@@ -50,6 +50,14 @@ from .manifest import (
     load_local_cognition,
 )
 from .registry import LocalModelRegistry, ServingEndpoint, load_serving
+from .shadow import (
+    ShadowPayloadError,
+    ShadowSpec,
+    append_shadow_receipt,
+    build_shadow_plan,
+    run_shadow,
+    shadow_receipt_path,
+)
 
 SCHEMA = "z0int.cognition.v1"
 
@@ -75,12 +83,18 @@ __all__ = [
     "ModelCapability",
     "Rule",
     "ServingEndpoint",
+    "ShadowPayloadError",
+    "ShadowSpec",
     "SourceClaim",
+    "append_shadow_receipt",
     "assert_selection_is_evidence_based",
+    "build_shadow_plan",
     "compile_actions",
     "entropy_of",
     "load_local_cognition",
     "load_serving",
     "margin_of",
     "mark_executed",
+    "run_shadow",
+    "shadow_receipt_path",
 ]
