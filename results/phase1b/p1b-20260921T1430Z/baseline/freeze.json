@@ -1,0 +1,736 @@
+{
+  "created_at": "2026-09-21T19:22:03.396551Z",
+  "created_at_unix": 1790018523.3965783,
+  "fixtures": [
+    {
+      "bytes": 28822,
+      "kind": "bounded-choice",
+      "owner": "z0intelligence",
+      "path": "benchmarks/fixtures/local-cognition-v1/examples.jsonl",
+      "resolved": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/benchmarks/fixtures/local-cognition-v1/examples.jsonl",
+      "root": "z0intelligence",
+      "rows": 28,
+      "sha256": "eeae4daa9f6184adfd6ad264158e679bca02b77d3b8309e6d59d4b404625d1df",
+      "status": "ok"
+    },
+    {
+      "bytes": 9021,
+      "kind": "orchestration",
+      "owner": "z0intelligence",
+      "path": "benchmarks/fixtures/orchestration-v1/scenarios.jsonl",
+      "resolved": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/benchmarks/fixtures/orchestration-v1/scenarios.jsonl",
+      "root": "z0intelligence",
+      "rows": 12,
+      "sha256": "87b4a08edf256e91687535c33ed8f30384b85d6a4aabb23d86119a36e996ce89",
+      "status": "ok"
+    },
+    {
+      "bytes": 7866,
+      "kind": "capability",
+      "owner": "z0intelligence",
+      "path": "benchmarks/fixtures/decision-capability-v1/examples.jsonl",
+      "resolved": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/benchmarks/fixtures/decision-capability-v1/examples.jsonl",
+      "root": "z0intelligence",
+      "rows": 11,
+      "sha256": "01e771b53bbdf2494984da413bae167a37b829a21d2c23f48e8ed5e46c094673",
+      "status": "ok"
+    },
+    {
+      "bytes": 30865,
+      "kind": "serving",
+      "owner": "z0intelligence",
+      "path": "manifests/local_cognition.v1.json",
+      "resolved": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/manifests/local_cognition.v1.json",
+      "root": "z0intelligence",
+      "sha256": "bc3cb0053c80418d420b996727a412c1a040cc51f71250ab9978f2ae5b7c0851",
+      "status": "ok"
+    },
+    {
+      "bytes": 46085,
+      "kind": "tournament",
+      "owner": "evolution-lab",
+      "path": "data/tool_tournament/v1/fixtures.jsonl",
+      "resolved": "/home/kvn/tmp/evolution-lab/data/tool_tournament/v1/fixtures.jsonl",
+      "root": "evolution-lab",
+      "rows": 28,
+      "sha256": "7f889560212f64c3c1917a831f9d6b0b89ab2a652b36b07eadad871fae06b4eb",
+      "status": "ok"
+    },
+    {
+      "bytes": 664,
+      "kind": "tournament-manifest",
+      "owner": "evolution-lab",
+      "path": "data/tool_tournament/v1/manifest.json",
+      "resolved": "/home/kvn/tmp/evolution-lab/data/tool_tournament/v1/manifest.json",
+      "root": "evolution-lab",
+      "sha256": "35719a54da377ef90157f17758acb37d419c2b41ad71812275b1bde23f1e9fa6",
+      "status": "ok"
+    },
+    {
+      "bytes": 6873,
+      "kind": "authority-schema",
+      "owner": "aodl",
+      "path": "schema/hotl-0.2.schema.json",
+      "resolved": "/home/kvn/tmp/aodl/schema/hotl-0.2.schema.json",
+      "root": "aodl",
+      "sha256": "a5d3bfc77d6a3b8d5599580fb669c53f61759e35f5f7f72aa6318232476b6ccf",
+      "status": "ok"
+    },
+    {
+      "bytes": 1447,
+      "kind": "authority-language",
+      "owner": "aodl",
+      "path": "spec/hotl-0.2.ebnf",
+      "resolved": "/home/kvn/tmp/aodl/spec/hotl-0.2.ebnf",
+      "root": "aodl",
+      "sha256": "0eba82de8745df9d118bbc13af4fecbc5f4a1addbdb9fb1d7aaa9b7e32202e9e",
+      "status": "ok"
+    },
+    {
+      "bytes": 300,
+      "kind": "accounting-conformance",
+      "owner": "tokenomics",
+      "path": "fixtures/conformance.json",
+      "resolved": "/mnt/zer0models/workspace/tokenomics/fixtures/conformance.json",
+      "root": "tokenomics",
+      "sha256": "fbd1ffb42760e1e7237b12c9c095caa96d93614b2511d2498ea1651de44f4a9e",
+      "status": "ok"
+    },
+    {
+      "bytes": 617,
+      "kind": "accounting-receipt",
+      "owner": "tokenomics",
+      "path": "fixtures/z0int_receipt.json",
+      "resolved": "/mnt/zer0models/workspace/tokenomics/fixtures/z0int_receipt.json",
+      "root": "tokenomics",
+      "sha256": "1cce06bcaeceb49da76bfbe826a3955ddae2edf589ce6a6999ef483afa3dd97e",
+      "status": "ok"
+    },
+    {
+      "bytes": 474,
+      "kind": "accounting-placement",
+      "owner": "tokenomics",
+      "path": "fixtures/kerdoios_observation.json",
+      "resolved": "/mnt/zer0models/workspace/tokenomics/fixtures/kerdoios_observation.json",
+      "root": "tokenomics",
+      "sha256": "caa0c1d1eecbe9ec01e5e3eb985b195fed90a9b5bd7c13636ec298a1248b4a1c",
+      "status": "ok"
+    }
+  ],
+  "frozen_config": {
+    "arm_ladder": {
+      "A_qwen9b_alone": "general_fallback",
+      "B_nemotron_alone": "orchestrator",
+      "C_compiler_nemotron": "orchestrator",
+      "D_compiler_jev_nemotron": "orchestrator",
+      "E_compiler_jev_nemotron_qwen": "general_fallback",
+      "E_compiler_jev_nemotron_qwen9b": "general_fallback",
+      "F_compiler_jev_nemotron_qwen9b_specialists": "general_fallback",
+      "F_compiler_tiny_jev_nemotron_qwen": "general_fallback",
+      "SUB_compiler_functiongemma": "tiny_specialist",
+      "SUB_compiler_hammer3b": "tiny_specialist",
+      "SUB_compiler_hammer7b": "general_function_caller",
+      "SUB_compiler_qwen4b": "general_function_caller",
+      "SUB_qwen4b_alone": "general_function_caller",
+      "functiongemma_270m": "tiny_specialist",
+      "functiongemma_specialist": "tiny_specialist",
+      "hammer2.1_3b": "tiny_specialist",
+      "hammer2.1_7b": "general_function_caller",
+      "hammer3b_specialist": "tiny_specialist",
+      "hammer7b_specialist": "general_function_caller",
+      "logistic_baseline": "bounded_jev",
+      "nemotron_orchestrator_8b": "orchestrator",
+      "optimal_greedy": "deterministic",
+      "qwen3.5_4b": "general_function_caller",
+      "qwen3.5_9b": "general_fallback",
+      "qwen4b_instead_of_9b": "general_function_caller",
+      "rules_baseline": "deterministic"
+    },
+    "escalation": {
+      "confidence_checked_tiers": [
+        "tiny_specialist",
+        "bounded_jev"
+      ],
+      "credited_families": [],
+      "high_risk_classes": [
+        "destructive",
+        "credential",
+        "payment",
+        "publish"
+      ],
+      "jev_min_confidence": 0.65,
+      "latency_budget_floor_ms": 1500.0,
+      "max_candidate_entropy": 0.55,
+      "min_top1_top2_margin": 0.15,
+      "orchestrator_min_actions": 5,
+      "orchestrator_on_historical_failure": true,
+      "orchestrator_on_novel_combination": true,
+      "verify_min_tier": "orchestrator_slm",
+      "version": "escalation-v1"
+    },
+    "gate": {
+      "gate_id": "qroute.gate.v1",
+      "max_dangerous_rate": 0.0,
+      "max_latency_ratio": 1.0,
+      "max_utility_regression": 0.02,
+      "min_observations": 1
+    },
+    "ladder": [
+      "deterministic",
+      "tiny_specialist",
+      "bounded_jev",
+      "general_function_caller",
+      "orchestrator",
+      "general_fallback"
+    ],
+    "utility": {
+      "dangerous_penalty": 1.0,
+      "latency_budget_ms": 4000.0,
+      "risk_aversion": 0.5,
+      "tail_quantile": 0.9
+    }
+  },
+  "harness_files": [
+    {
+      "bytes": 15439,
+      "label": "script",
+      "path": "scripts/composition_eval.py",
+      "sha256": "2a0c9432633e80f64011e9a1ee12ee07208ecb8970f9010a7381f0d40011acad"
+    },
+    {
+      "bytes": 17899,
+      "label": "script",
+      "path": "scripts/local_tool_calling_eval.py",
+      "sha256": "8c3951e194764963d28ed30235497c97204509e19a81eaa6cc8064a274005109"
+    },
+    {
+      "bytes": 11605,
+      "label": "script",
+      "path": "scripts/orchestration_eval.py",
+      "sha256": "7997ad31c558bd6b2fb720ec69edc0d2da2bc20048a47ecfb2baf743f1500060"
+    },
+    {
+      "bytes": 16729,
+      "label": "script",
+      "path": "scripts/phase1b_freeze.py",
+      "sha256": "8c847546f7efd3578f11fb665f55e873651421879a8be57647a987d829469fa1"
+    },
+    {
+      "bytes": 7385,
+      "label": "script",
+      "path": "scripts/probe_local_cognition.py",
+      "sha256": "d1806e5a356a2ba17fd1f4644a1e27645c9e4fd60ef73c07ef160200001c80d8"
+    },
+    {
+      "bytes": 7070,
+      "label": "script",
+      "path": "scripts/race-omp-backends.py",
+      "sha256": "427d883a240f16f68f59ac68788c14db8e80cec9c7a851c6c24c9843dc56c5ea"
+    },
+    {
+      "bytes": 971,
+      "label": "script",
+      "path": "scripts/bootstrap.sh",
+      "sha256": "2413810f21820fe5bae2ef0a7f4cc0aeea2adf11219a83de24c6d2a6b7c1709a"
+    },
+    {
+      "bytes": 1933,
+      "label": "script",
+      "path": "scripts/e2e_spine.sh",
+      "sha256": "ade2077e6ed966f1b1f658d469909d6a3601ab8ede99d7874f95f117731a9a89"
+    },
+    {
+      "bytes": 665,
+      "label": "script",
+      "path": "scripts/get_wikispeedia.sh",
+      "sha256": "0069b72c016b1a912fc0507cbb9e688ba6c1077a921fba9f93427d72165d3999"
+    },
+    {
+      "bytes": 8158,
+      "label": "script",
+      "path": "scripts/local-stack.sh",
+      "sha256": "83dd6c82e66262b3f010ccbb708ebadba3389e6754a28a7b83c2e439a5d312a2"
+    },
+    {
+      "bytes": 3660,
+      "label": "script",
+      "path": "scripts/setup-flyforge.sh",
+      "sha256": "dc531460a8bb0d03e0a9f3c7663028af17e7ba8e80274c64d1a370a9b061b206"
+    },
+    {
+      "bytes": 1965,
+      "label": "script",
+      "path": "scripts/setup-vllm-diffusion.sh",
+      "sha256": "bb6f7c9123c2e970c5d9c80cb1c264d60aa61a1346812aeee0211ef4f55d8b98"
+    },
+    {
+      "bytes": 2386,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/__init__.py",
+      "sha256": "65f2753471401732b798c0b6888136999beec26b3b0e94b912daa130e002815c"
+    },
+    {
+      "bytes": 14141,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/actions.py",
+      "sha256": "cfa1345c1d1ceed538f4016943cf48ef81844d7bf09273ad6a56029cd9ff6d87"
+    },
+    {
+      "bytes": 1159,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/adapters/__init__.py",
+      "sha256": "0874829cfc26c3cc80dc62ee3bed3e81970a68ec7ac8f5c66506f67af0f01208"
+    },
+    {
+      "bytes": 11907,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/adapters/bounded.py",
+      "sha256": "1be5ab2a1636868d8bccaf1c4161a6bfba9ea7eed812cd7553be8851a10012a4"
+    },
+    {
+      "bytes": 13684,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/adapters/dialects.py",
+      "sha256": "42dc69e90a7d16f3eb067b07c45227533f67efe33be175624de9b918fd494d7e"
+    },
+    {
+      "bytes": 14302,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/adapters/local_slm.py",
+      "sha256": "0cf0fb753639506d2ca3a5f90f1e3da224550782e118476163ceefe0b4a297be"
+    },
+    {
+      "bytes": 7036,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/adapters/transport.py",
+      "sha256": "ede1e9687563b77c0620f0a9a966efb434db341e99041fb0335c232055e36553"
+    },
+    {
+      "bytes": 16948,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/cascade.py",
+      "sha256": "d46b4d00d5baf6253a409bcf15bebccdf012b9ce54f7758c945235db3c11424d"
+    },
+    {
+      "bytes": 12987,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/cli.py",
+      "sha256": "e2c88339c1745d38dd38eabcda948c43cafa5be2ec62c575ab11dd578ac559f9"
+    },
+    {
+      "bytes": 11458,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/escalation.py",
+      "sha256": "d8908d183a742a76765f98c98c8b24de3b4d87434e6f3200779ac0851e0f6f6f"
+    },
+    {
+      "bytes": 14164,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/manifest.py",
+      "sha256": "c883563c8bb39d1cd5c2637de501e1868d2a8a44dd5b51bc7d50ed56d22d28af"
+    },
+    {
+      "bytes": 14117,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/orchestration.py",
+      "sha256": "3aeebfceada270cc84f18bc4ed6540521d7d2b0c4d1515c8bfb9de7185ea1454"
+    },
+    {
+      "bytes": 11986,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/probe.py",
+      "sha256": "d700bc2606ac95640484f2e0eaf12a39458e604d7a8401bf2ffeed2e6158b833"
+    },
+    {
+      "bytes": 6863,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/registry.py",
+      "sha256": "a6892b25fc11c0d9c3a00d881fc481ee73690dcc3fec2f7a7c0f5c311cf28e9f"
+    },
+    {
+      "bytes": 14200,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/server.py",
+      "sha256": "faaf74968fcce7a9d622578689a1e7c56b5ea516b91fa9539ae12bc0cf1270df"
+    },
+    {
+      "bytes": 5872,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/serving.py",
+      "sha256": "2fa5378ee1d4eee7e4fc4f6144727e585b34993e92a623492a80643e3da1afce"
+    },
+    {
+      "bytes": 20221,
+      "label": "cognition-module",
+      "path": "src/z0int/cognition/shadow.py",
+      "sha256": "45eed9c3cd41267e3bf1e42c54bb3d165bfd9334ae4e3cb910f250dd6aa7d308"
+    }
+  ],
+  "machine": {
+    "cwd": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence",
+    "gpu": "NVIDIA GeForce RTX 3080 Ti 12GB",
+    "hostname": "groot",
+    "platform": "Linux-7.2.2-1-cachyos-x86_64-with-glibc2.44"
+  },
+  "models": [
+    {
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "commercial_use": false,
+      "gated_access": false,
+      "gguf": {
+        "bytes": 5027783840,
+        "path": "/mnt/zer0models/zer0-models/gguf/nvidia-orchestrator-8b/nvidia_Orchestrator-8B-Q4_K_M.gguf",
+        "sha256": "1cc7077e20b3339d1a46bc72e29959cdd4c7249ebbd73e6977e76f23625995c7"
+      },
+      "hf": "nvidia/Nemotron-Orchestrator-8B",
+      "hf_revision": "26df4b9aad5abdc5b7871ee4c71063ce888feb26",
+      "license": "nvidia-license",
+      "model_id": "nemotron_orchestrator_8b",
+      "parameter_count": "8B",
+      "quant": "Q4_K_M",
+      "role_tags": [
+        "semantic_orchestrator"
+      ],
+      "runtime": "llama.cpp"
+    },
+    {
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "commercial_use": true,
+      "gated_access": false,
+      "gguf": {
+        "bytes": 6169341984,
+        "path": "/mnt/zer0models/zer0-models/gguf/qwen3.5-9b/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+        "sha256": "d784ce9eda1a5a7b51e8f705a9e6310844bf4f173654d115823c775fdea56d43"
+      },
+      "hf": "Qwen/Qwen3.5-9B",
+      "hf_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "license": "apache-2.0",
+      "model_id": "qwen3.5_9b",
+      "parameter_count": "9B",
+      "quant": "Q4_K_M",
+      "role_tags": [
+        "semantic_orchestrator",
+        "general_local_fallback",
+        "general_function_caller"
+      ],
+      "runtime": "llama.cpp"
+    },
+    {
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "commercial_use": true,
+      "gated_access": false,
+      "gguf": {
+        "bytes": 3013027808,
+        "path": "/mnt/zer0models/zer0-models/gguf/qwen3.5-4b/Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+        "sha256": "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983"
+      },
+      "hf": "Qwen/Qwen3.5-4B",
+      "hf_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "license": "apache-2.0",
+      "model_id": "qwen3.5_4b",
+      "parameter_count": "4B",
+      "quant": "Q4_K_M",
+      "role_tags": [
+        "semantic_orchestrator",
+        "general_local_fallback",
+        "general_function_caller",
+        "bounded_scorer"
+      ],
+      "runtime": "vllm"
+    },
+    {
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "commercial_use": false,
+      "gated_access": false,
+      "gguf": {
+        "bytes": 1929442272,
+        "path": "/mnt/zer0models/zer0-models/gguf/hammer2.1-3b/Hammer2.1-3b.Q4_K_M.gguf",
+        "sha256": "320b6114e54cdee0b2ded57e7fc4c55e343819599c583459782750c72c0009ad"
+      },
+      "hf": "MadeAgents/Hammer2.1-3b",
+      "hf_revision": "702ce4215e1391cb000a9c037b86b997660750f3",
+      "license": "qwen-research",
+      "model_id": "hammer2.1_3b",
+      "parameter_count": "3B",
+      "quant": "Q4_K_M",
+      "role_tags": [
+        "general_function_caller",
+        "tiny_action_specialist"
+      ],
+      "runtime": "llama.cpp"
+    },
+    {
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "commercial_use": false,
+      "gated_access": false,
+      "gguf": {
+        "bytes": 4178136704,
+        "path": "/mnt/zer0models/zer0-models/gguf/hammer2.1-7b/Hammer2.1-7b-Q4_K_M.gguf",
+        "sha256": "cd698cb286d02e407ef41b2304f4b7fd1f7d45eece1780120016e5fbc41e8020"
+      },
+      "hf": "MadeAgents/Hammer2.1-7b",
+      "hf_revision": "c5692ee193b806c1aadeaf68c4aec3de503fac30",
+      "license": "cc-by-nc-4.0",
+      "model_id": "hammer2.1_7b",
+      "parameter_count": "7B",
+      "quant": "Q4_K_M",
+      "role_tags": [
+        "general_function_caller"
+      ],
+      "runtime": "llama.cpp"
+    },
+    {
+      "available_quantizations": [
+        "Q8_0"
+      ],
+      "commercial_use": true,
+      "gated_access": true,
+      "gguf": {
+        "bytes": 291557792,
+        "path": "/mnt/zer0models/zer0-models/gguf/functiongemma-270m/functiongemma-270m-it-q8_0.gguf",
+        "sha256": "83940d4dd9676710856f43523bed096164a595a96f6b34771610a03937de5270"
+      },
+      "hf": "google/functiongemma-270m-it",
+      "hf_revision": "39eccb091651513a5dfb56892d3714c1b5b8276c",
+      "license": "gemma",
+      "model_id": "functiongemma_270m",
+      "parameter_count": "270M",
+      "quant": "Q8_0",
+      "role_tags": [
+        "tiny_action_specialist"
+      ],
+      "runtime": "llama.cpp"
+    },
+    {
+      "available_quantizations": [
+        "bfloat16"
+      ],
+      "commercial_use": null,
+      "gated_access": false,
+      "gguf": null,
+      "hf": "C-Tianyu/NanoJev",
+      "hf_revision": "4a19595eada0857133c0d2be024f879a4077054b",
+      "license": null,
+      "model_id": "nanojev_06b",
+      "parameter_count": "0.6B",
+      "quant": "bfloat16",
+      "role_tags": [
+        "bounded_scorer"
+      ],
+      "runtime": "transformers"
+    }
+  ],
+  "raw_sources": [
+    {
+      "bytes": 143143,
+      "frozen_path": "sources/compositions__raw.jsonl",
+      "kind": "composition",
+      "origin": "/mnt/zer0models/workspace/zer0/oss/.work/compositions/raw.jsonl",
+      "rows": 308,
+      "sha256": "9a5bb188ba49a7c84a915236f3d299d93d98558bd9c21d697abf2199a7678d9a",
+      "status": "copied"
+    },
+    {
+      "bytes": 40040,
+      "frozen_path": "sources/compositions-escalating__raw.jsonl",
+      "kind": "composition-escalating",
+      "origin": "/mnt/zer0models/workspace/zer0/oss/.work/compositions-escalating/raw.jsonl",
+      "rows": 84,
+      "sha256": "e4cdc2b5c1bb3f4a7a73025b8c39567240cd1c82070645c755a00b9c36cb669d",
+      "status": "copied"
+    },
+    {
+      "bytes": 78607,
+      "frozen_path": "sources/eval-llamacpp__raw.jsonl",
+      "kind": "bounded",
+      "origin": "/mnt/zer0models/workspace/zer0/oss/.work/eval-llamacpp/raw.jsonl",
+      "rows": 140,
+      "sha256": "182b29af767b6616a5ca1734d62d37e7e960c2df0c9ffdd078e6b5614ba5ff6c",
+      "status": "copied"
+    },
+    {
+      "bytes": 31524,
+      "frozen_path": "sources/eval-thinking__raw.jsonl",
+      "kind": "bounded",
+      "origin": "/mnt/zer0models/workspace/zer0/oss/.work/eval-thinking/raw.jsonl",
+      "rows": 56,
+      "sha256": "13bda2020c970917ba23fb44e14d1281e7a8efe7b1bdfab7e04108ad958744d1",
+      "status": "copied"
+    },
+    {
+      "bytes": 62214,
+      "frozen_path": "sources/eval-budget1024__raw.jsonl",
+      "kind": "bounded",
+      "origin": "/mnt/zer0models/workspace/zer0/oss/.work/eval-budget1024/raw.jsonl",
+      "rows": 112,
+      "sha256": "709fa686a44b7b45e008eb030575a6adab869cb0085dbbee325826204a508184",
+      "status": "copied"
+    },
+    {
+      "bytes": 58930,
+      "frozen_path": "sources/orch-v1__raw.jsonl",
+      "kind": "orchestration",
+      "origin": "/mnt/zer0models/workspace/zer0/oss/.work/orch-v1/raw.jsonl",
+      "rows": 84,
+      "sha256": "564c7499c20745f8f62bbfabcb700a528fd7156679b56e80f12a42b676b29e2f",
+      "status": "copied"
+    }
+  ],
+  "repos": [
+    {
+      "branch": "feat/local-cognition-portfolio",
+      "dirty_count": 1,
+      "dirty_files": [
+        "?? scripts/phase1b_freeze.py"
+      ],
+      "exists": true,
+      "git_common_dir": "/home/kvn/tmp/openjev/.git",
+      "label": "z0intelligence",
+      "path": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence",
+      "sha": "3430a5afd06e451d892545012e56e74a5e9b99b2",
+      "worktree_root": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence"
+    },
+    {
+      "branch": "experiment/q-route-v0",
+      "dirty_count": 0,
+      "dirty_files": [],
+      "exists": true,
+      "git_common_dir": "/home/kvn/tmp/evolution-lab/.git",
+      "label": "evolution-lab",
+      "path": "/home/kvn/tmp/evolution-lab",
+      "sha": "80ffebe9512a3201ad44fe22c28413dcf845f96e",
+      "worktree_root": "/home/kvn/tmp/evolution-lab"
+    },
+    {
+      "branch": "feat/aodl-contract-importable",
+      "dirty_count": 0,
+      "dirty_files": [],
+      "exists": true,
+      "git_common_dir": "/home/kvn/tmp/aodl/.git",
+      "label": "aodl",
+      "path": "/home/kvn/tmp/aodl",
+      "sha": "1fa80da2b9d3c7cde70e48b26c452329d657e788",
+      "worktree_root": "/home/kvn/tmp/aodl"
+    },
+    {
+      "branch": "feat/orchestration-telemetry",
+      "dirty_count": 0,
+      "dirty_files": [],
+      "exists": true,
+      "git_common_dir": "/mnt/zer0models/workspace/tokenomics/.git",
+      "label": "tokenomics",
+      "path": "/mnt/zer0models/workspace/tokenomics",
+      "sha": "9af30cafd566e2340e31df34812534d1a05ce3f1",
+      "worktree_root": "/mnt/zer0models/workspace/tokenomics"
+    },
+    {
+      "branch": "feat/local-cognition-placement",
+      "dirty_count": 0,
+      "dirty_files": [],
+      "exists": true,
+      "git_common_dir": "/home/kvn/tmp/kerdoios/.git",
+      "label": "kerdoios",
+      "path": "/home/kvn/tmp/kerdoios",
+      "sha": "8441c3cb473979ce424d2e384da99ff8b97108bc",
+      "worktree_root": "/home/kvn/tmp/kerdoios"
+    },
+    {
+      "branch": "feat/network-cutover-harness-adapters",
+      "dirty_count": 4,
+      "dirty_files": [
+        "?? cls",
+        "?? omp-extensions/z0int-bridge/index.ts.bak",
+        "?? results/decision-backends/20260921T081030Z/",
+        "?? results/decision-backends/20260921T081047Z/"
+      ],
+      "exists": true,
+      "git_common_dir": "/home/kvn/tmp/openjev/.git",
+      "label": "openjev",
+      "path": "/home/kvn/tmp/openjev",
+      "sha": "cf687a7ec56fb79cea38989e09c93c640f643a6a",
+      "worktree_root": "/home/kvn/tmp/openjev"
+    }
+  ],
+  "run_id": "p1b-20260921T1430Z",
+  "runtime": {
+    "llama_cpp": "0.4.1-dev",
+    "llama_server_sha256": "6d35c17ff2aa655fdd4f92a2a70a8f5fada0c53cefbf249b0ca58baf06b55a43",
+    "platform": "Linux-7.2.2-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.11.14"
+  },
+  "schema": "z0int.phase1b.freeze.v1",
+  "serving": {
+    "document": {
+      "description": "PRODUCTION serving map for the z0intelligence local cognition portfolio. All models are served by the llama.cpp model supervisor (z0int cognition serve), which holds one resident model at a time. Do not add a second runtime here: latency labels must come from the same stack requests execute through.",
+      "endpoints": [
+        {
+          "backend_id": "functiongemma",
+          "base_url": "http://127.0.0.1:11500",
+          "model_id": "functiongemma_270m",
+          "quantization": "Q8_0",
+          "runtime": "llama.cpp-supervisor",
+          "served_model": "functiongemma_270m"
+        },
+        {
+          "backend_id": "hammer3b",
+          "base_url": "http://127.0.0.1:11500",
+          "model_id": "hammer2.1_3b",
+          "quantization": "Q4_K_M",
+          "runtime": "llama.cpp-supervisor",
+          "served_model": "hammer2.1_3b"
+        },
+        {
+          "backend_id": "hammer7b",
+          "base_url": "http://127.0.0.1:11500",
+          "model_id": "hammer2.1_7b",
+          "quantization": "Q4_K_M",
+          "runtime": "llama.cpp-supervisor",
+          "served_model": "hammer2.1_7b"
+        },
+        {
+          "backend_id": "nemotron",
+          "base_url": "http://127.0.0.1:11500",
+          "model_id": "nemotron_orchestrator_8b",
+          "quantization": "Q4_K_M",
+          "runtime": "llama.cpp-supervisor",
+          "served_model": "nemotron_orchestrator_8b"
+        },
+        {
+          "backend_id": "qwen9b",
+          "base_url": "http://127.0.0.1:11500",
+          "model_id": "qwen3.5_9b",
+          "quantization": "Q4_K_M",
+          "runtime": "llama.cpp-supervisor",
+          "served_model": "qwen3.5_9b"
+        },
+        {
+          "backend_id": "qwen4b",
+          "base_url": "http://127.0.0.1:11500",
+          "model_id": "qwen3.5_4b",
+          "quantization": "Q4_K_M",
+          "runtime": "llama.cpp-supervisor",
+          "served_model": "qwen3.5_4b"
+        }
+      ],
+      "schema": "z0int.serving.v1",
+      "supervisor": {
+        "base_url": "http://127.0.0.1:11500",
+        "idle_unload_s": 600,
+        "runtime": "llama.cpp-supervisor"
+      }
+    },
+    "path": "/home/kvn/.z0int/config/serving.json",
+    "sha256": "8449c5133107e47d83be387ef1fb3ed9938e34863bc6e607586b3da14a5a62a0",
+    "status": "ok"
+  }
+}

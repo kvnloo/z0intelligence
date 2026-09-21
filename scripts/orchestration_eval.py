@@ -244,9 +244,14 @@ def summarise(label: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
         c["solved"] += int(bool(r["solved"]))
         c["correct_stop"] += int(bool(r.get("correct_stop")))
     precisions = [r["specialist_precision"] for r in rows if r["specialist_precision"] is not None]
+    cohort_metrics = {
+        cohort: _cohort_block([r for r in rows if r.get("cohort") == cohort])
+        for cohort in sorted({r.get("cohort", "?") for r in rows})
+    }
     return {
         "backend": label,
         "scenarios": n,
+        "cohort_metrics": cohort_metrics,
         "solved": sum(int(bool(r["solved"])) for r in rows),
         "correct_stop": sum(int(bool(r.get("correct_stop"))) for r in rows),
         "premature_stop": sum(int(bool(r["premature_stop"])) for r in rows),
@@ -278,6 +283,36 @@ def summarise(label: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _cohort_block(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Every headline metric for one cohort, so a per-cohort row is not a mix."""
+    n = len(rows)
+    lat = [r["latency_ms"] for r in rows]
+    precisions = [r["specialist_precision"] for r in rows if r["specialist_precision"] is not None]
+    return {
+        "n": n,
+        "solved": sum(int(bool(r["solved"])) for r in rows),
+        "correct_stop": sum(int(bool(r.get("correct_stop"))) for r in rows),
+        "premature_stop": sum(int(bool(r["premature_stop"])) for r in rows),
+        "budget_exhausted": sum(int(bool(r["budget_exhausted"])) for r in rows),
+        "wasted_calls": sum(int(r["wasted_calls"]) for r in rows),
+        "order_violations": sum(int(r["order_violations"]) for r in rows),
+        "invalid_calls": sum(int(r["invalid_calls"]) for r in rows),
+        "errors": sum(1 for r in rows if r["error"]),
+        "cost_units_total": sum(int(r["cost_units"]) for r in rows),
+        "turns_total": sum(int(r["turns"]) for r in rows),
+        "mean_specialist_precision": (statistics.fmean(precisions) if precisions else None),
+        "recovered": sum(int(bool(r.get("recovered"))) for r in rows),
+        "recovery_opportunities": sum(
+            1 for r in rows if r["scenario_id"].startswith("recover")
+        ),
+        "needless_escalation": sum(int(r.get("needless_escalation", 0)) for r in rows),
+        "failure_to_escalate": sum(int(bool(r.get("failure_to_escalate"))) for r in rows),
+        "optional_evidence_taken": sum(int(r.get("optional_evidence_taken", 0)) for r in rows),
+        "p50_ms": percentile(lat, 50),
+        "p95_ms": percentile(lat, 95),
+    }
+
+
 def render_md(results: list[dict[str, Any]]) -> str:
     lines = [
         "# Multi-turn orchestration evaluation",
@@ -300,20 +335,22 @@ def render_md(results: list[dict[str, Any]]) -> str:
         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in results:
-        lat = r["latency_ms"]
-        prec = r["mean_specialist_precision"]
-        for cohort, c in sorted(r.get("by_cohort", {"all": {"n": r["scenarios"], "solved": r["solved"],
-                                                            "correct_stop": r["correct_stop"]}}).items()):
+        # Every column is computed per cohort.  Showing the backend-wide totals on
+        # each cohort row made the two rows look identical and invited the reader
+        # to attribute a whole-run average to one cohort.
+        blocks = r.get("cohort_metrics") or {}
+        for cohort, c in sorted(blocks.items()):
             lines.append(
                 f"| {r['backend']} | {cohort} | {c['n']} | {c['solved']}/{c['n']} "
                 f"| {c['correct_stop']}/{c['n']} "
-                f"| {r['premature_stop']} | {r['budget_exhausted']} | {r['wasted_calls']} "
-                f"| {r['order_violations']} | {r['invalid_calls']} | {r['errors']} "
-                f"| {r['cost_units_total']} | {r['turns_total']} "
-                f"| {_num(prec, 2)} | {r['recovered']}/{r['recovery_opportunities']} "
-                f"| {r['needless_escalation']} | {r['failure_to_escalate']} "
-                f"| {r['optional_evidence_taken']} "
-                f"| {_num(lat['p50'], 0)} | {_num(lat['p95'], 0)} |"
+                f"| {c['premature_stop']} | {c['budget_exhausted']} | {c['wasted_calls']} "
+                f"| {c['order_violations']} | {c['invalid_calls']} | {c['errors']} "
+                f"| {c['cost_units_total']} | {c['turns_total']} "
+                f"| {_num(c['mean_specialist_precision'], 2)} "
+                f"| {c['recovered']}/{c['recovery_opportunities']} "
+                f"| {c['needless_escalation']} | {c['failure_to_escalate']} "
+                f"| {c['optional_evidence_taken']} "
+                f"| {_num(c['p50_ms'], 0)} | {_num(c['p95_ms'], 0)} |"
             )
     return "\n".join(lines) + "\n"
 
@@ -335,7 +372,18 @@ def main() -> int:
     ap.add_argument("--greedy", action="store_true", help="include the optimal_greedy control")
     ap.add_argument("--out", default=None)
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--rerender", default=None,
+                    help="re-render report.md from an existing report.json (no measurement)")
     args = ap.parse_args()
+
+    if args.rerender:
+        existing = json.loads(Path(args.rerender).read_text(encoding="utf-8"))
+        results = [summarise(r["backend"], r["rows"]) for r in existing["results"]]
+        target = Path(args.rerender).parent
+        (target / "report.md").write_text(render_md(results), encoding="utf-8")
+        print(f"# re-rendered {target / 'report.md'}", file=sys.stderr)
+        print(render_md(results))
+        return 0
 
     if args.expansion_only:
         sources: list[tuple[Path, str]] = [(EXPANSION_SCENARIOS, "expansion")]

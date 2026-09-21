@@ -424,6 +424,20 @@ def pairwise(
         ratio = (p50_c / p50_e) if p50_e > 0 else float("inf")
         quality_regression = (expensive.successes / expensive.n) - (cheap.successes / cheap.n)
         separated = lo_c > hi_e or lo_e > hi_c
+        cheap_rate = cheap.successes / cheap.n
+        expensive_rate = expensive.successes / expensive.n
+        # Three states, not two.  Overlapping intervals mean *indistinguishable*,
+        # which is not the same as inferior, and reporting it as "not
+        # non-inferior" would invert the answer to the section C questions.
+        if not separated:
+            verdict = "indistinguishable_at_this_n"
+        elif cheap_rate > expensive_rate:
+            verdict = "cheap_superior"
+        else:
+            verdict = "expensive_superior"
+        # Non-inferior means "not shown to be meaningfully worse": either the
+        # evidence cannot separate them, or the cheap arm is at least as good.
+        cheap_non_inferior = verdict in ("indistinguishable_at_this_n", "cheap_superior")
         out.append(
             {
                 "cheap": cheap_name,
@@ -444,13 +458,13 @@ def pairwise(
                     "frozen_max_utility_regression": fusion_utility_regression,
                     "cheap_is_faster": ratio <= fusion_latency_ratio,
                     "quality_regression": quality_regression,
-                    "cheap_non_inferior": (
-                        quality_regression <= fusion_utility_regression and separated
-                    ),
+                    "verdict": verdict,
+                    "cheap_non_inferior": cheap_non_inferior,
                     "evidence_sufficient": cheap.n >= 3 and expensive.n >= 3,
                     "note": (
                         "gate-shaped read only: the frozen gate consumes utility, not "
-                        "raw success, and is not re-run here"
+                        "raw success, and is not re-run here. 'indistinguishable' means "
+                        "the 95% intervals overlap at this n, not that either arm is worse."
                     ),
                 },
             }
@@ -628,6 +642,8 @@ def render_md(report: Mapping[str, Any]) -> str:
         "",
         "## Section C pairwise comparisons",
         "",
+        "`indistinguishable` = the 95% intervals overlap at this n, which is not a loss.",
+        "",
         "| cheap | expensive | n (c/e) | success c/e | separated | p50 ratio | verdict |",
         "|---|---|---|---|---|---|---|",
     ]
@@ -636,17 +652,12 @@ def render_md(report: Mapping[str, Any]) -> str:
             lines.append(f"| {row['cheap']} | {row['expensive']} | - | - | - | - | not measured |")
             continue
         v = row["gate_shaped_verdict"]
-        verdict = (
-            "cheap non-inferior" if v["cheap_non_inferior"]
-            else ("cheap faster, quality regression" if v["cheap_is_faster"]
-                  else "cheap not faster and not separated")
-        )
         lines.append(
             f"| {row['cheap']} | {row['expensive']} "
             f"| {row['n']['cheap']}/{row['n']['expensive']} "
             f"| {row['success']['cheap']:.2f}/{row['success']['expensive']:.2f} "
             f"| {row['success']['separated']} | {row['latency_p50_ms']['ratio']:.2f} "
-            f"| {verdict} |"
+            f"| {v['verdict']} |"
         )
     lines += [
         "",

@@ -241,7 +241,8 @@ def _arms() -> dict[str, Arm]:
             alias="SUB_compiler_functiongemma"),
         Arm("compiler+qwen3.5_4b", "bounded", model="qwen3.5_4b",
             alias="SUB_compiler_qwen4b"),
-        Arm("compiler+qwen3.5_9b", "bounded", model="qwen3.5_9b"),
+        Arm("compiler+qwen3.5_9b", "bounded", model="qwen3.5_9b",
+            alias="SUB_compiler_qwen9b"),
         Arm("compiler+nemotron_orchestrator_8b", "bounded", model="nemotron_orchestrator_8b",
             alias="C_compiler_nemotron"),
         # --- compiler-first bounded scorer
