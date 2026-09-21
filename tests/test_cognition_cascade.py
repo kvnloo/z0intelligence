@@ -212,6 +212,54 @@ def test_credited_tiny_specialist_is_tried_before_jev():
     assert jev.requests == []
 
 
+# --- a bounded scorer that always answers must not make the ladder inert ---
+
+
+def test_low_confidence_bounded_scorer_escalates_to_the_next_tier():
+    """Measured on NanoJev: it decided 25/28 fixtures and never abstained, so
+    every tier above it was dead code until the answer itself was checked."""
+    ctx = _ctx(authority=("read", "write"))
+    jev = _Recorder("jev", action="a", confidence=0.10, distribution={"a": 0.55, "b": 0.45})
+    orchestrator = _Recorder("nemotron", action="b", confidence=0.99)
+    outcome = CognitionCascade(jev=jev, orchestrator=orchestrator).run(ctx)
+    assert outcome.tier == "orchestrator_slm"
+    assert outcome.selected_action == "b"
+    assert any(row.get("escalated") for row in outcome.attempts)
+    assert any("margin" in str(row.get("reason", "")) or "confidence" in str(row.get("reason", ""))
+               for row in outcome.attempts)
+
+
+def test_confident_bounded_scorer_is_accepted_and_stops_the_ladder():
+    ctx = _ctx(authority=("read", "write"))
+    jev = _Recorder("jev", action="a", confidence=0.95, distribution={"a": 0.95, "b": 0.05})
+    orchestrator = _Recorder("nemotron", action="b")
+    outcome = CognitionCascade(jev=jev, orchestrator=orchestrator).run(ctx)
+    assert outcome.tier == "bounded_jev"
+    assert outcome.selected_action == "a"
+    assert orchestrator.requests == []
+
+
+def test_uncertain_bounded_scorer_is_accepted_when_no_later_tier_exists():
+    """Never abstain just because we cannot escalate: accept the best we have."""
+    ctx = _ctx(authority=("read", "write"))
+    jev = _Recorder("jev", action="a", confidence=0.01, distribution={"a": 0.51, "b": 0.49})
+    outcome = CognitionCascade(jev=jev).run(ctx)
+    assert outcome.tier == "bounded_jev"
+    assert outcome.selected_action == "a"
+
+
+def test_generative_tiers_are_not_confidence_checked():
+    """Only bounded scorers are re-checked; a model we escalated to is trusted."""
+    ctx = _ctx(authority=("read", "write"))
+    orchestrator = _Recorder("nemotron", action="b", confidence=0.01,
+                             distribution={"a": 0.51, "b": 0.49})
+    general = _Recorder("qwen", action="a")
+    outcome = CognitionCascade(orchestrator=orchestrator, general=general).run(ctx)
+    assert outcome.tier == "orchestrator_slm"
+    assert outcome.selected_action == "b"
+    assert general.requests == []
+
+
 # --- shadow mode --------------------------------------------------------
 
 

@@ -39,6 +39,11 @@ class EscalationThresholds:
     jev_min_confidence: float = 0.65
     # Below this top-1/top-2 margin the choice is too close to trust.
     min_top1_top2_margin: float = 0.15
+    # Tiers whose *answer* is re-checked against the thresholds above. A bounded
+    # scorer that always answers would otherwise make the rest of the ladder
+    # decorative: measured on NanoJev, it decided 25/28 fixtures and never
+    # abstained, so the orchestrator and the general fallback never ran.
+    confidence_checked_tiers: tuple[str, ...] = ("tiny_specialist", "bounded_jev")
     # Above this normalised entropy the legal set is effectively unordered.
     max_candidate_entropy: float = 0.55
     # Semantic orchestration is required above this many legal actions...
@@ -61,6 +66,7 @@ class EscalationThresholds:
             "version": self.version,
             "jev_min_confidence": self.jev_min_confidence,
             "min_top1_top2_margin": self.min_top1_top2_margin,
+            "confidence_checked_tiers": list(self.confidence_checked_tiers),
             "max_candidate_entropy": self.max_candidate_entropy,
             "orchestrator_min_actions": self.orchestrator_min_actions,
             "orchestrator_on_novel_combination": self.orchestrator_on_novel_combination,
@@ -123,6 +129,33 @@ class EscalationPolicy:
         self.thresholds = thresholds or EscalationThresholds()
 
     # ---- helpers ---------------------------------------------------
+    def accept_or_escalate(
+        self,
+        tier: str,
+        *,
+        confidence: float | None,
+        distribution: Mapping[str, float] | None,
+    ) -> tuple[bool, str | None]:
+        """Should this tier's answer be accepted, or handed to the next tier?
+
+        Returns ``(accept, reason_to_escalate)``. Tiers not listed in
+        ``confidence_checked_tiers`` are always accepted -- this is only about
+        re-checking a *bounded* scorer, not about second-guessing a generative
+        model that was explicitly escalated to.
+        """
+        t = self.thresholds
+        if tier not in t.confidence_checked_tiers:
+            return True, None
+        if confidence is not None and confidence < t.jev_min_confidence:
+            return False, f"confidence {confidence:.3f} < {t.jev_min_confidence}"
+        margin = margin_of(distribution)
+        if margin is not None and margin < t.min_top1_top2_margin:
+            return False, f"top1-top2 margin {margin:.3f} < {t.min_top1_top2_margin}"
+        entropy = entropy_of(distribution)
+        if entropy is not None and entropy > t.max_candidate_entropy:
+            return False, f"entropy {entropy:.3f} > {t.max_candidate_entropy}"
+        return True, None
+
     def _budget_exhausted(self, s: EscalationSignals) -> bool:
         if s.latency_budget_ms is None:
             return False

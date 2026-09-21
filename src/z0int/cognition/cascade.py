@@ -143,6 +143,14 @@ class CognitionCascade:
     def backend(self, tier: str) -> ToolDecisionBackend | None:
         return self._backends.get(tier)
 
+    def _has_later_tier(self, tier: str) -> bool:
+        """True when a configured, more expensive tier could still take this."""
+        try:
+            start = self._TIER_INDEX[tier]
+        except KeyError:
+            return False
+        return any(self._backends.get(t) is not None for t in self._TIER_SEQUENCE[start + 1 :])
+
     # ------------------------------------------------------------------
     def compile(self, context: CascadeContext) -> LegalActionSet:
         return compile_actions(
@@ -351,6 +359,18 @@ class CognitionCascade:
                 continue
             # Keep the last attempt as the record even when it abstains.
             if decision.selected_action is not None and not decision.abstained:
+                accept, why = self._policy.accept_or_escalate(
+                    tier,
+                    confidence=decision.confidence,
+                    distribution=decision.distribution,
+                )
+                if not accept and self._has_later_tier(tier):
+                    attempts.append(
+                        {"tier": tier, "escalated": True, "reason": why,
+                         "selected_action": decision.selected_action}
+                    )
+                    record(decision, tier, "log_only")
+                    continue
                 record(decision, tier, "live")
                 return CascadeOutcome(
                     trace_id=tid,
