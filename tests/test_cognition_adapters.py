@@ -274,6 +274,45 @@ def test_backend_only_advertises_the_legal_action_ids():
     assert "fs.rm" not in json.dumps(sent["tools"])
 
 
+def test_reasoning_content_is_never_parsed_as_the_decision():
+    """Measured on Nemotron-Orchestrator-8B: the reasoning channel enumerates
+    options it then rejects ("fs.read ... Alternatively, using shell.run ...").
+    Treating it as the answer would record a rejected option as the decision."""
+    from z0int.cognition.adapters.transport import OpenAICompatTransport, ServerConfig
+
+    raw = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "reasoning_content": (
+                        "Let me think. fs.write could work. Alternatively shell.run "
+                        "would also do it."
+                    ),
+                    "tool_calls": None,
+                },
+                "finish_reason": "length",
+            }
+        ],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 40},
+    }
+    transport = OpenAICompatTransport(ServerConfig(base_url="http://127.0.0.1:1", model="m"))
+    transport._post = lambda path, payload: raw  # type: ignore[method-assign]
+    outcome = transport.chat([{"role": "user", "content": "go"}], max_tokens=8)
+    assert outcome.content == ""
+    assert outcome.tool_call is None
+
+    # And the backend therefore abstains rather than picking a rejected option.
+    class _T(_FakeTransport):
+        def chat(self, messages, **kwargs):  # noqa: ANN001
+            return outcome
+
+    decision = _backend(_T()).decide(ToolDecisionRequest(state="s", legal=_legal()))
+    assert decision.abstained is True
+    assert decision.selected_action is None
+
+
 # --- JEV -> tool surface ------------------------------------------------
 
 

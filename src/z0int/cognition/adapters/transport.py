@@ -146,6 +146,12 @@ class OpenAICompatTransport:
         content = message.get("content") or ""
         tool_calls = message.get("tool_calls") or []
         tool_call = tool_calls[0] if tool_calls else None
+        # ``reasoning_content`` is deliberately ignored. Measured on
+        # Nemotron-Orchestrator-8B: its reasoning explicitly enumerates
+        # alternatives it then rejects ("fs.read ... Alternatively, using
+        # shell.run ..."), so parsing the reasoning channel as the decision
+        # would record a rejected option as the answer. Only ``content`` and
+        # ``tool_calls`` are the model's decision.
         usage = data.get("usage") or {}
         # llama.cpp exposes precise timings; ollama exposes durations in ns.
         timings = data.get("timings") or {}

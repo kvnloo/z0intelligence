@@ -315,6 +315,8 @@ QWEN_DIALECT = ToolDialect(
     name="qwen",
     use_native_tools=True,
     tool_choice="required",
+    # Qwen3.5 has thinking on by default.
+    max_tokens=1024,
     call_patterns=(_QWEN35_CALL,),
     json_blob_patterns=(_HERMES_BLOB,),
     stop=("</tool_call>", "<start_function_response>"),
@@ -323,7 +325,10 @@ NEMOTRON_DIALECT = ToolDialect(
     name="nemotron",
     use_native_tools=True,
     tool_choice="required",
-    max_tokens=384,
+    # Nemotron-Orchestrator emits a <think> block before its call; the measured
+    # failure mode at 256 tokens was an EMPTY content field with the whole
+    # budget spent on reasoning.
+    max_tokens=1024,
     json_blob_patterns=(_HERMES_BLOB,),
     stop=("</tool_call>", "<start_function_response>", "<tool_response>"),
 )
