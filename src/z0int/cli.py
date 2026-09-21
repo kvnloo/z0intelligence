@@ -28,6 +28,9 @@ def _bool_opt(s: str) -> bool:
     return s.lower() in ("1", "true", "yes", "y")
 
 
+from .cognition.cli import add_cognition_parser, cmd_cognition  # noqa: E402
+
+
 def cmd_doctor(*, as_json: bool) -> int:
     from .doctor import format_human, run_doctor
 
@@ -498,6 +501,8 @@ def build_parser() -> argparse.ArgumentParser:
     beb.add_argument("--json", action="store_true")
 
 
+    add_cognition_parser(sub)
+
     art = sub.add_parser("artifacts", help="Candidate artifact inspect/import/list")
     art_sub = art.add_subparsers(dest="artifacts_cmd", required=True)
     arti = art_sub.add_parser("inspect", help="Validate manifest without installing")
@@ -830,6 +835,9 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_context(args)
     if args.cmd == "task":
         return _cmd_task(args)
+    if args.cmd == "cognition":
+        return cmd_cognition(args)
+
     if args.cmd == "backends":
         return _cmd_backends(args)
 
