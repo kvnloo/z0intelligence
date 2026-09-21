@@ -232,6 +232,26 @@ def test_idle_unload_zero_disables_the_reaper(supervisor):
     assert supervisor.resident == "hammer2.1_3b"
 
 
+def test_release_gives_the_gpu_back(supervisor):
+    supervisor.ensure("hammer2.1_3b")
+    assert supervisor.resident == "hammer2.1_3b"
+    assert supervisor.release("test") is True
+    assert supervisor.resident is None
+    # releasing with nothing resident is a no-op, not an error
+    assert supervisor.release("test") is False
+
+
+def test_http_release_endpoint_evicts(live_supervisor):
+    req = urllib.request.Request(
+        f"{live_supervisor}/z0int/release", data=b"{}",
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        out = json.loads(resp.read().decode())
+    assert out["schema"] == SCHEMA
+    assert out["resident"] is None
+
+
 def test_status_reports_resident_and_history(supervisor):
     supervisor.ensure("hammer2.1_3b")
     status = supervisor.status()

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import threading
 import time
 from dataclasses import dataclass, field
@@ -189,6 +190,19 @@ class ModelSupervisor:
                 return True
             return False
 
+    def release(self, reason: str = "requested") -> bool:
+        """Give the GPU back. Returns True when something was actually evicted.
+
+        A resident model blocks every other GPU consumer (including test suites
+        that need CUDA). Anything may ask for the card back rather than waiting
+        out the idle timer.
+        """
+        with self._lock:
+            if self._server is None:
+                return False
+            self._evict_locked(reason)
+            return True
+
     def shutdown(self) -> None:
         with self._lock:
             self._evict_locked("shutdown")
@@ -304,6 +318,11 @@ def _handler_factory(supervisor: ModelSupervisor):
 
         def do_POST(self) -> None:  # noqa: N802
             path = self.path.split("?", 1)[0]
+            if path in ("/z0int/release", "/z0int/evict"):
+                evicted = supervisor.release("api_request")
+                self._send(200, {"schema": SCHEMA, "evicted": evicted,
+                                 "resident": supervisor.resident})
+                return
             if path != "/v1/chat/completions":
                 self._send(404, {"error": {"message": f"no route {path}"}})
                 return
@@ -339,6 +358,20 @@ def serve_forever(
                 sup.maybe_idle_unload()
             except Exception:  # noqa: BLE001 - the reaper must never die
                 pass
+
+    def _terminate(signum: int, _frame: Any) -> None:
+        # Children are started in their own session so a group kill cannot reach
+        # them; without this handler a plain SIGTERM orphans a llama-server that
+        # keeps holding the whole GPU.
+        print(f"z0int supervisor: signal {signum}, releasing GPU", flush=True)
+        sup.shutdown()
+        raise SystemExit(0)
+
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        try:
+            signal.signal(sig, _terminate)
+        except (ValueError, OSError):  # not the main thread / unsupported
+            pass
 
     threading.Thread(target=reaper, daemon=True).start()
     httpd = ThreadingHTTPServer((host, port), _handler_factory(sup))
