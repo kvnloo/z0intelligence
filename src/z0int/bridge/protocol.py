@@ -25,6 +25,7 @@ OPS = frozenset(
         "shutdown",
         "decision",
         "decision_warm",
+        "cognition_shadow",
     }
 )
 
@@ -90,6 +91,7 @@ def compute_build_id(root: Path | None = None) -> str:
         "src/z0int/bridge/runtime.py",
         "src/z0int/bridge/worker.py",
         "src/z0int/bridge/generation.py",
+        "src/z0int/cognition/shadow.py",
         "omp-extensions/z0int-bridge/index.ts",
     ):
         fp = root / rel

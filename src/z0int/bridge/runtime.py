@@ -299,6 +299,22 @@ class BridgeRuntime:
             out["trace_id"] = trace_id
         return out
 
+    def cognition_shadow(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Observe-only shadow lane (oh-my-pi#83).
+
+        Compiles the legal action set and records what local models would have
+        chosen. Never executes anything and never raises into the host: any
+        failure comes back as ``{"ok": false, "reason": ...}``.
+        """
+        try:
+            from z0int.cognition.shadow import run_shadow
+
+            out = run_shadow(payload if isinstance(payload, dict) else {})
+        except Exception as exc:  # noqa: BLE001 - the op must fail open
+            out = {"ok": False, "reason": f"{type(exc).__name__}: {exc}"}
+        out.update(self.identity())
+        return out
+
     def _maybe_quarantine(self, row: dict[str, Any], writer_generation: int | None) -> bool:
         if gen.is_stale(writer_generation):
             gen.quarantine(row, reason=f"stale_generation:{writer_generation}")

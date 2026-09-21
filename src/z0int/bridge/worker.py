@@ -80,6 +80,14 @@ def serve(generation: int | None = None) -> int:
                 rt.mark_drain()
                 _respond(req_id, {"ok": True, "draining": True, **rt.identity()})
                 continue
+            if op == "cognition_shadow":
+                # The shadow op carries its fields flat on the request; a nested
+                # `payload` object is accepted too and overlaid on top.
+                payload = {k: v for k, v in req.items() if k not in ("id", "op")}
+                if isinstance(req.get("payload"), dict):
+                    payload.update(req["payload"])
+                _respond(req_id, rt.cognition_shadow(payload))
+                continue
             if op == "shutdown":
                 _respond(req_id, {"ok": True, "shutdown": True, **rt.identity()})
                 return 0
