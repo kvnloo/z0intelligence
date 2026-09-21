@@ -231,6 +231,26 @@ def test_shadow_backends_record_but_never_execute():
     assert shadow.requests[0].legal.ids() == outcome.legal.ids()
 
 
+def test_shadow_still_runs_when_the_deterministic_tier_already_decided():
+    """Dogfooding needs candidate behaviour on record even for easy decisions."""
+    ctx = _ctx(
+        graph=_graph(
+            _action("a"),
+            _action("b"),
+            rules=(Rule(id="r", when={"intent": "x"}, choose="a"),),
+        ),
+        facts={"intent": "x"},
+        authority=("read",),
+    )
+    shadow = _Recorder("qwen", action="b")
+    outcome = CognitionCascade().run(ctx, shadow=(("qwen_shadow", shadow),))
+    assert outcome.tier == "deterministic"
+    assert outcome.selected_action == "a"
+    assert len(outcome.shadow) == 1
+    assert outcome.shadow[0]["selected_action"] == "b"
+    assert shadow.requests[0].legal.ids() == outcome.legal.ids()
+
+
 def test_shadow_failure_never_breaks_the_turn():
     ctx = _ctx(authority=("read", "write"))
     shadow = _Recorder("qwen", raises=RuntimeError("boom"))

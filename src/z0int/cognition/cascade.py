@@ -198,6 +198,31 @@ class CognitionCascade:
             receipts.append(receipt)
             return receipt
 
+        # --- shadow (never executes, even when the answer is already known)
+        # Running this BEFORE any early return is the whole point of dogfooding:
+        # a deterministic shortcut is exactly the case where we want candidate
+        # behaviour on record for later grouped evaluation.
+        shadow_rows: list[Mapping[str, Any]] = []
+        if shadow:
+            shadow_request = ToolDecisionRequest(
+                state=context.state,
+                legal=legal,
+                objective=context.objective,
+                risk_class=context.risk_class,
+                constraints=context.constraints,
+                max_tokens=context.max_tokens,
+            )
+            for label, backend in shadow:
+                try:
+                    decision = backend.decide(shadow_request)
+                except Exception as exc:  # noqa: BLE001 - shadow must never break the turn
+                    shadow_rows.append(
+                        {"label": label, "error": f"{type(exc).__name__}: {exc}"}
+                    )
+                    continue
+                record(decision, f"shadow:{label}", "shadow")
+                shadow_rows.append({"label": label, **_attempt_row(label, decision)})
+
         # --- deterministic tier -------------------------------------
         if legal.deterministic_solution is not None:
             row = {
@@ -242,7 +267,7 @@ class CognitionCascade:
                 executed_action=None,
                 decision=None,
                 attempts=tuple(attempts),
-                shadow=(),
+                shadow=tuple(shadow_rows),
                 abstained=False,
                 reason=legal.deterministic_reason or "deterministic_solution",
                 receipts=tuple(receipts),
@@ -264,7 +289,7 @@ class CognitionCascade:
                 executed_action=None,
                 decision=None,
                 attempts=tuple(attempts),
-                shadow=(),
+                shadow=tuple(shadow_rows),
                 abstained=True,
                 reason="no_legal_actions",
                 receipts=tuple(receipts),
@@ -285,28 +310,6 @@ class CognitionCascade:
         )
         plan = self._policy.decide(signals)
         start_index = self._TIER_INDEX[plan.tier]
-
-        # --- shadow (never executes) --------------------------------
-        shadow_rows: list[Mapping[str, Any]] = []
-        if shadow:
-            shadow_request = ToolDecisionRequest(
-                state=context.state,
-                legal=legal,
-                objective=context.objective,
-                risk_class=context.risk_class,
-                constraints=context.constraints,
-                max_tokens=context.max_tokens,
-            )
-            for label, backend in shadow:
-                try:
-                    decision = backend.decide(shadow_request)
-                except Exception as exc:  # noqa: BLE001 - shadow must never break the turn
-                    shadow_rows.append(
-                        {"label": label, "error": f"{type(exc).__name__}: {exc}"}
-                    )
-                    continue
-                record(decision, f"shadow:{label}", "shadow")
-                shadow_rows.append({"label": label, **_attempt_row(label, decision)})
 
         # --- learned tiers ------------------------------------------
         for tier in self._TIER_SEQUENCE[start_index:]:
