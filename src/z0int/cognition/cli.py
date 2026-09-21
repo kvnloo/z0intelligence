@@ -13,6 +13,7 @@ from typing import Any
 
 from .actions import ActionCandidate, ActionGraph, Rule, compile_actions
 from .cascade import CascadeContext, CognitionCascade
+from .candidates import build_inventory, load_pi_ai_catalog
 from .escalation import EscalationPolicy, EscalationThresholds
 from .manifest import (
     ROLES,
@@ -21,6 +22,7 @@ from .manifest import (
 )
 from .registry import LocalModelRegistry
 from .serving import DEFAULT_GGUF_DIR, DEFAULT_LLAMA_SERVER
+from .surface import DecisionSurface, SurfaceThresholds
 
 
 def _print(payload: Any, *, as_json: bool) -> None:
@@ -110,6 +112,29 @@ def _cmd_serving(args: argparse.Namespace) -> int:
     for model_id, info in registry.health().items():
         ready = "ready" if info.get("ready") else "DOWN"
         print(f"{model_id:<28} {ready:<6} {info.get('detail', '')}")
+    return 0
+
+
+def _cmd_candidates(args: argparse.Namespace) -> int:
+    """Show the shared capability inventory (local manifest + pi-ai catalog)."""
+    manifest = load_local_cognition()
+    catalog = load_pi_ai_catalog(args.catalog)
+    inventory = build_inventory(manifest=manifest, catalog=catalog)
+    if args.json:
+        _print(inventory.to_dict(), as_json=True)
+        return 0
+    print(f"providers   {', '.join(inventory.providers()) or '-'}")
+    print(f"candidates  {len(inventory)}")
+    print(
+        f"catalog     {len(catalog)} payload(s) from "
+        f"{args.catalog or '$Z0INT_PI_AI_CATALOG'}"
+    )
+    for candidate in inventory:
+        print(
+            f"  {candidate.candidate_id:<44} {candidate.quality_class:<9} "
+            f"risk<={candidate.max_risk_class:<11} cost={candidate.cost_class:<8} "
+            f"tiers={','.join(candidate.serves_tiers) or '-'}"
+        )
     return 0
 
 
@@ -224,12 +249,24 @@ def _cmd_decide(args: argparse.Namespace) -> int:
     thresholds = EscalationThresholds(
         credited_families=tuple(payload.get("credited_families") or ())
     )
+    # Candidate surfaces are opt-in: without --catalog/--surface the cascade
+    # behaves exactly as before (the escalation policy alone picks the tier).
+    surface = None
+    if args.surface or args.catalog:
+        inventory = build_inventory(
+            manifest=load_local_cognition(), catalog=load_pi_ai_catalog(args.catalog)
+        )
+        surface = DecisionSurface(
+            inventory.candidates,
+            thresholds=SurfaceThresholds(max_cost_class=args.max_cost_class),
+        )
     cascade = CognitionCascade(
         tiny=registry.role_backend("tiny_action_specialist") if args.use_models else None,
         jev=None,
         orchestrator=registry.role_backend("semantic_orchestrator") if args.use_models else None,
         general=registry.role_backend("general_local_fallback") if args.use_models else None,
         policy=EscalationPolicy(thresholds),
+        surface=surface,
     )
     shadow: list[tuple[str, Any]] = []
     if args.shadow:
@@ -275,6 +312,14 @@ def add_cognition_parser(sub: argparse._SubParsersAction) -> None:  # type: igno
     cm = co_sub.add_parser("manifest", help="Show the versioned model capability manifest")
     cm.add_argument("--json", action="store_true")
 
+    ccand = co_sub.add_parser(
+        "candidates",
+        help="Shared capability inventory: local manifest + pi-ai provider catalog",
+    )
+    ccand.add_argument("--catalog", default=None,
+                       help="pi-ai catalog JSON file or directory (default: $Z0INT_PI_AI_CATALOG)")
+    ccand.add_argument("--json", action="store_true")
+
     cr = co_sub.add_parser("roles", help="Role -> model assignment with local-evidence status")
     cr.add_argument("--json", action="store_true")
 
@@ -311,12 +356,19 @@ def add_cognition_parser(sub: argparse._SubParsersAction) -> None:  # type: igno
     cd.add_argument("--use-models", action="store_true", help="Allow learned tiers to run")
     cd.add_argument("--shadow", action="append", default=[],
                     help="model_id to run in shadow (recorded, never executed)")
+    cd.add_argument("--surface", action="store_true",
+                    help="Enforce the candidate surface (quality/risk gating, fail closed)")
+    cd.add_argument("--catalog", default=None,
+                    help="pi-ai catalog JSON file or directory (default: $Z0INT_PI_AI_CATALOG)")
+    cd.add_argument("--max-cost-class", default=None,
+                    help="Fail closed before candidates costlier than this class")
     cd.add_argument("--json", action="store_true", default=True)
 
 
 def cmd_cognition(args: argparse.Namespace) -> int:
     handlers = {
         "manifest": _cmd_manifest,
+        "candidates": _cmd_candidates,
         "roles": _cmd_roles,
         "serving": _cmd_serving,
         "serve": _cmd_serve,

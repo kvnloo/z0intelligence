@@ -25,6 +25,9 @@ learned answer that names anything else is rejected.
 | Piece | Where | What it owns |
 |---|---|---|
 | Legal-action compiler | `src/z0int/cognition/actions.py` | capability / dependency / permission / budget / deterministic-shortcut filtering, replayable eliminations |
+| Shared capability model | `src/z0int/cognition/candidates.py` | one provider-neutral `CandidateModel`; pi-ai catalog projection; hard filters + suitability ranking |
+| Decision surface | `src/z0int/cognition/surface.py` | suitability, uncertainty, required quality/risk class, escalation, fail-closed |
+| Replayable receipts | `src/z0int/cognition/receipts.py` | `z0int.cognition.receipt.v1`: state, eligible set, choice, quota, latency, tokens, cost, retries |
 | Capability manifest | `manifests/local_cognition.v1.json` | versioned per-model metadata; source claims separated from local measurements |
 | Adapters | `src/z0int/cognition/adapters/` | model-specific tool dialects behind one backend-neutral surface |
 | Escalation policy | `src/z0int/cognition/escalation.py` | measured-signal tier choice; versioned thresholds |
@@ -33,7 +36,7 @@ learned answer that names anything else is rejected.
 | OMP bridge op | `src/z0int/cognition/shadow.py`, `src/z0int/bridge/` | observe-only `cognition_shadow` op |
 | OMP extension | `omp-extensions/local-cognition/` | shadow-only harness lane; never blocks a tool call |
 | Evaluation | `scripts/local_tool_calling_eval.py` | schema vs trajectory axes, p50/p95/p99, dangerous-selection counter |
-| CLI | `z0int cognition {manifest,roles,serving,probe,compile,decide}` | |
+| CLI | `z0int cognition {manifest,candidates,roles,serving,probe,compile,decide}` | |
 
 ## Evidence discipline
 
@@ -258,6 +261,99 @@ worse in utility, and routed latency of 1660 ms versus 221034 ms for
 always-most-expensive. The distilled 32-parameter router reaches 0.579 fidelity
 against a 0.658 feature-map ceiling — the gap is the frozen 4-feature v0
 resolution and is reported as `feature_bucket_ceiling` rather than hidden.
+
+## Shared capability model and the decision surface
+
+Semantic selection is not per-provider code. One frozen candidate type
+(`CandidateModel` in `src/z0int/cognition/candidates.py`) describes every
+execution target — a locally served SLM, the JEV/OpenJev bounded scorer, and a
+remote free-tier provider — by *capability*:
+
+```text
+candidate_id, provider, model_id
+capabilities: tool_calling, parallel_tool_calls, structured_output,
+              reasoning, multi_turn, modalities, context_window,
+              supports_confidence, supports_abstention
+quality_class: tiny | bounded | standard | strong | frontier
+max_risk_class: read | write | destructive | credential | payment | publish
+cost_class: local | free | unknown | metered
+serves_tiers: which rungs of the ladder may execute here
+```
+
+**Groq and Cerebras are ordinary rows, not special cases.** They enter when DSH's
+`llm-pi-ai` catalog is projected through `candidates_from_pi_ai_catalog()`;
+z0intelligence keeps no second model registry, and no selection code branches on a
+provider name. A third provider flows through the same adapter with zero code
+change (asserted by `test_a_third_provider_needs_no_code_change`, and by an AST
+guard that no non-docstring string literal in the selection modules names a
+provider). Per-row capabilities come from the catalog (`reasoning`, `input`
+modalities, `contextWindow`); anything the catalog cannot know (tool calling,
+quality class, risk ceiling, cost class, served rungs) is supplied as a `z0int`
+row annotation or a caller hint. Remote candidates default to the conservative
+`quality_class=standard`, `max_risk_class=read`, so a provider is never trusted
+for consequential work until someone says so.
+
+`DecisionSurface` (`src/z0int/cognition/surface.py`) is the only place that
+answers the four questions:
+
+1. **Which candidates are semantically suitable?** — the shared hard filters
+   (`filter_candidates`) in a fixed, replayable order: served tier, capabilities,
+   required quality class, risk ceiling, cost ceiling; then `rank_candidates`
+   orders the survivors by semantic suitability (quality headroom, execution cost
+   class, latency headroom). Nothing consults a vendor benchmark.
+2. **How uncertain is this decision?** — `uncertainty_of()`, a deterministic mean
+   over *observed* signals: candidate entropy, top-1/top-2 margin, state novelty,
+   novel tool combination, historical failure family, verification demand and
+   capability demand. It never looks at the prompt.
+3. **What quality/risk class is required?** — derived from risk class,
+   independent-verification demand and capability demand, then raised by measured
+   uncertainty, using versioned `SurfaceThresholds`.
+4. **Should we escalate?** — yes when the required class sits above the tier the
+   escalation policy proposed, when uncertainty crosses the threshold, or when the
+   proposed rung has no eligible candidate but a later one does. If no rung has an
+   eligible candidate the surface **fails closed**: the allowed set stays empty
+   rather than lowering the bar to spend free capacity.
+
+The effective entry tier is `max(escalation policy, quality-class floor)`, so the
+surface can only ever raise the floor. The ladder rungs keep their meaning:
+
+| Rung | Code |
+|---|---|
+| deterministic / compiled route | `actions.compile_actions()` + `LegalActionSet.deterministic_solution` |
+| tiny specialist | rung `tiny_specialist`, `ROLE_TIERS["tiny_action_specialist"]` |
+| JEV / OpenJev bounded scorer | rung `bounded_jev`, `ROLE_TIERS["bounded_scorer"]`, confidence re-checked by `EscalationPolicy.accept_or_escalate` |
+| local / remote SLM router | rung `orchestrator_slm`, served by `CandidateRungBackend` over local **and** Groq/Cerebras candidates |
+| general fallback | rungs `general_slm` / `remote_frontier` |
+
+Legal-action filtering happens strictly before any learned selection:
+`CognitionCascade.run()` compiles the `LegalActionSet` first and hands that set —
+and nothing else — to every tier; `CandidateRungBackend` derives its capability
+requirement from the already-legal set, and an out-of-set selection is rejected as
+an illegal call even if a backend returns it.
+
+### Replayable receipts
+
+Every learned decision emits one `z0int.cognition.receipt.v1` row
+(`src/z0int/cognition/receipts.py`) capturing: state, the eligible candidate set
+(with capabilities), the chosen candidate/provider/model, observed quota state,
+latency state (budget, observed, TTFT, decode tok/s), prediction and confidence,
+execution outcome, verified outcome, tokens, GPU/provider cost, and retries. The
+receipt round-trips through JSON and `receipt_from_dict()` reconstructs it for
+replay without a model server; `mark_execution()` and `mark_verification()` join
+the runtime and verifier facts later without collapsing them.
+
+### Ownership boundary
+
+| Concern | Owner |
+|---|---|
+| which models exist at a provider, price, wire API | DSH `llm-pi-ai` catalog (projected read-only) |
+| live capacity, RPM/RPD/TPM/TPD, reset timers, placement | **Kerdoios** |
+| semantic suitability, uncertainty, required quality/risk class, escalation | **z0intelligence** |
+
+`QuotaState` is carried through receipts, never computed here: passing observed
+quota state changes no decision. There is deliberately no quota arithmetic, rate
+limit token bucket or reset timer in the cognition plane
+(`test_no_quota_or_reset_accounting_parameters`).
 
 ## Safety properties (tested)
 

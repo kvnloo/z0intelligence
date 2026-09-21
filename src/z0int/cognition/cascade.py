@@ -20,6 +20,7 @@ from typing import Any, Mapping, Sequence
 from ..receipt import DecisionReceipt, new_trace_id
 from .actions import ActionGraph, LegalActionSet, compile_actions
 from .adapters.local_slm import ToolDecision, ToolDecisionBackend, ToolDecisionRequest
+from .candidates import CandidateModel, requirement_for_legal_set
 from .escalation import (
     EscalationDecision,
     EscalationPolicy,
@@ -27,6 +28,15 @@ from .escalation import (
     entropy_of,
     margin_of,
 )
+from .receipts import (
+    CognitionReceipt,
+    CostState,
+    ExecutionOutcome,
+    LatencyState,
+    QuotaState,
+    TokenState,
+)
+from .surface import DecisionSurface, SurfaceDecision, SurfaceRequest
 
 SCHEMA = "z0int.cognition.decision.v1"
 
@@ -80,6 +90,9 @@ class CascadeOutcome:
     abstained: bool
     reason: str
     receipts: tuple[Mapping[str, Any], ...]
+    #: The candidate-surface verdict for this pass, when a candidate inventory
+    #: was supplied. ``None`` means the surface was not enforced.
+    surface: SurfaceDecision | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -89,6 +102,7 @@ class CascadeOutcome:
             "legal_ids": list(self.legal.ids()),
             "candidate_action_count": self.legal.candidate_count,
             "escalation": self.escalation.to_dict(),
+            "surface": self.surface.to_dict() if self.surface is not None else None,
             "tier": self.tier,
             "selected_action": self.selected_action,
             "executed_action": self.executed_action,
@@ -114,8 +128,29 @@ def _attempt_row(tier: str, decision: ToolDecision) -> dict[str, Any]:
     }
 
 
+def _maybe_float(value: Any) -> float | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _maybe_int(value: Any) -> int | None:
+    number = _maybe_float(value)
+    return None if number is None else int(number)
+
+
 class CognitionCascade:
-    """Deterministic orchestration of learned semantic tiers."""
+    """Deterministic orchestration of learned semantic tiers.
+
+    ``surface`` (a :class:`~z0int.cognition.surface.DecisionSurface`) is optional.
+    When supplied with a candidate inventory it decides which rung the pass
+    enters at, records the semantically suitable candidate set, and fails closed
+    when no candidate is eligible. Without it the ladder behaves exactly as
+    before: the escalation policy alone picks the entry tier.
+    """
 
     def __init__(
         self,
@@ -126,6 +161,8 @@ class CognitionCascade:
         general: ToolDecisionBackend | None = None,
         remote: ToolDecisionBackend | None = None,
         policy: EscalationPolicy | None = None,
+        surface: DecisionSurface | None = None,
+        candidates: Sequence[CandidateModel] = (),
     ) -> None:
         self._backends: dict[str, ToolDecisionBackend | None] = {
             "tiny_specialist": tiny,
@@ -135,10 +172,17 @@ class CognitionCascade:
             "remote_frontier": remote,
         }
         self._policy = policy or EscalationPolicy()
+        self._surface = surface or (
+            DecisionSurface(candidates) if candidates else None
+        )
 
     @property
     def policy(self) -> EscalationPolicy:
         return self._policy
+
+    @property
+    def surface(self) -> DecisionSurface | None:
+        return self._surface
 
     def backend(self, tier: str) -> ToolDecisionBackend | None:
         return self._backends.get(tier)
@@ -162,6 +206,158 @@ class CognitionCascade:
             satisfied=context.satisfied,
         )
 
+    def _signals(
+        self, context: CascadeContext, legal: LegalActionSet
+    ) -> EscalationSignals:
+        return EscalationSignals(
+            legal_action_count=legal.candidate_count,
+            novel_tool_combination=context.novel_tool_combination,
+            historical_failure_family=context.historical_failure_family,
+            risk_class=context.risk_class,
+            verification_required=context.verification_required,
+            latency_budget_ms=context.latency_budget_ms,
+            estimated_candidate_latency_ms=context.estimated_candidate_latency_ms,
+            state_novelty=context.state_novelty,
+            capability_required=context.capability_required,
+            families=legal.family_options(),
+        )
+
+    def _assess_surface(
+        self,
+        context: CascadeContext,
+        legal: LegalActionSet,
+        signals: EscalationSignals,
+        plan: EscalationDecision,
+    ) -> SurfaceDecision | None:
+        if self._surface is None:
+            return None
+        estimate = context.constraints.get("estimated_latency_ms")
+        return self._surface.assess(
+            SurfaceRequest(
+                tier=plan.tier,
+                legal_ids=legal.ids(),
+                state=context.state,
+                required=requirement_for_legal_set(legal),
+                risk_class=context.risk_class,
+                verification_required=context.verification_required,
+                capability_required=context.capability_required,
+                signals=signals,
+                high_risk_classes=tuple(self._policy.thresholds.high_risk_classes),
+                latency_budget_ms=context.latency_budget_ms,
+                estimated_latency_ms=estimate if isinstance(estimate, Mapping) else {},
+            )
+        )
+
+    def _receipt_for(
+        self,
+        decision: ToolDecision,
+        *,
+        tier: str,
+        execution: str,
+        context: CascadeContext,
+        legal: LegalActionSet,
+        surface: SurfaceDecision | None,
+        trace_id: str,
+    ) -> Mapping[str, Any]:
+        """Build the one replayable receipt a learned decision emits."""
+        diagnostics = decision.diagnostics or {}
+        supervisor = diagnostics.get("supervisor")
+        supervisor = supervisor if isinstance(supervisor, Mapping) else {}
+        quota_raw = diagnostics.get("quota")
+        quota = quota_raw if isinstance(quota_raw, Mapping) else {}
+        chosen_candidate_id = diagnostics.get("chosen_candidate_id")
+        # A provider-neutral rung router knows exactly which candidates were
+        # eligible for the tier that actually ran; prefer its view over the
+        # surface's entry-tier view, which may name a rung that was skipped.
+        rung_rows = diagnostics.get("eligible_candidates")
+        if isinstance(rung_rows, (list, tuple)) and rung_rows:
+            eligible = tuple(dict(row) for row in rung_rows if isinstance(row, Mapping))
+        else:
+            eligible = tuple(
+                candidate.to_dict() for candidate in (surface.eligible if surface else ())
+            )
+        by_id = {
+            str(row.get("candidate_id")): row
+            for row in eligible
+            if isinstance(row, Mapping)
+        }
+        allowed = diagnostics.get("allowed_candidates")
+        if not isinstance(allowed, (list, tuple)):
+            allowed = surface.allowed_candidates if surface else ()
+        chosen = by_id.get(str(chosen_candidate_id)) if chosen_candidate_id else None
+        gpu_ms = supervisor.get("wall_ms")
+        receipt = CognitionReceipt(
+            trace_id=trace_id,
+            tier=tier,
+            execution=execution,
+            state=context.state,
+            eligible_candidates=eligible,
+            allowed_candidates=tuple(allowed),
+            chosen_candidate=chosen,
+            quota=QuotaState(
+                source=quota.get("source"),
+                free_tier=quota.get("free_tier"),
+                remaining=quota.get("remaining"),
+                limit=quota.get("limit"),
+                resets_at=quota.get("resets_at"),
+                exhausted=quota.get("exhausted"),
+                raw=dict(quota.get("raw") or {}),
+            ),
+            latency=LatencyState(
+                budget_ms=context.latency_budget_ms,
+                observed_ms=decision.latency_ms,
+                ttft_ms=decision.ttft_ms,
+                decode_tok_s=decision.decode_tok_s,
+                observed_by="model_response" if not supervisor else "supervisor",
+            ),
+            prediction=decision.selected_action,
+            confidence=decision.confidence,
+            action_taken=decision.selected_action,
+            route=tier,
+            provider=decision.backend,
+            model=decision.model,
+            candidate_id=chosen_candidate_id,
+            capability_id=legal.graph_digest,
+            legal_ids=legal.ids(),
+            surface=surface.to_dict() if surface is not None else {},
+            policy_version=(surface.policy_version if surface else self._policy.thresholds.version),
+            tokens=TokenState(
+                input_tokens=decision.prompt_tokens,
+                output_tokens=decision.completion_tokens,
+                cached_input_tokens=decision.cached_tokens,
+                reasoning_tokens=_maybe_int(diagnostics.get("reasoning_tokens")),
+            ),
+            cost=CostState(
+                gpu_ms=_maybe_float(gpu_ms),
+                gpu_vram_mib=None,
+                provider_cost_usd=_maybe_float(diagnostics.get("provider_cost_usd")),
+                provider_cost_units=_maybe_float(diagnostics.get("provider_cost_units")),
+                cost_class=(
+                    "local"
+                    if supervisor
+                    else (diagnostics.get("cost_class") if isinstance(diagnostics.get("cost_class"), str) else None)
+                ),
+                source="supervisor" if supervisor else None,
+            ),
+            execution_outcome=ExecutionOutcome(),
+            retries=int(diagnostics.get("retries") or 0),
+            extra={
+                "schema": SCHEMA,
+                "tier": tier,
+                "revision": decision.revision,
+                "candidate_action_count": decision.candidate_action_count,
+                "invalid_call": decision.invalid_call,
+                "irrelevant_call": decision.irrelevant_call,
+                "unnecessary_call": decision.unnecessary_call,
+                "abstained": decision.abstained,
+                "ttft_ms": decision.ttft_ms,
+                "decode_tok_s": decision.decode_tok_s,
+                "graph_digest": legal.graph_digest,
+                "chosen_candidate_id": chosen_candidate_id,
+            },
+        )
+        return receipt.to_dict()
+
     def run(
         self,
         context: CascadeContext,
@@ -174,35 +370,24 @@ class CognitionCascade:
         receipts: list[Mapping[str, Any]] = []
         attempts: list[Mapping[str, Any]] = []
 
+        # Signals, the escalation plan and the candidate-surface verdict are all
+        # pure functions of the compiled set and the observed context. Computing
+        # them before shadow means the observe-only lane records the same verdict
+        # the live lane would use.
+        signals = self._signals(context, legal)
+        plan = self._policy.decide(signals)
+        surface_decision = self._assess_surface(context, legal, signals, plan)
+
         def record(decision: ToolDecision, tier: str, execution: str) -> Mapping[str, Any]:
-            receipt = DecisionReceipt(
-                trace_id=tid,
-                capability_id=legal.graph_digest,
-                provider=decision.backend,
-                model=decision.model,
-                prediction=decision.selected_action,
-                confidence=decision.confidence,
-                action_taken=decision.selected_action,
-                route=tier,
+            receipt = self._receipt_for(
+                decision,
+                tier=tier,
                 execution=execution,
-                latency_ms=decision.latency_ms,
-                input_tokens=decision.prompt_tokens,
-                output_tokens=decision.completion_tokens,
-                cached_input_tokens=decision.cached_tokens,
-                extra={
-                    "schema": SCHEMA,
-                    "tier": tier,
-                    "revision": decision.revision,
-                    "candidate_action_count": decision.candidate_action_count,
-                    "invalid_call": decision.invalid_call,
-                    "irrelevant_call": decision.irrelevant_call,
-                    "unnecessary_call": decision.unnecessary_call,
-                    "abstained": decision.abstained,
-                    "ttft_ms": decision.ttft_ms,
-                    "decode_tok_s": decision.decode_tok_s,
-                    "graph_digest": legal.graph_digest,
-                },
-            ).to_dict()
+                context=context,
+                legal=legal,
+                surface=surface_decision,
+                trace_id=tid,
+            )
             receipts.append(receipt)
             return receipt
 
@@ -279,6 +464,7 @@ class CognitionCascade:
                 abstained=False,
                 reason=legal.deterministic_reason or "deterministic_solution",
                 receipts=tuple(receipts),
+                surface=surface_decision,
             )
 
         # --- nothing legal: do not bother a model --------------------
@@ -301,25 +487,43 @@ class CognitionCascade:
                 abstained=True,
                 reason="no_legal_actions",
                 receipts=tuple(receipts),
+                surface=surface_decision,
             )
 
-        # --- escalation decision ------------------------------------
-        signals = EscalationSignals(
-            legal_action_count=legal.candidate_count,
-            novel_tool_combination=context.novel_tool_combination,
-            historical_failure_family=context.historical_failure_family,
-            risk_class=context.risk_class,
-            verification_required=context.verification_required,
-            latency_budget_ms=context.latency_budget_ms,
-            estimated_candidate_latency_ms=context.estimated_candidate_latency_ms,
-            state_novelty=context.state_novelty,
-            capability_required=context.capability_required,
-            families=legal.family_options(),
-        )
-        plan = self._policy.decide(signals)
-        start_index = self._TIER_INDEX[plan.tier]
+        # --- candidate surface: fail closed rather than lower the bar ----
+        # Free capacity is a reason to *place* work, never a reason to accept a
+        # worse answer; an empty allowed set stays empty.
+        if surface_decision is not None and surface_decision.fail_closed:
+            attempts.append(
+                {
+                    "tier": "surface",
+                    "abstained": True,
+                    "reason": surface_decision.escalate_reason or "no_eligible_candidate",
+                    "quality_class_required": surface_decision.quality_class_required,
+                }
+            )
+            return CascadeOutcome(
+                trace_id=tid,
+                legal=legal,
+                escalation=plan,
+                tier="abstained",
+                selected_action=None,
+                executed_action=None,
+                decision=None,
+                attempts=tuple(attempts),
+                shadow=tuple(shadow_rows),
+                abstained=True,
+                reason="no_eligible_candidate",
+                receipts=tuple(receipts),
+                surface=surface_decision,
+            )
 
         # --- learned tiers ------------------------------------------
+        start_tier = plan.tier
+        if surface_decision is not None and surface_decision.tier in self._TIER_INDEX:
+            start_tier = surface_decision.tier
+        start_index = self._TIER_INDEX[start_tier]
+
         for tier in self._TIER_SEQUENCE[start_index:]:
             backend = self._backends.get(tier)
             if backend is None:
@@ -385,6 +589,7 @@ class CognitionCascade:
                     abstained=False,
                     reason=f"{tier}_selected",
                     receipts=tuple(receipts),
+                    surface=surface_decision,
                 )
             last = decision
 
@@ -403,6 +608,7 @@ class CognitionCascade:
             abstained=True,
             reason="all_tiers_abstained",
             receipts=tuple(receipts),
+            surface=surface_decision,
         )
 
     # Ordered learned tiers, cheapest first.

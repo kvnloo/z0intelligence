@@ -423,6 +423,12 @@ class LocalSLMBackend:
         )
 
 
+#: Public name for the shared abstention constructor. A tier that cannot answer
+#: abstains rather than guessing, and every other module should build that same
+#: object instead of reaching for the private helper.
+abstain = _abstain
+
+
 # Keep the dialect registry importable from here for convenience.
 __all__ = [
     "DIALECTS",
@@ -431,4 +437,5 @@ __all__ = [
     "ToolDecision",
     "ToolDecisionBackend",
     "ToolDecisionRequest",
+    "abstain",
 ]

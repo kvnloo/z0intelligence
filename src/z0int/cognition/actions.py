@@ -27,14 +27,27 @@ IRREVERSIBLE_RISKS: frozenset[str] = frozenset(
     {"destructive", "publish", "credential", "payment"}
 )
 
-_RISK_RANK = {
-    "read": 0,
-    "write": 1,
-    "destructive": 2,
-    "credential": 3,
-    "payment": 4,
-    "publish": 5,
-}
+#: Risk classes ordered least- to most-consequential. Public so the candidate
+#: capability model can gate on the *same* ordering the compiler uses instead of
+#: re-declaring it.
+RISK_CLASSES: tuple[str, ...] = (
+    "read",
+    "write",
+    "destructive",
+    "credential",
+    "payment",
+    "publish",
+)
+
+_RISK_RANK = {name: rank for rank, name in enumerate(RISK_CLASSES)}
+
+
+def risk_rank(risk_class: str) -> int:
+    """Position of ``risk_class`` in :data:`RISK_CLASSES`; raises when unknown."""
+    try:
+        return _RISK_RANK[risk_class]
+    except KeyError as exc:
+        raise ValueError(f"unsupported risk class: {risk_class!r}") from exc
 
 
 def _canonical(value: Any) -> str:
