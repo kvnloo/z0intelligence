@@ -19,13 +19,7 @@ import argparse
 import json
 import os
 import shutil
-import signal
-import subprocess
 import sys
-import time
-import urllib.error
-import urllib.request
-from dataclasses import replace
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -39,95 +33,16 @@ from z0int.cognition.probe import (  # noqa: E402
     write_receipts,
 )
 from z0int.cognition.registry import ServingEndpoint  # noqa: E402
-
-DEFAULT_LLAMA_SERVER = (
-    "/mnt/zer0models/workspace/zer0/oss/.work/llama.cpp/build/bin/llama-server"
+from z0int.cognition.serving import (  # noqa: E402
+    DEFAULT_GGUF_DIR,
+    DEFAULT_LLAMA_SERVER,
+    GGUF_LAYOUT,
+    LlamaServer,
+    free_port,
+    llama_build,
+    quant_from_name,
 )
-DEFAULT_GGUF_DIR = "/mnt/zer0models/zer0-models/gguf"
 
-# model_id -> path under --gguf-dir
-GGUF_LAYOUT = {
-    "functiongemma_270m": "functiongemma-270m/functiongemma-270m-it-q8_0.gguf",
-    "hammer2.1_3b": "hammer2.1-3b/Hammer2.1-3b.Q4_K_M.gguf",
-    "hammer2.1_7b": "hammer2.1-7b/Hammer2.1-7b-Q4_K_M.gguf",
-    "nemotron_orchestrator_8b": "nvidia-orchestrator-8b/nvidia_Orchestrator-8B-Q4_K_M.gguf",
-    "qwen3.5_9b": "qwen3.5-9b/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
-}
-
-
-def _wait_health(base_url: str, timeout_s: float = 180.0) -> bool:
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        try:
-            with urllib.request.urlopen(f"{base_url}/health", timeout=4) as resp:
-                if json.loads(resp.read().decode()).get("status") == "ok":
-                    return True
-        except (urllib.error.URLError, OSError, ValueError):
-            time.sleep(1.0)
-    return False
-
-
-class LlamaServer:
-    def __init__(self, *, binary: str, gguf: Path, context: int, port: int) -> None:
-        self.binary = binary
-        self.gguf = gguf
-        self.context = context
-        self.port = port
-        self.proc: subprocess.Popen[bytes] | None = None
-        self.log = Path(f"/tmp/z0int-llama-{port}.log")
-
-    @property
-    def base_url(self) -> str:
-        return f"http://127.0.0.1:{self.port}"
-
-    def __enter__(self) -> LlamaServer:
-        cmd = [
-            self.binary,
-            "-m", str(self.gguf),
-            "-c", str(self.context),
-            "-ngl", "999",
-            "--jinja",
-            "--host", "127.0.0.1",
-            "--port", str(self.port),
-            "-fa", "auto",
-            "--no-warmup",
-        ]
-        handle = self.log.open("wb")
-        self.proc = subprocess.Popen(cmd, stdout=handle, stderr=subprocess.STDOUT, start_new_session=True)
-        if not _wait_health(self.base_url):
-            self.__exit__(None, None, None)
-            raise RuntimeError(f"llama-server did not become ready; see {self.log}")
-        return self
-
-    def __exit__(self, *exc: object) -> None:
-        if self.proc is not None and self.proc.poll() is None:
-            try:
-                os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
-            except OSError:
-                self.proc.terminate()
-            try:
-                self.proc.wait(timeout=20)
-            except subprocess.TimeoutExpired:
-                try:
-                    os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
-                except OSError:
-                    self.proc.kill()
-        self.proc = None
-        # Let the driver actually release VRAM before the next model loads.
-        time.sleep(3.0)
-
-
-def _free_port(start: int = 18100) -> int:
-    import socket
-
-    for port in range(start, start + 40):
-        with socket.socket() as sock:
-            try:
-                sock.bind(("127.0.0.1", port))
-            except OSError:
-                continue
-        return port
-    raise RuntimeError("no free port")
 
 
 def probe_model(
@@ -142,40 +57,17 @@ def probe_model(
     gguf = gguf_dir / rel
     if not gguf.is_file():
         raise FileNotFoundError(f"missing GGUF for {model_id}: {gguf}")
-    port = _free_port()
+    port = free_port()
     with LlamaServer(binary=binary, gguf=gguf, context=context, port=port) as server:
         endpoint = ServingEndpoint(
             model_id=model_id,
             base_url=server.base_url,
             served_model=model_id,
-            runtime=f"llama.cpp-{_llama_build(binary)}",
-            quantization=_quant_from_name(gguf.name),
+            runtime=f"llama.cpp-{llama_build(binary)}",
+            quantization=quant_from_name(gguf.name),
             backend_id=model_id,
         )
         return probe_endpoint(endpoint, context=context, repeats=repeats)
-
-
-def _llama_build(binary: str) -> str:
-    """llama-server prints its banner on stderr, so capture both streams."""
-    try:
-        proc = subprocess.run(
-            [binary, "--version"], capture_output=True, text=True, timeout=10
-        )
-        for line in (proc.stdout + proc.stderr).splitlines():
-            line = line.strip()
-            if line.startswith("version:"):
-                return line.split(":", 1)[1].strip().split()[0]
-    except (subprocess.SubprocessError, OSError):
-        pass
-    return "unknown"
-
-
-def _quant_from_name(name: str) -> str:
-    lowered = name.lower()
-    for tag in ("q8_0", "q6_k", "q5_k_m", "q4_k_m", "q4_0", "q3_k_m", "iq4_xs", "f16", "bf16"):
-        if tag in lowered:
-            return tag.upper()
-    return "unknown"
 
 
 def _table(receipts: list[ServingReceipt]) -> str:
