@@ -96,6 +96,9 @@ def main() -> int:
     ap.add_argument("--model", action="append", default=[],
                     help="model_id from manifests/local_cognition.v1.json (repeatable)")
     ap.add_argument("--all", action="store_true", help="probe every model with a known GGUF")
+    ap.add_argument("--served", action="store_true",
+                    help="probe through the PRODUCTION serving map (~/.z0int/config/serving.json) "
+                         "instead of spawning llama-server, so labels match the deployed stack")
     ap.add_argument("--binary", default=os.environ.get("LLAMA_SERVER", DEFAULT_LLAMA_SERVER))
     ap.add_argument("--gguf-dir", default=os.environ.get("Z0INT_GGUF_DIR", DEFAULT_GGUF_DIR))
     ap.add_argument("--context", type=int, default=4096)
@@ -107,7 +110,15 @@ def main() -> int:
     args = ap.parse_args()
 
     manifest = load_local_cognition()
-    if args.all:
+    if args.served:
+        from z0int.cognition.registry import load_serving
+
+        endpoints = load_serving()
+        served = [m for m in endpoints if m in manifest.models]
+        wanted = args.model or served
+        if not args.model and not args.all:
+            wanted = served
+    elif args.all:
         wanted = [m for m in GGUF_LAYOUT if m in manifest.models]
     elif args.model:
         wanted = args.model
@@ -119,7 +130,7 @@ def main() -> int:
         return 2
 
     binary = args.binary
-    if not shutil.which(binary) and not Path(binary).is_file():
+    if not args.served and not shutil.which(binary) and not Path(binary).is_file():
         print(
             f"llama-server not found at {binary}. Build it with:\n"
             "  cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_COMPILER=/opt/cuda/bin/nvcc "
@@ -132,6 +143,12 @@ def main() -> int:
     for model_id in wanted:
         print(f"# probing {model_id} ...", file=sys.stderr)
         try:
+            if args.served:
+                from z0int.cognition.registry import ServingEndpoint, load_serving
+
+                endpoint = load_serving()[model_id]
+                receipts.append(probe_endpoint(endpoint, context=args.context, repeats=args.repeats))
+                continue
             receipts.append(
                 probe_model(
                     model_id,

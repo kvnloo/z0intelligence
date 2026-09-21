@@ -20,6 +20,7 @@ from .manifest import (
     load_local_cognition,
 )
 from .registry import LocalModelRegistry
+from .serving import DEFAULT_GGUF_DIR, DEFAULT_LLAMA_SERVER
 
 
 def _print(payload: Any, *, as_json: bool) -> None:
@@ -109,6 +110,34 @@ def _cmd_serving(args: argparse.Namespace) -> int:
     for model_id, info in registry.health().items():
         ready = "ready" if info.get("ready") else "DOWN"
         print(f"{model_id:<28} {ready:<6} {info.get('detail', '')}")
+    return 0
+
+
+def _cmd_serve(args: argparse.Namespace) -> int:
+    """One production endpoint: llama.cpp supervisor, one resident model."""
+    from .server import ModelSupervisor, serve_forever
+
+    supervisor = ModelSupervisor(
+        binary=args.llama_server or DEFAULT_LLAMA_SERVER,
+        gguf_dir=args.gguf_dir or DEFAULT_GGUF_DIR,
+        default_context=args.context,
+        idle_unload_s=args.idle_unload,
+    )
+    if args.print_serving_map:
+        endpoints = [
+            {
+                "model_id": m,
+                "base_url": f"http://{args.host}:{args.port}",
+                "served_model": m,
+                "runtime": supervisor.runtime,
+                "quantization": None,
+                "backend_id": m,
+            }
+            for m in supervisor.known_models()
+        ]
+        _print({"schema": "z0int.serving.v1", "endpoints": endpoints}, as_json=True)
+        return 0
+    serve_forever(host=args.host, port=args.port, supervisor=supervisor)
     return 0
 
 
@@ -252,6 +281,19 @@ def add_cognition_parser(sub: argparse._SubParsersAction) -> None:  # type: igno
     cs = co_sub.add_parser("serving", help="Health of the locally served endpoints")
     cs.add_argument("--json", action="store_true")
 
+    cse = co_sub.add_parser(
+        "serve",
+        help="Run the llama.cpp model supervisor: one OpenAI endpoint, one resident model",
+    )
+    cse.add_argument("--host", default="127.0.0.1")
+    cse.add_argument("--port", type=int, default=11500)
+    cse.add_argument("--llama-server", default=None)
+    cse.add_argument("--gguf-dir", default=None)
+    cse.add_argument("--context", type=int, default=4096)
+    cse.add_argument("--idle-unload", type=float, default=300.0)
+    cse.add_argument("--print-serving-map", action="store_true",
+                     help="print the serving.json endpoints for this supervisor and exit")
+
     cp = co_sub.add_parser("probe", help="Measure real VRAM/TTFT/tok-s on this machine")
     cp.add_argument("--model", action="append", default=[])
     cp.add_argument("--all", action="store_true")
@@ -277,6 +319,7 @@ def cmd_cognition(args: argparse.Namespace) -> int:
         "manifest": _cmd_manifest,
         "roles": _cmd_roles,
         "serving": _cmd_serving,
+        "serve": _cmd_serve,
         "probe": _cmd_probe,
         "compile": _cmd_compile,
         "decide": _cmd_decide,
