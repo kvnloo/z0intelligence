@@ -154,6 +154,22 @@ def _abstain(
     )
 
 
+def _supervisor_facts(raw: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """Residency facts the production supervisor attaches to every response.
+
+    A router must be able to see the *load* cost of choosing a model, not only
+    the decode cost: on a 12 GB card a cold 9B pays a real multi-second load that
+    a warm resident invocation does not. ``z0int cognition serve`` records that
+    per response; this keeps it on the decision so receipts can carry it.
+    """
+    if not isinstance(raw, Mapping):
+        return None
+    facts = raw.get("z0int_supervisor")
+    if not isinstance(facts, Mapping):
+        return None
+    return dict(facts)
+
+
 class LocalSLMBackend:
     """A local generative model used as a *bounded* chooser."""
 
@@ -298,6 +314,7 @@ class LocalSLMBackend:
             cached_tokens=(usage.get("prompt_tokens_details") or {}).get("cached_tokens")
             if isinstance(usage.get("prompt_tokens_details"), dict)
             else usage.get("cached_tokens"),
+            supervisor=_supervisor_facts(outcome.raw),
         )
 
         if invocation is None:
@@ -379,7 +396,11 @@ class LocalSLMBackend:
         completion_tokens: int | None = None,
         cached_tokens: int | None = None,
         diagnostics: Mapping[str, Any] | None = None,
+        supervisor: Mapping[str, Any] | None = None,
     ) -> ToolDecision:
+        merged: dict[str, Any] = dict(diagnostics or {})
+        if supervisor:
+            merged["supervisor"] = dict(supervisor)
         return ToolDecision(
             backend=backend,
             model=model,
@@ -398,7 +419,7 @@ class LocalSLMBackend:
             candidate_action_count=candidate_count,
             invalid_call=invalid_call,
             parse_error=parse_error,
-            diagnostics=dict(diagnostics or {}),
+            diagnostics=merged,
         )
 
 

@@ -85,6 +85,17 @@ class Scenario:
     solvable: bool = True
     # ordered pairs: first must be dispatched before second
     order_constraints: tuple[tuple[str, str], ...] = ()
+    # Callables that misbehave on first use, as ``(name, mode)`` where mode is
+    # ``"error"`` (first dispatch returns an error and resolves nothing; a retry
+    # works) or ``"empty"`` (always resolves nothing).  Recovery is only
+    # observable when the world can actually hand back a bad result.
+    faulty_callables: tuple[tuple[str, str], ...] = ()
+    # Callables that are legitimate but never necessary.  Taking one is legal
+    # spend; taking one when the task was already solvable is waste.
+    optional_evidence: tuple[str, ...] = ()
+    # True when at least one required specialty can only be resolved by a
+    # specialist or generalist model, i.e. the cheap tool tier is insufficient.
+    requires_escalation: bool = False
 
     def __post_init__(self) -> None:
         if not self.task.strip():
@@ -95,6 +106,14 @@ class Scenario:
         for a, b in self.order_constraints:
             if a not in names or b not in names:
                 raise ValueError(f"order constraint names unknown callable: {a!r} -> {b!r}")
+        for name, mode in self.faulty_callables:
+            if name not in names:
+                raise ValueError(f"faulty callable {name!r} is not in the graph")
+            if mode not in ("error", "empty"):
+                raise ValueError(f"unknown fault mode {mode!r}")
+        for name in self.optional_evidence:
+            if name not in names:
+                raise ValueError(f"optional evidence {name!r} is not in the graph")
 
     def by_name(self, name: str) -> OrchestrationTool | None:
         for c in self.callables:
@@ -111,6 +130,10 @@ class Scenario:
             "max_turns": self.max_turns,
             "budget_units": self.budget_units,
             "solvable": self.solvable,
+            "requires_escalation": self.requires_escalation,
+            "optional_evidence": list(self.optional_evidence),
+            "faulty_callables": [list(p) for p in self.faulty_callables],
+            "order_constraints": [list(p) for p in self.order_constraints],
             "callables": [
                 {"name": c.name, "kind": c.kind, "cost_units": c.cost_units,
                  "resolves": list(c.resolves), "latency_class": c.latency_class}
@@ -163,6 +186,20 @@ class OrchestrationResult:
     turns_detail: tuple[Turn, ...]
     error: str | None = None
     invalid_calls: int = 0
+    # --- Phase 1B section F additions ---------------------------------
+    #: A callable declared faulty was dispatched, failed, and the orchestrator
+    #: went on to resolve the requirement anyway.
+    recovered: bool = False
+    #: Faulty dispatches that were followed by real progress.
+    recoveries: int = 0
+    #: Dispatches to a costlier callable when a cheaper affordable one resolved
+    #: the same newly-covered specialty set.
+    needless_escalation: int = 0
+    #: Finished with work outstanding while an affordable callable that could
+    #: have resolved it was never dispatched.
+    failure_to_escalate: bool = False
+    #: Optional (never-necessary) callables that were dispatched.
+    optional_evidence_taken: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -184,6 +221,11 @@ class OrchestrationResult:
             "latency_ms": self.latency_ms,
             "invalid_calls": self.invalid_calls,
             "error": self.error,
+            "recovered": self.recovered,
+            "recoveries": self.recoveries,
+            "needless_escalation": self.needless_escalation,
+            "failure_to_escalate": self.failure_to_escalate,
+            "optional_evidence_taken": self.optional_evidence_taken,
             "turns_detail": [t.to_dict() for t in self.turns_detail],
         }
 
@@ -269,6 +311,11 @@ def run_scenario(
     budget_exhausted = False
     error: str | None = None
     total_latency = 0.0
+    faulty_mode = {name: mode for name, mode in scenario.faulty_callables}
+    faulty_hits: dict[str, int] = {}
+    failed_faulty: set[str] = set()
+    needless_escalation = 0
+    optional_taken = 0
 
     for index in range(scenario.max_turns):
         try:
@@ -322,14 +369,47 @@ def run_scenario(
         for before, after in scenario.order_constraints:
             if tool.name == after and before not in dispatches[:-1]:
                 order_violations += 1
+
+        # --- faulty world: a bad tool result the orchestrator must survive
+        hit = faulty_hits.get(tool.name, 0)
+        faulty_hits[tool.name] = hit + 1
+        mode = faulty_mode.get(tool.name)
+        failed_this_turn = False
+        if mode == "empty" or (mode == "error" and hit == 0):
+            failed_this_turn = True
+            failed_faulty.add(tool.name)
+            newly = ()
+            observation = (
+                f"{tool.name} returned: error (no result produced)"
+                if mode == "error"
+                else f"{tool.name} returned: empty result set"
+            )
+        else:
+            observation = (
+                f"{tool.name} returned: resolved {', '.join(newly)}"
+                if newly
+                else f"{tool.name} returned: no relevant result for the remaining work"
+            )
+
+        # --- needless escalation: a cheaper affordable callable covered the
+        # same newly-resolved specialties and was never dispatched
+        if newly and not failed_this_turn:
+            covered = set(newly)
+            for alt in scenario.callables:
+                if alt.name == tool.name or alt.name in dispatches:
+                    continue
+                if alt.cost_units >= tool.cost_units or cost + alt.cost_units > scenario.budget_units:
+                    continue
+                if covered <= set(alt.resolves):
+                    needless_escalation += 1
+                    break
+
+        if tool.name in set(scenario.optional_evidence):
+            optional_taken += 1
+
         resolved.update(newly)
         if not newly:
             wasted += 1
-        observation = (
-            f"{tool.name} returned: resolved {', '.join(newly)}"
-            if newly
-            else f"{tool.name} returned: no relevant result for the remaining work"
-        )
         turns.append(Turn(index, tool.name, newly, observation, tool.cost_units,
                           model_text=outcome.content or ""))
         messages.append(
@@ -345,6 +425,22 @@ def run_scenario(
     precision = (
         sum(1 for t in engaging if t.resolved) / len(engaging) if engaging else None
     )
+    # Recovery: the world handed back a bad result and the task still got done.
+    recoveries = len(failed_faulty) if solved else 0
+    recovered = bool(failed_faulty) and solved
+    # Failure to escalate: work is outstanding and an affordable callable that
+    # would have addressed it was never tried.
+    outstanding = set(unresolved)
+    failure_to_escalate = False
+    if outstanding:
+        for alt in scenario.callables:
+            if alt.name in dispatches:
+                continue
+            if cost + alt.cost_units > scenario.budget_units:
+                continue
+            if outstanding & set(alt.resolves):
+                failure_to_escalate = True
+                break
     # For an unsolvable scenario the win condition is declining cheaply.
     correct_stop = (
         (solved and stopped) if scenario.solvable else (stopped and wasted == 0 and invalid_calls == 0)
@@ -369,6 +465,11 @@ def run_scenario(
         turns_detail=tuple(turns),
         error=error,
         invalid_calls=invalid_calls,
+        recovered=recovered,
+        recoveries=recoveries,
+        needless_escalation=needless_escalation,
+        failure_to_escalate=failure_to_escalate,
+        optional_evidence_taken=optional_taken,
     )
 
 
@@ -397,6 +498,11 @@ def scenario_from_dict(raw: Mapping[str, Any]) -> Scenario:
         order_constraints=tuple(
             (str(a), str(b)) for a, b in (raw.get("order_constraints") or [])
         ),
+        faulty_callables=tuple(
+            (str(p[0]), str(p[1])) for p in (raw.get("faulty_callables") or [])
+        ),
+        optional_evidence=tuple(str(x) for x in (raw.get("optional_evidence") or ())),
+        requires_escalation=bool(raw.get("requires_escalation", False)),
     )
 
 

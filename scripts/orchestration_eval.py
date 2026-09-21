@@ -36,15 +36,16 @@ from z0int.cognition.registry import load_serving  # noqa: E402
 
 SCHEMA = "z0int.orchestration_eval_report.v1"
 DEFAULT_SCENARIOS = REPO / "benchmarks" / "fixtures" / "orchestration-v1" / "scenarios.jsonl"
+EXPANSION_SCENARIOS = REPO / "benchmarks" / "fixtures" / "orchestration-v2" / "scenarios.jsonl"
 
 
-def load_scenarios(path: Path) -> list[Scenario]:
-    out: list[Scenario] = []
+def load_scenarios(path: Path, cohort: str) -> list[tuple[Scenario, str]]:
+    out: list[tuple[Scenario, str]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
-        out.append(scenario_from_dict(json.loads(line)))
+        out.append((scenario_from_dict(json.loads(line)), cohort))
     return out
 
 
@@ -65,72 +66,131 @@ def _num(value: float | None, digits: int) -> str:
 
 
 def run_greedy(scenario: Scenario) -> dict[str, Any]:
-    """Deterministic control: cheapest-first coverage, then stop."""
-    resolved: set[str] = set()
-    remaining = list(scenario.requires)
-    max_by_specialty: dict[str, int] = {}
-    for c in scenario.callables:
-        for s in c.resolves:
-            if s in scenario.requires:
-                max_by_specialty.setdefault(s, 10_000)
-    cost = 0
+    """Deterministic control: cheapest affordable covering callable each turn.
+
+    Extended for the Phase 1B cohort so the control is measured on the same
+    axes as the models: it respects hard dependencies, retries a faulty callable
+    once, and never takes optional evidence.
+    """
+    faulty_mode = {name: mode for name, mode in scenario.faulty_callables}
+    faulty_hits: dict[str, int] = {}
+    failed_faulty: set[str] = set()
+    dead: set[str] = set()
+    remaining = set(scenario.requires)
+    dispatched: list[str] = []
+    succeeded: set[str] = set()
     picks: list[str] = []
     turns = 0
-    started = time.perf_counter()
+    cost = 0
+    wasted = 0
     order_violations = 0
+    needless_escalation = 0
+    optional_taken = 0
+    resolved_log: list[tuple[str, tuple[str, ...]]] = []
+    started = time.perf_counter()
+
     while remaining and turns < scenario.max_turns:
-        turns += 1
-        # cheapest callable that strictly cheapens the remaining set
         best = None
         for c in sorted(scenario.callables, key=lambda c: (c.cost_units, c.name)):
+            if cost + c.cost_units > scenario.budget_units:
+                continue
+            if c.name in succeeded or c.name in dead:
+                continue
             covered = [s for s in c.resolves if s in remaining]
             if not covered:
                 continue
-            if cost + c.cost_units > scenario.budget_units:
+            blocked = any(
+                c.name == after and before not in dispatched
+                for before, after in scenario.order_constraints
+            )
+            if blocked:
                 continue
             best = (c, covered)
             break
         if best is None:
             break
+
         c, covered = best
+        turns += 1
         cost += c.cost_units
-        picks.append(c.name)
         for before, after in scenario.order_constraints:
-            if c.name == after and before not in picks[:-1]:
+            if c.name == after and before not in dispatched:
                 order_violations += 1
+        hit = faulty_hits.get(c.name, 0)
+        faulty_hits[c.name] = hit + 1
+        mode = faulty_mode.get(c.name)
+        failed_this_turn = mode == "empty" or (mode == "error" and hit == 0)
+        if failed_this_turn:
+            failed_faulty.add(c.name)
+            if mode == "empty":
+                # an empty result will not change on a retry
+                dead.add(c.name)
+            covered = []
+        else:
+            succeeded.add(c.name)
+        if c.name in set(scenario.optional_evidence):
+            optional_taken += 1
+        dispatched.append(c.name)
+        picks.append(c.name)
+        resolved_log.append((c.name, tuple(covered)))
         for s in covered:
-            remaining.remove(s)
-            resolved.add(s)
+            remaining.discard(s)
+        if not covered:
+            wasted += 1
+
     latency = (time.perf_counter() - started) * 1000.0
+    solved = not remaining
+    recoveries = len(failed_faulty) if solved else 0
+    recovered = bool(failed_faulty) and solved
+    failure_to_escalate = False
+    if remaining:
+        for alt in scenario.callables:
+            if alt.name in dispatched:
+                continue
+            if cost + alt.cost_units > scenario.budget_units:
+                continue
+            if remaining & set(alt.resolves):
+                failure_to_escalate = True
+                break
+    engaging = [p for p in resolved_log]
+    precision = (
+        sum(1 for _, r in engaging if r) / len(engaging) if engaging else None
+    )
     return {
         "scenario_id": scenario.scenario_id,
         "backend": "optimal_greedy",
         "model": None,
-        "solved": not remaining,
+        "solved": solved,
         "solvable": scenario.solvable,
-        "correct_stop": (not remaining) if scenario.solvable else bool(not picks),
+        "correct_stop": (solved) if scenario.solvable else bool(not picks),
         "stopped": True,
         "premature_stop": bool(remaining),
         "budget_exhausted": False,
         "turns": turns,
         "cost_units": cost,
-        "unresolved": remaining,
+        "unresolved": sorted(remaining),
         "order_violations": order_violations,
-        "wasted_calls": 0,
-        "specialist_precision": 1.0 if picks else None,
+        "wasted_calls": wasted,
+        "specialist_precision": precision,
         "latency_ms": latency,
         "invalid_calls": 0,
         "error": None,
+        "recovered": recovered,
+        "recoveries": recoveries,
+        "needless_escalation": needless_escalation,
+        "failure_to_escalate": failure_to_escalate,
+        "optional_evidence_taken": optional_taken,
         "turns_detail": [{"chosen": p} for p in picks],
     }
 
 
 def evaluate(
-    backend_id: str, config: ServerConfig, scenarios: Sequence[Scenario], *, label: str | None = None
+    backend_id: str, config: ServerConfig, scenarios: Sequence[tuple[Scenario, str]], *,
+    label: str | None = None,
 ) -> dict[str, Any]:
     orchestrator = LocalOrchestrator(backend_id=label or backend_id, config=config)
     rows: list[dict[str, Any]] = []
-    for scenario in scenarios:
+    for scenario, cohort in scenarios:
         print(f"#   {scenario.scenario_id}", file=sys.stderr)
         try:
             result = run_scenario(scenario, orchestrator)
@@ -138,6 +198,7 @@ def evaluate(
             rows.append(
                 {
                     "scenario_id": scenario.scenario_id,
+                    "cohort": cohort,
                     "backend": label or backend_id,
                     "solved": False,
                     "solvable": scenario.solvable,
@@ -153,11 +214,18 @@ def evaluate(
                     "invalid_calls": 0,
                     "specialist_precision": None,
                     "unresolved": list(scenario.requires),
+                    "recovered": False,
+                    "recoveries": 0,
+                    "needless_escalation": 0,
+                    "failure_to_escalate": False,
+                    "optional_evidence_taken": 0,
                     "turns_detail": [],
                 }
             )
             continue
-        rows.append(result.to_dict())
+        row = result.to_dict()
+        row["cohort"] = cohort
+        rows.append(row)
     return summarise(label or backend_id, rows)
 
 
@@ -165,11 +233,16 @@ def summarise(label: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
     n = len(rows)
     lat = [r["latency_ms"] for r in rows]
     by_family: dict[str, dict[str, int]] = {}
+    by_cohort: dict[str, dict[str, int]] = {}
     for r in rows:
         fam = r["scenario_id"].split("_")[0]
         b = by_family.setdefault(fam, {"n": 0, "solved": 0})
         b["n"] += 1
         b["solved"] += int(bool(r["solved"]))
+        c = by_cohort.setdefault(r.get("cohort", "?"), {"n": 0, "solved": 0, "correct_stop": 0})
+        c["n"] += 1
+        c["solved"] += int(bool(r["solved"]))
+        c["correct_stop"] += int(bool(r.get("correct_stop")))
     precisions = [r["specialist_precision"] for r in rows if r["specialist_precision"] is not None]
     return {
         "backend": label,
@@ -185,6 +258,13 @@ def summarise(label: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
         "cost_units_total": sum(int(r["cost_units"]) for r in rows),
         "turns_total": sum(int(r["turns"]) for r in rows),
         "mean_specialist_precision": (statistics.fmean(precisions) if precisions else None),
+        "recovered": sum(int(bool(r.get("recovered"))) for r in rows),
+        "recovery_opportunities": sum(
+            1 for r in rows if r["scenario_id"].startswith("recover")
+        ),
+        "needless_escalation": sum(int(r.get("needless_escalation", 0)) for r in rows),
+        "failure_to_escalate": sum(int(bool(r.get("failure_to_escalate"))) for r in rows),
+        "optional_evidence_taken": sum(int(r.get("optional_evidence_taken", 0)) for r in rows),
         "latency_ms": {
             "p50": percentile(lat, 50),
             "p95": percentile(lat, 95),
@@ -193,6 +273,7 @@ def summarise(label: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
             "max": max(lat) if lat else None,
         },
         "by_family": by_family,
+        "by_cohort": by_cohort,
         "rows": rows,
     }
 
@@ -207,22 +288,33 @@ def render_md(results: list[dict[str, Any]]) -> str:
         "- `wasted_calls` = dispatches that resolved nothing.",
         "- `order_violations` = a dependency dispatched before its prerequisite.",
         "- `optimal_greedy` is the cheapest-covering-set control.",
+        "- `recovered` = the world returned an error/empty result and the task still got solved.",
+        "- `needless_escalation` = dispatched a costlier callable when a cheaper affordable one",
+        "  covered the same specialty.",
+        "- `failure_to_escalate` = stopped with work outstanding while an affordable callable",
+        "  that could have resolved it was never dispatched.",
         "",
-        "| backend | scenarios | solved | correct stop | premature stop | budget out | wasted "
-        "| order viol | invalids | errors | cost units | turns | precision | p50 ms | p95 ms |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| backend | cohort | scenarios | solved | correct stop | premature stop | budget out | wasted "
+        "| order viol | invalids | errors | cost units | turns | precision | recovered | needless esc "
+        "| failed to esc | optional taken | p50 ms | p95 ms |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in results:
         lat = r["latency_ms"]
         prec = r["mean_specialist_precision"]
-        lines.append(
-            f"| {r['backend']} | {r['scenarios']} | {r['solved']}/{r['scenarios']} "
-            f"| {r['correct_stop']}/{r['scenarios']} "
-            f"| {r['premature_stop']} | {r['budget_exhausted']} | {r['wasted_calls']} "
-            f"| {r['order_violations']} | {r['invalid_calls']} | {r['errors']} "
-            f"| {r['cost_units_total']} | {r['turns_total']} "
-            f"| {_num(prec, 2)} | {_num(lat['p50'], 0)} | {_num(lat['p95'], 0)} |"
-        )
+        for cohort, c in sorted(r.get("by_cohort", {"all": {"n": r["scenarios"], "solved": r["solved"],
+                                                            "correct_stop": r["correct_stop"]}}).items()):
+            lines.append(
+                f"| {r['backend']} | {cohort} | {c['n']} | {c['solved']}/{c['n']} "
+                f"| {c['correct_stop']}/{c['n']} "
+                f"| {r['premature_stop']} | {r['budget_exhausted']} | {r['wasted_calls']} "
+                f"| {r['order_violations']} | {r['invalid_calls']} | {r['errors']} "
+                f"| {r['cost_units_total']} | {r['turns_total']} "
+                f"| {_num(prec, 2)} | {r['recovered']}/{r['recovery_opportunities']} "
+                f"| {r['needless_escalation']} | {r['failure_to_escalate']} "
+                f"| {r['optional_evidence_taken']} "
+                f"| {_num(lat['p50'], 0)} | {_num(lat['p95'], 0)} |"
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -232,7 +324,12 @@ def _stamp() -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--scenarios", default=str(DEFAULT_SCENARIOS))
+    ap.add_argument("--scenarios", action="append", default=[],
+                    help="scenario file; repeatable. Default: the frozen regression cohort")
+    ap.add_argument("--include-expansion", action="store_true",
+                    help="also run benchmarks/fixtures/orchestration-v2 (the Phase 1B corpus)")
+    ap.add_argument("--expansion-only", action="store_true",
+                    help="run only the Phase 1B expansion corpus")
     ap.add_argument("--backend", action="append", default=[], help="served model_id")
     ap.add_argument("--served", action="store_true", help="evaluate every served model")
     ap.add_argument("--greedy", action="store_true", help="include the optimal_greedy control")
@@ -240,7 +337,19 @@ def main() -> int:
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
-    scenarios = load_scenarios(Path(args.scenarios))
+    if args.expansion_only:
+        sources: list[tuple[Path, str]] = [(EXPANSION_SCENARIOS, "expansion")]
+    else:
+        sources = [(Path(p), "regression" if "orchestration-v1" in p else "custom")
+                   for p in args.scenarios] or [(DEFAULT_SCENARIOS, "regression")]
+        if args.include_expansion:
+            sources.append((EXPANSION_SCENARIOS, "expansion"))
+    scenarios: list[tuple[Scenario, str]] = []
+    for path, cohort in sources:
+        found = load_scenarios(path, cohort)
+        scenarios.extend(found)
+        print(f"# cohort={cohort} file={path.name} scenarios={len(found)}", file=sys.stderr)
+
     endpoints = load_serving()
     wanted = list(args.backend)
     if args.served:
@@ -251,7 +360,11 @@ def main() -> int:
 
     results: list[dict[str, Any]] = []
     if args.greedy:
-        rows = [run_greedy(s) for s in scenarios]
+        rows = []
+        for scenario, cohort in scenarios:
+            row = run_greedy(scenario)
+            row["cohort"] = cohort
+            rows.append(row)
         results.append(summarise("optimal_greedy", rows))
 
     for model_id in wanted:
@@ -275,7 +388,8 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     report = {
         "schema": SCHEMA,
-        "scenarios_path": str(args.scenarios),
+        "scenario_sources": [{"path": str(p), "cohort": c} for p, c in
+                             (sources if not args.expansion_only else [(EXPANSION_SCENARIOS, "expansion")])],
         "scenario_count": len(scenarios),
         "results": results,
     }
