@@ -35,6 +35,7 @@ GGUF_LAYOUT: dict[str, str] = {
     "hammer2.1_7b": "hammer2.1-7b/Hammer2.1-7b-Q4_K_M.gguf",
     "nemotron_orchestrator_8b": "nvidia-orchestrator-8b/nvidia_Orchestrator-8B-Q4_K_M.gguf",
     "qwen3.5_9b": "qwen3.5-9b/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+    "qwen3.5_4b": "qwen3.5-4b/Qwen_Qwen3.5-4B-Q4_K_M.gguf",
 }
 
 

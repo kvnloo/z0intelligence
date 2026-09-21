@@ -63,19 +63,19 @@
       "measurements": [
         {
           "machine": "NVIDIA GeForce RTX 3080 Ti",
-          "runtime": "llama.cpp-0.4.1-dev",
+          "runtime": "llama.cpp-supervisor",
           "quantization": "Q4_K_M",
           "context": 4096,
-          "measured_vram_mib": 7023.0,
-          "vram_idle_mib": 7007.0,
-          "vram_peak_mib": 7023.0,
-          "cold_start_ms": 122.04679599972224,
-          "warm_ttft_ms": 9.735,
-          "decode_tok_s": 113.67188610077014,
-          "short_decision_ms": 733.0562030001602,
-          "long_decision_ms": 855.0350410000647,
-          "gpu_util_pct": 99.0,
-          "measured_at": "2026-09-21T17:27:27Z"
+          "measured_vram_mib": 6251.0,
+          "vram_idle_mib": 5240.0,
+          "vram_peak_mib": 6251.0,
+          "cold_start_ms": 15348.781665000388,
+          "warm_ttft_ms": 10.144,
+          "decode_tok_s": 108.03511141120866,
+          "short_decision_ms": 741.4457969998693,
+          "long_decision_ms": 887.5959609995334,
+          "gpu_util_pct": 100.0,
+          "measured_at": "2026-09-21T18:26:45Z"
         }
       ],
       "source_reported_benchmarks": [
@@ -191,19 +191,19 @@
       "measurements": [
         {
           "machine": "NVIDIA GeForce RTX 3080 Ti",
-          "runtime": "llama.cpp-0.4.1-dev",
+          "runtime": "llama.cpp-supervisor",
           "quantization": "Q4_K_M",
           "context": 4096,
-          "measured_vram_mib": 7406.0,
-          "vram_idle_mib": 7372.0,
-          "vram_peak_mib": 7406.0,
-          "cold_start_ms": 306.17335100032506,
-          "warm_ttft_ms": 62.562,
-          "decode_tok_s": 83.91989845692287,
-          "short_decision_ms": 1274.8163619999104,
-          "long_decision_ms": 1185.1446579994445,
-          "gpu_util_pct": 98.0,
-          "measured_at": "2026-09-21T17:27:52Z"
+          "measured_vram_mib": 6646.0,
+          "vram_idle_mib": 6251.0,
+          "vram_peak_mib": 6646.0,
+          "cold_start_ms": 17721.9307940004,
+          "warm_ttft_ms": 49.951,
+          "decode_tok_s": 87.93237999978017,
+          "short_decision_ms": 1083.2227880000573,
+          "long_decision_ms": 1149.7388190000493,
+          "gpu_util_pct": 97.0,
+          "measured_at": "2026-09-21T18:27:05Z"
         }
       ],
       "source_reported_benchmarks": [
@@ -286,7 +286,7 @@
         "ollama"
       ],
       "available_quantizations": [
-        "bfloat16"
+        "Q4_K_M"
       ],
       "tool_call_template": "qwen35",
       "tool_parser": "qwen3_coder",
@@ -299,11 +299,28 @@
         "irrelevant_tool_rejection": true,
         "model_as_tool_orchestration": false
       },
-      "tested_context": null,
-      "tested_quantization": null,
+      "tested_context": 4096,
+      "tested_quantization": "Q4_K_M",
       "supports_confidence": true,
       "supports_abstention": null,
-      "measurements": [],
+      "measurements": [
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-supervisor",
+          "quantization": "Q4_K_M",
+          "context": 4096,
+          "measured_vram_mib": 6646.0,
+          "vram_idle_mib": 6646.0,
+          "vram_peak_mib": 6646.0,
+          "cold_start_ms": 11479.440523999983,
+          "warm_ttft_ms": 57.955,
+          "decode_tok_s": 117.14745936447503,
+          "short_decision_ms": 778.5844720001478,
+          "long_decision_ms": 829.0741299997535,
+          "gpu_util_pct": 98.0,
+          "measured_at": "2026-09-21T18:27:19Z"
+        }
+      ],
       "source_reported_benchmarks": [
         {
           "name": "TAU2-Bench",
@@ -354,7 +371,15 @@
         "Do not co-reside with nanojev_06b or openjev_06b on 12GB (see manifests/models.z0int.json policies)."
       ],
       "mechanism": "Same unified vision-language Qwen3.5 architecture at 4B scale; hybrid Gated DeltaNet plus Gated Attention, sparse MoE, RL post-training, 262144 native context.",
-      "notes": "Already pinned as openjev_4b in manifests/models.z0int.json, which remains the canonical decision-backend record for this checkpoint."
+      "notes": "Already pinned as openjev_4b in manifests/models.z0int.json, which remains the canonical decision-backend record for this checkpoint. Local GGUF evidence: general.architecture=qwen35, qwen35.context_length=262144, file_type=15 (Q4_K_M), general.license=apache-2.0, quantized by bartowski.",
+      "local_artifact": {
+        "kind": "gguf",
+        "hf_repo": "bartowski/Qwen_Qwen3.5-4B-GGUF",
+        "hf_revision": "4168f45a16a1290d65a4ec0fa312ae917a4c15d6",
+        "file": "Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+        "sha256": "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983",
+        "bytes": 3013027808
+      }
     },
     "hammer2.1_3b": {
       "model_id": "hammer2.1_3b",
@@ -394,19 +419,19 @@
       "measurements": [
         {
           "machine": "NVIDIA GeForce RTX 3080 Ti",
-          "runtime": "llama.cpp-0.4.1-dev",
+          "runtime": "llama.cpp-supervisor",
           "quantization": "Q4_K_M",
           "context": 4096,
-          "measured_vram_mib": 3957.0,
-          "vram_idle_mib": 3939.0,
-          "vram_peak_mib": 3957.0,
-          "cold_start_ms": 65.72778800000378,
-          "warm_ttft_ms": 5.565,
-          "decode_tok_s": 281.6372512204281,
-          "short_decision_ms": 136.9289369999933,
-          "long_decision_ms": 214.19826200008174,
-          "gpu_util_pct": 40.0,
-          "measured_at": "2026-09-21T17:26:52Z"
+          "measured_vram_mib": 3178.0,
+          "vram_idle_mib": 1486.0,
+          "vram_peak_mib": 3178.0,
+          "cold_start_ms": 5222.007534999648,
+          "warm_ttft_ms": 5.801,
+          "decode_tok_s": 289.5473409902519,
+          "short_decision_ms": 138.23248300013802,
+          "long_decision_ms": 208.92001799984428,
+          "gpu_util_pct": 69.0,
+          "measured_at": "2026-09-21T18:26:14Z"
         }
       ],
       "source_reported_benchmarks": [],
@@ -456,19 +481,19 @@
       "measurements": [
         {
           "machine": "NVIDIA GeForce RTX 3080 Ti",
-          "runtime": "llama.cpp-0.4.1-dev",
+          "runtime": "llama.cpp-supervisor",
           "quantization": "Q4_K_M",
           "context": 4096,
-          "measured_vram_mib": 6014.0,
-          "vram_idle_mib": 5994.0,
-          "vram_peak_mib": 6014.0,
-          "cold_start_ms": 67.38425499997902,
-          "warm_ttft_ms": 9.291,
-          "decode_tok_s": 216.91973969631235,
-          "short_decision_ms": 211.04429800016078,
-          "long_decision_ms": 333.3635789999789,
-          "gpu_util_pct": 84.0,
-          "measured_at": "2026-09-21T17:27:06Z"
+          "measured_vram_mib": 5293.0,
+          "vram_idle_mib": 3178.0,
+          "vram_peak_mib": 5293.0,
+          "cold_start_ms": 13284.277826999642,
+          "warm_ttft_ms": 13.229,
+          "decode_tok_s": 124.74271814382834,
+          "short_decision_ms": 244.49857699983113,
+          "long_decision_ms": 356.5524949999599,
+          "gpu_util_pct": 100.0,
+          "measured_at": "2026-09-21T18:26:28Z"
         }
       ],
       "source_reported_benchmarks": [],
@@ -519,19 +544,19 @@
       "measurements": [
         {
           "machine": "NVIDIA GeForce RTX 3080 Ti",
-          "runtime": "llama.cpp-0.4.1-dev",
+          "runtime": "llama.cpp-supervisor",
           "quantization": "Q8_0",
           "context": 4096,
-          "measured_vram_mib": 2241.0,
-          "vram_idle_mib": 2223.0,
-          "vram_peak_mib": 2241.0,
-          "cold_start_ms": 46.496623999701114,
-          "warm_ttft_ms": 8.447,
-          "decode_tok_s": 360.0036000360003,
-          "short_decision_ms": 123.85085599999002,
-          "long_decision_ms": 100.10272699992129,
-          "gpu_util_pct": 40.0,
-          "measured_at": "2026-09-21T17:26:42Z"
+          "measured_vram_mib": 1482.0,
+          "vram_idle_mib": 3187.0,
+          "vram_peak_mib": 1482.0,
+          "cold_start_ms": 5319.287746000555,
+          "warm_ttft_ms": 8.595,
+          "decode_tok_s": 351.12359550561797,
+          "short_decision_ms": 139.41085799979192,
+          "long_decision_ms": 83.17142000032618,
+          "gpu_util_pct": 51.0,
+          "measured_at": "2026-09-21T18:26:08Z"
         }
       ],
       "source_reported_benchmarks": [
