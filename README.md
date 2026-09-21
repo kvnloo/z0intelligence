@@ -14,6 +14,29 @@ Today, this repository contains the OpenJev runtime and benchmark substrate: typ
 See [ROADMAP.md](ROADMAP.md) for the staged build.
 
 
+## Evaluation before promotion
+
+The decision stack has two separate planes:
+
+```text
+execution:  harness -> bounded live policy -> tools/artifacts -> verifier/outcome
+
+evaluation: replayable state/events
+              + objective Tokenomics counters
+              + JEV/reference semantic readings
+              + independent outcomes
+                    |
+                    v
+              Evolution Lab comparison
+                    |
+                    v
+              credited specialist may enter execution
+```
+
+JEV is the seed semantic observer/reference backend for this evaluation plane. It is not ground truth, a security authority, or automatically a production policy. A NanoJev ↔ JEV disagreement is an evaluation/adjudication case until independent evidence resolves it.
+
+See [docs/observer-evaluation.md](docs/observer-evaluation.md).
+
 ## Decision backends
 
 ```bash
