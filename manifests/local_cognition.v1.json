@@ -14,15 +14,17 @@
     }
   },
   "role_defaults": {
-    "semantic_orchestrator": "nemotron_orchestrator_8b",
+    "semantic_orchestrator": "qwen3.5_4b",
     "general_local_fallback": "qwen3.5_9b",
-    "tiny_action_specialist": "functiongemma_270m",
     "general_function_caller": "hammer2.1_3b",
+    "tiny_action_specialist": "hammer2.1_3b",
     "bounded_scorer": "nanojev_06b"
   },
   "role_notes": {
-    "tiny_action_specialist": "Only credited per action family after measured promotion. role_defaults records the current experiment target, not authority.",
-    "bounded_scorer": "JEV/OpenJev/NanoJev are canonically declared in the decision_roster of manifests/models.z0int.json; this entry references that manifest rather than duplicating it.",
+    "semantic_orchestrator": "DEMOTED FROM nemotron_orchestrator_8b ON MEASURED EVIDENCE. On the 12-scenario multi-turn orchestration benchmark qwen3.5_4b and qwen3.5_9b each solve 9/12 while Nemotron solves 6/12, and the 4B is 2.4x faster (p50 4740 ms vs 11475 ms). Nemotron is also dominated on bounded choice (17-20/28 vs 24-26/28) and its licence is non-commercial. It remains a research candidate only; see docs/local-cognition-portfolio.md.",
+    "tiny_action_specialist": "hammer2.1_3b, not the declared experiment target functiongemma_270m: measured 24/28 at p50 185 ms against FunctionGemma's 14/28 zero-shot. FunctionGemma keeps this role as a FINE-TUNING target (z0intelligence#20 phase 10) and must beat the Pareto frontier before it is promoted.",
+    "bounded_scorer": "Canonically declared in the decision_roster of manifests/models.z0int.json. Never abstained on 25/28 fixtures, so the cascade re-checks its confidence before accepting its answer; without that the rest of the ladder is dead code.",
+    "general_local_fallback": "qwen3.5_9b: 28/28 schema validity and 26/28 correct with an adequate completion budget. Its latency means it is a backstop, not a hot path.",
     "remote_specialist_fallback": "Deliberately unset: remote seats resolve from the dynamically inventoried FREE provider paths, never from a static list here."
   },
   "models": {
@@ -158,6 +160,7 @@
       "hf": "Qwen/Qwen3.5-9B",
       "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
       "role_tags": [
+        "semantic_orchestrator",
         "general_local_fallback",
         "general_function_caller"
       ],
@@ -272,6 +275,7 @@
       "hf": "Qwen/Qwen3.5-4B",
       "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
       "role_tags": [
+        "semantic_orchestrator",
         "general_local_fallback",
         "general_function_caller",
         "bounded_scorer"

@@ -146,12 +146,14 @@ def test_selectable_excludes_rejected_and_unavailable():
 
 
 def test_assert_selection_is_evidence_based_flags_unmeasured_defaults():
+    """Whatever is currently role-defaulted must carry local evidence."""
     raw = json.loads(default_manifest_path().read_text(encoding="utf-8"))
-    raw["models"]["nemotron_orchestrator_8b"]["measurements"] = []
-    raw["models"]["nemotron_orchestrator_8b"]["local_benchmark_receipt_ids"] = []
+    for model_id in raw["role_defaults"].values():
+        raw["models"][model_id]["measurements"] = []
+        raw["models"][model_id]["local_benchmark_receipt_ids"] = []
     manifest = parse_manifest(raw)
     offenders = assert_selection_is_evidence_based(manifest)
-    assert "nemotron_orchestrator_8b" in offenders
+    assert set(raw["role_defaults"].values()) <= set(offenders)
 
 
 def test_a_measured_default_passes_the_evidence_gate():
