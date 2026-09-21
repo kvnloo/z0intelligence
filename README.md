@@ -201,6 +201,19 @@ Hermes / OMP / other runtime
 
 The useful connection is not adding a `fly` node kind. It is using personalized learned policies to help **decode messy human language into a more explicit intent representation**, while AODL provides a portable vocabulary for the resulting orchestration.
 
+## JEV rollout: dogfood before formal eval
+
+The first live JEV surface is the existing [hermes-jev-skills](https://github.com/kvnloo/hermes-jev-skills) plugin, using public Hermes plugin seams. z0intelligence does **not** need to block that activation on a finished replay platform.
+
+Rollout order:
+
+1. enable one reversible, bounded decision lane such as model routing in live shadow/low-risk dogfood traffic;
+2. emit compact replayable decision receipts while preserving Hermes' existing path as fail-open fallback;
+3. after real traces exist, run the grouped JEV/NanoJev/OpenJev/control evaluations tracked in [#14](https://github.com/kvnloo/z0intelligence/issues/14);
+4. promote cheaper specialists only when independent outcomes credit that question family.
+
+JEV is the seed semantic observer/reference backend, not verified truth or a security authority. Historical traces remain useful controls, but synthetic or frozen replay is not a prerequisite to the first low-risk dogfood slice.
+
 ## Evolution Lab
 
 z0int supplies runtime scorers and training surfaces. [Evolution Lab](https://github.com/kvnloo/evolution-lab) owns the empirical search loop:
@@ -229,7 +242,7 @@ promote verified winner
 
 The ABAB meta-loop can evolve both **what data to train on** and **which architecture to use**. The benchmark, privacy boundary, and sealed evaluation set stay outside the evolvable surface.
 
-## Current foundation: OpenJev runtime
+## Local candidate foundation: OpenJev runtime
 
 The code in this repository currently reproduces the useful *interface pattern* of TypeSafe Jev with open components. It does not reproduce Jev's undisclosed model or training.
 
