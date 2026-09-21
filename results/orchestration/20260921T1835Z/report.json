@@ -1,0 +1,3696 @@
+{
+  "results": [
+    {
+      "backend": "optimal_greedy",
+      "budget_exhausted": 0,
+      "by_family": {
+        "budget": {
+          "n": 1,
+          "solved": 1
+        },
+        "cheap": {
+          "n": 1,
+          "solved": 1
+        },
+        "expensive": {
+          "n": 1,
+          "solved": 1
+        },
+        "generalist": {
+          "n": 1,
+          "solved": 1
+        },
+        "irrelevant": {
+          "n": 1,
+          "solved": 1
+        },
+        "no": {
+          "n": 1,
+          "solved": 0
+        },
+        "replan": {
+          "n": 1,
+          "solved": 1
+        },
+        "specialist": {
+          "n": 1,
+          "solved": 1
+        },
+        "stop": {
+          "n": 1,
+          "solved": 1
+        },
+        "three": {
+          "n": 1,
+          "solved": 1
+        },
+        "two": {
+          "n": 2,
+          "solved": 2
+        }
+      },
+      "correct_stop": 12,
+      "cost_units_total": 35,
+      "errors": 0,
+      "invalid_calls": 0,
+      "latency_ms": {
+        "max": 0.005592999514192343,
+        "mean": 0.0021813333053917936,
+        "p50": 0.0015905002328509,
+        "p95": 0.005187099804970784,
+        "p99": 0.005511819572348031
+      },
+      "mean_specialist_precision": 1.0,
+      "order_violations": 2,
+      "premature_stop": 1,
+      "rows": [
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 1,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.005592999514192343,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "cheap_tool_suffices",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "git_rev_parse"
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 4,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.0021920004655839875,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "specialist_required",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "legal_specialist_llm"
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.002237999979115557,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "generalist_required_no_specialist",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "general_llm"
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.0011880001693498343,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "expensive_model_unnecessary",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "date_parse"
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.0032059997465694323,
+          "model": null,
+          "order_violations": 1,
+          "premature_stop": false,
+          "scenario_id": "two_step_dependency",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 2,
+          "turns_detail": [
+            {
+              "chosen": "db_verify"
+            },
+            {
+              "chosen": "db_migrate"
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 3,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.0010980002116411924,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "replan_after_wrong_dispatch",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "run_build_repro"
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 1,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.0008999995770864189,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "budget_forces_cheap_path",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "rule_classifier"
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 2,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.0009239993232768029,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "stop_when_done",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "df_command"
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.0010650001058820635,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "no_relevant_capability",
+          "solvable": false,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [],
+          "unresolved": [
+            "forecast"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.0019930002963519655,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "two_independent_requirements",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 2,
+          "turns_detail": [
+            {
+              "chosen": "git_log"
+            },
+            {
+              "chosen": "editor_specialist_llm"
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 1,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.0009240002327715047,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "irrelevant_tool_rejection",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "hash_tool"
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "optimal_greedy",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 8,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 0.00485500004288042,
+          "model": null,
+          "order_violations": 1,
+          "premature_stop": false,
+          "scenario_id": "three_step_pipeline",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "detect_anomaly"
+            },
+            {
+              "chosen": "fetch_metrics"
+            },
+            {
+              "chosen": "attribute_commit"
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        }
+      ],
+      "scenarios": 12,
+      "solved": 11,
+      "turns_total": 16,
+      "wasted_calls": 0
+    },
+    {
+      "backend": "nemotron_orchestrator_8b",
+      "budget_exhausted": 0,
+      "by_family": {
+        "budget": {
+          "n": 1,
+          "solved": 0
+        },
+        "cheap": {
+          "n": 1,
+          "solved": 1
+        },
+        "expensive": {
+          "n": 1,
+          "solved": 0
+        },
+        "generalist": {
+          "n": 1,
+          "solved": 0
+        },
+        "irrelevant": {
+          "n": 1,
+          "solved": 1
+        },
+        "no": {
+          "n": 1,
+          "solved": 0
+        },
+        "replan": {
+          "n": 1,
+          "solved": 1
+        },
+        "specialist": {
+          "n": 1,
+          "solved": 0
+        },
+        "stop": {
+          "n": 1,
+          "solved": 0
+        },
+        "three": {
+          "n": 1,
+          "solved": 1
+        },
+        "two": {
+          "n": 2,
+          "solved": 2
+        }
+      },
+      "correct_stop": 7,
+      "cost_units_total": 30,
+      "errors": 0,
+      "invalid_calls": 0,
+      "latency_ms": {
+        "max": 30851.96404599992,
+        "mean": 10865.054172499867,
+        "p50": 11474.984984499315,
+        "p95": 24538.65889839957,
+        "p99": 29589.303016479862
+      },
+      "mean_specialist_precision": 0.7142857142857143,
+      "order_violations": 0,
+      "premature_stop": 6,
+      "rows": [
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 2,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 30851.96404599992,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "cheap_tool_suffices",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 0.5,
+          "stopped": true,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "git_rev_parse",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "rev"
+              ]
+            },
+            {
+              "chosen": "git_rev_parse",
+              "cost_units": 1,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 1
+        },
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 3909.107915000277,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "specialist_required",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "legal_review"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 1,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 4167.4237530005485,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "generalist_required_no_specialist",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": 0.0,
+          "stopped": true,
+          "turns": 2,
+          "turns_detail": [
+            {
+              "chosen": "fetch_timeline",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "summary"
+          ],
+          "wasted_calls": 1
+        },
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 11427.84920199938,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "expensive_model_unnecessary",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "epoch"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 15844.310010999834,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "two_step_dependency",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "db_migrate",
+              "cost_units": 3,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "migrate"
+              ]
+            },
+            {
+              "chosen": "db_verify",
+              "cost_units": 2,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "verify"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 8,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 11522.120766999251,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "replan_after_wrong_dispatch",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 0.5,
+          "stopped": true,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "run_build_repro",
+              "cost_units": 3,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "root_cause"
+              ]
+            },
+            {
+              "chosen": "infra_specialist_llm",
+              "cost_units": 5,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 1
+        },
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 12679.100121999909,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "budget_forces_cheap_path",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "classification"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 2124.873834999562,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "stop_when_done",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "disk_free"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 1964.2188500001794,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "no_relevant_capability",
+          "solvable": false,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "forecast"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 13068.5076940008,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "two_independent_requirements",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "git_log",
+              "cost_units": 2,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "changelog"
+              ]
+            },
+            {
+              "chosen": "editor_specialist_llm",
+              "cost_units": 3,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "readability"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 1,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 3447.9464609994466,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "irrelevant_tool_rejection",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 2,
+          "turns_detail": [
+            {
+              "chosen": "hash_tool",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "digest"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "nemotron_orchestrator_8b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 8,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 19373.227413999302,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "three_step_pipeline",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 4,
+          "turns_detail": [
+            {
+              "chosen": "fetch_metrics",
+              "cost_units": 2,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "metrics"
+              ]
+            },
+            {
+              "chosen": "detect_anomaly",
+              "cost_units": 2,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "anomaly"
+              ]
+            },
+            {
+              "chosen": "attribute_commit",
+              "cost_units": 4,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "attribution"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 3,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        }
+      ],
+      "scenarios": 12,
+      "solved": 6,
+      "turns_total": 25,
+      "wasted_calls": 3
+    },
+    {
+      "backend": "hammer2.1_3b",
+      "budget_exhausted": 0,
+      "by_family": {
+        "budget": {
+          "n": 1,
+          "solved": 0
+        },
+        "cheap": {
+          "n": 1,
+          "solved": 0
+        },
+        "expensive": {
+          "n": 1,
+          "solved": 0
+        },
+        "generalist": {
+          "n": 1,
+          "solved": 0
+        },
+        "irrelevant": {
+          "n": 1,
+          "solved": 0
+        },
+        "no": {
+          "n": 1,
+          "solved": 0
+        },
+        "replan": {
+          "n": 1,
+          "solved": 0
+        },
+        "specialist": {
+          "n": 1,
+          "solved": 0
+        },
+        "stop": {
+          "n": 1,
+          "solved": 0
+        },
+        "three": {
+          "n": 1,
+          "solved": 0
+        },
+        "two": {
+          "n": 2,
+          "solved": 0
+        }
+      },
+      "correct_stop": 1,
+      "cost_units_total": 0,
+      "errors": 0,
+      "invalid_calls": 0,
+      "latency_ms": {
+        "max": 10031.52034499999,
+        "mean": 1104.8725821666114,
+        "p50": 314.11346150025565,
+        "p95": 4837.832212399956,
+        "p99": 8992.78271847999
+      },
+      "mean_specialist_precision": null,
+      "order_violations": 0,
+      "premature_stop": 12,
+      "rows": [
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 10031.52034499999,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "cheap_tool_suffices",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'git_rev_parse', 'arguments': {'input': 'this repository'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "rev"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 323.3834869997736,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "specialist_required",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'legal_specialist_llm', 'arguments': {'input': 'migration'}}, {'name': 'grep_policy', 'arguments': {'input': 'data-retention policy'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "legal_review"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 362.57369200029643,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "generalist_required_no_specialist",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'fetch_timeline', 'arguments': {'input': 'incident timeline'}}, {'name': 'general_llm', 'arguments': {'input': 'Write a two-sentence executive summary of this incident timeline.'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "summary"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 243.786099999852,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "expensive_model_unnecessary",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'date_parse', 'arguments': {'input': '2026-09-21'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "epoch"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 304.8434360007377,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "two_step_dependency",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'db_migrate', 'arguments': {'input': 'pending_migration'}}, {'name': 'db_verify', 'arguments': {'input': 'pending_migration'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "migrate",
+            "verify"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 342.6730659994064,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "replan_after_wrong_dispatch",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'infra_specialist_llm', 'arguments': {'input': 'nightly build'}}, {'name': 'static_analyse', 'arguments': {'input': 'nightly build'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "root_cause"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 588.4510129999398,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "budget_forces_cheap_path",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'small_classifier_llm', 'arguments': {'input': 'support ticket 1'}}, {'name': 'small_classifier_llm', 'arguments': {'input': 'support ticket 2'}}, {'name': 'small_classifier_llm', 'arguments': {'input': 'support ticket 3'}}, {'name': 'small_classifier_llm', 'arguments': {'input': 'support ticket 4'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "classification"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 209.6607329995095,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "stop_when_done",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'df_command', 'arguments': {'input': '812 GiB'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "disk_free"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 87.92753600027936,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "no_relevant_capability",
+          "solvable": false,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "forecast"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 346.605843999896,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "two_independent_requirements",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'git_log', 'arguments': {'input': 'tag1..tag2'}}, {'name': 'release_generalist_llm', 'arguments': {'input': 'tag1..tag2'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "changelog",
+            "readability"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 194.0686679999999,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "irrelevant_tool_rejection",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'hash_tool', 'arguments': {'input': 'abc'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "digest"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_3b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 222.9770659996575,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "three_step_pipeline",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'fetch_metrics', 'arguments': {'input': 'metrics_data_1'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "metrics",
+            "anomaly",
+            "attribution"
+          ],
+          "wasted_calls": 0
+        }
+      ],
+      "scenarios": 12,
+      "solved": 0,
+      "turns_total": 12,
+      "wasted_calls": 0
+    },
+    {
+      "backend": "hammer2.1_7b",
+      "budget_exhausted": 0,
+      "by_family": {
+        "budget": {
+          "n": 1,
+          "solved": 0
+        },
+        "cheap": {
+          "n": 1,
+          "solved": 0
+        },
+        "expensive": {
+          "n": 1,
+          "solved": 0
+        },
+        "generalist": {
+          "n": 1,
+          "solved": 0
+        },
+        "irrelevant": {
+          "n": 1,
+          "solved": 0
+        },
+        "no": {
+          "n": 1,
+          "solved": 0
+        },
+        "replan": {
+          "n": 1,
+          "solved": 0
+        },
+        "specialist": {
+          "n": 1,
+          "solved": 0
+        },
+        "stop": {
+          "n": 1,
+          "solved": 0
+        },
+        "three": {
+          "n": 1,
+          "solved": 0
+        },
+        "two": {
+          "n": 2,
+          "solved": 0
+        }
+      },
+      "correct_stop": 1,
+      "cost_units_total": 0,
+      "errors": 0,
+      "invalid_calls": 0,
+      "latency_ms": {
+        "max": 13645.256400000108,
+        "mean": 1617.2981452500608,
+        "p50": 510.62884200018743,
+        "p95": 6742.527564799948,
+        "p99": 12264.710632960085
+      },
+      "mean_specialist_precision": null,
+      "order_violations": 0,
+      "premature_stop": 12,
+      "rows": [
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 13645.256400000108,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "cheap_tool_suffices",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'git_rev_parse', 'arguments': {'input': 'HEAD'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "rev"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 367.5907669994558,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "specialist_required",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'grep_policy', 'arguments': {'input': 'data-retention policy'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "legal_review"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 389.13044200035074,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "generalist_required_no_specialist",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'fetch_timeline', 'arguments': {'input': 'incident timeline'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "summary"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 462.43114699973376,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "expensive_model_unnecessary",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'date_parse', 'arguments': {'input': '2026-09-21'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "epoch"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 574.4026899992605,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "two_step_dependency",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'db_migrate', 'arguments': {'input': 'pending_migration'}}, {'name': 'db_verify', 'arguments': {'input': 'new_schema_version'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "migrate",
+            "verify"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 558.8265370006411,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "replan_after_wrong_dispatch",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'infra_specialist_llm', 'arguments': {'input': 'The nightly build is failing. Static analysis alone was already tried and produced nothing useful.'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "root_cause"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 1094.8403359998338,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "budget_forces_cheap_path",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'small_classifier_llm', 'arguments': {'input': 'support ticket 1'}}, {'name': 'small_classifier_llm', 'arguments': {'input': 'support ticket 2'}}, {'name': 'small_classifier_llm', 'arguments': {'input': 'support ticket 3'}}, {'name': 'small_classifier_llm', 'arguments': {'input': 'support ticket 4'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "classification"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 163.10872600024595,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "stop_when_done",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "disk_free"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 158.7675640002999,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "no_relevant_capability",
+          "solvable": false,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "forecast"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 777.5739140006408,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "two_independent_requirements",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'git_log', 'arguments': {'input': '1.0.0..1.1.0'}}, {'name': 'editor_specialist_llm', 'arguments': {'input': '1.0.0..1.1.0'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "changelog",
+            "readability"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 353.88291900017066,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "irrelevant_tool_rejection",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'hash_tool', 'arguments': {'input': 'abc'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "digest"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "hammer2.1_7b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 861.7663009999887,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "three_step_pipeline",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "```\n[{'name': 'fetch_metrics', 'arguments': {'input': 'raw metrics'}}, {'name': 'perf_generalist_llm', 'arguments': {'input': 'detect anomaly window'}}, {'name': 'perf_generalist_llm', 'arguments': {'input': 'attribute regression to a commit'}}]\n```",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "metrics",
+            "anomaly",
+            "attribution"
+          ],
+          "wasted_calls": 0
+        }
+      ],
+      "scenarios": 12,
+      "solved": 0,
+      "turns_total": 12,
+      "wasted_calls": 0
+    },
+    {
+      "backend": "qwen3.5_9b",
+      "budget_exhausted": 2,
+      "by_family": {
+        "budget": {
+          "n": 1,
+          "solved": 0
+        },
+        "cheap": {
+          "n": 1,
+          "solved": 1
+        },
+        "expensive": {
+          "n": 1,
+          "solved": 1
+        },
+        "generalist": {
+          "n": 1,
+          "solved": 1
+        },
+        "irrelevant": {
+          "n": 1,
+          "solved": 1
+        },
+        "no": {
+          "n": 1,
+          "solved": 0
+        },
+        "replan": {
+          "n": 1,
+          "solved": 1
+        },
+        "specialist": {
+          "n": 1,
+          "solved": 1
+        },
+        "stop": {
+          "n": 1,
+          "solved": 0
+        },
+        "three": {
+          "n": 1,
+          "solved": 1
+        },
+        "two": {
+          "n": 2,
+          "solved": 2
+        }
+      },
+      "correct_stop": 7,
+      "cost_units_total": 42,
+      "errors": 0,
+      "invalid_calls": 0,
+      "latency_ms": {
+        "max": 21789.96343400013,
+        "mean": 6585.24182724985,
+        "p50": 5062.677746499958,
+        "p95": 14466.069242649646,
+        "p99": 20325.18459573004
+      },
+      "mean_specialist_precision": 0.7,
+      "order_violations": 0,
+      "premature_stop": 3,
+      "rows": [
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 1,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 21789.96343400013,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "cheap_tool_suffices",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 2,
+          "turns_detail": [
+            {
+              "chosen": "git_rev_parse",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "rev"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 6,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 8473.792176999268,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "specialist_required",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 0.3333333333333333,
+          "stopped": true,
+          "turns": 4,
+          "turns_detail": [
+            {
+              "chosen": "grep_policy",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "grep_policy",
+              "cost_units": 1,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "legal_specialist_llm",
+              "cost_units": 4,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "legal_review"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 3,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 2
+        },
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": true,
+          "correct_stop": false,
+          "cost_units": 6,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 5170.078380999257,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "generalist_required_no_specialist",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 0.3333333333333333,
+          "stopped": false,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "fetch_timeline",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "general_llm",
+              "cost_units": 5,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "summary"
+              ]
+            },
+            {
+              "chosen": "general_llm",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 1
+        },
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": true,
+          "correct_stop": false,
+          "cost_units": 2,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 7729.151446999822,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "expensive_model_unnecessary",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 0.3333333333333333,
+          "stopped": false,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "date_parse",
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "epoch"
+              ]
+            },
+            {
+              "chosen": "small_llm",
+              "cost_units": 2,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "frontier_llm",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 1
+        },
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 4955.277112000658,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "two_step_dependency",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "db_migrate",
+              "cost_units": 3,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "migrate"
+              ]
+            },
+            {
+              "chosen": "db_verify",
+              "cost_units": 2,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "verify"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 3,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 4836.354540000684,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "replan_after_wrong_dispatch",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 2,
+          "turns_detail": [
+            {
+              "chosen": "run_build_repro",
+              "cost_units": 3,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "root_cause"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 6109.627911999269,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "budget_forces_cheap_path",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "I'd be happy to help classify those 400 support tickets. However, I don't see the actual ticket data in your message. Could you please provide the 400 support tickets that need to be classified?\n\nOnce you provide the tickets, I'll use the most cost-effective classifier (likely the rule_classifier given the tight budget of 4 cost units) to categorize them into billing, bug, or other categories.",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "classification"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 2250.079872000242,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "stop_when_done",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "The current disk free space is 812 GiB, as already measured and recorded.\n\n",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "disk_free"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 5692.042132999632,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "no_relevant_capability",
+          "solvable": false,
+          "solved": false,
+          "specialist_precision": 0.0,
+          "stopped": true,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "grep_logs",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "local_generalist_llm",
+              "cost_units": 4,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "forecast"
+          ],
+          "wasted_calls": 2
+        },
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 4919.470907000687,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "two_independent_requirements",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "git_log",
+              "cost_units": 2,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "changelog"
+              ]
+            },
+            {
+              "chosen": "editor_specialist_llm",
+              "cost_units": 3,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "readability"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 1,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 2700.681856999836,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "irrelevant_tool_rejection",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 2,
+          "turns_detail": [
+            {
+              "chosen": "hash_tool",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "digest"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_9b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 8,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 4396.382154998719,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "three_step_pipeline",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 4,
+          "turns_detail": [
+            {
+              "chosen": "fetch_metrics",
+              "cost_units": 2,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "metrics"
+              ]
+            },
+            {
+              "chosen": "detect_anomaly",
+              "cost_units": 2,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "anomaly"
+              ]
+            },
+            {
+              "chosen": "attribute_commit",
+              "cost_units": 4,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "attribution"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 3,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        }
+      ],
+      "scenarios": 12,
+      "solved": 9,
+      "turns_total": 31,
+      "wasted_calls": 6
+    },
+    {
+      "backend": "qwen3.5_4b",
+      "budget_exhausted": 5,
+      "by_family": {
+        "budget": {
+          "n": 1,
+          "solved": 1
+        },
+        "cheap": {
+          "n": 1,
+          "solved": 1
+        },
+        "expensive": {
+          "n": 1,
+          "solved": 1
+        },
+        "generalist": {
+          "n": 1,
+          "solved": 1
+        },
+        "irrelevant": {
+          "n": 1,
+          "solved": 1
+        },
+        "no": {
+          "n": 1,
+          "solved": 0
+        },
+        "replan": {
+          "n": 1,
+          "solved": 1
+        },
+        "specialist": {
+          "n": 1,
+          "solved": 0
+        },
+        "stop": {
+          "n": 1,
+          "solved": 0
+        },
+        "three": {
+          "n": 1,
+          "solved": 1
+        },
+        "two": {
+          "n": 2,
+          "solved": 2
+        }
+      },
+      "correct_stop": 5,
+      "cost_units_total": 53,
+      "errors": 0,
+      "invalid_calls": 0,
+      "latency_ms": {
+        "max": 16550.47379500138,
+        "mean": 5749.297780750415,
+        "p50": 4739.757302000271,
+        "p95": 12309.696548801043,
+        "p99": 15702.31834576132
+      },
+      "mean_specialist_precision": 0.5681818181818182,
+      "order_violations": 0,
+      "premature_stop": 2,
+      "rows": [
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": true,
+          "correct_stop": false,
+          "cost_units": 7,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 16550.47379500138,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "cheap_tool_suffices",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 0.3333333333333333,
+          "stopped": false,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "git_rev_parse",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "rev"
+              ]
+            },
+            {
+              "chosen": "repo_generalist_llm",
+              "cost_units": 6,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "repo_specialist_llm",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 1
+        },
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": true,
+          "correct_stop": false,
+          "cost_units": 6,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 4944.267158000002,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "specialist_required",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": 0.0,
+          "stopped": false,
+          "turns": 2,
+          "turns_detail": [
+            {
+              "chosen": "general_llm",
+              "cost_units": 6,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "general_llm",
+              "cost_units": 0,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "legal_review"
+          ],
+          "wasted_calls": 1
+        },
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": true,
+          "correct_stop": false,
+          "cost_units": 7,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 6841.019261000838,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "generalist_required_no_specialist",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 0.25,
+          "stopped": false,
+          "turns": 4,
+          "turns_detail": [
+            {
+              "chosen": "fetch_timeline",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "general_llm",
+              "cost_units": 5,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "summary"
+              ]
+            },
+            {
+              "chosen": "fetch_timeline",
+              "cost_units": 1,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "general_llm",
+              "cost_units": 0,
+              "index": 3,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 2
+        },
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": true,
+          "correct_stop": false,
+          "cost_units": 2,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 5580.578303000038,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "expensive_model_unnecessary",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 0.3333333333333333,
+          "stopped": false,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "date_parse",
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "epoch"
+              ]
+            },
+            {
+              "chosen": "small_llm",
+              "cost_units": 2,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "frontier_llm",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 1
+        },
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 3606.452950998573,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "two_step_dependency",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "db_migrate",
+              "cost_units": 3,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "migrate"
+              ]
+            },
+            {
+              "chosen": "db_verify",
+              "cost_units": 2,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "verify"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 3368.305357000281,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "replan_after_wrong_dispatch",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 2,
+          "turns_detail": [
+            {
+              "chosen": "infra_specialist_llm",
+              "cost_units": 5,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "root_cause"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": true,
+          "correct_stop": false,
+          "cost_units": 2,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 8839.969711000776,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "budget_forces_cheap_path",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 0.3333333333333333,
+          "stopped": false,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "rule_classifier",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "classification"
+              ]
+            },
+            {
+              "chosen": "rule_classifier",
+              "cost_units": 1,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "small_classifier_llm",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 1
+        },
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 2006.2916820006649,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "stop_when_done",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "disk_free"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 4535.24744600054,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "no_relevant_capability",
+          "solvable": false,
+          "solved": false,
+          "specialist_precision": 0.0,
+          "stopped": true,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "grep_logs",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "local_generalist_llm",
+              "cost_units": 4,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "forecast"
+          ],
+          "wasted_calls": 2
+        },
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 5,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 6205.614424001396,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "two_independent_requirements",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 3,
+          "turns_detail": [
+            {
+              "chosen": "git_log",
+              "cost_units": 2,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "changelog"
+              ]
+            },
+            {
+              "chosen": "editor_specialist_llm",
+              "cost_units": 3,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "readability"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 1,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 3185.8898629998293,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "irrelevant_tool_rejection",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 2,
+          "turns_detail": [
+            {
+              "chosen": "hash_tool",
+              "cost_units": 1,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "digest"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "qwen3.5_4b",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 8,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 3327.4634180006615,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": false,
+          "scenario_id": "three_step_pipeline",
+          "solvable": true,
+          "solved": true,
+          "specialist_precision": 1.0,
+          "stopped": true,
+          "turns": 4,
+          "turns_detail": [
+            {
+              "chosen": "fetch_metrics",
+              "cost_units": 2,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "metrics"
+              ]
+            },
+            {
+              "chosen": "detect_anomaly",
+              "cost_units": 2,
+              "index": 1,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "anomaly"
+              ]
+            },
+            {
+              "chosen": "attribute_commit",
+              "cost_units": 4,
+              "index": 2,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": [
+                "attribution"
+              ]
+            },
+            {
+              "chosen": "finish",
+              "cost_units": 0,
+              "index": 3,
+              "invalid_call": false,
+              "model_text": "",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [],
+          "wasted_calls": 0
+        }
+      ],
+      "scenarios": 12,
+      "solved": 9,
+      "turns_total": 33,
+      "wasted_calls": 8
+    },
+    {
+      "backend": "functiongemma_270m",
+      "budget_exhausted": 0,
+      "by_family": {
+        "budget": {
+          "n": 1,
+          "solved": 0
+        },
+        "cheap": {
+          "n": 1,
+          "solved": 0
+        },
+        "expensive": {
+          "n": 1,
+          "solved": 0
+        },
+        "generalist": {
+          "n": 1,
+          "solved": 0
+        },
+        "irrelevant": {
+          "n": 1,
+          "solved": 0
+        },
+        "no": {
+          "n": 1,
+          "solved": 0
+        },
+        "replan": {
+          "n": 1,
+          "solved": 0
+        },
+        "specialist": {
+          "n": 1,
+          "solved": 0
+        },
+        "stop": {
+          "n": 1,
+          "solved": 0
+        },
+        "three": {
+          "n": 1,
+          "solved": 0
+        },
+        "two": {
+          "n": 2,
+          "solved": 0
+        }
+      },
+      "correct_stop": 1,
+      "cost_units_total": 0,
+      "errors": 0,
+      "invalid_calls": 0,
+      "latency_ms": {
+        "max": 6004.271202000382,
+        "mean": 623.839639666888,
+        "p50": 148.47908550063948,
+        "p95": 2817.0125697503368,
+        "p99": 5366.819475550377
+      },
+      "mean_specialist_precision": null,
+      "order_violations": 0,
+      "premature_stop": 12,
+      "rows": [
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 6004.271202000382,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "cheap_tool_suffices",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "<start_function_call>call:repo_generalist_llm{input:<escape>your repository URL<escape>}<end_function_call><start_function_call>call:repo_specialist_llm{input:<escape>your repository URL<escape>}<end_function_call>",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "rev"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 160.57925499990233,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "specialist_required",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "I cannot assist with legal or financial decision-making regarding data retention policies or cost allocation. My current capabilities are limited to assisting with specific operational tasks like searching for policy terms or providing general LLM specialists. I cannot provide expert advice or recommendations regarding data governance or compliance.",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "legal_review"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 150.61441300076694,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "generalist_required_no_specialist",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "I can certainly assist with drafting an executive summary for your incident timeline. To generate the best summary for your budget of 10 cost units, could you please provide the specific incident details or the raw incident timeline you wish to summarize?",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "summary"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 178.3014810007444,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "expensive_model_unnecessary",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "I apologize, but I cannot assist with this task. My current capabilities are limited to assisting with specific tools like date parsing and logistics, such as dispatching to specialized models. I cannot perform complex financial calculations or manage budget constraints for tasks like converting strings.",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "epoch"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 209.25550700030726,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "two_step_dependency",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "<start_function_call>call:db_migrate{input:<escape>application<escape>}<end_function_call><start_function_call>call:db_verify{input:<escape>application<escape>}<end_function_call><start_function_call>call:db_generalist_llm{input:<escape>application<escape>}<end_function_call><start_function_call>call:finish{}<end_function_call>",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "migrate",
+            "verify"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 70.18681400040805,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "replan_after_wrong_dispatch",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "<start_function_call>call:static_analyse{input:<escape><escape>}<end_function_call>",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "root_cause"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 80.51875199998904,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "budget_forces_cheap_path",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "<start_function_call>call:frontier_llm{input:<escape>400<escape>}<end_function_call>",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "classification"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 89.57457599990448,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "stop_when_done",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "<start_function_call>call:df_command{input:<escape>812<escape>}<end_function_call>",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "disk_free"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": true,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 176.5539150001132,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "no_relevant_capability",
+          "solvable": false,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "I apologize, but I cannot assist with planning or retrieving weather information. My current capabilities are limited to assisting with tasks using the provided tools. I cannot provide weather predictions or insights.",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "forecast"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 146.34375800051203,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "two_independent_requirements",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "<start_function_call>call:git_log{input:<escape>changes to release topic<escape>}<end_function_call><start_function_call>call:editor_specialist_llm{input:<escape>readability pass<escape>}<end_function_call>",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "changelog",
+            "readability"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 84.52078299978893,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "irrelevant_tool_rejection",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "I need the prompt or input string to perform the string analysis. Could you please provide the prompt?",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "digest"
+          ],
+          "wasted_calls": 0
+        },
+        {
+          "backend": "functiongemma_270m",
+          "budget_exhausted": false,
+          "correct_stop": false,
+          "cost_units": 0,
+          "error": null,
+          "invalid_calls": 0,
+          "latency_ms": 135.35521999983757,
+          "model": null,
+          "order_violations": 0,
+          "premature_stop": true,
+          "scenario_id": "three_step_pipeline",
+          "solvable": true,
+          "solved": false,
+          "specialist_precision": null,
+          "stopped": true,
+          "turns": 1,
+          "turns_detail": [
+            {
+              "chosen": null,
+              "cost_units": 0,
+              "index": 0,
+              "invalid_call": false,
+              "model_text": "<start_function_call>call:fetch_metrics{}<end_function_call><start_function_call>call:detect_anomaly{input:<escape>14 cost units<escape>}<end_function_call><start_function_call>call:attribute_commit{}<end_function_call>",
+              "parse_error": null,
+              "resolved": []
+            }
+          ],
+          "unresolved": [
+            "metrics",
+            "anomaly",
+            "attribution"
+          ],
+          "wasted_calls": 0
+        }
+      ],
+      "scenarios": 12,
+      "solved": 0,
+      "turns_total": 12,
+      "wasted_calls": 0
+    }
+  ],
+  "scenario_count": 12,
+  "scenarios_path": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/benchmarks/fixtures/orchestration-v1/scenarios.jsonl",
+  "schema": "z0int.orchestration_eval_report.v1"
+}
