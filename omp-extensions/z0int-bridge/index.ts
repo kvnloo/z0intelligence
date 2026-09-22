@@ -20,6 +20,7 @@ import type { Interface } from "node:readline";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
 const BRIDGE_PROTOCOL = "z0int.bridge.v2";
@@ -27,14 +28,29 @@ const Z0 = join(homedir(), ".z0int");
 const RUNTIME = join(Z0, "runtime");
 const CURRENT = join(RUNTIME, "bridge-current.json");
 
+/**
+ * The tree that owns this extension.
+ *
+ * Derive it from this module rather than naming one machine's checkout. It used
+ * to fall back to the absolute path `/home/kvn/tmp/openjev` while a comment
+ * claimed it "prefer[s] the tree that owns this extension" -- so the bridge
+ * silently only worked on the machine it was written on, and a second checkout
+ * or a moved tree got a wrong `cwd` and a wrong interpreter.
+ *
+ * Env overrides still win, so an unusual install can point somewhere else.
+ */
+function owningRepoRoot(): string {
+	const override = process.env.Z0INT_ROOT || process.env.Z0INT_BRIDGE_ROOT;
+	if (override) return override;
+	// <root>/omp-extensions/z0int-bridge/index.ts -> <root>
+	return join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+}
+
+const Z0_ROOT = owningRepoRoot();
+const Z0_VENV_PY = join(Z0_ROOT, ".venv", "bin", "python");
 const Z0_PY =
 	process.env.Z0INT_PYTHON ||
-	"/home/kvn/tmp/openjev/.venv/bin/python";
-const Z0_ROOT =
-	process.env.Z0INT_ROOT ||
-	// Prefer the tree that owns this extension when possible.
-	process.env.Z0INT_BRIDGE_ROOT ||
-	"/home/kvn/tmp/openjev";
+	(existsSync(Z0_VENV_PY) ? Z0_VENV_PY : "python3");
 
 const WORKER_TIMEOUT_MS = Number(process.env.Z0INT_BRIDGE_TIMEOUT_MS || 45_000);
 const HANDSHAKE_TIMEOUT_MS = 20_000;

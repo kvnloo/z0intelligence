@@ -1,0 +1,7 @@
+{
+  "name": "omp-flyforge-recovery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FlyForge recovery OMP extension."
+}
