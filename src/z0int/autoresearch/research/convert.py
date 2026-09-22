@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .proposal import ALLOWED_KNOBS, LOCKED_HISTORY, ResearchProposalError, ResearchProposalV1
+from ... import paths as _paths
 
 
 def _ensure_el(root: Path) -> None:
@@ -23,7 +24,11 @@ def proposal_to_fly_candidate(
     champion: dict[str, Any] | None = None,
     evolution_lab_root: Path | None = None,
 ) -> Any:
-    root = Path(evolution_lab_root or os.environ.get("EVOLUTION_LAB_ROOT") or "/home/kvn/tmp/evolution-lab")
+    root = Path(evolution_lab_root) if evolution_lab_root else _paths.evolution_lab_root()
+    if root is None:
+        raise RuntimeError(
+            "no Evolution Lab checkout found; set EVOLUTION_LAB_ROOT"
+        )
     _ensure_el(root)
     from dataclasses import replace
 

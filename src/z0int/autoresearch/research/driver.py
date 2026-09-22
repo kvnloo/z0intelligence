@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from ... import paths as _paths
 from .job import ResearchJob
 from .proposal import (
     ResearchProposalError,
@@ -55,7 +56,7 @@ class DeterministicSearchDriver:
 
     def __init__(self, evolution_lab_root: Path | None = None) -> None:
         self.evolution_lab_root = Path(
-            evolution_lab_root or os.environ.get("EVOLUTION_LAB_ROOT") or "/home/kvn/tmp/evolution-lab"
+            (Path(evolution_lab_root) if evolution_lab_root else _paths.evolution_lab_root())
         )
 
     def propose(

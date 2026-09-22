@@ -146,7 +146,7 @@ def kerdoios_plan(capability_id: str, work: dict[str, Any] | None) -> dict[str, 
     kerd_py = (
         os.environ.get("KERDOIOS_PYTHON")
         or os.environ.get("EVOLUTION_LAB_PYTHON")
-        or "/workspace/evolution-lab/.venv/bin/python"
+        or paths.evolution_lab_python()
     )
     args = [
         kerd_py,
@@ -184,7 +184,7 @@ def kerdoios_record(
     kerd_py = (
         os.environ.get("KERDOIOS_PYTHON")
         or os.environ.get("EVOLUTION_LAB_PYTHON")
-        or "/workspace/evolution-lab/.venv/bin/python"
+        or paths.evolution_lab_python()
     )
     args = [
         kerd_py,

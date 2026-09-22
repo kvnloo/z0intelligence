@@ -19,6 +19,7 @@ from .driver import ResearchDriverResult, get_driver
 from .job import create_research_job
 from .promotion import noop_result, paired_decide
 from .proposal import ResearchProposalV1
+from ... import paths as _paths
 
 
 def _sha256(path: Path) -> str:
@@ -142,7 +143,7 @@ def run_research_once(
     el_root = Path(
         evolution_lab_root
         or os.environ.get("EVOLUTION_LAB_ROOT")
-        or "/home/kvn/tmp/evolution-lab-agy"
+        or str(_paths.evolution_lab_root() or _paths.LEGACY_EVOLUTION_LAB_ROOT)
     )
     jobs_root = Path(jobs_root or el_root)
     cand_root = Path(

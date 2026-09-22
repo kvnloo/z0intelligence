@@ -85,7 +85,15 @@ def main(argv: list[str] | None = None) -> int:
         import sys
         from pathlib import Path as P
 
-        sys.path.insert(0, str(P("/workspace/evolution-lab")))
+        from . import paths as _paths
+
+        _lab = _paths.evolution_lab_root()
+        if _lab is None:
+            raise SystemExit(
+                "--mb needs an Evolution Lab checkout; none found. "
+                "Set EVOLUTION_LAB_ROOT, or run `python -m z0int onboard`."
+            )
+        sys.path.insert(0, str(_lab))
         from evolution_lab.jev_distill import fit_fly, predict_fly
 
         fly = fit_fly(Xtr, ytr, len(FAMILIES), n_kc=args.n_kc, seed=1)

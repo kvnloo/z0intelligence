@@ -34,8 +34,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-CORPUS = Path("/home/kvn/tmp/evolution-lab/corpus/phase2/p1b-20260921T1430Z/episodes.jsonl")
-FIXTURES = Path("/home/kvn/tmp/openjev/benchmarks/fixtures/local-cognition-v1/examples.jsonl")
+from . import paths as _paths
+
+# Both of these used to be absolute paths to one machine's layout: the corpus
+# pointed into an Evolution Lab checkout, and the fixture pointed at one clone
+# of this repo. Neither survives a different checkout.
+_LEGACY_CORPUS = (
+    _paths.LEGACY_EVOLUTION_LAB_ROOT / "corpus/phase2/p1b-20260921T1430Z/episodes.jsonl"
+)
+CORPUS = _paths.evolution_lab_artifact(
+    "corpus/phase2/p1b-20260921T1430Z/episodes.jsonl"
+) or _LEGACY_CORPUS
+FIXTURES = Path(__file__).resolve().parents[2] / "benchmarks/fixtures/local-cognition-v1/examples.jsonl"
 
 
 @dataclass

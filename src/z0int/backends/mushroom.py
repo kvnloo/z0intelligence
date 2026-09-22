@@ -35,8 +35,19 @@ from .base import (
 
 RECOVERY_ACTIONS = ("retry", "restart_sandbox", "escalate", "noop", "page_human")
 
-DEFAULT_BUNDLE = Path("/home/kvn/tmp/evolution-lab/data/p0/recovery_student.npz")
-DEFAULT_META = Path("/home/kvn/tmp/evolution-lab/data/p0/recovery_student.json")
+# Resolved through the canonical lab resolver rather than a hardcoded checkout.
+# Three Evolution Lab checkouts exist on this machine at three revisions; naming
+# one here silently bound this production backend to that revision. The artifact
+# itself is byte-identical across all three, so the resolution is safe, but the
+# binding is now explicit and configurable.
+from .. import paths as _paths
+
+DEFAULT_BUNDLE = _paths.evolution_lab_artifact("data/p0/recovery_student.npz") or (
+    _paths.LEGACY_EVOLUTION_LAB_ROOT / "data/p0/recovery_student.npz"
+)
+DEFAULT_META = _paths.evolution_lab_artifact("data/p0/recovery_student.json") or (
+    _paths.LEGACY_EVOLUTION_LAB_ROOT / "data/p0/recovery_student.json"
+)
 
 N_FEATURES = 15
 HISTORY = 8
