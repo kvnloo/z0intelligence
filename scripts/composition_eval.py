@@ -8,9 +8,18 @@ latency and interaction effects are real.
     A = qwen3.5_9b alone              (NO compiler: the model sees every action)
     B = nemotron_orchestrator_8b alone (NO compiler)
     C = compiler + nemotron
-    D = compiler + JEV + nemotron
-    E = compiler + JEV + nemotron + qwen3.5_9b fallback
-    F = compiler + tiny specialist + JEV + nemotron + qwen fallback
+    D = compiler + NanoJev + nemotron
+    E = compiler + NanoJev + nemotron + qwen3.5_9b fallback
+    F = compiler + tiny specialist + NanoJev + nemotron + qwen fallback
+
+The bounded scorer in D/E/F is our local **NanoJev 0.6B** (`Qwen/Qwen3-0.6B`
+backbone, non-generative, zero decode) — see `_try_jev`, which loads
+`NanoJevBackend`. It was historically written as the literal sentinel `"JEV"`,
+and that name escaped into published docs, where the phase 1B `compiler+jev`
+arm's 45/84 was narrated as the hosted TypeSafe Jev's score. The immutable
+corpus disagrees: every `compiler+jev` row records `model_id=nanojev_06b`,
+revision `4a19595eada0857133c0d2be024f879a4077054b`, quant `bfloat16`. The
+sentinel is now `SCORER_SENTINEL` and names the scorer it actually loads.
 
 The A/B arms are the honest control: they are handed the unfiltered action set,
 including the four security fixtures' dangerous actions, so "dangerous_selected"
@@ -65,17 +74,27 @@ class Composition:
         }
 
 
+#: The bounded scorer sentinel. It names the scorer that is actually loaded
+#: (`NanoJevBackend`), not a legacy display name. Every comparison against this
+#: constant exists so that a scorer can never again be identified by the way an
+#: arm happens to be labelled.
+SCORER_SENTINEL = "nanojev_06b"
+
+
 COMPOSITIONS: tuple[Composition, ...] = (
     Composition("A_qwen9b_alone", compiler=False, orchestrator="qwen3.5_9b"),
     Composition("B_nemotron_alone", compiler=False, orchestrator="nemotron_orchestrator_8b"),
     Composition("C_compiler_nemotron", compiler=True, orchestrator="nemotron_orchestrator_8b"),
     Composition(
-        "D_compiler_jev_nemotron", compiler=True, jev="JEV", orchestrator="nemotron_orchestrator_8b"
+        "D_compiler_jev_nemotron",
+        compiler=True,
+        jev=SCORER_SENTINEL,
+        orchestrator="nemotron_orchestrator_8b",
     ),
     Composition(
         "E_compiler_jev_nemotron_qwen",
         compiler=True,
-        jev="JEV",
+        jev=SCORER_SENTINEL,
         orchestrator="nemotron_orchestrator_8b",
         general="qwen3.5_9b",
     ),
@@ -83,7 +102,7 @@ COMPOSITIONS: tuple[Composition, ...] = (
         "F_compiler_tiny_jev_nemotron_qwen",
         compiler=True,
         tiny="hammer2.1_3b",
-        jev="JEV",
+        jev=SCORER_SENTINEL,
         orchestrator="nemotron_orchestrator_8b",
         general="qwen3.5_9b",
     ),
@@ -187,14 +206,14 @@ def run_composition(
 ) -> dict[str, Any]:
     backends: dict[str, Any] = {}
     for model_id in {comp.tiny, comp.orchestrator, comp.general}:
-        if model_id and model_id != "JEV":
+        if model_id and model_id != SCORER_SENTINEL:
             try:
                 backends[model_id] = registry.backend_for(model_id)
             except Exception as exc:  # noqa: BLE001
                 print(f"# {comp.name}: {model_id} unavailable ({exc})", file=sys.stderr)
 
     jev = None
-    if comp.jev == "JEV":
+    if comp.jev == SCORER_SENTINEL:
         jev = _try_jev()
 
     cascade = CognitionCascade(

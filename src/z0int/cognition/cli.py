@@ -302,6 +302,90 @@ def _cmd_decide(args: argparse.Namespace) -> int:
 # --- registration -------------------------------------------------------
 
 
+def _cmd_runtime_status(args: argparse.Namespace) -> int:
+    """Both inference planes in one view.
+
+    `serving.json` describes only the generative plane and its own comment
+    forbids adding a second runtime there. Every non-generative backend —
+    Laya, Decider, NanoJev, OpenJev, the mushroom readouts, any fitted head —
+    therefore had no lifecycle reporting at all. This is that reporting.
+    """
+    from z0int.backends.lifecycle import runtime_status
+
+    st = runtime_status()
+    if args.json:
+        _print(st, as_json=True)
+        return 0
+
+    gen = st["planes"]["generative"]
+    dec = st["planes"]["decision"]
+
+    print(f"generative runtime  {gen.get('runtime_id')}  ({gen['implementation']})")
+    print(f"  base_url          {gen.get('supervisor_base_url')}")
+    print(f"  reachable         {gen.get('reachable')}   version {gen.get('runtime_version')}")
+    print(f"  RESIDENT          {gen.get('resident')}")
+    for m in gen.get("models", []):
+        print(f"    - {m['model_id']:28s} {str(m.get('quantization')):8s} {m.get('backend_id')}")
+    if gen.get("detail"):
+        print(f"  detail            {gen['detail']}")
+
+    print()
+    print(f"decision runtime    {dec['runtime_id']}  ({dec['implementation']})")
+    print(f"  RESIDENT          {dec.get('resident')}")
+    print(f"  invocations       {dec.get('invocations')}")
+    for b in dec.get("backends", []):
+        mark = "resident" if b["loaded"] else ("ready" if b["ready"] else "UNAVAILABLE")
+        print(
+            f"    - {b['backend_id']:14s} {mark:11s} decode={str(b['autoregressive_decode']):5s} "
+            f"batch={str(b['supports_batch_questions']):5s} {b['kind']}"
+        )
+    print()
+    print("note: `resident` is reported by the live runtime, never by a config file.")
+    return 0
+
+
+def _cmd_trust(args: argparse.Namespace) -> int:
+    from z0int.backends.trust import TRUST_STATUSES, trust_for, trust_table
+
+    if args.model and args.capability:
+        rec = trust_for(args.model, args.capability)
+        if rec is None:
+            _print(
+                {
+                    "backend_id": args.model,
+                    "capability": args.capability,
+                    "status": "untested",
+                    "note": "no record; default is untested, never trusted",
+                },
+                as_json=args.json,
+            )
+            return 1
+        _print(rec.to_dict(), as_json=args.json)
+        return 0
+
+    table = trust_table()
+    if args.json:
+        _print({"statuses": list(TRUST_STATUSES), "models": table}, as_json=True)
+        return 0
+
+    print("trust is per model x capability. there is no global per-model flag.")
+    print(f"statuses: {', '.join(TRUST_STATUSES)}")
+    print()
+    for model_id in sorted(table):
+        print(f"{model_id}")
+        for cap, rec in sorted(table[model_id].items()):
+            bits = []
+            if rec.get("coverage") is not None:
+                bits.append(f"coverage={rec['coverage']}")
+            if rec.get("success_given_covered") is not None:
+                bits.append(f"success|covered={rec['success_given_covered']}")
+            if rec.get("threshold") is not None:
+                bits.append(f"thr={rec['threshold']}")
+            suffix = ("  " + " ".join(bits)) if bits else ""
+            print(f"    {cap:36s} {rec['status']}{suffix}")
+    return 0
+
+
 def add_cognition_parser(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
     co = sub.add_parser(
         "cognition",
@@ -364,6 +448,20 @@ def add_cognition_parser(sub: argparse._SubParsersAction) -> None:  # type: igno
                     help="Fail closed before candidates costlier than this class")
     cd.add_argument("--json", action="store_true", default=True)
 
+    crt = co_sub.add_parser(
+        "runtime-status",
+        help="Both inference planes in one view: generative (llama.cpp/GGUF) + decision (DecisionBackend)",
+    )
+    crt.add_argument("--json", action="store_true")
+
+    ctr = co_sub.add_parser(
+        "trust",
+        help="Per-capability trust records (never a global per-model flag)",
+    )
+    ctr.add_argument("model", nargs="?", default=None, help="backend id, e.g. nanojev")
+    ctr.add_argument("capability", nargs="?", default=None)
+    ctr.add_argument("--json", action="store_true")
+
 
 def cmd_cognition(args: argparse.Namespace) -> int:
     handlers = {
@@ -375,6 +473,8 @@ def cmd_cognition(args: argparse.Namespace) -> int:
         "probe": _cmd_probe,
         "compile": _cmd_compile,
         "decide": _cmd_decide,
+        "runtime-status": _cmd_runtime_status,
+        "trust": _cmd_trust,
     }
     handler = handlers.get(args.cognition_cmd)
     if handler is None:

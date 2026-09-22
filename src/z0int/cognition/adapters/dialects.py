@@ -367,6 +367,25 @@ DIALECTS: dict[str, ToolDialect] = {
 }
 
 
+def resolve_max_tokens(requested: int, dialect: ToolDialect) -> tuple[int, int, int]:
+    """Return ``(requested, runtime_cap, effective)`` for one inference request.
+
+    Phase 1B recorded only the first of these and called it the contract. The
+    value that reached the wire is the third, and for four of six generative arms
+    it was not 1024: `dialect_for` matches ``tool_parser`` first, so
+    ``tool_parser="hermes"`` resolves to HERMES_DIALECT (256) and the separate
+    ``tool_call_template`` is never consulted. NEMOTRON_DIALECT exists with
+    ``max_tokens=1024`` and a comment naming this exact failure, and is
+    unreachable for that model.
+
+    Callers must record all three. A receipt that records only ``requested`` is
+    the defect this function exists to prevent.
+    """
+    cap = int(getattr(dialect, "max_tokens", 0) or 0)
+    effective = min(int(requested), cap) if cap else int(requested)
+    return int(requested), cap, effective
+
+
 def dialect_for(tool_parser: str | None, tool_call_template: str | None = None) -> ToolDialect:
     """Resolve a dialect from a manifest row, defaulting to the Hermes shape."""
     for key in (tool_parser, tool_call_template):

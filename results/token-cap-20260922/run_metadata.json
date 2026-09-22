@@ -1,0 +1,2962 @@
+{
+  "argv": [
+    "results/token-cap-20260922/run_token_cap.py"
+  ],
+  "base_url": "http://127.0.0.1:11500",
+  "created_at": "2026-09-22T05:17:59.751905Z",
+  "fixture": {
+    "frozen_sha256": "eeae4daa9f6184adfd6ad264158e679bca02b77d3b8309e6d59d4b404625d1df",
+    "n_states": 28,
+    "path": "/home/kvn/tmp/openjev/benchmarks/fixtures/local-cognition-v1/examples.jsonl",
+    "sha256": "eeae4daa9f6184adfd6ad264158e679bca02b77d3b8309e6d59d4b404625d1df"
+  },
+  "frozen_run_mutated": false,
+  "frozen_run_reference": "p1b-20260921T1430Z",
+  "git": {
+    "branch": "feat/steal-sweep",
+    "dirty": true,
+    "head": "8e62e223f6067b156c30e3bc90f62570a77a6674"
+  },
+  "gold_mentioned_in_reasoning": "gold action id found in raw reasoning text (reasoning_content or <think> block); for models with no reasoning channel it falls back to raw content; gold_mention_channel records which",
+  "matrix": {
+    "functiongemma_270m": [
+      128,
+      256
+    ],
+    "hammer2.1_3b": [
+      256,
+      512,
+      1024
+    ],
+    "hammer2.1_7b": [
+      256,
+      512
+    ],
+    "nemotron_orchestrator_8b": [
+      256,
+      512,
+      1024
+    ],
+    "qwen3.5_4b": [
+      256,
+      1024
+    ],
+    "qwen3.5_9b": [
+      1024,
+      2048
+    ]
+  },
+  "models": {
+    "functiongemma_270m": {
+      "gguf_sha256": "83940d4dd9676710856f43523bed096164a595a96f6b34771610a03937de5270",
+      "hf": "google/functiongemma-270m-it",
+      "hf_revision": "39eccb091651513a5dfb56892d3714c1b5b8276c",
+      "native_dialect_max_tokens": 128,
+      "quant": "Q8_0",
+      "resolved_dialect": "functiongemma",
+      "revision": "39eccb091651513a5dfb56892d3714c1b5b8276c",
+      "tool_call_template": "functiongemma",
+      "tool_parser": "functiongemma"
+    },
+    "hammer2.1_3b": {
+      "gguf_sha256": "320b6114e54cdee0b2ded57e7fc4c55e343819599c583459782750c72c0009ad",
+      "hf": "MadeAgents/Hammer2.1-3b",
+      "hf_revision": "702ce4215e1391cb000a9c037b86b997660750f3",
+      "native_dialect_max_tokens": 256,
+      "quant": "Q4_K_M",
+      "resolved_dialect": "hermes",
+      "revision": "702ce4215e1391cb000a9c037b86b997660750f3",
+      "tool_call_template": "hammer-json-array",
+      "tool_parser": "hermes"
+    },
+    "hammer2.1_7b": {
+      "gguf_sha256": "cd698cb286d02e407ef41b2304f4b7fd1f7d45eece1780120016e5fbc41e8020",
+      "hf": "MadeAgents/Hammer2.1-7b",
+      "hf_revision": "c5692ee193b806c1aadeaf68c4aec3de503fac30",
+      "native_dialect_max_tokens": 256,
+      "quant": "Q4_K_M",
+      "resolved_dialect": "hermes",
+      "revision": "c5692ee193b806c1aadeaf68c4aec3de503fac30",
+      "tool_call_template": "hammer-json-array",
+      "tool_parser": "hermes"
+    },
+    "nemotron_orchestrator_8b": {
+      "gguf_sha256": "1cc7077e20b3339d1a46bc72e29959cdd4c7249ebbd73e6977e76f23625995c7",
+      "hf": "nvidia/Nemotron-Orchestrator-8B",
+      "hf_revision": "26df4b9aad5abdc5b7871ee4c71063ce888feb26",
+      "native_dialect_max_tokens": 256,
+      "quant": "Q4_K_M",
+      "resolved_dialect": "hermes",
+      "revision": "26df4b9aad5abdc5b7871ee4c71063ce888feb26",
+      "tool_call_template": "qwen3-hermes",
+      "tool_parser": "hermes"
+    },
+    "qwen3.5_4b": {
+      "gguf_sha256": "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983",
+      "hf": "Qwen/Qwen3.5-4B",
+      "hf_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "native_dialect_max_tokens": 1024,
+      "quant": "Q4_K_M",
+      "resolved_dialect": "qwen",
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "tool_call_template": "qwen35",
+      "tool_parser": "qwen3_coder"
+    },
+    "qwen3.5_9b": {
+      "gguf_sha256": "d784ce9eda1a5a7b51e8f705a9e6310844bf4f173654d115823c775fdea56d43",
+      "hf": "Qwen/Qwen3.5-9B",
+      "hf_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "native_dialect_max_tokens": 1024,
+      "quant": "Q4_K_M",
+      "resolved_dialect": "qwen",
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "tool_call_template": "qwen35",
+      "tool_parser": "qwen3_coder"
+    }
+  },
+  "native_caps_from_phase1b": {
+    "functiongemma_270m": 128,
+    "hammer2.1_3b": 256,
+    "hammer2.1_7b": 256,
+    "nemotron_orchestrator_8b": 256,
+    "qwen3.5_4b": 1024,
+    "qwen3.5_9b": 1024
+  },
+  "override_mechanism": {
+    "how": "dataclasses.replace(resolved_dialect, max_tokens=cap) passed to LocalSLMBackend(dialect=...), with ToolDecisionRequest(max_tokens=cap) so min(request, dialect) == cap",
+    "why_needed": "dialect_for(tool_parser, tool_call_template) matches tool_parser first; nemotron/hammer rows resolve to HERMES_DIALECT (256) and functiongemma to FUNCTIONGEMMA_DIALECT (128), so the requested 1024 never reached the wire",
+    "wire_verification": "WireTransport._post records the literal payload['max_tokens']; stored per receipt as wire_max_tokens / effective_max_tokens; invalid_cell flags any mismatch"
+  },
+  "platform": "Linux-7.2.2-1-cachyos-x86_64-with-glibc2.44",
+  "post_run": {
+    "finished_at": "2026-09-22T05:30:38.632581Z",
+    "n_calls_total": 360,
+    "n_invalid_cells": 0,
+    "n_measured": 354,
+    "n_measured_used": 354,
+    "n_warmups": 6,
+    "note_tool_call_emitted": "raw.jsonl's tool_call_emitted uses dialect-pattern detection only and undercounts Hammer's single-quoted repr array; report.json/md derive tool_call_emitted from structured signatures instead."
+  },
+  "python": "3.11.14 (main, Nov 20 2025, 15:58:12) [GCC 15.2.1 20251112]",
+  "reasoning_tokens_method": "exact count of reasoning_text under the resident llama-server's own /tokenize endpoint (child port 18100-18159); falls back to chars/4 and records reasoning_token_method per call",
+  "run_id": "token-cap-20260922",
+  "schedule_design": {
+    "order": "rep-major; models rotated by rep; within a model block, states rotated by rep and the caps of each state rotated by (rep+state_index); one warmup call per model block (recorded with kind=warmup, excluded from analysis)",
+    "purpose": "interleave + time-rotate caps so a warm/cold or time-of-day artifact cannot masquerade as a cap effect"
+  },
+  "schema": "z0int.tokencap.run_metadata.v1",
+  "serving": {
+    "functiongemma_270m": {
+      "backend_id": "functiongemma",
+      "base_url": "http://127.0.0.1:11500",
+      "model_id": "functiongemma_270m",
+      "quantization": "Q8_0",
+      "runtime": "llama.cpp-supervisor",
+      "served_model": "functiongemma_270m"
+    },
+    "hammer2.1_3b": {
+      "backend_id": "hammer3b",
+      "base_url": "http://127.0.0.1:11500",
+      "model_id": "hammer2.1_3b",
+      "quantization": "Q4_K_M",
+      "runtime": "llama.cpp-supervisor",
+      "served_model": "hammer2.1_3b"
+    },
+    "hammer2.1_7b": {
+      "backend_id": "hammer7b",
+      "base_url": "http://127.0.0.1:11500",
+      "model_id": "hammer2.1_7b",
+      "quantization": "Q4_K_M",
+      "runtime": "llama.cpp-supervisor",
+      "served_model": "hammer2.1_7b"
+    },
+    "nemotron_orchestrator_8b": {
+      "backend_id": "nemotron",
+      "base_url": "http://127.0.0.1:11500",
+      "model_id": "nemotron_orchestrator_8b",
+      "quantization": "Q4_K_M",
+      "runtime": "llama.cpp-supervisor",
+      "served_model": "nemotron_orchestrator_8b"
+    },
+    "qwen3.5_4b": {
+      "backend_id": "qwen4b",
+      "base_url": "http://127.0.0.1:11500",
+      "model_id": "qwen3.5_4b",
+      "quantization": "Q4_K_M",
+      "runtime": "llama.cpp-supervisor",
+      "served_model": "qwen3.5_4b"
+    },
+    "qwen3.5_9b": {
+      "backend_id": "qwen9b",
+      "base_url": "http://127.0.0.1:11500",
+      "model_id": "qwen3.5_9b",
+      "quantization": "Q4_K_M",
+      "runtime": "llama.cpp-supervisor",
+      "served_model": "qwen3.5_9b"
+    }
+  },
+  "settings": {
+    "arm": "compiler+<model> (compiler-first, identical to Phase 1B core arms)",
+    "context": 4096,
+    "repetitions": 3,
+    "seed": 42,
+    "temperature": "dialect default (0.0 for all six dialects)",
+    "top_p": "server default (not sent by the adapter)"
+  },
+  "supervisor_status_pre_run": {
+    "history": [
+      {
+        "context": 4096,
+        "evicted_at": 1790017439.5597188,
+        "load_ms": 12013.30280303955,
+        "loaded_at": 1790017434.1565301,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790018067.91252,
+        "load_ms": 5008.734703063965,
+        "loaded_at": 1790017444.5687559,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790018624.4856663,
+        "load_ms": 5018.10884475708,
+        "loaded_at": 1790018453.4588094,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790018728.111184,
+        "load_ms": 7009.603977203369,
+        "loaded_at": 1790018631.4961307,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790018736.6996632,
+        "load_ms": 5004.110097885132,
+        "loaded_at": 1790018733.1154459,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790018761.7473812,
+        "load_ms": 5003.5200119018555,
+        "loaded_at": 1790018741.703314,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790018772.4900987,
+        "load_ms": 2002.5691986083984,
+        "loaded_at": 1790018763.7500226,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 26,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790018794.9541838,
+        "load_ms": 10008.17584991455,
+        "loaded_at": 1790018782.4983563,
+        "model_id": "hammer2.1_7b",
+        "quantization": "Q4_K_M",
+        "requests": 28,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790018801.9112594,
+        "load_ms": 2002.4595260620117,
+        "loaded_at": 1790018796.9567964,
+        "model_id": "functiongemma_270m",
+        "quantization": "Q8_0",
+        "requests": 28,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790018875.755972,
+        "load_ms": 7005.131483078003,
+        "loaded_at": 1790018808.9164655,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 28,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790019046.3129635,
+        "load_ms": 15012.568473815918,
+        "loaded_at": 1790018890.7691116,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 28,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790019129.191137,
+        "load_ms": 12011.018753051758,
+        "loaded_at": 1790019058.3245847,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 28,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790019143.4884372,
+        "load_ms": 5003.851652145386,
+        "loaded_at": 1790019134.1951852,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 28,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790019213.1151874,
+        "load_ms": 8005.31268119812,
+        "loaded_at": 1790019151.493889,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 26,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790019379.934488,
+        "load_ms": 15011.375427246094,
+        "loaded_at": 1790019228.1272914,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 28,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790019419.3711438,
+        "load_ms": 14021.870136260986,
+        "loaded_at": 1790019393.9569423,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 5,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790019442.7089431,
+        "load_ms": 7007.925748825073,
+        "loaded_at": 1790019426.3792474,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 56,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790019477.5057228,
+        "load_ms": 11008.68272781372,
+        "loaded_at": 1790019453.724906,
+        "model_id": "hammer2.1_7b",
+        "quantization": "Q4_K_M",
+        "requests": 56,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790019491.6330962,
+        "load_ms": 6007.781267166138,
+        "loaded_at": 1790019483.521893,
+        "model_id": "functiongemma_270m",
+        "quantization": "Q8_0",
+        "requests": 56,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790019626.3021913,
+        "load_ms": 8006.305932998657,
+        "loaded_at": 1790019499.6397355,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 56,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790019953.8454669,
+        "load_ms": 15011.856317520142,
+        "loaded_at": 1790019641.314711,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 56,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790020104.2775676,
+        "load_ms": 12010.493993759155,
+        "loaded_at": 1790019965.856537,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 56,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790020124.9272056,
+        "load_ms": 6011.1448764801025,
+        "loaded_at": 1790020110.2895718,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 56,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790020258.8385468,
+        "load_ms": 8005.4121017456055,
+        "loaded_at": 1790020132.9327834,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 56,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790020554.5171134,
+        "load_ms": 15012.858629226685,
+        "loaded_at": 1790020273.8522024,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 56,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790020990.000543,
+        "load_ms": 12013.18335533142,
+        "loaded_at": 1790020566.5317242,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 80,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021042.3378575,
+        "load_ms": 9008.070707321167,
+        "loaded_at": 1790021037.0833256,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021064.2699425,
+        "load_ms": 15010.367631912231,
+        "loaded_at": 1790021058.3502648,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021074.8183646,
+        "load_ms": 6005.088329315186,
+        "loaded_at": 1790021071.277255,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021094.3525584,
+        "load_ms": 12008.469343185425,
+        "loaded_at": 1790021087.833834,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021112.487482,
+        "load_ms": 13008.842468261719,
+        "loaded_at": 1790021108.363745,
+        "model_id": "hammer2.1_7b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021119.7648728,
+        "load_ms": 3002.986431121826,
+        "loaded_at": 1790021116.492761,
+        "model_id": "functiongemma_270m",
+        "quantization": "Q8_0",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021133.5577493,
+        "load_ms": 8005.392789840698,
+        "loaded_at": 1790021128.7721665,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021153.2829287,
+        "load_ms": 13009.844064712524,
+        "loaded_at": 1790021147.5696065,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021162.7716665,
+        "load_ms": 5004.408836364746,
+        "loaded_at": 1790021159.289721,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021182.287589,
+        "load_ms": 12008.22925567627,
+        "loaded_at": 1790021175.7815926,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021197.2185636,
+        "load_ms": 10005.775451660156,
+        "loaded_at": 1790021193.2950683,
+        "model_id": "hammer2.1_7b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021205.185779,
+        "load_ms": 3011.4290714263916,
+        "loaded_at": 1790021201.2632647,
+        "model_id": "functiongemma_270m",
+        "quantization": "Q8_0",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021230.4389722,
+        "load_ms": 18020.29037475586,
+        "loaded_at": 1790021224.2179618,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021260.6749632,
+        "load_ms": 21022.255182266235,
+        "loaded_at": 1790021252.4743567,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021279.2249217,
+        "load_ms": 14014.784336090088,
+        "loaded_at": 1790021275.6942456,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021299.9192195,
+        "load_ms": 13021.408081054688,
+        "loaded_at": 1790021293.2486212,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021324.6220264,
+        "load_ms": 19017.60745048523,
+        "loaded_at": 1790021319.9444048,
+        "model_id": "hammer2.1_7b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021332.6608794,
+        "load_ms": 2001.6016960144043,
+        "loaded_at": 1790021327.6263905,
+        "model_id": "functiongemma_270m",
+        "quantization": "Q8_0",
+        "requests": 26,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021344.5172808,
+        "load_ms": 4003.0770301818848,
+        "loaded_at": 1790021336.6640425,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 25,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021356.1783047,
+        "load_ms": 2001.8727779388428,
+        "loaded_at": 1790021346.5192072,
+        "model_id": "hammer2.1_7b",
+        "quantization": "Q4_K_M",
+        "requests": 25,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021425.0319161,
+        "load_ms": 11006.972789764404,
+        "loaded_at": 1790021367.1853256,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 25,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021477.2355359,
+        "load_ms": 8006.29186630249,
+        "loaded_at": 1790021433.0385418,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 25,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021688.4155302,
+        "load_ms": 15011.539459228516,
+        "loaded_at": 1790021492.2472317,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 25,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021930.3184457,
+        "load_ms": 8006.680011749268,
+        "loaded_at": 1790021696.4228637,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 52,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021939.6029809,
+        "load_ms": 6006.950855255127,
+        "loaded_at": 1790021936.3260326,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021959.7911267,
+        "load_ms": 8005.263090133667,
+        "loaded_at": 1790021947.608349,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021964.000879,
+        "load_ms": 1001.0557174682617,
+        "loaded_at": 1790021960.792252,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021977.8914106,
+        "load_ms": 2002.004623413086,
+        "loaded_at": 1790021966.0029502,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021982.1080089,
+        "load_ms": 1000.9703636169434,
+        "loaded_at": 1790021978.8924482,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790021996.097702,
+        "load_ms": 2007.9877376556396,
+        "loaded_at": 1790021984.116045,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022000.37065,
+        "load_ms": 1000.9667873382568,
+        "loaded_at": 1790021997.098727,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022014.3418407,
+        "load_ms": 2002.049207687378,
+        "loaded_at": 1790022002.3727465,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022019.6457665,
+        "load_ms": 2001.6753673553467,
+        "loaded_at": 1790022016.3435946,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022034.0259504,
+        "load_ms": 2001.9707679748535,
+        "loaded_at": 1790022021.6477978,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022039.2918181,
+        "load_ms": 2002.0751953125,
+        "loaded_at": 1790022036.0280912,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022053.203088,
+        "load_ms": 2002.4223327636719,
+        "loaded_at": 1790022041.2942994,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022058.5016494,
+        "load_ms": 2001.5904903411865,
+        "loaded_at": 1790022055.2047734,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022072.5860016,
+        "load_ms": 2001.7683506011963,
+        "loaded_at": 1790022060.503518,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022078.047542,
+        "load_ms": 2002.195119857788,
+        "loaded_at": 1790022074.58826,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022099.38099,
+        "load_ms": 3003.0531883239746,
+        "loaded_at": 1790022081.0506742,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022105.9950068,
+        "load_ms": 3010.2763175964355,
+        "loaded_at": 1790022102.3918614,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022128.8648179,
+        "load_ms": 7008.501768112183,
+        "loaded_at": 1790022113.0035741,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022139.36364,
+        "load_ms": 7011.614561080933,
+        "loaded_at": 1790022135.8769927,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022163.0155988,
+        "load_ms": 5008.859157562256,
+        "loaded_at": 1790022144.3725996,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022168.6280797,
+        "load_ms": 2004.3084621429443,
+        "loaded_at": 1790022165.0200207,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022190.5301847,
+        "load_ms": 4008.7032318115234,
+        "loaded_at": 1790022172.637075,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022195.992659,
+        "load_ms": 2002.1042823791504,
+        "loaded_at": 1790022192.5323634,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022216.5300941,
+        "load_ms": 2002.2461414337158,
+        "loaded_at": 1790022197.9949605,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022222.1248813,
+        "load_ms": 2002.532720565796,
+        "loaded_at": 1790022218.5327063,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022236.1942651,
+        "load_ms": 2002.0391941070557,
+        "loaded_at": 1790022224.1269865,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022242.4622705,
+        "load_ms": 3001.9335746765137,
+        "loaded_at": 1790022239.1962478,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022258.269294,
+        "load_ms": 4002.946138381958,
+        "loaded_at": 1790022246.4652698,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022263.5411236,
+        "load_ms": 2001.7359256744385,
+        "loaded_at": 1790022260.2711115,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022277.4850547,
+        "load_ms": 2063.4312629699707,
+        "loaded_at": 1790022265.6046116,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022282.7561114,
+        "load_ms": 2002.1047592163086,
+        "loaded_at": 1790022279.487222,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022296.7694786,
+        "load_ms": 2001.5199184417725,
+        "loaded_at": 1790022284.757686,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022302.0731878,
+        "load_ms": 2002.1800994873047,
+        "loaded_at": 1790022298.7717056,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022316.0960515,
+        "load_ms": 2001.861333847046,
+        "loaded_at": 1790022304.0751116,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022321.3139753,
+        "load_ms": 2001.840591430664,
+        "loaded_at": 1790022318.097958,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022335.1314328,
+        "load_ms": 2001.7590522766113,
+        "loaded_at": 1790022323.3157918,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022339.5213556,
+        "load_ms": 1001.0404586791992,
+        "loaded_at": 1790022336.1325247,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022353.3534265,
+        "load_ms": 2002.112865447998,
+        "loaded_at": 1790022341.5235186,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022357.5524843,
+        "load_ms": 1001.0528564453125,
+        "loaded_at": 1790022354.3545308,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022371.359874,
+        "load_ms": 2001.558780670166,
+        "loaded_at": 1790022359.5541,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022375.6995876,
+        "load_ms": 1000.95534324646,
+        "loaded_at": 1790022372.3608806,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022389.6870902,
+        "load_ms": 2001.6741752624512,
+        "loaded_at": 1790022377.7013333,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022395.0974658,
+        "load_ms": 2001.9259452819824,
+        "loaded_at": 1790022391.689091,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022409.2218637,
+        "load_ms": 2001.7545223236084,
+        "loaded_at": 1790022397.0992808,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022414.6222882,
+        "load_ms": 2023.8685607910156,
+        "loaded_at": 1790022411.2457867,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022428.870341,
+        "load_ms": 2001.952886581421,
+        "loaded_at": 1790022416.6242886,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022434.1530383,
+        "load_ms": 2002.1090507507324,
+        "loaded_at": 1790022430.8725166,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022448.3981915,
+        "load_ms": 2001.659631729126,
+        "loaded_at": 1790022436.1547709,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022453.7360795,
+        "load_ms": 2002.2735595703125,
+        "loaded_at": 1790022450.4005256,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022467.9290144,
+        "load_ms": 2001.694917678833,
+        "loaded_at": 1790022455.7378345,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022472.193682,
+        "load_ms": 1001.0290145874023,
+        "loaded_at": 1790022468.9301078,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022487.3380482,
+        "load_ms": 3002.988338470459,
+        "loaded_at": 1790022475.196756,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022492.56451,
+        "load_ms": 2001.5754699707031,
+        "loaded_at": 1790022489.3396702,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022505.9022915,
+        "load_ms": 2002.0363330841064,
+        "loaded_at": 1790022494.5666008,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022511.1301832,
+        "load_ms": 2001.6584396362305,
+        "loaded_at": 1790022507.9039996,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022524.6127474,
+        "load_ms": 2002.0334720611572,
+        "loaded_at": 1790022513.132259,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022528.8345065,
+        "load_ms": 1001.0387897491455,
+        "loaded_at": 1790022525.6138525,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022542.1697202,
+        "load_ms": 2003.3981800079346,
+        "loaded_at": 1790022530.8379755,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022546.4436836,
+        "load_ms": 1000.899076461792,
+        "loaded_at": 1790022543.1706738,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022560.0378923,
+        "load_ms": 2001.9099712371826,
+        "loaded_at": 1790022548.4456394,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022564.316352,
+        "load_ms": 1001.5115737915039,
+        "loaded_at": 1790022561.0394623,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022577.507034,
+        "load_ms": 2002.7732849121094,
+        "loaded_at": 1790022566.3191845,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022581.7285714,
+        "load_ms": 1000.9441375732422,
+        "loaded_at": 1790022578.50803,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022595.0364037,
+        "load_ms": 2001.6226768493652,
+        "loaded_at": 1790022583.7302427,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022600.2639818,
+        "load_ms": 2001.587152481079,
+        "loaded_at": 1790022597.0380495,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022613.5022643,
+        "load_ms": 2001.8866062164307,
+        "loaded_at": 1790022602.2659135,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022618.7092178,
+        "load_ms": 2002.291202545166,
+        "loaded_at": 1790022615.504603,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022632.2193992,
+        "load_ms": 2001.9335746765137,
+        "loaded_at": 1790022620.7111936,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022637.5030322,
+        "load_ms": 2023.5607624053955,
+        "loaded_at": 1790022634.243009,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022650.9874344,
+        "load_ms": 2027.050256729126,
+        "loaded_at": 1790022639.5301392,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022655.275358,
+        "load_ms": 1001.1520385742188,
+        "loaded_at": 1790022651.9886503,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022668.6006753,
+        "load_ms": 2002.5057792663574,
+        "loaded_at": 1790022657.2779124,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022672.9178145,
+        "load_ms": 1000.9770393371582,
+        "loaded_at": 1790022669.601697,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022687.126494,
+        "load_ms": 2001.5981197357178,
+        "loaded_at": 1790022674.9194684,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022692.480334,
+        "load_ms": 2001.4593601226807,
+        "loaded_at": 1790022689.1280015,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022706.879296,
+        "load_ms": 2002.378225326538,
+        "loaded_at": 1790022694.4827895,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022711.2513738,
+        "load_ms": 1001.0418891906738,
+        "loaded_at": 1790022707.880395,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022727.1617503,
+        "load_ms": 2004.9574375152588,
+        "loaded_at": 1790022713.2563834,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022731.4311304,
+        "load_ms": 1001.0716915130615,
+        "loaded_at": 1790022728.1628904,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022745.2859416,
+        "load_ms": 2001.7387866973877,
+        "loaded_at": 1790022733.4329522,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022750.5388982,
+        "load_ms": 2018.6903476715088,
+        "loaded_at": 1790022747.3046882,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022768.4165597,
+        "load_ms": 2002.0334720611572,
+        "loaded_at": 1790022752.5409884,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022774.7124543,
+        "load_ms": 3002.6421546936035,
+        "loaded_at": 1790022771.4192765,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022788.5752988,
+        "load_ms": 2001.692771911621,
+        "loaded_at": 1790022776.714206,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022793.9239898,
+        "load_ms": 2002.2163391113281,
+        "loaded_at": 1790022790.5776472,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022808.015489,
+        "load_ms": 2001.8548965454102,
+        "loaded_at": 1790022795.9259527,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022813.2500134,
+        "load_ms": 2001.5761852264404,
+        "loaded_at": 1790022810.0171099,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022827.2008169,
+        "load_ms": 2001.4824867248535,
+        "loaded_at": 1790022815.2515502,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022832.5907483,
+        "load_ms": 2001.9912719726562,
+        "loaded_at": 1790022829.2028766,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022846.6932993,
+        "load_ms": 2002.0694732666016,
+        "loaded_at": 1790022834.5928729,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022851.9839406,
+        "load_ms": 2029.4075012207031,
+        "loaded_at": 1790022848.72277,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022865.9514391,
+        "load_ms": 2001.9118785858154,
+        "loaded_at": 1790022853.9859402,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022871.2874455,
+        "load_ms": 2002.300500869751,
+        "loaded_at": 1790022867.9537978,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022885.2269976,
+        "load_ms": 2001.7032623291016,
+        "loaded_at": 1790022873.2892325,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022890.435792,
+        "load_ms": 2002.237319946289,
+        "loaded_at": 1790022887.2292926,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022904.4632096,
+        "load_ms": 2001.657247543335,
+        "loaded_at": 1790022892.4375243,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022909.8281882,
+        "load_ms": 2002.1820068359375,
+        "loaded_at": 1790022906.4654582,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022923.9533017,
+        "load_ms": 2001.6753673553467,
+        "loaded_at": 1790022911.8299167,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022929.2808452,
+        "load_ms": 2001.7526149749756,
+        "loaded_at": 1790022925.955109,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022943.4096515,
+        "load_ms": 2001.6469955444336,
+        "loaded_at": 1790022931.2825515,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022948.6915996,
+        "load_ms": 2001.8956661224365,
+        "loaded_at": 1790022945.411639,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022962.768628,
+        "load_ms": 2001.716136932373,
+        "loaded_at": 1790022950.6933703,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022968.0492935,
+        "load_ms": 2002.0771026611328,
+        "loaded_at": 1790022964.7707644,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022982.1500869,
+        "load_ms": 2001.4958381652832,
+        "loaded_at": 1790022970.0508473,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790022987.4718072,
+        "load_ms": 2002.058506011963,
+        "loaded_at": 1790022984.1521935,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023019.2501945,
+        "load_ms": 15062.417030334473,
+        "loaded_at": 1790023002.5400422,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023031.6191416,
+        "load_ms": 9009.55843925476,
+        "loaded_at": 1790023028.2604072,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023062.613072,
+        "load_ms": 17021.259784698486,
+        "loaded_at": 1790023048.641755,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023068.9659495,
+        "load_ms": 3003.4475326538086,
+        "loaded_at": 1790023065.6166484,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023091.9172804,
+        "load_ms": 5007.086515426636,
+        "loaded_at": 1790023073.9731023,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023098.4290633,
+        "load_ms": 3005.3296089172363,
+        "loaded_at": 1790023094.9227328,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023119.0410302,
+        "load_ms": 4004.6606063842773,
+        "loaded_at": 1790023102.4339044,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023124.3999429,
+        "load_ms": 2002.2337436676025,
+        "loaded_at": 1790023121.0433345,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023144.0744147,
+        "load_ms": 3002.4731159210205,
+        "loaded_at": 1790023127.4024746,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023149.295051,
+        "load_ms": 2002.084493637085,
+        "loaded_at": 1790023146.076566,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023168.891794,
+        "load_ms": 3002.6774406433105,
+        "loaded_at": 1790023152.2977877,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023174.2433817,
+        "load_ms": 2002.0029544830322,
+        "loaded_at": 1790023170.8938603,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023193.901623,
+        "load_ms": 3002.530336380005,
+        "loaded_at": 1790023177.2459779,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023199.2041082,
+        "load_ms": 2002.140760421753,
+        "loaded_at": 1790023195.9038305,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023218.8772492,
+        "load_ms": 3002.692222595215,
+        "loaded_at": 1790023202.206864,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023224.2145326,
+        "load_ms": 2002.087116241455,
+        "loaded_at": 1790023220.8793874,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023243.8301547,
+        "load_ms": 3002.5103092193604,
+        "loaded_at": 1790023227.2170978,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023249.1239083,
+        "load_ms": 2013.8943195343018,
+        "loaded_at": 1790023245.8441017,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023268.8046165,
+        "load_ms": 3003.2505989074707,
+        "loaded_at": 1790023252.1272268,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023274.1484313,
+        "load_ms": 2016.991376876831,
+        "loaded_at": 1790023270.8216703,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023293.7565358,
+        "load_ms": 3002.8233528137207,
+        "loaded_at": 1790023277.151315,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023299.1320798,
+        "load_ms": 2002.8984546661377,
+        "loaded_at": 1790023295.759506,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023318.7432697,
+        "load_ms": 3002.7685165405273,
+        "loaded_at": 1790023302.134924,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023324.1323957,
+        "load_ms": 2002.0403861999512,
+        "loaded_at": 1790023320.7453659,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023343.8617845,
+        "load_ms": 3002.7408599853516,
+        "loaded_at": 1790023327.1351998,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023349.1966794,
+        "load_ms": 2002.0954608917236,
+        "loaded_at": 1790023345.8639507,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023373.8754568,
+        "load_ms": 8005.459547042847,
+        "loaded_at": 1790023357.202197,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023382.1941664,
+        "load_ms": 5005.428791046143,
+        "loaded_at": 1790023378.8809462,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023404.9597569,
+        "load_ms": 6004.539012908936,
+        "loaded_at": 1790023388.198775,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023410.2393224,
+        "load_ms": 2001.817226409912,
+        "loaded_at": 1790023406.9616425,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023432.9699109,
+        "load_ms": 6004.828214645386,
+        "loaded_at": 1790023416.2442074,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023438.3249454,
+        "load_ms": 2001.7168521881104,
+        "loaded_at": 1790023434.9717011,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023457.997493,
+        "load_ms": 3002.5854110717773,
+        "loaded_at": 1790023441.3275938,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023463.2684221,
+        "load_ms": 2002.2733211517334,
+        "loaded_at": 1790023459.9998357,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023479.369104,
+        "load_ms": 3002.6657581329346,
+        "loaded_at": 1790023466.2711477,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023484.7605236,
+        "load_ms": 2002.11763381958,
+        "loaded_at": 1790023481.3712885,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023504.418501,
+        "load_ms": 3002.7239322662354,
+        "loaded_at": 1790023487.7633142,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023509.667876,
+        "load_ms": 2002.0596981048584,
+        "loaded_at": 1790023506.420607,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023529.323053,
+        "load_ms": 3003.8416385650635,
+        "loaded_at": 1790023512.6717892,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023534.667093,
+        "load_ms": 2001.6257762908936,
+        "loaded_at": 1790023531.3247368,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023553.7658134,
+        "load_ms": 3002.7105808258057,
+        "loaded_at": 1790023537.6698666,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023559.213107,
+        "load_ms": 2001.5826225280762,
+        "loaded_at": 1790023555.7674572,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023580.7263055,
+        "load_ms": 7004.146337509155,
+        "loaded_at": 1790023566.2173052,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023585.9956229,
+        "load_ms": 2001.9359588623047,
+        "loaded_at": 1790023582.728299,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023606.2853088,
+        "load_ms": 5003.499507904053,
+        "loaded_at": 1790023590.9991777,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023610.5601645,
+        "load_ms": 1001.6794204711914,
+        "loaded_at": 1790023607.2870731,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023627.6755552,
+        "load_ms": 2070.762872695923,
+        "loaded_at": 1790023612.6309814,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023631.943564,
+        "load_ms": 1000.9515285491943,
+        "loaded_at": 1790023628.6765535,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023652.3404152,
+        "load_ms": 5003.107309341431,
+        "loaded_at": 1790023636.9467225,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023657.6053107,
+        "load_ms": 2002.1488666534424,
+        "loaded_at": 1790023654.3426225,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023681.3945742,
+        "load_ms": 5003.722667694092,
+        "loaded_at": 1790023662.609091,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790023851.9954026,
+        "load_ms": 8005.071640014648,
+        "loaded_at": 1790023689.3997583,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 132,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790024071.8726587,
+        "load_ms": 15011.574029922485,
+        "loaded_at": 1790023867.007781,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 128,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790024416.0637283,
+        "load_ms": 13016.710996627808,
+        "loaded_at": 1790024084.8901205,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 94,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790024453.5966046,
+        "load_ms": 6008.723258972168,
+        "loaded_at": 1790024422.0731168,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 40,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790024601.8650968,
+        "load_ms": 8005.59139251709,
+        "loaded_at": 1790024461.6027277,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 56,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790024645.796322,
+        "load_ms": 8005.91778755188,
+        "loaded_at": 1790024616.5757403,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790024656.170209,
+        "load_ms": 5003.318786621094,
+        "loaded_at": 1790024650.7997642,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 26,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790024983.1263742,
+        "load_ms": 2001.4958381652832,
+        "loaded_at": 1790024658.171752,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 26,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790025414.0271862,
+        "load_ms": 15017.196416854858,
+        "loaded_at": 1790024998.145583,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 26,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026082.541307,
+        "load_ms": 8006.0670375823975,
+        "loaded_at": 1790025422.0338824,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 52,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026091.9391847,
+        "load_ms": 6011.612892150879,
+        "loaded_at": 1790026088.6658795,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026121.31768,
+        "load_ms": 8005.140066146851,
+        "loaded_at": 1790026099.944426,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026125.5234675,
+        "load_ms": 1001.0082721710205,
+        "loaded_at": 1790026122.31875,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026157.636734,
+        "load_ms": 2001.7552375793457,
+        "loaded_at": 1790026127.525268,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026161.8505943,
+        "load_ms": 1000.9744167327881,
+        "loaded_at": 1790026158.6377723,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026196.0596726,
+        "load_ms": 2001.8327236175537,
+        "loaded_at": 1790026163.8524802,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026200.3279407,
+        "load_ms": 1001.190185546875,
+        "loaded_at": 1790026197.0609298,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026226.980168,
+        "load_ms": 2001.7528533935547,
+        "loaded_at": 1790026202.3297434,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026232.2758608,
+        "load_ms": 2001.5745162963867,
+        "loaded_at": 1790026228.981817,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026258.5876915,
+        "load_ms": 2001.8372535705566,
+        "loaded_at": 1790026234.277744,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026262.797832,
+        "load_ms": 1001.0273456573486,
+        "loaded_at": 1790026259.5887814,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026288.0520942,
+        "load_ms": 2001.7461776733398,
+        "loaded_at": 1790026264.7996316,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026293.3406174,
+        "load_ms": 2001.5337467193604,
+        "loaded_at": 1790026290.0536976,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026331.5928326,
+        "load_ms": 2003.260612487793,
+        "loaded_at": 1790026295.3439503,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026336.8811848,
+        "load_ms": 2002.0036697387695,
+        "loaded_at": 1790026333.5949097,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026369.747283,
+        "load_ms": 2001.513957977295,
+        "loaded_at": 1790026338.8827446,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026377.0349693,
+        "load_ms": 4002.904176712036,
+        "loaded_at": 1790026373.7502704,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026415.726401,
+        "load_ms": 3002.7787685394287,
+        "loaded_at": 1790026380.0378394,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026420.9960656,
+        "load_ms": 2001.5432834625244,
+        "loaded_at": 1790026417.7280073,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026455.4353585,
+        "load_ms": 5003.227949142456,
+        "loaded_at": 1790026425.9993463,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026459.7436602,
+        "load_ms": 1000.9994506835938,
+        "loaded_at": 1790026456.4364204,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026497.6505802,
+        "load_ms": 2001.9748210906982,
+        "loaded_at": 1790026461.7456822,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026502.9832072,
+        "load_ms": 2001.9595623016357,
+        "loaded_at": 1790026499.6525998,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026543.2607837,
+        "load_ms": 2001.6798973083496,
+        "loaded_at": 1790026504.9849415,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026549.7045484,
+        "load_ms": 3002.3021697998047,
+        "loaded_at": 1790026546.2631524,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026583.4854136,
+        "load_ms": 5003.647089004517,
+        "loaded_at": 1790026554.7082632,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026588.7896204,
+        "load_ms": 2001.8596649169922,
+        "loaded_at": 1790026585.4873574,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026618.692597,
+        "load_ms": 2002.0840167999268,
+        "loaded_at": 1790026590.7917705,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026625.1446755,
+        "load_ms": 3005.121946334839,
+        "loaded_at": 1790026621.6978614,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026667.216682,
+        "load_ms": 9013.94271850586,
+        "loaded_at": 1790026634.158797,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026676.5928195,
+        "load_ms": 6006.083011627197,
+        "loaded_at": 1790026673.2228413,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026720.075185,
+        "load_ms": 4007.5299739837646,
+        "loaded_at": 1790026680.6005054,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026727.3763344,
+        "load_ms": 4002.659797668457,
+        "loaded_at": 1790026724.077906,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026769.7229035,
+        "load_ms": 5003.13925743103,
+        "loaded_at": 1790026732.3795261,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026776.995878,
+        "load_ms": 4002.777576446533,
+        "loaded_at": 1790026773.7257297,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026802.305557,
+        "load_ms": 3002.5272369384766,
+        "loaded_at": 1790026779.998468,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026807.6871629,
+        "load_ms": 2001.9855499267578,
+        "loaded_at": 1790026804.3076053,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026838.3049517,
+        "load_ms": 2001.7154216766357,
+        "loaded_at": 1790026809.6889384,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026843.5002258,
+        "load_ms": 2001.6837120056152,
+        "loaded_at": 1790026840.3067017,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026874.139277,
+        "load_ms": 2022.7644443511963,
+        "loaded_at": 1790026845.5230458,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026879.430357,
+        "load_ms": 2002.4125576019287,
+        "loaded_at": 1790026876.1417649,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026910.4632945,
+        "load_ms": 2002.4502277374268,
+        "loaded_at": 1790026881.4328606,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026915.880883,
+        "load_ms": 2002.269983291626,
+        "loaded_at": 1790026912.4656658,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026949.995923,
+        "load_ms": 4003.8814544677734,
+        "loaded_at": 1790026919.8848321,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790026958.315904,
+        "load_ms": 5012.37416267395,
+        "loaded_at": 1790026955.0083778,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790027000.946278,
+        "load_ms": 4002.586841583252,
+        "loaded_at": 1790026962.318552,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790027007.2324886,
+        "load_ms": 3002.2990703582764,
+        "loaded_at": 1790027003.9486463,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790027045.7118278,
+        "load_ms": 3002.3257732391357,
+        "loaded_at": 1790027010.2348878,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790027051.0501666,
+        "load_ms": 2001.6779899597168,
+        "loaded_at": 1790027047.7135684,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790027088.5723784,
+        "load_ms": 2001.774787902832,
+        "loaded_at": 1790027053.0520022,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790027093.9030256,
+        "load_ms": 2002.579689025879,
+        "loaded_at": 1790027090.575048,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790027369.8194227,
+        "load_ms": 2001.659870147705,
+        "loaded_at": 1790027095.9047494,
+        "model_id": "qwen3.5_4b",
+        "quantization": "Q4_K_M",
+        "requests": 2,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790049761.5930507,
+        "load_ms": 6009.695768356323,
+        "loaded_at": 1790048755.9023898,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 120,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790053485.8713322,
+        "load_ms": 13019.71983909607,
+        "loaded_at": 1790051215.5624378,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 568,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790054134.044073,
+        "load_ms": 15021.149635314941,
+        "loaded_at": 1790054088.0661712,
+        "model_id": "nemotron_orchestrator_8b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790054145.0859778,
+        "load_ms": 7011.974573135376,
+        "loaded_at": 1790054141.0580893,
+        "model_id": "hammer2.1_3b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790054151.4353428,
+        "load_ms": 3004.2946338653564,
+        "loaded_at": 1790054148.090802,
+        "model_id": "functiongemma_270m",
+        "quantization": "Q8_0",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      },
+      {
+        "context": 4096,
+        "evicted_at": 1790054242.8701875,
+        "load_ms": 16016.331434249878,
+        "loaded_at": 1790054167.4521716,
+        "model_id": "qwen3.5_9b",
+        "quantization": "Q4_K_M",
+        "requests": 1,
+        "runtime": "llama.cpp-0.4.1-dev"
+      }
+    ],
+    "idle_unload_s": 600.0,
+    "known_models": [
+      "functiongemma_270m",
+      "hammer2.1_3b",
+      "hammer2.1_7b",
+      "nemotron_orchestrator_8b",
+      "qwen3.5_9b",
+      "qwen3.5_4b"
+    ],
+    "resident": "qwen3.5_4b",
+    "runtime": "llama.cpp-0.4.1-dev",
+    "schema": "z0int.local_model_supervisor.v1"
+  }
+}

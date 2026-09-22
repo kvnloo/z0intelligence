@@ -1,0 +1,975 @@
+{
+  "schema": "z0int.schedule_completeness.v1.missing",
+  "schedule_id": "token-cap-20260922",
+  "state_universe_size": 28,
+  "state_universe_source": "fixture:/home/kvn/tmp/openjev/benchmarks/fixtures/local-cognition-v1/examples.jsonl",
+  "universe_matches_declaration": true,
+  "n_missing": 193,
+  "missing": [
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "cheap_model_sufficient"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "continue_work"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "credential_required_action"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "destructive_action"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "diamond_dependency_graph"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "escalate_action"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "expensive_model_unnecessary"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "hard_dependency_a_then_b"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "jev_uncertain"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "no_relevant_tool"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "one_obvious_tool"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "orchestrator_should_abstain"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "permission_denied"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "publish_send_deploy_action"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "replan"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "required_argument_missing"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "retry_action"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "slm_uncertain"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "specialist_required"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "stop_now"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "tool_fails"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "tool_returns_malformed_data"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "tool_succeeds_after_retry"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "tool_times_out"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "two_independent_parallel_actions"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "two_similar_tools"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "unknown_tool"
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "repetition": 2,
+      "state_id": "wrong_argument_type"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "cheap_model_sufficient"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "continue_work"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "credential_required_action"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "destructive_action"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "diamond_dependency_graph"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "escalate_action"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "expensive_model_unnecessary"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "hard_dependency_a_then_b"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "jev_uncertain"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "no_relevant_tool"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "one_obvious_tool"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "orchestrator_should_abstain"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "permission_denied"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "publish_send_deploy_action"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "replan"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "required_argument_missing"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "retry_action"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "slm_uncertain"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "specialist_required"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "stop_now"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "tool_fails"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "tool_returns_malformed_data"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "tool_succeeds_after_retry"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "tool_times_out"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "two_independent_parallel_actions"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "two_similar_tools"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "unknown_tool"
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "repetition": 2,
+      "state_id": "wrong_argument_type"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "cheap_model_sufficient"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "continue_work"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "credential_required_action"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "destructive_action"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "diamond_dependency_graph"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "escalate_action"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "expensive_model_unnecessary"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "hard_dependency_a_then_b"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "jev_uncertain"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "no_relevant_tool"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "one_obvious_tool"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "orchestrator_should_abstain"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "permission_denied"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "publish_send_deploy_action"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "replan"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "required_argument_missing"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "retry_action"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "slm_uncertain"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "specialist_required"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "stop_now"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "tool_fails"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "tool_returns_malformed_data"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "tool_succeeds_after_retry"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "tool_times_out"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "two_independent_parallel_actions"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "two_similar_tools"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "unknown_tool"
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "repetition": 2,
+      "state_id": "wrong_argument_type"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "cheap_model_sufficient"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "continue_work"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "credential_required_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "destructive_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "diamond_dependency_graph"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "escalate_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "expensive_model_unnecessary"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "hard_dependency_a_then_b"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "jev_uncertain"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "no_relevant_tool"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "one_obvious_tool"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "orchestrator_should_abstain"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "permission_denied"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "publish_send_deploy_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "replan"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "required_argument_missing"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "retry_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "slm_uncertain"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "specialist_required"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "stop_now"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "tool_fails"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "tool_returns_malformed_data"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "tool_succeeds_after_retry"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "tool_times_out"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "two_independent_parallel_actions"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "two_similar_tools"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "unknown_tool"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "repetition": 2,
+      "state_id": "wrong_argument_type"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "cheap_model_sufficient"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "continue_work"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "credential_required_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "destructive_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "diamond_dependency_graph"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "escalate_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "expensive_model_unnecessary"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "hard_dependency_a_then_b"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "jev_uncertain"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "no_relevant_tool"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "one_obvious_tool"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "orchestrator_should_abstain"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "permission_denied"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "publish_send_deploy_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "replan"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "required_argument_missing"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "retry_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "slm_uncertain"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "specialist_required"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "stop_now"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "tool_fails"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "tool_returns_malformed_data"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "tool_succeeds_after_retry"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "tool_times_out"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "two_independent_parallel_actions"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "two_similar_tools"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "unknown_tool"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "repetition": 2,
+      "state_id": "wrong_argument_type"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "cheap_model_sufficient"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "continue_work"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "credential_required_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "destructive_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "diamond_dependency_graph"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "escalate_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "expensive_model_unnecessary"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "hard_dependency_a_then_b"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "jev_uncertain"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "no_relevant_tool"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "one_obvious_tool"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "orchestrator_should_abstain"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "permission_denied"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "publish_send_deploy_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "replan"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "required_argument_missing"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "retry_action"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "slm_uncertain"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "specialist_required"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "stop_now"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "tool_fails"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "tool_returns_malformed_data"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "tool_succeeds_after_retry"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "tool_times_out"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "two_independent_parallel_actions"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "two_similar_tools"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "unknown_tool"
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "repetition": 2,
+      "state_id": "wrong_argument_type"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "continue_work"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "credential_required_action"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "destructive_action"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "escalate_action"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "jev_uncertain"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "one_obvious_tool"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "permission_denied"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "publish_send_deploy_action"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "replan"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "retry_action"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "slm_uncertain"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "stop_now"
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "repetition": 2,
+      "state_id": "two_similar_tools"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "continue_work"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "credential_required_action"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "destructive_action"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "escalate_action"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "one_obvious_tool"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "permission_denied"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "publish_send_deploy_action"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "replan"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "retry_action"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "slm_uncertain"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "stop_now"
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "repetition": 2,
+      "state_id": "two_similar_tools"
+    }
+  ]
+}

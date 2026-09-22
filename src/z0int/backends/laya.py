@@ -30,13 +30,12 @@ def _default_device() -> str:
 
 
 def _resolve_model_dir(*, hf: str, revision: str) -> Path:
-    from z0int.models_mgmt import model_cached
+    # Never downloads: `health(load=False)` reaches this through `_model_path()`,
+    # so a download here would make `registry.backend_status()` a network
+    # operation. Opt in with Z0INT_ALLOW_DOWNLOAD=1.
+    from z0int.models_mgmt import require_cached_snapshot
 
-    from huggingface_hub import snapshot_download
-
-    if model_cached(hf, revision):
-        return Path(snapshot_download(repo_id=hf, revision=revision, local_files_only=True))
-    return Path(snapshot_download(repo_id=hf, revision=revision))
+    return require_cached_snapshot(hf, revision)
 
 
 def _laya_import_error() -> str | None:

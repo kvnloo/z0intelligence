@@ -205,7 +205,18 @@ class Arm:
     kind: str  # deterministic | bounded | unfiltered | cascade
     compiler: bool = True
     model: str | None = None
+    #: True when the arm routes through the local NanoJev (non-generative, zero
+    #: decode) scorer rather than a generative model. Historically the arm's
+    #: model field held the literal string "JEV" and every emission rewrote it to
+    #: `nanojev_06b`; the display name leaked into published docs and into
+    #: z0evals, where the phase 1B arm's 45/84 was narrated as TypeSafe Jev's
+    #: score. It never was: `observations.jsonl` records `model_id=nanojev_06b`,
+    #: revision 4a19595eada0857133c0d2be024f879a4077054b, quant bfloat16 for
+    #: every `compiler+jev` row. The flag is kept (it also marks "not a
+    #: supervisor resident"), but the model field is now honest and the emitted
+    #: `scorer_type` states the scorer explicitly.
     jev: bool = False
+    scorer_type: str | None = None
     cascade: tuple[str, ...] = ()
     alias: str = ""
     note: str = ""
@@ -213,7 +224,9 @@ class Arm:
     def models(self) -> tuple[str, ...]:
         if self.kind == "cascade":
             return self.cascade
-        return (self.model,) if self.model and self.model != "JEV" else ()
+        # The NanoJev scorer is not servable by the llama.cpp supervisor, so it is
+        # excluded from residency planning — unchanged behaviour, now stated.
+        return (self.model,) if self.model and not self.jev else ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -222,6 +235,7 @@ class Arm:
             "compiler": self.compiler,
             "model": self.model,
             "jev": self.jev,
+            "scorer_type": self.scorer_type,
             "cascade": list(self.cascade),
             "alias": self.alias,
             "note": self.note,
@@ -246,8 +260,11 @@ def _arms() -> dict[str, Arm]:
         Arm("compiler+nemotron_orchestrator_8b", "bounded", model="nemotron_orchestrator_8b",
             alias="C_compiler_nemotron"),
         # --- compiler-first bounded scorer
-        Arm("compiler+jev", "bounded", model="JEV", jev=True),
-        Arm("compiler+jev+qwen3.5_4b", "cascade", jev=True, cascade=("qwen3.5_4b",)),
+        # `model` was the literal string "JEV"; it is our local NanoJev 0.6B.
+        Arm("compiler+jev", "bounded", model="nanojev_06b", jev=True,
+            scorer_type="nanojev"),
+        Arm("compiler+jev+qwen3.5_4b", "cascade", jev=True, scorer_type="nanojev",
+            cascade=("qwen3.5_4b",)),
         # --- unfiltered controls: the model sees every action, incl. dangerous
         Arm("unfiltered+hammer2.1_3b", "unfiltered", compiler=False, model="hammer2.1_3b"),
         Arm("unfiltered+qwen3.5_4b", "unfiltered", compiler=False, model="qwen3.5_4b",
@@ -257,12 +274,12 @@ def _arms() -> dict[str, Arm]:
         Arm("unfiltered+nemotron_orchestrator_8b", "unfiltered", compiler=False,
             model="nemotron_orchestrator_8b", alias="B_nemotron_alone"),
         # --- Phase 1 ladder arms, preserved for comparability (multi-model cascades)
-        Arm("compiler+jev+nemotron_orchestrator_8b", "cascade", jev=True,
+        Arm("compiler+jev+nemotron_orchestrator_8b", "cascade", jev=True, scorer_type="nanojev",
             cascade=("nemotron_orchestrator_8b",), alias="D_compiler_jev_nemotron"),
-        Arm("compiler+jev+nemotron+qwen3.5_9b", "cascade", jev=True,
+        Arm("compiler+jev+nemotron+qwen3.5_9b", "cascade", jev=True, scorer_type="nanojev",
             cascade=("nemotron_orchestrator_8b", "qwen3.5_9b"),
             alias="E_compiler_jev_nemotron_qwen"),
-        Arm("compiler+hammer3b+jev+nemotron+qwen3.5_9b", "cascade", jev=True,
+        Arm("compiler+hammer3b+jev+nemotron+qwen3.5_9b", "cascade", jev=True, scorer_type="nanojev",
             cascade=("hammer2.1_3b", "nemotron_orchestrator_8b", "qwen3.5_9b"),
             alias="F_compiler_tiny_jev_nemotron_qwen"),
     ]
@@ -439,12 +456,19 @@ class ObservationBuilder:
             "compiler_first": bool(arm.compiler),
             "router_in_loop": False,
             # --- model identity
-            "model_id": arm.model if arm.model != "JEV" else "nanojev_06b",
+            "model_id": arm.model,
+            # Explicit scorer identity. This field is what was missing when the
+            # phase 1B arm's 45/84 was published as TypeSafe Jev's score: the
+            # scorer was only ever encoded in the arm's display name, and that
+            # name said "jev" while the run used local NanoJev. Never infer a
+            # scorer from an arm name.
+            "scorer_type": arm.scorer_type,
+            "scorer_backend": "nanojev" if arm.jev else "generative",
             "model_revision": self.provenance["models"].get(
-                arm.model if arm.model != "JEV" else "nanojev_06b", {}
+                arm.model or "", {}
             ).get("hf_revision"),
             "quant": self.provenance["models"].get(
-                arm.model if arm.model != "JEV" else "nanojev_06b", {}
+                arm.model or "", {}
             ).get("quant"),
             "compiler_revision": self.provenance["compiler_revision"],
             "router_revision": self.provenance["router_revision"],
@@ -623,7 +647,9 @@ class Campaign:
         resident_before = status.get("resident")
         self.note_resident(resident_before)
 
-        model_id = arm.model if arm.model != "JEV" else None
+        # The NanoJev scorer is not a supervisor resident, so it contributes no
+        # residency class — but it IS a model and must still be named.
+        model_id = arm.model if not arm.jev else None
         if arm.kind == "cascade":
             # A cascade calls several models; the last tier is the one whose
             # residency the final decision came from, and it is the only model
@@ -776,7 +802,7 @@ class Campaign:
         being dropped on the floor (which is exactly what a positional mapping
         did before this was written down).
         """
-        present = {m for m in arm.cascade if m != "JEV"}
+        present = set(arm.cascade)
         tiny = "hammer2.1_3b" if "hammer2.1_3b" in present else None
         if "nemotron_orchestrator_8b" in present:
             orchestrator = "nemotron_orchestrator_8b"

@@ -107,6 +107,33 @@ def cmd_models_sync(*, which: str, dry_run: bool, as_json: bool) -> int:
     return 1 if bad else 0
 
 
+def cmd_models_reconcile(*, write: bool, as_json: bool) -> int:
+    """One canonical identity per model/revision; projections are derived."""
+    from .models_mgmt import reconcile, write_projection
+
+    if write:
+        path = write_projection()
+        if not as_json:
+            print(f"regenerated projection from the canonical manifest: {path}")
+
+    report = reconcile()
+    if as_json:
+        print(json.dumps(report, indent=2, default=str))
+    else:
+        print("z0int models reconcile")
+        print(f"  canonical : {report['canonical_source']} ({report['canonical_manifest_sha256'][:16]})")
+        print(f"  projection: {report['projection_path']} (present={report['projection_present']})")
+        gen = report["residency"]["generative"]
+        dec = report["residency"]["decision"]
+        print(f"  generative resident (live runtime): {gen.get('reported_by_live_runtime')}")
+        print(f"  decision planned_resident         : {dec.get('planned_resident')}")
+        print(f"  decision declared in projection   : {dec.get('declared_in_projection')}")
+        print(f"  verdict   : {report['verdict']} ({report['drift_count']} drift entries)")
+        for d in report["drift"]:
+            print(f"    - {d['model_id'] or '(plane)':16s} {d['kind']}")
+    return 0 if report["verdict"] == "consistent" else 1
+
+
 def cmd_data_discover(*, as_json: bool) -> int:
     from . import paths
     from .doctor import discover_data_sources
@@ -307,6 +334,17 @@ def build_parser() -> argparse.ArgumentParser:
     mss.add_argument("--which", choices=("resident", "on_demand", "all"), default="resident")
     mss.add_argument("--dry-run", action="store_true")
 
+    mrec = ms_sub.add_parser(
+        "reconcile",
+        help="Compare the canonical manifest against disk and against the generated projection",
+    )
+    _json_flag(mrec)
+    mrec.add_argument(
+        "--write",
+        action="store_true",
+        help="Regenerate the projection from the manifest (the manifest is canonical)",
+    )
+
     data = sub.add_parser("data", help="Data source helpers")
     data_sub = data.add_subparsers(dest="data_cmd", required=True)
     dd = data_sub.add_parser("discover", help="Find Hermes/OMP/Codex/export paths")
@@ -500,6 +538,51 @@ def build_parser() -> argparse.ArgumentParser:
     beb.add_argument("--bootstrap-draws", type=int, default=500, help="Fixture-resample draws for Pareto inclusion probability")
     beb.add_argument("--json", action="store_true")
 
+
+    svc = sub.add_parser(
+        "service",
+        help="Start / stop the local z0intelligence model service (one supervisor + resident model)",
+    )
+    svc_sub = svc.add_subparsers(dest="service_cmd", required=True)
+
+    def _service_target(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--host", default=None, help="default 127.0.0.1")
+        sp.add_argument("--port", type=int, default=None, help="default 11500")
+        sp.add_argument("--gguf-dir", default=None, help="GGUF root used to recognise our own llama-server")
+
+    def _service_model_options(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--context", type=int, default=None, help="default 4096")
+        sp.add_argument("--idle-unload", type=float, default=None, help="Seconds idle before dropping the model (default 600)")
+        sp.add_argument("--llama-server", default=None, help="Path to the llama-server binary")
+
+    svcs = svc_sub.add_parser("start", help="Start in the background and wait until /health is ok")
+    _service_target(svcs)
+    _service_model_options(svcs)
+    svcs.add_argument("--no-wait", action="store_true", help="Return immediately instead of waiting for health")
+    svcs.add_argument("--health-timeout", type=float, default=60.0)
+    svcs.add_argument("--force", action="store_true", help="Restart if already running")
+    _json_flag(svcs)
+
+    svcp = svc_sub.add_parser("stop", help="Stop the supervisor and any llama-server it orphaned")
+    _service_target(svcp)
+    svcp.add_argument("--grace", type=float, default=15.0, help="Seconds to wait after SIGTERM before SIGKILL")
+    _json_flag(svcp)
+
+    svcr = svc_sub.add_parser("restart", help="stop then start")
+    _service_target(svcr)
+    _service_model_options(svcr)
+    svcr.add_argument("--grace", type=float, default=15.0)
+    svcr.add_argument("--health-timeout", type=float, default=60.0)
+    _json_flag(svcr)
+
+    svcu = svc_sub.add_parser("unload", help="Give the GPU back but keep the supervisor listening")
+    svcu.add_argument("--host", default=None)
+    svcu.add_argument("--port", type=int, default=None)
+    _json_flag(svcu)
+
+    svcst = svc_sub.add_parser("status", help="What is running, what is resident, what holds the GPU")
+    _service_target(svcst)
+    _json_flag(svcst)
 
     add_cognition_parser(sub)
 
@@ -859,6 +942,11 @@ def main(argv: list[str] | None = None) -> int:
                 dry_run=bool(getattr(args, "dry_run", False)),
                 as_json=as_json,
             )
+        if args.models_cmd == "reconcile":
+            return cmd_models_reconcile(
+                write=bool(getattr(args, "write", False)),
+                as_json=as_json,
+            )
     if args.cmd == "data":
         if args.data_cmd == "discover":
             return cmd_data_discover(as_json=as_json)
@@ -1035,6 +1123,87 @@ def main(argv: list[str] | None = None) -> int:
             out = next_operator.shadow_report()
             _print(out, as_json=as_json)
             return 0 if out.get("ok", True) else 1
+
+    if args.cmd == "service":
+        from .cognition import service as _service
+
+        host = getattr(args, "host", None) or _service.DEFAULT_HOST
+        port = int(getattr(args, "port", None) or _service.DEFAULT_PORT)
+        gguf = getattr(args, "gguf_dir", None) or None
+        state_file = _service.default_state_file()
+        log_file = _service.default_log_file()
+        # Read every optional knob through getattr: a subparser that forgets one
+        # must degrade to the default, not crash the command.
+        context = getattr(args, "context", None) or _service.DEFAULT_CONTEXT
+        idle_unload = getattr(args, "idle_unload", None)
+        if idle_unload is None:
+            idle_unload = _service.DEFAULT_IDLE_UNLOAD_S
+        llama_server = getattr(args, "llama_server", None)
+        grace = float(getattr(args, "grace", 15.0) or 0.0)
+        health_timeout = float(getattr(args, "health_timeout", 60.0) or 0.0)
+
+        if args.service_cmd == "status":
+            res = _service.service_status(
+                host=host, port=port,
+                gguf_dir=gguf or _service.DEFAULT_GGUF_DIR,
+                state_file=state_file,
+            )
+        elif args.service_cmd == "unload":
+            res = _service.unload_service(host=host, port=port)
+        elif args.service_cmd == "stop":
+            res = _service.stop_service(
+                host=host, port=port,
+                gguf_dir=gguf or _service.DEFAULT_GGUF_DIR,
+                state_file=state_file, grace=grace,
+            )
+        elif args.service_cmd == "restart":
+            _service.stop_service(
+                host=host, port=port,
+                gguf_dir=gguf or _service.DEFAULT_GGUF_DIR,
+                state_file=state_file, grace=grace,
+            )
+            res = _service.start_service(
+                host=host, port=port,
+                context=context, idle_unload=idle_unload,
+                llama_server=llama_server, gguf_dir=gguf,
+                state_file=state_file, log_file=log_file,
+                health_timeout=health_timeout, force=True,
+            )
+        else:  # start
+            res = _service.start_service(
+                host=host, port=port,
+                context=context, idle_unload=idle_unload,
+                llama_server=llama_server, gguf_dir=gguf,
+                state_file=state_file, log_file=log_file,
+                wait_health=not getattr(args, "no_wait", False),
+                health_timeout=health_timeout,
+                force=getattr(args, "force", False),
+            )
+
+        if as_json:
+            _print(res.to_dict(), as_json=True)
+        else:
+            print(f"{'ok' if res.ok else 'FAILED'}  {res.message}")
+            details = res.details
+            if res.action == "status":
+                for s in details.get("supervisors", []):
+                    print(f"  supervisor pid {s['pid']}  {s['cmdline']}")
+                for s in details.get("llama_servers", []):
+                    print(f"  llama-server pid {s['pid']} (parent {s['ppid']})  {s['model']}")
+                for pid in details.get("orphan_llama_servers", []):
+                    print(f"  ORPHAN pid {pid} still holds the GPU -- run: z0int service stop")
+                apps = details.get("gpu_compute_apps")
+                if apps is not None:
+                    print(f"  GPU compute apps: {apps or 'none'}")
+            elif res.action.startswith("stop") or res.action == "already_stopped":
+                apps = details.get("gpu_compute_apps")
+                if apps is not None:
+                    print(f"  GPU compute apps now: {apps or 'none'}")
+            if not res.ok and details.get("log_tail"):
+                print("  log tail:")
+                for line in details["log_tail"]:
+                    print(f"    {line}")
+        return 0 if res.ok else 1
 
     if args.cmd == "preflight":
         from .preflight import preflight_dict

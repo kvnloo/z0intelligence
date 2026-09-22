@@ -1,0 +1,76 @@
+== 1. registry ==
+["decider_2b", "laya_421m", "mushroom", "nanojev", "openjev_06b", "openjev_4b"]
+
+== 2. backend_status('laya_421m', load=True) ==
+{
+  "id": "laya_421m",
+  "ready": true,
+  "loaded": true,
+  "model": "laya_421m",
+  "detail": "weights loaded on cpu"
+}
+checkpoint: /mnt/zer0models/zer0-models/huggingface/hub/models--convaiinnovations--laya/snapshots/7c76b622dfc5cac71b2dc1c29873efe2ce509a05
+wall for status+load: 9079.5 ms
+
+== 3. one typed boolean call ==
+{
+  "latency_ms": 275.40192600281443,
+  "wall_ms": 6223.126288998174,
+  "answers": [
+    {
+      "question_id": "verification_needed",
+      "type": "boolean",
+      "probabilities": {
+        "false": 0.7291000000000001,
+        "true": 0.2709
+      },
+      "value": false,
+      "confidence": 0.7291
+    }
+  ]
+}
+
+== 4. multi-question batch (n=8) ==
+answers returned: 8 / 8 requested
+reported latency_ms: 1251.4294400025392   wall_ms: 1251.4
+per-question wall: 156.43 ms
+   context_relevant_0         value=False  conf=0.7612
+   tool_family_git_1          value=False  conf=0.8995
+   needs_escalation_2         value=False  conf=0.7136
+   risk_class_high_3          value=False  conf=0.7975
+
+== summary ==
+{
+  "backend": "laya_421m",
+  "registered": [
+    "decider_2b",
+    "laya_421m",
+    "mushroom",
+    "nanojev",
+    "openjev_06b",
+    "openjev_4b"
+  ],
+  "status": {
+    "id": "laya_421m",
+    "ready": true,
+    "loaded": true,
+    "model": "laya_421m",
+    "checkpoint": "/mnt/zer0models/zer0-models/huggingface/hub/models--convaiinnovations--laya/snapshots/7c76b622dfc5cac71b2dc1c29873efe2ce509a05",
+    "detail": "weights loaded on cpu"
+  },
+  "status_load_wall_ms": 9079.453106998699,
+  "boolean_call": {
+    "latency_ms": 275.40192600281443,
+    "wall_ms": 6223.126288998174,
+    "n_answers": 1
+  },
+  "batch": {
+    "requested": 8,
+    "returned": 8,
+    "latency_ms": 1251.4294400025392,
+    "wall_ms": 1251.4424399996642,
+    "per_question_ms": 156.43030499995803,
+    "capabilities_supports_batch_questions": true
+  }
+}
+wrote results/decision-runtime-20260922/laya_421m.json

@@ -1,0 +1,196 @@
+{
+  "schema": "z0int.capability_trust.v1",
+  "description": "Trust is per model x capability x distribution. There is deliberately no global per-model trust flag; see z0int.backends.trust.assert_no_global_trust. Every status above `experimental` must cite the artifact it was measured from.",
+  "capabilities": [
+    "bounded_legal_action",
+    "generic_next_action_real_traffic",
+    "recovery_action",
+    "verification_needed",
+    "context_compress_needed",
+    "orchestration",
+    "temporal_recovery"
+  ],
+  "models": {
+    "laya_421m": {
+      "hf": "convaiinnovations/laya",
+      "revision": "7c76b622dfc5cac71b2dc1c29873efe2ce509a05",
+      "capabilities": {
+        "verification_needed": {
+          "status": "untested",
+          "note": "Registered only on 2026-09-22; the adapter, the `laya` package and the weights had all been present for days while the backend was absent from the registry, so it has never appeared in a roster, bench run or Pareto plot. Native boolean (`noul`) call and an 8-question batch are proven in results/decision-runtime-20260922/laya_421m.json, but no accuracy has been measured on this capability.",
+          "evidence": [
+            "results/decision-runtime-20260922/laya_421m.json"
+          ]
+        },
+        "context_compress_needed": {
+          "status": "untested",
+          "note": "Its input budget is 512 tokens per question (card; not yet re-measured locally), which is the binding constraint for any Hermes context task. Measure before assigning."
+        },
+        "bounded_legal_action": {
+          "status": "untested",
+          "note": "Laya's own card reports 0.362 on a typed-workflow benchmark for the base checkpoint and warns that choice accuracy degrades past ~20 options; the fine-tuned specialist reaches 0.766 on four synthetic workflows. Neither number is ours."
+        }
+      }
+    },
+    "nanojev": {
+      "hf": "C-Tianyu/NanoJev",
+      "revision": "4a19595eada0857133c0d2be024f879a4077054b",
+      "capabilities": {
+        "bounded_legal_action": {
+          "status": "exploratory_beta",
+          "threshold": 0.6,
+          "coverage": 0.607,
+          "success_given_covered": 0.941,
+          "split_id": "compiler legal_actions, 28 states x 3 reps",
+          "note": "On the compiler's EXACT legal-action set: 17/28 Hammer3B calls eliminated at 94.1% success-given-covered, p50 34.7 ms, zero network calls; cascade nanojev->hammer3b end-to-end 26/28 = 0.929 against a 0.893 baseline. This supersedes the earlier 43.6% figure, which was a mismatched-candidate-set artifact: candidate_set_equal was false on 40/40 paired decisions before the fix.",
+          "evidence": [
+            "results/steal-sweep-20260922/"
+          ]
+        },
+        "generic_next_action_real_traffic": {
+          "status": "rejected_for_current_checkpoint",
+          "note": "0.143 against a 0.514 majority floor on 4,921 gold rows of real Hermes traffic. Consistent with the upstream checkpoint being trained on maze/snake/ViZDoom: it is a trainable substrate for our decision families, not an off-the-shelf router. This is a statement about this checkpoint on this distribution, not about the architecture.",
+          "evidence": [
+            "/home/kvn/tmp/evolution-lab/results/shadow-real-traffic.json",
+            "/home/kvn/tmp/evolution-lab/results/phase2-training-comparison.json"
+          ]
+        },
+        "recovery_action": {
+          "status": "rejected_for_current_checkpoint",
+          "note": "0.000 per-step on recovery; answers retry on 31 of 48 episodes where retry is 4% of gold. Out-of-distribution input.",
+          "evidence": [
+            "/home/kvn/tmp/evolution-lab/results/recovery-compare.json"
+          ]
+        }
+      }
+    },
+    "mushroom": {
+      "revision": null,
+      "capabilities": {
+        "recovery_action": {
+          "status": "rejected_for_current_checkpoint",
+          "note": "Per-step 0.839 against a 0.977 deterministic teacher rule. NOTE the promotion gate did not see this: ~/.z0int/benchmarks/recovery_action_l2.json records student confirm 1.000 per EPISODE and promoted to canary with promote_allowed=true. Same 640-parameter bundle, two units, and the gate read the passing one. The artifact also passed an OOD gate (>=0.85) on a slice whose 32/32 labels are `escalate`, so the majority baseline scores 1.000 and the gate cannot discriminate. See docs/model-inventory.md section 5.",
+          "evidence": [
+            "/home/kvn/tmp/evolution-lab/results/recovery-compare.json",
+            "~/.z0int/benchmarks/recovery_action_l2.json"
+          ]
+        },
+        "bounded_choice_next_action": {
+          "status": "quarantined",
+          "note": "0.143 on real Hermes traffic against a 0.514 majority. The bundle records acc=1.0 AND ridge=1.0, i.e. the split it was scored on was separable by construction; that field measured memorability, not transfer, and is quoted nowhere. Dominated by ridge at every operating point of the risk/coverage sweep, never reaching 0.25 confidence.",
+          "evidence": [
+            "results/steal-sweep-20260922/",
+            "/home/kvn/tmp/evolution-lab/results/shadow-real-traffic.json"
+          ]
+        }
+      }
+    },
+    "decider_2b": {
+      "hf": "Mapika/decider-2b",
+      "revision": "1d96be0093133e194fe18105a521b3e69be931d2",
+      "capabilities": {
+        "bounded_legal_action": {
+          "status": "untested",
+          "note": "Registered and weight-complete, never measured on this machine. Its card claims 0.98 on sampled-10 CLINC degrading to 0.88 at 151 labels, supports 2-255 runtime options, and advises splitting multi-step judgments into separate questions; none of that is our measurement."
+        }
+      }
+    },
+    "hammer2.1_3b": {
+      "revision": "702ce4215e1391cb000a9c037b86b997660750f3",
+      "capabilities": {
+        "bounded_legal_action": {
+          "status": "trusted_bounded",
+          "success_given_covered": 0.893,
+          "split_id": "28 states x 3 reps, compiler-contract p1b-20260921T1430Z",
+          "note": "The incumbent production default: 75/84 = 0.893 with compiler-first, 0 dangerous selections. It is non-commercial (`qwen-research`). `trusted_bounded` here means legality-bounded and incumbent, not verified generalisation: the evidence is 28 states at n=3, and the compiler's +6 gain over unfiltered (69/84) is the only arm where the compiler changed accuracy at all.",
+          "evidence": [
+            "results/phase1b/p1b-20260921T1430Z/observations.jsonl"
+          ]
+        }
+      }
+    },
+    "hammer2.1_7b": {
+      "revision": "c5692ee193b806c1aadeaf68c4aec3de503fac30",
+      "capabilities": {
+        "bounded_legal_action": {
+          "status": "experimental",
+          "success_given_covered": 0.857,
+          "note": "72/84, WORSE than the 3B's 75/84 on bounded action choice. Also 0/3 on the cold probe, consistent with its 13.3 s supervisor cold load. Non-commercial (cc-by-nc-4.0)."
+        }
+      }
+    },
+    "functiongemma_270m": {
+      "revision": "39eccb091651513a5dfb56892d3714c1b5b8276c",
+      "capabilities": {
+        "bounded_legal_action": {
+          "status": "experimental",
+          "success_given_covered": 0.607,
+          "note": "51/84 with compiler-first. Its card states it is intended to be fine-tuned for a specific function-calling task and is not intended as a direct dialogue model; the word 'router' does not appear. The right question is whether a task-specific adapter steals a tool family from Hammer, not whether base FunctionGemma handles arbitrary Zer0 actions. Gated under Gemma Terms."
+        }
+      }
+    },
+    "nemotron_orchestrator_8b": {
+      "revision": "26df4b9aad5abdc5b7871ee4c71063ce888feb26",
+      "capabilities": {
+        "bounded_legal_action": {
+          "status": "experimental",
+          "note": "Corrected 2026-09-22, PRELIMINARY. The earlier 0.619 (52/84) was measured under an effective 256-token cap while the receipt recorded 1024, and 37.4% of draws were truncated before emitting a tool call. The cap rerun shows truncation falling 42.9% -> 0% and gold-in-reasoning at 100% across caps, so the mechanism is established. The corrected ACCURACY is deliberately not recorded here: the only figure so far is rep 0, n=28, which is not a capability record. Populate this once the full n=84 cells land.",
+          "evidence": [
+            "results/token-cap-20260922/",
+            "results/phase1b/p1b-20260921T1430Z/analysis/execution-contract-audit.json"
+          ],
+          "n": 0,
+          "awaiting": "full 3-repetition cells (n=84) from results/token-cap-20260922/"
+        },
+        "orchestration": {
+          "status": "untested",
+          "note": "ToolOrchestra trains this model to alternate reasoning with heterogeneous tools AND other LLMs under outcome/efficiency/preference rewards. It has never been evaluated on that contract here. Retiring it on the bounded-choice result was premature."
+        }
+      }
+    },
+    "qwen3.5_4b": {
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "capabilities": {
+        "bounded_legal_action": {
+          "status": "experimental",
+          "success_given_covered": 0.893,
+          "note": "75/84, identical with and without the compiler, at 1,993 ms p50 against Hammer3B's 195 ms. Apache-2.0, so commercially usable."
+        },
+        "orchestration": {
+          "status": "untested",
+          "note": "Intended role. Must be scored per TRAJECTORY, not per decision."
+        }
+      }
+    },
+    "qwen3.5_9b": {
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "capabilities": {
+        "bounded_legal_action": {
+          "status": "experimental",
+          "success_given_covered": 0.929,
+          "note": "78/84, 3,603 ms. Its measured advantage over the 4B localises to stopping and a small hard tail; it should see residual/high-regret states, not every request."
+        }
+      }
+    },
+    "openjev_06b": {
+      "hf": "Qwen/Qwen3-0.6B",
+      "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+      "capabilities": {
+        "bounded_legal_action": {
+          "status": "untested",
+          "note": "Registered 2026-09-22; never measured here."
+        }
+      }
+    },
+    "openjev_4b": {
+      "hf": "Qwen/Qwen3.5-4B",
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "capabilities": {
+        "bounded_legal_action": {
+          "status": "untested",
+          "note": "Registered 2026-09-22; never measured here."
+        }
+      }
+    }
+  }
+}

@@ -10,6 +10,51 @@ no runtime authority.** Nothing was pushed or merged. External inference spend
 was **$0.00** — every measurement came from local `llama.cpp` through
 `z0int cognition serve`.
 
+> ## Correction (2026-09-22): the `compiler+jev` arm is NanoJev
+>
+> This document, and the published z0evals article derived from it, described the
+> arm `compiler+jev` as the hosted **TypeSafe Jev** scorer. **It is not.** It is
+> our local **NanoJev 0.6B**.
+>
+> The immutable rows settle it. Every `compiler+jev` observation in
+> `results/phase1b/p1b-20260921T1430Z/observations.jsonl` records:
+>
+> | field | value |
+> |---|---|
+> | `model_id` | `nanojev_06b` |
+> | `model_revision` | `4a19595eada0857133c0d2be024f879a4077054b` |
+> | `quant` | `bfloat16` |
+>
+> The name came from the arm's legacy display value. `scripts/densify_measurements.py`
+> defined `Arm("compiler+jev", "bounded", model="JEV", jev=True)` and every emission
+> quietly rewrote `"JEV"` to `nanojev_06b` — so the label said Jev while the run used
+> NanoJev, and the label was the only thing the reader saw. The scorer was never
+> encoded as a field; that is the actual defect, and it is fixed in
+> `scripts/densify_measurements.py` and `scripts/composition_eval.py`, where the
+> sentinel now names the scorer it loads (`SCORER_SENTINEL = "nanojev_06b"`) and every
+> emitted observation carries an explicit `scorer_type` and `scorer_backend`.
+>
+> What changes, and what does not:
+>
+> * **No measurement changed.** Only the identity of the scorer behind it.
+> * The arm id `compiler+jev` is a join key in immutable artifacts and is
+>   deliberately **not** renamed. Display labels are corrected instead.
+> * **This is not the J1 shadow pilot.** The pilot
+>   (`studies/slm-router-v0/data/nanojev-j1-shadow-pilot.json`) genuinely compares
+>   NanoJev against the hosted Jev (~304 ms network vs ~236 ms local) and is
+>   unaffected by this correction. The two experiments must not be merged.
+> * The correct reading of 45/84 is now: **NanoJev, zero-shot, across the full
+>   bounded-choice action space.** That is consistent with its upstream checkpoint
+>   being trained largely on maze/snake/ViZDoom control decisions. It is not a
+>   statement about the architecture's ceiling: on the compiler's *exact matched
+>   candidate set*, the same checkpoint removes 60.7% of Hammer3B calls at 94.1%
+>   success-given-covered and improves the cascade from 0.893 to 0.929.
+> * `tests/test_nanojev_provenance.py` fails if the substitution returns or if the
+>   corpus is relabelled.
+>
+> History was not rewritten: the arm id, the raw rows and this document's original
+> numbers all stand.
+
 ## 1. What changed in the evidence base
 
 | | Phase 1 | Phase 1B |
@@ -47,6 +92,12 @@ measurement contract:
 | qwen3.5_4b | `851bf6e806ef` | Q4_K_M | `13c16f426047e2de…` |
 | qwen3.5_9b | `c20223623576` | Q4_K_M | `d784ce9eda1a5a7b…` |
 | nemotron_orchestrator_8b | `26df4b9aad5a` | Q4_K_M | `1cc7077e20b3339d…` |
+| **nanojev_06b** | `4a19595eada0` | bfloat16 (safetensors) | n/a — not a GGUF, and not served by the supervisor; runs in-process |
+
+`nanojev_06b` was omitted from this table in the original run, which is part of how
+the "jev" label went unchallenged: the one arm whose scorer was not a generative
+GGUF model was also the one arm whose model was not listed. See the correction at
+the top of this document.
 
 ## 2. Bounded-choice benchmark (n=84 per arm: 28 states x 3 repetitions)
 
@@ -59,8 +110,8 @@ measurement contract:
 | compiler + qwen3.5_4b | 75/84 | [0.81, 0.94] | 1993 | 3884 | 0 |
 | compiler + qwen3.5_9b | 78/84 | [0.84, 0.96] | 3603 | 13807 | 0 |
 | compiler + nemotron_orchestrator_8b | 52/84 | [0.51, 0.71] | 2475 | 2821 | 0 |
-| compiler + jev (bounded scorer) | 45/84 | [0.43, 0.64] | 31 | — | 0 |
-| compiler + jev + qwen3.5_4b | 63/76 | [0.73, 0.90] | 1647 | — | 0 |
+| compiler + **NanoJev 0.6B** (bounded scorer) | 45/84 | [0.43, 0.64] | 31 | — | 0 |
+| compiler + NanoJev 0.6B + qwen3.5_4b | 63/76 | [0.73, 0.90] | 1647 | — | 0 |
 | **unfiltered** + hammer2.1_3b | 69/84 | [0.72, 0.89] | 186 | 372 | **6** |
 | unfiltered + qwen3.5_4b | 75/84 | [0.81, 0.94] | 2082 | 3470 | 0 |
 | unfiltered + qwen3.5_9b | 78/84 | [0.84, 0.96] | 3322 | 13796 | 0 |
@@ -82,7 +133,7 @@ response, so residency is observed rather than inferred from wall clock.
 | cold load (GPU idle → first call) | 18 | 13928 | 20820 |
 | model swap (different model evicted) | 23 | 12927 | 21298 |
 | warm invocation (same residency) | 893 | 1763 | 5014 |
-| no model call (deterministic / JEV) | 168 | 0.0 | 32 |
+| no supervisor model call (deterministic compiler / in-process NanoJev) | 168 | 0.0 | 32 |
 
 There are **no `already_resident` rows**. The sweep is arm-major, so every arm
 begins with a cold load or a swap and every later call in that arm is a warm
@@ -162,7 +213,7 @@ and the run is preserved only as evidence of the failure.
 | baseline: compiler → hammer3b | 10/28 | — | — | 68 |
 | baseline: compiler → qwen4b | 18/28 | — | — | 13801 |
 | baseline: compiler → qwen9b | 19/28 | — | — | 14686 |
-| compiler → **JEV** → qwen4b | 13/28 | **0** | **8** | 15738 |
+| compiler → **NanoJev** → qwen4b | 13/28 | **0** | **8** | 15738 |
 | compiler → **hammer3b** → qwen4b | 6/28 | **0** | **13** | 27506 |
 
 **True composition loses to simply selecting one appropriate model, and the loss
@@ -325,14 +376,24 @@ the `tiny_specialist` rung, so the gate never compares them and FunctionGemma
    correctly (27/40 vs 23/40), is the only arm with 5/5 recovery, and is the only
    bounded-choice arm not dominated by anything.
 
-4. **Does JEV add enough information to justify its latency anywhere?**
-   **No.** `compiler + JEV` alone is 45/84 (0.54) at 31 ms — weak. In front of the
+4. **Does NanoJev add enough information to justify its latency anywhere?**
+   **No, on this formulation.** `compiler + NanoJev 0.6B` alone is 45/84 (0.54) at
+   31 ms — weak. In front of the
    4B it gives 63/76 (0.83) at 1647 ms versus the 4B's own 75/84 (0.89) at
-   1993 ms: indistinguishable success, ~17% faster. JEV's distribution prunes the
-   legal set; it does not improve the answer. And in true composition, JEV's
-   artifact **hurt** the downstream model on 8 states and helped on 0. JEV's
+   1993 ms: indistinguishable success, ~17% faster. NanoJev's distribution prunes the
+   legal set; it does not improve the answer. And in true composition, NanoJev's
+   artifact **hurt** the downstream model on 8 states and helped on 0. NanoJev's
    confidence/margin/entropy are the only calibrated signals in the system, so it
    remains worth *recording* — but not worth a tier.
+
+   **Read this together with the correction at the top.** 45/84 is the local
+   NanoJev 0.6B scored **zero-shot across the full bounded-choice action space**,
+   which is the one thing its upstream checkpoint (maze/snake/ViZDoom control
+   decisions) was never trained for. It is not the architecture's ceiling, and it
+   is not a statement about the hosted Jev scorer. On the compiler's exact matched
+   candidate set the same checkpoint eliminates 60.7% of Hammer3B calls at 94.1%
+   success-given-covered and lifts the cascade to 0.929 — see
+   `results/steal-sweep-20260922/` and `docs/model-inventory.md`.
 
 5. **Does Nemotron retain any Pareto niche?**
    **No measured niche.** 0.62 bounded-choice success (dominated by FunctionGemma
@@ -384,8 +445,8 @@ the `tiny_specialist` rung, so the gate never compares them and FunctionGemma
 
 * A composition stage that is *consumed* can still be *harmful* — consumption is
   not value, and only the ablation distinguishes them.
-* `compiler + JEV + qwen4b` is **worse** than `compiler + qwen4b` on true
-  composition (hurt 8, helped 0) even though JEV's shortlist is genuinely used.
+* `compiler + NanoJev + qwen4b` is **worse** than `compiler + qwen4b` on true
+  composition (hurt 8, helped 0) even though NanoJev's shortlist is genuinely used.
 * FunctionGemma and Hammer3B share a rung, so the gate picks the cheaper and
   never compares quality: **19→15 states owned by a 0.61 arm over a 0.89 arm.**
 * The frozen utility saturates at −1.0, so the gate cannot distinguish

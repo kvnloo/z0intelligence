@@ -1,0 +1,327 @@
+{
+  "schema": "z0int.phase1b.execution_contract_audit.v1",
+  "run_id": "p1b-20260921T1430Z",
+  "frozen_run_mutated": false,
+  "executed_at": "2026-09-22",
+  "summary": {
+    "defect": "Every receipt records max_tokens=1024, the requested campaign setting. The value sent to the wire is min(requested, dialect.max_tokens), and the dialect is chosen by dialect_for(tool_parser, tool_call_template), which matches tool_parser first and never consults the template.",
+    "models_with_a_clipped_cap": [
+      "hammer2.1_3b",
+      "hammer2.1_7b",
+      "nemotron_orchestrator_8b",
+      "functiongemma_270m"
+    ],
+    "models_unaffected": [
+      "qwen3.5_4b",
+      "qwen3.5_9b"
+    ],
+    "headline": "4 of 6 generative arms ran under a cap smaller than the one recorded on their receipts.",
+    "the_fix_existed_and_was_unreachable": "NEMOTRON_DIALECT is defined with max_tokens=1024 and its comment names the exact 256-token empty-content failure. It is never selected for nemotron_orchestrator_8b because that row's tool_parser is 'hermes', which wins the lookup before the template is examined."
+  },
+  "models": {
+    "hammer2.1_3b": {
+      "model_id": "hammer2.1_3b",
+      "tool_parser": "hermes",
+      "tool_call_template": "hammer-json-array",
+      "dialect": "hermes",
+      "dialect_max_tokens": 256,
+      "observed_calls": 171,
+      "arms": [
+        "coldprobe+hammer2.1_3b",
+        "compiler+hammer2.1_3b",
+        "unfiltered+hammer2.1_3b"
+      ],
+      "recorded_requested_max_tokens": [
+        1024
+      ],
+      "observed_completion_tokens_min": 5,
+      "observed_completion_tokens_median": 21,
+      "observed_completion_tokens_max": 80,
+      "observed_histogram_at_caps": {
+        "==128": 0,
+        "==256": 0,
+        "==384": 0,
+        ">=1024": 0
+      },
+      "observed_max_never_exceeds": 80,
+      "requested_max_tokens": 1024,
+      "effective_max_tokens": 256,
+      "clipped": true,
+      "confidence": "high",
+      "evidence_source": "source: dialect lookup in dialect_for() -> hermes(256); observed max completion 80 <= 256"
+    },
+    "hammer2.1_7b": {
+      "model_id": "hammer2.1_7b",
+      "tool_parser": "hermes",
+      "tool_call_template": "hammer-json-array",
+      "dialect": "hermes",
+      "dialect_max_tokens": 256,
+      "observed_calls": 87,
+      "arms": [
+        "coldprobe+hammer2.1_7b",
+        "compiler+hammer2.1_7b"
+      ],
+      "recorded_requested_max_tokens": [
+        1024
+      ],
+      "observed_completion_tokens_min": 18,
+      "observed_completion_tokens_median": 19,
+      "observed_completion_tokens_max": 63,
+      "observed_histogram_at_caps": {
+        "==128": 0,
+        "==256": 0,
+        "==384": 0,
+        ">=1024": 0
+      },
+      "observed_max_never_exceeds": 63,
+      "requested_max_tokens": 1024,
+      "effective_max_tokens": 256,
+      "clipped": true,
+      "confidence": "high",
+      "evidence_source": "source: dialect lookup in dialect_for() -> hermes(256); observed max completion 63 <= 256"
+    },
+    "nemotron_orchestrator_8b": {
+      "model_id": "nemotron_orchestrator_8b",
+      "tool_parser": "hermes",
+      "tool_call_template": "qwen3-hermes",
+      "dialect": "hermes",
+      "dialect_max_tokens": 256,
+      "observed_calls": 171,
+      "arms": [
+        "coldprobe+nemotron_orchestrator_8b",
+        "compiler+nemotron_orchestrator_8b",
+        "unfiltered+nemotron_orchestrator_8b"
+      ],
+      "recorded_requested_max_tokens": [
+        1024
+      ],
+      "observed_completion_tokens_min": 116,
+      "observed_completion_tokens_median": 225,
+      "observed_completion_tokens_max": 256,
+      "observed_histogram_at_caps": {
+        "==128": 2,
+        "==256": 64,
+        "==384": 0,
+        ">=1024": 0
+      },
+      "observed_max_never_exceeds": 256,
+      "requested_max_tokens": 1024,
+      "effective_max_tokens": 256,
+      "clipped": true,
+      "confidence": "high",
+      "evidence_source": "source: dialect lookup in dialect_for() -> hermes(256); observed max completion 256 <= 256"
+    },
+    "qwen3.5_4b": {
+      "model_id": "qwen3.5_4b",
+      "tool_parser": "qwen3_coder",
+      "tool_call_template": "qwen35",
+      "dialect": "qwen",
+      "dialect_max_tokens": 1024,
+      "observed_calls": 171,
+      "arms": [
+        "coldprobe+qwen3.5_4b",
+        "compiler+qwen3.5_4b",
+        "unfiltered+qwen3.5_4b"
+      ],
+      "recorded_requested_max_tokens": [
+        1024
+      ],
+      "observed_completion_tokens_min": 99,
+      "observed_completion_tokens_median": 208,
+      "observed_completion_tokens_max": 558,
+      "observed_histogram_at_caps": {
+        "==128": 0,
+        "==256": 1,
+        "==384": 0,
+        ">=1024": 0
+      },
+      "observed_max_never_exceeds": 558,
+      "requested_max_tokens": 1024,
+      "effective_max_tokens": 1024,
+      "clipped": false,
+      "confidence": "high",
+      "evidence_source": "requested 1024 == dialect cap 1024; nothing was clipped"
+    },
+    "qwen3.5_9b": {
+      "model_id": "qwen3.5_9b",
+      "tool_parser": "qwen3_coder",
+      "tool_call_template": "qwen35",
+      "dialect": "qwen",
+      "dialect_max_tokens": 1024,
+      "observed_calls": 171,
+      "arms": [
+        "coldprobe+qwen3.5_9b",
+        "compiler+qwen3.5_9b",
+        "unfiltered+qwen3.5_9b"
+      ],
+      "recorded_requested_max_tokens": [
+        1024
+      ],
+      "observed_completion_tokens_min": 96,
+      "observed_completion_tokens_median": 239,
+      "observed_completion_tokens_max": 1024,
+      "observed_histogram_at_caps": {
+        "==128": 0,
+        "==256": 0,
+        "==384": 0,
+        ">=1024": 30
+      },
+      "observed_max_never_exceeds": 1024,
+      "requested_max_tokens": 1024,
+      "effective_max_tokens": 1024,
+      "clipped": false,
+      "confidence": "high",
+      "evidence_source": "requested 1024 == dialect cap 1024; nothing was clipped"
+    },
+    "functiongemma_270m": {
+      "model_id": "functiongemma_270m",
+      "tool_parser": "functiongemma",
+      "tool_call_template": "functiongemma",
+      "dialect": "functiongemma",
+      "dialect_max_tokens": 128,
+      "observed_calls": 87,
+      "arms": [
+        "coldprobe+functiongemma_270m",
+        "compiler+functiongemma_270m"
+      ],
+      "recorded_requested_max_tokens": [
+        1024
+      ],
+      "observed_completion_tokens_min": 6,
+      "observed_completion_tokens_median": 14,
+      "observed_completion_tokens_max": 39,
+      "observed_histogram_at_caps": {
+        "==128": 0,
+        "==256": 0,
+        "==384": 0,
+        ">=1024": 0
+      },
+      "observed_max_never_exceeds": 39,
+      "requested_max_tokens": 1024,
+      "effective_max_tokens": 128,
+      "clipped": true,
+      "confidence": "high",
+      "evidence_source": "source: dialect lookup in dialect_for() -> functiongemma(128); observed max completion 39 <= 128"
+    }
+  },
+  "nemotron_dialect_reachability": {
+    "hammer2.1_3b": {
+      "dialect_selected": "hermes",
+      "nemotron_dialect_exists": true,
+      "nemotron_dialect_cap": 1024,
+      "nemotron_dialect_used": false
+    },
+    "hammer2.1_7b": {
+      "dialect_selected": "hermes",
+      "nemotron_dialect_exists": true,
+      "nemotron_dialect_cap": 1024,
+      "nemotron_dialect_used": false
+    },
+    "nemotron_orchestrator_8b": {
+      "dialect_selected": "hermes",
+      "nemotron_dialect_exists": true,
+      "nemotron_dialect_cap": 1024,
+      "nemotron_dialect_used": false
+    },
+    "qwen3.5_4b": {
+      "dialect_selected": "qwen",
+      "nemotron_dialect_exists": true,
+      "nemotron_dialect_cap": 1024,
+      "nemotron_dialect_used": false
+    },
+    "qwen3.5_9b": {
+      "dialect_selected": "qwen",
+      "nemotron_dialect_exists": true,
+      "nemotron_dialect_cap": 1024,
+      "nemotron_dialect_used": false
+    },
+    "functiongemma_270m": {
+      "dialect_selected": "functiongemma",
+      "nemotron_dialect_exists": true,
+      "nemotron_dialect_cap": 1024,
+      "nemotron_dialect_used": false
+    }
+  },
+  "recoverability": {
+    "finish_reason_in_frozen_corpus": "absent",
+    "truncation_flag_in_frozen_corpus": "absent",
+    "gold_mentioned_in_reasoning": "absent",
+    "note": "The frozen receipts record no finish_reason, no truncation flag and no reasoning text, so truncation cannot be recovered per row. It can be inferred only from completion_tokens hitting the effective cap exactly, which is what the histogram above counts. Per-row recovery requires the fresh run, which does record finish_reason."
+  },
+  "cap_rerun": {
+    "artifact": "results/token-cap-20260922/ (IN PROGRESS \u2014 the numbers below are REP 0 ONLY, n=28 per cap, not the full 3 repetitions; the schedule is rep-major so at this checkpoint only rep 0 of nemotron and hammer3b had finished. Final cells will be n=84 = 28 states x 3 reps.)",
+    "override": "dataclasses.replace(resolved_dialect, max_tokens=cap) passed to LocalSLMBackend(dialect=...); a WireTransport subclass records the literal payload['max_tokens'] POSTed, and every receipt stores wire_max_tokens. Verified effective: nemotron reached 871 completion tokens at wire cap 1024; 19 calls exceeded the old 256 native cap.",
+    "nemotron_orchestrator_8b": {
+      "at_256": {
+        "accuracy": 0.571,
+        "truncated": 0.429,
+        "draws_at_cap": "12/28",
+        "parsed": 0.571
+      },
+      "at_512": {
+        "accuracy": 0.821,
+        "truncated": 0.071,
+        "parsed": 0.929
+      },
+      "at_1024": {
+        "accuracy": 0.857,
+        "truncated": 0.0,
+        "parsed": 1.0,
+        "max_completion_tokens": 871
+      },
+      "gold_mentioned_in_reasoning": "1.00 at every cap",
+      "paired_256_to_1024": {
+        "no_parsed_call_at_256": "12/28",
+        "became_parsed_call_at_1024": "12/12",
+        "flipped_wrong_to_correct": "8/12",
+        "delta_pp": 28.6,
+        "ci95_pp": [
+          14.3,
+          46.4
+        ]
+      },
+      "verdict": "The frozen 52/84 = 0.619 measured a decode-budget artefact, not the model. At a truthful contract Nemotron is 85.7%, which EQUALS its reasoning-implied ceiling exactly: it is correct whenever gold appears in its reasoning, and the cap was deciding how often that reasoning reached a parsable tool call. Its preference never changed (gold_in_reasoning = 1.00 at every cap).",
+      "preliminary": true,
+      "n": 28
+    },
+    "hammer2.1_3b": {
+      "at_256": 0.893,
+      "at_512": 0.893,
+      "at_1024": 0.893,
+      "truncated": "0.0 at every cap",
+      "max_completion_tokens": [
+        55,
+        80,
+        55
+      ],
+      "paired_delta_pp": 0.0,
+      "ci95_pp": [
+        0.0,
+        0.0
+      ],
+      "paired_ties": "28/28",
+      "verdict": "EXACT NULL, as predicted from the audit. Its cap was recorded wrong but never bound, so the frozen 75/84 = 0.893 is cap-invariant. This confirms the NanoJev cascade baseline by re-measurement rather than merely asserting it.",
+      "preliminary": true,
+      "n": 28
+    },
+    "hammer2.1_7b": {
+      "at_256": 0.857,
+      "at_512": 0.857,
+      "paired_delta_pp": 0.0,
+      "truncated": "0.0",
+      "preliminary": true,
+      "n": 28
+    },
+    "parser_caveat": "The production parser's step-5 substring fallback parses Hammer/FunctionGemma output the dialect patterns miss; parse_source is recorded per call so this is visible rather than silently credited.",
+    "still_running": [
+      "functiongemma_270m 128/256",
+      "qwen3.5_4b 256/1024",
+      "qwen3.5_9b 1024/2048"
+    ],
+    "status": "preliminary_rep0_n28",
+    "n_per_cell": 28,
+    "n_per_cell_final_expected": 84,
+    "reported_by": "subagent interim, then corrected: the first report described these as 'complete (28 states x 3 reps)'. That was wrong. Recording a rep-0 slice as a finished cell is the same defect this audit is about \u2014 a measurement labelled with a contract it was not run under \u2014 and it was mine, not the model's.",
+    "what_is_expected_to_hold": "The DIRECTION and the null are expected to survive: gold_in_reasoning is 1.00 at every cap, so the cap is deciding emission, not preference; and hammer3b's maximum completion is 55-80 tokens against a 256 cap, so it has no mechanism by which a cap change could move it. The ACCURACIES will change at n=84 and must not be quoted as final."
+  }
+}

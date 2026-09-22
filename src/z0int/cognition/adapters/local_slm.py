@@ -22,7 +22,7 @@ import time
 
 from ..actions import LegalActionSet
 from ..manifest import ModelCapability
-from .dialects import DIALECTS, ToolDialect, dialect_for
+from .dialects import DIALECTS, ToolDialect, dialect_for, resolve_max_tokens
 from .transport import ChatOutcome, OpenAICompatTransport, ServerConfig, TransportError
 
 # JSON Schema used when a server supports constrained decoding.
@@ -269,15 +269,21 @@ class LocalSLMBackend:
         ]
 
         started = time.perf_counter()
+        # The three values the old receipt collapsed into one. `requested` is what
+        # the caller asked for; `runtime_cap` is the dialect ceiling; `effective`
+        # is what actually reaches the wire. Phase 1B recorded only the first and
+        # four of six arms ran at 256 or 128 while every receipt said 1024.
+        _requested_tokens, _runtime_cap, _effective_max_tokens = resolve_max_tokens(
+            request.max_tokens, self._dialect
+        )
         try:
             outcome: ChatOutcome = self._transport.chat(
                 messages,
                 tools=tools,
                 tool_choice=self._dialect.tool_choice,
                 response_format=response_format,
-                max_tokens=min(request.max_tokens, self._dialect.max_tokens)
-                if self._dialect.max_tokens
-                else request.max_tokens,
+                # record the triple, not just what the caller hoped to send
+                max_tokens=_effective_max_tokens,
                 temperature=self._dialect.temperature,
                 stop=self._dialect.stop or None,
             )

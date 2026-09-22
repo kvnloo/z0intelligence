@@ -1,0 +1,140 @@
+{
+  "schema": "z0int.schedule_completeness.v1",
+  "schedule_id": "token-cap-20260922",
+  "states_expected": 28,
+  "reps_expected": 3,
+  "cells_expected": 14,
+  "states_completed": 28,
+  "reps_completed": 3,
+  "reps_completed_note": "maximum over cells, because repetitions need not finish in lockstep; per_cell is authoritative",
+  "cells_completed": 6,
+  "n_measured": 983,
+  "n_expected": 1176,
+  "complete": false,
+  "stopping_rule": "states x repetitions per declared cell; no early stop declared",
+  "undeclared_cells_observed": [],
+  "per_cell": [
+    {
+      "cell": "functiongemma_270m@128",
+      "complete": true,
+      "reps_completed": 3,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 84
+    },
+    {
+      "cell": "functiongemma_270m@256",
+      "complete": true,
+      "reps_completed": 3,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 84
+    },
+    {
+      "cell": "hammer2.1_3b@1024",
+      "complete": false,
+      "reps_completed": 2,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 56
+    },
+    {
+      "cell": "hammer2.1_3b@256",
+      "complete": false,
+      "reps_completed": 2,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 56
+    },
+    {
+      "cell": "hammer2.1_3b@512",
+      "complete": false,
+      "reps_completed": 2,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 56
+    },
+    {
+      "cell": "hammer2.1_7b@256",
+      "complete": true,
+      "reps_completed": 3,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 84
+    },
+    {
+      "cell": "hammer2.1_7b@512",
+      "complete": true,
+      "reps_completed": 3,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 84
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@1024",
+      "complete": false,
+      "reps_completed": 2,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 56
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@256",
+      "complete": false,
+      "reps_completed": 2,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 56
+    },
+    {
+      "cell": "nemotron_orchestrator_8b@512",
+      "complete": false,
+      "reps_completed": 2,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 56
+    },
+    {
+      "cell": "qwen3.5_4b@1024",
+      "complete": true,
+      "reps_completed": 3,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 84
+    },
+    {
+      "cell": "qwen3.5_4b@256",
+      "complete": true,
+      "reps_completed": 3,
+      "reps_partial": [],
+      "states_completed": 28,
+      "n_measured": 84
+    },
+    {
+      "cell": "qwen3.5_9b@1024",
+      "complete": false,
+      "reps_completed": 2,
+      "reps_partial": [
+        2
+      ],
+      "states_completed": 28,
+      "n_measured": 71
+    },
+    {
+      "cell": "qwen3.5_9b@2048",
+      "complete": false,
+      "reps_completed": 2,
+      "reps_partial": [
+        2
+      ],
+      "states_completed": 28,
+      "n_measured": 72
+    }
+  ],
+  "declared_progress_counters": 354,
+  "declared_counters_agree_with_records": false,
+  "capability_projection_allowed": false,
+  "capability_projection_reason": "schedule incomplete (6/14 cells, 983/1176 measurements); capability number must be omitted, not annotated",
+  "n_missing": 193,
+  "missing_work_file": "resume-point.json"
+}
