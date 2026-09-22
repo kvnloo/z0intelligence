@@ -265,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
                                 for k, v in preds.items()}}
 
     results: dict[str, Any] = {
-        "schema": "z0evals.steal-sweep.v1",
+        "schema": "z0int.steal-sweep.v1",
         "evidence_class": "exploratory_beta",
         "promotion_eligible": False,
         "corpus": a.corpus,

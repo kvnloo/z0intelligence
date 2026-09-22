@@ -305,7 +305,7 @@ def run(
         policies[f"backend:{b}"] = make_backend_policy(b)
 
     results: dict[str, Any] = {
-        "schema": "z0evals.exploratory-beta.tournament.v1",
+        "schema": "z0int.exploratory-beta.tournament.v1",
         "evidence_class": "exploratory_beta",
         "promotion_eligible": False,
         "note": (

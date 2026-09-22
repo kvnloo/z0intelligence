@@ -180,7 +180,7 @@ def main(argv: list[str] | None = None) -> int:
     tout = sum(x["output_tokens"] or 0 for x in ok)
 
     summary = {
-        "schema": "z0evals.exploratory-beta.provider-tournament.v1",
+        "schema": "z0int.exploratory-beta.provider-tournament.v1",
         "evidence_class": "exploratory_beta",
         "promotion_eligible": False,
         "provider": a.provider,
