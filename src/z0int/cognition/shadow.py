@@ -273,6 +273,83 @@ def _timeout_s(payload: Mapping[str, Any], timeout_s: float | None) -> float:
     return DEFAULT_SERVER_TIMEOUT_MS / 1000.0
 
 
+class DecisionBackendShadow:
+    """Adapt a z0int ``DecisionBackend`` to the shadow lane's ``decide()`` contract.
+
+    The lane resolves models through ``~/.z0int/config/serving.json``, which lists only
+    llama.cpp-supervised models. NanoJev is an *in-process* DecisionBackend, so it is not
+    in that map and could not be shadowed at all — the lane recorded
+    ``nanojev_06b is not served`` and skipped it, which meant the single most promising
+    cheap path found (60.7% of hammer3b's bounded-choice work on the corpus) was the one
+    path the observe-only lane could not watch.
+
+    This adapter bridges the two interfaces: it compiles the same legal set into a typed
+    choice question, calls ``evaluate()``, and maps the result back to a ``ToolDecision``.
+    It adds no capability the lane did not already have — the candidate set is still the
+    compiler's, and the lane still never executes anything.
+    """
+
+    def __init__(self, backend_id: str) -> None:
+        self.backend_id = backend_id
+
+    def decide(self, request: Any) -> Any:
+        settings = _shadow_settings()
+        if not settings["shadow_decision_backends"]:
+            raise RuntimeError(
+                "decision-backend shadowing is disabled; set "
+                "Z0INT_COGNITION_SHADOW_DECISION_BACKENDS=1 to enable"
+            )
+        from ..backends.base import request_from_mapping
+        from ..backends.registry import create_backend
+        from .adapters.local_slm import ToolDecision
+
+        legal = tuple(getattr(request.legal, "legal", ()) or ())
+        option_ids = [str(getattr(a, "action_id", "")) for a in legal if getattr(a, "action_id", "")]
+        if len(option_ids) < 2:
+            # A one-option menu is not a decision, and the backends refuse it anyway.
+            return ToolDecision(
+                backend=self.backend_id, model=None, revision=None, selected_action=None,
+                arguments={}, confidence=None, distribution=None, latency_ms=0.0,
+                abstained=True, candidate_action_count=len(option_ids),
+            )
+        payload = {
+            "state": getattr(request, "state", "") or "",
+            "questions": [{
+                "id": "action", "type": "choice",
+                "instructions": "Choose the single next action from exactly these legal actions.",
+                "options": [{"id": o, "description": o.replace("_", " ")} for o in option_ids],
+            }],
+        }
+        backend = create_backend(self.backend_id)
+        t0 = time.perf_counter()
+        result = backend.evaluate(request_from_mapping(payload))
+        dt = (time.perf_counter() - t0) * 1000.0
+        answer = result.answers[0] if getattr(result, "answers", None) else None
+        value = getattr(answer, "value", None)
+        return ToolDecision(
+            backend=self.backend_id,
+            model=getattr(result, "model", None),
+            revision=getattr(result, "revision", None),
+            selected_action=str(value) if value else None,
+            arguments={},
+            confidence=getattr(answer, "confidence", None),
+            distribution=getattr(answer, "probabilities", None) or None,
+            latency_ms=float(getattr(result, "latency_ms", None) or dt),
+            abstained=value is None,
+            candidate_action_count=len(option_ids),
+        )
+
+
+def _shadow_settings() -> dict[str, bool]:
+    """Decision-backend shadowing is opt-in.
+
+    Off by default: the served-model path is the one that has been exercised, and turning
+    on a second resolver by default would change what every existing shadow caller runs.
+    """
+    raw = os.environ.get("Z0INT_COGNITION_SHADOW_DECISION_BACKENDS", "")
+    return {"shadow_decision_backends": raw.strip().lower() in ("1", "true", "yes", "on")}
+
+
 def _resolve_shadows(
     registry: Any, specs: Sequence[ShadowSpec]
 ) -> list[tuple[ShadowSpec, Any, str | None]]:
@@ -291,7 +368,7 @@ def _resolve_shadows(
             served = tuple(served_attr())
         except Exception:  # noqa: BLE001
             served = ()
-        if not served:
+        if not served and not _shadow_settings()["shadow_decision_backends"]:
             # Nothing is served: still return the compiled legal set.
             return []
 
@@ -308,6 +385,18 @@ def _resolve_shadows(
             except Exception as exc:  # noqa: BLE001 - missing/unreachable model
                 backend = None
                 error = f"{type(exc).__name__}: {exc}"
+                # Fall back to the DecisionBackend registry. Models that are not in
+                # `serving.json` because they are served in-process (nanojev) are still
+                # shadowable, which is the whole point of the adapter.
+                if _shadow_settings()["shadow_decision_backends"]:
+                    try:
+                        from ..backends import registry as backend_registry
+
+                        resolved_id = backend_registry.resolve_backend_id(model_id)
+                        backend = DecisionBackendShadow(resolved_id)
+                        error = None
+                    except Exception:  # noqa: BLE001 - still not resolvable
+                        pass
         resolved.append((spec, backend, error))
     return resolved
 

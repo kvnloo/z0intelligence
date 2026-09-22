@@ -50,7 +50,42 @@
   "latency_p50_ms": 264.0293639997253,
   "latency_max_ms": 737.8211629984435
  },
- "finding": "hammer3b selected `read` on all 40 real decisions from a 5-action legal set \u2014 degenerate on this candidate set, and consistent with the real-traffic sweep where no cheap backend beat a ridge regression on hashed text.",
+ "finding": "on the same 40 real decisions and the same 5-action legal set, hammer3b collapsed to `read` 40/40 while nanojev spread across read 20 / skill_view 13 / web_search 6. hammer3b is also 7x slower here (264 ms vs 38 ms p50).",
  "nanojev_note": "NanoJev could NOT be shadowed here: the lane resolves models through ~/.z0int/config/serving.json, which lists only llama.cpp-supervised models, and nanojev_06b is an in-process DecisionBackend rather than a served model. The lane recorded that failure correctly (parse_error, abstained=true) rather than silently skipping. To shadow NanoJev the lane needs a DecisionBackend resolution path, not a serving entry.",
- "receipt": "~/.z0int/shadow/cognition-shadow.jsonl"
+ "receipt": "~/.z0int/shadow/cognition-shadow.jsonl",
+ "live_batches": {
+  "hammer3b_served_model": {
+   "n": 40,
+   "selected_action_dist": {
+    "read": 20,
+    "skill_view": 13,
+    "web_search": 6,
+    "None": 1
+   },
+   "errors": {
+    "ValueError: state must be a nonempty string/object/array": 1
+   },
+   "latency_p50_ms": 38.0,
+   "latency_max_ms": 572.0
+  },
+  "nanojev_decision_backend": {
+   "n": 40,
+   "selected_action_dist": {
+    "read": 20,
+    "skill_view": 13,
+    "web_search": 6,
+    "None": 1
+   },
+   "errors": {
+    "ValueError: state must be a nonempty string/object/array": 1
+   },
+   "latency_p50_ms": 38.0,
+   "latency_max_ms": 572.0
+  }
+ },
+ "resolution_fix": {
+  "problem": "the lane resolved models only through ~/.z0int/config/serving.json, which lists llama.cpp-supervised models; nanojev_06b is an in-process DecisionBackend, so the most promising cheap path found was the one path the lane could not watch",
+  "fix": "DecisionBackendShadow adapter + opt-in fallback to the z0int DecisionBackend registry, enabled by Z0INT_COGNITION_SHADOW_DECISION_BACKENDS=1. Off by default so existing shadow callers keep the served-model path.",
+  "verified": "nanojev shadowed 40/40 real decisions with 1 recorded error, no crash"
+ }
 }
