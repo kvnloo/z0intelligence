@@ -1,0 +1,56 @@
+{
+ "schema": "z0evals.live-shadow.v1",
+ "evidence_class": "exploratory_beta",
+ "promotion_eligible": false,
+ "what": "The live observe-only cognition_shadow bridge op, driven over real Hermes traffic.",
+ "not_a_replay": "This ran `python -u -m z0int.bridge.worker` and sent real cognition_shadow ops. It is the actual lane, not a re-analysis of a log.",
+ "traffic": {
+  "source": "~/.z0int/episodes/next_action.jsonl",
+  "rows": 40,
+  "tier": "gold"
+ },
+ "candidate_set": {
+  "offered": 9,
+  "legal": 5,
+  "legal_ids": [
+   "glob",
+   "grep",
+   "read",
+   "skill_view",
+   "web_search"
+  ],
+  "eliminated": [
+   "edit",
+   "write",
+   "bash",
+   "task"
+  ],
+  "elimination_stage": "permission",
+  "reason": "risk_class 'write' not in granted authority"
+ },
+ "shadow_backend": {
+  "label": "hammer3b",
+  "model_id": "hammer2.1_3b",
+  "served_by": "llama.cpp supervisor :11500"
+ },
+ "boundary_verified": {
+  "executed_action_values": [
+   null
+  ],
+  "lane_selected_action_values": [
+   null
+  ],
+  "note": "the lane never returned an executable action across all 40 decisions"
+ },
+ "result": {
+  "errors": 0,
+  "selected_action_dist": {
+   "read": 40
+  },
+  "latency_p50_ms": 264.0293639997253,
+  "latency_max_ms": 737.8211629984435
+ },
+ "finding": "hammer3b selected `read` on all 40 real decisions from a 5-action legal set \u2014 degenerate on this candidate set, and consistent with the real-traffic sweep where no cheap backend beat a ridge regression on hashed text.",
+ "nanojev_note": "NanoJev could NOT be shadowed here: the lane resolves models through ~/.z0int/config/serving.json, which lists only llama.cpp-supervised models, and nanojev_06b is an in-process DecisionBackend rather than a served model. The lane recorded that failure correctly (parse_error, abstained=true) rather than silently skipping. To shadow NanoJev the lane needs a DecisionBackend resolution path, not a serving entry.",
+ "receipt": "~/.z0int/shadow/cognition-shadow.jsonl"
+}
