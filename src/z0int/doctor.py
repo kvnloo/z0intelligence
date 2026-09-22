@@ -73,7 +73,6 @@ def discover_evolution_lab() -> dict[str, Any]:
     candidates.extend(
         [
             root.parent / "evolution-lab",
-            Path("/workspace/evolution-lab"),
             Path.home() / "src" / "evolution-lab",
             Path.home() / "code" / "evolution-lab",
         ]

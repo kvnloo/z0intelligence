@@ -7,6 +7,7 @@ import hashlib
 import importlib
 import json
 import os
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -19,18 +20,33 @@ PN = 96
 
 #: The MB / fly-plasticity arm is a research baseline owned by Evolution Lab.
 #: Ownership runs one way (Evolution Lab consumes z0intelligence, never the
-#: reverse), so this module must not import across that boundary. The primitive is
-#: resolved by name from an explicit opt-in provider; with no provider configured
-#: the arm reports why it did not run instead of reaching into another repo's file
-#: layout. The previous version hardcoded `/workspace/evolution-lab` on sys.path.
+#: reverse), so this module must not import across that boundary at import time.
+#: The primitive is resolved by name from an explicit opt-in provider; with no
+#: provider configured the arm reports why it did not run instead of reaching into
+#: another repo's file layout. The previous version hardcoded
+#: `/workspace/evolution-lab` on sys.path.
 MB_PROVIDER_ENV = "Z0INT_MB_PROVIDER"
+#: Conventional provider when `Z0INT_MB_PROVIDER` is unset and a lab checkout resolves.
+MB_PROVIDER_MODULE = "evolution_lab.jev_distill"
 
 
 def _mb_provider():
     """Return ``(fit_fly, predict_fly, None)`` or ``(None, None, reason)``."""
     spec = os.environ.get(MB_PROVIDER_ENV, "").strip()
     if not spec:
-        return None, None, f"{MB_PROVIDER_ENV} is not set; MB arm skipped"
+        # No explicit provider. Rather than naming one machine's checkout, ask the
+        # shared resolver -- the same one every other call site uses -- and report
+        # `ambiguous` instead of quietly binding to whichever copy happens to exist.
+        from . import paths as _paths
+
+        root = _paths.evolution_lab_root()
+        if root is None:
+            return None, None, (
+                f"{MB_PROVIDER_ENV} is not set and no Evolution Lab checkout resolved; "
+                "MB arm skipped (set EVOLUTION_LAB_ROOT or run `python -m z0int onboard`)"
+            )
+        sys.path.insert(0, str(root))
+        spec = MB_PROVIDER_MODULE
     try:
         module = importlib.import_module(spec)
     except Exception as exc:  # noqa: BLE001 - report, never crash the baseline run
