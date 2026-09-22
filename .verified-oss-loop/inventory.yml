@@ -5,8 +5,8 @@
 #   python3 scripts/kit-inventory.py mark --root . --path skills/NAME/SKILL.md --source local
 schema: verified-oss-loop.inventory.v1
 kit: https://github.com/kvnloo/verified-oss-loop
-kit_revision: 7ba2782090bef0a5fe8a8e039a700d76f23ca274
-synced_at: 2026-09-18T05:43:40Z
+kit_revision: 19c3c9294be7f538f1dd311899a4df623a772b26
+synced_at: 2026-09-22T08:03:40Z
 files:
   - path: .github/CODEOWNERS
     source: kit
@@ -34,12 +34,12 @@ files:
     kit_sha256: f7b19ea5ae7226368a3515db9dd292ab20844fb09618bebb7c92f8abc3d6132d
   - path: .github/workflows/automerge-nightly.yml
     source: kit
-    sha256: b1db0e5112b5f16cad13b3683ddf4ea699e398fc1c81221a8c34056e0d6c78b8
-    kit_sha256: b1db0e5112b5f16cad13b3683ddf4ea699e398fc1c81221a8c34056e0d6c78b8
+    sha256: 4e7d84230b112893d53f37f6d91e6f107148a39f8ceadbbe309e092666012ecb
+    kit_sha256: 4e7d84230b112893d53f37f6d91e6f107148a39f8ceadbbe309e092666012ecb
   - path: .github/workflows/automerge-preview.yml
     source: kit
-    sha256: 573c5b5abd509eb84384f3ed21f77f76649b3e1c3bf105205c2d799af74242b3
-    kit_sha256: 573c5b5abd509eb84384f3ed21f77f76649b3e1c3bf105205c2d799af74242b3
+    sha256: 34187962b748965b8ad45f7d47b54895fc951c4f178c65139cab1a552b69f064
+    kit_sha256: 34187962b748965b8ad45f7d47b54895fc951c4f178c65139cab1a552b69f064
   - path: .github/workflows/claim-expiry.yml
     source: kit
     sha256: 23f4a98d0dff21e44251ae5804a00afd17d2c6214616f96083e6148347eff6b0
@@ -50,8 +50,8 @@ files:
     kit_sha256: 555c50172b8bc51d15fca6d896b4ed2d3420e01ae63af39013f95d7fcb99598b
   - path: .github/workflows/promote-preview.yml
     source: kit
-    sha256: 0d27a95441c4f8483b4ffe6773d6323d40083615da77886536ab25b86d39da6d
-    kit_sha256: 0d27a95441c4f8483b4ffe6773d6323d40083615da77886536ab25b86d39da6d
+    sha256: 47e0cb138aa14416abca83b398dbcc9c1ca2a1b7f1ac01a23c8aeea0e0d1390f
+    kit_sha256: 47e0cb138aa14416abca83b398dbcc9c1ca2a1b7f1ac01a23c8aeea0e0d1390f
   - path: .github/workflows/receipt.yml
     source: kit
     sha256: 3b06f0f0928b6149beb187de8588280c637d2ed9167c2d4ad2c3457feb0af91f
@@ -114,8 +114,11 @@ files:
     kit_sha256: 41a045bd22ea9ce94114925fd80493fbe431489d0c5511f0b43588b1f5c42ca9
   - path: docs/verified-oss-loop.md
     source: modified
-    sha256: cb3b0ee1e3b7841ca5227def98c79efaa019f62bef4d9e82a8c27f7e2a22e0fc
-    kit_sha256: 535588eb69e3037f0c86c26540abcfd6e28f14cb47c4b06b9604bdfaf9ed063b
+    sha256: 90c2d109e50d7c04167a987a6d609099aae0c893b77dcf8edde98e09ef8a4566
+    kit_sha256: 77b6f9c6f2eea9b9776d74d53600e6951f136480a12c4b2309443756fb2bfcc5
   - path: skills/z0int-onboard/SKILL.md
     source: local
     sha256: 34ffeea3395c78d324e3920a420bcb41fb3d84793ec23ef10e35d1e66501f864
+  - path: skills/z0int-repair-routine/SKILL.md
+    source: local
+    sha256: 4732489b85a381ceea5deda6d09ce4aeacbb11c43c0a2804536743783c6e3fed
