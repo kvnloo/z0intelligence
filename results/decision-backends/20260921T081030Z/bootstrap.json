@@ -1,0 +1,54 @@
+{
+  "schema": "z0int.backends_bench.bootstrap_pareto.v1",
+  "n_bootstrap": 500,
+  "seed": 0,
+  "valid_draws": 500,
+  "note": "Inclusion probability is the fraction of fixture-resampled datasets in which a backend remained on the eligible Pareto frontier. At small n this can be unstable — treat provisional evidence seriously.",
+  "by_capability": {
+    "rlm.worker_needed": {
+      "n_bootstrap": 500,
+      "inclusion_probability": {
+        "nanojev_06b": 0.0
+      },
+      "eligible_probability": {
+        "nanojev_06b": 0.0
+      }
+    },
+    "tool_family_select": {
+      "n_bootstrap": 500,
+      "inclusion_probability": {
+        "nanojev_06b": 0.0
+      },
+      "eligible_probability": {
+        "nanojev_06b": 0.0
+      }
+    },
+    "retry_or_escalate": {
+      "n_bootstrap": 500,
+      "inclusion_probability": {
+        "nanojev_06b": 0.0
+      },
+      "eligible_probability": {
+        "nanojev_06b": 0.0
+      }
+    },
+    "context_compress_needed": {
+      "n_bootstrap": 500,
+      "inclusion_probability": {
+        "nanojev_06b": 0.0
+      },
+      "eligible_probability": {
+        "nanojev_06b": 0.0
+      }
+    },
+    "verification_needed": {
+      "n_bootstrap": 500,
+      "inclusion_probability": {
+        "nanojev_06b": 0.0
+      },
+      "eligible_probability": {
+        "nanojev_06b": 0.0
+      }
+    }
+  }
+}

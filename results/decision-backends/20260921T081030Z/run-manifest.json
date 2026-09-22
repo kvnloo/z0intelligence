@@ -1,0 +1,22 @@
+{
+  "schema": "z0int.backends_bench.run_manifest.v1",
+  "run_id": "20260921T081030Z",
+  "contract": "decision-capability-v1",
+  "dataset_hash": "01e771b53bbdf2494984da413bae167a37b829a21d2c23f48e8ed5e46c094673",
+  "fixtures_path": "/home/kvn/tmp/openjev/benchmarks/fixtures/decision-capability-v1/examples.jsonl",
+  "candidates": [
+    "nanojev_06b"
+  ],
+  "z0int_git_sha": "cf687a7ec56fb79cea38989e09c93c640f643a6a",
+  "tokenomics_git_sha": "cf687a7ec56fb79cea38989e09c93c640f643a6a",
+  "python_version": "3.11.14",
+  "torch_version": "2.10.0+cu128",
+  "transformers_version": "5.17.0",
+  "cuda_version": null,
+  "gpu_name": "NVIDIA GeForce RTX 3080 Ti",
+  "platform": "Linux-7.2.2-1-cachyos-x86_64-with-glibc2.44",
+  "device_env": {},
+  "model_revisions": {},
+  "started_at": "2026-09-21T08:10:30.695970+00:00",
+  "finished_at": "2026-09-21T08:10:45.983709+00:00"
+}
