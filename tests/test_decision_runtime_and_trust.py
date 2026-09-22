@@ -37,7 +37,7 @@ def test_repository_trust_manifest_is_valid_and_cited():
     assert records, "capability_trust.json produced no records"
     for r in records:
         assert r.status in trust_mod.TRUST_STATUSES
-        if r.status in ("exploratory_beta", "trusted_shadow", "trusted_bounded"):
+        if r.status in ("tested_experimental", "trusted_shadow", "trusted_bounded"):
             assert r.evidence, f"{r.backend_id}/{r.capability} claims {r.status} with no evidence"
 
 
@@ -46,7 +46,7 @@ def test_same_model_is_trusted_for_one_capability_and_rejected_for_another():
     bounded = status_for("nanojev", "bounded_legal_action")
     generic = status_for("nanojev", "generic_next_action_real_traffic")
 
-    assert bounded == "exploratory_beta"
+    assert bounded == "tested_experimental"
     assert generic == "rejected_for_current_checkpoint"
     assert bounded != generic
 
@@ -58,8 +58,8 @@ def test_unknown_capability_defaults_to_untested_never_trusted():
 
 def test_only_explicitly_trusted_capabilities_may_serve():
     assert may_serve("hammer2.1_3b", "bounded_legal_action") is True
-    assert may_serve("nanojev", "bounded_legal_action") is False  # exploratory_beta
-    assert "exploratory_beta" not in PRODUCTION_STATUSES
+    assert may_serve("nanojev", "bounded_legal_action") is False  # tested_experimental
+    assert "tested_experimental" not in PRODUCTION_STATUSES
 
 
 def test_nemotron_is_not_quarantined_for_its_actual_contract():
@@ -222,3 +222,78 @@ def test_structural_digest_is_labelled_as_structural_not_content():
         network_model_calls=0, autoregressive_decode_steps=0,
     )
     assert r.to_dict()["checkpoint_digest_kind"] == "structural"
+
+
+# --------------------------------------------------------------------------
+# The vocabulary must be the registry's, not this repo's
+# --------------------------------------------------------------------------
+
+# Mirror of kvnloo/z0 `registry/maturity.yaml` (`trust:`), lowercased exactly as
+# that registry serializes it. Hardcoded because this repo has no dependency on
+# z0's lib/; the comment is the contract and the test is the tripwire.
+CANONICAL_TRUST_STATUSES = (
+    "untested", "experimental", "tested_experimental", "trusted_shadow",
+    "trusted_bounded", "trusted_general", "quarantined", "deprecated",
+    "not_applicable",
+)
+
+# Declared aliases: names the registry accepts for a value it also defines.
+DECLARED_TRUST_ALIASES = {
+    "rejected_for_current_checkpoint": "deprecated",
+}
+
+# Mirror of the registry's `evidence:` keys, lowercased.
+CANONICAL_EVIDENCE_CLASSES = (
+    "smoke", "exploratory_beta", "shadow", "paired_replay",
+    "confirm", "ood", "promotion",
+)
+
+
+def test_trust_statuses_are_canonical():
+    """Every status here is a value the z0 registry declares, or an alias of one."""
+    unknown = [
+        s for s in trust_mod.TRUST_STATUSES
+        if s not in CANONICAL_TRUST_STATUSES and s not in DECLARED_TRUST_ALIASES
+    ]
+    assert not unknown, (
+        f"trust statuses not in the canonical vocabulary: {unknown}. "
+        "The taxonomy is defined in kvnloo/z0 registry/maturity.yaml (trust:)."
+    )
+
+
+def test_no_trust_status_collides_with_an_evidence_class():
+    """The defect this test exists for.
+
+    `exploratory_beta` was BOTH a trust status in `capability_trust.json` and an
+    evidence class in every artifact beside it, so a reader could not tell from
+    the string which one a record was reporting, and a normalizer had to guess.
+    The status is now the canonical `tested_experimental`; the registry rejects
+    the collision from its side and this checks it from ours.
+    """
+    overlap = sorted(set(trust_mod.TRUST_STATUSES) & set(CANONICAL_EVIDENCE_CLASSES))
+    assert not overlap, (
+        f"trust statuses that are also evidence classes: {overlap}. "
+        "One token cannot mean two things; see registry/maturity.yaml."
+    )
+
+
+def test_only_tested_experimental_and_above_require_a_citation():
+    """The EXPERIMENTAL / TESTED_EXPERIMENTAL distinction is load-bearing.
+
+    `experimental` means somebody ran it informally and no artifact records how;
+    `tested_experimental` means there is a measurement to cite. Requiring a
+    citation for `experimental` would make an unrecorded run unrepresentable;
+    not requiring one for `tested_experimental` would let a tested claim stand
+    without evidence.
+    """
+    with pytest.raises(ValueError):
+        CapabilityTrust(backend_id="b", capability="c", status="tested_experimental")
+    CapabilityTrust(backend_id="b", capability="c", status="experimental")
+
+    # Only the two production tiers may gate a production path: bounded (inside
+    # the measured distribution) and general (beyond it, which only OOD
+    # evidence establishes). Nothing below them may.
+    assert PRODUCTION_STATUSES == frozenset({"trusted_bounded", "trusted_general"})
+    for weak in ("untested", "experimental", "tested_experimental", "trusted_shadow",
+                 "quarantined", "rejected_for_current_checkpoint", "not_applicable"):
+        assert weak not in PRODUCTION_STATUSES

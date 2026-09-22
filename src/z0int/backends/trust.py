@@ -21,12 +21,27 @@ from pathlib import Path
 
 TRUST_SCHEMA = "z0int.capability_trust.v1"
 
-#: Ordered from least to most assurance. `rejected_*` and `quarantined` are
-#: terminal states for a given checkpoint, not steps on the way up.
+#: Canonical names from `kvnloo/z0` `registry/maturity.yaml` (`trust:`), spelled
+#: as that registry serializes them: the registry keys are uppercase and the
+#: on-disk value is the same name lowercased.
+#:
+#: `exploratory_beta` used to sit here, and it was a genuine collision: the same
+#: token is an EVIDENCE CLASS (`"evidence_class": "exploratory_beta"`), so a
+#: reader could not tell from the string whether a record was reporting how
+#: strong its evidence was or what it had earned. It is now the canonical
+#: `tested_experimental`, which is what it always meant. `test_trust_statuses_
+#: are_canonical` pins this list to the registry.
+#:
+#: `experimental` is deliberately kept apart from `tested_experimental`: the
+#: first means somebody ran it informally and no artifact records how, the second
+#: means there is a measurement to cite -- and only the second requires one.
+#:
+#: Ordered from least to most assurance. `rejected_for_current_checkpoint` and
+#: `quarantined` are terminal states for a given checkpoint, not steps up.
 TRUST_STATUSES: tuple[str, ...] = (
     "untested",
     "experimental",
-    "exploratory_beta",
+    "tested_experimental",
     "trusted_shadow",
     "trusted_bounded",
     "quarantined",
@@ -35,7 +50,12 @@ TRUST_STATUSES: tuple[str, ...] = (
 )
 
 #: Statuses that may gate a production path.
-PRODUCTION_STATUSES: frozenset[str] = frozenset({"trusted_bounded"})
+#: Statuses that may gate a production path. `trusted_general` belongs here:
+#: the registry defines it as "permitted on a production path beyond the
+#: measured distribution", which is still a production path. Leaving it out
+#: would make the one status OOD evidence establishes the one that `may_serve`
+#: refuses.
+PRODUCTION_STATUSES: frozenset[str] = frozenset({"trusted_bounded", "trusted_general"})
 
 
 @dataclass(frozen=True)
@@ -57,7 +77,7 @@ class CapabilityTrust:
             raise ValueError(
                 f"unknown trust status {self.status!r}; known={', '.join(TRUST_STATUSES)}"
             )
-        if self.status in ("exploratory_beta", "trusted_shadow", "trusted_bounded") and not self.evidence:
+        if self.status in ("tested_experimental", "trusted_shadow", "trusted_bounded") and not self.evidence:
             raise ValueError(
                 f"{self.backend_id}/{self.capability} claims {self.status!r} with no "
                 "evidence artifact; a trust claim must cite where it was measured"
