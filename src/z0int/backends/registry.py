@@ -91,6 +91,23 @@ def register_builtin_backends() -> None:
     if _BUILTINS_LOADED:
         return
     _BUILTINS_LOADED = True
+
+    if "mushroom" not in _REGISTRY:
+        from .mushroom import MushroomBackend
+
+        register(
+            BackendSpec(
+                id="mushroom",
+                kind="local_plasticity_specialist",
+                description=(
+                    "Mushroom-body recovery specialist (Kenyon cells -> MBON, 640 params). "
+                    "Recovery only: consumes an 8x15 Hermes frame tensor."
+                ),
+                factory=MushroomBackend,
+                aliases=("mushroom_body", "mushroom-body"),
+                local=True,
+            )
+        )
     if "nanojev" not in _REGISTRY:
         from .nanojev import NanoJevBackend
 
