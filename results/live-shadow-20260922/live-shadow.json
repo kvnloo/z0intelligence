@@ -54,21 +54,36 @@
  "nanojev_note": "NanoJev could NOT be shadowed here: the lane resolves models through ~/.z0int/config/serving.json, which lists only llama.cpp-supervised models, and nanojev_06b is an in-process DecisionBackend rather than a served model. The lane recorded that failure correctly (parse_error, abstained=true) rather than silently skipping. To shadow NanoJev the lane needs a DecisionBackend resolution path, not a serving entry.",
  "receipt": "~/.z0int/shadow/cognition-shadow.jsonl",
  "live_batches": {
-  "hammer3b_served_model": {
+  "no_backend_spec": {
    "n": 40,
    "selected_action_dist": {
-    "read": 20,
-    "skill_view": 13,
-    "web_search": 6,
-    "None": 1
+    "None": 40
+   },
+   "errors": "none",
+   "latency_p50_ms": null,
+   "latency_max_ms": null
+  },
+  "nanojev_not_served": {
+   "n": 40,
+   "selected_action_dist": {
+    "None": 40
    },
    "errors": {
-    "ValueError: state must be a nonempty string/object/array": 1
+    "RuntimeError: nanojev_06b is not served; add it to /home": 40
    },
-   "latency_p50_ms": 38.0,
-   "latency_max_ms": 572.0
+   "latency_p50_ms": null,
+   "latency_max_ms": null
   },
-  "nanojev_decision_backend": {
+  "hammer3b_served": {
+   "n": 40,
+   "selected_action_dist": {
+    "read": 40
+   },
+   "errors": "none",
+   "latency_p50_ms": 264.0,
+   "latency_max_ms": 737.8
+  },
+  "nanojev_via_adapter": {
    "n": 40,
    "selected_action_dist": {
     "read": 20,
