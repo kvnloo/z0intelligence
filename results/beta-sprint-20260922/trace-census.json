@@ -1,0 +1,465 @@
+{
+ "sessions": 93,
+ "parse_errors": 0,
+ "model_calls": 4644,
+ "total_input_tokens": 12450349,
+ "total_output_tokens": 4132505,
+ "total_cache_read": 950235648,
+ "total_reasoning_tokens": 1552059,
+ "tool_calls": 6332,
+ "models": [
+  {
+   "model": "deepseek-official/deepseek-flash",
+   "calls": 4643,
+   "input_tokens": 12440010,
+   "output_tokens": 4132444,
+   "cache_read": 950235648,
+   "reasoning_tokens": 1552059,
+   "total_tokens": 16572454,
+   "latency_p50_ms": 4393.5,
+   "latency_p95_ms": 28395.0,
+   "tool_calls": 6332
+  },
+  {
+   "model": "cerebras/qwen-3.8-27b",
+   "calls": 1,
+   "input_tokens": 10339,
+   "output_tokens": 61,
+   "cache_read": 0,
+   "reasoning_tokens": 0,
+   "total_tokens": 10400,
+   "latency_p50_ms": 919.0,
+   "latency_p95_ms": null,
+   "tool_calls": 0
+  }
+ ],
+ "tools": [
+  {
+   "tool": "bash",
+   "steps": 3272,
+   "input_tokens": 10457965,
+   "output_tokens": 2279012,
+   "total_tokens": 12736977,
+   "latency_p50_ms": 4672.0
+  },
+  {
+   "tool": "read",
+   "steps": 486,
+   "input_tokens": 1374054,
+   "output_tokens": 207887,
+   "total_tokens": 1581941,
+   "latency_p50_ms": 2447.0
+  },
+  {
+   "tool": "write",
+   "steps": 192,
+   "input_tokens": 111229,
+   "output_tokens": 769319,
+   "total_tokens": 880548,
+   "latency_p50_ms": 11678.0
+  },
+  {
+   "tool": "list_agents",
+   "steps": 54,
+   "input_tokens": 630222,
+   "output_tokens": 19677,
+   "total_tokens": 649899,
+   "latency_p50_ms": 2913.0
+  },
+  {
+   "tool": "edit",
+   "steps": 435,
+   "input_tokens": 245331,
+   "output_tokens": 349275,
+   "total_tokens": 594606,
+   "latency_p50_ms": 3289.0
+  },
+  {
+   "tool": "send_message",
+   "steps": 51,
+   "input_tokens": 31136,
+   "output_tokens": 245563,
+   "total_tokens": 276699,
+   "latency_p50_ms": 15576.0
+  },
+  {
+   "tool": "create_goal",
+   "steps": 7,
+   "input_tokens": 246291,
+   "output_tokens": 9574,
+   "total_tokens": 255865,
+   "latency_p50_ms": 8900.0
+  },
+  {
+   "tool": "web_fetch",
+   "steps": 30,
+   "input_tokens": 164513,
+   "output_tokens": 27379,
+   "total_tokens": 191892,
+   "latency_p50_ms": 5571.5
+  },
+  {
+   "tool": "todo_write",
+   "steps": 60,
+   "input_tokens": 108910,
+   "output_tokens": 66870,
+   "total_tokens": 175780,
+   "latency_p50_ms": 3934.5
+  },
+  {
+   "tool": "job_output",
+   "steps": 65,
+   "input_tokens": 108237,
+   "output_tokens": 54543,
+   "total_tokens": 162780,
+   "latency_p50_ms": 4330.0
+  },
+  {
+   "tool": "grep",
+   "steps": 20,
+   "input_tokens": 131350,
+   "output_tokens": 11782,
+   "total_tokens": 143132,
+   "latency_p50_ms": 3626.5
+  },
+  {
+   "tool": "subagent",
+   "steps": 33,
+   "input_tokens": 57709,
+   "output_tokens": 84429,
+   "total_tokens": 142138,
+   "latency_p50_ms": 12199.0
+  },
+  {
+   "tool": "web_search",
+   "steps": 10,
+   "input_tokens": 82060,
+   "output_tokens": 13480,
+   "total_tokens": 95540,
+   "latency_p50_ms": 12666.5
+  },
+  {
+   "tool": "present",
+   "steps": 29,
+   "input_tokens": 9983,
+   "output_tokens": 19292,
+   "total_tokens": 29275,
+   "latency_p50_ms": 3790.0
+  },
+  {
+   "tool": "rlm",
+   "steps": 7,
+   "input_tokens": 3219,
+   "output_tokens": 8300,
+   "total_tokens": 11519,
+   "latency_p50_ms": 17115.0
+  },
+  {
+   "tool": "list_subagent_models",
+   "steps": 11,
+   "input_tokens": 6565,
+   "output_tokens": 3747,
+   "total_tokens": 10312,
+   "latency_p50_ms": 1659.0
+  },
+  {
+   "tool": "interrupt_agent",
+   "steps": 5,
+   "input_tokens": 2591,
+   "output_tokens": 6195,
+   "total_tokens": 8786,
+   "latency_p50_ms": 4766.0
+  },
+  {
+   "tool": "read_image",
+   "steps": 13,
+   "input_tokens": 4453,
+   "output_tokens": 2486,
+   "total_tokens": 6939,
+   "latency_p50_ms": 3846.0
+  },
+  {
+   "tool": "ask_user_question",
+   "steps": 3,
+   "input_tokens": 1000,
+   "output_tokens": 5372,
+   "total_tokens": 6372,
+   "latency_p50_ms": 324845.0
+  },
+  {
+   "tool": "get_goal",
+   "steps": 5,
+   "input_tokens": 1434,
+   "output_tokens": 2454,
+   "total_tokens": 3888,
+   "latency_p50_ms": 4212.0
+  },
+  {
+   "tool": "glob",
+   "steps": 2,
+   "input_tokens": 1774,
+   "output_tokens": 1389,
+   "total_tokens": 3163,
+   "latency_p50_ms": 6044.5
+  },
+  {
+   "tool": "update_goal",
+   "steps": 5,
+   "input_tokens": 2121,
+   "output_tokens": 485,
+   "total_tokens": 2606,
+   "latency_p50_ms": 2623.0
+  },
+  {
+   "tool": "job_list",
+   "steps": 2,
+   "input_tokens": 1574,
+   "output_tokens": 900,
+   "total_tokens": 2474,
+   "latency_p50_ms": 4232.0
+  },
+  {
+   "tool": "job_kill",
+   "steps": 1,
+   "input_tokens": 167,
+   "output_tokens": 1607,
+   "total_tokens": 1774,
+   "latency_p50_ms": 62665.0
+  },
+  {
+   "tool": "execute",
+   "steps": 1,
+   "input_tokens": 344,
+   "output_tokens": 1356,
+   "total_tokens": 1700,
+   "latency_p50_ms": 8752.0
+  }
+ ],
+ "step_shapes": [
+  {
+   "shape": "1 tool: bash",
+   "calls": 2061,
+   "input_tokens": 5940608,
+   "output_tokens": 1362644,
+   "total_tokens": 7303252,
+   "input_p50": 291,
+   "latency_p50_ms": 4689.0
+  },
+  {
+   "shape": "2 tools",
+   "calls": 1259,
+   "input_tokens": 4357555,
+   "output_tokens": 966397,
+   "total_tokens": 5323952,
+   "input_p50": 1874,
+   "latency_p50_ms": 4385.0
+  },
+  {
+   "shape": "1 tool: write",
+   "calls": 168,
+   "input_tokens": 89703,
+   "output_tokens": 684340,
+   "total_tokens": 774043,
+   "input_p50": 241.5,
+   "latency_p50_ms": 11266.0
+  },
+  {
+   "shape": "3 tools",
+   "calls": 125,
+   "input_tokens": 574265,
+   "output_tokens": 100753,
+   "total_tokens": 675018,
+   "input_p50": 3715,
+   "latency_p50_ms": 4311.0
+  },
+  {
+   "shape": "text-only (no tool call)",
+   "calls": 135,
+   "input_tokens": 363469,
+   "output_tokens": 220876,
+   "total_tokens": 584345,
+   "input_p50": 232,
+   "latency_p50_ms": 6141.0
+  },
+  {
+   "shape": "1 tool: edit",
+   "calls": 388,
+   "input_tokens": 195301,
+   "output_tokens": 308318,
+   "total_tokens": 503619,
+   "input_p50": 230.5,
+   "latency_p50_ms": 3108.0
+  },
+  {
+   "shape": "4 tools",
+   "calls": 68,
+   "input_tokens": 361832,
+   "output_tokens": 65599,
+   "total_tokens": 427431,
+   "input_p50": 4822.0,
+   "latency_p50_ms": 4910.0
+  },
+  {
+   "shape": "1 tool: read",
+   "calls": 191,
+   "input_tokens": 238915,
+   "output_tokens": 55103,
+   "total_tokens": 294018,
+   "input_p50": 458,
+   "latency_p50_ms": 2110.0
+  },
+  {
+   "shape": "1 tool: send_message",
+   "calls": 47,
+   "input_tokens": 28642,
+   "output_tokens": 238385,
+   "total_tokens": 267027,
+   "input_p50": 292,
+   "latency_p50_ms": 16709.0
+  },
+  {
+   "shape": "6 tools",
+   "calls": 9,
+   "input_tokens": 97024,
+   "output_tokens": 7393,
+   "total_tokens": 104417,
+   "input_p50": 5515,
+   "latency_p50_ms": 2716.0
+  },
+  {
+   "shape": "5 tools",
+   "calls": 13,
+   "input_tokens": 74182,
+   "output_tokens": 12938,
+   "total_tokens": 87120,
+   "input_p50": 4682,
+   "latency_p50_ms": 2621.0
+  },
+  {
+   "shape": "1 tool: todo_write",
+   "calls": 27,
+   "input_tokens": 23753,
+   "output_tokens": 30379,
+   "total_tokens": 54132,
+   "input_p50": 252,
+   "latency_p50_ms": 3048.0
+  },
+  {
+   "shape": "1 tool: job_output",
+   "calls": 29,
+   "input_tokens": 23219,
+   "output_tokens": 24550,
+   "total_tokens": 47769,
+   "input_p50": 313,
+   "latency_p50_ms": 3617.0
+  },
+  {
+   "shape": "1 tool: list_agents",
+   "calls": 33,
+   "input_tokens": 37478,
+   "output_tokens": 6513,
+   "total_tokens": 43991,
+   "input_p50": 250,
+   "latency_p50_ms": 2597.0
+  },
+  {
+   "shape": "1 tool: present",
+   "calls": 22,
+   "input_tokens": 7812,
+   "output_tokens": 10023,
+   "total_tokens": 17835,
+   "input_p50": 241.5,
+   "latency_p50_ms": 3626.0
+  },
+  {
+   "shape": "1 tool: rlm",
+   "calls": 7,
+   "input_tokens": 3219,
+   "output_tokens": 8300,
+   "total_tokens": 11519,
+   "input_p50": 504,
+   "latency_p50_ms": 17115.0
+  },
+  {
+   "shape": "1 tool: subagent",
+   "calls": 9,
+   "input_tokens": 2878,
+   "output_tokens": 8120,
+   "total_tokens": 10998,
+   "input_p50": 248,
+   "latency_p50_ms": 8801.0
+  },
+  {
+   "shape": "1 tool: read_image",
+   "calls": 13,
+   "input_tokens": 4453,
+   "output_tokens": 2486,
+   "total_tokens": 6939,
+   "input_p50": 218,
+   "latency_p50_ms": 3846.0
+  },
+  {
+   "shape": "1 tool: ask_user_question",
+   "calls": 3,
+   "input_tokens": 1000,
+   "output_tokens": 5372,
+   "total_tokens": 6372,
+   "input_p50": 217,
+   "latency_p50_ms": 324845.0
+  },
+  {
+   "shape": "7 tools",
+   "calls": 1,
+   "input_tokens": 4920,
+   "output_tokens": 1105,
+   "total_tokens": 6025,
+   "input_p50": 4920,
+   "latency_p50_ms": 291505.0
+  },
+  {
+   "shape": "1 tool: list_subagent_models",
+   "calls": 9,
+   "input_tokens": 3310,
+   "output_tokens": 2646,
+   "total_tokens": 5956,
+   "input_p50": 216,
+   "latency_p50_ms": 1526.0
+  },
+  {
+   "shape": "1 tool: web_fetch",
+   "calls": 7,
+   "input_tokens": 3437,
+   "output_tokens": 2340,
+   "total_tokens": 5777,
+   "input_p50": 485,
+   "latency_p50_ms": 3136.0
+  },
+  {
+   "shape": "8 tools",
+   "calls": 1,
+   "input_tokens": 4164,
+   "output_tokens": 866,
+   "total_tokens": 5030,
+   "input_p50": 4164,
+   "latency_p50_ms": 4234.0
+  },
+  {
+   "shape": "1 tool: grep",
+   "calls": 2,
+   "input_tokens": 2553,
+   "output_tokens": 1809,
+   "total_tokens": 4362,
+   "input_p50": 1276.5,
+   "latency_p50_ms": 5148.0
+  },
+  {
+   "shape": "1 tool: update_goal",
+   "calls": 5,
+   "input_tokens": 2121,
+   "output_tokens": 485,
+   "total_tokens": 2606,
+   "input_p50": 444,
+   "latency_p50_ms": 2623.0
+  }
+ ]
+}

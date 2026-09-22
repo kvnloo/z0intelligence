@@ -1,0 +1,16 @@
+{
+ "host_container": {
+  "docker_run_ms": 2734.5,
+  "create_to_serving_ms": 2963.1,
+  "warm_p50_ms": 1.08
+ },
+ "kind_pod": {
+  "scheduled_ms": 610.0,
+  "create_to_ready_ms": 5867.9,
+  "warm_p50_ms": 2.46
+ },
+ "k8s_gpu": {
+  "allocatable_nvidia_gpu": null,
+  "note": "no nvidia device plugin; GPU workloads cannot schedule in this cluster"
+ }
+}
