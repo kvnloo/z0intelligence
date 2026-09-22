@@ -2,10 +2,27 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
 from .base import DecisionBackend
+
+
+def _linear_from_env() -> DecisionBackend:
+    """Build the linear backend, loading fitted weights when pointed at them.
+
+    ``Z0INT_LINEAR_WEIGHTS`` lets a host process and a worker process construct
+    the SAME fitted model. Without it a worker always builds an untrained
+    backend, so a host-vs-service comparison would compare two different models
+    and any difference would be unattributable.
+    """
+    from .linear import LinearDecisionBackend
+
+    path = os.environ.get("Z0INT_LINEAR_WEIGHTS")
+    if path:
+        return LinearDecisionBackend.load(path)
+    return LinearDecisionBackend(kind="ridge")
 
 
 @dataclass(frozen=True)
@@ -131,6 +148,79 @@ def register_builtin_backends() -> None:
                 description="Mapika Decider-2B typed decision model",
                 factory=lambda: DeciderBackend.for_manifest_id("decider_2b"),
                 aliases=("decider",),
+                local=True,
+            )
+        )
+    # --- registered after the fact -----------------------------------------
+    #
+    # `laya.py` and `openjev_direct.py` shipped as working adapters with
+    # `health().ready is True`, installed runtimes and present weights, but were
+    # never added here. Because every roster, bench run, Pareto plot and shadow
+    # lane enumerates backends through this registry, both were invisible to the
+    # entire evaluation stack. Laya — the cheapest calibrated decision model in
+    # the portfolio, and the one the research pass identified as the best
+    # fine-tuning substrate — had never appeared in a single comparison.
+    #
+    # Registration is metadata only: the factories are lazy and `health()` is
+    # a filesystem probe that never downloads (see
+    # `models_mgmt.require_cached_snapshot`).
+    if "laya_421m" not in _REGISTRY:
+        from .laya import LayaBackend
+
+        register(
+            BackendSpec(
+                id="laya_421m",
+                kind="calibrated_decision",
+                description=(
+                    "Laya 421M non-autoregressive typed decision model "
+                    "(ModernBERT-large + decision head; choice/score/noul)"
+                ),
+                factory=lambda: LayaBackend.for_manifest_id("laya_421m"),
+                aliases=("laya",),
+                local=True,
+            )
+        )
+    if "openjev_06b" not in _REGISTRY:
+        from .openjev_direct import OpenJevDirectBackend
+
+        register(
+            BackendSpec(
+                id="openjev_06b",
+                kind="direct_option_logits",
+                description="OpenJev direct option-logit readout on Qwen/Qwen3-0.6B",
+                factory=lambda: OpenJevDirectBackend.for_manifest_id("openjev_06b"),
+                aliases=("openjev",),
+                local=True,
+            )
+        )
+    if "openjev_4b" not in _REGISTRY:
+        from .openjev_direct import OpenJevDirectBackend
+
+        register(
+            BackendSpec(
+                id="openjev_4b",
+                kind="direct_option_logits",
+                description="OpenJev direct option-logit readout on Qwen/Qwen3.5-4B",
+                factory=lambda: OpenJevDirectBackend.for_manifest_id("openjev_4b"),
+                local=True,
+            )
+        )
+    # The cheap transferred baseline. CPU-resident, numpy-only, no GPU and no
+    # weight download, so it is the backend that can actually be served from a
+    # host process AND a worker process to prove they agree.
+    if "linear" not in _REGISTRY:
+        from .linear import LinearDecisionBackend
+
+        register(
+            BackendSpec(
+                id="linear",
+                kind="linear_baseline",
+                description=(
+                    "ridge/logistic linear baseline over hashed state features. "
+                    "Cheap, CPU-resident, abstains on low confidence."
+                ),
+                factory=_linear_from_env,
+                aliases=("ridge", "logistic"),
                 local=True,
             )
         )
