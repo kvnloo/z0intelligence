@@ -31,6 +31,7 @@ Design rules carried over from the resolver:
 from __future__ import annotations
 
 import json
+import os
 import sys
 from typing import Any
 
@@ -350,10 +351,102 @@ def serve(stdin: Any = None, stdout: Any = None) -> int:
     return 0
 
 
+def serve_http(host: str = "127.0.0.1", port: int = 8791, path: str = "/mcp") -> int:
+    """Streamable-HTTP transport, implementing the MCP single-JSON-response mode.
+
+    WHY HTTP RATHER THAN STDIO. DSH's MCP stdio transport spawns the server with
+    only a scrubbed parent environment but with DSH's own OS authority -- it does
+    not go through the harness sandbox. A long-lived localhost service that
+    already reads local indexes read-only should not be handed write authority
+    over the whole machine just to answer questions, so this is the transport the
+    resolver is registered with.
+
+    Only a single JSON response per request is implemented (no SSE stream): the
+    MCP spec permits a server to answer ``application/json`` instead of
+    ``text/event-stream``, and nothing here needs server-initiated messages.
+    """
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    def _send(handler: Any, status: int, payload: Any) -> None:
+        body = b"" if payload is None else json.dumps(
+            payload, ensure_ascii=False, default=str
+        ).encode("utf-8")
+        handler.send_response(status)
+        handler.send_header("Content-Type", "application/json")
+        handler.send_header("Content-Length", str(len(body)))
+        handler.end_headers()
+        if body:
+            handler.wfile.write(body)
+
+    class _Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, *args: Any) -> None:  # keep stdout clean for the harness
+            pass
+
+        def _trace(self, method: str, detail: str = "") -> None:
+            """One line per request on stderr, so a harness mount is provable."""
+            print(f"mcp {method} {detail}".rstrip(), file=sys.stderr, flush=True)
+
+        def do_POST(self) -> None:  # noqa: N802 - http.server API
+            if self.path.rstrip("/") != path.rstrip("/"):
+                _send(self, 404, {"error": f"POST {path} only"})
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = 0
+            raw = self.rfile.read(length) if length else b""
+            try:
+                request = json.loads(raw or b"{}")
+            except json.JSONDecodeError:
+                _send(self, 200, _err(None, -32700, "parse error"))
+                return
+            batch = isinstance(request, list)
+            requests = request if batch else [request]
+            for item in requests:
+                if isinstance(item, dict):
+                    params = item.get("params") or {}
+                    self._trace(str(item.get("method")),
+                                str(params.get("name") or params.get("query") or "")[:80])
+            responses = [r for r in (handle(x) for x in requests if isinstance(x, dict)) if r]
+            if not responses:
+                # A notification-only POST: 202 with no body, per the spec.
+                self.send_response(202)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            _send(self, 200, responses if batch else responses[0])
+
+        def do_GET(self) -> None:  # noqa: N802
+            # No server-initiated stream is offered, so GET is refused explicitly
+            # rather than left to hang.
+            _send(self, 405, {"error": "GET unsupported; POST JSON-RPC to " + path})
+
+        def do_DELETE(self) -> None:  # noqa: N802
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    server = ThreadingHTTPServer((host, port), _Handler)
+    print(f"z0int mcp: streamable-http on http://{host}:{port}{path}", file=sys.stderr, flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "selftest":
         return selftest()
+    if argv and argv[0] == "--http":
+        port = int(argv[1]) if len(argv) > 1 else 8791
+        host = os.environ.get("Z0INT_MCP_HOST", "127.0.0.1")
+        return serve_http(host, port)
     return serve()
 
 

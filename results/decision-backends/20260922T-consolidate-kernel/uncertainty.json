@@ -1,0 +1,315 @@
+{
+  "schema": "z0int.backends_bench.uncertainty.v1",
+  "by_backend": {
+    "decider_2b": {
+      "context_compress_needed": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "retry_or_escalate": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 1,
+        "dangerous_false_rate": 0.5,
+        "dangerous_false_upper_95": 0.9054713451991339,
+        "note": null
+      },
+      "rlm.worker_needed": {
+        "n": 3,
+        "accuracy": 0.6666666666666666,
+        "accuracy_ci95": [
+          0.20765495512648796,
+          0.9385096847238394
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "tool_family_select": {
+        "n": 2,
+        "accuracy": 1.0,
+        "accuracy_ci95": [
+          0.34237195288961925,
+          1.0
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "verification_needed": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      }
+    },
+    "laya_421m": {
+      "context_compress_needed": {
+        "n": 2,
+        "accuracy": 0.0,
+        "accuracy_ci95": [
+          0.0,
+          0.6576280471103807
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "retry_or_escalate": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 1,
+        "dangerous_false_rate": 0.5,
+        "dangerous_false_upper_95": 0.9054713451991339,
+        "note": null
+      },
+      "rlm.worker_needed": {
+        "n": 3,
+        "accuracy": 0.3333333333333333,
+        "accuracy_ci95": [
+          0.061490315276160556,
+          0.792345044873512
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "tool_family_select": {
+        "n": 2,
+        "accuracy": 1.0,
+        "accuracy_ci95": [
+          0.34237195288961925,
+          1.0
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "verification_needed": {
+        "n": 2,
+        "accuracy": 1.0,
+        "accuracy_ci95": [
+          0.34237195288961925,
+          1.0
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      }
+    },
+    "nanojev_06b": {
+      "context_compress_needed": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "retry_or_escalate": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 1,
+        "dangerous_false_rate": 0.5,
+        "dangerous_false_upper_95": 0.9054713451991339,
+        "note": null
+      },
+      "rlm.worker_needed": {
+        "n": 3,
+        "accuracy": 0.3333333333333333,
+        "accuracy_ci95": [
+          0.061490315276160556,
+          0.792345044873512
+        ],
+        "dangerous_false_count": 1,
+        "dangerous_false_rate": 0.3333333333333333,
+        "dangerous_false_upper_95": 0.792345044873512,
+        "note": null
+      },
+      "tool_family_select": {
+        "n": 2,
+        "accuracy": 0.0,
+        "accuracy_ci95": [
+          0.0,
+          0.6576280471103807
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "verification_needed": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      }
+    },
+    "openjev_06b": {
+      "context_compress_needed": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "retry_or_escalate": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 1,
+        "dangerous_false_rate": 0.5,
+        "dangerous_false_upper_95": 0.9054713451991339,
+        "note": null
+      },
+      "rlm.worker_needed": {
+        "n": 3,
+        "accuracy": 0.6666666666666666,
+        "accuracy_ci95": [
+          0.20765495512648796,
+          0.9385096847238394
+        ],
+        "dangerous_false_count": 1,
+        "dangerous_false_rate": 0.3333333333333333,
+        "dangerous_false_upper_95": 0.792345044873512,
+        "note": null
+      },
+      "tool_family_select": {
+        "n": 2,
+        "accuracy": 0.0,
+        "accuracy_ci95": [
+          0.0,
+          0.6576280471103807
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "verification_needed": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      }
+    },
+    "openjev_4b": {
+      "context_compress_needed": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "retry_or_escalate": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 1,
+        "dangerous_false_rate": 0.5,
+        "dangerous_false_upper_95": 0.9054713451991339,
+        "note": null
+      },
+      "rlm.worker_needed": {
+        "n": 3,
+        "accuracy": 0.6666666666666666,
+        "accuracy_ci95": [
+          0.20765495512648796,
+          0.9385096847238394
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "tool_family_select": {
+        "n": 2,
+        "accuracy": 1.0,
+        "accuracy_ci95": [
+          0.34237195288961925,
+          1.0
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      },
+      "verification_needed": {
+        "n": 2,
+        "accuracy": 0.5,
+        "accuracy_ci95": [
+          0.09452865480086614,
+          0.9054713451991339
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 1.0,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 1.0"
+      }
+    }
+  }
+}
