@@ -1,0 +1,13 @@
+{
+  "version": "resolve-fast-v3",
+  "derived_from": "resolve-fast-v2",
+  "gate": "scripts/eval_audit.py::classify v3 vocabulary (adds PREFIX_ECHO, CORRUPT_VALUE)",
+  "independent_critique": "subagent pass found PREFIX_ECHO; gate was extended to agree with it",
+  "counts": {
+    "train": 663,
+    "dev": 83,
+    "sealed": 71
+  },
+  "known_limitation": "no zero-overlap family; measures single-hop lexical addressing only. regression-17 remains the two-hop adversarial suite.",
+  "dataset_sha256": "4a24f7678352520f4179812199867cf90f931c0c00ebd7293f078eb39873ac1e"
+}

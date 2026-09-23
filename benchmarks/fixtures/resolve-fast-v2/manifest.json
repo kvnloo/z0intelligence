@@ -1,0 +1,30 @@
+{
+  "version": "resolve-fast-v2",
+  "generator": "scripts/gen_resolve_eval_v2.py",
+  "quality_gate": "scripts/eval_audit.py::classify (frozen vocabulary)",
+  "split_policy": "sha256(session_id)%100 -> train<60, dev<80, sealed>=80",
+  "family": [
+    "tokenized"
+  ],
+  "known_limitation": "no zero-overlap (two-hop) family: measures single-hop lexical addressing only; the regression-17 suite remains the adversarial suite for two-hop",
+  "ground_truth": "sampled coverage.db source fact; templates never contain the value literal",
+  "counts": {
+    "train": 1633,
+    "dev": 233,
+    "sealed": 266
+  },
+  "gate_labels": {
+    "VALID": 2132,
+    "UNNATURAL": 253,
+    "ANSWER_LEAK": 93
+  },
+  "rejected": {
+    "scratch_or_secret": 1305,
+    "ambiguous_answer": 9949,
+    "slot_shape": 1251,
+    "no_topic": 6017,
+    "gate:unnatural": 253,
+    "gate:answer_leak": 93
+  },
+  "dataset_sha256": "f4d5f4891175c5e967d307eaa8d97ac249cf3cdf185f83ed19385acf1a1b45d0"
+}

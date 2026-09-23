@@ -47,8 +47,9 @@ def value_match(resolved: str | None, expected: str) -> bool:
     return e in r or r in e
 
 
-def load(split: str, limit: int | None, seed: int = 0) -> list[dict]:
-    rows = [json.loads(l) for l in (FIXTURES / f"{split}.jsonl").read_text().splitlines() if l.strip()]
+def load(split: str, limit: int | None, fixtures: Path | None = None, seed: int = 0) -> list[dict]:
+    base = Path(fixtures) if fixtures else FIXTURES
+    rows = [json.loads(l) for l in (base / f"{split}.jsonl").read_text().splitlines() if l.strip()]
     if limit and limit < len(rows):
         rnd = random.Random(seed)
         # stratify by slot kind so a small run is not all PATH
@@ -129,12 +130,13 @@ def evaluate(rows: list[dict], *, policy: dict | None, use_full: bool = False) -
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--split", default="dev")
+    ap.add_argument("--fixtures", default=str(FIXTURES), help="fixture directory (dataset path, not scoring)")
     ap.add_argument("--limit", type=int, default=200)
     ap.add_argument("--policy", default=None, help="path to a policy JSON")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
     policy = json.loads(Path(a.policy).read_text()) if a.policy else None
-    rows = load(a.split, a.limit)
+    rows = load(a.split, a.limit, Path(a.fixtures))
     out = evaluate(rows, policy=policy)
     if a.json:
         print(json.dumps(out, indent=2))
