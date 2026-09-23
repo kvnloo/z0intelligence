@@ -1,0 +1,51 @@
+{
+  "version": "resolve-real-v1",
+  "purpose": "primary real-user-question ruler; replaces value-token-template generation for this task family",
+  "provenance": "mined from AgentsView sessions.db user turns (real, unmodified), bound to later source evidence",
+  "binding_signal": "last assistant *narration* message in the turn naming exactly one slot-shaped candidate that is also present in tool evidence; NOT topical overlap and NOT the provenance signal under test",
+  "independent_critique": {
+    "pass_1": "4 independent agents, 76 items (10 mechanically accepted + 66 ambiguity cases), no binding logic shown",
+    "pass_2": "2 further independent agents re-judged the 10 accepted pairs plus the 4 ambiguity survivors",
+    "pass1_to_pass2_agreement_on_accepted_pairs": "10/10 rejected by critic A, 7/10 by critic B",
+    "pass2_inter_agent_agreement": "11/14 items",
+    "rule": "an item enters the scored split only if BOTH pass-2 critics accept it"
+  },
+  "counts": {
+    "train": 0,
+    "dev": 4,
+    "sealed": 0
+  },
+  "dataset_sha256": "928d7022af7d220612e9da629deeefdebd42de20ff4ca163b2488a27d9216150",
+  "yield_chain": {
+    "sessions_scanned_with_tools": 5587,
+    "user_turns_scanned": 22683,
+    "utterances_after_naturalness_filter": 3833,
+    "slot_cued_real_requests": 913,
+    "mechanically_bound_pairs": 50,
+    "passed_deterministic_gate": 50,
+    "distinct_after_near_duplicate_collapse": 10,
+    "bound_pairs_surviving_independent_critique": 0,
+    "ambiguity_bucket": 70,
+    "ambiguity_items_surviving_both_critics": 37,
+    "distinct_questions_in_final_ruler": 4,
+    "note": "the 4 scored items come from the adjudicated ambiguity bucket, not from the mechanically bound set; every mechanically bound pair was rejected by the independent critics"
+  },
+  "gate_reasons": {
+    "Q_ACTION_REQUEST": 11,
+    "ACCEPT": 10,
+    "DEDUP_NEAR_COPY": 27,
+    "VALUE_SHAPE_PATH_FRAGMENT": 1,
+    "VALUE_SHAPE_PATH_ASSET": 1
+  },
+  "ambiguity_cases": 70,
+  "known_limitations": [
+    "n=4 and only 3 distinct question texts: this measures the 'where is the link' class, not arbitrary lookups",
+    "the mechanically bound set (50 pairs, 10 distinct) had a 0% survival rate under independent critique: the binder's truth signal is satisfied by incidental mentions",
+    "the frozen champion falls back on all 4 items, so this ruler currently separates nothing about the champion",
+    "no train/sealed split is meaningful at this size; they are empty rather than padded",
+    "the corpus contains very few real slot-lookup questions (913 of 35657 user turns), and the mechanical binder produced 0 items that both critics accepted",
+    "harness coverage is skewed: surviving items come from codex/hermes sessions only",
+    "all four scored items come from ONE session in the private archive: the ruler is single-lineage and cannot measure session-level generalisation",
+    "rows are not committed: they contain real user turns, private hosts and session ids, and this repository is public. The ruler is versioned by generator + dataset_sha256 instead."
+  ]
+}

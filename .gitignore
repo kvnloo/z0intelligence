@@ -10,3 +10,13 @@ cache/
 .z0int/
 data/private/
 omp-extensions/**/*.log
+
+# Scratch: mining/audit intermediates, including raw user turns from the private
+# session archive. Regenerate with scripts/mine_real_questions.py.
+.work/
+
+# The real-question ruler is derived from private session history (real user
+# turns, private hosts, session ids) and this repository is public. The dataset
+# is versioned by its generator + manifest sha256 instead of by committing its
+# content: see benchmarks/fixtures/resolve-real-v1/README.md.
+benchmarks/fixtures/resolve-real-v1/*.jsonl
