@@ -77,7 +77,7 @@ FAIL = re.compile(
 )
 #: A fetch is "consumed successfully" only on a real status line, not on the
 #: number 200 appearing somewhere in the output.
-HTTP_OK = re.compile(r"HTTP/[\d.]\s+2\d\d", re.I)
+HTTP_OK = re.compile(r"HTTP/[\d.]+\s+2\d\d", re.I)
 RUNNERS = re.compile(
     r"(?:^|[;&|]\s*|\bthen\s+)(?:sudo\s+)?(?:bash|sh|zsh|python3?|node|deno|bun|uv|ruby|perl)\s+$"
 )
@@ -176,10 +176,29 @@ def clean_url(u: str) -> str | None:
     return host + rest
 
 
+def session_path_index(tcs) -> dict[str, set[str]]:
+    """term -> set of distinct candidate paths in this session whose basename carries it.
+
+    Used to require that the artifact the question names is *unique* in the
+    session. Without this, "shares a distinctive term" still admits several real
+    files and the consumption of one of them proves nothing about the question.
+    """
+    index: dict[str, set[str]] = defaultdict(set)
+    for t in tcs:
+        blob = "\n".join([t["file_path"] or "", t["input"] or "", t["result"] or ""])
+        for p in slot_values(blob, "PATH"):
+            base = p.rstrip("/").rsplit("/", 1)[-1].lower()
+            for part in re.split(r"[_.\-]+", base):
+                if len(part) > 2:
+                    index[part].add(p)
+    return index
+
+
 def mine_tier_a(msgs, tcs, item_sink, reject_sink, meta) -> None:
     users = [(m["ordinal"], m["content"] or "") for m in msgs if m["role"] == "user" and not m["has_tool_use"]]
     if not users:
         return
+    path_index = session_path_index(tcs)
     for t in tcs:
         cmd = t["input"] or ""
         res = t["result"] or ""
@@ -235,6 +254,11 @@ def mine_tier_a(msgs, tcs, item_sink, reject_sink, meta) -> None:
                     shared = sorted(qt & ({p for p in re.split(r"[_.\-]+", host + tail) if len(p) > 2}))
                 if not shared:
                     reject_sink["TIER_A_NO_QUESTION_MATCH"] += 1
+                    continue
+                # the named artifact must be unambiguous in this session, or
+                # consuming one of several real files proves nothing
+                if slot == "PATH" and any(len(path_index.get(term, ())) > 1 for term in shared):
+                    reject_sink["TIER_A_AMBIGUOUS_ARTIFACT"] += 1
                     continue
                 if slot == "URL" and not (FETCH_HINT.search(cmd) and HTTP_OK.search(res[:2000])):
                     reject_sink["TIER_A_NO_SUCCESS_RECEIPT"] += 1
@@ -412,6 +436,7 @@ def main() -> int:
     ap.add_argument("--out", default=".work/confirmed-ruler.jsonl")
     ap.add_argument("--ambiguous-out", default=".work/confirmed-ambiguous.jsonl")
     ap.add_argument("--stats-out", default=".work/confirmed-stats.json")
+    ap.add_argument("--manifest-out", default="benchmarks/fixtures/confirmed-ruler/manifest.json")
     a = ap.parse_args()
 
     conn = sqlite3.connect(f"file:{a.db}?mode=ro", uri=True)
@@ -513,6 +538,33 @@ def main() -> int:
         ).hexdigest(),
     }
     Path(a.stats_out).write_text(json.dumps(stats, indent=2))
+
+    # A committed manifest: statistics and protocol only. The rows themselves are
+    # private user turns and stay gitignored.
+    stats["protocol"] = {
+        "tiers": {
+            "A": "mechanically verified outcome: the candidate was consumed by a real command "
+                 "whose success depends on it being the requested value",
+            "B": "explicit user confirmation or correction, carrying rejection and acceptance",
+            "C": "authoritative source-native relation (git ref -> commit), verified against the "
+                 "live authority at mining time",
+            "D": "assistant narration or critic inference -- COUNTED, never written to truth",
+        },
+        "question_source": "verbatim real user turn; never derived from the answer",
+        "truth_source": "the tier relation only; never the assistant's wording",
+        "ambiguity": "one question with several equally consumed candidates is emitted to the "
+                     "ambiguity bucket, not to ground truth",
+        "artifact_match": "a candidate must share a distinctive term with the artifact the "
+                          "question names, and for PATH that term must appear in the "
+                          "candidate's own basename",
+        "success_receipt": "a command counts as consumed only if its own output shows success; "
+                           "`-> exit N` (N>0), `exit code: N`, `command not found`, "
+                           "`No such file` and non-2xx HTTP status all disqualify",
+        "determinism": "fixed input store; dataset_sha256 covers the emitted rows in order",
+    }
+    manifest = Path(a.manifest_out)
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(json.dumps(stats, indent=2) + "\n")
     print(json.dumps(stats, indent=2))
     return 0
 

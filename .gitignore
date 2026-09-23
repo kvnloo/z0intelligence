@@ -20,3 +20,7 @@ omp-extensions/**/*.log
 # is versioned by its generator + manifest sha256 instead of by committing its
 # content: see benchmarks/fixtures/resolve-real-v1/README.md.
 benchmarks/fixtures/resolve-real-v1/*.jsonl
+
+# Confirmed-outcome ruler rows: verbatim private user turns and execution
+# receipts. Only manifest/statistics and the generator are committed.
+benchmarks/fixtures/confirmed-ruler/*.jsonl

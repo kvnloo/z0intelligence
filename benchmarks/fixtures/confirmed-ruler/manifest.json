@@ -1,0 +1,40 @@
+{
+  "sessions_scanned": 7327,
+  "tier_A": 0,
+  "tier_B": 0,
+  "tier_C": 0,
+  "tier_D_excluded": 4750,
+  "correction_pairs": 0,
+  "verified_execution_pairs": 0,
+  "duplicates_removed": 0,
+  "ambiguous": 0,
+  "final": 0,
+  "slot_distribution": {},
+  "confirmation_types": {},
+  "reject_reasons": {
+    "TIER_A_NO_URL_QUESTION": 141248,
+    "TIER_A_NO_PATH_QUESTION": 123791,
+    "TIER_A_NO_QUESTION_MATCH": 981,
+    "TIER_B_NO_PRIOR_CANDIDATE": 22,
+    "TIER_A_AMBIGUOUS_ARTIFACT": 7,
+    "TIER_B_AMBIGUOUS_PRIOR": 5,
+    "TIER_B_CORRECTION_WITHOUT_ACCEPTED_VALUE": 5,
+    "TIER_C_NO_REPO_IN_QUESTION": 2,
+    "TIER_B_NO_PRIOR_ANSWER": 2
+  },
+  "dataset_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "protocol": {
+    "tiers": {
+      "A": "mechanically verified outcome: the candidate was consumed by a real command whose success depends on it being the requested value",
+      "B": "explicit user confirmation or correction, carrying rejection and acceptance",
+      "C": "authoritative source-native relation (git ref -> commit), verified against the live authority at mining time",
+      "D": "assistant narration or critic inference -- COUNTED, never written to truth"
+    },
+    "question_source": "verbatim real user turn; never derived from the answer",
+    "truth_source": "the tier relation only; never the assistant's wording",
+    "ambiguity": "one question with several equally consumed candidates is emitted to the ambiguity bucket, not to ground truth",
+    "artifact_match": "a candidate must share a distinctive term with the artifact the question names, and for PATH that term must appear in the candidate's own basename",
+    "success_receipt": "a command counts as consumed only if its own output shows success; `-> exit N` (N>0), `exit code: N`, `command not found`, `No such file` and non-2xx HTTP status all disqualify",
+    "determinism": "fixed input store; dataset_sha256 covers the emitted rows in order"
+  }
+}
