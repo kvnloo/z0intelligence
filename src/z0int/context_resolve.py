@@ -19,6 +19,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+from . import context_providers as provider_registry
 from . import paths
 
 SCHEMA = "z0int.context_resolve.v1"
@@ -56,9 +57,34 @@ class EvidenceRef:
 
 @dataclass(frozen=True)
 class InformationNeed:
+    """One bounded thing the caller must know.
+
+    ``kind`` names the *semantic type* of the answer, not its spelling. That
+    distinction is what lets a prose question reach an identifier it shares no
+    lexical overlap with: the caller states that it wants a path, a config value
+    or a model id, and the provider registry applies the type filter. The typed
+    kinds declared here originally (``exact_symbol`` among them) had no handling
+    branch at all and fell through to "unsupported kind"; they are now routed.
+    """
+
     id: str
     description: str
-    kind: Literal["exact_path", "exact_symbol", "natural_language", "memory"] = "natural_language"
+    kind: Literal[
+        "exact_path",
+        "exact_symbol",
+        "path",
+        "symbol",
+        "config_value",
+        "model",
+        "command",
+        "url",
+        "revision",
+        "repository",
+        "issue",
+        "identifier",
+        "natural_language",
+        "memory",
+    ] = "natural_language"
     path: str | None = None
     symbol: str | None = None
     required: bool = True
@@ -258,6 +284,51 @@ def save_recipe_cache(recipe: ResolutionRecipe, packet_summary: dict[str, Any]) 
     return path
 
 
+def invalidate_recipe_cache(scope_fingerprint: str | None = None) -> int:
+    """Mark cached recipes stale by scope. **Never deletes.**
+
+    Folded from ``MemoryPacketCache.invalidate`` (hermes-agent branch
+    ``memory-packet-cache``): the entry stays readable and gains
+    ``invalidated_at``, so a consumer can still be handed the last known good
+    recipe while its staleness is explicit rather than silent. ``put``-style
+    correctness is enforced on the write side in :func:`resolve_context`, which
+    refuses to cache a failed or empty resolution at all.
+
+    Returns the number of entries touched (already-invalidated ones included).
+    """
+    touched = 0
+    for path in _cache_dir().glob("recipe_*.json"):
+        try:
+            blob = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if scope_fingerprint is not None:
+            if blob.get("recipe", {}).get("scope_fingerprint") != scope_fingerprint:
+                continue
+        touched += 1
+        if blob.get("invalidated_at"):
+            continue
+        blob["invalidated_at"] = _now_iso()
+        path.write_text(json.dumps(blob, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return touched
+
+
+def recipe_cache_state(signature: str, *, scope_fingerprint: str | None = None) -> str:
+    """``FRESH`` | ``STALE`` | ``MISS`` for a signature.
+
+    Staleness is anchored on ``invalidated_at`` (correctness), not on age --
+    there is no TTL here, matching the invariant that a packet is superseded
+    because a source changed, not because a timer elapsed.
+    """
+    blob = load_recipe_cache(signature)
+    if not blob:
+        return "MISS"
+    if scope_fingerprint is not None:
+        if blob.get("recipe", {}).get("scope_fingerprint") != scope_fingerprint:
+            return "MISS"
+    return "STALE" if blob.get("invalidated_at") else "FRESH"
+
+
 def project_to_aodl_fields(packet: ContextPacket) -> dict[str, Any]:
     """Map packet into existing AODL-ish provenance/evidence/constraint bags.
 
@@ -290,14 +361,31 @@ def resolve_context(
     collections: tuple[str, ...] = (),
     policy_revision: str = "v0",
     use_cache: bool = True,
-    allow_qmd: bool = True,
+    allow_qmd: bool = False,
     allow_memory: bool = False,
+    providers: tuple[str, ...] | None = None,
+    provider_limit: int = 8,
+    typed_limit: int = 12,
+    typed_fallback: bool = True,
 ) -> ContextPacket:
     """Resolve information needs into a provenance-preserving packet.
 
+    Evidence is served by the local provider registry
+    (:mod:`z0int.context_providers`): AgentsView conversational/hybrid search,
+    the Hermes profile stores, the Claude hosted-app export, the off-root
+    Claude/Cursor indexes, contentless tool-output FTS, and ``coverage.db``
+    primitives. ``qmd`` is no longer the evidence substrate -- it is an optional
+    *supplement* (``allow_qmd``) for callers who have a markdown index worth
+    consulting, because it was lexically blind to conversation and tool output.
+
+    ``typed_fallback`` enables the two-hop identifier hop for prose needs. A
+    question such as "where is the key that the DSH plugin reads stored on disk"
+    shares no tokens with ``~/.hermes/profiles/chiefstaff/.env``; the hop reaches
+    it by harvesting identifier-shaped tokens out of the surrounding evidence and
+    looking those up in the typed fact store.
+
     Memory recall is off by default (avoid double-inject with TencentDB proxy).
-    QMD is lexical-only here; no embedding/rerank on the critical path unless
-    later tiers are explicitly enabled.
+    No model is loaded and no network model call is made on this path.
     """
     t0 = time.perf_counter()
     root = Path(project_root).expanduser().resolve() if project_root else None
@@ -316,80 +404,155 @@ def resolve_context(
     gaps: list[str] = []
     contradictions: list[str] = []
     epochs: dict[str, str] = {"policy": policy_revision}
+    provider_errors: list[str] = []
+    provider_status: dict[str, dict[str, Any]] = {}
 
     if use_cache:
         cached = load_recipe_cache(sig)
         if cached and cached.get("recipe", {}).get("scope_fingerprint") == scope_fp:
             ops.append({"op": "recipe_cache_hit", "signature": sig})
 
-    qmd_status = "absent"
-    if allow_qmd and _qmd_bin():
-        qmd_status = "installed"
-        # index freshness — status only
-        try:
-            st = subprocess.run(
-                [_qmd_bin() or "qmd", "status"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
+    qmd_status = "disabled"
+    if allow_qmd:
+        qmd_status = "absent"
+        if _qmd_bin():
+            qmd_status = "installed"
+            try:
+                st = subprocess.run(
+                    [_qmd_bin() or "qmd", "status"],
+                    capture_output=True, text=True, timeout=5, check=False,
+                )
+                if st.returncode == 0:
+                    qmd_status = "ready"
+                    epochs["qmd_status_sha"] = _sha16(st.stdout[:2000])
+            except (OSError, subprocess.TimeoutExpired):
+                qmd_status = "error"
+
+    def _absorb(hits: list[Any], need_id: str, *, op: str) -> int:
+        """Append provider hits as EvidenceRefs. Returns how many were added."""
+        added = 0
+        for h in hits:
+            evidence.append(
+                EvidenceRef(
+                    source_id=f"{h.provider}:{h.locator}",
+                    source_version=h.source_version,
+                    locator=h.locator,
+                    trust_class=h.trust_class,
+                    observed_at=h.timestamp or _now_iso(),
+                    excerpt=(h.excerpt or None),
+                    note=" ".join(
+                        x for x in (
+                            f"via={op}",
+                            f"bridge={h.bridge}" if h.bridge else None,
+                            f"tool={h.tool_name}" if h.tool_name else None,
+                        ) if x
+                    ),
+                )
             )
-            if st.returncode == 0:
-                qmd_status = "ready"
-                epochs["qmd_status_sha"] = _sha16(st.stdout[:2000])
-        except (OSError, subprocess.TimeoutExpired):
-            qmd_status = "error"
+            added += 1
+        return added
+
+    def _record_status(status: list[Any], need_id: str) -> None:
+        for s in status:
+            ops.append(
+                {
+                    "op": "provider", "need": need_id, "name": s.provider,
+                    "ok": s.ok, "hits": s.hits, "wall_ms": round(s.wall_ms, 1),
+                    **({"error": s.error} if s.error else {}),
+                }
+            )
+            provider_status[s.provider] = {"ok": s.ok, "hits": s.hits, "error": s.error}
+            if not s.ok:
+                provider_errors.append(f"{s.provider}: {s.error}")
 
     for need in need_list:
         satisfied = False
-        if need.kind == "exact_path" or need.path:
+
+        if need.kind in provider_registry.SOURCE_KINDS or need.path:
             path_s = need.path or need.description
             ref = _fetch_exact_path(path_s, root)
             ops.append({"op": "exact_path", "need": need.id, "path": path_s, "hit": ref is not None})
             if ref:
                 evidence.append(ref)
-                satisfied = True
-            elif need.required:
+                continue
+            # A literal path that exists was handled above. A path-shaped need
+            # that does *not* resolve is still allowed to fall through to
+            # identifier resolution, because the caller may have given a symbol,
+            # a basename or a prose description rather than a real path -- so the
+            # gap is recorded only for a need that explicitly named a path.
+            if need.path is not None and need.required:
                 gaps.append(f"{need.id}: missing path {path_s}")
-        elif need.kind == "natural_language":
-            if allow_qmd and qmd_status in {"ready", "installed"}:
-                hits = _qmd_search(need.description, limit=5)
-                ops.append(
-                    {
-                        "op": "qmd_search",
-                        "need": need.id,
-                        "hits": len(hits),
-                        "qmd_status": qmd_status,
-                    }
-                )
-                for i, hit in enumerate(hits):
-                    if not isinstance(hit, dict):
-                        continue
-                    loc = str(hit.get("path") or hit.get("file") or hit.get("id") or f"hit:{i}")
-                    ver = str(hit.get("version") or hit.get("score") or "unknown")
-                    evidence.append(
-                        EvidenceRef(
-                            source_id=f"qmd:{loc}",
-                            source_version=ver,
-                            locator=loc,
-                            trust_class="index_hit",
-                            observed_at=_now_iso(),
-                            excerpt=str(hit.get("snippet") or hit.get("text") or hit.get("raw_preview") or "")[:400]
-                            or None,
-                        )
-                    )
-                    satisfied = True
-            if not satisfied and need.required:
-                # empty index is a gap, not a license to invent requirements
-                gaps.append(
-                    f"{need.id}: no lexical hits for {need.description!r} (qmd={qmd_status})"
-                )
-        elif need.kind == "memory":
+                continue
+
+        if need.kind == "memory":
             ops.append({"op": "memory_skipped", "need": need.id, "reason": "allow_memory=False by default"})
             if need.required and not allow_memory:
                 gaps.append(f"{need.id}: memory recall disabled (avoid double-inject)")
-        else:
-            gaps.append(f"{need.id}: unsupported kind {need.kind}")
+            continue
+
+        query_text = need.description or need.symbol or ""
+        typed = need.kind in provider_registry.KIND_FACTS
+
+        if typed or need.kind == "natural_language":
+            lex = provider_registry.search_lexical(
+                query_text, limit=provider_limit, only=providers
+            )
+            _record_status(lex.status, need.id)
+
+            # Ordering is semantic, not cosmetic. When the caller DECLARED the
+            # answer's type, the type-correct fact *is* the answer and the
+            # surrounding conversation is only the bridge to it -- so facts lead.
+            # For a natural_language need the conversation is the substance, so it
+            # leads and the identifier hop follows. Either way both are returned.
+            def _identifier_hop() -> int:
+                fhits, _ = provider_registry.resolve_identifier_need(
+                    query_text, need_kind=need.kind, limit=typed_limit,
+                    lexical_limit=provider_limit, lex=lex,
+                )
+                n = _absorb(fhits, need.id, op="identifier")
+                ops.append(
+                    {
+                        "op": "identifier", "need": need.id, "kind": need.kind,
+                        "fact_kinds": list(provider_registry.kinds_for(need.kind)),
+                        "hits": n,
+                    }
+                )
+                return n
+
+            fn = 0
+            if typed and typed_fallback:
+                fn = _identifier_hop()
+            n = _absorb(lex.hits, need.id, op="lexical")
+            ops.append({"op": "lexical", "need": need.id, "hits": n})
+            if not typed and typed_fallback:
+                fn = _identifier_hop()
+            if n or fn:
+                satisfied = True
+
+        if allow_qmd and qmd_status in {"ready", "installed"}:
+            hits = _qmd_search(query_text, limit=5)
+            ops.append({"op": "qmd_search", "need": need.id, "hits": len(hits), "qmd_status": qmd_status})
+            for i, hit in enumerate(hits):
+                if not isinstance(hit, dict):
+                    continue
+                loc = str(hit.get("path") or hit.get("file") or hit.get("id") or f"hit:{i}")
+                evidence.append(
+                    EvidenceRef(
+                        source_id=f"qmd:{loc}",
+                        source_version=str(hit.get("version") or hit.get("score") or "unknown"),
+                        locator=loc,
+                        trust_class="index_hit",
+                        observed_at=_now_iso(),
+                        excerpt=str(
+                            hit.get("snippet") or hit.get("text") or hit.get("raw_preview") or ""
+                        )[:400] or None,
+                    )
+                )
+                satisfied = True
+
+        if not satisfied and need.required:
+            # An empty provider result is a gap, never a license to invent.
+            gaps.append(f"{need.id}: no evidence for {query_text!r} (kind={need.kind})")
 
     if allow_memory:
         contradictions.append(
@@ -421,6 +584,8 @@ def resolve_context(
             "qmd_bin": bool(_qmd_bin()),
             "allow_qmd": allow_qmd,
             "allow_memory": allow_memory,
+            "providers": provider_status,
+            "provider_errors": provider_errors,
             "gpu_loaded": False,
             "network_model_calls": 0,
         },
@@ -428,14 +593,35 @@ def resolve_context(
     packet.aodl_projection = project_to_aodl_fields(packet)
 
     if use_cache:
-        save_recipe_cache(
-            recipe,
-            {
-                "evidence_count": len(evidence),
-                "gaps": gaps,
-                "wall_ms": packet.measurements["wall_ms"],
-            },
-        )
+        # Correctness semantics folded in from `MemoryPacketCache` (hermes-agent
+        # branch `memory-packet-cache`), applied to this module's existing cache
+        # rather than via a second cache abstraction:
+        #
+        #   * a FAILED source is never cached. Caching a provider error would
+        #     turn a transient outage into a durable false negative for every
+        #     later caller of the same signature.
+        #   * an EMPTY result is never cached for the same reason -- an empty
+        #     read is indistinguishable from an unavailable source.
+        #   * `policy_revision` already participates in `request_signature`,
+        #     which is the policy-version-in-key rule.
+        #
+        # A previously-cached entry is invalidated (never deleted) by
+        # `invalidate_recipe_cache` when the source epoch for its scope changes.
+        if provider_errors or not evidence:
+            packet.measurements["cache_write"] = (
+                "skipped:provider-error" if provider_errors else "skipped:empty-evidence"
+            )
+        else:
+            save_recipe_cache(
+                recipe,
+                {
+                    "evidence_count": len(evidence),
+                    "gaps": gaps,
+                    "wall_ms": packet.measurements["wall_ms"],
+                    "source_epochs": dict(epochs),
+                },
+            )
+            packet.measurements["cache_write"] = "saved"
     return packet
 
 

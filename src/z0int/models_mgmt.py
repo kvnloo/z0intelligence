@@ -222,6 +222,34 @@ def model_cached(hf_id: str, revision: str | None = None) -> bool:
     return (root / "snapshots" / revision).is_dir()
 
 
+def require_cached_snapshot(hf_id: str, revision: str) -> Path:
+    """Resolve an already-downloaded snapshot, or fail. **Never downloads.**
+
+    Inventory operations must not be able to pull weights. Before this guard,
+    both the ``laya`` and ``decider`` adapters resolved their model directory
+    with ``snapshot_download(repo_id=..., revision=...)`` *without*
+    ``local_files_only=True`` on the cache-miss path, and ``health(load=False)``
+    calls that resolver. So a plain ``registry.backend_status()`` — the command
+    used to inventory the fleet — could start a multi-gigabyte download for any
+    backend whose weights were not yet present.
+
+    Callers that genuinely want to fetch weights opt in explicitly by setting
+    ``Z0INT_ALLOW_DOWNLOAD=1``.
+    """
+    import os
+
+    from huggingface_hub import snapshot_download
+
+    if model_cached(hf_id, revision):
+        return Path(snapshot_download(repo_id=hf_id, revision=revision, local_files_only=True))
+
+    if os.environ.get("Z0INT_ALLOW_DOWNLOAD") == "1":
+        return Path(snapshot_download(repo_id=hf_id, revision=revision))
+
+    raise FileNotFoundError(
+        f"{hf_id}@{revision} is not in the local cache; refusing to download during "
+        f"inventory (set Z0INT_ALLOW_DOWNLOAD=1 to fetch it explicitly)"
+    )
 
 
 def managed_model_dir(model_id: str) -> Path:

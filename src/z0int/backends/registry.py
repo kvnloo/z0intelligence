@@ -117,3 +117,44 @@ def register_builtin_backends() -> None:
                 local=True,
             )
         )
+    # --- registered after the fact -----------------------------------------
+    #
+    # `laya.py` and `openjev_direct.py` shipped as working adapters with
+    # `health().ready is True`, installed runtimes and present weights, but were
+    # never added here. Because every roster, bench run, Pareto plot and shadow
+    # lane enumerates backends through this registry, both were invisible to the
+    # entire evaluation stack — Laya, the cheapest calibrated decision model in
+    # the portfolio, had never appeared in a single comparison.
+    #
+    # Registration is metadata only: the factories are lazy and `health()` is a
+    # filesystem probe that never downloads (see
+    # `models_mgmt.require_cached_snapshot`).
+    if "laya_421m" not in _REGISTRY:
+        from .laya import LayaBackend
+
+        register(
+            BackendSpec(
+                id="laya_421m",
+                kind="calibrated_decision",
+                description=(
+                    "Laya 421M non-autoregressive typed decision model "
+                    "(ModernBERT-large + decision head; choice/score/noul)"
+                ),
+                factory=lambda: LayaBackend.for_manifest_id("laya_421m"),
+                aliases=("laya",),
+                local=True,
+            )
+        )
+    if "openjev_06b" not in _REGISTRY:
+        from .openjev_direct import OpenJevDirectBackend
+
+        register(
+            BackendSpec(
+                id="openjev_06b",
+                kind="direct_option_logits",
+                description="OpenJev direct option-logit readout on Qwen/Qwen3-0.6B",
+                factory=lambda: OpenJevDirectBackend.for_manifest_id("openjev_06b"),
+                aliases=("openjev",),
+                local=True,
+            )
+        )

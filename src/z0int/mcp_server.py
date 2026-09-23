@@ -1,0 +1,387 @@
+"""One harness-facing MCP surface for the z0 kernel.
+
+A dependency-free stdio MCP server (JSON-RPC 2.0, newline-delimited) that exposes
+the canonical primitives rather than a second retrieval stack. Every tool is a
+thin projection of :mod:`z0int.context_resolve` and
+:mod:`z0int.context_providers`; nothing is implemented here that those modules do
+not already own.
+
+This replaces the transitional `tools/recall_mcp.py` union, which exposed a
+*sources* view of the index set. Harnesses should not need to know which indexes
+exist.
+
+Tools
+-----
+``resolve``   needs/query -> full ContextPacket (evidence, gaps, recipe)
+``orient``    the same resolution, summarized (packet is large; this is the
+              one-shot priming call)
+``history``   lexical conversation/tool evidence only, no fact hop
+``inspect``   bounded read of one evidence locator's source line
+``unknowns``  only the unresolved gaps and contradictions for a query
+``verify``    evidence-sufficiency verdict: ABSTAIN when declared-required
+              evidence is not present
+
+Design rules carried over from the resolver:
+
+* every result carries provenance (source_id, source_version, locator, trust);
+* a failure is reported as ``{ok: false, error}``, never as an empty success;
+* no tool loads a model, and none makes a network model call.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from typing import Any
+
+SCHEMA = "z0int.mcp.v1"
+PROTOCOL_VERSION = "2024-11-05"
+
+TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "resolve",
+        "description": (
+            "Resolve information needs into a provenance-preserving context packet. "
+            "Needs may be plain strings (natural language) or typed objects naming the "
+            "semantic type of the answer (path, symbol, config_value, model, command, "
+            "url, revision, repository, issue, identifier)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "single natural-language question"},
+                "needs": {"type": "array", "items": {"type": ["string", "object"]}},
+                "task_id": {"type": "string"},
+                "project_root": {"type": "string"},
+                "typed_fallback": {"type": "boolean", "default": True},
+                "use_cache": {"type": "boolean", "default": True},
+            },
+        },
+    },
+    {
+        "name": "orient",
+        "description": "One-shot priming call: resolve a query and return a compact orientation.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}, "limit": {"type": "integer", "default": 8}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "history",
+        "description": "Lexical conversation and tool-output evidence for a query (no fact hop).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "limit": {"type": "integer", "default": 8},
+                "providers": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "inspect",
+        "description": "Bounded read of the source behind one evidence locator.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "locator": {"type": "string"},
+                "chars": {"type": "integer", "default": 400},
+            },
+            "required": ["locator"],
+        },
+    },
+    {
+        "name": "unknowns",
+        "description": "Only the unresolved gaps and contradictions for a query.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "verify",
+        "description": (
+            "Evidence-sufficiency verdict for a query: ABSTAIN when the declared-required "
+            "evidence is absent, rather than returning a confident partial answer."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "requires": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "substrings that must be present in the evidence",
+                },
+            },
+            "required": ["query"],
+        },
+    },
+]
+
+
+def _packet_payload(packet: Any) -> dict[str, Any]:
+    return packet.to_dict()
+
+
+def _tool_resolve(args: dict[str, Any]) -> dict[str, Any]:
+    from z0int.context_resolve import needs_from_mapping, resolve_context
+
+    needs = None
+    if args.get("needs"):
+        needs = needs_from_mapping(args["needs"])
+    packet = resolve_context(
+        needs=needs,
+        query=args.get("query"),
+        task_id=args.get("task_id"),
+        project_root=args.get("project_root"),
+        typed_fallback=bool(args.get("typed_fallback", True)),
+        use_cache=bool(args.get("use_cache", True)),
+    )
+    out = _packet_payload(packet)
+    out["schema"] = SCHEMA
+    return out
+
+
+def _tool_orient(args: dict[str, Any]) -> dict[str, Any]:
+    from z0int.context_resolve import resolve_context
+
+    limit = int(args.get("limit") or 8)
+    packet = resolve_context(query=str(args["query"]), use_cache=True)
+    return {
+        "schema": SCHEMA,
+        "op": "orient",
+        "query": args["query"],
+        "evidence_count": len(packet.evidence),
+        "unresolved_gaps": list(packet.unresolved_gaps),
+        "contradictions": list(packet.contradictions),
+        "recipe_signature": packet.recipe.request_signature if packet.recipe else None,
+        "measurements": dict(packet.measurements),
+        "evidence": [e.to_dict() for e in packet.evidence[:limit]],
+        "evidence_omitted": max(0, len(packet.evidence) - limit),
+    }
+
+
+def _tool_history(args: dict[str, Any]) -> dict[str, Any]:
+    from z0int import context_providers as cp
+
+    only = tuple(args["providers"]) if args.get("providers") else None
+    res = cp.search_lexical(str(args["query"]), limit=int(args.get("limit") or 8), only=only)
+    return {
+        "schema": SCHEMA,
+        "op": "history",
+        "query": args["query"],
+        "hits": [
+            {
+                "provider": h.provider,
+                "locator": h.locator,
+                "trust_class": h.trust_class,
+                "session_id": h.session_id,
+                "timestamp": h.timestamp,
+                "tool_name": h.tool_name,
+                "excerpt": h.excerpt,
+                "bridge": h.bridge,
+            }
+            for h in res.hits
+        ],
+        "providers": [
+            {"name": s.provider, "ok": s.ok, "hits": s.hits,
+             "wall_ms": round(s.wall_ms, 1), "error": s.error}
+            for s in res.status
+        ],
+    }
+
+
+def _tool_inspect(args: dict[str, Any]) -> dict[str, Any]:
+    """Bounded read of the source row behind a locator.
+
+    Only locators this system produced are understood; anything else is an
+    explicit error rather than a guess.
+    """
+    from z0int.context_resolve import _fetch_exact_path
+
+    locator = str(args["locator"])
+    chars = int(args.get("chars") or 400)
+    if locator.startswith("file:") or locator.startswith("/"):
+        ref = _fetch_exact_path(locator.removeprefix("file:"), None)
+        if ref is None:
+            return {"schema": SCHEMA, "op": "inspect", "ok": False,
+                    "error": f"cannot read {locator}"}
+        return {"schema": SCHEMA, "op": "inspect", "ok": True,
+                "locator": ref.locator, "source_version": ref.source_version,
+                "excerpt": (ref.excerpt or "")[:chars]}
+    return {
+        "schema": SCHEMA, "op": "inspect", "ok": False,
+        "error": (
+            f"unsupported locator {locator!r}; expected a filesystem path. "
+            "Index rows are re-read through `resolve`, which owns that mapping."
+        ),
+    }
+
+
+def _tool_unknowns(args: dict[str, Any]) -> dict[str, Any]:
+    from z0int.context_resolve import resolve_context
+
+    packet = resolve_context(query=str(args["query"]), use_cache=True)
+    return {
+        "schema": SCHEMA,
+        "op": "unknowns",
+        "query": args["query"],
+        "unresolved_gaps": list(packet.unresolved_gaps),
+        "contradictions": list(packet.contradictions),
+        "answerable": not packet.unresolved_gaps,
+        "evidence_count": len(packet.evidence),
+    }
+
+
+def _tool_verify(args: dict[str, Any]) -> dict[str, Any]:
+    """Abstain rather than answer from insufficient evidence.
+
+    The rule is deliberately mechanical and stated in the output: a verdict of
+    ``USE`` requires every declared ``requires`` string to be grounded in a
+    returned evidence excerpt or locator. With no ``requires`` given, the verdict
+    is ``FALLBACK`` whenever the resolver reported any unresolved gap.
+    """
+    from z0int.context_resolve import resolve_context
+
+    packet = resolve_context(query=str(args["query"]), use_cache=True)
+    blob = " ".join(
+        f"{e.locator} {e.excerpt or ''}" for e in packet.evidence
+    ).lower()
+    requires = [str(r) for r in (args.get("requires") or [])]
+    missing = [r for r in requires if r.lower() not in blob]
+    if requires:
+        verdict = "USE" if not missing else "FALLBACK"
+    else:
+        verdict = "FALLBACK" if packet.unresolved_gaps else "USE"
+    return {
+        "schema": SCHEMA,
+        "op": "verify",
+        "query": args["query"],
+        "verdict": verdict,
+        "requires": requires,
+        "missing": missing,
+        "grounded": len(requires) - len(missing),
+        "evidence_count": len(packet.evidence),
+        "unresolved_gaps": list(packet.unresolved_gaps),
+        "rule": (
+            "USE iff every declared requirement is grounded in returned evidence; "
+            "otherwise FALLBACK to raw evidence"
+        ),
+    }
+
+
+HANDLERS = {
+    "resolve": _tool_resolve,
+    "orient": _tool_orient,
+    "history": _tool_history,
+    "inspect": _tool_inspect,
+    "unknowns": _tool_unknowns,
+    "verify": _tool_verify,
+}
+
+
+def _ok(req_id: Any, result: Any) -> dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": req_id, "result": result}
+
+
+def _err(req_id: Any, code: int, message: str) -> dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
+
+
+def handle(req: dict[str, Any]) -> dict[str, Any] | None:
+    """Handle one JSON-RPC request. Returns None for notifications."""
+    method = req.get("method")
+    req_id = req.get("id")
+    params = req.get("params") or {}
+
+    if method == "initialize":
+        return _ok(req_id, {
+            "protocolVersion": PROTOCOL_VERSION,
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": "z0int", "version": "0.1.0"},
+        })
+    if method in ("notifications/initialized", "initialized"):
+        return None
+    if method == "tools/list":
+        return _ok(req_id, {"tools": TOOLS})
+    if method == "tools/call":
+        name = params.get("name")
+        fn = HANDLERS.get(str(name))
+        if fn is None:
+            return _err(req_id, -32601, f"unknown tool {name!r}")
+        try:
+            payload = fn(params.get("arguments") or {})
+        except Exception as exc:  # noqa: BLE001 - the harness must see the failure
+            return _ok(req_id, {
+                "content": [{"type": "text", "text": json.dumps(
+                    {"ok": False, "error": f"{type(exc).__name__}: {exc}"})}],
+                "isError": True,
+            })
+        return _ok(req_id, {
+            "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, default=str)}],
+            "isError": False,
+        })
+    if method == "ping":
+        return _ok(req_id, {})
+    return _err(req_id, -32601, f"unknown method {method!r}")
+
+
+def serve(stdin: Any = None, stdout: Any = None) -> int:
+    stdin = stdin or sys.stdin
+    stdout = stdout or sys.stdout
+    for line in stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            req = json.loads(line)
+        except json.JSONDecodeError:
+            stdout.write(json.dumps(_err(None, -32700, "parse error")) + "\n")
+            stdout.flush()
+            continue
+        resp = handle(req)
+        if resp is not None:
+            stdout.write(json.dumps(resp, ensure_ascii=False, default=str) + "\n")
+            stdout.flush()
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "selftest":
+        return selftest()
+    return serve()
+
+
+def selftest() -> int:
+    """Protocol-level check that does not depend on any index being present."""
+    problems: list[str] = []
+    init = handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+    if not init or "result" not in init:
+        problems.append("initialize failed")
+    listed = handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+    names = [t["name"] for t in listed["result"]["tools"]]
+    if set(names) != set(HANDLERS):
+        problems.append(f"tool list mismatch: {names}")
+    unknown = handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                      "params": {"name": "nope", "arguments": {}}})
+    if "error" not in unknown:
+        problems.append("unknown tool did not error")
+    inspect = handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+                      "params": {"name": "inspect", "arguments": {"locator": "not-a-path"}}})
+    body = json.loads(inspect["result"]["content"][0]["text"])
+    if body.get("ok") is not False:
+        problems.append("inspect accepted an unsupported locator")
+    if problems:
+        print("SELFTEST FAIL: " + "; ".join(problems), file=sys.stderr)
+        return 1
+    print(f"selftest ok: {len(names)} tools")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
