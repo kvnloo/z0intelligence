@@ -342,16 +342,24 @@ def _conversation_http(query: str, limit: int) -> list[ProviderHit]:
             continue
         sid = row.get("session_id") or row.get("sessionId")
         mid = row.get("message_id") or row.get("messageId") or row.get("id")
+        ordinal = row.get("ordinal")
+        # The daemon identifies a hit by (session_id, ordinal) and does not return
+        # a message id. `inspect` cannot open `...#None`, so the ordinal form is
+        # emitted explicitly and `read_locator` resolves it.
+        if mid is None and ordinal is not None:
+            locator = f"agentsview:{sid}@{ordinal}"
+        else:
+            locator = f"agentsview:{sid}#{mid}"
         out.append(
             ProviderHit(
                 provider="conversation",
-                locator=f"agentsview:{sid}#{mid}",
+                locator=locator,
                 source_version=ver,
                 trust_class="conversation",
                 excerpt=_clip(_strip_marks(row.get("snippet") or row.get("content"))),
                 session_id=str(sid) if sid is not None else None,
                 message_id=str(mid) if mid is not None else None,
-                timestamp=row.get("timestamp"),
+                timestamp=row.get("timestamp") or row.get("session_ended_at"),
                 project=row.get("project"),
                 tool_name=row.get("agent"),
                 bridge="agentsview.http.hybrid",
@@ -868,3 +876,311 @@ def resolve_identifier_need(
             )
         )
     return hits, lex
+
+
+# --------------------------------------------------------------------------- #
+# Reading an index locator back to its source
+# --------------------------------------------------------------------------- #
+# The provider layer is where the locator grammar and the stores that define it
+# live, so it is where "open this locator" belongs. `mcp_server.inspect` used to
+# answer this with "re-read through `resolve`", which sent the caller back to
+# search instead of letting it read the passage it had already found.
+#
+# Locator grammar produced by this module:
+#   agentsview:<session_id>#<message_id>      (row id)
+#   agentsview:<session_id>@<ordinal>          (what the daemon returns)
+#   claude-extra:<session_id>#<message_id>      misc-extra:<session_id>#<message_id>
+#   hermes/<profile>:<session_id>#<message_id>  anthropic:<conversation_id>#<message_id>
+#   coverage:<session_id>#<kind>:<value>
+#   tool_calls#<id>   tool_result_events#<id>   messages#<id>      (AgentsView)
+#   /abs/path  file:/abs/path                                        (filesystem)
+
+#: locator prefix -> (db, table, id_col, session_col, role_col, ts_col, text_col, order_col)
+_MESSAGE_SOURCES: dict[str, tuple[Path, str, str, str, str, str, str, str]] = {
+    "agentsview": (SESSIONS_DB, "messages", "id", "session_id", "role", "timestamp", "content", "ordinal"),
+    "claude-extra": (CLAUDE_EXTRA_DB, "messages", "id", "session_id", "role", "timestamp", "content", "ordinal"),
+    "misc-extra": (MISC_EXTRA_DB, "messages", "id", "session_id", "role", "timestamp", "content", "ordinal"),
+    "anthropic": (ANTHROPIC_DB, "message", "id", "conversation_id", "role", "created_at", "text", "ordinal"),
+}
+
+#: Same, for the tables the `tool` provider names directly.
+_TOOL_TABLES: dict[str, tuple[str, str]] = {
+    "tool_calls": ("result_content", "input_json"),
+    "tool_result_events": ("content", "source"),
+    "messages": ("content", "thinking_text"),
+}
+
+_MAX_CONTEXT_CHARS = 2000
+
+#: Conservative credential shapes. Applied to everything this module returns:
+#: a bounded read of a real transcript can otherwise hand a live key to a model.
+_SECRET_RES = (
+    re.compile(r"\b(?:sk|pk|rk)-[A-Za-z0-9_\-]{16,}"),
+    re.compile(r"\bAIza[0-9A-Za-z_\-]{20,}"),
+    re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+    re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}"),
+    re.compile(r"\bxox[baprs]-[A-Za-z0-9\-]{10,}"),
+    re.compile(r"(?i)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd)\b\s*[:=]\s*[\"']?([^\s\"',;]{8,})"),
+    re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._\-]{16,}"),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.S),
+)
+
+
+def _redact_secrets(
+    text: str, *, session_id: str | None = None, ordinal: Any = None, locator_kind: str | None = None
+) -> tuple[str, int]:
+    """Blank known secret spans, then obvious credential shapes. Returns (text, n).
+
+    `secret_findings` (AgentsView) already knows the *exact* offsets of definite
+    findings, so those are used when they line up; the patterns are a backstop
+    for stores that carry no such table.
+    """
+    n = 0
+    if text and session_id and ordinal is not None and SESSIONS_DB.is_file():
+        try:
+            conn = _ro(SESSIONS_DB)
+            try:
+                rows = conn.execute(
+                    "select match_start, match_end, location_kind from secret_findings "
+                    "where session_id=?",
+                    (session_id,),
+                ).fetchall()
+            finally:
+                conn.close()
+            spans = [
+                (int(a), int(b))
+                for a, b, _kind in rows
+                if a is not None and b is not None and 0 <= int(a) < int(b) <= len(text)
+            ]
+            for a, b in sorted(spans, reverse=True):
+                text = text[:a] + "[redacted:secret]" + text[b:]
+                n += 1
+        except sqlite3.Error:
+            pass
+    for rx in _SECRET_RES:
+        text, k = rx.subn("[redacted:credential]", text)
+        n += k
+    return text, n
+
+
+def _message_source(locator: str):
+    """Resolve a locator to (spec, session_id, key, by_ordinal), or None.
+
+    `#<id>` addresses the row id; `@<ordinal>` addresses the (session, ordinal)
+    pair, which is what the AgentsView daemon actually returns. Both appear.
+    """
+    if locator.startswith("hermes/"):
+        head, _, tail = locator.partition(":")
+        profile = head.split("/", 1)[1]
+        db = (HERMES_ROOT / "state.db") if profile == "root" else (HERMES_ROOT / "profiles" / profile / "state.db")
+        spec = (db, "messages", "id", "session_id", "role", "timestamp", "content", "rowid")
+    else:
+        head, _, tail = locator.partition(":")
+        if head not in _MESSAGE_SOURCES:
+            return None
+        spec = _MESSAGE_SOURCES[head]
+    if "@" in tail:
+        sid, _, key = tail.partition("@")
+        return spec, sid, key, True
+    sid, _, key = tail.partition("#")
+    return spec, sid, key, False
+
+
+def read_locator(locator: str, *, chars: int = 400, siblings: int = 2) -> dict[str, Any] | None:
+    """Open one locator and return bounded original text with its surroundings.
+
+    Returns ``None`` when the locator is not one of this system's -- the caller
+    must then report an error rather than guess. The returned dict carries the
+    target row, the neighbouring rows with their roles and timestamps, and a
+    stable citation string, so a reader can see the passage in context instead of
+    receiving an extracted identifier.
+    """
+    chars = max(80, min(int(chars or 400), 4000))
+    siblings = max(0, min(int(siblings if siblings is not None else 2), 20))
+    parts = _message_source(locator)
+    if parts is not None:
+        spec, sid, key, by_ordinal = parts
+        db, table, id_col, sess_col, role_col, ts_col, text_col, order_col = spec
+        if not db.is_file():
+            return {"ok": False, "error": f"source store missing for locator {locator!r}: {db}"}
+        conn = _ro(db)
+        try:
+            if by_ordinal:
+                if key in ("", "None"):
+                    return {"ok": False, "error": f"locator {locator!r} carries no ordinal"}
+                row = conn.execute(
+                    f"select {id_col},{sess_col},{role_col},{ts_col},{order_col},"
+                    f"substr({text_col},1,8000) from {table} where {sess_col}=? and {order_col}=?",
+                    (sid, key),
+                ).fetchone()
+            else:
+                if key in ("", "None"):
+                    return {"ok": False, "error": (
+                        f"locator {locator!r} carries no row id; it cannot be opened. "
+                        "Re-run resolve/history so the locator is emitted in @ordinal form.")}
+                row = conn.execute(
+                    f"select {id_col},{sess_col},{role_col},{ts_col},{order_col},"
+                    f"substr({text_col},1,8000) from {table} where {id_col}=?",
+                    (key,),
+                ).fetchone()
+            if row is None:
+                return {"ok": False, "error": f"locator {locator!r} resolves to no row"}
+            rid, rsid, role, ts, order, body = row
+            around = []
+            if order is not None:
+                lo, hi = int(order) - siblings, int(order) + siblings
+                around = conn.execute(
+                    f"select {id_col},{role_col},{ts_col},{order_col},substr({text_col},1,{_MAX_CONTEXT_CHARS}) "
+                    f"from {table} where {sess_col}=? and {order_col} between ? and ? order by {order_col}",
+                    (rsid, lo, hi),
+                ).fetchall()
+        finally:
+            conn.close()
+        target_text, redactions = _redact_secrets(
+            str(body or ""), session_id=str(rsid), ordinal=order, locator_kind="message")
+        context = []
+        for cid, crole, cts, corder, ctext in around:
+            ctext, k = _redact_secrets(str(ctext or ""), session_id=str(rsid), ordinal=corder,
+                                        locator_kind="message")
+            redactions += k
+            context.append(
+                {
+                    "locator": f"{locator.split(':', 1)[0]}:{rsid}#{cid}" if ":" in locator else f"{rsid}#{cid}",
+                    "role": crole,
+                    "timestamp": cts,
+                    "ordinal": corder,
+                    "text": ctext[:chars],
+                    "is_target": corder == order,
+                }
+            )
+        return {
+            "ok": True,
+            "kind": "message",
+            "locator": locator,
+            "citation": f"{db.name}:{table}#{rid} (session {rsid}, ordinal {order}, {ts or 'no timestamp'})",
+            "source_version": _version(db),
+            "role": role,
+            "timestamp": ts,
+            "session_id": rsid,
+            "message_id": str(rid),
+            "excerpt": target_text[:chars],
+            "context": context,
+            "redactions": redactions,
+        }
+
+    if locator.startswith("coverage:"):
+        if not COVERAGE_DB.is_file():
+            return {"ok": False, "error": f"source store missing for locator {locator!r}"}
+        body = locator.split("#", 1)[1] if "#" in locator else ""
+        kind, _, value = body.partition(":")
+        conn = _ro(COVERAGE_DB)
+        try:
+            row = conn.execute(
+                "select id,session_id,kind,key,value,tool_name,ts,harness,cwd,src_table,src_id "
+                "from facts where kind=? and value=? order by id limit 1",
+                (kind, value),
+            ).fetchone()
+        finally:
+            conn.close()
+        if row is None:
+            return {"ok": False, "error": f"locator {locator!r} resolves to no fact row"}
+        text, redactions = _redact_secrets(str(row[4] or ""))
+        return {
+            "ok": True,
+            "kind": "fact",
+            "locator": locator,
+            "citation": f"{COVERAGE_DB.name}:facts#{row[0]} ({row[7] or 'harness?'} {row[8] or ''}, {row[6] or 'no timestamp'})",
+            "source_version": _version(COVERAGE_DB),
+            "fact_kind": row[2],
+            "key": row[3],
+            "excerpt": _clip(text, chars),
+            "session_id": row[1],
+            "tool_name": row[5],
+            "timestamp": row[6],
+            "source_pointer": f"{row[9]}#{row[10]}" if row[9] else None,
+            "context": [],
+            "redactions": redactions,
+        }
+
+    if "#" in locator and locator.split("#", 1)[0] in _TOOL_TABLES:
+        table, mid = locator.split("#", 1)
+        if not SESSIONS_DB.is_file():
+            return {"ok": False, "error": f"source store missing for locator {locator!r}"}
+        text_col, aux_col = _TOOL_TABLES[table]
+        conn = _ro(SESSIONS_DB)
+        try:
+            if table == "tool_calls":
+                row = conn.execute(
+                    "select id,session_id,message_id,tool_name,file_path,substr(input_json,1,4000),"
+                    "substr(result_content,1,8000) from tool_calls where id=?",
+                    (mid,),
+                ).fetchone()
+            elif table == "tool_result_events":
+                row = conn.execute(
+                    "select id,session_id,tool_call_message_ordinal,agent_id,source,substr(content,1,8000) "
+                    "from tool_result_events where id=?",
+                    (mid,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "select id,session_id,ordinal,role,timestamp,substr(coalesce(content,''),1,8000) "
+                    "from messages where id=?",
+                    (mid,),
+                ).fetchone()
+            if row is None:
+                return {"ok": False, "error": f"locator {locator!r} resolves to no row"}
+            if table == "tool_calls":
+                rid, rsid, mmsg, tool, fpath, raw_input, result = row
+                ordinal = conn.execute(
+                    "select ordinal from messages where id=?", (mmsg,)
+                ).fetchone()
+                ordinal = ordinal[0] if ordinal else None
+                around = []
+                if ordinal is not None:
+                    around = conn.execute(
+                        "select id,role,timestamp,ordinal,substr(coalesce(content,''),1,{}) from messages "
+                        "where session_id=? and ordinal between ? and ? order by ordinal".format(_MAX_CONTEXT_CHARS),
+                        (rsid, ordinal - 2, ordinal + 2),
+                    ).fetchall()
+                body = result or raw_input or ""
+                extra = {"tool_name": tool, "file_path": fpath, "input": _clip(raw_input, 1200)}
+            elif table == "tool_result_events":
+                rid, rsid, mmsg, agent, src, content = row
+                ordinal, around = mmsg, []
+                body = content or ""
+                extra = {"agent_id": agent, "source": src}
+            else:
+                rid, rsid, ordinal, role, ts, body = row
+                around = conn.execute(
+                    "select id,role,timestamp,ordinal,substr(coalesce(content,''),1,{}) from messages "
+                    "where session_id=? and ordinal between ? and ? order by ordinal".format(_MAX_CONTEXT_CHARS),
+                    (rsid, (ordinal or 0) - 2, (ordinal or 0) + 2),
+                ).fetchall()
+                extra = {"role": role, "timestamp": ts}
+        finally:
+            conn.close()
+        target_text, redactions = _redact_secrets(
+            str(body or ""), session_id=str(rsid), ordinal=ordinal, locator_kind="tool")
+        context = []
+        for cid, crole, cts, corder, ctext in around:
+            ctext, k = _redact_secrets(str(ctext or ""), session_id=str(rsid), ordinal=corder,
+                                        locator_kind="message")
+            redactions += k
+            context.append(
+                {"locator": f"messages#{cid}", "role": crole, "timestamp": cts,
+                 "ordinal": corder, "text": ctext[:chars]}
+            )
+        return {
+            "ok": True,
+            "kind": "tool",
+            "locator": locator,
+            "citation": f"{SESSIONS_DB.name}:{table}#{rid} (session {rsid}, ordinal {ordinal})",
+            "source_version": _version(SESSIONS_DB),
+            "session_id": rsid,
+            "ordinal": ordinal,
+            "excerpt": target_text[:chars],
+            "context": context,
+            "redactions": redactions,
+            **extra,
+        }
+    return None

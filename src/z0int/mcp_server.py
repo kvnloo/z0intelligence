@@ -42,13 +42,14 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "resolve",
         "description": (
-            "Answer a concrete memory question with the first complete VERIFIED answer and "
-            "minimum work. Infers the exact values the question needs (PATH, MODEL, "
+            "Find the evidence that bears on a concrete memory question and return it with "
+            "locators. Infers the exact values the question needs (PATH, MODEL, "
             "CONFIG_VALUE, COMMAND, URL, REVISION, IDENTIFIER, CLAIM, ...), races the cheap "
-            "evidence providers, and accepts a value only if it is present in returned "
-            "evidence. Unresolved questions fall back to the full resolver. Prefer this over "
-            "orient() for 'where is X stored', 'which model', 'what command' questions. Set "
-            "fast=false (or pass explicit typed needs) to get the full compiled packet instead."
+            "evidence providers, and returns a candidate value only when it occurs in "
+            "returned evidence. NOTE: occurrence in evidence is not proof -- a value can be "
+            "real and still not answer the question. Treat a returned value as a lead and "
+            "call inspect(locator) to read the passage before relying on it. Set fast=false "
+            "(or pass explicit typed needs) to get the full compiled packet instead."
         ),
         "inputSchema": {
             "type": "object",
@@ -92,12 +93,27 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "inspect",
-        "description": "Bounded read of the source behind one evidence locator.",
+        "description": (
+            "Open one evidence locator returned by resolve/history and read the original "
+            "passage in context: the target row plus neighbouring messages with roles and "
+            "timestamps, and a stable citation. Use this after resolve to read the sentence "
+            "that decides the answer. Read-only; known secrets are redacted. Locators "
+            "resolve/history return are index locators (agentsview:, coverage:, "
+            "tool_calls#, messages#, ...), not only filesystem paths."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "locator": {"type": "string"},
-                "chars": {"type": "integer", "default": 400},
+                "chars": {"type": "integer", "default": 400,
+                          "description": "max characters returned per message"},
+                "context": {"type": "integer", "default": 2,
+                            "description": (
+                                "how many neighbouring messages to include on each side. "
+                                "Raise it when the answer may have been superseded later "
+                                "in the same session -- a passage that looks decisive in "
+                                "isolation is often corrected a few turns on."
+                            )},
             },
             "required": ["locator"],
         },
@@ -226,11 +242,20 @@ def _tool_history(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _tool_inspect(args: dict[str, Any]) -> dict[str, Any]:
-    """Bounded read of the source row behind a locator.
+    """Bounded read of the source row behind a locator, with its surroundings.
+
+    This is the *reading* half of memory: `resolve`/`history` return locators,
+    and this opens the passage they point at so a caller can read the sentence
+    that decides the answer instead of re-running a search.
+
+    Returns the target row plus neighbouring rows with roles and timestamps, and
+    a stable citation. Known secret spans and credential shapes are redacted on
+    the way out; the read is read-only.
 
     Only locators this system produced are understood; anything else is an
     explicit error rather than a guess.
     """
+    from z0int.context_providers import read_locator
     from z0int.context_resolve import _fetch_exact_path
 
     locator = str(args["locator"])
@@ -240,16 +265,24 @@ def _tool_inspect(args: dict[str, Any]) -> dict[str, Any]:
         if ref is None:
             return {"schema": SCHEMA, "op": "inspect", "ok": False,
                     "error": f"cannot read {locator}"}
-        return {"schema": SCHEMA, "op": "inspect", "ok": True,
+        return {"schema": SCHEMA, "op": "inspect", "ok": True, "kind": "path",
                 "locator": ref.locator, "source_version": ref.source_version,
-                "excerpt": (ref.excerpt or "")[:chars]}
-    return {
-        "schema": SCHEMA, "op": "inspect", "ok": False,
-        "error": (
-            f"unsupported locator {locator!r}; expected a filesystem path. "
-            "Index rows are re-read through `resolve`, which owns that mapping."
-        ),
-    }
+                "excerpt": (ref.excerpt or "")[:chars], "context": []}
+
+    read = read_locator(locator, chars=chars, siblings=int(args.get("context") or 2))
+    if read is None:
+        return {
+            "schema": SCHEMA, "op": "inspect", "ok": False,
+            "error": (
+                f"unsupported locator {locator!r}. Expected a locator produced by "
+                "resolve/history/inspect (agentsview:, claude-extra:, misc-extra:, "
+                "hermes/<profile>:, anthropic:, coverage:, tool_calls#, "
+                "tool_result_events#, messages#) or a filesystem path."
+            ),
+        }
+    read["schema"] = SCHEMA
+    read["op"] = "inspect"
+    return read
 
 
 def _tool_unknowns(args: dict[str, Any]) -> dict[str, Any]:
