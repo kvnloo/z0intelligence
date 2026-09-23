@@ -1,0 +1,86 @@
+{
+  "schema": "z0int.api-provider-registry.v1",
+  "purpose": "API-served models for the local-cognition decision battery. Adding a model here is the ONLY edit needed to include it in an api_provider_eval run.",
+  "billing_note": "cohort records how a call is paid for, because on Cerebras the two products bill differently: 'trial-credit' draws down a finite $5 one-time grant, 'subscription-exempt' does NOT consume PayGo credits, 'renewable' is a free plan that resets daily.",
+  "key_source": "environment first, then the `refs:` block of ~/.dsh/.credentials.yaml (loaded in-process; values are never printed or passed on argv)",
+  "providers": {
+    "groq": {
+      "base_url": "https://api.groq.com/openai",
+      "api_key_env": "GROQ_API_KEY",
+      "cohort": "renewable",
+      "limits_note": "free plan: 30 RPM, 8000 TPM, 200000 TPD. TPM binds first \u2014 one ~6k-token call fills a minute.",
+      "source": "https://console.groq.com/docs/rate-limits",
+      "models": [
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "gpt-oss-120b",
+          "context": 131072,
+          "notes": "reasoning model",
+          "dialect": "hammer"
+        },
+        {
+          "id": "openai/gpt-oss-20b",
+          "label": "gpt-oss-20b",
+          "context": 131072,
+          "notes": "smallest of the cohort",
+          "dialect": "hammer"
+        },
+        {
+          "id": "qwen/qwen3.8-27b",
+          "label": "qwen3.8-27b",
+          "context": 131072,
+          "notes": null,
+          "dialect": "hammer"
+        }
+      ],
+      "dialect": "hammer",
+      "dialect_note": "hammer = tool_choice 'auto', 384-token completion budget, parses BOTH native tool_calls and bare JSON content. Required because these models intermittently answer with JSON content instead of a tool_call: under tool_choice='required' that is an HTTP 400 'tool_use_failed' on Groq, which the adapter would record as an abstention. 'qwen'/'hermes' cap output at 1024/256 and both demand a native call.",
+      "base_url_note": "Host root only. The transport appends '/v1/chat/completions' itself, so a base_url ending in /v1 produces /v1/v1/chat/completions and a 404."
+    },
+    "cerebras": {
+      "base_url": "https://api.cerebras.ai",
+      "api_key_env": "CEREBRAS_API_KEY",
+      "cohort": "trial-credit",
+      "limits_note": "Free Trial: 5 RPM, 30K uncached / 90K total TPM, 1M TPH, 1M TPD. Consumes a finite $5 grant that expires 30 days after issue. Cached tokens do not count against uncached TPM.",
+      "source": "https://inference-docs.cerebras.ai/support/rate-limits",
+      "models": [
+        {
+          "id": "gpt-oss-120b",
+          "label": "gpt-oss-120b",
+          "context": 65536,
+          "notes": "free-tier context is 65,536 \u2014 NOT the 131,072 the paid table shows",
+          "dialect": "hammer"
+        },
+        {
+          "id": "qwen-3.8-27b",
+          "label": "qwen-3.8-27b",
+          "context": 65536,
+          "notes": null,
+          "dialect": "hammer"
+        }
+      ],
+      "dialect": "hammer",
+      "dialect_note": "hammer = tool_choice 'auto', 384-token completion budget, parses BOTH native tool_calls and bare JSON content. Required because these models intermittently answer with JSON content instead of a tool_call: under tool_choice='required' that is an HTTP 400 'tool_use_failed' on Groq, which the adapter would record as an abstention. 'qwen'/'hermes' cap output at 1024/256 and both demand a native call.",
+      "base_url_note": "Host root only. The transport appends '/v1/chat/completions' itself, so a base_url ending in /v1 produces /v1/v1/chat/completions and a 404."
+    },
+    "deepseek": {
+      "base_url": "https://api.deepseek.com",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "cohort": "paid-api",
+      "limits_note": "the incumbent route; included as the comparison baseline, not as a free tier",
+      "source": "https://api-docs.deepseek.com/quick_start/pricing",
+      "models": [
+        {
+          "id": "deepseek-chat",
+          "label": "deepseek-chat",
+          "context": 131072,
+          "notes": "baseline",
+          "dialect": "hammer"
+        }
+      ],
+      "dialect": "hammer",
+      "dialect_note": "hammer = tool_choice 'auto', 384-token completion budget, parses BOTH native tool_calls and bare JSON content. Required because these models intermittently answer with JSON content instead of a tool_call: under tool_choice='required' that is an HTTP 400 'tool_use_failed' on Groq, which the adapter would record as an abstention. 'qwen'/'hermes' cap output at 1024/256 and both demand a native call.",
+      "base_url_note": "Host root only. The transport appends '/v1/chat/completions' itself, so a base_url ending in /v1 produces /v1/v1/chat/completions and a 404."
+    }
+  }
+}

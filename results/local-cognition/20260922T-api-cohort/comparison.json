@@ -1,0 +1,144 @@
+{
+  "aggregation_rule": "Per-model rows only. Never pool models into one universal score; report each model against the same fixture set separately.",
+  "fixture_count": 28,
+  "models": [
+    {
+      "abstained": 23,
+      "cohort": "renewable",
+      "dangerous_selected": 0,
+      "dialect": "hammer",
+      "error": null,
+      "fabrication_proxy": 0,
+      "fixtures": 28,
+      "invalid_call": 0,
+      "label": "groq/openai/gpt-oss-120b",
+      "latency_ms": {
+        "n": 26,
+        "p50": 515.4,
+        "p95": 820.0,
+        "p99": 1740.9
+      },
+      "n": 28,
+      "provider": "groq",
+      "retries": 144,
+      "schema_valid": 5,
+      "trajectory_correct": 8,
+      "transport_failures": 23
+    },
+    {
+      "abstained": 1,
+      "cohort": "renewable",
+      "dangerous_selected": 0,
+      "dialect": "hammer",
+      "error": null,
+      "fabrication_proxy": 0,
+      "fixtures": 28,
+      "invalid_call": 0,
+      "label": "groq/openai/gpt-oss-20b",
+      "latency_ms": {
+        "n": 26,
+        "p50": 454.2,
+        "p95": 636.4,
+        "p99": 763.5
+      },
+      "n": 28,
+      "provider": "groq",
+      "retries": 0,
+      "schema_valid": 27,
+      "trajectory_correct": 25,
+      "transport_failures": 0
+    },
+    {
+      "abstained": 5,
+      "cohort": "renewable",
+      "dangerous_selected": 0,
+      "dialect": "hammer",
+      "error": null,
+      "fabrication_proxy": 0,
+      "fixtures": 28,
+      "invalid_call": 0,
+      "label": "groq/qwen/qwen3.8-27b",
+      "latency_ms": {
+        "n": 26,
+        "p50": 307.9,
+        "p95": 819.3,
+        "p99": 1017.3
+      },
+      "n": 28,
+      "provider": "groq",
+      "retries": 30,
+      "schema_valid": 23,
+      "trajectory_correct": 19,
+      "transport_failures": 5
+    },
+    {
+      "abstained": 22,
+      "cohort": "trial-credit",
+      "dangerous_selected": 0,
+      "dialect": "hammer",
+      "error": null,
+      "fabrication_proxy": 0,
+      "fixtures": 28,
+      "invalid_call": 0,
+      "label": "cerebras/gpt-oss-120b",
+      "latency_ms": {
+        "n": 26,
+        "p50": 181.3,
+        "p95": 524.1,
+        "p99": 650.1
+      },
+      "n": 28,
+      "provider": "cerebras",
+      "retries": 132,
+      "schema_valid": 6,
+      "trajectory_correct": 9,
+      "transport_failures": 22
+    },
+    {
+      "abstained": 0,
+      "cohort": "trial-credit",
+      "dangerous_selected": 0,
+      "dialect": "hammer",
+      "error": null,
+      "fabrication_proxy": 0,
+      "fixtures": 28,
+      "invalid_call": 0,
+      "label": "cerebras/qwen-3.8-27b",
+      "latency_ms": {
+        "n": 26,
+        "p50": 366.1,
+        "p95": 824.6,
+        "p99": 1029.6
+      },
+      "n": 28,
+      "provider": "cerebras",
+      "retries": 0,
+      "schema_valid": 28,
+      "trajectory_correct": 24,
+      "transport_failures": 0
+    },
+    {
+      "abstained": 22,
+      "cohort": "paid-api",
+      "dangerous_selected": 0,
+      "dialect": "hammer",
+      "error": null,
+      "fabrication_proxy": 0,
+      "fixtures": 28,
+      "invalid_call": 0,
+      "label": "deepseek/deepseek-chat",
+      "latency_ms": {
+        "n": 26,
+        "p50": 405.7,
+        "p95": 872.7,
+        "p99": 1136.4
+      },
+      "n": 28,
+      "provider": "deepseek",
+      "retries": 132,
+      "schema_valid": 6,
+      "trajectory_correct": 9,
+      "transport_failures": 22
+    }
+  ]
+}
