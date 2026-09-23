@@ -42,7 +42,7 @@ import re
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal
+from typing import Any, Callable, Iterable, Iterator, Literal
 
 # --------------------------------------------------------------------- roots
 
@@ -567,6 +567,7 @@ def lexical_misc_extra(query: str, limit: int = 8) -> list[ProviderHit]:
 # in the fact store costs one FTS term, but a token that appears everywhere
 # dilutes the ranking.
 _TOKEN_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"~/[\w.\-+@/]+"),                                 # tilde path
     re.compile(r"(?:/[\w.\-+@]+){2,}(?:\.[A-Za-z0-9]{1,8})?"),   # absolute path
     re.compile(r"\b[\w.\-]+\.(?:env|json|ts|tsx|js|py|sh|ya?ml|toml|db|md|cfg|ini)\b"),
     re.compile(r"\b[A-Z][A-Z0-9]{2,}_[A-Z0-9_]{2,}\b"),           # ENV_VAR
@@ -733,6 +734,53 @@ def search_lexical(
         res.hits.extend(hits)
         res.status.append(status)
     return res
+
+
+#: Provider stages ordered by MEASURED warm latency and yield on this machine.
+#: The point of the ordering is that the fastest provider is also the one that
+#: holds the answer for the identifier failure this fast path exists to fix:
+#:
+#:   conversation (AgentsView HTTP)   69 ms   <- held the #7 answer at rank 1
+#:   misc-extra                        8 ms
+#:   anthropic                        28 ms
+#:   claude-extra                     92 ms
+#:   hermes                          291 ms
+#:   tool                            358 ms
+#:
+#: A full fan-out pays ~1.4 s because `tool` and `hermes` are slow and, for
+#: identifier questions, empty. Staging lets the caller stop once its slots are
+#: filled instead of buying the whole union.
+PROVIDER_STAGES: tuple[tuple[str, ...], ...] = (
+    ("conversation", "misc-extra", "anthropic"),
+    ("claude-extra", "hermes"),
+    ("tool",),
+)
+
+
+def search_staged(
+    query: str,
+    *,
+    limit: int = 8,
+    stages: tuple[tuple[str, ...], ...] = PROVIDER_STAGES,
+) -> Iterator[tuple[int, LexicalResult]]:
+    """Yield cumulative results after each stage, so a caller can stop early.
+
+    This is the "race to fill the slots" primitive. Each stage is strictly
+    additive: the caller sees every hit found so far and decides whether it has
+    enough. Nothing is thrown away by stopping, because the caller only stops
+    when its own completeness test passes.
+    """
+    cumulative = LexicalResult()
+    index: dict[str, Callable[[str, int], list[ProviderHit]]] = dict(LEXICAL_PROVIDERS)
+    for stage_no, names in enumerate(stages):
+        for name in names:
+            fn = index.get(name)
+            if fn is None:
+                continue
+            hits, status = _timed(lambda fn=fn: fn(query, limit), name)
+            cumulative.hits.extend(hits)
+            cumulative.status.append(status)
+        yield stage_no, cumulative
 
 
 def kinds_for(need_kind: str) -> tuple[str, ...]:

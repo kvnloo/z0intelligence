@@ -12,17 +12,19 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Sequence
 
 from . import context_providers as provider_registry
 from . import paths
 
 SCHEMA = "z0int.context_resolve.v1"
+FAST_SCHEMA = "z0int.resolve_fast.v1"
 RECIPE_SCHEMA = "z0int.resolution_recipe.v1"
 
 TrustClass = Literal[
@@ -623,6 +625,603 @@ def resolve_context(
             )
             packet.measurements["cache_write"] = "saved"
     return packet
+
+
+# ===========================================================================
+# Fast concrete-resolution path
+# ===========================================================================
+#
+# The full resolver answers by breadth: it fans out over every provider, then
+# compiles a packet. That is the right shape for "compile me the context of this
+# task" and the wrong shape for "where is the key stored". Measured on this
+# machine, the identifier question below costs ~1.4 s and ~80 evidence items
+# through `resolve_context`, while the provider that actually holds the answer
+# (AgentsView HTTP) returns it in **69 ms**.
+#
+# `resolve_fast` instead states what values the question needs (slots), races the
+# cheap providers in measured-latency order, and stops the moment every required
+# slot has a candidate that is present in returned evidence. Anything it cannot
+# finish falls through to `resolve_context`, so the coverage win is retained.
+#
+# Models are used only to choose among a bounded set of retrieval operators when
+# the deterministic cues are silent, and never to produce a value. Every slot
+# value must be found in evidence or it does not count as resolved.
+
+SlotKind = Literal[
+    "PATH", "MODEL", "CONFIG_VALUE", "COMMAND", "URL",
+    "REVISION", "REPOSITORY", "ISSUE", "IDENTIFIER", "CLAIM",
+]
+
+#: Requested-slot vocabulary -> the `InformationNeed.kind` the fact store uses.
+SLOT_NEED_KIND: dict[str, str] = {
+    "PATH": "path",
+    "MODEL": "model",
+    "CONFIG_VALUE": "config_value",
+    "COMMAND": "command",
+    "URL": "url",
+    "REVISION": "revision",
+    "REPOSITORY": "repository",
+    "ISSUE": "issue",
+    "IDENTIFIER": "identifier",
+    "CLAIM": "natural_language",
+}
+
+#: Deterministic slot cues. Ordered most-specific first: a question that matches
+#: several cues takes the earliest as its primary slot, so "where is the plugin
+#: key stored?" resolves to PATH alone rather than PATH+CONFIG_VALUE.
+SLOT_CUES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("PATH", re.compile(r"\b(where(?:'s| is| are)?\b.*\b(stored|located|live|on disk|saved)|which file|what file|file path|path to|config file|settings file)\b", re.I)),
+    ("MODEL", re.compile(r"\b(which|what)\s+(model|models)\b|\bmodel id\b|\bfail(?:s|ed)? over to\b", re.I)),
+    ("URL", re.compile(r"\b(url|uri|endpoint|base url|gateway address|host:port)\b", re.I)),
+    ("COMMAND", re.compile(r"\b(what|which)\s+command\b|\bcommand (?:fixed|ran|to run)\b|\bhow do i run\b", re.I)),
+    ("REVISION", re.compile(r"\b(revision|commit sha|\bsha\b|pinned version|version pin)\b", re.I)),
+    ("ISSUE", re.compile(r"\b(issue|pull request|\bpr\b|ticket)\s*#?\d*", re.I)),
+    ("REPOSITORY", re.compile(r"\b(which|what)\s+(repo|repository)\b", re.I)),
+    ("CONFIG_VALUE", re.compile(r"\b(config value|setting|backend|env(?:ironment)? variable|which .{0,20}backend|what .{0,20}backend)\b", re.I)),
+    ("IDENTIFIER", re.compile(r"\b(which|what)\s+(identifier|symbol|function|helper|module)\b", re.I)),
+    ("CLAIM", re.compile(r"\b(did we decide|what did we decide|should happen to|agreed|policy on)\b", re.I)),
+)
+
+#: Shape tests for candidate extraction, per slot. `CLAIM` has no shape: a claim
+#: is prose and is verified by presence in evidence rather than by pattern.
+SLOT_PATTERNS: dict[str, re.Pattern[str] | None] = {
+    "PATH": re.compile(r"~?/(?:[\w.\-+@]+/)*[\w.\-+@]*\.[A-Za-z0-9]{1,8}"),
+    "MODEL": re.compile(r"\b[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*\d[\w.\-]*\b"),
+    "URL": re.compile(r"https?://[^\s\"'<>)\]]+"),
+    "REVISION": re.compile(r"\b[0-9a-f]{7,40}\b"),
+    "COMMAND": re.compile(r"\b[\w.\-/]+\.(?:sh|py|mjs|js|ts)\b"),
+    # ENV_VAR names, and the `dotted.key:=value` form the fact store records for
+    # tool-argument config (e.g. `memory.backend:=off`).
+    "CONFIG_VALUE": re.compile(
+        r"\b[A-Z][A-Z0-9]{2,}_[A-Z0-9_]{2,}\b|\b[\w]+(?:\.[\w]+)+:?=\s*[\w.\-/]+"
+    ),
+    "REPOSITORY": re.compile(r"\b(?:[\w.\-]+/){1,2}[\w.\-]+\b"),
+    "ISSUE": re.compile(r"#\d+\b"),
+    "IDENTIFIER": re.compile(r"\b[a-zA-Z_][\w]*(?:[.\-/][\w]+){1,}\b"),
+    "CLAIM": None,
+}
+
+#: Temporal cues select the history operator.
+_TEMPORAL_RE = re.compile(r"\b(when|before|after|earlier|history|changed|over time|last (?:week|month))\b", re.I)
+
+#: Bounded action set. The model, when consulted, picks from exactly this list.
+OPERATORS = (
+    "EXACT_LOOKUP",
+    "FACT_KIND_LOOKUP",
+    "SESSION_TO_IDENTIFIER",
+    "TEMPORAL_HISTORY",
+    "CLAIM_LOOKUP",
+    "FULL_RECALL",
+)
+
+#: Operators the fast path can actually execute today. The rest of `OPERATORS`
+#: is the declared bounded action set; naming an operator the fast path cannot
+#: run yet must cost nothing, so those short-circuit to the full resolver.
+FAST_EXECUTABLE = frozenset({"EXACT_LOOKUP", "FACT_KIND_LOOKUP", "SESSION_TO_IDENTIFIER"})
+
+#: Providers actually exercised by a fast-path run, in measured cost order.
+FAST_LEXICAL_ONLY = ("conversation", "misc-extra", "anthropic")
+
+
+@dataclass
+class Slot:
+    """One exact value the question needs. Resolved only by evidence."""
+
+    kind: SlotKind
+    required: bool = True
+    value: str | None = None
+    evidence_pointer: str | None = None
+    verification: str | None = None
+    provider: str | None = None
+
+    @property
+    def resolved(self) -> bool:
+        return self.value is not None and self.verification is not None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "required": self.required,
+            "resolved": self.resolved,
+            "value": self.value,
+            "evidence_pointer": self.evidence_pointer,
+            "verification": self.verification,
+            "provider": self.provider,
+        }
+
+
+@dataclass
+class FastAnswer:
+    schema: str = FAST_SCHEMA
+    question: str = ""
+    slots: list[Slot] = field(default_factory=list)
+    operators: list[str] = field(default_factory=list)
+    operator_source: str = "rule"
+    providers_used: list[str] = field(default_factory=list)
+    evidence: list[dict[str, Any]] = field(default_factory=list)
+    evidence_opened: int = 0
+    ttfa_ms: float | None = None
+    total_ms: float = 0.0
+    fallback_used: bool = False
+    answer: list[dict[str, Any]] = field(default_factory=list)
+    verification_sources: list[str] = field(default_factory=list)
+
+    @property
+    def complete(self) -> bool:
+        req = [s for s in self.slots if s.required]
+        return bool(req) and all(s.resolved for s in req)
+
+    @property
+    def unnecessary_evidence_read(self) -> int:
+        """Evidence opened beyond what the verified answer needed.
+
+        A fast path that opens 80 items to return one verified path is counted
+        against, exactly as the brief requires.
+        """
+        return max(0, self.evidence_opened - len(self.answer))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema": self.schema,
+            "question": self.question,
+            "slots": [s.to_dict() for s in self.slots],
+            "complete": self.complete,
+            "operators": list(self.operators),
+            "operator_source": self.operator_source,
+            "providers_used": list(self.providers_used),
+            "evidence_opened": self.evidence_opened,
+            "unnecessary_evidence_read": self.unnecessary_evidence_read,
+            "ttfa_ms": self.ttfa_ms,
+            "total_ms": self.total_ms,
+            "fallback_used": self.fallback_used,
+            "answer": list(self.answer),
+            "verification_sources": list(self.verification_sources),
+            "evidence": list(self.evidence),
+        }
+
+
+def infer_slots(question: str) -> list[Slot]:
+    """Which exact values does this question need?
+
+    Deterministic and deliberately shallow. It must not try to model an
+    ontology: it answers only "what kind of value is being asked for". A second
+    slot is added only when the question explicitly conjoins two cues.
+    """
+    matches = [kind for kind, rx in SLOT_CUES if rx.search(question)]
+    if not matches:
+        return []
+    primary = matches[0]
+    slots = [Slot(kind=primary)]  # type: ignore[arg-type]
+    conjoined = re.search(r"\band\b|,", question, re.I) is not None
+    if conjoined:
+        for kind in matches[1:]:
+            if kind != primary:
+                slots.append(Slot(kind=kind))  # type: ignore[arg-type]
+                break
+    return slots
+
+
+def _slot_candidates(text: str, kind: str, limit: int = 4) -> list[str]:
+    """Identifier-shaped values of the requested kind, de-duplicated in order."""
+    rx = SLOT_PATTERNS.get(kind)
+    if rx is None:
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for m in rx.finditer(text or ""):
+        val = m.group(0).strip().strip("`'\".,;:)]}")
+        if len(val) < 2 or val.lower() in seen:
+            continue
+        seen.add(val.lower())
+        out.append(val)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _verify_slot(slot: Slot, value: str, hit: Any) -> str | None:
+    """Verify a candidate against evidence. Returns the verification source.
+
+    The invariant: a value is never accepted because a model proposed it. It is
+    accepted only because it appears in returned evidence, with the evidence
+    pointer naming where. A filesystem check, where the value is a path and the
+    path is local, upgrades the verdict but is never required -- a legitimately
+    deleted file must still be reportable.
+    """
+    blob = ((getattr(hit, "excerpt", "") or "") + " " + (getattr(hit, "locator", "") or "")).lower()
+    if value.lower() not in blob:
+        return None
+    if slot.kind == "PATH":
+        try:
+            if Path(value).expanduser().exists():
+                return "evidence+fs-exists"
+        except (OSError, RuntimeError):
+            pass
+    return "evidence"
+
+
+#: Terms too common to establish that evidence is about the question.
+_RELEVANCE_STOP = frozenset(
+    """
+    the a an of to in on for and or that this it is are was were be been do does did
+    what which where when who why how we you i they he she them us our your their
+    before after now then than with from at by as into over under about
+    use used using does did should would could can will shall may might must
+    """.split()
+)
+
+
+def _content_terms(question: str, limit: int = 12) -> list[str]:
+    """Content words of the question, used as a deterministic relevance gate."""
+    out: list[str] = []
+    for t in re.findall(r"[A-Za-z0-9_][\w.\-]{2,}", question or ""):
+        low = t.lower()
+        if low in _RELEVANCE_STOP or low in out:
+            continue
+        out.append(low)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _absorb_candidates(
+    slots: list[Slot], hits: Sequence[Any], providers: set[str], *, question: str = ""
+) -> None:
+    """Try to fill unresolved slots from a batch of hits.
+
+    A candidate is accepted only if the hit it came from is *about the question*
+    -- at least one question content term must appear in the hit. Shape matching
+    alone is not enough, and this gate is why: on "what memory backend did OMP
+    use", a shape-only rule accepted the first `CONFIG_VALUE`-shaped token in the
+    union (``BUILT_IN``) and reported a confident, verified, wrong answer. Value
+    shapes are cheap to satisfy and say nothing about relevance; the envelope is
+    what carries relevance, which is the same reason the two-hop bridge exists.
+    """
+    terms = _content_terms(question) if question else []
+    # Corroboration threshold. A single shared content term is far too weak: on
+    # the 17-miss set it produced 5 verified-but-WRONG answers, including two
+    # returned without fallback (a `gamma.app` URL for "what is the TencentDB
+    # memory gateway URL", and a directory for "which file implements the jev
+    # auth registry helper"). One term is satisfied by any message that merely
+    # shares the topic. Requiring TWO distinct question terms in the same
+    # evidence -- when the question has two to give -- keeps the genuine answers
+    # (the chiefstaff .env hit carries key+DSH+plugin; the cleanup path carries
+    # cleanup+cachyos) and rejects topical near-misses.
+    min_score = 2 if len(terms) >= 2 else 1
+    # Collect EVERY candidate with its score, then require an unambiguous
+    # winner. Presence in relevant evidence establishes topicality, not
+    # answerhood: measured on the 17-miss set, a corroborated presence rule
+    # still produced 4 verified-but-wrong answers (a `/.env` fragment for "which
+    # file implements the jev auth registry helper", a commit-sha fragment for
+    # "which model does the system fail over to"). When several same-shaped
+    # candidates compete, the honest verdict is "this evidence does not single
+    # out an answer", so the slot stays unresolved and the question falls back to
+    # the full resolver -- which is the difference between a slow answer and a
+    # confident false memory.
+    cands: dict[int, dict[str, int]] = {}
+    owner: dict[tuple[int, str], Any] = {}
+    for hit in hits:
+        text = (getattr(hit, "excerpt", "") or "") + " " + (getattr(hit, "locator", "") or "")
+        # Score on the EXCERPT only. The locator is a pointer, not evidence, and
+        # it embeds the harness name -- session ids look like `omp:01a0...` -- so
+        # scoring on it awarded relevance for the string "omp" to a fact whose
+        # entire content was `BUILT_IN`.
+        semantic = (getattr(hit, "excerpt", "") or "").lower()
+        score = sum(1 for t in terms if t in semantic)
+        if terms and score < min_score:
+            continue
+        for index, slot in enumerate(slots):
+            if slot.resolved:
+                continue
+            if slot.kind == "CLAIM":
+                excerpt = (getattr(hit, "excerpt", "") or "").strip()
+                if len(excerpt) < 40:
+                    continue
+                cands.setdefault(index, {})[excerpt[:400]] = score
+                owner.setdefault((index, excerpt[:400]), hit)
+                continue
+            for cand in _slot_candidates(text, slot.kind):
+                if _verify_slot(slot, cand, hit) is None:
+                    continue
+                bucket = cands.setdefault(index, {})
+                bucket[cand] = max(bucket.get(cand, 0), score)
+                owner.setdefault((index, cand), hit)
+                break
+    resolved: dict[int, tuple[str, Any]] = {}
+    for index, scores in cands.items():
+        if not scores:
+            continue
+        top = max(scores.values())
+        winners = [value for value, s in scores.items() if s == top]
+        if len(winners) != 1:
+            continue  # ambiguous -> stays unresolved -> fallback
+        resolved[index] = (winners[0], owner[(index, winners[0])])
+    best = {i: (0, v, h) for i, (v, h) in resolved.items()}
+    for index, (_score, value, hit) in best.items():
+        slot = slots[index]
+        slot.value = value
+        slot.evidence_pointer = getattr(hit, "locator", None)
+        slot.verification = (
+            "evidence:prose" if slot.kind == "CLAIM" else (_verify_slot(slot, value, hit) or "evidence")
+        )
+        slot.provider = getattr(hit, "provider", None)
+        providers.add(str(getattr(hit, "provider", "")))
+
+
+def _tokens_from(slots: list[Slot], hits: Sequence[Any]) -> list[str]:
+    """Harvest bridge tokens for the fact hop. Richer snippets first."""
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for hit in hits:
+        for tok in provider_registry.fact_tokens(getattr(hit, "excerpt", "") or ""):
+            if tok.lower() not in seen:
+                seen.add(tok.lower())
+                ordered.append(tok)
+    return ordered[:32]
+
+
+def _advisory_operator(question: str, *, timeout_s: float = 5.0) -> str | None:
+    """Ask a small z0 decision backend which operator to use -- advisory only.
+
+    Only called when the deterministic cues are silent, i.e. when the
+    alternative is paying full-resolver cost anyway. It cannot introduce a fact:
+    whatever it returns is used to pick a retrieval strategy, and the resulting
+    candidate still has to be found in evidence. Any failure returns None and the
+    caller falls back to FULL_RECALL.
+    """
+    try:
+        from .backends.registry import create_backend, register_builtin_backends
+        from .backends.base import DecisionQuestion, DecisionRequest
+
+        register_builtin_backends()
+        backend = create_backend("laya_421m")
+        request = DecisionRequest(
+            capability_id="resolve.operator_select",
+            questions=[
+                DecisionQuestion(
+                    id="op",
+                    prompt=(
+                        "Pick the retrieval operator for a question about local "
+                        "engineering history. Answer with the option id only.\n"
+                        f"Question: {question}"
+                    ),
+                    options=list(OPERATORS[:-1]),
+                )
+            ],
+        )
+        result = backend.evaluate(request)
+        for answer in getattr(result, "answers", []) or []:
+            choice = getattr(answer, "choice", None)
+            if choice in OPERATORS:
+                return str(choice)
+    except Exception:  # noqa: BLE001 - advisory; never fatal to the fast path
+        return None
+    return None
+
+
+def _episode_path() -> Path:
+    root = paths.home() / "episodes"
+    root.mkdir(parents=True, exist_ok=True)
+    return root / "resolve_fast.jsonl"
+
+
+def emit_episode(answer: FastAnswer) -> None:
+    """Append one lightweight episode. Never fatal, never blocks the answer."""
+    try:
+        row = {
+            "question": answer.question,
+            "requested_slots": [s.kind for s in answer.slots if s.required],
+            "operator": answer.operators[0] if answer.operators else None,
+            "operator_source": answer.operator_source,
+            "providers_used": answer.providers_used,
+            "candidates": [s.value for s in answer.slots if s.value],
+            "verified": answer.complete,
+            "fallback_used": answer.fallback_used,
+            "ttfa_ms": answer.ttfa_ms,
+            "total_ms": answer.total_ms,
+            "evidence_opened": answer.evidence_opened,
+            "unnecessary_evidence_read": answer.unnecessary_evidence_read,
+        }
+        path = _episode_path()
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
+        os.chmod(path, 0o600)
+    except Exception:  # noqa: BLE001 - telemetry must never break an answer
+        pass
+
+
+def select_operators(question: str, slots: list[Slot], *, allow_model: bool) -> tuple[list[str], str]:
+    """Choose the bounded retrieval operators to execute, cheapest first."""
+    ops: list[str] = []
+    # A value the caller already spelled out is an exact lookup, not a search.
+    if any(c in question for c in ("/", "://", "=")) or re.search(r"\b[0-9a-f]{7,40}\b", question):
+        ops.append("EXACT_LOOKUP")
+    if any(s.kind == "CLAIM" for s in slots):
+        ops.append("CLAIM_LOOKUP")
+    if _TEMPORAL_RE.search(question):
+        ops.append("TEMPORAL_HISTORY")
+    ops.append("SESSION_TO_IDENTIFIER")
+    ops.append("FACT_KIND_LOOKUP")
+    ops.append("FULL_RECALL")
+
+    source = "rule"
+    if not slots and allow_model:
+        chosen = _advisory_operator(question)
+        if chosen:
+            ops = [chosen] + [o for o in ops if o != chosen]
+            source = "model:laya_421m"
+    return ops, source
+
+
+def resolve_fast(
+    question: str,
+    *,
+    allow_model: bool = True,
+    fallback: bool = True,
+    emit: bool = True,
+    stage_limit: int = 8,
+) -> FastAnswer:
+    """Return the first complete verified answer with the least work.
+
+    Shape::
+        slots -> cheapest operator -> staged lexical race -> fact hop
+              -> deterministic verify -> complete? return : full fallback
+    """
+    t0 = time.perf_counter()
+    answer = FastAnswer(question=question)
+    answer.slots = infer_slots(question)
+    answer.operators, answer.operator_source = select_operators(
+        question, answer.slots, allow_model=allow_model
+    )
+    providers: set[str] = set()
+
+    def _finish(*, fallback_used: bool) -> FastAnswer:
+        answer.providers_used = sorted(p for p in providers if p)
+        # NOTE: `evidence_opened` is maintained incrementally by `_note` and by
+        # the fallback. It must not be recomputed from `answer.evidence` here --
+        # that list is a bounded sample, and recomputing silently reported 0 for
+        # every fallback, which made the fallback look free.
+        answer.total_ms = (time.perf_counter() - t0) * 1000.0
+        answer.fallback_used = fallback_used
+        answer.answer = [
+            {
+                "slot": s.kind,
+                "value": s.value,
+                "evidence_pointer": s.evidence_pointer,
+                "verification": s.verification,
+                "provider": s.provider,
+            }
+            for s in answer.slots
+            if s.resolved
+        ]
+        answer.verification_sources = sorted({s.verification or "" for s in answer.slots if s.resolved})
+        if emit:
+            emit_episode(answer)
+        return answer
+
+    def _note(hits: Sequence[Any]) -> None:
+        answer.evidence_opened += len(hits)
+        for h in hits[:12]:
+            answer.evidence.append(
+                {
+                    "provider": getattr(h, "provider", None),
+                    "locator": getattr(h, "locator", None),
+                    "excerpt": (getattr(h, "excerpt", "") or "")[:240],
+                    "bridge": getattr(h, "bridge", None),
+                }
+            )
+
+    # No slots at all -> nothing to be complete about. Go straight to the full
+    # resolver rather than pretending a fast path answered.
+    if not answer.slots:
+        if not fallback:
+            return _finish(fallback_used=False)
+        return _full_fallback(answer, question, _finish)
+
+    # An operator the fast path cannot execute (TEMPORAL_HISTORY, CLAIM_LOOKUP)
+    # must fall back immediately rather than run a staged race first. Measured:
+    # doing the race and then falling back cost 2,537 ms on the temporal case
+    # against 1,472 ms for the full resolver alone -- the fast path made that
+    # question slower than not having one.
+    #
+    # This tests the PRIMARY operator, not `any` of them: SESSION_TO_IDENTIFIER
+    # is always present as a later fallback within the action list, so an `any`
+    # test is never false and the guard silently does nothing.
+    if not answer.operators or answer.operators[0] not in FAST_EXECUTABLE:
+        if not fallback:
+            return _finish(fallback_used=False)
+        return _full_fallback(answer, question, _finish)
+
+    # Operator 1: EXACT_LOOKUP -- a value the caller already spelled out.
+    if "EXACT_LOOKUP" in answer.operators:
+        try:
+            direct = provider_registry.facts_lexical(
+                question, kinds=provider_registry.kinds_for("natural_language"), limit=stage_limit
+            )
+            providers.add("coverage_facts")
+            _note(direct)
+            _absorb_candidates(answer.slots, direct, providers, question=question)
+            if answer.complete:
+                answer.ttfa_ms = (time.perf_counter() - t0) * 1000.0
+                return _finish(fallback_used=False)
+        except Exception:  # noqa: BLE001 - a dead fact store degrades, never crashes
+            pass
+
+    # Operator 2: the staged lexical race. Stop at the first stage that fills
+    # every required slot; this is what makes an easy query cheap.
+    harvested: list[Any] = []
+    try:
+        for _stage, result in provider_registry.search_staged(question, limit=stage_limit):
+            _note(result.hits)
+            _absorb_candidates(answer.slots, result.hits, providers, question=question)
+            if answer.complete:
+                answer.ttfa_ms = (time.perf_counter() - t0) * 1000.0
+                return _finish(fallback_used=False)
+            harvested = list(result.hits)
+    except Exception:  # noqa: BLE001
+        harvested = list(harvested)
+
+    # Operator 3: FACT_KIND_LOOKUP / SESSION_TO_IDENTIFIER -- the two-hop bridge.
+    # This is the only path that can reach an identifier sharing no tokens with
+    # the question, so it runs before we give up and pay full-resolver cost.
+    try:
+        tokens = _tokens_from(answer.slots, harvested) or provider_registry.fact_tokens(question)
+        kinds: tuple[str, ...] = ()
+        for slot in answer.slots:
+            kinds += provider_registry.kinds_for(SLOT_NEED_KIND[slot.kind])
+        facts = provider_registry.facts_for_tokens(tokens, kinds=tuple(dict.fromkeys(kinds)) or (), limit=stage_limit)
+        providers.add("coverage_facts")
+        _note(facts)
+        _absorb_candidates(answer.slots, facts, providers, question=question)
+        if answer.complete:
+            answer.ttfa_ms = (time.perf_counter() - t0) * 1000.0
+            return _finish(fallback_used=False)
+    except Exception:  # noqa: BLE001
+        pass
+
+    if not fallback:
+        return _finish(fallback_used=False)
+    return _full_fallback(answer, question, _finish)
+
+
+def _full_fallback(answer: FastAnswer, question: str, finish: Any) -> FastAnswer:
+    """Pay full-resolver cost, then let it try to fill the same slots.
+
+    The fallback keeps the coverage win: the slots are filled from the packet's
+    evidence under the same verification rule, so a fallback answer is held to
+    the identical standard as a fast one. Its evidence cost is recorded too --
+    otherwise a fallback would look free in the metrics.
+    """
+    try:
+        packet = resolve_context(query=question, use_cache=True)
+    except Exception:  # noqa: BLE001 - a failed fallback is still an answer
+        return finish(fallback_used=True)
+    providers: set[str] = set()
+    for e in packet.evidence:
+        providers.add(str(e.source_id).split(":", 1)[0])
+    answer.evidence_opened += len(packet.evidence)
+    _absorb_candidates(answer.slots, packet.evidence, providers, question=question)
+    return finish(fallback_used=True)
 
 
 def needs_from_mapping(raw: dict[str, Any] | list[Any]) -> list[InformationNeed]:

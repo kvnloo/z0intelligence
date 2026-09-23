@@ -42,16 +42,25 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "resolve",
         "description": (
-            "Resolve information needs into a provenance-preserving context packet. "
-            "Needs may be plain strings (natural language) or typed objects naming the "
-            "semantic type of the answer (path, symbol, config_value, model, command, "
-            "url, revision, repository, issue, identifier)."
+            "Answer a concrete memory question with the first complete VERIFIED answer and "
+            "minimum work. Infers the exact values the question needs (PATH, MODEL, "
+            "CONFIG_VALUE, COMMAND, URL, REVISION, IDENTIFIER, CLAIM, ...), races the cheap "
+            "evidence providers, and accepts a value only if it is present in returned "
+            "evidence. Unresolved questions fall back to the full resolver. Prefer this over "
+            "orient() for 'where is X stored', 'which model', 'what command' questions. Set "
+            "fast=false (or pass explicit typed needs) to get the full compiled packet instead."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "single natural-language question"},
+                "query": {"type": "string", "description": "the concrete memory question"},
                 "needs": {"type": "array", "items": {"type": ["string", "object"]}},
+                "fast": {"type": "boolean", "default": True,
+                         "description": "false forces the full resolver packet"},
+                "allow_model": {"type": "boolean", "default": True,
+                                "description": "let a small decision backend pick the retrieval operator when rules are silent"},
+                "fallback": {"type": "boolean", "default": True,
+                             "description": "fall back to the full resolver when slots stay unresolved"},
                 "task_id": {"type": "string"},
                 "project_root": {"type": "string"},
                 "typed_fallback": {"type": "boolean", "default": True},
@@ -129,11 +138,31 @@ def _packet_payload(packet: Any) -> dict[str, Any]:
 
 
 def _tool_resolve(args: dict[str, Any]) -> dict[str, Any]:
-    from z0int.context_resolve import needs_from_mapping, resolve_context
+    """Concrete memory question -> first complete verified answer, least work.
+
+    `resolve` is the fast path: infer the requested slots, race the cheap
+    providers in measured-latency order, verify candidates against evidence, and
+    return as soon as every required slot is filled. Unfinished questions fall
+    through to the full resolver, which is what keeps the coverage win.
+
+    `fast: false`, or an explicit typed `needs` list, forces the full packet --
+    use that when the caller wants a compiled context rather than an answer.
+    """
+    from z0int.context_resolve import needs_from_mapping, resolve_context, resolve_fast
 
     needs = None
     if args.get("needs"):
         needs = needs_from_mapping(args["needs"])
+    use_fast = bool(args.get("fast", True)) and needs is None and bool(args.get("query"))
+    if use_fast:
+        answer = resolve_fast(
+            str(args["query"]),
+            allow_model=bool(args.get("allow_model", True)),
+            fallback=bool(args.get("fallback", True)),
+        )
+        out = answer.to_dict()
+        out["schema"] = SCHEMA
+        return out
     packet = resolve_context(
         needs=needs,
         query=args.get("query"),
