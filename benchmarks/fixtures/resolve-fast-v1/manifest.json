@@ -1,0 +1,20 @@
+{
+  "counts": {
+    "PATH": 219,
+    "IDENTIFIER": 1297,
+    "CONFIG_VALUE": 4960,
+    "COMMAND": 4977,
+    "URL": 5327,
+    "REVISION": 10738
+  },
+  "rejected": {
+    "scratch_or_machine_name": 4668,
+    "ambiguous_answer": 59321,
+    "no_topic": 27947,
+    "generic": 1801,
+    "context_leak": 406,
+    "secret": 301,
+    "duplicate": 7809
+  },
+  "total": 19709
+}

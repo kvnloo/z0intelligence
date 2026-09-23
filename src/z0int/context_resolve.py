@@ -839,7 +839,7 @@ def _slot_candidates(text: str, kind: str, limit: int = 4) -> list[str]:
     return out
 
 
-def _verify_slot(slot: Slot, value: str, hit: Any) -> str | None:
+def _verify_slot(slot: Slot, value: str, hit: Any, *, require_fs: bool = False) -> str | None:
     """Verify a candidate against evidence. Returns the verification source.
 
     The invariant: a value is never accepted because a model proposed it. It is
@@ -857,6 +857,11 @@ def _verify_slot(slot: Slot, value: str, hit: Any) -> str | None:
                 return "evidence+fs-exists"
         except (OSError, RuntimeError):
             pass
+        # A path that does not exist locally cannot be discriminated from any
+        # other path-shaped candidate by shape alone, so when the policy demands
+        # existence it is not accepted.
+        if require_fs:
+            return None
     return "evidence"
 
 
@@ -885,7 +890,8 @@ def _content_terms(question: str, limit: int = 12) -> list[str]:
 
 
 def _absorb_candidates(
-    slots: list[Slot], hits: Sequence[Any], providers: set[str], *, question: str = ""
+    slots: list[Slot], hits: Sequence[Any], providers: set[str], *,
+    question: str = "", require_fs: bool = False, allowed: set[str] | None = None,
 ) -> None:
     """Try to fill unresolved slots from a batch of hits.
 
@@ -933,6 +939,13 @@ def _absorb_candidates(
         for index, slot in enumerate(slots):
             if slot.resolved:
                 continue
+            # Eligibility is enforced at ACCEPTANCE, not as an early exit: the
+            # full-resolver fallback also fills slots, so a gate that only
+            # short-circuited the fast path left the fallback free to claim a
+            # slot type the fast path cannot verify (measured: 50/156
+            # verified-wrong on dev, and 1/17 on the regression suite).
+            if allowed is not None and slot.kind not in allowed:
+                continue
             if slot.kind == "CLAIM":
                 excerpt = (getattr(hit, "excerpt", "") or "").strip()
                 if len(excerpt) < 40:
@@ -941,7 +954,7 @@ def _absorb_candidates(
                 owner.setdefault((index, excerpt[:400]), hit)
                 continue
             for cand in _slot_candidates(text, slot.kind):
-                if _verify_slot(slot, cand, hit) is None:
+                if _verify_slot(slot, cand, hit, require_fs=require_fs) is None:
                     continue
                 bucket = cands.setdefault(index, {})
                 bucket[cand] = max(bucket.get(cand, 0), score)
@@ -1073,6 +1086,54 @@ def select_operators(question: str, slots: list[Slot], *, allow_model: bool) -> 
     return ops, source
 
 
+#: The single declarative policy object the autoresearch loop mutates. It holds
+#: ONLY retrieval policy -- never truth, never verification, never the slot
+#: vocabulary's meaning. Cheap to hash, diff, replay and roll back.
+DEFAULT_POLICY: dict[str, Any] = {
+    "revision": "champion-991b531",
+    # Slot-conditioned provider order. `None` means the measured global order.
+    "provider_order": {
+        "PATH": ["conversation", "misc-extra", "anthropic", "claude-extra", "hermes", "tool"],
+        "CONFIG_VALUE": ["conversation", "misc-extra", "anthropic", "claude-extra", "hermes", "tool"],
+        "COMMAND": ["conversation", "misc-extra", "anthropic", "claude-extra", "hermes", "tool"],
+    },
+    # Per-slot minimum number of distinct question terms the evidence must carry
+    # before a candidate may be accepted. Higher = stricter = safer.
+    "corroboration": {"default": 2},
+    # Require a PATH candidate to exist on the local filesystem to be accepted
+    # when the value is locally resolvable. Deterministic, and it is the single
+    # strongest discriminator available for path questions.
+    "require_fs_exists_for_path": False,
+    # Slot types allowed to resolve on the fast path. Measured: accepting any
+    # slot type produced 91/156 verified-wrong answers on the controlled
+    # resolve-fast-v1 dev set, because shape+topicality does NOT establish
+    # answerhood for URL/REVISION/CONFIG_VALUE/IDENTIFIER. Restricting to slots
+    # with a deterministic discriminator is what makes the gate passable.
+    "eligible_slots": ["PATH"],
+    # Ambiguity handling: when several same-shaped candidates tie, run one extra
+    # targeted retrieval for the terms that DISTINGUISH the candidates, and
+    # accept only if exactly one candidate is corroborated by that new evidence.
+    "disambiguation": {"enabled": False, "probe_limit": 6},
+    "candidate_limits": {"stage_limit": 8, "max_candidates": 24},
+}
+
+
+def merged_policy(policy: dict[str, Any] | None) -> dict[str, Any]:
+    """Shallow-merge a challenger policy over the defaults."""
+    out = json.loads(json.dumps(DEFAULT_POLICY))
+    for key, value in (policy or {}).items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key].update(value)
+        else:
+            out[key] = value
+    return out
+
+
+def policy_revision(policy: dict[str, Any]) -> str:
+    blob = json.dumps(policy, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(blob.encode()).hexdigest()[:12]
+
+
 def resolve_fast(
     question: str,
     *,
@@ -1080,6 +1141,7 @@ def resolve_fast(
     fallback: bool = True,
     emit: bool = True,
     stage_limit: int = 8,
+    policy: dict[str, Any] | None = None,
 ) -> FastAnswer:
     """Return the first complete verified answer with the least work.
 
@@ -1087,6 +1149,7 @@ def resolve_fast(
         slots -> cheapest operator -> staged lexical race -> fact hop
               -> deterministic verify -> complete? return : full fallback
     """
+    pol = merged_policy(policy)
     t0 = time.perf_counter()
     answer = FastAnswer(question=question)
     answer.slots = infer_slots(question)
@@ -1131,12 +1194,24 @@ def resolve_fast(
                 }
             )
 
+    # Eligibility: if any required slot is a kind the fast path cannot verify
+    # deterministically, do not attempt resolution at all.
+    _eligible = set(pol.get("eligible_slots") or [])
+    if _eligible and any(s.kind not in _eligible for s in answer.slots if s.required):
+        if not fallback:
+            return _finish(fallback_used=False)
+        return _full_fallback(answer, question, _finish,
+                              require_fs=bool(pol.get("require_fs_exists_for_path", False)),
+                              allowed=_eligible or None)
+
     # No slots at all -> nothing to be complete about. Go straight to the full
     # resolver rather than pretending a fast path answered.
     if not answer.slots:
         if not fallback:
             return _finish(fallback_used=False)
-        return _full_fallback(answer, question, _finish)
+        return _full_fallback(answer, question, _finish,
+                              require_fs=bool(pol.get("require_fs_exists_for_path", False)),
+                              allowed=_eligible or None)
 
     # An operator the fast path cannot execute (TEMPORAL_HISTORY, CLAIM_LOOKUP)
     # must fall back immediately rather than run a staged race first. Measured:
@@ -1150,7 +1225,9 @@ def resolve_fast(
     if not answer.operators or answer.operators[0] not in FAST_EXECUTABLE:
         if not fallback:
             return _finish(fallback_used=False)
-        return _full_fallback(answer, question, _finish)
+        return _full_fallback(answer, question, _finish,
+                              require_fs=bool(pol.get("require_fs_exists_for_path", False)),
+                              allowed=_eligible or None)
 
     # Operator 1: EXACT_LOOKUP -- a value the caller already spelled out.
     if "EXACT_LOOKUP" in answer.operators:
@@ -1160,7 +1237,7 @@ def resolve_fast(
             )
             providers.add("coverage_facts")
             _note(direct)
-            _absorb_candidates(answer.slots, direct, providers, question=question)
+            _absorb_candidates(answer.slots, direct, providers, question=question, require_fs=bool(pol.get("require_fs_exists_for_path", False)), allowed=_eligible or None)
             if answer.complete:
                 answer.ttfa_ms = (time.perf_counter() - t0) * 1000.0
                 return _finish(fallback_used=False)
@@ -1173,7 +1250,7 @@ def resolve_fast(
     try:
         for _stage, result in provider_registry.search_staged(question, limit=stage_limit):
             _note(result.hits)
-            _absorb_candidates(answer.slots, result.hits, providers, question=question)
+            _absorb_candidates(answer.slots, result.hits, providers, question=question, require_fs=bool(pol.get("require_fs_exists_for_path", False)), allowed=_eligible or None)
             if answer.complete:
                 answer.ttfa_ms = (time.perf_counter() - t0) * 1000.0
                 return _finish(fallback_used=False)
@@ -1192,7 +1269,7 @@ def resolve_fast(
         facts = provider_registry.facts_for_tokens(tokens, kinds=tuple(dict.fromkeys(kinds)) or (), limit=stage_limit)
         providers.add("coverage_facts")
         _note(facts)
-        _absorb_candidates(answer.slots, facts, providers, question=question)
+        _absorb_candidates(answer.slots, facts, providers, question=question, require_fs=bool(pol.get("require_fs_exists_for_path", False)), allowed=_eligible or None)
         if answer.complete:
             answer.ttfa_ms = (time.perf_counter() - t0) * 1000.0
             return _finish(fallback_used=False)
@@ -1201,10 +1278,15 @@ def resolve_fast(
 
     if not fallback:
         return _finish(fallback_used=False)
-    return _full_fallback(answer, question, _finish)
+    return _full_fallback(answer, question, _finish,
+                              require_fs=bool(pol.get("require_fs_exists_for_path", False)),
+                              allowed=_eligible or None)
 
 
-def _full_fallback(answer: FastAnswer, question: str, finish: Any) -> FastAnswer:
+def _full_fallback(
+    answer: FastAnswer, question: str, finish: Any, *,
+    require_fs: bool = False, allowed: set[str] | None = None,
+) -> FastAnswer:
     """Pay full-resolver cost, then let it try to fill the same slots.
 
     The fallback keeps the coverage win: the slots are filled from the packet's
@@ -1220,7 +1302,10 @@ def _full_fallback(answer: FastAnswer, question: str, finish: Any) -> FastAnswer
     for e in packet.evidence:
         providers.add(str(e.source_id).split(":", 1)[0])
     answer.evidence_opened += len(packet.evidence)
-    _absorb_candidates(answer.slots, packet.evidence, providers, question=question)
+    _absorb_candidates(
+        answer.slots, packet.evidence, providers, question=question,
+        require_fs=require_fs, allowed=allowed,
+    )
     return finish(fallback_used=True)
 
 
