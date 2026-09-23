@@ -100,6 +100,27 @@ is exactly the layer that could not be measured here (see `docs/` for the
 separate finding that the DSH-facing `inspect()` cannot open an index locator at
 all).
 
+## LoCoMo — assessed, not run
+
+The brief asks for LoCoMo "if already supported cheaply". It was assessed and it
+is not cheap here, so it was not run:
+
+* `snap-research/locomo` is **CC BY-NC 4.0** (non-commercial) and pins a conda
+  explicit export for Python 3.9 / CUDA 11.7; Python 3.11 support is unvalidated;
+* **no local retrieval-only entry point exists.** `rag_utils.get_context_embeddings`
+  reads `compressed_text`/`clean_text`, which the released turns do not have, and
+  hardcodes `range(1, 20)`, so it cannot see sessions >= 20 (5 of 10 conversations);
+  the `contriever` branches reference undefined names. Only the GPT reader path
+  computes `_recall`, so producing a retrieval number means reconstructing the
+  harness from `gpt_utils.prepare_for_rag` — new benchmark glue, which this
+  iteration was explicitly told not to build;
+* the local QA path (`evaluate_hf_llm.sh`) needs a 7B model download and a
+  HuggingFace token.
+
+LongMemEval alone already answered the decision question ("does any of these
+deserve a local bakeoff?"), and it did so with the upstream metric functions
+rather than a reconstruction.
+
 ## Reproduce
 
 ```bash
