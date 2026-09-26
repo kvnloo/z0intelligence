@@ -21,6 +21,19 @@ Importing `z0int.backends.base` is stdlib-only (no torch).
 Probabilities that sum to one are **complete normalized distributions**.
 Calibration is checkpoint/task dependent — do not treat “sums to 1” as calibrated.
 
+## Observer semantics
+
+A `DecisionBackend` is a transport/runtime contract, not an authority claim.
+
+The same backend may be used in two different roles:
+
+- **observer/reference** — read state and emit typed probabilistic features/weak labels for replay and evaluation;
+- **runtime specialist** — make a bounded live decision only after that question family has independently passed its promotion gate.
+
+JEV is the initial semantic observer/reference backend for cross-backend evals. JEV agreement alone is not verified truth. NanoJev/OpenJev/rules/statistical models should be compared against independent outcomes and verifiers, not promoted merely for matching JEV.
+
+See [observer-evaluation.md](observer-evaluation.md).
+
 ## NanoJev install
 
 ```bash
