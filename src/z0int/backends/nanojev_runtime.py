@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 import json
+import sys
 import math
 
 
@@ -53,6 +54,10 @@ class RuntimeExample:
     type: str
     candidate_ids: tuple[str, ...]
     leaf_tokens: tuple[tuple[int, ...], ...]
+    #: True when the state did not fit ``max_length`` and had its head dropped.
+    #: Callers must surface this: a decision taken on a truncated state was not
+    #: taken on the state the caller passed in.
+    truncated: bool = False
 
 
 def build_examples(request, tokenizer, max_length: int) -> list[RuntimeExample]:
@@ -87,20 +92,50 @@ def build_examples(request, tokenizer, max_length: int) -> list[RuntimeExample]:
                 prefix_b += f"True criterion: {q.true_criterion}\n"
 
         prefix = _encode(tokenizer, prefix_a) + _encode(tokenizer, prefix_b)
-        leaves = tuple(
-            tuple(prefix + _encode(tokenizer, f"Candidate:\n{text}\nDecision:") + [eos])
+        candidate_ids_tokens = tuple(
+            _encode(tokenizer, f"Candidate:\n{text}\nDecision:") + [eos]
             for text in candidate_texts
         )
-        if max(map(len, leaves)) > max_length:
-            raise ValueError(
-                f"question {q.id}: encoded candidate path exceeds max_length={max_length}; no truncation"
+        leaves = tuple(tuple(prefix + cand) for cand in candidate_ids_tokens)
+        longest = max(map(len, leaves))
+        did_truncate = False
+        if longest > max_length:
+            # Previously this raised, so a single long row aborted the whole run.
+            # On the real abstentionbench corpus 16/150 rows overflow a
+            # checkpoint-fixed 512-token budget (median row needs 296 incl. the
+            # 50-token question block), so the raise blocked a benchmark that
+            # 89% of rows fit.
+            #
+            # Trim the FRONT of the state and keep the TAIL: for this benchmark
+            # the assistant response under judgement is at the end of `state`,
+            # and the question block is appended after it. Dropping the head
+            # keeps the part the verdict depends on.
+            #
+            # `max_length` comes from the checkpoint's own config.json and is the
+            # budget the model was trained with, so it is not raised here.
+            head = _encode(tokenizer, "State:\n")
+            state_tokens = _encode(tokenizer, state_text)
+            tail = _encode(tokenizer, "\n") + _encode(tokenizer, prefix_b)
+            budget = max_length - len(head) - len(tail) - max(map(len, candidate_ids_tokens))
+            state_tokens = state_tokens[-budget:] if budget > 0 else []
+            leaves = tuple(tuple(head + state_tokens + tail + cand) for cand in candidate_ids_tokens)
+            print(
+                f"  [nanojev] truncated state for question {q.id}: "
+                f"{longest} -> {max(map(len, leaves))} tokens (budget {max_length}, kept tail)",
+                file=sys.stderr,
             )
+            if max(map(len, leaves)) > max_length:
+                raise ValueError(
+                    f"question {q.id}: cannot fit max_length={max_length} even with an empty state"
+                )
+            did_truncate = True
         result.append(
             RuntimeExample(
                 question_id=q.id,
                 type=q.type,
                 candidate_ids=candidate_ids,
                 leaf_tokens=leaves,
+                truncated=did_truncate,
             )
         )
     return result
@@ -300,4 +335,7 @@ class NanoJevEngine:
             "autoregressive_decode_steps": 0,
             "network_model_calls": 0,
             "prefix_sharing": False,
+            # A truncated state means the model judged a state the caller did not
+            # pass in. That must travel with the result, not only to stderr.
+            "truncated_questions": [ex.question_id for ex in examples if ex.truncated],
         }
