@@ -64,7 +64,7 @@ import time
 from pathlib import Path
 from typing import Any, Sequence
 
-from .backends.base import DecisionQuestion, DecisionRequest
+from .backends.base import DecisionOption, DecisionQuestion, DecisionRequest
 from .backends.nanojev_runtime import canonical_state_text
 from .backends.registry import create_backend
 from .receipt import build_receipt, validate_receipt
@@ -350,19 +350,35 @@ def gate(
     state_text = packet_state_text(packet)
     verifier = backend if backend is not None else create_backend(backend_name)
 
+    # The proposition is asked as a two-candidate `choice`, not a `boolean`.
+    #
+    # This is not a stylistic preference, it is what the checkpoint can actually
+    # do. NanoJev is trained with "complete-question categorical cross entropy"
+    # over an offered candidate set (attention-based Choice head), on four
+    # embodied tasks; boolean and score are interface affordances it was never
+    # trained on. The two paths differ structurally:
+    #
+    #   choice  -> one encoded candidate text per option, the trained set head is
+    #              applied (`if self.set_head == "attention" and len(choice)`),
+    #              and softmax normalises ACROSS candidates.
+    #   boolean -> a single candidate text, slot 0 hard-pinned to `z * 0`, and
+    #              boolean is excluded from the set-head list entirely. So
+    #              P(true) = sigmoid(z) with no second candidate to contrast
+    #              against, and nothing to cancel a shared shift in how the
+    #              prefix reads.
+    #
+    # With one candidate text and a pinned zero there is no explicit FALSE
+    # alternative anywhere -- not in the encoding, not in the loss. Naming both
+    # candidates makes the contrast real and uses the path the head was trained
+    # on. The candidate texts are the minimal symmetric pair: the fixed
+    # continuation the boolean path already used, plus its negation.
     q = DecisionQuestion(
         id="evidence_answers_query",
-        type="boolean",
+        type="choice",
         instructions=question,
-        # The criteria are rendered into the prompt too, so they must state the
-        # same proposition rather than the retired "supports acting" one.
-        false_criterion=(
-            "The evidence is relevant but does not contain enough information to "
-            "answer the query correctly."
-        ),
-        true_criterion=(
-            "The evidence contains enough information to answer the query "
-            "correctly, without further retrieval or assumptions."
+        options=(
+            DecisionOption(id="true", description="The proposition is true."),
+            DecisionOption(id="false", description="The proposition is false."),
         ),
     )
     request = DecisionRequest(
