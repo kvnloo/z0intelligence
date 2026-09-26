@@ -364,6 +364,25 @@ def test_state_render_tolerates_a_packet_without_evidence():
     assert "Evidence 0" not in text
 
 
+def test_proposition_is_asked_as_a_two_candidate_choice():
+    """P(true) must come from a contrast, not from one pinned logit.
+
+    NanoJev is trained with categorical cross entropy over an offered candidate
+    set (attention Choice head). The `boolean` path encodes a single candidate
+    text and hard-pins slot 0 to zero, so it has no FALSE alternative and nothing
+    to cancel a shared prefix shift. This pins the construction so it cannot
+    silently revert.
+    """
+    stub = StubBackend(0.5)
+    gate(packet(), backend=stub)
+    q = stub.seen_requests[0].questions[0]
+    assert q.type == "choice"
+    assert [o.id for o in q.options] == ["true", "false"]
+    # A boolean question would carry criteria and no options; choice cannot.
+    assert q.false_criterion is None and q.true_criterion is None
+    assert len(q.options) == 2
+
+
 def test_gate_passes_evidence_prose_into_the_backend_state():
     stub = StubBackend(0.5)
     gate(packet(evidence=[{"rank": 0, "source_id": "conversation:a:b#1",
@@ -456,7 +475,15 @@ def test_gate_passes_the_question_and_state_to_the_backend():
     req = stub.seen_requests[0]
     assert "is the sky blue" in req.state
     assert "is the sky blue" not in req.questions[0].instructions
-    assert req.questions[0].type == "boolean"
+    assert req.questions[0].type == "choice"
+    opts = req.questions[0].options
+    assert [o.id for o in opts] == ["true", "false"], "the contrast needs both candidates"
+    # The candidate texts are the contrast being measured: an affirming text and
+    # its negation. A placeholder description would satisfy a non-empty check and
+    # silently destroy the contrast.
+    assert "true" in opts[0].description.lower()
+    assert "false" in opts[1].description.lower()
+    assert opts[0].description != opts[1].description
     assert "sessions_touched=53" in req.state
 
 
