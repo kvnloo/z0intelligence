@@ -68,20 +68,25 @@ DEFAULT_ESCALATE_BELOW = 0.35
 
 #: Character budget for the rendered state. NanoJev's budget is 512 *tokens*
 #: (its checkpoint config) and its runtime drops the head of an over-budget
-#: state. Measuring the real packets showed this text tokenizes at ~2.2
-#: chars/token -- paths and ids, not prose -- so the usual ~4 chars/token guess
-#: overruns by more than 2x. 800 chars measured out at ~440 of 512 tokens,
-#: leaving room for the question block with margin.
+#: state. This text mixes ids and paths (~2.1-2.7 chars/token) with prose, so an
+#: assumed ~4 chars/token overruns by more than 2x. Measured against the real
+#: tokenizer on the three proof packets: 1300 chars encoded to 423-462 of 512
+#: tokens including the question block, while 1500 chars reached 578 and
+#: overflowed. 1300 is the largest budget measured to fit with margin.
 #:
-#: This is a heuristic that holds for index-shaped text; it is not a guarantee.
-#: The safety net is the contract, not this number: the runtime now reports
-#: ``truncated_questions`` and the receipt records it, so a run can never claim
-#: the verifier saw more than it did.
-_STATE_CHAR_BUDGET = 800
+#: This is a heuristic; it is not a guarantee. The safety net is the contract,
+#: not this number: the runtime reports ``truncated_questions`` and the receipt
+#: records ``state_truncated``, so a run can never claim the verifier saw more
+#: than it did.
+_STATE_CHAR_BUDGET = 1300
 
 #: Uniform entry cap so no one section can consume the whole budget. Applied
 #: identically to every list section -- this is not a per-section knob.
 _MAX_ENTRIES_PER_SECTION = 4
+
+#: Shortest clipped line worth emitting. Below this the line is a stub that
+#: spends tokens without carrying content.
+_MIN_LINE_CHARS = 40
 
 
 def action_of(
@@ -147,11 +152,13 @@ class _Budget:
 
     def add(self, line: str, *, priority: str = "low") -> None:
         room = self._room()
-        if room <= 2:
+        # A line clipped to a few characters ("Evide...") costs tokens and tells
+        # the verifier nothing, so drop it rather than emit a stub.
+        if room < _MIN_LINE_CHARS:
             self.dropped.append(priority)
             return
         if len(line) > room:
-            line = _clip(line, max(2, room - 1))
+            line = _clip(line, room - 1)
         if line:
             self.lines.append(line)
         else:
@@ -167,9 +174,9 @@ def packet_state_text(packet: dict[str, Any]) -> str:
     Deterministic so the same packet always yields the same judgement, and
     budget-bounded so NanoJev's truncation should not fire.
 
-    Note this renders only what the packet actually carries. The live packet is
-    an index: ``decision_like`` excerpts are file paths and there is no evidence
-    prose field at all, so the verifier is judging pointers, not statements.
+    Note this renders only what the packet actually carries. Provenance stays on
+    the packet -- tied to this text by ``state_sha256`` -- rather than being
+    repeated here, where it would spend budget the prose needs.
     """
     b = _Budget(_STATE_CHAR_BUDGET)
 
@@ -177,22 +184,14 @@ def packet_state_text(packet: dict[str, Any]) -> str:
     if counts:
         b.add("Evidence counts: " + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())),
               priority="counts")
-    cov = packet.get("coverage") or {}
-    if cov:
-        b.add("Sources: " + _clip(cov.get("harnesses_with_hits") or [], 160), priority="sources")
-        if cov.get("earliest") or cov.get("latest"):
-            b.add(f"Evidence window: {cov.get('earliest')} .. {cov.get('latest')}",
-                  priority="window")
-    plan = packet.get("plan") or {}
-    if plan:
-        b.add("Question type: " + _clip(plan.get("question_type"), 40)
-              + "; entities: " + _clip(plan.get("entities") or [], 100), priority="plan")
 
     # Order is generic decision value, not per-section tuning: contradictions,
     # unknowns and supersession signals are the decisive content and are usually
-    # absent (so they cost nothing); literals are a compact vocabulary summary;
-    # decision-like priors and the pointer index are redundant with each other
-    # and come last, where they can absorb whatever budget remains.
+    # absent (so they cost nothing). Evidence prose comes next, because judging
+    # support is the whole job. Retrieval plumbing (which harnesses answered, the
+    # time window, the plan) and the index-shaped sections are demoted below it:
+    # they are auditable from the packet, and they used to crowd out the evidence
+    # entirely.
     for label, key in (
         ("Contradiction candidate", "contradiction_candidates"),
         ("Unknown", "unknowns"),
@@ -205,6 +204,31 @@ def packet_state_text(packet: dict[str, Any]) -> str:
                 b.add(f"{label} [{_clip(src, 50)}]: {_clip(body, 160)}", priority=key)
             else:
                 b.add(f"{label}: {_clip(item, 160)}", priority=key)
+
+    # The evidence itself. Before the packet carried an `evidence` field this
+    # renderer could only show pointers and literals -- file paths -- so the
+    # verifier was judging an index and could not tell a supported claim from an
+    # unsupported one.
+    for item in (packet.get("evidence") or [])[:_MAX_ENTRIES_PER_SECTION * 2]:
+        if isinstance(item, dict):
+            excerpt = item.get("excerpt") or item.get("text") or ""
+            harness = str(item.get("source_id") or item.get("source") or "?")
+            harness = harness.split(":", 1)[0]
+            b.add(f"Evidence {item.get('rank')} [{_clip(harness, 24)}]: {_clip(excerpt, 320)}",
+                  priority="evidence")
+        else:
+            b.add(f"Evidence: {_clip(item, 320)}", priority="evidence")
+
+    cov = packet.get("coverage") or {}
+    if cov:
+        b.add("Sources: " + _clip(cov.get("harnesses_with_hits") or [], 160), priority="sources")
+        if cov.get("earliest") or cov.get("latest"):
+            b.add(f"Evidence window: {cov.get('earliest')} .. {cov.get('latest')}",
+                  priority="window")
+    plan = packet.get("plan") or {}
+    if plan:
+        b.add("Question type: " + _clip(plan.get("question_type"), 40)
+              + "; entities: " + _clip(plan.get("entities") or [], 100), priority="plan")
 
     literals = packet.get("literals") or []
     if literals:
