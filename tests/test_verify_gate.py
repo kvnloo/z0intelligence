@@ -23,6 +23,7 @@ from z0int.verify_gate import (
     DEFAULT_ALLOW_AT,
     DEFAULT_ESCALATE_BELOW,
     SCHEMA,
+    _MIN_LINE_CHARS,
     _STATE_CHAR_BUDGET,
     action_of,
     gate,
@@ -231,6 +232,77 @@ def test_state_digest_is_stable_and_short():
     d = state_digest("abc")
     assert d == state_digest("abc") and len(d) == 16
     assert d != state_digest("abd")
+
+
+def test_state_render_includes_evidence_prose():
+    """The packet now carries evidence; the verifier must actually see it."""
+    text = packet_state_text(packet(evidence=[
+        {"rank": 0, "source_id": "conversation:agentsview:hermes:abc#1",
+         "locator": "agentsview:hermes:abc#1", "trust_class": "conversation",
+         "observed_at": "2026-08-15T10:50:05Z",
+         "excerpt": "The MCP bridge listens on port 8791 in this profile."},
+    ]))
+    assert "Evidence 0 [conversation]: The MCP bridge listens on port 8791" in text
+
+
+def test_state_render_prefers_evidence_over_the_pointer_index():
+    """Evidence must outrank the index sections that used to crowd it out."""
+    text = packet_state_text(packet(
+        evidence=[{"rank": 0, "source_id": "conversation:x:y#1",
+                   "excerpt": "E" * 400}],
+        evidence_pointers_ranked=[{"pointer": "facts:" + "p" * 400, "hits": 9}],
+        decision_like=[{"session_id": "s" * 300, "excerpt": "D" * 400}],
+    ))
+    assert "Evidence 0" in text, "evidence was evicted by the index sections"
+    if "Pointer" in text:
+        assert text.index("Evidence 0") < text.index("Pointer"), "index outranks evidence"
+
+
+def test_budget_drops_every_sub_useful_remainder():
+    """Sweep the whole stub window, not one lucky remainder.
+
+    A single construction pins only the remainder it happens to produce, so
+    mutating the constant to 10 or 30 left the earlier version of this test
+    green. Sweeping 1..39 pins the boundary wherever it is set.
+    """
+    from z0int.verify_gate import _Budget
+
+    for rem in range(1, 40):
+        b = _Budget(100)
+        b.add("x" * (99 - rem))  # leaves exactly `rem` chars of room
+        b.add("y" * 200)
+        assert len(b.lines) == 1, f"{rem}-char remainder produced a stub: {b.lines}"
+        assert b.dropped, f"{rem}-char remainder was not recorded as dropped"
+
+
+def test_state_render_never_emits_a_clipped_stub():
+    """A sub-useful clipped line spends tokens and says nothing."""
+    text = packet_state_text(packet(
+        evidence=[{"rank": i, "source_id": f"conversation:s{i}",
+                   "excerpt": "x" * 320} for i in range(40)],
+    ))
+    # The threshold is a literal on purpose: comparing against _MIN_LINE_CHARS
+    # would make this test follow the constant it is supposed to pin, and it
+    # passed against a mutated constant until this was fixed.
+    stubs = [l for l in text.splitlines() if l.endswith("\u2026") and len(l) < 40]
+    assert stubs == [], f"stub lines emitted: {stubs}"
+    assert len(text) <= _STATE_CHAR_BUDGET
+
+
+def test_state_render_tolerates_a_packet_without_evidence():
+    """Older packets have no `evidence` key; rendering must still work."""
+    p = packet()
+    p.pop("evidence", None)
+    text = packet_state_text(p)
+    assert "Evidence counts:" in text
+    assert "Evidence 0" not in text
+
+
+def test_gate_passes_evidence_prose_into_the_backend_state():
+    stub = StubBackend(0.5)
+    gate(packet(evidence=[{"rank": 0, "source_id": "conversation:a:b#1",
+                           "excerpt": "The daemon binds 8791."}]), backend=stub)
+    assert "The daemon binds 8791." in stub.seen_requests[0].state
 
 
 # --- gate + receipt ---------------------------------------------------------
