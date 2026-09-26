@@ -111,17 +111,38 @@ class DecisionAnswer:
 
 @dataclass(frozen=True)
 class BackendCapabilities:
+    """What a decision backend can answer.
+
+    Two shapes were in flight: the original (`trainable`, `returns_distribution`)
+    used by `nanojev`, and a newer descriptive shape (`kind`, `description`,
+    `supports_batch_questions`) used by `decider_2b`, `laya` and
+    `openjev_direct`. Constructing the newer shape raised
+
+        TypeError: BackendCapabilities.__init__() got an unexpected keyword
+        argument 'kind'
+
+    which took out `registry.backend_status()` entirely — so no backend could be
+    inventoried at all. Every field that the newer shape needs is therefore
+    optional here, and `trainable` gained a default so the newer adapters can
+    omit it. Both shapes now construct.
+    """
+
     id: str
     local: bool
-    trainable: bool
     supports_boolean: bool
     supports_choice: bool
     supports_score: bool
     max_choice_options: int
     max_score_levels: int
+    # Descriptive metadata (newer shape) — also what the runtime inventory
+    # projects into its `capabilities`/`kind` columns.
+    kind: str = "decision"
+    description: str = ""
+    trainable: bool = False
     returns_distribution: bool = True
     autoregressive_decode: bool = False
     shared_prefix: bool = False
+    supports_batch_questions: bool = False
     supports_observed_outcome_training: bool = False
     supports_soft_distribution_training: bool = False
 

@@ -109,6 +109,35 @@ def select_policy(vram_gb: float | None, policies: dict[str, Any]) -> str:
     return "cpu_only" if "cpu_only" in policies else "twelve_gb"
 
 
+def decision_roster(*, manifest: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Canonical Jev/System-One decision backend roster from manifests/models.*."""
+    man = manifest or load_manifest()
+    roster = man.get("decision_roster") or {}
+    candidates = list(roster.get("candidates") or [])
+    models = man.get("models") or {}
+    entries = {
+        cid: {
+            "family": (models.get(cid) or {}).get("family"),
+            "hf": (models.get(cid) or {}).get("hf"),
+            "revision": (models.get(cid) or {}).get("revision"),
+            "type": (models.get(cid) or {}).get("type", "hf"),
+            "platforms": (models.get(cid) or {}).get("platforms"),
+            "license": (models.get(cid) or {}).get("license"),
+            "commercial_use": (models.get(cid) or {}).get("commercial_use"),
+            "optional": (models.get(cid) or {}).get("optional"),
+            "roles": (models.get(cid) or {}).get("roles") or [],
+        }
+        for cid in candidates
+        if cid in models
+    }
+    return {
+        "schema": roster.get("schema") or "z0int.decision_roster.v1",
+        "description": roster.get("description"),
+        "candidates": candidates,
+        "entries": entries,
+    }
+
+
 def plan_models(*, manifest: dict[str, Any] | None = None, vram_gb: float | None = None) -> dict[str, Any]:
     man = manifest or load_manifest()
     models = man.get("models") or {}
@@ -191,6 +220,37 @@ def model_cached(hf_id: str, revision: str | None = None) -> bool:
             except OSError:
                 continue
     return (root / "snapshots" / revision).is_dir()
+
+
+def require_cached_snapshot(hf_id: str, revision: str) -> Path:
+    """Resolve an already-downloaded snapshot, or fail. **Never downloads.**
+
+    Inventory operations must not be able to pull weights. Before this guard,
+    both the `laya` and `decider` adapters resolved their model directory with
+    ``snapshot_download(repo_id=..., revision=...)`` *without*
+    ``local_files_only=True`` on the cache-miss path, and
+    ``health(load=False)`` calls that resolver. So a plain
+    ``registry.backend_status()`` — the command used to inventory the fleet —
+    could start a multi-gigabyte download for any backend whose weights were not
+    yet present.
+
+    Callers that genuinely want to fetch weights opt in explicitly by setting
+    ``Z0INT_ALLOW_DOWNLOAD=1``.
+    """
+    import os
+
+    from huggingface_hub import snapshot_download
+
+    if model_cached(hf_id, revision):
+        return Path(snapshot_download(repo_id=hf_id, revision=revision, local_files_only=True))
+
+    if os.environ.get("Z0INT_ALLOW_DOWNLOAD") == "1":
+        return Path(snapshot_download(repo_id=hf_id, revision=revision))
+
+    raise FileNotFoundError(
+        f"{hf_id}@{revision} is not in the local cache; refusing to download during "
+        f"inventory (set Z0INT_ALLOW_DOWNLOAD=1 to fetch it explicitly)"
+    )
 
 
 
@@ -347,3 +407,244 @@ def sync_models(
                 {"id": mid, "status": "error", "hf": hf, "revision": rev, "error": str(exc)}
             )
     return {"schema": "z0int.models_sync.v1", "which": which, "dry_run": dry_run, "results": results}
+
+
+# ---------------------------------------------------------------------------
+# Source-of-truth reconciliation
+# ---------------------------------------------------------------------------
+
+RECONCILE_SCHEMA = "z0int.models_reconcile.v1"
+
+
+def projection_path() -> Path:
+    """The generated projection the runtime reads."""
+    from . import paths
+
+    return paths.home() / "config" / "z0int.json"
+
+
+def manifest_digest(manifest: dict[str, Any] | None = None) -> str:
+    import hashlib
+
+    man = manifest if manifest is not None else load_manifest()
+    blob = json.dumps(man, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def _hf_snapshot_revisions(hf_id: str) -> list[str]:
+    root = Path.home() / ".cache" / "huggingface" / "hub" / ("models--" + hf_id.replace("/", "--"))
+    snaps = root / "snapshots"
+    if not snaps.is_dir():
+        return []
+    return sorted(p.name for p in snaps.iterdir() if p.is_dir())
+
+
+def _serving_json_resident() -> dict[str, Any]:
+    """The generative plane's supervisor, read live. Never from a local claim.
+
+    `serving.json` has no `resident` field by design: the supervisor is the only
+    thing that can say what is loaded now. This reads that answer.
+    """
+    from .backends.lifecycle import generative_plane_status
+
+    st = generative_plane_status()
+    return {
+        "runtime_id": st.get("runtime_id"),
+        "reachable": st.get("reachable"),
+        "reported_by_live_runtime": st.get("resident"),
+        "config_file_declares_resident": None,  # by design: config states endpoints only
+        "detail": st.get("detail"),
+    }
+
+
+def reconcile(*, manifest: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Compare the canonical manifest against disk and against the projection.
+
+    Three artifacts disagreed about the same models on 2026-09-22:
+
+    * `manifests/models.z0int.json` pinned `openjev_06b` at
+      `c1899de289a04d12100db370d81485cdf75e47ca`, which is what is on disk;
+    * `~/.z0int/config/z0int.json` (a generated projection, written
+      2026-09-18) pinned the same model at `c1899deebe5c…`, which is not on disk
+      at all;
+    * the same projection claimed `resident: [openjev_06b, local_mb]` while the
+      manifest policy said `[nanojev_06b, local_mb]`, and the live generative
+      supervisor reported `hammer2.1_3b` — a third answer, in a third id space.
+
+    Nothing read all three, so nothing noticed. This does.
+    """
+    man = manifest if manifest is not None else load_manifest()
+    models = man.get("models") or {}
+    policies = man.get("policies") or {}
+
+    proj: dict[str, Any] = {}
+    ppath = projection_path()
+    if ppath.is_file():
+        try:
+            proj = json.loads(ppath.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            proj = {}
+    proj_models = ((proj.get("models_plan") or {}).get("models")) or {}
+    proj_plan = proj.get("models_plan") or {}
+
+    rows: list[dict[str, Any]] = []
+    drift: list[dict[str, Any]] = []
+
+    for mid in sorted(models):
+        meta = models[mid] or {}
+        hf = meta.get("hf")
+        rev = meta.get("revision")
+        # `hf_bundle` models (NanoJev) live in the managed bundle directory under
+        # ~/.z0int/models, not in the HF hub cache, so a cache probe on its own
+        # reports a present artifact as missing. Presence first, then the cache
+        # check only for models that really are HF-cache-resident.
+        on_disk = model_present(mid, meta)
+        if on_disk and hf and (meta.get("type") or "hf") == "hf":
+            on_disk = bool(rev) and model_cached(hf, rev)
+        snaps = _hf_snapshot_revisions(hf) if hf else []
+        proj_rev = (proj_models.get(mid) or {}).get("revision")
+
+        flags: list[str] = []
+        if hf and rev:
+            if not on_disk:
+                flags.append("manifest_revision_not_on_disk")
+            elif snaps and rev not in snaps:
+                flags.append("disk_holds_a_different_revision")
+        if proj_rev and rev and proj_rev != rev:
+            flags.append("projection_revision_differs_from_manifest")
+        if proj_rev and not proj_models.get(mid, {}).get("hf"):
+            pass  # local/generated artifact; revision legitimately absent
+
+        row = {
+            "model_id": mid,
+            "hf": hf,
+            "manifest_revision": rev,
+            "projection_revision": proj_rev,
+            "on_disk": on_disk,
+            "disk_snapshot_revisions": snaps,
+            "type": meta.get("type"),
+            "roles": meta.get("roles") or [],
+            "flags": flags,
+        }
+        rows.append(row)
+        for f in flags:
+            drift.append({"model_id": mid, "kind": f, "manifest": rev, "projection": proj_rev, "disk": snaps})
+
+    # --- residency, namespaced by plane -----------------------------------
+    # `resident` was ambiguous: the manifest policy meant "in-process decision
+    # backend", the projection copied it, and the generative supervisor means
+    # something else entirely in a different id space. Name the plane.
+    # The canonical residency answer comes from applying the manifest's own
+    # hardware policy — not from a union across every policy, which conflates a
+    # 12 GB box with a CPU-only one and reports drift against a plan nobody runs.
+    canonical_plan = plan_models(manifest=man)
+    policy_resident = sorted(canonical_plan.get("resident") or [])
+    # Accept the legacy key so an old projection is *reported* rather than read as
+    # empty, but prefer `planned_resident`: a bare `resident` in a generated file
+    # is exactly the ambiguity this reconciliation exists to remove.
+    proj_resident = sorted(proj_plan.get("planned_resident") or proj_plan.get("resident") or [])
+    if proj_plan and "resident" in proj_plan and "planned_resident" not in proj_plan:
+        drift.append(
+            {
+                "model_id": None,
+                "kind": "projection_states_bare_resident_without_naming_the_plane",
+                "manifest": "planned_resident",
+                "projection": "resident",
+                "disk": None,
+            }
+        )
+    proj_stamp = proj.get("generated_manifest_sha256")
+    if proj and proj_stamp != manifest_digest(man):
+        drift.append(
+            {
+                "model_id": None,
+                "kind": "projection_is_unstamped_or_stale_against_the_manifest",
+                "manifest": manifest_digest(man)[:16],
+                "projection": (proj_stamp or "(no digest)")[:16],
+                "disk": None,
+            }
+        )
+    if proj_resident and proj_resident != policy_resident:
+        drift.append(
+            {
+                "model_id": None,
+                "kind": "projection_residency_differs_from_manifest_policy",
+                "manifest": policy_resident,
+                "projection": proj_resident,
+                "disk": None,
+            }
+        )
+
+    residency = {
+        "generative": _serving_json_resident(),
+        "decision": {
+            "policy": canonical_plan.get("policy"),
+            "planned_resident": policy_resident,
+            "declared_in_projection": proj_resident,
+            "reported_by_live_runtime": None,
+            "detail": (
+                "`planned_resident` is intent, not residency. The decision plane has no "
+                "supervisor yet, so actual residency is whatever the in-process "
+                "DecisionRuntime reports — and nothing has loaded anything, which is why "
+                "`reported_by_live_runtime` is null rather than a model name."
+            ),
+        },
+    }
+
+    return {
+        "schema": RECONCILE_SCHEMA,
+        "canonical_source": "manifests/models.z0int.json",
+        "canonical_manifest_sha256": manifest_digest(man),
+        "projection_path": str(ppath),
+        "projection_present": ppath.is_file(),
+        "models": rows,
+        "residency": residency,
+        "drift": drift,
+        "drift_count": len(drift),
+        "verdict": "consistent" if not drift else "drift",
+        "rule": (
+            "one canonical identity per model/revision in the manifest; projections are "
+            "derived and must be regenerated, never hand-edited. `resident` always names "
+            "its plane and is only ever what a live runtime reports is loaded now."
+        ),
+    }
+
+
+def write_projection(*, manifest: dict[str, Any] | None = None, path: Path | None = None) -> Path:
+    """Regenerate the projection from the canonical manifest.
+
+    Stamps the manifest digest so a stale projection is identifiable on sight
+    rather than by diffing revisions by hand.
+    """
+    man = manifest if manifest is not None else load_manifest()
+    target = path or projection_path()
+    plan = dict(plan_models(manifest=man))
+    # `resident` in a generated file is an intention, and an intention is not
+    # residency. Rename on the way out so nothing can read this file and conclude
+    # a model is loaded now. Actual residency comes from the runtime, always.
+    planned_resident = list(plan.pop("resident", []) or [])
+    planned_on_demand = list(plan.pop("on_demand", []) or [])
+    plan["planned_resident"] = planned_resident
+    plan["planned_on_demand"] = planned_on_demand
+    plan["residency_note"] = (
+        "intent only. Actual residency is reported by the live runtime "
+        "(`z0int cognition runtime-status`), never by this file."
+    )
+    payload = {
+        "schema": "z0int.models_plan.v1",
+        "generated_from": "manifests/models.z0int.json",
+        "generated_manifest_sha256": manifest_digest(man),
+        "models_plan": plan,
+        "models": {
+            mid: {
+                "hf": (meta or {}).get("hf"),
+                "revision": (meta or {}).get("revision"),
+                "type": (meta or {}).get("type"),
+                "roles": (meta or {}).get("roles") or [],
+            }
+            for mid, meta in (man.get("models") or {}).items()
+        },
+    }
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, indent=2, default=str) + "\n", encoding="utf-8")
+    return target

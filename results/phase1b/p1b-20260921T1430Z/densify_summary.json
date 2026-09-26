@@ -1,0 +1,22 @@
+{
+  "arms": [
+    "deterministic.compiler_only",
+    "compiler+hammer2.1_3b",
+    "compiler+hammer2.1_7b",
+    "compiler+functiongemma_270m",
+    "compiler+qwen3.5_4b",
+    "compiler+qwen3.5_9b",
+    "compiler+nemotron_orchestrator_8b",
+    "unfiltered+hammer2.1_3b",
+    "unfiltered+qwen3.5_4b",
+    "unfiltered+qwen3.5_9b",
+    "unfiltered+nemotron_orchestrator_8b"
+  ],
+  "finished_at": "2026-09-21T19:59:12.830647Z",
+  "max_tokens": 1024,
+  "n_observations": 924,
+  "observations_path": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/results/phase1b/p1b-20260921T1430Z/observations.jsonl",
+  "repetitions": 3,
+  "run_id": "p1b-20260921T1430Z",
+  "schema": "z0int.phase1b.densify_run.v1"
+}

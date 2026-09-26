@@ -1,0 +1,160 @@
+{
+  "schema": "z0int.phase1b.claim_status.v1",
+  "run_id": "p1b-20260921T1430Z",
+  "frozen_run_mutated": false,
+  "corpus_rows": 1102,
+  "principle": "A wrong recorded execution contract invalidates a measurement only where the contract actually bound. Classify per arm against the observed at-cap count, not against the size of the discrepancy.",
+  "status_counts": {
+    "VALID_AS_EXECUTED": 7,
+    "REQUIRES_CORRECTED_RERUN": 3,
+    "UNCHANGED": 2,
+    "INVALID_COMPARISON": 2
+  },
+  "claims": [
+    {
+      "claim": "Hammer3B 75/84 = 0.893 (compiler-first)",
+      "depends_on_arm": "hammer2.1_3b",
+      "status": "VALID_AS_EXECUTED",
+      "reason": "effective cap 256 vs recorded 1024, but the cap never bound \u2014 max observed completion 80 tokens, 0 draws at the cap. The number is a true measurement of the model as run; only the historical description of its contract was wrong",
+      "arm_effective_max_tokens": 256,
+      "arm_observed_max_completion_tokens": 80,
+      "arm_draws_at_effective_cap": 0
+    },
+    {
+      "claim": "Hammer3B 69/84 unfiltered",
+      "depends_on_arm": "hammer2.1_3b",
+      "status": "VALID_AS_EXECUTED",
+      "reason": "effective cap 256 vs recorded 1024, but the cap never bound \u2014 max observed completion 80 tokens, 0 draws at the cap. The number is a true measurement of the model as run; only the historical description of its contract was wrong",
+      "arm_effective_max_tokens": 256,
+      "arm_observed_max_completion_tokens": 80,
+      "arm_draws_at_effective_cap": 0
+    },
+    {
+      "claim": "Hammer7B 72/84",
+      "depends_on_arm": "hammer2.1_7b",
+      "status": "VALID_AS_EXECUTED",
+      "reason": "effective cap 256 vs recorded 1024, but the cap never bound \u2014 max observed completion 63 tokens, 0 draws at the cap. The number is a true measurement of the model as run; only the historical description of its contract was wrong",
+      "arm_effective_max_tokens": 256,
+      "arm_observed_max_completion_tokens": 63,
+      "arm_draws_at_effective_cap": 0
+    },
+    {
+      "claim": "FunctionGemma 51/84",
+      "depends_on_arm": "functiongemma_270m",
+      "status": "VALID_AS_EXECUTED",
+      "reason": "effective cap 128 vs recorded 1024, but the cap never bound \u2014 max observed completion 39 tokens, 0 draws at the cap. The number is a true measurement of the model as run; only the historical description of its contract was wrong",
+      "arm_effective_max_tokens": 128,
+      "arm_observed_max_completion_tokens": 39,
+      "arm_draws_at_effective_cap": 0
+    },
+    {
+      "claim": "Nemotron 52/84 compiler-first and 61/84 unfiltered",
+      "depends_on_arm": "nemotron_orchestrator_8b",
+      "status": "REQUIRES_CORRECTED_RERUN",
+      "reason": "effective cap 256 vs recorded 1024, and it bound on 64 draws (37.4% of 171)",
+      "arm_effective_max_tokens": 256,
+      "arm_observed_max_completion_tokens": 256,
+      "arm_draws_at_effective_cap": 64,
+      "rerun_result": {
+        "status": "PRELIMINARY_REP0_N28",
+        "preliminary_accuracy_at_effective_1024": 0.857,
+        "frozen_value": 0.619,
+        "n": 28,
+        "n_final_expected": 84,
+        "note": "Direction established at rep 0 (n=28), not a final corrected value. Truncation falls 42.9% -> 0% and gold-in-reasoning is 100% at every cap, so the mechanism is not in doubt; the accuracy will change at n=84. Do not quote 0.857 as the corrected number until the full three repetitions land."
+      }
+    },
+    {
+      "claim": "Qwen3.5-4B 75/84",
+      "depends_on_arm": "qwen3.5_4b",
+      "status": "UNCHANGED",
+      "reason": "effective == requested and the cap never bound",
+      "arm_effective_max_tokens": 1024,
+      "arm_observed_max_completion_tokens": 558,
+      "arm_draws_at_effective_cap": 0
+    },
+    {
+      "claim": "Qwen3.5-9B 78/84",
+      "depends_on_arm": "qwen3.5_9b",
+      "status": "REQUIRES_CORRECTED_RERUN",
+      "reason": "effective cap equals the requested 1024, but it bound on 30 draws \u2014 not a contract defect; the requested cap itself was too small",
+      "arm_effective_max_tokens": 1024,
+      "arm_observed_max_completion_tokens": 1024,
+      "arm_draws_at_effective_cap": 30
+    },
+    {
+      "claim": "Qwen3.5-9B 78/84 vs Qwen3.5-4B 75/84 ranking",
+      "depends_on_arm": "qwen3.5_9b",
+      "status": "REQUIRES_CORRECTED_RERUN",
+      "reason": "effective cap equals the requested 1024, but it bound on 30 draws \u2014 not a contract defect; the requested cap itself was too small",
+      "arm_effective_max_tokens": 1024,
+      "arm_observed_max_completion_tokens": 1024,
+      "arm_draws_at_effective_cap": 30
+    },
+    {
+      "claim": "compiler-first vs unfiltered accuracy delta (all models)",
+      "depends_on_arm": null,
+      "status": "INVALID_COMPARISON",
+      "reason": "the A/B/C/D 2x2 was RANK-DEFICIENT: `dialect_for` and `ToolDecisionRequest` carry no framing variable, so 'compiler framing' and 'unfiltered framing' render the same template. Hash-verified: A==C and B==D on all 28 states.",
+      "arm_effective_max_tokens": null,
+      "arm_observed_max_completion_tokens": null,
+      "arm_draws_at_effective_cap": null
+    },
+    {
+      "claim": "compiler removes dangerous exposure",
+      "depends_on_arm": null,
+      "status": "VALID_AS_EXECUTED",
+      "reason": "structural and deterministic \u2014 the illegal actions are absent from the menu by construction. Fresh paired run: dangerous exposed 20/140 all-actions vs 0/140 legal-only. This claim does not depend on any model.",
+      "arm_effective_max_tokens": null,
+      "arm_observed_max_completion_tokens": null,
+      "arm_draws_at_effective_cap": null
+    },
+    {
+      "claim": "compiler prevents dangerous SELECTION",
+      "depends_on_arm": null,
+      "status": "INVALID_COMPARISON",
+      "reason": "NOT supported. Fresh paired run: dangerous selected = 0 in every cell including all-actions. The 6 dangerous selections in the frozen corpus do not replicate.",
+      "arm_effective_max_tokens": null,
+      "arm_observed_max_completion_tokens": null,
+      "arm_draws_at_effective_cap": null
+    },
+    {
+      "claim": "NanoJev cascade 0.893 -> 0.929",
+      "depends_on_arm": "hammer2.1_3b",
+      "status": "VALID_AS_EXECUTED",
+      "reason": "the cascade's Hammer baseline is 75/84, whose cap never bound (max 80 tokens), so the comparison stands AS EXECUTED. The historical worry that Hammer ran at 384 was wrong twice over: its effective cap was 256, and 256 never bound either. Supported at rep 0 (n=28, preliminary): Hammer3B is 89.3% at 256, 512 and 1024 with 28/28 paired ties and a maximum of 80 completion tokens, so the baseline is very likely cap-invariant \u2014 pending the full n=84 cells. The one thing that could have undermined the cascade was tested and ruled out.",
+      "arm_effective_max_tokens": 256,
+      "arm_observed_max_completion_tokens": 80,
+      "arm_draws_at_effective_cap": 0
+    },
+    {
+      "claim": "NanoJev threshold 0.6 / coverage 17/28 = 0.607 / success|covered 0.941 / p50 34.7 ms",
+      "depends_on_arm": null,
+      "status": "UNCHANGED",
+      "reason": "non-autoregressive, matched-menu measurements with zero decode steps. No generation cap applies to them at all.",
+      "arm_effective_max_tokens": null,
+      "arm_observed_max_completion_tokens": null,
+      "arm_draws_at_effective_cap": null
+    },
+    {
+      "claim": "composition: qwen4b+jev 13/28, hammer3b+qwen4b 6/28",
+      "depends_on_arm": null,
+      "status": "VALID_AS_EXECUTED",
+      "reason": "Qwen4B was uncapped in effect (max 558 < 1024) and Hammer3B's cap never bound, so these stand as executed.",
+      "arm_effective_max_tokens": null,
+      "arm_observed_max_completion_tokens": null,
+      "arm_draws_at_effective_cap": null
+    }
+  ],
+  "affected_arms": [
+    "nemotron_orchestrator_8b",
+    "qwen3.5_9b"
+  ],
+  "unaffected_arms": [
+    "functiongemma_270m",
+    "hammer2.1_3b",
+    "hammer2.1_7b",
+    "qwen3.5_4b"
+  ],
+  "narrowing": "The recorded contract was false for four of six generative arms, but only two were materially affected: nemotron (64/171 draws at its cap) and qwen3.5_9b (30/171, from a cap that was correctly recorded but too small). Hammer3B, Hammer7B and FunctionGemma recorded a contract they never approached, so their published numbers are true measurements of the models as run. Cap rerun (nemotron + hammer complete): the defect damaged exactly ONE arm's number. Nemotron 0.619 -> 0.857 at a truthful contract; Hammer3B/7B and FunctionGemma are cap-invariant; Qwen unaffected in contract, still pending a raised-cap check."
+}

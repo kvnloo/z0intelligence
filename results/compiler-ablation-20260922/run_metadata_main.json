@@ -1,0 +1,3413 @@
+{
+ "base_url": "http://127.0.0.1:11500",
+ "call_order": [
+  {
+   "cell": "A",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 0,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 0,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 0,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 0,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 0,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 0,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 0,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 0,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "d55863bff16ee94519e68ad44b531a462c9f91391d6c70d1af57f8b4808ee258",
+   "rep": 0,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "825e6acb9e1780fe1b8457d969ddcdce0941592f7c23db9303345fbad25636f6",
+   "rep": 0,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "d55863bff16ee94519e68ad44b531a462c9f91391d6c70d1af57f8b4808ee258",
+   "rep": 0,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "825e6acb9e1780fe1b8457d969ddcdce0941592f7c23db9303345fbad25636f6",
+   "rep": 0,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 0,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 0,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 0,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 0,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 0,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 0,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 0,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 0,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 0,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 0,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 0,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 0,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 0,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 0,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 0,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 0,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 0,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 0,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 0,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 0,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 0,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 0,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 0,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 0,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 0,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 0,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 0,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 0,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 0,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 0,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 0,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 0,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "6ede31bb1e9b6bfe8fb4f78fb92cfda69f48aa3801155cd49c3c0ddf584c3e55",
+   "rep": 0,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "a2752fd4e5448e1e0b96993b82513428bb4143b55c92482961022c6737489d77",
+   "rep": 0,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "6ede31bb1e9b6bfe8fb4f78fb92cfda69f48aa3801155cd49c3c0ddf584c3e55",
+   "rep": 0,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "a2752fd4e5448e1e0b96993b82513428bb4143b55c92482961022c6737489d77",
+   "rep": 0,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 0,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 0,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 0,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 0,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 0,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 0,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 0,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 0,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "2714ebff9a74d395c9bba1da1023b7ff79134342d70be8bc96a40a6d0f5c58e1",
+   "rep": 0,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "307b3e1c22e0a69ccf4afef204599f0f43c18b2573341ecbc6cdc38e47e61264",
+   "rep": 0,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "2714ebff9a74d395c9bba1da1023b7ff79134342d70be8bc96a40a6d0f5c58e1",
+   "rep": 0,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "307b3e1c22e0a69ccf4afef204599f0f43c18b2573341ecbc6cdc38e47e61264",
+   "rep": 0,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 0,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 0,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 0,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 0,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 0,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 0,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 0,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 0,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 0,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 0,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 0,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 0,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 0,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 0,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 0,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 0,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 0,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 0,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 0,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 0,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 0,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 0,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 0,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 0,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 0,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 0,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 0,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 0,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 0,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 0,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 0,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 0,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 0,
+   "state_id": "replan"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 0,
+   "state_id": "replan"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 0,
+   "state_id": "replan"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 0,
+   "state_id": "replan"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "80cb1e7fcfd48b02779de26852896aacd937a0bfac48f874846f0277f4c2cf55",
+   "rep": 0,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "0e3d7742432d35bccec025d9e8d9793a98267d6ae960e88e592f26148dc1d539",
+   "rep": 0,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "80cb1e7fcfd48b02779de26852896aacd937a0bfac48f874846f0277f4c2cf55",
+   "rep": 0,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "0e3d7742432d35bccec025d9e8d9793a98267d6ae960e88e592f26148dc1d539",
+   "rep": 0,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "46f9fd76639b7f6ebd72086271efaa60ba24518fe2f352913e51a5c7905923e5",
+   "rep": 0,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "da4ac83238eb65fad3e84ff828da354c023b951b92d30ba7ebe2c2655c3e061d",
+   "rep": 0,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "46f9fd76639b7f6ebd72086271efaa60ba24518fe2f352913e51a5c7905923e5",
+   "rep": 0,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "da4ac83238eb65fad3e84ff828da354c023b951b92d30ba7ebe2c2655c3e061d",
+   "rep": 0,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "67d4ecf75665a9d6b208e00dc6f16f7e8e01312869577f6cf2d86358d139b450",
+   "rep": 0,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "28735b6716290823dfaa06113180527d1699e5e12f8aa9fcbc658431fa22e615",
+   "rep": 0,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "67d4ecf75665a9d6b208e00dc6f16f7e8e01312869577f6cf2d86358d139b450",
+   "rep": 0,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "28735b6716290823dfaa06113180527d1699e5e12f8aa9fcbc658431fa22e615",
+   "rep": 0,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "112ad89d8dcd01b5cad2e895e1bbcae3b9fabc5af43fed2e87ea6a4ea9533555",
+   "rep": 0,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "fd898b60859a554121206cfd70b36ae4379da6d763683381c788b42862272a08",
+   "rep": 0,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "112ad89d8dcd01b5cad2e895e1bbcae3b9fabc5af43fed2e87ea6a4ea9533555",
+   "rep": 0,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "fd898b60859a554121206cfd70b36ae4379da6d763683381c788b42862272a08",
+   "rep": 0,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 1,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 1,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 1,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 1,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 1,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 1,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 1,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 1,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "825e6acb9e1780fe1b8457d969ddcdce0941592f7c23db9303345fbad25636f6",
+   "rep": 1,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "d55863bff16ee94519e68ad44b531a462c9f91391d6c70d1af57f8b4808ee258",
+   "rep": 1,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "825e6acb9e1780fe1b8457d969ddcdce0941592f7c23db9303345fbad25636f6",
+   "rep": 1,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "d55863bff16ee94519e68ad44b531a462c9f91391d6c70d1af57f8b4808ee258",
+   "rep": 1,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 1,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 1,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 1,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 1,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 1,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 1,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 1,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 1,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 1,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 1,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 1,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 1,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 1,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 1,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 1,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 1,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 1,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 1,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 1,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 1,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 1,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 1,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 1,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 1,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 1,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 1,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 1,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 1,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 1,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 1,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 1,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 1,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "a2752fd4e5448e1e0b96993b82513428bb4143b55c92482961022c6737489d77",
+   "rep": 1,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "6ede31bb1e9b6bfe8fb4f78fb92cfda69f48aa3801155cd49c3c0ddf584c3e55",
+   "rep": 1,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "a2752fd4e5448e1e0b96993b82513428bb4143b55c92482961022c6737489d77",
+   "rep": 1,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "6ede31bb1e9b6bfe8fb4f78fb92cfda69f48aa3801155cd49c3c0ddf584c3e55",
+   "rep": 1,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 1,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 1,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 1,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 1,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 1,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 1,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 1,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 1,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "307b3e1c22e0a69ccf4afef204599f0f43c18b2573341ecbc6cdc38e47e61264",
+   "rep": 1,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "2714ebff9a74d395c9bba1da1023b7ff79134342d70be8bc96a40a6d0f5c58e1",
+   "rep": 1,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "307b3e1c22e0a69ccf4afef204599f0f43c18b2573341ecbc6cdc38e47e61264",
+   "rep": 1,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "2714ebff9a74d395c9bba1da1023b7ff79134342d70be8bc96a40a6d0f5c58e1",
+   "rep": 1,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 1,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 1,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 1,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 1,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 1,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 1,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 1,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 1,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 1,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 1,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 1,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 1,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 1,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 1,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 1,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 1,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 1,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 1,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 1,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 1,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 1,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 1,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 1,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 1,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 1,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 1,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 1,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 1,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 1,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 1,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 1,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 1,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 1,
+   "state_id": "replan"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 1,
+   "state_id": "replan"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 1,
+   "state_id": "replan"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 1,
+   "state_id": "replan"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "0e3d7742432d35bccec025d9e8d9793a98267d6ae960e88e592f26148dc1d539",
+   "rep": 1,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "80cb1e7fcfd48b02779de26852896aacd937a0bfac48f874846f0277f4c2cf55",
+   "rep": 1,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "0e3d7742432d35bccec025d9e8d9793a98267d6ae960e88e592f26148dc1d539",
+   "rep": 1,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "80cb1e7fcfd48b02779de26852896aacd937a0bfac48f874846f0277f4c2cf55",
+   "rep": 1,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "da4ac83238eb65fad3e84ff828da354c023b951b92d30ba7ebe2c2655c3e061d",
+   "rep": 1,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "46f9fd76639b7f6ebd72086271efaa60ba24518fe2f352913e51a5c7905923e5",
+   "rep": 1,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "da4ac83238eb65fad3e84ff828da354c023b951b92d30ba7ebe2c2655c3e061d",
+   "rep": 1,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "46f9fd76639b7f6ebd72086271efaa60ba24518fe2f352913e51a5c7905923e5",
+   "rep": 1,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "28735b6716290823dfaa06113180527d1699e5e12f8aa9fcbc658431fa22e615",
+   "rep": 1,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "67d4ecf75665a9d6b208e00dc6f16f7e8e01312869577f6cf2d86358d139b450",
+   "rep": 1,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "28735b6716290823dfaa06113180527d1699e5e12f8aa9fcbc658431fa22e615",
+   "rep": 1,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "67d4ecf75665a9d6b208e00dc6f16f7e8e01312869577f6cf2d86358d139b450",
+   "rep": 1,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "fd898b60859a554121206cfd70b36ae4379da6d763683381c788b42862272a08",
+   "rep": 1,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "112ad89d8dcd01b5cad2e895e1bbcae3b9fabc5af43fed2e87ea6a4ea9533555",
+   "rep": 1,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "fd898b60859a554121206cfd70b36ae4379da6d763683381c788b42862272a08",
+   "rep": 1,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "112ad89d8dcd01b5cad2e895e1bbcae3b9fabc5af43fed2e87ea6a4ea9533555",
+   "rep": 1,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 2,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 2,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 2,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 2,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 2,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 2,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 2,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 2,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "d55863bff16ee94519e68ad44b531a462c9f91391d6c70d1af57f8b4808ee258",
+   "rep": 2,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "825e6acb9e1780fe1b8457d969ddcdce0941592f7c23db9303345fbad25636f6",
+   "rep": 2,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "d55863bff16ee94519e68ad44b531a462c9f91391d6c70d1af57f8b4808ee258",
+   "rep": 2,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "825e6acb9e1780fe1b8457d969ddcdce0941592f7c23db9303345fbad25636f6",
+   "rep": 2,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 2,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 2,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 2,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 2,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 2,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 2,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 2,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 2,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 2,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 2,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 2,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 2,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 2,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 2,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 2,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 2,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 2,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 2,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 2,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 2,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 2,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 2,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 2,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 2,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 2,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 2,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 2,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 2,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 2,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 2,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 2,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 2,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "6ede31bb1e9b6bfe8fb4f78fb92cfda69f48aa3801155cd49c3c0ddf584c3e55",
+   "rep": 2,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "a2752fd4e5448e1e0b96993b82513428bb4143b55c92482961022c6737489d77",
+   "rep": 2,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "6ede31bb1e9b6bfe8fb4f78fb92cfda69f48aa3801155cd49c3c0ddf584c3e55",
+   "rep": 2,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "a2752fd4e5448e1e0b96993b82513428bb4143b55c92482961022c6737489d77",
+   "rep": 2,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 2,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 2,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 2,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 2,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 2,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 2,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 2,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 2,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "2714ebff9a74d395c9bba1da1023b7ff79134342d70be8bc96a40a6d0f5c58e1",
+   "rep": 2,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "307b3e1c22e0a69ccf4afef204599f0f43c18b2573341ecbc6cdc38e47e61264",
+   "rep": 2,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "2714ebff9a74d395c9bba1da1023b7ff79134342d70be8bc96a40a6d0f5c58e1",
+   "rep": 2,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "307b3e1c22e0a69ccf4afef204599f0f43c18b2573341ecbc6cdc38e47e61264",
+   "rep": 2,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 2,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 2,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 2,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 2,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 2,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 2,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 2,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 2,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 2,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 2,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 2,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 2,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 2,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 2,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 2,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 2,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 2,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 2,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 2,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 2,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 2,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 2,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 2,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 2,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 2,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 2,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 2,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 2,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 2,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 2,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 2,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 2,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 2,
+   "state_id": "replan"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 2,
+   "state_id": "replan"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 2,
+   "state_id": "replan"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 2,
+   "state_id": "replan"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "80cb1e7fcfd48b02779de26852896aacd937a0bfac48f874846f0277f4c2cf55",
+   "rep": 2,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "0e3d7742432d35bccec025d9e8d9793a98267d6ae960e88e592f26148dc1d539",
+   "rep": 2,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "80cb1e7fcfd48b02779de26852896aacd937a0bfac48f874846f0277f4c2cf55",
+   "rep": 2,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "0e3d7742432d35bccec025d9e8d9793a98267d6ae960e88e592f26148dc1d539",
+   "rep": 2,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "46f9fd76639b7f6ebd72086271efaa60ba24518fe2f352913e51a5c7905923e5",
+   "rep": 2,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "da4ac83238eb65fad3e84ff828da354c023b951b92d30ba7ebe2c2655c3e061d",
+   "rep": 2,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "46f9fd76639b7f6ebd72086271efaa60ba24518fe2f352913e51a5c7905923e5",
+   "rep": 2,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "da4ac83238eb65fad3e84ff828da354c023b951b92d30ba7ebe2c2655c3e061d",
+   "rep": 2,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "67d4ecf75665a9d6b208e00dc6f16f7e8e01312869577f6cf2d86358d139b450",
+   "rep": 2,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "28735b6716290823dfaa06113180527d1699e5e12f8aa9fcbc658431fa22e615",
+   "rep": 2,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "67d4ecf75665a9d6b208e00dc6f16f7e8e01312869577f6cf2d86358d139b450",
+   "rep": 2,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "28735b6716290823dfaa06113180527d1699e5e12f8aa9fcbc658431fa22e615",
+   "rep": 2,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "112ad89d8dcd01b5cad2e895e1bbcae3b9fabc5af43fed2e87ea6a4ea9533555",
+   "rep": 2,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "fd898b60859a554121206cfd70b36ae4379da6d763683381c788b42862272a08",
+   "rep": 2,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "112ad89d8dcd01b5cad2e895e1bbcae3b9fabc5af43fed2e87ea6a4ea9533555",
+   "rep": 2,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "fd898b60859a554121206cfd70b36ae4379da6d763683381c788b42862272a08",
+   "rep": 2,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 3,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 3,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 3,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 3,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 3,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 3,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 3,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 3,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "825e6acb9e1780fe1b8457d969ddcdce0941592f7c23db9303345fbad25636f6",
+   "rep": 3,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "d55863bff16ee94519e68ad44b531a462c9f91391d6c70d1af57f8b4808ee258",
+   "rep": 3,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "825e6acb9e1780fe1b8457d969ddcdce0941592f7c23db9303345fbad25636f6",
+   "rep": 3,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "d55863bff16ee94519e68ad44b531a462c9f91391d6c70d1af57f8b4808ee258",
+   "rep": 3,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 3,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 3,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 3,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 3,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 3,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 3,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 3,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 3,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 3,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 3,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 3,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 3,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 3,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 3,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 3,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 3,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 3,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 3,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 3,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 3,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 3,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 3,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 3,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 3,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 3,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 3,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 3,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 3,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 3,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 3,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 3,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 3,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "a2752fd4e5448e1e0b96993b82513428bb4143b55c92482961022c6737489d77",
+   "rep": 3,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "6ede31bb1e9b6bfe8fb4f78fb92cfda69f48aa3801155cd49c3c0ddf584c3e55",
+   "rep": 3,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "a2752fd4e5448e1e0b96993b82513428bb4143b55c92482961022c6737489d77",
+   "rep": 3,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "6ede31bb1e9b6bfe8fb4f78fb92cfda69f48aa3801155cd49c3c0ddf584c3e55",
+   "rep": 3,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 3,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 3,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 3,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 3,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 3,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 3,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 3,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 3,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "307b3e1c22e0a69ccf4afef204599f0f43c18b2573341ecbc6cdc38e47e61264",
+   "rep": 3,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "2714ebff9a74d395c9bba1da1023b7ff79134342d70be8bc96a40a6d0f5c58e1",
+   "rep": 3,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "307b3e1c22e0a69ccf4afef204599f0f43c18b2573341ecbc6cdc38e47e61264",
+   "rep": 3,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "2714ebff9a74d395c9bba1da1023b7ff79134342d70be8bc96a40a6d0f5c58e1",
+   "rep": 3,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 3,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 3,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 3,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 3,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 3,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 3,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 3,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 3,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 3,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 3,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 3,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 3,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 3,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 3,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 3,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 3,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 3,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 3,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 3,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 3,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 3,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 3,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 3,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 3,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 3,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 3,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 3,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 3,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 3,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 3,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 3,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 3,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 3,
+   "state_id": "replan"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 3,
+   "state_id": "replan"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 3,
+   "state_id": "replan"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 3,
+   "state_id": "replan"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "0e3d7742432d35bccec025d9e8d9793a98267d6ae960e88e592f26148dc1d539",
+   "rep": 3,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "80cb1e7fcfd48b02779de26852896aacd937a0bfac48f874846f0277f4c2cf55",
+   "rep": 3,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "0e3d7742432d35bccec025d9e8d9793a98267d6ae960e88e592f26148dc1d539",
+   "rep": 3,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "80cb1e7fcfd48b02779de26852896aacd937a0bfac48f874846f0277f4c2cf55",
+   "rep": 3,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "da4ac83238eb65fad3e84ff828da354c023b951b92d30ba7ebe2c2655c3e061d",
+   "rep": 3,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "46f9fd76639b7f6ebd72086271efaa60ba24518fe2f352913e51a5c7905923e5",
+   "rep": 3,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "da4ac83238eb65fad3e84ff828da354c023b951b92d30ba7ebe2c2655c3e061d",
+   "rep": 3,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "46f9fd76639b7f6ebd72086271efaa60ba24518fe2f352913e51a5c7905923e5",
+   "rep": 3,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "28735b6716290823dfaa06113180527d1699e5e12f8aa9fcbc658431fa22e615",
+   "rep": 3,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "67d4ecf75665a9d6b208e00dc6f16f7e8e01312869577f6cf2d86358d139b450",
+   "rep": 3,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "28735b6716290823dfaa06113180527d1699e5e12f8aa9fcbc658431fa22e615",
+   "rep": 3,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "67d4ecf75665a9d6b208e00dc6f16f7e8e01312869577f6cf2d86358d139b450",
+   "rep": 3,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "fd898b60859a554121206cfd70b36ae4379da6d763683381c788b42862272a08",
+   "rep": 3,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "112ad89d8dcd01b5cad2e895e1bbcae3b9fabc5af43fed2e87ea6a4ea9533555",
+   "rep": 3,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "fd898b60859a554121206cfd70b36ae4379da6d763683381c788b42862272a08",
+   "rep": 3,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "112ad89d8dcd01b5cad2e895e1bbcae3b9fabc5af43fed2e87ea6a4ea9533555",
+   "rep": 3,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 4,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 4,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 4,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "bb1d2025fc5fcb44776c3ee6abdb9bbaaffbe0856d5fa59411e92b9ac9187d31",
+   "rep": 4,
+   "state_id": "one_obvious_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 4,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 4,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 4,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "efa145f7e4d66dede705b59d15c863f740d32006b0e6c141712d9eb5a5f8f778",
+   "rep": 4,
+   "state_id": "two_similar_tools"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "d55863bff16ee94519e68ad44b531a462c9f91391d6c70d1af57f8b4808ee258",
+   "rep": 4,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "825e6acb9e1780fe1b8457d969ddcdce0941592f7c23db9303345fbad25636f6",
+   "rep": 4,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "d55863bff16ee94519e68ad44b531a462c9f91391d6c70d1af57f8b4808ee258",
+   "rep": 4,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "825e6acb9e1780fe1b8457d969ddcdce0941592f7c23db9303345fbad25636f6",
+   "rep": 4,
+   "state_id": "no_relevant_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 4,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 4,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 4,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "50084e7fd2373e875ece83e0b60b76953db23d7570b1903b153c2b2e9dc334f0",
+   "rep": 4,
+   "state_id": "required_argument_missing"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 4,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 4,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 4,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "fb7a8031afe4c7ca75c57ee1cab69c2bc61ca51ff8732b65d24ad8b72204adb9",
+   "rep": 4,
+   "state_id": "wrong_argument_type"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 4,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 4,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 4,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "4cd03b89c552eb4748c18630b8dc05f2d014f7dcb9dd0da2d9761353632672cb",
+   "rep": 4,
+   "state_id": "unknown_tool"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 4,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 4,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 4,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "268b312d1a51770a0300a68ba68186c06536c2b85efe2b1efafa34c504b7b3b2",
+   "rep": 4,
+   "state_id": "tool_returns_malformed_data"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 4,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 4,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 4,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "e5de1aeff0af7b66cd3b35cf9be6620ee5a39858af64c3782f90cbbd71c369dc",
+   "rep": 4,
+   "state_id": "tool_fails"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 4,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 4,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 4,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "b7000848d5f9f48e9ce30bfd0947d6e97d8af27fd58fa63d9d1b50bd17a27b7f",
+   "rep": 4,
+   "state_id": "tool_times_out"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 4,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 4,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 4,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "6f9c65ee53562041d3c86316981954cbb05b4769255c4dfa924898049c12c814",
+   "rep": 4,
+   "state_id": "tool_succeeds_after_retry"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 4,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 4,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 4,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "947324ecc0563fd8028b6ef04066fc1df608db76795e9157a5fd9c8b4e2f15f0",
+   "rep": 4,
+   "state_id": "two_independent_parallel_actions"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "6ede31bb1e9b6bfe8fb4f78fb92cfda69f48aa3801155cd49c3c0ddf584c3e55",
+   "rep": 4,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "a2752fd4e5448e1e0b96993b82513428bb4143b55c92482961022c6737489d77",
+   "rep": 4,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "6ede31bb1e9b6bfe8fb4f78fb92cfda69f48aa3801155cd49c3c0ddf584c3e55",
+   "rep": 4,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "a2752fd4e5448e1e0b96993b82513428bb4143b55c92482961022c6737489d77",
+   "rep": 4,
+   "state_id": "hard_dependency_a_then_b"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 4,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 4,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 4,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "7f6317b5f4597f7ef846f70eff1a3daa4cbea675a8918c8e689174c9293d44cf",
+   "rep": 4,
+   "state_id": "diamond_dependency_graph"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 4,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 4,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 4,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "82497e03f92472aeb3f4417de819a742951259318cee78a8aa0a255728a0c480",
+   "rep": 4,
+   "state_id": "cheap_model_sufficient"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "2714ebff9a74d395c9bba1da1023b7ff79134342d70be8bc96a40a6d0f5c58e1",
+   "rep": 4,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "307b3e1c22e0a69ccf4afef204599f0f43c18b2573341ecbc6cdc38e47e61264",
+   "rep": 4,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "2714ebff9a74d395c9bba1da1023b7ff79134342d70be8bc96a40a6d0f5c58e1",
+   "rep": 4,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "307b3e1c22e0a69ccf4afef204599f0f43c18b2573341ecbc6cdc38e47e61264",
+   "rep": 4,
+   "state_id": "specialist_required"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 4,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 4,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 4,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "15d85c7194bdf29917c1f54e43463aa4e837640e1a2c4fc510c5fd438622c1ec",
+   "rep": 4,
+   "state_id": "expensive_model_unnecessary"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 4,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 4,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 4,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "c62751a11e52f8fb5e06c4a95528ce5ef711cfb998accbcd63eab5f09ea9d8ed",
+   "rep": 4,
+   "state_id": "orchestrator_should_abstain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 4,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 4,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 4,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "c6606d6fc58969fc21a49673e9ae4ade3b1895b1e9b344bec4caa96a42dee38c",
+   "rep": 4,
+   "state_id": "jev_uncertain"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 4,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 4,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 4,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "eb9d3f091191f5d4043362ac7102f7262e74e1252241ef3107712a88cb5dfb56",
+   "rep": 4,
+   "state_id": "slm_uncertain"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 4,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 4,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 4,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "950d5b648208d149fd48eb4ca925ecaf3584ab792f7cac309204a6e19d68ca17",
+   "rep": 4,
+   "state_id": "stop_now"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 4,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 4,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 4,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "5a6eedf952102ee0f64fbf3ed1397c175b5e52eed466444476c287f124a7d638",
+   "rep": 4,
+   "state_id": "continue_work"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 4,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 4,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 4,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "9fa2d09c34f533626c3e2df9d5bafe1d0ef9c577e8b54a82073e6185be20dcb2",
+   "rep": 4,
+   "state_id": "retry_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 4,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 4,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 4,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "93604153fd384eeb5d21addbe94e2c6ba445183a3ed9ea1705897c9d0bb99f50",
+   "rep": 4,
+   "state_id": "escalate_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 4,
+   "state_id": "replan"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 4,
+   "state_id": "replan"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 4,
+   "state_id": "replan"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "5dfbf54df6ae37ffc71d0e89f2ca1328a6e8207d243b57beb12fb1365776a16a",
+   "rep": 4,
+   "state_id": "replan"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "80cb1e7fcfd48b02779de26852896aacd937a0bfac48f874846f0277f4c2cf55",
+   "rep": 4,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "0e3d7742432d35bccec025d9e8d9793a98267d6ae960e88e592f26148dc1d539",
+   "rep": 4,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "80cb1e7fcfd48b02779de26852896aacd937a0bfac48f874846f0277f4c2cf55",
+   "rep": 4,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "0e3d7742432d35bccec025d9e8d9793a98267d6ae960e88e592f26148dc1d539",
+   "rep": 4,
+   "state_id": "permission_denied"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "46f9fd76639b7f6ebd72086271efaa60ba24518fe2f352913e51a5c7905923e5",
+   "rep": 4,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "da4ac83238eb65fad3e84ff828da354c023b951b92d30ba7ebe2c2655c3e061d",
+   "rep": 4,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "46f9fd76639b7f6ebd72086271efaa60ba24518fe2f352913e51a5c7905923e5",
+   "rep": 4,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "da4ac83238eb65fad3e84ff828da354c023b951b92d30ba7ebe2c2655c3e061d",
+   "rep": 4,
+   "state_id": "credential_required_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "67d4ecf75665a9d6b208e00dc6f16f7e8e01312869577f6cf2d86358d139b450",
+   "rep": 4,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "28735b6716290823dfaa06113180527d1699e5e12f8aa9fcbc658431fa22e615",
+   "rep": 4,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "67d4ecf75665a9d6b208e00dc6f16f7e8e01312869577f6cf2d86358d139b450",
+   "rep": 4,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "28735b6716290823dfaa06113180527d1699e5e12f8aa9fcbc658431fa22e615",
+   "rep": 4,
+   "state_id": "destructive_action"
+  },
+  {
+   "cell": "D",
+   "prompt_hash": "112ad89d8dcd01b5cad2e895e1bbcae3b9fabc5af43fed2e87ea6a4ea9533555",
+   "rep": 4,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "A",
+   "prompt_hash": "fd898b60859a554121206cfd70b36ae4379da6d763683381c788b42862272a08",
+   "rep": 4,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "B",
+   "prompt_hash": "112ad89d8dcd01b5cad2e895e1bbcae3b9fabc5af43fed2e87ea6a4ea9533555",
+   "rep": 4,
+   "state_id": "publish_send_deploy_action"
+  },
+  {
+   "cell": "C",
+   "prompt_hash": "fd898b60859a554121206cfd70b36ae4379da6d763683381c788b42862272a08",
+   "rep": 4,
+   "state_id": "publish_send_deploy_action"
+  }
+ ],
+ "cells": {
+  "A": {
+   "candidates": "all_actions",
+   "framing": "unfiltered",
+   "legal_arg": "dm._unfiltered"
+  },
+  "B": {
+   "candidates": "legal_only",
+   "framing": "unfiltered",
+   "legal_arg": "compile_actions"
+  },
+  "C": {
+   "candidates": "all_actions",
+   "framing": "compiler",
+   "legal_arg": "dm._unfiltered"
+  },
+  "D": {
+   "candidates": "legal_only",
+   "framing": "compiler",
+   "legal_arg": "compile_actions"
+  }
+ },
+ "dialect": "hermes",
+ "finished_at": "2026-09-22T04:54:43.738610Z",
+ "fixture_path": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/benchmarks/fixtures/local-cognition-v1/examples.jsonl",
+ "fixture_sha256": "eeae4daa9f6184adfd6ad264158e679bca02b77d3b8309e6d59d4b404625d1df",
+ "generation_settings": {
+  "dialect_max_tokens": 256,
+  "effective_max_tokens": 256,
+  "request_max_tokens": 1024,
+  "response_format": null,
+  "seed": 42,
+  "stop": [
+   "</tool_call>",
+   "<start_function_response>"
+  ],
+  "temperature": 0.0,
+  "tool_choice": "required",
+  "use_json_schema": false,
+  "use_native_tools": true
+ },
+ "mode_revision": "26df4b9aad5abdc5b7871ee4c71063ce888feb26",
+ "model_id": "nemotron_orchestrator_8b",
+ "n_calls": 560,
+ "quantization": "Q4_K_M",
+ "schema": "z0int.compiler_ablation.v1",
+ "started_at": "2026-09-22T04:27:22.329251Z",
+ "tag": "main"
+}

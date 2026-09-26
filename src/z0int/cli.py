@@ -28,6 +28,9 @@ def _bool_opt(s: str) -> bool:
     return s.lower() in ("1", "true", "yes", "y")
 
 
+from .cognition.cli import add_cognition_parser, cmd_cognition  # noqa: E402
+
+
 def cmd_doctor(*, as_json: bool) -> int:
     from .doctor import format_human, run_doctor
 
@@ -102,6 +105,33 @@ def cmd_models_sync(*, which: str, dry_run: bool, as_json: bool) -> int:
     _print(result, as_json=as_json)
     bad = [r for r in result.get("results") or [] if r.get("status") == "error"]
     return 1 if bad else 0
+
+
+def cmd_models_reconcile(*, write: bool, as_json: bool) -> int:
+    """One canonical identity per model/revision; projections are derived."""
+    from .models_mgmt import reconcile, write_projection
+
+    if write:
+        path = write_projection()
+        if not as_json:
+            print(f"regenerated projection from the canonical manifest: {path}")
+
+    report = reconcile()
+    if as_json:
+        print(json.dumps(report, indent=2, default=str))
+    else:
+        print("z0int models reconcile")
+        print(f"  canonical : {report['canonical_source']} ({report['canonical_manifest_sha256'][:16]})")
+        print(f"  projection: {report['projection_path']} (present={report['projection_present']})")
+        gen = report["residency"]["generative"]
+        dec = report["residency"]["decision"]
+        print(f"  generative resident (live runtime): {gen.get('reported_by_live_runtime')}")
+        print(f"  decision planned_resident         : {dec.get('planned_resident')}")
+        print(f"  decision declared in projection   : {dec.get('declared_in_projection')}")
+        print(f"  verdict   : {report['verdict']} ({report['drift_count']} drift entries)")
+        for d in report["drift"]:
+            print(f"    - {d['model_id'] or '(plane)':16s} {d['kind']}")
+    return 0 if report["verdict"] == "consistent" else 1
 
 
 def cmd_data_discover(*, as_json: bool) -> int:
@@ -304,6 +334,17 @@ def build_parser() -> argparse.ArgumentParser:
     mss.add_argument("--which", choices=("resident", "on_demand", "all"), default="resident")
     mss.add_argument("--dry-run", action="store_true")
 
+    mrec = ms_sub.add_parser(
+        "reconcile",
+        help="Compare the canonical manifest against disk and against the generated projection",
+    )
+    _json_flag(mrec)
+    mrec.add_argument(
+        "--write",
+        action="store_true",
+        help="Regenerate the projection from the manifest (the manifest is canonical)",
+    )
+
     data = sub.add_parser("data", help="Data source helpers")
     data_sub = data.add_subparsers(dest="data_cmd", required=True)
     dd = data_sub.add_parser("discover", help="Find Hermes/OMP/Codex/export paths")
@@ -412,6 +453,12 @@ def build_parser() -> argparse.ArgumentParser:
     cfm.add_argument("--provider-substr", default="xai,grok", help="Comma substrings for reference providers/models")
     cfs = cf_sub.add_parser("summary", help="Replay grade / pair inventory")
     _json_flag(cfs)
+    cfi = cf_sub.add_parser(
+        "worker-needed-ingest",
+        help="Ingest OMP rlm.worker_needed paired-replay results into Tokenomics analytics",
+    )
+    _json_flag(cfi)
+    cfi.add_argument("--limit", type=int, default=50, help="Max recent result rows to ingest")
 
     # Future compiler stack — remainder args forwarded to module CLIs.
 
@@ -428,6 +475,20 @@ def build_parser() -> argparse.ArgumentParser:
     cxr.add_argument("--allow-memory", action="store_true")
     cxr.add_argument("--input", default=None, help="JSON file with needs[]")
 
+
+    osc = sub.add_parser(
+        "os-context",
+        help="OS Episode Compiler: workspace-copilot → z0int vault (sanitized only)",
+    )
+    osc_sub = osc.add_subparsers(dest="os_context_cmd", required=True)
+    osc_imp = osc_sub.add_parser("import", help="Compile closed episodes + shadow into ~/.z0int/episodes/os_context")
+    osc_imp.add_argument("--limit", type=int, default=50000)
+    osc_imp.add_argument("--db", default=None, help="override workspace-copilot db path")
+    _json_flag(osc_imp)
+    osc_st = osc_sub.add_parser("stats", help="Live/imported os.next_context metrics")
+    _json_flag(osc_st)
+    osc_op = osc_sub.add_parser("next-operator", help="os.next_operator shadow coverage report")
+    _json_flag(osc_op)
 
     tk = sub.add_parser("task", help="Authorized verified-loop task family (worktree + checkpoint)")
     tk_sub = tk.add_subparsers(dest="task_cmd", required=True)
@@ -467,7 +528,63 @@ def build_parser() -> argparse.ArgumentParser:
     bee.add_argument("--backend", default="nanojev")
     bee.add_argument("--input", required=True, help="Path to request JSON")
     bee.add_argument("--json", action="store_true", default=True)
+    beb = be_sub.add_parser("bench", help="Pareto benchmark decision backends (decision-capability-v1)")
+    beb.add_argument("--contract", default="decision-capability-v1")
+    beb.add_argument("--backend", default=None, help="Single roster candidate id")
+    beb.add_argument("--capability", default=None, help="Filter to one capability")
+    beb.add_argument("--fixtures", default=None, help="Path to examples.jsonl")
+    beb.add_argument("--output", default=None, help="Output directory (default: results/decision-backends/<ts>)")
+    beb.add_argument("--seed", type=int, default=0, help="Benchmark seed for pair_id / counterfactual pairing")
+    beb.add_argument("--bootstrap-draws", type=int, default=500, help="Fixture-resample draws for Pareto inclusion probability")
+    beb.add_argument("--json", action="store_true")
 
+
+    svc = sub.add_parser(
+        "service",
+        help="Start / stop the local z0intelligence model service (one supervisor + resident model)",
+    )
+    svc_sub = svc.add_subparsers(dest="service_cmd", required=True)
+
+    def _service_target(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--host", default=None, help="default 127.0.0.1")
+        sp.add_argument("--port", type=int, default=None, help="default 11500")
+        sp.add_argument("--gguf-dir", default=None, help="GGUF root used to recognise our own llama-server")
+
+    def _service_model_options(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--context", type=int, default=None, help="default 4096")
+        sp.add_argument("--idle-unload", type=float, default=None, help="Seconds idle before dropping the model (default 600)")
+        sp.add_argument("--llama-server", default=None, help="Path to the llama-server binary")
+
+    svcs = svc_sub.add_parser("start", help="Start in the background and wait until /health is ok")
+    _service_target(svcs)
+    _service_model_options(svcs)
+    svcs.add_argument("--no-wait", action="store_true", help="Return immediately instead of waiting for health")
+    svcs.add_argument("--health-timeout", type=float, default=60.0)
+    svcs.add_argument("--force", action="store_true", help="Restart if already running")
+    _json_flag(svcs)
+
+    svcp = svc_sub.add_parser("stop", help="Stop the supervisor and any llama-server it orphaned")
+    _service_target(svcp)
+    svcp.add_argument("--grace", type=float, default=15.0, help="Seconds to wait after SIGTERM before SIGKILL")
+    _json_flag(svcp)
+
+    svcr = svc_sub.add_parser("restart", help="stop then start")
+    _service_target(svcr)
+    _service_model_options(svcr)
+    svcr.add_argument("--grace", type=float, default=15.0)
+    svcr.add_argument("--health-timeout", type=float, default=60.0)
+    _json_flag(svcr)
+
+    svcu = svc_sub.add_parser("unload", help="Give the GPU back but keep the supervisor listening")
+    svcu.add_argument("--host", default=None)
+    svcu.add_argument("--port", type=int, default=None)
+    _json_flag(svcu)
+
+    svcst = svc_sub.add_parser("status", help="What is running, what is resident, what holds the GPU")
+    _service_target(svcst)
+    _json_flag(svcst)
+
+    add_cognition_parser(sub)
 
     art = sub.add_parser("artifacts", help="Candidate artifact inspect/import/list")
     art_sub = art.add_subparsers(dest="artifacts_cmd", required=True)
@@ -481,6 +598,35 @@ def build_parser() -> argparse.ArgumentParser:
     artl = art_sub.add_parser("list", help="List installed specialists")
     _json_flag(artl)
 
+    ct = sub.add_parser(
+        "contrastive",
+        help="Contrastive evidence-sufficiency eval (Nimble-style unit; no Nimble weights)",
+    )
+    ct_sub = ct.add_subparsers(dest="contrastive_cmd", required=True)
+    ct_ev = ct_sub.add_parser("eval", help="Run four-condition probe on a family or built-in fixture")
+    ct_ev.add_argument("--family-json", default=None, help="ContrastFamily JSON path")
+    ct_ev.add_argument("--recipe-json", default=None, help="optional evidence-filter recipe JSON")
+    ct_ev.add_argument("--store", action="store_true", help="write evidence_dependency record")
+    _json_flag(ct_ev)
+    ct_fx = ct_sub.add_parser("fixture", help="Print built-in project_status contrast family")
+    _json_flag(ct_fx)
+    ct_race = ct_sub.add_parser("race", help="Ordinary vs contrastive gate on frozen families")
+    ct_race.add_argument("--families-jsonl", default=None, help="JSONL of ContrastFamily rows")
+    ct_race.add_argument("--recipe-json", default=None)
+    _json_flag(ct_race)
+
+    cps = sub.add_parser(
+        "context-state",
+        help="Frozen capability context.current_project_state",
+    )
+    cps_sub = cps.add_subparsers(dest="context_state_cmd", required=True)
+    cps_fx = cps_sub.add_parser("fixture", help="Built-in contrast family for P0 capability")
+    _json_flag(cps_fx)
+    cps_cmp = cps_sub.add_parser("compile", help="Compile episode from workspace snapshot JSON")
+    cps_cmp.add_argument("snapshot_json")
+    cps_cmp.add_argument("--store", action="store_true", help="append contrast family JSONL")
+    _json_flag(cps_cmp)
+
     ar = sub.add_parser("autoresearch", help="Verified Trajectory Superoptimizer")
     ar_sub = ar.add_subparsers(dest="autoresearch_cmd", required=True)
     for _ar_name, _ar_help in (
@@ -491,6 +637,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("daemon", "Run background loop (bounded iterations unless --forever)"),
         ("report", "Recent replay results"),
         ("enqueue", "Manually enqueue a verified trace"),
+        ("research-once", "P0: Tokenomics gap → ResearchDriver → fly bench → ABAB"),
     ):
         _sp = ar_sub.add_parser(_ar_name, help=_ar_help)
         _json_flag(_sp)
@@ -500,8 +647,13 @@ def build_parser() -> argparse.ArgumentParser:
             _sp.add_argument("--poll-seconds", type=float, default=5.0)
         if _ar_name == "enqueue":
             _sp.add_argument("--trace-id", required=True)
+            _sp.add_argument("--kind", default="context_policy", choices=["context_policy", "contrastive_evidence"])
             _sp.add_argument("--verifier-id", required=True)
             _sp.add_argument("--verified-success", type=str, default="true")
+        if _ar_name == "research-once":
+            _sp.add_argument("--driver", default="agy", choices=["agy", "deterministic"])
+            _sp.add_argument("--evolution-lab-root", default=None)
+            _sp.add_argument("--force-resources", action="store_true")
 
     kerd = sub.add_parser("kerdoios", help="Kerdoios projection helpers (receipts stay authoritative)")
     kerd_sub = kerd.add_subparsers(dest="kerdoios_cmd", required=True)
@@ -633,6 +785,33 @@ def _cmd_backends(args: argparse.Namespace) -> int:
         print(json.dumps(payload, indent=2, default=str))
         return 0
 
+    if cmd == "bench":
+        from pathlib import Path
+
+        from z0int.backends.bench import run_bench
+
+        out = run_bench(
+            contract=args.contract,
+            fixtures_path=Path(args.fixtures).expanduser() if args.fixtures else None,
+            backend_filter=args.backend,
+            capability_filter=args.capability,
+            output_dir=Path(args.output).expanduser() if args.output else None,
+            seed=args.seed,
+            bootstrap_draws=args.bootstrap_draws,
+        )
+        if args.json:
+            print(json.dumps(out, indent=2, default=str))
+        else:
+            print("z0int backends bench")
+            print(f"  contract={args.contract}")
+            print(f"  output={out.get('output_dir')}")
+            print(f"  tokenomics={out.get('tokenomics_events')}")
+            print(f"  raw={out.get('raw_jsonl')}")
+            print(f"  summary={out.get('summary_json')}")
+            print(f"  pareto={out.get('pareto_md')}")
+            print(f"  parity_ok={out.get('parity_ok')}")
+        return 0
+
     print(f"unknown backends command: {cmd}", file=sys.stderr)
     return 2
 
@@ -739,6 +918,9 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_context(args)
     if args.cmd == "task":
         return _cmd_task(args)
+    if args.cmd == "cognition":
+        return cmd_cognition(args)
+
     if args.cmd == "backends":
         return _cmd_backends(args)
 
@@ -758,6 +940,11 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_models_sync(
                 which=getattr(args, "which", "resident"),
                 dry_run=bool(getattr(args, "dry_run", False)),
+                as_json=as_json,
+            )
+        if args.models_cmd == "reconcile":
+            return cmd_models_reconcile(
+                write=bool(getattr(args, "write", False)),
                 as_json=as_json,
             )
     if args.cmd == "data":
@@ -785,6 +972,10 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_mine(args=args, as_json=as_json)
         if args.counterfactual_cmd == "summary":
             return cmd_summary(args=args, as_json=as_json)
+        if args.counterfactual_cmd == "worker-needed-ingest":
+            from .replay.worker_needed import cmd_ingest
+
+            return cmd_ingest(as_json=as_json, limit=int(getattr(args, "limit", 50) or 50))
 
 
     if args.cmd == "artifacts":
@@ -801,6 +992,61 @@ def main(argv: list[str] | None = None) -> int:
             out = {"schema": "z0int.artifacts_list.v1", "artifacts": list_artifacts()}
             _print(out, as_json=as_json)
             return 0
+
+    if args.cmd == "contrastive":
+        from . import contrastive_evidence as ce
+        import json as _json
+        if args.contrastive_cmd == "fixture":
+            fam = ce.example_project_status_family()
+            _print(fam.to_dict(), as_json=True)
+            return 0
+        if args.contrastive_cmd == "eval":
+            if getattr(args, "family_json", None):
+                fam = ce.ContrastFamily.from_dict(_json.loads(Path(args.family_json).read_text(encoding="utf-8")))
+            else:
+                fam = ce.example_project_status_family()
+            if getattr(args, "recipe_json", None):
+                recipe = _json.loads(Path(args.recipe_json).read_text(encoding="utf-8"))
+                out = ce.evaluate_recipe_on_family(fam, recipe)
+            else:
+                out = ce.evaluate_family(fam)
+            if getattr(args, "store", False):
+                path = ce.store_dependency(out["dependency"])
+                out["dependency_path"] = str(path)
+            _print(out, as_json=as_json)
+            return 0 if out.get("full_pass") else 1
+        if args.contrastive_cmd == "race":
+            from .data_recipe_race import race_data_recipes
+
+            if getattr(args, "families_jsonl", None):
+                families = []
+                for line in Path(args.families_jsonl).read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line:
+                        families.append(ce.ContrastFamily.from_dict(_json.loads(line)))
+            else:
+                families = [ce.example_project_status_family()]
+            recipe = None
+            if getattr(args, "recipe_json", None):
+                recipe = _json.loads(Path(args.recipe_json).read_text(encoding="utf-8"))
+            out = race_data_recipes(families, recipe=recipe)
+            _print(out, as_json=as_json)
+            return 0
+
+    if args.cmd == "context-state":
+        from .capabilities import context_project_state as cps
+
+        if args.context_state_cmd == "fixture":
+            _print(cps.fixture_family().to_dict(), as_json=True)
+            return 0
+        if args.context_state_cmd == "compile":
+            snap = _json.loads(Path(args.snapshot_json).read_text(encoding="utf-8"))
+            if getattr(args, "store", False):
+                out = cps.compile_and_store(snap)
+            else:
+                out = cps.compile_episode(snap)
+            _print(out, as_json=as_json)
+            return 0 if out.get("ok", True) else 1
 
     if args.cmd == "autoresearch":
         from .autoresearch import daemon as ar_daemon
@@ -827,10 +1073,26 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if cmd == "enqueue":
             vs = str(getattr(args, "verified_success", "true")).lower() in ("1", "true", "yes", "y")
-            out = enqueue_trace(args.trace_id, verified_success=vs if vs else None, verifier_id=args.verifier_id)
-            # if user passed false, force not verified
-            if not vs:
-                out = enqueue_trace(args.trace_id, verified_success=False, verifier_id=args.verifier_id)
+            kind = getattr(args, "kind", None) or "context_policy"
+            pl = {"kind": kind}
+            out = enqueue_trace(
+                args.trace_id,
+                verified_success=True if vs else False,
+                verifier_id=args.verifier_id,
+                payload=pl,
+            )
+            _print(out, as_json=as_json)
+            return 0 if out.get("ok") else 1
+        if cmd == "research-once":
+            from pathlib import Path
+            from .autoresearch.research.pipeline import run_research_once
+            el = getattr(args, "evolution_lab_root", None)
+            out = run_research_once(
+                driver_name=str(getattr(args, "driver", "agy")),
+                evolution_lab_root=Path(el) if el else None,
+                force_resources=bool(getattr(args, "force_resources", False)),
+                skip_unit_tests=True,
+            )
             _print(out, as_json=as_json)
             return 0 if out.get("ok") else 1
 
@@ -840,6 +1102,108 @@ def main(argv: list[str] | None = None) -> int:
             out = export_observations(since=getattr(args, "since", None), output=getattr(args, "output", None))
             _print(out, as_json=as_json)
             return 0
+
+    if args.cmd == "os-context":
+        from . import os_context
+        from .specialists import next_operator
+
+        if args.os_context_cmd == "import":
+            db = Path(args.db).expanduser() if getattr(args, "db", None) else None
+            if db is not None:
+                out = os_context.import_from_db(db_path=db, limit=int(getattr(args, "limit", 50000) or 50000))
+            else:
+                out = os_context.import_via_cli(limit=int(getattr(args, "limit", 50000) or 50000))
+            _print(out, as_json=as_json)
+            return 0 if out.get("ok") else 1
+        if args.os_context_cmd == "stats":
+            out = os_context.stats()
+            _print(out, as_json=as_json)
+            return 0 if out.get("ok", True) else 1
+        if args.os_context_cmd == "next-operator":
+            out = next_operator.shadow_report()
+            _print(out, as_json=as_json)
+            return 0 if out.get("ok", True) else 1
+
+    if args.cmd == "service":
+        from .cognition import service as _service
+
+        host = getattr(args, "host", None) or _service.DEFAULT_HOST
+        port = int(getattr(args, "port", None) or _service.DEFAULT_PORT)
+        gguf = getattr(args, "gguf_dir", None) or None
+        state_file = _service.default_state_file()
+        log_file = _service.default_log_file()
+        # Read every optional knob through getattr: a subparser that forgets one
+        # must degrade to the default, not crash the command.
+        context = getattr(args, "context", None) or _service.DEFAULT_CONTEXT
+        idle_unload = getattr(args, "idle_unload", None)
+        if idle_unload is None:
+            idle_unload = _service.DEFAULT_IDLE_UNLOAD_S
+        llama_server = getattr(args, "llama_server", None)
+        grace = float(getattr(args, "grace", 15.0) or 0.0)
+        health_timeout = float(getattr(args, "health_timeout", 60.0) or 0.0)
+
+        if args.service_cmd == "status":
+            res = _service.service_status(
+                host=host, port=port,
+                gguf_dir=gguf or _service.DEFAULT_GGUF_DIR,
+                state_file=state_file,
+            )
+        elif args.service_cmd == "unload":
+            res = _service.unload_service(host=host, port=port)
+        elif args.service_cmd == "stop":
+            res = _service.stop_service(
+                host=host, port=port,
+                gguf_dir=gguf or _service.DEFAULT_GGUF_DIR,
+                state_file=state_file, grace=grace,
+            )
+        elif args.service_cmd == "restart":
+            _service.stop_service(
+                host=host, port=port,
+                gguf_dir=gguf or _service.DEFAULT_GGUF_DIR,
+                state_file=state_file, grace=grace,
+            )
+            res = _service.start_service(
+                host=host, port=port,
+                context=context, idle_unload=idle_unload,
+                llama_server=llama_server, gguf_dir=gguf,
+                state_file=state_file, log_file=log_file,
+                health_timeout=health_timeout, force=True,
+            )
+        else:  # start
+            res = _service.start_service(
+                host=host, port=port,
+                context=context, idle_unload=idle_unload,
+                llama_server=llama_server, gguf_dir=gguf,
+                state_file=state_file, log_file=log_file,
+                wait_health=not getattr(args, "no_wait", False),
+                health_timeout=health_timeout,
+                force=getattr(args, "force", False),
+            )
+
+        if as_json:
+            _print(res.to_dict(), as_json=True)
+        else:
+            print(f"{'ok' if res.ok else 'FAILED'}  {res.message}")
+            details = res.details
+            if res.action == "status":
+                for s in details.get("supervisors", []):
+                    print(f"  supervisor pid {s['pid']}  {s['cmdline']}")
+                for s in details.get("llama_servers", []):
+                    print(f"  llama-server pid {s['pid']} (parent {s['ppid']})  {s['model']}")
+                for pid in details.get("orphan_llama_servers", []):
+                    print(f"  ORPHAN pid {pid} still holds the GPU -- run: z0int service stop")
+                apps = details.get("gpu_compute_apps")
+                if apps is not None:
+                    print(f"  GPU compute apps: {apps or 'none'}")
+            elif res.action.startswith("stop") or res.action == "already_stopped":
+                apps = details.get("gpu_compute_apps")
+                if apps is not None:
+                    print(f"  GPU compute apps now: {apps or 'none'}")
+            if not res.ok and details.get("log_tail"):
+                print("  log tail:")
+                for line in details["log_tail"]:
+                    print(f"    {line}")
+        return 0 if res.ok else 1
 
     if args.cmd == "preflight":
         from .preflight import preflight_dict

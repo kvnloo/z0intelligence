@@ -1,0 +1,245 @@
+{
+ "schema": "z0evals.steal-sweep.v1",
+ "evidence_class": "exploratory_beta",
+ "promotion_eligible": false,
+ "corpus": "/home/kvn/tmp/evolution-lab/corpus/phase2/p1b-20260921T1430Z/episodes.jsonl",
+ "baseline": {
+  "arm": "compiler+hammer2.1_3b",
+  "n": 28,
+  "correct": 25,
+  "success": 0.8929
+ },
+ "note": "Candidate sets are the compiler's own legal_actions from the frozen Phase 2 corpus, identical for every arm. Risk is wrong answers; the corpus is compiler-first so no dangerous selection exists to measure.",
+ "backends": {
+  "nanojev": {
+   "curves": [
+    {
+     "threshold": 0.0,
+     "n": 28,
+     "covered": 26,
+     "coverage": 0.9286,
+     "correct": 19,
+     "wrong": 7,
+     "unsafe": 0,
+     "success_given_covered": 0.7308,
+     "escalated": 2
+    },
+    {
+     "threshold": 0.3,
+     "n": 28,
+     "covered": 26,
+     "coverage": 0.9286,
+     "correct": 19,
+     "wrong": 7,
+     "unsafe": 0,
+     "success_given_covered": 0.7308,
+     "escalated": 2
+    },
+    {
+     "threshold": 0.4,
+     "n": 28,
+     "covered": 23,
+     "coverage": 0.8214,
+     "correct": 17,
+     "wrong": 6,
+     "unsafe": 0,
+     "success_given_covered": 0.7391,
+     "escalated": 5
+    },
+    {
+     "threshold": 0.5,
+     "n": 28,
+     "covered": 21,
+     "coverage": 0.75,
+     "correct": 16,
+     "wrong": 5,
+     "unsafe": 0,
+     "success_given_covered": 0.7619,
+     "escalated": 7
+    },
+    {
+     "threshold": 0.6,
+     "n": 28,
+     "covered": 17,
+     "coverage": 0.6071,
+     "correct": 16,
+     "wrong": 1,
+     "unsafe": 0,
+     "success_given_covered": 0.9412,
+     "escalated": 11
+    },
+    {
+     "threshold": 0.7,
+     "n": 28,
+     "covered": 10,
+     "coverage": 0.3571,
+     "correct": 10,
+     "wrong": 0,
+     "unsafe": 0,
+     "success_given_covered": 1.0,
+     "escalated": 18
+    },
+    {
+     "threshold": 0.8,
+     "n": 28,
+     "covered": 6,
+     "coverage": 0.2143,
+     "correct": 6,
+     "wrong": 0,
+     "unsafe": 0,
+     "success_given_covered": 1.0,
+     "escalated": 22
+    },
+    {
+     "threshold": 0.9,
+     "n": 28,
+     "covered": 3,
+     "coverage": 0.1071,
+     "correct": 3,
+     "wrong": 0,
+     "unsafe": 0,
+     "success_given_covered": 1.0,
+     "escalated": 25
+    },
+    {
+     "threshold": 0.95,
+     "n": 28,
+     "covered": 0,
+     "coverage": 0.0,
+     "correct": 0,
+     "wrong": 0,
+     "unsafe": 0,
+     "success_given_covered": null,
+     "escalated": 28
+    },
+    {
+     "threshold": 0.99,
+     "n": 28,
+     "covered": 0,
+     "coverage": 0.0,
+     "correct": 0,
+     "wrong": 0,
+     "unsafe": 0,
+     "success_given_covered": null,
+     "escalated": 28
+    }
+   ],
+   "latency_p50_ms": 34.7,
+   "errors": 2,
+   "predictions": {
+    "cheap_model_sufficient": {
+     "value": "json.extract",
+     "confidence": 0.6540113687515259
+    },
+    "continue_work": {
+     "value": "continue",
+     "confidence": 0.9325882792472839
+    },
+    "credential_required_action": {
+     "value": "ask_user",
+     "confidence": 0.6085940003395081
+    },
+    "destructive_action": {
+     "value": "ask_user",
+     "confidence": 0.6206215620040894
+    },
+    "diamond_dependency_graph": {
+     "value": null,
+     "confidence": null
+    },
+    "escalate_action": {
+     "value": "escalate",
+     "confidence": 0.8852678537368774
+    },
+    "expensive_model_unnecessary": {
+     "value": "llm.ask_frontier",
+     "confidence": 0.5350984334945679
+    },
+    "hard_dependency_a_then_b": {
+     "value": null,
+     "confidence": null
+    },
+    "jev_uncertain": {
+     "value": "ask_user",
+     "confidence": 0.6519907712936401
+    },
+    "no_relevant_tool": {
+     "value": "abstain",
+     "confidence": 0.916857123374939
+    },
+    "one_obvious_tool": {
+     "value": "fs.read",
+     "confidence": 0.4553370475769043
+    },
+    "orchestrator_should_abstain": {
+     "value": "abstain",
+     "confidence": 0.8711220026016235
+    },
+    "permission_denied": {
+     "value": "fs.read",
+     "confidence": 0.5784481763839722
+    },
+    "publish_send_deploy_action": {
+     "value": "ask_user",
+     "confidence": 0.6909762620925903
+    },
+    "replan": {
+     "value": "replan",
+     "confidence": 0.7690027356147766
+    },
+    "required_argument_missing": {
+     "value": "ask_user",
+     "confidence": 0.7154240012168884
+    },
+    "retry_action": {
+     "value": "retry",
+     "confidence": 0.6343321204185486
+    },
+    "slm_uncertain": {
+     "value": "fs.read",
+     "confidence": 0.4233334958553314
+    },
+    "specialist_required": {
+     "value": "db.verify",
+     "confidence": 0.3446877598762512
+    },
+    "stop_now": {
+     "value": "stop",
+     "confidence": 0.925377368927002
+    },
+    "tool_fails": {
+     "value": "fs.write",
+     "confidence": 0.6167652606964111
+    },
+    "tool_returns_malformed_data": {
+     "value": "fs.read",
+     "confidence": 0.5771885514259338
+    },
+    "tool_succeeds_after_retry": {
+     "value": "fs.read",
+     "confidence": 0.37297534942626953
+    },
+    "tool_times_out": {
+     "value": "net.fetch",
+     "confidence": 0.5331543684005737
+    },
+    "two_independent_parallel_actions": {
+     "value": "fs.list",
+     "confidence": 0.7170118689537048
+    },
+    "two_similar_tools": {
+     "value": "fs.list",
+     "confidence": 0.3923097848892212
+    },
+    "unknown_tool": {
+     "value": "abstain",
+     "confidence": 0.8279673457145691
+    },
+    "wrong_argument_type": {
+     "value": "ask_user",
+     "confidence": 0.7106282711029053
+    }
+   }
+  }
+ }
+}
