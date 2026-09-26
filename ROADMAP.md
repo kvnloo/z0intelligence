@@ -82,6 +82,45 @@ Do not rewrite historical benchmark claims without new row-level evidence.
 
 ---
 
+## P0c - external detector + calibration battery (RLCDAlignBench)
+
+**Status: next evaluation wave**
+
+Use [RLCDAlignBench](https://github.com/sumleo/RLCDAlignBench) / [arXiv:2609.29429](https://arxiv.org/abs/2609.29429) as a new external battery for typed probabilistic decision backends.
+
+The paper reports 7,193 labelled instances across 44 benchmarks and ten alignment-failure families. Its most relevant findings for z0int are:
+
+- a generic binary question ranks many failures well (reported median AUROC 0.886);
+- targeted wording changes relatively little (reported median out-of-sample gain +0.006 AUROC);
+- **state/context construction matters much more** when the missing field defines the label;
+- probabilities can rank well while the default threshold transfers poorly;
+- fitting a threshold on ten labelled items recovers much of the threshold gap in the paper's protocol;
+- confident detector/label disagreements can surface data-quality defects.
+
+Treat these as hypotheses to reproduce, not as guaranteed properties of z0int backends.
+
+Immediate workstream:
+
+1. #24 — integrate the gated benchmark as a benchmark-only local adapter and reproduce the released cached-Jev scorer.
+2. #25 — run the same frozen rows through NanoJev, OpenJev/direct Qwen, and simple controls.
+3. #14 — extend the existing observer/calibration contract with per-family threshold receipts; never interpret normalized probabilities as globally calibrated confidence.
+4. #28 — make state/context construction an evolvable surface while initially freezing the question pack.
+5. #26 — use the winning pattern as a **shadow-only** multi-question SafetySentinel, never as capability authority.
+6. #27 — route confident observer/label disagreement into a provenance-preserving audit queue rather than auto-relabeling.
+
+Hard rules:
+
+- do not rewrite historical Phase 1 results;
+- do not fine-tune on the held-out detector battery;
+- do not vendor gated/CC BY-NC benchmark payloads into this repository;
+- preserve benchmark, context variant, question-pack, label-source, model-revision, and serving provenance;
+- report per-benchmark discrimination, calibration, selective prediction, latency, and cost rather than a single blended score;
+- a local backend must still beat simple controls and real outcome gates before production promotion.
+
+**Exit:** z0int has an independently reproducible external detector scorecard, a registered per-family calibration protocol, and at least one measured state-construction ablation that informs a shadow runtime surface.
+
+---
+
 ## P1 - private onboarding and data plane
 
 **Priority: critical path**
@@ -161,7 +200,17 @@ Avoid random train/test leakage. Split primarily by **time**, session, and held-
 
 Maintain a small sealed human-audited evaluation set. It is for judging the auto-labelers and models, not bulk training.
 
-**Exit:** one command can compile sanitized history into reproducible train/val/confirm/OOD episode sets.
+Add an independent **episode-audit queue** (#27):
+
+- compare automatic/reference labels with an observer distribution without treating either as truth;
+- prioritize high-confidence disagreement, threshold flips, verifier disagreement, and repeated cross-backend disagreement;
+- preserve the original label and provenance;
+- distinguish source-label defects, observer failures, ambiguous cases, and insufficient-state cases;
+- rebuild corrected datasets reproducibly rather than silently mutating labels.
+
+Confident disagreement is an audit candidate, **never an automatic relabel**. Sealed evaluation examples must not leak into training through this path.
+
+**Exit:** one command can compile sanitized history into reproducible train/val/confirm/OOD episode sets, and high-information label disagreements can be audited without corrupting source provenance.
 
 ---
 
@@ -192,6 +241,8 @@ Train and compare:
 Do not optimize for raw top-1 accuracy alone. Measure **risk/coverage**: how much traffic can a specialist safely absorb before escalating?
 
 Deploy in shadow first.
+
+A first cross-cutting shadow surface can be the versioned **SafetySentinel** question pack (#26): many probabilistic checks over one structured state, with full receipts and later outcome joins. It may add warnings, verification requests, or escalation recommendations, but deterministic capability/approval policy remains authoritative.
 
 **Exit:** at least one specialist safely removes measurable frontier-model latency/context on real traffic.
 
@@ -239,7 +290,11 @@ ABAB should operate at two timescales:
 
 The judge, sealed battery, privacy policy, and safety gates are never evolvable.
 
-**Exit:** measured examples where changing the data recipe improves a production specialist more than ordinary parameter tuning.
+For the first **state-construction** experiments (#28), freeze the question pack and evolve the state recipe separately from model architecture. Compare minimal state, deployed/available context, reference-complete state, and evolved selection. Context budget is part of fitness, and fields unavailable at inference time are invalid even if they improve benchmark score.
+
+This makes context selection/compression a measured specialist rather than prompt folklore.
+
+**Exit:** measured examples where changing the data/state recipe improves a production specialist more than ordinary parameter tuning, including at least one win that survives its context-token and latency cost.
 
 ---
 
@@ -433,6 +488,8 @@ The hard tail remains with the frontier model.
 Primary measurements:
 
 - verified task success;
+- AUROC / ranking quality where the task is detector-like;
+- Brier / calibration error where probabilities are operationally consumed;
 - safe coverage / escalation rate;
 - end-to-end latency;
 - p95/p99 decision latency;
@@ -447,6 +504,8 @@ Primary measurements:
 Hard gates:
 
 - no additional hard-policy violations;
+- no single global confidence threshold is assumed to transfer across unrelated task/question families;
+- operational thresholds are registered with their task family, question-pack version, calibration evidence, and fallback;
 - privacy boundary holds;
 - secrets are not exposed to training/inference paths that do not require them;
 - candidate beats or matches a simple baseline;
@@ -478,6 +537,7 @@ A candidate that is biologically interesting but does not improve the measured f
 - Replacing frontier LLMs on genuinely open-ended reasoning.
 - Adding frameworks before a measured bottleneck requires them.
 - Letting the training loop modify its own judge, privacy boundary, or sealed evaluation set.
+- Vendoring gated RLCDAlignBench payloads or silently treating its evaluation set as ordinary training data.
 - Claiming that a small specialist understands a person's identity simply because it memorized their text.
 
 The project succeeds when **verified outcomes improve while expensive generic inference decreases**.
