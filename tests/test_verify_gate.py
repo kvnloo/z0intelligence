@@ -24,6 +24,7 @@ from z0int.verify_gate import (
     DEFAULT_ESCALATE_BELOW,
     SCHEMA,
     _MIN_LINE_CHARS,
+    _QUERY_MAX_CHARS,
     _STATE_CHAR_BUDGET,
     action_of,
     gate,
@@ -33,6 +34,9 @@ from z0int.verify_gate import (
 )
 
 REPO = Path(__file__).resolve().parents[1]
+
+#: The whole state: the budgeted lines plus the unbilled, capped query context.
+STATE_BOUND = _STATE_CHAR_BUDGET + len("Query: ") + _QUERY_MAX_CHARS
 
 
 class StubBackend:
@@ -139,18 +143,40 @@ def test_defaults_are_wider_than_the_bare_half():
     assert DEFAULT_ESCALATE_BELOW < 0.5 < DEFAULT_ALLOW_AT
 
 
-# --- question derivation ----------------------------------------------------
+# --- proposition wording ----------------------------------------------------
+#
+# The proposition is deliberately fixed and query-free. It used to read "does
+# the evidence support acting on <query>", which asks a different question from
+# the experiment's labels ("can this query be answered from this evidence
+# alone"). The query is now supplied once, in the state.
 
-def test_question_is_derived_from_the_packet_query():
+PROPOSITION = ("Does the supplied evidence contain enough information to answer "
+               "the user's query correctly without additional retrieval or "
+               "assumptions?")
+
+
+def test_proposition_is_the_fixed_wording():
+    assert verification_question(packet(query="anything at all")) == PROPOSITION
+    assert PROPOSITION.endswith("?")
+
+
+def test_proposition_does_not_embed_the_query():
+    """The old failure mode: the query leaked into the proposition itself."""
     q = verification_question(packet(query="is the daemon listening on 8791"))
-    assert "is the daemon listening on 8791" in q
-    assert q.endswith("?")
+    assert "is the daemon listening on 8791" not in q
+    assert "8791" not in q
 
 
-def test_question_differs_between_packets():
-    a = verification_question(packet(query="alpha"))
-    b = verification_question(packet(query="beta"))
-    assert a != b
+def test_proposition_is_identical_across_packets():
+    assert (verification_question(packet(query="alpha"))
+            == verification_question(packet(query="beta")))
+
+
+def test_proposition_has_no_task_specific_wording():
+    """No wording tailored to the three proof cases."""
+    low = PROPOSITION.lower()
+    for fragment in ("agentsview", "nanojev", "memory provider", "port", "gpu"):
+        assert fragment not in low
 
 
 def test_question_requires_a_query():
@@ -184,13 +210,53 @@ def test_state_render_surfaces_contradictions_and_unknowns():
     assert "Unknown" in text and "no record of a TLS terminator" in text
 
 
-def test_state_render_changes_with_content_but_not_with_query_alone():
-    """Guards the real finding: counts saturate, so only content moves the state."""
+def test_state_carries_the_query_exactly_once():
+    """The query moved into the state, and must not be duplicated there."""
+    text = packet_state_text(packet(query="is the daemon listening on 8791"))
+    assert "Query: is the daemon listening on 8791" in text
+    assert text.count("is the daemon listening on 8791") == 1
+
+
+def test_state_still_changes_with_content():
     a = packet_state_text(packet(query="alpha"))
-    b = packet_state_text(packet(query="beta"))
-    assert a == b  # query is not in the state; it is in the question
-    c = packet_state_text(packet(decision_like=[{"session_id": "s", "excerpt": "different"}]))
+    c = packet_state_text(packet(
+        query="alpha", decision_like=[{"session_id": "s", "excerpt": "different"}]))
     assert c != a
+
+
+def test_query_line_cannot_displace_evidence():
+    """The query is context, not a replacement for the evidence payload."""
+    ev = [{"rank": 0, "source_id": "conversation:a:b#1", "excerpt": "E" * 300}]
+    text = packet_state_text(packet(query="q" * 300, evidence=ev))
+    assert "Query:" in text
+    assert "E" * 100 in text
+
+
+def test_query_length_does_not_change_the_evidence_payload():
+    """Only the proposition may change; the query must not re-trim the payload.
+
+    The evidence here deliberately overflows the budget so that clipping really
+    happens: if the query line were charged to the budget, a long query would
+    clip it at a different point and this would fail.
+    """
+    ev = [{"rank": i, "source_id": f"conversation:a:b#{i}", "excerpt": "E" * 320}
+          for i in range(4)]
+    strip = lambda t: [l for l in t.splitlines() if not l.startswith("Query: ")]
+    long_q = packet_state_text(packet(query="q" * 290, evidence=ev))
+    short_q = packet_state_text(packet(query="short", evidence=ev))
+    assert strip(long_q) == strip(short_q), "the query changed the evidence payload"
+    assert strip(long_q), "no budgeted lines were emitted at all"
+
+
+def test_budget_lead_lines_are_not_charged():
+    from z0int.verify_gate import _Budget
+
+    b = _Budget(100)
+    b.add_lead("Query: " + "q" * 60)
+    assert b._room() == 100, "a lead line was charged to the budget"
+    b.add("x" * 99)
+    assert len(b.lines) == 1 and b._room() == 0
+    assert b.text().startswith("Query: ")
 
 
 def test_state_render_respects_the_char_budget():
@@ -205,7 +271,7 @@ def test_state_render_respects_the_char_budget():
         evidence_pointers_ranked=[{"pointer": "p" * 900, "hits": 1} for _ in range(500)],
         literals=["l" * 300] * 200,
     ))
-    assert len(text) <= _STATE_CHAR_BUDGET, f"state over budget: {len(text)} chars"
+    assert len(text) <= STATE_BOUND, f"state over bound: {len(text)} chars"
 
 
 def test_state_render_keeps_the_header_and_literals_under_pressure():
@@ -286,7 +352,7 @@ def test_state_render_never_emits_a_clipped_stub():
     # passed against a mutated constant until this was fixed.
     stubs = [l for l in text.splitlines() if l.endswith("\u2026") and len(l) < 40]
     assert stubs == [], f"stub lines emitted: {stubs}"
-    assert len(text) <= _STATE_CHAR_BUDGET
+    assert len(text) <= STATE_BOUND
 
 
 def test_state_render_tolerates_a_packet_without_evidence():
@@ -342,7 +408,8 @@ def test_receipt_carries_every_required_field():
     prov = x["state_packet"]
     assert prov["recipe_signature"] and prov["query"] and prov["source"]
     assert prov["evidence_counts"]["sessions_touched"] == 53
-    assert "which port" in x["verification_question"]
+    assert x["verification_question"] == PROPOSITION
+    assert x["state_packet"]["query"] == "which port does the AgentsView MCP server listen on"
     assert x["verifier"]["backend"] == "stub"
     assert x["verifier"]["model"] == "stub-model"
     assert x["verifier"]["state_chars"] > 0
@@ -387,7 +454,8 @@ def test_gate_passes_the_question_and_state_to_the_backend():
     stub = StubBackend(0.5)
     gate(packet(query="is the sky blue"), backend=stub)
     req = stub.seen_requests[0]
-    assert "is the sky blue" in req.questions[0].instructions
+    assert "is the sky blue" in req.state
+    assert "is the sky blue" not in req.questions[0].instructions
     assert req.questions[0].type == "boolean"
     assert "sessions_touched=53" in req.state
 
@@ -418,7 +486,7 @@ def test_receipt_records_that_the_state_was_truncated():
     """The receipt must never claim the verifier saw a state it did not."""
     r = gate(packet(), backend=TruncatingBackend(0.5))
     assert _extra(r)["verifier"]["state_truncated"] is True
-    assert _extra(r)["verifier"]["truncated_questions"] == ["state_packet_supports_action"]
+    assert _extra(r)["verifier"]["truncated_questions"] == ["evidence_answers_query"]
 
 
 def test_receipt_is_json_serializable():

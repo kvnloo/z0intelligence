@@ -26,9 +26,20 @@ Thresholds are PROVISIONAL. On the real RLCDAlignBench corpus every NanoJev
 score falls in 0.323-0.543, so 0.5 is not a decision boundary and this module
 refuses to pretend otherwise. It exposes the ambiguity as a band:
 
-    p_true >= allow_at          -> ALLOW     evidence supports acting now
-    p_true <= escalate_below    -> ESCALATE  evidence is contrary; get a human
+    p_true >= allow_at          -> ALLOW     evidence answers the query
+    p_true <= escalate_below    -> ESCALATE  evidence does not; get more or a human
     otherwise                   -> ABSTAIN   unresolved; do not act on this alone
+
+The proposition is fixed wording and does not interpolate the query:
+
+    "Does the supplied evidence contain enough information to answer the user's
+     query correctly without additional retrieval or assumptions?"
+
+It previously read "does the evidence support acting on <query>", which asks
+whether the material is relevant to acting. The experiment's labels mean
+something else -- whether the query can be answered from this evidence alone --
+so the two questions were conflated and the cases did not separate. The query is
+supplied exactly once, in the state, as context for the proposition.
 
 ``ALLOW``/``ABSTAIN``/``ESCALATE`` are this gate's vocabulary. ``families.py``
 owns the action-family vocabulary and already has ``ABSTAIN``; the other two are
@@ -88,6 +99,10 @@ _MAX_ENTRIES_PER_SECTION = 4
 #: spends tokens without carrying content.
 _MIN_LINE_CHARS = 40
 
+#: Cap on the unbilled query context. The whole state is therefore bounded by
+#: ``_STATE_CHAR_BUDGET + len("Query: ") + _QUERY_MAX_CHARS``.
+_QUERY_MAX_CHARS = 300
+
 
 def action_of(
     p_true: float,
@@ -105,20 +120,29 @@ def action_of(
     return "ABSTAIN"
 
 
-def verification_question(packet: dict[str, Any]) -> str:
-    """Derive the question from the packet, never a fixed string.
+#: The proposition under test. It is deliberately *not* interpolated with the
+#: query: the previous wording ("does the evidence support acting on <query>")
+#: asked whether the material was relevant to acting, while the experiment's
+#: labels mean "can this query be answered correctly from this evidence alone".
+#: Those are different questions, and mixing them made the three cases
+#: unseparable. The query is supplied once, in the state, as context.
+_PROPOSITION = (
+    "Does the supplied evidence contain enough information to answer the user's "
+    "query correctly without additional retrieval or assumptions?"
+)
 
-    The contemplated action is whatever the packet was orienting for, which is
-    its ``query``; the question asks whether this packet's evidence is enough to
-    act on it now.
+
+def verification_question(packet: dict[str, Any]) -> str:
+    """Return the fixed proposition; the query travels in the state instead.
+
+    The query is still required -- the proposition refers to "the user's query"
+    and cannot be judged without it -- so a packet lacking one is rejected here
+    rather than producing an unanswerable prompt.
     """
     query = str(packet.get("query") or "").strip()
     if not query:
-        raise ValueError("state packet has no 'query'; cannot derive a verification question")
-    return (
-        f'Does the evidence in this state packet support acting on "{query}" now, '
-        "without obtaining more information?"
-    )
+        raise ValueError("state packet has no 'query'; cannot pose a verification question")
+    return _PROPOSITION
 
 
 def _clip(value: Any, limit: int) -> str:
@@ -144,11 +168,25 @@ class _Budget:
     def __init__(self, budget: int):
         self.budget = budget
         self.lines: list[str] = []
+        #: Context emitted ahead of the budgeted lines and NOT charged to them.
+        self.lead: list[str] = []
         self.dropped: list[str] = []
 
     def _room(self) -> int:
         used = sum(len(x) + 1 for x in self.lines)
         return self.budget - used
+
+    def add_lead(self, line: str) -> None:
+        """Emit context outside the evidence budget.
+
+        The query is context for the proposition, not evidence. Charging it to
+        the budget would re-trim the trailing sections and change the evidence
+        payload as a side effect, which is exactly what must not happen when only
+        the proposition is meant to change. It is capped by the caller, so it
+        cannot grow without bound.
+        """
+        if line:
+            self.lead.append(line)
 
     def add(self, line: str, *, priority: str = "low") -> None:
         room = self._room()
@@ -165,7 +203,7 @@ class _Budget:
             self.dropped.append(priority)
 
     def text(self) -> str:
-        return "\n".join(self.lines)
+        return "\n".join(self.lead + self.lines)
 
 
 def packet_state_text(packet: dict[str, Any]) -> str:
@@ -179,6 +217,16 @@ def packet_state_text(packet: dict[str, Any]) -> str:
     repeated here, where it would spend budget the prose needs.
     """
     b = _Budget(_STATE_CHAR_BUDGET)
+
+    # The user's query, supplied exactly once, as context for the proposition.
+    # It moved here from the proposition itself: the proposition now asks whether
+    # this evidence answers "the user's query", so the query has to be visible to
+    # the verifier, and it must not also appear in the question or it would be
+    # duplicated. Highest priority so it cannot be squeezed out, and it displaces
+    # only the low-priority index sections below, never the evidence.
+    query = str(packet.get("query") or "").strip()
+    if query:
+        b.add_lead("Query: " + _clip(query, _QUERY_MAX_CHARS))
 
     counts = packet.get("evidence_counts") or {}
     if counts:
@@ -303,11 +351,19 @@ def gate(
     verifier = backend if backend is not None else create_backend(backend_name)
 
     q = DecisionQuestion(
-        id="state_packet_supports_action",
+        id="evidence_answers_query",
         type="boolean",
         instructions=question,
-        false_criterion="The packet does not support acting on the query now.",
-        true_criterion="The packet supports acting on the query now.",
+        # The criteria are rendered into the prompt too, so they must state the
+        # same proposition rather than the retired "supports acting" one.
+        false_criterion=(
+            "The evidence is relevant but does not contain enough information to "
+            "answer the query correctly."
+        ),
+        true_criterion=(
+            "The evidence contains enough information to answer the query "
+            "correctly, without further retrieval or assumptions."
+        ),
     )
     request = DecisionRequest(
         state=canonical_state_text(state_text),
