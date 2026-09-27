@@ -18,5 +18,5 @@ if [ ! -d "$root/plaintext_articles" ]; then
   tar -xzf "$root/wikispeedia_articles_plaintext.tar.gz" -C "$root"
 fi
 
-jevlike-data wikispeedia --root "$root" --output "$root/jsonl"
+openjev-data wikispeedia --root "$root" --output "$root/jsonl"
 echo "Built $root/jsonl. Cite West and Leskovec, WWW 2012."
