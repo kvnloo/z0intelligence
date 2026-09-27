@@ -91,6 +91,23 @@ def register_builtin_backends() -> None:
     if _BUILTINS_LOADED:
         return
     _BUILTINS_LOADED = True
+    if "qwen_ollama" not in _REGISTRY:
+        from .qwen_ollama import QwenOllamaBackend
+
+        register(
+            BackendSpec(
+                id="qwen_ollama",
+                kind="remote_local",
+                description=(
+                    "Local Qwen verifier over an existing Ollama endpoint. Reads a genuine "
+                    "token-level P(true) from the first generated token's logprobs at the "
+                    "decision position; comparable with nanojev."
+                ),
+                factory=QwenOllamaBackend,
+                aliases=("qwen",),
+                local=True,
+            )
+        )
     if "nanojev" not in _REGISTRY:
         from .nanojev import NanoJevBackend
 
