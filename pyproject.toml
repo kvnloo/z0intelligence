@@ -32,7 +32,21 @@ z0int = "z0int.cli:main"
 z0int-compile = "z0int.compile:main"
 z0int-train-next-action = "z0int.train:main"
 [project.optional-dependencies]
-test = ["pytest==8.4.2", "agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@e67d76fe2f1d52a5911abc8974489a10e89bb431"]
+  # Runtime deps for the decision backends and verifiers that ship in this tree.
+  # `laya` and `flash-linear-attention` were previously declared ONLY in
+  # requirements.txt, so the documented `pip install -e '.[test]'` produced an
+  # environment where the laya live tests failed with `No module named 'laya'`.
+  verifiers = [
+    "laya==0.1.6",
+    "flash-linear-attention==0.5.2",
+  ]
+  test = [
+    "pytest==8.4.2",
+    "agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@e67d76fe2f1d52a5911abc8974489a10e89bb431",
+    # the suite exercises the verifier backends, so the test extra pulls them in
+    "laya==0.1.6",
+    "flash-linear-attention==0.5.2",
+  ]
 analytics = ["agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@e67d76fe2f1d52a5911abc8974489a10e89bb431"]
 games = [
   "chess>=1.11",
@@ -46,3 +60,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "webgpu-demo"]
+markers = [
+  "live: requires a live provider or an external verifier; deselect with -m 'not live'",
+]

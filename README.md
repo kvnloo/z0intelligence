@@ -278,6 +278,28 @@ export HF_HOME=/path/to/large-drive/huggingface
 pip install -e '.[test]'
 ```
 
+#### Environment contract
+
+`pip install -e '.[test]'` is the declared install for the supported runtime and is sufficient
+for the full suite. Two things are worth stating explicitly because they were silently missing:
+
+- **Supported runtime is Python 3.11** (`requires-python = ">=3.10,<3.14"`, `.python-version`).
+  Measurements taken on an interpreter outside that range are not comparable.
+- **`laya` and `flash-linear-attention`** are required by the Laya decision backend and the Laya
+  verifier. They are now declared in `.[test]` and in the `verifiers` extra; before this they were
+  listed only in `requirements.txt`, so a declared install produced an environment where the laya
+  live tests failed with `No module named 'laya'`.
+- **`jevkit` cannot be pip-installed.** It is not on PyPI and `kvnloo/hermes-jev-skills` carries no
+  packaging. The Jev verifier treats it as an *optional* credential source and falls back to
+  `TYPESAFE_API_KEY`, so the suite passes without it. To exercise the live Jev test, put that
+  checkout on the path:
+
+  ```bash
+  export PYTHONPATH=/path/to/hermes-jev-skills:$PYTHONPATH
+  ```
+
+Live tests are marked `live` and can be deselected with `pytest -m 'not live'`.
+
 Owned example (typed option scores, timing, model revision, prompt hash):
 
 ```bash

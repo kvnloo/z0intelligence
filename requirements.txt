@@ -10,3 +10,8 @@ protobuf==7.36.1
 pytest==8.4.2
 laya==0.1.6
 flash-linear-attention==0.5.2
+agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@e67d76fe2f1d52a5911abc8974489a10e89bb431
+# jevkit is NOT published to PyPI and kvnloo/hermes-jev-skills carries no packaging,
+# so it cannot be pip-installed. The Jev verifier uses it as an OPTIONAL credential
+# source and falls back to TYPESAFE_API_KEY. To exercise the live Jev test:
+#   export PYTHONPATH=/path/to/hermes-jev-skills:$PYTHONPATH
