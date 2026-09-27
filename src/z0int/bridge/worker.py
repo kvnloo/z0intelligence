@@ -51,11 +51,42 @@ def serve(generation: int | None = None) -> int:
                 _respond(req_id, rt.self_check())
                 continue
             if op == "status":
-                _respond(req_id, {"ok": True, **rt.identity()})
+                _respond(req_id, rt.decision_status())
+                continue
+            if op == "decision_warm":
+                payload = req.get("payload") if isinstance(req.get("payload"), dict) else {}
+                backend = str(payload.get("backend") or req.get("backend") or "decider_2b")
+                _respond(req_id, rt.decision_warm(backend=backend))
+                continue
+            if op == "decision":
+                payload = req.get("payload") if isinstance(req.get("payload"), dict) else {}
+                backend = str(payload.get("backend") or req.get("backend") or "decider_2b")
+                capability_id = payload.get("capability_id") or req.get("capability_id")
+                request_mapping = payload.get("request")
+                if not isinstance(request_mapping, dict):
+                    _respond(req_id, {"ok": False, "error": "payload.request must be object", **rt.identity()})
+                    continue
+                _respond(
+                    req_id,
+                    rt.decision(
+                        backend=backend,
+                        request_mapping=request_mapping,
+                        capability_id=str(capability_id) if capability_id else None,
+                        trace_id=str(req.get("trace_id") or payload.get("trace_id") or "") or None,
+                    ),
+                )
                 continue
             if op == "drain":
                 rt.mark_drain()
                 _respond(req_id, {"ok": True, "draining": True, **rt.identity()})
+                continue
+            if op == "cognition_shadow":
+                # The shadow op carries its fields flat on the request; a nested
+                # `payload` object is accepted too and overlaid on top.
+                payload = {k: v for k, v in req.items() if k not in ("id", "op")}
+                if isinstance(req.get("payload"), dict):
+                    payload.update(req["payload"])
+                _respond(req_id, rt.cognition_shadow(payload))
                 continue
             if op == "shutdown":
                 _respond(req_id, {"ok": True, "shutdown": True, **rt.identity()})
