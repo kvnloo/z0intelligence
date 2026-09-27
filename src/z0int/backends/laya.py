@@ -153,14 +153,12 @@ class LayaBackend:
     def capabilities(self) -> BackendCapabilities:
         return BackendCapabilities(
             id=self.ID,
-            kind="calibrated_decision",
-            description="Laya non-autoregressive System-1 decision model (~421M)",
+            trainable=False,
             supports_boolean=True,
             supports_choice=True,
             supports_score=True,
             max_choice_options=16,
             max_score_levels=10,
-            supports_batch_questions=True,
             local=True,
         )
 

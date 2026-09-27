@@ -1,0 +1,13 @@
+{
+  "provider": "openrouter",
+  "model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "function": "planning",
+  "quality_metric": {
+    "name": "usable_correct_physical_calls",
+    "correct": 6,
+    "n": 6
+  },
+  "measurement_confidence": "PROVISIONAL; one small authored fixture cohort. Failed/invalid/truncated inference earns no quality credit. Native-tool adapter is not the production text-worker contract. A/B found no benefit.",
+  "source_sha256": "4b789859f002cb795c814fb6a4520865653a940e7748db61eda699b0ad6dd8e7",
+  "note": "Aggregate of preserved local measurements; no raw private receipts or transcripts published."
+}

@@ -91,6 +91,11 @@ def register_builtin_backends() -> None:
     if _BUILTINS_LOADED:
         return
     _BUILTINS_LOADED = True
+    if "laya_421m" not in _REGISTRY:
+        from .laya import LayaBackend
+        register(BackendSpec(id="laya_421m", kind="typed_decision",
+            description="Local Laya experimental verifier", factory=LayaBackend.for_manifest_id,
+            aliases=("laya",), local=True))
     if "nanojev" not in _REGISTRY:
         from .nanojev import NanoJevBackend
 

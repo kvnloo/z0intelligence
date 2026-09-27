@@ -1,0 +1,337 @@
+{
+  "schema": "z0int.worker_routing.v1",
+  "policy_revision": "validated-free-only-dsh-v1",
+  "baseline": {
+    "model": "codex-parent",
+    "method": "ceil_utf8_bytes_div_4_v1",
+    "description": "Estimated tokens for the same worker messages and delivered output if handled by the Codex parent; not measured savings or currency."
+  },
+  "max_attempts": 3,
+  "timeout_s": 20,
+  "fallback_order": [
+    "cerebras",
+    "deepseek",
+    "groq"
+  ],
+  "defaults": {
+    "groq": "openai/gpt-oss-20b",
+    "cerebras": "qwen-3.8-27b",
+    "deepseek": "deepseek-chat",
+    "openrouter": "nvidia/nemotron-3-super-120b-a12b:free",
+    "nous": "inclusionai/ling-3.0-flash-sante:free",
+    "vercel": "openai/gpt-oss-20b",
+    "nvidia": "openai/gpt-oss-20b",
+    "grok": "grok-4.20-0309-non-reasoning",
+    "local": "qwen2.5:3b"
+  },
+  "providers": {
+    "groq": {
+      "base_url": "https://api.groq.com/openai",
+      "api_key_env": "GROQ_API_KEY",
+      "cohort": "renewable",
+      "limits_note": "free plan: 30 RPM, 8000 TPM, 200000 TPD. TPM binds first \u2014 one ~6k-token call fills a minute.",
+      "source": "https://console.groq.com/docs/rate-limits",
+      "models": [
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "gpt-oss-120b",
+          "context": 131072,
+          "notes": "reasoning model",
+          "dialect": "hammer"
+        },
+        {
+          "id": "openai/gpt-oss-20b",
+          "label": "gpt-oss-20b",
+          "context": 131072,
+          "notes": "smallest of the cohort",
+          "dialect": "hammer"
+        },
+        {
+          "id": "qwen/qwen3.8-27b",
+          "label": "qwen3.8-27b",
+          "context": 131072,
+          "notes": null,
+          "dialect": "hammer"
+        }
+      ],
+      "dialect": "hammer",
+      "dialect_note": "hammer = tool_choice 'auto', 384-token completion budget, parses BOTH native tool_calls and bare JSON content. Required because these models intermittently answer with JSON content instead of a tool_call: under tool_choice='required' that is an HTTP 400 'tool_use_failed' on Groq, which the adapter would record as an abstention. 'qwen'/'hermes' cap output at 1024/256 and both demand a native call.",
+      "base_url_note": "Host root only. The transport appends '/v1/chat/completions' itself, so a base_url ending in /v1 produces /v1/v1/chat/completions and a 404."
+    },
+    "cerebras": {
+      "base_url": "https://api.cerebras.ai",
+      "api_key_env": "CEREBRAS_API_KEY",
+      "cohort": "trial-credit",
+      "limits_note": "Free Trial: 5 RPM, 30K uncached / 90K total TPM, 1M TPH, 1M TPD. Consumes a finite $5 grant that expires 30 days after issue. Cached tokens do not count against uncached TPM.",
+      "source": "https://inference-docs.cerebras.ai/support/rate-limits",
+      "models": [
+        {
+          "id": "gpt-oss-120b",
+          "label": "gpt-oss-120b",
+          "context": 65536,
+          "notes": "free-tier context is 65,536 \u2014 NOT the 131,072 the paid table shows",
+          "dialect": "hammer"
+        },
+        {
+          "id": "qwen-3.8-27b",
+          "label": "qwen-3.8-27b",
+          "context": 65536,
+          "notes": null,
+          "dialect": "hammer"
+        }
+      ],
+      "dialect": "hammer",
+      "dialect_note": "hammer = tool_choice 'auto', 384-token completion budget, parses BOTH native tool_calls and bare JSON content. Required because these models intermittently answer with JSON content instead of a tool_call: under tool_choice='required' that is an HTTP 400 'tool_use_failed' on Groq, which the adapter would record as an abstention. 'qwen'/'hermes' cap output at 1024/256 and both demand a native call.",
+      "base_url_note": "Host root only. The transport appends '/v1/chat/completions' itself, so a base_url ending in /v1 produces /v1/v1/chat/completions and a 404."
+    },
+    "deepseek": {
+      "base_url": "https://api.deepseek.com",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "cohort": "paid-api",
+      "limits_note": "the incumbent route; included as the comparison baseline, not as a free tier",
+      "source": "https://api-docs.deepseek.com/quick_start/pricing",
+      "models": [
+        {
+          "id": "deepseek-chat",
+          "label": "deepseek-chat",
+          "context": 131072,
+          "notes": "baseline",
+          "dialect": "hammer"
+        }
+      ],
+      "dialect": "hammer",
+      "dialect_note": "hammer = tool_choice 'auto', 384-token completion budget, parses BOTH native tool_calls and bare JSON content. Required because these models intermittently answer with JSON content instead of a tool_call: under tool_choice='required' that is an HTTP 400 'tool_use_failed' on Groq, which the adapter would record as an abstention. 'qwen'/'hermes' cap output at 1024/256 and both demand a native call.",
+      "base_url_note": "Host root only. The transport appends '/v1/chat/completions' itself, so a base_url ending in /v1 produces /v1/v1/chat/completions and a 404."
+    },
+    "openrouter": {
+      "base_url": "https://openrouter.ai/api",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "cohort": "existing-api",
+      "auth": "environment",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "qwen/qwen3.8-27b",
+          "label": "qwen/qwen3.8-27b"
+        },
+        {
+          "id": "nvidia/nemotron-3-super-120b-a12b:free",
+          "label": "nvidia/nemotron-3-super-120b-a12b:free"
+        }
+      ],
+      "worker_default_model": "nvidia/nemotron-3-super-120b-a12b:free"
+    },
+    "nous": {
+      "base_url": "https://inference-api.nousresearch.com",
+      "api_key_env": null,
+      "cohort": "existing-subscription",
+      "auth": "hermes-oauth",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "qwen/qwen3.8-27b",
+          "label": "qwen/qwen3.8-27b"
+        },
+        {
+          "id": "inclusionai/ling-3.0-flash-sante:free",
+          "label": "inclusionai/ling-3.0-flash-sante:free"
+        }
+      ],
+      "worker_default_model": "inclusionai/ling-3.0-flash-sante:free"
+    },
+    "vercel": {
+      "base_url": "https://ai-gateway.vercel.sh",
+      "api_key_env": "AI_GATEWAY_API_KEY",
+      "cohort": "existing-api",
+      "auth": "environment",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "openai/gpt-oss-20b",
+          "label": "openai/gpt-oss-20b"
+        }
+      ],
+      "worker_default_model": "openai/gpt-oss-20b"
+    },
+    "nvidia": {
+      "base_url": "https://integrate.api.nvidia.com",
+      "api_key_env": "NVIDIA_API_KEY",
+      "cohort": "existing-api",
+      "auth": "environment",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "openai/gpt-oss-20b",
+          "label": "openai/gpt-oss-20b"
+        }
+      ],
+      "worker_default_model": "openai/gpt-oss-20b"
+    },
+    "grok": {
+      "base_url": "https://api.x.ai",
+      "api_key_env": null,
+      "cohort": "existing-subscription",
+      "auth": "hermes-oauth",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "grok-4.20-0309-non-reasoning",
+          "label": "grok-4.20-0309-non-reasoning"
+        }
+      ],
+      "worker_default_model": "grok-4.20-0309-non-reasoning"
+    },
+    "local": {
+      "base_url": "http://127.0.0.1:11434",
+      "api_key_env": null,
+      "cohort": "local",
+      "auth": "none",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "qwen2.5:3b",
+          "label": "qwen2.5:3b"
+        }
+      ],
+      "worker_default_model": "qwen2.5:3b"
+    }
+  },
+  "rules": [
+    {
+      "category": "local",
+      "pattern": "\\blocal-only\\b",
+      "provider": "local",
+      "remote_fallback": false
+    },
+    {
+      "category": "code",
+      "pattern": "\\b(python|javascript|sql|function|code|regex)\\b",
+      "provider": "cerebras"
+    },
+    {
+      "category": "structured",
+      "pattern": "\\b(json|csv|extract|sort|sum|calculate|arithmetic)\\b",
+      "provider": "groq"
+    },
+    {
+      "category": "language",
+      "pattern": "\\b(translate|translation|summarize|summary)\\b",
+      "provider": "deepseek"
+    },
+    {
+      "category": "critique",
+      "pattern": "\\b(critique|counterargument|weakness)\\b",
+      "provider": "grok"
+    },
+    {
+      "category": "comparison",
+      "pattern": "\\b(compare|comparison|tradeoffs)\\b",
+      "provider": "nous"
+    },
+    {
+      "category": "classification",
+      "pattern": "\\b(classify|classification|sentiment)\\b",
+      "provider": "nvidia"
+    },
+    {
+      "category": "rewrite",
+      "pattern": "\\b(rewrite|proofread|grammar)\\b",
+      "provider": "openrouter"
+    }
+  ],
+  "default_provider": "cerebras",
+  "provider_caps": {
+    "cerebras": 32,
+    "deepseek": 32,
+    "jev": 32,
+    "groq": 16,
+    "nvidia": 12,
+    "local": 1,
+    "openrouter": 1,
+    "vercel": 8,
+    "nous": null,
+    "grok": null
+  },
+  "provider_caps_source": {
+    "kind": "operator_handoff",
+    "path": "preserved-local-evidence:pasted-text.txt",
+    "referenced_report": "provider-saturation-and-scaling-policy.md",
+    "verification": "Referenced report not located; supplied measurements are policy inputs, not independently reproduced here.",
+    "affected_update": {
+      "openrouter": 1,
+      "vercel": 8,
+      "evidence_path": "preserved-local-evidence:dsh-evidence.json",
+      "sha256": "26e6bbbdef2ef9343c5440ec6b728e998eccb53b5cbd54e503142e9f1cb5a53d"
+    }
+  },
+  "function_orders": {
+    "structured": [
+      "cerebras",
+      "groq",
+      "deepseek"
+    ],
+    "text": [
+      "cerebras",
+      "deepseek",
+      "groq"
+    ]
+  },
+  "structured_functions": [
+    "tool_selection",
+    "coding_implementation"
+  ],
+  "health_cooldown_seconds": 60,
+  "health_error_ttl_seconds": 30,
+  "free_only": true,
+  "free_provider_order": [
+    "openrouter"
+  ],
+  "validated_free_routes": [
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "validated": true,
+      "price_usd": 0,
+      "evidence_path": "preserved-local-evidence:dsh-evidence.json",
+      "evidence_sha256": "26e6bbbdef2ef9343c5440ec6b728e998eccb53b5cbd54e503142e9f1cb5a53d",
+      "source": "DSH session-e9a2142b-3884-4abb-b890-b646dd0860ab seq17817-17818",
+      "cap_basis": "conservative single-call validation, not measured saturation ceiling",
+      "request_constraints": {
+        "provider": {
+          "max_price": {
+            "prompt": 0,
+            "completion": 0,
+            "request": 0
+          },
+          "allow_fallbacks": false
+        }
+      }
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "validated": true,
+      "price_usd": 0,
+      "evidence_sha256": "2b5bc3e8b1a887c461661624c04713f233d0738f73e5fc158f0461ef36cf6685",
+      "evidence_path": "manifests/capability-evidence/groq-free-authorization.json",
+      "billing_basis": "operator_confirmed_free_plan; no paid fallback"
+    }
+  ],
+  "free_policy_exclusions": {
+    "vercel": "Recovered transport and cap8, but measured positive gateway cost: free credit is not a zero-priced route",
+    "other_providers": "No explicitly validated zero-priced route imported for this policy"
+  },
+  "allow_paid_jev_verification": true,
+  "quota_budgets": {
+    "groq": {
+      "model": "openai/gpt-oss-20b",
+      "limits": {
+        "rpm": 30,
+        "rpd": 1000,
+        "tpm": 8000,
+        "tpd": 200000
+      },
+      "no_paid_spill": true
+    }
+  }
+}
