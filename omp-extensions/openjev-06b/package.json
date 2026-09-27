@@ -1,0 +1,7 @@
+{
+  "name": "omp-openjev-06b",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenJev 0.6B OMP extension."
+}

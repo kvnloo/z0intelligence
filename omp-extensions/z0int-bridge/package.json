@@ -1,0 +1,7 @@
+{
+  "name": "omp-z0int-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "z0int bridge - immutable OMP transport shim (v2) to the z0int decision runtime."
+}
