@@ -190,7 +190,12 @@ class CLIBackendsTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             payload = json.loads(buf.getvalue())
             self.assertEqual(payload["schema"], "z0int.backends.doctor.v1")
-            row = payload["backends"][0]
+            # Look the backend up by id rather than trusting list order. The
+            # registry sorts by id, so any backend added alphabetically before
+            # `nanojev` (e.g. `decider_2b`) would otherwise break this.
+            by_id = {r["id"]: r for r in payload["backends"]}
+            self.assertIn("nanojev", by_id)
+            row = by_id["nanojev"]
             self.assertEqual(row["id"], "nanojev")
             self.assertFalse(row["ready"])
             self.assertFalse(row["loaded"])
