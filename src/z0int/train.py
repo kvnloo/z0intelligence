@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
+import os
 from collections import Counter
 from pathlib import Path
 
@@ -14,6 +16,30 @@ from .families import FAMILIES
 from .compile import DEFAULT_OUT
 
 PN = 96
+
+#: The MB / fly-plasticity arm is a research baseline owned by Evolution Lab.
+#: Ownership runs one way (Evolution Lab consumes z0intelligence, never the
+#: reverse), so this module must not import across that boundary. The primitive is
+#: resolved by name from an explicit opt-in provider; with no provider configured
+#: the arm reports why it did not run instead of reaching into another repo's file
+#: layout. The previous version hardcoded `/workspace/evolution-lab` on sys.path.
+MB_PROVIDER_ENV = "Z0INT_MB_PROVIDER"
+
+
+def _mb_provider():
+    """Return ``(fit_fly, predict_fly, None)`` or ``(None, None, reason)``."""
+    spec = os.environ.get(MB_PROVIDER_ENV, "").strip()
+    if not spec:
+        return None, None, f"{MB_PROVIDER_ENV} is not set; MB arm skipped"
+    try:
+        module = importlib.import_module(spec)
+    except Exception as exc:  # noqa: BLE001 - report, never crash the baseline run
+        return None, None, f"{spec!r} not importable: {type(exc).__name__}: {exc}"
+    fit = getattr(module, "fit_fly", None)
+    predict = getattr(module, "predict_fly", None)
+    if fit is None or predict is None:
+        return None, None, f"{spec!r} does not export fit_fly/predict_fly"
+    return fit, predict, None
 
 
 def _hash(text: str, dim: int = PN) -> np.ndarray:
@@ -82,17 +108,16 @@ def main(argv: list[str] | None = None) -> int:
         "note": "Time-split; same features. MB uses Evolution Lab local_plasticity (KC→MBON).",
     }
     if args.mb:
-        import sys
-        from pathlib import Path as P
-
-        sys.path.insert(0, str(P("/workspace/evolution-lab")))
-        from evolution_lab.jev_distill import fit_fly, predict_fly
-
-        fly = fit_fly(Xtr, ytr, len(FAMILIES), n_kc=args.n_kc, seed=1)
-        pred_f = predict_fly(Xcf, fly)
-        report["mb_confirm"] = float((pred_f == ycf).mean())
-        report["mb_n_params"] = int(fly["n_params"])
-        report["mb_n_kc"] = int(args.n_kc)
+        fit_fly, predict_fly, reason = _mb_provider()
+        if fit_fly is None:
+            report["mb_confirm"] = None
+            report["mb_unavailable"] = reason
+        else:
+            fly = fit_fly(Xtr, ytr, len(FAMILIES), n_kc=args.n_kc, seed=1)
+            pred_f = predict_fly(Xcf, fly)
+            report["mb_confirm"] = float((pred_f == ycf).mean())
+            report["mb_n_params"] = int(fly["n_params"])
+            report["mb_n_kc"] = int(args.n_kc)
     print(json.dumps(report, indent=2))
     dest = args.episodes.parent / "next_action_report.json"
     dest.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
