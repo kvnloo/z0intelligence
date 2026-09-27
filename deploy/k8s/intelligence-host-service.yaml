@@ -1,0 +1,28 @@
+# Existing hermes-lab lane: host authority keeps models and credentials local.
+apiVersion: v1
+kind: Service
+metadata:
+  name: z0intelligence
+  namespace: hermes-lab
+spec:
+  ports:
+    - name: http
+      port: 11501
+      targetPort: 11501
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: z0intelligence-host
+  namespace: hermes-lab
+  labels:
+    kubernetes.io/service-name: z0intelligence
+addressType: IPv4
+ports:
+  - name: http
+    protocol: TCP
+    port: 11501
+endpoints:
+  - addresses: ["172.19.0.1"]
+    conditions:
+      ready: false # Publish only after probing this host from the existing Kind lane.

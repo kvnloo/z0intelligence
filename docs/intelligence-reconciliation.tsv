@@ -1,0 +1,559 @@
+path	classification	reason
+.github/CODEOWNERS	ALREADY_CANONICAL	Byte-identical
+.github/dependabot.yml	ALREADY_CANONICAL	Byte-identical
+.github/labeler.yml	ALREADY_CANONICAL	Byte-identical
+.github/scripts/check-receipt.py	ALREADY_CANONICAL	Byte-identical
+.github/scripts/create-labels.sh	ALREADY_CANONICAL	Byte-identical
+.github/scripts/expire-claims.sh	ALREADY_CANONICAL	Byte-identical
+.github/workflows/automerge-nightly.yml	ALREADY_CANONICAL	Byte-identical
+.github/workflows/automerge-preview.yml	ALREADY_CANONICAL	Byte-identical
+.github/workflows/claim-expiry.yml	ALREADY_CANONICAL	Byte-identical
+.github/workflows/labeler.yml	ALREADY_CANONICAL	Byte-identical
+.github/workflows/promote-preview.yml	ALREADY_CANONICAL	Byte-identical
+.github/workflows/receipt.yml	ALREADY_CANONICAL	Byte-identical
+.github/workflows/scorecard.yml	ALREADY_CANONICAL	Byte-identical
+.github/workflows/stale.yml	ALREADY_CANONICAL	Byte-identical
+.gitignore	ALREADY_CANONICAL	Byte-identical
+.python-version	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/README.md	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/inventory.yml	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/kit-inventory.py	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/rollout.py	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/rollout.yml	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/scripts/cluster-similar-issues.py	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/skills/anti-slop/SKILL.md	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/skills/autodevelop/SKILL.md	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/skills/dr-eggbot/SKILL.md	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/skills/orient/SKILL.md	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/skills/pstack/SKILL.md	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/skills/tdd/SKILL.md	ALREADY_CANONICAL	Byte-identical
+.verified-oss-loop/skills/verify/SKILL.md	ALREADY_CANONICAL	Byte-identical
+ABAB_ITERATION_REPORT.md	ALREADY_CANONICAL	Byte-identical
+AGENTS.md	ALREADY_CANONICAL	Byte-identical
+AODL_COMPAT.md	ALREADY_CANONICAL	Byte-identical
+CLAUDE.md	ALREADY_CANONICAL	Byte-identical
+FUTURE_SLICE.md	ALREADY_CANONICAL	Byte-identical
+INTEGRATION_LEDGER.md	ALREADY_CANONICAL	Byte-identical
+LICENSE	ALREADY_CANONICAL	Byte-identical
+README.md	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+REFINEMENT_IMPLEMENTATION_REPORT.md	ALREADY_CANONICAL	Byte-identical
+ROADMAP.md	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+THIRD_PARTY.md	ALREADY_CANONICAL	Byte-identical
+adapters/__init__.py	ALREADY_CANONICAL	Byte-identical
+adapters/hermes-z0int/README.md	ALREADY_CANONICAL	Byte-identical
+adapters/hermes-z0int/adapter.py	ALREADY_CANONICAL	Byte-identical
+adapters/hermes_z0int/__init__.py	ALREADY_CANONICAL	Byte-identical
+adapters/hermes_z0int/adapter.py	ALREADY_CANONICAL	Byte-identical
+assets/README.md	ALREADY_CANONICAL	Byte-identical
+assets/openjev-hero.png	ALREADY_CANONICAL	Byte-identical
+assets/openjev-no-waitlist.png	ALREADY_CANONICAL	Byte-identical
+benchmarks/README.md	ALREADY_CANONICAL	Byte-identical
+benchmarks/build_compiler_contract.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/build_every.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/build_orchestration_v2.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/build_perturbations.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/build_typesafe.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/build_wanli.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/data/authored144.jsonl	ALREADY_CANONICAL	Byte-identical
+benchmarks/data/perturbations108-manifest.json	ALREADY_CANONICAL	Byte-identical
+benchmarks/data/perturbations108.jsonl	ALREADY_CANONICAL	Byte-identical
+benchmarks/data/shape777-manifest.json	ALREADY_CANONICAL	Byte-identical
+benchmarks/data/shape777.jsonl	ALREADY_CANONICAL	Byte-identical
+benchmarks/decision_vs_generation.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/evaluate.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/evaluate_external.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/evaluate_perturbations.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/fetch_sources.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/fixtures/compiler-contract-v1/examples.jsonl	ALREADY_CANONICAL	Byte-identical
+benchmarks/fixtures/decision-capability-v1/examples.jsonl	ALREADY_CANONICAL	Byte-identical
+benchmarks/fixtures/local-cognition-v1/examples.jsonl	ALREADY_CANONICAL	Byte-identical
+benchmarks/fixtures/orchestration-v1/scenarios.jsonl	ALREADY_CANONICAL	Byte-identical
+benchmarks/fixtures/orchestration-v2/scenarios.jsonl	ALREADY_CANONICAL	Byte-identical
+benchmarks/manifests/api-provider-registry.json	SUPERSEDED	Provider data reconciled into the one production worker_routing manifest
+benchmarks/manifests/evaluation-matrix.jsonl	ALREADY_CANONICAL	Byte-identical
+benchmarks/manifests/metric-contract.json	ALREADY_CANONICAL	Byte-identical
+benchmarks/manifests/source-selection.jsonl	ALREADY_CANONICAL	Byte-identical
+benchmarks/shape777.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/shape777_reranker.py	ALREADY_CANONICAL	Byte-identical
+benchmarks/verify_published.py	ALREADY_CANONICAL	Byte-identical
+demo/README.md	ALREADY_CANONICAL	Byte-identical
+demo/assets/openjev-phase1-replay-poster.png	ALREADY_CANONICAL	Byte-identical
+demo/assets/openjev-phase1-replay.gif	ALREADY_CANONICAL	Byte-identical
+demo/assets/openjev-phase1-replay.webm	ALREADY_CANONICAL	Byte-identical
+demo/assets/openjev-social-preview.png	ALREADY_CANONICAL	Byte-identical
+demo/index.html	ALREADY_CANONICAL	Byte-identical
+deploy/executor/Dockerfile	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+deploy/systemd/z0intelligence.service	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+docs/METHOD.md	ALREADY_CANONICAL	Byte-identical
+docs/ONBOARDING.md	ALREADY_CANONICAL	Byte-identical
+docs/REPRODUCE.md	ALREADY_CANONICAL	Byte-identical
+docs/RESEARCH.md	ALREADY_CANONICAL	Byte-identical
+docs/RESULTS.md	ALREADY_CANONICAL	Byte-identical
+docs/SCIENCE_CLAIMS.md	ALREADY_CANONICAL	Byte-identical
+docs/abab-loop.md	ALREADY_CANONICAL	Byte-identical
+docs/aodl-integration.md	ALREADY_CANONICAL	Byte-identical
+docs/backends.md	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+docs/brand.md	ALREADY_CANONICAL	Byte-identical
+docs/bridge-hot-reload.md	ALREADY_CANONICAL	Byte-identical
+docs/cascade-compiler.md	ALREADY_CANONICAL	Byte-identical
+docs/contrastive-evidence.md	ALREADY_CANONICAL	Byte-identical
+docs/critical-path-phase0.md	ALREADY_CANONICAL	Byte-identical
+docs/decision-capability-v2-plan.md	ALREADY_CANONICAL	Byte-identical
+docs/dispatch-authority.md	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+docs/evolution-lab.md	ALREADY_CANONICAL	Byte-identical
+docs/free-only-execution.md	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+docs/intelligence-layer.md	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+docs/intelligence-operations.md	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+docs/jevlike-trainable-route.md	ALREADY_CANONICAL	Byte-identical
+docs/local-cognition-omp-shadow.md	ALREADY_CANONICAL	Byte-identical
+docs/local-cognition-portfolio.md	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+docs/network-cutover-finish-report.md	ALREADY_CANONICAL	Byte-identical
+docs/network-cutover-harness.md	ALREADY_CANONICAL	Byte-identical
+docs/network-cutover-phase-a.md	ALREADY_CANONICAL	Byte-identical
+docs/observer-evaluation.md	SUPERSEDED	Canonical addition retained; absent from old checkout
+docs/os-episode-compiler.md	ALREADY_CANONICAL	Byte-identical
+docs/phase1b-decision-artifact.md	ALREADY_CANONICAL	Byte-identical
+docs/phase1b-measurement-campaign.md	ALREADY_CANONICAL	Byte-identical
+docs/routine-compiler.md	ALREADY_CANONICAL	Byte-identical
+docs/routine-repair.md	ALREADY_CANONICAL	Byte-identical
+docs/verified-oss-loop.md	ALREADY_CANONICAL	Byte-identical
+docs/vllm-diffusion-route.md	ALREADY_CANONICAL	Byte-identical
+docs/worker-activity.md	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+examples/aodl/routine-cascade.json	ALREADY_CANONICAL	Byte-identical
+examples/decisions.jsonl	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/checkpoints/joint-imitation.pt	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/README.md	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/board.png	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/checkpoints/chess-dagger1.pt	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/dagger.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/data.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/eval.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/keys.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/play.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/positions.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/render.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/stem.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/test_smoke.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/chess/train.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/README.md	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/audit.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/checkpoints/deadly-dagger.pt	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/diagnostics.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/environment.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/play.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/test_smoke.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/train_dagger.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/train_imitation.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/train_joint.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/train_joint_ppo.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/doom/train_ppo.py	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/film/build-film.mjs	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/film/diagram.svg	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/film/film.html	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/film/make-film.sh	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/film/package-lock.json	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/film/package.json	ALREADY_CANONICAL	Byte-identical
+examples/jevlike/film/render-film.mjs	ALREADY_CANONICAL	Byte-identical
+examples/refinement/demo.py	ALREADY_CANONICAL	Byte-identical
+harness-adapters/automatic-client.mjs	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+harness-adapters/dsh-z0intelligence/index.mjs	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+harness-adapters/dsh-z0intelligence/package.json	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+harness-adapters/hermes-z0intelligence/__init__.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+harness-adapters/hermes-z0intelligence/plugin.yaml	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+manifests/capabilities.v1.json	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+manifests/capability-evidence/groq-free-authorization.json	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+manifests/capability-evidence/jev-bench-authored144.jsonl	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+manifests/capability-evidence/jev-bench-perturbations108.jsonl	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+manifests/local_cognition.v1.json	ALREADY_CANONICAL	Byte-identical
+manifests/models.json	ALREADY_CANONICAL	Byte-identical
+manifests/models.yaml	ALREADY_CANONICAL	Byte-identical
+manifests/models.z0int.json	ALREADY_CANONICAL	Byte-identical
+manifests/worker_routing.v1.json	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+omp-extensions/flyforge-jev/index.ts	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+omp-extensions/flyforge-recovery/index.ts	ALREADY_CANONICAL	Byte-identical
+omp-extensions/flyforge-recovery/recovery.py	ALREADY_CANONICAL	Byte-identical
+omp-extensions/local-cognition/README.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+omp-extensions/local-cognition/index.test.ts	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+omp-extensions/local-cognition/index.ts	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+omp-extensions/local-cognition/package.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+omp-extensions/openjev-06b/index.ts	ALREADY_CANONICAL	Byte-identical
+omp-extensions/openjev-06b/worker.py	ALREADY_CANONICAL	Byte-identical
+omp-extensions/openjev/index.ts	ALREADY_CANONICAL	Byte-identical
+omp-extensions/openjev/worker.py	ALREADY_CANONICAL	Byte-identical
+omp-extensions/vllm-jev/index.ts	ALREADY_CANONICAL	Byte-identical
+omp-extensions/z0int-bridge/index.legacy.ts	ALREADY_CANONICAL	Byte-identical
+omp-extensions/z0int-bridge/index.ts	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+omp-extensions/z0int-intelligence/index.ts	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+omp-extensions/z0int-intelligence/schema.json	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+pyproject.toml	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+requirements.txt	ALREADY_CANONICAL	Byte-identical
+results/compositions/20260921T1846Z-served/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/compositions/20260921T1846Z-served/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/compositions/20260921T1905Z-escalating/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/compositions/20260921T1905Z-escalating/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T013049Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T013049Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T013049Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T013107Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T013107Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T013107Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015152Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015152Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015152Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015215Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015215Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015215Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015542Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015542Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015542Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015610Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015610Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T015610Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T020839Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T020839Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T020839Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T020929Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T020929Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T020929Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T021534Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T021534Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T021534Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T021545Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T021545Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T021545Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T022327Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T022327Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T022327Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T023249Z/analytics.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T023249Z/analytics.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T023249Z/coverage.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T023249Z/coverage.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T023249Z/pareto.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T023249Z/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T023249Z/run-manifest.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T023249Z/summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/decision-backends/20260919T023249Z/tokenomics-events.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/20260921T1727Z-serving/serving-receipts.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/20260921T1730Z-llamacpp-256/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/20260921T1730Z-llamacpp-256/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/20260921T1800Z-llamacpp-1024/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/20260921T1800Z-llamacpp-1024/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/20260922T-api-cohort/comparison.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/20260922T-api-cohort/comparison.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/20260922T-api-cohort/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/20260922T-api-cohort/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/20260922T-api-cohort/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke-groq-20b/comparison.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke-groq-20b/comparison.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke-groq-20b/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke-groq-20b/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke-groq-20b/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke2-groq-20b-qwen/comparison.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke2-groq-20b-qwen/comparison.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke2-groq-20b-qwen/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke2-groq-20b-qwen/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke2-groq-20b-qwen/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke3-groq-20b-ua/comparison.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke3-groq-20b-ua/comparison.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke3-groq-20b-ua/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke3-groq-20b-ua/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke3-groq-20b-ua/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke4-groq-20b/comparison.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke4-groq-20b/comparison.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke4-groq-20b/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke4-groq-20b/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke4-groq-20b/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke5-groq-20b-hammer/comparison.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke5-groq-20b-hammer/comparison.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke5-groq-20b-hammer/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke5-groq-20b-hammer/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke5-groq-20b-hammer/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke6-groq-20b-throttled/comparison.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke6-groq-20b-throttled/comparison.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke6-groq-20b-throttled/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke6-groq-20b-throttled/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke6-groq-20b-throttled/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke7-groq-20b/comparison.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke7-groq-20b/comparison.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke7-groq-20b/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke7-groq-20b/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/local-cognition/smoke7-groq-20b/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/orchestration/20260921T1835Z/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/orchestration/20260921T1835Z/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1-summary.json	ALREADY_CANONICAL	Byte-identical
+results/phase1b/p1b-20260921T1430Z/SHA256SUMS	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/analysis/decision_artifact.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/analysis/decision_artifact.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/baseline/freeze.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/compiler-contract/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/compiler-contract/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/densify_summary.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/observations.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/orchestration-v2/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/orchestration-v2/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/orchestration-v2/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/sources/compositions-escalating__raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/sources/compositions__raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/sources/eval-budget1024__raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/sources/eval-llamacpp__raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/sources/eval-thinking__raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/sources/orch-v1__raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/teacher_rows.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/tokenomics_receipts.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/true-composition-tok2048/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/true-composition-tok2048/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/true-composition-tok2048/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/true-composition/raw.jsonl	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/true-composition/report.json	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/phase1b/p1b-20260921T1430Z/true-composition/report.md	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+results/raw/SHA256SUMS	ALREADY_CANONICAL	Byte-identical
+results/raw/decision-vs-compact-array.json	ALREADY_CANONICAL	Byte-identical
+results/raw/decision-vs-verbose-json.json	ALREADY_CANONICAL	Byte-identical
+results/raw/minified-array-failure.json	ALREADY_CANONICAL	Byte-identical
+results/raw/perturbation-comparison.json	ALREADY_CANONICAL	Byte-identical
+results/raw/predictions/direct-authored144.jsonl	ALREADY_CANONICAL	Byte-identical
+results/raw/predictions/direct-every204.jsonl	ALREADY_CANONICAL	Byte-identical
+results/raw/predictions/direct-perturbations108.jsonl	ALREADY_CANONICAL	Byte-identical
+results/raw/predictions/direct-typesafe102.jsonl	ALREADY_CANONICAL	Byte-identical
+results/raw/predictions/direct-wanli256.jsonl	ALREADY_CANONICAL	Byte-identical
+results/raw/predictions/reranker-authored144.jsonl	ALREADY_CANONICAL	Byte-identical
+results/raw/predictions/reranker-every204.jsonl	ALREADY_CANONICAL	Byte-identical
+results/raw/predictions/reranker-perturbations108.jsonl	ALREADY_CANONICAL	Byte-identical
+results/raw/predictions/reranker-typesafe102.jsonl	ALREADY_CANONICAL	Byte-identical
+results/raw/predictions/reranker-wanli256.jsonl	ALREADY_CANONICAL	Byte-identical
+results/raw/quality-comparison.json	ALREADY_CANONICAL	Byte-identical
+results/raw/shape777-direct.json	ALREADY_CANONICAL	Byte-identical
+results/raw/shape777-direct.predictions.jsonl	ALREADY_CANONICAL	Byte-identical
+results/raw/shape777-reranker.json	ALREADY_CANONICAL	Byte-identical
+results/raw/shape777-reranker.predictions.jsonl	ALREADY_CANONICAL	Byte-identical
+scripts/api_provider_eval.py	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+scripts/bootstrap.sh	ALREADY_CANONICAL	Byte-identical
+scripts/compiler_contract_eval.py	ALREADY_CANONICAL	Byte-identical
+scripts/composition_eval.py	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+scripts/densify_measurements.py	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+scripts/e2e_spine.sh	ALREADY_CANONICAL	Byte-identical
+scripts/export_teacher_rows.py	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+scripts/get_wikispeedia.sh	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+scripts/intelligence-readiness.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+scripts/local-stack.sh	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+scripts/local_tool_calling_eval.py	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+scripts/orchestration_eval.py	ALREADY_CANONICAL	Byte-identical
+scripts/phase1b_campaign.sh	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+scripts/phase1b_freeze.py	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+scripts/phase1b_report.py	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+scripts/probe_local_cognition.py	ALREADY_CANONICAL	Byte-identical
+scripts/project_tokenomics_receipts.py	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+scripts/race-omp-backends.py	ALREADY_CANONICAL	Byte-identical
+scripts/setup-flyforge.sh	ALREADY_CANONICAL	Byte-identical
+scripts/setup-vllm-diffusion.sh	ALREADY_CANONICAL	Byte-identical
+scripts/true_composition_eval.py	EXPERIMENTAL	Separate historical experiment/evaluation; not production runtime dependency
+skills/z0int-onboard/SKILL.md	ALREADY_CANONICAL	Byte-identical
+skills/z0int-repair-routine/SKILL.md	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/cli.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/core.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/direct.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/jevlike/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/jevlike/bridge.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/jevlike/data.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/jevlike/eval.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/jevlike/model.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/jevlike/predict.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/jevlike/train.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/jevlike/vision.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/reranker.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/serial.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/shared.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/vllm_route/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/vllm_route/client.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/vllm_route/config.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/vllm_route/score.py	ALREADY_CANONICAL	Byte-identical
+src/openjev_phase1/vllm_route/template.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/__main__.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/abab.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/alignbench.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+src/z0int/aodl.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/artifacts.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/automatic.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/autoresearch/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/autoresearch/daemon.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/autoresearch/measurement_gaps.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/autoresearch/mutations.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/autoresearch/p07a_classification.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/autoresearch/p07a_regression.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/autoresearch/queue.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/autoresearch/replay.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/autoresearch/research/__init__.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/autoresearch/research/canonicalize.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/autoresearch/research/convert.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/autoresearch/research/driver.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/autoresearch/research/job.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/autoresearch/research/pipeline.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/autoresearch/research/promotion.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/autoresearch/research/proposal.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/autoresearch/resources.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/autoresearch/schema.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/autoresearch/store.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/base.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/backends/bench/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/analytics.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/bootstrap.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/contract.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/eligibility.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/fixtures.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/materialize.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/metrics.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/pareto.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/roster.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/run_manifest.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/runner.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/bench/tokenomics_bridge.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/decider.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/jev.py	SUPERSEDED	Canonical functions/jev.py and state packet owner take precedence
+src/z0int/backends/laya.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/backends/nanojev.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/backends/nanojev_runtime.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/backends/openjev_direct.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/backends/registry.py	PROMOTE	Laya registration only; duplicate Jev backend omitted in favor of functions/jev.py
+src/z0int/battery.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/bridge/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/bridge/decision_cache.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/bridge/generation.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/bridge/protocol.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/bridge/runtime.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/bridge/worker.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/capabilities/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/capabilities/context_project_state.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cascade.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cli.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/__init__.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/cognition/actions.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/cognition/adapters/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/adapters/bounded.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/adapters/dialects.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/adapters/local_slm.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/cognition/adapters/transport.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/cognition/candidates.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+src/z0int/cognition/cascade.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/cognition/cli.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/cognition/escalation.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/manifest.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/orchestration.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/probe.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/receipts.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+src/z0int/cognition/registry.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/server.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/serving.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/shadow.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/cognition/surface.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+src/z0int/compile.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/context_resolve.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/contrastive_evidence.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/counterfactual.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/credit.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/data_recipe_race.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/dispatch_authority.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/doctor.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/families.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/functions/__init__.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+src/z0int/functions/contract.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+src/z0int/functions/jev.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+src/z0int/functions/laya.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+src/z0int/functions/verify_evidence_sufficiency.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+src/z0int/harness_id.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/intelligence.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/intelligence_mcp.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/intelligence_service.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/kerdoios_export.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/models_mgmt.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/onboard.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/os_context.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/paths.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/preflight.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/provider_saturation.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/quota_budget.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/receipt.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/refinement.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/remote_executor.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/replay/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/replay/worker_needed.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/routines.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/specialists/__init__.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/specialists/next_operator.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/status.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/task_loop.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/tokenomics_emit.py	ALREADY_CANONICAL	Byte-identical
+src/z0int/train.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+src/z0int/worker_activity.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+src/z0int/worker_routing.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+tests/fixtures/nanojev_request.json	ALREADY_CANONICAL	Byte-identical
+tests/fixtures/tokenomics-bench-parity/four-way/MANIFEST.json	ALREADY_CANONICAL	Byte-identical
+tests/fixtures/tokenomics-bench-parity/four-way/pareto.md	ALREADY_CANONICAL	Byte-identical
+tests/fixtures/tokenomics-bench-parity/four-way/raw.jsonl	ALREADY_CANONICAL	Byte-identical
+tests/fixtures/tokenomics-bench-parity/four-way/summary.json	ALREADY_CANONICAL	Byte-identical
+tests/shadow/test_p07a_regression.py	ALREADY_CANONICAL	Byte-identical
+tests/test_agy_research_driver.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+tests/test_alignbench.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+tests/test_backend_bench.py	ALREADY_CANONICAL	Byte-identical
+tests/test_backend_contract.py	PRESERVE	Outside intelligence promotion; retain original checkout/ref
+tests/test_bootstrap.py	ALREADY_CANONICAL	Byte-identical
+tests/test_bridge_decision.py	ALREADY_CANONICAL	Byte-identical
+tests/test_bridge_worker.py	ALREADY_CANONICAL	Byte-identical
+tests/test_cognition_adapters.py	ALREADY_CANONICAL	Byte-identical
+tests/test_cognition_candidates.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+tests/test_cognition_cascade.py	ALREADY_CANONICAL	Byte-identical
+tests/test_cognition_compiler.py	ALREADY_CANONICAL	Byte-identical
+tests/test_cognition_manifest.py	ALREADY_CANONICAL	Byte-identical
+tests/test_cognition_orchestration.py	ALREADY_CANONICAL	Byte-identical
+tests/test_cognition_server.py	ALREADY_CANONICAL	Byte-identical
+tests/test_cognition_shadow.py	ALREADY_CANONICAL	Byte-identical
+tests/test_cognition_surface.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+tests/test_context_resolve.py	ALREADY_CANONICAL	Byte-identical
+tests/test_contrastive_evidence.py	ALREADY_CANONICAL	Byte-identical
+tests/test_core.py	ALREADY_CANONICAL	Byte-identical
+tests/test_decider_backend.py	ALREADY_CANONICAL	Byte-identical
+tests/test_dispatch_authority.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+tests/test_eligibility.py	ALREADY_CANONICAL	Byte-identical
+tests/test_free_only.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+tests/test_functions_verify.py	SUPERSEDED	Canonical addition retained; absent from old checkout
+tests/test_hermes_adapter.py	ALREADY_CANONICAL	Byte-identical
+tests/test_intelligence.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+tests/test_intelligence_service.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+tests/test_jevlike_smoke.py	ALREADY_CANONICAL	Byte-identical
+tests/test_laya_backend.py	ALREADY_CANONICAL	Byte-identical
+tests/test_nanojev_adapter.py	ALREADY_CANONICAL	Byte-identical
+tests/test_nanojev_parity.py	ALREADY_CANONICAL	Byte-identical
+tests/test_network_cutover_phase_a.py	ALREADY_CANONICAL	Byte-identical
+tests/test_openjev_backend.py	ALREADY_CANONICAL	Byte-identical
+tests/test_os_context.py	ALREADY_CANONICAL	Byte-identical
+tests/test_provider_saturation.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+tests/test_quota_budget.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+tests/test_receipt.py	ALREADY_CANONICAL	Byte-identical
+tests/test_reranker.py	ALREADY_CANONICAL	Byte-identical
+tests/test_serial.py	ALREADY_CANONICAL	Byte-identical
+tests/test_shared.py	ALREADY_CANONICAL	Byte-identical
+tests/test_task_loop.py	ALREADY_CANONICAL	Byte-identical
+tests/test_tokenomics_bridge.py	ALREADY_CANONICAL	Byte-identical
+tests/test_vllm_route.py	ALREADY_CANONICAL	Byte-identical
+tests/test_worker_activity.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+tests/test_worker_activity_live.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+tests/test_worker_routing.py	PROMOTE	Reconcile proven intelligence dependency against master; portability and ownership fixes required
+tests/test_z0int_abab.py	ALREADY_CANONICAL	Byte-identical
+tests/test_z0int_aodl.py	ALREADY_CANONICAL	Byte-identical
+tests/test_z0int_battery.py	ALREADY_CANONICAL	Byte-identical
+tests/test_z0int_cascade.py	ALREADY_CANONICAL	Byte-identical
+tests/test_z0int_credit.py	ALREADY_CANONICAL	Byte-identical
+tests/test_z0int_families.py	ALREADY_CANONICAL	Byte-identical
+tests/test_z0int_onboard.py	ALREADY_CANONICAL	Byte-identical
+tests/test_z0int_refinement.py	ALREADY_CANONICAL	Byte-identical
+tests/test_z0int_refinement_cli.py	ALREADY_CANONICAL	Byte-identical
+tests/test_z0int_routines.py	ALREADY_CANONICAL	Byte-identical
+webgpu-demo/README.md	ALREADY_CANONICAL	Byte-identical
+webgpu-demo/_headers	ALREADY_CANONICAL	Byte-identical
+webgpu-demo/app.js	ALREADY_CANONICAL	Byte-identical
+webgpu-demo/index.html	ALREADY_CANONICAL	Byte-identical
+webgpu-demo/style.css	ALREADY_CANONICAL	Byte-identical
+webgpu-demo/test_demo.py	ALREADY_CANONICAL	Byte-identical
+webgpu-demo/worker.js	ALREADY_CANONICAL	Byte-identical

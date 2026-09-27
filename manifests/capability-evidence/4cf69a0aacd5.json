@@ -1,0 +1,13 @@
+{
+  "provider": "openrouter",
+  "model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "function": "coding_implementation",
+  "quality_metric": {
+    "name": "raw_worker_implementation_usable_without_parent_repair",
+    "correct": 0,
+    "n": 2
+  },
+  "measurement_confidence": "n=2 public implementation tasks; one escaped-newline syntax failure, one output-budget truncation; final parent quality is not worker quality",
+  "source_sha256": "4b789859f002cb795c814fb6a4520865653a940e7748db61eda699b0ad6dd8e7",
+  "note": "Aggregate of preserved local measurements; no raw private receipts or transcripts published."
+}

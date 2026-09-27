@@ -1,0 +1,14 @@
+{
+  "provider": "local",
+  "model": "laya_421m",
+  "function": "verification_needed",
+  "quality_metric": {
+    "name": "accuracy",
+    "correct": 2,
+    "n": 2,
+    "brier": 0.3653653
+  },
+  "measurement_confidence": "PROVISIONAL, measured_but_ineligible; n=2",
+  "source_sha256": "76e5d8e13487c163a19f3e53d0e42a47d18c52e5db599777bea45ce6893f8c2f",
+  "note": "Aggregate of preserved local measurements; no raw private receipts or transcripts published."
+}

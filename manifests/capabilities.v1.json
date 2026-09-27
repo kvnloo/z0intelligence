@@ -1,0 +1,1741 @@
+{
+  "schema": "z0int.capability_registry.v1",
+  "entries": [
+    {
+      "provider": "typesafe",
+      "model": "jev-1.13.0",
+      "function": "evidence_sufficiency",
+      "route": "JEV_FUNCTION",
+      "eval_source": {
+        "path": "manifests/capability-evidence/jev-bench-authored144.jsonl",
+        "sha256": "e2beb21e9f45b12ece52982e33e0ee918d54440820cad3ab24d3d59b3585a6fc"
+      },
+      "quality_metric": {
+        "name": "three_way_accuracy",
+        "correct": 46,
+        "n": 48
+      },
+      "latency_ms": 279.62676201423164,
+      "cost": null,
+      "local": false,
+      "availability": "credential_probe_then_live_call",
+      "measurement_confidence": "authored/model-reviewed labels; narrow contract; perturbations lacks insufficient labels",
+      "adapter": "z0int.functions.jev.assess_claim",
+      "fallback_candidates": [
+        "PARENT_ONLY"
+      ],
+      "eligible": true,
+      "contract": "supported/insufficient/contradicted; Which option does the supplied evidence establish?"
+    },
+    {
+      "provider": "typesafe",
+      "model": "jev-1.13.0",
+      "function": "evidence_sufficiency",
+      "route": "JEV_FUNCTION",
+      "eval_source": {
+        "path": "manifests/capability-evidence/jev-bench-perturbations108.jsonl",
+        "sha256": "39bd321b2faf58e3374a44276456b706d666eed2f9fae548aae6a412f470bf2f"
+      },
+      "quality_metric": {
+        "name": "three_way_accuracy",
+        "correct": 36,
+        "n": 36
+      },
+      "latency_ms": 306.36890001187567,
+      "cost": null,
+      "local": false,
+      "availability": "credential_probe_then_live_call",
+      "measurement_confidence": "authored/model-reviewed labels; narrow contract; perturbations lacks insufficient labels",
+      "adapter": "z0int.functions.jev.assess_claim",
+      "fallback_candidates": [
+        "PARENT_ONLY"
+      ],
+      "eligible": true,
+      "contract": "supported/insufficient/contradicted; Which option does the supplied evidence establish?"
+    },
+    {
+      "provider": "local",
+      "model": "laya_421m",
+      "function": "verification_needed",
+      "route": "LAYA_FUNCTION",
+      "eval_source": {
+        "path": "manifests/capability-evidence/fc02c95989e8.json",
+        "sha256": "38938d6eba3410af9d267416e8362a86b404abd29890a3b98dba9437ba644cfb"
+      },
+      "quality_metric": {
+        "name": "accuracy",
+        "correct": 2,
+        "n": 2,
+        "brier": 0.3653653
+      },
+      "latency_ms": 228.6249975,
+      "cost": null,
+      "local": true,
+      "availability": "cached_weights_and_runtime",
+      "measurement_confidence": "PROVISIONAL, measured_but_ineligible; n=2",
+      "adapter": "laya_421m",
+      "fallback_candidates": [
+        "PARENT_ONLY"
+      ],
+      "eligible": false,
+      "experimental": true
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "function": "coding_implementation",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "cerebras",
+      "model": "qwen-3.8-27b",
+      "function": "coding_implementation",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "function": "coding_implementation",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nous",
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "function": "coding_implementation",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nvidia",
+      "model": "openai/gpt-oss-20b",
+      "function": "coding_implementation",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "grok",
+      "model": "grok-4.20-0309-non-reasoning",
+      "function": "coding_implementation",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "local",
+      "model": "qwen2.5:3b",
+      "function": "coding_implementation",
+      "route": "LOCAL_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": true,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "function": "code_review",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "cerebras",
+      "model": "qwen-3.8-27b",
+      "function": "code_review",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "function": "code_review",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nous",
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "function": "code_review",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nvidia",
+      "model": "openai/gpt-oss-20b",
+      "function": "code_review",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "grok",
+      "model": "grok-4.20-0309-non-reasoning",
+      "function": "code_review",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "local",
+      "model": "qwen2.5:3b",
+      "function": "code_review",
+      "route": "LOCAL_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": true,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "function": "research",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "cerebras",
+      "model": "qwen-3.8-27b",
+      "function": "research",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "function": "research",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nous",
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "function": "research",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nvidia",
+      "model": "openai/gpt-oss-20b",
+      "function": "research",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "grok",
+      "model": "grok-4.20-0309-non-reasoning",
+      "function": "research",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "local",
+      "model": "qwen2.5:3b",
+      "function": "research",
+      "route": "LOCAL_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": true,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "function": "summarization",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "cerebras",
+      "model": "qwen-3.8-27b",
+      "function": "summarization",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "function": "summarization",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nous",
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "function": "summarization",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nvidia",
+      "model": "openai/gpt-oss-20b",
+      "function": "summarization",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "grok",
+      "model": "grok-4.20-0309-non-reasoning",
+      "function": "summarization",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "local",
+      "model": "qwen2.5:3b",
+      "function": "summarization",
+      "route": "LOCAL_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": true,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "function": "cheap_bounded_worker",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "cerebras",
+      "model": "qwen-3.8-27b",
+      "function": "cheap_bounded_worker",
+      "route": "REMOTE_MODEL",
+      "eval_source": {
+        "path": "manifests/capability-evidence/d4fc0d34ca23.json",
+        "sha256": "8b620cde8ff0b595b37e54c207c79f2b8c8dd47ddc2370d2836e5238a453da0b"
+      },
+      "quality_metric": {
+        "name": "repeated_two_task_raw_worker_pass",
+        "correct": 60,
+        "n": 60,
+        "independent_task_specs": 2
+      },
+      "latency_ms": 624.5276895206189,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "60 physical calls across two repeated public task specifications; original checks, separate grader safety-allowlist correction; no evidence of parent-token benefit.",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false,
+      "execution_parameters": {
+        "reasoning_effort": "none",
+        "max_tokens": 2048,
+        "temperature": 0
+      },
+      "promotion_blocker": "No measured positive delegation slice: equal-cache parent input/output increases on both tasks; only two fixed-size tasks were repeated. Preserve PARENT_ONLY for this lane."
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "function": "cheap_bounded_worker",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nous",
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "function": "cheap_bounded_worker",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nvidia",
+      "model": "openai/gpt-oss-20b",
+      "function": "cheap_bounded_worker",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "grok",
+      "model": "grok-4.20-0309-non-reasoning",
+      "function": "cheap_bounded_worker",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "local",
+      "model": "qwen2.5:3b",
+      "function": "cheap_bounded_worker",
+      "route": "LOCAL_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": true,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "function": "long_context_reasoning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "cerebras",
+      "model": "qwen-3.8-27b",
+      "function": "long_context_reasoning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "function": "long_context_reasoning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nous",
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "function": "long_context_reasoning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nvidia",
+      "model": "openai/gpt-oss-20b",
+      "function": "long_context_reasoning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "grok",
+      "model": "grok-4.20-0309-non-reasoning",
+      "function": "long_context_reasoning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "local",
+      "model": "qwen2.5:3b",
+      "function": "long_context_reasoning",
+      "route": "LOCAL_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": true,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "function": "tool_selection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "cerebras",
+      "model": "qwen-3.8-27b",
+      "function": "tool_selection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "function": "tool_selection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nous",
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "function": "tool_selection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nvidia",
+      "model": "openai/gpt-oss-20b",
+      "function": "tool_selection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "grok",
+      "model": "grok-4.20-0309-non-reasoning",
+      "function": "tool_selection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "local",
+      "model": "qwen2.5:3b",
+      "function": "tool_selection",
+      "route": "LOCAL_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": true,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "function": "planning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "cerebras",
+      "model": "qwen-3.8-27b",
+      "function": "planning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "function": "planning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nous",
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "function": "planning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nvidia",
+      "model": "openai/gpt-oss-20b",
+      "function": "planning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "grok",
+      "model": "grok-4.20-0309-non-reasoning",
+      "function": "planning",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "local",
+      "model": "qwen2.5:3b",
+      "function": "planning",
+      "route": "LOCAL_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": true,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "function": "uncertainty_abstention",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "cerebras",
+      "model": "qwen-3.8-27b",
+      "function": "uncertainty_abstention",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "function": "uncertainty_abstention",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nous",
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "function": "uncertainty_abstention",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nvidia",
+      "model": "openai/gpt-oss-20b",
+      "function": "uncertainty_abstention",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "grok",
+      "model": "grok-4.20-0309-non-reasoning",
+      "function": "uncertainty_abstention",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "local",
+      "model": "qwen2.5:3b",
+      "function": "uncertainty_abstention",
+      "route": "LOCAL_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": true,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "function": "alignment_failure_detection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "cerebras",
+      "model": "qwen-3.8-27b",
+      "function": "alignment_failure_detection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "function": "alignment_failure_detection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nous",
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "function": "alignment_failure_detection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "nvidia",
+      "model": "openai/gpt-oss-20b",
+      "function": "alignment_failure_detection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "grok",
+      "model": "grok-4.20-0309-non-reasoning",
+      "function": "alignment_failure_detection",
+      "route": "REMOTE_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": false,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "local",
+      "model": "qwen2.5:3b",
+      "function": "alignment_failure_detection",
+      "route": "LOCAL_MODEL",
+      "eval_source": null,
+      "quality_metric": null,
+      "latency_ms": null,
+      "cost": null,
+      "local": true,
+      "availability": "existing_worker_router",
+      "measurement_confidence": "execution observed, function quality unmeasured",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "cerebras",
+        "groq",
+        "deepseek"
+      ],
+      "eligible": false
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "function": "tool_selection",
+      "route": "REMOTE_MODEL",
+      "eval_source": {
+        "path": "manifests/capability-evidence/5c00aa91d3e7.json",
+        "sha256": "4618fa0657a40c08e3ac316f1fdd0cbc60b0fcf8436c09746193d311f2811805"
+      },
+      "quality_metric": {
+        "name": "usable_correct_physical_calls",
+        "correct": 2,
+        "n": 2
+      },
+      "latency_ms": 895.5878479901003,
+      "cost": {
+        "price_usd": 0,
+        "basis": "explicit :free route, zero-price request ceiling and successful response cost0"
+      },
+      "local": false,
+      "availability": "authority_health_and_cap1",
+      "measurement_confidence": "PROVISIONAL; one small authored fixture cohort. Failed/invalid/truncated inference earns no quality credit. Native-tool adapter is not the production text-worker contract. A/B found no benefit.",
+      "adapter": "route_worker",
+      "evaluated_adapter": "LocalSLMBackend/hammer, reversible NVIDIA tool-name aliases, max_tokens384",
+      "fallback_candidates": [
+        "PARENT_ONLY"
+      ],
+      "eligible": false,
+      "contract": "existing local-cognition-v1 tool_selection",
+      "promotion_blocker": "No held-out sufficient-quality and net-benefit evidence for automatic text-worker use"
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "function": "schema_following",
+      "route": "REMOTE_MODEL",
+      "eval_source": {
+        "path": "manifests/capability-evidence/c0f4df537ede.json",
+        "sha256": "537ce2a3260ef7d94638f25a20a6e1fffd5bfcdc0759c370462d9583489b796a"
+      },
+      "quality_metric": {
+        "name": "usable_correct_physical_calls",
+        "correct": 3,
+        "n": 3
+      },
+      "latency_ms": 1712.0081819884945,
+      "cost": {
+        "price_usd": 0,
+        "basis": "explicit :free route, zero-price request ceiling and successful response cost0"
+      },
+      "local": false,
+      "availability": "authority_health_and_cap1",
+      "measurement_confidence": "PROVISIONAL; one small authored fixture cohort. Failed/invalid/truncated inference earns no quality credit. Native-tool adapter is not the production text-worker contract. A/B found no benefit.",
+      "adapter": "route_worker",
+      "evaluated_adapter": "LocalSLMBackend/hammer, reversible NVIDIA tool-name aliases, max_tokens384",
+      "fallback_candidates": [
+        "PARENT_ONLY"
+      ],
+      "eligible": false,
+      "contract": "existing local-cognition-v1 schema",
+      "promotion_blocker": "No held-out sufficient-quality and net-benefit evidence for automatic text-worker use"
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "function": "recovery",
+      "route": "REMOTE_MODEL",
+      "eval_source": {
+        "path": "manifests/capability-evidence/1ba0321a43bd.json",
+        "sha256": "aa416bf8791948a95bb2c7383dc49cafdd63dff26f66c4d19ad1c18d2f90b543"
+      },
+      "quality_metric": {
+        "name": "usable_correct_physical_calls",
+        "correct": 1,
+        "n": 4
+      },
+      "latency_ms": 3025.6542389979586,
+      "cost": {
+        "price_usd": 0,
+        "basis": "explicit :free route, zero-price request ceiling and successful response cost0"
+      },
+      "local": false,
+      "availability": "authority_health_and_cap1",
+      "measurement_confidence": "PROVISIONAL; one small authored fixture cohort. Failed/invalid/truncated inference earns no quality credit. Native-tool adapter is not the production text-worker contract. A/B found no benefit.",
+      "adapter": "route_worker",
+      "evaluated_adapter": "LocalSLMBackend/hammer, reversible NVIDIA tool-name aliases, max_tokens384",
+      "fallback_candidates": [
+        "PARENT_ONLY"
+      ],
+      "eligible": false,
+      "contract": "existing local-cognition-v1 recovery",
+      "promotion_blocker": "No held-out sufficient-quality and net-benefit evidence for automatic text-worker use"
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "function": "uncertainty_abstention",
+      "route": "REMOTE_MODEL",
+      "eval_source": {
+        "path": "manifests/capability-evidence/d572f81618dc.json",
+        "sha256": "a0340621f4d4c2877ed99666c7947668738950837daee82534b02c165b21d962"
+      },
+      "quality_metric": {
+        "name": "usable_correct_physical_calls",
+        "correct": 3,
+        "n": 4
+      },
+      "latency_ms": null,
+      "cost": {
+        "price_usd": 0,
+        "basis": "explicit :free route, zero-price request ceiling and successful response cost0"
+      },
+      "local": false,
+      "availability": "authority_health_and_cap1",
+      "measurement_confidence": "PROVISIONAL; one small authored fixture cohort. Failed/invalid/truncated inference earns no quality credit. Native-tool adapter is not the production text-worker contract. A/B found no benefit.",
+      "adapter": "route_worker",
+      "evaluated_adapter": "LocalSLMBackend/hammer, reversible NVIDIA tool-name aliases, max_tokens384",
+      "fallback_candidates": [
+        "PARENT_ONLY"
+      ],
+      "eligible": false,
+      "contract": "existing local-cognition-v1 uncertainty,abstention",
+      "promotion_blocker": "No held-out sufficient-quality and net-benefit evidence for automatic text-worker use"
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "function": "planning",
+      "route": "REMOTE_MODEL",
+      "eval_source": {
+        "path": "manifests/capability-evidence/85f6ea403443.json",
+        "sha256": "a45689b89c2a0000c936bad40aa15b4d29d690ae51d0a5538e55d44bcbdde8d3"
+      },
+      "quality_metric": {
+        "name": "usable_correct_physical_calls",
+        "correct": 6,
+        "n": 6
+      },
+      "latency_ms": null,
+      "cost": {
+        "price_usd": 0,
+        "basis": "explicit :free route, zero-price request ceiling and successful response cost0"
+      },
+      "local": false,
+      "availability": "authority_health_and_cap1",
+      "measurement_confidence": "PROVISIONAL; one small authored fixture cohort. Failed/invalid/truncated inference earns no quality credit. Native-tool adapter is not the production text-worker contract. A/B found no benefit.",
+      "adapter": "route_worker",
+      "evaluated_adapter": "LocalSLMBackend/hammer, reversible NVIDIA tool-name aliases, max_tokens384",
+      "fallback_candidates": [
+        "PARENT_ONLY"
+      ],
+      "eligible": false,
+      "contract": "bounded action choice only; not general planning",
+      "promotion_blocker": "No held-out sufficient-quality and net-benefit evidence for automatic text-worker use"
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "function": "coding_implementation",
+      "route": "REMOTE_MODEL",
+      "eval_source": {
+        "path": "manifests/capability-evidence/4cf69a0aacd5.json",
+        "sha256": "6e52bcfdeebfd4bd23c1dba673b334a0f1b509c418bc7eb5c055e46949314229"
+      },
+      "quality_metric": {
+        "name": "raw_worker_implementation_usable_without_parent_repair",
+        "correct": 0,
+        "n": 2
+      },
+      "latency_ms": null,
+      "cost": {
+        "price_usd": 0
+      },
+      "local": false,
+      "availability": "authority_health_and_cap1",
+      "measurement_confidence": "n=2 public implementation tasks; one escaped-newline syntax failure, one output-budget truncation; final parent quality is not worker quality",
+      "adapter": "route_worker",
+      "fallback_candidates": [
+        "PARENT_ONLY"
+      ],
+      "eligible": false,
+      "promotion_blocker": "Raw worker outputs required repair/fallback; both A/B workflows worse in uncached parent input and wall time"
+    }
+  ],
+  "exclusions": [
+    {
+      "model": "nanojev_06b",
+      "function": "evidence_sufficiency",
+      "reason": "Falsified supported/unsupported/ambiguous discrimination; unsupported scored highest",
+      "sources": [
+        {
+          "path": "preserved-local-evidence:choice1.receipt.json",
+          "sha256": "96dfd4ff0630508cf00f83d296212fdaaff0088441699e9d58c915ef26485d69"
+        },
+        {
+          "path": "preserved-local-evidence:choice2.receipt.json",
+          "sha256": "6b6fa7c4373882fbed50154d8f97a3e78f155b4f9b49f42ce8a357e4f4b39dc9"
+        },
+        {
+          "path": "preserved-local-evidence:choice3.receipt.json",
+          "sha256": "232aaa78a33652674892e5e69c399587d98c902f7be207b46870d4330a1d6d84"
+        }
+      ]
+    },
+    {
+      "provider": "cerebras",
+      "model": "qwen-3.8-27b",
+      "function": "cheap_bounded_worker",
+      "reasoning_effort": "high",
+      "max_tokens": 2048,
+      "reason": "All four calls returned finish_reason=length with empty final content; default/high reasoning is ineligible in this bounded output-budget lane. No conclusion about other budgets/functions.",
+      "sources": [
+        {
+          "path": "preserved-local-evidence:high-reasoning-exclusion.json",
+          "sha256": "76a45c82ce4a467b595758590281f442f11c5a416f36a2fce9b6894277a2e99b"
+        }
+      ]
+    }
+  ],
+  "delegation_policy": {
+    "tiny_parent_tokens_max": 256,
+    "default_overhead_ms": 1000,
+    "history": {
+      "path": "preserved-local-evidence:comparison.json",
+      "sha256": "204f630e403e0a96621a4647069a0225f90840b8dd76d65c44a8ba2503825795"
+    },
+    "observed_tiny_uncached_parent_delta": 1347,
+    "confidence": "single sequential observation; no general causal savings claim",
+    "observed_workflow_overhead_ms": 30803.801774978638,
+    "additional_history": [
+      {
+        "path": "preserved-local-evidence:decision-report.json",
+        "sha256": "4b789859f002cb795c814fb6a4520865653a940e7748db61eda699b0ad6dd8e7",
+        "outcome": "Neither real A/B task improved latency or uncached parent input; no X/Y threshold established",
+        "promoted": false
+      },
+      {
+        "path": "preserved-local-evidence:decision-evidence.json",
+        "sha256": "cf9fcac1aba34dcf7d9aa587a1237b6cfa8320127b545b0a89cfbbc28c970247",
+        "outcome": "No measured positive delegation slice: equal-cache parent input/output increases on both tasks; only two fixed-size tasks were repeated. Preserve PARENT_ONLY for this lane.",
+        "promoted": false
+      }
+    ]
+  }
+}

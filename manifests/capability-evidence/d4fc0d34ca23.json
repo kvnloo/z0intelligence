@@ -1,0 +1,14 @@
+{
+  "provider": "cerebras",
+  "model": "qwen-3.8-27b",
+  "function": "cheap_bounded_worker",
+  "quality_metric": {
+    "name": "repeated_two_task_raw_worker_pass",
+    "correct": 60,
+    "n": 60,
+    "independent_task_specs": 2
+  },
+  "measurement_confidence": "60 physical calls across two repeated public task specifications; original checks, separate grader safety-allowlist correction; no evidence of parent-token benefit.",
+  "source_sha256": "cf9fcac1aba34dcf7d9aa587a1237b6cfa8320127b545b0a89cfbbc28c970247",
+  "note": "Aggregate of preserved local measurements; no raw private receipts or transcripts published."
+}

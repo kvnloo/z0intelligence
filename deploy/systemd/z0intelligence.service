@@ -1,0 +1,19 @@
+[Unit]
+Description=z0intelligence shared host capability router
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/z0intelligence/service.env
+ExecStart=/bin/sh -c 'exec "$Z0INT_PYTHON" -m z0int.intelligence_service --bind "$Z0INT_BIND"'
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=125
+KillMode=control-group
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

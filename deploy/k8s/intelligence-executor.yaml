@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: z0intelligence-executor
+  namespace: hermes-lab
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: z0intelligence-executor}
+  template:
+    metadata:
+      labels: {app: z0intelligence-executor}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 125
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: executor
+          image: z0intelligence-executor:canonical
+          imagePullPolicy: Never
+          ports: [{name: http, containerPort: 11503}]
+          env:
+            - name: Z0INT_AUTHORITY_URL
+              value: http://z0intelligence.hermes-lab.svc.cluster.local:11501
+            - name: Z0INT_EXECUTOR_PROVIDERS
+              value: openrouter
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef: {name: openrouter-credentials, key: api_key}
+            - name: POD_IP
+              valueFrom:
+                fieldRef: {fieldPath: status.podIP}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 100m, memory: 64Mi}
+            limits: {cpu: '1', memory: 256Mi}
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 15
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: z0intelligence-executor
+  namespace: hermes-lab
+spec:
+  selector: {app: z0intelligence-executor}
+  ports: [{name: http, port: 11503, targetPort: http}]

@@ -1,0 +1,13 @@
+{
+  "authorization": "Operator-confirmed Groq free-tier route; quota exhaustion returns native fallback, never paid overflow. Cerebras experimental cohorts do not authorize automatic worker delegation.",
+  "docs": "https://console.groq.com/docs/rate-limits",
+  "limits": {
+    "rpd": 1000,
+    "rpm": 30,
+    "tpd": 200000,
+    "tpm": 8000
+  },
+  "model": "openai/gpt-oss-20b",
+  "request_headers": "unsuffixed requests are RPD, tokens TPM",
+  "reset": "Provider header reset plus conservative rolling 24h ceiling; no midnight assumption"
+}

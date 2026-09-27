@@ -1,0 +1,52 @@
+{
+  "type": "object",
+  "properties": {
+    "task": {
+      "type": "string"
+    },
+    "context": {
+      "type": "string"
+    },
+    "parent_agent": {
+      "type": "string"
+    },
+    "max_tokens": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2048,
+      "default": 512
+    },
+    "trace_id": {
+      "type": "string"
+    },
+    "function": {
+      "type": "string"
+    },
+    "state": {
+      "type": "object"
+    },
+    "expected_parent_tokens": {
+      "type": "number",
+      "minimum": 0
+    },
+    "expected_parent_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "allow_remote": {
+      "type": "boolean",
+      "default": false
+    },
+    "experimental": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "task",
+    "parent_agent",
+    "trace_id",
+    "function"
+  ],
+  "additionalProperties": false
+}

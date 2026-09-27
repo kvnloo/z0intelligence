@@ -227,3 +227,37 @@ class JevVerifier:
             "provider_latency_ms": reply.get("latency_ms"),
             "question_type": "noul",
         }
+
+
+def assess_claim(state: dict[str, str]) -> dict[str, Any]:
+    """Validated three-way claim contract, distinct from binary sufficiency.
+
+    Uses the same canonical client and credential resolver. No internal retry:
+    the dispatch authority owns physical-attempt accounting and reconciliation.
+    """
+    import time
+    from jevkit import client as jev_client
+    key = ensure_credential()
+    if not key:
+        raise VerifierUnavailable("jev", "no credential resolvable")
+    choices = {"supported": "The evidence establishes the claim",
+               "insufficient": "The evidence does not establish either",
+               "contradicted": "The evidence establishes the opposite"}
+    capture = _Capture()
+    started = time.monotonic()
+    reply = jev_client.ask(state, {"assess": jev_client.choice(
+        "Which option does the supplied evidence establish?", choices)},
+        model=EXPECTED_JEV_MODEL, api_key=key, timeout=15, retries=0, transport=capture)
+    if capture.model != EXPECTED_JEV_MODEL:
+        raise VerifierUnavailable("jev", "served revision does not match validated revision")
+    answer = reply["answers"]["assess"]
+    if set(answer["probabilities"]) != set(choices):
+        raise VerifierUnavailable("jev", "incomplete choice distribution")
+    usage = reply.get("usage") or {}
+    return {"backend": "jev", "model": capture.model, "revision": capture.model,
+            "status": {"supported": "SUPPORTED", "insufficient": "UNKNOWN",
+                       "contradicted": "UNSUPPORTED"}[answer["choice"]],
+            "answers": [{"id": "assess", **answer}],
+            "latency_ms": (time.monotonic()-started)*1000,
+            "diagnostics": {**usage, "credential_source": credential_source(),
+                            "usage_source": "provider_response"}}
