@@ -1,0 +1,744 @@
+{
+  "schema": "z0int.local_cognition.v1",
+  "revision": "2026-09-21",
+  "description": "Canonical local cognition portfolio for z0intelligence#20. Role assignments come from locally reproduced measurements only; source_reported_benchmarks is recorded for evidence and is NEVER read by selection.",
+  "machines": {
+    "rtx3080ti-12gb": {
+      "gpu": "NVIDIA GeForce RTX 3080 Ti",
+      "vram_mib": 12288,
+      "driver": "610.57.04",
+      "cuda": "13.3",
+      "cpu": "Intel(R) Core(TM) i9-10900KF @ 3.70GHz",
+      "system_ram_gib": 23,
+      "note": "system_ram_gib is what the current sandbox namespace reports; the bare-metal value may differ."
+    }
+  },
+  "role_defaults": {
+    "semantic_orchestrator": "qwen3.5_4b",
+    "general_local_fallback": "qwen3.5_9b",
+    "general_function_caller": "hammer2.1_3b",
+    "tiny_action_specialist": "hammer2.1_3b",
+    "bounded_scorer": "nanojev_06b"
+  },
+  "role_notes": {
+    "semantic_orchestrator": "DEMOTED FROM nemotron_orchestrator_8b ON MEASURED EVIDENCE. On the 12-scenario multi-turn orchestration benchmark qwen3.5_4b and qwen3.5_9b each solve 9/12 while Nemotron solves 6/12, and the 4B is 2.4x faster (p50 4740 ms vs 11475 ms). Nemotron is also dominated on bounded choice (17-20/28 vs 24-26/28) and its licence is non-commercial. It remains a research candidate only; see docs/local-cognition-portfolio.md.",
+    "tiny_action_specialist": "hammer2.1_3b, not the declared experiment target functiongemma_270m: measured 24/28 at p50 185 ms against FunctionGemma's 14/28 zero-shot. FunctionGemma keeps this role as a FINE-TUNING target (z0intelligence#20 phase 10) and must beat the Pareto frontier before it is promoted.",
+    "bounded_scorer": "Canonically declared in the decision_roster of manifests/models.z0int.json. Never abstained on 25/28 fixtures, so the cascade re-checks its confidence before accepting its answer; without that the rest of the ladder is dead code.",
+    "general_local_fallback": "qwen3.5_9b: 28/28 schema validity and 26/28 correct with an adequate completion budget. Its latency means it is a backstop, not a hot path.",
+    "remote_specialist_fallback": "Deliberately unset: remote seats resolve from the dynamically inventoried FREE provider paths, never from a static list here."
+  },
+  "models": {
+    "nemotron_orchestrator_8b": {
+      "model_id": "nemotron_orchestrator_8b",
+      "hf": "nvidia/Nemotron-Orchestrator-8B",
+      "revision": "26df4b9aad5abdc5b7871ee4c71063ce888feb26",
+      "role_tags": [
+        "semantic_orchestrator"
+      ],
+      "parameter_count": "8B",
+      "license": "nvidia-license",
+      "gated_access": false,
+      "commercial_use": false,
+      "supported_runtimes": [
+        "llama.cpp",
+        "ollama",
+        "vllm"
+      ],
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "tool_call_template": "qwen3-hermes",
+      "tool_parser": "hermes",
+      "structured_output_support": "Card requires tool calls as a JSON object inside <tool_call> XML tags; no JSON-schema/guided-decoding claim.",
+      "capabilities": {
+        "single_tool_call": true,
+        "parallel_tool_calls": true,
+        "multi_step_calls": true,
+        "multi_turn_calls": true,
+        "irrelevant_tool_rejection": false,
+        "model_as_tool_orchestration": true
+      },
+      "tested_context": 4096,
+      "tested_quantization": "Q4_K_M",
+      "supports_confidence": false,
+      "supports_abstention": false,
+      "measurements": [
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-supervisor",
+          "quantization": "Q4_K_M",
+          "context": 4096,
+          "measured_vram_mib": 6251.0,
+          "vram_idle_mib": 5240.0,
+          "vram_peak_mib": 6251.0,
+          "cold_start_ms": 15348.781665000388,
+          "warm_ttft_ms": 10.144,
+          "decode_tok_s": 108.03511141120866,
+          "short_decision_ms": 741.4457969998693,
+          "long_decision_ms": 887.5959609995334,
+          "gpu_util_pct": 100.0,
+          "measured_at": "2026-09-21T18:26:45Z"
+        }
+      ],
+      "source_reported_benchmarks": [
+        {
+          "name": "HLE",
+          "value": "37.1",
+          "dataset": "Humanity's Last Exam",
+          "setup_note": "Orchestrator-8B with basic tools + specialist + generalist LLMs",
+          "source_url": "https://huggingface.co/nvidia/Nemotron-Orchestrator-8B"
+        },
+        {
+          "name": "FRAMES",
+          "value": "76.3",
+          "dataset": "FRAMES",
+          "setup_note": "NVIDIA ToolOrchestra blog Table 1",
+          "source_url": "https://developer.nvidia.com/blog/train-small-orchestration-agents-to-solve-big-problems"
+        },
+        {
+          "name": "tau2-Bench",
+          "value": "80.2",
+          "dataset": "tau2-Bench",
+          "setup_note": "NVIDIA ToolOrchestra blog Table 1",
+          "source_url": "https://developer.nvidia.com/blog/train-small-orchestration-agents-to-solve-big-problems"
+        },
+        {
+          "name": "Cost",
+          "value": "9.2 US cents",
+          "dataset": "HLE+FRAMES avg",
+          "setup_note": "lower is better; NVIDIA blog Table 1",
+          "source_url": "https://developer.nvidia.com/blog/train-small-orchestration-agents-to-solve-big-problems"
+        },
+        {
+          "name": "Latency",
+          "value": "8.2 minutes",
+          "dataset": "HLE+FRAMES avg",
+          "setup_note": "lower is better; NVIDIA blog Table 1",
+          "source_url": "https://developer.nvidia.com/blog/train-small-orchestration-agents-to-solve-big-problems"
+        },
+        {
+          "name": "GPT-5 HLE baseline",
+          "value": "35.1",
+          "dataset": "Humanity's Last Exam",
+          "setup_note": "with basic tools; blog SOTA row states 35.2 - discrepancy noted",
+          "source_url": "https://huggingface.co/nvidia/Nemotron-Orchestrator-8B"
+        },
+        {
+          "name": "GPT-5 FRAMES baseline",
+          "value": "74.0",
+          "dataset": "FRAMES",
+          "setup_note": "NVIDIA blog Table 1",
+          "source_url": "https://developer.nvidia.com/blog/train-small-orchestration-agents-to-solve-big-problems"
+        },
+        {
+          "name": "GPT-5 tau2-Bench baseline",
+          "value": "77.7",
+          "dataset": "tau2-Bench",
+          "setup_note": "NVIDIA blog Table 1",
+          "source_url": "https://developer.nvidia.com/blog/train-small-orchestration-agents-to-solve-big-problems"
+        },
+        {
+          "name": "Efficiency vs GPT-5",
+          "value": "2.5x",
+          "dataset": "HLE",
+          "setup_note": "claimed '2.5x more efficient'; 'only 30% monetary cost'",
+          "source_url": "https://arxiv.org/abs/2511.21689"
+        }
+      ],
+      "local_benchmark_receipt_ids": [],
+      "promotion_state": "candidate",
+      "deployment_constraints": [
+        "NVIDIA License Section 3.3 'Use Limitation': the Work and derivatives may be used NON-COMMERCIALLY only. commercial_use=false.",
+        "Model card states: 'This model is for research and development only.'",
+        "nvidia/Orchestrator-8B is an alias redirecting to this repo."
+      ],
+      "mechanism": "ToolOrchestra RL (GRPO) on Qwen3-8B with outcome-, efficiency- and user-preference-aware rewards. Alternates reasoning and tool calling over multiple turns, dispatching to basic tools, specialist LLMs and generalist LLMs while trading accuracy against cost/latency. Trained on 552 synthetic problems / 1296 prompts.",
+      "notes": "Local GGUF evidence: general.architecture=qwen3, qwen3.context_length=40960, file_type=15 (Q4_K_M), chat template carries a tools block."
+    },
+    "qwen3.5_9b": {
+      "model_id": "qwen3.5_9b",
+      "hf": "Qwen/Qwen3.5-9B",
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "role_tags": [
+        "semantic_orchestrator",
+        "general_local_fallback",
+        "general_function_caller"
+      ],
+      "parameter_count": "9B",
+      "license": "apache-2.0",
+      "gated_access": false,
+      "commercial_use": true,
+      "supported_runtimes": [
+        "llama.cpp",
+        "ollama",
+        "vllm"
+      ],
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "tool_call_template": "qwen35",
+      "tool_parser": "qwen3_coder",
+      "structured_output_support": "Card claims a strict structured XML tool-call format; no explicit JSON-schema/guided-decoding claim (unverified).",
+      "capabilities": {
+        "single_tool_call": true,
+        "parallel_tool_calls": true,
+        "multi_step_calls": true,
+        "multi_turn_calls": true,
+        "irrelevant_tool_rejection": true,
+        "model_as_tool_orchestration": false
+      },
+      "tested_context": 4096,
+      "tested_quantization": "Q4_K_M",
+      "supports_confidence": false,
+      "supports_abstention": null,
+      "measurements": [
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-supervisor",
+          "quantization": "Q4_K_M",
+          "context": 4096,
+          "measured_vram_mib": 6646.0,
+          "vram_idle_mib": 6251.0,
+          "vram_peak_mib": 6646.0,
+          "cold_start_ms": 17721.9307940004,
+          "warm_ttft_ms": 49.951,
+          "decode_tok_s": 87.93237999978017,
+          "short_decision_ms": 1083.2227880000573,
+          "long_decision_ms": 1149.7388190000493,
+          "gpu_util_pct": 97.0,
+          "measured_at": "2026-09-21T18:27:05Z"
+        }
+      ],
+      "source_reported_benchmarks": [
+        {
+          "name": "BFCL-V4",
+          "value": "66.1",
+          "dataset": "BFCL-V4",
+          "setup_note": "card table, General Agent section",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-9B"
+        },
+        {
+          "name": "TAU2-Bench",
+          "value": "79.1",
+          "dataset": "TAU2-Bench",
+          "setup_note": "card table",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-9B"
+        },
+        {
+          "name": "MMLU-Pro",
+          "value": "82.5",
+          "dataset": "MMLU-Pro",
+          "setup_note": "card table",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-9B"
+        },
+        {
+          "name": "GPQA Diamond",
+          "value": "81.7",
+          "dataset": "GPQA Diamond",
+          "setup_note": "card table",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-9B"
+        },
+        {
+          "name": "LiveCodeBench v6",
+          "value": "65.6",
+          "dataset": "LiveCodeBench v6",
+          "setup_note": "card table",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-9B"
+        },
+        {
+          "name": "IFEval",
+          "value": "91.5",
+          "dataset": "IFEval",
+          "setup_note": "card table",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-9B"
+        },
+        {
+          "name": "DeepPlanning",
+          "value": "18.0",
+          "dataset": "DeepPlanning",
+          "setup_note": "card table",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-9B"
+        }
+      ],
+      "local_benchmark_receipt_ids": [],
+      "promotion_state": "candidate",
+      "deployment_constraints": [
+        "Card is shared with Qwen3.5-4B; several card sections are malformed so TIR-Bench / medical-VQA numbers are unattributable and deliberately omitted.",
+        "Thinking mode is ON by default; disable via chat_template_kwargs {'enable_thinking': false}.",
+        "Requires recent transformers/vLLM-nightly/SGLang for the qwen35 architecture."
+      ],
+      "mechanism": "Unified vision-language foundation model with hybrid Gated DeltaNet (linear attention) plus Gated Attention and sparse MoE; RL post-training. 262144 native context, advertised extensible to ~1.01M via YaRN.",
+      "notes": "Local GGUF evidence: general.architecture=qwen35, qwen35.context_length=262144, attention.key_length=256, full_attention_interval=4, general.license=apache-2.0. Do NOT load the advertised context on a 12GB card."
+    },
+    "qwen3.5_4b": {
+      "model_id": "qwen3.5_4b",
+      "hf": "Qwen/Qwen3.5-4B",
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "role_tags": [
+        "semantic_orchestrator",
+        "general_local_fallback",
+        "general_function_caller",
+        "bounded_scorer"
+      ],
+      "parameter_count": "4B",
+      "license": "apache-2.0",
+      "gated_access": false,
+      "commercial_use": true,
+      "supported_runtimes": [
+        "vllm",
+        "llama.cpp",
+        "ollama"
+      ],
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "tool_call_template": "qwen35",
+      "tool_parser": "qwen3_coder",
+      "structured_output_support": "Direct option logits via the decider/openjev engine.",
+      "capabilities": {
+        "single_tool_call": true,
+        "parallel_tool_calls": true,
+        "multi_step_calls": true,
+        "multi_turn_calls": true,
+        "irrelevant_tool_rejection": true,
+        "model_as_tool_orchestration": false
+      },
+      "tested_context": 4096,
+      "tested_quantization": "Q4_K_M",
+      "supports_confidence": true,
+      "supports_abstention": null,
+      "measurements": [
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-supervisor",
+          "quantization": "Q4_K_M",
+          "context": 4096,
+          "measured_vram_mib": 6646.0,
+          "vram_idle_mib": 6646.0,
+          "vram_peak_mib": 6646.0,
+          "cold_start_ms": 11479.440523999983,
+          "warm_ttft_ms": 57.955,
+          "decode_tok_s": 117.14745936447503,
+          "short_decision_ms": 778.5844720001478,
+          "long_decision_ms": 829.0741299997535,
+          "gpu_util_pct": 98.0,
+          "measured_at": "2026-09-21T18:27:19Z"
+        }
+      ],
+      "source_reported_benchmarks": [
+        {
+          "name": "TAU2-Bench",
+          "value": "79.9",
+          "dataset": "TAU2-Bench",
+          "setup_note": "card table. NOTE: upstream-claimed 4B value exceeds the claimed 9B value of 79.1 - do not assume the 9B dominates.",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-4B"
+        },
+        {
+          "name": "BFCL-V4",
+          "value": "50.3",
+          "dataset": "BFCL-V4",
+          "setup_note": "card table",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-4B"
+        },
+        {
+          "name": "MMLU-Pro",
+          "value": "79.1",
+          "dataset": "MMLU-Pro",
+          "setup_note": "card table",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-4B"
+        },
+        {
+          "name": "GPQA Diamond",
+          "value": "76.2",
+          "dataset": "GPQA Diamond",
+          "setup_note": "card table",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-4B"
+        },
+        {
+          "name": "LiveCodeBench v6",
+          "value": "55.8",
+          "dataset": "LiveCodeBench v6",
+          "setup_note": "card table",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-4B"
+        },
+        {
+          "name": "DeepPlanning",
+          "value": "17.6",
+          "dataset": "DeepPlanning",
+          "setup_note": "card table",
+          "source_url": "https://huggingface.co/Qwen/Qwen3.5-4B"
+        }
+      ],
+      "local_benchmark_receipt_ids": [],
+      "promotion_state": "candidate",
+      "deployment_constraints": [
+        "Do not co-reside with nanojev_06b or openjev_06b on 12GB (see manifests/models.z0int.json policies)."
+      ],
+      "mechanism": "Same unified vision-language Qwen3.5 architecture at 4B scale; hybrid Gated DeltaNet plus Gated Attention, sparse MoE, RL post-training, 262144 native context.",
+      "notes": "Already pinned as openjev_4b in manifests/models.z0int.json, which remains the canonical decision-backend record for this checkpoint. Local GGUF evidence: general.architecture=qwen35, qwen35.context_length=262144, file_type=15 (Q4_K_M), general.license=apache-2.0, quantized by bartowski.",
+      "local_artifact": {
+        "kind": "gguf",
+        "hf_repo": "bartowski/Qwen_Qwen3.5-4B-GGUF",
+        "hf_revision": "4168f45a16a1290d65a4ec0fa312ae917a4c15d6",
+        "file": "Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+        "sha256": "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983",
+        "bytes": 3013027808
+      }
+    },
+    "hammer2.1_3b": {
+      "model_id": "hammer2.1_3b",
+      "hf": "MadeAgents/Hammer2.1-3b",
+      "revision": "702ce4215e1391cb000a9c037b86b997660750f3",
+      "role_tags": [
+        "general_function_caller",
+        "tiny_action_specialist"
+      ],
+      "parameter_count": "3B",
+      "license": "qwen-research",
+      "gated_access": false,
+      "commercial_use": false,
+      "supported_runtimes": [
+        "llama.cpp",
+        "ollama",
+        "vllm"
+      ],
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "tool_call_template": "hammer-json-array",
+      "tool_parser": "hermes",
+      "structured_output_support": "Card mandates output be ONLY a JSON array in a fenced block, or [] when no call is needed. No guided-decoding API claim.",
+      "capabilities": {
+        "single_tool_call": true,
+        "parallel_tool_calls": true,
+        "multi_step_calls": true,
+        "multi_turn_calls": true,
+        "irrelevant_tool_rejection": true,
+        "model_as_tool_orchestration": false
+      },
+      "tested_context": 4096,
+      "tested_quantization": "Q4_K_M",
+      "supports_confidence": false,
+      "supports_abstention": true,
+      "measurements": [
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-supervisor",
+          "quantization": "Q4_K_M",
+          "context": 4096,
+          "measured_vram_mib": 3178.0,
+          "vram_idle_mib": 1486.0,
+          "vram_peak_mib": 3178.0,
+          "cold_start_ms": 5222.007534999648,
+          "warm_ttft_ms": 5.801,
+          "decode_tok_s": 289.5473409902519,
+          "short_decision_ms": 138.23248300013802,
+          "long_decision_ms": 208.92001799984428,
+          "gpu_util_pct": 69.0,
+          "measured_at": "2026-09-21T18:26:14Z"
+        }
+      ],
+      "source_reported_benchmarks": [],
+      "local_benchmark_receipt_ids": [],
+      "promotion_state": "candidate",
+      "deployment_constraints": [
+        "License 'qwen-research' -> commercial_use=false. Verify against the upstream card before any commercial use.",
+        "Tools must be injected in a user turn between [BEGIN OF AVAILABLE_TOOLS] and [END OF AVAILABLE_TOOLS]; the model answers with a JSON array only."
+      ],
+      "mechanism": "Large Action Model fine-tuned from Qwen2.5-Coder-3B-Instruct using function masking on xLAM function-calling plus a 7.5k irrelevant-tool set; adds multi-step/multi-turn planning and irrelevant-tool rejection.",
+      "notes": "UNVERIFIED BENCHMARKS: the card reports BFCL-v3 and other results only as PNG figures with no machine-readable numbers, so source_reported_benchmarks is empty by design. Local GGUF evidence: general.architecture=qwen2, qwen2.context_length=32768, rope yarn x4, file_type=15 (Q4_K_M), general.license.name=qwen-research."
+    },
+    "hammer2.1_7b": {
+      "model_id": "hammer2.1_7b",
+      "hf": "MadeAgents/Hammer2.1-7b",
+      "revision": "c5692ee193b806c1aadeaf68c4aec3de503fac30",
+      "role_tags": [
+        "general_function_caller"
+      ],
+      "parameter_count": "7B",
+      "license": "cc-by-nc-4.0",
+      "gated_access": false,
+      "commercial_use": false,
+      "supported_runtimes": [
+        "llama.cpp",
+        "ollama",
+        "vllm"
+      ],
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "tool_call_template": "hammer-json-array",
+      "tool_parser": "hermes",
+      "structured_output_support": "Same strict JSON-array output requirement as the 3B; [] when no call is needed.",
+      "capabilities": {
+        "single_tool_call": true,
+        "parallel_tool_calls": true,
+        "multi_step_calls": true,
+        "multi_turn_calls": true,
+        "irrelevant_tool_rejection": true,
+        "model_as_tool_orchestration": false
+      },
+      "tested_context": 4096,
+      "tested_quantization": "Q4_K_M",
+      "supports_confidence": false,
+      "supports_abstention": true,
+      "measurements": [
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-supervisor",
+          "quantization": "Q4_K_M",
+          "context": 4096,
+          "measured_vram_mib": 5293.0,
+          "vram_idle_mib": 3178.0,
+          "vram_peak_mib": 5293.0,
+          "cold_start_ms": 13284.277826999642,
+          "warm_ttft_ms": 13.229,
+          "decode_tok_s": 124.74271814382834,
+          "short_decision_ms": 244.49857699983113,
+          "long_decision_ms": 356.5524949999599,
+          "gpu_util_pct": 100.0,
+          "measured_at": "2026-09-21T18:26:28Z"
+        }
+      ],
+      "source_reported_benchmarks": [],
+      "local_benchmark_receipt_ids": [],
+      "promotion_state": "candidate",
+      "deployment_constraints": [
+        "cc-by-nc-4.0 -> commercial_use=false.",
+        "No LICENSE file in the repository tree; the license appears only in cardData."
+      ],
+      "mechanism": "Larger Hammer2.1 function-calling specialist fine-tuned from Qwen2.5-Coder-7B-Instruct via function masking.",
+      "notes": "UNVERIFIED BENCHMARKS: BFCL-v3 and other results are figures only on the card; no concrete numbers recorded. Local GGUF evidence: general.architecture=qwen2, qwen2.context_length=32768, file_type=15 (Q4_K_M)."
+    },
+    "functiongemma_270m": {
+      "model_id": "functiongemma_270m",
+      "hf": "google/functiongemma-270m-it",
+      "revision": "39eccb091651513a5dfb56892d3714c1b5b8276c",
+      "role_tags": [
+        "tiny_action_specialist"
+      ],
+      "parameter_count": "270M",
+      "license": "gemma",
+      "gated_access": true,
+      "commercial_use": true,
+      "supported_runtimes": [
+        "llama.cpp",
+        "ollama",
+        "vllm",
+        "transformers"
+      ],
+      "available_quantizations": [
+        "Q8_0"
+      ],
+      "tool_call_template": "functiongemma",
+      "tool_parser": "functiongemma",
+      "structured_output_support": "Chat template takes JSON-schema tool definitions and emits structured function-call tokens; no guided-decoding claim.",
+      "capabilities": {
+        "single_tool_call": true,
+        "parallel_tool_calls": true,
+        "multi_step_calls": false,
+        "multi_turn_calls": false,
+        "irrelevant_tool_rejection": true,
+        "model_as_tool_orchestration": false
+      },
+      "tested_context": 4096,
+      "tested_quantization": "Q8_0",
+      "supports_confidence": false,
+      "supports_abstention": false,
+      "measurements": [
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-supervisor",
+          "quantization": "Q8_0",
+          "context": 4096,
+          "measured_vram_mib": 1482.0,
+          "vram_idle_mib": 3187.0,
+          "vram_peak_mib": 1482.0,
+          "cold_start_ms": 5319.287746000555,
+          "warm_ttft_ms": 8.595,
+          "decode_tok_s": 351.12359550561797,
+          "short_decision_ms": 139.41085799979192,
+          "long_decision_ms": 83.17142000032618,
+          "gpu_util_pct": 51.0,
+          "measured_at": "2026-09-21T18:26:08Z"
+        }
+      ],
+      "source_reported_benchmarks": [
+        {
+          "name": "BFCL Simple",
+          "value": "61.6",
+          "dataset": "BFCL",
+          "setup_note": "0-shot base FunctionGemma 270m",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "BFCL Multiple",
+          "value": "63.5",
+          "dataset": "BFCL",
+          "setup_note": "0-shot",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "BFCL Parallel",
+          "value": "39.0",
+          "dataset": "BFCL",
+          "setup_note": "0-shot",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "BFCL Parallel Multiple",
+          "value": "29.5",
+          "dataset": "BFCL",
+          "setup_note": "0-shot",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "BFCL Live Simple",
+          "value": "36.2",
+          "dataset": "BFCL",
+          "setup_note": "0-shot",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "BFCL Live Multiple",
+          "value": "25.7",
+          "dataset": "BFCL",
+          "setup_note": "0-shot",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "BFCL Live Parallel",
+          "value": "22.9",
+          "dataset": "BFCL",
+          "setup_note": "0-shot",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "BFCL Live Parallel Multiple",
+          "value": "20.8",
+          "dataset": "BFCL",
+          "setup_note": "0-shot",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "BFCL Relevance",
+          "value": "61.1",
+          "dataset": "BFCL",
+          "setup_note": "0-shot",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "BFCL Irrelevance",
+          "value": "73.7",
+          "dataset": "BFCL",
+          "setup_note": "0-shot",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "Mobile Actions eval",
+          "value": "58% base",
+          "dataset": "Mobile Actions recipe",
+          "setup_note": "before fine-tuning",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "Mobile Actions eval",
+          "value": "85% fine-tuned",
+          "dataset": "Mobile Actions recipe",
+          "setup_note": "after the published fine-tuning recipe - this is the reason not to judge it zero-shot",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "Prefill",
+          "value": "1718 tokens/s",
+          "dataset": "on-device Samsung S25 Ultra CPU",
+          "setup_note": "LiteRT XNNPACK, 4 threads, dynamic_int8, ctx 1024",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "Decode",
+          "value": "125.9 tokens/s",
+          "dataset": "on-device",
+          "setup_note": "same setup",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "Time to first token",
+          "value": "0.3 s",
+          "dataset": "on-device",
+          "setup_note": "same setup",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        },
+        {
+          "name": "Model size",
+          "value": "288 MB",
+          "dataset": "on-device dynamic_int8",
+          "setup_note": "peak RSS 551 MB",
+          "source_url": "https://huggingface.co/google/functiongemma-270m-it"
+        }
+      ],
+      "local_benchmark_receipt_ids": [],
+      "promotion_state": "candidate",
+      "deployment_constraints": [
+        "GATED = manual: requires a logged-in Hugging Face account and accepting Google's usage license.",
+        "Gemma Terms of Use apply. Respect the access agreement.",
+        "Not a dialogue model: the card explicitly frames the base model as single-turn and says it should be fine-tuned for multi-turn. Judge it after task-specific fine-tuning (z0intelligence#20 phase 10), never zero-shot."
+      ],
+      "mechanism": "Gemma 3 270M architecture with a function-calling chat format, trained on 6T tokens of public tool definitions and tool-use interactions.",
+      "notes": "Card provenance: the upstream card is gated (raw fetch 401), so the claims above were read from the identical official card mirrored at unsloth/functiongemma-270m-it plus Google docs; revision and license tag come from the HF API. Local GGUF evidence: general.architecture=gemma3, gemma3.context_length=32768, sliding_window=512, head_count_kv=1, file_type=7 (Q8_0), general.license=gemma."
+    },
+    "nanojev_06b": {
+      "model_id": "nanojev_06b",
+      "hf": "C-Tianyu/NanoJev",
+      "revision": "4a19595eada0857133c0d2be024f879a4077054b",
+      "role_tags": [
+        "bounded_scorer"
+      ],
+      "parameter_count": "0.6B",
+      "license": null,
+      "gated_access": false,
+      "commercial_use": null,
+      "supported_runtimes": [
+        "transformers"
+      ],
+      "available_quantizations": [
+        "bfloat16"
+      ],
+      "tool_call_template": "typed-choice",
+      "tool_parser": "decision-backend",
+      "structured_output_support": "Returns direct option probabilities; generates no free text.",
+      "capabilities": {
+        "single_tool_call": false,
+        "parallel_tool_calls": false,
+        "multi_step_calls": false,
+        "multi_turn_calls": false,
+        "irrelevant_tool_rejection": true,
+        "model_as_tool_orchestration": false
+      },
+      "tested_context": null,
+      "tested_quantization": null,
+      "supports_confidence": true,
+      "supports_abstention": true,
+      "measurements": [],
+      "source_reported_benchmarks": [],
+      "local_benchmark_receipt_ids": [],
+      "promotion_state": "candidate",
+      "deployment_constraints": [],
+      "mechanism": "Bounded scorer: returns calibrated probabilities over a caller-supplied candidate set and cannot invent a trajectory. Not a generative orchestrator.",
+      "notes": "Reference entry. The canonical record is the decision_roster in manifests/models.z0int.json; this entry exists so the cascade can name it as a role default without duplicating fields."
+    }
+  },
+  "sources": {
+    "agent0": {
+      "kind": "training_methodology",
+      "name": "Agent0",
+      "paper_url": "https://arxiv.org/abs/2511.16043",
+      "repo_url": "https://github.com/aiming-lab/Agent0",
+      "license": "Apache-2.0 (repository code); no serving checkpoint released under this id",
+      "mechanism": "Zero-external-data self-evolution: co-trains a Curriculum Agent and an Executor Agent from the same base LLM. External tools strengthen the executor, which pressures the curriculum agent to generate harder tool-aware tasks.",
+      "not_a_checkpoint": true,
+      "owner": "evolution-lab",
+      "notes": "Belongs in Evolution Lab as a training arm; never a serving checkpoint and never online self-modification in production. Reported gains are for Qwen3-8B-Base (+18.3% math AVG, +22.0% general AVG per README; the paper abstract's '24%' does not match the README table - recorded as a discrepancy)."
+    }
+  }
+}
