@@ -4,11 +4,11 @@ import { readFileSync } from "node:fs";
 
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
-let registered = false;
+const registration = Symbol.for("z0intelligence.omp.registration");
 
 export default function(pi: ExtensionAPI) {
-  if (registered) return;
-  registered = true;
+  if (Reflect.get(pi.events, registration) === true) return;
+  Reflect.set(pi.events, registration, true);
   pi.on("before_agent_start", async (event, ctx) => {
     const result = await route("omp", ctx.sessionManager.getSessionId(), randomUUID(), event.prompt);
     if (result.action === "context" && typeof result.context === "string") {
