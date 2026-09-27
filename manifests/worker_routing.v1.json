@@ -1,0 +1,260 @@
+{
+  "schema": "z0int.worker_routing.v1",
+  "policy_revision": "validated-free-only-dsh-v1",
+  "baseline": {
+    "model": "codex-parent",
+    "method": "ceil_utf8_bytes_div_4_v1",
+    "description": "Estimated tokens for the same worker messages and delivered output if handled by the Codex parent; not measured savings or currency."
+  },
+  "max_attempts": 3,
+  "timeout_s": 20,
+  "fallback_order": [
+    "cerebras",
+    "deepseek",
+    "groq"
+  ],
+  "defaults": {
+    "groq": "openai/gpt-oss-20b",
+    "cerebras": "qwen-3.8-27b",
+    "deepseek": "deepseek-chat",
+    "openrouter": "nvidia/nemotron-3-super-120b-a12b:free",
+    "nous": "inclusionai/ling-3.0-flash-sante:free",
+    "vercel": "openai/gpt-oss-20b",
+    "nvidia": "openai/gpt-oss-20b",
+    "grok": "grok-4.20-0309-non-reasoning",
+    "local": "qwen2.5:3b"
+  },
+  "providers": {
+    "openrouter": {
+      "base_url": "https://openrouter.ai/api",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "cohort": "existing-api",
+      "auth": "environment",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "qwen/qwen3.8-27b",
+          "label": "qwen/qwen3.8-27b"
+        },
+        {
+          "id": "nvidia/nemotron-3-super-120b-a12b:free",
+          "label": "nvidia/nemotron-3-super-120b-a12b:free"
+        }
+      ],
+      "worker_default_model": "nvidia/nemotron-3-super-120b-a12b:free"
+    },
+    "nous": {
+      "base_url": "https://inference-api.nousresearch.com",
+      "api_key_env": null,
+      "cohort": "existing-subscription",
+      "auth": "hermes-oauth",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "qwen/qwen3.8-27b",
+          "label": "qwen/qwen3.8-27b"
+        },
+        {
+          "id": "inclusionai/ling-3.0-flash-sante:free",
+          "label": "inclusionai/ling-3.0-flash-sante:free"
+        }
+      ],
+      "worker_default_model": "inclusionai/ling-3.0-flash-sante:free"
+    },
+    "vercel": {
+      "base_url": "https://ai-gateway.vercel.sh",
+      "api_key_env": "AI_GATEWAY_API_KEY",
+      "cohort": "existing-api",
+      "auth": "environment",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "openai/gpt-oss-20b",
+          "label": "openai/gpt-oss-20b"
+        }
+      ],
+      "worker_default_model": "openai/gpt-oss-20b"
+    },
+    "nvidia": {
+      "base_url": "https://integrate.api.nvidia.com",
+      "api_key_env": "NVIDIA_API_KEY",
+      "cohort": "existing-api",
+      "auth": "environment",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "openai/gpt-oss-20b",
+          "label": "openai/gpt-oss-20b"
+        }
+      ],
+      "worker_default_model": "openai/gpt-oss-20b"
+    },
+    "grok": {
+      "base_url": "https://api.x.ai",
+      "api_key_env": null,
+      "cohort": "existing-subscription",
+      "auth": "hermes-oauth",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "grok-4.20-0309-non-reasoning",
+          "label": "grok-4.20-0309-non-reasoning"
+        }
+      ],
+      "worker_default_model": "grok-4.20-0309-non-reasoning"
+    },
+    "local": {
+      "base_url": "http://127.0.0.1:11434",
+      "api_key_env": null,
+      "cohort": "local",
+      "auth": "none",
+      "catalog_verified_at": "2026-09-26",
+      "models": [
+        {
+          "id": "qwen2.5:3b",
+          "label": "qwen2.5:3b"
+        }
+      ],
+      "worker_default_model": "qwen2.5:3b"
+    }
+  },
+  "rules": [
+    {
+      "category": "local",
+      "pattern": "\\blocal-only\\b",
+      "provider": "local",
+      "remote_fallback": false
+    },
+    {
+      "category": "code",
+      "pattern": "\\b(python|javascript|sql|function|code|regex)\\b",
+      "provider": "cerebras"
+    },
+    {
+      "category": "structured",
+      "pattern": "\\b(json|csv|extract|sort|sum|calculate|arithmetic)\\b",
+      "provider": "groq"
+    },
+    {
+      "category": "language",
+      "pattern": "\\b(translate|translation|summarize|summary)\\b",
+      "provider": "deepseek"
+    },
+    {
+      "category": "critique",
+      "pattern": "\\b(critique|counterargument|weakness)\\b",
+      "provider": "grok"
+    },
+    {
+      "category": "comparison",
+      "pattern": "\\b(compare|comparison|tradeoffs)\\b",
+      "provider": "nous"
+    },
+    {
+      "category": "classification",
+      "pattern": "\\b(classify|classification|sentiment)\\b",
+      "provider": "nvidia"
+    },
+    {
+      "category": "rewrite",
+      "pattern": "\\b(rewrite|proofread|grammar)\\b",
+      "provider": "openrouter"
+    }
+  ],
+  "default_provider": "cerebras",
+  "provider_caps": {
+    "cerebras": 32,
+    "deepseek": 32,
+    "jev": 32,
+    "groq": 16,
+    "nvidia": 12,
+    "local": 1,
+    "openrouter": 1,
+    "vercel": 8,
+    "nous": null,
+    "grok": null
+  },
+  "provider_caps_source": {
+    "kind": "operator_handoff",
+    "path": "/home/kvn/.codex/attachments/56ac2ac4-e725-4b9e-9061-2ec7b76600c8/pasted-text.txt",
+    "referenced_report": "provider-saturation-and-scaling-policy.md",
+    "verification": "Referenced report not located; supplied measurements are policy inputs, not independently reproduced here.",
+    "affected_update": {
+      "openrouter": 1,
+      "vercel": 8,
+      "evidence_path": "/home/kvn/Documents/ChatGPT/z0/receipts/free-tier/dsh-evidence.json",
+      "sha256": "26e6bbbdef2ef9343c5440ec6b728e998eccb53b5cbd54e503142e9f1cb5a53d"
+    }
+  },
+  "function_orders": {
+    "structured": [
+      "cerebras",
+      "groq",
+      "deepseek"
+    ],
+    "text": [
+      "cerebras",
+      "deepseek",
+      "groq"
+    ]
+  },
+  "structured_functions": [
+    "tool_selection",
+    "coding_implementation"
+  ],
+  "health_cooldown_seconds": 60,
+  "health_error_ttl_seconds": 30,
+  "free_only": true,
+  "free_provider_order": [
+    "openrouter"
+  ],
+  "validated_free_routes": [
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "validated": true,
+      "price_usd": 0,
+      "evidence_path": "/home/kvn/Documents/ChatGPT/z0/receipts/free-tier/dsh-evidence.json",
+      "evidence_sha256": "26e6bbbdef2ef9343c5440ec6b728e998eccb53b5cbd54e503142e9f1cb5a53d",
+      "source": "DSH session-e9a2142b-3884-4abb-b890-b646dd0860ab seq17817-17818",
+      "cap_basis": "conservative single-call validation, not measured saturation ceiling",
+      "request_constraints": {
+        "provider": {
+          "max_price": {
+            "prompt": 0,
+            "completion": 0,
+            "request": 0
+          },
+          "allow_fallbacks": false
+        }
+      }
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "validated": true,
+      "price_usd": 0,
+      "evidence_sha256": "7214223f5a3ca25820759b6d527ef1474e991f7d879e8d2191795e187ea8a9f6",
+      "evidence_path": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/manifests/capability-evidence/groq-free-authorization.json",
+      "billing_basis": "operator_confirmed_free_plan; no paid fallback"
+    }
+  ],
+  "free_policy_exclusions": {
+    "vercel": "Recovered transport and cap8, but measured positive gateway cost: free credit is not a zero-priced route",
+    "other_providers": "No explicitly validated zero-priced route imported for this policy"
+  },
+  "allow_paid_jev_verification": true,
+  "quota_budgets": {
+    "groq": {
+      "model": "openai/gpt-oss-20b",
+      "limits": {
+        "rpm": 30,
+        "rpd": 1000,
+        "tpm": 8000,
+        "tpd": 200000
+      },
+      "kerdoios_root": "/home/kvn/tmp/kerdoios",
+      "no_paid_spill": true
+    }
+  }
+}

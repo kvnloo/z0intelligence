@@ -52,6 +52,7 @@ class OpenAICompatTransport:
 
     def __init__(self, config: ServerConfig) -> None:
         self.config = config
+        self.quota_headers = {}
 
     # ---- low level -------------------------------------------------
     def _post(self, path: str, payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -65,8 +66,10 @@ class OpenAICompatTransport:
         )
         try:
             with urllib.request.urlopen(req, timeout=self.config.timeout_s) as resp:
+                self.quota_headers = {k.lower():v for k,v in resp.headers.items() if k.lower().startswith("x-ratelimit-") or k.lower()=="retry-after"}
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:  # pragma: no cover - network path
+            self.quota_headers = {k.lower():v for k,v in exc.headers.items() if k.lower().startswith("x-ratelimit-") or k.lower()=="retry-after"}
             detail = exc.read().decode("utf-8", "replace")[:500]
             raise TransportError(f"HTTP {exc.code} from {path}: {detail}") from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:

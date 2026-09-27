@@ -1,0 +1,29 @@
+{
+  "aggregation_rule": "Per-model rows only. Never pool models into one universal score; report each model against the same fixture set separately.",
+  "fixture_count": 28,
+  "models": [
+    {
+      "abstained": 1,
+      "cohort": "renewable",
+      "dangerous_selected": 0,
+      "dialect": "hammer",
+      "error": null,
+      "fabrication_proxy": 0,
+      "fixtures": 28,
+      "invalid_call": 0,
+      "label": "groq/openai/gpt-oss-20b",
+      "latency_ms": {
+        "n": 26,
+        "p50": 400.2,
+        "p95": 685.2,
+        "p99": 927.0
+      },
+      "n": 28,
+      "provider": "groq",
+      "retries": 0,
+      "schema_valid": 27,
+      "trajectory_correct": 24,
+      "transport_failures": 0
+    }
+  ]
+}

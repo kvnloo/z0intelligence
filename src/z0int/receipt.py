@@ -8,6 +8,8 @@ Personal artifacts land under ``~/.z0int/receipts/`` (never the git tree).
 from __future__ import annotations
 
 import json
+import fcntl
+import os
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -394,7 +396,11 @@ def append_receipt(receipt: DecisionReceipt | dict[str, Any], *, root: Path | No
     path = receipts_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
         fh.write(json.dumps(row, default=str) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+        fcntl.flock(fh, fcntl.LOCK_UN)
     return row
 
 

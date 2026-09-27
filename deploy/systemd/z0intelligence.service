@@ -1,0 +1,26 @@
+[Unit]
+Description=z0intelligence shared host capability router
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence
+Environment=PYTHONPATH=/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/src
+Environment=OMP_NUM_THREADS=2
+Environment=MKL_NUM_THREADS=2
+Environment=HF_HUB_OFFLINE=1
+Environment=HERMES_HOME=/home/kvn/.hermes
+ExecStart=/home/kvn/.hermes/hermes-agent/venv/bin/python /mnt/zer0models/workspace/zer0/oss/tools/dsh-env-exec.py --allow GROQ_API_KEY --allow CEREBRAS_API_KEY --allow DEEPSEEK_API_KEY --allow OPENROUTER_API_KEY --allow AI_GATEWAY_API_KEY --allow NVIDIA_API_KEY -- /home/kvn/tmp/openjev/.venv/bin/python -m z0int.intelligence_service --bind 127.0.0.1 --bind 172.19.0.1
+ExecStartPost=/usr/bin/python3 /mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/scripts/intelligence-readiness.py ready
+ExecStopPost=/usr/bin/python3 /mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/scripts/intelligence-readiness.py not-ready
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=125
+KillMode=control-group
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
