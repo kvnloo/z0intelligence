@@ -1,0 +1,68 @@
+name: Core unit
+
+on:
+  push:
+    paths:
+      - "src/z0int/receipt.py"
+      - "src/z0int/bridge/**"
+      - "src/z0int/tokenomics_emit.py"
+      - "omp-extensions/z0int-bridge/**"
+      - "tests/test_receipt.py"
+      - "tests/test_bridge_worker.py"
+      - "tests/test_tokenomics_emit.py"
+      - ".github/workflows/core-unit.yml"
+  pull_request:
+    paths:
+      - "src/z0int/receipt.py"
+      - "src/z0int/bridge/**"
+      - "src/z0int/tokenomics_emit.py"
+      - "omp-extensions/z0int-bridge/**"
+      - "tests/test_receipt.py"
+      - "tests/test_bridge_worker.py"
+      - "tests/test_tokenomics_emit.py"
+      - ".github/workflows/core-unit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  core-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Syntax-check touched Python
+        run: |
+          python -m py_compile \
+            src/z0int/receipt.py \
+            src/z0int/tokenomics_emit.py \
+            src/z0int/bridge/worker.py \
+            src/z0int/bridge/runtime.py \
+            src/z0int/backends/bench/tokenomics_bridge.py
+      - name: Receipt and bridge runtime tests
+        env:
+          PYTHONPATH: src
+          Z0INT_PYTHON: python
+        run: |
+          python -m unittest \
+            tests.test_receipt.ReceiptBuild \
+            tests.test_receipt.ReceiptClose \
+            tests.test_bridge_worker.BridgeRuntimeTests
+      - name: Tokenomics emitter fallback tests
+        env:
+          PYTHONPATH: src
+        run: |
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          path = Path("tests/test_tokenomics_emit.py")
+          spec = importlib.util.spec_from_file_location("test_tokenomics_emit", path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(module)
+          module.test_provider_usage_preserves_explicit_measurement_state()
+          module.test_provider_usage_does_not_invent_measurement_state()
+          PY

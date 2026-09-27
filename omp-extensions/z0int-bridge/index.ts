@@ -336,36 +336,96 @@ function estimateMeasuredFromMessages(messages: unknown[]): {
 	measured: number;
 	provider: string | null;
 	model: string | null;
+	usage_source: "provider_usage" | "char_proxy";
 } {
-	// Char/4 proxy until OMP exposes provider usage on the event.
-	let chars = 0;
+	// Prefer provider usage when the close event exposes it. A turn_end may only
+	// carry the final assistant message, so this remains partial coverage unless
+	// the host later supplies a true turn/session aggregate.
 	let provider: string | null = null;
 	let model: string | null = null;
-	const walk = (node: unknown, depth = 0): void => {
-		if (depth > 8 || node == null) return;
-		if (typeof node === "string") {
-			chars += node.length;
-			return;
+	let usageIn: number | null = null;
+	let usageOut: number | null = null;
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i];
+		if (!m || typeof m !== "object") continue;
+		const o = m as Record<string, unknown>;
+		const role = String(o.role || "");
+		if (role && role !== "assistant") continue;
+		if (typeof o.provider === "string") provider = o.provider;
+		if (typeof o.model === "string") model = o.model;
+		const usage = o.usage;
+		if (usage && typeof usage === "object") {
+			const u = usage as Record<string, unknown>;
+			const inn = u.input ?? u.input_tokens;
+			const out = u.output ?? u.output_tokens;
+			if (typeof inn === "number") usageIn = inn;
+			if (typeof out === "number") usageOut = out;
+			if (usageIn != null || usageOut != null) break;
 		}
-		if (Array.isArray(node)) {
-			for (const x of node) walk(x, depth + 1);
-			return;
+		const nested = o.message;
+		if (nested && typeof nested === "object") {
+			const nm = nested as Record<string, unknown>;
+			if (typeof nm.provider === "string") provider = nm.provider;
+			if (typeof nm.model === "string") model = nm.model;
+			const nestedUsage = nm.usage;
+			if (nestedUsage && typeof nestedUsage === "object") {
+				const u = nestedUsage as Record<string, unknown>;
+				const inn = u.input ?? u.input_tokens;
+				const out = u.output ?? u.output_tokens;
+				if (typeof inn === "number") usageIn = inn;
+				if (typeof out === "number") usageOut = out;
+				if (usageIn != null || usageOut != null) break;
+			}
 		}
-		if (typeof node === "object") {
-			const o = node as Record<string, unknown>;
-			if (typeof o.provider === "string" && !provider) provider = o.provider;
-			if (typeof o.model === "string" && !model) model = o.model;
-			if (typeof o.text === "string") chars += o.text.length;
-			if (typeof o.content === "string") chars += o.content.length;
-			for (const v of Object.values(o)) walk(v, depth + 1);
-		}
+	}
+	if (usageIn != null || usageOut != null) {
+		const input_tokens = Math.max(0, Math.round(usageIn || 0));
+		const output_tokens = Math.max(0, Math.round(usageOut || 0));
+		return {
+			input_tokens,
+			output_tokens,
+			measured: input_tokens + output_tokens,
+			provider,
+			model,
+			usage_source: "provider_usage",
+		};
+	}
+
+	// Fallback estimate only. Never label this measured coverage complete.
+	let userChars = 0;
+	let assistantChars = 0;
+	const walkContent = (content: unknown): string => {
+		if (typeof content === "string") return content;
+		if (!Array.isArray(content)) return "";
+		return content
+			.map(item =>
+				item && typeof item === "object" && "text" in item
+					? String((item as { text?: unknown }).text || "")
+					: "",
+			)
+			.join("");
 	};
-	walk(messages);
-	const measured = Math.max(1, Math.ceil(chars / 4));
-	// split rough 40/60 in/out
-	const input_tokens = Math.floor(measured * 0.4);
-	const output_tokens = measured - input_tokens;
-	return { input_tokens, output_tokens, measured, provider, model };
+	for (const m of messages) {
+		if (!m || typeof m !== "object") continue;
+		const o = m as Record<string, unknown>;
+		const role = String(o.role || "");
+		const text = walkContent(o.content);
+		if (role === "user") userChars += text.length;
+		else if (role === "assistant") assistantChars += text.length;
+		else if (!role) assistantChars += text.length;
+		if (typeof o.provider === "string" && !provider) provider = o.provider;
+		if (typeof o.model === "string" && !model) model = o.model;
+	}
+	const input_tokens = Math.max(0, Math.round(userChars / 4));
+	const output_tokens = Math.max(1, Math.round(assistantChars / 4));
+	return {
+		input_tokens,
+		output_tokens,
+		measured: input_tokens + output_tokens,
+		provider,
+		model,
+		usage_source: "char_proxy",
+	};
 }
 
 type ShadowTransport = {
@@ -488,6 +548,11 @@ export default function z0intBridge(pi: ExtensionAPI) {
 					source,
 					provider: est.provider,
 					model: est.model,
+					measurement_state: "partial",
+					state_reason:
+						est.usage_source === "provider_usage"
+							? "last_message_provider_usage"
+							: "char_count_proxy",
 					opened_generation: turn.openedGeneration,
 					close_generation: h.generation,
 				},

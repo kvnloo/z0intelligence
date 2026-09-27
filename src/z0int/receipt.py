@@ -46,6 +46,22 @@ GOLD_SIGNALS = (
 
 NEGATIVE_TRUE_SIGNALS = ("user_correction", "reverted", "ci_failed")
 
+MEASUREMENT_STATES = frozenset({"complete", "partial", "unsupported", "failed", "unknown"})
+EXPLICIT_INCOMPLETE_MEASUREMENT_STATES = frozenset({"partial", "unsupported", "failed"})
+
+
+def normalize_measurement_state(value: Any) -> str | None:
+    if value is None:
+        return None
+    state = str(value).strip().lower()
+    return state if state in MEASUREMENT_STATES else None
+
+
+def normalize_state_reason(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text[:500] if text else None
 
 
 def receipts_path(root: Path | None = None) -> Path:
@@ -226,6 +242,8 @@ class DecisionReceipt:
     baseline_output_tokens: int | None = None
     estimated_frontier_tokens_avoided: int | None = None
     measured_frontier_tokens: int | None = None  # actual post-turn when known
+    measurement_state: str | None = None
+    state_reason: str | None = None
     latency_ms: float | None = None
     fallbacks: int = 0
     ts: float = field(default_factory=time.time)
@@ -256,6 +274,8 @@ class DecisionReceipt:
     def tokens_saved_est(self) -> int | None:
         if self.estimated_frontier_tokens_avoided is not None:
             return int(self.estimated_frontier_tokens_avoided)
+        if normalize_measurement_state(self.measurement_state) in EXPLICIT_INCOMPLETE_MEASUREMENT_STATES:
+            return None
         if self.baseline_input_tokens is None and self.baseline_output_tokens is None:
             return None
         base = int(self.baseline_input_tokens or 0) + int(self.baseline_output_tokens or 0)
@@ -283,6 +303,8 @@ def build_receipt(
     baseline_input_tokens: int | None = None,
     baseline_output_tokens: int | None = None,
     estimated_frontier_tokens_avoided: int | None = None,
+    measurement_state: str | None = None,
+    state_reason: str | None = None,
     fallbacks: int = 0,
     extra: dict[str, Any] | None = None,
 ) -> DecisionReceipt:
@@ -303,6 +325,8 @@ def build_receipt(
         baseline_input_tokens=baseline_input_tokens,
         baseline_output_tokens=baseline_output_tokens,
         estimated_frontier_tokens_avoided=estimated_frontier_tokens_avoided,
+        measurement_state=normalize_measurement_state(measurement_state),
+        state_reason=normalize_state_reason(state_reason),
         fallbacks=fallbacks,
         extra=dict(extra or {}),
     )
@@ -489,6 +513,8 @@ def close_turn(
     provider: str | None = None,
     model: str | None = None,
     outcome: Outcome | dict[str, Any] | None = None,
+    measurement_state: str | None = None,
+    state_reason: str | None = None,
     root: Path | None = None,
     source: str = "close_turn",
 ) -> dict[str, Any]:
@@ -516,6 +542,12 @@ def close_turn(
         closed["provider"] = provider
     if model is not None:
         closed["model"] = model
+    normalized_state = normalize_measurement_state(measurement_state)
+    if normalized_state is not None:
+        closed["measurement_state"] = normalized_state
+    normalized_reason = normalize_state_reason(state_reason)
+    if normalized_reason is not None:
+        closed["state_reason"] = normalized_reason
     closed["schema"] = SCHEMA
     closed["close_ts"] = time.time()
     closed["close_source"] = source
@@ -528,7 +560,10 @@ def close_turn(
     except (TypeError, ValueError):
         base_tot = None
     meas = closed.get("measured_frontier_tokens")
-    if base_tot is not None and meas is not None:
+    state = normalize_measurement_state(closed.get("measurement_state"))
+    if state in EXPLICIT_INCOMPLETE_MEASUREMENT_STATES:
+        closed.pop("actual_tokens_saved", None)
+    elif base_tot is not None and meas is not None:
         try:
             closed["actual_tokens_saved"] = max(0, base_tot - int(meas))
         except (TypeError, ValueError):
@@ -547,6 +582,8 @@ def close_turn(
         "outcome_join": joined,
         "actual_tokens_saved": row.get("actual_tokens_saved"),
         "measured_frontier_tokens": row.get("measured_frontier_tokens"),
+        "measurement_state": row.get("measurement_state"),
+        "state_reason": row.get("state_reason"),
         "baseline_tokens": base_tot,
     }
 
@@ -563,10 +600,16 @@ def summarize_tokenomics(*, root: Path | None = None, limit: int = 5000) -> dict
     measured = 0
     baseline = 0
     actual_saved = 0
+    actual_saved_authoritative = 0
+    actual_saved_provisional = 0
     rows_with_both = 0
+    measurement_state_counts: dict[str, int] = {}
     with_outcome = 0
     verified = 0
     verified_tokens = 0
+    verified_complete_tokens = 0
+    verified_with_token_measurement = 0
+    verified_complete_token_measurements = 0
     false_gold_ignored = 0
     by_cap: dict[str, int] = {}
     by_tier: dict[str, int] = {}
@@ -581,6 +624,8 @@ def summarize_tokenomics(*, root: Path | None = None, limit: int = 5000) -> dict
             if not isinstance(rec, dict):
                 continue
             rows += 1
+            state = normalize_measurement_state(rec.get("measurement_state")) or "unknown"
+            measurement_state_counts[state] = measurement_state_counts.get(state, 0) + 1
             av = rec.get("estimated_frontier_tokens_avoided")
             if av is not None:
                 try:
@@ -606,7 +651,13 @@ def summarize_tokenomics(*, root: Path | None = None, limit: int = 5000) -> dict
                     meas_i = None
             if base_tot is not None and meas_i is not None:
                 rows_with_both += 1
-                actual_saved += max(0, base_tot - meas_i)
+                if state not in EXPLICIT_INCOMPLETE_MEASUREMENT_STATES:
+                    saved = max(0, base_tot - meas_i)
+                    actual_saved += saved
+                    if state == "complete":
+                        actual_saved_authoritative += saved
+                    else:
+                        actual_saved_provisional += saved
             outcome = rec.get("outcome") or row.get("outcome")
             stored_tier = rec.get("outcome_tier") or row.get("outcome_tier")
             if outcome or stored_tier:
@@ -631,9 +682,23 @@ def summarize_tokenomics(*, root: Path | None = None, limit: int = 5000) -> dict
                             tok = None
                     if tok is not None:
                         verified_tokens += int(tok)
+                        verified_with_token_measurement += 1
+                        if state == "complete":
+                            verified_complete_tokens += int(tok)
+                            verified_complete_token_measurements += 1
             cap = rec.get("capability_id") or row.get("capability_id") or "unknown"
             by_cap[str(cap)] = by_cap.get(str(cap), 0) + 1
     t_per_v = (verified_tokens / verified) if verified else None
+    verified_tokens_authoritative = (
+        verified > 0
+        and verified_with_token_measurement == verified
+        and verified_complete_token_measurements == verified
+    )
+    authoritative_t_per_v = (
+        verified_complete_tokens / verified
+        if verified_tokens_authoritative
+        else None
+    )
     return {
         "schema": "z0int.tokenomics_summary.v1",
         "rows": rows,
@@ -641,10 +706,15 @@ def summarize_tokenomics(*, root: Path | None = None, limit: int = 5000) -> dict
         "baseline_tokens_sum": baseline,
         "measured_frontier_tokens_sum": measured,
         "actual_tokens_saved": actual_saved,
+        "actual_tokens_saved_authoritative": actual_saved_authoritative,
+        "actual_tokens_saved_provisional": actual_saved_provisional,
         "rows_with_baseline_and_measured": rows_with_both,
+        "measurement_state_counts": measurement_state_counts,
         "rows_with_outcome": with_outcome,
         "verified_tasks": verified,
         "tokens_per_verified_task": t_per_v,
+        "tokens_per_verified_task_authoritative": authoritative_t_per_v,
+        "verified_token_measurement_authoritative": verified_tokens_authoritative,
         "false_gold_ignored": false_gold_ignored,
         "by_tier": by_tier,
         "by_capability": by_cap,
