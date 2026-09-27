@@ -61,6 +61,12 @@ type ActiveTurn = {
 	traceId: string;
 	sessionId: string;
 	openedGeneration: number;
+	turnsSeen: number;
+	turnsWithProviderUsage: number;
+	inputTokens: number;
+	outputTokens: number;
+	provider: string | null;
+	model: string | null;
 };
 
 type WorkerHandle = {
@@ -428,6 +434,49 @@ function estimateMeasuredFromMessages(messages: unknown[]): {
 	};
 }
 
+function providerUsageFromMessage(message: unknown): {
+	input_tokens: number;
+	output_tokens: number;
+	provider: string | null;
+	model: string | null;
+} | null {
+	if (!message || typeof message !== "object") return null;
+	const o = message as Record<string, unknown>;
+	const role = String(o.role || "");
+	if (role && role !== "assistant") return null;
+	let provider = typeof o.provider === "string" ? o.provider : null;
+	let model = typeof o.model === "string" ? o.model : null;
+	let usage = o.usage;
+	if ((!usage || typeof usage !== "object") && o.message && typeof o.message === "object") {
+		const nested = o.message as Record<string, unknown>;
+		if (typeof nested.provider === "string") provider = nested.provider;
+		if (typeof nested.model === "string") model = nested.model;
+		usage = nested.usage;
+	}
+	if (!usage || typeof usage !== "object") return null;
+	const u = usage as Record<string, unknown>;
+	const rawIn = u.input ?? u.input_tokens;
+	const rawOut = u.output ?? u.output_tokens;
+	if (typeof rawIn !== "number" && typeof rawOut !== "number") return null;
+	return {
+		input_tokens: Math.max(0, Math.round(typeof rawIn === "number" ? rawIn : 0)),
+		output_tokens: Math.max(0, Math.round(typeof rawOut === "number" ? rawOut : 0)),
+		provider,
+		model,
+	};
+}
+
+function accumulateTurnUsage(turn: ActiveTurn, message: unknown): void {
+	turn.turnsSeen += 1;
+	const usage = providerUsageFromMessage(message);
+	if (!usage) return;
+	turn.turnsWithProviderUsage += 1;
+	turn.inputTokens += usage.input_tokens;
+	turn.outputTokens += usage.output_tokens;
+	if (usage.provider) turn.provider = usage.provider;
+	if (usage.model) turn.model = usage.model;
+}
+
 type ShadowTransport = {
 	kind: "z0int-bridge";
 	request: (body: Jsonish, timeoutMs?: number) => Promise<Jsonish>;
@@ -511,6 +560,12 @@ export default function z0intBridge(pi: ExtensionAPI) {
 				traceId: randomUUID().replaceAll("-", ""),
 				sessionId,
 				openedGeneration: h.generation,
+				turnsSeen: 0,
+				turnsWithProviderUsage: 0,
+				inputTokens: 0,
+				outputTokens: 0,
+				provider: null,
+				model: null,
 			};
 			activeTurn = turn;
 			await request(h, {
@@ -528,7 +583,34 @@ export default function z0intBridge(pi: ExtensionAPI) {
 	async function closeActive(messages: unknown[], source: string): Promise<void> {
 		const turn = activeTurn;
 		if (!turn) return;
-		const est = estimateMeasuredFromMessages(messages);
+
+		let inputTokens = turn.inputTokens;
+		let outputTokens = turn.outputTokens;
+		let provider = turn.provider;
+		let model = turn.model;
+		let measurementState: "complete" | "partial";
+		let stateReason: string;
+
+		if (turn.turnsSeen > 0) {
+			measurementState =
+				turn.turnsWithProviderUsage === turn.turnsSeen ? "complete" : "partial";
+			stateReason =
+				measurementState === "complete"
+					? "all_turns_provider_usage"
+					: "missing_turn_provider_usage";
+		} else {
+			const fallback = estimateMeasuredFromMessages(messages);
+			inputTokens = fallback.input_tokens;
+			outputTokens = fallback.output_tokens;
+			provider = fallback.provider;
+			model = fallback.model;
+			measurementState = "partial";
+			stateReason =
+				fallback.usage_source === "provider_usage"
+					? "agent_end_last_message_provider_usage"
+					: "agent_end_char_count_proxy";
+		}
+
 		try {
 			const h = await ensureWorker();
 			await request(h, {
@@ -540,19 +622,18 @@ export default function z0intBridge(pi: ExtensionAPI) {
 					trace_id: turn.traceId,
 					session_id: turn.sessionId,
 					omp_pid: process.pid,
-					measured: est.measured,
-					input_tokens: est.input_tokens,
-					output_tokens: est.output_tokens,
+					measured: inputTokens + outputTokens,
+					input_tokens: inputTokens,
+					output_tokens: outputTokens,
 					execution_completed: true,
 					// verified_success stays null until async join
 					source,
-					provider: est.provider,
-					model: est.model,
-					measurement_state: "partial",
-					state_reason:
-						est.usage_source === "provider_usage"
-							? "last_message_provider_usage"
-							: "char_count_proxy",
+					provider,
+					model,
+					measurement_state: measurementState,
+					state_reason: stateReason,
+					turns_seen: turn.turnsSeen,
+					turns_with_provider_usage: turn.turnsWithProviderUsage,
 					opened_generation: turn.openedGeneration,
 					close_generation: h.generation,
 				},
@@ -566,11 +647,13 @@ export default function z0intBridge(pi: ExtensionAPI) {
 
 	pi.on("turn_end", async event => {
 		try {
+			const turn = activeTurn;
+			if (!turn) return;
 			const msg =
 				event && typeof event === "object" && "message" in event
 					? (event as { message?: unknown }).message
 					: null;
-			await closeActive(msg ? [msg] : [], "bridge_turn_end");
+			accumulateTurnUsage(turn, msg);
 		} catch {
 			/* */
 		}

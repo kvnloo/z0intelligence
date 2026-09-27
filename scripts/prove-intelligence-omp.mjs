@@ -20,6 +20,20 @@ const runner=new ExtensionRunner(loaded.extensions,loaded.runtime,root,session,r
 const text='Claim: The fictional museum closes at five.\nEvidence: The fictional museum opens at nine and closes at five.';
 const result=await runner.emitBeforeAgentStart(text,undefined,['Native OMP system prompt.']);
 if(result===undefined)throw new Error('Canonical result was not returned to OMP');
+
+// Prove multi-turn usage stays on one bridge trace and becomes authoritative
+// only after terminal agent_end. Each turn carries provider-reported usage.
+const turn0={role:'assistant',content:[{type:'text',text:'tool call'}],provider:'openai',model:'gpt-test',usage:{input:10,output:2}};
+const turn1={role:'assistant',content:[{type:'text',text:'done'}],provider:'openai',model:'gpt-test',usage:{input:7,output:2}};
+await runner.emit({type:'turn_end',turnIndex:0,timestamp:Date.now(),message:turn0,toolResults:[]});
+await runner.emit({type:'turn_end',turnIndex:1,timestamp:Date.now(),message:turn1,toolResults:[]});
+await runner.emit({type:'agent_end',messages:[turn0,turn1],willContinue:false});
+
+const heartRows=readFileSync(process.env.Z0INT_HOME+'/stream/bridge_heart.jsonl','utf8').trim().split('\n').map(JSON.parse);
+const usageHeart=[...heartRows].reverse().find(r=>r.omp_session_id===session.getSessionId()&&r.source==='bridge_agent_end');
+if(!usageHeart)throw new Error('Missing terminal bridge usage heart');
+if(usageHeart.measurement_state!=='complete')throw new Error('Expected complete provider usage, got '+JSON.stringify(usageHeart));
+if(usageHeart.measured!==21)throw new Error('Expected 21 accumulated tokens, got '+JSON.stringify(usageHeart));
 const rows=readFileSync(process.env.Z0INT_HOME+'/receipts/decisions.jsonl','utf8').trim().split('\n').map(JSON.parse).filter(r=>r.session_id===session.getSessionId()&&r.extra?.automatic);
 const completed=rows.filter(r=>r.extra.status==='completed');
 const delivered=rows.filter(r=>r.extra.status==='delivered_to_hook');
@@ -31,6 +45,6 @@ if(check.status!==0)throw new Error('Automatic integration health failed: '+chec
 process.env.Z0INT_AUTO_OMP='0';
 const native=await runner.emitBeforeAgentStart('Trivial native turn',undefined,['Native OMP system prompt.']);
 if(native!==undefined)throw new Error('Kill switch did not preserve native behavior');
-writeFileSync(process.env.Z0INT_PROOF_OUTPUT+'/omp.json',JSON.stringify({runtime:'OMP ExtensionRunner.emitBeforeAgentStart',parent_model_called:false,returned_to_parent:result,dispatch_receipt:decision.trace_id,consumed_receipt:delivered[0].trace_id,health:JSON.parse(check.stdout),rollback_native:true,duplicate_hook:false},null,2)+'\n');
+writeFileSync(process.env.Z0INT_PROOF_OUTPUT+'/omp.json',JSON.stringify({runtime:'OMP ExtensionRunner.emitBeforeAgentStart',parent_model_called:false,returned_to_parent:result,dispatch_receipt:decision.trace_id,consumed_receipt:delivered[0].trace_id,health:JSON.parse(check.stdout),rollback_native:true,duplicate_hook:false,usage_measurement_state:usageHeart.measurement_state,usage_measured_tokens:usageHeart.measured},null,2)+'\n');
 console.log(JSON.stringify({omp:true,dispatch_receipt:decision.trace_id,rollback_native:true}));
 process.exit(0);
