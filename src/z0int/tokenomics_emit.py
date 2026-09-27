@@ -44,6 +44,12 @@ def emit_provider_usage(
     attribution: str = "incremental",
     cost_usd: float | None = None,
     latency_ms: float | None = None,
+    measurement_state: str | None = None,
+    state_reason: str | None = None,
+    observer_id: str | None = None,
+    logical_source_id: str | None = None,
+    physical_source_id: str | None = None,
+    identity_basis: str | None = None,
     extra: dict[str, Any] | None = None,
     root: Path | None = None,
 ) -> Path | None:
@@ -64,6 +70,16 @@ def emit_provider_usage(
         raw["cost_usd"] = cost_usd
     if latency_ms is not None:
         raw["latency_ms"] = latency_ms
+    for key, value in (
+        ("measurement_state", measurement_state),
+        ("state_reason", state_reason),
+        ("observer_id", observer_id),
+        ("logical_source_id", logical_source_id),
+        ("physical_source_id", physical_source_id),
+        ("identity_basis", identity_basis),
+    ):
+        if value is not None:
+            raw[key] = value
     if extra:
         raw.update(extra)
     try:

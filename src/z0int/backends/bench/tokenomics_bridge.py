@@ -14,6 +14,7 @@ from tokenomics import (
     JsonlSink,
     Latency,
     MemorySink,
+    MeasurementSourceRef,
     ModelRef,
     Outcome,
     Recorder,
@@ -377,6 +378,15 @@ class BenchTokenomicsSession:
                 role="router",
                 status="ok",
                 model=ModelRef(provider="local", name=candidate_id, revision=model_revision),
+                measurement_source=(
+                    MeasurementSourceRef(
+                        identity_basis="derived",
+                        measurement_state="partial",
+                        state_reason="derived_input_only",
+                    )
+                    if usage is not None
+                    else None
+                ),
                 usage=usage,
                 latency=Latency(duration_ms=float(latency_ms)),
                 experiment=self._experiment(

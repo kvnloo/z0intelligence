@@ -74,7 +74,8 @@ class BridgeRuntimeTests(unittest.TestCase):
                 "estimated_frontier_tokens_avoided": 0,
             }
             rtmod.kerdoios_plan = lambda *a, **k: None  # type: ignore[assignment]
-            rtmod.kerdoios_record = lambda **k: None  # type: ignore[assignment]
+            recorded: dict = {}
+            rtmod.kerdoios_record = lambda **k: recorded.update(k)  # type: ignore[assignment]
 
             rt = BridgeRuntime(generation=1, instance_id="test", build_id="buildtest")
             opened = rt.turn_open(
@@ -98,11 +99,20 @@ class BridgeRuntimeTests(unittest.TestCase):
                 execution_completed=True,
                 verified_success=None,
                 source="bridge_turn_end",
+                measurement_state="partial",
+                state_reason="char_count_proxy",
                 writer_generation=1,
             )
             self.assertTrue(closed.get("ok"))
+            self.assertEqual(
+                closed.get("closed", {}).get("receipt", {}).get("measurement_state"),
+                "partial",
+            )
+            self.assertEqual(recorded.get("measurement_state"), "partial")
+            self.assertEqual(recorded.get("state_reason"), "char_count_proxy")
             heart = (Path(tmp) / "stream" / "bridge_heart.jsonl").read_text()
             self.assertIn("abc123def456", heart)
+            self.assertIn('"measurement_state": "partial"', heart)
 
     def test_stale_generation_open_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp, z0home(tmp):

@@ -176,6 +176,8 @@ def kerdoios_record(
     completed: bool,
     input_tokens: int | None,
     output_tokens: int | None,
+    measurement_state: str | None = None,
+    state_reason: str | None = None,
 ) -> None:
     kerd_root = Path(
         os.environ.get("KERDOIOS_ROOT")
@@ -208,6 +210,10 @@ def kerdoios_record(
         args.extend(["--input-tokens", str(input_tokens)])
     if output_tokens is not None:
         args.extend(["--output-tokens", str(output_tokens)])
+    if measurement_state:
+        args.extend(["--measurement-state", measurement_state])
+    if state_reason:
+        args.extend(["--state-reason", state_reason[:500]])
     _run_json(args, kerd_root, 5.0)
 
 
@@ -471,6 +477,8 @@ class BridgeRuntime:
         verification_source: str | None = None,
         provider: str | None = None,
         model: str | None = None,
+        measurement_state: str | None = None,
+        state_reason: str | None = None,
         writer_generation: int | None = None,
     ) -> dict[str, Any]:
         stamp = _meta_stamp(
@@ -514,6 +522,8 @@ class BridgeRuntime:
                 provider=provider,
                 model=model,
                 outcome=oc,
+                measurement_state=measurement_state,
+                state_reason=state_reason,
                 source=source,
             )
             if "ok" not in closed:
@@ -532,6 +542,8 @@ class BridgeRuntime:
             "model": model,
             "execution_completed": execution_completed,
             "verified_success": verified_success,
+            "measurement_state": measurement_state,
+            "state_reason": state_reason,
             "outcome_tier": (closed.get("outcome_join") or {}).get("outcome_tier")
             if isinstance(closed.get("outcome_join"), dict)
             else None,
@@ -562,6 +574,8 @@ class BridgeRuntime:
                 completed=verified_success is True,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
+                measurement_state=measurement_state,
+                state_reason=state_reason,
             )
         except Exception:
             pass

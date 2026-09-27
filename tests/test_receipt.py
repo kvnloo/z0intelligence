@@ -26,6 +26,21 @@ class ReceiptBuild(unittest.TestCase):
         self.assertEqual(validate_receipt(d), [])
         self.assertEqual(r.tokens_saved_est(), 4800)
 
+    def test_partial_receipt_does_not_infer_saved_tokens_from_incomplete_actual(self):
+        from z0int.receipt import build_receipt
+
+        r = build_receipt(
+            capability_id="coding.next_action",
+            route="model",
+            baseline_input_tokens=1000,
+            baseline_output_tokens=200,
+            input_tokens=400,
+            output_tokens=100,
+            measurement_state="partial",
+            state_reason="char_count_proxy",
+        )
+        self.assertIsNone(r.tokens_saved_est())
+
     def test_validate_missing_trace(self):
         from z0int.receipt import validate_receipt
 
@@ -352,6 +367,63 @@ class ReceiptClose(unittest.TestCase):
             self.assertGreaterEqual(s["actual_tokens_saved"], 1860)
             self.assertGreaterEqual(s["measured_frontier_tokens_sum"], 1240)
             self.assertGreaterEqual(s["verified_tasks"], 1)
+
+
+    def test_partial_close_preserves_observed_tokens_without_measured_savings(self):
+        from z0int.receipt import append_receipt, build_receipt, close_turn, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            row = append_receipt(
+                build_receipt(
+                    capability_id="coding.edit",
+                    route="model",
+                    baseline_input_tokens=2500,
+                    baseline_output_tokens=600,
+                ),
+                root=home,
+            )
+            closed = close_turn(
+                row["trace_id"],
+                measured_frontier_tokens=1240,
+                input_tokens=900,
+                output_tokens=340,
+                measurement_state="partial",
+                state_reason="char_count_proxy",
+                root=home,
+            )
+            self.assertEqual(closed["measurement_state"], "partial")
+            self.assertIsNone(closed["actual_tokens_saved"])
+            self.assertEqual(closed["measured_frontier_tokens"], 1240)
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["actual_tokens_saved"], 0)
+            self.assertEqual(summary["measurement_state_counts"].get("partial"), 1)
+
+    def test_complete_close_mints_authoritative_savings(self):
+        from z0int.receipt import append_receipt, build_receipt, close_turn, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            row = append_receipt(
+                build_receipt(
+                    capability_id="coding.edit",
+                    route="model",
+                    baseline_input_tokens=2500,
+                    baseline_output_tokens=600,
+                ),
+                root=home,
+            )
+            closed = close_turn(
+                row["trace_id"],
+                measured_frontier_tokens=1240,
+                measurement_state="complete",
+                state_reason="provider_turn_usage",
+                root=home,
+            )
+            self.assertEqual(closed["actual_tokens_saved"], 1860)
+            summary = summarize_tokenomics(root=home)
+            self.assertGreaterEqual(summary["actual_tokens_saved_authoritative"], 1860)
+            self.assertEqual(summary["actual_tokens_saved_provisional"], 0)
 
 
 class CounterfactualMine(unittest.TestCase):

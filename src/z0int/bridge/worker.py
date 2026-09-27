@@ -120,6 +120,8 @@ def serve(generation: int | None = None) -> int:
                     provider=payload.get("provider") if isinstance(payload.get("provider"), str) else None,
                     model=payload.get("model") if isinstance(payload.get("model"), str) else None,
                     verification_source=payload.get("verification_source") if isinstance(payload.get("verification_source"), str) else None,
+                    measurement_state=payload.get("measurement_state") if isinstance(payload.get("measurement_state"), str) else None,
+                    state_reason=payload.get("state_reason") if isinstance(payload.get("state_reason"), str) else None,
                     writer_generation=req.get("bridge_generation")
                     if isinstance(req.get("bridge_generation"), int)
                     else rt.generation,
