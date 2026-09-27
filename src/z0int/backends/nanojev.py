@@ -144,6 +144,7 @@ class NanoJevBackend:
                 "autoregressive_decode_steps": 0,
                 "network_model_calls": 0,
                 "prefix_sharing": False,
+                "truncated_questions": raw.get("truncated_questions", []),
                 "probability_status": (
                     "complete normalized decision distribution; "
                     "calibration is checkpoint/task dependent"
