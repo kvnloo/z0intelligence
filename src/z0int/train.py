@@ -23,8 +23,9 @@ PN = 96
 #: reverse), so this module must not import across that boundary at import time.
 #: The primitive is resolved by name from an explicit opt-in provider; with no
 #: provider configured the arm reports why it did not run instead of reaching into
-#: another repo's file layout. The previous version hardcoded
-#: `/workspace/evolution-lab` on sys.path.
+#: another repo's file layout. The previous version named one machine's Evolution
+#: Lab checkout on sys.path -- see `paths.LEGACY_EVOLUTION_LAB_ROOTS` for the one
+#: place such a path may still live.
 MB_PROVIDER_ENV = "Z0INT_MB_PROVIDER"
 #: Conventional provider when `Z0INT_MB_PROVIDER` is unset and a lab checkout resolves.
 MB_PROVIDER_MODULE = "evolution_lab.jev_distill"
