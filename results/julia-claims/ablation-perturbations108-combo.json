@@ -1,0 +1,44 @@
+{
+  "baseline": {
+    "A": "A0",
+    "B": "B0",
+    "D": "D0",
+    "dev_acc": 0.2821,
+    "sealed_acc": 0.3
+  },
+  "baseline_sealed": 0.3,
+  "combo": {
+    "A": "A2",
+    "B": "B1",
+    "D": "D2",
+    "dev_acc": 0.3846,
+    "dev_selected": true,
+    "jev_sealed_acc": 1.0,
+    "sealed_acc": 0.2,
+    "sealed_by_family": {
+      "candidate_selection": {
+        "acc": 0.1667,
+        "correct": 1,
+        "n": 6
+      },
+      "evidence_interpretation": {
+        "acc": 0.2667,
+        "correct": 4,
+        "n": 15
+      },
+      "rule_application": {
+        "acc": 0.1111,
+        "correct": 1,
+        "n": 9
+      }
+    },
+    "sealed_correct": 6,
+    "sealed_n": 30
+  },
+  "corpus": "perturbations108",
+  "dev": 78,
+  "n": 108,
+  "schema_sha256": "b3f32db4c0caee9df7eca1aab43670712d729a5bb27f075dcdb00f3e733a1d4b",
+  "sealed": 30,
+  "variants": {}
+}

@@ -1,0 +1,35 @@
+{
+  "abstained": 0,
+  "accuracy": 0.94,
+  "answered": 100,
+  "autocast": "auto",
+  "correct": 94,
+  "coverage": 1.0,
+  "dataset": "agnews",
+  "device": "cuda",
+  "dtype": "bfloat16",
+  "encoding": {
+    "head_length": 512,
+    "max_length": 1024,
+    "strict": true
+  },
+  "manifest_sha256": "7e0fd117e0156ce79c576802fdf0c403389872a997557aeba7db2534d6749e07",
+  "n": 100,
+  "protocol": {
+    "btzsc_revision": "fef2a2ac62b69c58670047dddf045c53d7c3cb5e",
+    "dataset_offset": 0,
+    "jev_bench_commit": "0d610cc53e79bcbec691312b0c4adb4a0e371642",
+    "labels": [
+      "This example news text is about business news",
+      "This example news text is about science and technology",
+      "This example news text is about sports",
+      "This example news text is about world news"
+    ],
+    "n_classes": 4,
+    "question": "Which single label best describes the input text?",
+    "sampler": "jev_benchmarks.data._balanced_indices (imported from the pinned repo)",
+    "samples_per_dataset": 100,
+    "seed": 20260917
+  },
+  "published": "94/100"
+}

@@ -1,0 +1,36 @@
+{
+  "cases": 400,
+  "differing": 400,
+  "identical": 0,
+  "native_rendering": "json.dumps(state, ensure_ascii=False) [default separators, insertion order]",
+  "adapter_rendering": "json.dumps(state, ensure_ascii=False, sort_keys=True, separators=(',',':')) [compact, sorted]",
+  "examples": [
+    {
+      "case_id": "agent_trace_observability_000000",
+      "native_len": 335,
+      "adapter_len": 316,
+      "native_sha256": "d5a6c9c69a1ca923",
+      "adapter_sha256": "d528e0569f9673e3",
+      "native_head": "{\"agent\": {\"autonomy\": \"checkpointed\", \"model\": \"internal-agent-v1\"}, \"constraints\": [\"Do not exceed a $50 spend on clou",
+      "adapter_head": "{\"agent\":{\"autonomy\":\"checkpointed\",\"model\":\"internal-agent-v1\"},\"constraints\":[\"Do not exceed a $50 spend on cloud reso"
+    },
+    {
+      "case_id": "agent_trace_observability_000001",
+      "native_len": 326,
+      "adapter_len": 307,
+      "native_sha256": "11606bed9ed3c62a",
+      "adapter_sha256": "4f0471c75c281f00",
+      "native_head": "{\"agent\": {\"autonomy\": \"unsupervised\", \"model\": \"internal-agent-v1\"}, \"constraints\": [\"Never disable monitoring or alert",
+      "adapter_head": "{\"agent\":{\"autonomy\":\"unsupervised\",\"model\":\"internal-agent-v1\"},\"constraints\":[\"Never disable monitoring or alerting\"],"
+    },
+    {
+      "case_id": "agent_trace_observability_000002",
+      "native_len": 439,
+      "adapter_len": 418,
+      "native_sha256": "2f5926a6e4b58cd9",
+      "adapter_sha256": "2e0fde771d38ae9a",
+      "native_head": "{\"agent\": {\"autonomy\": \"unsupervised\", \"model\": \"internal-agent-v3\"}, \"constraints\": [\"Do not touch customer data outsid",
+      "adapter_head": "{\"agent\":{\"autonomy\":\"unsupervised\",\"model\":\"internal-agent-v3\"},\"constraints\":[\"Do not touch customer data outside the "
+    }
+  ]
+}

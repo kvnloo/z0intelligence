@@ -1,0 +1,143 @@
+{
+  "accuracy_by_confidence_decile_sealed": [
+    {
+      "accuracy": 0.2,
+      "decile": 1,
+      "mean_p1": 1.0
+    },
+    {
+      "accuracy": 0.5,
+      "decile": 2,
+      "mean_p1": 0.9991
+    },
+    {
+      "accuracy": 0.6,
+      "decile": 3,
+      "mean_p1": 0.9966
+    },
+    {
+      "accuracy": 0.6667,
+      "decile": 4,
+      "mean_p1": 0.9869
+    },
+    {
+      "accuracy": 0.6667,
+      "decile": 5,
+      "mean_p1": 0.9647
+    },
+    {
+      "accuracy": 0.2,
+      "decile": 6,
+      "mean_p1": 0.9205
+    },
+    {
+      "accuracy": 0.5,
+      "decile": 7,
+      "mean_p1": 0.8965
+    },
+    {
+      "accuracy": 0.8,
+      "decile": 8,
+      "mean_p1": 0.8107
+    },
+    {
+      "accuracy": 0.8333,
+      "decile": 9,
+      "mean_p1": 0.691
+    },
+    {
+      "accuracy": 0.1667,
+      "decile": 10,
+      "mean_p1": 0.5522
+    }
+  ],
+  "auroc_correctness": {
+    "logit_margin": {
+      "auroc": 0.4662,
+      "circular": false,
+      "meaning": "logit margin (== log-prob margin)"
+    },
+    "neg_brier": {
+      "auroc": 1.0,
+      "circular": true,
+      "meaning": "negative Brier -- CIRCULAR, needs gold"
+    },
+    "neg_entropy": {
+      "auroc": 0.4687,
+      "circular": false,
+      "meaning": "negative entropy"
+    },
+    "neg_nll": {
+      "auroc": 1.0,
+      "circular": true,
+      "meaning": "negative NLL -- CIRCULAR, needs gold"
+    },
+    "p1": {
+      "auroc": 0.47,
+      "circular": false,
+      "meaning": "max softmax probability"
+    },
+    "p1_calibrated": {
+      "auroc": 0.4585,
+      "meaning": "temperature-scaled max probability"
+    },
+    "softmax_margin": {
+      "auroc": 0.4636,
+      "circular": false,
+      "meaning": "p1 - p2"
+    }
+  },
+  "base_accuracy": {
+    "dev": 0.3523,
+    "sealed": 0.5179
+  },
+  "corpus": "authored144",
+  "coverage_at_error_budget": {
+    "logit_margin": {
+      "<= 1%": 0.0179,
+      "<= 10%": 0.0179,
+      "<= 2%": 0.0179,
+      "<= 5%": 0.0179
+    },
+    "neg_brier": {
+      "<= 1%": 0.5179,
+      "<= 10%": 0.5714,
+      "<= 2%": 0.5179,
+      "<= 5%": 0.5357
+    },
+    "neg_entropy": {
+      "<= 1%": 0.0179,
+      "<= 10%": 0.0179,
+      "<= 2%": 0.0179,
+      "<= 5%": 0.0179
+    },
+    "neg_nll": {
+      "<= 1%": 0.5179,
+      "<= 10%": 0.5714,
+      "<= 2%": 0.5179,
+      "<= 5%": 0.5357
+    },
+    "p1": {
+      "<= 1%": 0.0179,
+      "<= 10%": 0.0179,
+      "<= 2%": 0.0179,
+      "<= 5%": 0.0179
+    },
+    "softmax_margin": {
+      "<= 1%": 0.0179,
+      "<= 10%": 0.0179,
+      "<= 2%": 0.0179,
+      "<= 5%": 0.0179
+    }
+  },
+  "dev": 88,
+  "ece": {
+    "p1_sealed_calibrated": 0.1749,
+    "p1_sealed_uncalibrated": 0.3947
+  },
+  "n": 144,
+  "sealed": 56,
+  "temperature": {
+    "fitted_on_dev": 6.0
+  }
+}

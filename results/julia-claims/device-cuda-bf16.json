@@ -1,0 +1,22 @@
+{
+  "mode": "cuda-bf16",
+  "n": 2000,
+  "total": "1460/2000",
+  "by_type": {
+    "choice": {
+      "count": 600,
+      "correct": 429,
+      "accuracy": 0.715
+    },
+    "noul": {
+      "count": 600,
+      "correct": 484,
+      "accuracy": 0.8066666666666666
+    },
+    "score": {
+      "count": 800,
+      "correct": 547,
+      "accuracy": 0.68375
+    }
+  }
+}

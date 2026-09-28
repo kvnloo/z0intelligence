@@ -1,0 +1,4 @@
+# Raw dataset text is NOT redistributed. These are regenerable caches; rebuild them
+# from the pinned revisions and hashes in benchmarks/julia_claims/frozen_config.json.
+typed-decisions-test.jsonl
+*-manifest.jsonl

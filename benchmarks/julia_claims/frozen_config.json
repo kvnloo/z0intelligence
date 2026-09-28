@@ -1,0 +1,82 @@
+{
+  "schema": "z0int.julia_claims.frozen_config.v1",
+  "frozen_at": "2026-09-28",
+  "model": {
+    "repo": "SupersonicLabs/Julia-1",
+    "revision": "a85b127321d580d65176c89ced8273f305745d85",
+    "weights_sha256": "df853bf7fe424420011f3d0c47a05d7341aa9eefa7fb9f203ea4aada4ad95b72",
+    "package": "supersonic-julia 0.1.0",
+    "license": "apache-2.0",
+    "parameters": 144300000
+  },
+  "runtime": {
+    "python": "3.11.14",
+    "torch_cpu": "2.14.0+cpu",
+    "torch_cuda": "2.10.0+cu128",
+    "transformers": "5.0.0",
+    "safetensors": "0.8.0",
+    "device": "cpu",
+    "dtype": "float32",
+    "autocast": "off (CPU FP32)",
+    "threads": 4
+  },
+  "encoding": {
+    "strict_encoding": true,
+    "max_length": 1024,
+    "head_length": 512,
+    "batch_size": 16,
+    "marker_only_head": false,
+    "note": "The published historical accuracy protocol. 8192 tokens has only an inference smoke test and must not be used to claim benchmark reproduction."
+  },
+  "datasets": {
+    "typed_decisions": {
+      "repo": "LocalLLaMA/typed-decisions",
+      "revision": "c76749ec58bd8c3d2ea706b31c333a9059c38f90",
+      "sha256": "4f294f218ea1da27f3efef936359389c62ea4d3973a41457732990f1d31b647c",
+      "file": "all/test-00000-of-00001.parquet",
+      "cases": 400,
+      "questions": 2000,
+      "state_types": ["dict"]
+    },
+    "btzsc_agnews_emotion": {
+      "jev_bench_commit": "0d610cc53e79bcbec691312b0c4adb4a0e371642",
+      "btzsc_revision": "fef2a2ac62b69c58670047dddf045c53d7c3cb5e",
+      "seed": 20260917,
+      "samples_per_dataset": 100,
+      "question": "Which single label best describes the input text?"
+    },
+    "banking77": {
+      "labels": 72,
+      "official_result": "64/100 with a shortlist route",
+      "note": "native option limit is 20, so the official route cannot be a single native call"
+    },
+    "massive": {
+      "scenario_labels": 18,
+      "locales": 52,
+      "examples": 154648,
+      "official_all_locales": "110573/154648 = 71.50%",
+      "official_en_us": "2580/2974 = 86.75%",
+      "official_pt_pt": "2565/2974 = 86.25%"
+    }
+  },
+  "z0_corpora": {
+    "authored144": {
+      "path": "benchmarks/data/authored144.jsonl",
+      "cases": 144,
+      "families": ["evidence_interpretation", "rule_application", "candidate_selection"],
+      "jev_reference": "manifests/capability-evidence/jev-bench-authored144.jsonl"
+    },
+    "perturbations108": {
+      "path": "benchmarks/data/perturbations108.jsonl",
+      "cases": 108,
+      "jev_reference": "manifests/capability-evidence/jev-bench-perturbations108.jsonl"
+    }
+  },
+  "published_targets": {
+    "typed_cpu_fp32": {"choice": "426/600", "noul": "483/600", "score": "542/800", "total": "1451/2000"},
+    "typed_h200_bf16": {"choice": "428/600", "noul": "484/600", "score": "551/800", "total": "1463/2000"},
+    "agnews": "94/100",
+    "emotion": "86/100",
+    "banking77": "64/100"
+  }
+}
