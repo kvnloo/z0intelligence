@@ -18,6 +18,7 @@ from .base import (
     DecisionRequest,
     DecisionResult,
 )
+from .named_questions import answer_from_named, normalize_probs, question_to_named
 
 
 @dataclass
@@ -62,82 +63,19 @@ def _runtime_import_error() -> str | None:
     return None
 
 
+# The z0int ⇄ named-question mapping moved to ``named_questions`` so ``julia``,
+# ``laya`` and ``decider`` share one implementation. These shims keep the original
+# private names working, with the old one-argument signatures.
 def _normalize_probs(probs: dict[str, float]) -> dict[str, float]:
-    cleaned: dict[str, float] = {}
-    for key, val in probs.items():
-        fval = float(val)
-        if not math.isfinite(fval) or fval < 0:
-            raise ValueError(f"invalid probability for {key!r}: {val!r}")
-        cleaned[str(key)] = fval
-    total = sum(cleaned.values())
-    if total <= 0:
-        raise ValueError("empty probability mass from decider")
-    return {k: v / total for k, v in cleaned.items()}
+    return normalize_probs(probs, source="decider")
 
 
 def _question_to_decider(q: DecisionQuestion) -> dict[str, Any]:
-    if q.type == "boolean":
-        return {
-            "type": "noul",
-            "instructions": q.instructions,
-            "criteria": {
-                "false": q.false_criterion or "no, the statement does not hold",
-                "true": q.true_criterion or "yes, the statement holds",
-            },
-        }
-    if q.type == "choice":
-        return {
-            "type": "choice",
-            "instructions": q.instructions,
-            "criteria": {o.id: o.description for o in q.options},
-        }
-    return {
-        "type": "score",
-        "instructions": q.instructions,
-        "criteria": list(q.levels),
-    }
+    return question_to_named(q)
 
 
 def _answer_from_decider(q: DecisionQuestion, raw: dict[str, Any]) -> DecisionAnswer:
-    qtype = raw.get("type")
-    confidence = raw.get("confidence")
-    conf_val = float(confidence) if confidence is not None else None
-
-    if qtype == "noul" or q.type == "boolean":
-        p_true = float(raw.get("noul", 0.5))
-        probs = _normalize_probs({"false": 1.0 - p_true, "true": p_true})
-        return DecisionAnswer(
-            question_id=q.id,
-            type="boolean",
-            probabilities=probs,
-            value=p_true >= 0.5,
-            confidence=conf_val,
-        )
-
-    if qtype == "choice" or q.type == "choice":
-        probs_raw = raw.get("probabilities") or {}
-        probs = _normalize_probs({str(k): float(v) for k, v in probs_raw.items()})
-        choice = str(raw.get("choice") or max(probs, key=probs.get))
-        return DecisionAnswer(
-            question_id=q.id,
-            type="choice",
-            probabilities=probs,
-            value=choice,
-            confidence=conf_val,
-        )
-
-    probs_raw = raw.get("probabilities") or {}
-    probs = _normalize_probs({str(k): float(v) for k, v in probs_raw.items()})
-    score_val = raw.get("score")
-    if score_val is None and probs:
-        score_val = sum(int(k) * v for k, v in probs.items())
-    return DecisionAnswer(
-        question_id=q.id,
-        type="score",
-        probabilities=probs,
-        value=float(score_val if score_val is not None else 0.0),
-        confidence=conf_val,
-    )
+    return answer_from_named(q, raw, source="decider")
 
 
 class DeciderBackend:
@@ -278,7 +216,7 @@ class DeciderBackend:
     def evaluate(self, request: DecisionRequest) -> DecisionResult:
         loaded = self._ensure_loaded()
         start = time.perf_counter()
-        questions = {q.id: _question_to_decider(q) for q in request.questions}
+        questions = {q.id: question_to_named(q) for q in request.questions}
         raw = loaded.decider.system_one(request.state, questions)
         answers: list[DecisionAnswer] = []
         raw_probs: dict[str, Any] = {}
@@ -287,7 +225,7 @@ class DeciderBackend:
             if not isinstance(ans_raw, dict):
                 raise ValueError(f"decider returned no answer for question {q.id!r}")
             raw_probs[q.id] = dict(ans_raw.get("probabilities") or {})
-            answers.append(_answer_from_decider(q, ans_raw))
+            answers.append(answer_from_named(q, ans_raw, source="decider"))
         usage = raw.get("usage") or {}
         return DecisionResult(
             backend=self.ID,

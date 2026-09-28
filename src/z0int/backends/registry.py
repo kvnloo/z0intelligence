@@ -122,3 +122,19 @@ def register_builtin_backends() -> None:
                 local=True,
             )
         )
+    if "julia_1" not in _REGISTRY:
+        from .julia import JuliaBackend
+
+        register(
+            BackendSpec(
+                id="julia_1",
+                kind="finite_choice_decision",
+                description=(
+                    "SupersonicLabs Julia-1 144.3M finite-choice decision model "
+                    "(choice/score/noul, 2-20 options); CPU-resident by default"
+                ),
+                factory=lambda: JuliaBackend.for_manifest_id("julia_1"),
+                aliases=("julia", "julia-1"),
+                local=True,
+            )
+        )

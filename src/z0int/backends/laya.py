@@ -16,6 +16,7 @@ from .base import (
     DecisionRequest,
     DecisionResult,
 )
+from .named_questions import answer_from_named, normalize_probs, question_to_named
 
 
 @dataclass
@@ -47,76 +48,20 @@ def _laya_import_error() -> str | None:
     return None
 
 
+# The z0int ⇄ named-question mapping now lives in ``named_questions`` because
+# ``julia`` and ``decider`` need the identical translation. These shims keep the
+# original private names working for existing callers and tests, with the old
+# one-argument signatures.
 def _normalize_probs(probs: dict[str, float]) -> dict[str, float]:
-    total = sum(probs.values())
-    if total <= 0:
-        raise ValueError("empty probability mass from laya")
-    return {k: v / total for k, v in probs.items()}
+    return normalize_probs(probs, source="laya")
 
 
 def _question_to_laya(q: DecisionQuestion) -> dict[str, Any]:
-    if q.type == "boolean":
-        return {
-            "type": "noul",
-            "instructions": q.instructions,
-            "criteria": {
-                "false": q.false_criterion or "no, the statement does not hold",
-                "true": q.true_criterion or "yes, the statement holds",
-            },
-        }
-    if q.type == "choice":
-        return {
-            "type": "choice",
-            "instructions": q.instructions,
-            "criteria": {o.id: o.description for o in q.options},
-        }
-    return {
-        "type": "score",
-        "instructions": q.instructions,
-        "criteria": list(q.levels),
-    }
+    return question_to_named(q)
 
 
 def _answer_from_laya(q: DecisionQuestion, raw: dict[str, Any]) -> DecisionAnswer:
-    qtype = raw.get("type")
-    conf = raw.get("confidence")
-    confidence = float(conf) if conf is not None else None
-
-    if qtype == "noul" or q.type == "boolean":
-        p_true = float(raw.get("noul", 0.5))
-        probs = _normalize_probs({"false": 1.0 - p_true, "true": p_true})
-        return DecisionAnswer(
-            question_id=q.id,
-            type="boolean",
-            probabilities=probs,
-            value=p_true >= 0.5,
-            confidence=confidence,
-        )
-
-    if qtype == "choice" or q.type == "choice":
-        probs_raw = raw.get("probabilities") or {}
-        probs = _normalize_probs({str(k): float(v) for k, v in probs_raw.items()})
-        choice = str(raw.get("choice") or max(probs, key=probs.get))
-        return DecisionAnswer(
-            question_id=q.id,
-            type="choice",
-            probabilities=probs,
-            value=choice,
-            confidence=confidence,
-        )
-
-    probs_raw = raw.get("probabilities") or {}
-    probs = _normalize_probs({str(k): float(v) for k, v in probs_raw.items()})
-    score_val = raw.get("score")
-    if score_val is None and probs:
-        score_val = sum(int(k) * v for k, v in probs.items())
-    return DecisionAnswer(
-        question_id=q.id,
-        type="score",
-        probabilities=probs,
-        value=float(score_val if score_val is not None else 0.0),
-        confidence=confidence,
-    )
+    return answer_from_named(q, raw, source="laya")
 
 
 class LayaBackend:
@@ -243,14 +188,14 @@ class LayaBackend:
     def evaluate(self, request: DecisionRequest) -> DecisionResult:
         loaded = self._ensure_loaded()
         start = time.perf_counter()
-        questions = {q.id: _question_to_laya(q) for q in request.questions}
+        questions = {q.id: question_to_named(q) for q in request.questions}
         raw = loaded.agent.predict(request.state, questions)
         answers: list[DecisionAnswer] = []
         for q in request.questions:
             ans_raw = (raw.get("answers") or {}).get(q.id)
             if not isinstance(ans_raw, dict):
                 raise ValueError(f"laya returned no answer for question {q.id!r}")
-            answers.append(_answer_from_laya(q, ans_raw))
+            answers.append(answer_from_named(q, ans_raw, source="laya"))
         usage = raw.get("usage") or {}
         return DecisionResult(
             backend=self.ID,

@@ -10,7 +10,8 @@
       "reflex",
       "system_one_4b",
       "openjev_06b",
-      "openjev_4b"
+      "openjev_4b",
+      "julia_1"
     ]
   },
   "models": {
@@ -168,6 +169,43 @@
         "recovery"
       ],
       "note": "Trained by evolution-lab / z0int train; weights under ~/.z0int/specialists"
+    },
+    "julia_1": {
+      "family": "decision_backend",
+      "type": "hf_bundle",
+      "hf": "SupersonicLabs/Julia-1",
+      "revision": "a85b127321d580d65176c89ced8273f305745d85",
+      "allow_patterns": [
+        "model.safetensors",
+        "config.json",
+        "julia_config.json",
+        "inference-policy.json",
+        "provenance.json",
+        "encoder/*",
+        "tokenizer/*",
+        "julia/*",
+        "julia/router/*",
+        "julia/router/native/*"
+      ],
+      "min_vram_gb": 0,
+      "dtype": "float32",
+      "license": "apache-2.0",
+      "commercial_use": true,
+      "platforms": [
+        "cpu",
+        "cuda"
+      ],
+      "roles": [
+        "semantic_decision",
+        "routing",
+        "classification",
+        "finite_choice",
+        "gating",
+        "escalation"
+      ],
+      "resident_preferred": false,
+      "optional": true,
+      "note": "144.3M finite-choice decision model (choice/score/noul over 2-20 supplied options). Needs the complete repository, not just model.safetensors: it ships its own runtime and is not a Transformers AutoModel. Pins transformers>=5.0,<5.1, which the z0int runtime (5.17) violates, so it is served through backends/julia_worker.py under Z0INT_JULIA_PYTHON. CPU-resident by default: CUDA costs ~825MB VRAM and its bfloat16 autocast shifts borderline noul decisions by ~7.5e-2."
     }
   },
   "policies": {
@@ -181,7 +219,8 @@
         "decider_2b",
         "openjev_4b",
         "openjev_06b",
-        "system_one_4b"
+        "system_one_4b",
+        "julia_1"
       ],
       "never_coreside": [
         [
