@@ -1,0 +1,38 @@
+name: Image decision unit
+
+on:
+  push:
+    paths:
+      - "src/z0int/backends/image_decision.py"
+      - "src/z0int/image_decision_cli.py"
+      - "tests/test_image_decision_backend.py"
+      - "benchmarks/image-jev-bench/**"
+      - "pyproject.toml"
+      - ".github/workflows/image-decision-unit.yml"
+  pull_request:
+    paths:
+      - "src/z0int/backends/image_decision.py"
+      - "src/z0int/image_decision_cli.py"
+      - "tests/test_image_decision_backend.py"
+      - "benchmarks/image-jev-bench/**"
+      - "pyproject.toml"
+      - ".github/workflows/image-decision-unit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  image-decision-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Syntax check
+        run: |
+          python -m py_compile             src/z0int/backends/image_decision.py             src/z0int/image_decision_cli.py             tests/test_image_decision_backend.py
+      - name: Pure adapter tests
+        env:
+          PYTHONPATH: src
+        run: python -m unittest tests.test_image_decision_backend
