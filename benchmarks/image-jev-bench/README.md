@@ -25,6 +25,9 @@ readout layer, not a claim that z0int trained Qwen2.5-VL.
 pip install -e '.[image]'
 ```
 
+The image extra installs Pillow and torchvision. The runner also needs a CUDA
+build of torch and transformers. Qwen2.5-VL will not load without torchvision.
+
 ## Public smoke test
 
 ```bash
