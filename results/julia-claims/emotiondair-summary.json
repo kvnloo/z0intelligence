@@ -1,0 +1,36 @@
+{
+  "abstained": 0,
+  "accuracy": 0.84,
+  "answered": 100,
+  "correct": 84,
+  "coverage": 1.0,
+  "dataset": "emotiondair",
+  "device": "cpu",
+  "dtype": "float32",
+  "encoding": {
+    "head_length": 512,
+    "max_length": 1024,
+    "strict": true
+  },
+  "manifest_sha256": "a6a2c97d6fe5fdc9be4422efc05d452fe29a80617dfdc893af5d260deaa82d25",
+  "n": 100,
+  "protocol": {
+    "btzsc_revision": "fef2a2ac62b69c58670047dddf045c53d7c3cb5e",
+    "dataset_offset": 1,
+    "jev_bench_commit": "0d610cc53e79bcbec691312b0c4adb4a0e371642",
+    "labels": [
+      "This example tweet expresses the emotion: anger",
+      "This example tweet expresses the emotion: fear",
+      "This example tweet expresses the emotion: joy",
+      "This example tweet expresses the emotion: love",
+      "This example tweet expresses the emotion: sadness",
+      "This example tweet expresses the emotion: surprise"
+    ],
+    "n_classes": 6,
+    "question": "Which single label best describes the input text?",
+    "sampler": "jev_benchmarks.data._balanced_indices (imported from the pinned repo)",
+    "samples_per_dataset": 100,
+    "seed": 20260917
+  },
+  "published": "86/100"
+}

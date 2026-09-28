@@ -1,0 +1,72 @@
+{
+  "corpus": "authored144",
+  "dev": 88,
+  "n": 144,
+  "schema_sha256": "b3f32db4c0caee9df7eca1aab43670712d729a5bb27f075dcdb00f3e733a1d4b",
+  "sealed": 56,
+  "variants": {
+    "A=A0": {
+      "dev_acc": 0.3523,
+      "dev_correct": 31,
+      "jev_dev_acc": 0.9659,
+      "sealed_acc": 0.5179,
+      "sealed_correct": 29
+    },
+    "A=A1": {
+      "dev_acc": 0.3636,
+      "dev_correct": 32,
+      "jev_dev_acc": 0.9659,
+      "sealed_acc": 0.4643,
+      "sealed_correct": 26
+    },
+    "A=A2": {
+      "dev_acc": 0.4205,
+      "dev_correct": 37,
+      "jev_dev_acc": 0.9659,
+      "sealed_acc": 0.4464,
+      "sealed_correct": 25
+    },
+    "B=B0": {
+      "dev_acc": 0.3523,
+      "dev_correct": 31,
+      "jev_dev_acc": 0.9659,
+      "sealed_acc": 0.5179,
+      "sealed_correct": 29
+    },
+    "B=B1": {
+      "dev_acc": 0.4659,
+      "dev_correct": 41,
+      "jev_dev_acc": 0.9659,
+      "sealed_acc": 0.4464,
+      "sealed_correct": 25
+    },
+    "B=B2": {
+      "dev_acc": 0.3636,
+      "dev_correct": 32,
+      "jev_dev_acc": 0.9659,
+      "sealed_acc": 0.5,
+      "sealed_correct": 28
+    },
+    "D=D0": {
+      "dev_acc": 0.3523,
+      "dev_correct": 31,
+      "jev_dev_acc": 0.9659,
+      "sealed_acc": 0.5179,
+      "sealed_correct": 29
+    },
+    "D=D1": {
+      "dev_acc": 0.375,
+      "dev_correct": 33,
+      "jev_dev_acc": 0.9659,
+      "sealed_acc": 0.4821,
+      "sealed_correct": 27
+    },
+    "D=D2": {
+      "dev_acc": 0.3864,
+      "dev_correct": 34,
+      "jev_dev_acc": 0.9659,
+      "sealed_acc": 0.4821,
+      "sealed_correct": 27
+    }
+  }
+}

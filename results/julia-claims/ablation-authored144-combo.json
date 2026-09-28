@@ -1,0 +1,44 @@
+{
+  "baseline": {
+    "A": "A0",
+    "B": "B0",
+    "D": "D0",
+    "dev_acc": 0.3523,
+    "sealed_acc": 0.5179
+  },
+  "baseline_sealed": 0.5179,
+  "combo": {
+    "A": "A2",
+    "B": "B1",
+    "D": "D2",
+    "dev_acc": 0.4773,
+    "dev_selected": true,
+    "jev_sealed_acc": 0.9286,
+    "sealed_acc": 0.4464,
+    "sealed_by_family": {
+      "candidate_selection": {
+        "acc": 0.5,
+        "correct": 10,
+        "n": 20
+      },
+      "evidence_interpretation": {
+        "acc": 0.55,
+        "correct": 11,
+        "n": 20
+      },
+      "rule_application": {
+        "acc": 0.25,
+        "correct": 4,
+        "n": 16
+      }
+    },
+    "sealed_correct": 25,
+    "sealed_n": 56
+  },
+  "corpus": "authored144",
+  "dev": 88,
+  "n": 144,
+  "schema_sha256": "b3f32db4c0caee9df7eca1aab43670712d729a5bb27f075dcdb00f3e733a1d4b",
+  "sealed": 56,
+  "variants": {}
+}

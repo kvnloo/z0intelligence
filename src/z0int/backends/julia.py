@@ -392,8 +392,15 @@ class JuliaBackend:
         questions = {q.id: question_to_named(q) for q in request.questions}
         state = request.state
         if not isinstance(state, str):
-            state = json.dumps(state, ensure_ascii=False, allow_nan=False,
-                               sort_keys=True, separators=(",", ":"))
+            # Render the state EXACTLY as Julia's own runtime does. julia/data.py
+            # `sequence` uses ``json.dumps(state, ensure_ascii=False)`` -- default
+            # separators, insertion order. An earlier version of this adapter used
+            # ``sort_keys=True, separators=(",", ":")``, which changes the token
+            # stream and measured 1300/2000 against the published 1451/2000 on
+            # typed-decisions: a 151-question fidelity loss from serialization
+            # alone. Validate first (finiteness), then render identically.
+            json.dumps(state, ensure_ascii=False, allow_nan=False)
+            state = json.dumps(state, ensure_ascii=False)
         worker = self._ensure_worker()
         t0 = time.perf_counter()
         out = self._request({

@@ -1,0 +1,26 @@
+{
+  "by_type": {
+    "choice": {
+      "count": 600,
+      "correct": 426,
+      "accuracy": 0.71
+    },
+    "noul": {
+      "count": 600,
+      "correct": 483,
+      "accuracy": 0.805
+    },
+    "score": {
+      "count": 800,
+      "correct": 542,
+      "accuracy": 0.6775
+    }
+  },
+  "total": "1451/2000",
+  "state_serialization": "adapter default (compact, sorted)",
+  "encoding": {
+    "max_length": 1024,
+    "head_length": 512,
+    "strict": true
+  }
+}

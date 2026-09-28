@@ -1,0 +1,15 @@
+{
+  "compared": 400,
+  "top_label_agreement": 400,
+  "top_label_agreement_pct": 100.0,
+  "probability_match_within_1e-6": 400,
+  "max_probability_delta": 5.239101988907535e-07,
+  "label_mismatches": [],
+  "n_label_mismatches": 0,
+  "state_text": "forced byte-identical via json.dumps(state, ensure_ascii=False)",
+  "encoding": {
+    "max_length": 1024,
+    "head_length": 512,
+    "strict": true
+  }
+}
