@@ -150,6 +150,31 @@ A "accept when Julia is confident, escalate when unsure" cascade would therefore
 Julia's wrong answers**, because its wrong answers are its most confident ones. That is a worse
 failure mode than having no cheap stage at all.
 
+## The incumbents, on the same corpus
+
+`laya_421m` is the existing local fast path, and its weights were already cached, so it was run on
+`authored144` too. Three-way, same 144 cases, same gold:
+
+| model | params | accuracy | p50 latency | vs Jev |
+|---|---|---|---|---|
+| Jev 1.13.0 (remote, paid) | — | **95.1%** | 267.6 ms | — |
+| Laya 421M (local) | 421M | 61.1% | 226.5 ms | −34.0 pp, 1.2x faster |
+| **Julia-1 (local)** | 144M | **41.7%** | **28.6 ms** | −53.5 pp, **9.4x faster** |
+
+Per family, Laya vs Jev: `evidence_interpretation` 66.7% / 95.8%, `rule_application` 60.4% / 95.8%,
+`candidate_selection` 56.2% / 93.8%. Laya was right where Jev was wrong 3 times, Jev right where
+Laya was wrong 52 times. No errors and no refusals: 144/144 answered.
+
+Two things follow. First, the existing local fast path is **already** 34 points behind Jev while
+buying only 1.2x — so the "cheap local layer" hypothesis was never strong on this corpus, and Julia
+does not repair it. Second, Julia is the only candidate with a real latency story (7.9x faster than
+Laya, 9.4x faster than Jev); its problem is accuracy and calibration, not speed.
+
+*Not measured:* a 3B Qwen baseline. No 3B checkpoint is cached locally — the host has
+`Qwen3.5-4B`, `Qwen3-0.6B`, `Qwen2.5-1.5B-Instruct` and `nanojev_06b`, and the roster's
+`system_one_4b`/`openjev_4b` occupy that role. Running a 4B on GPU would not change the verdict:
+Julia sits 19.4 points below the *worse* of the two measured incumbents.
+
 ## The instrument was verified first
 
 A 41.7% score on a 3-way task is close enough to chance (33%) that the harness itself had to be
