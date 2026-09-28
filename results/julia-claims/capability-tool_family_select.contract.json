@@ -1,0 +1,55 @@
+{
+  "capability_id": "tool_family_select",
+  "ceiling_note": "per-prompt-majority ceiling measured at 97.9% of first-action rows",
+  "error_cost": "low: a routing hint that narrows candidates, reversible by the next stage",
+  "exclusion_criteria": [
+    "empty user prompt",
+    "rows that are not the session's first action (state would be a repeated prompt)",
+    "families with fewer than 50 examples"
+  ],
+  "gold_generation": "majority family across sessions sharing a normalised prompt",
+  "group_key": "normalised prompt (lowercased, whitespace-collapsed)",
+  "input_fields": [
+    "state = the session's opening user request (source truncates at 400 chars)"
+  ],
+  "intended_use": "choose the coarse tool family for an agent's first action on a user request, to narrow a tool registry before an expensive router",
+  "known_ambiguity_policy": "prompts with >1 observed family keep their majority family; count and rate are reported",
+  "label_descriptions": {
+    "ABSTAIN": "Do nothing, or defer the decision",
+    "DELEGATE": "Create or update tasks, todos, or hand work to another agent",
+    "EDIT": "Modify an existing file or write a new one",
+    "EXECUTE": "Run a command, process, or program",
+    "READ_SEARCH": "Locate or read existing information: files, code, skills, sessions, search",
+    "RESPOND": "Answer the user directly without using a tool",
+    "VERIFY": "Check or validate something that was already produced",
+    "WEB": "Search or browse the web, or analyse an external page or image"
+  },
+  "labels_below_minimum": [
+    "EXECUTE"
+  ],
+  "labels_with_enough_evidence": [
+    "READ_SEARCH",
+    "WEB",
+    "DELEGATE"
+  ],
+  "minimum_evaluation_size": 50,
+  "ordered_label_ids": [
+    "READ_SEARCH",
+    "EDIT",
+    "EXECUTE",
+    "WEB",
+    "DELEGATE",
+    "VERIFY",
+    "RESPOND",
+    "ABSTAIN"
+  ],
+  "representations": [
+    "R0",
+    "R1",
+    "R2"
+  ],
+  "schema_sha256": "0c8b160e970832c9da4147bd9b7c4361589f4c445ba62d83ea16abe32fe4c30e",
+  "source_of_gold": "family of the tool the agent actually invoked first in that session (~/.z0int/episodes/next_action.jsonl, prev == [])",
+  "split": "60% dev / 20% validation / 20% sealed, by group_key",
+  "version": "v1"
+}
