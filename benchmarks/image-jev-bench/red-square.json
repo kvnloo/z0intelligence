@@ -1,0 +1,9 @@
+{
+  "id": "public-red-square-01",
+  "image": "fixtures/red-square.ppm",
+  "question": "What color is the square?",
+  "options": [
+    {"id": "red", "description": "red"},
+    {"id": "blue", "description": "blue"}
+  ]
+}
