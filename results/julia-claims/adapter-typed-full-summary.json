@@ -17,7 +17,7 @@
     }
   },
   "total": "1451/2000",
-  "state_serialization": "adapter default (compact, sorted)",
+  "state_serialization": "adapter default == julia/data.py sequence rendering (json.dumps(state, ensure_ascii=False))",
   "encoding": {
     "max_length": 1024,
     "head_length": 512,
