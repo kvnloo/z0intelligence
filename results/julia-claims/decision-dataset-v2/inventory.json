@@ -1,0 +1,80 @@
+{
+  "action_rows": 35248,
+  "compaction_rows": 169,
+  "family_counts": {
+    "DELEGATE": 1468,
+    "EDIT": 3079,
+    "EXECUTE": 12288,
+    "READ_SEARCH": 16436,
+    "RESPOND": 54,
+    "UNMAPPED": 587,
+    "VERIFY": 1132,
+    "WEB": 204
+  },
+  "milestone_assessment": {
+    "criterion": ">=5 capabilities with >=500 independent, outcome-backed decision rows each",
+    "not_reachable": {
+      "rlm.worker_needed": "requires counterfactual native-vs-worker replay, which was never recorded",
+      "verification_needed": "no verification-decision label exists in the traces; the receipt rows for it are log_only with null prediction/outcome"
+    },
+    "reachable": [
+      "tool_family_select",
+      "context_compress_needed",
+      "model_family_select",
+      "retry_or_escalate"
+    ],
+    "reachable_count": 4,
+    "verdict": "4 of 5; the 5th is a recording gap, not a modelling gap"
+  },
+  "model_usage_rows": 264,
+  "outcome_rule": "toolResult text matched against ERROR_RE / OK_RE; 'unclear' otherwise",
+  "projection_to_full_corpus": {
+    "note": "linear projection from the 300-file run; the user asked for >=5 capabilities with >=500 independent outcome-backed rows",
+    "projected_action_rows": 291000,
+    "projected_compactions": 1395,
+    "projected_model_usage": 2180,
+    "session_files_total": 2477
+  },
+  "schema": "z0int.decision_dataset_v2.v1",
+  "session_files_scanned": 300,
+  "sessions": 101,
+  "state_fields": [
+    "user_request",
+    "recent_assistant",
+    "tool_history"
+  ],
+  "tool_counts": {
+    "ask": 54,
+    "ast_grep": 2,
+    "bash": 12231,
+    "delete": 2,
+    "edit": 2435,
+    "eval": 1132,
+    "find": 16,
+    "fm_watch_arm_omp": 197,
+    "glob": 714,
+    "goal": 18,
+    "grep": 5882,
+    "hermes_memory": 90,
+    "hub": 453,
+    "irc": 24,
+    "job": 7,
+    "launch": 57,
+    "learn": 23,
+    "list_mcp_resources": 1,
+    "lsp": 1,
+    "read": 9840,
+    "recovery_advise": 7,
+    "task": 46,
+    "tdai_memory_search": 34,
+    "todo": 969,
+    "wait": 19,
+    "web_fetch": 27,
+    "web_search": 204,
+    "write": 644,
+    "xd://mcp__agentsview_search_content": 1,
+    "xd://mcp__agentsview_search_sessions": 3,
+    "yield": 115
+  },
+  "tool_family_mapping_sha256": "dcd0f6703b7c37f6ab5c38f48063f01793d1dbae2dc1331bf599530eac7520e8"
+}
