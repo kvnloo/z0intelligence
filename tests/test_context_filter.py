@@ -174,8 +174,10 @@ def test_fast_path_does_not_apply_in_none_mode_flag():
 def test_none_returns_everything_unfiltered():
     pages = [{"raw_content": "a" * 20000}, {"raw_content": "b" * 20000}]
     res = filter_context("q", pages, mode="none")
-    assert res.receipt.selected == res.receipt.chunks
+    # unfiltered means the ORIGINAL passages, not a chunked/overlapped rebuild
+    assert len(res.selected) == len(pages)
     assert res.receipt.context_tokens_avoided == 0
+    assert res.receipt.output_chars <= res.receipt.input_chars
 
 
 # ------------------------------------------------------------------ auto policy
@@ -187,10 +189,11 @@ def test_auto_uses_keyword_without_a_jev_scorer():
 
 def test_auto_uses_jev_when_available():
     pages = [{"raw_content": "chunk one " * 100}, {"raw_content": "chunk two " * 100}]
-    res = filter_context("q", pages, mode="auto", small_input_chars=1,
+    res = filter_context("q", pages, mode="auto", small_input_chars=1, allow_remote=True,
                          jev_scorer=lambda q, t: [3.0] * len(t))
     assert res.receipt.mode_used == "jev"
-    assert res.receipt.scorer == "jev"
+    # a bare list carries no backend identity, so it is labelled inline
+    assert res.receipt.scorer == "inline"
 
 
 def test_unknown_mode_degrades_to_auto_with_receipt():
@@ -203,7 +206,7 @@ def test_unknown_mode_degrades_to_auto_with_receipt():
 # ------------------------------------------------------------------- jev lane
 def test_jev_floor_selects_and_reports_threshold():
     pages = [{"raw_content": "good " * 200}, {"raw_content": "bad " * 200}]
-    res = filter_context("q", pages, mode="jev", small_input_chars=1,
+    res = filter_context("q", pages, mode="jev", small_input_chars=1, allow_remote=True,
                          jev_scorer=lambda q, t: [2.5, 0.5])
     assert res.receipt.mode_used == "jev"
     assert res.receipt.threshold == JEV_MIN_USEFULNESS
@@ -223,7 +226,8 @@ def test_scorer_failure_degrades_to_keyword_and_records_it(failure, expected):
     def boom(q, t):
         raise failure
 
-    res = filter_context("alpha", pages, mode="jev", small_input_chars=1, jev_scorer=boom)
+    res = filter_context("alpha", pages, mode="jev", small_input_chars=1,
+                         allow_remote=True, jev_scorer=boom)
     assert res.selected, "a scorer outage must never yield zero context"
     assert res.receipt.fallback is True
     assert res.receipt.mode_used == "keyword"
@@ -232,15 +236,15 @@ def test_scorer_failure_degrades_to_keyword_and_records_it(failure, expected):
 
 def test_scorer_returning_wrong_length_is_rejected_and_falls_back():
     pages = [{"raw_content": "x " * 100}]
-    res = filter_context("q", pages, mode="jev", small_input_chars=1,
+    res = filter_context("q", pages, mode="jev", small_input_chars=1, allow_remote=True,
                          jev_scorer=lambda q, t: [1.0, 2.0, 3.0])
     assert res.receipt.mode_used == "keyword"
-    assert "expected" in (res.receipt.fallback_reason or "")
+    assert "scores for" in (res.receipt.fallback_reason or "")
 
 
 def test_jev_floor_abstains_rather_than_returning_empty():
     pages = [{"raw_content": "x " * 300}]
-    res = filter_context("q", pages, mode="jev", small_input_chars=1,
+    res = filter_context("q", pages, mode="jev", small_input_chars=1, allow_remote=True,
                          jev_scorer=lambda q, t: [0.1] * len(t))
     assert res.selected, "must not hand the writer empty context"
     assert res.receipt.fallback is True
@@ -334,3 +338,162 @@ def test_selection_parity_with_upstream_ranking_rule():
             theirs = [i for i in up_ranked
                       if up_scores[i] >= KEYWORD_RELATIVE_THRESHOLD * up_best][:25]
         assert mine == theirs, (query, mine, theirs)
+
+
+# ============================ P0 correctness regressions =====================
+
+def test_jev_ordering_keeps_the_BEST_chunks_not_the_first():
+    """Regression: a later chunk with the highest score must be selected.
+
+    The old code took the first N chunks clearing the floor, which silently
+    preferred document order over usefulness.
+    """
+    pages = [{"url": f"u{i}", "raw_content": f"chunk number {i} " * 60} for i in range(6)]
+    # only the LAST chunk is highly useful; the early ones clear the floor
+    scores = [1.6, 1.6, 1.7, 1.6, 1.6, 3.0]
+    res = filter_context("q", pages, mode="jev", max_results=2, small_input_chars=1,
+                         allow_remote=True, jev_scorer=lambda q, t: scores[:len(t)])
+    picked = [s.score for s in res.selected]
+    assert picked == sorted(picked, reverse=True), picked
+    assert max(picked) == 3.0, "the highest-scoring chunk must survive"
+    assert res.selected[0].score == 3.0
+
+
+def test_jev_ordering_is_stable_for_equal_scores():
+    pages = [{"url": f"u{i}", "raw_content": f"c{i} " * 60} for i in range(4)]
+    res = filter_context("q", pages, mode="jev", max_results=4, small_input_chars=1,
+                         allow_remote=True, jev_scorer=lambda q, t: [2.0] * len(t))
+    assert [s.chunk_index for s in res.selected] == sorted(s.chunk_index for s in res.selected)
+
+
+def test_none_has_no_overlap_duplication():
+    """100-char overlap must not appear in the unfiltered control."""
+    body = "".join(f"unique_token_{i:04d} " for i in range(600))
+    pages = [{"url": "https://x.test/1", "title": "T", "raw_content": body}]
+    res = filter_context("q", pages, mode="none")
+    assert len(res.selected) == 1
+    assert res.selected[0].text == body, "none must return the passage verbatim"
+    assert res.receipt.output_chars <= res.receipt.input_chars
+    assert res.receipt.sources[0]["url"] == "https://x.test/1"
+
+
+def test_fast_path_returns_originals_not_chunks():
+    body = "sentence about widgets. " * 40
+    pages = [{"url": "https://y.test/1", "title": "Y", "raw_content": body}]
+    res = filter_context("widgets", pages, mode="keyword")   # small -> fast path
+    assert res.receipt.fast_path is True
+    assert res.selected[0].text == body
+    assert res.receipt.output_chars <= res.receipt.input_chars
+
+
+def test_chunker_uses_position_not_object_identity():
+    """Equal strings must not make `part is parts[-1]` true for every element."""
+    text = ("same\n" * 400)
+    chunks = chunk_text(text, size=200, overlap=0)
+    assert len(chunks) > 1
+    assert sum(len(c) for c in chunks) >= len(text) - 10
+
+
+def test_token_budget_is_applied():
+    body = "word " * 4000
+    pages = [{"url": f"b{i}", "raw_content": body} for i in range(4)]
+    capped = filter_context("word", pages, mode="keyword", small_input_chars=1,
+                            token_budget=50)
+    uncapped = filter_context("word", pages, mode="keyword", small_input_chars=1)
+    assert capped.receipt.output_tokens_est <= 50
+    assert len(capped.selected) <= len(uncapped.selected)
+
+
+def test_remote_scoring_requires_explicit_authority():
+    """A reusable primitive must not ship private context to a remote scorer just
+    because credentials exist."""
+    pages = [{"raw_content": "private personal note " * 100}]
+    calls = []
+
+    def spy(q, t):
+        calls.append(t)
+        return [3.0] * len(t)
+
+    res = filter_context("note", pages, mode="jev", small_input_chars=1, jev_scorer=spy)
+    assert calls == [], "remote scorer must not be called without authorization"
+    assert res.receipt.mode_used == "keyword"
+    assert res.receipt.fallback is True
+    assert "not authorized" in (res.receipt.fallback_reason or "")
+
+    ok = filter_context("note", pages, mode="jev", small_input_chars=1,
+                        allow_remote=True, jev_scorer=spy)
+    assert calls, "explicit authorization must enable the remote lane"
+    assert ok.receipt.mode_used == "jev"
+
+
+def test_scorer_metadata_reaches_the_receipt():
+    pages = [{"raw_content": "text " * 200}]
+    from z0int.context_filter import ScorerResult
+
+    def scorer(q, t):
+        return ScorerResult(scores=[2.5] * len(t), scorer="jev", model="jev-1.13.0",
+                            revision="jev-1.13.0", usage={"input": 42},
+                            cost_usd=0.00006 * len(t), provider_latency_ms=210.0)
+
+    res = filter_context("q", pages, mode="jev", small_input_chars=1,
+                         allow_remote=True, jev_scorer=scorer)
+    r = res.receipt.as_dict()
+    assert r["model"] == "jev-1.13.0" and r["revision"] == "jev-1.13.0"
+    assert res.receipt.cost_usd > 0
+
+
+def test_plain_list_scorer_still_works_but_is_marked_unmeasured():
+    pages = [{"raw_content": "text " * 200}]
+    res = filter_context("q", pages, mode="jev", small_input_chars=1,
+                         allow_remote=True, jev_scorer=lambda q, t: [2.0] * len(t))
+    assert res.receipt.mode_used == "jev"
+    assert res.receipt.model is None
+
+
+# ------------------------------------------------------- tokenomics read-back
+def test_tokenomics_event_physically_lands_on_disk(tmp_path, monkeypatch):
+    """Emit, then READ THE JSONL BACK. A silent no-op is the failure mode."""
+    import json as _json
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    pages = [{"url": "https://z.test/1", "raw_content": "alpha beta " * 400}]
+    res = filter_context("alpha", pages, mode="keyword", small_input_chars=1,
+                         trace_id="trace-abc")
+    from z0int.tokenomics_emit import events_path
+
+    path = events_path()
+    assert path.is_file(), f"no tokenomics file at {path}"
+    rows = [_json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+    mine = [r for r in rows if r.get("kind") == "context_filter"]
+    assert mine, "the context_filter event did not land"
+    row = mine[-1]
+    assert row["trace_id"] == "trace-abc"
+    assert row["schema"] == "z0int.context_filter.v1"
+    for key in ("input_chars", "output_chars", "input_tokens_est", "output_tokens_est",
+                "context_tokens_avoided_est", "latency_ms", "filter_cost_usd",
+                "fallback", "fallback_reason", "measurement_state", "mode_used",
+                "scorer", "model", "revision"):
+        assert key in row, f"missing {key}"
+    assert row["context_tokens_avoided_est"] == \
+        max(0, row["input_tokens_est"] - row["output_tokens_est"])
+    assert "estimated" in row["measurement_state"]
+
+
+def test_emit_can_be_disabled(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    pages = [{"raw_content": "x " * 400}]
+    filter_context("x", pages, mode="keyword", small_input_chars=1, emit_tokenomics=False)
+    from z0int.tokenomics_emit import events_path
+
+    assert not events_path().exists()
+
+
+def test_no_dead_knobs_are_exposed():
+    """Every accepted kwarg must do something."""
+    import inspect
+
+    from z0int import context_filter as cf
+
+    params = set(inspect.signature(cf.filter_context).parameters)
+    assert "token_budget" in params
+    assert "local_scorer" not in params, "dead knob must not be exposed"
+    assert "allow_remote" in params

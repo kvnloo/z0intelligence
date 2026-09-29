@@ -137,8 +137,11 @@ def chunk_text(text: str, *, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLA
         parts = block.split(sep)
         out: list[str] = []
         buf = ""
-        for part in parts:
-            piece = part + sep if part is not parts[-1] else part
+        last = len(parts) - 1
+        for idx, part in enumerate(parts):
+            # sequence position, never object identity: equal strings would make
+            # `part is not parts[-1]` true for every element
+            piece = part + sep if idx != last else part
             if len(piece) > size:
                 if buf:
                     out.append(buf)
@@ -306,8 +309,38 @@ class FilterResult:
         }
 
 
-# Scorer protocol: (query, passages) -> list of scores, one per passage.
-Scorer = Callable[[str, Sequence[str]], list[float]]
+@dataclass
+class ScorerResult:
+    """What a scorer must return: scores AND the metadata a receipt needs.
+
+    A bare ``list[float]`` cannot carry the served model, revision, usage or cost,
+    which is why the receipt used to be permanently null.
+    """
+
+    scores: list[float]
+    scorer: str = "unknown"
+    model: str | None = None
+    revision: str | None = None
+    usage: dict[str, Any] = field(default_factory=dict)
+    cost_usd: float = 0.0
+    provider_latency_ms: float | None = None
+    measured: bool = True
+
+    def __post_init__(self) -> None:
+        self.scores = [float(x) for x in self.scores]
+
+
+# Scorer: (query, passages) -> ScorerResult. A plain list is still accepted and
+# wrapped, so simple local scorers stay easy to write.
+Scorer = Callable[[str, Sequence[str]], "ScorerResult | list[float]"]
+
+
+def _as_scorer_result(raw: Any) -> ScorerResult:
+    if isinstance(raw, ScorerResult):
+        return raw
+    if isinstance(raw, list):
+        return ScorerResult(scores=[float(x) for x in raw], scorer="inline", measured=False)
+    raise TypeError(f"scorer must return ScorerResult or list[float], got {type(raw).__name__}")
 
 
 def _chunk_passages(passages: Sequence[Passage], *, size: int, overlap: int
@@ -316,16 +349,6 @@ def _chunk_passages(passages: Sequence[Passage], *, size: int, overlap: int
     for p in passages:
         for i, chunk in enumerate(chunk_text(p.text, size=size, overlap=overlap)):
             out.append((p, i, chunk))
-    return out
-
-
-def _to_selected(chunks, scores, keep: list[int]) -> list[Selected]:
-    out = []
-    for i in keep:
-        p, chunk_index, text = chunks[i]
-        out.append(Selected(text=text, score=float(scores[i]) if i < len(scores) else 0.0,
-                            chunk_index=chunk_index, url=p.url, title=p.title,
-                            doc_id=p.doc_id, source_id=p.source_id, position=p.position))
     return out
 
 
@@ -343,17 +366,20 @@ def filter_context(
     small_input_chars: int = SMALL_INPUT_CHARS,
     jev_scorer: Scorer | None = None,
     jev_available: bool | None = None,
-    local_scorer: Scorer | None = None,
+    allow_remote: bool = False,
     trace_id: str | None = None,
     session_id: str | None = None,
     emit_tokenomics: bool = True,
 ) -> FilterResult:
     """Select the context worth sending to an expensive model.
 
-    ``jev_scorer`` is injected rather than imported so this module stays free of
-    network dependencies and remains testable offline; the CLI wires the canonical
-    z0int Jev transport in. ``local_scorer`` is for experimental/shadow local
-    backends and is never selected by ``auto`` until it earns promotion.
+    ``allow_remote`` is the privacy boundary and defaults to False. This primitive
+    serves PRIVATE personal retrieval as well as public research, so a remote
+    scorer is never used just because credentials happen to exist: the caller must
+    authorize remote transmission explicitly. The keyword lane is always local.
+
+    ``token_budget`` caps the selected context by estimated tokens; it is applied
+    after ranking, so the best chunks survive. ``None`` means no cap.
     """
     t0 = time.perf_counter()
     ps = [p if isinstance(p, Passage) else Passage.from_mapping(p, position=i)
@@ -362,84 +388,93 @@ def filter_context(
                             candidates=len(ps), trace_id=trace_id, session_id=session_id)
     receipt.input_chars = sum(len(p.text) for p in ps)
 
-    chunks = _chunk_passages(ps, size=chunk_size, overlap=chunk_overlap)
-    texts = [c[2] for c in chunks]
-    receipt.chunks = len(chunks)
-    receipt.max_results = max_results
-
-    # ---- lane resolution -------------------------------------------------
     requested = receipt.mode_requested
     if requested not in MODES:
         requested = "auto"
         receipt.fallback = True
         receipt.fallback_reason = f"unknown mode; expected one of {MODES}"
 
+    # ---- none: the unfiltered control. Original passages, never chunked. -----
+    # Chunking here would duplicate 100-char overlap boundaries into the baseline
+    # and make the control incomparable to the filtered lanes.
+    if requested == "none":
+        receipt.mode_used = "none"
+        receipt.scorer = "none"
+        selected = _originals_as_selected(ps)
+        return _finish(selected, receipt, t0, emit_tokenomics, token_budget)
+
+    # ---- fast path: filtering cannot pay for itself on little content -------
+    if receipt.input_chars < small_input_chars and len(ps) <= max_results:
+        receipt.mode_used = "none"
+        receipt.scorer = "none"
+        receipt.fast_path = True
+        receipt.fallback_reason = receipt.fallback_reason or "small input fast path"
+        selected = _originals_as_selected(ps[:max_results])
+        return _finish(selected, receipt, t0, emit_tokenomics, token_budget)
+
+    resolved = requested
     if requested == "auto":
         resolved = "jev" if (jev_available if jev_available is not None
                              else jev_scorer is not None) else "keyword"
-    else:
-        resolved = requested
 
-    # ---- fast path: filtering cannot pay for itself on little content ----
-    if requested != "none" and receipt.input_chars < small_input_chars and len(ps) <= max_results:
-        keep = list(range(len(chunks)))
-        receipt.mode_used = "none"
-        receipt.fast_path = True
-        receipt.fallback_reason = receipt.fallback_reason or "small input fast path"
-        receipt.scores = [0.0] * len(chunks)
-        selected = _to_selected(chunks, receipt.scores, keep)
-        return _finish(selected, receipt, chunks, t0, emit_tokenomics)
-
-    # ---- none: explicit control ------------------------------------------
-    if requested == "none":
-        receipt.mode_used = "none"
-        receipt.scores = [0.0] * len(chunks)
-        selected = _to_selected(chunks, receipt.scores, list(range(len(chunks))))
-        return _finish(selected, receipt, chunks, t0, emit_tokenomics)
-
-    # ---- jev: semantic usefulness, bounded, with local fallback ----------
+    # ---- jev: semantic usefulness, bounded, ordered by ranking rule ---------
     if resolved == "jev":
-        scorer = jev_scorer
-        if scorer is None:
+        if not allow_remote:
+            receipt.fallback = True
+            receipt.fallback_reason = ("remote scoring not authorized for this "
+                                       "context; using local keyword ranking")
+        elif jev_scorer is None:
             receipt.fallback = True
             receipt.fallback_reason = "jev scorer not configured"
         else:
+            chunks = _chunk_passages(ps, size=chunk_size, overlap=chunk_overlap)
+            texts = [c[2] for c in chunks]
+            receipt.chunks = len(chunks)
             try:
-                raw = scorer(query, texts)
-                if not isinstance(raw, list) or len(raw) != len(texts):
+                result = _as_scorer_result(jev_scorer(query, texts))
+                if len(result.scores) != len(texts):
                     raise ValueError(
-                        f"scorer returned {type(raw).__name__} of length "
-                        f"{len(raw) if isinstance(raw, list) else 'n/a'}, expected {len(texts)}")
-                receipt.scores = [float(x) for x in raw]
+                        f"scorer returned {len(result.scores)} scores for {len(texts)} chunks")
+                receipt.scores = result.scores
                 receipt.mode_used = "jev"
-                receipt.scorer = "jev"
-                keep = [i for i, s in enumerate(receipt.scores)
-                        if s >= JEV_MIN_USEFULNESS][:max_results]
-                if not keep:
-                    # Every chunk below the usefulness floor: abstain from filtering
-                    # rather than hand the writer an empty context.
+                receipt.scorer = result.scorer
+                receipt.model = result.model
+                receipt.revision = result.revision
+                receipt.cost_usd = result.cost_usd
+                receipt.threshold = JEV_MIN_USEFULNESS
+                receipt.max_results = max_results
+                qualifying = [i for i, sv in enumerate(result.scores)
+                              if sv >= JEV_MIN_USEFULNESS]
+                if not qualifying:
                     receipt.fallback = True
                     receipt.fallback_reason = "no chunk met the usefulness floor"
                 else:
-                    receipt.threshold = JEV_MIN_USEFULNESS
-                    selected = _to_selected(chunks, receipt.scores, keep)
-                    return _finish(selected, receipt, chunks, t0, emit_tokenomics)
+                    # Rank the QUALIFYING chunks and keep the best, exactly like the
+                    # reference: (-score, position). Taking the first qualifying
+                    # chunks instead would silently prefer whichever chunk happened
+                    # to come first in the document.
+                    ranked = sorted(qualifying, key=lambda i: (-result.scores[i], i))
+                    keep = ranked[:max_results]
+                    selected = _to_selected(chunks, result.scores, keep)
+                    return _finish(selected, receipt, t0, emit_tokenomics, token_budget)
             except Exception as exc:  # noqa: BLE001
                 receipt.fallback = True
                 receipt.fallback_reason = f"jev scorer failed: {type(exc).__name__}: {exc}"[:200]
 
-    # ---- keyword: always available ---------------------------------------
+    # ---- keyword: always available, always local ---------------------------
     receipt.mode_used = "keyword"
     receipt.scorer = "bm25"
     receipt.threshold = relative_threshold
     receipt.max_results = keyword_max_results
+    chunks = _chunk_passages(ps, size=chunk_size, overlap=chunk_overlap)
+    texts = [c[2] for c in chunks]
+    receipt.chunks = len(chunks)
+    if not chunks:
+        return _finish([], receipt, t0, emit_tokenomics, token_budget)
     scores = bm25_scores(query, texts)
     receipt.scores = scores
     best = max(scores, default=0.0)
-    if not chunks:
-        return _finish([], receipt, chunks, t0, emit_tokenomics)
     if best <= 0:
-        # no lexical overlap at all -> deterministic opening/source fallback
         receipt.fallback = True
         receipt.fallback_reason = (receipt.fallback_reason or "") + \
             ("; " if receipt.fallback_reason else "") + "no keyword overlap; kept opening chunks"
@@ -448,16 +483,39 @@ def filter_context(
         ranked = sorted(range(len(chunks)), key=lambda i: (-scores[i], i))
         keep = [i for i in ranked if scores[i] >= relative_threshold * best][:keyword_max_results]
     selected = _to_selected(chunks, scores, keep)
-    return _finish(selected, receipt, chunks, t0, emit_tokenomics)
+    return _finish(selected, receipt, t0, emit_tokenomics, token_budget)
 
 
-def _finish(selected: list[Selected], receipt: FilterReceipt, chunks, t0: float,
-            emit: bool) -> FilterResult:
+def _originals_as_selected(ps: Sequence[Passage]) -> list[Selected]:
+    """Original passages as-is: no chunking, so no overlap duplication."""
+    return [Selected(text=p.text, score=0.0, chunk_index=0, url=p.url, title=p.title,
+                     doc_id=p.doc_id, source_id=p.source_id, position=p.position)
+            for p in ps if p.text.strip()]
+
+
+def _apply_token_budget(selected: list[Selected], budget: int | None) -> list[Selected]:
+    if not budget or budget <= 0:
+        return selected
+    out: list[Selected] = []
+    used = 0
+    for s in selected:
+        cost = estimate_tokens(s.text)
+        if used + cost > budget:
+            continue
+        out.append(s)
+        used += cost
+    return out
+
+
+def _finish(selected: list[Selected], receipt: FilterReceipt, t0: float,
+            emit: bool, token_budget: int | None = None) -> FilterResult:
+    selected = _apply_token_budget(selected, token_budget)
     receipt.selected = len(selected)
+    receipt.chunks = max(receipt.chunks, len(selected))
     receipt.rejected = max(0, receipt.chunks - receipt.selected)
     receipt.output_chars = sum(len(s.text) for s in selected)
-    receipt.input_tokens_est = estimate_tokens(" " * receipt.input_chars)
-    receipt.output_tokens_est = estimate_tokens(" " * receipt.output_chars)
+    receipt.input_tokens_est = receipt.input_chars // 4
+    receipt.output_tokens_est = receipt.output_chars // 4
     receipt.context_tokens_avoided = max(0, receipt.input_tokens_est - receipt.output_tokens_est)
     receipt.retention_ratio = (receipt.output_chars / receipt.input_chars
                                if receipt.input_chars else 0.0)
@@ -470,21 +528,138 @@ def _finish(selected: list[Selected], receipt: FilterReceipt, chunks, t0: float,
     receipt.sources = list(seen.values())
     result = FilterResult(selected=selected, receipt=receipt)
     if emit:
-        _emit_tokenomics(receipt)
+        emit_filter_event(receipt)
     return result
 
 
-def _emit_tokenomics(receipt: FilterReceipt) -> None:
-    """Best-effort bridge into the existing tokenomics lane. Never fatal."""
+def emit_filter_event(receipt: FilterReceipt, *, root: Path | None = None) -> Path | None:
+    """Append the filter event to the existing tokenomics lane.
+
+    Uses ``tokenomics_emit.emit_raw`` -- the real append-only path to
+    ``~/.z0int/tokenomics/events.jsonl``. Returns the path written, or None if the
+    import is unavailable. Never raises: telemetry must not break filtering.
+    """
+    row = {
+        "kind": "context_filter",
+        "schema": SCHEMA,
+        "trace_id": receipt.trace_id,
+        "session_id": receipt.session_id,
+        "mode_requested": receipt.mode_requested,
+        "mode_used": receipt.mode_used,
+        "scorer": receipt.scorer,
+        "model": receipt.model,
+        "revision": receipt.revision,
+        "input_chars": receipt.input_chars,
+        "output_chars": receipt.output_chars,
+        "input_tokens_est": receipt.input_tokens_est,
+        "output_tokens_est": receipt.output_tokens_est,
+        # "avoided" is derived once, here, from the two measured/estimated ends so
+        # it can never be double counted by a downstream consumer
+        "context_tokens_avoided_est": receipt.context_tokens_avoided,
+        "retention_ratio": round(receipt.retention_ratio, 6),
+        "latency_ms": round(receipt.latency_ms, 3),
+        "filter_cost_usd": receipt.cost_usd,
+        "fallback": receipt.fallback,
+        "fallback_reason": receipt.fallback_reason,
+        "fast_path": receipt.fast_path,
+        "candidates": receipt.candidates,
+        "chunks": receipt.chunks,
+        "selected": receipt.selected,
+        # measured vs estimated is explicit: no tokenizer ran, so token fields are
+        # estimated while chars/latency/cost are measured
+        "measurement_state": "mixed: chars+latency+cost measured; tokens estimated at chars//4",
+        "token_estimate_method": "chars//4",
+    }
     try:
         from . import tokenomics_emit
 
-        fn = getattr(tokenomics_emit, "context_filter_event", None)
-        if callable(fn):
-            fn(receipt.as_dict())
-            return
-        fn = getattr(tokenomics_emit, "emit", None)
-        if callable(fn):
-            fn({"kind": "context_filter", **receipt.as_dict()})
+        return tokenomics_emit.emit_raw(row, root=root)
     except Exception:  # noqa: BLE001
-        pass
+        return None
+
+
+def _to_selected(chunks, scores, keep: list[int]) -> list[Selected]:
+    out = []
+    for i in keep:
+        p, chunk_index, text = chunks[i]
+        out.append(Selected(text=text, score=float(scores[i]) if i < len(scores) else 0.0,
+                            chunk_index=chunk_index, url=p.url, title=p.title,
+                            doc_id=p.doc_id, source_id=p.source_id, position=p.position))
+    return out
+
+
+# --------------------------------------------------------------- jev lane (#6)
+JEV_QUESTION_ID = "usefulness"
+JEV_RUBRIC = {
+    "0": "unrelated to the query",
+    "1": "same topic but does not help answer the query",
+    "2": "partially answers the query or provides useful supporting evidence",
+    "3": "directly answers the query with specific evidence",
+}
+
+
+def jev_context_scorer(*, timeout: float = 20.0, concurrency: int = 4,
+                       expected_model: str | None = None) -> Scorer:
+    """Build a context-usefulness scorer on the CANONICAL Jev path.
+
+    Reuses ``functions.jev``'s credential resolver and ``jevkit.client`` -- the
+    same transport, credential store and capture the existing Jev verifier uses.
+    No second TypeSafe HTTP client is created here.
+
+    The rubric is the four-level usefulness scale, asked as one choice question per
+    chunk, bounded by ``concurrency``.
+
+    STATUS: the question construction mirrors ``JevVerifier.verify``'s use of
+    ``jevkit.client.ask`` and the named-choice form. It has NOT been exercised
+    against a live endpoint in this change (that requires a paid call), so treat
+    the lane as implemented-but-unverified-live. ``filter_context`` degrades to
+    keyword and says so if anything raises.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from .functions.jev import ensure_credential, credential_source
+
+    def scorer(query: str, passages: Sequence[str]) -> ScorerResult:
+        key = ensure_credential()
+        if not key:
+            raise RuntimeError("no Jev credential resolvable")
+        from jevkit import client as jev_client  # type: ignore
+
+        def one(text: str) -> tuple[float, dict]:
+            import time as _t
+            t0 = _t.perf_counter()
+            reply = jev_client.ask(
+                f"Query: {query}\n\nPassage: {text}",
+                {JEV_QUESTION_ID: jev_client.choice(
+                    "How useful is this passage for answering the query?",
+                    JEV_RUBRIC)},
+                timeout=timeout,
+                model=expected_model,
+                api_key=key,
+            )
+            answer = reply["answers"][JEV_QUESTION_ID]
+            probs = answer.get("probabilities") or {}
+            return (sum(float(k) * float(v) for k, v in probs.items()),
+                    {"model": reply.get("model"), "usage": reply.get("usage") or {},
+                     "latency_ms": (_t.perf_counter() - t0) * 1000.0})
+
+        with ThreadPoolExecutor(max_workers=max(1, concurrency)) as pool:
+            rows = list(pool.map(one, passages))
+        models = {r[1]["model"] for r in rows if r[1]["model"]}
+        usage: dict[str, Any] = {}
+        for _s, meta in rows:
+            for k, v in (meta.get("usage") or {}).items():
+                if isinstance(v, int):
+                    usage[k] = usage.get(k, 0) + v
+        return ScorerResult(
+            scores=[r[0] for r in rows],
+            scorer="jev",
+            model=(models.pop() if len(models) == 1 else None),
+            revision=(models.pop() if models else None),
+            usage=usage,
+            cost_usd=0.00006 * len(passages),
+            provider_latency_ms=sum(r[1]["latency_ms"] for r in rows) / max(1, len(rows)),
+            measured=True,
+        )
+
+    return scorer
