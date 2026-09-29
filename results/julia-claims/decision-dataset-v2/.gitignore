@@ -1,0 +1,6 @@
+# Private session traces: these rows contain raw user requests and tool output.
+# NOT redistributed. Regenerate with benchmarks/julia_claims/omp_decisions.py
+# against the local OMP session store.
+actions.jsonl
+compactions.jsonl
+model_usage.jsonl
