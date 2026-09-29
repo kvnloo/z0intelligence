@@ -450,6 +450,16 @@ def build_parser() -> argparse.ArgumentParser:
     cxp.add_argument("--authorize", default=None, metavar="ACTION", help="With --check: gate a transition")
     cxp.add_argument("--hook", choices=["session-start"], default=None,
                      help="Emit Claude Code hook JSON (reads hook stdin for cwd); fail-open")
+    cxf = cx_sub.add_parser(
+        "filter",
+        help="context.filter — select the context an expensive model actually needs")
+    cxf.add_argument("--json", action="store_true")
+    cxf.add_argument("--query", required=True, help="The information need the context must serve")
+    cxf.add_argument("--input", required=True,
+                     help='JSON: a list of {raw_content,url,title} or {"passages":[...]}')
+    cxf.add_argument("--mode", default="auto", choices=["auto", "jev", "keyword", "none"])
+    cxf.add_argument("--max-results", type=int, default=10)
+    cxf.add_argument("--trace-id", default=None)
 
 
     osc = sub.add_parser(
@@ -792,6 +802,26 @@ def _cmd_context(args: argparse.Namespace) -> int:
 
     if args.context_cmd == "packet":
         return _cmd_context_packet(args)
+    if args.context_cmd == "filter":
+        from pathlib import Path as _Path
+
+        from z0int.context_filter import filter_context
+
+        raw = json.loads(_Path(args.input).expanduser().read_text(encoding="utf-8"))
+        passages = raw.get("passages") if isinstance(raw, dict) else raw
+        # No scorer is wired here, so a requested jev lane degrades to keyword and
+        # says so in the receipt rather than silently doing nothing.
+        result = filter_context(
+            args.query, passages or [], mode=args.mode,
+            max_results=args.max_results, trace_id=args.trace_id)
+        out = result.as_dict()
+        if getattr(args, "json", False):
+            print(json.dumps(out, indent=2))
+        else:
+            print(out["context"])
+            print(json.dumps({"receipt": out["receipt"]}, indent=2))
+        return 0
+
     if args.context_cmd != "resolve":
         print(f"unknown context command: {args.context_cmd}", file=sys.stderr)
         return 2
