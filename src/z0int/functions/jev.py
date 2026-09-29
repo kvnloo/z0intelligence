@@ -21,7 +21,7 @@ from __future__ import annotations
 import importlib.util
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from .contract import (
     EXPECTED_JEV_MODEL,
@@ -148,6 +148,76 @@ class _Capture:
         except Exception:
             pass
         return raw
+
+
+#: GPT Researcher's four-level usefulness rubric, verbatim. The question type is
+#: Jev's native ``score``, not ``choice``: a score question returns an ordered
+#: expected index, and collapsing it to a choice with a hand-rolled
+#: sum(label*probability) would be a different question, not a reimplementation.
+RELEVANCE_LEVELS = (
+    "Unrelated to the question",
+    "Same topic, but does not help answer the question",
+    "Partially answers the question or gives useful supporting facts",
+    "Directly answers the question with specific facts",
+)
+
+
+def ask_score(state: str, *, question_id: str = "usefulness",
+              instructions: str = "How useful is this passage for answering the question",
+              criteria: Sequence[str] = RELEVANCE_LEVELS, timeout: float = 20.0,
+              model: str | None = None) -> tuple[float, dict[str, Any]]:
+    """One native Jev ``score`` call on the CANONICAL transport.
+
+    Mirrors ``ask_named_choice``: same credential resolver, same ``jevkit.client``,
+    same ``_Capture`` transport used to recover the served revision (jevkit drops
+    it from the return value), same EXPECTED_JEV_MODEL request and strict
+    mismatch signalling. No second HTTP path.
+
+    Returns ``(score, metadata)``. ``score`` is Jev's expected zero-based rubric
+    index, unrounded, exactly as the reference adapter reads
+    ``answers[question_id]["score"]``.
+    """
+    import time as _t
+
+    key = ensure_credential()
+    if not key:
+        raise VerifierUnavailable("jev", "no credential resolvable")
+    try:
+        from jevkit import client as jev_client  # type: ignore
+    except Exception as exc:  # pragma: no cover - environment problem
+        raise VerifierUnavailable("jev", f"jevkit.client unavailable: {exc}") from exc
+
+    expected = model or EXPECTED_JEV_MODEL
+    capture = _Capture()
+    t0 = _t.perf_counter()
+    try:
+        reply = jev_client.ask(
+            state,
+            {question_id: jev_client.score(instructions, list(criteria))},
+            timeout=timeout, model=expected, api_key=key, transport=capture,
+        )
+    except Exception as exc:
+        code = getattr(exc, "code", type(exc).__name__)
+        detail = getattr(exc, "detail", "") or str(exc)
+        raise VerifierUnavailable("jev", f"{code}: {detail}") from exc
+
+    served = capture.model
+    answer = reply["answers"][question_id]
+    if "score" not in answer:
+        raise VerifierUnavailable("jev", f"score answer missing 'score': {sorted(answer)}")
+    return float(answer["score"]), {
+        "model": served or expected,
+        "revision": served or expected,
+        "requested_model": expected,
+        "served_model": served,
+        "model_matches_validated": (served == expected) if served else None,
+        "credential_source": credential_source(),
+        "usage": reply.get("usage") or {},
+        "probabilities": answer.get("probabilities") or {},
+        "provider_latency_ms": (_t.perf_counter() - t0) * 1000.0,
+        "reply_latency_ms": reply.get("latency_ms"),
+        "question_type": "score",
+    }
 
 
 def ask_named_choice(state: str, *, question_id: str, instructions: str,

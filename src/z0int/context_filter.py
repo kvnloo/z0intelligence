@@ -654,13 +654,17 @@ def _to_selected(chunks, scores, keep: list[int]) -> list[Selected]:
 
 
 # --------------------------------------------------------------- jev lane (#6)
+#: The native score question matches the reference adapter: ``type: "score"`` with
+#: ordered criteria, answered as an expected zero-based rubric index. An earlier
+#: version asked a ``choice`` question and computed sum(label*probability), which
+#: merely resembles a score and is a different Jev question type.
 JEV_QUESTION_ID = "usefulness"
-JEV_RUBRIC = {
-    "0": "unrelated to the query",
-    "1": "same topic but does not help answer the query",
-    "2": "partially answers the query or provides useful supporting evidence",
-    "3": "directly answers the query with specific evidence",
-}
+JEV_RUBRIC = (
+    "Unrelated to the question",
+    "Same topic, but does not help answer the question",
+    "Partially answers the question or gives useful supporting facts",
+    "Directly answers the question with specific facts",
+)
 
 
 def jev_context_scorer(*, timeout: float = 20.0, concurrency: int = 4,
@@ -685,14 +689,15 @@ def jev_context_scorer(*, timeout: float = 20.0, concurrency: int = 4,
     """
     from concurrent.futures import ThreadPoolExecutor
 
-    from .functions.jev import ask_named_choice
+    from .functions.jev import ask_score
 
     def scorer(query: str, passages: Sequence[str]) -> ScorerResult:
         def one(text: str) -> tuple[float, dict]:
-            probs, meta = ask_named_choice(
-                f"Query: {query}\n\nPassage: {text}",
+            # native score question type, as the reference adapter uses
+            score, meta = ask_score(
+                text,
                 question_id=JEV_QUESTION_ID,
-                instructions="How useful is this passage for answering the query?",
+                instructions=f"How useful is this passage for answering the question: {query}",
                 criteria=JEV_RUBRIC,
                 timeout=timeout,
                 model=expected_model,
@@ -702,7 +707,6 @@ def jev_context_scorer(*, timeout: float = 20.0, concurrency: int = 4,
             if strict_model and served and served != expected:
                 raise RuntimeError(
                     f"served revision {served!r} != validated {expected!r}")
-            score = sum(float(k) * float(v) for k, v in (probs or {}).items())
             return score, meta
 
         with ThreadPoolExecutor(max_workers=max(1, concurrency)) as pool:
