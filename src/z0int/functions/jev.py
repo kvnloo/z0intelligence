@@ -150,6 +150,55 @@ class _Capture:
         return raw
 
 
+def ask_named_choice(state: str, *, question_id: str, instructions: str,
+                     criteria: dict[str, str], timeout: float = 20.0,
+                     model: str | None = None) -> tuple[dict[str, float], dict[str, Any]]:
+    """One named-choice call on the CANONICAL Jev transport.
+
+    Reuses ``_Capture`` so the served revision is recovered exactly the way
+    ``JevVerifier.verify`` recovers it: jevkit drops the model from its return
+    value, so the transport capture is the only place it survives. No new HTTP
+    path is introduced.
+    """
+    import time as _t
+
+    key = ensure_credential()
+    if not key:
+        raise VerifierUnavailable("jev", "no credential resolvable")
+    try:
+        from jevkit import client as jev_client  # type: ignore
+    except Exception as exc:  # pragma: no cover - environment problem
+        raise VerifierUnavailable("jev", f"jevkit.client unavailable: {exc}") from exc
+
+    expected = model or EXPECTED_JEV_MODEL
+    capture = _Capture()
+    t0 = _t.perf_counter()
+    try:
+        reply = jev_client.ask(
+            state,
+            {question_id: jev_client.choice(instructions, criteria)},
+            timeout=timeout, model=expected, api_key=key, transport=capture,
+        )
+    except Exception as exc:
+        code = getattr(exc, "code", type(exc).__name__)
+        detail = getattr(exc, "detail", "") or str(exc)
+        raise VerifierUnavailable("jev", f"{code}: {detail}") from exc
+
+    served = capture.model
+    answer = reply["answers"][question_id]
+    return dict(answer.get("probabilities") or {}), {
+        "model": served or expected,
+        "revision": served or expected,
+        "requested_model": expected,
+        "served_model": served,
+        "model_matches_validated": (served == expected) if served else None,
+        "credential_source": credential_source(),
+        "usage": reply.get("usage") or {},
+        "provider_latency_ms": (_t.perf_counter() - t0) * 1000.0,
+        "reply_latency_ms": reply.get("latency_ms"),
+    }
+
+
 class JevVerifier:
     """Reference/escalation implementation. Remote, metered, pinned revision."""
 
