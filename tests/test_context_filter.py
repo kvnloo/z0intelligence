@@ -497,3 +497,117 @@ def test_no_dead_knobs_are_exposed():
     assert "token_budget" in params
     assert "local_scorer" not in params, "dead knob must not be exposed"
     assert "allow_remote" in params
+
+
+# ============================ review wave 2 regressions ======================
+
+def test_jev_scorer_reports_model_and_revision_together():
+    """Regression: the old set-pop left revision=None whenever exactly one model
+    was served. Model and revision must both land."""
+    import z0int.context_filter as cf
+    from z0int.functions import jev as jevmod
+
+    def fake_ask(state, *, question_id, instructions, criteria, timeout, model):
+        return ({"0": 0.1, "1": 0.1, "2": 0.2, "3": 0.6},
+                {"model": "jev-1.13.0", "revision": "jev-1.13.0",
+                 "requested_model": "jev-1.13.0", "served_model": "jev-1.13.0",
+                 "model_matches_validated": True, "usage": {"input": 10, "output": 4},
+                 "provider_latency_ms": 123.0})
+
+    import types
+    fake = types.ModuleType("z0int.functions.jev")
+    fake.ask_named_choice = fake_ask
+    fake.EXPECTED_JEV_MODEL = "jev-1.13.0"
+    import sys
+    orig = sys.modules.get("z0int.functions.jev")
+    sys.modules["z0int.functions.jev"] = fake
+    try:
+        scorer = cf.jev_context_scorer()
+        res = scorer("q", ["passage one", "passage two"])
+    finally:
+        if orig is not None:
+            sys.modules["z0int.functions.jev"] = orig
+    assert res.model == "jev-1.13.0"
+    assert res.revision == "jev-1.13.0", "revision must not be None"
+    assert res.usage == {"input": 20, "output": 8}
+    assert res.provider_latency_ms == 123.0
+
+
+def test_receipt_carries_usage_provider_latency_and_cost_state():
+    from z0int.context_filter import ScorerResult
+
+    pages = [{"raw_content": "text " * 200}]
+    def scorer(q, t):
+        return ScorerResult(scores=[2.5] * len(t), scorer="jev", model="jev-1.13.0",
+                            revision="jev-1.13.0", usage={"input": 7}, cost_usd=0.0,
+                            cost_measured=False, provider_latency_ms=99.0)
+    res = filter_context("q", pages, mode="jev", small_input_chars=1,
+                         allow_remote=True, jev_scorer=scorer)
+    r = res.receipt.as_dict()
+    assert r["scorer_usage"] == {"input": 7}
+    assert r["provider_latency_ms"] == 99.0
+    assert r["latency_ms"] is not None and r["latency_ms"] != r["provider_latency_ms"]
+    assert r["cost_measurement"] in ("unavailable", "estimated", "measured")
+    assert r["cost_measurement"] != "measured", "zero cost must not be called measured"
+
+
+def test_token_budget_never_empties_context():
+    body = "word " * 2000          # one chunk far larger than the budget
+    pages = [{"url": "https://t.test/1", "title": "T", "raw_content": body}]
+    res = filter_context("word", pages, mode="keyword", small_input_chars=1,
+                         token_budget=5)
+    assert res.selected, "a budget must never produce zero context"
+    assert res.receipt.budget_truncated is True
+    assert res.selected[0].url == "https://t.test/1", "provenance survives truncation"
+    assert res.receipt.output_tokens_est <= 5
+
+
+def test_token_budget_zero_means_no_cap():
+    pages = [{"raw_content": "word " * 2000}]
+    capped = filter_context("word", pages, mode="keyword", small_input_chars=1,
+                            token_budget=0)
+    assert capped.receipt.budget_truncated is False
+    assert capped.selected
+
+
+def test_pre_chunked_hands_the_boundary_to_the_caller():
+    """z0int ranks; the caller owns splitting. Each passage is one ranked unit."""
+    pages = [{"url": "u1", "raw_content": "alpha " * 400},
+             {"url": "u2", "raw_content": "beta " * 400}]
+    res = filter_context("alpha", pages, mode="keyword", small_input_chars=1,
+                         pre_chunked=True)
+    assert res.receipt.pre_chunked is True
+    assert res.receipt.chunks == 2, "no splitting must occur in pre_chunked mode"
+    # ranking still applies: the beta chunk is correctly dropped for an alpha query
+    assert len(res.selected) == 1
+    assert res.selected[0].url == "u1"
+
+
+# ------------------------------------------------- golden splitter fixtures
+import json as _json
+from pathlib import Path as _P
+
+_GOLDEN = _P(__file__).resolve().parent / "fixtures" / "gptr_splitter_golden.json"
+
+
+def test_golden_fixtures_are_checked_in_and_revision_pinned():
+    assert _GOLDEN.is_file(), "golden fixtures must be checked in, not generated from /home/kvn/tmp"
+    data = _json.loads(_GOLDEN.read_text())
+    assert data["gpt_researcher_revision"], "the source revision must be recorded"
+    assert len(data["cases"]) >= 8
+    for name in ("paragraphs", "newlines", "sentences", "spaces", "no_separators",
+                 "unicode", "over_1000_block", "repeated_identical", "multi_overlap"):
+        assert name in data["cases"], f"missing fixture case {name}"
+
+
+def test_splitter_divergence_is_recorded_not_claimed_as_parity():
+    """z0int's splitter is NOT LangChain's. The fixtures record that, and the
+    contract is that z0int owns RANKING, not splitting (see `pre_chunked`)."""
+    data = _json.loads(_GOLDEN.read_text())
+    exact = 0
+    for name, case in data["cases"].items():
+        if chunk_text(case["input"], size=1000, overlap=100) == case["chunks"]:
+            exact += 1
+    assert exact == 0, (
+        "splitter now matches the golden fixtures exactly -- update the docs and "
+        f"the pre_chunked rationale (exact={exact})")

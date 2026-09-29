@@ -446,6 +446,9 @@ def build_parser() -> argparse.ArgumentParser:
     cxf.add_argument("--mode", default="auto", choices=["auto", "jev", "keyword", "none"])
     cxf.add_argument("--max-results", type=int, default=10)
     cxf.add_argument("--trace-id", default=None)
+    cxf.add_argument("--allow-remote", action="store_true",
+                     help="Authorize sending context to the remote Jev scorer. "
+                          "Required for --mode jev; without it jev degrades to local keyword")
 
 
     osc = sub.add_parser(
@@ -758,11 +761,17 @@ def _cmd_context(args: argparse.Namespace) -> int:
 
         raw = json.loads(_Path(args.input).expanduser().read_text(encoding="utf-8"))
         passages = raw.get("passages") if isinstance(raw, dict) else raw
-        # No scorer is wired here, so a requested jev lane degrades to keyword and
-        # says so in the receipt rather than silently doing nothing.
+        # Remote authority is opt-in: context may be private, so the canonical Jev
+        # scorer is only constructed when the operator passes --allow-remote.
+        scorer = None
+        if args.mode in ("jev", "auto") and getattr(args, "allow_remote", False):
+            from z0int.context_filter import jev_context_scorer
+
+            scorer = jev_context_scorer()
         result = filter_context(
             args.query, passages or [], mode=args.mode,
-            max_results=args.max_results, trace_id=args.trace_id)
+            max_results=args.max_results, trace_id=args.trace_id,
+            jev_scorer=scorer, allow_remote=bool(getattr(args, "allow_remote", False)))
         out = result.as_dict()
         if getattr(args, "json", False):
             print(json.dumps(out, indent=2))

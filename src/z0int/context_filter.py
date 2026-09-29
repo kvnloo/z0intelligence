@@ -231,6 +231,7 @@ class FilterReceipt:
     fallback: bool = False
     fallback_reason: str | None = None
     fast_path: bool = False
+    pre_chunked: bool = False
     scorer: str = "bm25"
     model: str | None = None
     revision: str | None = None
@@ -248,7 +249,13 @@ class FilterReceipt:
     context_tokens_avoided: int = 0
     retention_ratio: float = 0.0
     latency_ms: float = 0.0
+    #: filter wall time and provider time are different measurements
+    provider_latency_ms: float | None = None
+    scorer_usage: dict[str, Any] = field(default_factory=dict)
     cost_usd: float = 0.0
+    #: measured | estimated | unavailable -- never present a guess as measured
+    cost_measurement: str = "unavailable"
+    budget_truncated: bool = False
     trace_id: str | None = None
     session_id: str | None = None
     sources: list[dict[str, Any]] = field(default_factory=list)
@@ -261,6 +268,7 @@ class FilterReceipt:
             "fallback": self.fallback,
             "fallback_reason": self.fallback_reason,
             "fast_path": self.fast_path,
+            "pre_chunked": self.pre_chunked,
             "scorer": self.scorer,
             "model": self.model,
             "revision": self.revision,
@@ -277,7 +285,12 @@ class FilterReceipt:
             "context_tokens_avoided": self.context_tokens_avoided,
             "retention_ratio": round(self.retention_ratio, 4),
             "latency_ms": round(self.latency_ms, 3),
+            "provider_latency_ms": (round(self.provider_latency_ms, 3)
+                                    if self.provider_latency_ms is not None else None),
+            "scorer_usage": dict(self.scorer_usage),
             "cost_usd": self.cost_usd,
+            "cost_measurement": self.cost_measurement,
+            "budget_truncated": self.budget_truncated,
             "trace_id": self.trace_id,
             "session_id": self.session_id,
             "sources": self.sources,
@@ -325,6 +338,8 @@ class ScorerResult:
     cost_usd: float = 0.0
     provider_latency_ms: float | None = None
     measured: bool = True
+    #: True only when cost comes from returned usage and a real pricing rule
+    cost_measured: bool = False
 
     def __post_init__(self) -> None:
         self.scores = [float(x) for x in self.scores]
@@ -364,6 +379,7 @@ def filter_context(
     relative_threshold: float = KEYWORD_RELATIVE_THRESHOLD,
     keyword_max_results: int = KEYWORD_MAX_RESULTS,
     small_input_chars: int = SMALL_INPUT_CHARS,
+    pre_chunked: bool = False,
     jev_scorer: Scorer | None = None,
     jev_available: bool | None = None,
     allow_remote: bool = False,
@@ -379,7 +395,16 @@ def filter_context(
     authorize remote transmission explicitly. The keyword lane is always local.
 
     ``token_budget`` caps the selected context by estimated tokens; it is applied
-    after ranking, so the best chunks survive. ``None`` means no cap.
+    after ranking, so the best chunks survive. ``0`` or ``None`` means no cap; a
+    budget never empties the context (see ``_apply_token_budget``).
+
+    ``pre_chunked`` hands the chunking boundary to the caller: each passage is
+    treated as exactly one chunk and z0int only RANKS. This exists because z0int's
+    splitter is measurably NOT equivalent to LangChain's (see
+    ``tests/fixtures/gptr_splitter_golden.json``: 0/9 exact). Rather than clone
+    LangChain, a harness that has already chunked -- GPT Researcher, for one --
+    passes its chunks here so both strategies rank the same units. z0int owns
+    ranking; the caller owns splitting.
     """
     t0 = time.perf_counter()
     ps = [p if isinstance(p, Passage) else Passage.from_mapping(p, position=i)
@@ -427,7 +452,9 @@ def filter_context(
             receipt.fallback = True
             receipt.fallback_reason = "jev scorer not configured"
         else:
-            chunks = _chunk_passages(ps, size=chunk_size, overlap=chunk_overlap)
+            chunks = _as_given_chunks(ps) if pre_chunked else _chunk_passages(
+                ps, size=chunk_size, overlap=chunk_overlap)
+            receipt.pre_chunked = pre_chunked
             texts = [c[2] for c in chunks]
             receipt.chunks = len(chunks)
             try:
@@ -440,7 +467,12 @@ def filter_context(
                 receipt.scorer = result.scorer
                 receipt.model = result.model
                 receipt.revision = result.revision
-                receipt.cost_usd = result.cost_usd
+                receipt.scorer_usage = dict(result.usage or {})
+                receipt.provider_latency_ms = result.provider_latency_ms
+                receipt.cost_usd = float(result.cost_usd or 0.0)
+                receipt.cost_measurement = (
+                    "measured" if result.cost_measured else
+                    ("estimated" if result.cost_usd else "unavailable"))
                 receipt.threshold = JEV_MIN_USEFULNESS
                 receipt.max_results = max_results
                 qualifying = [i for i, sv in enumerate(result.scores)
@@ -466,7 +498,9 @@ def filter_context(
     receipt.scorer = "bm25"
     receipt.threshold = relative_threshold
     receipt.max_results = keyword_max_results
-    chunks = _chunk_passages(ps, size=chunk_size, overlap=chunk_overlap)
+    chunks = _as_given_chunks(ps) if pre_chunked else _chunk_passages(
+        ps, size=chunk_size, overlap=chunk_overlap)
+    receipt.pre_chunked = pre_chunked
     texts = [c[2] for c in chunks]
     receipt.chunks = len(chunks)
     if not chunks:
@@ -486,6 +520,11 @@ def filter_context(
     return _finish(selected, receipt, t0, emit_tokenomics, token_budget)
 
 
+def _as_given_chunks(ps: Sequence[Passage]) -> list[tuple[Passage, int, str]]:
+    """Treat each passage as exactly one chunk: the caller owns the boundary."""
+    return [(p, 0, p.text) for p in ps if p.text.strip()]
+
+
 def _originals_as_selected(ps: Sequence[Passage]) -> list[Selected]:
     """Original passages as-is: no chunking, so no overlap duplication."""
     return [Selected(text=p.text, score=0.0, chunk_index=0, url=p.url, title=p.title,
@@ -493,23 +532,42 @@ def _originals_as_selected(ps: Sequence[Passage]) -> list[Selected]:
             for p in ps if p.text.strip()]
 
 
-def _apply_token_budget(selected: list[Selected], budget: int | None) -> list[Selected]:
+def _apply_token_budget(selected: list[Selected], budget: int | None,
+                        receipt: "FilterReceipt | None" = None) -> list[Selected]:
+    """`token_budget <= 0` means no cap (same as None).
+
+    For a positive budget, preserve the fail-safe guarantee: a budget must never
+    turn useful context into none. If no selected chunk fits whole, the
+    highest-ranked chunk is truncated to fit and the receipt records it.
+    """
     if not budget or budget <= 0:
         return selected
     out: list[Selected] = []
     used = 0
-    for s in selected:
-        cost = estimate_tokens(s.text)
-        if used + cost > budget:
+    for item in selected:
+        cost = estimate_tokens(item.text)
+        if used + cost <= budget:
+            out.append(item)
+            used += cost
             continue
-        out.append(s)
-        used += cost
+        if not out:
+            # nothing fits whole -- keep the best chunk, truncated to the budget
+            keep_chars = max(1, budget * 4)
+            trimmed = item.text[:keep_chars]
+            out.append(Selected(text=trimmed, score=item.score, chunk_index=item.chunk_index,
+                                url=item.url, title=item.title, doc_id=item.doc_id,
+                                source_id=item.source_id, position=item.position))
+            if receipt is not None:
+                receipt.budget_truncated = True
+            break
+    if receipt is not None and len(out) < len(selected):
+        receipt.budget_truncated = True
     return out
 
 
 def _finish(selected: list[Selected], receipt: FilterReceipt, t0: float,
             emit: bool, token_budget: int | None = None) -> FilterResult:
-    selected = _apply_token_budget(selected, token_budget)
+    selected = _apply_token_budget(selected, token_budget, receipt)
     receipt.selected = len(selected)
     receipt.chunks = max(receipt.chunks, len(selected))
     receipt.rejected = max(0, receipt.chunks - receipt.selected)
@@ -558,10 +616,17 @@ def emit_filter_event(receipt: FilterReceipt, *, root: Path | None = None) -> Pa
         "context_tokens_avoided_est": receipt.context_tokens_avoided,
         "retention_ratio": round(receipt.retention_ratio, 6),
         "latency_ms": round(receipt.latency_ms, 3),
+        "filter_latency_ms": round(receipt.latency_ms, 3),
+        "provider_latency_ms": (round(receipt.provider_latency_ms, 3)
+                                if receipt.provider_latency_ms is not None else None),
+        "scorer_usage": dict(receipt.scorer_usage),
         "filter_cost_usd": receipt.cost_usd,
+        "cost_measurement": receipt.cost_measurement,
+        "budget_truncated": receipt.budget_truncated,
         "fallback": receipt.fallback,
         "fallback_reason": receipt.fallback_reason,
         "fast_path": receipt.fast_path,
+        "pre_chunked": receipt.pre_chunked,
         "candidates": receipt.candidates,
         "chunks": receipt.chunks,
         "selected": receipt.selected,
@@ -599,66 +664,70 @@ JEV_RUBRIC = {
 
 
 def jev_context_scorer(*, timeout: float = 20.0, concurrency: int = 4,
-                       expected_model: str | None = None) -> Scorer:
-    """Build a context-usefulness scorer on the CANONICAL Jev path.
+                       expected_model: str | None = None,
+                       strict_model: bool = True) -> Scorer:
+    """Context-usefulness scorer on the CANONICAL Jev path.
 
-    Reuses ``functions.jev``'s credential resolver and ``jevkit.client`` -- the
-    same transport, credential store and capture the existing Jev verifier uses.
-    No second TypeSafe HTTP client is created here.
+    Calls ``functions.jev.ask_named_choice``, which reuses the existing credential
+    resolver, ``jevkit.client`` and the ``_Capture`` transport -- the same
+    mechanism ``JevVerifier.verify`` uses to recover the served model, because
+    jevkit drops it from the return value. No second HTTP client.
 
-    The rubric is the four-level usefulness scale, asked as one choice question per
-    chunk, bounded by ``concurrency``.
+    Revision handling matches the canonical verifier: the request asks for
+    ``EXPECTED_JEV_MODEL``, the served model is captured from the transport, and a
+    mismatch raises (``strict_model``) so ``filter_context`` degrades to keyword
+    rather than silently mixing revisions.
 
-    STATUS: the question construction mirrors ``JevVerifier.verify``'s use of
-    ``jevkit.client.ask`` and the named-choice form. It has NOT been exercised
-    against a live endpoint in this change (that requires a paid call), so treat
-    the lane as implemented-but-unverified-live. ``filter_context`` degrades to
-    keyword and says so if anything raises.
+    Cost is reported from returned usage when present; otherwise the scorer marks
+    cost unavailable rather than inventing a per-call constant.
+
+    STATUS: implemented, not exercised live in this change (a live call is paid).
     """
     from concurrent.futures import ThreadPoolExecutor
 
-    from .functions.jev import ensure_credential, credential_source
+    from .functions.jev import ask_named_choice
 
     def scorer(query: str, passages: Sequence[str]) -> ScorerResult:
-        key = ensure_credential()
-        if not key:
-            raise RuntimeError("no Jev credential resolvable")
-        from jevkit import client as jev_client  # type: ignore
-
         def one(text: str) -> tuple[float, dict]:
-            import time as _t
-            t0 = _t.perf_counter()
-            reply = jev_client.ask(
+            probs, meta = ask_named_choice(
                 f"Query: {query}\n\nPassage: {text}",
-                {JEV_QUESTION_ID: jev_client.choice(
-                    "How useful is this passage for answering the query?",
-                    JEV_RUBRIC)},
+                question_id=JEV_QUESTION_ID,
+                instructions="How useful is this passage for answering the query?",
+                criteria=JEV_RUBRIC,
                 timeout=timeout,
                 model=expected_model,
-                api_key=key,
             )
-            answer = reply["answers"][JEV_QUESTION_ID]
-            probs = answer.get("probabilities") or {}
-            return (sum(float(k) * float(v) for k, v in probs.items()),
-                    {"model": reply.get("model"), "usage": reply.get("usage") or {},
-                     "latency_ms": (_t.perf_counter() - t0) * 1000.0})
+            expected = meta["requested_model"]
+            served = meta["served_model"]
+            if strict_model and served and served != expected:
+                raise RuntimeError(
+                    f"served revision {served!r} != validated {expected!r}")
+            score = sum(float(k) * float(v) for k, v in (probs or {}).items())
+            return score, meta
 
         with ThreadPoolExecutor(max_workers=max(1, concurrency)) as pool:
             rows = list(pool.map(one, passages))
-        models = {r[1]["model"] for r in rows if r[1]["model"]}
+
+        # every row carries model+revision: no set-pop, which necessarily left
+        # revision None whenever exactly one model was seen
+        models = {r[1]["model"] for r in rows if r[1].get("model")}
+        served = sorted(models)[0] if len(models) == 1 else None
         usage: dict[str, Any] = {}
         for _s, meta in rows:
             for k, v in (meta.get("usage") or {}).items():
                 if isinstance(v, int):
                     usage[k] = usage.get(k, 0) + v
+        lat = [r[1]["provider_latency_ms"] for r in rows
+               if r[1].get("provider_latency_ms") is not None]
         return ScorerResult(
             scores=[r[0] for r in rows],
             scorer="jev",
-            model=(models.pop() if len(models) == 1 else None),
-            revision=(models.pop() if models else None),
+            model=served,
+            revision=served,
             usage=usage,
-            cost_usd=0.00006 * len(passages),
-            provider_latency_ms=sum(r[1]["latency_ms"] for r in rows) / max(1, len(rows)),
+            cost_usd=0.0,
+            cost_measured=False,
+            provider_latency_ms=(sum(lat) / len(lat)) if lat else None,
             measured=True,
         )
 
