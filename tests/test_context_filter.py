@@ -507,16 +507,18 @@ def test_jev_scorer_reports_model_and_revision_together():
     import z0int.context_filter as cf
     from z0int.functions import jev as jevmod
 
-    def fake_ask(state, *, question_id, instructions, criteria, timeout, model):
-        return ({"0": 0.1, "1": 0.1, "2": 0.2, "3": 0.6},
-                {"model": "jev-1.13.0", "revision": "jev-1.13.0",
-                 "requested_model": "jev-1.13.0", "served_model": "jev-1.13.0",
-                 "model_matches_validated": True, "usage": {"input": 10, "output": 4},
-                 "provider_latency_ms": 123.0})
+    # the scorer now uses the NATIVE score question type
+    def fake_score(state, *, question_id, instructions, criteria, timeout, model):
+        return (2.4, {"model": "jev-1.13.0", "revision": "jev-1.13.0",
+                      "requested_model": "jev-1.13.0", "served_model": "jev-1.13.0",
+                      "model_matches_validated": True, "usage": {"input": 10, "output": 4},
+                      "probabilities": {"0": 0.1, "1": 0.1, "2": 0.2, "3": 0.6},
+                      "provider_latency_ms": 123.0, "question_type": "score"})
 
     import types
     fake = types.ModuleType("z0int.functions.jev")
-    fake.ask_named_choice = fake_ask
+    fake.ask_score = fake_score
+    fake.RELEVANCE_LEVELS = ("a", "b", "c", "d")
     fake.EXPECTED_JEV_MODEL = "jev-1.13.0"
     import sys
     orig = sys.modules.get("z0int.functions.jev")
@@ -531,6 +533,8 @@ def test_jev_scorer_reports_model_and_revision_together():
     assert res.revision == "jev-1.13.0", "revision must not be None"
     assert res.usage == {"input": 20, "output": 8}
     assert res.provider_latency_ms == 123.0
+    # native score semantics, not sum(label*probability)
+    assert res.scores == [2.4, 2.4]
 
 
 def test_receipt_carries_usage_provider_latency_and_cost_state():
