@@ -92,7 +92,7 @@ variable for this model.** If you deploy it, pin the device *and* `Z0INT_JULIA_A
 record both in the receipt — they are already in `DecisionResult.diagnostics`.
 
 **Default is CPU.** 825 MB of a 12 GB card is a poor trade for 1.5–3.7x on a call that is already
-~30 ms, when that VRAM is what lets `nanojev`/`openjev`/`system_one` stay resident.
+~30 ms, when preserving VRAM matters more for the active OpenJev/System-One GPU lanes.
 
 ## Limits
 

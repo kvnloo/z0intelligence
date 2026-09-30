@@ -2,7 +2,7 @@
 
 No model weights or third-party raw evaluation records are distributed here.
 
-| NanoJev (runtime port) | https://github.com/TianyuCodings/NanoJev (fork baseline kvnloo/NanoJev) | model `C-Tianyu/NanoJev@4a19595eada0857133c0d2be024f879a4077054b`; code port in `src/z0int/backends/nanojev_runtime.py` | MIT; local DecisionBackend only — no full research repo vendored. |
+| NanoJev (legacy runtime port) | https://github.com/TianyuCodings/NanoJev (fork baseline kvnloo/NanoJev) | model `C-Tianyu/NanoJev@4a19595eada0857133c0d2be024f879a4077054b`; code port in `src/z0int/backends/nanojev_runtime.py` | MIT; retained for benchmark/reproducibility only, not as the production verification default. |
 | jevlike trainable scorers | https://github.com/vinnylarouge/jevlike | `main` at port time | Route A code in `src/openjev_phase1/jevlike/`; MIT. |
 | vLLM structured diffusion reads | https://github.com/vllm-project/vllm/pull/57250 | open at port time | Route C client only; Apache-2.0 upstream. |
 | Item | Upstream | Pinned revision | Note |

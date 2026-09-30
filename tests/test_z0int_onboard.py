@@ -33,9 +33,11 @@ class ModelsPlan(unittest.TestCase):
 
         plan = plan_models(vram_gb=12.0)
         self.assertEqual(plan["policy"], "twelve_gb")
-        # NanoJev is the preferred resident semantic decision engine on 12GB;
-        # openjev_06b remains available on_demand and must not coreside with nanojev.
-        self.assertIn("nanojev_06b", plan["resident"])
+        # Laya is the preferred resident local fast path on 12GB.
+        # NanoJev remains available only on demand for legacy benchmark/repro work.
+        self.assertIn("laya_421m", plan["resident"])
+        self.assertNotIn("nanojev_06b", plan["resident"])
+        self.assertIn("nanojev_06b", plan["on_demand"])
         self.assertIn("local_mb", plan["resident"])
         self.assertNotIn("openjev_4b", plan["resident"])
         pairs = {tuple(x) for x in plan["never_coreside"]}

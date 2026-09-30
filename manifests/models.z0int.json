@@ -2,7 +2,7 @@
   "schema": "z0int.models.v1",
   "decision_roster": {
     "schema": "z0int.decision_roster.v1",
-    "description": "Jev/System-One-style typed decision backends \u2014 not general LLM roster entries",
+    "description": "Jev/System-One-style typed decision backends — not general LLM roster entries",
     "candidates": [
       "laya_421m",
       "decider_2b",
@@ -32,9 +32,9 @@
         "calibrated_choice",
         "system_one"
       ],
-      "resident_preferred": false,
+      "resident_preferred": true,
       "optional": true,
-      "note": "~421M non-autoregressive calibrated decision model; CPU/MPS-friendly."
+      "note": "Primary local fast-path typed decision backend; CPU/MPS/CUDA-friendly. Verification eligibility remains contract-specific."
     },
     "decider_2b": {
       "family": "decision_backend",
@@ -76,8 +76,9 @@
         "dynamic_choice",
         "outcome_predictor"
       ],
-      "resident_preferred": true,
-      "note": "Verify measured VRAM before treating min_vram_gb as a hard production fact. Managed under ~/.z0int/models/nanojev_06b/"
+      "resident_preferred": false,
+      "note": "Legacy benchmark/reproducibility lane only; do not use as the production verification default. Managed under ~/.z0int/models/nanojev_06b/",
+      "optional": true
     },
     "reflex": {
       "family": "decision_backend",
@@ -118,7 +119,7 @@
       ],
       "resident_preferred": false,
       "optional": true,
-      "note": "CC-BY-NC-4.0 \u2014 non-commercial only. LoRA scorer on Qwen3.5-4B-Base."
+      "note": "CC-BY-NC-4.0 — non-commercial only. LoRA scorer on Qwen3.5-4B-Base."
     },
     "openjev_06b": {
       "family": "decision_backend",
@@ -211,12 +212,12 @@
   "policies": {
     "twelve_gb": {
       "resident": [
-        "nanojev_06b",
+        "laya_421m",
         "local_mb"
       ],
       "on_demand": [
-        "laya_421m",
         "decider_2b",
+        "nanojev_06b",
         "openjev_4b",
         "openjev_06b",
         "system_one_4b",
@@ -259,15 +260,15 @@
     },
     "high_vram": {
       "resident": [
-        "nanojev_06b",
+        "laya_421m",
         "openjev_4b",
         "local_mb"
       ],
       "on_demand": [
         "decider_2b",
+        "nanojev_06b",
         "openjev_06b",
-        "system_one_4b",
-        "laya_421m"
+        "system_one_4b"
       ],
       "never_coreside": [
         [

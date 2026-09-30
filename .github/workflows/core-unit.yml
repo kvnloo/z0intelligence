@@ -7,6 +7,10 @@ on:
       - "src/z0int/ao_bridge.py"
       - "src/z0int/intelligence_service.py"
       - "tests/test_ao_bridge.py"
+      - "src/z0int/memory/**"
+      - "tests/test_memory_event_log.py"
+      - "src/z0int/memory/**"
+      - "tests/test_memory_event_log.py"
       - "src/z0int/bridge/**"
       - "src/z0int/tokenomics_emit.py"
       - "omp-extensions/z0int-bridge/**"
@@ -45,6 +49,8 @@ jobs:
             src/z0int/receipt.py \
             src/z0int/ao_bridge.py \
             src/z0int/intelligence_service.py \
+            src/z0int/memory/event_log.py \
+            src/z0int/memory/optmem_tree.py \
             src/z0int/tokenomics_emit.py \
             src/z0int/bridge/worker.py \
             src/z0int/bridge/runtime.py \
@@ -58,7 +64,9 @@ jobs:
             tests.test_receipt.ReceiptBuild \
             tests.test_receipt.ReceiptClose \
             tests.test_bridge_worker.BridgeRuntimeTests \
-            tests.test_ao_bridge.AOBridgeTests
+            tests.test_ao_bridge.AOBridgeTests \
+            tests.test_memory_event_log.EventLogTests \
+            tests.test_memory_optmem_tree.OptMemTreeTests
       - name: Tokenomics emitter fallback tests
         env:
           PYTHONPATH: src
