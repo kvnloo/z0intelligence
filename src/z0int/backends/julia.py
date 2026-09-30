@@ -114,6 +114,12 @@ def _resolve_model_dir(*, hf: str, revision: str, model_dir: Path | None = None)
     override = os.environ.get("Z0INT_JULIA_MODEL_DIR")
     if override:
         return Path(override).expanduser()
+    # scripts/setup-julia.sh's default target: use it when it is a complete checkout.
+    from z0int import paths
+
+    managed = paths.home() / "models" / "julia_1"
+    if managed.is_dir() and not missing_entries(managed):
+        return managed
     from huggingface_hub import snapshot_download
 
     return Path(snapshot_download(repo_id=hf, revision=revision))
@@ -369,6 +375,11 @@ class JuliaBackend:
                 if not out.get("ok", False) and out.get("error"):
                     raise ValueError(f"julia: {out['error']}")
                 return out
+
+    def resident_pids(self) -> list[int]:
+        """Out-of-process memory the bench should attribute to this backend."""
+        w = self._worker
+        return [w.process.pid] if w is not None and w.process.poll() is None else []
 
     def close(self) -> None:
         with self._lock:

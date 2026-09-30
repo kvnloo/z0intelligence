@@ -43,7 +43,9 @@ class NanoJevBackend:
             if raw
             else paths.home() / "models" / "nanojev_06b"
         )
-        return cls(checkpoint)
+        device = os.environ.get("Z0INT_NANOJEV_DEVICE") or "cuda:0"
+        precision = os.environ.get("Z0INT_NANOJEV_PRECISION") or ("fp32" if device.startswith("cpu") else "bf16")
+        return cls(checkpoint, device=device, precision=precision)
 
     @property
     def capabilities(self) -> BackendCapabilities:
