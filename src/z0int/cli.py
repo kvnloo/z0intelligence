@@ -590,6 +590,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("aodl", "Bind routines/cascades into AODL strategy docs (→ z0int.aodl)"),
         ("repair", "Counterexample-driven routine repair (→ z0int.refinement)"),
         ("abab", "ABAB experiment archive helpers (→ z0int.abab)"),
+        ("claude-code", "Claude Code launch profiles + prefix-cache residency (→ z0int.claude_code_launch)"),
     ):
         sp = sub.add_parser(name, help=help_txt)
         sp.add_argument(
@@ -1042,7 +1043,7 @@ def main(argv: list[str] | None = None) -> int:
         _print(out, as_json=as_json)
         return 0
 
-    if args.cmd in ("routine", "cascade", "aodl", "repair", "abab"):
+    if args.cmd in ("routine", "cascade", "aodl", "repair", "abab", "claude-code"):
         rest = list(getattr(args, "module_argv", None) or [])
         # argparse REMAINDER keeps a leading "--" when users write: z0int routine -- compile ...
         if rest and rest[0] == "--":
@@ -1058,6 +1059,8 @@ def main(argv: list[str] | None = None) -> int:
             from .aodl import _main as _mod_main
         elif args.cmd == "repair":
             from .refinement import main as _mod_main
+        elif args.cmd == "claude-code":
+            from .claude_code_launch import _main as _mod_main
         else:
             from .abab import _main as _mod_main
         return int(_mod_main(rest))
