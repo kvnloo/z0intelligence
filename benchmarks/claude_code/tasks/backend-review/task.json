@@ -1,0 +1,17 @@
+{
+ "id": "backend-review",
+ "family": "long_horizon_recall",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "c4a4554",
+  "paths": [
+   "src"
+  ]
+ },
+ "prompt": "Review this repository's decision backends. For EACH of the following files, in this order, print the complete file with a separate `cat <path>` Bash command (no head, tail, grep, sed, or the Read tool), then append a one-line summary of that file to REVIEW.md: src/z0int/backends/__init__.py, src/z0int/backends/base.py, src/z0int/backends/decider.py, src/z0int/backends/image_decision.py, src/z0int/backends/julia.py, src/z0int/backends/julia_worker.py, src/z0int/backends/laya.py, src/z0int/backends/named_questions.py, src/z0int/backends/nanojev.py, src/z0int/backends/nanojev_runtime.py, src/z0int/backends/openjev_direct.py, src/z0int/backends/registry.py. After you have reviewed all twelve, do NOT open or print any source file again (you may use any recall helper the environment provides for earlier command output). Then write ANSWERS.json with exactly these keys, answered from what you already reviewed: q1 the value of JULIA_MAX_OPTIONS (number); q2 max_choice_options declared by the Laya backend (number); q3 max_choice_options declared by the OpenJev direct backend (number); q4 the image decision backend's DEFAULT_MODEL_ID (string); q5 the image decision backend's MAX_OPTIONS (number); q6 the environment variable that selects the Decider device (string); q7 the Julia backend's DEFAULT_TIMEOUT_S (number).",
+ "check": [
+  "python3",
+  "-c",
+  "import json,sys; a=json.load(open('ANSWERS.json')); e={\"q1\": 20, \"q2\": 16, \"q3\": 16, \"q4\": \"Qwen/Qwen2.5-VL-3B-Instruct\", \"q5\": 26, \"q6\": \"Z0INT_DECIDER_DEVICE\", \"q7\": 180.0}; bad=[k for k,v in e.items() if not (a.get(k)==v or (isinstance(v,(int,float)) and isinstance(a.get(k),(int,float)) and float(a[k])==float(v)))]; import os; ok=os.path.exists('REVIEW.md') and len(open('REVIEW.md').read().strip().splitlines())>=12; print(bad, ok); sys.exit(1 if bad or not ok else 0)"
+ ]
+}
