@@ -31,10 +31,23 @@ def _sha(obj: Any, n: int = 16) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:n]
 
 
-def _authority(aodl_doc: Mapping[str, Any] | None) -> dict[str, Any]:
+def _standing(harness_grants: Iterable[str] | None) -> dict[str, Any]:
+    """A harness's standing authority, authored by the user's session choice (e.g. Claude Code outside plan
+    mode may edit the working copy). Privileged authority is never standing: only AODL or a user answer."""
+    if harness_grants is None:
+        return {"source": "harness-default", "grants": list(DEFAULT_AUTHORITY), "fingerprint": None}
+    grants = set(harness_grants) | set(DEFAULT_AUTHORITY)
+    bad = sorted(g for g in grants if g not in EFFECTS or g == "privileged")
+    if bad:
+        raise ValueError(f"harness standing authority cannot include {bad}; privileged comes only from AODL or a user grant")
+    grants = sorted(grants, key=EFFECTS.index)
+    return {"source": "harness-standing", "grants": grants, "fingerprint": None}
+
+
+def _authority(aodl_doc: Mapping[str, Any] | None, harness_grants: Iterable[str] | None = None) -> dict[str, Any]:
     """Authority is authored, versioned and fingerprinted; it is never inferred."""
     if not aodl_doc:
-        return {"source": "harness-default", "grants": list(DEFAULT_AUTHORITY), "fingerprint": None}
+        return _standing(harness_grants)
     grants: set[str] = set()
     for graph in ("intentGraph",):
         for node in ((aodl_doc.get(graph) or {}).get("nodes") or []):
@@ -144,7 +157,8 @@ def _action_space(unknowns: list[dict[str, Any]], contradictions: list[dict[str,
 def build_decision_opportunity(repo: str | Path, request: str, *, effects: Iterable[str] = ("read",),
                                aodl_doc: Mapping[str, Any] | None = None, packet: Mapping[str, Any] | None = None,
                                harness: str | None = None, trace_id: str | None = None, attempt: int = 0,
-                               projects_root: str | Path | None = None, scoped: bool = True) -> dict[str, Any]:
+                               projects_root: str | Path | None = None, scoped: bool = True,
+                               harness_grants: Iterable[str] | None = None) -> dict[str, Any]:
     """Deterministic given pinned evidence: identical inputs give an identical ``semantic_id``."""
     effects = [e for e in effects]
     unknown_effects = [e for e in effects if e not in EFFECTS]
@@ -154,7 +168,7 @@ def build_decision_opportunity(repo: str | Path, request: str, *, effects: Itera
         from .state_packet import build_state_packet
 
         packet = build_state_packet(Path(repo), projects_root=projects_root)
-    authority = _authority(aodl_doc)
+    authority = _authority(aodl_doc, harness_grants)
     scope = _scope(packet, request) if scoped else {"mode": "repo", "families": []}
     unknowns = _unknowns(packet)
     contradictions = list(packet.get("contradictions") or [])

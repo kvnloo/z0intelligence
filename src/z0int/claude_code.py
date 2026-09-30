@@ -70,15 +70,29 @@ def is_harness_message(text):
     return isinstance(text, str) and text.lstrip().startswith(HARNESS_MESSAGE_PREFIXES)
 
 
+def standing_grants(hook):
+    """Claude Code's standing authority, authored by the user's permission mode: plan mode is read-only,
+    any other mode may edit the working copy. Privileged work (push, PR, deploy, ...) is never standing."""
+    return ('read',) if hook.get('permission_mode') == 'plan' else ('read', 'write')
+
+
 def on_opportunity(hook, root=None):
     from .decision_opportunity import build_decision_opportunity, deterministic_gate
-    from .state_packet import repo_root
+    from .effect_inference import infer_effects
+    from .state_packet import build_state_packet, repo_root
     repo = repo_root(hook.get('cwd') or os.getcwd())
     if repo is None:
         return None
-    opp = build_decision_opportunity(repo, hook['prompt'], harness=HARNESS, trace_id=turn_id(hook))
+    packet = build_state_packet(repo)
+    inferred = infer_effects(hook['prompt'], packet)
+    grants = standing_grants(hook)
+    opp = build_decision_opportunity(repo, hook['prompt'], effects=inferred['effects'], packet=packet,
+                                     harness=HARNESS, trace_id=turn_id(hook), harness_grants=grants)
+    # The hard-coded read-only emission this replaces, kept so the live cohort can compare both (shadow).
+    baseline = build_decision_opportunity(repo, hook['prompt'], packet=packet, harness=HARNESS, trace_id=turn_id(hook))
     record = {'schema': 'z0int.claude_code.opportunity_record.v0', 'session_id': hook.get('session_id'),
-              'gate': deterministic_gate(opp), 'opportunity': opp}
+              'gate': deterministic_gate(opp), 'gate_readonly_baseline': deterministic_gate(baseline),
+              'permission_mode': hook.get('permission_mode'), 'effects_inference': inferred, 'opportunity': opp}
     path = opportunities_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('a', encoding='utf-8') as fh:

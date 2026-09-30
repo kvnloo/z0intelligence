@@ -95,7 +95,7 @@ def decisions_report(root=None):
             return []
     outcomes = {r.get('trace_id'): r for r in rows('outcomes.jsonl') if r.get('trace_id')}
     from .claude_code import is_harness_message
-    table, unlinked, examples, harness = {}, 0, [], 0
+    table, unlinked, examples, harness, rescored = {}, 0, [], 0, {}
     for rec in rows('opportunities.jsonl'):
         opp = rec['opportunity']
         if is_harness_message(opp['intent']['request']):  # recorded before emission skipped them
@@ -111,8 +111,33 @@ def decisions_report(root=None):
         if (rec['gate'] == 'ACT') != (observed == 'answered') and len(examples) < 10:
             examples.append({'gate': rec['gate'], 'observed': observed, 'scope': opp['scope'].get('mode'),
                              'families': opp['scope'].get('families'), 'request': opp['intent']['request'][:80]})
+        for name, grants in RESCORE_AUTHORITY.items():
+            gate = rescore_gate(opp, grants)
+            if gate is not None:
+                rescored.setdefault(name, {})
+                rescored[name][(gate, observed)] = rescored[name].get((gate, observed), 0) + 1
+    fmt = lambda t: {f'{g}->{o}': n for (g, o), n in sorted(t.items())}
     return {'linked': sum(table.values()), 'unlinked': unlinked, 'harness_messages_excluded': harness,
-            'table': {f'{g}->{o}': n for (g, o), n in sorted(table.items())}, 'disagreements': examples}
+            'table': fmt(table), 'disagreements': examples,
+            # z0int#55 effect inference: the same recorded state, re-gated with inferred effects (counts only)
+            'rescore_inferred_effects': {name: fmt(t) for name, t in rescored.items()}}
+
+
+# Recorded authority was the harness default; 'session' is Claude Code's standing authority outside plan mode.
+RESCORE_AUTHORITY = {'default_read': ('read',), 'session_read_write': ('read', 'write')}
+
+
+def rescore_gate(opp, grants):
+    """Recompute the gate from the opportunity's *recorded* state with inferred effects (no packet rebuild)."""
+    from .decision_opportunity import _action_space, deterministic_gate
+    from .effect_inference import infer_effects
+    state = opp.get('state')
+    if not isinstance(state, dict) or 'unknowns' not in state:
+        return None
+    effects = infer_effects(opp['intent']['request'], {'current_claims': state.get('claims') or []})['effects']
+    observe = [a for a in opp.get('action_space') or [] if a.get('kind') == 'OBSERVE']
+    space = _action_space(state['unknowns'], state.get('contradictions') or [], effects, {'grants': list(grants)}, observe)
+    return deterministic_gate({'action_space': space})
 
 
 def build_argv(profile, claude_args, plugin=True):
