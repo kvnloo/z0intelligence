@@ -1,0 +1,147 @@
+{
+ "schema": "z0int.bench.action_authority.results.v0",
+ "sample": {
+  "calls_total": 3716,
+  "candidates": 718,
+  "random_noncandidates": 80,
+  "labeled": 798,
+  "missing_labels": 0
+ },
+ "parser": {
+  "privileged_kind_target": {
+   "precision": "215/298 (72.1%)",
+   "recall": "215/306 (70.3%)"
+  },
+  "privileged_kind_only": {
+   "precision": "251/298 (84.2%)",
+   "recall": "251/306 (82.0%)"
+  },
+  "call_is_privileged": {
+   "precision": "199/222 (89.6%)",
+   "recall": "199/220 (90.5%)"
+  },
+  "per_kind_counts": {
+   "delete": {
+    "pred": 2,
+    "gold": 1
+   },
+   "deploy": {
+    "gold": 5,
+    "pred": 1
+   },
+   "discard": {
+    "gold": 8,
+    "pred": 13
+   },
+   "external_system": {
+    "gold": 1
+   },
+   "fs_outside_repo": {
+    "gold": 110,
+    "pred": 95
+   },
+   "install": {
+    "gold": 4,
+    "pred": 18
+   },
+   "network": {
+    "gold": 6,
+    "pred": 6
+   },
+   "push": {
+    "gold": 93,
+    "pred": 84
+   },
+   "rewrite": {
+    "gold": 2
+   },
+   "secret": {
+    "gold": 5,
+    "pred": 3
+   },
+   "service": {
+    "gold": 11,
+    "pred": 17
+   },
+   "ssh": {
+    "gold": 58,
+    "pred": 57
+   },
+   "sudo": {
+    "gold": 2,
+    "pred": 2
+   }
+  }
+ },
+ "authority": {
+  "unauthorized_privileged_caught": {
+   "caught": 112,
+   "total": 134,
+   "recall": "112/134 (83.6%)",
+   "decisions": {
+    "ask": 112,
+    "allow": 22
+   }
+  },
+  "false_friction_authorized_all_sample": "81/664 (12.2%)",
+  "false_friction_authorized_all_population_weighted": "2.3%",
+  "false_friction_authorized_privileged": "59/86 (68.6%)",
+  "friction_by_effect": {
+   "ssh:ask": 29,
+   "fs_outside_repo:ask": 14,
+   "push:ask": 9,
+   "install:ask": 9,
+   "fs_outside_repo:ask;push:ask": 7,
+   "discard:ask": 7,
+   "install:ask;network:ask": 1,
+   "network:ask": 1,
+   "service:ask": 1,
+   "secret:ask;ssh:ask": 1,
+   "delete:deny;fs_outside_repo:ask": 1,
+   "delete:deny": 1
+  }
+ },
+ "replay_all_calls_unlabeled": {
+  "n": 3716,
+  "decision": {
+   "allow": 3456,
+   "ask": 258,
+   "deny": 2
+  }
+ },
+ "latency": {
+  "n": 360,
+  "python": "3.11.16",
+  "wall_ms": {
+   "p50": 31.6,
+   "p95": 34.0,
+   "max": 118.6
+  },
+  "wall_ms_warm_session_cache": {
+   "n": 300,
+   "p50": 31.3,
+   "p95": 33.9
+  },
+  "wall_ms_first_call_in_session": {
+   "n": 60,
+   "p50": 32.0,
+   "p95": 34.3
+  },
+  "wall_ms_privileged_calls": {
+   "n": 84,
+   "p50": 33.0,
+   "p95": 34.7
+  },
+  "in_process_ms": {
+   "p50": 6.2,
+   "p95": 8.3
+  },
+  "baseline_python_startup_ms": 15.9
+ },
+ "concentration": {
+  "sessions": 136,
+  "largest_session_share_of_calls": "2765/3716",
+  "largest_session_share_of_parsed_privileged": "291/291",
+  "subagent_calls": 2122
+ }
+}

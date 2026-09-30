@@ -397,6 +397,17 @@ def score() -> dict:
     return res
 
 
+def _concentration() -> dict:
+    """How much of the corpus one session carries (reported: the replay is not 169 independent sessions)."""
+    calls = load_calls()
+    by = Counter(c["session"] for c in calls)
+    priv = Counter(c["session"] for c in calls if any(e["class"] == "privileged" for e in c["effects"]))
+    top, n = by.most_common(1)[0]
+    return {"sessions": len(by), "largest_session_share_of_calls": f"{n}/{len(calls)}",
+            "largest_session_share_of_parsed_privileged": f"{priv.get(top, 0)}/{sum(priv.values())}",
+            "subagent_calls": sum(1 for c in calls if c["subagent"])}
+
+
 # ---------------------------------------------------------------------------------------------------------
 def latency(n: int = 360) -> dict:
     """Wall time of the real hook (fresh interpreter per call, as Claude Code runs it)."""
@@ -455,7 +466,9 @@ if __name__ == "__main__":
         sample()
     elif cmd == "score":
         out = score()
-        out["latency"] = latency() if "--latency" in sys.argv else None
+        lat = os.path.join(PRIVATE, "latency.json")
+        out["latency"] = latency() if "--latency" in sys.argv else (json.load(open(lat)) if os.path.exists(lat) else None)
+        out["concentration"] = _concentration()
         dest = os.path.join(HERE, "results_v0.json")
         with open(dest, "w") as fh:
             json.dump(out, fh, indent=1)
