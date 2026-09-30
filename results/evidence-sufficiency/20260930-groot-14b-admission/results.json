@@ -1,0 +1,198 @@
+{
+ "schema": "z0int.evidence_sufficiency_admission.v1",
+ "preregistration_commit": "5d28db7",
+ "base_commit": "b072468",
+ "bar": {
+  "accuracy_min": 44,
+  "n": 48,
+  "confident_errors_max": 1,
+  "confidence_threshold": 0.9,
+  "warm_p50_ms_max": 500,
+  "warm_definition": "median ms over rows 2-48 (row 1 is the cold load)"
+ },
+ "baseline": {
+  "arm": "groot_qwen3_8b_q4",
+  "accuracy": 43,
+  "confident_errors": 1,
+  "warm_p50_ms": 89.8,
+  "sha256": "3b0574870dc6088e1f406a49113a8d9af646d1e310751b8c9b0bc5bfe874a888"
+ },
+ "jev": {
+  "accuracy": 46
+ },
+ "arms": {
+  "groot_qwen3_14b_q4": {
+   "model": "qwen3-14b-q4km",
+   "gguf": "Qwen/Qwen3-14B-GGUF@530227a7d994db8eca5ab5ced2fb692b614357fd Qwen3-14B-Q4_K_M.gguf",
+   "gguf_sha256_verified_on_groot": "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0",
+   "vram_llama_server_mib": 9878,
+   "vram_gpu_total_used_mib": 10625,
+   "started_utc": "2026-09-30T22:29:44Z",
+   "results_file": "groot_qwen3_14b_q4.jsonl",
+   "results_sha256": "b6898cb27bab6ce8753c079b5e5972aa387b029528b61622341964c520ee8a2a",
+   "accuracy": 44,
+   "n": 48,
+   "confident_errors": 1,
+   "confident_error_ids": [
+    "6149a17bc154f9c5b4a0"
+   ],
+   "errors": [
+    {
+     "id": "6149a17bc154f9c5b4a0",
+     "gold": "supported",
+     "pred": "contradicted",
+     "conf": 0.944
+    },
+    {
+     "id": "0ebd299739302d8b057b",
+     "gold": "supported",
+     "pred": "contradicted",
+     "conf": 0.535
+    },
+    {
+     "id": "843185706adff0c60f8b",
+     "gold": "insufficient",
+     "pred": "contradicted",
+     "conf": 0.511
+    },
+    {
+     "id": "37cebc3792e98049439f",
+     "gold": "supported",
+     "pred": "contradicted",
+     "conf": 0.794
+    }
+   ],
+   "warm_p50_ms": 106.7,
+   "all_p50_ms": 107.1,
+   "warm_p90_ms": 120.2,
+   "warm_max_ms": 602.2,
+   "cold_first_item_ms": 17565,
+   "disagreements_vs_8b_q4": [
+    {
+     "id": "1105577da4c8dad4609d",
+     "gold": "supported",
+     "baseline": "contradicted",
+     "arm": "supported"
+    },
+    {
+     "id": "0ebd299739302d8b057b",
+     "gold": "supported",
+     "baseline": "insufficient",
+     "arm": "contradicted"
+    },
+    {
+     "id": "843185706adff0c60f8b",
+     "gold": "insufficient",
+     "baseline": "insufficient",
+     "arm": "contradicted"
+    },
+    {
+     "id": "b863998d4be2721a5dfd",
+     "gold": "contradicted",
+     "baseline": "insufficient",
+     "arm": "contradicted"
+    },
+    {
+     "id": "37cebc3792e98049439f",
+     "gold": "supported",
+     "baseline": "insufficient",
+     "arm": "contradicted"
+    }
+   ],
+   "admitted": true
+  },
+  "groot_qwen3_8b_q6": {
+   "model": "qwen3-8b-q6k",
+   "gguf": "Qwen/Qwen3-8B-GGUF@7c41481f57cb95916b40956ab2f0b139b296d974 Qwen3-8B-Q6_K.gguf",
+   "gguf_sha256_verified_on_groot": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6",
+   "vram_llama_server_mib": 7470,
+   "vram_gpu_total_used_mib": 8209,
+   "started_utc": "2026-09-30T22:30:22Z",
+   "results_file": "groot_qwen3_8b_q6.jsonl",
+   "results_sha256": "263f433b0fbd56a335f744b4be2e1d0c2a9b6bdbacf2c03e2fd542d3b9ad41af",
+   "accuracy": 43,
+   "n": 48,
+   "confident_errors": 1,
+   "confident_error_ids": [
+    "37cebc3792e98049439f"
+   ],
+   "errors": [
+    {
+     "id": "f46f392ef9e9e9df564b",
+     "gold": "insufficient",
+     "pred": "contradicted",
+     "conf": 0.505
+    },
+    {
+     "id": "1105577da4c8dad4609d",
+     "gold": "supported",
+     "pred": "insufficient",
+     "conf": 0.505
+    },
+    {
+     "id": "0ebd299739302d8b057b",
+     "gold": "supported",
+     "pred": "insufficient",
+     "conf": 0.519
+    },
+    {
+     "id": "b863998d4be2721a5dfd",
+     "gold": "contradicted",
+     "pred": "insufficient",
+     "conf": 0.672
+    },
+    {
+     "id": "37cebc3792e98049439f",
+     "gold": "supported",
+     "pred": "insufficient",
+     "conf": 0.977
+    }
+   ],
+   "warm_p50_ms": 83.9,
+   "all_p50_ms": 84.0,
+   "warm_p90_ms": 92.2,
+   "warm_max_ms": 96.7,
+   "cold_first_item_ms": 11396,
+   "disagreements_vs_8b_q4": [
+    {
+     "id": "f46f392ef9e9e9df564b",
+     "gold": "insufficient",
+     "baseline": "insufficient",
+     "arm": "contradicted"
+    },
+    {
+     "id": "6149a17bc154f9c5b4a0",
+     "gold": "supported",
+     "baseline": "contradicted",
+     "arm": "supported"
+    },
+    {
+     "id": "1105577da4c8dad4609d",
+     "gold": "supported",
+     "baseline": "contradicted",
+     "arm": "insufficient"
+    }
+   ],
+   "admitted": false
+  }
+ },
+ "co_residency_with_qwen3_8b_q4km": {
+  "qwen3_14b_q4km": {
+   "fits": false,
+   "observed": "8B resident (6000 MiB) -> 14B load: HTTP 500 'failed to load' (cudaMalloc OOM allocating 8161.75 MiB; common_fit_params aborts because -ngl 99 is user-set); 8B stays loaded and keeps answering. Reverse: 14B resident (9872 MiB) -> 8B load: HTTP 500. The router does not evict a resident model to make room while under --models-max 2; the second model fails until the first is unloaded or idle-sleeps (900 s)."
+  },
+  "qwen3_8b_q6k": {
+   "fits": "not tested live; 7470 + 6000 MiB exceeds 12288 MiB, so no"
+  }
+ },
+ "deviations": [
+  "Before any model call, the first arm-A invocation crashed on import (tokenomics missing from the fresh venv; fixed by installing the pinned [test] extra). No row was written or any request sent; the log of that crash was discarded and the arm was then run once.",
+  "Between arm A and arm B the 14B was unloaded via POST /models/unload so the 8B Q6_K load would not OOM against it (not stated in the pre-registration; infrastructure only)."
+ ],
+ "decision": {
+  "groot_qwen3_14b_q4": "ADMITTED (at the bar: 44/48, 1 confident error, warm p50 106.7 ms)",
+  "groot_qwen3_8b_q6": "NOT ADMITTED (43/48)",
+  "local_order_changed": false,
+  "groot_default_model_changed": false
+ }
+}
