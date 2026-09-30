@@ -1,18 +1,17 @@
 """OptMem-style temporal projection over the canonical z0 EventLog.
 
-This is a structural P0 baseline, not a semantic summarizer. It proves the hard
-memory invariants first:
+P0 proves structure, not semantic summarization:
 
-- the EventLog stays canonical and immutable;
-- TREE is a rebuildable cache;
-- nodes use deterministic aligned power-of-two addresses;
-- older history is represented by coarse nodes;
-- the newest tail stays as raw canonical event records;
-- sticky historical events force local expansion instead of global retiling;
-- zoom() returns exact canonical event payloads with provenance.
+- events.jsonl remains canonical;
+- TREE is a rebuildable O(log n) age-decay cache, not another event copy;
+- persisted nodes are the current aligned dyadic cover of coarse history;
+- recent events remain raw;
+- appends after nap remain raw without changing the coarse revision;
+- sticky old events expand only their local node path;
+- zoom() resolves exact canonical payloads.
 
-A learned or LLM nap summarizer can replace the structural summary later
-without changing addressing, provenance, cover, or zoom semantics.
+A learned nap summarizer can later replace the structural node summary without
+changing addresses, provenance, cover, or zoom semantics.
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ import shutil
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 from .event_log import EventLog, MemoryEvent
 
@@ -108,12 +107,6 @@ def _estimate_tokens(value: Any) -> int:
     return max(1, math.ceil(len(_canonical(value)) / 4))
 
 
-def _counter_sum(a: Mapping[str, int], b: Mapping[str, int]) -> dict[str, int]:
-    out = Counter({str(k): int(v) for k, v in a.items()})
-    out.update({str(k): int(v) for k, v in b.items()})
-    return dict(sorted(out.items()))
-
-
 def _dyadic_cover(end: int) -> list[tuple[int, int]]:
     """Canonical aligned power-of-two cover of [0,end)."""
     if end < 0:
@@ -159,97 +152,67 @@ class OptMemTree:
             os.fsync(out.fileno())
         os.replace(tmp, path)
 
-    def _leaf(self, event: MemoryEvent) -> TreeNode:
+    def _summarize_segment(
+        self,
+        events: Sequence[MemoryEvent],
+        start: int,
+        size: int,
+    ) -> TreeNode:
+        if size <= 0 or size & (size - 1) or start % size:
+            raise ValueError("segment must be an aligned power of two")
+        end = start + size
+        if end > len(events):
+            raise ValueError("segment exceeds event snapshot")
+        segment = events[start:end]
+        if not segment:
+            raise ValueError("empty segment")
+        event_types = dict(sorted(Counter(e.event_type for e in segment).items()))
+        sources = dict(sorted(Counter(e.source for e in segment).items()))
         semantic = {
-            "level": 0,
-            "start": event.event_id,
-            "end": event.event_id + 1,
-            "event_types": {event.event_type: 1},
-            "sources": {event.source: 1},
-            "first_checksum": event.checksum,
-            "last_checksum": event.checksum,
-        }
-        return TreeNode(
-            level=0,
-            start_event_id=event.event_id,
-            end_event_id=event.event_id + 1,
-            event_count=1,
-            event_types={event.event_type: 1},
-            sources={event.source: 1},
-            first_checksum=event.checksum,
-            last_checksum=event.checksum,
-            digest=_digest(semantic),
-        )
-
-    def _parent(self, left: TreeNode, right: TreeNode) -> TreeNode:
-        if left.level != right.level or left.end_event_id != right.start_event_id:
-            raise ValueError("children are not adjacent peers")
-        size = left.size + right.size
-        if size & (size - 1):
-            raise ValueError("parent size is not a power of two")
-        level = left.level + 1
-        start = left.start_event_id
-        if start % size:
-            raise ValueError("parent is not aligned")
-        event_types = _counter_sum(left.event_types, right.event_types)
-        sources = _counter_sum(left.sources, right.sources)
-        semantic = {
-            "level": level,
+            "level": size.bit_length() - 1,
             "start": start,
-            "end": right.end_event_id,
-            "children": [left.digest, right.digest],
+            "end": end,
             "event_types": event_types,
             "sources": sources,
-            "first_checksum": left.first_checksum,
-            "last_checksum": right.last_checksum,
+            "event_checksums": [e.checksum for e in segment],
         }
         return TreeNode(
-            level=level,
+            level=size.bit_length() - 1,
             start_event_id=start,
-            end_event_id=right.end_event_id,
-            event_count=left.event_count + right.event_count,
+            end_event_id=end,
+            event_count=size,
             event_types=event_types,
             sources=sources,
-            first_checksum=left.first_checksum,
-            last_checksum=right.last_checksum,
+            first_checksum=segment[0].checksum,
+            last_checksum=segment[-1].checksum,
             digest=_digest(semantic),
         )
 
     def nap(self) -> dict[str, Any]:
-        """Rebuild the projection for the currently committed event prefix."""
+        """Rebuild only the current coarse cover; raw events remain in EventLog."""
         events = list(self.event_log.iter_events())
+        n = len(events)
+        coarse_end = max(0, n - self.raw_tail_events)
+        segments = _dyadic_cover(coarse_end)
+
+        if self.nodes_dir.exists():
+            shutil.rmtree(self.nodes_dir)
         self.nodes_dir.mkdir(parents=True, exist_ok=True)
 
-        nodes: dict[tuple[int, int], TreeNode] = {}
-        for event in events:
-            node = self._leaf(event)
-            nodes[(0, event.event_id)] = node
-            self._write_json_atomic(self._node_path(0, event.event_id), node.to_dict())
+        nodes: list[TreeNode] = []
+        for start, size in segments:
+            node = self._summarize_segment(events, start, size)
+            nodes.append(node)
+            self._write_json_atomic(self._node_path(node.level, start), node.to_dict())
 
-        level = 1
-        size = 2
-        n = len(events)
-        while size <= n:
-            half = size // 2
-            for start in range(0, n - size + 1, size):
-                left = nodes[(level - 1, start)]
-                right = nodes[(level - 1, start + half)]
-                parent = self._parent(left, right)
-                nodes[(level, start)] = parent
-                self._write_json_atomic(self._node_path(level, start), parent.to_dict())
-            level += 1
-            size *= 2
-
-        coarse_end = max(0, n - self.raw_tail_events)
-        coarse_segments = _dyadic_cover(coarse_end)
-        coarse_nodes = [self._load_segment(nodes, start, size) for start, size in coarse_segments]
-        coarse_hash = _digest([node.digest for node in coarse_nodes])
+        coarse_hash = _digest([node.digest for node in nodes])
         manifest = {
             "schema": SCHEMA,
             "event_count": n,
             "raw_tail_events": self.raw_tail_events,
             "coarse_end": coarse_end,
-            "coarse_cover": [node.address for node in coarse_nodes],
+            "coarse_cover": [node.address for node in nodes],
+            "coarse_node_count": len(nodes),
             "coarse_history_hash": coarse_hash,
             "event_log_last_id": events[-1].event_id if events else None,
             "event_log_last_checksum": events[-1].checksum if events else None,
@@ -258,20 +221,11 @@ class OptMemTree:
         self._write_json_atomic(self.manifest_path, manifest)
         return manifest
 
-    def _load_segment(
-        self,
-        cache: Mapping[tuple[int, int], TreeNode] | None,
-        start: int,
-        size: int,
-    ) -> TreeNode:
-        if size <= 0 or size & (size - 1) or start % size:
-            raise ValueError("segment must be aligned power of two")
+    def _load_node(self, start: int, size: int) -> TreeNode:
         level = size.bit_length() - 1
-        if cache is not None and (level, start) in cache:
-            return cache[(level, start)]
         path = self._node_path(level, start)
         if not path.is_file():
-            raise FileNotFoundError(f"missing OptMem node {level}:{start}; run nap()")
+            raise FileNotFoundError(f"missing OptMem cover node L{level}:{start}; run nap()")
         return TreeNode.from_dict(json.loads(path.read_text(encoding="utf-8")))
 
     def manifest(self) -> dict[str, Any]:
@@ -290,19 +244,25 @@ class OptMemTree:
 
     def _expand_segment(
         self,
+        events: Sequence[MemoryEvent],
         start: int,
         size: int,
         sticky: set[int],
+        *,
+        root_segment: bool,
     ) -> list[dict[str, Any]]:
-        contained = [event_id for event_id in sticky if start <= event_id < start + size]
-        if not contained:
-            return [{"kind": "summary", "node": self._load_segment(None, start, size).to_dict()}]
+        has_sticky = any(start <= event_id < start + size for event_id in sticky)
+        if not has_sticky:
+            node = self._load_node(start, size) if root_segment else self._summarize_segment(events, start, size)
+            return [{"kind": "summary", "node": node.to_dict()}]
         if size == 1:
             event = self.event_log.get(start, resolve_blob=True)
             return [{"kind": "raw", "event": event.to_dict(), "sticky": True}]
         half = size // 2
-        return self._expand_segment(start, half, sticky) + self._expand_segment(
-            start + half, half, sticky
+        return self._expand_segment(
+            events, start, half, sticky, root_segment=False
+        ) + self._expand_segment(
+            events, start + half, half, sticky, root_segment=False
         )
 
     def cover(
@@ -323,12 +283,14 @@ class OptMemTree:
         if any(x < 0 or x >= len(events) for x in sticky):
             raise ValueError("sticky event id outside canonical event range")
 
-        old_end = max(0, nap_count - self.raw_tail_events)
+        old_end = int(manifest["coarse_end"])
         items: list[dict[str, Any]] = []
         for start, size in _dyadic_cover(old_end):
-            items.extend(self._expand_segment(start, size, sticky))
+            items.extend(
+                self._expand_segment(events, start, size, sticky, root_segment=True)
+            )
 
-        # The nap-time recent tail and every event appended since the nap stay raw.
+        # Nap-time recent tail + post-nap appends are raw and exact.
         for event_id in range(old_end, len(events)):
             event = self.event_log.get(event_id, resolve_blob=True)
             items.append(
