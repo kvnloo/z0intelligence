@@ -114,10 +114,21 @@ a source-revision change changes `semantic_id`.
 }
 ```
 
-## Known limitation → next slice
+## Question scoping and the #53 falsification test
 
-v0 inherits the packet's **repo-level** required facts, so an unrelated contradiction
-(`docs.priority` above) blocks `ACT` for a question about the Bend session. The falsification test in
-#53 ("weaken this if the State Packet alone suffices") hinges on **question scoping**: derive the
-facts a request actually depends on, then block/ask only on those. Next: scoped `required` facts +
-a frozen state-sufficiency cohort scored against the deterministic gate and the packet alone.
+`scoped=True` (default) maps the request to packet fact families (`FACT_FAMILIES`, authored from the
+packet key namespace only); only unknowns/contradictions in those families block, and a required family
+with no claim becomes an explicit unknown (`source_unavailable` when the source was never collected).
+
+Pre-registered test (`benchmarks/decision_opportunity/falsification.py`, committed in 402d622 before any
+run) on the 11 pinned held-out questions, deterministic arms only:
+
+| arm | strict | answer | abstain | conflict | false ACT |
+| --- | --- | --- | --- | --- | --- |
+| packet alone | 2/11 | 0/8 | 2/2 | 0/1 | 0 |
+| DecisionOpportunity, repo scope | 3/11 | 0/8 | 2/2 | 1/1 | 0 |
+| **DecisionOpportunity, question scope** | **8/11** | 5/8 | 2/2 | 1/1 | **0** |
+
+The contract survives its falsification rule. All three misses are ASK (the safe side) and trace to a
+State Packet gap: sub-agent-only transcripts leave `conv.latest_session` unknown although the facts exist.
+Caveats: n=11, one snapshot; the vocabulary was written after seeing one pinned prompt (not its key).
