@@ -45,6 +45,8 @@ READ_ONLY_TOOLS = [
     "Bash(grep:*)", "Bash(rg:*)", "Bash(jq:*)", "Bash(cat:*)", "Bash(date:*)",
 ]
 GH_READ_TOOLS = ["Bash(gh issue list:*)", "Bash(gh issue view:*)", "Bash(gh pr list:*)", "Bash(gh pr view:*)"]
+# User-installed z0 plugins must never leak a second packet/obspack into any arm.
+NO_INSTALLED_Z0 = {"z0intelligence@z0intelligence": False, "z0-obspack@z0intelligence": False}
 LEAN = ["--setting-sources", "project", "--strict-mcp-config", "--disable-slash-commands"]
 def history_hint() -> str:
     where = "~/.claude/projects/" if PROJECTS == DEFAULT_PROJECTS else f"{PROJECTS}/"
@@ -57,7 +59,8 @@ def hook_settings(z0home: Path) -> str:
     if os.environ.get("Z0INT_CLAUDE_PROJECTS"):  # failure injection: conversation source removed
         gh += f" Z0INT_CLAUDE_PROJECTS={os.environ['Z0INT_CLAUDE_PROJECTS']}"
     cmd = f"env Z0INT_HOME={z0home}{gh} {PY} -m z0int.state_packet --hook --max-tokens 1500"
-    return json.dumps({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": cmd, "timeout": 60}]}]}})
+    return json.dumps({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": cmd, "timeout": 60}]}]},
+                       "enabledPlugins": NO_INSTALLED_Z0})
 
 
 def run_claude(q: dict, arm: str, args: argparse.Namespace, contract: str, z0home: Path) -> dict:
@@ -70,6 +73,8 @@ def run_claude(q: dict, arm: str, args: argparse.Namespace, contract: str, z0hom
         cmd += ["--effort", args.effort]
     if arm in ("packet_only", "packet_tools"):
         cmd += ["--settings", hook_settings(z0home)]
+    else:
+        cmd += ["--settings", json.dumps({"enabledPlugins": NO_INSTALLED_Z0})]
     if arm == "packet_only":
         cmd += ["--tools", ""]
     else:
