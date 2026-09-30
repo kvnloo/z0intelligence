@@ -601,6 +601,12 @@ def build_parser() -> argparse.ArgumentParser:
     po.add_argument("--log", action="store_true", help="Append a snapshot to ~/.z0int/state/posture/history.jsonl")
     _json_flag(po)
 
+    prm = sub.add_parser("promote", help="Promotion Authority (shadow): may a nightly branch graduate to default?")
+    prm_sub = prm.add_subparsers(dest="promote_cmd", required=True)
+    prc = prm_sub.add_parser("check", help="Per-branch ACT/OBSERVE/ASK/ABSTAIN/ESCALATE over a nightly manifest",
+                             add_help=False)
+    prc.add_argument("promote_args", nargs=argparse.REMAINDER, help="see `z0int promote check --help`")
+
     pf = sub.add_parser("preflight", help="z0intelligence production preflight (no Evolution Lab)")
     pf.add_argument("prompt")
     pf.add_argument("--capability-id", default=None)
@@ -882,6 +888,9 @@ def _cmd_task(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:2] == ["promote", "check"]:  # own argparse (flags would otherwise hit the root parser)
+        from .promotion import main as promotion_main
+        return promotion_main(argv[2:])
     parser = build_parser()
     args = parser.parse_args(argv)
     as_json = bool(getattr(args, "as_json", False))
@@ -1066,6 +1075,10 @@ def main(argv: list[str] | None = None) -> int:
             )
             _print(out, as_json=as_json)
             return 0 if out.get("ok") else 1
+
+    if args.cmd == "promote":
+        from .promotion import main as promotion_main
+        return promotion_main(list(args.promote_args))
 
     if args.cmd == "posture":
         from .posture import main as posture_main
