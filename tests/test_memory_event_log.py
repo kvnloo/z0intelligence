@@ -56,6 +56,18 @@ class EventLogTests(unittest.TestCase):
         self.log.index_path.write_text(lines[0] + "\n")
         self.assertEqual(self.log.get(2).payload, {"i": 2})
 
+
+    def test_append_repairs_truncated_index_before_writing_next_row(self):
+        for i in range(3):
+            self.log.append("test.event", {"i": i}, source="test")
+        lines = self.log.index_path.read_text().splitlines()
+        self.log.index_path.write_text(lines[0] + "\n")
+        fourth = self.log.append("test.event", {"i": 3}, source="test")
+        self.assertEqual(fourth.event_id, 3)
+        self.assertEqual(len(self.log.index_path.read_text().splitlines()), 4)
+        self.assertEqual(self.log.get(2).payload, {"i": 2})
+        self.assertEqual(self.log.get(3).payload, {"i": 3})
+
     def test_checksum_tamper_fails_closed(self):
         self.log.append("test.event", {"value": "safe"}, source="test")
         row = json.loads(self.log.events_path.read_text())
