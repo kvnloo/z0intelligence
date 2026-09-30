@@ -96,3 +96,19 @@ def test_session_start_packet_is_opt_in(monkeypatch):
     monkeypatch.setenv('Z0INT_CLAUDE_CODE_PACKET', '1')
     monkeypatch.setattr(sp, 'session_start_hook', lambda text, max_tokens: {'hookSpecificOutput': {'hookEventName': 'SessionStart', 'additionalContext': f'packet {max_tokens}'}})
     assert claude_code.on_session_start('{}')['hookSpecificOutput']['additionalContext'] == 'packet 1500'
+
+
+def test_host_config_drives_packet_and_shadow(monkeypatch, tmp_path):
+    import json as _json
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
+    for name in ('Z0INT_CLAUDE_CODE_PACKET', 'Z0INT_CLAUDE_CODE_SHADOW'):
+        monkeypatch.delenv(name, raising=False)
+    assert claude_code.shadow() is True and claude_code.config() == {}
+    (tmp_path / 'config').mkdir()
+    (tmp_path / 'config' / 'claude-code.json').write_text(_json.dumps({'shadow': False, 'packet': True}))
+    assert claude_code.shadow() is False
+    import z0int.state_packet as sp
+    monkeypatch.setattr(sp, 'session_start_hook', lambda text, max_tokens: {'hookSpecificOutput': {'hookEventName': 'SessionStart', 'additionalContext': 'p'}})
+    assert claude_code.on_session_start('{}') is not None
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_PACKET', '0')  # env overrides config
+    assert claude_code.on_session_start('{}') is None

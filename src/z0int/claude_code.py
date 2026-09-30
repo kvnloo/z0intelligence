@@ -17,9 +17,18 @@ HARNESS = 'claude-code'
 USAGE_KEYS = ('input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens')
 
 
+def config():
+    """Host settings for interactive sessions (env vars still override): ~/.z0int/config/claude-code.json."""
+    try:
+        return json.loads((paths.home() / 'config' / 'claude-code.json').read_text())
+    except (OSError, ValueError):
+        return {}
+
+
 def shadow():
     # Shadow is the default: route and record, never change what the model sees.
-    return os.environ.get('Z0INT_CLAUDE_CODE_SHADOW', '1') != '0'
+    env = os.environ.get('Z0INT_CLAUDE_CODE_SHADOW')
+    return env != '0' if env is not None else config().get('shadow', True) is not False
 
 
 def turn_id(hook):
@@ -113,7 +122,8 @@ def on_stop(hook, root=None):
 def on_session_start(stdin_text):
     # Opt-in: measured as an aid to tools (held-out 14/14 vs 12/14, -30% input tokens),
     # not a replacement for them; off by default until a per-host A/B says otherwise.
-    if os.environ.get('Z0INT_CLAUDE_CODE_PACKET') != '1':
+    env = os.environ.get('Z0INT_CLAUDE_CODE_PACKET')
+    if not (env == '1' if env is not None else config().get('packet') is True):
         return None
     from .state_packet import session_start_hook
     out = session_start_hook(stdin_text, max_tokens=int(os.environ.get('Z0INT_CLAUDE_CODE_PACKET_TOKENS', '1500')))

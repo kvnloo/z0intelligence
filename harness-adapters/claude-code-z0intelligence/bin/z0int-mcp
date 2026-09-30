@@ -1,0 +1,3 @@
+#!/bin/sh
+# Resolve the z0int runtime for the MCP server (installed plugins run from the plugin cache).
+exec "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.intelligence_mcp "$@"
