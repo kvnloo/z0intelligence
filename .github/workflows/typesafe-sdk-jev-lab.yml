@@ -1,0 +1,31 @@
+name: TypeSafe SDK Jev Lab
+
+on:
+  pull_request:
+    branches: [lab/agentweb-emma-v0]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sdk-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest==8.4.2 typesafe-sdk==0.7.2
+      - name: Official SDK wire-contract tests
+        env:
+          PYTHONPATH: src
+        run: python -m pytest -q tests/test_typesafe_sdk_jev.py
+      - name: Existing AgentWeb authority regression slice
+        env:
+          PYTHONPATH: src
+        run: python -m pytest -q tests/test_agentweb_choice_experiment.py tests/test_agentweb_noul_experiment.py tests/test_agentweb_integration.py
