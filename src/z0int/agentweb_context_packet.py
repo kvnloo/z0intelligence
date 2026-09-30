@@ -388,10 +388,11 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
     def render() -> tuple[dict[str, Any], int]:
         packet.evidence = refs
         projection = project_to_aodl_fields(packet)
-        # Do not duplicate private excerpts into the AODL structural projection.
-        # The canonical packet evidence owns the excerpt text; the projection only
-        # needs provenance/address/trust metadata to remain reconstructable.
-        projection["contextEvidence"] = [
+        # The canonical packet is the only owner of private excerpt text. The
+        # AODL projection is structural metadata only, so remove the generic
+        # projection's excerpt-bearing evidence field instead of keeping a
+        # second copy beside contextEvidence.
+        safe_context_evidence = [
             {
                 key: value
                 for key, value in ref.to_dict().items()
@@ -399,13 +400,33 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
             }
             for ref in refs
         ]
+        projection.pop("evidence", None)
+        projection["contextEvidence"] = safe_context_evidence
         packet.aodl_projection = projection
+
+        # Budget the object that is actually returned. packet_bytes and
+        # compression_ratio are part of that object, so converge them into the
+        # serialized size instead of measuring a pre-measurement projection.
+        packet.measurements.pop("packet_bytes", None)
+        packet.measurements.pop("compression_ratio", None)
+        input_bytes = max(1, packet.measurements["input_content_bytes"])
+        previous_size = -1
+        for _ in range(8):
+            value = packet.to_dict()
+            size = _json_bytes(value)
+            packet.measurements["packet_bytes"] = size
+            packet.measurements["compression_ratio"] = size / input_bytes
+            if size == previous_size:
+                break
+            previous_size = size
+
         value = packet.to_dict()
         size = _json_bytes(value)
-        value["measurements"]["packet_bytes"] = size
-        value["measurements"]["compression_ratio"] = (
-            size / max(1, value["measurements"]["input_content_bytes"])
-        )
+        if packet.measurements.get("packet_bytes") != size:
+            packet.measurements["packet_bytes"] = size
+            packet.measurements["compression_ratio"] = size / input_bytes
+            value = packet.to_dict()
+            size = _json_bytes(value)
         return value, size
 
     result, size = render()
