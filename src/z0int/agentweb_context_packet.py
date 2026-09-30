@@ -387,7 +387,19 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
 
     def render() -> tuple[dict[str, Any], int]:
         packet.evidence = refs
-        packet.aodl_projection = project_to_aodl_fields(packet)
+        projection = project_to_aodl_fields(packet)
+        # Do not duplicate private excerpts into the AODL structural projection.
+        # The canonical packet evidence owns the excerpt text; the projection only
+        # needs provenance/address/trust metadata to remain reconstructable.
+        projection["contextEvidence"] = [
+            {
+                key: value
+                for key, value in ref.to_dict().items()
+                if key != "excerpt"
+            }
+            for ref in refs
+        ]
+        packet.aodl_projection = projection
         value = packet.to_dict()
         size = _json_bytes(value)
         value["measurements"]["packet_bytes"] = size
