@@ -8,6 +8,7 @@ Hermes (`pre_llm_call`), OMP (`before_agent_start`) and DSH (`llm/stream`) use.
 | `UserPromptSubmit` | `z0int.claude_code prompt` → `automatic.handle_event` | shadow: routed and receipted, never injected |
 | `Stop`, `SessionEnd` | `z0int.claude_code stop` → Tokenomics `claude-code.provider_usage.v0` | on |
 | `SessionStart` | `z0int.claude_code session-start` → State Packet `additionalContext` | off (opt-in `Z0INT_CLAUDE_CODE_PACKET=1`) |
+| `SessionStart`, `UserPromptSubmit` | resource-posture hint: one line, only when the session's posture changes ([docs](../../docs/resource-posture-v1.md#5-claude-code-hint-one-line-only-on-change)) | shadow: decided and logged, not injected (`Z0INT_CLAUDE_CODE_POSTURE_HINT=on` / `off`) |
 | MCP `route_worker` | `z0int.intelligence_mcp` with `Z0INT_HARNESS=claude-code` | on |
 
 Requires `pip install -e .` of this repo (or `Z0INT_PYTHON` pointing at that

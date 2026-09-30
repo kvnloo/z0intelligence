@@ -3,7 +3,16 @@ import json
 import subprocess
 import sys
 
+import pytest
+
 from z0int import automatic, claude_code
+
+
+@pytest.fixture(autouse=True)
+def _no_posture_hint(monkeypatch):
+    # These tests exercise the other hook paths; posture hints have their own tests (test_posture_v1.py)
+    # and must never compute live posture or write host state from here.
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_POSTURE_HINT', 'off')
 
 
 def assistant(mid, model='claude-sonnet-5-5', **usage):

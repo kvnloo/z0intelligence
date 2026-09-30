@@ -86,10 +86,88 @@ def on_opportunity(hook, root=None):
     return record
 
 
+POSTURE_HINT_MODES = ('off', 'shadow', 'on')
+
+
+def posture_hint_mode():
+    """off | shadow (default: decide + record, inject nothing) | on (inject the line)."""
+    env = os.environ.get('Z0INT_CLAUDE_CODE_POSTURE_HINT')
+    mode = env if env is not None else config().get('posture_hint', 'shadow')
+    return mode if mode in POSTURE_HINT_MODES else 'shadow'
+
+
+def posture_hint(hook, event, root=None, posture_fn=None, now=None):
+    """One-line resource-posture hint, only when this session's posture key changes (never every prompt).
+
+    A session's first observation counts as a change only if it is actionable (not BALANCED). Every
+    emitted-or-shadowed hint is appended to state/claude-code/posture-hints.jsonl. Fail-open."""
+    mode = posture_hint_mode()
+    if mode == 'off':
+        return None
+    from datetime import datetime, timezone
+    from .posture import current_posture, hint_key, hint_line
+    now = now or datetime.now(timezone.utc)
+    p = posture_fn() if posture_fn else current_posture(now, kerdoios=False)
+    key = hint_key(p)
+    session = hook.get('session_id') or HARNESS
+    base = paths.ensure_layout(root)['state'] / HARNESS
+    base.mkdir(parents=True, exist_ok=True)
+    state_path = base / 'posture-hint.json'
+    try:
+        state = json.loads(state_path.read_text())
+        sessions = state['sessions'] if isinstance(state.get('sessions'), dict) else {}
+    except (OSError, ValueError, KeyError, AttributeError):
+        sessions = {}
+    prev = (sessions.get(session) or {}).get('key')
+    changed = key != prev if prev is not None else p['factory']['posture'] != 'BALANCED'
+    stamp = now.strftime('%Y-%m-%dT%H:%M:%SZ')
+    sessions[session] = {'key': key, 'at': stamp}
+    if len(sessions) > 256:  # bounded state: keep the most recently seen sessions
+        sessions = dict(sorted(sessions.items(), key=lambda kv: kv[1].get('at', ''))[-256:])
+    tmp = state_path.with_suffix('.tmp')
+    tmp.write_text(json.dumps({'schema': 'z0int.claude_code.posture_hint_state.v1', 'sessions': sessions}))
+    tmp.replace(state_path)
+    if not changed:
+        return None
+    line = hint_line(p, prev)
+    with (base / 'posture-hints.jsonl').open('a', encoding='utf-8') as fh:
+        fh.write(json.dumps({'schema': 'z0int.claude_code.posture_hint.v1', 'ts': stamp, 'session_id': session,
+                             'event': event, 'key': key, 'previous_key': prev, 'line': line, 'mode': mode,
+                             'delivered': mode == 'on', 'revision': p.get('revision')}) + '\n')
+    return line if mode == 'on' else None
+
+
+def _with_context(output, event, extra):
+    """Append one line of additionalContext to a hook output (creating it if needed)."""
+    if not extra:
+        return output
+    if not output:
+        return {'hookSpecificOutput': {'hookEventName': event, 'additionalContext': extra}}
+    spec = output.setdefault('hookSpecificOutput', {'hookEventName': event})
+    spec['additionalContext'] = (spec.get('additionalContext') or '') + ('\n' if spec.get('additionalContext') else '') + extra
+    return output
+
+
 def on_prompt(hook):
     text = hook.get('prompt')
     if not isinstance(text, str) or not text.strip():
         return None
+    hint = None
+    if not is_harness_message(text):
+        try:
+            hint = posture_hint(hook, 'UserPromptSubmit')
+        except Exception:
+            hint = None  # a posture failure never affects the turn
+    try:
+        output = _on_prompt(hook, text)
+    except Exception:
+        if hint is None:
+            raise  # unchanged behaviour: main() fails open
+        output = None
+    return _with_context(output, 'UserPromptSubmit', hint)
+
+
+def _on_prompt(hook, text):
     try:
         if not is_harness_message(text):
             emit_opportunity_async(hook)
@@ -199,13 +277,26 @@ def on_stop(hook, root=None):
 
 
 def on_session_start(stdin_text):
+    hint = None
+    try:
+        hook = json.loads(stdin_text) if stdin_text and stdin_text.strip() else {}
+        hint = posture_hint(hook if isinstance(hook, dict) else {}, 'SessionStart')
+    except Exception:
+        hint = None
+    return _with_context(_packet_session_start(stdin_text), 'SessionStart', hint)
+
+
+def _packet_session_start(stdin_text):
     # Opt-in: measured as an aid to tools (held-out 14/14 vs 12/14, -30% input tokens),
     # not a replacement for them; off by default until a per-host A/B says otherwise.
     env = os.environ.get('Z0INT_CLAUDE_CODE_PACKET')
     if not (env == '1' if env is not None else config().get('packet') is True):
         return None
-    from .state_packet import session_start_hook
-    out = session_start_hook(stdin_text, max_tokens=int(os.environ.get('Z0INT_CLAUDE_CODE_PACKET_TOKENS', '1500')))
+    try:
+        from .state_packet import session_start_hook
+        out = session_start_hook(stdin_text, max_tokens=int(os.environ.get('Z0INT_CLAUDE_CODE_PACKET_TOKENS', '1500')))
+    except Exception:
+        return None
     return out if out['hookSpecificOutput']['additionalContext'] else None
 
 
