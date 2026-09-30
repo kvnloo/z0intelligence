@@ -277,3 +277,10 @@ def test_log_snapshot_is_compact_and_identity_free(tmp_path, monkeypatch, capsys
     assert len(rows) == 1 and rows[0]["factory"] == "BURN"
     assert {r["id"] for r in rows[0]["pools"]} >= {"claude:weekly", "cursor:30d"}
     assert "example.com" not in P.history_path().read_text()
+
+
+def test_group_tie_prefers_more_constrained_pool():
+    idle = pool(id="codex:a-reserve", group="codex", remaining=100.0, resets_at=iso(160), burn_rate_per_hour=0.0)
+    busy = pool(id="codex:weekly", group="codex", remaining=50.0, resets_at=iso(74), burn_rate_per_hour=0.5)
+    out = P.evaluate([idle, busy], NOW)
+    assert out["groups"]["codex"]["binding_pool"] == "codex:weekly"
