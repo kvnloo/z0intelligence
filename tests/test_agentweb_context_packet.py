@@ -51,6 +51,10 @@ def test_packet_is_bounded_and_preserves_required_needs():
     packet = result["packet"]
     assert packet["schema"] == "z0int.context_resolve.v1"
     assert packet["measurements"]["packet_bytes"] <= 5000
+    actual_bytes = len(json.dumps(
+        packet, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8"))
+    assert actual_bytes <= 5000
     assert packet["measurements"]["network_model_calls"] == 0
     assert packet["measurements"]["gpu_loaded"] is False
     assert packet["measurements"]["private_text_persisted"] is False
@@ -180,4 +184,5 @@ def test_aodl_projection_does_not_duplicate_private_excerpt():
     serialized = json.dumps(packet)
     assert "PRIVATE-EXCERPT-ONCE" in serialized
     assert "PRIVATE-EXCERPT-ONCE" not in json.dumps(packet["aodl_projection"])
+    assert "evidence" not in packet["aodl_projection"]
     assert packet["aodl_projection"]["contextEvidence"][0]["source_id"].startswith("agentweb-kb:")
