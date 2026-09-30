@@ -102,7 +102,7 @@ Treat these as hypotheses to reproduce, not as guaranteed properties of z0int ba
 Immediate workstream:
 
 1. #24 — integrate the gated benchmark as a benchmark-only local adapter and reproduce the released cached-Jev scorer.
-2. #25 — run the same frozen rows through NanoJev, OpenJev/direct Qwen, and simple controls.
+2. #25 — run the same frozen rows through the legacy NanoJev baseline, OpenJev/direct Qwen, Laya, and simple controls; this is comparison work, not a runtime-default decision.
 3. #14 — extend the existing observer/calibration contract with per-family threshold receipts; never interpret normalized probabilities as globally calibrated confidence.
 4. #28 — make state/context construction an evolvable surface while initially freezing the question pack.
 5. #26 — use the winning pattern as a **shadow-only** multi-question SafetySentinel, never as capability authority.
