@@ -6,7 +6,9 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 EnvironmentFile=%h/.config/z0intelligence/service.env
-ExecStart=/bin/sh -c 'exec "$Z0INT_PYTHON" -m z0int.intelligence_service --bind "$Z0INT_BIND"'
+# Z0INT_BIND_2 (optional) is the host's Kind bridge gateway so hermes-lab pods reach the router;
+# the desktop's established convention. Never a wildcard; tailnet binding is an explicit opt-in.
+ExecStart=/bin/sh -c 'exec "$Z0INT_PYTHON" -m z0int.intelligence_service --bind "$Z0INT_BIND" $${Z0INT_BIND_2:+--bind "$Z0INT_BIND_2"}'
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=125
