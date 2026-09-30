@@ -230,6 +230,43 @@ class StatePacketTests(_Base):
             main(["context", "packet", "--repo", str(self.repo), "--projects-root", str(self.projects), "--render"])
         self.assertTrue(re.search(r"^<z0-state-packet repo=proj", buf.getvalue()))
 
+    def test_priority_conflict_forces_observe_for_plan(self):
+        (self.repo / "AGENTS.md").write_text("# Agents\n\n## Widget export (critical path)\n", encoding="utf-8")
+        p = self.build(intent="plan")
+        conf = [c for c in p["contradictions"] if c["kind"] == "priority_conflict"]
+        self.assertEqual(len(conf), 1)
+        self.assertEqual(len(conf[0]["claims"]), 2)
+        self.assertEqual(p["decision"]["mode"], "OBSERVE")
+        self.assertIn("docs.priority", p["decision"]["missing"])
+        self.assertIn("priority_conflict", sp.render_additional_context(p))
+
+    def test_github_adapter_with_fake_gh(self):
+        _git(self.repo, "remote", "add", "origin", "https://github.com/example/proj.git")
+        bindir = Path(self._tmp.name) / "bin"
+        bindir.mkdir()
+        issues = [{"number": 7, "title": "SYNTHETIC tracker", "updatedAt": "2026-01-01T00:00:00Z",
+                   "body": "## Agent priority\n\n**P0 next slice: widget exporter.**\n"}]
+        prs = [{"number": 9, "title": "SYNTHETIC pr", "headRefName": "feat/x", "isDraft": True,
+                "updatedAt": "2026-01-01T00:00:00Z"}]
+        script = bindir / "gh"
+        script.write_text("#!/bin/sh\nif [ \"$1\" = issue ]; then echo '%s'; else echo '%s'; fi\n"
+                          % (json.dumps(issues), json.dumps(prs)), encoding="utf-8")
+        script.chmod(0o755)
+        prev = os.environ["PATH"]
+        os.environ["PATH"] = f"{bindir}{os.pathsep}{prev}"
+        try:
+            p = self.build(intent="plan", github=True)
+        finally:
+            os.environ["PATH"] = prev
+        self.assertIn("github", p["source_revisions"])
+        gh = next(c for c in p["current_claims"] if c["key"] == "gh.priority[#7]")
+        self.assertEqual(gh["value"]["declares"], "P0 next slice: widget exporter.")
+        self.assertTrue(any(w["kind"] == "open_pr" for w in p["open_work"]))
+        conf = [c for c in p["contradictions"] if c["kind"] == "priority_conflict"]
+        self.assertEqual(len(conf), 1)  # ROADMAP P0 vs GitHub P0
+        self.assertEqual(p["decision"]["mode"], "OBSERVE")
+        self.assertEqual(sp.provenance_complete(p), [])
+
     def test_redact(self):
         self.assertEqual(sp.redact("key ghp_" + "a" * 30 + " mail me@x.io"), "key [redacted] mail [email]")
         self.assertLessEqual(len(sp.redact("x" * 500)), sp.EXCERPT_CHARS)

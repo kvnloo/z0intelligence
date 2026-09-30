@@ -558,10 +558,33 @@ def adapter_github(repo: Path, reader: Reader, *, timeout: float = 15.0) -> Evid
 
 
 def _gh_revision(repo: Path, reader: Reader, timeout: float = 15.0) -> dict[str, str] | None:
-    """Cheap probe: open issue/PR numbers + updatedAt (no bodies)."""
+    """Cheap probe: open issue/PR numbers + updatedAt (no bodies).
+
+    Network calls cost ~1-2s each, so the probe result is reused for
+    ``Z0INT_PACKET_GH_TTL`` seconds (default 300): GitHub-side changes are
+    detected with at most that lag (declared in the packet as ``github_ttl_s``).
+    """
     slug = _gh_slug(repo, reader)
     if not slug:
         return None
+    ttl = float(os.environ.get("Z0INT_PACKET_GH_TTL", "300"))
+    cache = _state_dir(repo) / "gh_revision.json"
+    try:
+        cached = json.loads(cache.read_text(encoding="utf-8")) if cache.is_file() else None
+    except (OSError, ValueError):
+        cached = None
+    if cached and cached.get("value", {}).get("slug") == slug and time.time() - float(cached.get("ts", 0)) < ttl:
+        return cached["value"]
+    value = _gh_revision_live(slug, reader, timeout)
+    if value.get("items") != "unavailable":
+        try:
+            cache.write_text(json.dumps({"ts": time.time(), "value": value}), encoding="utf-8")
+        except OSError:
+            pass
+    return value
+
+
+def _gh_revision_live(slug: str, reader: Reader, timeout: float) -> dict[str, str]:
     items: dict[str, str] = {}
     for kind, limit in (("issue", "40"), ("pr", "20")):
         try:
@@ -1114,6 +1137,7 @@ def build_state_packet(
         "source_revisions": revisions,
         "policy_revision": POLICY_REVISION,
         "coverage": {b.facet: b.coverage for b in bundles},
+        "freshness": {"github_probe_ttl_s": float(os.environ.get("Z0INT_PACKET_GH_TTL", "300"))} if github else {},
         "claims_index": {k: {"id": v["id"], "value": v["value"], "observed_at": v["observed_at"],
                              "material": v["material"]} for k, v in claims.items()},
         "cache": {"key": key, "prior_packet_id": (prior or {}).get("packet_id")},
