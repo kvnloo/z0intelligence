@@ -7,6 +7,7 @@ Hermes (`pre_llm_call`), OMP (`before_agent_start`) and DSH (`llm/stream`) use.
 | --- | --- | --- |
 | `UserPromptSubmit` | `z0int.claude_code prompt` → `automatic.handle_event` | shadow: routed and receipted, never injected |
 | `Stop`, `SessionEnd` | `z0int.claude_code stop` → Tokenomics `claude-code.provider_usage.v0` | on |
+| `PreToolUse` | `z0int.action_hook` → `action_effects` + `authority_check` (z0int#55) | shadow: logs `{session, prompt_id, tool, effects, decision}` to `~/.z0int/state/claude-code/actions.jsonl`; prints nothing, always allows (`Z0INT_ACTION_AUTHORITY=0` disables) |
 | MCP `route_worker` | `z0int.intelligence_mcp` with `Z0INT_HARNESS=claude-code` | on |
 
 Requires `pip install -e .` of this repo (or `Z0INT_PYTHON` pointing at that
