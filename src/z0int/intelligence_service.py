@@ -8,6 +8,7 @@ import time
 from collections import Counter
 from .intelligence import dispatch, route, routing_snapshot, REGISTRY
 from .automatic import dispatch_event, consume
+from .decision_experiment import run_choice_experiment
 
 SLOTS=threading.BoundedSemaphore(4)
 METRIC_LOCK=threading.Lock()
@@ -108,7 +109,7 @@ class Handler(BaseHTTPRequestHandler):
                 METRICS['dispatch_active']+=1
                 METRICS['dispatch_peak']=max(METRICS['dispatch_peak'],METRICS['dispatch_active'])
             try:
-                result=(dispatch_event(args) if self.path=='/v1/automatic' else (__import__('z0int.decision_experiment', fromlist=['run_choice_experiment']).run_choice_experiment(args) if self.path=='/v1/experimental/choice' else dispatch(args)))
+                result=(dispatch_event(args) if self.path=='/v1/automatic' else (run_choice_experiment(args) if self.path=='/v1/experimental/choice' else dispatch(args)))
                 metric('dispatch_replayed_total' if result.get('replayed') else 'dispatch_new_total')
                 metric('dispatch_ok_total' if result.get('ok') else 'dispatch_failed_total')
             finally:
