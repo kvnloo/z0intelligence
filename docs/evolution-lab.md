@@ -60,7 +60,7 @@ Environment overrides:
 ## Manual setup
 
 ```bash
-# 1. OpenJev (this repo)
+# 1. z0intelligence (this repo)
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[test]'
 
@@ -68,15 +68,15 @@ pip install -e '.[test]'
 git clone https://github.com/kvnloo/evolution-lab.git ../evolution-lab
 cd ../evolution-lab && git checkout nightly
 pip install -e .
-cd -  # back to openjev
+cd -  # back to z0intelligence
 
 # 3. Lock experiment splits (deterministic, in git)
 python -m evolution_lab lock-splits
 python -m evolution_lab lock-jev-splits
 ```
 
-For GPU Route A Jev training, OpenJev is already installed. You do **not** need
-`pip install -e '.[openjev]'` on evolution-lab when OpenJev is editable from this tree.
+For GPU Route A Jev training, the legacy OpenJev substrate is already installed from this tree. You do **not** need
+`pip install -e '.[openjev]'` on evolution-lab when this z0intelligence checkout is editable.
 
 ## Two evolution tracks
 
