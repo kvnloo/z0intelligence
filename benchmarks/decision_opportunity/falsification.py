@@ -35,7 +35,7 @@ def main():
     packets, rows = {}, []
     for q in qs:
         if q['repo'] not in packets:
-            packets[q['repo']] = build_state_packet(PINNED / q['repo'], projects_root=PINNED / 'projects')
+            packets[q['repo']] = build_state_packet(PINNED / q['repo'], projects_root=PINNED / 'projects', adapters=('git', 'docs', 'claude_code'))
         pkt = packets[q['repo']]
         gold = q['key']['action']
         preds = {

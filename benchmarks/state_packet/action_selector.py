@@ -32,7 +32,7 @@ def cohort():
     packets = {}
     for q in qs:
         if q['repo'] not in packets:
-            pkt = build_state_packet(PINNED / q['repo'], projects_root=PINNED / 'projects')
+            pkt = build_state_packet(PINNED / q['repo'], projects_root=PINNED / 'projects', adapters=('git', 'docs', 'claude_code'))
             packets[q['repo']] = render_additional_context(pkt, max_tokens=1500)
         yield q, packets[q['repo']]
 
