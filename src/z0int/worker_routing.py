@@ -19,10 +19,46 @@ HERMES_ROOT = os.environ.get('Z0INT_HERMES_ROOT', '')
 SYSTEM = 'Complete the bounded task using supplied context. Return your answer to the Codex parent. You have no filesystem, shell, or external tools.'
 
 
+def _host_overrides():
+    """Per-host endpoint for keyless local providers: ~/.z0int/config/worker_routing.local.json.
+
+    Only providers the manifest marks cohort=local and auth=none may be repointed, so a
+    host file can never redirect a keyed provider (and its credential) to another URL.
+    """
+    try:
+        from . import paths
+        return json.loads((paths.home() / 'config' / 'worker_routing.local.json').read_text()).get('providers') or {}
+    except (OSError, ValueError, ImportError):
+        return {}
+
+
 def configuration():
     policy = json.loads(POLICY_PATH.read_text())
     providers = policy['providers']
+    for name, override in _host_overrides().items():
+        base = providers.get(name)
+        if not base or base.get('cohort') != 'local' or base.get('auth') != 'none' or not isinstance(override, dict):
+            continue
+        merged = {**base, **{k: v for k, v in override.items() if k in ('base_url', 'models', 'worker_default_model')}}
+        providers[name] = merged
+        if 'worker_default_model' in override and isinstance(policy.get('defaults'), dict):
+            policy['defaults'][name] = override['worker_default_model']
+        # Host-validated $0 routes for local hardware: evidence file must exist and match its sha256.
+        for route in override.get('validated_free_routes') or []:
+            if _local_route_evidenced(name, route):
+                policy.setdefault('validated_free_routes', []).append({**route, 'provider': name})
     return policy, providers
+
+
+def _local_route_evidenced(provider, route):
+    import hashlib
+    try:
+        path = Path(route['evidence_path']).expanduser()
+        ok = hashlib.sha256(path.read_bytes()).hexdigest() == route['evidence_sha256']
+    except (KeyError, OSError, TypeError):
+        return False
+    return (ok and route.get('validated') is True and route.get('price_usd') == 0
+            and isinstance(route.get('model'), str) and route.get('provider', provider) == provider)
 
 
 def oauth_module():
