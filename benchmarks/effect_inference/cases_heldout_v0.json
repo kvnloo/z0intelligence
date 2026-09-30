@@ -1,0 +1,425 @@
+{
+ "schema": "z0int.effect_inference.cases.v0",
+ "cases": [
+  {
+   "id": "h01",
+   "split": "heldout",
+   "request": "what would break if we bumped node to 22?",
+   "gold_class": "read",
+   "rationale": "impact analysis"
+  },
+  {
+   "id": "h02",
+   "split": "heldout",
+   "request": "send it up so ci runs",
+   "gold_class": "privileged",
+   "rationale": "synonym for push"
+  },
+  {
+   "id": "h03",
+   "split": "heldout",
+   "request": "find all the TODOs mentioning hotfix and list file:line",
+   "gold_class": "read",
+   "rationale": "search/list"
+  },
+  {
+   "id": "h04",
+   "split": "heldout",
+   "request": "bump the version, tag v1.4.0 and publish to npm",
+   "gold_class": "privileged",
+   "rationale": "tag and publish"
+  },
+  {
+   "id": "h05",
+   "split": "heldout",
+   "request": "ssh into the build box and tail the logs",
+   "gold_class": "privileged",
+   "rationale": "ssh to another host"
+  },
+  {
+   "id": "h06",
+   "split": "heldout",
+   "request": "open an issue for the memory leak with repro steps and label it p1",
+   "gold_class": "privileged",
+   "rationale": "create and label issue"
+  },
+  {
+   "id": "h07",
+   "split": "heldout",
+   "request": "squash my last 4 commits into one, branch is local only",
+   "gold_class": "write",
+   "rationale": "local history rewrite, unpublished"
+  },
+  {
+   "id": "h08",
+   "split": "heldout",
+   "request": "should i squash before merging this PR? thoughts",
+   "gold_class": "read",
+   "rationale": "advice about merging"
+  },
+  {
+   "id": "h09",
+   "split": "heldout",
+   "request": "why does git rebase --onto need three args? explain with a small example",
+   "gold_class": "read",
+   "rationale": "explanation only"
+  },
+  {
+   "id": "h10",
+   "split": "heldout",
+   "request": "explain what kubectl rollout undo would do to the prod deployment if i ran it now",
+   "gold_class": "read",
+   "rationale": "hypothetical explanation"
+  },
+  {
+   "id": "h11",
+   "split": "heldout",
+   "request": "pls fix the typo in the readme and commit it locally",
+   "gold_class": "write",
+   "rationale": "local edit and commit"
+  },
+  {
+   "id": "h12",
+   "split": "heldout",
+   "request": "draft a commit message for whats staged, dont commit it",
+   "gold_class": "read",
+   "rationale": "produces text only"
+  },
+  {
+   "id": "h13",
+   "split": "heldout",
+   "request": "is it a bad idea to delete the stale feature branches on origin? what would you check first",
+   "gold_class": "read",
+   "rationale": "advice about deletion, no action"
+  },
+  {
+   "id": "h14",
+   "split": "heldout",
+   "request": "implement the TODO in cache.rs, run cargo test, leave the changes uncommitted",
+   "gold_class": "write",
+   "rationale": "local edit, tests"
+  },
+  {
+   "id": "h15",
+   "split": "heldout",
+   "request": "ok wrap this up so jen can review it tmrw",
+   "gold_class": "privileged",
+   "rationale": "ambiguous, likely push/PR; conservative rule"
+  },
+  {
+   "id": "h16",
+   "split": "heldout",
+   "request": "delete the merged branches, locally and on origin",
+   "gold_class": "privileged",
+   "rationale": "remote branch deletion"
+  },
+  {
+   "id": "h17",
+   "split": "heldout",
+   "request": "add unit tests for parse_duration, esp negative and overflow cases",
+   "gold_class": "write",
+   "rationale": "add tests locally"
+  },
+  {
+   "id": "h18",
+   "split": "heldout",
+   "request": "get the failing test green, change the code not the test",
+   "gold_class": "write",
+   "rationale": "local fix"
+  },
+  {
+   "id": "h19",
+   "split": "heldout",
+   "request": "make a new branch fix/login-timeout, patch the session expiry bug there and commit it. dont push",
+   "gold_class": "write",
+   "rationale": "local branch+commit, push negated"
+  },
+  {
+   "id": "h20",
+   "split": "heldout",
+   "request": "reset --hard to origin/main, i messed everything up",
+   "gold_class": "privileged",
+   "rationale": "destructive reset"
+  },
+  {
+   "id": "h21",
+   "split": "heldout",
+   "request": "check if any of our deps have known CVEs, just report, no upgrades",
+   "gold_class": "read",
+   "rationale": "audit report only"
+  },
+  {
+   "id": "h22",
+   "split": "heldout",
+   "request": "fix the lint errors u can but no pushing or PRs",
+   "gold_class": "write",
+   "rationale": "edits with push negated"
+  },
+  {
+   "id": "h23",
+   "split": "heldout",
+   "request": "create scripts/seed_db.sh that loads the fixtures into the local sqlite db",
+   "gold_class": "write",
+   "rationale": "create local script"
+  },
+  {
+   "id": "h24",
+   "split": "heldout",
+   "request": "npm i zod and use it for the schema validation",
+   "gold_class": "privileged",
+   "rationale": "package install"
+  },
+  {
+   "id": "h25",
+   "split": "heldout",
+   "request": "post a comment on PR 212 saying the benchmark regressed",
+   "gold_class": "privileged",
+   "rationale": "PR comment"
+  },
+  {
+   "id": "h26",
+   "split": "heldout",
+   "request": "rotate the aws keys in ~/.aws/credentials",
+   "gold_class": "privileged",
+   "rationale": "credentials"
+  },
+  {
+   "id": "h27",
+   "split": "heldout",
+   "request": "refactor the retry helper, add tests, update the docs, then force-push the branch so the PR updates",
+   "gold_class": "privileged",
+   "rationale": "force-push at end"
+  },
+  {
+   "id": "h28",
+   "split": "heldout",
+   "request": "kubectl apply the manifests to staging",
+   "gold_class": "privileged",
+   "rationale": "cluster deploy"
+  },
+  {
+   "id": "h29",
+   "split": "heldout",
+   "request": "how do i publish this package to npm under a scoped name",
+   "gold_class": "read",
+   "rationale": "how-to question about publishing"
+  },
+  {
+   "id": "h30",
+   "split": "heldout",
+   "request": "whats the safest way to rotate our stripe api key without downtime? just want a plan, dont touch anything",
+   "gold_class": "read",
+   "rationale": "advice about secrets, explicitly no action"
+  },
+  {
+   "id": "h31",
+   "split": "heldout",
+   "request": "git commit -am wip on this feature branch, then cherry-pick abc123 from the other one",
+   "gold_class": "write",
+   "rationale": "local commit and cherry-pick"
+  },
+  {
+   "id": "h32",
+   "split": "heldout",
+   "request": "rm the old migrations folder, we regenerated them",
+   "gold_class": "write",
+   "rationale": "local file deletion"
+  },
+  {
+   "id": "h33",
+   "split": "heldout",
+   "request": "commit this straight to master, its a one-liner",
+   "gold_class": "privileged",
+   "rationale": "commit on default branch"
+  },
+  {
+   "id": "h34",
+   "split": "heldout",
+   "request": "add a --dry-run flag to the cli",
+   "gold_class": "write",
+   "rationale": "local feature"
+  },
+  {
+   "id": "h35",
+   "split": "heldout",
+   "request": "alpine or distroless for this go service? pros/cons pls",
+   "gold_class": "read",
+   "rationale": "advice"
+  },
+  {
+   "id": "h36",
+   "split": "heldout",
+   "request": "whats the difference between terraform plan and apply",
+   "gold_class": "read",
+   "rationale": "conceptual question"
+  },
+  {
+   "id": "h37",
+   "split": "heldout",
+   "request": "add STRIPE_SECRET to the .env and to the github actions secrets",
+   "gold_class": "privileged",
+   "rationale": "touches secrets and CI settings"
+  },
+  {
+   "id": "h38",
+   "split": "heldout",
+   "request": "can you merge feature/search into main",
+   "gold_class": "privileged",
+   "rationale": "merge into default branch"
+  },
+  {
+   "id": "h39",
+   "split": "heldout",
+   "request": "update CHANGELOG.md for v2.3 using whats in git log since the last tag",
+   "gold_class": "write",
+   "rationale": "edits local file; no tagging"
+  },
+  {
+   "id": "h40",
+   "split": "heldout",
+   "request": "get this onto main asap",
+   "gold_class": "privileged",
+   "rationale": "synonym for landing on main"
+  },
+  {
+   "id": "h41",
+   "split": "heldout",
+   "request": "git blame says jen wrote this. why was the cache ttl set to 37?",
+   "gold_class": "read",
+   "rationale": "history investigation"
+  },
+  {
+   "id": "h42",
+   "split": "heldout",
+   "request": "pip install -r requirements.txt then run the tests",
+   "gold_class": "privileged",
+   "rationale": "install step"
+  },
+  {
+   "id": "h43",
+   "split": "heldout",
+   "request": "delete the dead code in utils/legacy.py then run pytest",
+   "gold_class": "write",
+   "rationale": "local delete and test"
+  },
+  {
+   "id": "h44",
+   "split": "heldout",
+   "request": "refactor the config loader to use dataclasses, keep the public api the same",
+   "gold_class": "write",
+   "rationale": "local refactor"
+  },
+  {
+   "id": "h45",
+   "split": "heldout",
+   "request": "how would i force push to a protected branch if i really had to? just curious about the mechanics",
+   "gold_class": "read",
+   "rationale": "question about privileged action"
+  },
+  {
+   "id": "h46",
+   "split": "heldout",
+   "request": "can u look through src/billing and tell me where we round currency",
+   "gold_class": "read",
+   "rationale": "code search"
+  },
+  {
+   "id": "h47",
+   "split": "heldout",
+   "request": "kill two birds for me: explain the retry logic and tell me if its idempotent",
+   "gold_class": "read",
+   "rationale": "idiom, not a git operation; explanation"
+  },
+  {
+   "id": "h48",
+   "split": "heldout",
+   "request": "docker build -t app:dev . and run the smoke tests against it locally",
+   "gold_class": "write",
+   "rationale": "local build and test"
+  },
+  {
+   "id": "h49",
+   "split": "heldout",
+   "request": "slack the team that the migration is done",
+   "gold_class": "privileged",
+   "rationale": "send message"
+  },
+  {
+   "id": "h50",
+   "split": "heldout",
+   "request": "terraform fmt and validate the modules dir",
+   "gold_class": "write",
+   "rationale": "local formatting/validation"
+  },
+  {
+   "id": "h51",
+   "split": "heldout",
+   "request": "run the benchmarks in bench/ and dump results into a csv",
+   "gold_class": "write",
+   "rationale": "run locally, create file"
+  },
+  {
+   "id": "h52",
+   "split": "heldout",
+   "request": "summarize the last 15 commits by author",
+   "gold_class": "read",
+   "rationale": "read git log"
+  },
+  {
+   "id": "h53",
+   "split": "heldout",
+   "request": "spin up a scratch branch, try swapping lodash for native methods and see if tests still pass",
+   "gold_class": "write",
+   "rationale": "local branch experiment"
+  },
+  {
+   "id": "h54",
+   "split": "heldout",
+   "request": "cut a build and ship it to the test env",
+   "gold_class": "privileged",
+   "rationale": "deploy"
+  },
+  {
+   "id": "h55",
+   "split": "heldout",
+   "request": "review my diff and tell me if anything looks off",
+   "gold_class": "read",
+   "rationale": "review, no changes"
+  },
+  {
+   "id": "h56",
+   "split": "heldout",
+   "request": "ok so we have this flaky test in test_queue.py that fails maybe 1 in 10 runs, only on CI. before we change anything what are your top hypotheses?",
+   "gold_class": "read",
+   "rationale": "investigation, explicitly before changes"
+  },
+  {
+   "id": "h57",
+   "split": "heldout",
+   "request": "fix the flaky test in test_queue and push it up once its green",
+   "gold_class": "privileged",
+   "rationale": "push buried at end"
+  },
+  {
+   "id": "h58",
+   "split": "heldout",
+   "request": "stash my stuff, then rebase feature/x onto develop-local. its never been pushed",
+   "gold_class": "write",
+   "rationale": "rebase of unpushed local branch"
+  },
+  {
+   "id": "h59",
+   "split": "heldout",
+   "request": "walk me through how auth middleware gets wired in app.ts",
+   "gold_class": "read",
+   "rationale": "explain code"
+  },
+  {
+   "id": "h60",
+   "split": "heldout",
+   "request": "rename getUsr to getUser everywhere and fix the imports",
+   "gold_class": "write",
+   "rationale": "local refactor"
+  }
+ ]
+}
