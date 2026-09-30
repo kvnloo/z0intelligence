@@ -27,3 +27,37 @@ def test_agentweb_event_normalizes_to_stable_pseudonymous_dispatch_identity():
     assert request["function"] == "summarization"
     assert request["automatic"] is True
     assert request["allow_remote"] is False
+
+
+def test_shadow_plan_does_not_enter_dispatch(monkeypatch):
+    from z0int import intelligence_service
+
+    monkeypatch.setattr(
+        intelligence_service,
+        "routing_snapshot",
+        lambda args: {"fixture": True},
+    )
+    monkeypatch.setattr(
+        intelligence_service,
+        "route",
+        lambda args, snapshot: {"kind": "PARENT_ONLY", "executed": False},
+    )
+
+    def forbidden_dispatch(_args):
+        raise AssertionError("shadow planning must never enter dispatch")
+
+    monkeypatch.setattr(intelligence_service, "dispatch", forbidden_dispatch)
+    result = intelligence_service.plan_intelligence({
+        "harness": "agentweb",
+        "trace_id": "trace",
+        "parent_agent": "agentweb:fixture",
+        "function": "summarization",
+        "task": "summarize fixture",
+    })
+
+    assert result == {
+        "ok": True,
+        "mode": "shadow",
+        "executed": False,
+        "route": {"kind": "PARENT_ONLY", "executed": False},
+    }
