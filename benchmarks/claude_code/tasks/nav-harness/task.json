@@ -1,0 +1,4 @@
+{"id": "nav-harness", "family": "code_navigation",
+ "source": {"repo": "z0intelligence", "sha": "c4a4554", "paths": ["src", "docs", "harness-adapters", "omp-extensions", "adapters"]},
+ "prompt": "Which harness identifiers does the canonical automatic adapter (the one that normalizes native harness events) accept? Write them to ANSWER.txt, one per line, sorted alphabetically, nothing else.",
+ "check": ["python3", "-c", "import sys; a=open('ANSWER.txt').read().split(); sys.exit(0 if a==['dsh','hermes','omp'] else 1)"]}
