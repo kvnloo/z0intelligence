@@ -26,7 +26,7 @@ LOCATOR_RE = re.compile(r"^agentweb-kb://[0-9a-f]{64}$")
 MAX_EVIDENCE = 20
 MAX_CONTENT_CHARS = 5000
 DEFAULT_PACKET_BYTES = 6000
-MIN_PACKET_BYTES = 1024
+MIN_PACKET_BYTES = 4096
 MAX_PACKET_BYTES = 12000
 
 
@@ -321,13 +321,83 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
             "private_text_persisted": False,
         },
     )
-    packet.aodl_projection = project_to_aodl_fields(packet)
-    result = packet.to_dict()
-    result["measurements"]["packet_bytes"] = _json_bytes(result)
-    result["measurements"]["compression_ratio"] = (
-        result["measurements"]["packet_bytes"]
-        / max(1, result["measurements"]["input_content_bytes"])
-    )
+    # The final serialized packet — including provenance/recipe metadata — is
+    # the budgeted object. Shrink excerpts first, then drop only redundant
+    # evidence. Never drop the sole retained source for a required need.
+    source_needs = {
+        item["source_id"]: set(item["need_ids"])
+        for item in deduped
+    }
+
+    def render() -> tuple[dict[str, Any], int]:
+        packet.evidence = refs
+        packet.aodl_projection = project_to_aodl_fields(packet)
+        value = packet.to_dict()
+        size = _json_bytes(value)
+        value["measurements"]["packet_bytes"] = size
+        value["measurements"]["compression_ratio"] = (
+            size / max(1, value["measurements"]["input_content_bytes"])
+        )
+        return value, size
+
+    result, size = render()
+    while size > max_packet_bytes:
+        # Shrink the longest remaining excerpt, down to a useful minimum.
+        longest_index = -1
+        longest_size = 0
+        for index, ref in enumerate(refs):
+            excerpt = ref.excerpt or ""
+            if len(excerpt) > 160 and len(excerpt) > longest_size:
+                longest_index = index
+                longest_size = len(excerpt)
+        if longest_index >= 0:
+            ref = refs[longest_index]
+            excerpt = ref.excerpt or ""
+            target = max(160, int(len(excerpt) * 0.65))
+            refs[longest_index] = EvidenceRef(
+                source_id=ref.source_id,
+                source_version=ref.source_version,
+                locator=ref.locator,
+                trust_class=ref.trust_class,
+                observed_at=ref.observed_at,
+                excerpt=excerpt[:target],
+                note=ref.note,
+            )
+            truncated += 1
+            packet.measurements["truncated_excerpts"] = truncated
+            result, size = render()
+            continue
+
+        # No excerpt can shrink further. Drop a redundant source only when every
+        # required need it covers remains covered by another retained source.
+        required_ids = {need.id for need in needs if need.required}
+        drop_index = None
+        for index in range(len(refs) - 1, -1, -1):
+            ref = refs[index]
+            covered = source_needs.get(ref.source_id, set()) & required_ids
+            safe = True
+            for need_id in covered:
+                if not any(
+                    need_id in source_needs.get(other.source_id, set())
+                    for j, other in enumerate(refs)
+                    if j != index
+                ):
+                    safe = False
+                    break
+            if safe:
+                drop_index = index
+                break
+        if drop_index is None:
+            break
+        refs.pop(drop_index)
+        packet.measurements["retained_evidence_count"] = len(refs)
+        result, size = render()
+
+    if size > max_packet_bytes:
+        raise ValueError(
+            "max_packet_bytes too small to preserve required evidence and packet metadata"
+        )
+
     return {
         "ok": True,
         "mode": "shadow",
