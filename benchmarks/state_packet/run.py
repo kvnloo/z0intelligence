@@ -61,7 +61,8 @@ def run_claude(q: dict, arm: str, args: argparse.Namespace, contract: str, z0hom
     repo = WORKSPACE / q["repo"]
     prompt = (f"{q['prompt']}\n\nFields to fill: {json.dumps(q['fields'])}\n\n{contract}")
     cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--model", args.model,
-           "--no-session-persistence", "--max-budget-usd", str(args.max_usd), *LEAN]
+           "--no-session-persistence", "--max-budget-usd", str(args.max_usd),
+           *(LEAN if getattr(args, "profile", "lean") == "lean" else [])]
     if args.effort:
         cmd += ["--effort", args.effort]
     if arm in ("packet_only", "packet_tools"):
@@ -232,6 +233,7 @@ def main() -> None:
     ap.add_argument("--gh", action="store_true", help="enable the network GitHub adapter in the packet")
     ap.add_argument("--raw-gh", action="store_true", help="also allow read-only gh issue/pr commands in tool arms")
     ap.add_argument("--questions", default=None, help="question/key file (default questions.json)")
+    ap.add_argument("--profile", choices=["lean", "stock"], default="lean", help="launch profile: lean (default, all published runs) or stock user settings/MCP/skills")
     ap.add_argument("--remove-conversation", action="store_true",
                     help="failure injection: point the packet's transcript source at an empty dir")
     args = ap.parse_args()
