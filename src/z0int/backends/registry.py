@@ -122,6 +122,19 @@ def register_builtin_backends() -> None:
                 local=True,
             )
         )
+    if "llama_http" not in _REGISTRY:
+        from .llama_http import LlamaHttpBackend
+
+        register(
+            BackendSpec(
+                id="llama_http",
+                kind="direct_readout",
+                description="Option-letter readout over the host llama.cpp server (any device, any GGUF)",
+                factory=LlamaHttpBackend.from_env,
+                aliases=("slm", "z0-slm"),
+                local=True,
+            )
+        )
     if "julia_1" not in _REGISTRY:
         from .julia import JuliaBackend
 
