@@ -33,7 +33,7 @@ evaluation: replayable state/events
               credited specialist may enter execution
 ```
 
-JEV is the seed semantic observer/reference backend for this evaluation plane. It is not ground truth, a security authority, or automatically a production policy. A NanoJev ↔ JEV disagreement is an evaluation/adjudication case until independent evidence resolves it.
+For `verify.evidence_sufficiency`, the current composition is **Laya 421M fast path → TypeSafe Jev 1.13.0 reference on uncertainty**. Jev is eligible for that narrow verified contract; it is not universal ground truth or a security authority. NanoJev is retained only as a legacy benchmark/reproducibility lane and is not a production verification default.
 
 See [docs/observer-evaluation.md](docs/observer-evaluation.md).
 
@@ -42,10 +42,10 @@ See [docs/observer-evaluation.md](docs/observer-evaluation.md).
 ```bash
 z0int onboard --auto --sync-models
 z0int backends list
-z0int backends eval --backend nanojev --input tests/fixtures/nanojev_request.json --json
+z0int backends eval --backend laya_421m --input tests/fixtures/decision_request.json --json
 ```
 
-See `docs/backends.md`. NanoJev is a local DecisionBackend; existing OpenJev/vLLM/MB lanes are unchanged.
+See `docs/backends.md`. Laya is the default local DecisionBackend fast path. The canonical verifier function lives in `z0int.functions.verify_evidence_sufficiency` and escalates Laya uncertainty to Jev 1.13.0. NanoJev remains available only for historical comparison and reproducibility; existing OpenJev/vLLM/MB lanes are unchanged.
 
 ## Why
 
