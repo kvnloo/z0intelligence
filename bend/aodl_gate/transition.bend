@@ -35,12 +35,21 @@ type Tr is Data:
 # Parser
 # ------
 
+# n doubled k times. (2^32 is not written as a closed Nat: the --verdict
+# translation normalizes closed terms, and a unary 2^32 overflows it.)
+def dbl(k: Nat, n: Nat) -> Nat:
+  match k:
+    case 0n:
+      n
+    case 1n+j:
+      dbl(j, Nat.double(n))
+
 # a Nat sent as two U32 tokens, hi and lo: hi * 2^32 + lo
 def p_natr() -> C.Parse(Nat):
   do C.Parse<Nat>:
     hi : U32 <- C.p_u32()
     lo : U32 <- C.p_u32()
-    return Nat.add(Nat.mul(U32.to_nat(hi), Nat.mul(65536n, 65536n)), U32.to_nat(lo))
+    return Nat.add(dbl(32n, U32.to_nat(hi)), U32.to_nat(lo))
 
 def p_dim() -> C.Parse(Dim):
   do C.Parse<Dim>:
