@@ -800,10 +800,20 @@ def adapter_claude_code(repo: Path, reader: Reader, projects_root: Path | None =
     b.reads, b.bytes_read = reader.reads, reader.bytes
     if not sessions:
         b.coverage = "none"
-        b.unknowns.append({
-            "key": "conv.latest_session",
-            "reason": f"no local Claude Code session touched {repo.name} ({len(files)} candidate transcript(s) scanned)",
-        })
+        if files:
+            # Source present, complete, and silent: absence is the answer, not a scanner fault.
+            b.unknowns.append({
+                "key": "conv.latest_session", "source_status": "no_match",
+                "reason": f"none recorded: {len(files)} local Claude Code transcript(s) checked and none touched "
+                          f"{repo.name}; the index is complete, so answer 'no recorded session' rather than guessing",
+            })
+        else:
+            # Source absent or unreadable on this host: the fact is genuinely unknown.
+            b.unknowns.append({
+                "key": "conv.latest_session", "source_status": "source_unavailable",
+                "reason": "Claude Code history is unavailable on this host (no readable transcripts); session facts "
+                          "are UNKNOWN - abstain on questions that depend on them",
+            })
         return b
     sessions.sort(key=lambda fs: fs[1].get("last_ts") or "", reverse=True)
     top_level = [fs for fs in sessions if not fs[1].get("is_subagent")]
@@ -1011,8 +1021,11 @@ def reduce_bundles(
     blocking = []
     for k in required:
         if k not in claims:
-            reason = next((u["reason"] for u in unknowns if u["key"] == k), "no source produced this fact")
-            blocking.append({"key": k, "reason": reason, "required_by": intent})
+            src = next((u for u in unknowns if u["key"] == k), {})
+            row = {"key": k, "reason": src.get("reason", "no source produced this fact"), "required_by": intent}
+            if src.get("source_status"):
+                row["source_status"] = src["source_status"]
+            blocking.append(row)
     for c in contradictions:
         contested = c.get("contests") or c["key"]
         if contested in required:
@@ -1323,8 +1336,12 @@ def render_additional_context(packet: dict[str, Any], *, max_tokens: int = 1500)
         lines.append(f"- {k}: {_fmt_value(k, c['value'])} [{_ptr(packet, c['evidence'])}]")
     # sections in decision-priority order; lower sections are dropped first under the budget
     sections: list[tuple[str, list[str]]] = []
+    blocking = packet.get("blocking_unknowns") or []
     sections.append(("BLOCKING UNKNOWNS (OBSERVE before acting):", [
-        f"- {u['key']}: {u['reason']}" for u in packet.get("blocking_unknowns") or []]))
+        f"- {u['key']}: {u['reason']}" for u in blocking] + ([
+        "- RULE: if a question depends on a blocking unknown and you cannot observe it with the tools you actually"
+        " have, answer that it is unknown (abstain). Do not guess, and do not call tools you were not given."]
+        if blocking else [])))
     sections.append(("CONTRADICTIONS (unresolved; do not pick a winner silently):", [
         f"- {c['kind']} {c['key']}: " + " vs ".join(f"{x['value']} [{_ptr(packet, x['evidence'])}]" for x in c["claims"])
         for c in (packet.get("contradictions") or [])[:5]]))

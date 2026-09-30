@@ -274,3 +274,21 @@ class StatePacketTests(_Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_missing_history_is_unavailable_not_no_match(tmp_path):
+    import subprocess
+    from z0int import state_packet as sp
+    repo = tmp_path / "r"; repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    (repo / "f").write_text("x")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "i"], check=True)
+    empty = tmp_path / "projects"; empty.mkdir()
+    pkt = sp.build_state_packet(repo, projects_root=empty)
+    unknown = [u for u in pkt["unknowns"] + pkt.get("blocking_unknowns", []) if u["key"] == "conv.latest_session"]
+    assert unknown and unknown[0]["source_status"] == "source_unavailable"
+    text = sp.render_additional_context(pkt)
+    assert "scanner" not in text and "transcript(s) scanned" not in text
+    if pkt.get("blocking_unknowns"):
+        assert "abstain" in text
