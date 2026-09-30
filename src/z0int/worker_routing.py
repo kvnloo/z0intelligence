@@ -19,17 +19,32 @@ HERMES_ROOT = os.environ.get('Z0INT_HERMES_ROOT', '')
 SYSTEM = 'Complete the bounded task using supplied context. Return your answer to the Codex parent. You have no filesystem, shell, or external tools.'
 
 
+def _host_config():
+    try:
+        from . import paths
+        return json.loads((paths.home() / 'config' / 'worker_routing.local.json').read_text())
+    except (OSError, ValueError, ImportError):
+        return {}
+
+
 def _host_overrides():
     """Per-host endpoint for keyless local providers: ~/.z0int/config/worker_routing.local.json.
 
     Only providers the manifest marks cohort=local and auth=none may be repointed, so a
     host file can never redirect a keyed provider (and its credential) to another URL.
     """
-    try:
-        from . import paths
-        return json.loads((paths.home() / 'config' / 'worker_routing.local.json').read_text()).get('providers') or {}
-    except (OSError, ValueError, ImportError):
-        return {}
+    return _host_config().get('providers') or {}
+
+
+def _host_local_order(providers):
+    """Host-chosen order for local-only work (e.g. a faster tailnet GPU box before this host's
+    own model). Only keyless local providers are kept, so it can never add a remote fallback."""
+    order = _host_config().get('local_order')
+    if not isinstance(order, list):
+        return None
+    kept = [n for n in order if isinstance(n, str) and (providers.get(n) or {}).get('cohort') == 'local'
+            and (providers.get(n) or {}).get('auth') == 'none']
+    return list(dict.fromkeys(kept)) or None
 
 
 HOST_PROVIDER_NAME = re.compile(r'^[a-z][a-z0-9_-]{0,31}$')
@@ -78,6 +93,9 @@ def configuration():
         for route in override.get('validated_free_routes') or []:
             if _local_route_evidenced(name, route):
                 policy.setdefault('validated_free_routes', []).append({**route, 'provider': name})
+    local_order = _host_local_order(providers)
+    if local_order:
+        policy['local_order'] = local_order
     return policy, providers
 
 
@@ -174,7 +192,8 @@ def plan_route(task, policy, providers, available_providers=None, function=None)
     if category=='local':
         # Host-defined keyless local providers (e.g. a tailnet GPU box) are the offload
         # tier behind this host's own local model; still no remote fallback.
-        primary='local';order=['local']+list(policy.get('host_local_providers',[]))
+        order=policy.get('local_order') or ['local']+list(policy.get('host_local_providers',[]))
+        primary=order[0]
     else:
         family='structured' if function in policy.get('structured_functions',[]) or category=='structured' else 'text'
         order=list(policy.get('function_orders',{}).get(family,policy['fallback_order']))
