@@ -6,7 +6,7 @@ The guiding constraint is simple:
 
 > **Optimize for measurable reduction in frontier-model work without reducing verified task quality.**
 
-z0int is not trying to replace a frontier model with one small personal model. It is trying to progressively compile repeated parts of a user's cognition and workflow into retrieval, deterministic routines, mushroom-body-style decision heads, and specialized fly controllers.
+z0int is not trying to replace a frontier model with one small personal model. It is trying to progressively compile repeated parts of a user's cognition and workflow into the cheapest verified mechanism that preserves the registered outcome contract — deterministic code, retrieval, learned specialists, typed decision models, or other mechanisms when they actually win.
 
 OpenJev remains an important historical/runtime substrate, but z0intelligence is now the broader evidence→state→decision→outcome control plane. [Evolution Lab](https://github.com/kvnloo/evolution-lab) owns experiment/search and promotion studies. [AODL](https://github.com/kvnloo/aodl) owns portable intent, authority, topology, and budgets.
 
