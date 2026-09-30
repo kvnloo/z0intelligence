@@ -284,6 +284,36 @@ class EventLog:
             self._write_state(next_event_id=0, end_offset=0, last_row=None)
         return len(rows), committed_end
 
+    def _last_index_row(self) -> dict[str, Any] | None:
+        if not self.index_path.is_file():
+            return None
+        with self.index_path.open("rb") as idx:
+            idx.seek(0, os.SEEK_END)
+            end = idx.tell()
+            if end == 0:
+                return None
+            idx.seek(end - 1)
+            if idx.read(1) != b"\n":
+                return None
+            start = max(0, end - 8192)
+            idx.seek(start)
+            lines = idx.read(end - start).splitlines()
+        if not lines:
+            return None
+        try:
+            row = json.loads(lines[-1])
+        except json.JSONDecodeError:
+            return None
+        if (
+            not isinstance(row, dict)
+            or row.get("schema") != INDEX_SCHEMA
+            or type(row.get("event_id")) is not int
+            or type(row.get("offset")) is not int
+            or type(row.get("length")) is not int
+        ):
+            return None
+        return row
+
     def _append_state_locked(self, events) -> tuple[int, int]:
         """Fast O(1) append state; full ledger scan only on stale/crash recovery."""
         events.seek(0, os.SEEK_END)
@@ -313,6 +343,15 @@ class EventLog:
             row = self._decode_committed_line(raw, expected_id=next_id - 1)
             if row["checksum"] != state.get("last_checksum"):
                 raise ValueError("last checksum mismatch")
+            index_last = self._last_index_row()
+            if (
+                index_last is None
+                or index_last.get("event_id") != next_id - 1
+                or index_last.get("offset") != offset
+                or index_last.get("length") != length
+                or index_last.get("checksum") != row["checksum"]
+            ):
+                raise ValueError("index tail does not match state")
             return next_id, file_end
         except (OSError, ValueError, TypeError, json.JSONDecodeError, EventLogCorruption):
             return self._repair_derived_locked(events)
