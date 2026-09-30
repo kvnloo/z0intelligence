@@ -2,6 +2,10 @@
 
 **Status:** shadow only (`posture_enforce: false`). Module `z0int.posture`, CLI `z0int posture`.
 
+> v1 (recent-rate method, band gating, replay simulator, enforce design, Claude Code hint) is documented in
+> [resource-posture-v1.md](resource-posture-v1.md) with its own, separate pre-registration. This document's
+> pre-registered evaluation is unchanged and is run mechanically by `z0int posture-replay --policy v0-logged`.
+
 The factory had no view of budgets over time. It could not tell *"Claude weekly
 quota resets at 03:00 tonight and 80% is unused"* (spend frontier now) from
 *"a week left, but at this burn rate it's gone in 2 days"* (move bounded work to
