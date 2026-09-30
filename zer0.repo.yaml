@@ -31,6 +31,14 @@ architecture:
         - src/z0int/functions/jev.py
       depends_on:
         - dispatch-authority
+    - id: agentweb-context-packet
+      name: AgentWeb preselected-evidence ContextPacket compiler
+      kind: context-compiler
+      paths:
+        - src/z0int/agentweb_context_packet.py
+        - src/z0int/context_resolve.py
+      depends_on:
+        - dispatch-authority
     - id: agentweb-reliability-observations
       name: AgentWeb reliability observation ingest
       kind: evidence-ingest
@@ -60,5 +68,6 @@ architecture:
       - tests/test_agentweb_integration.py
       - tests/test_agentweb_choice_experiment.py
       - tests/test_agentweb_reliability_observation.py
+      - tests/test_agentweb_context_packet.py
     schemas:
       - manifests/capabilities.v1.json
