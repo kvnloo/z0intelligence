@@ -59,7 +59,9 @@ def trial(task, arm, rep, args):
         fixture(task, work)
     env = {**os.environ, 'Z0INT_HOME': str(home), 'Z0INT_PYTHON': str(ROOT / '.venv/bin/python'),
            'PATH': str(ROOT / '.venv/bin') + os.pathsep + os.environ['PATH']}
-    cmd = ['claude', '-p', task['prompt'], '--output-format', 'json', '--model', args.model,
+    # Installed (user-scope) z0 plugins would leak into every arm; arms add z0 only via --plugin-dir.
+    no_installed = json.dumps({'enabledPlugins': {'z0intelligence@z0intelligence': False, 'z0-obspack@z0intelligence': False}})
+    cmd = ['claude', '-p', task['prompt'], '--settings', no_installed, '--output-format', 'json', '--model', args.model,
            '--effort', args.effort, '--permission-mode', 'bypassPermissions', '--max-budget-usd', str(args.max_usd)]
     cmd += ARMS[arm]
     t0 = time.time()
