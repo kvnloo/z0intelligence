@@ -1,0 +1,29 @@
+{
+  "state": {
+    "repo": "kvnloo/z0intelligence",
+    "event": "tests passed after a local edit"
+  },
+  "questions": [
+    {
+      "id": "verify",
+      "type": "boolean",
+      "instructions": "Does this task need another verification pass?"
+    },
+    {
+      "id": "route",
+      "type": "choice",
+      "instructions": "Choose the cheapest sufficient decision path.",
+      "criteria": [
+        {"id": "specialist", "description": "Use a narrow trained specialist"},
+        {"id": "local_fast_path", "description": "Use the resident local typed-decision fast path"},
+        {"id": "reference", "description": "Escalate to the reference verifier or a stronger model"}
+      ]
+    },
+    {
+      "id": "confidence",
+      "type": "score",
+      "instructions": "How confident should the local route be before escalating?",
+      "criteria": ["very_low", "low", "medium", "high", "very_high"]
+    }
+  ]
+}
