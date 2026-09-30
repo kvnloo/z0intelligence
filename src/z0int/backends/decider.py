@@ -55,6 +55,41 @@ def _bootstrap_decider_runtime(model_dir: Path) -> None:
         sys.path.insert(0, root)
 
 
+def _cpu_compute() -> str:
+    """CPU compute mode: ``fp32`` (default) or ``bf16``.
+
+    bf16 matmuls without AVX512-BF16/AMX run 5-10x slower than fp32 (measured on an
+    AVX2-only i7-4870HQ: ~50-100 s vs ~10 s per request), but a full fp32 copy of the
+    2B checkpoint needs ~9 GB RSS. ``fp32`` keeps weights resident in bf16 (~3.7 GB)
+    and upcasts each Linear weight per call, which reproduces full-fp32 probabilities.
+    """
+    return os.environ.get("Z0INT_DECIDER_CPU_COMPUTE", "fp32").strip().lower()
+
+
+def _cpu_fp32_compute(lm: Any) -> None:
+    """Patch a bf16 HF causal LM in place: bf16-resident weights, fp32 compute."""
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+
+    def _upcast(mod: Any) -> None:
+        def fwd(x: Any, _m: Any = mod) -> Any:
+            bias = None if _m.bias is None else _m.bias.float()
+            return F.linear(x.float(), _m.weight.float(), bias)
+
+        mod.forward = fwd
+
+    for mod in lm.modules():
+        if isinstance(mod, nn.Linear):
+            _upcast(mod)
+        elif not isinstance(mod, nn.Embedding):
+            for p in mod.parameters(recurse=False):  # norms, conv1d, gates: small
+                p.data = p.data.float()
+    lm.model.embed_tokens.register_forward_hook(lambda _m, _i, out: out.float())
+    # Decider reads slots against ``lm_head.weight[letters]`` (bf16) directly.
+    lm.model.norm.register_forward_hook(lambda _m, _i, out: out.to(torch.bfloat16))
+
+
 def _runtime_import_error() -> str | None:
     try:
         import torch  # noqa: F401
@@ -208,6 +243,8 @@ class DeciderBackend:
         if self.use_graphs is not None:
             kwargs["use_graphs"] = self.use_graphs
         decider = Decider(str(path), **kwargs)
+        if str(decider.dev).startswith("cpu") and getattr(decider, "eng", None) is None and _cpu_compute() == "fp32":
+            _cpu_fp32_compute(decider.m.lm)
         load_ms = (time.perf_counter() - t0) * 1000.0
         self.device = str(decider.dev)
         self._loaded = _Loaded(decider=decider, model_dir=str(path), load_ms=load_ms)
