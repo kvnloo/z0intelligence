@@ -593,6 +593,14 @@ def build_parser() -> argparse.ArgumentParser:
     kerde.add_argument("--output", default=None)
     _json_flag(kerde)
 
+    po = sub.add_parser("posture", help="Resource posture: BURN / BALANCED / OFFLOAD / RESERVE per budget pool")
+    po.add_argument("--now", default=None, help="ISO time to evaluate at (default: now)")
+    po.add_argument("--codexbar", default=None, help="codexbar last.json (default ~/.cache/codexbar-waybar/last.json)")
+    po.add_argument("--config", default=None, help="posture config (default ~/.z0int/config/posture.local.json)")
+    po.add_argument("--no-kerdoios", action="store_true", help="Skip the Kerdoios inventory cache source")
+    po.add_argument("--log", action="store_true", help="Append a snapshot to ~/.z0int/state/posture/history.jsonl")
+    _json_flag(po)
+
     pf = sub.add_parser("preflight", help="z0intelligence production preflight (no Evolution Lab)")
     pf.add_argument("prompt")
     pf.add_argument("--capability-id", default=None)
@@ -1058,6 +1066,18 @@ def main(argv: list[str] | None = None) -> int:
             )
             _print(out, as_json=as_json)
             return 0 if out.get("ok") else 1
+
+    if args.cmd == "posture":
+        from .posture import main as posture_main
+        argv2 = ["--json"] if as_json else []
+        for flag in ("now", "codexbar", "config"):
+            if getattr(args, flag, None):
+                argv2 += [f"--{flag}", getattr(args, flag)]
+        if getattr(args, "no_kerdoios", False):
+            argv2.append("--no-kerdoios")
+        if getattr(args, "log", False):
+            argv2.append("--log")
+        return posture_main(argv2)
 
     if args.cmd == "kerdoios":
         from .kerdoios_export import export_observations

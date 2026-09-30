@@ -9,6 +9,9 @@ Three read-only adapters fan out concurrently and return structured
 * ``claude_code``  — local Claude Code transcripts (``~/.claude/projects``),
                      structural facts only (session, branch, files touched,
                      open delegations, a short redacted last-prompt excerpt)
+* ``resource``     — ``resource.posture`` fact family (``z0int.posture``): is a
+                     budget perishing (BURN), on pace, tight (RESERVE) or running
+                     dry (OFFLOAD)? Shadow context only; never gates a transition.
 
 A reducer publishes the packet: current claims, superseded claims,
 contradictions, blocking unknowns, open work, source revisions and allowed
@@ -872,6 +875,60 @@ def adapter_claude_code(repo: Path, reader: Reader, projects_root: Path | None =
 
 
 # ---------------------------------------------------------------------------
+# resource posture adapter (shadow: informs, never gates)
+# ---------------------------------------------------------------------------
+
+
+def _posture_revision() -> dict[str, Any] | None:
+    """Verdict-level revision: stable while postures hold, so drifting numbers don't bust the packet cache."""
+    try:
+        from .posture import current_posture
+
+        p = current_posture()
+        return {"posture": p["revision"], "factory": p["factory"]["posture"]}
+    except Exception:  # fail-open: posture must never break packet builds
+        return None
+
+
+def adapter_resource(reader: Reader) -> EvidenceBundle:
+    from .posture import current_posture, render_line
+
+    b = EvidenceBundle(facet="resource")
+    p = current_posture()
+    b.source_revision = {"posture": p["revision"], "factory": p["factory"]["posture"]}
+    ok = [s for s in p["sources"] if s.get("status") == "ok"]
+    if not any(r["remaining"] is not None for r in p["pools"]):
+        b.coverage = "none"
+        b.unknowns.append({"key": "resource.posture", "source_status": "source_unavailable",
+                           "reason": "no metered budget pool observed (codexbar cache / posture.local.json); "
+                                     "budget posture is UNKNOWN"})
+        return b
+    b.coverage = "full" if all(s.get("status") in ("ok", "absent") for s in p["sources"]) else "partial"
+    src = next((s for s in p["sources"] if s["source"] == "codexbar"), {})
+    observed = max((r.get("observation_age_hours") or 0) for r in p["pools"] if r["remaining"] is not None)
+    ref = EvidenceRef(source_id="posture:" + "+".join(sorted(s["source"] for s in ok)),
+                      source_version=p["revision"], locator=str(src.get("path") or "z0int posture"),
+                      trust_class="derived_memory", observed_at=p["now"],
+                      note=f"derived from usage snapshots up to {observed:.1f}h old; re-run `z0int posture`")
+    fac = p["factory"]
+    b.claim("resource.posture", {
+        "factory": fac["posture"], "action": fac["action"], "prefer": fac["prefer"], "avoid": fac["avoid"],
+        "offload_targets": fac["offload_targets"][:6], "earliest_reset": fac.get("earliest_reset"),
+        "groups": {g: v["posture"] for g, v in p["groups"].items()
+                   if any(r["group"] == g and r["remaining"] is not None for r in p["pools"])},
+        "enforce": p["enforce"], "line": render_line(p),
+    }, ref, material=False)
+    for g, v in p["groups"].items():
+        row = next(r for r in p["pools"] if r["id"] == v["binding_pool"])
+        if row["remaining"] is None:
+            continue
+        b.claim(f"resource.posture[{g}]", {"posture": v["posture"], "binding_pool": row["id"],
+                                           "arithmetic": row["arithmetic"], "resets_at": row["resets_at"]},
+                ref, material=False)
+    return b
+
+
+# ---------------------------------------------------------------------------
 # reducer
 # ---------------------------------------------------------------------------
 
@@ -1065,7 +1122,7 @@ def reduce_bundles(
 
 
 def source_revisions(repo: Path, projects_root: Path | None = None, reader: Reader | None = None,
-                     *, github: bool = False) -> dict[str, Any]:
+                     *, github: bool = False, resource: bool = True) -> dict[str, Any]:
     """Cheap revision probe used for invalidation: 3 git calls, doc hashes, incremental transcript scan
     (+ 2 metadata-only ``gh`` calls when the GitHub adapter is enabled)."""
     r = reader or Reader()
@@ -1081,7 +1138,8 @@ def source_revisions(repo: Path, projects_root: Path | None = None, reader: Read
             continue
         docs[d.name] = "sha256:" + hashlib.sha256(data).hexdigest()[:12]
     _, sessions = scan_transcripts(repo, projects_root or default_projects_root(), r)
-    return {"git": git, "docs": docs, "claude_code": conversation_revision(sessions), **out_gh}
+    return {"git": git, "docs": docs, "claude_code": conversation_revision(sessions),
+            **({"resource": _posture_revision()} if resource else {}), **out_gh}
 
 
 def build_state_packet(
@@ -1092,7 +1150,7 @@ def build_state_packet(
     projects_root: str | Path | None = None,
     use_cache: bool = True,
     store: bool = True,
-    adapters: tuple[str, ...] = ("git", "docs", "claude_code"),
+    adapters: tuple[str, ...] = ("git", "docs", "claude_code", "resource"),
     github: bool | None = None,
 ) -> dict[str, Any]:
     """Build (or reuse) the State Packet for ``repo``. Read-only against sources.
@@ -1108,7 +1166,7 @@ def build_state_packet(
     if github and "github" not in adapters:
         adapters = (*adapters, "github")
     probe = Reader()
-    revisions = source_revisions(root, proj, probe, github=bool(github))
+    revisions = source_revisions(root, proj, probe, github=bool(github), resource="resource" in adapters)
     key = _cache_key(intent, required, root, revisions)
     prior = _load_prior(root) if (use_cache or store) else None
     if use_cache and prior and prior.get("packet_id") == key:
@@ -1125,6 +1183,7 @@ def build_state_packet(
         "docs": lambda rd: adapter_docs(root, rd),
         "claude_code": lambda rd: adapter_claude_code(root, rd, proj),
         "github": lambda rd: adapter_github(root, rd),
+        "resource": lambda rd: adapter_resource(rd),
     }
 
     def run(name: str) -> EvidenceBundle:
@@ -1195,8 +1254,8 @@ def check_packet(packet: dict[str, Any], projects_root: str | Path | None = None
     root = Path(packet["scope"]["repo"])
     proj = Path(projects_root).expanduser() if projects_root else default_projects_root()
     old = packet.get("source_revisions") or {}
-    live = source_revisions(root, proj, github="github" in old)
-    changed = [k for k in ("git", "docs", "claude_code", "github") if (old.get(k) or {}) != (live.get(k) or {})]
+    live = source_revisions(root, proj, github="github" in old, resource="resource" in old)
+    changed = [k for k in ("git", "docs", "claude_code", "resource", "github") if (old.get(k) or {}) != (live.get(k) or {})]
     return {"valid": not changed, "changed_sources": changed, "packet_id": packet.get("packet_id")}
 
 
@@ -1274,6 +1333,10 @@ def _fmt_value(key: str, v: Any) -> str:
         rows = [f"{r['session']}(cwd {r.get('cwd')}, last {r.get('last_ts')})" for r in v.get("sessions", [])[:8]]
         return (f"{v.get('count')} session(s) worked in this repo ({'complete' if v.get('complete') else 'truncated'};"
                 f" {v.get('transcripts_scanned')} transcripts scanned): " + "; ".join(rows))
+    if key == "resource.posture" and isinstance(v, dict):
+        return str(v.get("line") or v.get("factory")) + ("" if v.get("enforce") else " (shadow; not enforced)")
+    if key.startswith("resource.posture[") and isinstance(v, dict):
+        return f"{v.get('posture')}: {v.get('binding_pool')} {v.get('arithmetic')}"
     if key.startswith("gh.priority[") and isinstance(v, dict):
         return f"\"{v.get('declares')}\" (issue: {v.get('issue_title')}, updated {str(v.get('updated'))[:10]})"
     if key == "git.worktrees" and isinstance(v, list):
@@ -1306,6 +1369,8 @@ def _ptr(packet: dict[str, Any], eids: list[str]) -> str:
         if e.get("source_version") == "worktree":
             return f"{e['source_id']}:worktree"
         return f"{e['source_id']}@{str(e['source_version'])[:7]}"
+    if str(e.get("source_id", "")).startswith("posture:"):
+        return f"{e['source_id']}@{str(e.get('source_version'))[:8]}"
     if e.get("trust_class") == "conversation":
         sid = str(e["source_id"]).split(":", 1)[-1]
         sub = sid.split("/", 1)
@@ -1316,7 +1381,7 @@ def _ptr(packet: dict[str, Any], eids: list[str]) -> str:
 
 _RENDER_ORDER = ("git.branch", "git.head", "git.dirty", "git.upstream", "git.default_branch", "git.branches_ahead",
                  "git.worktrees", "git.remote_refs_age_hours", "conv.latest_session", "conv.sessions_here",
-                 "docs.priority", "git.stash_count", "git.recent_commits")
+                 "docs.priority", "resource.posture", "git.stash_count", "git.recent_commits")
 
 
 def render_additional_context(packet: dict[str, Any], *, max_tokens: int = 1500) -> str:
@@ -1365,6 +1430,8 @@ def render_additional_context(packet: dict[str, Any], *, max_tokens: int = 1500)
     recent = [f"- {k}: {_fmt_value(k, claims[k]['value'])}" for k in claims if k.startswith("conv.last_prompt[")][:2]
     sections.append(("LAST USER ASKS (redacted excerpts):", recent))
     sessions = [k for k in claims if k.startswith("conv.session[") and k not in keys]
+    sections.append(("RESOURCE POSTURE (shadow; binding window per budget):", [
+        f"- {k}: {_fmt_value(k, claims[k]['value'])}" for k in sorted(claims) if k.startswith("resource.posture[")][:5]))
     sections.append(("OTHER SESSIONS HERE:", [f"- {k}: {_fmt_value(k, claims[k]['value'])}" for k in sessions[:3]]))
     footer = f"Refresh/verify: z0int context packet --repo {packet['scope']['repo']} --check\n</z0-state-packet>"
     budget = int(max_tokens * 3.5)

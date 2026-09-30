@@ -29,7 +29,7 @@ def gates():
     packets, out = {}, {}
     for q in qs:
         if q['repo'] not in packets:
-            packets[q['repo']] = build_state_packet(PINNED / q['repo'], projects_root=PINNED / 'projects')
+            packets[q['repo']] = build_state_packet(PINNED / q['repo'], projects_root=PINNED / 'projects', adapters=('git', 'docs', 'claude_code'))
         opp = build_decision_opportunity(PINNED / q['repo'], q['prompt'], packet=packets[q['repo']])
         out[q['id']] = {'gate': deterministic_gate(opp), 'gold': q['key']['action']}
     return out
