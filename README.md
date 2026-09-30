@@ -4,7 +4,7 @@
 
 z0intelligence turns evidence, runtime state, and observed outcomes into bounded decisions, auditable execution choices, and eventually cheaper verified mechanisms. The goal is not “replace the frontier model with a tiny model.” The goal is to make expensive generic inference do less work **without confusing confidence, completion, or memory with truth or authority**.
 
-The package and CLI remain `z0int`. Historical OpenJev compatibility code remains in-tree, but OpenJev is now one substrate inside the larger z0intelligence system.
+The Python import/CLI namespace remains `z0int`; the distribution metadata still carries the historical `openjev-phase1` name for compatibility. Historical OpenJev code remains in-tree, but it is now one substrate inside the larger z0intelligence system.
 
 > Core invariant: **evidence ≠ claim/state ≠ authority ≠ action ≠ outcome ≠ learned procedure.**
 
