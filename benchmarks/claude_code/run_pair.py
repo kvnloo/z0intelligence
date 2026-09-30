@@ -16,6 +16,8 @@ ARMS = {
     'z0-shadow': ['--plugin-dir', str(PLUGIN)],
     'lean': ['--setting-sources', 'project', '--strict-mcp-config', '--disable-slash-commands'],
     'obspack': ['--plugin-dir', str(ROOT / 'harness-adapters/claude-code-z0-obspack')],
+    'lean+obspack': ['--setting-sources', 'project', '--strict-mcp-config', '--disable-slash-commands',
+                     '--plugin-dir', str(ROOT / 'harness-adapters/claude-code-z0-obspack')],
     'lean+z0': ['--setting-sources', 'project', '--strict-mcp-config', '--disable-slash-commands', '--plugin-dir', str(PLUGIN)],
 }
 
