@@ -87,10 +87,18 @@ def test_incomplete_scan_prevents_exhaustive_absence_claim():
     args = request()
     args["scan_incomplete"] = True
     result = compile_agentweb_context_packet(args)
+    packet = result["packet"]
     assert any(
         "source scan incomplete" in gap
-        for gap in result["packet"]["unresolved_gaps"]
+        for gap in packet["unresolved_gaps"]
     )
+    actual_bytes = len(json.dumps(
+        packet, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8"))
+    assert actual_bytes <= args["max_packet_bytes"]
+    retained = {row["source_id"] for row in packet["evidence"]}
+    assert source("brand-a", "x", ["brand"])["source_id"] in retained
+    assert source("market-a", "x", ["market"])["source_id"] in retained
 
 
 def test_private_source_names_are_not_accepted_as_identifiers():
