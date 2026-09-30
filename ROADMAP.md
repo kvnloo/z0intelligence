@@ -8,7 +8,24 @@ The guiding constraint is simple:
 
 z0int is not trying to replace a frontier model with one small personal model. It is trying to progressively compile repeated parts of a user's cognition and workflow into retrieval, deterministic routines, mushroom-body-style decision heads, and specialized fly controllers.
 
-The existing OpenJev code is the current runtime substrate. [Evolution Lab](https://github.com/kvnloo/evolution-lab) is the experiment/search engine. [AODL](https://github.com/kvnloo/aodl) is an optional future intent/orchestration representation, not a prerequisite for useful results.
+OpenJev remains an important historical/runtime substrate, but z0intelligence is now the broader evidence→state→decision→outcome control plane. [Evolution Lab](https://github.com/kvnloo/evolution-lab) owns experiment/search and promotion studies. [AODL](https://github.com/kvnloo/aodl) owns portable intent, authority, topology, and budgets.
+
+## 2026-09-30 architecture correction
+
+RFCs #53–#59 supersede the older assumption that the product should converge on one fixed cognition ladder.
+
+Current architectural invariants:
+
+- state construction and provenance are upstream of routing;
+- evidence, belief/state, authority, action, outcome, and learned procedure stay distinct;
+- execution completion and teacher/reference agreement are not verified success;
+- learned systems choose only inside deterministic legal/authority boundaries;
+- promotion is **mechanism-neutral**: rule, cache, retrieval recipe, linear model, MB/fly, SLM, Jev-style backend, or another mechanism may win;
+- every promoted mechanism carries an operating region, verifier/outcome contract, invalidators, drift evidence, fallback, and deoptimization path;
+- memory is being unified around immutable events + derived projections (#63/#66), not another universal memory database;
+- cross-harness learning should converge on a stable DecisionOpportunity / episode-credit contract (#53/#54/#62).
+
+Accordingly, “army of flies” and deterministic→fly→Jev→SLM→frontier should be read below as **candidate research mechanisms**, not a mandatory production hierarchy. Historical experiment plans remain here because they still contain useful evidence and implementation work.
 
 ## North star
 
@@ -519,7 +536,7 @@ A candidate that is biologically interesting but does not improve the measured f
 
 | Repo | Role |
 | --- | --- |
-| `kvnloo/z0int` | personal decision runtime, scorers, onboarding/training surfaces |
+| `kvnloo/z0intelligence` | evidence/state compiler, decision runtime, dispatch/receipt authority, specialist/compiler surfaces |
 | `kvnloo/evolution-lab` | experiment genomes, ABAB, DAgger, search, frozen promotion gates |
 | `kvnloo/frontier-kb` | research memory, evidence, claims, kill criteria |
 | `kvnloo/aodl` | optional typed intent/orchestration IR |
