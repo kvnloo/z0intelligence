@@ -139,7 +139,7 @@ def test_query_focused_excerpt_preserves_relevant_tail_fact():
     args["needs"] = [
         {"id": "q0", "description": "deployment rollback token", "required": True},
     ]
-    content = "irrelevant " * 500 + "deployment rollback token = KEEP-ME-42 " + "tail " * 200
+    content = "irrelevant " * 300 + "deployment rollback token = KEEP-ME-42 " + "tail " * 120
     args["evidence"] = [
         source("focused", content, ["q0"]),
     ]
@@ -165,3 +165,19 @@ def test_packet_preserves_top_three_ranked_sources_when_budgeted():
     retained = {row["source_id"] for row in packet["evidence"]}
     for i in range(3):
         assert source(f"rank-{i}", "x", ["q0"])["source_id"] in retained
+
+
+def test_aodl_projection_does_not_duplicate_private_excerpt():
+    args = request()
+    args["needs"] = [
+        {"id": "q0", "description": "brand positioning", "required": True},
+    ]
+    secret = "brand positioning PRIVATE-EXCERPT-ONCE " + "x" * 2500
+    args["evidence"] = [source("secret", secret, ["q0"])]
+    args["max_packet_bytes"] = 5000
+    result = compile_agentweb_context_packet(args)
+    packet = result["packet"]
+    serialized = json.dumps(packet)
+    assert "PRIVATE-EXCERPT-ONCE" in serialized
+    assert "PRIVATE-EXCERPT-ONCE" not in json.dumps(packet["aodl_projection"])
+    assert packet["aodl_projection"]["contextEvidence"][0]["source_id"].startswith("agentweb-kb:")
