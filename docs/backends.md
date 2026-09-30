@@ -11,6 +11,16 @@ Backends implement local (or remote) judgment engines behind one contract.
 
 Importing `z0int.backends.base` is stdlib-only (no torch).
 
+## Current roles
+
+| Role | Backend | Status |
+|---|---|---|
+| Reference verifier | TypeSafe Jev `jev-1.13.0` | Eligible for the narrow `verify.evidence_sufficiency` contract |
+| Local fast path | `laya_421m` | Default local typed-decision backend; Laya → Jev on verification uncertainty |
+| Legacy comparison | `nanojev_06b` | Benchmark/reproducibility only; not a production verification default |
+
+The function-level verification contract lives in `z0int.functions.verify_evidence_sufficiency`; it is separate from the generic DecisionBackend registry.
+
 ## Decision roster (canonical)
 
 `manifests/models.yaml` → `decision_roster.candidates` lists **Jev/System-One-style
@@ -21,7 +31,7 @@ Kerdoios sees installed weights as secondary `ResourceOffer`s; z0int remains sou
 |----|-------------|--------|-------|
 | `laya_421m` | `convaiinnovations/laya` | pinned | ~421M calibrated; CPU/MPS-friendly |
 | `decider_2b` | `Mapika/decider-2b` | pinned | Qwen3.5-2B one-pass typed probs |
-| `nanojev_06b` | `C-Tianyu/NanoJev` | pinned + adapter | parallel decision heads |
+| `nanojev_06b` | `C-Tianyu/NanoJev` | legacy + pinned | historical parallel-decision benchmark lane |
 | `reflex` | browser / GitHub | optional | WebGPU demo; no HF pin yet |
 | `system_one_4b` | `pngwn/system-one-qwen3.5-4b-scorer` | pinned | **CC-BY-NC-4.0** (non-commercial) |
 | `openjev_06b` / `openjev_4b` | Qwen base + direct logits | pinned | OpenJev substrate |
@@ -34,8 +44,9 @@ select, retry/escalate, intent route, compression gate) and maintain a Pareto ta
 
 | Backend | Kind | Notes |
 |---------|------|-------|
-| `nanojev` | local semantic model | Pinned HF bundle `nanojev_06b`; CUDA V0 |
-| `laya` / `decider` / `system_one_4b` | manifest candidates | Adapters TBD; weights via `z0int models sync` |
+| `laya` | local typed-decision fast path | Pinned `laya_421m`; CPU/MPS/CUDA; current CLI default |
+| `nanojev` | legacy local semantic model | Pinned `nanojev_06b`; benchmark/repro only |
+| `decider` / `system_one_4b` | manifest candidates | Compare through the shared benchmark contract |
 | `reflex` | browser / WebGPU | optional; no torch load path yet |
 | OpenJev / vLLM / MB / fly | existing lanes | Not rewritten in the first backend PR; thin adapters later |
 
@@ -51,11 +62,11 @@ The same backend may be used in two different roles:
 - **observer/reference** — read state and emit typed probabilistic features/weak labels for replay and evaluation;
 - **runtime specialist** — make a bounded live decision only after that question family has independently passed its promotion gate.
 
-JEV is the initial semantic observer/reference backend for cross-backend evals. JEV agreement alone is not verified truth. NanoJev/OpenJev/rules/statistical models should be compared against independent outcomes and verifiers, not promoted merely for matching JEV.
+Jev 1.13.0 is the reference verifier for the registered evidence-sufficiency contract. Laya is the local fast path for that composition. Jev agreement alone is not universal truth: Laya/OpenJev/rules/statistical models still need independent outcomes and verifiers before promotion. NanoJev is retained only as a historical comparison lane.
 
 See [observer-evaluation.md](observer-evaluation.md).
 
-## NanoJev install
+## Legacy NanoJev reproduction
 
 ```bash
 z0int onboard --auto --sync-models   # or: z0int models sync
@@ -66,13 +77,15 @@ z0int onboard --auto --sync-models   # or: z0int models sync
 
 Override checkpoint: `Z0INT_NANOJEV_CHECKPOINT=/path/to/bundle`.
 
+This path exists to reproduce historical NanoJev experiments. New runtime integrations should not select it by default.
+
 ## CLI
 
 ```bash
 z0int backends list --json          # no GPU load
 z0int backends doctor --json        # filesystem/config only
 z0int backends doctor --load        # explicit weight load
-z0int backends eval --backend nanojev --input tests/fixtures/nanojev_request.json --json
+z0int backends eval --backend laya_421m --input tests/fixtures/decision_request.json --json
 ```
 
 ## Ready means
@@ -81,7 +94,7 @@ z0int backends eval --backend nanojev --input tests/fixtures/nanojev_request.jso
 - **ready** — checkpoint complete on disk
 - **loaded** — weights resident in process
 
-Ordinary `z0int doctor` never loads NanoJev weights.
+Ordinary `z0int doctor` never eagerly loads backend weights.
 
 
 ## Pareto benchmark
@@ -96,7 +109,7 @@ Pre-Pareto gates (v2 Pareto report):
 
 ```bash
 z0int backends bench --contract decision-capability-v1
-z0int backends bench --backend nanojev_06b --capability rlm.worker_needed --json
+z0int backends bench --backend laya_421m --capability rlm.worker_needed --json
 ```
 
 Artifacts land under `results/decision-backends/<timestamp>/`:
@@ -156,7 +169,7 @@ Architecture (from upstream bundled `decider/` runtime + HF bundle):
 
 ```bash
 Z0INT_DECIDER_DEVICE=cuda z0int backends bench --backend decider_2b --contract decision-capability-v1
-Z0INT_LAYA_DEVICE=cpu z0int backends bench --backend decider_2b,nanojev_06b,laya_421m --contract decision-capability-v1
+Z0INT_LAYA_DEVICE=cpu z0int backends bench --backend decider_2b,laya_421m --contract decision-capability-v1
 ```
 
 ## OpenJev adapter (`openjev_06b`)
@@ -183,6 +196,6 @@ z0int models sync --which on_demand   # includes openjev_06b
 ```bash
 Z0INT_LAYA_DEVICE=cpu z0int backends bench --backend openjev_06b --contract decision-capability-v1
 Z0INT_LAYA_DEVICE=cpu z0int backends bench \
-  --backend openjev_06b,decider_2b,nanojev_06b,laya_421m --contract decision-capability-v1
+  --backend openjev_06b,decider_2b,laya_421m --contract decision-capability-v1
 ```
 
