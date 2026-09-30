@@ -31,7 +31,9 @@ class OpenJevDirectBackend:
         self.model_id = model_id
         self.hf = hf
         self.revision = revision
-        self.device = os.environ.get("Z0INT_OPENJEV_DEVICE", "cuda")
+        from .device import default_device
+
+        self.device = default_device("Z0INT_OPENJEV_DEVICE")
         self._loaded: _Loaded | None = None
 
     @classmethod

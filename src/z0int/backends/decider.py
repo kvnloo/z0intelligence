@@ -29,7 +29,9 @@ class _Loaded:
 
 
 def _default_device() -> str:
-    return os.environ.get("Z0INT_DECIDER_DEVICE", "cuda")
+    from .device import default_device
+
+    return default_device("Z0INT_DECIDER_DEVICE")
 
 
 def _use_graphs() -> bool | None:
