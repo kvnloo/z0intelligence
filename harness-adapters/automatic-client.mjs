@@ -1,5 +1,8 @@
 import {spawn} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
+import {readFileSync} from 'node:fs';
+import {homedir} from 'node:os';
+import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
 export const instanceId = randomUUID();
@@ -17,7 +20,21 @@ export function call(operation, value) {
     child.stdin.end(JSON.stringify(value));
   });
 }
+// Mirrors z0int.automatic.settings(): a harness is enabled only by
+// $Z0INT_HOME/config/automatic.json {<harness>:{enabled:true}} and
+// Z0INT_AUTO_<HARNESS>=0 always disables it. When disabled the Python side
+// would answer {action:'native',disabled:true}; answer that here and skip a
+// ~100ms interpreter spawn on every turn.
+export function automaticEnabled(harness, env=process.env) {
+  if(env['Z0INT_AUTO_'+String(harness).toUpperCase().replaceAll('-','_')]==='0')return false;
+  const home=env.Z0INT_HOME||join(homedir(),'.z0int');
+  try{
+    const cfg=JSON.parse(readFileSync(join(home,'config','automatic.json'),'utf8'));
+    return cfg?.[harness]?.enabled===true;
+  }catch{return false;}
+}
 export async function route(harness, sessionId, turnId, text) {
+  if(!automaticEnabled(harness))return {action:'native',disabled:true};
   try{return await call('event',{harness,session_id:sessionId,turn_id:turnId,instance_id:instanceId,text});}
   catch{return {action:'native',ready:false};}
 }

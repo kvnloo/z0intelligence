@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface, type Interface } from "node:readline";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
@@ -27,14 +27,24 @@ const Z0 = process.env.Z0INT_HOME || join(homedir(), ".z0int");
 const RUNTIME = join(Z0, "runtime");
 const CURRENT = join(RUNTIME, "bridge-current.json");
 
-const Z0_PY =
-	process.env.Z0INT_PYTHON ||
-	"python3";
+const PID_CURRENT = join(RUNTIME, "bridge-current.d", `${process.pid}.json`);
+
 const Z0_ROOT =
 	process.env.Z0INT_ROOT ||
 	// Prefer the tree that owns this extension when possible.
 	process.env.Z0INT_BRIDGE_ROOT ||
 	fileURLToPath(new URL("../../", import.meta.url));
+
+/** Z0INT_PYTHON, else the owning checkout's .venv, else the z0int runtime, else python3. */
+export function resolvePython(env: NodeJS.ProcessEnv = process.env, root = Z0_ROOT, z0 = Z0): string {
+	if (env.Z0INT_PYTHON) return env.Z0INT_PYTHON;
+	for (const candidate of [join(root, ".venv", "bin", "python"), join(z0, "bin", "python")]) {
+		if (existsSync(candidate)) return candidate;
+	}
+	return "python3";
+}
+
+const Z0_PY = resolvePython();
 
 const WORKER_TIMEOUT_MS = Number(process.env.Z0INT_BRIDGE_TIMEOUT_MS || 45_000);
 const HANDSHAKE_TIMEOUT_MS = 20_000;
@@ -82,6 +92,8 @@ let current: WorkerHandle | null = null;
 let generation = 0;
 let reloadPromise: Promise<Jsonish> | null = null;
 let activeTurn: ActiveTurn | null = null;
+let stderrTail = "";
+let lastStartError: string | null = null;
 
 function ensureDir(path: string): void {
 	mkdirSync(path, { recursive: true });
@@ -97,8 +109,21 @@ function publishCurrent(h: WorkerHandle): void {
 		activated_at: Date.now() / 1000,
 		omp_pid: process.pid,
 	};
-	writeFileSync(CURRENT, JSON.stringify(blob, null, 2) + "\n", "utf8");
+	const text = JSON.stringify(blob, null, 2) + "\n";
+	// Global pointer is informational; the per-pid pointer is what the worker's
+	// stale-generation check trusts (generations are numbered per OMP process).
+	writeFileSync(CURRENT, text, "utf8");
+	ensureDir(dirname(PID_CURRENT));
+	writeFileSync(PID_CURRENT, text, "utf8");
 }
+
+process.once("exit", () => {
+	try {
+		rmSync(PID_CURRENT, { force: true });
+	} catch {
+		/* best effort */
+	}
+});
 
 function failAll(h: WorkerHandle, err: Error): void {
 	for (const p of h.pending.values()) {
@@ -147,8 +172,9 @@ function spawnWorker(nextGen: number): Promise<WorkerHandle> {
 			p.resolve(msg);
 		});
 
-		child.stderr?.on("data", () => {
-			/* keep resident quiet unless debugging */
+		child.stderr?.on("data", chunk => {
+			// Keep resident quiet, but retain a short tail for status/diagnostics.
+			stderrTail = (stderrTail + String(chunk)).slice(-2000);
 		});
 
 		child.on("exit", code => {
@@ -328,10 +354,20 @@ async function reload(reason: string): Promise<Jsonish> {
 	return reloadPromise;
 }
 
-function resolveSessionId(ctx: unknown): string {
-	if (ctx && typeof ctx === "object" && "sessionId" in ctx) {
-		const s = (ctx as { sessionId?: unknown }).sessionId;
-		if (typeof s === "string" && s) return s;
+export function resolveSessionId(ctx: unknown): string {
+	if (ctx && typeof ctx === "object") {
+		// OMP exposes the session id through ctx.sessionManager.getSessionId().
+		const sm = (ctx as { sessionManager?: { getSessionId?: () => unknown } }).sessionManager;
+		try {
+			const id = typeof sm?.getSessionId === "function" ? sm.getSessionId() : undefined;
+			if (typeof id === "string" && id) return id;
+		} catch {
+			/* fall through */
+		}
+		if ("sessionId" in ctx) {
+			const s = (ctx as { sessionId?: unknown }).sessionId;
+			if (typeof s === "string" && s) return s;
+		}
 	}
 	return process.env.OMP_SESSION_ID || `omp-${process.pid}`;
 }
@@ -518,7 +554,8 @@ export default function z0intBridge(pi: ExtensionAPI) {
 	pi.setLabel("z0int bridge v2 + canonical intelligence");
 
 	// Eager start so first turn is warm.
-	void ensureWorker().catch(() => {
+	void ensureWorker().catch(e => {
+		lastStartError = e instanceof Error ? e.message : String(e);
 		/* fail-open; next turn retries */
 	});
 
@@ -686,11 +723,15 @@ export default function z0intBridge(pi: ExtensionAPI) {
 				const h = await ensureWorker();
 				const st = await request(h, { op: "status" }, 5000);
 				ctx.ui.notify(
-					`z0int bridge: gen=${st.generation} build=${st.build_id} id=${st.instance_id} protocol=${st.protocol}`,
+					`z0int bridge: gen=${st.generation} build=${st.build_id} id=${st.instance_id} protocol=${st.protocol} python=${Z0_PY} root=${Z0_ROOT}`,
 					"info",
 				);
 			} catch (e) {
-				ctx.ui.notify(String(e), "error");
+				const tail = stderrTail.trim().split("\n").slice(-3).join(" | ");
+				ctx.ui.notify(
+					`${String(e)}${lastStartError ? ` (start: ${lastStartError})` : ""}${tail ? ` stderr: ${tail}` : ""} python=${Z0_PY}`,
+					"error",
+				);
 			}
 		},
 	});

@@ -136,18 +136,34 @@ def preflight(prompt: str) -> dict[str, Any]:
     return preflight_dict(prompt)
 
 
+def kerdoios_target() -> tuple[Path, str] | None:
+    """Resolve the optional Kerdoios residual planner, or None when unconfigured.
+
+    Kerdoios is opt-in: set ``KERDOIOS_ROOT`` (or ``Z0INT_KERDOIOS_ROOT``) to a
+    checkout that contains the ``kerdoios`` package. ``Z0INT_BRIDGE_KERDOIOS=0``
+    forces it off. Without configuration the bridge never spawns Kerdoios and
+    never writes to its observed log, so an unconfigured install stays
+    side-effect free outside ``Z0INT_HOME``.
+    """
+    if os.environ.get("Z0INT_BRIDGE_KERDOIOS", "").strip().lower() in {"0", "false", "off", "no"}:
+        return None
+    raw = os.environ.get("KERDOIOS_ROOT") or os.environ.get("Z0INT_KERDOIOS_ROOT")
+    if not raw:
+        return None
+    root = Path(raw).expanduser()
+    if not (root / "kerdoios").is_dir():
+        return None
+    py = os.environ.get("KERDOIOS_PYTHON") or os.environ.get("EVOLUTION_LAB_PYTHON") or sys.executable
+    return root, py
+
+
 def kerdoios_plan(capability_id: str, work: dict[str, Any] | None) -> dict[str, Any] | None:
     if not work:
         return None
-    kerd_root = Path(
-        os.environ.get("KERDOIOS_ROOT")
-        or "/home/kvn/.hermes/profiles/chiefstaff/plugins/kerdoios"
-    )
-    kerd_py = (
-        os.environ.get("KERDOIOS_PYTHON")
-        or os.environ.get("EVOLUTION_LAB_PYTHON")
-        or "/workspace/evolution-lab/.venv/bin/python"
-    )
+    target = kerdoios_target()
+    if target is None:
+        return None
+    kerd_root, kerd_py = target
     args = [
         kerd_py,
         "-m",
@@ -179,15 +195,10 @@ def kerdoios_record(
     measurement_state: str | None = None,
     state_reason: str | None = None,
 ) -> None:
-    kerd_root = Path(
-        os.environ.get("KERDOIOS_ROOT")
-        or "/home/kvn/.hermes/profiles/chiefstaff/plugins/kerdoios"
-    )
-    kerd_py = (
-        os.environ.get("KERDOIOS_PYTHON")
-        or os.environ.get("EVOLUTION_LAB_PYTHON")
-        or "/workspace/evolution-lab/.venv/bin/python"
-    )
+    target = kerdoios_target()
+    if target is None:
+        return
+    kerd_root, kerd_py = target
     args = [
         kerd_py,
         "-m",
@@ -321,8 +332,10 @@ class BridgeRuntime:
         out.update(self.identity())
         return out
 
-    def _maybe_quarantine(self, row: dict[str, Any], writer_generation: int | None) -> bool:
-        if gen.is_stale(writer_generation):
+    def _maybe_quarantine(
+        self, row: dict[str, Any], writer_generation: int | None, omp_pid: int | None = None
+    ) -> bool:
+        if gen.is_stale(writer_generation, omp_pid=omp_pid):
             gen.quarantine(row, reason=f"stale_generation:{writer_generation}")
             return True
         return False
@@ -380,7 +393,8 @@ class BridgeRuntime:
         is_local = route in ("local", "local_model", "routine", "specialist")
         plan_provider = None
         plan_model = None
-        if isinstance(plan, dict) and isinstance(plan.get("placements"), list) and plan["placements"]:
+        plan_ok = isinstance(plan, dict) and plan.get("ok") is not False and not plan.get("error")
+        if plan_ok and isinstance(plan.get("placements"), list) and plan["placements"]:
             top = plan["placements"][0]
             if isinstance(top, dict):
                 if isinstance(top.get("provider"), str):
@@ -393,7 +407,8 @@ class BridgeRuntime:
             "trace_id": trace_id,
             "session_id": session_id,
             "capability_id": capability_id,
-            "provider": "local_mb" if is_local else (plan_provider or ("kerdoios_plan" if plan else "frontier")),
+            # Attribute to Kerdoios only when its plan actually succeeded.
+            "provider": "local_mb" if is_local else (plan_provider or ("kerdoios_plan" if plan_ok else "frontier")),
             "model": "mb_local" if is_local else plan_model,
             "prediction": pf.get("label") if isinstance(pf.get("label"), str) else pf.get("prediction"),
             "confidence": pf.get("p") if isinstance(pf.get("p"), (int, float)) else pf.get("confidence"),
@@ -423,7 +438,7 @@ class BridgeRuntime:
             "receipt": receipt,
             **stamp,
         }
-        if self._maybe_quarantine(row, writer_generation):
+        if self._maybe_quarantine(row, writer_generation, omp_pid):
             return {"ok": False, "error": "quarantined_stale", **stamp}
 
         _append(_stream_dir() / "bridge.jsonl", row)
@@ -551,7 +566,7 @@ class BridgeRuntime:
             "writer_generation": writer_generation,
             **stamp,
         }
-        if gen.is_stale(writer_generation):
+        if gen.is_stale(writer_generation, omp_pid=omp_pid):
             gen.quarantine(heart, reason="close_stale_generation")
         else:
             _append(_stream_dir() / "bridge_heart.jsonl", heart)
