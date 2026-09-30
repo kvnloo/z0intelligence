@@ -1711,6 +1711,17 @@
           "sha256": "76a45c82ce4a467b595758590281f442f11c5a416f36a2fce9b6894277a2e99b"
         }
       ]
+    },
+    {
+      "model": "decider_2b",
+      "function": "evidence_sufficiency",
+      "reason": "Measured 40/48 three-way accuracy on the frozen authored48 set Jev was admitted on (Jev 46/48); all 8 errors predict 'contradicted' (5 insufficient, 3 supported); 4 errors at confidence >=0.9, so no selective threshold reaches Jev-level safety. CPU fp32, mbp i7-4870HQ, ~62 s/item.",
+      "sources": [
+        {
+          "path": "manifests/capability-evidence/decider2b-authored48-evidence.jsonl",
+          "sha256": "2eb961bd8bb33606e6baf1c9c3094329f945862fd6ce1b019c1f418015505d37"
+        }
+      ]
     }
   ],
   "delegation_policy": {
