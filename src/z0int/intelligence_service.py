@@ -6,7 +6,7 @@ import threading
 import signal
 import time
 from collections import Counter
-from .intelligence import dispatch, REGISTRY
+from .intelligence import dispatch, route, routing_snapshot, REGISTRY
 from .automatic import dispatch_event, consume
 
 SLOTS=threading.BoundedSemaphore(4)
@@ -84,7 +84,7 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404,{'error':'not_found'})
 
     def do_POST(self):
-        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/worker','/v1/automatic','/v1/automatic/consumed'):return self.reply(404,{'error':'not_found'})
+        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/plan','/v1/worker','/v1/automatic','/v1/automatic/consumed'):return self.reply(404,{'error':'not_found'})
         try:
             size=int(self.headers.get('Content-Length','0'))
             if not 0<size<=(262144 if self.path.startswith('/v1/authority/') else 40000):return self.reply(413,{'error':'request_size'})
@@ -96,6 +96,9 @@ class Handler(BaseHTTPRequestHandler):
                 from .worker_routing import dispatch_worker
                 return self.reply(200,dispatch_worker(args))
             if self.path=='/v1/automatic/consumed':return self.reply(200,consume(args))
+            if self.path=='/v1/plan':
+                selected=route(args,routing_snapshot(args))
+                return self.reply(200,{'ok':True,'mode':'shadow','executed':False,'route':selected})
             started=time.monotonic()
             with METRIC_LOCK:
                 METRICS['dispatch_active']+=1
