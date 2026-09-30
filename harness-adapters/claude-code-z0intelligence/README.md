@@ -6,7 +6,7 @@ Hermes (`pre_llm_call`), OMP (`before_agent_start`) and DSH (`llm/stream`) use.
 | Claude Code seam | z0int surface | Default |
 | --- | --- | --- |
 | `UserPromptSubmit` | `z0int.claude_code prompt` → `automatic.handle_event` | shadow: routed and receipted, never injected |
-| `Stop` | `z0int.claude_code stop` → Tokenomics `claude-code.provider_usage.v0` | on |
+| `Stop`, `SessionEnd` | `z0int.claude_code stop` → Tokenomics `claude-code.provider_usage.v0` | on |
 | MCP `route_worker` | `z0int.intelligence_mcp` with `Z0INT_HARNESS=claude-code` | on |
 
 Requires `pip install -e .` of this repo (or `Z0INT_PYTHON` pointing at that
