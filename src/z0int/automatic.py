@@ -14,7 +14,7 @@ import urllib.request
 from . import paths
 from .receipt import append_receipt, find_receipt, receipts_path
 
-HARNESSES = {'omp', 'hermes', 'dsh'}
+HARNESSES = {'omp', 'hermes', 'dsh', 'agentweb'}
 
 
 def evidenced(entry):
