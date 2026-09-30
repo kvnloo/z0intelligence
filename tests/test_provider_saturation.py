@@ -95,6 +95,7 @@ def test_local_singleton_and_no_permit_expiry(monkeypatch):
     assert p.acquire('local','four')['admitted']
 
 
+@pytest.mark.kerdoios  # groq admission projects quota through kerdoios; absent => fail-closed, never 'available'
 def test_health_429_ttl_403_operator_only(monkeypatch):
     first=p.acquire('groq','one',{'quota_model':'openai/gpt-oss-20b','quota_reserved_tokens':100});p.release(first['token'],'groq',429,100)
     assert not p.snapshot('groq')['available']
