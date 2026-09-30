@@ -62,6 +62,14 @@ def emit_opportunity_async(hook):
     return True
 
 
+HARNESS_MESSAGE_PREFIXES = ('<agent-message', '<task-notification', '<system-reminder')
+
+
+def is_harness_message(text):
+    """Subagent hand-backs and task notifications arrive as prompts but carry no user intent."""
+    return isinstance(text, str) and text.lstrip().startswith(HARNESS_MESSAGE_PREFIXES)
+
+
 def on_opportunity(hook, root=None):
     from .decision_opportunity import build_decision_opportunity, deterministic_gate
     from .state_packet import repo_root
@@ -83,7 +91,8 @@ def on_prompt(hook):
     if not isinstance(text, str) or not text.strip():
         return None
     try:
-        emit_opportunity_async(hook)
+        if not is_harness_message(text):
+            emit_opportunity_async(hook)
     except Exception:
         pass  # shadow emission never affects the turn
     session = hook.get('session_id') or HARNESS

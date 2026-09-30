@@ -94,9 +94,13 @@ def decisions_report(root=None):
         except OSError:
             return []
     outcomes = {r.get('trace_id'): r for r in rows('outcomes.jsonl') if r.get('trace_id')}
-    table, unlinked, examples = {}, 0, []
+    from .claude_code import is_harness_message
+    table, unlinked, examples, harness = {}, 0, [], 0
     for rec in rows('opportunities.jsonl'):
         opp = rec['opportunity']
+        if is_harness_message(opp['intent']['request']):  # recorded before emission skipped them
+            harness += 1
+            continue
         out = outcomes.get(opp['trace'].get('trace_id'))
         if out is None:
             unlinked += 1
@@ -107,7 +111,7 @@ def decisions_report(root=None):
         if (rec['gate'] == 'ACT') != (observed == 'answered') and len(examples) < 10:
             examples.append({'gate': rec['gate'], 'observed': observed, 'scope': opp['scope'].get('mode'),
                              'families': opp['scope'].get('families'), 'request': opp['intent']['request'][:80]})
-    return {'linked': sum(table.values()), 'unlinked': unlinked,
+    return {'linked': sum(table.values()), 'unlinked': unlinked, 'harness_messages_excluded': harness,
             'table': {f'{g}->{o}': n for (g, o), n in sorted(table.items())}, 'disagreements': examples}
 
 

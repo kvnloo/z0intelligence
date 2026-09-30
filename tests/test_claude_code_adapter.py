@@ -136,6 +136,11 @@ def test_prompt_hook_emits_opportunity_off_the_hot_path(monkeypatch):
     spawned.clear()
     claude_code.on_prompt({'session_id': 's', 'prompt': 'x'})
     assert spawned == []
+    monkeypatch.delenv('Z0INT_CLAUDE_CODE_OPPORTUNITIES', raising=False)
+    # subagent hand-backs / task notifications are harness traffic, not user intent
+    for text in ('<agent-message from="a1">\n[Subagent hand-back] on branch x', '  <task-notification>done'):
+        claude_code.on_prompt({'session_id': 's', 'prompt': text, 'cwd': '/tmp'})
+    assert spawned == []
 
 
 def test_opportunity_record_written_for_a_repo(monkeypatch, tmp_path):
