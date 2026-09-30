@@ -1,33 +1,40 @@
-# Evolution Lab — evolve fly specialists after OpenJev setup
+# Evolution Lab integration
 
-OpenJev is the **runtime stack** people clone first: typed decisions (JEV lane), optional SLM
-scorers, and the Route A/B tooling to run them. [Evolution Lab](https://github.com/kvnloo/evolution-lab)
-is the **experiment engine** you add when you want to evolve and validate fly-style specialists
-on that stack.
+z0intelligence is the runtime/control plane: evidence-backed state, typed decisions, deterministic
+legal-action compilation, receipts, harness adapters, and promoted mechanism execution. Historical
+OpenJev code remains one backend/training substrate inside this repository.
+
+[Evolution Lab](https://github.com/kvnloo/evolution-lab) is the **experiment/search engine**. It
+compares candidate mechanisms against frozen evidence and outcome contracts, then exports credited
+artifacts back to z0intelligence. Fly/mushroom-body specialists are one candidate family, not a
+mandatory production layer.
 
 ```
-Clone openjev  →  setup SLMs + fly runtime  →  run decisions at inference time
-                         ↓
-              clone evolution-lab (optional)
-                         ↓
-              evolve / promote / export winner  →  deploy back into OpenJev / OMP
+z0intelligence runtime / receipts / replay
+                    ↓
+             Evolution Lab study
+      rules · retrieval · linear · MB/fly
+        local SLM · typed backend · ...
+                    ↓
+       promote / reject / deoptimize
+                    ↓
+      deploy credited mechanism back into z0int
 ```
 
 ## Who owns what
 
 | Repo | Role | You use it when… |
 | --- | --- | --- |
-| **openjev** (this repo) | Infra + inference: JEV scorers, benchmarks, Route A train/eval CLI | You need typed routing, clarify, skill-pick, or zero-shot direct logit readout |
+| **z0intelligence** (this repo) | Runtime/control plane: state, decisions, authority/receipts, compiler surfaces, backend experiments | You need runtime cognition, context, routing evidence, replay, or promoted mechanisms |
 | **evolution-lab** | Evolution: genomes, locked splits, promotion ladder, DAgger, control tables | You want to search for a fly recovery specialist or JEV head that beats controls |
 | **frontier-kb** | Claims vault / research notes | You need protocol, kill criteria, or receipts |
 | **OMP extensions** | Live wiring (`typesafe-jev`, `flyforge-recovery`) | You want token-saving decisions inside Cursor / OMP today |
 
-Evolution Lab **calls** OpenJev for Track B genomes (`backend=openjev`). OpenJev does **not**
-depend on evolution-lab at runtime.
+Evolution Lab may call the legacy OpenJev training backend for Track B genomes (`backend=openjev`). z0intelligence does **not** depend on Evolution Lab at runtime.
 
 ## Quick setup (recommended)
 
-From the openjev repo root:
+From the z0intelligence repo root:
 
 ```bash
 bash scripts/setup-flyforge.sh
@@ -35,7 +42,7 @@ bash scripts/setup-flyforge.sh
 
 This will:
 
-1. Create `.venv` (if missing) and `pip install -e '.[test]'` for OpenJev
+1. Create `.venv` (if missing) and `pip install -e '.[test]'` for z0intelligence
 2. Clone [kvnloo/evolution-lab](https://github.com/kvnloo/evolution-lab) as a sibling (or use `EVOLUTION_LAB_DIR`)
 3. Install evolution-lab editable (numpy-only core; OpenJev already satisfies `openjev_phase1`)
 4. Lock P0 Hermes recovery splits and Jev Track B splits
@@ -48,7 +55,7 @@ Environment overrides:
 | `EVOLUTION_LAB_DIR` | `../evolution-lab` | Where to clone/install the lab |
 | `EVOLUTION_LAB_REF` | `nightly` | Git branch to checkout |
 | `HF_HOME` | unset | Hugging Face cache (set for Route B 4B models) |
-| `SKIP_EVOLUTION_LAB=1` | — | OpenJev-only install (no clone) |
+| `SKIP_EVOLUTION_LAB=1` | — | z0intelligence-only install (no clone) |
 
 ## Manual setup
 
