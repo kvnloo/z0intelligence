@@ -606,6 +606,9 @@ def build_parser() -> argparse.ArgumentParser:
     prc = prm_sub.add_parser("check", help="Per-branch ACT/OBSERVE/ASK/ABSTAIN/ESCALATE over a nightly manifest",
                              add_help=False)
     prc.add_argument("promote_args", nargs=argparse.REMAINDER, help="see `z0int promote check --help`")
+    prs = prm_sub.add_parser("sim", help="Replay promotion policies over the factory's real history (shadow)",
+                             add_help=False)
+    prs.add_argument("promote_args", nargs=argparse.REMAINDER, help="see `z0int promote sim --help`")
 
     pf = sub.add_parser("preflight", help="z0intelligence production preflight (no Evolution Lab)")
     pf.add_argument("prompt")
@@ -891,6 +894,9 @@ def main(argv: list[str] | None = None) -> int:
     if argv[:2] == ["promote", "check"]:  # own argparse (flags would otherwise hit the root parser)
         from .promotion import main as promotion_main
         return promotion_main(argv[2:])
+    if argv[:2] == ["promote", "sim"]:
+        from .promotion_sim import main as promotion_sim_main
+        return promotion_sim_main(argv[2:])
     parser = build_parser()
     args = parser.parse_args(argv)
     as_json = bool(getattr(args, "as_json", False))
@@ -1077,6 +1083,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if out.get("ok") else 1
 
     if args.cmd == "promote":
+        if args.promote_cmd == "sim":
+            from .promotion_sim import main as promotion_sim_main
+            return promotion_sim_main(list(args.promote_args))
         from .promotion import main as promotion_main
         return promotion_main(list(args.promote_args))
 

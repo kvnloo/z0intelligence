@@ -238,6 +238,7 @@ class ImportGraph:
         self.roots: dict[str, list[str]] = defaultdict(list)
         self.parent: dict[str, str | None] = {}
         self.by_name: dict[str, list[str]] = defaultdict(list)
+        self._siblings: dict[tuple[str, str], list[str]] | None = None
         for rel in files:
             self.by_name[Path(rel).name].append(rel)
         self._index()
@@ -277,8 +278,11 @@ class ImportGraph:
             name = ".".join(base + ([name] if name else []))
         cands = [name] if name in self.modules else []
         if not cands and name and "." not in name:  # sibling import (sys.path.insert of own dir)
-            d = str(Path(rel).parent)
-            cands = [m for f, m in self.file2mod.items() if str(Path(f).parent) == d and Path(f).stem == name]
+            if self._siblings is None:  # (dir, stem) index: a linear scan per import is quadratic
+                self._siblings = defaultdict(list)
+                for f, m in self.file2mod.items():
+                    self._siblings[(str(Path(f).parent), Path(f).stem)].append(m)
+            cands = list(self._siblings.get((str(Path(rel).parent), name), ()))
         return cands, name
 
     def _path_targets(self, s: str) -> list[str]:
