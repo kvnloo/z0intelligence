@@ -39,6 +39,13 @@ fresh worktree is a cold start. Measure your own prefix:
 claude -p "Reply with just OK." --output-format json | jq '.usage'
 ```
 
+## Failure behaviour (measured)
+
+`benchmarks/claude_code/failure_injection.sh`: with the router down, a missing
+`Z0INT_PYTHON`, the packet enabled outside git, or an unwritable `Z0INT_HOME`, every session
+still answered normally (1.1–1.7 s, no hook stderr). Usage receipts are written whenever z0 can
+run and write (3/3 expected cases).
+
 ## Hook contract notes (verified empirically on 2.1.285)
 
 - `PostToolUse` `updatedToolOutput` for Bash must mirror the `tool_response` object
