@@ -1,0 +1,103 @@
+{
+  "specVersion": "0.2",
+  "graphId": "verifier-merge-grant",
+  "revision": 0,
+  "intentGraph": {
+    "nodes": [
+      {
+        "id": "packet",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "review",
+        "kind": "verifier",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-review",
+        "relation": "verification",
+        "from": "packet",
+        "to": "review",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "merge"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+        }
+      }
+    ]
+  },
+  "policies": {
+    "kinds": [
+      "sequence"
+    ],
+    "fanIn": "all",
+    "dynamic": {
+      "allowed": false,
+      "maxChildren": 0,
+      "maxDepth": 0
+    }
+  },
+  "constraints": {
+    "budgets": {
+      "tokens": 0
+    },
+    "termination": {
+      "on": "verifier.succeeded"
+    }
+  },
+  "provenance": {
+    "source": "example",
+    "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+  }
+}
