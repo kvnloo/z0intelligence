@@ -5,5 +5,13 @@ and StatePackets are derived projections.
 """
 
 from .event_log import EventLog, EventLogCorruption, MemoryEvent
+from .optmem_tree import CoverBudgetExceeded, OptMemTree, TreeNode
 
-__all__ = ["EventLog", "EventLogCorruption", "MemoryEvent"]
+__all__ = [
+    "CoverBudgetExceeded",
+    "EventLog",
+    "EventLogCorruption",
+    "MemoryEvent",
+    "OptMemTree",
+    "TreeNode",
+]
