@@ -352,3 +352,69 @@ def decide_choice(state: object, *, instructions: str, options: dict[str, str]) 
         "usage": clean_usage,
         "credential_source": credential_source(),
     }
+
+
+def decide_noul(state: object, *, proposition: str) -> dict[str, Any]:
+    """Experimental bounded Noul using the canonical jevkit client."""
+    import math
+    import time
+
+    if not isinstance(proposition, str) or not proposition.strip() or len(proposition) > 4000:
+        raise ValueError("noul proposition must be 1..4000 characters")
+
+    key = ensure_credential()
+    if not key:
+        raise VerifierUnavailable("jev", "no credential resolvable")
+    try:
+        from jevkit import client as jev_client  # type: ignore
+    except Exception as exc:
+        raise VerifierUnavailable("jev", f"jevkit.client unavailable: {exc}") from exc
+
+    capture = _Capture()
+    started = time.monotonic()
+    try:
+        reply = jev_client.ask(
+            state,
+            {"decision": jev_client.noul(proposition)},
+            model=EXPECTED_JEV_MODEL,
+            api_key=key,
+            timeout=15,
+            retries=0,
+            transport=capture,
+        )
+    except Exception as exc:
+        code = getattr(exc, "code", type(exc).__name__)
+        detail = getattr(exc, "detail", "") or str(exc)
+        raise VerifierUnavailable("jev", f"{code}: {detail}") from exc
+
+    if capture.model != EXPECTED_JEV_MODEL:
+        raise VerifierUnavailable(
+            "jev",
+            f"served revision {capture.model!r} != validated {EXPECTED_JEV_MODEL!r}",
+        )
+
+    answer = (reply.get("answers") or {}).get("decision")
+    if not isinstance(answer, dict):
+        raise VerifierUnavailable("jev", "noul response missing decision answer")
+    probability = answer.get("noul")
+    if not isinstance(probability, (int, float)) or not math.isfinite(float(probability)):
+        raise VerifierUnavailable("jev", "noul probability is not finite")
+    probability = float(probability)
+    if not 0 <= probability <= 1:
+        raise VerifierUnavailable("jev", "noul probability must be in [0,1]")
+
+    usage = reply.get("usage") or {}
+    clean_usage = {
+        key: int(usage[key])
+        for key in ("input_tokens", "output_tokens")
+        if isinstance(usage.get(key), int) and usage[key] >= 0
+    }
+    return {
+        "backend": "jev",
+        "model": capture.model,
+        "revision": capture.model,
+        "probability": probability,
+        "latency_ms": (time.monotonic() - started) * 1000,
+        "usage": clean_usage,
+        "credential_source": credential_source(),
+    }
