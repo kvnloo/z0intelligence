@@ -184,14 +184,15 @@ def _target(kind: str, sentence: str, m: re.Match, current: str | None, default:
         return {"branches": "pr_base", "protected": True, "named": []}
     named = []
     for g in _BRANCH_AFTER.finditer(window):
-        name = next((x for x in g.groups() if x), "").rstrip(".").lower()
+        name = next((x for x in g.groups() if x), "").rstrip(".,:)").lower()
         if name and name not in _NOT_BRANCH and not name.isdigit():
             named.append(name)
     if re.search(r"\bthe\s+default\s+branch\b", window, re.I):
         named.append(default or "the default branch")
     if kind == "merge":  # the branch that changes is the one merged INTO
         into = re.search(r"\b(?:into|onto|to)\s+(?:origin/)?([\w./-]+)", window, re.I)
-        named = [into.group(1).lower()] if into and into.group(1).lower() not in _NOT_BRANCH else []
+        into_name = into.group(1).rstrip(".,:)").lower() if into else ""
+        named = [into_name] if into_name and into_name not in _NOT_BRANCH else []
     if named:
         prot = [b for b in named if _is_protected(b, default)]
         return {"branches": named, "protected": bool(prot), "protected_branches": prot, "named": named}
@@ -199,7 +200,7 @@ def _target(kind: str, sentence: str, m: re.Match, current: str | None, default:
         return {"branches": "all", "protected": True, "named": []}
     if _NON_DEFAULT.search(window):
         return {"branches": "non_default", "protected": False, "named": []}
-    if current:
+    if current and not current.startswith("("):  # "(detached)" HEAD is not a branch: unknown target
         prot = [current.lower()] if _is_protected(current, default) else []
         return {"branches": [current.lower()], "protected": bool(prot), "protected_branches": prot, "named": []}
     return {"branches": "unknown", "protected": True, "named": []}

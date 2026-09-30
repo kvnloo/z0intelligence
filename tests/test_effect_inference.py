@@ -169,3 +169,10 @@ def test_prompt_grants_refuse_harness_and_foreign_phrases():
 ])
 def test_v1_classes(text, cls):
     assert infer_effects(text)['effect_class'] == cls
+
+
+def test_detached_head_and_punctuated_targets_are_not_non_default():
+    detached = _br('(detached)', 'origin/master')
+    assert _gate_v1('push this', detached) == 'ASK'
+    acts = infer_effects('then merge it into main.', _br('feat/a'))['privileged_actions']
+    assert acts[0]['target']['branches'] == ['main'] and acts[0]['target']['protected']
