@@ -122,3 +122,29 @@ Otherwise the result is null or negative and is reported as such. It is never pr
 
 deterministic/baselines (no model) → `orch_nothink` → `orch_think` → `qwen3_8b_nothink` → `qwen3_8b_think`. Items run in fixed file order, one pass per arm.
 Outputs go to `benchmarks/orchestrator_router/results_v0.json` (metrics + per-item rows), with each input file's sha256.
+
+---
+
+## Results addendum (written after the run; everything above is unchanged from commit 1302c3a)
+
+Full numbers are in `results_v0.json`, per-call rows in `raw_v0.jsonl`, and VRAM in `vram_v0.json`. 280 router calls were made (4 LLM arms × 70 items).
+
+Pooled labeled (S1+S2, n=59), gated choices:
+
+| arm | choice acc | pass rate | mean regret | raw illegal | warm p50 / p95 |
+|---|---|---|---|---|---|
+| deterministic (plan_route / rule) | 8/59 (0.14) | 0.56 | 1.17 | 0 | 0 |
+| orch_nothink | 8/59 (0.14) | 0.56 | 1.12 | 0 | 332 / 523 ms |
+| **orch_think** (primary) | 23/59 (0.39) | 0.58 | 0.74 | 0 | 3597 / 6527 ms |
+| qwen3_8b_nothink | 9/59 (0.15) | 0.56 | 1.14 | 0 | 253 / 469 ms |
+| qwen3_8b_think | 23/59 (0.39) | 0.56 | 0.73 | 2 (no tool call) | 4721 / 10587 ms |
+| cheapest | 35/59 (0.59) | 0.59 | 0.35 | n/a | n/a |
+| majority_loo | 35/59 (0.59) | 0.59 | 0.35 | n/a | n/a |
+| strongest (S1 only, n=48) | 4/48 | **0.90** | **0.13** | n/a | n/a |
+
+- McNemar: orch_think vs deterministic, 16 vs 1 discordant, p = 0.0003. orch_think vs qwen3_8b_think, 9 vs 9, p = 1.0.
+- Decision rule: (a) passes, (b) passes, (c) **fails**. **Do not continue in shadow.** In this setting the learned router is no better than a generic Qwen3-8B given the same prompt, and both are beaten by a trivial `cheapest` rule. A fixed `strongest` rule dominates them on delivered quality.
+- The orchestrator never proposed the 4B or 8B candidate when thinking was on (S1: 27× groot-0.6B, 21× mbp-0.6B). It optimises the stated latency preference and does not predict difficulty.
+- The deterministic arm's S1 accuracy is 0 because `plan_route` puts the host's own `local/qwen3-0.6b-q8` (mbp Vulkan, 1236 ms) first. That candidate is never the cheapest passing one, since the same weights run on groot at 41 ms. This is a finding about current host ordering, not about learned routing.
+- VRAM (groot, shared GPU): about +6.0 GB for either 8B at `-c 8192 --parallel 2`. Orchestrator 935→6951 MiB; Qwen3-8B 901→6917 MiB. Cold first call: 3.9–7.6 s.
+- Deviation: none in the protocol. One scoring bug was fixed before any metric was read: `oracle` crashed on unlabeled S3. The decision-rule block was added to the scorer after the run and mechanically encodes the rule above.

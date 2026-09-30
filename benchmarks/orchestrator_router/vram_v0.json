@@ -1,0 +1,10 @@
+{
+ "nemotron-orchestrator-8b-q4km": {
+  "before_mib": 935,
+  "after_mib": 6951
+ },
+ "qwen3-8b-q4km": {
+  "before_mib": 901,
+  "after_mib": 6917
+ }
+}
