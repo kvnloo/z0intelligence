@@ -17,10 +17,11 @@ from collections import Counter
 from pathlib import Path
 
 from z0int.decision_opportunity import build_decision_opportunity, deterministic_gate
-from z0int.effect_inference import ORDER, infer_effects
+from z0int.effect_inference import ORDER, infer_effects, slm_label
 
 HERE = Path(__file__).resolve().parent
 AUTHORITY = {'session': ('read', 'write'), 'default': ('read',)}
+slm_cache = {}
 
 
 def packet(facts):
@@ -40,7 +41,15 @@ def run(cases, arm, authority):
     rows = []
     for c in cases:
         pkt = packet(c.get('facts'))
-        effects = ['read'] if arm == 'baseline' else infer_effects(c['request'], pkt)['effects']
+        if arm == 'baseline':
+            effects = ['read']
+        elif arm == 'slm':  # secondary, shadow-only arm: the local SLM's label alone (read if it fails)
+            if c['id'] not in slm_cache:
+                slm_cache[c['id']] = slm_label(c['request']).get('class')
+            label = slm_cache[c['id']]
+            effects = ['read'] if label in (None, 'read') else ['read', label]
+        else:
+            effects = infer_effects(c['request'], pkt)['effects']
         opp = build_decision_opportunity('/nonexistent', c['request'], effects=effects, packet=pkt, scoped=False,
                                          harness_grants=AUTHORITY[authority])
         rows.append({'id': c['id'], 'split': c['split'], 'gold_class': c['gold_class'], 'pred_class': effect_class(effects),
@@ -74,12 +83,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out')
     ap.add_argument('--cases', default=str(HERE / 'cases_v0.json'))
+    ap.add_argument('--slm', action='store_true', help='add the shadow groot qwen3-8b arm (secondary, not in the decision rule)')
     args = ap.parse_args()
     cases = json.loads(Path(args.cases).read_text())['cases']
     splits = ['all'] + sorted({c['split'] for c in cases})
     result = {'schema': 'z0int.effect_inference.results.v0', 'arms': {}, 'misses': {}}
     for authority in AUTHORITY:
-        for arm in ('baseline', 'inferred'):
+        for arm in ('baseline', 'inferred') + (('slm',) if args.slm else ()):
             rows = run(cases, arm, authority)
             key = f'{arm}/{authority}'
             result['arms'][key] = {s: metrics([r for r in rows if s == 'all' or r['split'] == s]) for s in splits}
