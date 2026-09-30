@@ -135,6 +135,22 @@ def register_builtin_backends() -> None:
                 local=True,
             )
         )
+    if "openjev_06b" not in _REGISTRY:
+        from .openjev_direct import OpenJevDirectBackend
+
+        register(
+            BackendSpec(
+                id="openjev_06b",
+                kind="direct_option_logits",
+                description=(
+                    "OpenJev direct option-letter logits on Qwen3-0.6B "
+                    "(Z0INT_OPENJEV_DEVICE=cuda|cpu)"
+                ),
+                factory=lambda: OpenJevDirectBackend.for_manifest_id("openjev_06b"),
+                aliases=("openjev",),
+                local=True,
+            )
+        )
     if "julia_1" not in _REGISTRY:
         from .julia import JuliaBackend
 

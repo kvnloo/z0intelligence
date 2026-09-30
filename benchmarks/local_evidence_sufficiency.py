@@ -32,7 +32,12 @@ def main():
     args = ap.parse_args()
     out = Path(args.out)
     done = {json.loads(l)['id'] for l in out.read_text().splitlines()} if out.exists() else set()  # resumable
-    backend = registry.create_backend(args.backend)
+    try:
+        backend = registry.create_backend(args.backend)
+    except KeyError:
+        # Bench-roster ids such as llama_http:<arm> (GGUF arms on a router server).
+        from z0int.backends.bench.roster import create_backend_for_candidate
+        backend = create_backend_for_candidate(args.backend)
     todo = [r for r in items() if r['id'] not in done][:args.limit]
     with out.open('a') as fh:
         for r in todo:
@@ -49,7 +54,12 @@ def main():
             fh.flush()
             print(r['id'], gold, ans.value, round((time.perf_counter() - t), 1), 's', flush=True)
     rows = [json.loads(l) for l in out.read_text().splitlines()]
-    print(f"{args.backend}: {sum(x['pred_id'] == x['gold_id'] for x in rows)}/{len(rows)} three-way accuracy")
+    confident_errors = sum(x['pred_id'] != x['gold_id'] and max(x['probabilities'].values()) >= 0.9 for x in rows)
+    print(f"{args.backend}: {sum(x['pred_id'] == x['gold_id'] for x in rows)}/{len(rows)} three-way accuracy; "
+          f"{confident_errors} errors at conf>=0.9")
+    close = getattr(backend, 'close', None)
+    if callable(close):
+        close()
 
 
 if __name__ == '__main__':

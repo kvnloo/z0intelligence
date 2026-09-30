@@ -29,7 +29,7 @@ class Stub(BaseHTTPRequestHandler):
             top = [{'token': ' yes', 'logprob': math.log(0.8)}, {'token': 'No', 'logprob': math.log(0.2)}]
         else:
             # Always prefer the letter whose option says "tests": order-invariant truth.
-            line = next(l for l in prompt.splitlines() if 'tests' in l)
+            line = next((l for l in prompt.splitlines() if 'tests' in l), 'A')  # warm-up prompts have no options
             top = [{'token': ' ' + line[0], 'logprob': math.log(0.9)}, {'token': '7', 'logprob': math.log(0.1)}]
         # Real servers return n_probs (64) candidates, so unseen letters fall below a small floor.
         top += [{'token': f'x{i}', 'logprob': math.log(1e-6)} for i in range(60)]
@@ -72,3 +72,63 @@ def test_registered_with_aliases():
 
 def test_unreachable_server_is_not_ready():
     assert LlamaHttpBackend('http://127.0.0.1:9').health().ready is False
+
+
+def test_url_precedence_env_config_default(tmp_path, monkeypatch):
+    from z0int.backends.llama_http import DEFAULT_URL, configured_url
+
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
+    monkeypatch.delenv('Z0INT_SLM_URL', raising=False)
+    assert configured_url() == (DEFAULT_URL, 'default')
+
+    cfg = tmp_path / 'config' / 'z0int.json'
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text(json.dumps({'models_plan': {}, 'backends': {'llama_http': {'url': 'http://172.21.0.1:11510/'}}}))
+    backend = LlamaHttpBackend()
+    assert backend.url == 'http://172.21.0.1:11510' and backend.url_source.startswith('config:')
+
+    monkeypatch.setenv('Z0INT_SLM_URL', 'http://10.0.0.2:9999')
+    assert configured_url() == ('http://10.0.0.2:9999', 'env:Z0INT_SLM_URL')
+    assert LlamaHttpBackend('http://x:1').url_source == 'argument'
+
+
+def test_url_config_malformed_falls_back(tmp_path, monkeypatch):
+    from z0int.backends.llama_http import DEFAULT_URL, configured_url
+
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
+    monkeypatch.delenv('Z0INT_SLM_URL', raising=False)
+    cfg = tmp_path / 'config' / 'z0int.json'
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text('{not json')
+    assert configured_url() == (DEFAULT_URL, 'default')
+    cfg.write_text(json.dumps({'backends': {'llama_http': {'url': ''}}}))
+    assert configured_url() == (DEFAULT_URL, 'default')
+
+
+def test_bench_roster_llama_http_arms(tmp_path, monkeypatch):
+    from z0int.backends.bench.contract import is_roster_candidate
+    from z0int.backends.bench.roster import create_backend_for_candidate, probe_candidate
+
+    srv = serve()
+    try:
+        url = f'http://127.0.0.1:{srv.server_port}'
+        monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
+        monkeypatch.delenv('Z0INT_SLM_URL', raising=False)
+        cfg = tmp_path / 'config' / 'z0int.json'
+        cfg.parent.mkdir(parents=True)
+        cfg.write_text(json.dumps({'backends': {'llama_http': {'url': url, 'arms': {
+            'stub': {'model': 'stub.gguf', 'license': 'apache-2.0', 'sha256': 'ab' * 32, 'device': 'vulkan0'},
+            'absent': {'model': 'nope.gguf'}}}}}))
+        assert is_roster_candidate('llama_http:stub') and not is_roster_candidate('llama_http:')
+        assert probe_candidate('llama_http').status == 'available'
+        st = probe_candidate('llama_http:stub')
+        assert st.status == 'available' and st.commercial_use is True
+        absent = probe_candidate('llama_http:absent')
+        assert absent.status == 'unavailable' and 'not offered' in absent.reason
+        assert probe_candidate('llama_http:unknown').status == 'unavailable'
+        backend = create_backend_for_candidate('llama_http:stub')
+        assert backend.model_name == 'stub.gguf' and backend.revision == 'ab' * 32 and backend.device == 'vulkan0'
+        assert backend._body({'prompt': 'x'})['model'] == 'stub.gguf'
+        assert backend.health(load=True).loaded
+    finally:
+        srv.shutdown()
