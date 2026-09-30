@@ -1,0 +1,17 @@
+diff --git a/src/z0int/claude_code_launch.py b/src/z0int/claude_code_launch.py
+index 4d2e087..5c5db60 100644
+--- a/src/z0int/claude_code_launch.py
++++ b/src/z0int/claude_code_launch.py
+@@ -85,6 +85,12 @@ def rank(candidates, profile='lean', ttl=DEFAULT_TTL, root=None, now=None):
+     return rows
+ 
+ 
++def stale_dirs(root=None, ttl=DEFAULT_TTL, now=None):
++    """Recorded directories whose last launch is strictly older than ``ttl`` seconds."""
++    now = time.time() if now is None else now
++    return sorted(d for d, seen in _load(root).items() if now - seen['ts'] > ttl)
++
++
+ def decisions_report(root=None):
+     """Join shadow DecisionOpportunity records with observed turn outcomes (z0int#55 live cohort)."""
+     base = paths.ensure_layout(root)['state'] / 'claude-code'

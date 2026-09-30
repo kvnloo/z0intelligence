@@ -1,0 +1,33 @@
+{
+  "id": "tok-feat-range-weeks",
+  "family": "feature",
+  "repo": "tokenomics",
+  "effort": "low",
+  "source": {
+    "repo": "tokenomics",
+    "sha": "65e8f2dd9d6c5784a2a1c67f5236d69a5ae94021",
+    "paths": [
+      "packages/python",
+      "pyproject.toml",
+      "README.md",
+      "fixtures",
+      "spec",
+      "docs"
+    ]
+  },
+  "oracle_patch": "oracle.patch",
+  "prompt": "Add week support to the savings report range parser. `tokenomics.report.parse_range(spec, *, now=None)` currently accepts today|all|*|<N>d|<N>h|<N>m. Extend it so that `<N>w` (N a non-negative integer, case-insensitive, surrounding whitespace ignored, same as the other units) means the last N weeks: it must return `(end - N*7*86400.0, end)` where `end` is `now` (or the current time). Anything else that ends in `w` but is not exactly digits followed by `w` (e.g. `w`, `1.5w`, `-1w`, `2 w`) must still raise ValueError. Existing units must behave exactly as before, and `build_savings_report(..., range_spec=\"2w\")` / the CLI `--range 2w` should therefore work. Keep the change in packages/python/src/tokenomics/report.py; do not break the existing tests in packages/python/tests/test_report.py. Run tests with `PYTHONPATH=packages/python/src python -m pytest ...` from the repo root (an older copy of the package may be installed; the local source must win).",
+  "check": {
+    "kind": "pytest",
+    "restore": [
+      "packages/python/tests/test_report.py"
+    ],
+    "targets": [
+      "{task}/hidden_test.py",
+      "packages/python/tests/test_report.py"
+    ],
+    "pythonpath": [
+      "packages/python/src"
+    ]
+  }
+}

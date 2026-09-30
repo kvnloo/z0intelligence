@@ -1,0 +1,47 @@
+diff --git a/kerdoios/__init__.py b/kerdoios/__init__.py
+index 1fcc5f9..6a70bff 100644
+--- a/kerdoios/__init__.py
++++ b/kerdoios/__init__.py
+@@ -23,6 +23,9 @@ def _req_from_args(args: dict[str, Any]) -> WorkRequirement:
+     tools = args.get("tools") or []
+     if isinstance(tools, str):
+         tools = [part.strip() for part in tools.split(",") if part.strip()]
++    excluded = args.get("exclude") or []
++    if isinstance(excluded, str):
++        excluded = [part.strip() for part in excluded.split(",") if part.strip()]
+     budget = args.get("budget")
+     return WorkRequirement(
+         coding=float(args.get("coding") or 0.7),
+@@ -37,6 +40,7 @@ def _req_from_args(args: dict[str, Any]) -> WorkRequirement:
+         privacy=str(args.get("privacy") or "public"),  # type: ignore[arg-type]
+         mode=mode,
+         tools=tuple(tools) if tools else ("github",),
++        excluded_providers=tuple(excluded),
+     )
+ 
+ 
+diff --git a/kerdoios/optimize.py b/kerdoios/optimize.py
+index 2790c34..c7b55b6 100644
+--- a/kerdoios/optimize.py
++++ b/kerdoios/optimize.py
+@@ -26,6 +26,8 @@ def hard_filter(offers: list[ResourceOffer], req: WorkRequirement) -> tuple[list
+ 
+ 
+ def _hard_reject(offer: ResourceOffer, req: WorkRequirement) -> str | None:
++    if offer.provider in req.excluded_providers:
++        return f"provider {offer.provider} excluded"
+     if req.privacy == "local_only" and not offer.local:
+         return "privacy local_only excludes remote providers"
+     if req.privacy not in offer.privacy_ok and req.privacy != "public":
+diff --git a/kerdoios/types.py b/kerdoios/types.py
+index 1a10a1f..5b11a9a 100644
+--- a/kerdoios/types.py
++++ b/kerdoios/types.py
+@@ -124,6 +124,7 @@ class WorkRequirement:
+     privacy: PrivacyClass = "public"
+     mode: Mode = Mode.BALANCED
+     tools: tuple[str, ...] = ()
++    excluded_providers: tuple[str, ...] = ()
+ 
+ 
+ @dataclass

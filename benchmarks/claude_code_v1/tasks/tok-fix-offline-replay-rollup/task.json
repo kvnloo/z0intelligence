@@ -1,0 +1,38 @@
+{
+  "id": "tok-fix-offline-replay-rollup",
+  "family": "bugfix",
+  "repo": "tokenomics",
+  "effort": "low",
+  "source": {
+    "repo": "tokenomics",
+    "sha": "65e8f2dd9d6c5784a2a1c67f5236d69a5ae94021",
+    "paths": [
+      "packages/python",
+      "pyproject.toml",
+      "README.md",
+      "fixtures",
+      "spec",
+      "docs"
+    ]
+  },
+  "sabotage": [
+    {
+      "file": "packages/python/src/tokenomics/trace_accounting.py",
+      "old": "get(\"reuse_kind\") or \"\")",
+      "new": "get(\"reuse\") or \"\")"
+    }
+  ],
+  "prompt": "Our frontier trace rollup (`tokenomics.trace_accounting.rollup_trace`) is charging offline-replayed OMP provider rows as fresh provider spend, so a replayed run shows up as a second provider charge in actual_frontier_tokens. `packages/python/tests/test_trace_accounting.py` has a failing test for this. Find the root cause in the library code under packages/python/src and fix it. Do not edit the tests. Run tests with `PYTHONPATH=packages/python/src python -m pytest ...` from the repo root (an older copy of the package may be installed; the local source must win).",
+  "check": {
+    "kind": "pytest",
+    "restore": [
+      "packages/python/tests/test_trace_accounting.py"
+    ],
+    "targets": [
+      "packages/python/tests/test_trace_accounting.py"
+    ],
+    "pythonpath": [
+      "packages/python/src"
+    ]
+  }
+}

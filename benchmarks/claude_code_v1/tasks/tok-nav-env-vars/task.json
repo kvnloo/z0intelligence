@@ -1,0 +1,48 @@
+{
+  "id": "tok-nav-env-vars",
+  "family": "nav",
+  "repo": "tokenomics",
+  "effort": "low",
+  "source": {
+    "repo": "tokenomics",
+    "sha": "65e8f2dd9d6c5784a2a1c67f5236d69a5ae94021",
+    "paths": [
+      "packages/python",
+      "pyproject.toml",
+      "README.md",
+      "fixtures",
+      "spec",
+      "docs"
+    ]
+  },
+  "prompt": "Audit which environment variables the Python package under packages/python/src/tokenomics reads (via os.environ / os.getenv), then write your findings to ANSWERS.json in the repo root as a single JSON object with exactly these keys:\n- \"env_vars\": list of every environment variable name read anywhere in packages/python/src/tokenomics (strings, any order).\n- \"z0int_home_modules\": list of the module file basenames (e.g. \"foo.py\") in that package that read Z0INT_HOME (any order).\n- \"tokenomics_jsonl_modules\": list of the module file basenames that read TOKENOMICS_JSONL (any order).\n- \"hermes_fallback_events_path\": the events JSONL path the Hermes plugin writes to when TOKENOMICS_JSONL and HERMES_HOME are both unset and `hermes_constants` cannot be imported, written with a leading `~/` for the home directory (string).\n- \"default_sources_count\": integer number of paths `tokenomics.report.default_sources()` returns when Z0INT_HOME, OMP_HOME and TOKENOMICS_JSONL are all unset and the directory ~/.omp/tokenomics does not exist.\n- \"omp_events_glob\": the glob pattern (string) default_sources uses to pick up OMP tokenomics files.\nOnly answer from the code; do not modify any source files.",
+  "check": {
+    "kind": "answer_json",
+    "file": "ANSWERS.json",
+    "expect": {
+      "env_vars": [
+        "HERMES_HOME",
+        "OMP_HOME",
+        "TOKENOMICS_JSONL",
+        "Z0INT_HOME"
+      ],
+      "z0int_home_modules": [
+        "emit.py",
+        "report.py"
+      ],
+      "tokenomics_jsonl_modules": [
+        "hermes_plugin.py",
+        "report.py"
+      ],
+      "hermes_fallback_events_path": "~/.hermes/tokenomics/events.jsonl",
+      "default_sources_count": 5,
+      "omp_events_glob": "events-*.jsonl"
+    },
+    "unordered": [
+      "env_vars",
+      "z0int_home_modules",
+      "tokenomics_jsonl_modules"
+    ]
+  },
+  "key_derivation": "grep -rn 'environ\\|getenv' packages/python/src at the pinned sha: emit.py:14 Z0INT_HOME; report.py:223 Z0INT_HOME, :364 OMP_HOME, :368 TOKENOMICS_JSONL; hermes_plugin.py:129 TOKENOMICS_JSONL, :140 HERMES_HOME. hermes_plugin._events_path fallback = Path.home()/'.hermes'/'tokenomics'/'events.jsonl' (confirmed by calling it with HOME=fake). report.default_sources() lists 5 fixed paths under ~/.z0int, adds sorted glob('events-*.jsonl') only if ~/.omp/tokenomics is a dir, and TOKENOMICS_JSONL only if set; confirmed len()==5 by calling it with a fake empty HOME and the env vars unset."
+}

@@ -1,0 +1,13 @@
+{
+  "id": "ker-feature-exclude",
+  "repo": "kerdoios",
+  "family": "feature",
+  "effort": "low",
+  "source": {"repo": "kerdoios", "sha": "fd34a48a3584548696a3fe08a5bb80038be78618", "prefix": "kerdoios"},
+  "prompt": "The `kerdoios/` directory is a Python package that plans LLM worker placement across providers (run anything from the repository root, e.g. `python -m pytest -q kerdoios/tests`; not from inside kerdoios/, since it has a module named types.py). Add a way to exclude whole providers from planning:\n\n1. Add a field `excluded_providers: tuple[str, ...] = ()` to the `WorkRequirement` dataclass (kerdoios/types.py).\n2. In the hard filter used by `kerdoios.optimize.hard_filter` / `plan`, reject any offer whose `provider` is in `req.excluded_providers`, with the rejection reason exactly `provider <name> excluded` (e.g. `provider paid-api excluded`). This check must run before every other hard-filter rule, so an excluded offer always gets this reason even if it would also fail another rule. Excluded offers must therefore never be placed or appear in fallbacks.\n3. In the Hermes plugin entry point (`kerdoios/__init__.py`, function `_req_from_args`), accept an optional `exclude` argument that is either a list of provider names or a comma-separated string (whitespace around names stripped, empty parts dropped), and pass it through as `excluded_providers` (a tuple, in the given order; empty tuple when absent).\n\nDefault behaviour with no exclusions must be unchanged and the existing tests must keep passing.",
+  "oracle_patch": "oracle.patch",
+  "check": {"kind": "pytest",
+            "restore": ["kerdoios/tests/test_optimize.py", "kerdoios/tests/test_inventory.py", "kerdoios/tests/__init__.py"],
+            "targets": ["kerdoios/tests", "{task}/hidden_test.py"],
+            "pythonpath": ["."]}
+}

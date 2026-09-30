@@ -1,0 +1,15 @@
+{
+  "id": "ker-bugfix-merge",
+  "repo": "kerdoios",
+  "family": "bugfix",
+  "effort": "low",
+  "source": {"repo": "kerdoios", "sha": "fd34a48a3584548696a3fe08a5bb80038be78618", "prefix": "kerdoios"},
+  "sabotage": {"file": "kerdoios/inventory.py",
+               "old": "kept = [o for o in base if (o.provider, o.model) not in keys]",
+               "new": "kept = [o for o in base if (o.provider, o.id) not in keys]"},
+  "prompt": "The `kerdoios/` directory is a Python package that plans LLM worker placement across providers. Since a recent refactor, `kerdoios inventory --live` shows duplicate OpenRouter entries: when a live catalog row describes the same model as a built-in fixture row, both appear instead of the live row replacing the fixture one. One test catches this; run the suite from the repository root with `python -m pytest -q kerdoios/tests` (run it from the root, not from inside kerdoios/, since the package has a module named types.py). Fix the bug in the library code (do not modify tests) so the whole suite passes.",
+  "check": {"kind": "pytest",
+            "restore": ["kerdoios/tests/test_optimize.py", "kerdoios/tests/test_inventory.py", "kerdoios/tests/__init__.py"],
+            "targets": ["kerdoios/tests"],
+            "pythonpath": ["."]}
+}

@@ -1,0 +1,47 @@
+{
+ "id": "zint-nav-posture-importers",
+ "repo": "z0intelligence",
+ "effort": "low",
+ "family": "nav",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "b0724680bc7858ac872bd25c72ff8944322c6094",
+  "paths": [
+   "src",
+   "tests",
+   "pyproject.toml",
+   "README.md"
+  ]
+ },
+ "prompt": "In this repository, which Python modules under src/z0int (excluding src/z0int/posture.py itself) import anything from the resource-posture module z0int.posture, and which names does each of them import from it? Also report the posture verdict names that module defines and the default values of its reserve_ratio and burn_horizon_hours thresholds. Write ANSWERS.json with exactly these keys: \"importers\": an object mapping each importing module's path relative to the repo root (e.g. \"src/z0int/foo.py\") to the sorted list of names it imports from z0int.posture; \"verdicts\": list of the posture verdict names; \"reserve_ratio\": number; \"burn_horizon_hours\": number.",
+ "key_derivation": "grep 'from .posture import' across src/z0int at b072468: cli.py imports main (as posture_main); state_packet.py current_posture, render_line; worker_routing.py shadow_annotation. POSTURES tuple and Thresholds defaults in posture.py.",
+ "check": {
+  "kind": "answer_json",
+  "file": "ANSWERS.json",
+  "unordered": [
+   "verdicts"
+  ],
+  "expect": {
+   "importers": {
+    "src/z0int/cli.py": [
+     "main"
+    ],
+    "src/z0int/state_packet.py": [
+     "current_posture",
+     "render_line"
+    ],
+    "src/z0int/worker_routing.py": [
+     "shadow_annotation"
+    ]
+   },
+   "verdicts": [
+    "BURN",
+    "BALANCED",
+    "OFFLOAD",
+    "RESERVE"
+   ],
+   "reserve_ratio": 0.85,
+   "burn_horizon_hours": 24.0
+  }
+ }
+}

@@ -1,0 +1,40 @@
+{
+  "id": "tok-fix-trace-aggregate-doublecount",
+  "family": "bugfix",
+  "repo": "tokenomics",
+  "effort": "low",
+  "source": {
+    "repo": "tokenomics",
+    "sha": "65e8f2dd9d6c5784a2a1c67f5236d69a5ae94021",
+    "paths": [
+      "packages/python",
+      "pyproject.toml",
+      "README.md",
+      "fixtures",
+      "spec",
+      "docs"
+    ]
+  },
+  "sabotage": [
+    {
+      "file": "packages/python/src/tokenomics/aggregate.py",
+      "old": "total = sum(_event_tokens(r) for r in incremental)",
+      "new": "total = sum(_event_tokens(r) for r in rows)"
+    }
+  ],
+  "prompt": "When a trace contains both per-call usage rows and a session-level aggregate usage row, `summarize_trace` reports an inflated total_tokens (and the savings report's reconciliation is off as a result). Tests in `packages/python/tests/test_aggregate.py` and `packages/python/tests/test_report_attribution.py` are failing. Find the root cause in the library code under packages/python/src and fix it. Do not edit the tests. Run tests with `PYTHONPATH=packages/python/src python -m pytest ...` from the repo root (an older copy of the package may be installed; the local source must win).",
+  "check": {
+    "kind": "pytest",
+    "restore": [
+      "packages/python/tests/test_aggregate.py",
+      "packages/python/tests/test_report_attribution.py"
+    ],
+    "targets": [
+      "packages/python/tests/test_aggregate.py",
+      "packages/python/tests/test_report_attribution.py"
+    ],
+    "pythonpath": [
+      "packages/python/src"
+    ]
+  }
+}
