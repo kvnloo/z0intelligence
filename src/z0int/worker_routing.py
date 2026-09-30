@@ -212,6 +212,7 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
                'route_source': plan['source'], 'execution_source': 'z0intelligence',
                'policy_revision': policy['policy_revision'], 'policy_sha256': hashlib.sha256(POLICY_PATH.read_bytes()).hexdigest(),
                'category': plan['category'], 'reason': plan['reason'], 'physical_call_attempted': False,
+               'resource_posture': plan.get('resource_posture'),
                'task_sha256': hashlib.sha256(args['task'].encode()).hexdigest(),
                'context_sha256': hashlib.sha256(args.get('context', '').encode()).hexdigest(),
                'usage_source': 'unknown', 'expected_cost': None})
@@ -290,6 +291,24 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
     return {'ok': ok, 'output': output, 'receipt': receipt}
 
 
+def posture_annotate(plan, route_kind='offload'):
+    """Shadow resource posture on a routing decision (z0int.posture). Annotates, never changes the plan,
+    unless ~/.z0int/config/posture.local.json sets posture_enforce: true (default false). Fail-open."""
+    try:
+        from .posture import shadow_annotation
+        ann = shadow_annotation(route_kind)
+    except Exception as exc:
+        ann = {'available': False, 'error': type(exc).__name__, 'enforce': False}
+    plan['resource_posture'] = ann
+    if ann.get('enforce') is True and ann.get('available') and not ann.get('agrees') and route_kind == 'offload':
+        # Enforced BURN: frontier surplus perishes, so hand bounded work back to the parent instead of offloading.
+        plan['skipped'] = plan.get('skipped', []) + [{'provider': c['provider'], 'reason': 'posture_burn_parent_should_absorb'}
+                                                     for c in plan.get('candidates', [])]
+        plan['candidates'] = []
+        ann['enforced'] = True
+    return plan
+
+
 def route_worker(args):
     from .dispatch_authority import run,identity
     request={**args,'harness':args.get('harness','codex'),'function':'cheap_bounded_worker'}
@@ -300,6 +319,7 @@ def route_worker(args):
         policy,providers=configuration()
         plan={**plan_route(args['task'],policy,providers),'source':'z0intelligence.task_rules',
               'harness':request['harness'],'caller_trace_id':request['trace_id']}
+        posture_annotate(plan)
         return execute_plan(args,policy,providers,plan,receipt_sink=sink)
     return run(request,work)
 
@@ -352,7 +372,8 @@ def execute_plan(args, policy, providers, plan, *, receipt_sink, receipt_locatio
             'provider': attempts[-1]['provider'] if attempts else None,
             'model': attempts[-1]['model'] if attempts else None,
             'free_only':free_required(policy,args),'requires_parent':not result['ok'],
-            'refusal_reason':None if result['ok'] else 'No candidate completed; no paid overflow',
+            'refusal_reason':None if result['ok'] else ('Resource posture BURN (enforced): frontier surplus perishes; parent should absorb'
+                                                        if (plan.get('resource_posture') or {}).get('enforced') else 'No candidate completed; no paid overflow'),
             'attempts': attempts, 'receipt_path': receipt_location if receipt_location is not None else str(receipts_path()),
             'latency_ms': (time.monotonic() - started) * 1000,
             'input_tokens': sum(a.get('input_tokens') or 0 for a in attempts),
