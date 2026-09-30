@@ -41,6 +41,9 @@ from .context_resolve import ContextPacket, EvidenceRef, InformationNeed
 
 SCHEMA = "z0int.state_packet.v0"
 POLICY_REVISION = "sp-v0.2"
+# Cached packets must not outlive the code that built them: a reducer/adapter fix otherwise stays
+# invisible until some source revision happens to change.
+CODE_REVISION = __import__("hashlib").sha256(Path(__file__).read_bytes()).hexdigest()[:12]
 
 INTENTS: dict[str, tuple[str, ...]] = {
     # intent -> facts required before any ACT transition is legal
@@ -855,9 +858,13 @@ def adapter_claude_code(repo: Path, reader: Reader, projects_root: Path | None =
                                    "transcripts_scanned": len(files), "sessions": index},
             EvidenceRef(source_id="claude-code:index", source_version=f"files={len(files)}",
                         locator=str(root), trust_class="conversation", observed_at=_now_iso()), material=False)
-    if top_level:
-        f, s = top_level[0]
-        b.claim("conv.latest_session", str(s.get("session_id") or f.stem)[:8],
+    # Prefer a top-level session; if only sub-agent sessions touched this repo, the latest one is still a
+    # known fact (marked /sub:) — reporting "unknown" when the evidence exists would conflate unknown with absent.
+    latest = top_level[:1] or sessions[:1]
+    if latest:
+        f, s = latest[0]
+        value = str(s.get("session_id") or f.stem)[:8] + ("/sub:" + f.stem[-8:] if s.get("is_subagent") else "")
+        b.claim("conv.latest_session", value,
                 EvidenceRef(source_id=f"claude-code:{s.get('session_id')}", source_version=f"lines={s.get('last_line')}",
                             locator=f"{f.parent.name}/{f.name}", trust_class="conversation",
                             observed_at=s.get("last_ts") or ""))
@@ -885,7 +892,7 @@ def _load_prior(repo: Path) -> dict[str, Any] | None:
 
 def _cache_key(intent: str, required: tuple[str, ...], repo: Path, revisions: dict[str, Any]) -> str:
     return _sha(json.dumps(
-        {"schema": SCHEMA, "policy": POLICY_REVISION, "intent": intent, "required": list(required),
+        {"schema": SCHEMA, "policy": POLICY_REVISION, "code": CODE_REVISION, "intent": intent, "required": list(required),
          "scope": str(repo), "rev": revisions}, sort_keys=True), 20)
 
 

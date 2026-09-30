@@ -2,10 +2,44 @@
  "schema": "z0int.decision_opportunity.falsification.v0",
  "preregistered_commit": "402d622",
  "cohort": "benchmarks/state_packet/questions_pinned.json (11 pinned held-out current-work questions; fixtures + frozen transcripts local)",
- "strict": {"packet_alone": "2/11", "do_repo": "3/11", "do_question": "8/11"},
- "per_class_do_question": {"answer": "5/8", "abstain": "2/2", "conflict": "1/1"},
- "false_act": {"packet_alone": 0, "do_repo": 0, "do_question": 0},
+ "strict": {
+  "packet_alone": "2/11",
+  "do_repo": "3/11",
+  "do_question": "8/11"
+ },
+ "per_class_do_question": {
+  "answer": "5/8",
+  "abstain": "2/2",
+  "conflict": "1/1"
+ },
+ "false_act": {
+  "packet_alone": 0,
+  "do_repo": 0,
+  "do_question": 0
+ },
  "decision_rule": "PASS: do_question beats packet_alone and loses no abstain/conflict item packet_alone got right",
  "misses": "p03, p08, p09 -> ASK (safe side). Root cause: state_packet reports conv.latest_session unknown when the only transcripts are subagent sessions; the facts exist (Sonnet+tools answered them).",
- "caveats": ["n=11, one snapshot", "scoping vocabulary authored after seeing the prompt text of p01 (not its key)", "deterministic arms only; no learner"]
+ "caveats": [
+  "n=11, one snapshot",
+  "scoping vocabulary authored after seeing the prompt text of p01 (not its key)",
+  "deterministic arms only; no learner"
+ ],
+ "post_fix_dev": {
+  "label": "DEV-derived: two packet fixes motivated by the p03/p08/p09 misses (not held-out)",
+  "fixes": [
+   "conv.latest_session from sub-agent-only history (marked /sub:)",
+   "packet cache key includes a code hash (stale cached packets hid the first fix)"
+  ],
+  "strict": {
+   "packet_alone": "7/11",
+   "do_repo": "3/11",
+   "do_question": "11/11"
+  },
+  "per_class_do_question": {
+   "answer": "8/8",
+   "abstain": "2/2",
+   "conflict": "1/1"
+  },
+  "note": "scoping still adds value after the fix: answer 8/8 vs 5/8 and conflict 1/1 vs 0/1 over packet alone"
+ }
 }

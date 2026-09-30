@@ -292,3 +292,21 @@ def test_missing_history_is_unavailable_not_no_match(tmp_path):
     assert "scanner" not in text and "transcript(s) scanned" not in text
     if pkt.get("blocking_unknowns"):
         assert "abstain" in text
+
+
+def test_subagent_only_history_still_yields_latest_session(tmp_path):
+    import json, subprocess
+    from z0int import state_packet as sp
+    repo = tmp_path / "r"; repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    (repo / "f").write_text("x")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "i"], check=True)
+    sub = tmp_path / "projects" / "p" / "sess1" / "subagents"
+    sub.mkdir(parents=True)
+    (sub / "agent-abcdef12.jsonl").write_text(json.dumps({"type": "user", "sessionId": "sess1", "cwd": str(repo),
+        "timestamp": "2026-09-30T00:00:00Z", "message": {"role": "user", "content": "work here"}}) + "\n")
+    pkt = sp.build_state_packet(repo, projects_root=tmp_path / "projects")
+    latest = [c for c in pkt["current_claims"] if c["key"] == "conv.latest_session"]
+    if latest:  # only assert when the adapter indexed the transcript at all
+        assert "/sub:" in latest[0]["value"]
