@@ -42,10 +42,50 @@ def turn_id(hook):
     return hashlib.sha256(f"{hook.get('session_id')}\0{size}\0{hook.get('prompt')}".encode()).hexdigest()
 
 
+def opportunities_path(root=None):
+    return paths.ensure_layout(root)['state'] / HARNESS / 'opportunities.jsonl'
+
+
+def emit_opportunity_async(hook):
+    """z0int#62 shadow emission: build a DecisionOpportunity for this prompt OFF the hot path.
+
+    The hook returns immediately; a detached child builds the record (1-3 s) and appends it to a
+    private local file. Nothing is injected, routed or sent anywhere.
+    """
+    if os.environ.get('Z0INT_CLAUDE_CODE_OPPORTUNITIES', '1' if config().get('opportunities', True) else '0') == '0':
+        return False
+    import subprocess
+    child = subprocess.Popen([sys.executable, '-m', 'z0int.claude_code', 'opportunity'], stdin=subprocess.PIPE,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    child.stdin.write(json.dumps(hook).encode())
+    child.stdin.close()
+    return True
+
+
+def on_opportunity(hook, root=None):
+    from .decision_opportunity import build_decision_opportunity, deterministic_gate
+    from .state_packet import repo_root
+    repo = repo_root(hook.get('cwd') or os.getcwd())
+    if repo is None:
+        return None
+    opp = build_decision_opportunity(repo, hook['prompt'], harness=HARNESS, trace_id=turn_id(hook))
+    record = {'schema': 'z0int.claude_code.opportunity_record.v0', 'session_id': hook.get('session_id'),
+              'gate': deterministic_gate(opp), 'opportunity': opp}
+    path = opportunities_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('a', encoding='utf-8') as fh:
+        fh.write(json.dumps(record, ensure_ascii=False, default=str) + '\n')
+    return record
+
+
 def on_prompt(hook):
     text = hook.get('prompt')
     if not isinstance(text, str) or not text.strip():
         return None
+    try:
+        emit_opportunity_async(hook)
+    except Exception:
+        pass  # shadow emission never affects the turn
     session = hook.get('session_id') or HARNESS
     event = dict(harness=HARNESS, session_id=session, turn_id=turn_id(hook), instance_id=session, text=text)
     result = automatic.handle_event(event)
@@ -132,11 +172,14 @@ def on_session_start(stdin_text):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('event', choices=['prompt', 'stop', 'session-start'])
+    parser.add_argument('event', choices=['prompt', 'stop', 'session-start', 'opportunity'])
     args = parser.parse_args()
     try:
         if args.event == 'session-start':
             output = on_session_start(sys.stdin.read())
+        elif args.event == 'opportunity':
+            on_opportunity(json.load(sys.stdin))
+            output = None
         else:
             hook = json.load(sys.stdin)
             output = on_prompt(hook) if args.event == 'prompt' else (on_stop(hook) and None)

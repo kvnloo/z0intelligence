@@ -25,6 +25,7 @@ def test_claude_code_is_a_harness(monkeypatch):
 
 
 def test_shadow_prompt_is_inert(monkeypatch, tmp_path):
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_OPPORTUNITIES', '0')
     transcript = tmp_path / 't.jsonl'
     transcript.write_text('')
     seen = []
@@ -36,6 +37,7 @@ def test_shadow_prompt_is_inert(monkeypatch, tmp_path):
 
 
 def test_live_prompt_delivers_additional_context(monkeypatch, tmp_path):
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_OPPORTUNITIES', '0')
     consumed = []
     monkeypatch.setattr(automatic, 'handle_event', lambda e: {'action': 'context', 'context': 'data', 'receipt_id': 'r1'})
     monkeypatch.setattr(automatic, 'post', lambda path, value: consumed.append(value))
@@ -46,6 +48,7 @@ def test_live_prompt_delivers_additional_context(monkeypatch, tmp_path):
 
 
 def test_native_result_is_never_injected(monkeypatch):
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_OPPORTUNITIES', '0')
     monkeypatch.setattr(automatic, 'handle_event', lambda e: {'action': 'native'})
     monkeypatch.setenv('Z0INT_CLAUDE_CODE_SHADOW', '0')
     assert claude_code.on_prompt({'session_id': 's', 'prompt': 'q'}) is None
@@ -112,3 +115,42 @@ def test_host_config_drives_packet_and_shadow(monkeypatch, tmp_path):
     assert claude_code.on_session_start('{}') is not None
     monkeypatch.setenv('Z0INT_CLAUDE_CODE_PACKET', '0')  # env overrides config
     assert claude_code.on_session_start('{}') is None
+
+
+def test_prompt_hook_emits_opportunity_off_the_hot_path(monkeypatch):
+    spawned = []
+
+    class FakePopen:
+        def __init__(self, argv, **kw):
+            spawned.append((argv, kw))
+            self.stdin = __import__('io').BytesIO()
+
+    import subprocess
+    monkeypatch.setattr(subprocess, 'Popen', FakePopen)
+    monkeypatch.setattr(automatic, 'handle_event', lambda e: {'action': 'native'})
+    monkeypatch.delenv('Z0INT_CLAUDE_CODE_OPPORTUNITIES', raising=False)
+    assert claude_code.on_prompt({'session_id': 's', 'prompt': 'what branch?', 'cwd': '/tmp'}) is None
+    argv, kw = spawned[0]
+    assert argv[-1] == 'opportunity' and kw['start_new_session'] is True
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_OPPORTUNITIES', '0')
+    spawned.clear()
+    claude_code.on_prompt({'session_id': 's', 'prompt': 'x'})
+    assert spawned == []
+
+
+def test_opportunity_record_written_for_a_repo(monkeypatch, tmp_path):
+    import subprocess
+    from z0int import state_packet as sp
+    repo = tmp_path / 'r'; repo.mkdir()
+    subprocess.run(['git', 'init', '-q', '-b', 'main', str(repo)], check=True)
+    (repo / 'f').write_text('x')
+    subprocess.run(['git', '-C', str(repo), 'add', '-A'], check=True)
+    subprocess.run(['git', '-C', str(repo), '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'i'], check=True)
+    (tmp_path / 'projects').mkdir()
+    monkeypatch.setattr(sp, 'default_projects_root', lambda: tmp_path / 'projects')
+    rec = claude_code.on_opportunity({'session_id': 's', 'prompt': 'what branch am I on?', 'cwd': str(repo), 'prompt_id': 'p1'},
+                                     root=tmp_path / 'home')
+    assert rec['gate'] == 'ACT' and rec['opportunity']['trace']['harness'] == 'claude-code'
+    rows = (tmp_path / 'home' / 'state' / 'claude-code' / 'opportunities.jsonl').read_text().splitlines()
+    assert len(rows) == 1 and json.loads(rows[0])['opportunity']['scope']['families'] == ['git.branch']
+    assert claude_code.on_opportunity({'prompt': 'q', 'cwd': str(tmp_path)}, root=tmp_path / 'home') is None  # not a repo
