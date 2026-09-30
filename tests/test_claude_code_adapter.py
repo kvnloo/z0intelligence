@@ -154,3 +154,20 @@ def test_opportunity_record_written_for_a_repo(monkeypatch, tmp_path):
     rows = (tmp_path / 'home' / 'state' / 'claude-code' / 'opportunities.jsonl').read_text().splitlines()
     assert len(rows) == 1 and json.loads(rows[0])['opportunity']['scope']['families'] == ['git.branch']
     assert claude_code.on_opportunity({'prompt': 'q', 'cwd': str(tmp_path)}, root=tmp_path / 'home') is None  # not a repo
+
+
+def test_stop_writes_observed_turn_behaviour(tmp_path):
+    root = tmp_path / 'home'
+    transcript = tmp_path / 's.jsonl'
+    rows = [
+        {'type': 'assistant', 'message': {'id': 'm1', 'model': 'claude-sonnet-5-5', 'usage': {'input_tokens': 1, 'output_tokens': 1},
+                                         'content': [{'type': 'tool_use', 'name': 'Bash', 'input': {}}]}},
+        {'type': 'assistant', 'message': {'id': 'm2', 'model': 'claude-sonnet-5-5', 'usage': {'input_tokens': 1, 'output_tokens': 1},
+                                         'content': [{'type': 'text', 'text': 'Which branch did you mean?'}]}},
+    ]
+    transcript.write_text('\n'.join(json.dumps(r) for r in rows) + '\n')
+    claude_code.on_stop({'session_id': 's', 'transcript_path': str(transcript), 'prompt_id': 'p9'}, root=root)
+    out = [json.loads(l) for l in (root / 'state' / 'claude-code' / 'outcomes.jsonl').read_text().splitlines()]
+    assert out == [{'schema': 'z0int.claude_code.turn_outcome.v0', 'session_id': 's', 'trace_id': 'p9',
+                    'label_kind': 'observed_behaviour_not_optimal', 'asked_user': True, 'asked_via_tool': False,
+                    'tool_calls': 1, 'assistant_messages': 2}]

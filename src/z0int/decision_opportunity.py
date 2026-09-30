@@ -82,7 +82,9 @@ def _scope(packet: Mapping[str, Any], request: str) -> dict[str, Any]:
     """Question-scoped state: only facts the request depends on may block it."""
     families = required_families(request)
     if not families:
-        return {"mode": "repo", "families": []}
+        # A request that depends on no known fact family must not inherit unrelated repo-level
+        # blockers (e.g. a docs priority conflict blocking a coding question); authority still gates.
+        return {"mode": "unscoped", "families": [], "prefixes": [], "missing": []}
     prefixes = [p for f in families for p in FACT_FAMILIES[f][0]]
     claims = [c["key"] for c in packet.get("current_claims") or []]
     coverage = packet.get("coverage") or {}
@@ -156,7 +158,7 @@ def build_decision_opportunity(repo: str | Path, request: str, *, effects: Itera
     scope = _scope(packet, request) if scoped else {"mode": "repo", "families": []}
     unknowns = _unknowns(packet)
     contradictions = list(packet.get("contradictions") or [])
-    if scope["mode"] == "question":
+    if scope["mode"] in ("question", "unscoped"):
         pre = scope["prefixes"]
         for u in unknowns:  # an unknown blocks only if the question depends on its family
             u["blocking"] = _matches(u["key"], pre)

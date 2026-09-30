@@ -142,5 +142,8 @@ def test_required_family_without_claims_becomes_explicit_unknown():
     assert do.deterministic_gate(opp) == "ASK"
 
 
-def test_unmatched_request_falls_back_to_repo_scope():
-    assert build(request="hello there")["scope"]["mode"] == "repo"
+def test_unmatched_request_is_unscoped_not_repo_blocked():
+    p = packet(contradictions=CONFLICT, blocking_unknowns=[{"key": "conv.latest_session", "reason": "x"}])
+    opp = build(p, request="which file sets the hook timeout?")
+    assert opp["scope"]["mode"] == "unscoped" and do.deterministic_gate(opp) == "ACT"
+    assert do.deterministic_gate(build(p, request="which file sets the hook timeout?", effects=["write"])) == "ASK"

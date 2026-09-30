@@ -129,6 +129,25 @@ def transcripts(hook):
             yield 'subagent', path
 
 
+def turn_behaviour(fresh):
+    """Observed behaviour of the turn (z0int#54): what the frontier did — NOT an optimal label."""
+    ordered = [fresh[k] for k in sorted(fresh)]
+    tools = [b for m in ordered for b in (m.get('content') or []) if isinstance(b, dict) and b.get('type') == 'tool_use']
+    last_text = ''
+    for m in reversed(ordered):
+        texts = [b.get('text', '') for b in (m.get('content') or []) if isinstance(b, dict) and b.get('type') == 'text']
+        if texts:
+            last_text = texts[-1].strip()
+            break
+    asked_tool = any(t.get('name') == 'AskUserQuestion' for t in tools)
+    return {'asked_user': asked_tool or last_text.endswith('?'), 'asked_via_tool': asked_tool,
+            'tool_calls': len(tools), 'assistant_messages': len(ordered)}
+
+
+def outcomes_path(root=None):
+    return paths.ensure_layout(root)['state'] / HARNESS / 'outcomes.jsonl'
+
+
 def on_stop(hook, root=None):
     session = hook.get('session_id')
     if not session or not hook.get('transcript_path'):
@@ -154,6 +173,17 @@ def on_stop(hook, root=None):
             extra={'message_count': len(fresh)}, root=root)
         seen.update(fresh)
         emitted.append({'role': role, 'usage': usage, 'messages': len(fresh)})
+        if role == 'root':
+            try:  # link to the prompt's DecisionOpportunity record by trace id (prompt_id)
+                row = {'schema': 'z0int.claude_code.turn_outcome.v0', 'session_id': session,
+                       'trace_id': hook.get('prompt_id'), 'label_kind': 'observed_behaviour_not_optimal',
+                       **turn_behaviour(fresh)}
+                out = outcomes_path(root)
+                out.parent.mkdir(parents=True, exist_ok=True)
+                with out.open('a', encoding='utf-8') as fh:
+                    fh.write(json.dumps(row) + '\n')
+            except Exception:
+                pass
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text(json.dumps({'message_ids': sorted(seen)}))
     return emitted
