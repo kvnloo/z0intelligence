@@ -227,8 +227,9 @@ def evaluate_pool(pool: Pool, now: datetime, th: Thresholds = Thresholds()) -> d
 def _group_postures(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     def key(row: dict[str, Any]) -> tuple[Any, ...]:
         # Binding window: highest-precedence posture; ties -> longest window (the plan budget, e.g. weekly
-        # over 5h), then a pool with an observed ratio, then id (rows arrive id-sorted, so min id wins).
-        return (_GROUP_PRECEDENCE[row["posture"]], row.get("window_hours") or 0, row.get("ratio") is not None)
+        # over 5h), then the more constrained pool (higher ratio; unobserved last), then id (rows arrive id-sorted).
+        ratio = row.get("ratio")
+        return (_GROUP_PRECEDENCE[row["posture"]], row.get("window_hours") or 0, -1.0 if ratio is None else ratio)
 
     groups: dict[str, dict[str, Any]] = {}
     best: dict[str, dict[str, Any]] = {}
