@@ -110,13 +110,26 @@ def on_stop(hook, root=None):
     return emitted
 
 
+def on_session_start(stdin_text):
+    # Opt-in: measured as an aid to tools (held-out 14/14 vs 12/14, -30% input tokens),
+    # not a replacement for them; off by default until a per-host A/B says otherwise.
+    if os.environ.get('Z0INT_CLAUDE_CODE_PACKET') != '1':
+        return None
+    from .state_packet import session_start_hook
+    out = session_start_hook(stdin_text, max_tokens=int(os.environ.get('Z0INT_CLAUDE_CODE_PACKET_TOKENS', '1500')))
+    return out if out['hookSpecificOutput']['additionalContext'] else None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('event', choices=['prompt', 'stop'])
+    parser.add_argument('event', choices=['prompt', 'stop', 'session-start'])
     args = parser.parse_args()
     try:
-        hook = json.load(sys.stdin)
-        output = on_prompt(hook) if args.event == 'prompt' else (on_stop(hook) and None)
+        if args.event == 'session-start':
+            output = on_session_start(sys.stdin.read())
+        else:
+            hook = json.load(sys.stdin)
+            output = on_prompt(hook) if args.event == 'prompt' else (on_stop(hook) and None)
     except Exception:
         # A hook failure must never block or alter the native turn.
         output = None

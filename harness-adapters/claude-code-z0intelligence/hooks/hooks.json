@@ -32,6 +32,17 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-python3}\" -m z0int.claude_code session-start || true",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

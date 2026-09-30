@@ -87,3 +87,12 @@ def test_cli_fails_open_on_garbage():
 def test_turn_id_prefers_prompt_id():
     assert claude_code.turn_id({'prompt_id': 'p-1', 'session_id': 's', 'prompt': 'x'}) == 'p-1'
     assert len(claude_code.turn_id({'session_id': 's', 'prompt': 'x'})) == 64
+
+
+def test_session_start_packet_is_opt_in(monkeypatch):
+    monkeypatch.delenv('Z0INT_CLAUDE_CODE_PACKET', raising=False)
+    assert claude_code.on_session_start('{"cwd": "/"}') is None
+    import z0int.state_packet as sp
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_PACKET', '1')
+    monkeypatch.setattr(sp, 'session_start_hook', lambda text, max_tokens: {'hookSpecificOutput': {'hookEventName': 'SessionStart', 'additionalContext': f'packet {max_tokens}'}})
+    assert claude_code.on_session_start('{}')['hookSpecificOutput']['additionalContext'] == 'packet 1500'
