@@ -53,6 +53,12 @@ class Service(ThreadingHTTPServer):
         finally:SLOTS.release()
 
 
+def plan_intelligence(args):
+    """Pure shadow wrapper: route against a snapshot without dispatch or receipt writes."""
+    selected=route(args,routing_snapshot(args))
+    return {'ok':True,'mode':'shadow','executed':False,'route':selected}
+
+
 class Handler(BaseHTTPRequestHandler):
     def setup(self):
         super().setup();self.connection.settimeout(30)
@@ -96,9 +102,7 @@ class Handler(BaseHTTPRequestHandler):
                 from .worker_routing import dispatch_worker
                 return self.reply(200,dispatch_worker(args))
             if self.path=='/v1/automatic/consumed':return self.reply(200,consume(args))
-            if self.path=='/v1/plan':
-                selected=route(args,routing_snapshot(args))
-                return self.reply(200,{'ok':True,'mode':'shadow','executed':False,'route':selected})
+            if self.path=='/v1/plan':return self.reply(200,plan_intelligence(args))
             started=time.monotonic()
             with METRIC_LOCK:
                 METRICS['dispatch_active']+=1
