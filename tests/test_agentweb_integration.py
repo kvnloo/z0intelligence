@@ -20,9 +20,13 @@ def test_agentweb_event_normalizes_to_stable_pseudonymous_dispatch_identity():
     request = automatic.normalize(event)
 
     assert request["harness"] == "agentweb"
-    assert request["parent_agent"] == "agentweb-session-secret"
+    expected_parent = "agentweb:" + hashlib.sha256(
+        b"agentweb-session-secret"
+    ).hexdigest()[:24]
+    assert request["parent_agent"] == expected_parent
+    assert "agentweb-session-secret" not in request["parent_agent"]
     assert request["trace_id"] == hashlib.sha256(
-        b"agentweb-session-secret\\0operation-42"
+        (expected_parent + "\\0operation-42").encode()
     ).hexdigest()
     assert request["function"] == "summarization"
     assert request["automatic"] is True
