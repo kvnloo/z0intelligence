@@ -85,8 +85,9 @@ Contradictions that ESCALATE:
 - The branch or its PR cites a `benchmarks/…results….json` that is not in the branch tree.
 
 A report entry at a different SHA than the branch tip is **stale**: `merge` becomes `unknown`, and the OBSERVE
-action is to re-run the nightly. A branch that is already an ancestor of the default branch (graduated), or one
-that no longer exists, gets ABSTAIN with the reason given.
+action is to re-run the nightly. A branch that is already an ancestor of the default branch gets ABSTAIN with the reason given. So does a
+branch whose merge onto the default branch yields the default branch's own tree (its content was squash-merged
+or cherry-picked, so merging would be a no-op), and a branch that no longer exists.
 
 ## Output
 

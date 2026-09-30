@@ -545,7 +545,7 @@ def fact_merge(branch: str, sha: str, default_sha: str, repo: Path, scratch: Pat
                 f.observe = "re-run the nightly rebuild: final gate was not green"
     f.evidence.append(kept_ev)
     clean = mt.get("clean")
-    f.value = {"clean": clean, "kept": kept}
+    f.value = {"clean": clean, "kept": kept, "merge_tree": mt.get("tree")}
     if clean is False and kept is True:
         f.status = "unknown"
         f.contradiction = ("nightly kept the branch, but it does not merge onto the default branch alone "
@@ -760,46 +760,53 @@ def check_branch(repo: Path, entry: Mapping[str, Any], *, default: str, default_
         with tempfile.TemporaryDirectory(prefix="z0promote-") as tmp:
             scratch = Path(tmp)
             fm, rentry = fact_merge(branch, sha, default_sha, repo, scratch, report, report_path)
-            facts.append(fm)
-            base = _git(repo, "merge-base", default_sha, sha).stdout.strip() or default_sha
-            changed = changed_files(repo, base, sha)
-            tree = scratch / "tree"
-            graph, err, files = None, None, []
-            try:
-                files = extract_tree(repo, sha, tree)
-                graph = ImportGraph(tree, files, extra_roots)
-            except Exception as exc:  # noqa: BLE001 - becomes an unknown, never a pass
-                err = f"{type(exc).__name__}: {exc}"
-            roots = src_roots(tree) if files else ["src"]
-            added = sorted(p for p, st in changed.items() if st == "A" and files and is_source_module(p, roots, tree))
-            facts.append(fact_wired(graph, added, err))
-            # tested: added function-body lines in changed source modules must be executed
-            src_changed = [p for p, st in changed.items() if st in ("A", "M") and files and is_source_module(p, roots, tree)]
-            adds = added_lines(repo, base, sha, src_changed)
-            gated, ungated = {}, []
-            for rel in src_changed:
-                fl = _funclines((tree / rel).read_text(errors="replace")) if (tree / rel).exists() else None
-                lines = adds.get(rel, set())
-                g = lines & fl if fl else (lines if fl == set() else set())
-                if g:
-                    gated[rel] = g
-                else:
-                    ungated.append(rel)
-            run = None
-            if test_cmd and run_tests and gated and files:
-                run = run_ci_tests(tree, test_cmd, scratch, test_timeout)
-            elif test_cmd and gated and not run_tests:
-                run = {"ran": False, "reason": "--no-tests"}
-            facts.append(fact_tested(test_cmd, cmd_src, run, gated, ungated, rentry))
-            log = _git(repo, "log", "--no-merges", "--format=%s%n%b", f"{base}..{sha}").stdout
-            texts = [("commits", log)]
-            pr_list = (prs or {}).get(branch, [])
-            for pr in pr_list:
-                texts.append((f"PR #{pr['number']}", f"{pr.get('title', '')}\n{pr.get('body') or ''}"))
-                extra.append({"key": f"promote.pr[{pr['number']}]", "value": {"state": pr.get("state"), "base": pr.get("baseRefName"),
-                              "url": pr.get("url")}, "status": "observed", "evidence": []})
-            facts.append(fact_receipt(texts, prs is not None, changed, set(files)))
-            revisions["commits"] = int(_git(repo, "rev-list", "--count", f"{base}..{sha}").stdout.strip() or 0)
+            default_tree = _git(repo, "rev-parse", f"{default_sha}^{{tree}}").stdout.strip()
+            if fm.value.get("merge_tree") and fm.value["merge_tree"] == default_tree:
+                # squash-merged / cherry-picked: merging changes nothing, so there is nothing to promote
+                facts.append(Fact("promote.pending", "no_match", value={"merge_tree": default_tree},
+                                  reason=f"content already in {default} (merge onto it is a no-op); remove it from the manifest",
+                                  evidence=[f"merge-tree result == {default}^{{tree}} {default_tree[:12]}", *fm.evidence[1:]]))
+            else:
+                facts.append(fm)
+                base = _git(repo, "merge-base", default_sha, sha).stdout.strip() or default_sha
+                changed = changed_files(repo, base, sha)
+                tree = scratch / "tree"
+                graph, err, files = None, None, []
+                try:
+                    files = extract_tree(repo, sha, tree)
+                    graph = ImportGraph(tree, files, extra_roots)
+                except Exception as exc:  # noqa: BLE001 - becomes an unknown, never a pass
+                    err = f"{type(exc).__name__}: {exc}"
+                roots = src_roots(tree) if files else ["src"]
+                added = sorted(p for p, st in changed.items() if st == "A" and files and is_source_module(p, roots, tree))
+                facts.append(fact_wired(graph, added, err))
+                # tested: added function-body lines in changed source modules must be executed
+                src_changed = [p for p, st in changed.items() if st in ("A", "M") and files and is_source_module(p, roots, tree)]
+                adds = added_lines(repo, base, sha, src_changed)
+                gated, ungated = {}, []
+                for rel in src_changed:
+                    fl = _funclines((tree / rel).read_text(errors="replace")) if (tree / rel).exists() else None
+                    lines = adds.get(rel, set())
+                    g = lines & fl if fl else (lines if fl == set() else set())
+                    if g:
+                        gated[rel] = g
+                    else:
+                        ungated.append(rel)
+                run = None
+                if test_cmd and run_tests and gated and files:
+                    run = run_ci_tests(tree, test_cmd, scratch, test_timeout)
+                elif test_cmd and gated and not run_tests:
+                    run = {"ran": False, "reason": "--no-tests"}
+                facts.append(fact_tested(test_cmd, cmd_src, run, gated, ungated, rentry))
+                log = _git(repo, "log", "--no-merges", "--format=%s%n%b", f"{base}..{sha}").stdout
+                texts = [("commits", log)]
+                pr_list = (prs or {}).get(branch, [])
+                for pr in pr_list:
+                    texts.append((f"PR #{pr['number']}", f"{pr.get('title', '')}\n{pr.get('body') or ''}"))
+                    extra.append({"key": f"promote.pr[{pr['number']}]", "value": {"state": pr.get("state"), "base": pr.get("baseRefName"),
+                                  "url": pr.get("url")}, "status": "observed", "evidence": []})
+                facts.append(fact_receipt(texts, prs is not None, changed, set(files)))
+                revisions["commits"] = int(_git(repo, "rev-list", "--count", f"{base}..{sha}").stdout.strip() or 0)
     packet = build_packet(branch, sha, default, default_sha, facts, revisions, extra)
     opp = build_opportunity(repo, branch, sha, default, packet, aodl_doc)
     verdict = promotion_verdict(opp)

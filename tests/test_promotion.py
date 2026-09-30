@@ -84,7 +84,10 @@ def fx(tmp_path):
     git(repo, "checkout", "-q", "-b", "feat/old", "master")
     write(repo, "docs/old.md", "old\n")
     shas["feat/old"] = commit(repo, "docs: old")
+    shas["feat/squashed"] = branch(repo, "feat/squashed", {"docs/sq.md": "sq\n"}, "docs: sq")
     git(repo, "checkout", "-q", "master")
+    write(repo, "docs/sq.md", "sq\n")
+    commit(repo, "docs: sq (squash-merged)")
     write(repo, "shared.txt", "master moved\n")
     commit(repo, "master: edit shared")
     git(repo, "merge", "-q", "--no-edit", "feat/old")
@@ -178,7 +181,7 @@ def test_cited_receipt_missing_from_tree_escalates(fx):
 
 def test_kept_in_nightly_but_conflicts_with_default_escalates(fx):
     r = run(fx, ["feat/conflict"])["feat/conflict"]
-    assert r["criteria"]["merge"]["value"] == {"clean": False, "kept": True}
+    assert {k: r["criteria"]["merge"]["value"][k] for k in ("clean", "kept")} == {"clean": False, "kept": True}
     assert r["verdict"] == "ESCALATE"
 
 
@@ -280,3 +283,9 @@ def test_import_graph_roots_and_parent_packages(tmp_path):
     assert g.reach("src/pkg/sub/__init__.py") and g.reach("src/pkg/__init__.py")
     assert "Claude Code plugin manifest" in g.reach("src/pkg/hook.py")
     assert g.reach("src/pkg/lonely.py") is None  # a CI test line is test evidence, not production reach
+
+
+def test_squash_merged_branch_has_nothing_to_promote(fx):
+    r = run(fx, ["feat/squashed"])["feat/squashed"]
+    assert r["verdict"] == "ABSTAIN"
+    assert r["criteria"]["pending"]["status"] == "no_match" and "no-op" in r["criteria"]["pending"]["reason"]
