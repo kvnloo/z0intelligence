@@ -199,3 +199,68 @@ Z0INT_LAYA_DEVICE=cpu z0int backends bench \
   --backend openjev_06b,decider_2b,laya_421m --contract decision-capability-v1
 ```
 
+
+## Running the roster on a CUDA-less host (CPU + Vulkan)
+
+Every in-process backend has a CPU path; pick it per backend:
+
+| Backend | Device switch | CPU numerics |
+|---|---|---|
+| `laya_421m` | `Z0INT_LAYA_DEVICE=cpu` (default) | FP32 |
+| `decider_2b` | `Z0INT_DECIDER_DEVICE=cpu` | bf16-resident weights, FP32 compute |
+| `nanojev` / `nanojev_06b` | `Z0INT_NANOJEV_DEVICE=cpu` (default `cuda:0`) | FP32 (bf16 autocast is CUDA-only) |
+| `openjev_06b` | `Z0INT_OPENJEV_DEVICE=cpu` (default `cuda`) | FP32 weights + compute |
+| `julia_1` | `Z0INT_JULIA_DEVICE=cpu` (default) | FP32, separate worker interpreter |
+| `llama_http` | whatever the llama.cpp server runs on (Vulkan, Metal, CUDA, CPU) | GGUF quant |
+
+Set `OMP_NUM_THREADS` to bound torch's CPU threads on shared hosts.
+
+`julia_1` looks for its interpreter in `Z0INT_JULIA_PYTHON`, then `~/.z0int/julia-venv`
+and for its checkout in `Z0INT_JULIA_MODEL_DIR`, then `~/.z0int/models/julia_1` (both
+created by `scripts/setup-julia.sh`), then the HF cache.
+
+`laya_421m` needs the upstream runtime pinned in `requirements.txt` (`laya==0.1.6`).
+
+## `llama_http` server URL and GGUF arms
+
+The URL resolves in this order:
+
+1. `Z0INT_SLM_URL`
+2. `backends.llama_http.url` in `~/.z0int/config/z0int.json` (honours `Z0INT_HOME`)
+3. `http://127.0.0.1:11510`
+
+Hosts whose server binds a bridge address set it once instead of exporting it in every
+shell (the MBP lab host's `z0-slm.service` binds the kind gateway):
+
+```json
+{"backends": {"llama_http": {"url": "http://172.21.0.1:11510"}}}
+```
+
+`z0int backends doctor --json` reports where the URL came from (`diagnostics.url_source`).
+
+**Arms.** `backends.llama_http.arms` names GGUFs so several can be benchmarked as separate
+roster candidates (`llama_http:<arm>`). Each arm sends its `model` id in every request, which
+is how a llama.cpp *router* server (`llama-server --models-dir DIR --models-max 1`) picks,
+loads and swaps the GGUF — one model resident at a time, so a 2 GB GPU can serve every arm
+in one bench run. `health(load=True)` forces the load, so the bench's cold-load column
+includes the swap.
+
+```json
+{"backends": {"llama_http": {"url": "http://172.21.0.1:11510", "arms": {
+  "hammer21_15b_q4": {"url": "http://127.0.0.1:11520", "model": "hammer2.1-1.5b-q4km",
+                      "device": "vulkan0", "license": "cc-by-nc-4.0",
+                      "sha256": "567555510e0c72d69a5fe17a6d3a391456f4471eac97ecaf840e701161703555",
+                      "source": "mradermacher/Hammer2.1-1.5b-GGUF@d341431 Hammer2.1-1.5b.Q4_K_M.gguf"}}}}}
+```
+
+The router's model ids are the GGUF file stems in `--models-dir` (symlinks are fine).
+`scripts/bench-host-roster.sh` stops the host's `z0-slm` service, starts a router on
+`127.0.0.1:11520`, runs `z0int backends bench` over the CPU backends plus every arm, and
+restarts `z0-slm` on exit.
+
+The bench roster now also includes `julia_1`, `llama_http` and every configured
+`llama_http:<arm>`. VRAM is read from `nvidia-smi` or, on amdgpu, from
+`/sys/class/drm/card*/device/mem_info_vram_used` (device-level, like `nvidia-smi`).
+RAM is the candidate's current RSS (plus declared out-of-process workers) sampled after
+each example, not the process-lifetime `ru_maxrss` high-water mark, which made every later
+candidate in a multi-backend run inherit the earlier ones' peak.

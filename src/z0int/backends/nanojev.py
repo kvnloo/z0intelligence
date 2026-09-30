@@ -43,7 +43,11 @@ class NanoJevBackend:
             if raw
             else paths.home() / "models" / "nanojev_06b"
         )
-        return cls(checkpoint)
+        from .device import default_device
+
+        device = default_device("Z0INT_NANOJEV_DEVICE", cuda="cuda:0")
+        precision = os.environ.get("Z0INT_NANOJEV_PRECISION") or ("fp32" if device.startswith("cpu") else "bf16")
+        return cls(checkpoint, device=device, precision=precision)
 
     @property
     def capabilities(self) -> BackendCapabilities:
@@ -97,6 +101,7 @@ class NanoJevBackend:
             detail="checkpoint complete" + ("; model loaded" if self._engine else "; not loaded"),
             model=self.model_id,
             checkpoint=str(self.checkpoint_dir),
+            diagnostics={"device": self.device, "precision": self.precision},
         )
 
     def _ensure_loaded(self) -> NanoJevEngine:
