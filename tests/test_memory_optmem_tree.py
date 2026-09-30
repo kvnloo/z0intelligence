@@ -34,7 +34,11 @@ class OptMemTreeTests(unittest.TestCase):
         second = tree.rebuild()
         self.assertEqual(first["coarse_history_hash"], second["coarse_history_hash"])
         self.assertEqual(first["coarse_end"], 28)
-        self.assertTrue((tree.nodes_dir / "L5-0.json").exists())
+        self.assertLess(first["coarse_node_count"], 8)
+        self.assertEqual(
+            len(list(tree.nodes_dir.glob("*.json"))),
+            first["coarse_node_count"],
+        )
 
     def test_rebuild_never_mutates_canonical_events(self):
         self.seed(20)
@@ -113,6 +117,7 @@ class OptMemTreeTests(unittest.TestCase):
         self.assertLessEqual(cover["estimated_tokens"], 4096)
         self.assertLess(len(summaries), 32)
         self.assertEqual(len(raw), 4)
+        self.assertLess(len(list(tree.nodes_dir.glob("*.json"))), 32)
 
 
 if __name__ == "__main__":
