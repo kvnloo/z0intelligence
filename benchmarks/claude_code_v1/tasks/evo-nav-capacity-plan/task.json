@@ -1,0 +1,43 @@
+{
+  "id": "evo-nav-capacity-plan",
+  "family": "nav",
+  "repo": "evolution-lab",
+  "effort": "low",
+  "source": {
+    "repo": "evolution-lab",
+    "sha": "4cf52bb1010d7570922c5e16710669524ccec26d"
+  },
+  "prompt": "Answer some questions about the capacity-fill queue in this repo (the explicitly queued work that may consume spare provider capacity) and write the answers to ANSWERS.json in the repository root as a single JSON object with exactly these keys:\n\n- \"queue_file\": repo-relative path (string) of the shipped default queue JSON file.\n- \"priority_4_work_class\": the work_class string whose priority index is 4.\n- \"default_cli_provider\": the provider id the `capacity-queue` CLI uses when --provider is not given (string).\n- \"selected_ids\": for the shipped default queue, planned for provider \"groq\" (no model) with a token budget of 80000 and no other budget, the list of selected item_id strings in the order the planner selects them.\n- \"selected_calls\": total estimated calls of those selected items (integer).\n- \"incompatible_ids\": item_ids skipped in that same plan because of provider/model incompatibility (list of strings).\n- \"protected_splits\": every split name the planner treats as protected / certification-only (list of strings).\n\nUse JSON strings/numbers/lists only; no extra commentary in the file.",
+  "check": {
+    "kind": "answer_json",
+    "file": "ANSWERS.json",
+    "expect": {
+      "queue_file": "data/capacity_queue/queue.json",
+      "priority_4_work_class": "agent0_curriculum",
+      "default_cli_provider": "local",
+      "selected_ids": [
+        "qroute-counterfactual-densified-cells",
+        "tool-tournament-candidate-substitutions",
+        "jev-tiny-router-training-pairs"
+      ],
+      "selected_calls": 222,
+      "incompatible_ids": [
+        "hermes-recovery-locked-train"
+      ],
+      "protected_splits": [
+        "confirm",
+        "ood",
+        "sealed",
+        "sealed_human_audited",
+        "holdout",
+        "future",
+        "test"
+      ]
+    },
+    "unordered": [
+      "incompatible_ids",
+      "protected_splits"
+    ]
+  },
+  "key_derivation": "capacity_queue.default_queue_path -> data/capacity_queue/queue.json; WORK_CLASSES index 4 = agent0_curriculum; cli.py pcq --provider default 'local'; plan_capacity(load_queue(), provider='groq', max_tokens=80000): hermes-recovery-locked-train providers=['local'] -> incompatible; pool by priority: qroute-counterfactual (30000 tok, 96 calls) sel, tool-tournament (22000, 46) sel -> 52000, phase2-distillation (52000) skip, agent0 (46000) skip, jev-tiny-router (24000, 80) sel -> 76000, qroute-ladder (28000) skip; calls 96+46+80=222; PROTECTED_SPLITS tuple in capacity_queue.py. Verified by running plan_capacity on the pinned source."
+}

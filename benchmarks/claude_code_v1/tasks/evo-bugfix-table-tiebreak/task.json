@@ -1,0 +1,28 @@
+{
+  "id": "evo-bugfix-table-tiebreak",
+  "family": "bugfix",
+  "repo": "evolution-lab",
+  "effort": "low",
+  "source": {
+    "repo": "evolution-lab",
+    "sha": "4cf52bb1010d7570922c5e16710669524ccec26d"
+  },
+  "sabotage": {
+    "file": "evolution_lab/table.py",
+    "old": "best = max(learned, key=lambda row: (_metric(row, \"success_rate\"), -_metric(row, \"cost\")))",
+    "new": "best = max(learned, key=lambda row: (_metric(row, \"success_rate\"), _metric(row, \"cost\")))"
+  },
+  "prompt": "`python -m pytest tests/test_table.py` is failing on main. The P1 control table report seems to pick the wrong 'best learned' student in some cases. Please track down the root cause in the evolution_lab package (do not edit the tests) and fix it so the whole test file passes.",
+  "check": {
+    "kind": "pytest",
+    "restore": [
+      "tests/test_table.py"
+    ],
+    "targets": [
+      "tests/test_table.py"
+    ],
+    "pythonpath": [
+      "."
+    ]
+  }
+}

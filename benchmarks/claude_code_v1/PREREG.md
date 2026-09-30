@@ -49,7 +49,7 @@ commit between reps).
 | z0intelligence | `c4a4554` | zint-long-backend-review (v0 `backend-review`, long-horizon recall; replication, not fresh) |
 | tokenomics | `65e8f2d` | tok-fix-offline-replay-rollup, tok-fix-trace-aggregate-doublecount (bugfix); tok-feat-range-weeks (feature); tok-nav-env-vars, tok-nav-cli-surface (nav) |
 | kerdoios | `fd34a48` | ker-bugfix-context, ker-bugfix-merge (bugfix); ker-feature-exclude (feature); ker-nav-defaults (nav) |
-| evolution-lab | `4cf52bb` | 5 tasks (2 bugfix, 1 feature, 2 nav) being authored in parallel; their ids are frozen in a separate commit **before the repo suite starts** (the qa suite may start first, it does not depend on them) |
+| evolution-lab | `4cf52bb` | evo-bugfix-capacity-budget, evo-bugfix-table-tiebreak (bugfix); evo-feature-capacity-max-calls (feature); evo-nav-capacity-plan, evo-nav-tool-tournament (nav) — frozen in a second commit before the repo suite started; the qa suite had already started |
 
 Planned n: qa 11 × 4 = 44 paired units per contrast; repo 20 × 4 = 80; pooled 124
 (≥ 30 per arm on every contrast). 4 arms × 124 = 496 runs. ≤ 4 concurrent `claude` processes.

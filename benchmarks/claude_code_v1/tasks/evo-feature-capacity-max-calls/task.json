@@ -1,0 +1,25 @@
+{
+  "id": "evo-feature-capacity-max-calls",
+  "family": "feature",
+  "repo": "evolution-lab",
+  "effort": "low",
+  "source": {
+    "repo": "evolution-lab",
+    "sha": "4cf52bb1010d7570922c5e16710669524ccec26d"
+  },
+  "oracle_patch": "oracle.patch",
+  "prompt": "Add a call-count budget to the capacity-fill planner in evolution_lab/capacity_queue.py.\n\nRequirements:\n1. `plan_capacity` gets a new keyword-only parameter `max_calls: int | None = None` (None = unlimited; existing callers must keep working).\n2. It behaves like the existing token/cost budgets: items are still walked in priority order, and an item is selected only if `calls used so far + item.estimate.calls <= max_calls`. An item that does not fit is appended to `skipped` with reason \"budget_exhausted_calls\" and planning continues with the next item (later, smaller items may still be selected).\n3. Budget checks happen in this order: tokens, then cost, then calls. An item that violates several budgets gets the reason of the first failing check.\n4. Expose it on the CLI: `python -m evolution_lab capacity-queue plan ... --max-calls N` (int, default None) is passed through to `plan_capacity`.\n\nKeep the existing tests in tests/test_capacity_queue.py passing.",
+  "check": {
+    "kind": "pytest",
+    "restore": [
+      "tests/test_capacity_queue.py"
+    ],
+    "targets": [
+      "tests/test_capacity_queue.py",
+      "{task}/hidden_test.py"
+    ],
+    "pythonpath": [
+      "."
+    ]
+  }
+}
