@@ -387,6 +387,12 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
 
     def render() -> tuple[dict[str, Any], int]:
         packet.evidence = refs
+        diversity_target = min(3, len(deduped))
+        packet.measurements["retained_evidence_count"] = len(refs)
+        packet.measurements["source_diversity_target"] = diversity_target
+        packet.measurements["source_diversity_degraded_for_budget"] = (
+            len(refs) < diversity_target
+        )
         projection = project_to_aodl_fields(packet)
         # The canonical packet is the only owner of private excerpt text. The
         # AODL projection is structural metadata only, so remove the generic
