@@ -264,3 +264,16 @@ def test_z0int_cli_dispatch(tmp_path, monkeypatch, capsys):
     cb.write_text(json.dumps(CODEXBAR))
     assert z0int_main(["posture", "--json", "--now", iso(0), "--codexbar", str(cb), "--no-kerdoios"]) == 0
     assert json.loads(capsys.readouterr().out)["factory"]["posture"] == "BURN"
+
+
+def test_log_snapshot_is_compact_and_identity_free(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    cb = tmp_path / "last.json"
+    cb.write_text(json.dumps(CODEXBAR))
+    assert P.main(["--json", "--log", "--now", iso(0), "--codexbar", str(cb), "--no-kerdoios", "--config",
+                   str(tmp_path / "none.json")]) == 0
+    capsys.readouterr()
+    rows = [json.loads(x) for x in P.history_path().read_text().splitlines()]
+    assert len(rows) == 1 and rows[0]["factory"] == "BURN"
+    assert {r["id"] for r in rows[0]["pools"]} >= {"claude:weekly", "cursor:30d"}
+    assert "example.com" not in P.history_path().read_text()

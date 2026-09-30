@@ -594,6 +594,25 @@ def render_line(p: dict[str, Any]) -> str:
     return f"{fac['posture']} ({groups}) — {fac['action']}"
 
 
+def history_path() -> Path:
+    from . import paths
+    return paths.home() / "state" / "posture" / "history.jsonl"
+
+
+def log_snapshot(p: dict[str, Any], path: Path | None = None) -> Path:
+    """Append a compact snapshot (no identities) — the evidence stream the pre-registered evaluation replays."""
+    path = path or history_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    row = {"schema": SCHEMA + ".log", "now": p["now"], "revision": p["revision"], "factory": p["factory"]["posture"],
+           "groups": {g: v["posture"] for g, v in p["groups"].items()},
+           "pools": [{k: r.get(k) for k in ("id", "kind", "posture", "remaining", "resets_at", "window_hours",
+                                            "burn_rate_per_hour", "projected_surplus_at_reset", "confidence")}
+                     for r in p["pools"] if r["remaining"] is not None]}
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True) + "\n")
+    return path
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
@@ -603,6 +622,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--codexbar", default=None, help="codexbar last.json path")
     ap.add_argument("--config", default=None, help="posture config path (default ~/.z0int/config/posture.local.json)")
     ap.add_argument("--no-kerdoios", action="store_true")
+    ap.add_argument("--log", action="store_true", help="append a snapshot to ~/.z0int/state/posture/history.jsonl")
     a = ap.parse_args(argv)
     now = parse_time(a.now) if a.now else None
     if a.now and now is None:
@@ -610,6 +630,8 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_config(Path(a.config).expanduser()) if a.config else None
     p = current_posture(now, config=cfg, codexbar=Path(a.codexbar).expanduser() if a.codexbar else None,
                         kerdoios=not a.no_kerdoios)
+    if a.log:
+        log_snapshot(p)
     print(json.dumps(p, indent=2) if a.as_json else render_human(p))
     return 0
 
