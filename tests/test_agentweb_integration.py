@@ -26,7 +26,7 @@ def test_agentweb_event_normalizes_to_stable_pseudonymous_dispatch_identity():
     assert request["parent_agent"] == expected_parent
     assert "agentweb-session-secret" not in request["parent_agent"]
     assert request["trace_id"] == hashlib.sha256(
-        (expected_parent + "\\0operation-42").encode()
+        (expected_parent + chr(0) + "operation-42").encode()
     ).hexdigest()
     assert request["function"] == "summarization"
     assert request["automatic"] is True
