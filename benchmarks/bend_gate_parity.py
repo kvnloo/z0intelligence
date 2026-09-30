@@ -444,7 +444,9 @@ def _rand_value(rng: random.Random, doc: Any) -> Any:
     if r < 0.45:
         return rng.choice(VOCAB)
     if r < 0.6:
-        ids = [n.get("id") for n in (doc.get("intentGraph", {}).get("nodes") or []) if isinstance(n, dict)]
+        graph = doc.get("intentGraph") if isinstance(doc, dict) else None
+        nodes = graph.get("nodes") if isinstance(graph, dict) else None
+        ids = [n.get("id") for n in (nodes if isinstance(nodes, list) else []) if isinstance(n, dict)]
         return rng.choice(ids) if ids else "x"
     if r < 0.7:
         return rng.choice([0, 1, 2, -1, 1.0, 0.0, True, False, None, 3, 10**20])
