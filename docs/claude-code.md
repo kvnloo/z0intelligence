@@ -13,7 +13,7 @@ seam, Tokenomics usage receipts, and levers promoted only on paired, verified ev
 | State Packet at SessionStart | `Z0INT_CLAUDE_CODE_PACKET=1` with the plugin | held-out 14/14 vs 12/14, −30% input tokens; pinned held-out 2×2: packet ×0.81–0.83 cost, lean ×0.47–0.49, composed −61% vs stock raw (dev: −74%) | **opt-in; an aid to tools, not a replacement** |
 | Usage receipts | plugin `Stop` + `SessionEnd` | equal to Claude Code's billed usage on all four token fields | on |
 | Automatic routing | plugin `UserPromptSubmit` | inert in shadow (default) | shadow |
-| ObservationPack | `--plugin-dir harness-adapters/claude-code-z0-obspack` | short tasks: null; long recall task (n=12): −30.3% total, Wilcoxon p=0.0068, 12/12 verified | **opt-in for long, output-heavy sessions** |
+| ObservationPack | `--plugin-dir harness-adapters/claude-code-z0-obspack` | short tasks: null; long recall task (n=12): −30.3% total, Wilcoxon p=0.0068, 12/12 verified; on top of lean a further −38.2% median (6/6, p=0.031) | **opt-in for long, output-heavy sessions** |
 | Skill exposure | `z0int.claude_code_skills` | best 2/30 misses; bar ≤1/30 | not promoted |
 
 ## Install
