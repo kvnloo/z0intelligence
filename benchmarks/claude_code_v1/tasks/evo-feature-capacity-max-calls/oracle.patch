@@ -1,0 +1,66 @@
+diff --git i/evolution_lab/capacity_queue.py w/evolution_lab/capacity_queue.py
+index bf558a3..90630c8 100644
+--- i/evolution_lab/capacity_queue.py
++++ w/evolution_lab/capacity_queue.py
+@@ -303,12 +303,14 @@ def plan_capacity(
+     model: str | None = None,
+     max_tokens: int | None = None,
+     max_cost_usd: float | None = None,
++    max_calls: int | None = None,
+     include_protected: bool = False,
+ ) -> dict[str, Any]:
+     """Answer "what useful compatible work is queued, and what would consume it?".
+ 
+     Returns a plan, never a fabricated queue.  Items are considered in priority
+-    order; an item is selected only if it stays inside both budgets.  Protected
++    order; an item is selected only if it stays inside every budget (tokens,
++    cost and calls).  Protected
+     splits are reported as skipped unless ``include_protected`` is set.
+     """
+     queue = list(items)
+@@ -343,6 +345,9 @@ def plan_capacity(
+         if max_cost_usd is not None and used_cost + est.cost_usd > max_cost_usd + 1e-12:
+             skipped.append({**_item_view(item), "reason": "budget_exhausted_cost"})
+             continue
++        if max_calls is not None and used_calls + est.calls > max_calls:
++            skipped.append({**_item_view(item), "reason": "budget_exhausted_calls"})
++            continue
+         selected.append({**_item_view(item), "reason": "selected"})
+         used_tokens += est.tokens
+         used_cost += est.cost_usd
+diff --git i/evolution_lab/cli.py w/evolution_lab/cli.py
+index 4219dcb..8858c31 100644
+--- i/evolution_lab/cli.py
++++ w/evolution_lab/cli.py
+@@ -662,6 +662,7 @@ def cmd_capacity_queue(
+     max_tokens: int | None,
+     max_cost_usd: float | None,
+     include_protected: bool,
++    max_calls: int | None = None,
+ ) -> None:
+     """What useful compatible work is queued, and what would consume it?"""
+     from .capacity_queue import QUEUE_SCHEMA, load_queue, plan_capacity
+@@ -687,6 +688,7 @@ def cmd_capacity_queue(
+         model=model,
+         max_tokens=max_tokens,
+         max_cost_usd=max_cost_usd,
++        max_calls=max_calls,
+         include_protected=include_protected,
+     )
+     print(json.dumps(plan, indent=2, sort_keys=True))
+@@ -954,6 +956,7 @@ def main(argv: list[str] | None = None) -> int:
+     pcq.add_argument("--model", type=str, default=None)
+     pcq.add_argument("--max-tokens", type=int, default=None)
+     pcq.add_argument("--max-cost-usd", type=float, default=None)
++    pcq.add_argument("--max-calls", type=int, default=None)
+     pcq.add_argument(
+         "--include-protected",
+         action="store_true",
+@@ -1021,6 +1024,7 @@ def main(argv: list[str] | None = None) -> int:
+             model=args.model,
+             max_tokens=args.max_tokens,
+             max_cost_usd=args.max_cost_usd,
++            max_calls=args.max_calls,
+             include_protected=args.include_protected,
+         )
+     elif args.cmd == "q-route":

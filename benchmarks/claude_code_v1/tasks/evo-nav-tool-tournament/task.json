@@ -1,0 +1,38 @@
+{
+  "id": "evo-nav-tool-tournament",
+  "family": "nav",
+  "repo": "evolution-lab",
+  "effort": "low",
+  "source": {
+    "repo": "evolution-lab",
+    "sha": "4cf52bb1010d7570922c5e16710669524ccec26d"
+  },
+  "prompt": "Answer these questions about the tool-calling tournament code in this repo (evolution_lab/tool_tournament and its CLI) and write the answers to ANSWERS.json in the repository root as a single JSON object with exactly these keys:\n\n- \"composition_count\": number of frozen compositions registered by default (integer).\n- \"orchestrated_compositions\": full names of all compositions whose mode is \"orchestrated\" (list of strings).\n- \"alias_F_primary\": the primary backend ids of the composition that the single-letter alias \"F\" resolves to, in declared order (list of strings).\n- \"logistic_unknown_risk_penalty\": the penalty the hand-frozen logistic baseline subtracts for an action whose risk_class is not in its risk table (number).\n- \"false_confidence_threshold\": the confidence at or above which an incorrect decision counts as false confidence (number).\n- \"cost_per_cost_unit_usd\": the USD proxy per action cost unit used when a backend reports no dollar cost (number).\n- \"cli_default_backend\": the default value of the `tool-tournament` CLI subcommand's --backend option (string).\n\nUse JSON strings/numbers/lists only; no extra commentary in the file.",
+  "check": {
+    "kind": "answer_json",
+    "file": "ANSWERS.json",
+    "expect": {
+      "composition_count": 12,
+      "orchestrated_compositions": [
+        "D_compiler_jev_nemotron",
+        "E_compiler_jev_nemotron_qwen9b",
+        "F_compiler_jev_nemotron_qwen9b_specialists",
+        "qwen4b_instead_of_9b"
+      ],
+      "alias_F_primary": [
+        "hammer3b",
+        "functiongemma",
+        "nemotron",
+        "qwen9b"
+      ],
+      "logistic_unknown_risk_penalty": 0.5,
+      "false_confidence_threshold": 0.8,
+      "cost_per_cost_unit_usd": 0.00025,
+      "cli_default_backend": "deterministic"
+    },
+    "unordered": [
+      "orchestrated_compositions"
+    ]
+  },
+  "key_derivation": "compositions.py COMPOSITIONS dict has 12 entries (len verified); mode=='orchestrated': D, E, F, qwen4b_instead_of_9b; COMPOSITION_ALIASES['F'] -> F_compiler_jev_nemotron_qwen9b_specialists, primary=(hammer3b, functiongemma, nemotron, qwen9b); LogisticBaselineBackend._score: score -= _RISK_PENALTY.get(action.risk_class, 0.5); score.py FALSE_CONFIDENCE_THRESHOLD=0.8, COST_PER_COST_UNIT_USD=0.00025; cli.py ptt --backend default='deterministic'."
+}

@@ -1,0 +1,28 @@
+{
+  "id": "evo-bugfix-capacity-budget",
+  "family": "bugfix",
+  "repo": "evolution-lab",
+  "effort": "low",
+  "source": {
+    "repo": "evolution-lab",
+    "sha": "4cf52bb1010d7570922c5e16710669524ccec26d"
+  },
+  "sabotage": {
+    "file": "evolution_lab/capacity_queue.py",
+    "old": "            skipped.append({**_item_view(item), \"reason\": \"budget_exhausted_tokens\"})\n            continue\n",
+    "new": "            skipped.append({**_item_view(item), \"reason\": \"budget_exhausted_tokens\"})\n            break\n"
+  },
+  "prompt": "The capacity-fill planner (`python -m evolution_lab capacity-queue plan ...`) looks like it under-fills when a token budget is set: some queued work that would still fit in the budget is never offered. `python -m pytest tests/test_capacity_queue.py` also has a failure now. Please find the root cause in the library code and fix it (do not modify the tests), then make sure that test file passes.",
+  "check": {
+    "kind": "pytest",
+    "restore": [
+      "tests/test_capacity_queue.py"
+    ],
+    "targets": [
+      "tests/test_capacity_queue.py"
+    ],
+    "pythonpath": [
+      "."
+    ]
+  }
+}
