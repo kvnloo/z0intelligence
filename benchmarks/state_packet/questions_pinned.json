@@ -1,0 +1,105 @@
+{
+  "schema": "z0int.state_packet_bench.questions.v0",
+  "frozen_at": "2026-09-30T10:18:00Z",
+  "authored_before_running": true,
+  "note": "Lane E drift-proof held-out set. Every key is computed from PINNED fixtures (benchmarks/state_packet/pin_fixtures.py: git clone --no-hardlinks of the local repos with all local branches + the source's origin/* refs, a deterministic worktree layout, origin URL pointed at a non-existent path, FETCH_HEAD removed) and a pinned copy of 4 Claude Code subagent transcripts whose cwd was inside z0intelligence (paths rewritten to the fixture root). Keys come from plain git / jq over the fixtures, independent of z0int.state_packet, and were frozen before any run on this set. Run with --workspace <pin> --projects-root <pin>/projects (GitHub adapter OFF). Two synthetic fixture edits (both documented in pin_fixtures.py SPEC): aodl has 1 stash entry, z0evals has 1 uncommitted README.md edit. Structural facts only; no transcript text.",
+  "key_revisions": {
+    "z0intelligence": {"head": "24424d1a18a5d8fa2329a97abdd4c1bd6ce2c009", "branch": "feat/claude-code-harness"},
+    "aodl": {"head": "ddcea2ed2e62340d9579b802de1c27d0ca301c56", "branch": "ai-native/oss-loop"},
+    "z0evals": {"head": "bb8ad2c0bd7dc7c73c2e66bcbf4ede5a2ced62da", "branch": "main"}
+  },
+  "answer_contract": "Reply with ONLY a JSON object: {\"action\": \"answer\"|\"abstain\"|\"conflict\", \"fields\": {...}, \"evidence\": [\"source pointers you relied on\"]}. Use action=abstain when local evidence does not establish the answer; use action=conflict when sources disagree (report each side in fields).",
+  "questions": [
+    {
+      "id": "p01-z0int-worktrees",
+      "repo": "z0intelligence",
+      "kind": "worktrees",
+      "prompt": "This repository is the current working directory. List every linked git worktree of it (exclude the main checkout itself), giving each worktree's path and checked-out branch.",
+      "fields": {"count": "integer", "worktrees": "list of {path, branch}"},
+      "key": {"action": "answer", "fields": {
+        "count": {"int": 4},
+        "worktrees": {"contains_all": ["exp/bend-aodl-gate", "feat/state-packet-v0", "exp/semantic-skill-select", "feat/portable-lab", "z0intelligence-lab"],
+                      "forbid_any": ["claude-code-z0-stack"]}}}
+    },
+    {
+      "id": "p02-z0int-furthest-ahead",
+      "repo": "z0intelligence",
+      "kind": "git-state",
+      "prompt": "In this repository (current working directory): which LOCAL branch is furthest ahead of the default branch origin/master, by how many commits, and is that branch checked out in any worktree?",
+      "fields": {"branch": "string", "commits_ahead": "integer", "checked_out_in_worktree": "boolean"},
+      "key": {"action": "answer", "fields": {"branch": {"re": "^integrate/claude-code-z0-stack$"}, "commits_ahead": {"int": 31}, "checked_out_in_worktree": {"bool": false}}}
+    },
+    {
+      "id": "p03-z0int-worktree-upstream",
+      "repo": "z0intelligence",
+      "kind": "worktrees",
+      "prompt": "In this repository (current working directory), look at the worktree at .claude/worktrees/agent-a5a881e0f9d9b6456: which branch is checked out there, which upstream does that branch track, and how many commits is it ahead of that upstream?",
+      "fields": {"branch": "string", "upstream": "string", "ahead_of_upstream": "integer"},
+      "key": {"action": "answer", "fields": {"branch": {"re": "^exp/bend-aodl-gate$"}, "upstream": {"re": "^origin/master$"}, "ahead_of_upstream": {"int": 5}}}
+    },
+    {
+      "id": "p04-aodl-stash",
+      "repo": "aodl",
+      "kind": "git-state",
+      "prompt": "In this repository (current working directory): are there any stashed changes? How many stash entries, and on which branch was the newest one made?",
+      "fields": {"stash_count": "integer", "stash_branch": "string"},
+      "key": {"action": "answer", "fields": {"stash_count": {"int": 1}, "stash_branch": {"re": "^ai-native/oss-loop$"}}}
+    },
+    {
+      "id": "p05-z0evals-dirty",
+      "repo": "z0evals",
+      "kind": "git-state",
+      "prompt": "In this repository (current working directory): is the working tree clean? List any modified tracked files, and say how many commits the checked-out branch is ahead of its upstream.",
+      "fields": {"clean": "boolean", "modified": "list of paths", "ahead_of_upstream": "integer"},
+      "key": {"action": "answer", "fields": {"clean": {"bool": false}, "modified": {"contains_all": ["README\\.md"]}, "ahead_of_upstream": {"int": 0}}}
+    },
+    {
+      "id": "p06-z0evals-external-worktree",
+      "repo": "z0evals",
+      "kind": "worktrees",
+      "prompt": "Does this repository (current working directory) have a git worktree located OUTSIDE its own directory? If so, give its path, its branch, and how many commits that branch is ahead of origin/main.",
+      "fields": {"exists": "boolean", "path": "string", "branch": "string", "commits_ahead_of_origin_main": "integer"},
+      "key": {"action": "answer", "fields": {"exists": {"bool": true}, "path": {"re": "z0evals-cc"}, "branch": {"re": "^study/claude-code-savings-v0$"}, "commits_ahead_of_origin_main": {"int": 4}}}
+    },
+    {
+      "id": "p07-z0int-priority-conflict",
+      "repo": "z0intelligence",
+      "kind": "contradiction",
+      "prompt": "According to this repository's own top-level docs (current working directory), what is THE current critical-path / P0 priority? If the docs disagree, report each claim with its source file instead of picking one.",
+      "fields": {"claims": "list of {priority, source}"},
+      "key": {"action": "conflict", "fields": {"claims": {"contains_all": ["GPU population", "context resolve|AGENTS"]}}}
+    },
+    {
+      "id": "p08-z0int-bend-session-file",
+      "repo": "z0intelligence",
+      "kind": "conversation",
+      "prompt": "Per the local Claude Code history, a Claude Code subagent worked with its working directory inside this repository's worktree .claude/worktrees/agent-a5a881e0f9d9b6456. Which file (path relative to that worktree) did that session edit/write MOST often?",
+      "fields": {"most_edited_file": "string"},
+      "key": {"action": "answer", "fields": {"most_edited_file": {"re": "(^|/)bend/aodl_gate/rules\\.bend$"}}}
+    },
+    {
+      "id": "p09-z0int-session-count",
+      "repo": "z0intelligence",
+      "kind": "conversation",
+      "prompt": "Per the local Claude Code history, how many distinct Claude Code sessions (subagents count separately) have recorded work with a working directory inside this repository or its .claude/worktrees? Which of them started earliest, and in which directory (relative to the repository) did it work?",
+      "fields": {"count": "integer", "earliest_agent_or_session_id_prefix": "string", "earliest_cwd": "string"},
+      "key": {"action": "answer", "fields": {"count": {"int": 4}, "earliest_agent_or_session_id_prefix": {"re": "a547f71c|200a849f"}, "earliest_cwd": {"re": "^\\s*\\.?/?\\s*$|\\broot\\b|main (checkout|worktree)|pinned/z0intelligence/?$"}}}
+    },
+    {
+      "id": "p10-aodl-abstain-session",
+      "repo": "aodl",
+      "kind": "abstention",
+      "prompt": "Per the local Claude Code history, what did the most recent Claude Code session whose working directory was this repository's .worktrees/dash-wired change, and on which branch?",
+      "fields": {"changed": "string", "branch": "string"},
+      "key": {"action": "abstain", "fields": {}}
+    },
+    {
+      "id": "p11-z0evals-abstain-ci",
+      "repo": "z0evals",
+      "kind": "abstention",
+      "prompt": "What is the GitHub pull request number for branch study/claude-code-savings-v0 of this repository (current working directory), and did its CI checks pass?",
+      "fields": {"pr_number": "integer", "ci_passed": "boolean"},
+      "key": {"action": "abstain", "fields": {}}
+    }
+  ]
+}

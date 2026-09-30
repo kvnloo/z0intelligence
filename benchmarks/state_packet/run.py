@@ -33,7 +33,8 @@ ROOT = Path(__file__).resolve().parents[2]
 QUESTIONS = Path(__file__).with_name("questions.json")
 PY = ROOT / ".venv" / "bin" / "python"
 WORKSPACE = Path(os.environ.get("Z0_BENCH_WORKSPACE", "~/workspace")).expanduser()
-PROJECTS = Path("~/.claude/projects").expanduser()
+DEFAULT_PROJECTS = Path("~/.claude/projects").expanduser()
+PROJECTS = DEFAULT_PROJECTS  # --projects-root overrides (pinned fixtures); packet reads it via Z0INT_CLAUDE_PROJECTS
 
 READ_ONLY_TOOLS = [
     "Read", "Grep", "Glob",
@@ -45,8 +46,10 @@ READ_ONLY_TOOLS = [
 ]
 GH_READ_TOOLS = ["Bash(gh issue list:*)", "Bash(gh issue view:*)", "Bash(gh pr list:*)", "Bash(gh pr view:*)"]
 LEAN = ["--setting-sources", "project", "--strict-mcp-config", "--disable-slash-commands"]
-HISTORY_HINT = ("Local Claude Code conversation history (JSONL transcripts) lives under ~/.claude/projects/. "
-                "Do not modify anything; read-only inspection only.")
+def history_hint() -> str:
+    where = "~/.claude/projects/" if PROJECTS == DEFAULT_PROJECTS else f"{PROJECTS}/"
+    return (f"Local Claude Code conversation history (JSONL transcripts) lives under {where}. "
+            "Do not modify anything; read-only inspection only.")
 
 
 def hook_settings(z0home: Path) -> str:
@@ -72,7 +75,7 @@ def run_claude(q: dict, arm: str, args: argparse.Namespace, contract: str, z0hom
     else:
         tools = READ_ONLY_TOOLS + (GH_READ_TOOLS if getattr(args, "raw_gh", False) else [])
         cmd += ["--allowedTools", *tools, "--add-dir", str(PROJECTS),
-                "--append-system-prompt", HISTORY_HINT]
+                "--append-system-prompt", history_hint()]
     env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
     t0 = time.time()
     proc = subprocess.run(cmd, cwd=repo, env=env, capture_output=True, text=True, timeout=args.timeout,
@@ -234,9 +237,19 @@ def main() -> None:
     ap.add_argument("--raw-gh", action="store_true", help="also allow read-only gh issue/pr commands in tool arms")
     ap.add_argument("--questions", default=None, help="question/key file (default questions.json)")
     ap.add_argument("--profile", choices=["lean", "stock"], default="lean", help="launch profile: lean (default, all published runs) or stock user settings/MCP/skills")
+    ap.add_argument("--workspace", default=None,
+                    help="root holding the question repos (default $Z0_BENCH_WORKSPACE or ~/workspace); e.g. pinned fixtures")
+    ap.add_argument("--projects-root", default=None,
+                    help="Claude Code transcripts dir for BOTH the packet hook and the raw arms (default ~/.claude/projects)")
     ap.add_argument("--remove-conversation", action="store_true",
                     help="failure injection: point the packet's transcript source at an empty dir")
     args = ap.parse_args()
+    global WORKSPACE, PROJECTS
+    if args.workspace:
+        WORKSPACE = Path(args.workspace).expanduser().resolve()
+    if args.projects_root:
+        PROJECTS = Path(args.projects_root).expanduser().resolve()
+        os.environ["Z0INT_CLAUDE_PROJECTS"] = str(PROJECTS)  # packet_stats + hook (removal below still wins)
     if args.gh:
         os.environ["Z0INT_PACKET_GH"] = "1"
     if args.remove_conversation:
@@ -264,6 +277,7 @@ def main() -> None:
     with out.open("x") as fh:
         fh.write(json.dumps({"type": "meta", "run_id": run_id, "z0int_revision": rev, "model": args.model,
                              "github_adapter": bool(args.gh), "raw_gh": bool(args.raw_gh),
+                             "profile": args.profile, "workspace": str(WORKSPACE), "projects_root": str(PROJECTS),
                              "questions": str(args.questions or QUESTIONS.name),
                              "effort": args.effort, "oracle_before": before, "packet_stats": stats,
                              "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}) + "\n")
