@@ -343,21 +343,104 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
     return {'ok': ok, 'output': output, 'receipt': receipt}
 
 
-def posture_annotate(plan, route_kind='offload'):
-    """Shadow resource posture on a routing decision (z0int.posture). Annotates, never changes the plan,
-    unless ~/.z0int/config/posture.local.json sets posture_enforce: true (default false). Fail-open."""
+# Which posture group a route_worker parent draws from (the pool "return to parent" would burn).
+HARNESS_POSTURE_GROUPS = {'claude-code': 'claude', 'claude': 'claude', 'codex': 'codex', 'cursor': 'cursor'}
+
+
+def _zero_cost_candidates(policy, providers, available_fn=None):
+    """Every validated $0 route the router may use, host-local cohort first (in local_order, e.g. groot
+    qwen3-8b), then the rest in policy order. One candidate per provider: its default model, because
+    available() and execute_attempt re-check exactly that (provider, default model) route."""
+    available_fn = available_fn or available
+    defaults = policy.get('defaults') or {}
+    routes = [r for r in policy.get('validated_free_routes') or [] if r.get('provider')]
+    by_provider = {}
+    for r in routes:
+        by_provider.setdefault(r['provider'], []).append(r)
+    local = [p for p in (policy.get('local_order') or []) if p in by_provider]
+    local += [p for p in by_provider if (providers.get(p) or {}).get('cohort') == 'local' and p not in local]
+    rest = [p for p in list(policy.get('free_provider_order') or []) + list(by_provider)
+            if p in by_provider and p not in local]
+    out = []
+    for provider in dict.fromkeys(local + rest):
+        model = defaults.get(provider)
+        if model is None or free_route(policy, provider, model) is None:
+            continue
+        if policy.get('provider_caps', {}).get(provider, 0) in (None, 0):
+            continue
+        config = providers.get(provider)
+        if not config or not available_fn(provider, config):
+            continue
+        out.append({'provider': provider, 'model': model})
+    return out
+
+
+def posture_route_decision(ann, plan, policy=None, providers=None, available_fn=None):
+    """What an ENFORCED posture would change about this plan (pure given its inputs; never raises).
+
+    * BURN  -> ``return_to_parent``: no candidates, the parent frontier absorbs the bounded task — only when
+      the parent's own pool (harness -> group) is one of the burning groups, and never for local-only tasks.
+    * OFFLOAD -> ``prefer_zero_cost``: candidates become every usable validated $0 route, host-local first
+      (groot qwen3-8b before hosted free tiers), followed by any original $0 candidates; still capped at
+      max_attempts, still re-checked by execute_plan's require_free_route.
+    * BALANCED / RESERVE / unavailable -> ``none``.
+    """
+    try:
+        posture = ann.get('factory_posture') if ann.get('available') else None
+        base = {'posture': posture, 'action': 'none', 'candidates': list(plan.get('candidates') or [])}
+        if posture is None:
+            return {**base, 'reason': 'posture_unavailable'}
+        if plan.get('category') == 'local':
+            return {**base, 'reason': 'local_only_task_stays_local'}
+        if posture == 'BURN':
+            group = HARNESS_POSTURE_GROUPS.get(plan.get('harness') or 'codex')
+            if group not in (ann.get('prefer') or []):
+                return {**base, 'reason': f'parent_pool_not_burning:{group}'}
+            return {**base, 'action': 'return_to_parent', 'candidates': [], 'parent_group': group,
+                    'reason': 'parent_frontier_surplus_perishes_at_reset'}
+        if posture == 'OFFLOAD':
+            if policy is None or providers is None:
+                policy, providers = configuration()
+            zero = _zero_cost_candidates(policy, providers, available_fn)
+            keep = [c for c in plan.get('candidates') or [] if free_route(policy, c['provider'], c['model'])]
+            merged = list({(c['provider'], c['model']): c for c in zero + keep}.values())
+            merged = merged[:policy.get('max_attempts', 3)]
+            if not merged:
+                return {**base, 'reason': 'no_usable_zero_cost_route'}
+            return {**base, 'action': 'prefer_zero_cost', 'candidates': merged, 'reason': 'frontier_over_pace'}
+        return {**base, 'reason': f'posture_{posture.lower()}_no_route_change'}
+    except Exception as exc:  # fail-open: the decision is advisory until applied
+        return {'posture': None, 'action': 'none', 'candidates': list(plan.get('candidates') or []),
+                'reason': f'error:{type(exc).__name__}'}
+
+
+def posture_annotate(plan, route_kind='offload', policy=None, providers=None, available_fn=None):
+    """Resource posture on a routing decision (z0int.posture). Fail-open.
+
+    Always annotates ``plan['resource_posture']`` with the posture and the decision an enforced posture
+    would take (``would``: action, reason, candidate providers). The plan itself changes only when
+    ~/.z0int/config/posture.local.json sets ``posture_enforce: true`` (default false = shadow)."""
     try:
         from .posture import shadow_annotation
         ann = shadow_annotation(route_kind)
     except Exception as exc:
         ann = {'available': False, 'error': type(exc).__name__, 'enforce': False}
     plan['resource_posture'] = ann
-    if ann.get('enforce') is True and ann.get('available') and not ann.get('agrees') and route_kind == 'offload':
-        # Enforced BURN: frontier surplus perishes, so hand bounded work back to the parent instead of offloading.
-        plan['skipped'] = plan.get('skipped', []) + [{'provider': c['provider'], 'reason': 'posture_burn_parent_should_absorb'}
-                                                     for c in plan.get('candidates', [])]
-        plan['candidates'] = []
+    if route_kind != 'offload':
+        return plan
+    decision = posture_route_decision(ann, plan, policy, providers, available_fn)
+    before = [(c['provider'], c['model']) for c in plan.get('candidates') or []]
+    after = [(c['provider'], c['model']) for c in decision['candidates']]
+    ann['would'] = {'action': decision['action'], 'reason': decision['reason'], 'changes_plan': before != after,
+                    'candidates': [f'{p}/{m}' for p, m in after]}
+    if ann.get('enforce') is True and ann.get('available') and decision['action'] != 'none':
+        removed = [c for c in plan.get('candidates') or [] if (c['provider'], c['model']) not in after]
+        reason = ('posture_burn_parent_should_absorb' if decision['action'] == 'return_to_parent'
+                  else 'posture_offload_prefers_zero_cost')
+        plan['skipped'] = plan.get('skipped', []) + [{'provider': c['provider'], 'reason': reason} for c in removed]
+        plan['candidates'] = decision['candidates']
         ann['enforced'] = True
+        ann['enforced_action'] = decision['action']
     return plan
 
 
@@ -371,7 +454,7 @@ def route_worker(args):
         policy,providers=configuration()
         plan={**plan_route(args['task'],policy,providers),'source':'z0intelligence.task_rules',
               'harness':request['harness'],'caller_trace_id':request['trace_id']}
-        posture_annotate(plan)
+        posture_annotate(plan,policy=policy,providers=providers)
         return execute_plan(args,policy,providers,plan,receipt_sink=sink)
     return run(request,work)
 
@@ -425,7 +508,7 @@ def execute_plan(args, policy, providers, plan, *, receipt_sink, receipt_locatio
             'model': attempts[-1]['model'] if attempts else None,
             'free_only':free_required(policy,args),'requires_parent':not result['ok'],
             'refusal_reason':None if result['ok'] else ('Resource posture BURN (enforced): frontier surplus perishes; parent should absorb'
-                                                        if (plan.get('resource_posture') or {}).get('enforced') else 'No candidate completed; no paid overflow'),
+                                                        if (plan.get('resource_posture') or {}).get('enforced_action')=='return_to_parent' else 'No candidate completed; no paid overflow'),
             'attempts': attempts, 'receipt_path': receipt_location if receipt_location is not None else str(receipts_path()),
             'latency_ms': (time.monotonic() - started) * 1000,
             'input_tokens': sum(a.get('input_tokens') or 0 for a in attempts),
