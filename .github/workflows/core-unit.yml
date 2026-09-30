@@ -42,6 +42,7 @@ jobs:
           python -m py_compile \
             src/z0int/receipt.py \
             src/z0int/memory/event_log.py \
+            src/z0int/memory/optmem_tree.py \
             src/z0int/tokenomics_emit.py \
             src/z0int/bridge/worker.py \
             src/z0int/bridge/runtime.py \
@@ -55,7 +56,8 @@ jobs:
             tests.test_receipt.ReceiptBuild \
             tests.test_receipt.ReceiptClose \
             tests.test_bridge_worker.BridgeRuntimeTests \
-            tests.test_memory_event_log.EventLogTests
+            tests.test_memory_event_log.EventLogTests \
+            tests.test_memory_optmem_tree.OptMemTreeTests
       - name: Tokenomics emitter fallback tests
         env:
           PYTHONPATH: src
