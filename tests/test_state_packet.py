@@ -121,20 +121,31 @@ class StatePacketTests(_Base):
     def test_transcript_append_invalidates_and_scans_incrementally(self):
         f = self.add_transcript()
         p1 = self.build()
-        full = p1["measurements"]["adapters"]["claude_code"]["bytes_read"]
+        full = p1["measurements"]["transcript_bytes_read"]
         extra = json.dumps({"type": "user", "sessionId": "00000000-fixture-0000-0000-000000000001",
                             "cwd": str(self.repo), "timestamp": "2026-01-02T09:00:00.000Z",
                             "message": {"role": "user", "content": "SYNTHETIC follow-up"}}) + "\n"
         with f.open("a", encoding="utf-8") as fh:
             fh.write(extra)
-        self.assertFalse(sp.check_packet(p1, self.projects)["valid"])
         p2 = self.build()
         self.assertFalse(p2["measurements"]["cache_hit"])
-        inc = p2["measurements"]["adapters"]["claude_code"]["bytes_read"]
-        self.assertEqual(inc, len(extra.encode()))
+        inc = p2["measurements"]["transcript_bytes_read"]
+        self.assertEqual(inc, len(extra.encode()))  # only the appended bytes are read
         self.assertLess(inc, full)
+        self.assertFalse(sp.check_packet(p1, self.projects)["valid"])
         sess = next(c for c in p2["current_claims"] if c["key"].startswith("conv.session["))
         self.assertEqual(sess["value"]["last_ts"], "2026-01-02T09:00:00.000Z")
+
+    def test_unrelated_transcript_append_does_not_invalidate(self):
+        f = self.add_transcript()
+        p1 = self.build()
+        with f.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"type": "user", "sessionId": "00000000-fixture-0000-0000-000000000001",
+                                 "cwd": "/elsewhere/unrelated", "timestamp": "2026-01-03T00:00:00.000Z",
+                                 "message": {"role": "user", "content": "SYNTHETIC unrelated"}}) + "\n")
+        self.assertTrue(sp.check_packet(p1, self.projects)["valid"])
+        p2 = self.build()
+        self.assertTrue(p2["measurements"]["cache_hit"])
 
     def test_supersession_keeps_history(self):
         self.add_transcript()

@@ -95,6 +95,7 @@ class Reader:
     def __init__(self) -> None:
         self.reads = 0
         self.bytes = 0
+        self.transcript_bytes = 0
         self.log: list[str] = []
 
     def git(self, repo: Path, *args: str, timeout: float = 10.0) -> str | None:
@@ -173,6 +174,7 @@ class EvidenceBundle:
     source_revision: Any = None
     reads: int = 0
     bytes_read: int = 0
+    transcript_bytes: int = 0
     wall_ms: float = 0.0
 
     def ev(self, ref: EvidenceRef) -> str:
@@ -555,7 +557,7 @@ def _scan_lines(lines: list[str], start_line: int, repo: Path, s: dict[str, Any]
                     s["files"] = s["files"][-20:]
                 elif mentions:
                     s["mentions"] = int(s.get("mentions", 0)) + 1
-                if name in ("Agent", "Task") and (in_repo or s["hits"]):
+                if name in ("Agent", "Task") and in_repo:
                     s["delegated"][str(c.get("id"))] = {"what": redact(inp.get("description") or "", 80), "line": lineno}
                 if name == "Bash" and re.search(r"\bgit\b[^|;&]*\bcommit\b", cmd) and in_repo:
                     s["commits"] += 1
@@ -568,7 +570,7 @@ def _scan_lines(lines: list[str], start_line: int, repo: Path, s: dict[str, Any]
             if isinstance(content, list):
                 texts = [c.get("text") for c in content if isinstance(c, dict) and c.get("type") == "text"]
                 text = texts[0] if texts else None
-            if text and not text.lstrip().startswith("<") and (in_repo or s["hits"]):
+            if text and not text.lstrip().startswith("<") and in_repo:
                 s["last_prompt"] = redact(text)
                 s["last_prompt_line"] = lineno
         if in_repo:
@@ -610,6 +612,7 @@ def summarize_transcript(path: Path, repo: Path, reader: Reader, cursors: dict[s
         return None
     reader.reads += 1
     reader.bytes += len(data)
+    reader.transcript_bytes += len(data)
     reader.log.append(f"transcript {path.name}@{offset}")
     end = data.rfind(b"\n")
     if end < 0:
@@ -622,23 +625,19 @@ def summarize_transcript(path: Path, repo: Path, reader: Reader, cursors: dict[s
     return summary
 
 
-def adapter_claude_code(repo: Path, reader: Reader, projects_root: Path | None = None) -> EvidenceBundle:
-    b = EvidenceBundle(facet="claude_code")
-    root = projects_root or default_projects_root()
-    files = transcript_candidates(repo, root)
+_RELEVANT_FIELDS = ("hits", "last_ts", "branch", "cwd", "title", "files", "delegated", "completed", "last_prompt")
+
+
+def scan_transcripts(repo: Path, projects_root: Path, reader: Reader) -> tuple[list[Path], list[tuple[Path, dict[str, Any]]]]:
+    """Incrementally scan candidate transcripts; return (candidates, relevant sessions)."""
+    files = transcript_candidates(repo, projects_root)
     cur_path = _cursor_path(repo)
     try:
         cursors = json.loads(cur_path.read_text(encoding="utf-8")) if cur_path.is_file() else {}
     except (OSError, ValueError):
         cursors = {}
-    revs: dict[str, str] = {}
     sessions = []
     for f in files:
-        try:
-            st = f.stat()
-        except OSError:
-            continue
-        revs[_sha(str(f), 12)] = f"size={st.st_size}"
         s = summarize_transcript(f, repo, reader, cursors)
         if s and s.get("hits"):
             sessions.append((f, s))
@@ -646,7 +645,28 @@ def adapter_claude_code(repo: Path, reader: Reader, projects_root: Path | None =
         cur_path.write_text(json.dumps(cursors), encoding="utf-8")
     except OSError:
         pass
-    b.source_revision = revs
+    return files, sessions
+
+
+def conversation_revision(sessions: list[tuple[Path, dict[str, Any]]]) -> dict[str, str]:
+    """Revision of the *repo-relevant* conversation facts.
+
+    Transcripts in ancestor project dirs grow constantly with unrelated work; keying
+    on raw file size would invalidate every packet under ~/workspace on every turn.
+    Instead the revision is a digest of the extracted relevant summary, so an
+    unrelated append (read incrementally, a few KB) does not invalidate.
+    """
+    out = {}
+    for f, s in sessions:
+        out[_sha(str(f), 12)] = _sha(json.dumps({k: s.get(k) for k in _RELEVANT_FIELDS}, sort_keys=True, default=str), 12)
+    return out
+
+
+def adapter_claude_code(repo: Path, reader: Reader, projects_root: Path | None = None) -> EvidenceBundle:
+    b = EvidenceBundle(facet="claude_code")
+    root = projects_root or default_projects_root()
+    files, sessions = scan_transcripts(repo, root, reader)
+    b.source_revision = conversation_revision(sessions)
     b.reads, b.bytes_read = reader.reads, reader.bytes
     if not sessions:
         b.coverage = "none"
@@ -877,16 +897,13 @@ def source_revisions(repo: Path, projects_root: Path | None = None, reader: Read
     for d in _doc_files(repo):
         try:
             data = d.read_bytes()[:DOC_MAX_BYTES]
+            r.reads += 1
+            r.bytes += len(data)
         except OSError:
             continue
         docs[d.name] = "sha256:" + hashlib.sha256(data).hexdigest()[:12]
-    conv = {}
-    for f in transcript_candidates(repo, projects_root or default_projects_root()):
-        try:
-            conv[_sha(str(f), 12)] = f"size={f.stat().st_size}"
-        except OSError:
-            continue
-    return {"git": git, "docs": docs, "claude_code": conv}
+    _, sessions = scan_transcripts(repo, projects_root or default_projects_root(), r)
+    return {"git": git, "docs": docs, "claude_code": conversation_revision(sessions)}
 
 
 def build_state_packet(
@@ -912,7 +929,8 @@ def build_state_packet(
         out = dict(prior)
         m = dict(out.get("measurements") or {})
         m.update({"cache_hit": True, "wall_ms": round((time.perf_counter() - t0) * 1000, 2),
-                  "raw_source_reads": probe.reads, "bytes_read": probe.bytes, "cold_wall_ms": m.get("wall_ms")})
+                  "raw_source_reads": probe.reads, "bytes_read": probe.bytes,
+                  "transcript_bytes_read": probe.transcript_bytes, "cold_wall_ms": m.get("wall_ms")})
         out["measurements"] = m
         return out
 
@@ -931,7 +949,7 @@ def build_state_packet(
             bundle = EvidenceBundle(facet=name, coverage="none")
             bundle.unknowns.append({"key": f"{name}.adapter", "reason": f"adapter error: {type(exc).__name__}: {exc}"})
         bundle.wall_ms = (time.perf_counter() - s) * 1000
-        bundle.reads, bundle.bytes_read = rd.reads, rd.bytes
+        bundle.reads, bundle.bytes_read, bundle.transcript_bytes = rd.reads, rd.bytes, rd.transcript_bytes
         return bundle
 
     names = [a for a in adapters if a in runners]
@@ -960,6 +978,7 @@ def build_state_packet(
     }
     total_reads = probe.reads + sum(b.reads for b in bundles)
     total_bytes = probe.bytes + sum(b.bytes_read for b in bundles)
+    transcript_bytes = probe.transcript_bytes + sum(b.transcript_bytes for b in bundles)
     body = json.dumps(packet, ensure_ascii=False)
     packet["measurements"] = {
         "cache_hit": False,
@@ -968,6 +987,7 @@ def build_state_packet(
                                "claims": len(b.claims)} for b in bundles},
         "raw_source_reads": total_reads,
         "bytes_read": total_bytes,
+        "transcript_bytes_read": transcript_bytes,
         "packet_bytes": len(body.encode("utf-8")),
         "concurrent_adapters": len(bundles),
         "network_calls": 0,
@@ -1174,3 +1194,29 @@ def session_start_hook(stdin_text: str | None = None, *, repo: str | None = None
     except Exception as exc:  # never break session start
         ctx = f"<z0-state-packet error=\"{type(exc).__name__}\"/>"
     return {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ctx}}
+
+
+def _main(argv: list[str] | None = None) -> int:
+    """Lightweight entry (skips the full z0int CLI import): ``python -m z0int.state_packet --hook``."""
+    import argparse
+    import sys
+
+    ap = argparse.ArgumentParser(prog="python -m z0int.state_packet")
+    ap.add_argument("--hook", action="store_true", help="SessionStart hook JSON (reads hook stdin for cwd)")
+    ap.add_argument("--repo", default=None)
+    ap.add_argument("--render", action="store_true")
+    ap.add_argument("--max-tokens", type=int, default=1500)
+    ap.add_argument("--projects-root", default=None)
+    a = ap.parse_args(argv)
+    if a.hook:
+        stdin_text = None if sys.stdin is None or sys.stdin.isatty() else sys.stdin.read()
+        print(json.dumps(session_start_hook(stdin_text, repo=a.repo, max_tokens=a.max_tokens,
+                                            projects_root=a.projects_root), ensure_ascii=False))
+        return 0
+    pkt = build_state_packet(a.repo or os.getcwd(), projects_root=a.projects_root)
+    print(render_additional_context(pkt, max_tokens=a.max_tokens) if a.render else json.dumps(pkt, indent=1, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())
