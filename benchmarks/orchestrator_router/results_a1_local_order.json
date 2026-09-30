@@ -1,0 +1,228 @@
+{
+ "schema": "z0int.orchestrator_router.results.a1",
+ "prereg": "benchmarks/orchestrator_router/PREREG_addendum_local_order.md",
+ "frozen_input_check": "passed",
+ "code_commit": "f8c925a3345ad01f834c4a9a9c01213d7d11badd",
+ "inputs": {
+  "authored144": "8162d1c73f925af64453f1ec05ef36d583b3815bf698e60f0d454bd11537e079",
+  "questions_pinned": "437412fcc04b6412b10a0950ce0024dcd503585db11b44ccbb184afdce6b95c4",
+  "worker_routing_policy": "5a168aa268f438af32082f1f38179d1df3c57aae7bca96d54e55ea2c8fb1a7c7",
+  "host_override": "7afacab46b9184030e7a457a40cef76e3311fb65d4b7f60a50b443a8c2237993",
+  "action_selector_run": "f819f552aea128fb1fdc9aa7b5218b1a6bf8612bb09e0629dfb4784d1ee1e2ed",
+  "s1_outcomes:local/qwen3-0.6b-q8": "9853ff13e79cedb4924e6598eff0fe23b6560694dddcbcc66f921204122bf038",
+  "s1_outcomes:groot/qwen3-0.6b-q8": "c7b83983fcfff3f10957e95b9fdfc9119d6da2946d77567102d7461f2035c1df",
+  "s1_outcomes:groot/qwen3-4b-q4km": "085be0d325f06f227a79a573f5800fa7262ff0fa4934651946e944d503eeb6c4",
+  "s1_outcomes:groot/qwen3-8b-q4km": "3b0574870dc6088e1f406a49113a8d9af646d1e310751b8c9b0bc5bfe874a888"
+ },
+ "v0_host_override": "c5005a80f57e54535715fe1412855ee9ff2cd40c34dcfa861eb7c7763c78f7ff",
+ "policy_local_order": [
+  "groot",
+  "local"
+ ],
+ "s1_deterministic_choice_distribution": {
+  "groot/qwen3-8b-q4km": 48
+ },
+ "items_with_changed_deterministic_choice": 48,
+ "arms_a1": {
+  "deterministic": {
+   "S1": {
+    "n": 48,
+    "choice_accuracy": 0.08333333333333333,
+    "correct": 4,
+    "pass_rate": 0.8958333333333334,
+    "mean_regret": 0.13433731329804033,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 1.0
+   },
+   "S2": {
+    "n": 11,
+    "choice_accuracy": 0.7272727272727273,
+    "correct": 8,
+    "pass_rate": 0.7272727272727273,
+    "mean_regret": 0.0,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 1.0
+   },
+   "pooled_labeled": {
+    "n": 59,
+    "choice_accuracy": 0.2033898305084746,
+    "correct": 12,
+    "pass_rate": 0.864406779661017,
+    "mean_regret": 0.10929137353060908,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 1.0
+   }
+  },
+  "cheapest": {
+   "S1": {
+    "n": 48,
+    "choice_accuracy": 0.5625,
+    "correct": 27,
+    "pass_rate": 0.5625,
+    "mean_regret": 0.4278484349286904,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 0.0
+   },
+   "S2": {
+    "n": 11,
+    "choice_accuracy": 0.7272727272727273,
+    "correct": 8,
+    "pass_rate": 0.7272727272727273,
+    "mean_regret": 0.0,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 1.0
+   },
+   "pooled_labeled": {
+    "n": 59,
+    "choice_accuracy": 0.5932203389830508,
+    "correct": 35,
+    "pass_rate": 0.5932203389830508,
+    "mean_regret": 0.3480800826538498,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 0.1864406779661017
+   }
+  },
+  "strongest": {
+   "S1": {
+    "n": 48,
+    "choice_accuracy": 0.08333333333333333,
+    "correct": 4,
+    "pass_rate": 0.8958333333333334,
+    "mean_regret": 0.13433731329804033,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 1.0
+   },
+   "pooled_labeled": {
+    "n": 48,
+    "choice_accuracy": 0.08333333333333333,
+    "correct": 4,
+    "pass_rate": 0.8958333333333334,
+    "mean_regret": 0.13433731329804033,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 1.0
+   }
+  }
+ },
+ "arms_v0": {
+  "deterministic": {
+   "S1": {
+    "n": 48,
+    "choice_accuracy": 0.0,
+    "correct": 0,
+    "pass_rate": 0.5208333333333334,
+    "mean_regret": 1.4363622701393572,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 1.0
+   },
+   "S2": {
+    "n": 11,
+    "choice_accuracy": 0.7272727272727273,
+    "correct": 8,
+    "pass_rate": 0.7272727272727273,
+    "mean_regret": 0.0,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 1.0
+   },
+   "pooled_labeled": {
+    "n": 59,
+    "choice_accuracy": 0.13559322033898305,
+    "correct": 8,
+    "pass_rate": 0.559322033898305,
+    "mean_regret": 1.1685659146896465,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 1.0
+   }
+  },
+  "cheapest": {
+   "S1": {
+    "n": 48,
+    "choice_accuracy": 0.5625,
+    "correct": 27,
+    "pass_rate": 0.5625,
+    "mean_regret": 0.4278484349286904,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 0.0
+   },
+   "S2": {
+    "n": 11,
+    "choice_accuracy": 0.7272727272727273,
+    "correct": 8,
+    "pass_rate": 0.7272727272727273,
+    "mean_regret": 0.0,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 1.0
+   },
+   "pooled_labeled": {
+    "n": 59,
+    "choice_accuracy": 0.5932203389830508,
+    "correct": 35,
+    "pass_rate": 0.5932203389830508,
+    "mean_regret": 0.3480800826538498,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 0.1864406779661017
+   }
+  },
+  "strongest": {
+   "S1": {
+    "n": 48,
+    "choice_accuracy": 0.08333333333333333,
+    "correct": 4,
+    "pass_rate": 0.8958333333333334,
+    "mean_regret": 0.13433731329804033,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 0.0
+   },
+   "pooled_labeled": {
+    "n": 48,
+    "choice_accuracy": 0.08333333333333333,
+    "correct": 4,
+    "pass_rate": 0.8958333333333334,
+    "mean_regret": 0.13433731329804033,
+    "raw_illegal": 0,
+    "raw_illegal_rate": 0.0,
+    "post_gate_illegal": 0,
+    "agree_with_deterministic": 0.0
+   }
+  }
+ },
+ "reading": {
+  "s1_pass_ge_0.85": true,
+  "s1_regret_below_v0_cheapest": true,
+  "fix_confirmed": true
+ },
+ "exploratory_orch_think_vs_a1_deterministic": {
+  "a_only": 16,
+  "b_only": 5,
+  "p": 0.02660369873046875
+ }
+}

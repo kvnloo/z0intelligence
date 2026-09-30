@@ -42,3 +42,26 @@ Each is reported next to the v0 row. There is no significance test. This is a de
 ## Execution
 
 `.venv/bin/python benchmarks/orchestrator_router/rerun_local_order.py` → `results_a1_local_order.json`.
+
+## Results addendum (A1, run at f8c925a; `results_a1_local_order.json`)
+
+The frozen-input check **passed**. Every input sha matches v0 except `host_override` (c5005a80… → 7afacab4…, which adds `local_order`).
+S1/S2 legal candidates, costs, per-candidate passes, and gold are identical to v0 on all 59 labeled items.
+Under the current policy, `local_order = ["groot", "local"]`, the S1 deterministic choice is `groot/qwen3-8b-q4km` on 48/48 items, so every S1 item changed.
+S2 is unchanged.
+
+| arm | set | v0 choice acc | v0 pass | v0 regret | A1 choice acc | A1 pass | A1 regret |
+|---|---|---|---|---|---|---|---|
+| deterministic | S1 (n=48) | 0/48 | 0.52 | 1.44 | 4/48 | **0.90** | **0.13** |
+| deterministic | S2 (n=11) | 8/11 | 0.73 | 0.00 | 8/11 | 0.73 | 0.00 |
+| deterministic | pooled (n=59) | 8/59 (0.14) | 0.56 | 1.17 | 12/59 (0.20) | **0.86** | **0.11** |
+| cheapest | pooled (n=59) | 35/59 | 0.59 | 0.35 | 35/59 | 0.59 | 0.35 (unchanged) |
+| strongest | S1 (n=48) | 4/48 | 0.90 | 0.13 | 4/48 | 0.90 | 0.13 (unchanged) |
+
+- The prediction held exactly. The S1 deterministic row now equals the v0 `strongest` row.
+- Reading: S1 pass 0.90 ≥ 0.85 and S1 regret 0.13 < 0.43 (v0 `cheapest`), so the fix is **confirmed**. The host `local_order` fix turns the
+  worst arm in the v0 table into the best one on delivered quality and regret among the non-oracle arms, pooled regret 0.11 vs 0.35 for `cheapest`.
+- Choice accuracy stays low (12/59) by construction, because gold is the cheapest passing candidate and 8B is rarely cheapest.
+- Exploratory only, with no decision attached: on choice accuracy, `orch_think` still beats the new deterministic arm (23 vs 12; McNemar 16 vs 5, p = 0.027).
+  On delivered quality it is well behind (pass 0.58 vs 0.86, regret 0.74 vs 0.11). The v0 decision "do not continue in shadow" stands and is not re-adjudicated.
+- Deviations: none. No model was called and no v0 artifact was modified.
