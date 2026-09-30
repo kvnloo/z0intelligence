@@ -84,6 +84,8 @@ def fx(tmp_path):
     git(repo, "checkout", "-q", "-b", "feat/old", "master")
     write(repo, "docs/old.md", "old\n")
     shas["feat/old"] = commit(repo, "docs: old")
+    shas["feat/ts-ext"] = branch(repo, "feat/ts-ext", {"ext/thing/index.ts": "export const x = 1;\n",
+                                                       "ext/thing/index.test.ts": "import {x} from './index';\n"}, "feat: ts ext")
     shas["feat/squashed"] = branch(repo, "feat/squashed", {"docs/sq.md": "sq\n"}, "docs: sq")
     git(repo, "checkout", "-q", "master")
     write(repo, "docs/sq.md", "sq\n")
@@ -289,3 +291,12 @@ def test_squash_merged_branch_has_nothing_to_promote(fx):
     r = run(fx, ["feat/squashed"])["feat/squashed"]
     assert r["verdict"] == "ABSTAIN"
     assert r["criteria"]["pending"]["status"] == "no_match" and "no-op" in r["criteria"]["pending"]["reason"]
+
+
+def test_non_python_code_is_unjudged_not_passed(fx):
+    r = run(fx, ["feat/ts-ext"])["feat/ts-ext"]
+    assert r["criteria"]["wired"]["status"] == "source_unavailable"
+    assert r["criteria"]["wired"]["value"]["unjudged"] == ["ext/thing/index.ts"]
+    assert r["criteria"]["tested"]["status"] == "source_unavailable"
+    assert r["verdict"] == "ASK"
+    assert {"unknown:promote.wired", "unknown:promote.tested", "authority:privileged"} <= set(r["ask_about"])

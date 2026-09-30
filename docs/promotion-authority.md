@@ -40,6 +40,11 @@ Workflow lines that only run `unittest`, `pytest`, `py_compile` or `compileall` 
 counts as test evidence, not production reach. Test files never propagate reach. Scripts and benchmarks are not
 gated.
 
+**Non-Python code.** v0 judges only Python. Added non-Python code (`.ts`, `.js`, `.sh` and so on, excluding tests)
+that the graph cannot reach, for example an omp or Hermes extension directory whose loader it can't see, sets
+`wired` to `source_unavailable`. Changed non-Python code always sets `tested` to `source_unavailable`, because the
+CI command is Python-only. Neither case is a pass. Both surface as ASK reasons, so the human judges them.
+
 **Coverage (criterion 3).** The CI test command is taken from `--test-cmd`, then the report's `test_cmd`, then
 the manifest's `NIGHTLY_TEST_CMD` header. It must be one `[ENV=…] python … ` invocation, which is re-run as
 `coverage run --include <tree>/*`. A shell pipeline cannot be instrumented, so criterion 3 is then `unknown`. As
@@ -62,7 +67,7 @@ scoped=False)` builds the opportunity:
 | observed / n/a | `current_claims` with evidence ids | none |
 | checked negative | blocking unknown, `source_status: no_match` (an answer, not a gap) | ACT blocked; not an ASK reason |
 | evidence missing but gatherable | blocking unknown, `unknown`, plus an `OBSERVE` transition | ACT blocked; OBSERVE legal |
-| claim without receipt | blocking unknown, `source_unavailable` | ACT blocked; ASK about it |
+| claim without receipt, or non-Python code v0 cannot judge | blocking unknown, `source_unavailable` | ACT blocked; ASK about it |
 | two sources disagree | `contradictions` | ESCALATE legal |
 
 `promotion_verdict()` picks the first match in this fixed order:

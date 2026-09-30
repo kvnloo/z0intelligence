@@ -181,8 +181,14 @@ def added_lines(repo: Path, base: str, sha: str, paths: Iterable[str]) -> dict[s
 
 # ----------------------------------------------------------------------------- import graph
 def is_test_path(rel: str) -> bool:
-    return (rel.startswith("tests/") or "/tests/" in rel or "/test/" in rel
-            or Path(rel).name.startswith("test_") or Path(rel).name == "conftest.py")
+    name = Path(rel).name
+    return (rel.startswith("tests/") or "/tests/" in rel or "/test/" in rel or "/__tests__/" in rel
+            or name.startswith("test_") or name == "conftest.py" or ".test." in name or ".spec." in name)
+
+
+def non_python_code(changed: Mapping[str, str], statuses: str) -> list[str]:
+    return sorted(p for p, st in changed.items() if st in statuses and Path(p).suffix in CODE_EXT - {".py"}
+                  and not is_test_path(p) and "node_modules" not in p)
 
 
 def src_roots(tree: Path) -> list[str]:
@@ -588,6 +594,24 @@ def fact_wired(graph: ImportGraph | None, added: list[str], err: str | None) -> 
     return f
 
 
+def non_python_gap(f: Fact, files: list[str], graph: ImportGraph | None) -> Fact:
+    """v0 judges Python only.  Non-Python code it cannot judge is missing evidence, never a pass."""
+    if not files or not f.ok:
+        return f
+    if f.key == "promote.wired":
+        files = [p for p in files if graph is None or graph.reach(p) is None]
+        why = ("added non-Python code not reachable in the v0 graph (loaders such as omp or Hermes "
+               "extension dirs are invisible to it)")
+    else:
+        why = "the CI test command is Python-only; changed non-Python code has no coverage evidence"
+    if not files:
+        return f
+    f.status, f.reason = "source_unavailable", f"{len(files)} file(s): {why}"
+    f.value = {**(f.value or {}), "unjudged": files}
+    f.evidence.append("unjudged: " + ", ".join(files[:6]) + (" …" if len(files) > 6 else ""))
+    return f
+
+
 def fact_tested(test_cmd: str | None, cmd_src: str, run: dict[str, Any] | None,
                 gated: dict[str, set[int]], ungated: list[str], entry: Mapping[str, Any] | None) -> Fact:
     f = Fact("promote.tested")
@@ -779,7 +803,7 @@ def check_branch(repo: Path, entry: Mapping[str, Any], *, default: str, default_
                     err = f"{type(exc).__name__}: {exc}"
                 roots = src_roots(tree) if files else ["src"]
                 added = sorted(p for p, st in changed.items() if st == "A" and files and is_source_module(p, roots, tree))
-                facts.append(fact_wired(graph, added, err))
+                facts.append(non_python_gap(fact_wired(graph, added, err), non_python_code(changed, "A") if files else [], graph))
                 # tested: added function-body lines in changed source modules must be executed
                 src_changed = [p for p, st in changed.items() if st in ("A", "M") and files and is_source_module(p, roots, tree)]
                 adds = added_lines(repo, base, sha, src_changed)
@@ -797,7 +821,8 @@ def check_branch(repo: Path, entry: Mapping[str, Any], *, default: str, default_
                     run = run_ci_tests(tree, test_cmd, scratch, test_timeout)
                 elif test_cmd and gated and not run_tests:
                     run = {"ran": False, "reason": "--no-tests"}
-                facts.append(fact_tested(test_cmd, cmd_src, run, gated, ungated, rentry))
+                facts.append(non_python_gap(fact_tested(test_cmd, cmd_src, run, gated, ungated, rentry),
+                                            non_python_code(changed, "AM") if files else [], graph))
                 log = _git(repo, "log", "--no-merges", "--format=%s%n%b", f"{base}..{sha}").stdout
                 texts = [("commits", log)]
                 pr_list = (prs or {}).get(branch, [])
