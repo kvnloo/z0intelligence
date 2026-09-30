@@ -1,0 +1,124 @@
+{
+  "schema": "z0int.state_packet_bench.questions.v0",
+  "frozen_at": "2026-09-30T06:15:00Z",
+  "authored_before_running": true,
+  "note": "Answer key authored from direct read-only inspection of the local checkouts (plain git + file reads, independent of z0int.state_packet) BEFORE any arm was run. Structural facts only (branch names, commit ids/subjects, paths, session-id prefixes); no conversation text. Questions whose key facts drift during the run are voided by run.py's post-run oracle, never re-keyed.",
+  "key_revisions": {
+    "z0intelligence": {"head": "435479b", "branch": "feat/claude-code-harness"},
+    "z0evals": {"head": "bb8ad2c", "branch": "main"},
+    "aodl": {"head": "ddcea2e", "branch": "ai-native/oss-loop"}
+  },
+  "answer_contract": "Reply with ONLY a JSON object: {\"action\": \"answer\"|\"abstain\"|\"conflict\", \"fields\": {...}, \"evidence\": [\"source pointers you relied on\"]}. Use action=abstain when local evidence does not establish the answer; use action=conflict when sources disagree (report each side in fields).",
+  "questions": [
+    {
+      "id": "q01-z0evals-head",
+      "repo": "z0evals",
+      "kind": "exact",
+      "prompt": "In the local checkout ~/workspace/z0evals: what branch is checked out, what is the HEAD short sha, and what is the HEAD commit subject?",
+      "fields": {"branch": "string", "head_sha": "string", "head_subject": "string"},
+      "key": {
+        "action": "answer",
+        "fields": {"branch": {"re": "^main$"}, "head_sha": {"re": "^bb8ad2c"}, "head_subject": {"re": "smoke markers"}}
+      }
+    },
+    {
+      "id": "q02-aodl-worktree-state",
+      "repo": "aodl",
+      "kind": "current-fact",
+      "prompt": "In ~/workspace/aodl: which branch is checked out, how many tracked files have uncommitted modifications, and which untracked paths exist at the top level?",
+      "fields": {"branch": "string", "modified_tracked_files": "integer", "untracked": "list of paths"},
+      "key": {
+        "action": "answer",
+        "fields": {"branch": {"re": "^ai-native/oss-loop$"}, "modified_tracked_files": {"int": 0}, "untracked": {"contains_all": ["\\.worktrees"]}}
+      }
+    },
+    {
+      "id": "q03-aodl-unmerged-branches",
+      "repo": "aodl",
+      "kind": "open-work",
+      "prompt": "In ~/workspace/aodl: which local branches have commits that are NOT on origin/main (per the local remote-tracking refs), how many commits ahead is each, and where (which worktree path, if any) is each checked out?",
+      "fields": {"branches": "list of {branch, ahead, worktree}"},
+      "key": {
+        "action": "answer",
+        "fields": {"branches": {"contains_all": ["catalog/dash-pi-fx.*\\b1\\b.*dash-wired|catalog/dash-pi-fx.*dash-wired.*\\b1\\b"], "forbid_any": ["ai-native/oss-loop", "language/"]}}
+      }
+    },
+    {
+      "id": "q04-aodl-remote-freshness",
+      "repo": "aodl",
+      "kind": "staleness",
+      "prompt": "In ~/workspace/aodl: roughly how many days ago were the remote-tracking refs last fetched, and can ahead/behind counts versus origin be trusted as the live remote state without fetching?",
+      "fields": {"remote_refs_age_days": "number", "ahead_behind_trustworthy_without_fetch": "boolean"},
+      "key": {
+        "action": "answer",
+        "fields": {"remote_refs_age_days": {"num": 19.4, "tol": 2.5}, "ahead_behind_trustworthy_without_fetch": {"bool": false}}
+      }
+    },
+    {
+      "id": "q05-z0int-main-branch",
+      "repo": "z0intelligence",
+      "kind": "current-fact",
+      "prompt": "In the main checkout ~/workspace/z0intelligence (not its .claude/worktrees): which branch is checked out and what is its upstream tracking ref?",
+      "fields": {"branch": "string", "upstream": "string"},
+      "key": {
+        "action": "answer",
+        "fields": {"branch": {"re": "^feat/claude-code-harness$"}, "upstream": {"re": "origin/master"}}
+      }
+    },
+    {
+      "id": "q06-z0int-state-packet-worktree",
+      "repo": "z0intelligence",
+      "kind": "cross-source",
+      "prompt": "In ~/workspace/z0intelligence: which branch and which worktree path hold the State Packet work?",
+      "fields": {"branch": "string", "worktree": "string"},
+      "key": {
+        "action": "answer",
+        "fields": {"branch": {"re": "^feat/state-packet-v0$"}, "worktree": {"re": "agent-abc30d057d833a884"}}
+      }
+    },
+    {
+      "id": "q07-z0int-last-cc-session",
+      "repo": "z0intelligence",
+      "kind": "conversation",
+      "prompt": "According to local Claude Code history (~/.claude/projects), which top-level (non-subagent) Claude Code session most recently worked in ~/workspace/z0intelligence? Give the first 8 characters of its session id.",
+      "fields": {"session_id_prefix": "string"},
+      "key": {
+        "action": "answer",
+        "fields": {"session_id_prefix": {"re": "^20af362c"}}
+      }
+    },
+    {
+      "id": "q08-z0int-p0-priority",
+      "repo": "z0intelligence",
+      "kind": "contradiction",
+      "prompt": "What is the current P0 / critical-path priority for z0intelligence? If local sources (repo docs, git, local Claude Code history) disagree, report each claim with its source instead of picking one.",
+      "fields": {"claims": "list of {priority, source}"},
+      "key": {
+        "action": "conflict",
+        "fields": {"claims": {"contains_all": ["GPU population", "State Packet|state.packet|#22"]}}
+      }
+    },
+    {
+      "id": "q09-aodl-abstain-worktree-session",
+      "repo": "aodl",
+      "kind": "abstention",
+      "prompt": "According to local Claude Code history, what did the most recent Claude Code session whose working directory was ~/workspace/aodl/.worktrees/dash-wired change, and on which branch?",
+      "fields": {"changed": "string", "branch": "string"},
+      "key": {
+        "action": "abstain",
+        "fields": {}
+      }
+    },
+    {
+      "id": "q10-z0evals-legal-next",
+      "repo": "z0evals",
+      "kind": "next-legal-action",
+      "prompt": "An agent wants to add new files under studies/ in ~/workspace/z0evals. Given the current checkout state and the repository's own rules: may it commit directly on the currently checked-out branch, and may it merge its work into main? What is the required path instead?",
+      "fields": {"may_commit_on_current_branch": "boolean", "may_merge_into_main": "boolean", "required_path": "string"},
+      "key": {
+        "action": "answer",
+        "fields": {"may_commit_on_current_branch": {"bool": false}, "may_merge_into_main": {"bool": false}, "required_path": {"re": "branch"}}
+      }
+    }
+  ]
+}

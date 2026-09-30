@@ -436,6 +436,20 @@ def build_parser() -> argparse.ArgumentParser:
     cxr.add_argument("--no-qmd", action="store_true")
     cxr.add_argument("--allow-memory", action="store_true")
     cxr.add_argument("--input", default=None, help="JSON file with needs[]")
+    cxp = cx_sub.add_parser("packet", help="State Packet v0 — current-work state from git + docs + Claude Code history")
+    cxp.add_argument("--repo", default=None, help="Target repository (default: cwd)")
+    cxp.add_argument("--json", action="store_true", help="Print the full packet JSON (default)")
+    cxp.add_argument("--intent", default="resume", choices=["resume", "status", "plan"])
+    cxp.add_argument("--require", action="append", default=[], help="Required fact key (overrides intent preset)")
+    cxp.add_argument("--projects-root", default=None, help="Claude Code projects dir (default ~/.claude/projects)")
+    cxp.add_argument("--no-cache", action="store_true", help="Rebuild even if source revisions are unchanged")
+    cxp.add_argument("--no-store", action="store_true", help="Do not persist latest packet / history")
+    cxp.add_argument("--render", action="store_true", help="Print SessionStart additionalContext text")
+    cxp.add_argument("--max-tokens", type=int, default=1500)
+    cxp.add_argument("--check", default=None, metavar="PACKET_JSON", help="Validate a saved packet against live sources")
+    cxp.add_argument("--authorize", default=None, metavar="ACTION", help="With --check: gate a transition")
+    cxp.add_argument("--hook", choices=["session-start"], default=None,
+                     help="Emit Claude Code hook JSON (reads hook stdin for cwd); fail-open")
 
 
     osc = sub.add_parser(
@@ -735,6 +749,40 @@ def _cmd_backends(args: argparse.Namespace) -> int:
 
 
 
+def _cmd_context_packet(args: argparse.Namespace) -> int:
+    import os
+    from pathlib import Path
+
+    from z0int import state_packet as sp
+
+    if args.hook == "session-start":
+        stdin_text = None if sys.stdin is None or sys.stdin.isatty() else sys.stdin.read()
+        print(json.dumps(sp.session_start_hook(stdin_text, repo=args.repo, max_tokens=args.max_tokens,
+                                               projects_root=args.projects_root), ensure_ascii=False))
+        return 0
+    if args.check:
+        packet = json.loads(Path(args.check).expanduser().read_text(encoding="utf-8"))
+        out = sp.check_packet(packet, args.projects_root)
+        if args.authorize:
+            out["authorization"] = sp.authorize_transition(packet, args.authorize, projects_root=args.projects_root)
+        print(json.dumps(out, indent=2))
+        return 0 if out["valid"] else 3
+    repo = args.repo or os.getcwd()
+    packet = sp.build_state_packet(
+        repo,
+        intent=args.intent,
+        require=tuple(args.require) or None,
+        projects_root=args.projects_root,
+        use_cache=not args.no_cache,
+        store=not args.no_store,
+    )
+    if args.render:
+        print(sp.render_additional_context(packet, max_tokens=args.max_tokens))
+    else:
+        print(json.dumps(packet, indent=2, ensure_ascii=False, default=str))
+    return 0
+
+
 def _cmd_context(args: argparse.Namespace) -> int:
     from z0int.context_resolve import (
         InformationNeed,
@@ -742,6 +790,8 @@ def _cmd_context(args: argparse.Namespace) -> int:
         resolve_context,
     )
 
+    if args.context_cmd == "packet":
+        return _cmd_context_packet(args)
     if args.context_cmd != "resolve":
         print(f"unknown context command: {args.context_cmd}", file=sys.stderr)
         return 2
