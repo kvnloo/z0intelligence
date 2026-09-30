@@ -10,6 +10,7 @@ from .intelligence import dispatch, route, routing_snapshot, REGISTRY
 from .automatic import dispatch_event, consume
 from .decision_experiment import run_choice_experiment, run_noul_experiment
 from .reliability_observation import ingest_observation
+from .agentweb_context_packet import compile_agentweb_context_packet
 
 SLOTS=threading.BoundedSemaphore(4)
 METRIC_LOCK=threading.Lock()
@@ -92,7 +93,7 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404,{'error':'not_found'})
 
     def do_POST(self):
-        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/plan','/v1/worker','/v1/automatic','/v1/automatic/consumed','/v1/experimental/choice','/v1/experimental/noul','/v1/observe/reliability'):return self.reply(404,{'error':'not_found'})
+        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/plan','/v1/worker','/v1/automatic','/v1/automatic/consumed','/v1/experimental/choice','/v1/experimental/noul','/v1/observe/reliability','/v1/context/pack'):return self.reply(404,{'error':'not_found'})
         try:
             size=int(self.headers.get('Content-Length','0'))
             if not 0<size<=(262144 if self.path.startswith('/v1/authority/') else 40000):return self.reply(413,{'error':'request_size'})
@@ -105,6 +106,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,dispatch_worker(args))
             if self.path=='/v1/automatic/consumed':return self.reply(200,consume(args))
             if self.path=='/v1/observe/reliability':return self.reply(200,ingest_observation(args))
+            if self.path=='/v1/context/pack':return self.reply(200,compile_agentweb_context_packet(args))
             if self.path=='/v1/plan':return self.reply(200,plan_intelligence(args))
             started=time.monotonic()
             with METRIC_LOCK:
