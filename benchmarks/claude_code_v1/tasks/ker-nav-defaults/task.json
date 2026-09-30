@@ -1,0 +1,21 @@
+{
+  "id": "ker-nav-defaults",
+  "repo": "kerdoios",
+  "family": "nav",
+  "effort": "low",
+  "source": {"repo": "kerdoios", "sha": "fd34a48a3584548696a3fe08a5bb80038be78618", "prefix": "kerdoios"},
+  "prompt": "The `kerdoios/` directory is a Python package that plans LLM worker placement across providers. Answer the following questions from the code in this repository (do not change any code), and write the answers to a file `ANSWERS.json` in the repository root (next to the kerdoios/ directory) as a single JSON object with exactly these keys:\n\n- `local_base_env` (string): the name of the environment variable that adds an extra OpenAI-compatible local endpoint base URL for live local discovery.\n- `cerebras_live_latency_ms` (number): the p50 latency in milliseconds assigned to Cerebras offers discovered from the live Cerebras catalog (not the fixture catalog).\n- `openrouter_free_quota` (number): the `remaining_free_quota` assigned to a free OpenRouter catalog row when mapping the OpenRouter /models payload.\n- `private_local_fitness_multiplier` (number): the factor by which an offer's fitness score is multiplied when the requirement mode is PRIVATE and the offer is local.\n- `module_cli_default_mode` (string): the default value of `--mode` for the `plan` subcommand of `python -m kerdoios`.\n- `plugin_cli_default_mode` (string): the default value of `--mode` for the `plan` subcommand registered through the Hermes plugin's CLI (`register_cli_command`).\n- `snapshot_model_count` (integer): how many model rows are in the vendored OpenRouter free-model snapshot file.\n- `fixture_ids_concurrency_ge_20` (list of strings): the `id`s of all offers in the deterministic fixture catalog whose concurrency is at least 20 (any order).\n\nExample shape: {\"local_base_env\": \"...\", \"cerebras_live_latency_ms\": 0, ...}",
+  "check": {"kind": "answer_json", "file": "ANSWERS.json",
+            "expect": {
+              "local_base_env": "KERDOIOS_LOCAL_BASE_URL",
+              "cerebras_live_latency_ms": 190,
+              "openrouter_free_quota": 50000,
+              "private_local_fitness_multiplier": 1.4,
+              "module_cli_default_mode": "cheap",
+              "plugin_cli_default_mode": "balanced",
+              "snapshot_model_count": 22,
+              "fixture_ids_concurrency_ge_20": ["cerebras/free-coder", "frontier/paid", "groq/free-70b", "openrouter/free", "tiny/8k-no-tools"]
+            },
+            "unordered": ["fixture_ids_concurrency_ge_20"]},
+  "key_derivation": "Pinned fd34a48: providers/local.py _bases() reads KERDOIOS_LOCAL_BASE_URL; providers/openai_compat.py discover_cerebras latency_ms=190.0 (groq is 280.0; fixture cerebras also 190 but question is the live one); providers/openrouter.py _offers_from_payload remaining_free_quota=50_000.0 if free; score.py score() fitness *= 1.4 for Mode.PRIVATE and offer.local; __main__.py plan/explain --mode default 'cheap'; __init__.py register._setup --mode default 'balanced'; len(json.load(providers/openrouter_free.snapshot.json)['data']) == 22; providers/fixture.py concurrency: groq 20, cerebras 20, openrouter/free 30, local 4, nous 8, frontier 50, tiny 100 -> ids with >=20 computed via fixture_offers()."
+}

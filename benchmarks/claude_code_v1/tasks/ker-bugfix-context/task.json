@@ -1,0 +1,15 @@
+{
+  "id": "ker-bugfix-context",
+  "repo": "kerdoios",
+  "family": "bugfix",
+  "effort": "low",
+  "source": {"repo": "kerdoios", "sha": "fd34a48a3584548696a3fe08a5bb80038be78618", "prefix": "kerdoios"},
+  "sabotage": {"file": "kerdoios/optimize.py",
+               "old": "offer.capacity.context_window < req.context",
+               "new": "offer.capacity.context_window <= req.context"},
+  "prompt": "The `kerdoios/` directory is a Python package (the compute-allotment planner). Several of its tests started failing: from the repository root run `python -m pytest -q kerdoios/tests` (run it from the root, not from inside kerdoios/, because the package has a module named types.py). Users also report that `plan` for 128k-context jobs no longer uses the local qwen model and that `local_only` privacy requests end up with no candidates at all. Find the root cause in the library code and fix it. Do not modify the tests. When done, all tests in kerdoios/tests must pass.",
+  "check": {"kind": "pytest",
+            "restore": ["kerdoios/tests/test_optimize.py", "kerdoios/tests/test_inventory.py", "kerdoios/tests/__init__.py"],
+            "targets": ["kerdoios/tests"],
+            "pythonpath": ["."]}
+}

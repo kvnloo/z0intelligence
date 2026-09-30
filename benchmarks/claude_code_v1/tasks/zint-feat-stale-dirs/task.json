@@ -1,0 +1,28 @@
+{
+ "id": "zint-feat-stale-dirs",
+ "repo": "z0intelligence",
+ "effort": "low",
+ "family": "feature",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "b0724680bc7858ac872bd25c72ff8944322c6094",
+  "paths": [
+   "src",
+   "tests",
+   "pyproject.toml",
+   "README.md"
+  ]
+ },
+ "oracle_patch": "oracle.patch",
+ "prompt": "Add a public function `stale_dirs(root=None, ttl=DEFAULT_TTL, now=None)` to src/z0int/claude_code_launch.py. It reads the same warm-state file that `record()` writes (under the z0int home given by `root`) and returns a sorted list of the recorded directory paths (strings, exactly as stored) whose last launch is strictly older than `ttl` seconds relative to `now` (default: current time). Return [] when nothing is recorded. Add a unit test for it in tests/test_claude_code_launch.py and run that file with `PYTHONPATH=src python -m pytest -q -p no:cacheprovider tests/test_claude_code_launch.py`.",
+ "check": {
+  "kind": "pytest",
+  "targets": [
+   "{task}/hidden_test.py"
+  ],
+  "pythonpath": [
+   "src",
+   "."
+  ]
+ }
+}

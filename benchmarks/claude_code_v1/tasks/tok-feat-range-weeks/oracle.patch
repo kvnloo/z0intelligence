@@ -1,0 +1,31 @@
+diff --git a/packages/python/src/tokenomics/report.py b/packages/python/src/tokenomics/report.py
+index 33d920b..7842f6c 100644
+--- a/packages/python/src/tokenomics/report.py
++++ b/packages/python/src/tokenomics/report.py
+@@ -33,7 +33,7 @@ SavingsTier = Literal["measured", "estimated", "unknown"]
+ 
+ 
+ def parse_range(spec: str, *, now: float | None = None) -> tuple[float, float]:
+-    """Parse range like today|7d|30d|all|24h into (start_ts, end_ts) local-aware UTC."""
++    """Parse range like today|7d|2w|30d|all|24h into (start_ts, end_ts) local-aware UTC."""
+     end = now if now is not None else time.time()
+     s = (spec or "7d").strip().lower()
+     if s in {"all", "*"}:
+@@ -46,13 +46,16 @@ def parse_range(spec: str, *, now: float | None = None) -> tuple[float, float]:
+     if s.endswith("d") and s[:-1].isdigit():
+         days = int(s[:-1])
+         return end - days * 86400.0, end
++    if s.endswith("w") and s[:-1].isdigit():
++        weeks = int(s[:-1])
++        return end - weeks * 7 * 86400.0, end
+     if s.endswith("h") and s[:-1].isdigit():
+         hours = int(s[:-1])
+         return end - hours * 3600.0, end
+     if s.endswith("m") and s[:-1].isdigit():
+         mins = int(s[:-1])
+         return end - mins * 60.0, end
+-    raise ValueError(f"unsupported range {spec!r}; use today|7d|30d|24h|all")
++    raise ValueError(f"unsupported range {spec!r}; use today|7d|2w|30d|24h|all")
+ 
+ 
+ def _usage_attribution(ev: TokenomicsEvent) -> str:

@@ -1,0 +1,59 @@
+{
+  "id": "tok-nav-cli-surface",
+  "family": "nav",
+  "repo": "tokenomics",
+  "effort": "low",
+  "source": {
+    "repo": "tokenomics",
+    "sha": "65e8f2dd9d6c5784a2a1c67f5236d69a5ae94021",
+    "paths": [
+      "packages/python",
+      "pyproject.toml",
+      "README.md",
+      "fixtures",
+      "spec",
+      "docs"
+    ]
+  },
+  "prompt": "Document the command-line surface of the Python `tokenomics` CLI (package under packages/python/src/tokenomics; console script declared in pyproject.toml). Write ANSWERS.json in the repo root as a single JSON object with exactly these keys:\n- \"console_script_target\": the `module:function` entry point string that the `tokenomics` console script maps to.\n- \"subcommands\": list of all subcommand names (any order).\n- \"json_flag_subcommands\": list of subcommands that accept a `--json` flag (any order).\n- \"range_flag_subcommands\": list of subcommands that accept `--range` (any order).\n- \"default_range\": the default value of `--range` (string).\n- \"convert_from_choices\": list of allowed values for `convert --from` (any order).\n- \"summary_economics_schema\": the value of the \"schema\" field inside the \"verified_economics\" object printed by `tokenomics summary`.\n- \"coverage_json_schema\": the value of the top-level \"schema\" field printed by `tokenomics coverage --json`.\n- \"report_schema\": the value of the top-level \"schema\" field printed by `tokenomics report`.\nOnly answer from the code; do not modify any source files.",
+  "check": {
+    "kind": "answer_json",
+    "file": "ANSWERS.json",
+    "expect": {
+      "console_script_target": "tokenomics.cli:main",
+      "subcommands": [
+        "validate",
+        "summary",
+        "convert",
+        "otel-attrs",
+        "savings",
+        "coverage",
+        "report"
+      ],
+      "json_flag_subcommands": [
+        "savings",
+        "coverage"
+      ],
+      "range_flag_subcommands": [
+        "savings",
+        "coverage",
+        "report"
+      ],
+      "default_range": "7d",
+      "convert_from_choices": [
+        "z0int",
+        "kerdoios"
+      ],
+      "summary_economics_schema": "tokenomics.verified_economics.v0",
+      "coverage_json_schema": "tokenomics.coverage.v1",
+      "report_schema": "tokenomics.report.v1"
+    },
+    "unordered": [
+      "subcommands",
+      "json_flag_subcommands",
+      "range_flag_subcommands",
+      "convert_from_choices"
+    ]
+  },
+  "key_derivation": "pyproject.toml [project.scripts] tokenomics = 'tokenomics.cli:main'. Subcommands/options/defaults obtained by introspecting the argparse subparsers built in cli.main (monkeypatched parse_args to dump each subparser's option_strings and defaults). summary -> aggregate.tokens_per_verified_task()['schema'] = 'tokenomics.verified_economics.v0'; coverage --json -> coverage.COVERAGE_SCHEMA = 'tokenomics.coverage.v1'; report -> savings_report_from_sources -> build_savings_report -> report.REPORT_SCHEMA = 'tokenomics.report.v1' (values printed from the imported constants)."
+}

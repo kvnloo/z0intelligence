@@ -1,0 +1,35 @@
+{
+ "id": "zint-fix-warm-ttl",
+ "repo": "z0intelligence",
+ "effort": "low",
+ "family": "bugfix",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "b0724680bc7858ac872bd25c72ff8944322c6094",
+  "paths": [
+   "src",
+   "tests",
+   "pyproject.toml",
+   "README.md"
+  ]
+ },
+ "sabotage": {
+  "file": "src/z0int/claude_code_launch.py",
+  "old": "if age > ttl:",
+  "new": "if age > ttl * 60:"
+ },
+ "prompt": "`z0int claude-code warm` keeps reporting directories as WARM hours after their prompt cache must have expired, so fleets get placed in cold directories. A test in tests/test_claude_code_launch.py fails (`PYTHONPATH=src python -m pytest -q -p no:cacheprovider tests/test_claude_code_launch.py`). Fix the bug in the library code, not the tests.",
+ "check": {
+  "kind": "pytest",
+  "restore": [
+   "tests/test_claude_code_launch.py"
+  ],
+  "targets": [
+   "tests/test_claude_code_launch.py"
+  ],
+  "pythonpath": [
+   "src",
+   "."
+  ]
+ }
+}

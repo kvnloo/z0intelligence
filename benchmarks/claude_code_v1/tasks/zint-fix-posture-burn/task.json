@@ -1,0 +1,35 @@
+{
+ "id": "zint-fix-posture-burn",
+ "repo": "z0intelligence",
+ "effort": "low",
+ "family": "bugfix",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "b0724680bc7858ac872bd25c72ff8944322c6094",
+  "paths": [
+   "src",
+   "tests",
+   "pyproject.toml",
+   "README.md"
+  ]
+ },
+ "sabotage": {
+  "file": "src/z0int/posture.py",
+  "old": "surplus_frac = surplus / cap if cap else None",
+  "new": "surplus_frac = surplus / pool.remaining if cap else None"
+ },
+ "prompt": "The resource-posture evaluator is calling BURN on pools that should be BALANCED: a frontier pool with plenty of capacity but little of it left unused at reset is being told to burn. `PYTHONPATH=src python -m pytest -q -p no:cacheprovider tests/test_posture.py` shows the failure. Find the root cause in src/z0int/posture.py and fix it without changing any test.",
+ "check": {
+  "kind": "pytest",
+  "restore": [
+   "tests/test_posture.py"
+  ],
+  "targets": [
+   "tests/test_posture.py"
+  ],
+  "pythonpath": [
+   "src",
+   "."
+  ]
+ }
+}

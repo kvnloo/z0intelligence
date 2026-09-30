@@ -1,0 +1,34 @@
+{
+ "id": "zint-nav-plugin-hooks",
+ "repo": "z0intelligence",
+ "effort": "low",
+ "family": "nav",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "b0724680bc7858ac872bd25c72ff8944322c6094",
+  "paths": [
+   "src",
+   "harness-adapters",
+   "README.md",
+   "docs"
+  ]
+ },
+ "prompt": "This repo ships a Claude Code plugin under harness-adapters/. For the z0intelligence plugin (not the ObservationPack one), work out: which Claude Code hook events it registers and which `z0int.claude_code` subcommand each runs; which environment variable turns the SessionStart state packet on and which one sets its token budget, and the default budget; and which environment variable (with what value) makes the UserPromptSubmit hook deliver context instead of running in shadow mode. Write ANSWERS.json with keys: \"hooks\": object mapping event name to subcommand; \"packet_env\": string; \"packet_tokens_env\": string; \"packet_tokens_default\": number; \"shadow_off\": string of the form NAME=VALUE.",
+ "key_derivation": "harness-adapters/claude-code-z0intelligence/hooks/hooks.json + src/z0int/claude_code.py (on_session_start, shadow) at b072468",
+ "check": {
+  "kind": "answer_json",
+  "file": "ANSWERS.json",
+  "expect": {
+   "hooks": {
+    "UserPromptSubmit": "prompt",
+    "Stop": "stop",
+    "SessionEnd": "stop",
+    "SessionStart": "session-start"
+   },
+   "packet_env": "Z0INT_CLAUDE_CODE_PACKET",
+   "packet_tokens_env": "Z0INT_CLAUDE_CODE_PACKET_TOKENS",
+   "packet_tokens_default": 1500,
+   "shadow_off": "Z0INT_CLAUDE_CODE_SHADOW=0"
+  }
+ }
+}
