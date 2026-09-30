@@ -85,6 +85,32 @@ def rank(candidates, profile='lean', ttl=DEFAULT_TTL, root=None, now=None):
     return rows
 
 
+def decisions_report(root=None):
+    """Join shadow DecisionOpportunity records with observed turn outcomes (z0int#55 live cohort)."""
+    base = paths.ensure_layout(root)['state'] / 'claude-code'
+    def rows(name):
+        try:
+            return [json.loads(l) for l in (base / name).read_text().splitlines() if l.strip()]
+        except OSError:
+            return []
+    outcomes = {r.get('trace_id'): r for r in rows('outcomes.jsonl') if r.get('trace_id')}
+    table, unlinked, examples = {}, 0, []
+    for rec in rows('opportunities.jsonl'):
+        opp = rec['opportunity']
+        out = outcomes.get(opp['trace'].get('trace_id'))
+        if out is None:
+            unlinked += 1
+            continue
+        observed = 'asked' if out.get('asked_user') else 'answered'
+        key = (rec['gate'], observed)
+        table[key] = table.get(key, 0) + 1
+        if (rec['gate'] == 'ACT') != (observed == 'answered') and len(examples) < 10:
+            examples.append({'gate': rec['gate'], 'observed': observed, 'scope': opp['scope'].get('mode'),
+                             'families': opp['scope'].get('families'), 'request': opp['intent']['request'][:80]})
+    return {'linked': sum(table.values()), 'unlinked': unlinked,
+            'table': {f'{g}->{o}': n for (g, o), n in sorted(table.items())}, 'disagreements': examples}
+
+
 def build_argv(profile, claude_args, plugin=True):
     argv = ['claude', *PROFILES[profile]]
     if plugin and PLUGIN.is_dir():
@@ -103,6 +129,7 @@ def _main(argv=None):
     la.add_argument('--no-plugin', action='store_true', help='do not attach the z0 harness plugin')
     la.add_argument('--dry-run', action='store_true')
     la.add_argument('claude_args', nargs=argparse.REMAINDER)
+    sub.add_parser('decisions', help='gate vs observed behaviour on live shadow DecisionOpportunity records')
     wa = sub.add_parser('warm', help='rank candidate directories by likely prefix-cache residency')
     wa.add_argument('dirs', nargs='+')
     wa.add_argument('--profile', choices=sorted(PROFILES), default='lean')
@@ -111,6 +138,9 @@ def _main(argv=None):
     args = ap.parse_args(argv)
     if args.cmd == 'profile':
         print(' '.join(PROFILES[args.name]))
+        return 0
+    if args.cmd == 'decisions':
+        print(json.dumps(decisions_report(), indent=1, ensure_ascii=False))
         return 0
     if args.cmd == 'warm':
         rows = rank(args.dirs, args.profile, args.ttl)

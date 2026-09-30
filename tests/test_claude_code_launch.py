@@ -38,3 +38,18 @@ def test_cli_dry_run(capsys):
     from z0int.cli import main
     assert main(['claude-code', 'launch', '--profile', 'lean', '--no-plugin', '--dry-run', '--', '-p', 'x']) == 0
     assert '--strict-mcp-config' in capsys.readouterr().out
+
+
+def test_decisions_report_joins_gate_and_observed_behaviour(tmp_path):
+    import json
+    base = tmp_path / 'state' / 'claude-code'
+    base.mkdir(parents=True)
+    opp = lambda tid, gate: {'gate': gate, 'opportunity': {'trace': {'trace_id': tid}, 'scope': {'mode': 'question', 'families': ['git.branch']},
+                                                           'intent': {'request': 'q ' + tid}}}
+    (base / 'opportunities.jsonl').write_text('\n'.join(json.dumps(r) for r in [opp('a', 'ACT'), opp('b', 'ASK'), opp('c', 'ACT')]) + '\n')
+    (base / 'outcomes.jsonl').write_text('\n'.join(json.dumps(r) for r in [
+        {'trace_id': 'a', 'asked_user': False}, {'trace_id': 'b', 'asked_user': False}]) + '\n')
+    rep = L.decisions_report(root=tmp_path)
+    assert rep['linked'] == 2 and rep['unlinked'] == 1
+    assert rep['table'] == {'ACT->answered': 1, 'ASK->answered': 1}
+    assert rep['disagreements'][0]['gate'] == 'ASK'
