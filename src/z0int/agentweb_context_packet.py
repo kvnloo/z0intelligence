@@ -359,6 +359,7 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
             "input_evidence_count": len(evidence),
             "deduped_evidence_count": len(deduped),
             "retained_evidence_count": len(refs),
+            "min_retained_sources": min(3, len(deduped)),
             "input_content_bytes": sum(len(item["content"].encode("utf-8")) for item in evidence),
             "max_packet_bytes": max_packet_bytes,
             "truncated_excerpts": truncated,
@@ -436,7 +437,10 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
         # No excerpt can shrink further. Drop a redundant source only when every
         # required need it covers remains covered by another retained source.
         required_ids = {need.id for need in needs if need.required}
+        minimum_sources = min(3, len(deduped))
         drop_index = None
+        if len(refs) <= minimum_sources:
+            break
         for index in range(len(refs) - 1, -1, -1):
             ref = refs[index]
             covered = source_needs.get(ref.source_id, set()) & required_ids
