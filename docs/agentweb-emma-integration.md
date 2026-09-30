@@ -81,3 +81,27 @@ Accepted rows must already be:
 The endpoint adds an observation digest and rejects changed payloads under an existing
 observation trace. Observations remain execution/reliability evidence, never quality
 gold.
+
+
+### `POST /v1/context/pack`
+
+Pure metadata/CPU context compiler for already-selected AgentWeb knowledge evidence.
+
+AgentWeb remains authoritative for retrieval and private-store access. Before
+transport it pseudonymizes source/file identity; z0 accepts only
+`agentweb-kb:<sha256>` source IDs/locators plus the selected excerpt text.
+The compiler:
+
+- makes zero model calls;
+- writes no private excerpts to `Z0INT_HOME`;
+- assigns `index_hit` trust itself rather than trusting caller labels;
+- preserves one source for every satisfiable required need;
+- preserves at least the top three ranked sources when three or more exist;
+- focuses excerpts deterministically around need/query terms, with head+tail fallback;
+- marks capped/incomplete retrieval as an unresolved gap;
+- keeps the final serialized packet within `max_packet_bytes` or fails closed;
+- strips excerpt duplication from the AODL structural projection.
+
+The returned packet remains `applied=false` in this study. Injection into Emma is
+a later promotion stage and requires z0eval evidence rather than a configuration
+flip alone.
