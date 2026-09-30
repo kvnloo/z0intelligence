@@ -45,7 +45,7 @@ def test_represents_current_superseded_and_next_legal_action():
 
 def test_contradiction_blocks_act_and_makes_escalate_legal():
     opp = build(packet(contradictions=[{"key": "priority", "kind": "priority_conflict", "contests": "docs.priority",
-                                        "claims": [{"value": "A"}, {"value": "B"}]}]))
+                                        "claims": [{"value": "A"}, {"value": "B"}]}]), request="what is the current priority?")
     assert "ACT" in kinds(opp, legal=False) and "ESCALATE" in kinds(opp)
     assert do.deterministic_gate(opp) == "ESCALATE"
 
@@ -53,7 +53,8 @@ def test_contradiction_blocks_act_and_makes_escalate_legal():
 def test_unknown_is_distinct_from_false_or_absent():
     opp = build(packet(blocking_unknowns=[
         {"key": "conv.latest_session", "reason": "history unavailable", "source_status": "source_unavailable"},
-        {"key": "conv.worktree_session", "reason": "none recorded", "source_status": "no_match"}]))
+        {"key": "conv.worktree_session", "reason": "none recorded", "source_status": "no_match"}]),
+        request="which Claude Code session last worked here?")
     statuses = {u["key"]: u["status"] for u in opp["state"]["unknowns"]}
     assert statuses == {"conv.latest_session": "source_unavailable", "conv.worktree_session": "no_match"}
     ask = next(a for a in opp["action_space"] if a["kind"] == "ASK")
@@ -120,3 +121,26 @@ def test_real_packet_builder_end_to_end(tmp_path):
     b = do.build_decision_opportunity(repo, "what branch?", projects_root=empty)
     assert a["schema"] == do.SCHEMA and a["semantic_id"] == b["semantic_id"]
     assert any(c["key"] == "git.branch" and c["value"] == "main" for c in a["state"]["claims"])
+
+
+CONFLICT = [{"key": "priority", "kind": "priority_conflict", "contests": "docs.priority", "claims": [{"value": "A"}, {"value": "B"}]}]
+
+
+def test_question_scoping_ignores_unrelated_blockers():
+    p = packet(contradictions=CONFLICT, blocking_unknowns=[{"key": "conv.latest_session", "reason": "x"}])
+    scoped = build(p, request="what branch am I on?")
+    repo = build(p, request="what branch am I on?", scoped=False)
+    assert scoped["scope"]["families"] == ["git.branch"] and do.deterministic_gate(scoped) == "ACT"
+    assert repo["scope"]["mode"] == "repo" and do.deterministic_gate(repo) == "ESCALATE"
+
+
+def test_required_family_without_claims_becomes_explicit_unknown():
+    p = packet(coverage={"git": "full", "docs": "full", "claude_code": "full"})
+    opp = build(p, request="what is the CI status of the open PR #12?")
+    missing = [u for u in opp["state"]["unknowns"] if u["key"] == "gh"]
+    assert missing and missing[0]["status"] == "source_unavailable" and missing[0]["blocking"]
+    assert do.deterministic_gate(opp) == "ASK"
+
+
+def test_unmatched_request_falls_back_to_repo_scope():
+    assert build(request="hello there")["scope"]["mode"] == "repo"

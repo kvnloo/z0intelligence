@@ -51,6 +51,55 @@ def _authority(aodl_doc: Mapping[str, Any] | None) -> dict[str, Any]:
     return {"source": "aodl", "grants": sorted(grants) or list(DEFAULT_AUTHORITY), "fingerprint": fingerprint}
 
 
+# Request vocabulary -> packet fact families. Authored from the packet key namespace only
+# (state_packet._RENDER_ORDER, conv.*, docs.*, gh.*), never from evaluation answer keys.
+FACT_FAMILIES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "git.branch": (("git.branch",), ("branch", "checked out", "checkout")),
+    "git.head": (("git.head",), ("head", "last commit", "latest commit", "current commit")),
+    "git.dirty": (("git.dirty",), ("dirty", "uncommitted", "modified", "clean", "working tree", "unstaged")),
+    "git.upstream": (("git.upstream",), ("upstream", "tracking", "tracks", "remote branch")),
+    "git.branches_ahead": (("git.branches_ahead", "git.default_branch"), ("ahead", "unmerged", "unpushed", "furthest", "behind")),
+    "git.worktrees": (("git.worktrees",), ("worktree",)),
+    "git.stash": (("git.stash_count",), ("stash",)),
+    "git.history": (("git.recent_commits",), ("recent commits", "history", "git log", "commit log")),
+    "git.remote": (("git.remote_refs_age_hours", "git.remote_state"), ("fetch", "stale remote", "remote refs")),
+    "conv": (("conv.",), ("session", "conversation", "transcript", "claude code", "edited", "worked on", "agent")),
+    "docs.priority": (("docs.priority", "gh.priority"), ("priority", "p0", "roadmap", "critical path", "what next", "do next")),
+    "gh": (("gh.",), ("pull request", " pr ", "pr #", "ci ", "ci status", "checks", "github issue", "issue #")),
+}
+
+
+def required_families(request: str) -> list[str]:
+    text = f" {request.lower()} "
+    return [fam for fam, (_, words) in FACT_FAMILIES.items() if any(w in text for w in words)]
+
+
+def _matches(key: str, prefixes: Iterable[str]) -> bool:
+    return any(key == p or (p.endswith(".") and key.startswith(p)) or key.startswith(p + "[") for p in prefixes)
+
+
+def _scope(packet: Mapping[str, Any], request: str) -> dict[str, Any]:
+    """Question-scoped state: only facts the request depends on may block it."""
+    families = required_families(request)
+    if not families:
+        return {"mode": "repo", "families": []}
+    prefixes = [p for f in families for p in FACT_FAMILIES[f][0]]
+    claims = [c["key"] for c in packet.get("current_claims") or []]
+    coverage = packet.get("coverage") or {}
+    facet_of = {"git": "git", "conv": "claude_code", "docs": "docs", "gh": "github"}
+    known = {u["key"] for u in (packet.get("blocking_unknowns") or []) + (packet.get("unknowns") or [])}
+    extra = []
+    for fam in families:
+        fam_prefixes = FACT_FAMILIES[fam][0]
+        if any(_matches(k, fam_prefixes) for k in claims) or any(_matches(k, fam_prefixes) for k in known):
+            continue
+        facet = facet_of.get(fam_prefixes[0].split(".")[0], "")
+        status = "unknown" if coverage.get(facet) in ("full", "partial") else "source_unavailable"
+        extra.append({"key": fam_prefixes[0].rstrip("."), "reason": f"required by the request; no {fam} claim in the state",
+                      "source_status": status})
+    return {"mode": "question", "families": families, "prefixes": prefixes, "missing": extra}
+
+
 def _unknowns(packet: Mapping[str, Any]) -> list[dict[str, Any]]:
     blocking = {u["key"]: u for u in packet.get("blocking_unknowns") or []}
     rows = []
@@ -93,7 +142,7 @@ def _action_space(unknowns: list[dict[str, Any]], contradictions: list[dict[str,
 def build_decision_opportunity(repo: str | Path, request: str, *, effects: Iterable[str] = ("read",),
                                aodl_doc: Mapping[str, Any] | None = None, packet: Mapping[str, Any] | None = None,
                                harness: str | None = None, trace_id: str | None = None, attempt: int = 0,
-                               projects_root: str | Path | None = None) -> dict[str, Any]:
+                               projects_root: str | Path | None = None, scoped: bool = True) -> dict[str, Any]:
     """Deterministic given pinned evidence: identical inputs give an identical ``semantic_id``."""
     effects = [e for e in effects]
     unknown_effects = [e for e in effects if e not in EFFECTS]
@@ -104,8 +153,16 @@ def build_decision_opportunity(repo: str | Path, request: str, *, effects: Itera
 
         packet = build_state_packet(Path(repo), projects_root=projects_root)
     authority = _authority(aodl_doc)
+    scope = _scope(packet, request) if scoped else {"mode": "repo", "families": []}
     unknowns = _unknowns(packet)
     contradictions = list(packet.get("contradictions") or [])
+    if scope["mode"] == "question":
+        pre = scope["prefixes"]
+        for u in unknowns:  # an unknown blocks only if the question depends on its family
+            u["blocking"] = _matches(u["key"], pre)
+        unknowns += [{"key": m["key"], "status": m["source_status"], "blocking": True, "reason": m["reason"]}
+                     for m in scope["missing"]]
+        contradictions = [c for c in contradictions if _matches(c.get("contests") or c["key"], pre)]
     observe = [t for t in packet.get("allowed_transitions") or [] if t.get("kind") == "OBSERVE"]
     claims = [{"key": c["key"], "value": c["value"], "evidence": c.get("evidence", []), "status": c.get("status")}
               for c in packet.get("current_claims") or []]
@@ -118,6 +175,7 @@ def build_decision_opportunity(repo: str | Path, request: str, *, effects: Itera
         "schema": SCHEMA, "intent": intent, "authority": authority,
         "state": {"claims": claims, "superseded": superseded, "contradictions": contradictions, "unknowns": unknowns},
         "invalidation": {"source_revisions": packet.get("source_revisions") or {}},
+        "scope": scope,
         "action_space": _action_space(unknowns, contradictions, effects, authority, observe),
     }
     semantic_id = _sha(semantic, 20)
@@ -153,7 +211,7 @@ def with_authority_grant(opportunity: Mapping[str, Any], *, granted_by_user: str
     authority["grants"] = sorted(set(authority["grants"]) | {effect})
     authority["granted"] = list(authority.get("granted", [])) + [{"effect": effect, "by": granted_by_user}]
     state = opportunity["state"]
-    semantic = {k: opportunity[k] for k in ("schema", "intent", "invalidation")}
+    semantic = {k: opportunity[k] for k in ("schema", "intent", "invalidation", "scope")}
     semantic.update({"authority": authority, "state": state,
                      "action_space": _action_space(state["unknowns"], state["contradictions"],
                                                    opportunity["intent"]["effects"], authority,
