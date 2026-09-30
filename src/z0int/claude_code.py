@@ -88,10 +88,17 @@ def on_opportunity(hook, root=None):
     grants = standing_grants(hook)
     opp = build_decision_opportunity(repo, hook['prompt'], effects=inferred['effects'], packet=packet,
                                      harness=HARNESS, trace_id=turn_id(hook), harness_grants=grants)
+    gate_without_prompt_grants = deterministic_gate(opp)
+    if inferred.get('prompt_grants') and inferred.get('privileged_actions'):
+        # z0int#55 v1: the user's own prompt authorises exactly the actions it names, on the scope it names.
+        from .decision_opportunity import with_prompt_grants
+        opp = with_prompt_grants(opp, grants=inferred['prompt_grants'], required=inferred['privileged_actions'],
+                                 source='user')
     # The hard-coded read-only emission this replaces, kept so the live cohort can compare both (shadow).
     baseline = build_decision_opportunity(repo, hook['prompt'], packet=packet, harness=HARNESS, trace_id=turn_id(hook))
     record = {'schema': 'z0int.claude_code.opportunity_record.v0', 'session_id': hook.get('session_id'),
               'gate': deterministic_gate(opp), 'gate_readonly_baseline': deterministic_gate(baseline),
+              'gate_without_prompt_grants': gate_without_prompt_grants,
               'permission_mode': hook.get('permission_mode'), 'effects_inference': inferred, 'opportunity': opp}
     path = opportunities_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)

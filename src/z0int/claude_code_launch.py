@@ -124,7 +124,9 @@ def decisions_report(root=None):
 
 
 # Recorded authority was the harness default; 'session' is Claude Code's standing authority outside plan mode.
-RESCORE_AUTHORITY = {'default_read': ('read',), 'session_read_write': ('read', 'write')}
+RESCORE_AUTHORITY = {'default_read': ('read',), 'session_read_write': ('read', 'write'),
+                     # z0int#55 v1: read+write standing plus the user's own scoped in-prompt grants
+                     'session_read_write_prompt_grants': ('read', 'write', '+prompt')}
 
 
 def rescore_gate(opp, grants):
@@ -134,9 +136,13 @@ def rescore_gate(opp, grants):
     state = opp.get('state')
     if not isinstance(state, dict) or 'unknowns' not in state:
         return None
-    effects = infer_effects(opp['intent']['request'], {'current_claims': state.get('claims') or []})['effects']
+    inferred = infer_effects(opp['intent']['request'], {'current_claims': state.get('claims') or []})
+    effects = inferred['effects']
     observe = [a for a in opp.get('action_space') or [] if a.get('kind') == 'OBSERVE']
-    space = _action_space(state['unknowns'], state.get('contradictions') or [], effects, {'grants': list(grants)}, observe)
+    authority = [g for g in grants if g != '+prompt']
+    if '+prompt' in grants and inferred.get('prompt_grants_cover_all'):
+        authority.append('privileged')  # same coverage rule as decision_opportunity.with_prompt_grants
+    space = _action_space(state['unknowns'], state.get('contradictions') or [], effects, {'grants': authority}, observe)
     return deterministic_gate({'action_space': space})
 
 

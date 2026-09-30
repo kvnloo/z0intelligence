@@ -233,3 +233,50 @@ def with_authority_grant(opportunity: Mapping[str, Any], *, granted_by_user: str
                                                    opportunity["intent"]["effects"], authority,
                                                    [a for a in opportunity["action_space"] if a["kind"] == "OBSERVE"])})
     return {**opportunity, **semantic, "semantic_id": _sha(semantic, 20)}
+
+
+HARNESS_PREFIXES = ("<agent-message", "<task-notification", "<system-reminder")
+
+
+def with_prompt_grants(opportunity: Mapping[str, Any], *, grants: Iterable[Mapping[str, Any]],
+                       required: Iterable[Mapping[str, Any]], source: str) -> dict[str, Any]:
+    """Scoped in-prompt grants (z0int#55 v1): the user's own prompt instructs a privileged action, so it
+    authorises exactly that action on exactly that scope, and nothing else.
+
+    Same shape as ``with_authority_grant``: authority widens only from an identified human source, never from
+    model confidence. ``privileged`` is added for THIS opportunity only when every required privileged action
+    is covered by a grant (``effect_inference.grant_covers``: same kind, target inside the phrase's scope;
+    protected branches only when named). Otherwise authority is unchanged and the uncovered actions are
+    recorded. Refused outright for non-user sources and harness/subagent messages; a grant whose phrase is not
+    in the opportunity's own request is rejected (provenance)."""
+    from .effect_inference import grant_covers
+
+    request = str(opportunity["intent"]["request"] or "")
+    if source != "user":
+        raise ValueError(f"in-prompt grants come only from the user's own prompt, not {source!r}")
+    if request.lstrip().startswith(HARNESS_PREFIXES):
+        raise ValueError("harness/subagent messages carry no user authority")
+    grants = [dict(g) for g in grants]
+    required = [dict(a) for a in required]
+    for g in grants:
+        if g.get("source") != "prompt" or not g.get("phrase") or not isinstance(g.get("scope"), Mapping):
+            raise ValueError("a prompt grant needs provenance {source: 'prompt', phrase, scope}")
+        if str(g["phrase"]).lower() not in request.lower():
+            raise ValueError(f"grant phrase {g['phrase']!r} is not in the user's request")
+    uncovered = [a for a in required if not any(grant_covers(g, a) for g in grants)]
+    authority = dict(opportunity["authority"])
+    authority["prompt_grants"] = [{"source": "prompt", "phrase": g["phrase"], "scope": g["scope"]} for g in grants]
+    authority["prompt_grant_uncovered"] = [{"kind": a.get("kind"), "phrase": a.get("phrase"), "target": a.get("target")}
+                                           for a in uncovered]
+    if required and not uncovered and "privileged" in opportunity["intent"]["effects"]:
+        authority["grants"] = sorted(set(authority["grants"]) | {"privileged"}, key=EFFECTS.index)
+        authority["granted"] = list(authority.get("granted", [])) + [
+            {"effect": "privileged", "by": "prompt", "scope": [g["scope"] for g in grants],
+             "phrases": [g["phrase"] for g in grants]}]
+    state = opportunity["state"]
+    semantic = {k: opportunity[k] for k in ("schema", "intent", "invalidation", "scope")}
+    semantic.update({"authority": authority, "state": state,
+                     "action_space": _action_space(state["unknowns"], state["contradictions"],
+                                                   opportunity["intent"]["effects"], authority,
+                                                   [a for a in opportunity["action_space"] if a["kind"] == "OBSERVE"])})
+    return {**opportunity, **semantic, "semantic_id": _sha(semantic, 20)}

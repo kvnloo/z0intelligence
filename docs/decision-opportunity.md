@@ -173,3 +173,27 @@ Live cohort re-score (counts only, `results_v0_live_cohort.json`): before the ch
 ACT→asked 1, ESCALATE→answered 1. With inferred effects under read+write it is ACT→answered 2, ASK→asked 1, ASK→answered 6,
 ESCALATE→answered 1. The single frontier ASK (the `/loop` default-branch push) is now gated ASK. The six ASK→answered are
 turns whose prompt itself instructed the privileged action. v0 does not honour in-prompt grants, which is the next lever.
+
+## Effect inference v1 (z0int#55): scoped in-prompt grants
+
+v0 recorded pre-approval phrases but never applied them, so it asked even when the user's own prompt had
+instructed the privileged act ("commit and push the feature branches"). v1 changes that:
+- `infer_effects` returns `privileged_actions`: one instance per privileged match, with `kind` (push, merge,
+  commit, pr, comment_issue, publish, deploy, message, external_system, env, force, destructive, aodl,
+  ambiguous) and, for branch-targeted kinds, the resolved `target`. A named branch wins. "feature branches" means
+  non-default. "all" and an unknown current branch count as protected.
+- It also returns `prompt_grants`: `{source: "prompt", phrase, scope}` for each **explicit, user-authored** direct
+  verb. The scope is exactly the phrase: the same kind, the named branches, and non-default only when no branch is
+  named. Colloquial cues ("ship it", "send it up", "get this onto main", "slack the team", "wrap it up so X can
+  review") are privileged but never grant. force/reset --hard, deletes, installs, sudo/ssh/secrets and payments are
+  never granted in-prompt (AODL or a user answer only). Neither are instructions attributed to a bot, subagent
+  or quote, or anything in a harness message (`source != "user"`).
+- `decision_opportunity.with_prompt_grants(opp, grants=, required=, source="user")` works like
+  `with_authority_grant`. It adds `privileged` to this opportunity's authority only when **every** required
+  action is covered (`effect_inference.grant_covers`). Otherwise it records `prompt_grant_uncovered`. It rejects
+  non-user sources, harness messages, and any grant phrase that is not in the request.
+- An imperative sentence whose leading verb is not in the read lexicon is now `write`, not `read`. External-effect
+  cues stay privileged. Fixed: the `come back w/ a plan` marker never matched.
+- `on_opportunity` applies the prompt grants and records `gate_without_prompt_grants`. Everything is still shadow.
+
+Pre-registration: `benchmarks/effect_inference/PREREG_v1.md`. Results: `results_v1_*.json`.
