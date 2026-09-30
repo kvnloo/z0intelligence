@@ -202,19 +202,19 @@ Jev's actual underlying architecture, parameter count, sampler internals, RLCD t
 
 Therefore:
 
-> OpenJev/z0int should reproduce and improve the **decision interface and systems behavior**, not pretend to reproduce Jev's hidden implementation.
+> z0intelligence should reproduce and improve useful **decision interfaces and systems behavior**, not pretend to reproduce Jev's hidden implementation. OpenJev is one historical/local substrate inside that broader system.
 
 ---
 
-# 4. z0int / OpenJev current foundation
+# 4. z0intelligence current foundation
 
-`kvnloo/z0int` currently inherits the OpenJev codebase.
+`kvnloo/z0intelligence` began from the OpenJev codebase but is now a broader provenance-backed cognition/control plane.
 
 Current repository identity:
 
-- repo: `kvnloo/z0int`
+- repo: `kvnloo/z0intelligence`
 - default branch: `master`
-- derived from `TheoLeeCJ/openjev`
+- historical substrate: `TheoLeeCJ/openjev`
 
 Current implemented substrate includes:
 
@@ -1438,7 +1438,7 @@ This should come before:
 
 | Repo | Role |
 | --- | --- |
-| `kvnloo/z0int` | personal decision runtime, OpenJev substrate, scorers, onboarding/training surfaces |
+| `kvnloo/z0intelligence` | evidence/state compiler, decision runtime, dispatch/receipt authority, specialist/compiler surfaces |
 | `kvnloo/evolution-lab` | experiment genomes, ABAB, DAgger, search, frozen promotion gates |
 | `kvnloo/frontier-kb` | research memory, evidence, protocol, kill criteria |
 | `kvnloo/aodl` | optional typed intent/orchestration IR |

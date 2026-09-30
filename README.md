@@ -1,400 +1,438 @@
-# z0int
+# z0intelligence
 
-> **Name:** product identity is **z0intelligence** — a play on stochastic parrots and useful abundance under finite frontier budgets (with Kerdoios). See `docs/brand.md`. Package/CLI stay `z0int` until an explicit rename cutover.
+**A provenance-backed cognition and control plane for agent systems.**
 
+z0intelligence turns evidence, runtime state, and observed outcomes into bounded decisions, auditable execution choices, and eventually cheaper verified mechanisms. The goal is not “replace the frontier model with a tiny model.” The goal is to make expensive generic inference do less work **without confusing confidence, completion, or memory with truth or authority**.
 
-**Personal intelligence that learns how you work, so your frontier models do less.**
+The Python import/CLI namespace remains `z0int`; the distribution metadata still carries the historical `openjev-phase1` name for compatibility. Historical OpenJev code remains in-tree, but it is now one substrate inside the larger z0intelligence system.
 
-z0int is evolving from an open Jev-style decision runtime into a private, personalized intelligence layer for agentic systems.
+> Core invariant: **evidence ≠ claim/state ≠ authority ≠ action ≠ outcome ≠ learned procedure.**
 
-The long-term goal is not to train one giant model on a person's life. It is to turn a user's own history into a hierarchy of tiny, verifiable specialists that understand recurring intent, retrieve the right identity/context, make bounded decisions, and offload repetitive work from expensive LLMs.
+## What exists on master
 
-Today, this repository contains the OpenJev runtime and benchmark substrate: typed probabilistic decisions, direct logit readout, trainable scorers, shared-state reuse, and integration with [Evolution Lab](https://github.com/kvnloo/evolution-lab). The personalization and onboarding system described below is the roadmap, not a claim that all of it is implemented today.
+The current repository is much more than the original OpenJev prototype.
 
-See [ROADMAP.md](ROADMAP.md) for the staged build.
-
-
-## Evaluation before promotion
-
-The decision stack has two separate planes:
-
-```text
-execution:  harness -> bounded live policy -> tools/artifacts -> verifier/outcome
-
-evaluation: replayable state/events
-              + objective Tokenomics counters
-              + JEV/reference semantic readings
-              + independent outcomes
-                    |
-                    v
-              Evolution Lab comparison
-                    |
-                    v
-              credited specialist may enter execution
-```
-
-For `verify.evidence_sufficiency`, the current composition is **Laya 421M fast path → TypeSafe Jev 1.13.0 reference on uncertainty**. Jev is eligible for that narrow verified contract; it is not universal ground truth or a security authority. NanoJev is retained only as a legacy benchmark/reproducibility lane and is not a production verification default.
-
-See [docs/observer-evaluation.md](docs/observer-evaluation.md).
-
-## Decision backends
-
-```bash
-z0int onboard --auto --sync-models
-z0int backends list
-z0int backends eval --backend laya_421m --input tests/fixtures/decision_request.json --json
-```
-
-See `docs/backends.md`. Laya is the default local DecisionBackend fast path. The canonical verifier function lives in `z0int.functions.verify_evidence_sufficiency` and escalates Laya uncertainty to Jev 1.13.0. NanoJev remains available only for historical comparison and reproducibility; existing OpenJev/vLLM/MB lanes are unchanged.
-
-## Why
-
-Your LLM should not have to rediscover who you are, what you care about, how you work, and which routine action to take on every turn.
-
-Most of that information already exists across years of conversations, projects, messages, tool traces, and decisions. z0int aims to compile that history into two complementary layers:
-
-- **retrieval-backed personal context** for mutable facts, current projects, relationships, documents, and provenance;
-- **small learned policies** for stable preferences, judgment, intent resolution, routing, tool selection, recovery, verification, and other repeated bounded decisions.
-
-The result should be a system where the frontier LLM spends its compute on genuinely novel reasoning instead of repeatedly reconstructing the same context.
-
-```text
-raw user request
-      |
-      v
-private context + identity retrieval
-      |
-      v
-z0int specialists
-  |       |       |
-  |       |       +--> temporal / recovery fly
-  |       +----------> mushroom-body decision head
-  +------------------> local semantic scorer
-      |
-      +--> confident: act / route / compress context
-      |
-      +--> uncertain: Jev / stronger local model
-      |
-      +--> hard tail: frontier LLM
-```
-
-## Onboarding: bring your history
-
-**Start here for install/setup:** [docs/ONBOARDING.md](docs/ONBOARDING.md).
-
-```bash
-./scripts/bootstrap.sh     # venv + editable install + doctor
-z0int onboard --auto       # resumable; safe to re-run
-z0int status
-z0int doctor --json        # agents consume JSON, not prose
-```
-
-Agents: prefer the `z0int` CLI over reproducing setup from memory
-(`skills/z0int-onboard/SKILL.md`, `AGENTS.md`, `CLAUDE.md`).
-
-z0int is designed around **data-complete onboarding** rather than a short preference questionnaire. The goal is to import as much of your user-owned digital history as you can safely and legally export, preserve provenance, and let the training/retrieval pipeline discover what is actually useful.
-
-Recommended sources include:
-
-- **GitHub**: repositories, commits, issues, pull requests, reviews, discussions, and other development history;
-- **Google**: Google Takeout data such as Search/Chrome history, Drive documents, Gmail, Calendar, and other relevant exports;
-- **messages**: personal chat archives from the services you use, with third-party/private content handled conservatively;
-- **LLM conversation history**: ChatGPT data export, Claude conversation export, and conversations from other assistants;
-- **agent harness history**: Hermes, OMP, Pi, Codex, Claude Code, Cursor, OpenCode, and other harness traces where available;
-- **Hermes state**: especially `state.db`, session/tool history, memories, outcomes, recovery events, and other local state that can be safely parsed;
-- **future computer-use history**: screen/action traces from tools such as [Memento](https://github.com/kvnloo/Memento), collected prospectively with privacy filtering.
-
-The onboarding target is comprehensive context, but **not every byte belongs in model weights**. Personalized state lives under **`~/.z0int/`** only.
-
-### Privacy boundary
-
-Raw personal data should stay private and local by default.
-
-- Secrets, credentials, raw environment variables, payment data, and other sensitive values must be filtered or excluded.
-- Mutable personal facts and current project state should stay retrieval-backed instead of being memorized into weights.
-- Personalized corpora and personalized checkpoints should not be committed to this public repository.
-- External training services should receive only explicitly sanitized, non-PII training material.
-- Every derived training example should retain source/provenance so it can be excluded, rebuilt, or invalidated later.
-
-This carries forward the core idea from the earlier private `sft-svlm` project: **learn how the user thinks; retrieve what is currently true.**
-
-
-## From `sft-svlm` to z0int
-
-The earlier `sft-svlm` idea was a personalized SLM/SVLM that could learn stable user behavior from personal history and help compile messy requests into better instructions for powerful workers.
-
-z0int keeps that thesis but decomposes it further.
-
-Instead of assuming one personal model should absorb everything:
-
-```text
-personal history
-      |
-      +--> retrieval memory --------> current facts / projects / provenance
-      |
-      +--> z0int training ----------> stable intent / preference / routing policies
-      |
-      +--> Evolution Lab -----------> specialist population
-```
-
-The model layer becomes an **army of specialists**, each earning production traffic through measurement.
-
-## From history to training signal
-
-z0int should not require a giant manual labeling project.
-
-Existing histories already contain weak or strong supervision:
-
-| Source | Useful signal |
+| Surface | Current role |
 | --- | --- |
-| Harness traces | tool/action chosen, retry, model route, success/error |
-| GitHub | edit -> test -> review -> merge/reject outcomes |
-| Jev / typed judges | soft probability distributions over bounded choices |
-| Conversations | corrections, follow-ups, accepted/rejected directions |
-| Hermes state | recurring workflows, recovery actions, session outcomes |
-| Memento going forward | screen state -> human/agent action -> next state |
+| Provenance-backed context resolution | Resolves explicit information needs into bounded `ContextPacket` / State Packet-style evidence without becoming another memory database |
+| Capability router | `z0int.intelligence.route(request, snapshot)` chooses only from evidence-backed eligible capabilities; missing evidence returns `PARENT_ONLY` |
+| Dispatch authority | Owns execution identity, replay/conflict protection, canonical receipts, and “do not execute twice when prior execution is uncertain” semantics |
+| Local cognition | Deterministic legal-action compiler + provider-neutral candidate model + risk/quality gates + escalation + shadow cascade |
+| Decision backends | Jev, Laya, OpenJev/direct logits, Decider, legacy NanoJev, Julia-1, plus a separate image-decision protocol |
+| Harness bridges | OMP bridge/runtime plus Hermes/DSH-oriented adapter surfaces and a harness-independent worker-activity projection |
+| Compiler stack | Routines, cascades, counterexample repair, ABAB experiment helpers, AODL plan bindings |
+| Evaluation | Backend Pareto harness, RLCDAlignBench-style detector lane, Image JevBench entry, observer/outcome receipts, Decision Dataset v2 |
+| Economics | Measurement-complete Tokenomics emission and provider-usage accounting; incomplete measurements stay explicitly partial |
+| Deployment | Host-owned z0int authority with a hardened Kubernetes `hermes-lab` executor lane |
+| Architecture export | `zer0.repo.yaml` exposes exact-ref subsystem boundaries to z0archy |
 
-The training pipeline should compile these into versioned episodes rather than dumping raw chat logs directly into SFT.
+The source of truth for the current architectural boundary is [zer0.repo.yaml](zer0.repo.yaml).
 
-```text
-context / observation
-      |
-      v
-bounded decision or action
-      |
-      v
-result / verifier / downstream outcome
-      |
-      v
-training episode
-```
+## Architecture
 
-Human labeling should be reserved for high-information cases such as disagreements, ambiguous outcomes, or novel workflows.
+~~~text
+authoritative sources / traces
+  git · OMP · Hermes · DSH · files · memory stores · external evidence
+                         |
+                         v
+              provenance-backed resolution
+              ContextPacket / state projection
+                         |
+                         v
+             capability / decision request
+                         |
+          +--------------+---------------+
+          |                              |
+          v                              v
+ deterministic compiler          typed decision surfaces
+ legal actions / budgets         Jev · Laya · OpenJev
+ permissions / constraints       local SLMs · specialists
+          |                              |
+          +--------------+---------------+
+                         |
+                         v
+                 intelligence.route()
+                         |
+                         v
+                  dispatch authority
+          replay · conflict · idempotency
+                         |
+                         v
+                  harness / executor
+              OMP · Hermes · DSH · ...
+                         |
+                         v
+               result + verifier/outcome
+                         |
+                         v
+        DecisionReceipt + Tokenomics + activity
+                         |
+             +-----------+-----------+
+             |                       |
+             v                       v
+          z0evals               Evolution Lab
+      frozen studies       search / promotion / credit
+             |                       |
+             +-----------+-----------+
+                         |
+                         v
+       routine / specialist / policy candidate
+             only after evidence-backed promotion
+~~~
 
-## Mushroom bodies + an army of flies
+AODL remains the portable intent / authority / structural contract. Kerdoios owns residual resource placement and quota economics. Harnesses own execution. Tokenomics owns measurement semantics. Evolution Lab owns experiment search/promotion. z0intelligence owns the evidence-to-state-to-decision runtime and its receipts.
 
-[Evolution Lab](https://github.com/kvnloo/evolution-lab) is the experiment engine for turning those episodes into small specialists.
+## Decision stack: current truth
 
-The first production target is the **mushroom-body-style learner** already explored in FlyForge: sparse expansion, k-winner coding, and a tiny plastic readout for bounded decisions.
+There are two different questions that older README text blurred together:
 
-Over time, z0int should train an **army of flies**, each optimized for a narrow repeated process rather than one universal student:
+1. **Can a backend answer a typed question?**
+2. **Is that backend eligible to influence an automatic production route for this specific capability?**
 
-- intent and skill routing;
-- tool-family selection;
-- context retrieval and compression;
-- retry / recover / escalate decisions;
-- verification and completion checks;
-- model / effort routing;
-- temporal computer-use state and action prediction;
-- personalized preference and workflow decisions.
+Those are not the same.
 
-Richer fly / MaleCNS-derived circuits can be used as temporal research substrates, but production promotion is results-driven: if a simpler mushroom-body, ridge, MLP, or deterministic rule is faster and equally correct, the simpler system wins.
+The canonical capability registry is [manifests/capabilities.v1.json](manifests/capabilities.v1.json). On current master, the narrow `evidence_sufficiency` route through **TypeSafe Jev 1.13.0** is the clear eligible verification capability. Most other backend/provider entries are observed, provisional, experimental, or ineligible until independent evidence improves.
 
-## Identity and context offload
+| Backend | Role today |
+| --- | --- |
+| TypeSafe Jev 1.13.0 | Reference verifier / typed semantic backend for the registered evidence-sufficiency contract |
+| Laya 421M | Resident local typed-decision fast path; function-level Laya→Jev escalation exists, but broader automatic verification eligibility remains experimental |
+| OpenJev 0.6B / 4B | Local direct-logit / training / benchmark substrate |
+| Decider-2B | Calibrated typed-decision candidate in the common benchmark surface |
+| NanoJev | **Legacy benchmark/reproducibility lane only**; not the verification default |
+| Julia-1 | Installed and measured, **default-off / rejected for the tested decision domains** |
+| Qwen2.5-VL-3B image adapter | Separate multimodal categorical decision protocol for Image JevBench-style experiments |
 
-The long-term product is a personal intelligence layer that can answer questions such as:
+Generic remote workers remain free-only by default. The Jev paid path is a narrow, named verification exception; backend registration itself never grants tool, filesystem, credential, or execution authority.
 
-- What is the user actually trying to accomplish?
-- Which prior project, conversation, or preference matters here?
-- What information is stable identity versus a mutable current fact?
-- Which context should the frontier model see, and which context can be compressed away?
-- Which routine decision can be handled locally without invoking the frontier model?
-- When should the system abstain and escalate?
+See [docs/intelligence-layer.md](docs/intelligence-layer.md), [docs/backends.md](docs/backends.md), and [docs/observer-evaluation.md](docs/observer-evaluation.md).
 
-This is where z0int can reduce context pressure on large models. Instead of shipping a lifetime of history into every prompt, local specialists can select, summarize, route, or act on the small slice that matters.
+## What the experiments actually taught us
 
-## Intent and AODL
+The architecture is deliberately shaped by negative results, not just demos.
 
-[AODL](https://github.com/kvnloo/aodl) is a complementary typed language/IR for describing agent orchestration graphs.
+### Local typed models are not automatically a cheap Jev replacement
 
-z0int does **not** depend on AODL to train or run. Results come first. But AODL can become useful as a shared representation for intent once the behavior is working:
+On the existing authored144 comparison:
 
-```text
-natural-language request
-        |
-        v
-z0int: infer intent / constraints / relevant identity
-        |
-        v
-AODL: typed intent + topology + budgets + authority
-        |
-        v
-Hermes / OMP / other runtime
-```
+| model | accuracy | p50 |
+| --- | ---: | ---: |
+| Jev 1.13.0 | 95.1% | 267.6 ms |
+| Laya 421M | 61.1% | 226.5 ms |
+| Julia-1 | 41.7% | 28.6 ms |
 
-The useful connection is not adding a `fly` node kind. It is using personalized learned policies to help **decode messy human language into a more explicit intent representation**, while AODL provides a portable vocabulary for the resulting orchestration.
+Laya is only modestly faster on that corpus and far less accurate. Julia is much faster, but its confidence is not a usable cascade gate and its performance collapses on the tested z0 decision domains. Julia therefore remains default-off rather than being promoted because it is small or fast.
 
-## Evolution Lab
+See [docs/julia-decision-model.md](docs/julia-decision-model.md).
 
-z0int supplies runtime scorers and training surfaces. [Evolution Lab](https://github.com/kvnloo/evolution-lab) owns the empirical search loop:
+### Real decision data matters more than synthetic routing stories
 
-```text
-personal episodes
-     |
-     v
-candidate dataset recipe + model genome
-     |
-     v
-train / distill / DAgger
-     |
-     v
-frozen replay + verifier
-     |
-     v
-keep / discard
-     |
-     v
-shadow traffic
-     |
-     v
-promote verified winner
-```
+The merged Decision Dataset v2 extractor reconstructs per-turn OMP decisions from real session JSONL rather than treating a repeated session prompt as per-turn state.
 
-The ABAB meta-loop can evolve both **what data to train on** and **which architecture to use**. The benchmark, privacy boundary, and sealed evaluation set stay outside the evolvable surface.
+A 300-file sample produced:
 
-## Current foundation: OpenJev runtime
+- 101 sessions;
+- **35,248** outcome-backed action rows;
+- 169 compaction rows;
+- 264 model-usage rows;
+- roughly **291k** projected actions over the full 2,477-session corpus.
 
-The code in this repository currently reproduces the useful *interface pattern* of TypeSafe Jev with open components. It does not reproduce Jev's undisclosed model or training.
+That immediately exposed the real bottleneck: several useful decision families are now data-rich, while others still lack the counterfactual or verifier labels required for trustworthy learning.
 
-Current capabilities include:
+See PR #43 and [docs/decision-capability-v2-plan.md](docs/decision-capability-v2-plan.md).
 
-- runtime-defined typed options;
-- generation-free direct-logit scoring;
-- shared-state prefix reuse;
-- trainable one-pass option scorers;
-- frozen benchmark/evaluation bundles;
-- integration with Evolution Lab and FlyForge.
+### Measurement completeness is part of correctness
 
-This is **setup for the runtime that exists today**. Personal-history onboarding (P1 in [ROADMAP.md](ROADMAP.md)) is not implemented yet.
+The OMP bridge now accumulates provider usage across the full multi-turn/tool loop and closes the trace only at terminal `agent_end`. A trace is marked complete only when every observed provider turn carries usage. Partial/failed/unsupported measurement cannot silently mint “measured savings.”
 
-### Quick start
+That distinction flows into Tokenomics and Kerdoios instead of being repaired later with guesses.
 
-Python 3.10+, CUDA, and a GPU that can hold a 4B BF16 model:
+## State, memory, and personal context
 
-```bash
+The old README described “bring your history” as if the main missing step were training on exports. The newer architecture is stricter:
+
+**raw history is evidence, not current truth; retrieval is not belief; memory is not instruction authority.**
+
+Master already contains provenance-backed context resolution and the existing State Packet / context compiler surfaces. The current memory program is being built additively without replacing the existing stores.
+
+### Active memory work — not merged into master yet
+
+| Work | Status | Purpose |
+| --- | --- | --- |
+| #67 canonical event ledger | open PR | Append-only canonical event truth, checksums, blobs, replayable index |
+| #69 OptMem temporal projection | open PR, stacked on #67 | Age-decay TREE cover, raw recent tail, exact `zoom()`, hard token budget |
+| #68 lifelong-memory contract v1 | open PR | Stable source identity, hierarchical scopes, bitemporal claims, snapshots, memory-use receipts |
+| #63 memory control-plane RFC | open | Defines EventLog → OptMem / FTS5 / AgentsView / TencentDB → StatePacket split |
+| #66 belief/scope/credit RFC | open | Defines the evidence→claim→state→outcome→procedure lifecycle |
+
+The intended separation is:
+
+~~~text
+EPISODIC     immutable events + OptMem temporal projection
+RETRIEVAL    FTS5 + AgentsView
+SEMANTIC     TencentDB L1/L2/L3
+WORKING      StatePacket / query-time state compiler
+PROCEDURAL   existing routine compiler after verified repeated outcomes
+~~~
+
+These are different projections over evidence. No second “universal memory database” is being introduced.
+
+## Deterministic compiler before learned policy
+
+The local-cognition stack follows a simple rule:
+
+> **ordinary computer science goes in the compiler, not the model.**
+
+Dependencies, legal actions, permissions, budgets, deterministic shortcuts, retries, and hard policy are compiled first. Learned systems only choose among already-legal candidates.
+
+The in-tree cognition stack includes:
+
+- legal-action compilation;
+- one provider-neutral candidate schema;
+- evidence-based model selectability;
+- quality/risk requirements;
+- abstention/escalation;
+- local/remote SLM adapters;
+- shadow cascade execution;
+- replayable cognition receipts;
+- a serving/probe layer for what is actually resident on the machine.
+
+See [docs/local-cognition-portfolio.md](docs/local-cognition-portfolio.md).
+
+## Compilation is mechanism-neutral
+
+An earlier project story hard-coded a ladder like:
+
+~~~text
+deterministic -> mushroom body / fly -> Jev -> SLM -> frontier
+~~~
+
+That is now treated as an **experiment hypothesis**, not the product architecture.
+
+The stronger invariant is:
+
+> repeated cognition may move to the cheapest **verified** mechanism that preserves the registered outcome contract, and it must deoptimize when the evidence/state region that justified promotion stops holding.
+
+A promoted mechanism might be a rule, cache, retrieval recipe, linear model, MB/fly specialist, SLM, typed decision backend, or something else. Evolution Lab should compare them; z0intelligence should not prejudge the winner.
+
+The existing mushroom-body/fly work remains valuable research. It just no longer defines the mandatory architecture.
+
+See #56 and #59.
+
+## AODL and Bend
+
+[AODL](https://github.com/kvnloo/aodl) owns portable intent, topology, authority, and budgets. z0intelligence binds concrete routines/models/policies to that contract and writes observed state/outcome events back without extending the AODL ontology.
+
+Current compiler support lives in `src/z0int/aodl.py` and [docs/aodl-integration.md](docs/aodl-integration.md).
+
+Bend is being evaluated separately in #48 as an **optional proof kernel for pure structural checks**:
+
+~~~text
+AODL contract
+   -> Bend fast structural filter
+   -> canonical validator / fail-closed fallback
+   -> resource placement
+   -> dispatch authority
+~~~
+
+Bend does not replace AODL, the dispatch authority, Tokenomics, Kerdoios, or the harness. It only earns a hot-path role if differential testing shows zero unexplained semantic divergence and a material latency/verification advantage.
+
+## Harness integrations
+
+### Merged / in-tree
+
+- **OMP**: hot-reloadable bridge v2, trace ownership, dispatch/receipt integration, complete-vs-partial provider usage, worker activity projection.
+- **Hermes**: adapter surfaces for z0int decisions/context and the broader recovery/evolution research path.
+- **DSH / other harnesses**: harness-neutral identity/activity/context seams are present; cross-harness DecisionOpportunity/credit standardization is tracked in #62.
+- **Kubernetes hermes-lab**: host z0int authority stays outside the cluster while a hardened executor runs behind the service boundary.
+
+### Active labs — not production claims
+
+- **AgentWeb / Emma** — PR #50: downstream-only first-class harness lab with pure plan, shadow Jev Choice/Noul experiments, bounded context packets, reliability observations, privacy-safe identity, and no authority expansion.
+- **Official TypeSafe SDK** — PR #52: replace the hidden local Jev transport dependency with the official SDK while preserving z0 authorization/receipt semantics.
+- **Agent Orchestrator** — PR #61: shadow `DecisionOpportunity` + outcome bridge with session fencing, replay/conflict protection, and no routing authority.
+- **OMP / Hermes / DSH common cognition records** — #62: one semantic DecisionOpportunity + episode/credit contract across harnesses.
+
+## Experience → outcome → learning
+
+The current research direction is not “train on everything the agent did.”
+
+Observed behavior is not automatically optimal, and a successful task does not tell us which component caused success.
+
+The next shared contract is:
+
+~~~text
+evidence
+  -> state / DecisionOpportunity
+  -> legal candidate set
+  -> action actually taken
+  -> physical execution
+  -> independent outcome/verifier
+  -> episode + credit evidence
+  -> experiment
+  -> promotion / rejection / deoptimization
+~~~
+
+Key open contracts:
+
+- #53 — DecisionOpportunity + evidence-derived state;
+- #54 — experience → outcome → counterfactual credit;
+- #55 — selective autonomy: ACT / OBSERVE_MORE / ASK / ABSTAIN / ESCALATE;
+- #56 — promotion validity, drift, and deoptimization;
+- #57 — determine the natural unit of cognition/control;
+- #58 — causal attribution across retrieval → policy → tool → verifier.
+
+Teacher agreement, model confidence, user history, and execution completion are all useful evidence. None is automatically gold.
+
+## Evaluation and promotion
+
+Three repositories deliberately have different jobs:
+
+| Repo | Owns |
+| --- | --- |
+| [z0evals](https://github.com/kvnloo/z0evals) | frozen studies, exact-ref cohorts, comparative evaluation, public result surfaces |
+| [Evolution Lab](https://github.com/kvnloo/evolution-lab) | search, candidate populations, grouped splits, promotion experiments, repair/ABAB loops |
+| [Tokenomics](https://github.com/kvnloo/tokenomics) | token/cost/latency/measurement completeness and outcome economics |
+
+z0intelligence supplies runtime contracts, candidate implementations, receipts, replayable state, and promotion/deoptimization hooks. It does not get to grade itself by changing the judge.
+
+Current evaluation surfaces include:
+
+- DecisionBackend Pareto runner;
+- observer-first stability/calibration receipts;
+- RLCDAlignBench-style detector scoring;
+- Image JevBench adapter;
+- Julia reproduction and rejection studies;
+- contrastive evidence experiments;
+- OMP Decision Dataset v2;
+- routine/cascade/repair synthetic/unit harnesses.
+
+## Quick start
+
+Python 3.10–3.13.
+
+~~~bash
+git clone https://github.com/kvnloo/z0intelligence.git
+cd z0intelligence
+
 python -m venv .venv
 . .venv/bin/activate
-export HF_HOME=/path/to/large-drive/huggingface
 pip install -e '.[test]'
-```
 
-Owned example (typed option scores, timing, model revision, prompt hash):
+z0int onboard --auto
+z0int doctor --json
+z0int status
+z0int models plan
+z0int backends list --json
+~~~
 
-```bash
-CUDA_VISIBLE_DEVICES=0 openjev-score \
-  --mode direct \
-  --model Qwen/Qwen3.5-4B \
-  --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a \
-  --input examples/decisions.jsonl \
-  --output results.jsonl
-```
+### Resolve context
 
-If every row has the same exact state, use `--mode shared` to prefill once and score criteria in parallel.
+~~~bash
+z0int context resolve --query "what evidence matters for this task?" --json
+~~~
 
-On the committed RTX 3090 benchmark, direct typed logits returned 21 probability pairs in a median **1.023 s** versus **5.332 s** for the compact autoregressive JSON-array baseline. Exact scope and limitations: [docs/RESULTS.md](docs/RESULTS.md), [docs/METHOD.md](docs/METHOD.md), [docs/REPRODUCE.md](docs/REPRODUCE.md).
+### Inspect the decision backends
 
-### FlyForge stack (this repo + Evolution Lab)
+~~~bash
+z0int backends doctor --json
+z0int backends capabilities laya_421m --json
+z0int backends eval   --backend laya_421m   --input tests/fixtures/decision_request.json   --json
+~~~
 
-Clone **this repo first**. It is the runtime. [Evolution Lab](https://github.com/kvnloo/evolution-lab) is the evolve sidecar (genomes, locked splits, promotion, DAgger, ABAB).
+### Local cognition
 
-```bash
-bash scripts/setup-flyforge.sh
-# installs this package, clones evolution-lab @ nightly, locks splits, prints smoke commands
-```
+~~~bash
+z0int cognition manifest
+z0int cognition candidates
+z0int cognition serving
+z0int cognition probe
+~~~
 
-Contract: [docs/evolution-lab.md](docs/evolution-lab.md) (Track A recovery fly, Track B JEV heads, export paths).
+### Image decision experiments
 
-### Route A: trainable scorers
+~~~bash
+pip install -e '.[image]'
+z0int-image-decide run --input benchmarks/image-jev-bench/red-square.json
+~~~
 
-When zero-shot direct readout is not enough, train a one-pass option head on labelled JSONL:
+### Historical OpenJev compatibility
 
-```bash
-pip install -e '.[test]'
-openjev-data synthetic --output data/synthetic
-openjev-train data/synthetic/train.jsonl --validation data/synthetic/validation.jsonl \
-  --output runs/synthetic.pt --device cuda
-openjev-eval runs/synthetic.pt data/synthetic/test.jsonl
-```
+The older direct-logit/trainable paths still exist:
 
-Details: [docs/jevlike-trainable-route.md](docs/jevlike-trainable-route.md). Optional `pip install -e '.[games]'` for Wikispeedia / Doom / Chess examples.
+~~~bash
+openjev-score --help
+openjev-train --help
+openjev-eval --help
+~~~
 
-### Route C: vLLM DiffusionGemma
-
-When a local vLLM with structured diffusion reads is up:
-
-```bash
-bash scripts/setup-vllm-diffusion.sh
-
-openjev-score --mode vllm \
-  --upstream http://127.0.0.1:8000 \
-  --model dgemma \
-  --tokenizer nvidia/diffusiongemma-26B-A4B-it-NVFP4 \
-  --input examples/decisions.jsonl \
-  --output results-vllm.jsonl
-```
-
-Details: [docs/vllm-diffusion-route.md](docs/vllm-diffusion-route.md).
+They are compatibility/research surfaces, not the product identity.
 
 ## Repository map
 
-- [ROADMAP.md](ROADMAP.md) - long-term z0int build order
-- [docs/RESEARCH.md](docs/RESEARCH.md) - durable research context and critical path
-- [docs/evolution-lab.md](docs/evolution-lab.md) - FlyForge / Evolution Lab contract
-- [docs/RESULTS.md](docs/RESULTS.md) - measured OpenJev results
-- [docs/METHOD.md](docs/METHOD.md) - frozen evaluation methodology
-- [docs/REPRODUCE.md](docs/REPRODUCE.md) - pinned environment and verification
-- [docs/jevlike-trainable-route.md](docs/jevlike-trainable-route.md) - Route A
-- [docs/vllm-diffusion-route.md](docs/vllm-diffusion-route.md) - Route C
-- [benchmarks/](benchmarks/) - reproducible fixtures
-- [demo/index.html](demo/index.html) - interactive replay
-- [webgpu-demo/index.html](webgpu-demo/index.html) - browser-only demo
-- [src/openjev_phase1/](src/openjev_phase1/) - current scoring/runtime implementation
+| Path | Purpose |
+| --- | --- |
+| `src/z0int/intelligence.py` | pure capability selection |
+| `src/z0int/dispatch_authority.py` | canonical execution/replay authority |
+| `src/z0int/context_resolve.py` | provenance-backed context resolution |
+| `src/z0int/cognition/` | deterministic legal-action compiler, candidate model, cascade, serving, shadow path |
+| `src/z0int/backends/` | typed decision backends + benchmark harness |
+| `src/z0int/functions/` | named function-level verification implementations |
+| `src/z0int/bridge/` | resident hot-reload OMP bridge runtime |
+| `src/z0int/routines.py` | compiled routine surface |
+| `src/z0int/cascade.py` | promoted cascade surface |
+| `src/z0int/refinement.py` | counterexample-driven repair |
+| `src/z0int/abab.py` | ABAB experiment/archive helpers |
+| `src/z0int/aodl.py` | AODL plan/runtime binding |
+| `src/z0int/worker_routing.py` | bounded text-worker execution policy |
+| `src/z0int/worker_activity.py` | harness-independent activity projection over receipts |
+| `src/z0int/tokenomics_emit.py` | measurement-state-aware Tokenomics emission |
+| `src/openjev_phase1/` | historical OpenJev runtime/training compatibility |
+| `omp-extensions/` | OMP integration surfaces |
+| `adapters/`, `harness-adapters/` | external harness bridges |
+| `deploy/k8s/` | host-authority / cluster-executor deployment lane |
+| `benchmarks/` | replayable benchmark/data-extraction surfaces |
+| `manifests/` | models, capabilities, routing, and evidence contracts |
+| `zer0.repo.yaml` | z0archy exact-ref architecture metadata |
+
+## Boundaries
+
+z0intelligence intentionally does **not** own:
+
+- the canonical AODL ontology or user-authored authority;
+- harness scheduling/execution semantics;
+- source memory database authority;
+- Tokenomics measurement semantics;
+- Evolution Lab promotion authority;
+- Kerdoios provider/quota placement;
+- “success” merely because a model or worker finished.
+
+Unknown stays unknown. Partial measurement stays partial. Execution completion stays distinct from verified success.
+
+## Related repositories
+
+- [z0](https://github.com/kvnloo/z0) — broader control-plane integration and architecture
+- [z0evals](https://github.com/kvnloo/z0evals) — frozen evaluations and public results
+- [Evolution Lab](https://github.com/kvnloo/evolution-lab) — search, evolution, promotion, repair
+- [AODL](https://github.com/kvnloo/aodl) — portable intent / authority / orchestration IR
+- [Tokenomics](https://github.com/kvnloo/tokenomics) — measurement/economics
+- [Kerdoios](https://github.com/kvnloo/kerdoios) — residual compute and quota placement
+- [frontier-kb](https://github.com/kvnloo/frontier-kb) — research evidence / claims / kill criteria
+- [z0archy](https://github.com/kvnloo/z0archy) — whole-system architecture graph
+- [Hermes Agent](https://github.com/NousResearch/hermes-agent) — execution/state/tool harness
+- [Oh My Pi](https://github.com/can1357/oh-my-pi) — coding harness and local judgment surfaces
+- [Agent Orchestrator](https://github.com/kvnloo/agent-orchestrator) — durable session/execution orchestration lab
+- [AgentWeb](https://github.com/kvnloo/agentweb) — downstream Emma/AgentWeb integration lab
 
 ## Principles
 
-1. **Results first.** New theory or architecture must earn its place through measured downstream improvement.
-2. **Private by default.** Raw personal history is a local asset, not public training data.
-3. **Retrieve facts, learn behavior.** Stable preferences/policies may be learned; mutable truth stays provenance-backed.
-4. **Specialize aggressively.** Tiny verified specialists should replace repeated expensive reasoning where they can.
-5. **Abstain instead of bluffing.** Low-confidence cases escalate to stronger systems.
-6. **Keep the controls.** Ridge, MLP, deterministic rules, and other simple baselines remain mandatory.
-7. **Evolution changes implementations, not the judge.** Frozen evaluation and privacy constraints are not optimization variables.
+1. **Evidence before authority.** A model probability cannot mint permission or truth.
+2. **Independent outcomes before promotion.** Execution, teacher agreement, and historical behavior are not gold by themselves.
+3. **Compiler before model.** Deterministic legality, permissions, dependencies, and budgets stay deterministic.
+4. **Mechanism-neutral optimization.** Promote the cheapest verified mechanism; deoptimize when its validity assumptions break.
+5. **Private by default.** Personal evidence and checkpoints stay local unless explicitly sanitized.
+6. **One semantic receipt spine.** Extend existing receipts rather than inventing parallel telemetry/outcome systems.
+7. **Fail explicit.** Unknown, partial, stale, contradicted, unavailable, and ineligible are first-class states.
+8. **Exact revisions matter.** Experiments, adapters, and cross-repo claims must bind to the exact code/data revision that produced them.
 
-## Related projects
-
-- [Evolution Lab](https://github.com/kvnloo/evolution-lab) - genomes, DAgger, Pareto/MAP-Elites, autoresearch and ABAB
-- [AODL](https://github.com/kvnloo/aodl) - typed intent/orchestration IR
-- [frontier-kb](https://github.com/kvnloo/frontier-kb) - research memory and claims
-- [Hermes Agent](https://github.com/NousResearch/hermes-agent) - runtime, state, tools, messaging and learning surfaces
-- [Oh My Pi](https://github.com/can1357/oh-my-pi) - fast coding harness and judgment/decision surfaces
-- [Memento](https://github.com/kvnloo/Memento) - prospective private computer-use history source
-
-This repository is an independent research project. Upstream components retain their licenses. Project code is released under the [MIT License](LICENSE).
-
-## Future compiler stack (integrated)
-
-Implemented in-tree (library + `z0int` CLI delegates). **Not product-validated on live Astra/Grok traffic.**
-
-| Command | Module | Role |
-|---|---|---|
-| `z0int routine …` | `z0int.routines` | Compile stable specialist regions into routines |
-| `z0int cascade …` | `z0int.cascade` | Premium-token cascades over specialists |
-| `z0int aodl …` | `z0int.aodl` | Bind routine/cascade into AODL strategy (`plan`, not intent) |
-| `z0int repair …` | `z0int.refinement` | Counterexample-driven routine repair |
-| `z0int abab …` | `z0int.abab` | Experiment archive / next / stop helpers |
-
-Docs: `docs/routine-compiler.md`, `docs/cascade-compiler.md`, `docs/aodl-integration.md`, `docs/abab-loop.md`, `docs/routine-repair.md`, `AODL_COMPAT.md`.
-
-### Measured (synthetic / unit only)
-
-- Future-feature unit suite: 73 tests.
-- Synthetic repair demo: 384/384 toy labels correct; fallback callbacks 384 → 192 after repaired-child activation; rollback returns 384. **No real LLM token savings.**
-
-### Not yet measured
-
-- Real frontier token savings from routines/cascades
-- Real Blender / harness L3 replacement
-- Energy / joule savings
-
-Token accounting stays on the existing **receipt** spine (`z0int receipt …`). Kerdoios still owns *where* residual model work runs; z0int owns *whether* cognition can stop earlier.
-
+Project code is released under the [MIT License](LICENSE). Third-party models, runtimes, datasets, and trademarks retain their upstream terms; see [THIRD_PARTY.md](THIRD_PARTY.md).

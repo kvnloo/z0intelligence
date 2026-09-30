@@ -24,7 +24,7 @@ Canonical runtime repo: **kvnloo/z0intelligence** (package/CLI `z0int`, dist `op
 
 ## Remaining duplicates / follow-ups
 
-- Historical mentions of `kvnloo/openjev` / `kvnloo/z0int` remain in RESEARCH.md / FUTURE_SLICE provenance (intentional).
+- Historical mentions of `kvnloo/openjev` / `kvnloo/z0int` remain only in dated provenance artifacts such as FUTURE_SLICE (intentional).
 - EL optional dep still named `openjev-phase1` (package name frozen) pointing at z0intelligence git URL.
 - PRs not yet squash-merged (await CI / review).
 - Live OMP one-restart after V2 shim still optional; **execution stays log_only**.
