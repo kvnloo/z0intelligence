@@ -50,6 +50,48 @@ def _json_bytes(value: Any) -> int:
     )
 
 
+_STOPWORDS = {
+    "the", "and", "for", "with", "from", "this", "that", "what", "when",
+    "where", "which", "into", "about", "have", "does", "your", "their",
+}
+
+
+def _focused_excerpt(content: str, descriptions: list[str], limit: int) -> str:
+    """Deterministic lexical focus; no model call and no semantic invention."""
+    if len(content) <= limit:
+        return content
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for description in descriptions:
+        for token in re.findall(r"[A-Za-z0-9_-]{3,}", description.lower()):
+            if token in _STOPWORDS or token in seen:
+                continue
+            seen.add(token)
+            tokens.append(token)
+
+    lower = content.lower()
+    hits = [lower.find(token) for token in tokens]
+    hits = [hit for hit in hits if hit >= 0]
+    if hits:
+        center = min(hits)
+        start = max(0, center - limit // 3)
+        end = min(len(content), start + limit)
+        start = max(0, end - limit)
+        prefix = "…[snip]…" if start > 0 else ""
+        suffix = "…[snip]…" if end < len(content) else ""
+        room = max(1, limit - len(prefix) - len(suffix))
+        body = content[start : start + room]
+        return prefix + body + suffix
+
+    # No query term appears: preserve both beginning and end rather than making
+    # prefix order synonymous with importance.
+    marker_text = "…[snip]…"
+    room = max(2, limit - len(marker_text))
+    head = int(room * 0.7)
+    tail = room - head
+    return content[:head] + marker_text + content[-tail:]
+
+
 def _parse_need(raw: Any, index: int) -> InformationNeed:
     if not isinstance(raw, dict):
         raise ValueError("need must be an object")
@@ -205,7 +247,12 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
     for item in selected:
         # Start bounded even before total-packet accounting.
         content = item["content"]
-        excerpt = content[:1200]
+        descriptions = [
+            need.description
+            for need in needs
+            if need.id in item["need_ids"]
+        ]
+        excerpt = _focused_excerpt(content, descriptions, 1200)
         if len(excerpt) < len(content):
             truncated += 1
         candidate = EvidenceRef(
@@ -228,8 +275,8 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
         if _json_bytes(packet_probe) > max_packet_bytes:
             # Try a smaller excerpt before dropping the source entirely.
             remaining = max(120, min(600, max_packet_bytes // max(2, len(selected))))
-            shorter = excerpt[:remaining]
-            if len(shorter) < len(excerpt):
+            shorter = _focused_excerpt(content, descriptions, remaining)
+            if len(shorter) < len(content):
                 truncated += 1
             candidate = EvidenceRef(
                 source_id=item["source_id"],
@@ -328,6 +375,14 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
         item["source_id"]: set(item["need_ids"])
         for item in deduped
     }
+    original_content = {
+        item["source_id"]: item["content"]
+        for item in deduped
+    }
+    need_descriptions = {
+        need.id: need.description
+        for need in needs
+    }
 
     def render() -> tuple[dict[str, Any], int]:
         packet.evidence = refs
@@ -354,13 +409,23 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
             ref = refs[longest_index]
             excerpt = ref.excerpt or ""
             target = max(160, int(len(excerpt) * 0.65))
+            descriptions = [
+                need_descriptions[need_id]
+                for need_id in source_needs.get(ref.source_id, set())
+                if need_id in need_descriptions
+            ]
+            focused = _focused_excerpt(
+                original_content.get(ref.source_id, excerpt),
+                descriptions,
+                target,
+            )
             refs[longest_index] = EvidenceRef(
                 source_id=ref.source_id,
                 source_version=ref.source_version,
                 locator=ref.locator,
                 trust_class=ref.trust_class,
                 observed_at=ref.observed_at,
-                excerpt=excerpt[:target],
+                excerpt=focused,
                 note=ref.note,
             )
             truncated += 1
