@@ -2,7 +2,7 @@
 
 ``prompt`` handles UserPromptSubmit through the shared automatic event path.
 ``stop`` projects the turn's billed usage from the Claude Code transcript into
-Tokenomics. Both read one hook JSON object on stdin and always fail open.
+Tokenomics as canonical ``tokenomics.event.v0`` rows (see claude_code_tokenomics). Both read one hook JSON object on stdin and always fail open.
 """
 import argparse
 import hashlib
@@ -163,25 +163,29 @@ def on_stop(hook, root=None):
         return []
     state_path = paths.ensure_layout(root)['state'] / HARNESS / f'{session}.json'
     try:
-        seen = set(json.loads(state_path.read_text()).get('message_ids', []))
+        state = json.loads(state_path.read_text())
     except (OSError, ValueError):
-        seen = set()
-    emitted = []
-    for role, path in transcripts(hook):
+        state = {}
+    seen = set(state.get('message_ids', []))
+    files = list(transcripts(hook))
+    fresh_by_role = {}
+    for role, path in files:
         fresh = {k: v for k, v in messages(path).items() if k not in seen}
-        if not fresh:
+        if fresh:
+            fresh_by_role.setdefault(role, {}).update(fresh)
+    # Canonical tokenomics.event.v0 per turn (observed usage + mechanism attribution + estimates).
+    from . import claude_code_tokenomics as cct
+    events = cct.events_for_stop(files, session_id=session, state=state,
+                                 env_profile=os.environ.get(cct.PROFILE_ENV), root=root)
+    for event in events:
+        tokenomics_emit.emit_event(event, root=root)
+    emitted = []
+    for event in events:
+        if event['name'] != 'claude_code.turn':
             continue
-        usage = {key: sum(int(m['usage'].get(key) or 0) for m in fresh.values()) for key in USAGE_KEYS}
-        models = sorted({m.get('model') for m in fresh.values() if m.get('model')})
-        last = sorted(fresh)[-1]
-        tokenomics_emit.emit_provider_usage(
-            harness=HARNESS, trace_id=hashlib.sha256(f'{session}\0{role}\0{last}'.encode()).hexdigest(),
-            session_id=session, provider='anthropic', model=models[0] if len(models) == 1 else ','.join(models),
-            usage=usage, role=role, measurement_state='complete', observer_id='z0int.claude_code.stop',
-            physical_source_id=path.name, identity_basis='transcript_message_id',
-            extra={'message_count': len(fresh)}, root=root)
-        seen.update(fresh)
-        emitted.append({'role': role, 'usage': usage, 'messages': len(fresh)})
+        emitted.append({'role': event['role'], 'usage': event['extra']['anthropic_usage'],
+                        'messages': event['attributes']['claude_code.api_requests']})
+    for role, fresh in fresh_by_role.items():
         if role == 'root':
             try:  # link to the prompt's DecisionOpportunity record by trace id (prompt_id)
                 row = {'schema': 'z0int.claude_code.turn_outcome.v0', 'session_id': session,
@@ -194,7 +198,7 @@ def on_stop(hook, root=None):
             except Exception:
                 pass
     state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(json.dumps({'message_ids': sorted(seen)}))
+    state_path.write_text(json.dumps(state))
     return emitted
 
 

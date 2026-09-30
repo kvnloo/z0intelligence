@@ -77,8 +77,11 @@ def test_stop_emits_deduplicated_incremental_usage(tmp_path):
     assert second['root']['usage']['input_tokens'] == 2 and second['root']['messages'] == 1
     assert second['subagent']['usage']['input_tokens'] == 8
     rows = [json.loads(l) for l in (root / 'tokenomics' / 'events.jsonl').read_text().splitlines()]
-    assert [r['schema'] for r in rows] == ['claude-code.provider_usage.v0'] * 3
-    assert rows[0]['measurement_state'] == 'complete' and rows[0]['provider'] == 'anthropic'
+    assert [r['schema'] for r in rows] == ['tokenomics.event.v0'] * 3
+    assert rows[0]['measurement_source']['measurement_state'] == 'complete'
+    assert rows[0]['model']['provider'] == 'anthropic' and rows[0]['usage']['source'] == 'provider'
+    # Anthropic prompt counters fold into input_tokens; cache reads/writes stay visible.
+    assert rows[0]['usage']['input_tokens'] == 144 and rows[0]['usage']['cached_input_tokens'] == 100
 
 
 def test_cli_fails_open_on_garbage():

@@ -10,6 +10,7 @@ place work where the prefix is still cached.
   z0int claude-code profile lean
   z0int claude-code launch --profile lean -- -p "fix the test" --output-format json
   z0int claude-code warm --json DIR [DIR ...]
+  z0int claude-code tokenomics [--range 7d] [--backfill] [--json]
 """
 import argparse
 import hashlib
@@ -59,6 +60,11 @@ def record(directory, profile, root=None):
     path = state_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=1, sort_keys=True))
+    try:  # append-only ledger so tokenomics can attribute sessions to a profile later
+        with (path.parent / 'launches.jsonl').open('a', encoding='utf-8') as fh:
+            fh.write(json.dumps({'dir': str(Path(directory).resolve()), 'profile': profile, 'ts': data[str(Path(directory).resolve())]['ts']}) + '\n')
+    except OSError:
+        pass
 
 
 def rank(candidates, profile='lean', ttl=DEFAULT_TTL, root=None, now=None):
@@ -123,6 +129,10 @@ def build_argv(profile, claude_args, plugin=True):
 
 
 def _main(argv=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ['tokenomics']:
+        from .claude_code_tokenomics import run
+        return run(argv[1:])
     ap = argparse.ArgumentParser(prog='z0int claude-code', description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -133,6 +143,7 @@ def _main(argv=None):
     la.add_argument('--no-plugin', action='store_true', help='do not attach the z0 harness plugin')
     la.add_argument('--dry-run', action='store_true')
     la.add_argument('claude_args', nargs=argparse.REMAINDER)
+    sub.add_parser('tokenomics', help='per-turn tokenomics report (observed/attributed/estimated); --backfill for transcripts')
     sub.add_parser('decisions', help='gate vs observed behaviour on live shadow DecisionOpportunity records')
     wa = sub.add_parser('warm', help='rank candidate directories by likely prefix-cache residency')
     wa.add_argument('dirs', nargs='+')
@@ -160,7 +171,8 @@ def _main(argv=None):
         print(json.dumps(cmd))
         return 0
     record(os.getcwd(), args.profile)
-    return subprocess.call(cmd)
+    from .claude_code_tokenomics import PROFILE_ENV
+    return subprocess.call(cmd, env={**os.environ, PROFILE_ENV: args.profile})
 
 
 if __name__ == '__main__':

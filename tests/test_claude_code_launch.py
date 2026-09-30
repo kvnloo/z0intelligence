@@ -53,3 +53,24 @@ def test_decisions_report_joins_gate_and_observed_behaviour(tmp_path):
     assert rep['linked'] == 2 and rep['unlinked'] == 1
     assert rep['table'] == {'ACT->answered': 1, 'ASK->answered': 1}
     assert rep['disagreements'][0]['gate'] == 'ASK'
+
+
+def test_launch_ledger_and_profile_env(tmp_path, monkeypatch):
+    import json
+    root = tmp_path / 'home'
+    L.record(tmp_path, 'lean', root=root)
+    L.record(tmp_path, 'stock', root=root)
+    ledger = (root / 'state' / 'claude-code' / 'launches.jsonl').read_text().splitlines()
+    assert [json.loads(l)['profile'] for l in ledger] == ['lean', 'stock']
+    seen = {}
+    monkeypatch.setattr(L, 'record', lambda *a, **k: None)
+    monkeypatch.setattr(L.subprocess, 'call', lambda cmd, env=None: seen.update(env=env) or 0)
+    assert L._main(['launch', '--profile', 'lean', '--no-plugin', '--', '-p', 'hi']) == 0
+    assert seen['env']['Z0INT_CLAUDE_CODE_PROFILE'] == 'lean'
+
+
+def test_tokenomics_subcommand_is_routed(capsys, monkeypatch, tmp_path):
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path / 'home'))
+    assert L._main(['tokenomics', '--range', '1d', '--json']) == 0
+    import json
+    assert json.loads(capsys.readouterr().out)['schema'] == 'z0int.claude_code.tokenomics_report.v0'

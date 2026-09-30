@@ -32,6 +32,22 @@ def emit_raw(row: dict[str, Any], *, root: Path | None = None) -> Path:
     return p
 
 
+def emit_event(event: dict[str, Any], *, root: Path | None = None) -> Path:
+    """Append a canonical ``tokenomics.event.v0`` dict.
+
+    Validated through the tokenomics package when it is importable; hook interpreters
+    without it still append the (already canonical) row so nothing is lost.
+    """
+    if event.get("schema") != "tokenomics.event.v0":
+        raise ValueError("emit_event requires a tokenomics.event.v0 row")
+    try:
+        from tokenomics.models import TokenomicsEvent
+    except Exception:
+        return emit_raw(event, root=root)
+    TokenomicsEvent.from_dict(event)  # raises on a malformed id/shape
+    return emit_raw(event, root=root)
+
+
 def emit_provider_usage(
     *,
     harness: str,
