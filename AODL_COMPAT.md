@@ -50,3 +50,11 @@ events. Gamma budgets include token, premium-token, latency, USD, joule and
 human-attention dimensions while observed spend remains separate.
 
 No z0int implementation concept becomes a new AODL node kind.
+
+## Action-level enforcement (feat/aodl-grants-v0)
+
+Per-action grants compile from node `authorityScopes` / `prohibitions`, added on
+`kvnloo/aodl@feat/authority-scopes` (`spec/authority-scopes.md`, on top of
+`feat/canonical-fingerprint` + `fix/validate-non-scalar-fields`). Install that
+branch editable so `harnesses/catalog.json` resolves; without `aodl_contract`
+every contract is rejected (no grants). See `docs/aodl-enforcement.md`.

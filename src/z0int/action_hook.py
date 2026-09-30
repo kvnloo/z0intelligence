@@ -1,7 +1,9 @@
 """Claude Code PreToolUse hook: action-level authority check in SHADOW (z0int#55).
 
 Reads the hook JSON on stdin, parses the tool call into concrete effects, folds the session's
-transcript (incrementally, cached) into grants/prohibitions, runs ``authority_check`` and appends
+transcript (incrementally, cached) into grants/prohibitions, adds the authored AODL contract's exact
+grants/prohibitions for privileged calls (``aodl_grants``: ``~/.z0int/state/claude-code/intent.aodl.json``
+and ``<repo>/.aodl/intent.json``; ``Z0INT_AODL_CONTRACT=0`` disables), runs ``authority_check`` and appends
 ``{session, prompt_id, tool, effects, decision}`` to ``~/.z0int/state/claude-code/actions.jsonl``.
 
 Shadow means: it prints nothing and always exits 0, so Claude Code's own permission flow decides
@@ -121,7 +123,14 @@ def on_pretool(hook: dict, *, log: bool = True) -> dict | None:
     tool = str(hook.get("tool_name") or "")
     sa = load_session(hook, ctx)
     mode = hook.get("permission_mode") or sa.permission_mode
-    out = sa.check(tool, hook.get("tool_input") or {}, ctx, permission_mode=mode)
+    contract = None
+    if os.environ.get("Z0INT_AODL_CONTRACT", "1") != "0":
+        from .aodl_grants import load_contracts
+        require_pin = os.environ.get("Z0INT_AODL_REQUIRE_PIN", "0") == "1"
+
+        def contract(c):
+            return load_contracts(c, require_pin=require_pin)
+    out = sa.check(tool, hook.get("tool_input") or {}, ctx, permission_mode=mode, contract=contract)
     if sa.pending == [] and out["effects"]["privileged"]:
         save_session(hook, sa)  # grants were materialised: keep them so the next call need not redo it
     parsed, decision = out["effects"], out["decision"]
@@ -133,6 +142,8 @@ def on_pretool(hook: dict, *, log: bool = True) -> dict | None:
         "decision": decision["decision"], "reason": decision["reason"],
         "privileged": [r for r in decision["per_effect"] if r["class"] == "privileged"],
         "grants_n": len(sa.grants), "prohibitions_n": len(sa.prohibitions),
+        # authored contracts consulted for this call (only when an effect is privileged)
+        "aodl": out.get("aodl"),
         "latency_ms": round((time.perf_counter() - t0) * 1000, 2),
     }
     if log:

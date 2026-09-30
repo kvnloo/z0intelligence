@@ -58,6 +58,9 @@ def _norm_branch(b: Any) -> str:
 
 def covers(grant: Mapping[str, Any], effect: Mapping[str, Any]) -> bool:
     scope = grant.get("scope") or {}
+    if scope.get("strict"):  # authored (AODL) grants: exact targets only (aodl_grants.strict_covers)
+        from .aodl_grants import strict_covers
+        return strict_covers(scope, effect)
     kind = effect["kind"]
     gk = scope.get("kind")
     if gk != kind and gk not in _ACCEPT.get(kind, ()):
@@ -177,7 +180,8 @@ def authority_check(effects: Iterable[Mapping[str, Any]], grants: Iterable[Mappi
         t = e.get("target") or {}
         if forbidding and last_forbid >= last_grant:
             p = max(forbidding, key=lambda x: x.get("turn", 0))
-            row.update(decision="deny", reason=f"user prohibited {e['kind']} ({p.get('phrase')!r}, turn {p.get('turn')})",
+            who = f"contract {p.get('fingerprint', '')[:26]} prohibits" if p.get("source") == "aodl" else "user prohibited"
+            row.update(decision="deny", reason=f"{who} {e['kind']} ({p.get('phrase')!r}, turn {p.get('turn')})",
                        provenance={"prohibition": _prov(p)})
         elif covering:
             g = max(covering, key=lambda x: x.get("turn", 0))
@@ -198,7 +202,8 @@ def authority_check(effects: Iterable[Mapping[str, Any]], grants: Iterable[Mappi
 
 
 def _prov(g: Mapping[str, Any]) -> dict[str, Any]:
-    return {k: g.get(k) for k in ("source", "via", "turn", "phrase", "scope") if g.get(k) is not None}
+    return {k: g.get(k) for k in ("source", "via", "turn", "phrase", "scope", "fingerprint", "node", "contract")
+            if g.get(k) is not None}
 
 
 def _tgt(t: Mapping[str, Any]) -> str:
@@ -383,11 +388,27 @@ class SessionAuthority:
     def standing(self) -> dict[str, Any]:
         return {"effects": ["read"] if self.permission_mode == "plan" else ["read", "write"], "mode": self.permission_mode}
 
-    def check(self, tool_name: str, tool_input: Mapping[str, Any], ctx: Ctx, permission_mode: str | None = None) -> dict[str, Any]:
+    def check(self, tool_name: str, tool_input: Mapping[str, Any], ctx: Ctx, permission_mode: str | None = None,
+              contract: Any = None) -> dict[str, Any]:
+        """``contract``: optional ``ctx -> {grants, prohibitions, contracts}`` (``aodl_grants.load_contracts``),
+        consulted only for privileged effects. Authored grants are never folded into session state: they are
+        recompiled per call, so an edited (re-fingerprinted) contract revokes immediately."""
         parsed = parse_tool_call(tool_name, tool_input, ctx)
+        grants, prohibitions, aodl = self.grants, self.prohibitions, None
         if parsed["privileged"]:
             self.materialize(ctx)
+            grants, prohibitions = self.grants, self.prohibitions
+            if contract is not None:
+                try:
+                    aodl = contract(ctx)
+                except Exception as exc:  # a contract that cannot be read grants nothing
+                    aodl = {"grants": [], "prohibitions": [], "contracts": [], "error": type(exc).__name__}
+                grants = grants + list(aodl.get("grants") or [])
+                prohibitions = prohibitions + list(aodl.get("prohibitions") or [])
         mode = permission_mode or self.permission_mode
         standing = {"effects": ["read"] if mode == "plan" else ["read", "write"], "mode": mode}
-        decision = authority_check(parsed["effects"], self.grants, standing, self.prohibitions)
-        return {"effects": parsed, "decision": decision}
+        decision = authority_check(parsed["effects"], grants, standing, prohibitions)
+        out = {"effects": parsed, "decision": decision}
+        if aodl is not None:
+            out["aodl"] = {k: aodl[k] for k in ("contracts", "error") if k in aodl}
+        return out
