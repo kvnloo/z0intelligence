@@ -37,9 +37,24 @@ def fixture(task, work):
 
 
 def trial(task, arm, rep, args):
-    work = Path(tempfile.mkdtemp(prefix=f"cc-{task['id']}-{arm}-"))
-    home = work.parent / (work.name + '-z0home')
-    fixture(task, work)
+    if args.warm:
+        # One persistent dir per (task, arm): rep 0 is cold, later reps reuse the cross-session
+        # prefix cache (keyed by cwd + git snapshot), so the tree is reset to its exact start.
+        work = Path(tempfile.gettempdir()) / f"cc-warm-{args.warm}-{task['id']}-{arm}"
+        home = work.parent / (work.name + '-z0home')
+        if not (work / '.git').exists():
+            work.mkdir(parents=True, exist_ok=True)
+            fixture(task, work)
+            subprocess.run(['git', '-C', str(work), 'add', '-A'], check=True)
+            subprocess.run(['git', '-C', str(work), '-c', 'user.name=bench', '-c', 'user.email=bench@local',
+                            'commit', '-qm', 'fixture'], check=True)
+        else:
+            subprocess.run(['git', '-C', str(work), 'reset', '-q', '--hard'], check=True)
+            subprocess.run(['git', '-C', str(work), 'clean', '-qfdx'], check=True)
+    else:
+        work = Path(tempfile.mkdtemp(prefix=f"cc-{task['id']}-{arm}-"))
+        home = work.parent / (work.name + '-z0home')
+        fixture(task, work)
     env = {**os.environ, 'Z0INT_HOME': str(home), 'Z0INT_PYTHON': str(ROOT / '.venv/bin/python'),
            'PATH': str(ROOT / '.venv/bin') + os.pathsep + os.environ['PATH']}
     cmd = ['claude', '-p', task['prompt'], '--output-format', 'json', '--model', args.model,
@@ -74,6 +89,7 @@ def main():
     ap.add_argument('--max-usd', type=float, default=1.0)
     ap.add_argument('--timeout', type=int, default=900)
     ap.add_argument('--out', required=True)
+    ap.add_argument('--warm', default='', help='persistent per-(task,arm) dirs under this tag; rep 0 cold, later reps warm')
     ap.add_argument('--jobs', type=int, default=1, help='concurrent trials (each has its own cwd, so no shared cache)')
     args = ap.parse_args()
     out = Path(args.out)
