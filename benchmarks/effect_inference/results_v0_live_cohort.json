@@ -1,0 +1,17 @@
+{
+ "schema": "z0int.effect_inference.live_cohort.v0",
+ "source": "~/.z0int/state/claude-code/{opportunities,outcomes}.jsonl as of 2026-09-30 (private; counts only)",
+ "method": "z0int claude-code decisions: recorded state (unknowns/contradictions as recorded) re-gated with infer_effects at b538963",
+ "linked": 10, "unlinked": 1, "harness_messages_excluded": 3,
+ "observed_label": "observed frontier behaviour (asked the user or not), NOT an optimal label",
+ "before_hardcoded_read": {"ACT->answered": 8, "ACT->asked": 1, "ESCALATE->answered": 1},
+ "after_inferred_effects": {
+  "default_read":       {"ACT->answered": 1, "ASK->answered": 7, "ASK->asked": 1, "ESCALATE->answered": 1},
+  "session_read_write": {"ACT->answered": 2, "ASK->answered": 6, "ASK->asked": 1, "ESCALATE->answered": 1}
+ },
+ "reading": [
+  "The one turn where the frontier asked (the /loop turn; it asked before default-branch pushes) moves ACT->ASK: the gate now sees the privileged effect.",
+  "Six ASK->answered under session authority are all privileged-inferred turns whose prompt itself instructed the privileged action (loop: commit+push feature branches x3; ssh/admin script; forward branches to main with an in-prompt approval phrase; set up GitHub Projects). v0 records in-prompt grant phrases but never applies them, so it asks where the frontier proceeded on the user's instruction.",
+  "Next lever this exposes: scoped in-prompt grants (the instruction names the action and scope, e.g. feature-branch pushes, not default-branch pushes)."
+ ]
+}

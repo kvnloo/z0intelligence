@@ -132,3 +132,44 @@ run) on the 11 pinned held-out questions, deterministic arms only:
 The contract survives its falsification rule. All three misses are ASK (the safe side) and trace to a
 State Packet gap: sub-agent-only transcripts leave `conv.latest_session` unknown although the facts exist.
 Caveats: n=11, one snapshot; the vocabulary was written after seeing one pinned prompt (not its key).
+
+## Effect inference v0 (z0int#55): when does a turn need the human's authority?
+
+Before this change, Claude Code emitted every prompt with `effects=("read",)`, so the gate could never ASK
+for authority. For example, a `/loop` turn that pushes branches gated ACT. `z0int.effect_inference.infer_effects(request, packet)`
+maps a request to a subset of read/write/privileged, with per-rule evidence (rule, phrase, packet fact).
+It works like this:
+- A deterministic lexicon runs over sentences. The vocabulary follows AODL `PRIVILEGED`, plus git, forge, release and messaging actions.
+- Questions *about* an action count as read. Negated actions ("don't push") don't count.
+- A commit while checked out on the default branch is privileged.
+- A request that is ambiguous between write and privileged resolves to privileged, so the gate ASKs.
+- User pre-approval phrases are recorded in `user_grant_phrases` and **never applied**.
+- `Z0INT_EFFECTS_SLM=1` adds a groot qwen3-8b label as shadow only.
+
+`on_opportunity` now uses the inferred effects. Its standing authority comes from the permission mode: `plan`
+gives read, any other mode gives read+write. Privileged is never standing (`harness_grants` rejects it). The
+record also keeps `gate_readonly_baseline`. Everything is still shadow.
+
+Pre-registered evaluation: `benchmarks/effect_inference/PREREG.md` and its held-out addendum. The primary authority is read+write.
+
+| set | arm | class acc | false ACT on privileged | unnecessary ASK on read |
+| --- | --- | --- | --- | --- |
+| v0 set (80, in-sample: author saw all cases) | read-only baseline | 26/80 | 30 | 0/26 |
+| | inferred | 80/80 | 0 | 0/26 |
+| | SLM alone (shadow) | 62/80 | 12 | 1/26 |
+| **held-out (60, fresh agent, committed unread, scored once)** | read-only baseline | 20/60 | 20 | 0/20 |
+| | **inferred** | **47/60** | **6** | **1/20** |
+| | SLM alone (shadow) | 48/60 | 10 | 2/20 |
+
+**On the held-out set, v0 fails its own decision rule.** It needs 0 false ACT on privileged and got 6 (the baseline has 20).
+The other two criteria pass: unnecessary ASK is 5% (limit 10%) and class accuracy beats the baseline. Five of the six false
+ACTs are privileged requests phrased in vocabulary the lexicon lacks: "send it up", "get this onto main", "npm i", "slack the team",
+"wrap this up so X can review". The sixth, "commit straight to master", names the target branch in the text instead of the
+packet, so it is also missed. The under-classifications fall back to read, because v0 treats an unknown imperative as
+read. Post-hoc and exploratory (not registered): a privileged-if-either(deterministic, SLM) union reduces held-out false ACT
+from 6 to 4 but raises unnecessary read ASKs to 3/20. It also fails.
+
+Live cohort re-score (counts only, `results_v0_live_cohort.json`): before the change the table was ACT→answered 8,
+ACT→asked 1, ESCALATE→answered 1. With inferred effects under read+write it is ACT→answered 2, ASK→asked 1, ASK→answered 6,
+ESCALATE→answered 1. The single frontier ASK (the `/loop` default-branch push) is now gated ASK. The six ASK→answered are
+turns whose prompt itself instructed the privileged action. v0 does not honour in-prompt grants, which is the next lever.
