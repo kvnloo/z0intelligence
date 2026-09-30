@@ -70,3 +70,17 @@ def test_host_defined_local_provider_is_keyless_capped_and_offload_only(monkeypa
     assert [c['provider'] for c in plan['candidates']] == ['groot']
     plan = wr.plan_route('write python code', policy, providers, available_providers={'groot'})
     assert all(c['provider'] != 'groot' for c in plan['candidates'])
+
+
+def test_host_local_order_prefers_faster_box_and_never_adds_remote(monkeypatch):
+    from z0int import worker_routing as r
+    cfg = {'providers': {'groot': {'cohort': 'local', 'auth': 'none', 'base_url': 'http://100.64.0.1:1/v1',
+                                   'models': ['m'], 'worker_default_model': 'm'}},
+           'local_order': ['groot', 'cerebras', 'local', 'groot', 'nope']}
+    monkeypatch.setattr(r, '_host_config', lambda: cfg)
+    policy, providers = r.configuration()
+    assert policy['local_order'] == ['groot', 'local']  # keyed/unknown providers dropped, deduped
+    policy['free_only'] = False  # fixture groot has no evidence file
+    monkeypatch.setattr(r, 'available', lambda *a, **k: True)
+    plan = r.plan_route('local-only: answer', policy, providers)
+    assert plan['primary_provider'] == 'groot' and [c['provider'] for c in plan['candidates']] == ['groot', 'local']
