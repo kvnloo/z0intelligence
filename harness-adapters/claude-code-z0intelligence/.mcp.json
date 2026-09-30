@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "z0intelligence": {
+      "command": "${Z0INT_PYTHON:-python3}",
+      "args": ["-m", "z0int.intelligence_mcp"],
+      "env": {"Z0INT_HARNESS": "claude-code", "Z0INT_SHARED_ONLY": "1"}
+    }
+  }
+}

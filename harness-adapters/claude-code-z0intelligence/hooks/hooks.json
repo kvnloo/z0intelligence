@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {"hooks": [{"type": "command", "command": "\"${Z0INT_PYTHON:-python3}\" -m z0int.claude_code prompt || true", "timeout": 30}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "\"${Z0INT_PYTHON:-python3}\" -m z0int.claude_code stop || true", "timeout": 30}]}
+    ]
+  }
+}
