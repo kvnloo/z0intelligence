@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
@@ -139,7 +140,7 @@ class BridgeWorkerProcessTests(unittest.TestCase):
         env["Z0INT_ROOT"] = str(root)
         with tempfile.TemporaryDirectory() as tmp:
             env["Z0INT_HOME"] = tmp
-            py = os.environ.get("Z0INT_PYTHON") or "/home/kvn/tmp/openjev/.venv/bin/python"
+            py = os.environ.get("Z0INT_PYTHON") or sys.executable
             proc = subprocess.Popen(
                 [py, "-u", "-m", "z0int.bridge.worker", "--generation", "7"],
                 stdin=subprocess.PIPE,

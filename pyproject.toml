@@ -48,4 +48,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "webgpu-demo"]
-markers = ["live: requires configured external or local model services"]
+markers = [
+  "live: requires configured external or local model services (opt in with --run-live)",
+]
