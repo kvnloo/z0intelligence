@@ -19,10 +19,77 @@ HERMES_ROOT = os.environ.get('Z0INT_HERMES_ROOT', '')
 SYSTEM = 'Complete the bounded task using supplied context. Return your answer to the Codex parent. You have no filesystem, shell, or external tools.'
 
 
+def _host_overrides():
+    """Per-host endpoint for keyless local providers: ~/.z0int/config/worker_routing.local.json.
+
+    Only providers the manifest marks cohort=local and auth=none may be repointed, so a
+    host file can never redirect a keyed provider (and its credential) to another URL.
+    """
+    try:
+        from . import paths
+        return json.loads((paths.home() / 'config' / 'worker_routing.local.json').read_text()).get('providers') or {}
+    except (OSError, ValueError, ImportError):
+        return {}
+
+
+HOST_PROVIDER_NAME = re.compile(r'^[a-z][a-z0-9_-]{0,31}$')
+HOST_PROVIDER_MAX_CAP = 8
+
+
+def _host_local_provider(name, override):
+    """A keyless local provider the manifest does not know (e.g. a tailnet GPU box).
+
+    The host file must declare it cohort=local and auth=none; the result is built from
+    whitelisted keys only, so it never carries a credential reference. Its cap is taken
+    from the override (default 1, clamped to HOST_PROVIDER_MAX_CAP).
+    """
+    if (not HOST_PROVIDER_NAME.match(name) or override.get('cohort') != 'local' or override.get('auth') != 'none'
+            or not isinstance(override.get('base_url'), str) or not override['base_url'].startswith('http')
+            or not isinstance(override.get('worker_default_model'), str) or not isinstance(override.get('models'), list)):
+        return None
+    cap = override.get('cap', 1)
+    cap = min(cap, HOST_PROVIDER_MAX_CAP) if type(cap) is int and cap > 0 else 1
+    return {'cohort': 'local', 'auth': 'none', 'base_url': override['base_url'], 'models': override['models'],
+            'worker_default_model': override['worker_default_model'], 'host_defined': True}, cap
+
+
 def configuration():
     policy = json.loads(POLICY_PATH.read_text())
     providers = policy['providers']
+    for name, override in _host_overrides().items():
+        if not isinstance(override, dict):
+            continue
+        if name not in providers:
+            added = _host_local_provider(name, override)
+            if not added:
+                continue
+            providers[name], cap = added
+            policy.setdefault('provider_caps', {})[name] = cap
+            policy.setdefault('defaults', {})[name] = override['worker_default_model']
+            policy.setdefault('host_local_providers', []).append(name)
+        base = providers.get(name)
+        if not base or base.get('cohort') != 'local' or base.get('auth') != 'none':
+            continue
+        merged = {**base, **{k: v for k, v in override.items() if k in ('base_url', 'models', 'worker_default_model')}}
+        providers[name] = merged
+        if 'worker_default_model' in override and isinstance(policy.get('defaults'), dict):
+            policy['defaults'][name] = override['worker_default_model']
+        # Host-validated $0 routes for local hardware: evidence file must exist and match its sha256.
+        for route in override.get('validated_free_routes') or []:
+            if _local_route_evidenced(name, route):
+                policy.setdefault('validated_free_routes', []).append({**route, 'provider': name})
     return policy, providers
+
+
+def _local_route_evidenced(provider, route):
+    import hashlib
+    try:
+        path = Path(route['evidence_path']).expanduser()
+        ok = hashlib.sha256(path.read_bytes()).hexdigest() == route['evidence_sha256']
+    except (KeyError, OSError, TypeError):
+        return False
+    return (ok and route.get('validated') is True and route.get('price_usd') == 0
+            and isinstance(route.get('model'), str) and route.get('provider', provider) == provider)
 
 
 def oauth_module():
@@ -105,7 +172,9 @@ def plan_route(task, policy, providers, available_providers=None, function=None)
     rule = next((r for r in policy['rules'] if re.search(r['pattern'], task, re.I)), None)
     category = rule['category'] if rule else 'general'
     if category=='local':
-        primary='local';order=['local']
+        # Host-defined keyless local providers (e.g. a tailnet GPU box) are the offload
+        # tier behind this host's own local model; still no remote fallback.
+        primary='local';order=['local']+list(policy.get('host_local_providers',[]))
     else:
         family='structured' if function in policy.get('structured_functions',[]) or category=='structured' else 'text'
         order=list(policy.get('function_orders',{}).get(family,policy['fallback_order']))
