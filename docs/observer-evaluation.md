@@ -4,9 +4,9 @@ Status: architecture contract for J2. This document builds on the existing `Deci
 
 ## Thesis
 
-JEV is the seed semantic observer/reference backend for evaluations.
+TypeSafe Jev 1.13.0 is the current reference verifier for the narrow `verify.evidence_sufficiency` contract. Laya 421M is the resident local fast path and escalates uncertain cases to Jev. Other DecisionBackends may still act as replayable observers.
 
-It provides cheap typed semantic readings over replayable agent state. Those readings are features and weak labels. They are not verified truth.
+These readings are features, weak labels, or contract-scoped verification evidence. No semantic backend is universal ground truth.
 
 ```text
 replayable events
@@ -14,8 +14,8 @@ replayable events
    +--> objective counters ---------------- Tokenomics
    |
    +--> semantic readings ----------------- DecisionBackend
-   |       JEV / NanoJev / OpenJev /
-   |       rules / ridge / MLP / fly / ...
+   |       Jev 1.13 / Laya / OpenJev /
+   |       legacy NanoJev / rules / ridge / MLP / fly / ...
    |
    +--> independent future outcome/verifier
    |
@@ -36,7 +36,7 @@ question-family specialist may enter runtime
 
 ## J1/J1.1 interpretation
 
-Existing JEV/NanoJev parity work remains useful, but parity is not ground truth.
+Existing JEV/NanoJev parity work remains useful as historical comparison data, but it no longer defines the runtime default and parity is not ground truth.
 
 Record at least:
 
@@ -48,7 +48,7 @@ Record at least:
 - latency/cost where known;
 - repeat index for stability trials.
 
-Repeated JEV runs should be used to estimate self-agreement, probability variance and threshold-flip rate. A high-risk NanoJev/JEV disagreement becomes a priority adjudication example rather than an automatic NanoJev error.
+Repeated Jev runs should be used to estimate self-agreement, probability variance and threshold-flip rate. A high-risk Laya/Jev disagreement becomes a priority adjudication example rather than an automatic Laya error; legacy NanoJev/Jev disagreements remain useful only as benchmark evidence.
 
 ## Evaluation identity
 
@@ -155,8 +155,9 @@ A candidate population may contain:
 deterministic rule
 ridge/logistic model
 small MLP
-NanoJev
+Laya/local fast path
 OpenJev/local semantic model
+legacy NanoJev benchmark
 mushroom-body learner
 fly/temporal specialist
 other backend

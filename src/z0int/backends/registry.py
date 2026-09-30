@@ -94,7 +94,7 @@ def register_builtin_backends() -> None:
     if "laya_421m" not in _REGISTRY:
         from .laya import LayaBackend
         register(BackendSpec(id="laya_421m", kind="typed_decision",
-            description="Local Laya experimental verifier", factory=LayaBackend.for_manifest_id,
+            description="Local Laya 421M fast-path typed decision backend", factory=LayaBackend.for_manifest_id,
             aliases=("laya",), local=True))
     if "nanojev" not in _REGISTRY:
         from .nanojev import NanoJevBackend
@@ -103,7 +103,7 @@ def register_builtin_backends() -> None:
             BackendSpec(
                 id="nanojev",
                 kind="semantic_model",
-                description="Local NanoJev Qwen3-0.6B typed decision model",
+                description="Legacy NanoJev Qwen3-0.6B benchmark backend; not verification-default",
                 factory=NanoJevBackend.from_config,
                 aliases=("nanojev_06b",),
                 local=True,

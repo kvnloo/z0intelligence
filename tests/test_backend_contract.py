@@ -147,9 +147,11 @@ class ModelPlanBackendTests(unittest.TestCase):
 
         twelve = models_mgmt.plan_models(vram_gb=12.0)
         self.assertEqual(twelve["policy"], "twelve_gb")
-        self.assertIn("nanojev_06b", twelve["resident"])
+        self.assertIn("laya_421m", twelve["resident"])
+        self.assertNotIn("nanojev_06b", twelve["resident"])
+        self.assertIn("nanojev_06b", twelve["on_demand"])
         self.assertIn("local_mb", twelve["resident"])
-        # never coreside nanojev with 4b / 06b
+        # keep explicit NanoJev co-residency guards for legacy/manual loads
         pairs = [tuple(p) for p in twelve["never_coreside"]]
         self.assertIn(("nanojev_06b", "openjev_4b"), pairs)
         self.assertIn(("nanojev_06b", "openjev_06b"), pairs)
@@ -159,10 +161,21 @@ class ModelPlanBackendTests(unittest.TestCase):
 
         high = models_mgmt.plan_models(vram_gb=24.0)
         self.assertEqual(high["policy"], "high_vram")
-        self.assertIn("nanojev_06b", high["resident"])
+        self.assertIn("laya_421m", high["resident"])
+        self.assertNotIn("nanojev_06b", high["resident"])
+        self.assertIn("nanojev_06b", high["on_demand"])
 
 
 class CLIBackendsTests(unittest.TestCase):
+    def test_backend_cli_defaults_to_laya_fast_path(self):
+        from z0int.cli import build_parser
+
+        parser = build_parser()
+        caps = parser.parse_args(["backends", "capabilities"])
+        self.assertEqual(caps.name, "laya_421m")
+        ev = parser.parse_args(["backends", "eval", "--input", "request.json"])
+        self.assertEqual(ev.backend, "laya_421m")
+
     def test_backends_list_json(self):
         from z0int.cli import main
         import io

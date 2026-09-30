@@ -34,9 +34,9 @@ models:
       - semantic_decision
       - calibrated_choice
       - system_one
-    resident_preferred: false
+    resident_preferred: true
     optional: true
-    note: ~421M non-autoregressive calibrated decision model; CPU/MPS-friendly.
+    note: Primary local fast-path typed decision backend; CPU/MPS/CUDA-friendly. Verification eligibility remains contract-specific.
 
   decider_2b:
     family: decision_backend
@@ -72,8 +72,9 @@ models:
       - system_one
       - dynamic_choice
       - outcome_predictor
-    resident_preferred: true
-    note: Verify measured VRAM before treating min_vram_gb as a hard production fact. Managed under ~/.z0int/models/nanojev_06b/
+    resident_preferred: false
+    optional: true
+    note: Legacy benchmark/reproducibility lane only; do not use as the production verification default. Managed under ~/.z0int/models/nanojev_06b/
 
   reflex:
     family: decision_backend
@@ -158,11 +159,11 @@ models:
 policies:
   twelve_gb:
     resident:
-      - nanojev_06b
+      - laya_421m
       - local_mb
     on_demand:
-      - laya_421m
       - decider_2b
+      - nanojev_06b
       - openjev_4b
       - openjev_06b
       - system_one_4b
@@ -180,14 +181,14 @@ policies:
       - laya_421m
   high_vram:
     resident:
-      - nanojev_06b
+      - laya_421m
       - openjev_4b
       - local_mb
     on_demand:
       - decider_2b
+      - nanojev_06b
       - openjev_06b
       - system_one_4b
-      - laya_421m
     never_coreside:
       - [nanojev_06b, openjev_06b]
       - [nanojev_06b, system_one_4b]
