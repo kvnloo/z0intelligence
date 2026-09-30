@@ -84,7 +84,7 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404,{'error':'not_found'})
 
     def do_POST(self):
-        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/worker','/v1/automatic','/v1/automatic/consumed'):return self.reply(404,{'error':'not_found'})
+        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/worker','/v1/automatic','/v1/automatic/consumed','/v1/integrations/agent-orchestrator/spawn-decision','/v1/integrations/agent-orchestrator/outcome'):return self.reply(404,{'error':'not_found'})
         try:
             size=int(self.headers.get('Content-Length','0'))
             if not 0<size<=(262144 if self.path.startswith('/v1/authority/') else 40000):return self.reply(413,{'error':'request_size'})
@@ -95,6 +95,12 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=='/v1/worker':
                 from .worker_routing import dispatch_worker
                 return self.reply(200,dispatch_worker(args))
+            if self.path=='/v1/integrations/agent-orchestrator/spawn-decision':
+                from .ao_bridge import spawn_decision
+                return self.reply(200,spawn_decision(args))
+            if self.path=='/v1/integrations/agent-orchestrator/outcome':
+                from .ao_bridge import join_ao_outcome
+                return self.reply(200,join_ao_outcome(args))
             if self.path=='/v1/automatic/consumed':return self.reply(200,consume(args))
             started=time.monotonic()
             with METRIC_LOCK:
