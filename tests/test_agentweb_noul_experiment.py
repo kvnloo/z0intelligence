@@ -89,7 +89,11 @@ def test_noul_replays_one_physical_call_and_never_applies(tmp_path, monkeypatch)
     assert row["extra"]["quality_authoritative"] is False
     assert row["extra"]["applied"] is False
     assert "that's enough" not in json.dumps(row)
-    assert "proposition" not in json.dumps(row)
+    serialized = json.dumps(row)
+    assert "The user's message explicitly asks" not in serialized
+    proposition_hash = row["extra"]["proposition_sha256"]
+    assert len(proposition_hash) == 64
+    int(proposition_hash, 16)
 
 
 def test_noul_mutation_conflicts_under_same_trace(tmp_path, monkeypatch):
