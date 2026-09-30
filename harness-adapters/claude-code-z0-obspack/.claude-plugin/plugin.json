@@ -1,0 +1,2 @@
+{"name": "z0-obspack", "version": "0.1.0", "license": "MIT", "author": {"name": "kvnloo"},
+ "description": "ObservationPack for Claude Code (after NVlabs/SoL-Pi): large Bash results are archived verbatim and replaced by head/tail plus a stable handle with exact recall via z0obs."}

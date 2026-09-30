@@ -82,3 +82,8 @@ def test_cli_fails_open_on_garbage():
     out = subprocess.run([sys.executable, '-m', 'z0int.claude_code', 'prompt'], input='not json',
                          capture_output=True, text=True, timeout=30)
     assert out.returncode == 0 and out.stdout == ''
+
+
+def test_turn_id_prefers_prompt_id():
+    assert claude_code.turn_id({'prompt_id': 'p-1', 'session_id': 's', 'prompt': 'x'}) == 'p-1'
+    assert len(claude_code.turn_id({'session_id': 's', 'prompt': 'x'})) == 64

@@ -14,6 +14,7 @@ ARMS = {
     'off': [],
     'z0-shadow': ['--plugin-dir', str(PLUGIN)],
     'lean': ['--setting-sources', 'project', '--strict-mcp-config', '--disable-slash-commands'],
+    'obspack': ['--plugin-dir', str(ROOT / 'harness-adapters/claude-code-z0-obspack')],
     'lean+z0': ['--setting-sources', 'project', '--strict-mcp-config', '--disable-slash-commands', '--plugin-dir', str(PLUGIN)],
 }
 
@@ -50,7 +51,7 @@ def trial(task, arm, rep, args):
         result = json.loads(run.stdout)
     except ValueError:
         result = {'parse_error': run.stdout[-500:], 'stderr': run.stderr[-500:]}
-    argv = [str(ROOT / '.venv/bin/python') if a == 'python3' else a.format(task=task['_dir'], work=work) for a in task['check']]
+    argv = [str(ROOT / '.venv/bin/python') if a == 'python3' else a.replace('{task}', str(task['_dir'])).replace('{work}', str(work)) for a in task['check']]
     check = subprocess.run(argv, cwd=work, capture_output=True, text=True, env={**env, 'PYTHONPATH': str(work / 'src')})
     events = home / 'tokenomics' / 'events.jsonl'
     receipts = [json.loads(l) for l in events.read_text().splitlines()] if events.exists() else []

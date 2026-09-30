@@ -23,7 +23,9 @@ def shadow():
 
 
 def turn_id(hook):
-    # Hooks carry no turn id; transcript size at submit time is stable per turn.
+    if isinstance(hook.get('prompt_id'), str) and hook['prompt_id']:
+        return hook['prompt_id']
+    # Older Claude Code sends no prompt_id; transcript size at submit time is stable per turn.
     try:
         size = Path(hook['transcript_path']).stat().st_size
     except (KeyError, OSError, TypeError):
