@@ -4,7 +4,8 @@ Each trial copies a fresh fixture, runs headless Claude Code with or without plu
 records Claude Code's own billed usage/cost, the plugin's Tokenomics receipts, and a
 programmatic verifier result. Tool-reported "savings" are never used.
 """
-import argparse, json, os, shutil, subprocess, sys, tempfile, time
+import argparse, json, os, shutil, subprocess, sys, tempfile, threading, time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -73,6 +74,7 @@ def main():
     ap.add_argument('--max-usd', type=float, default=1.0)
     ap.add_argument('--timeout', type=int, default=900)
     ap.add_argument('--out', required=True)
+    ap.add_argument('--jobs', type=int, default=1, help='concurrent trials (each has its own cwd, so no shared cache)')
     args = ap.parse_args()
     out = Path(args.out)
     if out.exists():
@@ -82,15 +84,19 @@ def main():
     for t in args.tasks:
         d = Path(__file__).parent / 'tasks' / t
         task = json.loads((d / 'task.json').read_text()); task['_dir'] = d; tasks.append(task)
+    # Interleave arms within each rep so provider drift hits both arms equally.
+    plan = [(task, arm, rep) for rep in range(args.reps) for task in tasks
+            for arm in (args.arms if rep % 2 == 0 else list(reversed(args.arms)))]
+    lock = threading.Lock()
     with out.open('x') as fh:
-        # Interleave arms within each rep so drift in the provider hits both arms equally.
-        for rep in range(args.reps):
-            for task in tasks:
-                for arm in (args.arms if rep % 2 == 0 else list(reversed(args.arms))):
-                    row = trial(task, arm, rep, args)
-                    fh.write(json.dumps(row) + '\n'); fh.flush()
-                    print(task['id'], arm, rep, row['verified'], row['cost_usd'], row['num_turns'], flush=True)
-
+        def run(item):
+            task, arm, rep = item
+            row = trial(task, arm, rep, args)
+            with lock:
+                fh.write(json.dumps(row) + '\n'); fh.flush()
+                print(task['id'], arm, rep, row['verified'], row['cost_usd'], row['num_turns'], flush=True)
+        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            list(pool.map(run, plan))
 
 if __name__ == '__main__':
     main()
