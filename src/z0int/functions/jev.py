@@ -261,3 +261,94 @@ def assess_claim(state: dict[str, str]) -> dict[str, Any]:
             "latency_ms": (time.monotonic()-started)*1000,
             "diagnostics": {**usage, "credential_source": credential_source(),
                             "usage_source": "provider_response"}}
+
+
+def decide_choice(state: object, *, instructions: str, options: dict[str, str]) -> dict[str, Any]:
+    """Experimental bounded Choice using the canonical jevkit client.
+
+    This helper does not decide whether a caller is authorized to use paid/remote
+    inference and does not write receipts. Those remain the caller/dispatch
+    authority's responsibility.
+    """
+    import math
+    import time
+
+    if not isinstance(instructions, str) or not instructions.strip():
+        raise ValueError("choice instructions are required")
+    if not isinstance(options, dict) or not 2 <= len(options) <= 16:
+        raise ValueError("choice options must contain 2..16 labels")
+    if any(
+        not isinstance(label, str) or not label.strip() or len(label) > 80
+        or not isinstance(description, str) or not description.strip()
+        for label, description in options.items()
+    ):
+        raise ValueError("choice labels/descriptions must be bounded nonempty strings")
+
+    key = ensure_credential()
+    if not key:
+        raise VerifierUnavailable("jev", "no credential resolvable")
+    try:
+        from jevkit import client as jev_client  # type: ignore
+    except Exception as exc:
+        raise VerifierUnavailable("jev", f"jevkit.client unavailable: {exc}") from exc
+
+    capture = _Capture()
+    started = time.monotonic()
+    try:
+        reply = jev_client.ask(
+            state,
+            {"decision": jev_client.choice(instructions, options)},
+            model=EXPECTED_JEV_MODEL,
+            api_key=key,
+            timeout=15,
+            retries=0,
+            transport=capture,
+        )
+    except Exception as exc:
+        code = getattr(exc, "code", type(exc).__name__)
+        detail = getattr(exc, "detail", "") or str(exc)
+        raise VerifierUnavailable("jev", f"{code}: {detail}") from exc
+
+    if capture.model != EXPECTED_JEV_MODEL:
+        raise VerifierUnavailable(
+            "jev",
+            f"served revision {capture.model!r} != validated {EXPECTED_JEV_MODEL!r}",
+        )
+
+    answer = (reply.get("answers") or {}).get("decision")
+    if not isinstance(answer, dict):
+        raise VerifierUnavailable("jev", "choice response missing decision answer")
+    choice = answer.get("choice")
+    probabilities = answer.get("probabilities")
+    if choice not in options or not isinstance(probabilities, dict) or set(probabilities) != set(options):
+        raise VerifierUnavailable("jev", "choice response labels do not match requested options")
+    parsed: dict[str, float] = {}
+    for label, value in probabilities.items():
+        if not isinstance(value, (int, float)) or not math.isfinite(float(value)) or not 0 <= float(value) <= 1:
+            raise VerifierUnavailable("jev", "choice probabilities must be finite in [0,1]")
+        parsed[label] = float(value)
+    total = math.fsum(parsed.values())
+    if abs(total - 1.0) > 1e-4:
+        raise VerifierUnavailable("jev", "choice probabilities must sum to 1")
+
+    confidence = answer.get("confidence")
+    if not isinstance(confidence, (int, float)) or not math.isfinite(float(confidence)) or not 0 <= float(confidence) <= 1:
+        confidence = max(parsed.values())
+
+    usage = reply.get("usage") or {}
+    clean_usage = {
+        key: int(usage[key])
+        for key in ("input_tokens", "output_tokens")
+        if isinstance(usage.get(key), int) and usage[key] >= 0
+    }
+    return {
+        "backend": "jev",
+        "model": capture.model,
+        "revision": capture.model,
+        "label": choice,
+        "probabilities": parsed,
+        "confidence": float(confidence),
+        "latency_ms": (time.monotonic() - started) * 1000,
+        "usage": clean_usage,
+        "credential_source": credential_source(),
+    }
