@@ -467,13 +467,13 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
             result, size = render()
             continue
 
-        # No excerpt can shrink further. Drop a redundant source only when every
-        # required need it covers remains covered by another retained source.
+        # No excerpt can shrink further. Source diversity is best-effort under
+        # the hard byte cap: keep the top three when they fit, but never violate
+        # the packet budget just to preserve an optional third source. A source
+        # may be dropped only when every required need it covers is still
+        # covered by another retained source.
         required_ids = {need.id for need in needs if need.required}
-        minimum_sources = min(3, len(deduped))
         drop_index = None
-        if len(refs) <= minimum_sources:
-            break
         for index in range(len(refs) - 1, -1, -1):
             ref = refs[index]
             covered = source_needs.get(ref.source_id, set()) & required_ids
