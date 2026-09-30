@@ -601,6 +601,15 @@ def build_parser() -> argparse.ArgumentParser:
     po.add_argument("--log", action="store_true", help="Append a snapshot to ~/.z0int/state/posture/history.jsonl")
     _json_flag(po)
 
+    pr = sub.add_parser("posture-replay", help="Replay posture policies over the snapshot history; run the pre-registered evaluation")
+    pr.add_argument("--history", default=None, help="history.jsonl (default ~/.z0int/state/posture/history.jsonl)")
+    pr.add_argument("--policy", action="append", default=None, help="v0-logged | v0 | v1 (repeatable; default all)")
+    pr.add_argument("--start", default=None, help="ISO start of day 1 (default: first snapshot)")
+    pr.add_argument("--transcripts", default=None, help="Claude Code projects dir (enables the counterfactual)")
+    pr.add_argument("--receipts", default=None, help="route receipts jsonl")
+    pr.add_argument("--decisions", action="store_true", help="Print per-snapshot decisions instead of the evaluation")
+    _json_flag(pr)
+
     pf = sub.add_parser("preflight", help="z0intelligence production preflight (no Evolution Lab)")
     pf.add_argument("prompt")
     pf.add_argument("--capability-id", default=None)
@@ -1066,6 +1075,18 @@ def main(argv: list[str] | None = None) -> int:
             )
             _print(out, as_json=as_json)
             return 0 if out.get("ok") else 1
+
+    if args.cmd == "posture-replay":
+        from .posture_sim import main as replay_main
+        argv2 = ["--json"] if as_json else []
+        for flag in ("history", "start", "transcripts", "receipts"):
+            if getattr(args, flag, None):
+                argv2 += [f"--{flag}", getattr(args, flag)]
+        for pol in getattr(args, "policy", None) or []:
+            argv2 += ["--policy", pol]
+        if getattr(args, "decisions", False):
+            argv2.append("--decisions")
+        return replay_main(argv2)
 
     if args.cmd == "posture":
         from .posture import main as posture_main

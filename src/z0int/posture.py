@@ -1,4 +1,10 @@
-"""Resource posture v0 — is a budget perishing, on pace, or running dry?
+"""Resource posture — is a budget perishing, on pace, or running dry?
+
+v1 (this module + ``z0int.posture_history``): the burn rate is a recent EWMA
+over the hourly snapshot log with the v0 window average as fallback; every
+rate carries an uncertainty band and a BURN/OFFLOAD verdict is asserted only
+when it holds across the band (see ``docs/resource-posture-v1.md``). The v0
+pre-registration in ``docs/resource-posture.md`` is unchanged.
 
 The factory is contextually blind about budgets without this: a frontier plan
 whose weekly window resets at 03:00 tonight with 80% unused should be *burned*
@@ -38,7 +44,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA = "z0int.resource_posture.v0"
+SCHEMA = "z0int.resource_posture.v1"
+LOG_SCHEMAS = ("z0int.resource_posture.v0.log", "z0int.resource_posture.v1.log")
 POSTURES = ("BURN", "BALANCED", "OFFLOAD", "RESERVE")
 KINDS = ("frontier", "fast", "local", "free", "paid")
 # Binding-constraint precedence when one group exposes several windows.
@@ -46,7 +53,7 @@ _GROUP_PRECEDENCE = {"OFFLOAD": 3, "RESERVE": 2, "BURN": 1, "BALANCED": 0}
 # Offload-target preference: fast hosted first, then local, then free catalog.
 _TARGET_ORDER = {"fast": 0, "local": 1, "free": 2}
 # Config keys that are settings, not pool overrides.
-_SETTINGS = {"posture_enforce", "thresholds", "pools", "sources", "aliases"}
+_SETTINGS = {"posture_enforce", "thresholds", "pools", "sources", "aliases", "rate"}
 # Friendly names a host config may use for a codexbar provider group.
 DEFAULT_ALIASES = {"claude-max": "claude", "claude-pro": "claude", "chatgpt-pro": "codex", "cursor-ultra": "cursor"}
 # codexbar providers and the pool kind they represent.
@@ -96,6 +103,10 @@ class Pool:
     observed_at: str | None = None
     source: str = "manual"
     note: str | None = None
+    rate_lo: float | None = None  # uncertainty band on burn_rate_per_hour (v1)
+    rate_hi: float | None = None
+    rate_window_avg: float | None = None  # the v0 single-snapshot rate, kept for comparison when EWMA wins
+    prev_posture: str | None = None  # this window's asserted posture at the previous snapshot (hysteresis)
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "Pool":
@@ -146,8 +157,34 @@ def _amt(x: float | None, unit: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _classify(remaining: float, rate: float, hours_left: float, cap: float | None,
+              th: Thresholds) -> tuple[str, str, float, float, float]:
+    """Perishable-pool verdict at one rate: (posture, reason, projected, surplus, ratio)."""
+    projected = rate * hours_left
+    surplus = remaining - projected
+    ratio = projected / remaining
+    surplus_frac = surplus / cap if cap else None
+    if ratio >= th.offload_ratio:
+        return "OFFLOAD", "runs_out_before_reset", projected, surplus, ratio
+    if ratio >= th.reserve_ratio:
+        return "RESERVE", "tight_until_reset", projected, surplus, ratio
+    if hours_left <= th.burn_horizon_hours and surplus_frac is not None and surplus_frac >= th.burn_min_surplus_frac:
+        return "BURN", "surplus_perishes_at_reset", projected, surplus, ratio
+    return "BALANCED", "on_pace", projected, surplus, ratio
+
+
 def evaluate_pool(pool: Pool, now: datetime, th: Thresholds = Thresholds()) -> dict[str, Any]:
-    """Posture for one pool, with every number that produced it."""
+    """Posture for one pool, with every number that produced it.
+
+    v1 band gating: when the pool carries a rate band (``rate_lo``/``rate_hi``), BURN is asserted only if it
+    also holds at ``rate_hi`` (surplus survives the fastest plausible burn) and OFFLOAD only if it also holds
+    at ``rate_lo`` (runs out even at the slowest plausible burn). A BURN the band cannot confirm degrades to
+    BALANCED; an OFFLOAD it cannot confirm degrades to RESERVE (possibly tight). Without a band, v0 rules.
+
+    Hysteresis: entering BURN/OFFLOAD needs the band; *staying* in it (``prev_posture`` equal to the central
+    verdict for the same window) needs only the central estimate, so a rate jittering at a threshold edge
+    does not flip the posture every hour.
+    """
     reset = parse_time(pool.resets_at)
     hours_left = (reset - now).total_seconds() / 3600 if reset else None
     observed = parse_time(pool.observed_at)
@@ -157,9 +194,10 @@ def evaluate_pool(pool: Pool, now: datetime, th: Thresholds = Thresholds()) -> d
         "id": pool.id, "kind": pool.kind, "group": pool.group or pool.id, "unit": pool.unit, "source": pool.source,
         "capacity": pool.capacity, "remaining": _r(pool.remaining), "resets_at": pool.resets_at,
         "window_hours": pool.window_hours, "hours_until_reset": _r(hours_left), "burn_rate_per_hour": _r(rate, 4),
+        "rate_lo": _r(pool.rate_lo, 4), "rate_hi": _r(pool.rate_hi, 4), "rate_window_avg": _r(pool.rate_window_avg, 4),
         "rate_observed_hours": _r(pool.rate_observed_hours), "rate_source": pool.rate_source,
         "observation_age_hours": _r(age_h), "projected_use_until_reset": None, "projected_surplus_at_reset": None,
-        "ratio": None, "runway_hours": None, "confidence": "ok",
+        "projected_surplus_band": None, "ratio": None, "runway_hours": None, "confidence": "ok",
     }
     if pool.note:
         out["note"] = pool.note
@@ -190,6 +228,7 @@ def evaluate_pool(pool: Pool, now: datetime, th: Thresholds = Thresholds()) -> d
     if stale:
         out["confidence"] = "stale"
 
+    band_why = None
     if reset is None:  # non-perishable (credits): runway, not expiry, is what matters
         runway = out["runway_hours"]
         arithmetic = (f"non-perishable: remaining {_amt(pool.remaining, unit)} / rate {rate:.3g}/h = runway "
@@ -199,28 +238,35 @@ def evaluate_pool(pool: Pool, now: datetime, th: Thresholds = Thresholds()) -> d
         else:
             posture, reason = "BALANCED", "nonperishable"
     else:
-        projected = rate * hours_left
-        surplus = pool.remaining - projected
-        ratio = projected / pool.remaining
+        cap = pool.capacity or (100.0 if unit == "percent" else None)
+        posture, reason, projected, surplus, ratio = _classify(pool.remaining, rate, hours_left, cap, th)
         out.update(projected_use_until_reset=_r(projected), projected_surplus_at_reset=_r(surplus), ratio=_r(ratio, 3))
         arithmetic = (f"projected {rate:.3g}/h x {_hours(hours_left)} = {_amt(projected, unit)} vs remaining "
                       f"{_amt(pool.remaining, unit)} (ratio {ratio:.2f})")
-        cap = pool.capacity or (100.0 if unit == "percent" else None)
-        surplus_frac = surplus / cap if cap else None
-        if ratio >= th.offload_ratio:
-            posture, reason = "OFFLOAD", "runs_out_before_reset"
+        if pool.rate_lo is not None and pool.rate_hi is not None:
+            s_hi = pool.remaining - pool.rate_lo * hours_left  # slow burn -> most surplus
+            s_lo = pool.remaining - pool.rate_hi * hours_left
+            out["projected_surplus_band"] = [_r(s_lo), _r(s_hi)]
+            arithmetic += f" [rate band {pool.rate_lo:.3g}-{pool.rate_hi:.3g}/h -> surplus {_amt(s_lo, unit)}..{_amt(s_hi, unit)}]"
+            if posture == "BURN" and _classify(pool.remaining, pool.rate_hi, hours_left, cap, th)[0] != "BURN":
+                band_why, degraded = "BURN fails at the band's high rate", "BALANCED"
+            elif posture == "OFFLOAD" and _classify(pool.remaining, pool.rate_lo, hours_left, cap, th)[0] != "OFFLOAD":
+                band_why, degraded = "OFFLOAD fails at the band's low rate", "RESERVE"
+        if posture == "OFFLOAD":
             arithmetic += f"; runs out in {_hours(out['runway_hours'])}, {_hours(hours_left - out['runway_hours'])} before reset"
-        elif ratio >= th.reserve_ratio:
-            posture, reason = "RESERVE", "tight_until_reset"
-        elif hours_left <= th.burn_horizon_hours and surplus_frac is not None and surplus_frac >= th.burn_min_surplus_frac:
-            posture, reason = "BURN", "surplus_perishes_at_reset"
+        elif posture == "BURN":
             arithmetic += f"; {_amt(surplus, unit)} perishes at reset in {_hours(hours_left)}"
-        else:
-            posture, reason = "BALANCED", "on_pace"
     if (low_conf or stale) and posture in ("BURN", "OFFLOAD"):
         out["unconfirmed_posture"] = posture
         why = "rate observed < %.1fh" % th.min_observation_hours if low_conf else "observation older than %.0fh" % th.max_observation_age_hours
         return done("BALANCED", arithmetic + f"; {posture} not asserted ({why})", reason + "_unconfirmed")
+    if band_why and pool.prev_posture == posture:
+        out["confidence"] = "band_held"
+        return done(posture, arithmetic + f"; held from previous snapshot ({band_why})", reason + "_held")
+    if band_why:
+        out["unconfirmed_posture"] = posture
+        out["confidence"] = "band"
+        return done(degraded, arithmetic + f"; {posture} not asserted ({band_why})", reason + "_band_unconfirmed")
     return done(posture, arithmetic, reason)
 
 
@@ -531,12 +577,32 @@ def collect_pools(now: datetime, *, config: dict[str, Any] | None = None, codexb
 
 
 def current_posture(now: datetime | None = None, *, config: dict[str, Any] | None = None,
-                    codexbar: Path | None = None, kerdoios: bool = True) -> dict[str, Any]:
+                    codexbar: Path | None = None, kerdoios: bool = True,
+                    history: list[dict[str, Any]] | Path | None = None) -> dict[str, Any]:
+    """Live posture. ``history``: snapshot rows, a history.jsonl path, or None for the default log."""
+    from .posture_history import RateConfig, apply_recent_rates, load_history, previous_postures
+
     now = now or datetime.now(timezone.utc)
     cfg = load_config() if config is None else config
     pools, sources = collect_pools(now, config=cfg, codexbar=codexbar, kerdoios=kerdoios)
-    return evaluate(pools, now, Thresholds.from_dict(cfg.get("thresholds")),
-                    enforce=cfg.get("posture_enforce") is True, sources=sources)
+    rate_cfg = RateConfig.from_dict(cfg.get("rate"))
+    rows: list[dict[str, Any]] = []
+    if rate_cfg.method == "ewma":
+        from datetime import timedelta
+        since = now - timedelta(hours=rate_cfg.lookback_hours)
+        if isinstance(history, list):
+            rows = [r for r in history if (t := parse_time(r.get("now"))) is not None and since <= t <= now]
+        else:
+            rows = load_history(history, since=since, until=now)
+    notes = apply_recent_rates(pools, rows, now, rate_cfg)
+    if rate_cfg.band and rows:
+        previous_postures(pools, rows[-1], rate_cfg)
+    sources.append({"source": "posture_history", "status": f"{rate_cfg.method}: {len(rows)} snapshot(s)",
+                    "rates": notes})
+    out = evaluate(pools, now, Thresholds.from_dict(cfg.get("thresholds")),
+                   enforce=cfg.get("posture_enforce") is True, sources=sources)
+    out["rate"] = rate_cfg.as_dict()
+    return out
 
 
 def shadow_annotation(route_kind: str = "offload") -> dict[str, Any]:
@@ -552,6 +618,49 @@ def shadow_annotation(route_kind: str = "offload") -> dict[str, Any]:
     return {"schema": SCHEMA, "available": True, "factory_posture": fac["posture"], "prefer": fac["prefer"],
             "avoid": fac["avoid"], "revision": p["revision"], "route_kind": route_kind, "agrees": agrees,
             "enforce": p["enforce"], "action": fac["action"][:240]}
+
+
+# ---------------------------------------------------------------------------
+# Claude Code hint (one line, emitted by the hook adapter only when the key changes)
+# ---------------------------------------------------------------------------
+
+
+def hint_key(p: dict[str, Any]) -> str:
+    """What a hint is about: factory verdict + frontier group verdicts. Numbers never change it."""
+    groups = ",".join(f"{g}={v['posture']}" for g, v in p["groups"].items() if v["kind"] == "frontier")
+    return f"{p['factory']['posture']}|{groups}"
+
+
+def hint_line(p: dict[str, Any], previous_key: str | None = None) -> str:
+    """One line for Claude Code's context. Bounded (~300 chars), no identities, advisory wording."""
+    fac = p["factory"]
+    rows = {r["id"]: r for r in p["pools"]}
+
+    def pool_bit(group: str) -> str:
+        g = p["groups"].get(group) or {}
+        r = rows.get(g.get("binding_pool")) or {}
+        label = r.get("id", group)
+        if r.get("posture") == "OFFLOAD" and (r.get("remaining") or 0) <= 0:
+            return f"{label} exhausted"
+        if r.get("projected_surplus_at_reset") is not None and r.get("hours_until_reset") is not None:
+            return (f"{label} ~{max(0.0, r['projected_surplus_at_reset']):.0f}% projected unused at reset in "
+                    f"{_hours(r['hours_until_reset'])}")
+        return label
+
+    posture = fac["posture"]
+    if posture == "BURN":
+        body = ("BURN: " + "; ".join(pool_bit(g) for g in fac["prefer"][:2])
+                + ". Frontier quota perishes at reset: do bounded work directly rather than offloading it.")
+    elif posture == "OFFLOAD":
+        targets = ", ".join(t.removeprefix("route:") for t in fac.get("offload_targets", [])[:3])
+        body = ("OFFLOAD: " + "; ".join(pool_bit(g) for g in fac.get("avoid", [])[:2])
+                + ". Frontier over pace: send bounded/cheap subtasks to route_worker"
+                + (f" ($0 routes: {targets})" if targets else "") + ".")
+    elif posture == "RESERVE":
+        body = "RESERVE: frontier tight and no offload target observed; keep turns lean."
+    else:
+        body = "BALANCED: frontier on pace" + (f" (was {previous_key.split('|', 1)[0]})" if previous_key else "") + "."
+    return f"[z0 resource posture] {body}"[:320]
 
 
 # ---------------------------------------------------------------------------
@@ -606,8 +715,10 @@ def log_snapshot(p: dict[str, Any], path: Path | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     row = {"schema": SCHEMA + ".log", "now": p["now"], "revision": p["revision"], "factory": p["factory"]["posture"],
            "groups": {g: v["posture"] for g, v in p["groups"].items()},
-           "pools": [{k: r.get(k) for k in ("id", "kind", "posture", "remaining", "resets_at", "window_hours",
-                                            "burn_rate_per_hour", "projected_surplus_at_reset", "confidence")}
+           "pools": [{k: r.get(k) for k in ("id", "kind", "group", "posture", "remaining", "resets_at", "window_hours",
+                                            "burn_rate_per_hour", "rate_lo", "rate_hi", "rate_window_avg",
+                                            "rate_source", "projected_surplus_at_reset", "confidence",
+                                            "unconfirmed_posture")}
                      for r in p["pools"] if r["remaining"] is not None]}
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(row, sort_keys=True) + "\n")
