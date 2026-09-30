@@ -40,7 +40,7 @@ from . import paths
 from .context_resolve import ContextPacket, EvidenceRef, InformationNeed
 
 SCHEMA = "z0int.state_packet.v0"
-POLICY_REVISION = "sp-v0.1"
+POLICY_REVISION = "sp-v0.2"
 
 INTENTS: dict[str, tuple[str, ...]] = {
     # intent -> facts required before any ACT transition is legal
@@ -170,6 +170,8 @@ class EvidenceBundle:
     unknowns: list[dict[str, Any]] = field(default_factory=list)
     superseded: list[dict[str, Any]] = field(default_factory=list)
     open_work: list[dict[str, Any]] = field(default_factory=list)
+    # candidate "what is the priority / critical path" declarations; reducer reconciles
+    priority_decls: list[dict[str, Any]] = field(default_factory=list)
     coverage: str = "full"  # full | partial | none
     source_revision: Any = None
     reads: int = 0
@@ -323,7 +325,12 @@ def adapter_git(repo: Path, reader: Reader) -> EvidenceBundle:
                 row["behind_default"] = int(ab[1])
         branches.append(row)
     ahead = [r for r in branches if r.get("ahead_of_default", 0) > 0]
-    ahead_claim = b.claim("git.branches_ahead", ahead[:MAX_LIST], ref(f"{repo}:git for-each-ref refs/heads"))
+    ahead_claim = b.claim(
+        "git.branches_ahead",
+        {"vs": default or None, "complete": True, "local_branches": len(branches),
+         "ahead": [{k: r[k] for k in ("branch", "ahead_of_default", "worktree") if k in r} for r in ahead[:MAX_LIST]]},
+        ref(f"{repo}:git for-each-ref refs/heads"),
+    )
     wts = [r for r in branches if r.get("worktree") not in (None, ".")]
     if wts:
         b.claim("git.worktrees", [{k: r[k] for k in ("branch", "worktree", "sha") if k in r} for r in wts][:MAX_LIST],
@@ -412,6 +419,16 @@ def adapter_docs(repo: Path, reader: Reader) -> EvidenceBundle:
         lines = text.splitlines()
         if d.name in last_touch:
             b.claim(f"docs.last_commit[{d.name}]", last_touch[d.name], ref(1), material=False)
+        # every heading that declares a P0 / critical path is a candidate priority claim
+        heading_i, heading = 0, ""
+        for i, line in enumerate(lines):
+            hm = re.match(r"^#{1,4}\s+(.*)$", line)
+            if hm:
+                heading_i, heading = i, hm.group(1).strip()
+                if re.search(r"\bP0\b|critical path", heading, re.I):
+                    b.priority_decls.append({"value": heading[:120], "evidence": [b.ev(ref(i + 1))], "source": d.name})
+            elif heading and re.match(r"^\**Priority:?\**:?\s*critical path", line.strip(), re.I):
+                b.priority_decls.append({"value": heading[:120], "evidence": [b.ev(ref(heading_i + 1))], "source": d.name})
         # priority: first P0 heading (ROADMAP first, else any doc)
         if not priority_set and d.name in ("ROADMAP.md", "README.md", "AGENTS.md"):
             for i, line in enumerate(lines):
@@ -470,6 +487,96 @@ def adapter_docs(repo: Path, reader: Reader) -> EvidenceBundle:
     b.source_revision = revs
     b.reads, b.bytes_read = reader.reads, reader.bytes
     return b
+
+
+# ---------------------------------------------------------------------------
+# GitHub adapter (opt-in: network; read-only `gh` queries)
+# ---------------------------------------------------------------------------
+
+_P0_LINE = re.compile(r"\*\*(P0\b[^*]{0,160})\*\*")
+
+
+def _gh_slug(repo: Path, reader: Reader) -> str | None:
+    url = (reader.git(repo, "remote", "get-url", "origin") or "").strip()
+    m = re.search(r"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?$", url)
+    return f"{m.group(1)}/{m.group(2)}" if m else None
+
+
+def adapter_github(repo: Path, reader: Reader, *, timeout: float = 15.0) -> EvidenceBundle:
+    """Open issues that *declare* a P0 (bold ``**P0 …**`` line) + open PRs. Public repo metadata only."""
+    b = EvidenceBundle(facet="github")
+    slug = _gh_slug(repo, reader)
+    if not slug:
+        b.coverage = "none"
+        b.unknowns.append({"key": "gh.repo", "reason": "origin is not a GitHub remote"})
+        return b
+    now = _now_iso()
+
+    def gh(*args: str) -> Any:
+        try:
+            proc = subprocess.run(["gh", *args, "-R", slug], capture_output=True, text=True, timeout=timeout, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        reader.reads += 1
+        reader.bytes += len(proc.stdout)
+        if proc.returncode != 0:
+            return None
+        try:
+            return json.loads(proc.stdout)
+        except ValueError:
+            return None
+
+    issues = gh("issue", "list", "--state", "open", "--limit", "40", "--json", "number,title,updatedAt,body")
+    prs = gh("pr", "list", "--state", "open", "--limit", "20", "--json", "number,title,headRefName,isDraft,updatedAt")
+    if issues is None and prs is None:
+        b.coverage = "none"
+        b.unknowns.append({"key": "gh.issues", "reason": f"gh unavailable/unauthenticated for {slug}"})
+        return b
+    revs = {}
+    for it in issues or []:
+        revs[f"#{it['number']}"] = it.get("updatedAt", "")
+        m = _P0_LINE.search(it.get("body") or "")
+        if not m:
+            continue
+        ref = EvidenceRef(source_id=f"github:{slug}#{it['number']}", source_version=it.get("updatedAt", ""),
+                          locator=f"https://github.com/{slug}/issues/{it['number']}", trust_class="authoritative_task",
+                          observed_at=now)
+        decl = redact(m.group(1).strip(), 120)
+        c = b.claim(f"gh.priority[#{it['number']}]", {"declares": decl, "issue_title": redact(it["title"], 90),
+                                                       "updated": it.get("updatedAt")}, ref)
+        b.priority_decls.append({"value": decl, "evidence": c.evidence, "source": f"github#{it['number']}"})
+    for pr in (prs or [])[:MAX_LIST]:
+        revs[f"pr{pr['number']}"] = pr.get("updatedAt", "")
+        ref = EvidenceRef(source_id=f"github:{slug}#pr{pr['number']}", source_version=pr.get("updatedAt", ""),
+                          locator=f"https://github.com/{slug}/pull/{pr['number']}", trust_class="authoritative_task",
+                          observed_at=now)
+        b.open_work.append({"kind": "open_pr", "what": f"PR #{pr['number']} {redact(pr['title'], 70)} "
+                            f"({pr.get('headRefName')}{', draft' if pr.get('isDraft') else ''})",
+                            "evidence": [b.ev(ref)]})
+    b.source_revision = {"slug": slug, "items": _sha(json.dumps(revs, sort_keys=True), 12)}
+    return b
+
+
+def _gh_revision(repo: Path, reader: Reader, timeout: float = 15.0) -> dict[str, str] | None:
+    """Cheap probe: open issue/PR numbers + updatedAt (no bodies)."""
+    slug = _gh_slug(repo, reader)
+    if not slug:
+        return None
+    items: dict[str, str] = {}
+    for kind, limit in (("issue", "40"), ("pr", "20")):
+        try:
+            proc = subprocess.run(["gh", kind, "list", "--state", "open", "--limit", limit, "--json", "number,updatedAt",
+                                   "-R", slug], capture_output=True, text=True, timeout=timeout, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            return {"slug": slug, "items": "unavailable"}
+        reader.reads += 1
+        reader.bytes += len(proc.stdout)
+        try:
+            for it in json.loads(proc.stdout or "[]"):
+                items[f"{kind}{it['number']}"] = it.get("updatedAt", "")
+        except ValueError:
+            return {"slug": slug, "items": "unavailable"}
+    return {"slug": slug, "items": _sha(json.dumps(items, sort_keys=True), 12)}
 
 
 # ---------------------------------------------------------------------------
@@ -708,6 +815,13 @@ def adapter_claude_code(repo: Path, reader: Reader, projects_root: Path | None =
         for v in list(pending.values())[:MAX_LIST]:
             e = b.ev(ref(v.get("line")))
             b.open_work.append({"kind": "delegation_pending", "what": f"[{short}] {v['what']}", "evidence": [e]})
+    # complete index of sessions that worked here (lets a consumer abstain on absence)
+    index = [{"session": str(s.get("session_id") or f.stem)[:8] + ("/sub:" + f.stem[-8:] if s.get("is_subagent") else ""),
+              "cwd": s.get("cwd"), "last_ts": (s.get("last_ts") or "")[:16]} for f, s in sessions[:20]]
+    b.claim("conv.sessions_here", {"complete": len(sessions) <= 20, "count": len(sessions),
+                                   "transcripts_scanned": len(files), "sessions": index},
+            EvidenceRef(source_id="claude-code:index", source_version=f"files={len(files)}",
+                        locator=str(root), trust_class="conversation", observed_at=_now_iso()), material=False)
     if top_level:
         f, s = top_level[0]
         b.claim("conv.latest_session", str(s.get("session_id") or f.stem)[:8],
@@ -812,6 +926,21 @@ def reduce_bundles(
         unknowns.extend(b.unknowns)
         open_work.extend(b.open_work)
 
+    # priority declarations from docs / GitHub: more than one distinct declaration is an
+    # explicit contradiction (never silently resolved by picking the first heading)
+    decls: list[dict[str, Any]] = []
+    for b in bundles:
+        for d in b.priority_decls:
+            if all(d["value"].lower() != x["value"].lower() for x in decls):
+                decls.append(d)
+    if len(decls) > 1:
+        contradictions.insert(0, {
+            "key": "priority",
+            "kind": "priority_conflict",
+            "contests": "docs.priority",
+            "claims": [{"value": f"{d['value']} ({d['source']})", "evidence": d["evidence"]} for d in decls[:6]],
+        })
+
     # cross-source temporal supersession: a conversation's branch observation vs git now
     git_branch = claims.get("git.branch")
     if git_branch:
@@ -831,11 +960,13 @@ def reduce_bundles(
                 })
 
     # packet-history supersession: claim values that changed since the prior packet
-    if prior:
+    if prior and prior.get("policy_revision") == POLICY_REVISION:  # different policy => not comparable
         for k, old in (prior.get("claims_index") or {}).items():
             new = claims.get(k)
             if new is None or old.get("id") == new["id"] or not old.get("material"):
                 continue
+            if k.startswith("conv."):
+                continue  # conversation facts are already histories; their growth is not supersession
             superseded.append({
                 "key": k,
                 "old_value": old.get("value"),
@@ -860,8 +991,9 @@ def reduce_bundles(
             reason = next((u["reason"] for u in unknowns if u["key"] == k), "no source produced this fact")
             blocking.append({"key": k, "reason": reason, "required_by": intent})
     for c in contradictions:
-        if c["key"] in required:
-            blocking.append({"key": c["key"], "reason": "contradictory evidence", "required_by": intent})
+        contested = c.get("contests") or c["key"]
+        if contested in required:
+            blocking.append({"key": contested, "reason": f"contradictory evidence ({c['kind']})", "required_by": intent})
     non_blocking = [u for u in unknowns if u["key"] not in {x["key"] for x in blocking}]
 
     transitions = _transitions(claims, blocking, contradictions, non_blocking)
@@ -889,9 +1021,12 @@ def reduce_bundles(
 # ---------------------------------------------------------------------------
 
 
-def source_revisions(repo: Path, projects_root: Path | None = None, reader: Reader | None = None) -> dict[str, Any]:
-    """Cheap revision probe (3 git calls + stats) used for invalidation."""
+def source_revisions(repo: Path, projects_root: Path | None = None, reader: Reader | None = None,
+                     *, github: bool = False) -> dict[str, Any]:
+    """Cheap revision probe used for invalidation: 3 git calls, doc hashes, incremental transcript scan
+    (+ 2 metadata-only ``gh`` calls when the GitHub adapter is enabled)."""
     r = reader or Reader()
+    out_gh = {"github": _gh_revision(repo, r)} if github else {}
     git = _git_revision(repo, r)
     docs = {}
     for d in _doc_files(repo):
@@ -903,7 +1038,7 @@ def source_revisions(repo: Path, projects_root: Path | None = None, reader: Read
             continue
         docs[d.name] = "sha256:" + hashlib.sha256(data).hexdigest()[:12]
     _, sessions = scan_transcripts(repo, projects_root or default_projects_root(), r)
-    return {"git": git, "docs": docs, "claude_code": conversation_revision(sessions)}
+    return {"git": git, "docs": docs, "claude_code": conversation_revision(sessions), **out_gh}
 
 
 def build_state_packet(
@@ -915,14 +1050,22 @@ def build_state_packet(
     use_cache: bool = True,
     store: bool = True,
     adapters: tuple[str, ...] = ("git", "docs", "claude_code"),
+    github: bool | None = None,
 ) -> dict[str, Any]:
-    """Build (or reuse) the State Packet for ``repo``. Read-only against sources."""
+    """Build (or reuse) the State Packet for ``repo``. Read-only against sources.
+
+    ``github`` (default: env ``Z0INT_PACKET_GH=1``) adds the network ``gh`` adapter.
+    """
     t0 = time.perf_counter()
     root = repo_root(repo) or Path(repo).expanduser().resolve()
     proj = Path(projects_root).expanduser() if projects_root else default_projects_root()
     required = tuple(require) if require else INTENTS.get(intent, INTENTS["resume"])
+    if github is None:
+        github = os.environ.get("Z0INT_PACKET_GH") == "1"
+    if github and "github" not in adapters:
+        adapters = (*adapters, "github")
     probe = Reader()
-    revisions = source_revisions(root, proj, probe)
+    revisions = source_revisions(root, proj, probe, github=bool(github))
     key = _cache_key(intent, required, root, revisions)
     prior = _load_prior(root) if (use_cache or store) else None
     if use_cache and prior and prior.get("packet_id") == key:
@@ -938,6 +1081,7 @@ def build_state_packet(
         "git": lambda rd: adapter_git(root, rd),
         "docs": lambda rd: adapter_docs(root, rd),
         "claude_code": lambda rd: adapter_claude_code(root, rd, proj),
+        "github": lambda rd: adapter_github(root, rd),
     }
 
     def run(name: str) -> EvidenceBundle:
@@ -1006,9 +1150,9 @@ def check_packet(packet: dict[str, Any], projects_root: str | Path | None = None
     """Is the packet still current? Compares stored vs live source revisions."""
     root = Path(packet["scope"]["repo"])
     proj = Path(projects_root).expanduser() if projects_root else default_projects_root()
-    live = source_revisions(root, proj)
     old = packet.get("source_revisions") or {}
-    changed = [k for k in ("git", "docs", "claude_code") if (old.get(k) or {}) != (live.get(k) or {})]
+    live = source_revisions(root, proj, github="github" in old)
+    changed = [k for k in ("git", "docs", "claude_code", "github") if (old.get(k) or {}) != (live.get(k) or {})]
     return {"valid": not changed, "changed_sources": changed, "packet_id": packet.get("packet_id")}
 
 
@@ -1076,8 +1220,18 @@ def _fmt_value(key: str, v: Any) -> str:
         return "; ".join(parts)
     if key == "git.upstream" and isinstance(v, dict):
         return f"{v.get('name')} ahead {v.get('ahead')} behind {v.get('behind')}"
-    if key == "git.branches_ahead" and isinstance(v, list):
-        return ", ".join(f"{r['branch']}(+{r.get('ahead_of_default')})" for r in v) or "none"
+    if key == "git.branches_ahead" and isinstance(v, dict):
+        rows = [f"{r['branch']}(+{r.get('ahead_of_default')}"
+                + (f", worktree {r['worktree']})" if r.get("worktree") else ")") for r in v.get("ahead", [])]
+        n_other = int(v.get("local_branches", 0)) - len(rows)
+        return (f"vs {v.get('vs')}: " + (", ".join(rows) or "none")
+                + f"; the other {n_other} local branch(es) are 0 ahead (complete list)")
+    if key == "conv.sessions_here" and isinstance(v, dict):
+        rows = [f"{r['session']}(cwd {r.get('cwd')}, last {r.get('last_ts')})" for r in v.get("sessions", [])[:8]]
+        return (f"{v.get('count')} session(s) worked in this repo ({'complete' if v.get('complete') else 'truncated'};"
+                f" {v.get('transcripts_scanned')} transcripts scanned): " + "; ".join(rows))
+    if key.startswith("gh.priority[") and isinstance(v, dict):
+        return f"\"{v.get('declares')}\" (issue: {v.get('issue_title')}, updated {str(v.get('updated'))[:10]})"
     if key == "git.worktrees" and isinstance(v, list):
         return ", ".join(f"{r['branch']}@{r.get('worktree')}" for r in v)
     if key == "git.recent_commits" and isinstance(v, list):
@@ -1117,7 +1271,8 @@ def _ptr(packet: dict[str, Any], eids: list[str]) -> str:
 
 
 _RENDER_ORDER = ("git.branch", "git.head", "git.dirty", "git.upstream", "git.default_branch", "git.branches_ahead",
-                 "git.worktrees", "conv.latest_session", "docs.priority", "git.stash_count", "git.recent_commits")
+                 "git.worktrees", "git.remote_refs_age_hours", "conv.latest_session", "conv.sessions_here",
+                 "docs.priority", "git.stash_count", "git.recent_commits")
 
 
 def render_additional_context(packet: dict[str, Any], *, max_tokens: int = 1500) -> str:
@@ -1127,35 +1282,42 @@ def render_additional_context(packet: dict[str, Any], *, max_tokens: int = 1500)
     head = (packet.get("source_revisions") or {}).get("git") or {}
     lines = [
         f"<z0-state-packet repo={name} id={packet['packet_id'][:12]} built={packet['built_at']} head={str(head.get('head', ''))[:10]}>",
-        "Derived from local git + repo docs + Claude Code transcripts. Facts carry [source@revision]; "
-        "memory is evidence, not truth. Packet is stale once any source revision changes.",
+        "Derived at session start from " + ", ".join(sorted((packet.get("coverage") or {}).keys()))
+        + ". Facts carry [source@revision]; memory is evidence, not truth. Listed branches, worktrees and"
+        " Claude Code sessions are complete as of build; re-read a source only for facts not listed here."
+        " Packet is stale once any source revision changes.",
         f"DECISION: {dec['mode']} — {dec['reason']}",
         "NOW:",
     ]
     claims = {c["key"]: c for c in packet.get("current_claims", [])}
     keys = [k for k in _RENDER_ORDER if k in claims]
-    keys += sorted(k for k in claims if k.startswith("conv.session["))
+    keys += sorted(k for k in claims if k.startswith("gh.priority["))
+    latest = claims.get("conv.latest_session", {}).get("value")
+    keys += [k for k in claims if k.startswith("conv.session[") and latest and k == f"conv.session[{latest}]"]
     for k in keys:
         c = claims[k]
         lines.append(f"- {k}: {_fmt_value(k, c['value'])} [{_ptr(packet, c['evidence'])}]")
+    # sections in decision-priority order; lower sections are dropped first under the budget
     sections: list[tuple[str, list[str]]] = []
-    sup = packet.get("superseded_claims") or []
-    sections.append(("SUPERSEDED (history, not current):", [
-        f"- {s['key']} was {json.dumps(s['old_value'], default=str)[:70]} (as of {str(s.get('old_observed_at') or '')[:16]})"
-        f" -> now {json.dumps(s['current_value'], default=str)[:50]}" for s in sup[:5]]))
+    sections.append(("BLOCKING UNKNOWNS (OBSERVE before acting):", [
+        f"- {u['key']}: {u['reason']}" for u in packet.get("blocking_unknowns") or []]))
     sections.append(("CONTRADICTIONS (unresolved; do not pick a winner silently):", [
         f"- {c['kind']} {c['key']}: " + " vs ".join(f"{x['value']} [{_ptr(packet, x['evidence'])}]" for x in c["claims"])
         for c in (packet.get("contradictions") or [])[:5]]))
-    sections.append(("BLOCKING UNKNOWNS (OBSERVE before acting):", [
-        f"- {u['key']}: {u['reason']}" for u in packet.get("blocking_unknowns") or []]))
-    sections.append(("OTHER UNKNOWNS:", [f"- {u['key']}: {u['reason']}" for u in (packet.get("unknowns") or [])[:4]]))
-    sections.append(("OPEN WORK:", [
-        f"- {w['kind']}: {w['what']} [{_ptr(packet, w.get('evidence') or [])}]" for w in (packet.get("open_work") or [])[:10]]))
     sections.append(("LEGAL NEXT TRANSITIONS (candidates, none pre-authorized):", [
         f"- {t['kind']} {t['action']}: {t['why']}" + (f" (blocked by {','.join(t['blocked_by'])})" if t.get("blocked_by") else "")
         for t in packet.get("allowed_transitions") or []]))
+    sections.append(("OPEN WORK:", [
+        f"- {w['kind']}: {w['what']} [{_ptr(packet, w.get('evidence') or [])}]" for w in (packet.get("open_work") or [])[:8]]))
+    sup = packet.get("superseded_claims") or []
+    sections.append(("SUPERSEDED (history, not current):", [
+        f"- {s['key']} was {_fmt_value(s['key'], s['old_value'])[:90]} (as of {str(s.get('old_observed_at') or '')[:16]})"
+        f" -> now {_fmt_value(s['key'], s['current_value'])[:60]}" for s in sup[:4]]))
+    sections.append(("OTHER UNKNOWNS:", [f"- {u['key']}: {u['reason']}" for u in (packet.get("unknowns") or [])[:4]]))
     recent = [f"- {k}: {_fmt_value(k, claims[k]['value'])}" for k in claims if k.startswith("conv.last_prompt[")][:2]
     sections.append(("LAST USER ASKS (redacted excerpts):", recent))
+    sessions = [k for k in claims if k.startswith("conv.session[") and k not in keys]
+    sections.append(("OTHER SESSIONS HERE:", [f"- {k}: {_fmt_value(k, claims[k]['value'])}" for k in sessions[:3]]))
     footer = f"Refresh/verify: z0int context packet --repo {packet['scope']['repo']} --check\n</z0-state-packet>"
     budget = int(max_tokens * 3.5)
     text = "\n".join(lines)

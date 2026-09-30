@@ -49,7 +49,8 @@ HISTORY_HINT = ("Local Claude Code conversation history (JSONL transcripts) live
 
 
 def hook_settings(z0home: Path) -> str:
-    cmd = f"env Z0INT_HOME={z0home} {PY} -m z0int.state_packet --hook --max-tokens 1500"
+    gh = " Z0INT_PACKET_GH=1" if os.environ.get("Z0INT_PACKET_GH") == "1" else ""
+    cmd = f"env Z0INT_HOME={z0home}{gh} {PY} -m z0int.state_packet --hook --max-tokens 1500"
     return json.dumps({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": cmd, "timeout": 60}]}]}})
 
 
@@ -109,19 +110,26 @@ def run_claude(q: dict, arm: str, args: argparse.Namespace, contract: str, z0hom
         "tool_result_bytes": tool_result_bytes,
         "hook_event_bytes": hook_ctx_bytes,
         "stderr_tail": proc.stderr[-400:] if proc.returncode else "",
+        "result_subtype": result.get("subtype"),
+        "is_error": result.get("is_error"),
     }
 
 
 def parse_answer(text: str | None) -> dict | None:
+    """First JSON object in the reply that has an ``action`` key (tolerates fences/prose)."""
     if not text:
         return None
-    m = re.search(r"\{.*\}", text, re.S)
-    if not m:
-        return None
-    try:
-        return json.loads(m.group(0))
-    except ValueError:
-        return None
+    dec = json.JSONDecoder()
+    for i, ch in enumerate(text):
+        if ch != "{":
+            continue
+        try:
+            obj, _ = dec.raw_decode(text[i:])
+        except ValueError:
+            continue
+        if isinstance(obj, dict) and "action" in obj:
+            return obj
+    return None
 
 
 def _flat(v) -> str:
@@ -217,7 +225,10 @@ def main() -> None:
     ap.add_argument("--timeout", type=int, default=600)
     ap.add_argument("--jobs", type=int, default=3)
     ap.add_argument("--summarize", default=None)
+    ap.add_argument("--gh", action="store_true", help="enable the network GitHub adapter in the packet")
     args = ap.parse_args()
+    if args.gh:
+        os.environ["Z0INT_PACKET_GH"] = "1"
     if args.summarize:
         summarize(Path(args.summarize).expanduser())
         return
@@ -238,6 +249,7 @@ def main() -> None:
     lock = threading.Lock()
     with out.open("x") as fh:
         fh.write(json.dumps({"type": "meta", "run_id": run_id, "z0int_revision": rev, "model": args.model,
+                             "github_adapter": bool(args.gh),
                              "effort": args.effort, "oracle_before": before, "packet_stats": stats,
                              "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}) + "\n")
 
@@ -272,6 +284,8 @@ def main() -> None:
                 + (u.get("cache_creation_input_tokens") or 0),
                 "output_tokens": u.get("output_tokens"), "cost_usd": r["cost_usd"], "num_turns": r["num_turns"],
                 "hook_seen": r["hook_event_bytes"] > 0, "returncode": r["returncode"], "stderr_tail": r["stderr_tail"],
+                "result_subtype": r["result_subtype"], "is_error": r["is_error"],
+                "result_text": (r["result_text"] or "")[:3000],
             }
             with lock:
                 fh.write(json.dumps(row) + "\n")
@@ -303,12 +317,24 @@ def summarize(path: Path) -> None:
               f"{sum(t['answer_supported'] for t in ab):>4}/{len(ab):<3} {med('raw_source_reads'):>7.0f} "
               f"{med('agent_tool_calls'):>6.0f} {med('context_bytes'):>8.0f} {med('input_tokens_total'):>8.0f} "
               f"{med('latency_ms')/1000:>6.1f} {sum(t['cost_usd'] or 0 for t in ts):>7.3f}")
-    print("\nper-question correctness:")
+    print("\nmeans per arm (all trials): tool calls, tool-result bytes, input tokens, latency s, action_ok")
+    for a in arms:
+        ts = [t for t in trials if t["arm"] == a]
+        mean = lambda k: statistics.mean([t[k] or 0 for t in ts])  # noqa: E731
+        print(f"  {a:14} tools={mean('agent_tool_calls'):.1f} tool_B={mean('tool_result_bytes'):.0f} "
+              f"ctx_B={mean('context_bytes'):.0f} in_tok={mean('input_tokens_total'):.0f} "
+              f"lat={mean('latency_ms')/1000:.1f} action_ok={sum(t['score'].get('action_ok', False) for t in ts)}/{len(ts)} "
+              f"proto_fail={sum(t['answer'] is None for t in ts)}")
+    print("\nper question: correct | mean tool calls | mean tool-result bytes | mean input tokens | mean latency s")
     for qid in sorted({t["question_id"] for t in trials}):
         cells = []
         for a in arms:
             ts = [t for t in trials if t["arm"] == a and t["question_id"] == qid]
-            cells.append(f"{a}={sum(t['answer_supported'] for t in ts)}/{len(ts)}")
+            if not ts:
+                continue
+            m = lambda k: statistics.mean([t[k] or 0 for t in ts])  # noqa: E731
+            cells.append(f"{a}={sum(t['answer_supported'] for t in ts)}/{len(ts)}|{m('agent_tool_calls'):.1f}|"
+                         f"{m('tool_result_bytes'):.0f}|{m('input_tokens_total'):.0f}|{m('latency_ms')/1000:.1f}")
         print(f"  {qid:34} " + "  ".join(cells))
 
 
