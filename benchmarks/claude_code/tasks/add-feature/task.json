@@ -1,0 +1,4 @@
+{"id": "add-feature", "family": "coding",
+ "source": {"repo": "z0intelligence", "sha": "c4a4554", "paths": ["src", "tests", "pyproject.toml"]},
+ "prompt": "In src/z0int/receipt.py add a public function `measurement_state_counts_from_rows(rows)` that takes an iterable of receipt dicts and returns a dict mapping each normalized measurement state (use the module's existing normalizer; rows with no valid state count under the key \"unknown\") to its count. Add a test for it under tests/. Run the tests you touched with `PYTHONPATH=src python -m pytest -q <file>`.",
+ "check": ["python3", "-m", "pytest", "-q", "{task}/hidden_test.py"]}

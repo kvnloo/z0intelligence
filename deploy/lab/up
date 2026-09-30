@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Portable z0intelligence lab bring-up for any fleet host (desktop, mbp, ...).
+#
+# Same principles as hermes-k8s-lab: a disposable Kind cluster named hermes-lab,
+# exact-context guard, mutations only in the hermes-lab namespace, host authority
+# (router, local models, credentials) stays on the host. Host deltas are DETECTED
+# (bridge gateway, GPU, memory), never hard-coded.
+#
+#   deploy/lab/up            create/verify cluster, publish host services when probed
+#   deploy/lab/up --plan     print what would happen, change nothing
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+CLUSTER=hermes-lab
+CONTEXT=kind-$CLUSTER
+NS=hermes-lab
+PLAN=0; [[ "${1:-}" == "--plan" ]] && PLAN=1
+say() { printf '%s\n' "$*"; }
+run() { if (( PLAN )); then say "plan: $*"; else "$@"; fi; }
+
+for bin in docker kind kubectl; do command -v "$bin" >/dev/null || { say "missing $bin (install pinned user-level binary; see deploy/lab/README.md)"; exit 1; }; done
+
+if kind get clusters 2>/dev/null | grep -qx "$CLUSTER"; then
+  say "cluster $CLUSTER exists"
+else
+  run kind create cluster --name "$CLUSTER" --config "$ROOT/deploy/lab/kind-single-node.yaml"
+fi
+(( PLAN )) || kubectl config use-context "$CONTEXT" >/dev/null
+[[ $PLAN == 1 || "$(kubectl config current-context)" == "$CONTEXT" ]] || { say "refusing: context is not $CONTEXT"; exit 1; }
+K() { kubectl --context "$CONTEXT" "$@"; }
+(( PLAN )) || K get namespace "$NS" >/dev/null 2>&1 || run K create namespace "$NS"
+
+# Host delta: the address pods use to reach host services is the kind bridge gateway.
+GATEWAY="$(docker network inspect kind -f '{{range .IPAM.Config}}{{.Gateway}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.' | head -1 || true)"
+say "host gateway (kind bridge): ${GATEWAY:-unknown}"
+
+# Publish a selectorless Service + EndpointSlice for a host service, marked ready only
+# after an in-cluster probe succeeds (the existing lane's rule: never advertise unprobed).
+publish() {
+  local name=$1 port=$2 path=$3 ready=false
+  [[ -n "$GATEWAY" ]] || { say "skip $name: no gateway"; return; }
+  if (( ! PLAN )); then
+    if K -n "$NS" run "probe-$name-$RANDOM" --rm -i --restart=Never --quiet --image=curlimages/curl:8.11.1 \
+         --command -- curl -fsS -m 5 "http://$GATEWAY:$port$path" >/dev/null 2>&1; then ready=true; fi
+  fi
+  say "$name -> $GATEWAY:$port ready=$ready"
+  if [[ $ready == false && $PLAN == 0 ]] && systemctl is-active -q ufw 2>/dev/null; then
+    local br; br="br-$(docker network inspect kind -f '{{.Id}}' | cut -c1-12)"
+    say "  hint: ufw is active; pods may be blocked. Scoped rule (needs sudo, run once per kind network):"
+    say "  sudo ufw allow in on $br from $(docker network inspect kind -f '{{range .IPAM.Config}}{{.Subnet}} {{end}}' | tr ' ' '\n' | grep -E '^[0-9]+\.' | head -1) to $GATEWAY port $port proto tcp"
+  fi
+  (( PLAN )) && return
+  K apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata: {name: $name, namespace: $NS, labels: {app.kubernetes.io/part-of: z0intelligence}}
+spec: {ports: [{name: http, port: $port, targetPort: $port}]}
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: $name-host
+  namespace: $NS
+  labels: {kubernetes.io/service-name: $name, app.kubernetes.io/part-of: z0intelligence}
+addressType: IPv4
+ports: [{name: http, protocol: TCP, port: $port}]
+endpoints: [{addresses: ["$GATEWAY"], conditions: {ready: $ready}}]
+EOF
+}
+publish z0intelligence 11501 /healthz
+publish z0-slm "${Z0INT_SLM_PORT:-11510}" /health
+
+# Host facts for placement (Kerdoios/z0 residency): recorded, not acted on.
+say "host: $(hostname) cpus=$(nproc) mem_gib=$(( $(awk '/MemTotal/{print $2}' /proc/meminfo) / 1048576 ))"
+if command -v vulkaninfo >/dev/null; then
+  vulkaninfo --summary 2>/dev/null | awk -F'= ' '/deviceName/{print "gpu: " $2}' | sort -u
+fi

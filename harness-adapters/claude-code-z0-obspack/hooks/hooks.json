@@ -1,0 +1,1 @@
+{"hooks": {"PostToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.claude_code_obs hook || true", "timeout": 20}]}]}}

@@ -1,0 +1,16 @@
+[Unit]
+Description=z0intelligence host SLM (llama.cpp server on the host's best local device)
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+# Host delta lives only in this file: LLAMA_SERVER, Z0INT_SLM_MODEL, Z0INT_SLM_DEVICE,
+# Z0INT_SLM_BIND (loopback or the Kind bridge gateway), Z0INT_SLM_PORT, Z0INT_SLM_CTX.
+EnvironmentFile=%h/.config/z0intelligence/slm.env
+ExecStart=/bin/sh -c 'exec "$LLAMA_SERVER" -m "$Z0INT_SLM_MODEL" --device "$Z0INT_SLM_DEVICE" -ngl 99 --host "$Z0INT_SLM_BIND" --port "$Z0INT_SLM_PORT" -c "$${Z0INT_SLM_CTX:-8192}" --parallel 2 --no-webui'
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=default.target

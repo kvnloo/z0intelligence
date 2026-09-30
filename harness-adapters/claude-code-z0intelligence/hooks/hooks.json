@@ -1,0 +1,48 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.claude_code prompt || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.claude_code stop || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.claude_code stop || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.claude_code session-start || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

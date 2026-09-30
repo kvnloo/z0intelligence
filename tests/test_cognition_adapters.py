@@ -412,6 +412,17 @@ def test_jev_adapter_passes_through_an_empty_answer_as_abstention():
     assert decision.abstained is True
 
 
+def test_jev_adapter_selects_a_single_legal_action_without_asking():
+    graph = ActionGraph(actions=(ActionCandidate(action_id="fs.read", kind="tool", description="read",
+                                                 tool="fs.read"),))
+    legal = compile_actions(graph=graph, granted_capabilities=(), authority=("read",), budget_units=5)
+    stub = _StubDecisionBackend("fs.read")
+    decision = JevBoundedToolBackend(stub).decide(ToolDecisionRequest(state="s", legal=legal))
+    assert decision.selected_action == "fs.read" and decision.abstained is False
+    assert decision.distribution == {"fs.read": 1.0}
+    assert stub.requests == []  # a 1-option choice question is invalid; never sent
+
+
 # --- ToolDecisionBackend -> legacy DecisionBackend ----------------------
 
 

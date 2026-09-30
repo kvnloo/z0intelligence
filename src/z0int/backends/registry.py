@@ -122,6 +122,35 @@ def register_builtin_backends() -> None:
                 local=True,
             )
         )
+    if "llama_http" not in _REGISTRY:
+        from .llama_http import LlamaHttpBackend
+
+        register(
+            BackendSpec(
+                id="llama_http",
+                kind="direct_readout",
+                description="Option-letter readout over the host llama.cpp server (any device, any GGUF)",
+                factory=LlamaHttpBackend.from_env,
+                aliases=("slm", "z0-slm"),
+                local=True,
+            )
+        )
+    if "openjev_06b" not in _REGISTRY:
+        from .openjev_direct import OpenJevDirectBackend
+
+        register(
+            BackendSpec(
+                id="openjev_06b",
+                kind="direct_option_logits",
+                description=(
+                    "OpenJev direct option-letter logits on Qwen3-0.6B "
+                    "(Z0INT_OPENJEV_DEVICE=cuda|cpu)"
+                ),
+                factory=lambda: OpenJevDirectBackend.for_manifest_id("openjev_06b"),
+                aliases=("openjev",),
+                local=True,
+            )
+        )
     if "julia_1" not in _REGISTRY:
         from .julia import JuliaBackend
 
