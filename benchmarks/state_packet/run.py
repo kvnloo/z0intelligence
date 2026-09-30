@@ -43,6 +43,7 @@ READ_ONLY_TOOLS = [
     "Bash(ls:*)", "Bash(stat:*)", "Bash(find:*)", "Bash(wc:*)", "Bash(head:*)", "Bash(tail:*)",
     "Bash(grep:*)", "Bash(rg:*)", "Bash(jq:*)", "Bash(cat:*)", "Bash(date:*)",
 ]
+GH_READ_TOOLS = ["Bash(gh issue list:*)", "Bash(gh issue view:*)", "Bash(gh pr list:*)", "Bash(gh pr view:*)"]
 LEAN = ["--setting-sources", "project", "--strict-mcp-config", "--disable-slash-commands"]
 HISTORY_HINT = ("Local Claude Code conversation history (JSONL transcripts) lives under ~/.claude/projects/. "
                 "Do not modify anything; read-only inspection only.")
@@ -66,7 +67,8 @@ def run_claude(q: dict, arm: str, args: argparse.Namespace, contract: str, z0hom
     if arm == "packet_only":
         cmd += ["--tools", ""]
     else:
-        cmd += ["--allowedTools", *READ_ONLY_TOOLS, "--add-dir", str(PROJECTS),
+        tools = READ_ONLY_TOOLS + (GH_READ_TOOLS if getattr(args, "raw_gh", False) else [])
+        cmd += ["--allowedTools", *tools, "--add-dir", str(PROJECTS),
                 "--append-system-prompt", HISTORY_HINT]
     env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
     t0 = time.time()
@@ -226,6 +228,8 @@ def main() -> None:
     ap.add_argument("--jobs", type=int, default=3)
     ap.add_argument("--summarize", default=None)
     ap.add_argument("--gh", action="store_true", help="enable the network GitHub adapter in the packet")
+    ap.add_argument("--raw-gh", action="store_true", help="also allow read-only gh issue/pr commands in tool arms")
+    ap.add_argument("--questions", default=None, help="question/key file (default questions.json)")
     args = ap.parse_args()
     if args.gh:
         os.environ["Z0INT_PACKET_GH"] = "1"
@@ -236,7 +240,7 @@ def main() -> None:
     if out.exists():
         sys.exit("output exists (create-only)")
     out.parent.mkdir(parents=True, exist_ok=True)
-    spec = json.loads(QUESTIONS.read_text())
+    spec = json.loads(Path(args.questions).read_text() if args.questions else QUESTIONS.read_text())
     qs = [q for q in spec["questions"] if not args.only or q["id"] in args.only]
     z0home = out.with_suffix(".z0home")
     z0home.mkdir(parents=True, exist_ok=True)
@@ -249,7 +253,8 @@ def main() -> None:
     lock = threading.Lock()
     with out.open("x") as fh:
         fh.write(json.dumps({"type": "meta", "run_id": run_id, "z0int_revision": rev, "model": args.model,
-                             "github_adapter": bool(args.gh),
+                             "github_adapter": bool(args.gh), "raw_gh": bool(args.raw_gh),
+                             "questions": str(args.questions or QUESTIONS.name),
                              "effort": args.effort, "oracle_before": before, "packet_stats": stats,
                              "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}) + "\n")
 
