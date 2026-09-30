@@ -647,14 +647,119 @@ def run(n_fuzz: int, seed: int, out: Path | None, spawn_sample: int) -> dict:
     return report
 
 
+# ---------------------------------------------------------------------------
+# Transition gate differential fuzz
+# ---------------------------------------------------------------------------
+
+
+def _boundary(rng: random.Random, around: int) -> Any:
+    """Mostly values at the boundary (around-1 / around / around+1)."""
+
+    r = rng.random()
+    if r < 0.85:
+        return max(0, around + rng.choice([-2, -1, -1, 0, 0, 1]))
+    if r < 0.95:
+        return rng.choice([0, 1, 2**32 - 1, 2**32, 2**32 + 1, 2**47 - 1])
+    return rng.choice([2**47, 2**60, -1, 1.5, None, True])  # unrepresentable: must deny
+
+
+def gen_spawn(rng: random.Random) -> bg.SpawnProposal:
+    caps = ["execute", "verify", "store", "route", "merge", "deploy", "payment"]
+    ceiling = rng.sample(caps, rng.randint(1, 5))
+    if rng.random() < 0.8:
+        requested = rng.sample(ceiling, rng.randint(0, len(ceiling)))
+    else:
+        requested = rng.sample(caps, rng.randint(1, 3))
+    maxc = rng.choice([1, 2, 4, 8, 2**33]) if rng.random() < 0.93 else rng.choice([0, "4", None, 3.0, True])
+    maxd = rng.choice([1, 2, 3, 2**33]) if rng.random() < 0.95 else rng.choice([0, None])
+    kids = _boundary(rng, (maxc if isinstance(maxc, int) and not isinstance(maxc, bool) else 2) - 1)
+    depth = _boundary(rng, (maxd if isinstance(maxd, int) else 1) - 1)
+    budgets, observed, proposed = {}, {}, {}
+    for dim in bg.BUDGET_DIMS:
+        if rng.random() < 0.4:
+            limit = rng.choice([0, 100, 4000, 2**32 + 7, 2**46])
+            budgets[dim] = limit
+            seen = rng.randint(0, limit)
+            observed[dim] = seen
+            proposed[dim] = _boundary(rng, limit - seen)
+        elif rng.random() < 0.3:
+            observed[dim] = rng.randint(0, 50)
+    rev = rng.randint(0, 3)
+    return bg.SpawnProposal(
+        contract_revision=rev, request_revision=rev if rng.random() < 0.9 else rev + 1,
+        dynamic_allowed=rng.random() < 0.95, max_children=maxc, max_depth=maxd,
+        live_children=kids, parent_depth=depth, budgets=budgets, observed=observed, proposed=proposed,
+        ceiling=ceiling, requested=requested,
+    )
+
+
+def run_transitions(n: int, seed: int) -> dict:
+    from z0int.aodl import AodlRuntimeContract, AodlSpend, check_budget
+
+    gate = bg.BendGate(timeout_s=10.0)
+    rng = random.Random(seed)
+    stats = Counter()
+    disagreements = []
+    bend_lat, ref_lat = [], []
+    for i in range(n):
+        p = gen_spawn(rng)
+        try:
+            tokens = bg.encode_transition(p)
+        except ValueError:
+            stats["unrepresentable_denied"] += 1
+            continue
+        t0 = time.perf_counter()
+        try:
+            ref = set(bg.reference_transition(p))
+        except TypeError:
+            stats["reference_error"] += 1
+            continue
+        t1 = time.perf_counter()
+        try:
+            ok, codes = gate.raw(tokens)
+        except Exception:  # kernel abort: the adapter would deny
+            stats["kernel_abort_denied"] += 1
+            continue
+        t2 = time.perf_counter()
+        ref_lat.append((t1 - t0) * 1e6)
+        bend_lat.append((t2 - t1) * 1e6)
+        stats["compared"] += 1
+        stats["allow" if ok else "deny"] += 1
+        if set(codes) != ref or ok != (not ref):
+            stats["disagree"] += 1
+            disagreements.append({"case": i, "bend": codes, "reference": sorted(ref), "proposal": repr(p)})
+        # budget dimension against z0int's pre-existing float-based Gamma guard
+        contract = AodlRuntimeContract("g", 0, "c", "omp", (), {}, dict(p.budgets), {}, "")
+        spend = lambda m: AodlSpend(**{k: m.get(k, 0) or 0 for k in bg.BUDGET_DIMS})  # noqa: E731
+        cb = check_budget(contract, observed=spend(p.observed), proposed=spend(p.proposed))
+        stats["check_budget_compared"] += 1
+        if cb.allowed != (105 not in codes):
+            stats["check_budget_disagree"] += 1
+            disagreements.append({"case": i, "vs": "check_budget", "bend": codes, "exceeded": cb.exceeded,
+                                  "proposal": repr(p)})
+    gate.close()
+
+    def lat(xs: list[float]) -> dict:
+        return {"n": len(xs), "p50_us": round(pct(xs, 0.5), 1), "p95_us": round(pct(xs, 0.95), 1)} if xs else {}
+
+    return {"stats": dict(stats), "latency": {"bend_roundtrip": lat(bend_lat), "python_reference": lat(ref_lat)},
+            "disagreements": disagreements[:20]}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fuzz", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=48)
     ap.add_argument("--spawn-sample", type=int, default=200)
+    ap.add_argument("--transitions", type=int, default=5000)
     ap.add_argument("--out", type=Path)
     args = ap.parse_args(argv)
-    rep = run(args.fuzz, args.seed, args.out, args.spawn_sample)
+    rep = run(args.fuzz, args.seed, None, args.spawn_sample)
+    rep["transitions"] = run_transitions(args.transitions, args.seed)
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(rep, indent=2) + "\n")
+    print(json.dumps(rep["transitions"], indent=2)[:3000])
     view = {k: rep[k] for k in ("aodl_reference", "kernel_revision", "bend_version", "corpus_sha256", "summary",
                                 "latency", "kernel_peak_rss_kb")}
     print(json.dumps(view, indent=2))
@@ -663,7 +768,9 @@ def main(argv: list[str] | None = None) -> int:
     for r in rep["code_disagreements"][:10]:
         print("CODES", r["case"], r["python_codes"], r["bend_codes"])
     s = rep["summary"]["all"]
-    return 0 if s["verdict_disagree_unexplained"] == 0 and s["codes_disagree"] == 0 else 1
+    t = rep["transitions"]["stats"]
+    ok = s["verdict_disagree_unexplained"] == 0 and s["codes_disagree"] == 0 and not t.get("disagree")
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

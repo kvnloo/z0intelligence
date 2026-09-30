@@ -66,8 +66,11 @@ UNPARSEABLE = 0
 MODE_DOCUMENT = 1
 MODE_TRANSITION = 2
 U32_MAX = (1 << 32) - 1
-# Nat.read accepts at most 2^48 - 1; the host refuses anything larger.
-NAT_MAX = (1 << 48) - 1
+# The compiled Bend runtime stores a Nat as an immediate of at most 2^48 - 1
+# and ABORTS the process past it (the proofs model Nat as unbounded).  The
+# kernel adds two values (seen + prop), so the host refuses any value of
+# 2^47 or more: every sum then stays below the runtime cap.
+NAT_MAX = (1 << 47) - 1
 # Doc-level numeric fields are only compared against 1, so clamping keeps
 # every comparison exact while fitting a U32 token.
 _CLAMP = 1 << 30
