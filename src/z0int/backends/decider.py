@@ -254,7 +254,20 @@ class DeciderBackend:
         loaded = self._ensure_loaded()
         start = time.perf_counter()
         questions = {q.id: question_to_named(q) for q in request.questions}
-        raw = loaded.decider.system_one(request.state, questions)
+        eager_cpu = str(self.device).startswith("cpu") and getattr(loaded.decider, "eng", None) is None
+        if eager_cpu and len(questions) > 1 and os.environ.get("Z0INT_DECIDER_CPU_ROWWISE", "1") != "0":
+            # Independent scoring already runs each question in its own row (state + that
+            # question); eager CPU batches pad every row to the longest question, which
+            # ~3x's compute for mixed-length questions. One call per question = same rows,
+            # no padding.
+            raw = {"answers": {}, "usage": {"input_tokens": 0, "output_tokens": 0}}
+            for qid, named in questions.items():
+                one = loaded.decider.system_one(request.state, {qid: named})
+                raw["model"] = one.get("model")
+                raw["answers"].update(one.get("answers") or {})
+                raw["usage"]["input_tokens"] += int((one.get("usage") or {}).get("input_tokens") or 0)
+        else:
+            raw = loaded.decider.system_one(request.state, questions)
         answers: list[DecisionAnswer] = []
         raw_probs: dict[str, Any] = {}
         for q in request.questions:
