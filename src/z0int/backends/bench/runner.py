@@ -279,6 +279,14 @@ def run_candidate(
                 device=str(device) if device is not None else None,
             )
             rows.append(_materialize_emitted(tm_session, trace_id))
+    close = getattr(backend, "close", None)
+    if callable(close):
+        # Out-of-process workers (Julia) must not outlive their candidate: they
+        # would hold RAM through every later candidate's measurement.
+        try:
+            close()
+        except Exception:  # noqa: BLE001
+            pass
     summary = {
         "candidate_id": candidate_id,
         "status": "available",
