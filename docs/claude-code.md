@@ -55,3 +55,10 @@ run and write (3/3 expected cases).
 - `Stop` fires before the final assistant message is in the transcript; sweep again at
   `SessionEnd` (dedupe by message id).
 - Hook input carries `prompt_id`; use it as the turn id.
+
+## Portable lab
+
+`deploy/lab/up` brings up the same `hermes-lab` Kind lane on any fleet host with detected
+host deltas (bridge gateway, GPU). `z0-slm.service` serves a GGUF on the host's best device
+(e.g. Radeon R9 M370X via Vulkan); the `llama_http` decision backend reads it
+(`Z0INT_SLM_URL`). See `deploy/lab/README.md`.
