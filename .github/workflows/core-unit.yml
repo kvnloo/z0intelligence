@@ -7,8 +7,12 @@ on:
       - "src/z0int/bridge/**"
       - "src/z0int/tokenomics_emit.py"
       - "omp-extensions/z0int-bridge/**"
+      - "omp-extensions/z0int-intelligence/**"
+      - "harness-adapters/automatic-client.mjs"
+      - "scripts/omp_bridge_*.py"
       - "tests/test_receipt.py"
       - "tests/test_bridge_worker.py"
+      - "tests/test_omp_bridge_ready.py"
       - "tests/test_tokenomics_emit.py"
       - ".github/workflows/core-unit.yml"
   pull_request:
@@ -17,8 +21,12 @@ on:
       - "src/z0int/bridge/**"
       - "src/z0int/tokenomics_emit.py"
       - "omp-extensions/z0int-bridge/**"
+      - "omp-extensions/z0int-intelligence/**"
+      - "harness-adapters/automatic-client.mjs"
+      - "scripts/omp_bridge_*.py"
       - "tests/test_receipt.py"
       - "tests/test_bridge_worker.py"
+      - "tests/test_omp_bridge_ready.py"
       - "tests/test_tokenomics_emit.py"
       - ".github/workflows/core-unit.yml"
 
@@ -40,6 +48,10 @@ jobs:
             src/z0int/tokenomics_emit.py \
             src/z0int/bridge/worker.py \
             src/z0int/bridge/runtime.py \
+            src/z0int/bridge/generation.py \
+            scripts/omp_bridge_install.py \
+            scripts/omp_bridge_e2e.py \
+            scripts/omp_bridge_fake_llm.py \
             src/z0int/backends/bench/tokenomics_bridge.py
       - name: Receipt and bridge runtime tests
         env:
@@ -49,7 +61,8 @@ jobs:
           python -m unittest \
             tests.test_receipt.ReceiptBuild \
             tests.test_receipt.ReceiptClose \
-            tests.test_bridge_worker.BridgeRuntimeTests
+            tests.test_bridge_worker \
+            tests.test_omp_bridge_ready
       - name: Tokenomics emitter fallback tests
         env:
           PYTHONPATH: src
