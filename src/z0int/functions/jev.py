@@ -1,9 +1,11 @@
-"""Canonical TypeSafe/Jev bounded-decision implementation.
+"""Canonical TypeSafe Jev implementation.
 
-Network execution uses the official typesafe-sdk client. z0 remains the
-authority for authorization, admission, idempotency, served-model pinning and
-receipts. The optional legacy jevkit.keystore may still supply credentials when
-installed, but it is not an execution dependency.
+Network requests use the official typesafe-sdk package. z0 owns physical
+attempt accounting, so SDK retries are disabled for every call.
+
+Credential resolution stays compatible with older local setups: an optional
+jevkit.keystore may still supply a key, but jevkit.client is no longer a
+runtime dependency.
 """
 
 from __future__ import annotations
@@ -11,8 +13,9 @@ from __future__ import annotations
 import importlib.util
 import math
 import os
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from .contract import (
     EXPECTED_JEV_MODEL,
@@ -21,8 +24,8 @@ from .contract import (
     BackendCapabilities,
     VerifierUnavailable,
 )
-from .typesafe_sdk_client import ask_choice, ask_noul
 
+_QUESTION_ID = "sufficient"
 
 VALIDATION = {
     "authored144": {"n": 144, "family_balanced_accuracy": 0.9514, "ece_top1": 0.0334},
@@ -36,7 +39,6 @@ def _repo_script(name: str) -> Path:
 
 
 def _host_env_loader():
-    """The existing host credential loader, imported rather than re-implemented."""
     path = _repo_script("race-omp-backends.py")
     if not path.is_file():
         return None
@@ -57,7 +59,6 @@ def reset_credential_cache() -> None:
 
 
 def resolve_credential() -> tuple[str | None, str]:
-    """Resolve key provenance without writing or logging the credential."""
     global _RESOLVED
     if _RESOLVED is not None:
         return _RESOLVED
@@ -105,13 +106,64 @@ def ensure_credential() -> str | None:
     return resolve_credential()[0]
 
 
-def _unavailable(exc: Exception) -> VerifierUnavailable:
-    return VerifierUnavailable("jev", f"{type(exc).__name__}: {exc}")
+def _sdk_symbols():
+    try:
+        from typesafe_sdk import Choice, Noul, RetryPolicy, TypeSafeClient
+    except Exception as exc:
+        raise VerifierUnavailable(
+            "jev",
+            f"official typesafe-sdk unavailable: {exc}",
+        ) from exc
+    return TypeSafeClient, RetryPolicy, Choice, Noul
 
 
-def _validate_model(model: object) -> str:
-    served = str(model or "")
-    if served != EXPECTED_JEV_MODEL:
+def _usage_dict(usage: Any) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for name in ("input_tokens", "output_tokens"):
+        value = getattr(usage, name, None)
+        if isinstance(value, int) and value >= 0:
+            out[name] = value
+    return out
+
+
+def _system_one(
+    state: object,
+    questions: Mapping[str, Any],
+    *,
+    timeout: float,
+) -> Any:
+    key = ensure_credential()
+    if not key:
+        raise VerifierUnavailable("jev", "no credential resolvable")
+
+    TypeSafeClient, RetryPolicy, _, _ = _sdk_symbols()
+    try:
+        with TypeSafeClient(
+            api_key=key,
+            model=EXPECTED_JEV_MODEL,
+            timeout=timeout,
+            retry=RetryPolicy(max_retries=0),
+        ) as client:
+            return client.system_one(
+                state,
+                questions,
+                model=EXPECTED_JEV_MODEL,
+                timeout=timeout,
+                retry=RetryPolicy(max_retries=0),
+            )
+    except VerifierUnavailable:
+        raise
+    except Exception as exc:
+        status = getattr(exc, "status", None)
+        prefix = f"http_{status}" if isinstance(status, int) else type(exc).__name__
+        raise VerifierUnavailable("jev", f"{prefix}: {exc}") from exc
+
+
+def _served_model(reply: Any, *, strict: bool = True) -> str:
+    served = getattr(reply, "model", None)
+    if not isinstance(served, str) or not served:
+        raise VerifierUnavailable("jev", "TypeSafe response missing served model")
+    if strict and served != EXPECTED_JEV_MODEL:
         raise VerifierUnavailable(
             "jev",
             f"served revision {served!r} != validated {EXPECTED_JEV_MODEL!r}",
@@ -119,18 +171,7 @@ def _validate_model(model: object) -> str:
     return served
 
 
-def _validate_probability(value: object, name: str) -> float:
-    if not isinstance(value, (int, float)):
-        raise VerifierUnavailable("jev", f"{name} is not numeric")
-    parsed = float(value)
-    if not math.isfinite(parsed) or not 0 <= parsed <= 1:
-        raise VerifierUnavailable("jev", f"{name} must be finite in [0,1]")
-    return parsed
-
-
 class JevVerifier:
-    """Reference/escalation implementation. Remote, metered, pinned revision."""
-
     backend = "jev"
     role = "reference_escalation"
 
@@ -160,17 +201,16 @@ class JevVerifier:
             cost_per_call_usd=0.00006,
             detail=(
                 "TypeSafe Jev via official typesafe-sdk; "
-                "P(true) is the native noul probability"
+                "P(true) is the native Noul probability"
             ),
         )
 
     def health(self) -> tuple[bool, str]:
         source = credential_source()
         if source == "absent":
-            return (
-                False,
-                "TYPESAFE_API_KEY not resolvable through optional legacy "
-                "keystore, environment, or host env file",
+            return False, (
+                "TYPESAFE_API_KEY not resolvable through the optional legacy "
+                "keystore, environment, or host env file"
             )
         return True, f"credential present via {source}; live readiness requires a call"
 
@@ -180,76 +220,58 @@ class JevVerifier:
         *,
         proposition: str = PROPOSITION,
     ) -> tuple[float, dict[str, Any]]:
-        key = ensure_credential()
-        if not key:
-            raise VerifierUnavailable(self.backend, "no credential resolvable")
-        try:
-            result = ask_noul(
-                state,
-                proposition=proposition,
-                api_key=key,
-                model=EXPECTED_JEV_MODEL,
-                timeout=self.timeout,
-            )
-        except Exception as exc:
-            raise _unavailable(exc) from exc
-
-        served = str(result.get("model") or "")
-        if self.strict_model:
-            served = _validate_model(served)
-        probability = _validate_probability(
-            result.get("probability"), "noul probability"
+        _, _, _, Noul = _sdk_symbols()
+        started = time.monotonic()
+        reply = _system_one(
+            state,
+            {_QUESTION_ID: Noul(instructions=proposition)},
+            timeout=self.timeout,
         )
-        return probability, {
-            "model": served or EXPECTED_JEV_MODEL,
-            "revision": served or EXPECTED_JEV_MODEL,
+        served = _served_model(reply, strict=self.strict_model)
+        answer = getattr(reply, "nouls", {}).get(_QUESTION_ID)
+        if answer is None:
+            raise VerifierUnavailable("jev", "Noul response missing sufficiency answer")
+        p_true = float(answer.noul)
+        if not math.isfinite(p_true) or not 0 <= p_true <= 1:
+            raise VerifierUnavailable("jev", "Noul probability must be finite in [0,1]")
+        return p_true, {
+            "model": served,
+            "revision": served,
             "model_matches_validated": served == EXPECTED_JEV_MODEL,
             "credential_source": credential_source(),
-            "usage": result.get("usage") or {},
-            "provider_latency_ms": result.get("latency_ms"),
+            "usage": _usage_dict(getattr(reply, "usage", None)),
+            "provider_latency_ms": (time.monotonic() - started) * 1000,
             "question_type": "noul",
+            "client": "typesafe-sdk",
         }
 
 
 def assess_claim(state: dict[str, str]) -> dict[str, Any]:
-    """Validated supported/insufficient/contradicted contract."""
-    key = ensure_credential()
-    if not key:
-        raise VerifierUnavailable("jev", "no credential resolvable")
-
+    _, _, Choice, _ = _sdk_symbols()
     choices = {
         "supported": "The evidence establishes the claim",
         "insufficient": "The evidence does not establish either",
         "contradicted": "The evidence establishes the opposite",
     }
-    try:
-        result = ask_choice(
-            state,
-            instructions="Which option does the supplied evidence establish?",
-            options=choices,
-            api_key=key,
-            model=EXPECTED_JEV_MODEL,
-            timeout=15,
-        )
-    except Exception as exc:
-        raise _unavailable(exc) from exc
-
-    served = _validate_model(result.get("model"))
-    probabilities = result.get("probabilities")
-    if not isinstance(probabilities, dict) or set(probabilities) != set(choices):
+    started = time.monotonic()
+    reply = _system_one(
+        state,
+        {
+            "assess": Choice(
+                instructions="Which option does the supplied evidence establish?",
+                criteria=choices,
+            )
+        },
+        timeout=15.0,
+    )
+    served = _served_model(reply)
+    answer = getattr(reply, "choices", {}).get("assess")
+    if answer is None:
+        raise VerifierUnavailable("jev", "Choice response missing assess answer")
+    probabilities = dict(answer.probabilities)
+    if set(probabilities) != set(choices):
         raise VerifierUnavailable("jev", "incomplete choice distribution")
-    parsed = {
-        label: _validate_probability(value, f"probability {label}")
-        for label, value in probabilities.items()
-    }
-    if abs(math.fsum(parsed.values()) - 1.0) > 1e-4:
-        raise VerifierUnavailable("jev", "choice probabilities must sum to 1")
-    label = result.get("label")
-    if label not in choices:
-        raise VerifierUnavailable("jev", "choice label is not in requested options")
-    confidence = _validate_probability(result.get("confidence"), "choice confidence")
-
-    usage = result.get("usage") or {}
+    usage = _usage_dict(getattr(reply, "usage", None))
     return {
         "backend": "jev",
         "model": served,
@@ -258,19 +280,20 @@ def assess_claim(state: dict[str, str]) -> dict[str, Any]:
             "supported": "SUPPORTED",
             "insufficient": "UNKNOWN",
             "contradicted": "UNSUPPORTED",
-        }[label],
+        }[answer.choice],
         "answers": [{
             "id": "assess",
             "type": "choice",
-            "choice": label,
-            "probabilities": parsed,
-            "confidence": confidence,
+            "choice": answer.choice,
+            "confidence": float(answer.confidence),
+            "probabilities": probabilities,
         }],
-        "latency_ms": result.get("latency_ms"),
+        "latency_ms": (time.monotonic() - started) * 1000,
         "diagnostics": {
             **usage,
             "credential_source": credential_source(),
             "usage_source": "provider_response",
+            "client": "typesafe-sdk",
         },
     }
 
@@ -281,7 +304,6 @@ def decide_choice(
     instructions: str,
     options: dict[str, str],
 ) -> dict[str, Any]:
-    """Experimental bounded Choice using the official TypeSafe SDK."""
     if not isinstance(instructions, str) or not instructions.strip():
         raise ValueError("choice instructions are required")
     if not isinstance(options, dict) or not 2 <= len(options) <= 16:
@@ -296,85 +318,83 @@ def decide_choice(
     ):
         raise ValueError("choice labels/descriptions must be bounded nonempty strings")
 
-    key = ensure_credential()
-    if not key:
-        raise VerifierUnavailable("jev", "no credential resolvable")
-    try:
-        result = ask_choice(
-            state,
-            instructions=instructions,
-            options=options,
-            api_key=key,
-            model=EXPECTED_JEV_MODEL,
-            timeout=15,
-        )
-    except Exception as exc:
-        raise _unavailable(exc) from exc
+    _, _, Choice, _ = _sdk_symbols()
+    started = time.monotonic()
+    reply = _system_one(
+        state,
+        {"decision": Choice(instructions=instructions, criteria=options)},
+        timeout=15.0,
+    )
+    served = _served_model(reply)
+    answer = getattr(reply, "choices", {}).get("decision")
+    if answer is None:
+        raise VerifierUnavailable("jev", "Choice response missing decision answer")
 
-    served = _validate_model(result.get("model"))
-    label = result.get("label")
-    probabilities = result.get("probabilities")
-    if (
-        label not in options
-        or not isinstance(probabilities, dict)
-        or set(probabilities) != set(options)
+    probabilities = {
+        label: float(value)
+        for label, value in dict(answer.probabilities).items()
+    }
+    if answer.choice not in options or set(probabilities) != set(options):
+        raise VerifierUnavailable(
+            "jev",
+            "choice response labels do not match requested options",
+        )
+    if any(
+        not math.isfinite(value) or not 0 <= value <= 1
+        for value in probabilities.values()
     ):
         raise VerifierUnavailable(
-            "jev", "choice response labels do not match requested options"
+            "jev",
+            "choice probabilities must be finite in [0,1]",
         )
-    parsed = {
-        name: _validate_probability(value, f"probability {name}")
-        for name, value in probabilities.items()
-    }
-    if abs(math.fsum(parsed.values()) - 1.0) > 1e-4:
+    if abs(math.fsum(probabilities.values()) - 1.0) > 1e-4:
         raise VerifierUnavailable("jev", "choice probabilities must sum to 1")
-    confidence = _validate_probability(result.get("confidence"), "choice confidence")
+
+    confidence = float(answer.confidence)
+    if not math.isfinite(confidence) or not 0 <= confidence <= 1:
+        raise VerifierUnavailable("jev", "choice confidence must be finite in [0,1]")
+
     return {
         "backend": "jev",
         "model": served,
         "revision": served,
-        "label": label,
-        "probabilities": parsed,
+        "label": answer.choice,
+        "probabilities": probabilities,
         "confidence": confidence,
-        "latency_ms": result.get("latency_ms"),
-        "usage": result.get("usage") or {},
+        "latency_ms": (time.monotonic() - started) * 1000,
+        "usage": _usage_dict(getattr(reply, "usage", None)),
         "credential_source": credential_source(),
+        "client": "typesafe-sdk",
     }
 
 
 def decide_noul(state: object, *, proposition: str) -> dict[str, Any]:
-    """Experimental bounded Noul using the official TypeSafe SDK."""
-    if (
-        not isinstance(proposition, str)
-        or not proposition.strip()
-        or len(proposition) > 4000
-    ):
+    if not isinstance(proposition, str) or not proposition.strip() or len(proposition) > 4000:
         raise ValueError("noul proposition must be 1..4000 characters")
 
-    key = ensure_credential()
-    if not key:
-        raise VerifierUnavailable("jev", "no credential resolvable")
-    try:
-        result = ask_noul(
-            state,
-            proposition=proposition,
-            api_key=key,
-            model=EXPECTED_JEV_MODEL,
-            timeout=15,
-        )
-    except Exception as exc:
-        raise _unavailable(exc) from exc
-
-    served = _validate_model(result.get("model"))
-    probability = _validate_probability(
-        result.get("probability"), "noul probability"
+    _, _, _, Noul = _sdk_symbols()
+    started = time.monotonic()
+    reply = _system_one(
+        state,
+        {"decision": Noul(instructions=proposition)},
+        timeout=15.0,
     )
+    served = _served_model(reply)
+    answer = getattr(reply, "nouls", {}).get("decision")
+    if answer is None:
+        raise VerifierUnavailable("jev", "Noul response missing decision answer")
+
+    probability = float(answer.noul)
+    if not math.isfinite(probability) or not 0 <= probability <= 1:
+        raise VerifierUnavailable("jev", "Noul probability must be finite in [0,1]")
+
     return {
         "backend": "jev",
         "model": served,
         "revision": served,
         "probability": probability,
-        "latency_ms": result.get("latency_ms"),
-        "usage": result.get("usage") or {},
+        "latency_ms": (time.monotonic() - started) * 1000,
+        "usage": _usage_dict(getattr(reply, "usage", None)),
         "credential_source": credential_source(),
+        "client": "typesafe-sdk",
     }
