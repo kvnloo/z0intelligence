@@ -23,6 +23,21 @@ architecture:
         - src/z0int/intelligence_service.py
       depends_on:
         - dispatch-authority
+    - id: agentweb-choice-experiments
+      name: AgentWeb bounded decision experiment lane
+      kind: experimental-decision
+      paths:
+        - src/z0int/decision_experiment.py
+        - src/z0int/functions/jev.py
+      depends_on:
+        - dispatch-authority
+    - id: agentweb-reliability-observations
+      name: AgentWeb reliability observation ingest
+      kind: evidence-ingest
+      paths:
+        - src/z0int/reliability_observation.py
+      depends_on:
+        - dispatch-authority
   implements_mechanisms:
     - jev-typed-decision
   provides_interfaces:
@@ -43,5 +58,7 @@ architecture:
       - docs/agentweb-emma-integration.md
     tests:
       - tests/test_agentweb_integration.py
+      - tests/test_agentweb_choice_experiment.py
+      - tests/test_agentweb_reliability_observation.py
     schemas:
       - manifests/capabilities.v1.json
