@@ -34,3 +34,50 @@ Do not promote this integration upstream until the z0evals AgentWeb/Emma cohort 
 6. preservation of AgentWeb safety guards;
 7. measurable latency/token benefit on at least one representative workload;
 8. no quality regression on the same workloads.
+
+
+## Evidence-only experiment surfaces
+
+Two additional endpoints exist on this downstream branch. Neither grants production
+capability eligibility.
+
+### `POST /v1/experimental/choice`
+
+A bounded AgentWeb-only Jev Choice lane for collecting receipt-backed evidence before
+a decision can enter `manifests/capabilities.v1.json` as eligible.
+
+Hard gates:
+
+- `harness=agentweb`;
+- `function=experimental_choice`;
+- `experimental=true`;
+- `allow_remote=true`;
+- authority-side `Z0INT_EXPERIMENTAL_JEV_SHADOW=1`;
+- 2–16 bounded choice labels;
+- state <= 24KB;
+- output is always `applied=false`;
+- receipts use `execution=shadow` and `quality_authoritative=false`;
+- identical trace + identical request replays;
+- identical trace + changed request conflicts.
+
+This lane may pay for the explicitly authorized Jev shadow call. It cannot overflow
+into arbitrary paid workers and it cannot make itself eligible.
+
+### `POST /v1/observe/reliability`
+
+Idempotent ingest for AgentWeb's already-scrubbed tool-boundary observations.
+
+Accepted rows must already be:
+
+- `z0int.decision_receipt.v1`;
+- `provider=agentweb`;
+- `route=shadow`;
+- `execution=log_only`;
+- `measurement_state=partial`;
+- pseudonymous `agentweb:<24 hex>` session identity, if present;
+- free of `verified_success`, `verification_source`, arbitrary error text, user ids,
+  prompt/tool arguments and tool results.
+
+The endpoint adds an observation digest and rejects changed payloads under an existing
+observation trace. Observations remain execution/reliability evidence, never quality
+gold.
