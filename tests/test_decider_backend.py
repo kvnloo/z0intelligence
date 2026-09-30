@@ -63,6 +63,20 @@ class DeciderBackendTests(unittest.TestCase):
             health = backend.health(load=False)
         self.assertFalse(health.ready)
 
+    def test_health_probe_never_downloads_uncached_weights(self):
+        backend = DeciderBackend(
+            model_id="decider_2b",
+            hf="Mapika/decider-2b",
+            revision="1d96be0093133e194fe18105a521b3e69be931d2",
+        )
+        with mock.patch("z0int.backends.decider._runtime_import_error", return_value=None), \
+                mock.patch("z0int.models_mgmt.model_cached", return_value=False), \
+                mock.patch("huggingface_hub.snapshot_download", side_effect=AssertionError("network")):
+            health = backend.health(load=False)
+        self.assertFalse(health.ready)
+        self.assertFalse(health.loaded)
+        self.assertEqual(health.detail, "weights not cached locally")
+
     def test_evaluate_with_mock_decider(self):
         backend = DeciderBackend(
             model_id="decider_2b",
