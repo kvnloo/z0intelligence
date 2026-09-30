@@ -36,12 +36,17 @@ This repo follows the [Verified OSS Loop](https://github.com/kvnloo/verified-oss
 ## Decision backends
 
 - Contract: `src/z0int/backends/` (`DecisionBackend`, not Provider).
-- First local semantic engine: NanoJev (`nanojev` / model id `nanojev_06b`).
+- Local fast path: **Laya 421M** (`laya_421m` / alias `laya`).
+- Verification contract: `src/z0int/functions/verify_evidence_sufficiency.py`.
+  - `verify()` defaults to Laya.
+  - `verify_with_escalation()` defaults to **Laya → Jev** when Laya lands in the abstain band.
+  - Expected reference revision: **`jev-1.13.0`**.
+- NanoJev is legacy benchmark/reproducibility only. Keep its adapter/tests for historical comparisons; do not make it a production or verification default.
 - Agent commands:
   - `z0int backends list --json`
   - `z0int backends doctor --json`
-  - `z0int backends eval --backend nanojev --input tests/fixtures/nanojev_request.json --json`
-- Do not load NanoJev from ordinary doctor/status list paths.
+  - `z0int backends eval --backend laya_421m --input tests/fixtures/decision_request.json --json`
+- Ordinary doctor/status/list paths must not eagerly load model weights.
 - Do not mark backend inference as `verified_success`; ambient turn close ≠ gold.
 
 ## Brand (background)
