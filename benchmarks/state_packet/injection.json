@@ -1,0 +1,33 @@
+{
+  "schema": "z0int.state_packet_bench.questions.v0",
+  "frozen_at": "2026-09-30T07:05:00Z",
+  "authored_before_running": true,
+  "note": "Failure injection (z0evals#56 test D): the Claude Code transcript source is deliberately removed from the packet (Z0INT_CLAUDE_PROJECTS -> empty dir) and only the packet_only arm runs, so the model cannot re-read history itself. Same prompts as q07/h05; the key flips to abstain because the required evidence is absent. Run with: run.py --questions injection.json --remove-conversation --arms packet_only.",
+  "answer_contract": "Reply with ONLY a JSON object: {\"action\": \"answer\"|\"abstain\"|\"conflict\", \"fields\": {...}, \"evidence\": [\"source pointers you relied on\"]}. Use action=abstain when local evidence does not establish the answer; use action=conflict when sources disagree (report each side in fields).",
+  "questions": [
+    {
+      "id": "i01-removed-last-cc-session",
+      "repo": "z0intelligence",
+      "kind": "abstention",
+      "prompt": "According to local Claude Code history (~/.claude/projects), which top-level (non-subagent) Claude Code session most recently worked in ~/workspace/z0intelligence? Give the first 8 characters of its session id.",
+      "fields": {"session_id_prefix": "string"},
+      "key": {"action": "abstain", "fields": {}}
+    },
+    {
+      "id": "i02-removed-worktree-session",
+      "repo": "z0intelligence",
+      "kind": "abstention",
+      "prompt": "Per local Claude Code history (~/.claude/projects), has any Claude Code session (including subagents) worked with its working directory inside the z0intelligence worktree .claude/worktrees/agent-a5a881e0f9d9b6456?",
+      "fields": {"any_session": "boolean"},
+      "key": {"action": "abstain", "fields": {}}
+    },
+    {
+      "id": "i03-control-git-fact",
+      "repo": "z0intelligence",
+      "kind": "current-fact",
+      "prompt": "In the main checkout ~/workspace/z0intelligence (not its .claude/worktrees): which branch is checked out and what is its upstream tracking ref?",
+      "fields": {"branch": "string", "upstream": "string"},
+      "key": {"action": "answer", "fields": {"branch": {"re": "^feat/claude-code-harness$"}, "upstream": {"re": "origin/master"}}}
+    }
+  ]
+}

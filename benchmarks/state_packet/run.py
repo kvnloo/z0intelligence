@@ -51,6 +51,8 @@ HISTORY_HINT = ("Local Claude Code conversation history (JSONL transcripts) live
 
 def hook_settings(z0home: Path) -> str:
     gh = " Z0INT_PACKET_GH=1" if os.environ.get("Z0INT_PACKET_GH") == "1" else ""
+    if os.environ.get("Z0INT_CLAUDE_PROJECTS"):  # failure injection: conversation source removed
+        gh += f" Z0INT_CLAUDE_PROJECTS={os.environ['Z0INT_CLAUDE_PROJECTS']}"
     cmd = f"env Z0INT_HOME={z0home}{gh} {PY} -m z0int.state_packet --hook --max-tokens 1500"
     return json.dumps({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": cmd, "timeout": 60}]}]}})
 
@@ -230,9 +232,15 @@ def main() -> None:
     ap.add_argument("--gh", action="store_true", help="enable the network GitHub adapter in the packet")
     ap.add_argument("--raw-gh", action="store_true", help="also allow read-only gh issue/pr commands in tool arms")
     ap.add_argument("--questions", default=None, help="question/key file (default questions.json)")
+    ap.add_argument("--remove-conversation", action="store_true",
+                    help="failure injection: point the packet's transcript source at an empty dir")
     args = ap.parse_args()
     if args.gh:
         os.environ["Z0INT_PACKET_GH"] = "1"
+    if args.remove_conversation:
+        empty = Path(args.out).expanduser().with_suffix(".empty-projects")
+        empty.mkdir(parents=True, exist_ok=True)
+        os.environ["Z0INT_CLAUDE_PROJECTS"] = str(empty)
     if args.summarize:
         summarize(Path(args.summarize).expanduser())
         return
