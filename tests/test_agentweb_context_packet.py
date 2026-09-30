@@ -132,3 +132,36 @@ def test_impossibly_small_budget_fails_instead_of_dropping_required_evidence():
         packet = result["packet"]
         assert packet["measurements"]["packet_bytes"] <= 4096
         assert packet["unresolved_gaps"] == []
+
+
+def test_query_focused_excerpt_preserves_relevant_tail_fact():
+    args = request()
+    args["needs"] = [
+        {"id": "q0", "description": "deployment rollback token", "required": True},
+    ]
+    content = "irrelevant " * 500 + "deployment rollback token = KEEP-ME-42 " + "tail " * 200
+    args["evidence"] = [
+        source("focused", content, ["q0"]),
+    ]
+    args["max_packet_bytes"] = 5000
+    result = compile_agentweb_context_packet(args)
+    excerpts = [row.get("excerpt", "") for row in result["packet"]["evidence"]]
+    assert any("KEEP-ME-42" in excerpt for excerpt in excerpts)
+
+
+def test_packet_preserves_top_three_ranked_sources_when_budgeted():
+    args = request()
+    args["needs"] = [
+        {"id": "q0", "description": "market agent positioning", "required": True},
+    ]
+    args["evidence"] = [
+        source(f"rank-{i}", f"market agent positioning source {i} " + chr(97 + i) * 3000, ["q0"])
+        for i in range(6)
+    ]
+    args["max_packet_bytes"] = 6000
+    result = compile_agentweb_context_packet(args)
+    packet = result["packet"]
+    assert packet["measurements"]["retained_evidence_count"] >= 3
+    retained = {row["source_id"] for row in packet["evidence"]}
+    for i in range(3):
+        assert source(f"rank-{i}", "x", ["q0"])["source_id"] in retained
