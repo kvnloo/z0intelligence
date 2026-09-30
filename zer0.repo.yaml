@@ -1,0 +1,47 @@
+version: 1
+repo: kvnloo/z0intelligence
+id: z0intelligence
+component: z0intelligence
+kind: component
+summary: >
+  z0intelligence decision/routing authority with an experimental AgentWeb harness and
+  side-effect-free shadow planning surface on this exact ref.
+architecture:
+  subsystems:
+    - id: dispatch-authority
+      name: Canonical dispatch and receipt authority
+      kind: authority
+      paths:
+        - src/z0int/dispatch_authority.py
+        - src/z0int/intelligence.py
+        - src/z0int/receipt.py
+    - id: agentweb-shadow-planner
+      name: AgentWeb shadow planner
+      kind: integration
+      paths:
+        - src/z0int/automatic.py
+        - src/z0int/intelligence_service.py
+      depends_on:
+        - dispatch-authority
+  implements_mechanisms:
+    - jev-typed-decision
+  provides_interfaces:
+    - z0int.decision_receipt.v1
+  produces_representations:
+    - decision-receipt
+  consumes_representations:
+    - compiled-decision-state
+  boundaries:
+    owns:
+      - z0 routing, idempotency, request fingerprinting, dispatch claims, and decision receipts.
+      - Remote-context and specialist eligibility policy.
+    not_here:
+      - AgentWeb user identity or account authorization.
+      - AgentWeb confirmation, evaluation-workspace, funding, scheduling, or publish policy.
+  evidence:
+    docs:
+      - docs/agentweb-emma-integration.md
+    tests:
+      - tests/test_agentweb_integration.py
+    schemas:
+      - manifests/capabilities.v1.json
