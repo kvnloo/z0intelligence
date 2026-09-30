@@ -25,6 +25,7 @@ from .. import paths
 
 SCHEMA = "z0int.memory.event.v1"
 INDEX_SCHEMA = "z0int.memory.event_index.v1"
+STATE_SCHEMA = "z0int.memory.event_state.v1"
 BLOB_SCHEMA = "z0int.memory.blob_ref.v1"
 BLOB_THRESHOLD_BYTES = 16 * 1024
 _EVENT_TYPE = re.compile(r"^[a-z][a-z0-9_.-]{0,127}$")
@@ -140,6 +141,7 @@ class EventLog:
         self.root = base
         self.events_path = base / "events.jsonl"
         self.index_path = base / "events.idx.jsonl"
+        self.state_path = base / "events.state.json"
         self.blobs_dir = base / "blobs"
         self.blob_threshold = max(1, int(blob_threshold))
         self._ensure_layout()
@@ -160,9 +162,13 @@ class EventLog:
                 raise EventLogCorruption("content-addressed blob mismatch")
         else:
             try:
-                written = os.write(fd, payload_bytes)
-                if written != len(payload_bytes):
-                    raise OSError("short blob write")
+                view = memoryview(payload_bytes)
+                total = 0
+                while total < len(view):
+                    written = os.write(fd, view[total:])
+                    if written <= 0:
+                        raise OSError("short blob write")
+                    total += written
                 os.fsync(fd)
             finally:
                 os.close(fd)
@@ -205,9 +211,111 @@ class EventLog:
             expected += 1
         return rows
 
-    def _has_incomplete_tail_locked(self, fh, committed_end: int) -> bool:
-        fh.seek(0, os.SEEK_END)
-        return fh.tell() != committed_end
+    def _write_json_atomic(self, path: Path, value: Mapping[str, Any]) -> None:
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        with tmp.open("w", encoding="utf-8") as out:
+            out.write(json.dumps(dict(value), sort_keys=True, separators=(",", ":")) + "\n")
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(tmp, path)
+
+    def _write_index_rows(self, rows: list[tuple[dict[str, Any], int, int]]) -> None:
+        tmp = self.index_path.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as out:
+            for row, offset, length in rows:
+                out.write(
+                    json.dumps(
+                        {
+                            "schema": INDEX_SCHEMA,
+                            "event_id": row["event_id"],
+                            "offset": offset,
+                            "length": length,
+                            "checksum": row["checksum"],
+                        },
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                )
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(tmp, self.index_path)
+
+    def _write_state(
+        self,
+        *,
+        next_event_id: int,
+        end_offset: int,
+        last_row: dict[str, Any] | None,
+        last_offset: int = 0,
+        last_length: int = 0,
+    ) -> None:
+        value: dict[str, Any] = {
+            "schema": STATE_SCHEMA,
+            "next_event_id": next_event_id,
+            "end_offset": end_offset,
+        }
+        if last_row is not None:
+            value.update(
+                last_event_id=last_row["event_id"],
+                last_offset=last_offset,
+                last_length=last_length,
+                last_checksum=last_row["checksum"],
+            )
+        self._write_json_atomic(self.state_path, value)
+
+    def _repair_derived_locked(self, events) -> tuple[int, int]:
+        rows = self._scan_locked(events)
+        committed_end = rows[-1][1] + rows[-1][2] if rows else 0
+        events.seek(0, os.SEEK_END)
+        if events.tell() != committed_end:
+            raise EventLogCorruption("incomplete trailing event blocks append")
+        self._write_index_rows(rows)
+        if rows:
+            row, offset, length = rows[-1]
+            self._write_state(
+                next_event_id=len(rows),
+                end_offset=committed_end,
+                last_row=row,
+                last_offset=offset,
+                last_length=length,
+            )
+        else:
+            self._write_state(next_event_id=0, end_offset=0, last_row=None)
+        return len(rows), committed_end
+
+    def _append_state_locked(self, events) -> tuple[int, int]:
+        """Fast O(1) append state; full ledger scan only on stale/crash recovery."""
+        events.seek(0, os.SEEK_END)
+        file_end = events.tell()
+        try:
+            state = json.loads(self.state_path.read_text(encoding="utf-8"))
+            if (
+                not isinstance(state, dict)
+                or state.get("schema") != STATE_SCHEMA
+                or type(state.get("next_event_id")) is not int
+                or type(state.get("end_offset")) is not int
+                or state["next_event_id"] < 0
+                or state["end_offset"] != file_end
+            ):
+                raise ValueError("stale state")
+            next_id = int(state["next_event_id"])
+            if next_id == 0:
+                if file_end != 0:
+                    raise ValueError("empty state over nonempty log")
+                return 0, 0
+            offset = int(state.get("last_offset", -1))
+            length = int(state.get("last_length", -1))
+            if offset < 0 or length <= 0 or offset + length != file_end:
+                raise ValueError("invalid last event range")
+            events.seek(offset)
+            raw = events.read(length)
+            row = self._decode_committed_line(raw, expected_id=next_id - 1)
+            if row["checksum"] != state.get("last_checksum"):
+                raise ValueError("last checksum mismatch")
+            return next_id, file_end
+        except (OSError, ValueError, TypeError, json.JSONDecodeError, EventLogCorruption):
+            return self._repair_derived_locked(events)
 
     def append(
         self,
@@ -229,11 +337,7 @@ class EventLog:
         self.events_path.touch(mode=0o600, exist_ok=True)
         with self.events_path.open("r+b") as events:
             fcntl.flock(events, fcntl.LOCK_EX)
-            rows = self._scan_locked(events)
-            committed_end = rows[-1][1] + rows[-1][2] if rows else 0
-            if self._has_incomplete_tail_locked(events, committed_end):
-                raise EventLogCorruption("incomplete trailing event blocks append")
-            event_id = len(rows)
+            event_id, committed_end = self._append_state_locked(events)
             parents = tuple(int(x) for x in parent_event_ids)
             if any(x < 0 or x >= event_id for x in parents):
                 raise ValueError("parent_event_ids must reference earlier events")
@@ -279,6 +383,13 @@ class EventLog:
                     "checksum": base["checksum"],
                 }
             )
+            self._write_state(
+                next_event_id=event_id + 1,
+                end_offset=offset + len(line),
+                last_row=base,
+                last_offset=offset,
+                last_length=len(line),
+            )
             return MemoryEvent.from_dict(base)
 
     def _append_index_row(self, row: dict[str, Any]) -> None:
@@ -305,31 +416,24 @@ class EventLog:
                 yield MemoryEvent.from_dict(row)
 
     def rebuild_index(self) -> int:
-        """Rebuild the derived byte-offset index without mutating events.jsonl."""
+        """Rebuild derived offset/state files without mutating events.jsonl."""
         self.events_path.touch(mode=0o600, exist_ok=True)
-        tmp = self.index_path.with_suffix(".tmp")
-        with self.events_path.open("rb") as events:
-            fcntl.flock(events, fcntl.LOCK_SH)
+        with self.events_path.open("r+b") as events:
+            fcntl.flock(events, fcntl.LOCK_EX)
             rows = self._scan_locked(events)
-            with tmp.open("w", encoding="utf-8") as out:
-                for row, offset, length in rows:
-                    out.write(
-                        json.dumps(
-                            {
-                                "schema": INDEX_SCHEMA,
-                                "event_id": row["event_id"],
-                                "offset": offset,
-                                "length": length,
-                                "checksum": row["checksum"],
-                            },
-                            sort_keys=True,
-                            separators=(",", ":"),
-                        )
-                        + "\n"
-                    )
-                out.flush()
-                os.fsync(out.fileno())
-        os.replace(tmp, self.index_path)
+            self._write_index_rows(rows)
+            committed_end = rows[-1][1] + rows[-1][2] if rows else 0
+            if rows:
+                row, offset, length = rows[-1]
+                self._write_state(
+                    next_event_id=len(rows),
+                    end_offset=committed_end,
+                    last_row=row,
+                    last_offset=offset,
+                    last_length=length,
+                )
+            else:
+                self._write_state(next_event_id=0, end_offset=0, last_row=None)
         return len(rows)
 
     def _index_rows(self) -> list[dict[str, Any]]:
