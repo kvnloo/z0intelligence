@@ -73,8 +73,9 @@ def frac(s):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out')
+    ap.add_argument('--cases', default=str(HERE / 'cases_v0.json'))
     args = ap.parse_args()
-    cases = json.loads((HERE / 'cases_v0.json').read_text())['cases']
+    cases = json.loads(Path(args.cases).read_text())['cases']
     splits = ['all'] + sorted({c['split'] for c in cases})
     result = {'schema': 'z0int.effect_inference.results.v0', 'arms': {}, 'misses': {}}
     for authority in AUTHORITY:

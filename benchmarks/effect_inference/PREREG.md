@@ -61,3 +61,17 @@ result is reported as a secondary arm and is not part of the decision rule.
 `z0int claude-code decisions` gets a re-score that recomputes each recorded opportunity's action space from
 its *recorded* state (unknowns and contradictions as recorded), with inferred effects instead of `read`. It
 reports gate-vs-observed counts before and after, under both authorities. Only counts are published.
+
+## Addendum A: held-out set (registered after run 1, before the held-out set exists)
+
+Run 1 (`results_v0_run1.json`) scored 80/80 on every split. That number is **in-sample**. The classifier's
+author read all 80 cases, including the "blind" split (read to check its format), before writing the
+lexicon. "Blind" only means the cases were written without sight of the classifier. The classifier was not
+blind to the cases. Run 1 therefore supports only a smoke-test claim.
+
+Out-of-sample test, registered now:
+- The classifier is frozen at commit `b538963` (`src/z0int/effect_inference.py`). Nothing changes before the held-out run.
+- A fresh agent writes `cases_heldout_v0.json`: 60 items, 20 per gold class, same label definitions, told to write realistic and adversarial Claude Code prompts. It never sees the classifier or `cases_v0.json`.
+- The file is committed **unread** by the classifier author. `score.py --cases` is run once, and metrics are reported before any miss is inspected.
+- Same metrics and decision rule as above. The held-out result is the headline number, and run 1 is reported only as in-sample.
+- The only harness change after registration is `score.py --cases`, an additive CLI flag.

@@ -1,0 +1,259 @@
+{
+ "schema": "z0int.effect_inference.results.v0",
+ "arms": {
+  "baseline/session": {
+   "all": {
+    "n": 80,
+    "class_acc": "26/80",
+    "gate_acc": "50/80",
+    "false_act_privileged": 30,
+    "unnecessary_ask_read": "0/26",
+    "unnecessary_ask_write": "0/24",
+    "over_class": 0,
+    "under_class": 54,
+    "confusion": {
+     "privileged->read": 30,
+     "read->read": 26,
+     "write->read": 24
+    }
+   },
+   "authored": {
+    "n": 40,
+    "class_acc": "11/40",
+    "gate_acc": "24/40",
+    "false_act_privileged": 16,
+    "unnecessary_ask_read": "0/11",
+    "unnecessary_ask_write": "0/13",
+    "over_class": 0,
+    "under_class": 29,
+    "confusion": {
+     "privileged->read": 16,
+     "read->read": 11,
+     "write->read": 13
+    }
+   },
+   "blind": {
+    "n": 32,
+    "class_acc": "11/32",
+    "gate_acc": "22/32",
+    "false_act_privileged": 10,
+    "unnecessary_ask_read": "0/11",
+    "unnecessary_ask_write": "0/11",
+    "over_class": 0,
+    "under_class": 21,
+    "confusion": {
+     "privileged->read": 10,
+     "read->read": 11,
+     "write->read": 11
+    }
+   },
+   "cohort": {
+    "n": 8,
+    "class_acc": "4/8",
+    "gate_acc": "4/8",
+    "false_act_privileged": 4,
+    "unnecessary_ask_read": "0/4",
+    "unnecessary_ask_write": "0/0",
+    "over_class": 0,
+    "under_class": 4,
+    "confusion": {
+     "privileged->read": 4,
+     "read->read": 4
+    }
+   }
+  },
+  "inferred/session": {
+   "all": {
+    "n": 80,
+    "class_acc": "80/80",
+    "gate_acc": "80/80",
+    "false_act_privileged": 0,
+    "unnecessary_ask_read": "0/26",
+    "unnecessary_ask_write": "0/24",
+    "over_class": 0,
+    "under_class": 0,
+    "confusion": {
+     "privileged->privileged": 30,
+     "read->read": 26,
+     "write->write": 24
+    }
+   },
+   "authored": {
+    "n": 40,
+    "class_acc": "40/40",
+    "gate_acc": "40/40",
+    "false_act_privileged": 0,
+    "unnecessary_ask_read": "0/11",
+    "unnecessary_ask_write": "0/13",
+    "over_class": 0,
+    "under_class": 0,
+    "confusion": {
+     "privileged->privileged": 16,
+     "read->read": 11,
+     "write->write": 13
+    }
+   },
+   "blind": {
+    "n": 32,
+    "class_acc": "32/32",
+    "gate_acc": "32/32",
+    "false_act_privileged": 0,
+    "unnecessary_ask_read": "0/11",
+    "unnecessary_ask_write": "0/11",
+    "over_class": 0,
+    "under_class": 0,
+    "confusion": {
+     "privileged->privileged": 10,
+     "read->read": 11,
+     "write->write": 11
+    }
+   },
+   "cohort": {
+    "n": 8,
+    "class_acc": "8/8",
+    "gate_acc": "8/8",
+    "false_act_privileged": 0,
+    "unnecessary_ask_read": "0/4",
+    "unnecessary_ask_write": "0/0",
+    "over_class": 0,
+    "under_class": 0,
+    "confusion": {
+     "privileged->privileged": 4,
+     "read->read": 4
+    }
+   }
+  },
+  "baseline/default": {
+   "all": {
+    "n": 80,
+    "class_acc": "26/80",
+    "gate_acc": "26/80",
+    "false_act_privileged": 30,
+    "unnecessary_ask_read": "0/26",
+    "unnecessary_ask_write": "0/24",
+    "over_class": 0,
+    "under_class": 54,
+    "confusion": {
+     "privileged->read": 30,
+     "read->read": 26,
+     "write->read": 24
+    }
+   },
+   "authored": {
+    "n": 40,
+    "class_acc": "11/40",
+    "gate_acc": "11/40",
+    "false_act_privileged": 16,
+    "unnecessary_ask_read": "0/11",
+    "unnecessary_ask_write": "0/13",
+    "over_class": 0,
+    "under_class": 29,
+    "confusion": {
+     "privileged->read": 16,
+     "read->read": 11,
+     "write->read": 13
+    }
+   },
+   "blind": {
+    "n": 32,
+    "class_acc": "11/32",
+    "gate_acc": "11/32",
+    "false_act_privileged": 10,
+    "unnecessary_ask_read": "0/11",
+    "unnecessary_ask_write": "0/11",
+    "over_class": 0,
+    "under_class": 21,
+    "confusion": {
+     "privileged->read": 10,
+     "read->read": 11,
+     "write->read": 11
+    }
+   },
+   "cohort": {
+    "n": 8,
+    "class_acc": "4/8",
+    "gate_acc": "4/8",
+    "false_act_privileged": 4,
+    "unnecessary_ask_read": "0/4",
+    "unnecessary_ask_write": "0/0",
+    "over_class": 0,
+    "under_class": 4,
+    "confusion": {
+     "privileged->read": 4,
+     "read->read": 4
+    }
+   }
+  },
+  "inferred/default": {
+   "all": {
+    "n": 80,
+    "class_acc": "80/80",
+    "gate_acc": "80/80",
+    "false_act_privileged": 0,
+    "unnecessary_ask_read": "0/26",
+    "unnecessary_ask_write": "0/24",
+    "over_class": 0,
+    "under_class": 0,
+    "confusion": {
+     "privileged->privileged": 30,
+     "read->read": 26,
+     "write->write": 24
+    }
+   },
+   "authored": {
+    "n": 40,
+    "class_acc": "40/40",
+    "gate_acc": "40/40",
+    "false_act_privileged": 0,
+    "unnecessary_ask_read": "0/11",
+    "unnecessary_ask_write": "0/13",
+    "over_class": 0,
+    "under_class": 0,
+    "confusion": {
+     "privileged->privileged": 16,
+     "read->read": 11,
+     "write->write": 13
+    }
+   },
+   "blind": {
+    "n": 32,
+    "class_acc": "32/32",
+    "gate_acc": "32/32",
+    "false_act_privileged": 0,
+    "unnecessary_ask_read": "0/11",
+    "unnecessary_ask_write": "0/11",
+    "over_class": 0,
+    "under_class": 0,
+    "confusion": {
+     "privileged->privileged": 10,
+     "read->read": 11,
+     "write->write": 11
+    }
+   },
+   "cohort": {
+    "n": 8,
+    "class_acc": "8/8",
+    "gate_acc": "8/8",
+    "false_act_privileged": 0,
+    "unnecessary_ask_read": "0/4",
+    "unnecessary_ask_write": "0/0",
+    "over_class": 0,
+    "under_class": 0,
+    "confusion": {
+     "privileged->privileged": 4,
+     "read->read": 4
+    }
+   }
+  }
+ },
+ "misses": {
+  "inferred/session": [],
+  "inferred/default": []
+ },
+ "decision": {
+  "false_act_privileged_zero_every_split": true,
+  "unnecessary_ask_read_le_10pct": true,
+  "class_acc_beats_baseline": true,
+  "passes": true
+ }
+}
