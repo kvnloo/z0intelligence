@@ -33,6 +33,10 @@ class _Base(unittest.TestCase):
         self.projects.mkdir()
         self._prev_home = os.environ.get("Z0INT_HOME")
         os.environ["Z0INT_HOME"] = str(base / "z0home")
+        # hermetic resource posture: never read this host's real usage cache
+        self._prev_cb = os.environ.get("Z0INT_POSTURE_CODEXBAR")
+        self.codexbar = base / "codexbar-last.json"
+        os.environ["Z0INT_POSTURE_CODEXBAR"] = str(self.codexbar)
         _git(self.repo, "init", "-q", "-b", "main")
         (self.repo / "src").mkdir()
         (self.repo / "src" / "widget.py").write_text("x = 1\n", encoding="utf-8")
@@ -44,6 +48,10 @@ class _Base(unittest.TestCase):
         _git(self.repo, "commit", "-q", "-m", "init widget")
 
     def tearDown(self) -> None:
+        if self._prev_cb is None:
+            os.environ.pop("Z0INT_POSTURE_CODEXBAR", None)
+        else:
+            os.environ["Z0INT_POSTURE_CODEXBAR"] = self._prev_cb
         if self._prev_home is None:
             os.environ.pop("Z0INT_HOME", None)
         else:
@@ -72,7 +80,7 @@ class StatePacketTests(_Base):
             self.assertIn(k, keys)
         self.assertEqual(sp.provenance_complete(p), [])
         self.assertEqual(p["decision"]["mode"], "ACT")
-        self.assertEqual(p["measurements"]["concurrent_adapters"], 3)
+        self.assertEqual(p["measurements"]["concurrent_adapters"], 4)
         prio = next(c for c in p["current_claims"] if c["key"] == "docs.priority")
         self.assertEqual(prio["value"]["status"], "in progress")
         self.assertTrue(all(t["authorizes"] is False for t in p["allowed_transitions"]))
@@ -310,3 +318,56 @@ def test_subagent_only_history_still_yields_latest_session(tmp_path):
     latest = [c for c in pkt["current_claims"] if c["key"] == "conv.latest_session"]
     if latest:  # only assert when the adapter indexed the transcript at all
         assert "/sub:" in latest[0]["value"]
+
+
+class ResourcePostureFactTests(_Base):
+    """``resource.posture`` fact family: shadow context, fail-open, never blocks ACT."""
+
+    def write_codexbar(self, used_weekly: float, reset_hours: float) -> None:
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        iso = lambda h: (now + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: E731
+        self.codexbar.write_text(json.dumps([{"provider": "claude", "usage": {
+            "updatedAt": iso(0), "secondary": {"resetsAt": iso(reset_hours), "windowMinutes": 10080,
+                                               "usedPercent": used_weekly}}}]), encoding="utf-8")
+
+    def test_posture_fact_present_and_rendered(self):
+        self.add_transcript()
+        self.write_codexbar(18, 9)
+        p = self.build()
+        claims = {c["key"]: c for c in p["current_claims"]}
+        self.assertEqual(claims["resource.posture"]["value"]["factory"], "BURN")
+        self.assertFalse(claims["resource.posture"]["material"])
+        self.assertEqual(claims["resource.posture[claude]"]["value"]["binding_pool"], "claude:weekly")
+        self.assertEqual(p["decision"]["mode"], "ACT")
+        self.assertIsNotNone(p["source_revisions"]["resource"])
+        text = sp.render_additional_context(p)
+        self.assertIn("resource.posture: BURN", text)
+        self.assertIn("(shadow; not enforced)", text)
+
+    def test_posture_change_invalidates_packet(self):
+        self.write_codexbar(18, 9)
+        p = self.build()
+        self.assertTrue(sp.check_packet(p, self.projects)["valid"])
+        self.write_codexbar(100, 9)  # exhausted -> OFFLOAD: verdict changed
+        chk = sp.check_packet(p, self.projects)
+        self.assertFalse(chk["valid"])
+        self.assertIn("resource", chk["changed_sources"])
+
+    def test_missing_usage_source_is_nonblocking_unknown(self):
+        self.add_transcript()
+        p = self.build()
+        self.assertNotIn("resource.posture", {c["key"] for c in p["current_claims"]})
+        self.assertIn("resource.posture", {u["key"] for u in p["unknowns"]})
+        self.assertEqual(p["decision"]["mode"], "ACT")
+
+    def test_posture_failure_is_fail_open(self):
+        from unittest import mock
+
+        self.add_transcript()
+        with mock.patch("z0int.posture.current_posture", side_effect=RuntimeError("boom")):
+            p = self.build(use_cache=False)
+        self.assertEqual(p["decision"]["mode"], "ACT")
+        self.assertIn("resource.adapter", {u["key"] for u in p["unknowns"]})
+        self.assertIsNone(p["source_revisions"]["resource"])
