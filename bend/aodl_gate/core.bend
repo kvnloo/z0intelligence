@@ -1,7 +1,7 @@
 # AODL Core IR for the Bend structural gate.
 #
 # The host (z0int.bend_gate) turns an AODL/HOTL 0.2 JSON document into a
-# flat stream of decimal U32 tokens. Every string or scalar the rules look
+# flat stream of U32 tokens. Every string or scalar the rules look
 # at is interned into a value table first, so the kernel never sees JSON:
 #
 #   table   := count entry*
@@ -63,17 +63,15 @@ type Doc is Data:
 # Parser
 # ------
 
-def Toks() -> Type:
-  List<&2, String>
-
+# Tokens arrive already decoded to U32 (main.bend scans the bytes).
 def Parse(-A: Type) -> Type:
-  List<&2, String> -> Maybe<&1, A & List<&2, String>>
+  List<&2, U32> -> Maybe<&1, A & List<&2, U32>>
 
 def Parse.pure(-A: Type, x: A) -> Parse(A):
   ts => Some{(x, ts)}
 
-def Parse.run(-A: Type, -B: Type, r: Maybe<&1, A & List<&2, String>>,
-  f: A -> Parse(B)) -> Maybe<&1, B & List<&2, String>>:
+def Parse.run(-A: Type, -B: Type, r: Maybe<&1, A & List<&2, U32>>,
+  f: A -> Parse(B)) -> Maybe<&1, B & List<&2, U32>>:
   match r:
     case None{}:
       None{}
@@ -83,20 +81,12 @@ def Parse.run(-A: Type, -B: Type, r: Maybe<&1, A & List<&2, String>>,
 def Parse.bind(-A: Type, -B: Type, m: Parse(A), f: A -> Parse(B)) -> Parse(B):
   ts => Parse.run(A, B, m(ts), f)
 
-def p_u32.fin(m: Maybe<&2, U32>, t: List<&2, String>) ->
-  Maybe<&1, U32 & List<&2, String>>:
-  match m:
-    case None{}:
-      None{}
-    case Some{x}:
-      Some{(x, t)}
-
-def p_u32.go(ts: List<&2, String>) -> Maybe<&1, U32 & List<&2, String>>:
+def p_u32.go(ts: List<&2, U32>) -> Maybe<&1, U32 & List<&2, U32>>:
   match ts:
     case Nil{}:
       None{}
     case h <> t:
-      p_u32.fin(U32.read(h), t)
+      Some{(h, t)}
 
 def p_u32() -> Parse(U32):
   ts => p_u32.go(ts)
@@ -267,7 +257,7 @@ def p_req() -> Parse(Req):
     doc : Doc <- p_doc()
     return Req{tab, doc}
 
-def parse.done(r: Maybe<&1, Req & List<&2, String>>) -> Maybe<&2, Req>:
+def parse.done(r: Maybe<&1, Req & List<&2, U32>>) -> Maybe<&2, Req>:
   match r:
     case None{}:
       None{}
@@ -276,5 +266,5 @@ def parse.done(r: Maybe<&1, Req & List<&2, String>>) -> Maybe<&2, Req>:
     case Some{(q, h <> t)}:
       None{}
 
-def parse(ts: List<&2, String>) -> Maybe<&2, Req>:
+def parse(ts: List<&2, U32>) -> Maybe<&2, Req>:
   parse.done(p_req()(ts))

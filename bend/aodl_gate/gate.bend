@@ -26,7 +26,7 @@ def doc.of(m: Maybe<&2, C.Req>) -> Verdict:
     case Some{q}:
       of_issues(R.req_issues(q))
 
-def doc(ts: List<&2, String>) -> Verdict:
+def doc(ts: List<&2, U32>) -> Verdict:
   doc.of(C.parse(ts))
 
 # Transitions
@@ -46,29 +46,25 @@ def tr.of(m: Maybe<&2, X.Tr>) -> Verdict:
     case Some{+t}:
       tr.pick(t, X.allows(t))
 
-def tr(ts: List<&2, String>) -> Verdict:
+def tr(ts: List<&2, U32>) -> Verdict:
   tr.of(X.parse(ts))
 
 # Requests
 # --------
 
-def decide.tr(ist: Bool, t: List<&2, String>) -> Verdict:
-  match ist:
-    case True{}:
+# mode 1: a document; mode 2: a transition; anything else is refused
+def decide.mode(n: Nat, t: List<&2, U32>) -> Verdict:
+  match n:
+    case 1n:
+      doc(t)
+    case 2n:
       tr(t)
-    case False{}:
+    case _:
       Deny{[0]}
 
-def decide.mode(isd: Bool, ist: Bool, t: List<&2, String>) -> Verdict:
-  match isd:
-    case True{}:
-      doc(t)
-    case False{}:
-      decide.tr(ist, t)
-
-def decide(ts: List<&2, String>) -> Verdict:
+def decide(ts: List<&2, U32>) -> Verdict:
   match ts:
     case Nil{}:
       Deny{[0]}
-    case +h <> t:
-      decide.mode(String.eq(h, "D"), String.eq(h, "T"), t)
+    case h <> t:
+      decide.mode(U32.to_nat(h), t)

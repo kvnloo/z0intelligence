@@ -13,9 +13,10 @@
 #   has/limit  a declared Gamma budget dimension (has=0: unbounded)
 #   seen/prop  observed spend so far and the spend this spawn proposes
 #
-# Everything is a Nat, so spend never wraps: seen + prop is exact. The
-# host refuses (fails closed) on values it cannot represent this way,
-# such as fractional budgets or numbers past 2^48.
+# Every count, revision and budget is a Nat sent as two U32 tokens (hi,
+# lo), so spend never wraps: seen + prop is exact. The host refuses
+# (fails closed) on values it cannot represent this way, such as
+# fractional budgets or numbers past 2^48.
 #
 # Deny codes: 101 revision mismatch, 102 dynamic spawn not allowed,
 # 103 child count past maxChildren, 104 depth past maxDepth,
@@ -34,24 +35,12 @@ type Tr is Data:
 # Parser
 # ------
 
-def p_natr.fin(m: Maybe<&2, Nat>, t: List<&2, String>) ->
-  Maybe<&1, Nat & List<&2, String>>:
-  match m:
-    case None{}:
-      None{}
-    case Some{x}:
-      Some{(x, t)}
-
-def p_natr.go(ts: List<&2, String>) -> Maybe<&1, Nat & List<&2, String>>:
-  match ts:
-    case Nil{}:
-      None{}
-    case h <> t:
-      p_natr.fin(Nat.read(h), t)
-
-# a Nat read from its decimal text (Nat.read: at most 2^48 - 1)
+# a Nat sent as two U32 tokens, hi and lo: hi * 2^32 + lo
 def p_natr() -> C.Parse(Nat):
-  ts => p_natr.go(ts)
+  do C.Parse<Nat>:
+    hi : U32 <- C.p_u32()
+    lo : U32 <- C.p_u32()
+    return Nat.add(Nat.mul(U32.to_nat(hi), Nat.mul(65536n, 65536n)), U32.to_nat(lo))
 
 def p_dim() -> C.Parse(Dim):
   do C.Parse<Dim>:
@@ -78,7 +67,7 @@ def p_tr() -> C.Parse(Tr):
     rq : List<&2, Nat> <- p_nats()
     return Tr{cr, rr, dy, mc, md, ks, dp, ds, cl, rq}
 
-def parse.done(r: Maybe<&1, Tr & List<&2, String>>) -> Maybe<&2, Tr>:
+def parse.done(r: Maybe<&1, Tr & List<&2, U32>>) -> Maybe<&2, Tr>:
   match r:
     case None{}:
       None{}
@@ -87,7 +76,7 @@ def parse.done(r: Maybe<&1, Tr & List<&2, String>>) -> Maybe<&2, Tr>:
     case Some{(t, h <> r2)}:
       None{}
 
-def parse(ts: List<&2, String>) -> Maybe<&2, Tr>:
+def parse(ts: List<&2, U32>) -> Maybe<&2, Tr>:
   parse.done(p_tr()(ts))
 
 # Checks

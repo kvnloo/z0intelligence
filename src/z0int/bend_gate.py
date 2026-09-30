@@ -63,6 +63,9 @@ TRANSITION_CODES: dict[int, str] = {
     104: "max-depth", 105: "budget", 106: "authority",
 }
 UNPARSEABLE = 0
+MODE_DOCUMENT = 1
+MODE_TRANSITION = 2
+U32_MAX = (1 << 32) - 1
 # Nat.read accepts at most 2^48 - 1; the host refuses anything larger.
 NAT_MAX = (1 << 48) - 1
 # Doc-level numeric fields are only compared against 1, so clamping keeps
@@ -419,7 +422,7 @@ def encode_document(doc: Any, catalog: Mapping[str, Any] | None) -> Encoded:
     body = enc.document(doc)
     if enc.shape or body is None:
         return Encoded(None, enc.shape or [("type", "unrepresentable")])
-    return Encoded(["D", *enc.tab.tokens(), *body], [])
+    return Encoded([MODE_DOCUMENT, *enc.tab.tokens(), *body], [])
 
 
 # ---------------------------------------------------------------------------
@@ -461,7 +464,13 @@ def _nat_or_zero(value: Any) -> int:
     return min(int(value), NAT_MAX)
 
 
-def encode_transition(p: SpawnProposal) -> list[Any]:
+def _hl(n: int) -> list[int]:
+    """A Nat as the kernel reads it: two U32 tokens, hi and lo."""
+
+    return [n >> 32, n & U32_MAX]
+
+
+def encode_transition(p: SpawnProposal) -> list[int]:
     """Tokens for the transition gate; raises ValueError when unrepresentable."""
 
     dims: list[int] = []
@@ -471,9 +480,9 @@ def encode_transition(p: SpawnProposal) -> list[Any]:
         seen = _nat(p.observed.get(dim, 0) or 0)
         prop = _nat(p.proposed.get(dim, 0) or 0)
         if limit is None:
-            dims += [0, 0, seen, prop]
+            dims += [0, *_hl(0), *_hl(seen), *_hl(prop)]
         else:
-            dims += [1, _nat(limit), seen, prop]
+            dims += [1, *_hl(_nat(limit)), *_hl(seen), *_hl(prop)]
         n += 1
     names: dict[str, int] = {}
 
@@ -483,9 +492,11 @@ def encode_transition(p: SpawnProposal) -> list[Any]:
     ceil = [cap(c) for c in p.ceiling]
     req = [cap(c) for c in p.requested]
     return [
-        "T", _nat(p.contract_revision), _nat(p.request_revision), 1 if p.dynamic_allowed else 0,
-        _nat_or_zero(p.max_children), _nat_or_zero(p.max_depth), _nat(p.live_children), _nat(p.parent_depth),
-        n, *dims, len(ceil), *ceil, len(req), *req,
+        MODE_TRANSITION, *_hl(_nat(p.contract_revision)), *_hl(_nat(p.request_revision)),
+        1 if p.dynamic_allowed else 0,
+        *_hl(_nat_or_zero(p.max_children)), *_hl(_nat_or_zero(p.max_depth)),
+        *_hl(_nat(p.live_children)), *_hl(_nat(p.parent_depth)),
+        n, *dims, len(ceil), *[t for c in ceil for t in _hl(c)], len(req), *[t for c in req for t in _hl(c)],
     ]
 
 
