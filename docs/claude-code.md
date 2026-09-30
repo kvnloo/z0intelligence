@@ -10,7 +10,7 @@ seam, Tokenomics usage receipts, and levers promoted only on paired, verified ev
 | --- | --- | --- | --- |
 | Lean launch profile | `z0int claude-code launch --profile lean -- <claude args>` | cold -63.8% median (5/5), warm -27.2% median (15/15), equal verified quality | **use for headless / fleet sessions** |
 | Prefix-cache residency | `z0int claude-code warm DIR...` before placing work | stock cold session ≈ 3× a warm one ($0.126 vs $0.0425/task) | use when choosing worktrees |
-| State Packet at SessionStart | `Z0INT_CLAUDE_CODE_PACKET=1` with the plugin | held-out 14/14 vs 12/14, −30% input tokens; with lean: 2×2 composes, −74% vs stock raw | **opt-in; an aid to tools, not a replacement** |
+| State Packet at SessionStart | `Z0INT_CLAUDE_CODE_PACKET=1` with the plugin | held-out 14/14 vs 12/14, −30% input tokens; pinned held-out 2×2: packet ×0.81–0.83 cost, lean ×0.47–0.49, composed −61% vs stock raw (dev: −74%) | **opt-in; an aid to tools, not a replacement** |
 | Usage receipts | plugin `Stop` + `SessionEnd` | equal to Claude Code's billed usage on all four token fields | on |
 | Automatic routing | plugin `UserPromptSubmit` | inert in shadow (default) | shadow |
 | ObservationPack | `--plugin-dir harness-adapters/claude-code-z0-obspack` | null at tested scale (native spill >~30k) | not promoted |
