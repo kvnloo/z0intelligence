@@ -22,6 +22,15 @@ METRICS=Counter({name:0 for name in METRIC_TYPES})
 DRAINING=threading.Event()
 
 
+def aodl_admission_state():
+    try:
+        import aodl_contract
+        version=getattr(aodl_contract,'CANON_VERSION',None)
+        return {'aodl_admission_ready':version=='aodl-canon-1','aodl_canon_version':version}
+    except Exception as exc:
+        return {'aodl_admission_ready':False,'aodl_canon_version':None,'aodl_error':type(exc).__name__}
+
+
 def metric(name, amount=1):
     with METRIC_LOCK: METRICS[name] += amount
 
@@ -69,7 +78,8 @@ class Handler(BaseHTTPRequestHandler):
             from .provider_saturation import policy,snapshot
             config=policy()
             states={p:{k:v for k,v in snapshot(p).items() if k!='held_tokens'} for p in policy()['provider_caps']}
-            return self.reply(200,{'authority_protocol_version':2,'providers':states,
+            aodl=aodl_admission_state()
+            return self.reply(200,{'authority_protocol_version':3,'supported_authority_protocol_versions':[2,3],**aodl,'providers':states,
                 'free_only':config.get('free_only',False),
                 'validated_free_models':{p:[e['model'] for e in config.get('validated_free_routes',[]) if e['provider']==p and e.get('validated') and e.get('price_usd')==0] for p in states}})
         if self.path=='/metrics':
@@ -79,7 +89,9 @@ class Handler(BaseHTTPRequestHandler):
             if DRAINING.is_set():return self.reply(503,{'ok':False,'draining':True})
             try:
                 registry=json.loads(REGISTRY.read_text());assert registry['entries']
-                return self.reply(200,{'ok':True,'authority_protocol_version':2,'scope':'dispatch ready; model availability checked on call','max_active':4,'socket_backlog':8,'queue_policy':'reject excess with 503'})
+                aodl=aodl_admission_state()
+                if not aodl['aodl_admission_ready']:raise ValueError('AODL admission unavailable')
+                return self.reply(200,{'ok':True,'authority_protocol_version':3,'supported_authority_protocol_versions':[2,3],**aodl,'scope':'dispatch ready; model availability checked on call','max_active':4,'socket_backlog':8,'queue_policy':'reject excess with 503'})
             except Exception:return self.reply(503,{'ok':False})
         self.reply(404,{'error':'not_found'})
 
