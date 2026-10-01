@@ -5,6 +5,7 @@ into AgentWeb stores and never persists private excerpts.
 """
 from __future__ import annotations
 
+from datetime import datetime
 import hashlib
 import json
 import re
@@ -22,6 +23,7 @@ from .context_resolve import (
 SESSION_RE = re.compile(r"^agentweb:[0-9a-f]{24}$")
 SOURCE_RE = re.compile(r"^agentweb-kb:[0-9a-f]{64}$")
 VERSION_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+CONTENT_SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 LOCATOR_RE = re.compile(r"^agentweb-kb://[0-9a-f]{64}$")
 MAX_EVIDENCE = 20
 MAX_CONTENT_CHARS = 5000
@@ -115,12 +117,25 @@ def _parse_need(raw: Any, index: int) -> InformationNeed:
     )
 
 
+def _parse_retrieved_at(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > 64:
+        raise ValueError("invalid retrieved_at")
+    text = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError("invalid retrieved_at") from exc
+    if parsed.tzinfo is None:
+        raise ValueError("retrieved_at must be timezone-aware")
+    return value
+
+
 def _validate_source(raw: Any, need_ids: set[str]) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("evidence must be an object")
     allowed = {
         "source_id", "source_version", "locator", "content",
-        "need_ids", "source_kind",
+        "need_ids", "source_kind", "retrieved_at", "content_sha256",
     }
     if set(raw) - allowed:
         raise ValueError("unknown evidence fields")
@@ -130,6 +145,8 @@ def _validate_source(raw: Any, need_ids: set[str]) -> dict[str, Any]:
     content = raw.get("content")
     refs = raw.get("need_ids")
     source_kind = raw.get("source_kind", "unknown")
+    retrieved_at = _parse_retrieved_at(raw.get("retrieved_at"))
+    content_sha256 = raw.get("content_sha256")
     if not isinstance(source_id, str) or not SOURCE_RE.fullmatch(source_id):
         raise ValueError("invalid pseudonymous source_id")
     if not isinstance(source_version, str) or not VERSION_RE.fullmatch(source_version):
@@ -138,6 +155,13 @@ def _validate_source(raw: Any, need_ids: set[str]) -> dict[str, Any]:
         raise ValueError("invalid pseudonymous locator")
     if not isinstance(content, str) or not content.strip() or len(content) > MAX_CONTENT_CHARS:
         raise ValueError("evidence content must be 1..5000 chars")
+    if not isinstance(content_sha256, str) or not CONTENT_SHA_RE.fullmatch(content_sha256):
+        raise ValueError("invalid content_sha256")
+    computed_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    if content_sha256 != computed_sha256:
+        raise ValueError("content_sha256 does not match evidence content")
+    if source_version != "sha256:" + content_sha256:
+        raise ValueError("source_version must match content_sha256")
     if not isinstance(refs, list) or not refs or any(x not in need_ids for x in refs):
         raise ValueError("evidence need_ids must reference declared needs")
     if source_kind not in {
@@ -156,6 +180,8 @@ def _validate_source(raw: Any, need_ids: set[str]) -> dict[str, Any]:
         "content": content,
         "need_ids": tuple(dict.fromkeys(refs)),
         "source_kind": source_kind,
+        "retrieved_at": retrieved_at,
+        "content_sha256": content_sha256,
     }
 
 
@@ -260,9 +286,12 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
             source_version=item["source_version"],
             locator=item["locator"],
             trust_class="index_hit",
-            observed_at=_now_iso(),
+            observed_at=item["retrieved_at"],
             excerpt=excerpt,
-            note=f"agentweb_source_kind={item['source_kind']}",
+            note=(
+                f"agentweb_source_kind={item['source_kind']};"
+                f"content_sha256={item['content_sha256']}"
+            ),
         )
         tentative = refs + [candidate]
         packet_probe = {
@@ -283,9 +312,12 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
                 source_version=item["source_version"],
                 locator=item["locator"],
                 trust_class="index_hit",
-                observed_at=_now_iso(),
+                observed_at=item["retrieved_at"],
                 excerpt=shorter,
-                note=f"agentweb_source_kind={item['source_kind']}",
+                note=(
+                    f"agentweb_source_kind={item['source_kind']};"
+                    f"content_sha256={item['content_sha256']}"
+                ),
             )
             packet_probe["evidence"] = [ref.to_dict() for ref in refs + [candidate]]
             if _json_bytes(packet_probe) > max_packet_bytes:
@@ -332,7 +364,7 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
             )
         ),
         scope_fingerprint=_sha16(args["parent_agent"]),
-        policy_revision="agentweb-context-pack-v0",
+        policy_revision="agentweb-context-pack-v1",
         source_epochs=source_epochs,
         operations=(
             {
@@ -363,6 +395,7 @@ def compile_agentweb_context_packet(args: dict[str, Any]) -> dict[str, Any]:
             "input_content_bytes": sum(len(item["content"].encode("utf-8")) for item in evidence),
             "max_packet_bytes": max_packet_bytes,
             "truncated_excerpts": truncated,
+            "provenance_verified_count": len(evidence),
             "scan_incomplete": args.get("scan_incomplete") is True,
             "gpu_loaded": False,
             "network_model_calls": 0,
