@@ -239,6 +239,32 @@ class AOPromotionReportTests(unittest.TestCase):
             report["promotion"]["evidence_gaps"],
         )
 
+    def test_report_rejects_pair_with_mismatched_task_snapshot(self):
+        spawn_decision(spawn_request("ao-spawn-c", "c"), root=self.root)
+        spawn_decision(spawn_request("ao-spawn-r", "r"), root=self.root)
+
+        candidate = attach_experiment(
+            dict(find_receipt("ao-spawn-c", root=self.root)),
+            experiment_id="exp-2",
+            pair_id="pair-2",
+            task_snapshot_id="task-a",
+            arm_id="candidate",
+        )
+        reference = attach_experiment(
+            dict(find_receipt("ao-spawn-r", root=self.root)),
+            experiment_id="exp-2",
+            pair_id="pair-2",
+            task_snapshot_id="task-b",
+            arm_id="reference",
+        )
+        append_receipt(candidate, root=self.root)
+        append_receipt(reference, root=self.root)
+
+        comparison = build_ao_promotion_report(root=self.root)["comparison"]
+        self.assertFalse(comparison["available"])
+        self.assertEqual(comparison["matched_pairs"], 0)
+        self.assertEqual(comparison["excluded"]["task_snapshot_mismatch"], 1)
+
     def test_empty_report_uses_none_for_undefined_rates(self):
         report = build_ao_promotion_report(root=self.root)
         self.assertEqual(report["decisions"]["count"], 0)
