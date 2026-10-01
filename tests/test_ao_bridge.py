@@ -40,7 +40,6 @@ def outcome_event(session_id="proj-1"):
         "outcome_id": "ao-outcome-proj-1-terminated",
         "session_id": session_id,
         "outcome": {
-            "execution_completed": True,
             "pr_merged": True,
             "source": "agent-orchestrator",
             "verification_source": "ao-pr-merge",
