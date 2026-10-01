@@ -9,6 +9,7 @@ from z0int.agentweb_bridge import (
     canonical_request_fingerprint,
     derive_trace_id,
     failure_semantics,
+    handle_bridge_request,
     project_intelligence_args,
     validate_bridge_request,
 )
@@ -132,6 +133,38 @@ def test_observation_join_change_does_not_change_dispatch_fingerprint():
     second_projected = project_intelligence_args(second)
     assert first_projected == second_projected
     assert dispatch_authority.fingerprint(first_projected) == dispatch_authority.fingerprint(second_projected)
+
+
+def test_shadow_handler_never_enters_dispatch(monkeypatch):
+    from z0int import intelligence
+
+    monkeypatch.setattr(
+        intelligence,
+        "routing_snapshot",
+        lambda args: {"fixture": True},
+    )
+    monkeypatch.setattr(
+        intelligence,
+        "route",
+        lambda args, snapshot: {
+            "kind": "PARENT_ONLY",
+            "reason": "fixture",
+            "executed": False,
+        },
+    )
+    monkeypatch.setattr(
+        intelligence,
+        "dispatch",
+        lambda args: pytest.fail("shadow mode entered physical dispatch"),
+    )
+
+    result = handle_bridge_request(request())
+    assert result["ok"] is True
+    assert result["mode"] == "shadow"
+    assert result["executed"] is False
+    assert result["reconcile_required"] is False
+    assert result["request_sha256"] == canonical_request_fingerprint(request())
+    assert result["route"]["kind"] == "PARENT_ONLY"
 
 
 def test_trace_must_be_derived_from_parent_and_operation():
