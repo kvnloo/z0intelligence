@@ -1,0 +1,103 @@
+{
+ "suffix": "This is a read-only question: do not modify any files. End your reply with one final line of the form `ANSWER: <answer>`.",
+ "tasks": [
+  {
+   "id": "ws-engagement",
+   "packet_shown": true,
+   "repo": "z0intelligence-engagement",
+   "files": [
+    "claude_code_engagement\\.py"
+   ],
+   "prompt": "Somewhere in my workspace I have a branch where I'm working on Claude Code engagement (a workspace packet for sessions that start outside a repo). At most how many repos does that workspace packet list? Answer with the number only.",
+   "accept": [
+    "12"
+   ]
+  },
+  {
+   "id": "ws-t3av",
+   "packet_shown": true,
+   "repo": "evolution-lab-t3av",
+   "files": [
+    "action_space_v1\\.py"
+   ],
+   "prompt": "In my evolution-lab checkout for the t3b action-space v1 experiment, what are the actions of the v1 action space, in their defined order? Answer as a comma-separated list.",
+   "accept": [
+    "noop,retry,edit_retry,switch_tool,ask,abort"
+   ]
+  },
+  {
+   "id": "ws-aodl",
+   "packet_shown": true,
+   "repo": "z0intelligence-aodl-grants",
+   "files": [
+    "aodl_grants\\.py"
+   ],
+   "prompt": "On my AODL grants branch, what file name does a session-level AODL intent contract use, and what is the repo-level intent contract path? Answer as `<session file>|<repo-relative path>`.",
+   "accept": [
+    "intent.aodl.json|.aodl/intent.json"
+   ]
+  },
+  {
+   "id": "ws-promsim",
+   "packet_shown": true,
+   "repo": "z0intelligence-promotion-sim",
+   "files": [
+    "results_holdout\\.json"
+   ],
+   "prompt": "My promotion-sim branch scored its holdout against the pre-registration. How many PRs were in the holdout set, and which hypotheses came out false? Answer as `<n>|<comma-separated hypothesis ids>`.",
+   "accept": [
+    "91|h1"
+   ]
+  },
+  {
+   "id": "ws-toolcall",
+   "packet_shown": true,
+   "repo": "z0intelligence-toolcall",
+   "files": [
+    "PREREG\\.md"
+   ],
+   "prompt": "For my tool-calling portfolio experiment, what host:port does the bench-only llama.cpp router listen on, and what is its transient unit name? Answer as `<host:port>|<unit name>`.",
+   "accept": [
+    "100.113.138.100:11541|z0-toolcall-bench"
+   ]
+  },
+  {
+   "id": "ws-orch",
+   "packet_shown": false,
+   "repo": "z0intelligence-orch",
+   "files": [
+    "results_a1_local_order\\.json",
+    "PREREG_addendum_local_order\\.md"
+   ],
+   "prompt": "On my orchestrator-router experiment branch, the A1 addendum re-scored the deterministic arm under the host local_order. What host local_order (provider names, in order) was used, and what was the deterministic arm's S1 pass rate rounded to two decimals? Answer as `<comma-separated providers>|<rate>`.",
+   "accept": [
+    "groot,local|0.90",
+    "groot,local|0.9"
+   ]
+  },
+  {
+   "id": "ws-do",
+   "packet_shown": false,
+   "repo": "z0intelligence-do",
+   "files": [
+    "results_falsification_v0\\.json"
+   ],
+   "prompt": "On my decision-opportunity branch, in the falsification eval results, what strict score did the repo-scoped (do_repo) arm get, and which pinned question ids did the question-scoped arm miss? Answer as `<score as k/n>|<comma-separated ids>`.",
+   "accept": [
+    "3/11|p03,p08,p09"
+   ]
+  },
+  {
+   "id": "ws-loa",
+   "packet_shown": false,
+   "repo": "z0evals-loa",
+   "files": [
+    "manifest\\.yaml"
+   ],
+   "prompt": "In my z0evals checkout for the local-offload-and-authority study, which claim ids in the study manifest end in `-fails`? Answer as a comma-separated list sorted alphabetically.",
+   "accept": [
+    "action-authority-v0-fails,effect-inference-v0-fails,effect-inference-v1-fails"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{"suffix": "Use the Agent tool to run the two investigations as two parallel general-purpose subagents (one per investigation), then combine their findings. This is read-only: do not modify any files. End your reply with one final line of the form `ANSWER: <answer>`.",
+ "tasks": [
+ {"id": "sa-hooks", "prompt": "Investigation A: which hook events does the Claude Code plugin in harness-adapters/claude-code-z0intelligence register? Investigation B: what is the maximum number of repos the workspace packet lists? Answer as `<events sorted alphabetically, comma-separated>|<number>`.",
+  "accept": ["sessionend,sessionstart,stop,subagentstart,userpromptsubmit|12"]},
+ {"id": "sa-branch", "prompt": "Investigation A: what branch is this checkout on? Investigation B: what is the short sha of the most recent commit whose subject mentions worker-routing? Answer as `<branch>|<7-char sha>`.",
+  "accept": ["feat/engagement-v0|b072468"]},
+ {"id": "sa-envvars", "prompt": "Investigation A: which environment variable disables the workspace packet? Investigation B: which environment variable enables the subagent packet? Answer as `<var A>|<var B>`.",
+  "accept": ["z0int_claude_code_workspace_packet|z0int_claude_code_subagent_packet"]},
+ {"id": "sa-lean", "prompt": "Investigation A: which claude CLI flags (flag names only, without values) make up the lean launch profile? Investigation B: which settings.json keys does the engagement lean-settings proposal set? Answer as `<flags sorted, comma-separated>|<keys sorted, comma-separated>`.",
+  "accept": ["--disable-slash-commands,--setting-sources,--strict-mcp-config|disableclaudeaiconnectors,skilllistingbudgetfraction,skilllistingmaxdescchars"]},
+ {"id": "sa-posture", "prompt": "Investigation A: which resource posture values does the posture module define? Investigation B: for which posture values does the engagement offload hint tell the model to try route_worker first? Answer as `<A sorted, comma-separated>|<B sorted, comma-separated>`.",
+  "accept": ["balanced,burn,offload,reserve|offload,reserve"]},
+ {"id": "sa-head", "prompt": "Investigation A: how many files did the HEAD commit change? Investigation B: which test files did the HEAD commit add or modify? Answer as `<number>|<paths sorted, comma-separated>`.",
+  "accept": ["9|tests/test_claude_code_adapter.py,tests/test_claude_code_engagement.py"]},
+ {"id": "sa-schemas", "prompt": "Investigation A: what schema string does the engagement cohort report emit? Investigation B: what schema string do per-turn Claude Code tokenomics events use? Answer as `<A>|<B>`.",
+  "accept": ["z0int.claude_code.engagement.v0|tokenomics.event.v0"]},
+ {"id": "sa-bench", "prompt": "Investigation A: which arm names does benchmarks/claude_code/run_pair.py define? Investigation B: how many task directories are under benchmarks/claude_code/tasks? Answer as `<arm names sorted, comma-separated>|<number>`.",
+  "accept": ["lean,lean+obspack,lean+z0,obspack,off,z0-shadow|10"]}
+]}
