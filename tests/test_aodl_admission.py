@@ -105,6 +105,17 @@ class AodlAdmissionTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.codes, ("parent-not-declared",))
 
+    def test_malformed_proposal_containers_fail_closed(self):
+        bad_observed = request(observed=[])
+        d1 = decide_spawn(document(), bad_observed, contract_api=FakeAodl)
+        self.assertFalse(d1.allowed)
+        self.assertEqual(d1.codes, ("proposal-or-contract-shape",))
+
+        bad_requested = request(requested="execute")
+        d2 = decide_spawn(document(), bad_requested, contract_api=FakeAodl)
+        self.assertFalse(d2.allowed)
+        self.assertEqual(d2.codes, ("proposal-or-contract-shape",))
+
     def test_invalid_contract_yields_no_authority(self):
         class Invalid(FakeAodl):
             @staticmethod
