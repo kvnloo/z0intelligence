@@ -11,6 +11,7 @@ from .automatic import dispatch_event, consume
 from .decision_experiment import run_choice_experiment, run_noul_experiment
 from .reliability_observation import ingest_observation
 from .agentweb_context_packet import compile_agentweb_context_packet
+from .agentweb_bridge_wire import unwrap_agentweb_bridge_request, wrap_agentweb_bridge_response
 
 SLOTS=threading.BoundedSemaphore(4)
 METRIC_LOCK=threading.Lock()
@@ -98,6 +99,9 @@ class Handler(BaseHTTPRequestHandler):
             size=int(self.headers.get('Content-Length','0'))
             if not 0<size<=(262144 if self.path.startswith('/v1/authority/') else 40000):return self.reply(413,{'error':'request_size'})
             args=json.loads(self.rfile.read(size))
+            bridge_envelope=None
+            if self.path in ('/v1/intelligence','/v1/plan','/v1/experimental/choice','/v1/experimental/noul'):
+                bridge_envelope,args=unwrap_agentweb_bridge_request(self.path,args)
             if self.path.startswith('/v1/authority/'):
                 from .dispatch_authority import rpc
                 return self.reply(200,rpc(self.path.removeprefix('/v1/authority/'),args))
@@ -107,7 +111,9 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=='/v1/automatic/consumed':return self.reply(200,consume(args))
             if self.path=='/v1/observe/reliability':return self.reply(200,ingest_observation(args))
             if self.path=='/v1/context/pack':return self.reply(200,compile_agentweb_context_packet(args))
-            if self.path=='/v1/plan':return self.reply(200,plan_intelligence(args))
+            if self.path=='/v1/plan':
+                result=plan_intelligence(args)
+                return self.reply(200,wrap_agentweb_bridge_response(bridge_envelope,result))
             started=time.monotonic()
             with METRIC_LOCK:
                 METRICS['dispatch_active']+=1
@@ -120,7 +126,7 @@ class Handler(BaseHTTPRequestHandler):
                 metric('dispatch_active',-1)
                 metric('dispatch_seconds_sum',time.monotonic()-started)
                 metric('dispatch_finished_total')
-            self.reply(200,result)
+            self.reply(200,wrap_agentweb_bridge_response(bridge_envelope,result))
         except (ValueError,TypeError):self.reply(400,{'error':'invalid_request_or_trace_conflict'})
         except Exception:self.reply(500,{'error':'dispatch_failed'})
 
