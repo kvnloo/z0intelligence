@@ -234,7 +234,11 @@ def join_ao_outcome(args: dict[str, Any], *, root=None) -> dict[str, Any]:
 
         raw = outcome.to_dict()
         raw["source"] = "agent-orchestrator"
-        joined = join_outcome(trace_id, raw, root=root)
+        meaningful = any(
+            key not in {"source", "verification_source", "note"}
+            for key in raw
+        )
+        joined = join_outcome(trace_id, raw, root=root) if meaningful else None
         updated = find_receipt(trace_id, root=root)
         if updated is None:
             raise RuntimeError("AO outcome join lost its decision receipt")
