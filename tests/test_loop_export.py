@@ -124,3 +124,20 @@ def test_cli_dispatch(state, tmp_path, capsys):
     from z0int.outcome_verifier import _main
     assert _main(['export', '--state-dir', str(state), '--out', str(tmp_path / 'x.jsonl')]) == 0
     assert 'with_features=' in capsys.readouterr().out
+
+
+def test_sweep_counts_are_counts_only(state):
+    rows = [{'session_id': 's1', 'trace_id': 't1', 'verification_state': 'verified_success',
+             'turn': {'started_at': '2026-09-30T10:00:00Z', 'harness_message': False}},
+            {'session_id': 's9', 'trace_id': 'x', 'verification_state': 'unverified',
+             'turn': {'started_at': '2026-09-29T10:00:00Z', 'harness_message': False}},
+            {'session_id': 's9', 'trace_id': 'y', 'verification_state': 'verified_failure',
+             'turn': {'started_at': '2026-09-29T11:00:00Z', 'harness_message': True}}]
+    out = le.sweep_counts(rows, state, since_spec='7d', now=0)
+    assert out['first_turn_at'] == '2026-09-29T10:00:00Z' and out['sessions'] == 2
+    assert out['total']['turns_after_first_opportunity'] == 1  # fixture packets are built 10:00Z
+    assert out['total']['with_opportunity_after_first_opportunity'] == 1
+    assert {k: v for k, v in out['total'].items() if 'after' not in k} == {'turns': 2, 'verified_success': 1, 'unverified': 1, 'with_opportunity': 1,
+                            'with_observed': 1, 'with_opportunity_and_resolved': 1}
+    assert set(out['by_day']) == {'2026-09-29', '2026-09-30'}
+    assert 's1' not in json.dumps(out)

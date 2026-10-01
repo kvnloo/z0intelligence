@@ -288,6 +288,56 @@ def manifest(rows: list[dict[str, Any]], *, sources: Mapping[str, Path], generat
     }
 
 
+def sweep_counts(verified_rows: Iterable[Mapping[str, Any]], state: Path, *, since_spec: str,
+                 now: float, cohort_fn=None) -> dict[str, Any]:
+    """Counts-only volume measurement over transcript turns (for the data-volume projection).
+
+    ``verified_rows`` come from ``outcome_verifier.verify(all_turns=True)`` in memory; nothing is
+    appended. Per UTC day: turns, verification states, and whether each turn also has an
+    opportunity record / an observed row (the feature coverage of the live hooks).
+    """
+    opp_keys = {(r.get('session_id'), ((r.get('opportunity') or {}).get('trace') or {}).get('trace_id'))
+                for r in _read_jsonl(state / 'opportunities.jsonl') if r.get('schema') == OPP_SCHEMA}
+    obs_keys = {(r.get('session_id'), r.get('trace_id')) for r in _read_jsonl(state / 'outcomes.jsonl')
+                if r.get('schema') == OBSERVED_SCHEMA}
+    first_opp = min((((r.get('opportunity') or {}).get('provenance') or {}).get('built_at') or '~')
+                    for r in _read_jsonl(state / 'opportunities.jsonl')) if opp_keys else None
+    cohort_fn = cohort_fn or (lambda sid: 'unknown')
+    days: dict[str, Counter] = {}
+    cohorts: dict[str, Counter] = {}
+    seen_cohort: dict[str, str] = {}
+    total: Counter = Counter()
+    stamps = []
+    for r in verified_rows:
+        if (r.get('turn') or {}).get('harness_message'):
+            continue
+        key = (r.get('session_id'), r.get('trace_id'))
+        started = (r.get('turn') or {}).get('started_at') or ''
+        if started:
+            stamps.append(started)
+        day = started[:10] or 'unknown'
+        sid = r.get('session_id')
+        if sid not in seen_cohort:
+            seen_cohort[sid] = cohort_fn(sid)
+        c = days.setdefault(day, Counter())
+        after = bool(first_opp) and started >= first_opp
+        for cc in (c, total, cohorts.setdefault(seen_cohort[sid], Counter())):
+            cc['turns_after_first_opportunity'] += after
+            cc['with_opportunity_after_first_opportunity'] += after and key in opp_keys
+            cc['turns'] += 1
+            cc[r.get('verification_state') or 'unverified'] += 1
+            cc['with_opportunity'] += key in opp_keys
+            cc['with_observed'] += key in obs_keys
+            cc['with_opportunity_and_resolved'] += key in opp_keys and r.get('verification_state') != 'unverified'
+    return {'since': since_spec, 'measured_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(now)),
+            'first_opportunity_at': first_opp, 'first_turn_at': min(stamps) if stamps else None,
+            'last_turn_at': max(stamps) if stamps else None, 'total': dict(total),
+            'sessions': len(seen_cohort),
+            'sessions_by_cohort': dict(Counter(seen_cohort.values())),
+            'by_cohort': {k: dict(c) for k, c in sorted(cohorts.items())},
+            'by_day': {d: dict(c) for d, c in sorted(days.items())}, 'privacy': 'counts only'}
+
+
 FORBIDDEN_KEYS = ('request', 'prompt', 'text', 'cwd', 'path', 'value', 'session_id', 'trace_id', 'locator')
 
 
@@ -307,7 +357,7 @@ def assert_private(rows: Iterable[Mapping[str, Any]]) -> None:
 
 
 def export(out: Path, *, state: Path | None = None, projects: Path | None = None,
-           include_unjoined: bool = False) -> dict[str, Any]:
+           include_unjoined: bool = False, sweep_since: str | None = None, gh: bool = True) -> dict[str, Any]:
     from .outcome_verifier import state_dir
     state = state or state_dir()
     now = time.time()
@@ -317,6 +367,12 @@ def export(out: Path, *, state: Path | None = None, projects: Path | None = None
     out.write_text(''.join(json.dumps(r, sort_keys=True) + '\n' for r in rows))
     man = manifest(rows, sources={n: state / n for n in ('opportunities.jsonl', 'outcomes.jsonl',
                                                          'outcomes_verified.jsonl')}, generated_at=now)
+    if sweep_since:
+        from .outcome_verifier import GitHub, parse_since, verify
+        swept = verify(root=state.parent.parent,  # state = <root>/state/claude-code
+                       since=parse_since(sweep_since, now), all_turns=True, gh=GitHub(gh), projects=projects, now=now)
+        man['sweep'] = sweep_counts(swept, state, since_spec=sweep_since, now=now,
+                                    cohort_fn=lambda sid: transcript_cohort(sid, projects))
     out.with_suffix('.manifest.json').write_text(json.dumps(man, indent=1, sort_keys=True) + '\n')
     return man
 
@@ -329,9 +385,14 @@ def _main(argv: list[str] | None = None) -> int:
     ap.add_argument('--projects-dir', type=Path, default=None)
     ap.add_argument('--include-unjoined', action='store_true',
                     help='also emit verified turns without an opportunity record (features=null; volume only)')
+    ap.add_argument('--sweep-since', default=None,
+                    help="also verify every transcript turn since this ('7d') in memory and add counts-only "
+                         "volume (manifest.sweep); nothing is appended")
+    ap.add_argument('--no-gh', action='store_true', help='sweep without read-only GitHub lookups')
     ap.add_argument('--json', action='store_true')
     args = ap.parse_args(argv)
-    man = export(args.out, state=args.state_dir, projects=args.projects_dir, include_unjoined=args.include_unjoined)
+    man = export(args.out, state=args.state_dir, projects=args.projects_dir, include_unjoined=args.include_unjoined,
+                 sweep_since=args.sweep_since, gh=not args.no_gh)
     c = man['counts']
     print(json.dumps(c, indent=1) if args.json else
           f"rows={c['rows']} with_features={c['with_features']} resolved={c['resolved']} "
