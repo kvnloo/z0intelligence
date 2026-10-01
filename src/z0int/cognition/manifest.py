@@ -10,6 +10,11 @@ Two kinds of evidence live here and are *never* mixed:
     What actually happened on a named machine, recorded by
     :mod:`z0int.cognition.probe` as a reproducible receipt.
 
+``reproduced_results``
+    Locally reproduced task scores (e.g. tool-call exact accuracy on a frozen,
+    pre-registered item set). Each one names the receipt that produced it, and
+    that receipt must be listed in ``local_benchmark_receipt_ids``.
+
 Selection helpers only read ``measurements`` and ``local_benchmark_receipt_ids``.
 That invariant is enforced by :func:`assert_selection_is_evidence_based` and
 covered by tests.
@@ -82,6 +87,8 @@ class Measurement:
     short_decision_ms: float | None = None
     long_decision_ms: float | None = None
     gpu_util_pct: float | None = None
+    decision_p50_ms: float | None = None
+    decision_p95_ms: float | None = None
     receipt_id: str | None = None
     measured_at: str | None = None
     notes: str | None = None
@@ -126,6 +133,36 @@ class SourceClaim:
 
 
 @dataclass(frozen=True)
+class ReproducedResult:
+    """One locally reproduced task score. Never copied from a model card."""
+
+    suite: str
+    metric: str
+    value: float
+    receipt_id: str
+    n: int | None = None
+    machine: str | None = None
+    runtime: str | None = None
+    quantization: str | None = None
+    adapter: str | None = None
+    comparator: str | None = None
+    measured_at: str | None = None
+    notes: str | None = None
+
+    def __post_init__(self) -> None:
+        if not str(self.receipt_id or "").strip():
+            raise ValueError(f"reproduced result {self.suite}/{self.metric} has no receipt_id")
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> ReproducedResult:
+        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+        return cls(**{k: v for k, v in raw.items() if k in known})  # type: ignore[arg-type]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items() if v is not None}
+
+
+@dataclass(frozen=True)
 class ModelCapability:
     model_id: str
     hf: str | None = None
@@ -148,6 +185,8 @@ class ModelCapability:
     measurements: tuple[Measurement, ...] = ()
     source_reported_benchmarks: tuple[SourceClaim, ...] = ()
     local_benchmark_receipt_ids: tuple[str, ...] = ()
+    reproduced_results: tuple[ReproducedResult, ...] = ()
+    local_artifact: Mapping[str, Any] | None = None
     promotion_state: str = "candidate"
     deployment_constraints: tuple[str, ...] = ()
     mechanism: str | None = None
@@ -174,8 +213,22 @@ class ModelCapability:
                 f"{self.model_id}: licence {self.license!r} is non-commercial but "
                 "commercial_use=True"
             )
+        unlinked = sorted(
+            {r.receipt_id for r in self.reproduced_results}
+            - set(self.local_benchmark_receipt_ids)
+        )
+        if unlinked:
+            raise ValueError(
+                f"{self.model_id}: reproduced_results cite receipts not in "
+                f"local_benchmark_receipt_ids: {unlinked}"
+            )
 
     # ---- evidence separation ---------------------------------------
+    def reproduced(self, suite: str, metric: str) -> ReproducedResult | None:
+        """Latest local reproduction of ``suite/metric`` (source claims are never consulted)."""
+        hits = [r for r in self.reproduced_results if r.suite == suite and r.metric == metric]
+        return hits[-1] if hits else None
+
     @property
     def measured(self) -> bool:
         """True only when this model has at least one local reproduction."""
@@ -221,6 +274,8 @@ class ModelCapability:
             "measurements": [m.to_dict() for m in self.measurements],
             "source_reported_benchmarks": [c.to_dict() for c in self.source_reported_benchmarks],
             "local_benchmark_receipt_ids": list(self.local_benchmark_receipt_ids),
+            "reproduced_results": [r.to_dict() for r in self.reproduced_results],
+            "local_artifact": dict(self.local_artifact) if self.local_artifact is not None else None,
             "promotion_state": self.promotion_state,
             "deployment_constraints": list(self.deployment_constraints),
             "mechanism": self.mechanism,
@@ -310,6 +365,10 @@ def _parse_model(model_id: str, raw: Mapping[str, Any]) -> ModelCapability:
             SourceClaim.from_dict(c) for c in raw.get("source_reported_benchmarks") or ()
         ),
         local_benchmark_receipt_ids=tuple(raw.get("local_benchmark_receipt_ids") or ()),
+        reproduced_results=tuple(
+            ReproducedResult.from_dict(r) for r in raw.get("reproduced_results") or ()
+        ),
+        local_artifact=dict(raw["local_artifact"]) if raw.get("local_artifact") else None,
         promotion_state=str(raw.get("promotion_state") or "candidate"),
         deployment_constraints=tuple(raw.get("deployment_constraints") or ()),
         mechanism=raw.get("mechanism"),

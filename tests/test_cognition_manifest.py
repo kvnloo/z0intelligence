@@ -246,3 +246,29 @@ def test_to_dict_round_trips_through_json():
 def test_missing_manifest_file_raises_file_not_found(tmp_path: Path):
     with pytest.raises(FileNotFoundError):
         load_local_cognition(tmp_path / "nope.json")
+
+
+def _repro(receipt="r-1", **kw):
+    return {"suite": "bfcl", "metric": "exact_call_acc", "value": 0.5, "n": 125, "receipt_id": receipt, **kw}
+
+
+def test_reproduced_results_must_cite_a_listed_receipt():
+    with pytest.raises(ValueError, match="local_benchmark_receipt_ids"):
+        parse_manifest({"schema": SCHEMA, "models": {"a": {"reproduced_results": [_repro()]}}})
+    with pytest.raises(ValueError, match="no receipt_id"):
+        parse_manifest({"schema": SCHEMA, "models": {"a": {"reproduced_results": [_repro(receipt="")],
+                                                           "local_benchmark_receipt_ids": [""]}}})
+
+
+def test_reproduced_results_are_separate_from_source_claims_and_round_trip():
+    raw = {"schema": SCHEMA, "models": {"a": {
+        "source_reported_benchmarks": [{"name": "BFCL", "value": "99"}],
+        "reproduced_results": [_repro(), _repro(metric="irrelevance_rejection", value=0.8)],
+        "local_benchmark_receipt_ids": ["r-1"],
+        "local_artifact": {"kind": "gguf", "sha256": "ab"}}}}
+    model = parse_manifest(raw).get("a")
+    assert model.reproduced("bfcl", "exact_call_acc").value == 0.5
+    assert model.reproduced("bfcl", "BFCL") is None  # a source claim is never returned as a reproduction
+    assert not model.measured  # task scores are not serving measurements
+    again = parse_manifest(json.loads(json.dumps({"schema": SCHEMA, "models": {"a": model.to_dict()}}))).get("a")
+    assert again == model
