@@ -72,7 +72,10 @@ class AdmissionDecision:
 def _number(value: Any, where: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{where} must be numeric")
-    result = float(value)
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{where} must be a finite numeric value") from exc
     if not math.isfinite(result) or result < 0:
         raise ValueError(f"{where} must be finite and >= 0")
     return result
