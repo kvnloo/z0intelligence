@@ -50,6 +50,9 @@ def decide_mutation_outcome(
     and complete the request in one receiver-side operation, but only when the
     receiver's identity/content binding is proven.
     """
+    if effect == "unknown" and not attempted:
+        raise ValueError("an unknown mutation effect requires attempted=True")
+
     if effect == "observed":
         evidence = verification_evidence or unresolved_evidence
         return MutationOutcome(
