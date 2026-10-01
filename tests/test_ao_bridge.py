@@ -154,6 +154,33 @@ class AOBridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "evidence"):
             join_ao_outcome(event, root=self.root)
 
+    def test_distinct_outcome_ids_form_event_ledger(self):
+        spawn_decision(request(), root=self.root)
+
+        ci_event = outcome_event()
+        ci_event["outcome_id"] = "ao-outcome-proj-1-ci-abc123"
+        ci_event["outcome"] = {
+            "ci_failed": True,
+            "source": "agent-orchestrator",
+            "verification_source": "ao-ci",
+        }
+        ci_event["evidence"]["disposition"] = "observed"
+        ci_event["evidence"]["terminated"] = False
+        ci_event["evidence"]["prs"][0]["merged"] = False
+        ci_event["evidence"]["prs"][0]["ci"] = "failing"
+        first = join_ao_outcome(ci_event, root=self.root)
+        self.assertEqual(first["outcome_tier"], "negative")
+
+        merge_event = outcome_event()
+        merge_event["outcome_id"] = "ao-outcome-proj-1-merged-def456"
+        merge_event["evidence"]["disposition"] = "observed"
+        merge_event["evidence"]["terminated"] = False
+        second = join_ao_outcome(merge_event, root=self.root)
+        self.assertEqual(second["outcome_tier"], "gold")
+
+        self.assertTrue(join_ao_outcome(ci_event, root=self.root)["replayed"])
+        self.assertTrue(join_ao_outcome(merge_event, root=self.root)["replayed"])
+
     def test_outcome_replay_rejects_changed_evidence(self):
         spawn_decision(request(), root=self.root)
         event = outcome_event()
