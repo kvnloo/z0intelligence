@@ -12,6 +12,7 @@ from .decision_experiment import run_choice_experiment, run_noul_experiment
 from .reliability_observation import ingest_observation
 from .agentweb_context_packet import compile_agentweb_context_packet
 from .agentweb_bridge_wire import unwrap_agentweb_bridge_request, wrap_agentweb_bridge_response
+from .agentweb_bridge_capabilities import agentweb_bridge_capabilities
 
 SLOTS=threading.BoundedSemaphore(4)
 METRIC_LOCK=threading.Lock()
@@ -75,6 +76,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path=='/healthz':return self.reply(200,{'ok':True})
+        if self.path=='/v1/bridge/capabilities':return self.reply(200,agentweb_bridge_capabilities())
         if self.path=='/v1/providers':
             from .provider_saturation import policy,snapshot
             config=policy()
