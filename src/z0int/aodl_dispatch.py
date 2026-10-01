@@ -106,6 +106,27 @@ def previous(request_sha256: str, key: str) -> dict[str, Any] | None:
     return row
 
 
+def _emit_tokenomics(row: dict[str, Any]) -> None:
+    extra = row.get("extra")
+    payload = extra.get("aodl_admission") if isinstance(extra, dict) else None
+    if not isinstance(payload, dict):
+        return
+    try:
+        from .tokenomics_emit import emit_aodl_admission_once
+
+        emit_aodl_admission_once(
+            receipt_id=str(row.get("trace_id")),
+            caller_trace_id=extra.get("caller_trace_id"),
+            session_id=row.get("session_id"),
+            harness=extra.get("harness"),
+            admission=payload,
+        )
+    except Exception:
+        # Measurement is non-authoritative. The durable admission receipt remains
+        # the source of truth and a replay can retry the one-time projection.
+        return
+
+
 def ensure(
     request: dict[str, Any],
     key: str,
@@ -117,6 +138,7 @@ def ensure(
 
     prior = previous(request_sha256, key)
     if prior is not None:
+        _emit_tokenomics(prior)
         return prior
 
     payload = evaluate(request, required=required)
@@ -141,7 +163,9 @@ def ensure(
             "aodl_admission": payload,
         },
     }
-    return append_receipt(row)
+    saved = append_receipt(row)
+    _emit_tokenomics(saved)
+    return saved
 
 
 def is_allowed(row: dict[str, Any] | None) -> bool:
