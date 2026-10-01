@@ -150,8 +150,10 @@ def test_cohorts_and_report_count_only(tmp_path):
     assert 'secret' not in json.dumps(rep)
 
 
-def test_hooks_json_registers_subagent_start():
+def test_hooks_json_does_not_register_subagent_start_by_default():
+    # subagent_packet is off by default; a registered hook would still spawn Python per subagent.
     from pathlib import Path
     hooks = json.loads((Path(__file__).resolve().parents[1] / 'harness-adapters' / 'claude-code-z0intelligence'
                         / 'hooks' / 'hooks.json').read_text())['hooks']
-    assert 'session-start' in hooks['SubagentStart'][0]['hooks'][0]['command']
+    assert 'SubagentStart' not in hooks
+    assert 'session-start' in hooks['SessionStart'][0]['hooks'][0]['command']

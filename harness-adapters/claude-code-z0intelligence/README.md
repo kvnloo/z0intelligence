@@ -8,7 +8,7 @@ Hermes (`pre_llm_call`), OMP (`before_agent_start`) and DSH (`llm/stream`) use.
 | `UserPromptSubmit` | `z0int.claude_code prompt` → `automatic.handle_event` | shadow: routed and receipted, never injected |
 | `Stop`, `SessionEnd` | `z0int.claude_code stop` → Tokenomics `claude-code.provider_usage.v0` | on |
 | `SessionStart` | `z0int.claude_code session-start` → repo State Packet, or a multi-repo workspace packet outside a repo, plus a posture-aware `route_worker` hint | off (`packet: true`) |
-| `SubagentStart` | same handler | off (`subagent_packet: true`) |
+| `SubagentStart` | same handler — NOT registered by default (it would spawn Python per subagent); add it to hooks.json together with `subagent_packet: true` | off |
 | MCP `route_worker` | `z0int.intelligence_mcp` with `Z0INT_HARNESS=claude-code`; `initialize.instructions` say when to offload | on |
 
 Requires `pip install -e .` of this repo (or `Z0INT_PYTHON` pointing at that
