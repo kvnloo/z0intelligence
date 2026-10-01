@@ -9,6 +9,7 @@ CAPABILITIES = (
     "rlm.worker_needed",
     "tool_family_select",
     "retry_or_escalate",
+    "mutation_retry_disposition",
     "context_compress_needed",
     "verification_needed",
 )
