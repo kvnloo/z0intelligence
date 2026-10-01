@@ -16,6 +16,7 @@ from .agentweb_bridge_capabilities import agentweb_bridge_capabilities
 from .outcome_observation import ingest_outcome_observation
 from .outcome_coverage import ingest_outcome_expectation, summarize_outcome_coverage
 from .outcome_randomized_evidence import ingest_outcome_assignment, summarize_randomized_outcome_evidence
+from .verified_event_ingress import ingest_verified_event_batch
 
 SLOTS=threading.BoundedSemaphore(4)
 METRIC_LOCK=threading.Lock()
@@ -101,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404,{'error':'not_found'})
 
     def do_POST(self):
-        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/plan','/v1/worker','/v1/automatic','/v1/automatic/consumed','/v1/experimental/choice','/v1/experimental/noul','/v1/observe/reliability','/v1/observe/outcome','/v1/observe/outcome/expectation','/v1/observe/outcome/assignment','/v1/context/pack'):return self.reply(404,{'error':'not_found'})
+        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/plan','/v1/worker','/v1/automatic','/v1/automatic/consumed','/v1/experimental/choice','/v1/experimental/noul','/v1/observe/reliability','/v1/observe/outcome','/v1/observe/outcome/expectation','/v1/observe/outcome/assignment','/v1/observe/event-batch','/v1/context/pack'):return self.reply(404,{'error':'not_found'})
         try:
             size=int(self.headers.get('Content-Length','0'))
             if not 0<size<=(262144 if self.path.startswith('/v1/authority/') else 40000):return self.reply(413,{'error':'request_size'})
@@ -120,6 +121,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=='/v1/observe/outcome':return self.reply(200,ingest_outcome_observation(args))
             if self.path=='/v1/observe/outcome/expectation':return self.reply(200,ingest_outcome_expectation(args))
             if self.path=='/v1/observe/outcome/assignment':return self.reply(200,ingest_outcome_assignment(args))
+            if self.path=='/v1/observe/event-batch':return self.reply(200,ingest_verified_event_batch(args))
             if self.path=='/v1/context/pack':return self.reply(200,compile_agentweb_context_packet(args))
             if self.path=='/v1/plan':
                 result=plan_intelligence(args)
