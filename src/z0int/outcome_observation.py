@@ -110,6 +110,11 @@ def validate_outcome_observation(row: dict[str, Any]) -> None:
         raise ValueError("observation_time cannot predate decision_time")
     if execution_time is not None and observation_time < execution_time:
         raise ValueError("observation_time cannot predate execution_time")
+    age_seconds = (observation_time - decision_time).total_seconds()
+    if age_seconds < WINDOW_SECONDS[window]:
+        raise ValueError(
+            "observation_time is earlier than the declared measurement window"
+        )
 
     if row.get("measurement_state") not in MEASUREMENT_STATES:
         raise ValueError("Invalid outcome measurement_state")
