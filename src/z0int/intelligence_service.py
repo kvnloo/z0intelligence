@@ -12,13 +12,17 @@ from .decision_experiment import run_choice_experiment, run_noul_experiment
 from .reliability_observation import ingest_observation
 from .agentweb_context_packet import compile_agentweb_context_packet
 from .agentweb_bridge_wire import unwrap_agentweb_bridge_request, wrap_agentweb_bridge_response
-from .agentweb_bridge_capabilities import agentweb_bridge_capabilities
+from .agentweb_bridge_capabilities import (
+    MAX_ACTIVE,
+    SOCKET_BACKLOG,
+    agentweb_bridge_capabilities,
+)
 from .outcome_observation import ingest_outcome_observation
 from .outcome_coverage import ingest_outcome_expectation, summarize_outcome_coverage
 from .outcome_randomized_evidence import ingest_outcome_assignment, summarize_randomized_outcome_evidence
 from .verified_event_ingress import ingest_verified_event_batch
 
-SLOTS=threading.BoundedSemaphore(4)
+SLOTS=threading.BoundedSemaphore(MAX_ACTIVE)
 METRIC_LOCK=threading.Lock()
 METRIC_TYPES={
     'admitted_connections_total':'counter', 'rejected_connections_total':'counter',
@@ -44,12 +48,18 @@ def metrics_text():
 
 class Service(ThreadingHTTPServer):
     daemon_threads=False
-    request_queue_size=8
+    request_queue_size=SOCKET_BACKLOG
 
     def process_request(self, request, address):
         if DRAINING.is_set() or not SLOTS.acquire(blocking=False):
             metric("rejected_connections_total")
-            try:request.sendall(b'HTTP/1.1 503 Service Unavailable\r\nRetry-After: 1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n')
+            try:request.sendall(
+                b'HTTP/1.1 503 Service Unavailable\r\n'
+                b'Retry-After: 1\r\n'
+                b'X-Z0-Execution: not_started\r\n'
+                b'Content-Length: 0\r\n'
+                b'Connection: close\r\n\r\n'
+            )
             finally:self.shutdown_request(request)
             return
         metric("admitted_connections_total")
