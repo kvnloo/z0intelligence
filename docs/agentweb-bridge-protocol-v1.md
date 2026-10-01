@@ -14,11 +14,12 @@ Key invariants:
   funding and publish-policy authority.
 - z0 retains routing, idempotency, request-fingerprint, dispatch-claim and receipt authority.
 - no raw AgentWeb user/account/session identifiers or credentials cross the bridge envelope.
-- shadow failures imply no execution and may fail open to AgentWeb.
+- shadow **plan/observe** failures imply no physical execution and may fail open to AgentWeb.
+- shadow **decide** failures may be physically ambiguous because a model/provider call can
+  already have occurred; those require same-identity reconciliation while remaining unapplied.
 - active ambiguity requires reconciliation with the same authority identity.
 - a changed request under one authority identity is a conflict, never permission to execute again.
 - active external side effects require AgentWeb-confirmed approval before dispatch admission.
 
 The fixture corpus in `tests/fixtures/agentweb-z0-bridge-v1.json` is byte-for-byte aligned
-with the AgentWeb-side seed corpus. A later cross-repo CI slice should compare/fetch the fixture
-directly and pin exact heads before any active-mode promotion.
+with the AgentWeb-side seed corpus. Exact-head cross-repo CI must remain green before active promotion.
