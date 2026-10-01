@@ -19,7 +19,7 @@ module adds a separate, append-only verification record, written after the fact 
 
 | record | file | written by |
 |---|---|---|
-| `z0int.claude_code.turn_outcome_verified.v0` | `outcomes_verified.jsonl` | `z0int outcomes verify [--since 7d] [--all-turns] [--fix-days 7] [--no-gh]` |
+| `z0int.claude_code.turn_outcome_verified.v0` | `outcomes_verified.jsonl` | `z0int outcomes verify [--since 7d] [--all-turns] [--fix-days 7] [--no-gh] [--no-gh-cache] [--no-density]` |
 | `z0int.claude_code.credit_join.v0` | wherever `--out` says | `z0int outcomes join [--out PATH]` |
 
 Observed rows are never rewritten. A verified row is appended only when its content (signals +
@@ -64,6 +64,13 @@ a `confidence` (low / medium / high), a #54 `label_class` and an `oracle` (who d
 | `user_weak_correction` | - | low | soft | user_cue | weak cues (leading `no`, `wrong`, leading `stop`) or a **re-ask** (word-set Jaccard >= 0.6 with this turn's prompt) |
 | `user_interrupt` | - | low | soft | user_cue | `[Request interrupted by user]` during the turn |
 | `ask_answered` / `ask_ignored` / `ask_pending` | 0 | low | soft | user_cue | the turn asked (AskUserQuestion, or the final text ends in `?`). Answered means a later user prompt exists, or the AskUserQuestion result was not an error. Ignored means no later user prompt and the session has been idle for over an hour. This is the outcome of the ASK action (#55), not task success. |
+
+Test/lint exit codes are **pipe-aware** (verifier 0.2.0): when the runner's output is piped into a filter
+(`| tail`, `| grep`, ...) without `pipefail`, the shell exit belongs to the filter, so the runner's summary
+line decides (failures win) and the exit is unknown without one (`shell_exit` keeps the raw code). Segments that
+only install or locate a runner (`pip install pytest`, `which pytest`) are not test runs. Additional
+session-level verifiers (`verifier_set: density`, all shipped at low until a pre-registered precision sample
+clears 0.9) and the turn-type diagnosis live in [verification-density.md](verification-density.md).
 
 Commits produced by a turn are found from successful `git commit|revert|cherry-pick` tool calls.
 The SHA comes from the `[branch sha]` line. For `git commit -q` there is no such line, so the

@@ -53,9 +53,34 @@ HARNESS_PREFIXES = ('<agent-message', '<task-notification', '<system-reminder', 
                     '<bash-', 'Caveat: ')
 INTERRUPT = '[Request interrupted by user'
 
-TEST_CMD = re.compile(r'(^|[\s;&|(/])(pytest|py\.test|tox|nox|(npm|pnpm|yarn|bun)( run)? test|vitest|jest|cargo test|'
+_TEST_RE = re.compile(r'(^|[\s;&|(/])(pytest|py\.test|tox|nox|(npm|pnpm|yarn|bun)( run)? test|vitest|jest|cargo test|'
                       r'go test|make (test|check)|ctest|mvn test|gradle test|rspec|phpunit|just test|'
                       r'python3? -m (pytest|unittest))(?=$|[\s;&|)])')
+# Segments that mention a runner without running it (installing it, asking its version or location).
+NOT_A_RUN = re.compile(r'\b(install|uninstall|add|remove|show|freeze|download|which|whereis)\b|--version\b|\s-V\b')
+SHELL_SEPARATORS = re.compile(r'&&|\|\||;|\n')
+
+
+class CommandMatcher:
+    """``re``-like ``search`` over shell segments, skipping segments that only install / locate the runner."""
+
+    def __init__(self, rx: re.Pattern[str]):
+        self.rx, self.pattern = rx, rx.pattern
+
+    def search(self, command: str) -> re.Match[str] | None:
+        for seg in SHELL_SEPARATORS.split(command):
+            if NOT_A_RUN.search(seg):
+                continue
+            m = self.rx.search(seg)
+            if m:
+                return m
+        return None
+
+
+TEST_CMD = CommandMatcher(_TEST_RE)
+CHECK_EXTRA = re.compile(r'(^|[\s;&|(/])(ruff|flake8|pylint|mypy|pyright|basedpyright|tsc|eslint|cargo (check|clippy|build)|'
+                         r'go (vet|build)|golangci-lint|shellcheck)(?=$|[\s;&|)])')
+CHECK_ANY = CommandMatcher(re.compile(TEST_CMD.pattern + '|' + CHECK_EXTRA.pattern))
 CI_CMD = re.compile(r'\bgh (run (watch|view)|pr checks)\b')
 COMMIT_CMD = re.compile(r'\bgit(?:\s+-[Cc]\s+\S+)*\s+(commit|revert|cherry-pick)\b(?!-)')
 COMMIT_OUT = re.compile(r'^\[(?P<branch>[^\]\s]+)(?: \(root-commit\))? (?P<sha>[0-9a-f]{7,40})\]', re.M)
@@ -189,6 +214,33 @@ def _exit_code(block: Mapping[str, Any], tur: Any) -> int | None:
     return 0
 
 
+# A check whose output is piped into a filter reports the filter's exit code, not the runner's (no pipefail).
+PIPE_FILTER = re.compile(r'\|\s*(tail|head|grep|egrep|rg|sed|awk|cut|sort|uniq|wc|less|more|cat|tee|tr|jq|column)\b')
+PIPE_SAFE = re.compile(r'pipefail|PIPESTATUS')
+SUMMARY_FAIL = re.compile(r'\b\d+ (failed|errors?)\b|^FAILED |^FAIL\b|test result: FAILED|^Tests?:.*\bfailed\b|'
+                          r'\bFAILED \((failures|errors)=|^ERROR collecting|Interrupted: \d+ errors?|'
+                          r'^Found \d+ errors?|error\[E\d+\]|^error: could not compile', re.M)
+SUMMARY_PASS = re.compile(r'\b\d+ passed\b|test result: ok\.|^ok\s+\S+|^Tests?:\s+\d+ passed|^OK( \(|$)|'
+                          r'All checks passed|^Success: no issues found', re.M)
+
+
+def effective_exit(command: str, code: int | None, out_tail: str, check_re: Any) -> tuple[int | None, bool]:
+    """(exit code to trust, piped). When the check's output is piped into a filter without pipefail, the shell
+    exit code belongs to the filter: read the runner's summary line instead (fail beats pass), else unknown."""
+    if code is None:
+        return None, False
+    segs = command.split('|')
+    piped = any(check_re.search(seg) and i + 1 < len(segs) and PIPE_FILTER.match('|' + segs[i + 1])
+                for i, seg in enumerate(segs))
+    if not piped or PIPE_SAFE.search(command):
+        return code, False
+    if SUMMARY_FAIL.search(out_tail):
+        return 1, True
+    if SUMMARY_PASS.search(out_tail):
+        return 0, True
+    return None, True
+
+
 def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
     """One dict per turn. ``_prompt`` holds the prompt text transiently for cue matching; callers must not emit it."""
     turns: list[dict[str, Any]] = []
@@ -299,6 +351,9 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                         call['_out_tail'] = text[-600:]
                         call['exit'] = _exit_code(block, row.get('toolUseResult'))
                         cmd = call.get('command', '')
+                        if CHECK_ANY.search(cmd):
+                            call['shell_exit'] = call['exit']
+                            call['exit'], call['piped'] = effective_exit(cmd, call['exit'], text[-2000:], CHECK_ANY)
                         if COMMIT_CMD.search(cmd):
                             call['commits'] = [m.group('sha') for m in COMMIT_OUT.finditer(text)]
                         if 'gh pr create' in cmd:
@@ -445,6 +500,8 @@ class RepoIndex:
         self._landed: dict[tuple[str, int], list[Landed]] = {}
         self._szz: dict[tuple[str, str], set[str]] = {}
         self.ls_cache: dict[str, list[str]] = {}
+        self.outcomes: dict[tuple, dict[str, Any]] = {}  # commit_outcome memo (planning pass + real pass)
+        self.sessions: dict[str, list[dict[str, Any]]] = {}  # session_turns memo
 
     def toplevel(self, path: str | Path | None) -> Path | None:
         if not path:
@@ -508,6 +565,14 @@ def command_paths(command: str, cwd: str | None) -> list[str]:
 def commit_outcome(index: RepoIndex, sha: str, candidates: list[str | None], *, fix_days: int, now: float,
                    own_shas: set[str]) -> dict[str, Any]:
     """Revert / SZZ-fix / survival facts for one commit the turn produced. Counts and SHAs only."""
+    key = (sha, tuple(str(c) for c in candidates), fix_days, now, tuple(sorted(own_shas)))
+    if key not in index.outcomes:
+        index.outcomes[key] = _commit_outcome(index, sha, candidates, fix_days=fix_days, now=now, own_shas=own_shas)
+    return index.outcomes[key]
+
+
+def _commit_outcome(index: RepoIndex, sha: str, candidates: list[str | None], *, fix_days: int, now: float,
+                    own_shas: set[str]) -> dict[str, Any]:
     hit = index.resolve(sha, candidates)
     if hit is None:
         return {'resolved': False}
@@ -750,13 +815,13 @@ def verify_turn(turn: Mapping[str, Any], next_prompt: str | None, *, index: Repo
             signals.append(signal('ci_watch_in_turn', -1, 'medium', 'negative_gold', 'ci', runs=len(ci), last_exit=last))
     # 2) commits produced by the turn: revert / SZZ fix / survival / CI on the pushed commit
     commit_calls = [c for c in turn['bash'] if c.get('exit') == 0 and COMMIT_CMD.search(c.get('command', ''))]
-    by_window = 0
     for c in commit_calls:
         if not c.get('commits') and c.get('t0') and c.get('t1'):
             hit = index.committed_between(command_paths(c['command'], c.get('cwd')) + [c.get('cwd')], c['t0'], c['t1'])
             if hit:
                 c['commits'] = hit[1]
-                by_window += len(hit[1])
+                c['commits_by_window'] = True  # idempotent across the gh planning pass and the real pass
+    by_window = sum(len(c['commits']) for c in commit_calls if c.get('commits_by_window'))
     commit_calls = [c for c in commit_calls if c.get('commits')]
     shas = [s for c in commit_calls for s in c['commits']]
     resolved = 0
@@ -864,23 +929,24 @@ def _rows_for_session(turns: list[dict[str, Any]], session_id: str, *, index: Re
 
 def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = False, gh: GitHub | None = None,
            fix_days: int = 7, projects: Path | None = None, now: float | None = None,
-           extra_repo_roots: Iterable[Path] = (), density: bool = True) -> list[dict[str, Any]]:
+           extra_repo_roots: Iterable[Path] = (), density: bool = True,
+           _index: RepoIndex | None = None) -> list[dict[str, Any]]:
     """Build verified rows for observed turns (and, with ``all_turns``, every transcript turn since ``since``).
 
     With GitHub enabled and a lookup cache, a planning pass records the lookups the sweep needs, resolves
     the uncached ones concurrently, then the real pass reads them from memory."""
     now = time.time() if now is None else now
     gh = gh or GitHub()
+    index = _index or RepoIndex(extra_repo_roots)
     if gh.enabled and gh.cache_path is not None and gh.recording is None:
         gh.recording = []
         try:
             verify(root=root, since=since, all_turns=all_turns, gh=gh, fix_days=fix_days, projects=projects, now=now,
-                   extra_repo_roots=extra_repo_roots, density=False)
+                   extra_repo_roots=extra_repo_roots, density=False, _index=index)
             keys, gh.recording = gh.recording, None
         finally:
             gh.recording = None
         gh.prefetch(keys)
-    index = RepoIndex(extra_repo_roots)
     sdir = state_dir(root)
     observed = [r for r in read_jsonl(sdir / 'outcomes.jsonl') if r.get('schema') == OBSERVED_SCHEMA]
     obs_by_key = {(r.get('session_id'), r.get('trace_id')): r for r in observed}
@@ -898,7 +964,9 @@ def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = Fa
                 continue
     rows = []
     for sid, path in sorted(sessions.items()):
-        cores = _rows_for_session(session_turns(path), sid, index=index, gh=gh, fix_days=fix_days,
+        if path is not None and str(path) not in index.sessions:
+            index.sessions[str(path)] = session_turns(path)
+        cores = _rows_for_session(index.sessions[str(path)], sid, index=index, gh=gh, fix_days=fix_days,
                                   now=now, density=density) if path else {}
         keys = [k for k in obs_by_key if k[0] == sid]
         if all_turns:

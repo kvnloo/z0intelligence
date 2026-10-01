@@ -1,10 +1,21 @@
 """Verification density v0: synthetic transcripts and fixture repos only (no real data)."""
 import json
 
+import pytest
+
 from z0int import outcome_verifier as ov
 from z0int import verification_density as vd
 
 from test_outcome_verifier import DAY, T0, Transcript, home, observed, repo, run  # noqa: F401  (fixtures)
+
+
+ALL = frozenset({'checked_later', 'tests_suite_new_tests', 'ended_on_error', 'edit_reverted', 'answer_ungrounded'})
+
+
+@pytest.fixture(autouse=True)
+def promoted(monkeypatch):
+    """Logic tests run with every verifier promoted; test_shipped_confidence_is_low checks the real default."""
+    monkeypatch.setattr(vd, 'PROMOTED', ALL)
 
 
 def kinds(row):
@@ -252,3 +263,51 @@ def test_diagnose_counts_only():
     assert rep['live']['unverified_reasons'] == {'qa:no_signal': 1}
     assert rep['live']['handoff_turns_excluded'] == {'unverified': 1}
     assert rep['harness']['turns'] == 1
+
+
+def test_shipped_confidence_is_low_until_promoted(tmp_path, home, repo, monkeypatch):
+    monkeypatch.setattr(vd, 'PROMOTED', frozenset())
+    tr = Transcript(cwd=str(repo))
+    tr.prompt('p1', 'change app', T0)
+    edit(tr, repo / 'src/app.py', 'a = 1', 'a = 10', T0 + 1)
+    tr.say('done', T0 + 3)
+    tr.prompt('p2', 'run the tests now', T0 + 60)
+    tr.bash('pytest -q', T0 + 61, exit=0)
+    tr.say('green', T0 + 70)
+    tr.write(tmp_path / 'projects')
+    observed(home, 'sess-1', 'p1', 'p2')
+    rows = run(home, tmp_path / 'projects', T0 + DAY)
+    sig = next(s for s in rows['p1']['signals'] if s['kind'] == 'checked_later')
+    assert sig['confidence'] == 'low' and sig['design_confidence'] == 'medium' and sig['label_class'] == 'soft'
+    assert rows['p1']['verification_state'] == 'unverified'
+
+
+def test_piped_test_output_uses_runner_summary(tmp_path, home):
+    ce = ov.CHECK_ANY
+    assert ov.effective_exit('pytest -q', 0, '', ce) == (0, False)
+    assert ov.effective_exit('pytest -q 2>&1 | tail -5', 0, '=== 2 failed, 10 passed in 1s ===', ce) == (1, True)
+    assert ov.effective_exit('pytest -q 2>&1 | tail -5', 0, '=== 12 passed in 1s ===', ce) == (0, True)
+    assert ov.effective_exit('pytest -q | head -3', 0, 'collecting ...', ce) == (None, True)
+    assert ov.effective_exit('set -o pipefail; pytest | tail', 1, '', ce) == (1, False)
+    assert ov.effective_exit('pytest | grep passed', 1, '', ce) == (None, True)  # grep's exit, no summary
+    assert ov.effective_exit('ruff check . | tail -3', 0, 'Found 3 errors.', ce) == (1, True)
+    tr = Transcript()
+    tr.prompt('p1', 'run tests', T0)
+    tr.bash('cd /x && python -m pytest -q 2>&1 | tail -3', T0 + 1, exit=0, out='ERROR collecting tests/test_a.py\n1 error in 0.2s')
+    tr.say('done', T0 + 5)
+    tr.write(tmp_path / 'projects')
+    observed(home, 'sess-1', 'p1')
+    rows = run(home, tmp_path / 'projects', T0 + DAY)
+    assert ('tests_in_turn', -1, 'medium') in kinds(rows['p1'])
+
+
+def test_installing_or_locating_a_runner_is_not_a_test_run():
+    assert not ov.TEST_CMD.search('uv pip install -q pytest')
+    assert not ov.TEST_CMD.search('which pytest && pytest --version')
+    assert ov.TEST_CMD.search('uv pip install -q pytest && python -m pytest -q')
+    assert ov.TEST_CMD.search('cargo test --workspace')
+
+
+def test_label_sample_refuses_git_work_tree(tmp_path, repo):
+    with pytest.raises(SystemExit):
+        vd.label_sample(repo / 'out', since=0, now=T0, projects=tmp_path / 'none')

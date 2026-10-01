@@ -37,7 +37,16 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
-VERSION = '0.1.0'
+VERSION = '0.1.1'
+# Pre-registered demotion (docs/prereg/verification-density-v0.md, result docs/verification-density.md): a verifier
+# ships at medium only after >= 50 labelled firings at precision >= 0.90. v0 labels (n, precision): checked_later
+# 33, 0.38 (piped test output masks exit codes); ended_on_error 6, 0.20; tests_suite_new_tests 4, n too small;
+# edit_reverted / answer_ungrounded 0 firings. All are LOW until a later pre-registered sample clears the bar.
+PROMOTED: frozenset[str] = frozenset()
+
+
+def _conf(kind: str, wanted: str) -> str:
+    return wanted if kind in PROMOTED else 'low'
 TURN_TYPES = ('qa', 'research', 'ops', 'edit_untested', 'edit_tested', 'orchestration', 'handoff')
 
 ORCH_TOOLS = frozenset({'Agent', 'Task', 'SendMessage', 'ScheduleWakeup', 'TaskStop', 'TaskCreate', 'TaskUpdate',
@@ -73,6 +82,7 @@ SEGMENT_SPLIT = re.compile(r'\s*(?:&&|\|\||;|\||\n)\s*')
 
 GIT_RESTORE = re.compile(r'\bgit\s+(?:-C\s+(\S+)\s+)?(?:checkout\s+(?:HEAD\s+)?--|restore(?!\s+--staged\b)(?:\s+--worktree)?'
                          r'(?:\s+--source[ =](?:HEAD|@)\S*)?)\s+(.+)$')
+_RESTORE_HINT = re.compile(r'\bgit\b.*\b(checkout|restore)\b')
 CITATION = re.compile(r'(?<![\w/.~-])((?:~/|/|\./|\.\./)?(?:[\w.@+-]+/)*[\w@+-][\w.@+-]*\.[A-Za-z][A-Za-z0-9]{0,7})'
                       r':(\d{1,6})(?:[-–](\d{1,6}))?\b')
 URL_CONTEXT = re.compile(r'(https?|ftp)://\S*$')
@@ -114,10 +124,16 @@ def approval_cues(next_prompt: str | None) -> tuple[bool, bool]:
 
 
 # --- turn typing ---------------------------------------------------------------------------------------------------
+QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\\\]|\\\\.)*\"")
+WRITE_REDIRECT = re.compile(r'(?<![0-9&])>>?\s*(?!/dev/null|&)')
+
+
 def is_probe_command(command: str) -> bool:
-    segs = [s for s in SEGMENT_SPLIT.split(command.strip()) if s.strip()]
-    return bool(segs) and all(PROBE_BASH.match(s) or re.match(r'^\s*(cd|pushd|popd|export|set|source|\.)\b', s)
-                              for s in segs)
+    """Every segment only looks around. Quoted text is blanked first (a quoted ``|`` is not a pipe) and a
+    segment that redirects into a file is a write, not a probe."""
+    segs = [s for s in SEGMENT_SPLIT.split(QUOTED.sub('Q', command.strip())) if s.strip()]
+    return bool(segs) and all((PROBE_BASH.match(s) or re.match(r'^\s*(cd|pushd|popd|export|set|source|\.)\b', s))
+                              and not WRITE_REDIRECT.search(s) for s in segs)
 
 
 def is_check_command(command: str, test_re: re.Pattern[str]) -> str | None:
@@ -201,8 +217,13 @@ def command_dir(command: str, cwd: str | None) -> str | None:
 
 # --- the verifiers -----------------------------------------------------------------------------------------------
 def _sig(kind: str, polarity: int, confidence: str, label_class: str, oracle: str, **details: Any) -> dict[str, Any]:
+    """``confidence`` is the design confidence; it ships only if the verifier is in ``PROMOTED``."""
     from .outcome_verifier import signal
-    return signal(kind, polarity, confidence, label_class, oracle, verifier_set='density', **details)
+    shipped = _conf(kind, confidence) if confidence != 'low' else 'low'
+    if shipped != confidence:
+        details['design_confidence'] = confidence
+        label_class = 'soft'
+    return signal(kind, polarity, shipped, label_class, oracle, verifier_set='density', **details)
 
 
 def _code_edits(turn: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -232,7 +253,7 @@ def _covers(check: Mapping[str, Any], scope: str, args: list[str], files: set[st
 
 
 def checked_later(turns: list[Mapping[str, Any]], i: int, test_re: re.Pattern[str],
-                  toplevel: Callable[[str | None], Any]) -> dict[str, Any] | None:
+                  toplevel: Callable[[str | None], Any], evidence: dict | None = None) -> dict[str, Any] | None:
     """First test/lint/typecheck run (this turn or later) after turn i's last code edit that covers its files."""
     from .outcome_verifier import TEST_PATH
     edits = _code_edits(turns[i])
@@ -256,6 +277,8 @@ def checked_later(turns: list[Mapping[str, Any]], i: int, test_re: re.Pattern[st
         if any(t_last < te < t0 and f in files for te, f in later_edits):
             return {'superseded': True}  # another turn changed the same files first: judges mixed state
         ok = c['exit'] == 0
+        if evidence is not None:  # transient, for the local labelling sample only; never emitted
+            evidence.update(check=c, check_turn=j, files=sorted(files))
         details = {'check': kind, 'scope': scope, 'same_turn': j == i, 'turns_later': j - i, 'exit_class': 0 if ok else 1}
         if kind == 'test' and not existing_tests_edited:
             return _sig('checked_later', 1 if ok else -1, 'medium', 'deterministic_gold' if ok else 'negative_gold',
@@ -295,7 +318,7 @@ def _call_failed(c: Mapping[str, Any]) -> bool | None:
     return bool(c.get('error'))
 
 
-def ended_on_error(turn: Mapping[str, Any]) -> dict[str, Any] | None:
+def ended_on_error(turn: Mapping[str, Any], evidence: dict | None = None) -> dict[str, Any] | None:
     """The turn's last non-probe tool call failed, and nothing after it succeeded (own calls, not subagents)."""
     if turn.get('interrupted'):
         return None
@@ -309,6 +332,8 @@ def ended_on_error(turn: Mapping[str, Any]) -> dict[str, Any] | None:
             return None
         if not failed:
             return None
+        if evidence is not None:
+            evidence.update(call=c)
         return _sig('ended_on_error', -1, 'medium', 'negative_gold', 'tool_runtime', tool=c.get('name'),
                     exit=c.get('exit') if c.get('name') == 'Bash' else None)
     return None
@@ -319,7 +344,7 @@ def _added_lines(e: Mapping[str, Any]) -> set[str]:
     return {ln.strip() for ln in (e.get('_new') or '').splitlines() if len(ln.strip()) >= 8 and ln.strip() not in old}
 
 
-def edit_reversal(turns: list[Mapping[str, Any]], i: int) -> list[dict[str, Any]]:
+def edit_reversal(turns: list[Mapping[str, Any]], i: int, evidence: dict | None = None) -> list[dict[str, Any]]:
     edits = _code_edits(turns[i])
     if not edits:
         return []
@@ -328,7 +353,7 @@ def edit_reversal(turns: list[Mapping[str, Any]], i: int) -> list[dict[str, Any]
     out: list[dict[str, Any]] = []
     for j in range(i + 1, len(turns)):
         for c in turns[j].get('bash') or []:
-            if c.get('exit') != 0 or not c.get('t0') or c['t0'] <= t_last:
+            if c.get('exit') != 0 or not c.get('t0') or c['t0'] <= t_last or not _RESTORE_HINT.search(c.get('command', '')):
                 continue
             for seg in SEGMENT_SPLIT.split(c.get('command', '')):
                 m = GIT_RESTORE.search(seg)
@@ -342,6 +367,8 @@ def edit_reversal(turns: list[Mapping[str, Any]], i: int) -> list[dict[str, Any]
                 hit = [a for a in args if a not in ('.', '*') and any(
                     f == _abs(a, base) or f.startswith(_abs(a, base).rstrip('/') + '/') for f in files)]
                 if hit:
+                    if evidence is not None:
+                        evidence.update(revert=c, revert_turn=j)
                     out.append(_sig('edit_reverted', -1, 'medium', 'negative_gold', 'workspace', turns_later=j - i))
                     return out
     added = set().union(*(_added_lines(e) for e in edits))
@@ -368,7 +395,7 @@ def _git_ls(top: str, cache: dict[str, list[str]]) -> list[str]:
 
 
 def grounding(turn: Mapping[str, Any], toplevel: Callable[[str | None], Any],
-              ls_cache: dict[str, list[str]]) -> dict[str, Any] | None:
+              ls_cache: dict[str, list[str]], evidence: dict | None = None) -> dict[str, Any] | None:
     """Do ``path:line`` citations in the final answer of a turn without edits resolve at answer time?
 
     Deterministic grounding, not truth. A citation is unmeasurable (skipped) when its base directory no
@@ -417,6 +444,8 @@ def grounding(turn: Mapping[str, Any], toplevel: Callable[[str | None], Any],
                     break
             if hit is None:
                 hit = next((k for k in known if k.endswith('/' + rel)), None)
+        if evidence is not None:
+            evidence.setdefault('citations', []).append({'cited': f'{path}:{line}', 'resolved': hit})
         if hit is None:
             missing += 1
             continue
@@ -550,8 +579,15 @@ def _main(argv: list[str] | None = None) -> int:
     ap.add_argument('--no-density', action='store_true', help='diagnose the v0 signal set only')
     ap.add_argument('--projects-dir', type=Path, default=None)
     ap.add_argument('--out', type=Path, default=None, help='write the counts-only JSON here')
+    ap.add_argument('--label-sample', type=Path, default=None, metavar='DIR',
+                    help='instead: write a blind labelling sample with PRIVATE excerpts to DIR (must be outside git, '
+                         'e.g. ~/.z0int/research/verification-density/<date>)')
     args = ap.parse_args(argv)
     now = time.time()
+    if args.label_sample:
+        print(json.dumps(label_sample(args.label_sample, since=ov.parse_since(args.since, now), now=now,
+                                      projects=args.projects_dir), indent=1))
+        return 0
     t0 = time.monotonic()
     gh = ov.GitHub(not args.no_gh, cache_path=ov.default_gh_cache())
     rows = ov.verify(since=ov.parse_since(args.since, now), all_turns=True, gh=gh, projects=args.projects_dir,
@@ -569,3 +605,122 @@ def _main(argv: list[str] | None = None) -> int:
         args.out.write_text(text + '\n')
     print(text)
     return 0
+
+
+# --- local labelling sample (private text; written only outside git, e.g. ~/.z0int/research/...) ------------------
+def _call_view(c: Mapping[str, Any]) -> dict[str, Any]:
+    v: dict[str, Any] = {'tool': c.get('name')}
+    for k, n in (('command', 300), ('path', 300)):
+        if c.get(k):
+            v[k] = str(c[k])[:n]
+    for k in ('exit', 'shell_exit', 'piped', 'created', 'via'):
+        if k in c:
+            v[k] = c[k]
+    if c.get('error'):
+        v['error'] = True
+    if c.get('_out_tail'):
+        v['out_tail'] = c['_out_tail'][-300:]
+    if c.get('_new') is not None:
+        v['new_head'], v['old_head'] = str(c.get('_new'))[:250], str(c.get('_old') or '')[:250]
+    return v
+
+
+def _clip(xs: list, head: int, tail: int) -> list:
+    return xs if len(xs) <= head + tail else xs[:head] + [{'elided': len(xs) - head - tail}] + xs[-tail:]
+
+
+def label_sample(out_dir: Path, *, since: float, now: float, per_verifier: int = 60, seed: int = 20260930,
+                 projects: Path | None = None) -> dict[str, int]:
+    """Firings of verifiers at their *design* confidence (medium/high) with excerpts, for a separate labeller.
+
+    Population: every root transcript modified since ``since`` plus its subagent transcripts read as
+    standalone sessions. Writes ``sample.jsonl`` (blind: no confidence) and ``cue_prompts_blind.jsonl`` +
+    ``cue_matches.jsonl``. Refuses to write inside a git work tree: the files hold private text."""
+    import json
+    import random
+    import subprocess
+
+    from . import outcome_verifier as ov
+    out_dir = Path(out_dir).expanduser()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    inside = subprocess.run(['git', '-C', str(out_dir), 'rev-parse', '--is-inside-work-tree'], capture_output=True,
+                            text=True).stdout.strip()
+    if inside == 'true':
+        raise SystemExit(f'refusing to write private excerpts inside a git work tree: {out_dir}')
+    index, gh = ov.RepoIndex(), ov.GitHub(False)
+    paths: list[tuple[str, Path]] = []
+    for p in sorted((projects or ov.projects_dir()).glob('*/*.jsonl')):
+        if p.stat().st_mtime >= since:
+            paths.append(('root', p))
+            sd = p.with_suffix('') / 'subagents'
+            if sd.is_dir():
+                paths += [('subagent', q) for q in sorted(sd.glob('agent-*.jsonl'))]
+    firings: list[dict[str, Any]] = []
+    cues: list[dict[str, Any]] = []
+    for src, p in paths:
+        turns = ov.session_turns(p) if src == 'root' else ov.turns_from_transcript(p)
+        real = [i for i, t in enumerate(turns) if not t['harness_message']]
+        for i, t in enumerate(turns):
+            if (t['started_at'] or 0) < since:
+                continue
+            nxt = next((turns[j]['_prompt'] for j in real if j > i), None)
+            core = ov.verify_turn(t, nxt, index=index, gh=gh, fix_days=7, now=now, session_merges=[], session_end=None)
+            found: list[tuple[dict[str, Any], dict[str, Any]]] = []
+            if not any(s['kind'] == 'tests_in_turn' and s['polarity'] and s['confidence'] != 'low' for s in core['signals']):
+                ev: dict[str, Any] = {}
+                s = tests_suite_new_tests(t, ov.TEST_CMD) or checked_later(turns, i, ov.TEST_CMD, index.toplevel, evidence=ev)
+                if s and 'superseded' not in s:
+                    found.append((s, ev))
+            ev = {}
+            s = ended_on_error(t, evidence=ev)
+            if s:
+                found.append((s, ev))
+            ev = {}
+            found += [(x, ev) for x in edit_reversal(turns, i, evidence=ev)]
+            ev = {}
+            s = grounding(t, index.toplevel, index.ls_cache, evidence=ev)
+            if s:
+                found.append((s, ev))
+            if src == 'root' and not t['harness_message'] and nxt is not None:
+                cues.append({'this_prompt_head': t['_prompt'][:300], 'final_answer_head': t['_final_text'][:400],
+                             'next_user_prompt_head': nxt[:300], 'v0_strong': ov.correction_cues(nxt, t['_prompt'])[0],
+                             'v2': correction_cues_v2(nxt), 'approval': list(approval_cues(nxt))})
+            for s, ev in found:
+                if s.get('design_confidence', s['confidence']) == 'low':
+                    continue
+                evv: dict[str, Any] = {}
+                if 'check' in ev:
+                    j = ev['check_turn']
+                    evv = {'check': _call_view(ev['check']), 'check_in_turns_later': j - i, 'edited_files': ev['files'],
+                           'check_turn_prompt_head': turns[j]['_prompt'][:200] if j != i else None}
+                elif 'call' in ev:
+                    evv = {'failing_call': _call_view(ev['call'])}
+                elif 'revert' in ev:
+                    evv = {'revert': _call_view(ev['revert']), 'turns_later': ev['revert_turn'] - i}
+                elif 'citations' in ev:
+                    evv = {'citations': ev['citations']}
+                firings.append({
+                    'verifier': s['kind'], 'polarity': s['polarity'], 'source': src, 'evidence': evv,
+                    'excerpt': {'prompt_head': t['_prompt'][:500],
+                                'tool_calls': _clip([_call_view(c) for c in t['tool_seq']], 15, 20),
+                                'subagent_calls': _clip([_call_view(c) for c in t['bash'] + t['edit_ops'] if c.get('via')], 10, 15),
+                                'final_answer_head': t['_final_text'][:900], 'next_user_prompt_head': (nxt or '')[:300],
+                                'interrupted': t.get('interrupted')}})
+    rng = random.Random(seed)
+    byv: dict[str, list[dict[str, Any]]] = {}
+    for f in firings:
+        byv.setdefault(f['verifier'], []).append(f)
+    sample = []
+    for v, fs in sorted(byv.items()):
+        rng.shuffle(fs)
+        sample += [{'id': f'{v}-{n:03d}', **f} for n, f in enumerate(fs[:per_verifier])]
+
+    def dump(name: str, rows: list[dict[str, Any]]) -> None:
+        (out_dir / name).write_text(''.join(json.dumps(r) + '\n' for r in rows))
+    dump('sample.jsonl', sample)
+    dump('cue_prompts_blind.jsonl', [{'id': f'cue-{n:03d}', **{k: c[k] for k in ('this_prompt_head', 'final_answer_head',
+                                                                                  'next_user_prompt_head')}}
+                                     for n, c in enumerate(cues)])
+    dump('cue_matches.jsonl', [{'id': f'cue-{n:03d}', **{k: c[k] for k in ('v0_strong', 'v2', 'approval')}}
+                               for n, c in enumerate(cues)])
+    return {**{f'firings[{k}]': len(v) for k, v in sorted(byv.items())}, 'sampled': len(sample), 'cue_prompts': len(cues)}
