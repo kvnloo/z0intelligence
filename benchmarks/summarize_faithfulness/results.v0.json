@@ -1,0 +1,329 @@
+{
+ "schema": "z0int.summarize_faithfulness.score.v0",
+ "n_items": 160,
+ "items_sha256": "6aaa2a3d91f214b6efa84f9c3664dc88354f2ae5e4ba376639e8eb51b6a2ced6",
+ "run_files_sha256": {
+  "haiku.jsonl": "5c24bce4e559577577d6f96cee311428e8dd61e07b50dee15bfd169433cb8103",
+  "haiku.meta.jsonl": "96a16fab6f3f85eb64d4594e9a82e97ef93afaf9ce30dbca1aeaf085353a6f5e",
+  "judge.jsonl": "a3b2cdbdb6ccfae6121afc5b6e40e66ac565fec7eaa2f76d1091f6c0fbd2dcbe",
+  "local14b.jsonl": "be7438d32b04c08a8391af6dc2d6154eabb7c35168942b681aa53e8811a160af",
+  "local14b.load-failed.jsonl": "510cbc41fcfed7554e67cf678bd9cccabbd965edca1d2da20d6c2c34f2e4662e",
+  "local14b.load-failed.meta.jsonl": "3052552a0f0045dea54745f277031f2051ea75bc5760b3558ec728905da0de29",
+  "local14b.meta.jsonl": "8d3659cff3bf08ce075b49110194e0cd574b8a23864b037548633888c486fe65",
+  "local8b.jsonl": "99b486ebe6e44bc77894167977e3558587919df1a854bcae512fc6f293430467",
+  "local8b.meta.jsonl": "22d308a0abaf6d7f49582c4feaa35b3d24f22a95af021c26aad53c6d22eb7274",
+  "sonnet.jsonl": "680c73266d442586e7d4d4a6a8a1b09e1cbe69fde4218143b52f061647c8e70c",
+  "sonnet.meta.jsonl": "082adfa074ccea1a2c19a2eccbdf70e01444498ad74a6296f46c82016cec127b"
+ },
+ "arms": {
+  "local8b": {
+   "rows": 160,
+   "errors": 0,
+   "format_pass": 158,
+   "critical_recall_mean": 0.816,
+   "critical_facts_micro": "335/403",
+   "all_critical_items": 102,
+   "judged": 160,
+   "hallucinated_items": 42,
+   "hallucination_rate": 0.2625,
+   "contradicted_items": 23,
+   "unsupported_claims": "63/831",
+   "judge_recall_mean": 0.8317,
+   "det_flagged_items": 15,
+   "words_p50": 25,
+   "p50_ms": 745,
+   "p95_ms": 2233,
+   "latency_basis": "wall (local HTTP)",
+   "by_kind": {
+    "build": {
+     "n": 40,
+     "recall": 0.872,
+     "halluc": "5/40"
+    },
+    "gh": {
+     "n": 40,
+     "recall": 0.733,
+     "halluc": "16/40"
+    },
+    "git": {
+     "n": 40,
+     "recall": 0.667,
+     "halluc": "14/40"
+    },
+    "pytest": {
+     "n": 40,
+     "recall": 0.992,
+     "halluc": "7/40"
+    }
+   }
+  },
+  "local14b": {
+   "rows": 160,
+   "errors": 0,
+   "format_pass": 157,
+   "critical_recall_mean": 0.8601,
+   "critical_facts_micro": "342/403",
+   "all_critical_items": 110,
+   "judged": 160,
+   "hallucinated_items": 35,
+   "hallucination_rate": 0.2188,
+   "contradicted_items": 17,
+   "unsupported_claims": "48/796",
+   "judge_recall_mean": 0.8603,
+   "det_flagged_items": 19,
+   "words_p50": 22,
+   "p50_ms": 875,
+   "p95_ms": 2914,
+   "latency_basis": "wall (local HTTP)",
+   "by_kind": {
+    "build": {
+     "n": 40,
+     "recall": 0.93,
+     "halluc": "15/40"
+    },
+    "gh": {
+     "n": 40,
+     "recall": 0.719,
+     "halluc": "13/40"
+    },
+    "git": {
+     "n": 40,
+     "recall": 0.808,
+     "halluc": "7/40"
+    },
+    "pytest": {
+     "n": 40,
+     "recall": 0.983,
+     "halluc": "0/40"
+    }
+   }
+  },
+  "haiku": {
+   "rows": 160,
+   "errors": 0,
+   "format_pass": 160,
+   "critical_recall_mean": 0.8927,
+   "critical_facts_micro": "364/403",
+   "all_critical_items": 125,
+   "judged": 159,
+   "hallucinated_items": 21,
+   "hallucination_rate": 0.1321,
+   "contradicted_items": 7,
+   "unsupported_claims": "22/873",
+   "judge_recall_mean": 0.9057,
+   "det_flagged_items": 29,
+   "words_p50": 20,
+   "p50_ms": 6883,
+   "p95_ms": 20375,
+   "latency_basis": "duration_api_ms (claude -p)",
+   "by_kind": {
+    "build": {
+     "n": 40,
+     "recall": 0.921,
+     "halluc": "3/40"
+    },
+    "gh": {
+     "n": 40,
+     "recall": 0.85,
+     "halluc": "5/39"
+    },
+    "git": {
+     "n": 40,
+     "recall": 0.825,
+     "halluc": "10/40"
+    },
+    "pytest": {
+     "n": 40,
+     "recall": 0.975,
+     "halluc": "3/40"
+    }
+   }
+  },
+  "sonnet": {
+   "rows": 160,
+   "errors": 0,
+   "format_pass": 136,
+   "critical_recall_mean": 0.9745,
+   "critical_facts_micro": "392/403",
+   "all_critical_items": 149,
+   "judged": 160,
+   "hallucinated_items": 18,
+   "hallucination_rate": 0.1125,
+   "contradicted_items": 5,
+   "unsupported_claims": "25/1099",
+   "judge_recall_mean": 0.9755,
+   "det_flagged_items": 18,
+   "words_p50": 34,
+   "p50_ms": 1483,
+   "p95_ms": 2054,
+   "latency_basis": "duration_api_ms (claude -p)",
+   "by_kind": {
+    "build": {
+     "n": 40,
+     "recall": 0.979,
+     "halluc": "3/40"
+    },
+    "gh": {
+     "n": 40,
+     "recall": 0.985,
+     "halluc": "4/40"
+    },
+    "git": {
+     "n": 40,
+     "recall": 0.967,
+     "halluc": "7/40"
+    },
+    "pytest": {
+     "n": 40,
+     "recall": 0.967,
+     "halluc": "4/40"
+    }
+   }
+  }
+ },
+ "comparisons": {
+  "local8b_vs_haiku": {
+   "recall": {
+    "n": 160,
+    "diff": -0.0767,
+    "lo95_one_sided": -0.1048,
+    "hi95_one_sided": -0.0501
+   },
+   "hallucination": {
+    "n": 159,
+    "diff": 0.1258,
+    "lo95_one_sided": 0.0629,
+    "hi95_one_sided": 0.1887
+   },
+   "judge_recall_sensitivity": {
+    "n": 159,
+    "diff": -0.0709,
+    "lo95_one_sided": -0.0998,
+    "hi95_one_sided": -0.0441
+   },
+   "dropped_for_comparator_error": 0,
+   "halluc_noninferior": false,
+   "recall_noninferior": false,
+   "qualifies": false,
+   "dropped_items": 1
+  },
+  "local8b_vs_sonnet": {
+   "recall": {
+    "n": 160,
+    "diff": -0.1584,
+    "lo95_one_sided": -0.195,
+    "hi95_one_sided": -0.123
+   },
+   "hallucination": {
+    "n": 160,
+    "diff": 0.15,
+    "lo95_one_sided": 0.0813,
+    "hi95_one_sided": 0.2188
+   },
+   "judge_recall_sensitivity": {
+    "n": 160,
+    "diff": -0.1439,
+    "lo95_one_sided": -0.1802,
+    "hi95_one_sided": -0.1095
+   },
+   "dropped_for_comparator_error": 0,
+   "halluc_noninferior": false,
+   "recall_noninferior": false,
+   "qualifies": false
+  },
+  "local14b_vs_haiku": {
+   "recall": {
+    "n": 160,
+    "diff": -0.0326,
+    "lo95_one_sided": -0.0623,
+    "hi95_one_sided": -0.0029
+   },
+   "hallucination": {
+    "n": 159,
+    "diff": 0.0818,
+    "lo95_one_sided": 0.0126,
+    "hi95_one_sided": 0.1509
+   },
+   "judge_recall_sensitivity": {
+    "n": 159,
+    "diff": -0.042,
+    "lo95_one_sided": -0.0676,
+    "hi95_one_sided": -0.0178
+   },
+   "dropped_for_comparator_error": 0,
+   "halluc_noninferior": false,
+   "recall_noninferior": false,
+   "qualifies": false
+  },
+  "sonnet_vs_haiku": {
+   "recall": {
+    "n": 160,
+    "diff": 0.0818,
+    "lo95_one_sided": 0.0536,
+    "hi95_one_sided": 0.1115
+   },
+   "hallucination": {
+    "n": 159,
+    "diff": -0.0189,
+    "lo95_one_sided": -0.0755,
+    "hi95_one_sided": 0.0377
+   },
+   "judge_recall_sensitivity": {
+    "n": 159,
+    "diff": 0.0697,
+    "lo95_one_sided": 0.0451,
+    "hi95_one_sided": 0.0959
+   },
+   "dropped_for_comparator_error": 0,
+   "halluc_noninferior": false,
+   "recall_noninferior": true,
+   "qualifies": false
+  }
+ },
+ "rule": {
+  "primary": "local8b",
+  "comparator": "haiku",
+  "halluc_margin": 0.02,
+  "recall_margin": 0.05,
+  "bootstrap": 10000,
+  "seed": 20261001
+ },
+ "verdict": "does_not_qualify",
+ "run_ids": {
+  "local8b": [
+   "local8b-20260930T231341-39715d"
+  ],
+  "local14b": [
+   "local14b-20260930T233522-41cbe7"
+  ],
+  "haiku": [
+   "haiku-20260930T231344-d0b91b"
+  ],
+  "sonnet": [
+   "sonnet-20260930T232311-85ea83"
+  ],
+  "judge": [
+   "judge-20260930T232537-91ba89 (pool: local8b, haiku, sonnet)",
+   "judge-20260930T233832-fa449e (local14b, separate pool)"
+  ]
+ },
+ "robustness": {
+  "contradicted_only_local8b_minus_haiku": {
+   "n": 159,
+   "diff": 0.0943,
+   "lo95_one_sided": 0.0503,
+   "hi95_one_sided": 0.1447
+  },
+  "contradicted_only_excluding_git": {
+   "n": 119,
+   "diff": 0.0924,
+   "lo95_one_sided": 0.042,
+   "hi95_one_sided": 0.1513
+  }
+ },
+ "deviations": [
+  "local14b first attempt: farm returned HTTP 500 \"failed to load\" for 38 calls while qwen3-8b was resident on the shared 12 GB GPU; rows set aside (local14b.load-failed.jsonl), arm re-run after 8b idled out",
+  "local14b judged in a second, separate blinded pool after the main pool (local14b rows did not exist when the main pool ran)",
+  "one haiku summary unjudged after 3 attempts (judge returned an invalid claim label); dropped from the paired hallucination comparison (1/160)"
+ ]
+}
