@@ -36,14 +36,14 @@ def mcnemar(a, b):
     if n == 0:
         return x, y, 1.0
     p = sum(math.comb(n, k) for k in range(0, min(x, y) + 1)) / 2 ** n * 2
-    return x, y, round(min(1.0, p), 4)
+    return x, y, float(f'{min(1.0, p):.3g}')
 
 
 def main():
     items = {i['id']: i for i in load_items()}
     order = list(items)
     raw = [json.loads(line) for line in RAW.read_text().splitlines() if line.strip()]
-    meta = json.loads(META.read_text())
+    meta = json.loads(META.read_text()) if META.exists() else {}
     rows, by = [], {}
     for r in raw:
         it = items[r['id']]
@@ -57,6 +57,13 @@ def main():
                'completion_tokens': (r.get('usage') or {}).get('completion_tokens'),
                'finish_reason': r.get('finish_reason'), 'error': bool(r['error'])}
         row.update({k: v for k, v in s.items() if k not in ('exact', 'pred', 'called')})
+        if it['suite'] == 'z0_route' and it['category'] == 'delegate_worker':
+            # POST-HOC sensitivity (not the pre-registered score): the frozen gold compares `task` with the whole
+            # 'Use provider P with model M for this: <subtask>' line; every arm put only <subtask> in `task`.
+            alt = score_item({**it, 'request': it['request'].split('for this: ', 1)[1]}, calls)
+            row['posthoc_exact'], row['posthoc_form_exact'] = bool(alt['exact']), bool(alt['form_exact'])
+        else:
+            row['posthoc_exact'], row['posthoc_form_exact'] = row['exact'], row.get('form_exact')
         if it['suite'] == 'action_selector':
             row['pred'] = s.get('pred')
         rows.append(row)
@@ -78,6 +85,11 @@ def main():
         d['z0_route']['function_ok_given_form'] = f"{sum(r.get('function_ok', False) for r in zr if r.get('form_exact'))}/{sum(r.get('form_exact', False) for r in zr)}"
         for k in ('tool_ok', 'ids_ok', 'task_ok', 'remote_ok'):
             d['z0_route'][k] = f"{sum(r.get(k, False) for r in zr)}/{len(zr)}"
+        d['posthoc_sensitivity'] = {
+            'note': 'NOT pre-registered: delegate_worker task fidelity checked against the subtask instead of the full request line',
+            'pooled_exact': sum(r['posthoc_exact'] for r in rs),
+            'z0_route_exact': sum(r['posthoc_exact'] for r in zr),
+            'z0_route_form_exact': f"{sum(bool(r['posthoc_form_exact']) for r in zr)}/{len(zr)}"}
         irr = [r for r in rs if r['category'] == 'irrelevance']
         d['irrelevance_rejection'] = round(sum(r['exact'] for r in irr) / max(1, len(irr)), 3)
         rel = [r for r in rs if r['suite'] == 'bfcl' and r['category'] != 'irrelevance']

@@ -1,6 +1,6 @@
 {
   "schema": "z0int.local_cognition.v1",
-  "revision": "2026-09-21",
+  "revision": "2026-09-30",
   "description": "Canonical local cognition portfolio for z0intelligence#20. Role assignments come from locally reproduced measurements only; source_reported_benchmarks is recorded for evidence and is NEVER read by selection.",
   "machines": {
     "rtx3080ti-12gb": {
@@ -78,6 +78,20 @@
           "long_decision_ms": 887.5959609995334,
           "gpu_util_pct": 100.0,
           "measured_at": "2026-09-21T18:26:45Z"
+        },
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "context": 8192,
+          "measured_vram_mib": 6004,
+          "vram_peak_mib": 6018,
+          "cold_start_ms": 14402.3,
+          "decision_p50_ms": 953.4,
+          "decision_p95_ms": 2419.6,
+          "receipt_id": "tool-calling-portfolio-v0:nemotron_orchestrator_8b:7fd542f9ebe2",
+          "measured_at": "2026-10-01T00:51:21Z",
+          "notes": "host groot; -c 8192 --parallel 2 (4096/slot); VRAM = bench router processes only (GPU shared); decision latency = client wall mbp->groot over tailnet, tool-call prompts"
         }
       ],
       "source_reported_benchmarks": [
@@ -145,7 +159,9 @@
           "source_url": "https://arxiv.org/abs/2511.21689"
         }
       ],
-      "local_benchmark_receipt_ids": [],
+      "local_benchmark_receipt_ids": [
+        "tool-calling-portfolio-v0:nemotron_orchestrator_8b:7fd542f9ebe2"
+      ],
       "promotion_state": "candidate",
       "deployment_constraints": [
         "NVIDIA License Section 3.3 'Use Limitation': the Work and derivatives may be used NON-COMMERCIALLY only. commercial_use=false.",
@@ -153,7 +169,115 @@
         "nvidia/Orchestrator-8B is an alias redirecting to this repo."
       ],
       "mechanism": "ToolOrchestra RL (GRPO) on Qwen3-8B with outcome-, efficiency- and user-preference-aware rewards. Alternates reasoning and tool calling over multiple turns, dispatching to basic tools, specialist LLMs and generalist LLMs while trading accuracy against cost/latency. Trained on 552 synthetic problems / 1296 prompts.",
-      "notes": "Local GGUF evidence: general.architecture=qwen3, qwen3.context_length=40960, file_type=15 (Q4_K_M), chat template carries a tools block."
+      "notes": "Local GGUF evidence: general.architecture=qwen3, qwen3.context_length=40960, file_type=15 (Q4_K_M), chat template carries a tools block.",
+      "reproduced_results": [
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "exact_call_acc",
+          "value": 0.804,
+          "n": 184,
+          "receipt_id": "tool-calling-portfolio-v0:nemotron_orchestrator_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:164+none:20",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:51:21Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "exact_call_acc",
+          "value": 0.583,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:nemotron_orchestrator_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:164+none:20",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:51:21Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "form_exact_acc",
+          "value": 0.792,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:nemotron_orchestrator_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:164+none:20",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:51:21Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "exact_call_acc",
+          "value": 0.88,
+          "n": 125,
+          "receipt_id": "tool-calling-portfolio-v0:nemotron_orchestrator_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:164+none:20",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:51:21Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "irrelevance_rejection",
+          "value": 0.72,
+          "n": 25,
+          "receipt_id": "tool-calling-portfolio-v0:nemotron_orchestrator_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:164+none:20",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:51:21Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "state_packet_action_selector",
+          "metric": "exact_call_acc",
+          "value": 0.909,
+          "n": 11,
+          "receipt_id": "tool-calling-portfolio-v0:nemotron_orchestrator_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:164+none:20",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:51:21Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "args_validity",
+          "value": 1.0,
+          "n": 164,
+          "receipt_id": "tool-calling-portfolio-v0:nemotron_orchestrator_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:164+none:20",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:51:21Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        }
+      ],
+      "local_artifact": {
+        "kind": "gguf",
+        "hf_repo": "bartowski/nvidia_Orchestrator-8B-GGUF",
+        "hf_revision": "b4bbbc08d2b475fe529428e6f358c932881aa0b5",
+        "file": "nvidia_Orchestrator-8B-Q4_K_M.gguf",
+        "sha256": "1cc7077e20b3339d1a46bc72e29959cdd4c7249ebbd73e6977e76f23625995c7",
+        "bytes": 5027783840
+      }
     },
     "qwen3.5_9b": {
       "model_id": "qwen3.5_9b",
@@ -207,6 +331,20 @@
           "long_decision_ms": 1149.7388190000493,
           "gpu_util_pct": 97.0,
           "measured_at": "2026-09-21T18:27:05Z"
+        },
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "context": 8192,
+          "measured_vram_mib": 5850,
+          "vram_peak_mib": 5852,
+          "cold_start_ms": 13072.7,
+          "decision_p50_ms": 1697.2,
+          "decision_p95_ms": 5395.8,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_9b:7fd542f9ebe2",
+          "measured_at": "2026-10-01T00:41:12Z",
+          "notes": "host groot; -c 8192 --parallel 2 (4096/slot); VRAM = bench router processes only (GPU shared); decision latency = client wall mbp->groot over tailnet, tool-call prompts"
         }
       ],
       "source_reported_benchmarks": [
@@ -260,7 +398,9 @@
           "source_url": "https://huggingface.co/Qwen/Qwen3.5-9B"
         }
       ],
-      "local_benchmark_receipt_ids": [],
+      "local_benchmark_receipt_ids": [
+        "tool-calling-portfolio-v0:qwen3.5_9b:7fd542f9ebe2"
+      ],
       "promotion_state": "candidate",
       "deployment_constraints": [
         "Card is shared with Qwen3.5-4B; several card sections are malformed so TIR-Bench / medical-VQA numbers are unattributable and deliberately omitted.",
@@ -268,7 +408,115 @@
         "Requires recent transformers/vLLM-nightly/SGLang for the qwen35 architecture."
       ],
       "mechanism": "Unified vision-language foundation model with hybrid Gated DeltaNet (linear attention) plus Gated Attention and sparse MoE; RL post-training. 262144 native context, advertised extensible to ~1.01M via YaRN.",
-      "notes": "Local GGUF evidence: general.architecture=qwen35, qwen35.context_length=262144, attention.key_length=256, full_attention_interval=4, general.license=apache-2.0. Do NOT load the advertised context on a 12GB card."
+      "notes": "Local GGUF evidence: general.architecture=qwen35, qwen35.context_length=262144, attention.key_length=256, full_attention_interval=4, general.license=apache-2.0. Do NOT load the advertised context on a 12GB card.",
+      "reproduced_results": [
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "exact_call_acc",
+          "value": 0.658,
+          "n": 184,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_9b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:41:12Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "exact_call_acc",
+          "value": 0.188,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_9b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:41:12Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "form_exact_acc",
+          "value": 0.292,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_9b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:41:12Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "exact_call_acc",
+          "value": 0.824,
+          "n": 125,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_9b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:41:12Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "irrelevance_rejection",
+          "value": 0.8,
+          "n": 25,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_9b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:41:12Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "state_packet_action_selector",
+          "metric": "exact_call_acc",
+          "value": 0.818,
+          "n": 11,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_9b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:41:12Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "args_validity",
+          "value": 1.0,
+          "n": 155,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_9b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:41:12Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        }
+      ],
+      "local_artifact": {
+        "kind": "gguf",
+        "hf_repo": "bartowski/Qwen_Qwen3.5-9B-GGUF",
+        "hf_revision": "182be2fd6c7bc44887d88a91cb03ff009cc9f549",
+        "file": "Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+        "sha256": "d784ce9eda1a5a7b51e8f705a9e6310844bf4f173654d115823c775fdea56d43",
+        "bytes": 6169341984
+      }
     },
     "qwen3.5_4b": {
       "model_id": "qwen3.5_4b",
@@ -323,6 +571,20 @@
           "long_decision_ms": 829.0741299997535,
           "gpu_util_pct": 98.0,
           "measured_at": "2026-09-21T18:27:19Z"
+        },
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "context": 8192,
+          "measured_vram_mib": 3486,
+          "vram_peak_mib": 3488,
+          "cold_start_ms": 5247.4,
+          "decision_p50_ms": 1454.2,
+          "decision_p95_ms": 4203.6,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_4b:7fd542f9ebe2",
+          "measured_at": "2026-10-01T00:27:00Z",
+          "notes": "host groot; -c 8192 --parallel 2 (4096/slot); VRAM = bench router processes only (GPU shared); decision latency = client wall mbp->groot over tailnet, tool-call prompts"
         }
       ],
       "source_reported_benchmarks": [
@@ -369,7 +631,9 @@
           "source_url": "https://huggingface.co/Qwen/Qwen3.5-4B"
         }
       ],
-      "local_benchmark_receipt_ids": [],
+      "local_benchmark_receipt_ids": [
+        "tool-calling-portfolio-v0:qwen3.5_4b:7fd542f9ebe2"
+      ],
       "promotion_state": "candidate",
       "deployment_constraints": [
         "Do not co-reside with nanojev_06b or openjev_06b on 12GB (see manifests/models.z0int.json policies)."
@@ -383,7 +647,107 @@
         "file": "Qwen_Qwen3.5-4B-Q4_K_M.gguf",
         "sha256": "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983",
         "bytes": 3013027808
-      }
+      },
+      "reproduced_results": [
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "exact_call_acc",
+          "value": 0.745,
+          "n": 184,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_4b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:27:00Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "exact_call_acc",
+          "value": 0.458,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_4b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:27:00Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "form_exact_acc",
+          "value": 0.646,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_4b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:27:00Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "exact_call_acc",
+          "value": 0.848,
+          "n": 125,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_4b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:27:00Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "irrelevance_rejection",
+          "value": 0.84,
+          "n": 25,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_4b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:27:00Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "state_packet_action_selector",
+          "metric": "exact_call_acc",
+          "value": 0.818,
+          "n": 11,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_4b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:27:00Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "args_validity",
+          "value": 1.0,
+          "n": 155,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3.5_4b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:155+none:29",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:27:00Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        }
+      ]
     },
     "hammer2.1_3b": {
       "model_id": "hammer2.1_3b",
@@ -436,17 +800,141 @@
           "long_decision_ms": 208.92001799984428,
           "gpu_util_pct": 69.0,
           "measured_at": "2026-09-21T18:26:14Z"
+        },
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "context": 8192,
+          "measured_vram_mib": 2504,
+          "vram_peak_mib": 2516,
+          "cold_start_ms": 3590.0,
+          "decision_p50_ms": 619.2,
+          "decision_p95_ms": 2004.8,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_3b:7fd542f9ebe2",
+          "measured_at": "2026-10-01T00:21:14Z",
+          "notes": "host groot; -c 8192 --parallel 2 (4096/slot); VRAM = bench router processes only (GPU shared); decision latency = client wall mbp->groot over tailnet, tool-call prompts"
         }
       ],
       "source_reported_benchmarks": [],
-      "local_benchmark_receipt_ids": [],
+      "local_benchmark_receipt_ids": [
+        "tool-calling-portfolio-v0:hammer2.1_3b:7fd542f9ebe2"
+      ],
       "promotion_state": "candidate",
       "deployment_constraints": [
         "License 'qwen-research' -> commercial_use=false. Verify against the upstream card before any commercial use.",
         "Tools must be injected in a user turn between [BEGIN OF AVAILABLE_TOOLS] and [END OF AVAILABLE_TOOLS]; the model answers with a JSON array only."
       ],
       "mechanism": "Large Action Model fine-tuned from Qwen2.5-Coder-3B-Instruct using function masking on xLAM function-calling plus a 7.5k irrelevant-tool set; adds multi-step/multi-turn planning and irrelevant-tool rejection.",
-      "notes": "UNVERIFIED BENCHMARKS: the card reports BFCL-v3 and other results only as PNG figures with no machine-readable numbers, so source_reported_benchmarks is empty by design. Local GGUF evidence: general.architecture=qwen2, qwen2.context_length=32768, rope yarn x4, file_type=15 (Q4_K_M), general.license.name=qwen-research."
+      "notes": "UNVERIFIED BENCHMARKS: the card reports BFCL-v3 and other results only as PNG figures with no machine-readable numbers, so source_reported_benchmarks is empty by design. Local GGUF evidence: general.architecture=qwen2, qwen2.context_length=32768, rope yarn x4, file_type=15 (Q4_K_M), general.license.name=qwen-research.",
+      "reproduced_results": [
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "exact_call_acc",
+          "value": 0.44,
+          "n": 184,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_3b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:96+none:88",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:21:14Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "exact_call_acc",
+          "value": 0.0,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_3b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:96+none:88",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:21:14Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "form_exact_acc",
+          "value": 0.0,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_3b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:96+none:88",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:21:14Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "exact_call_acc",
+          "value": 0.624,
+          "n": 125,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_3b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:96+none:88",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:21:14Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "irrelevance_rejection",
+          "value": 0.88,
+          "n": 25,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_3b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:96+none:88",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:21:14Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "state_packet_action_selector",
+          "metric": "exact_call_acc",
+          "value": 0.273,
+          "n": 11,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_3b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:96+none:88",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:21:14Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "args_validity",
+          "value": 0.885,
+          "n": 96,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_3b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:96+none:88",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:21:14Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        }
+      ],
+      "local_artifact": {
+        "kind": "gguf",
+        "hf_repo": "mradermacher/Hammer2.1-3b-GGUF",
+        "hf_revision": "4b0e6fc41ca1179be0c8a0def23df7236ffa8981",
+        "file": "Hammer2.1-3b.Q4_K_M.gguf",
+        "sha256": "320b6114e54cdee0b2ded57e7fc4c55e343819599c583459782750c72c0009ad",
+        "bytes": 1929442272
+      }
     },
     "hammer2.1_7b": {
       "model_id": "hammer2.1_7b",
@@ -498,17 +986,141 @@
           "long_decision_ms": 356.5524949999599,
           "gpu_util_pct": 100.0,
           "measured_at": "2026-09-21T18:26:28Z"
+        },
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "context": 8192,
+          "measured_vram_mib": 5052,
+          "vram_peak_mib": 5064,
+          "cold_start_ms": 7108.3,
+          "decision_p50_ms": 658.4,
+          "decision_p95_ms": 1983.3,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_7b:7fd542f9ebe2",
+          "measured_at": "2026-10-01T00:29:53Z",
+          "notes": "host groot; -c 8192 --parallel 2 (4096/slot); VRAM = bench router processes only (GPU shared); decision latency = client wall mbp->groot over tailnet, tool-call prompts"
         }
       ],
       "source_reported_benchmarks": [],
-      "local_benchmark_receipt_ids": [],
+      "local_benchmark_receipt_ids": [
+        "tool-calling-portfolio-v0:hammer2.1_7b:7fd542f9ebe2"
+      ],
       "promotion_state": "candidate",
       "deployment_constraints": [
         "cc-by-nc-4.0 -> commercial_use=false.",
         "No LICENSE file in the repository tree; the license appears only in cardData."
       ],
       "mechanism": "Larger Hammer2.1 function-calling specialist fine-tuned from Qwen2.5-Coder-7B-Instruct via function masking.",
-      "notes": "UNVERIFIED BENCHMARKS: BFCL-v3 and other results are figures only on the card; no concrete numbers recorded. Local GGUF evidence: general.architecture=qwen2, qwen2.context_length=32768, file_type=15 (Q4_K_M)."
+      "notes": "UNVERIFIED BENCHMARKS: BFCL-v3 and other results are figures only on the card; no concrete numbers recorded. Local GGUF evidence: general.architecture=qwen2, qwen2.context_length=32768, file_type=15 (Q4_K_M).",
+      "reproduced_results": [
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "exact_call_acc",
+          "value": 0.467,
+          "n": 184,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_7b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:138+none:46",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:29:53Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "exact_call_acc",
+          "value": 0.062,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_7b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:138+none:46",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:29:53Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "form_exact_acc",
+          "value": 0.125,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_7b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:138+none:46",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:29:53Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "exact_call_acc",
+          "value": 0.648,
+          "n": 125,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_7b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:138+none:46",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:29:53Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "irrelevance_rejection",
+          "value": 0.84,
+          "n": 25,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_7b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:138+none:46",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:29:53Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "state_packet_action_selector",
+          "metric": "exact_call_acc",
+          "value": 0.182,
+          "n": 11,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_7b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:138+none:46",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:29:53Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "args_validity",
+          "value": 0.754,
+          "n": 138,
+          "receipt_id": "tool-calling-portfolio-v0:hammer2.1_7b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:138+none:46",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:29:53Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        }
+      ],
+      "local_artifact": {
+        "kind": "gguf",
+        "hf_repo": "mradermacher/Hammer2.1-7b-GGUF",
+        "hf_revision": "5adddc4c1b2e07eb3a299397d1d516ed98276673",
+        "file": "Hammer2.1-7b.Q4_K_M.gguf",
+        "sha256": "22f425400b88ac8c7697e9d139601b34c1aa130cc2260f91367c643308a5ba61",
+        "bytes": 4681088000
+      }
     },
     "functiongemma_270m": {
       "model_id": "functiongemma_270m",
@@ -561,6 +1173,20 @@
           "long_decision_ms": 83.17142000032618,
           "gpu_util_pct": 51.0,
           "measured_at": "2026-09-21T18:26:08Z"
+        },
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "BF16",
+          "context": 8192,
+          "measured_vram_mib": 892,
+          "vram_peak_mib": 902,
+          "cold_start_ms": 2290.8,
+          "decision_p50_ms": 3273.9,
+          "decision_p95_ms": 9781.2,
+          "receipt_id": "tool-calling-portfolio-v0:functiongemma_270m:7fd542f9ebe2",
+          "measured_at": "2026-10-01T00:18:37Z",
+          "notes": "host groot; -c 8192 --parallel 2 (4096/slot); VRAM = bench router processes only (GPU shared); decision latency = client wall mbp->groot over tailnet, tool-call prompts"
         }
       ],
       "source_reported_benchmarks": [
@@ -677,7 +1303,9 @@
           "source_url": "https://huggingface.co/google/functiongemma-270m-it"
         }
       ],
-      "local_benchmark_receipt_ids": [],
+      "local_benchmark_receipt_ids": [
+        "tool-calling-portfolio-v0:functiongemma_270m:7fd542f9ebe2"
+      ],
       "promotion_state": "candidate",
       "deployment_constraints": [
         "GATED = manual: requires a logged-in Hugging Face account and accepting Google's usage license.",
@@ -685,7 +1313,115 @@
         "Not a dialogue model: the card explicitly frames the base model as single-turn and says it should be fine-tuned for multi-turn. Judge it after task-specific fine-tuning (z0intelligence#20 phase 10), never zero-shot."
       ],
       "mechanism": "Gemma 3 270M architecture with a function-calling chat format, trained on 6T tokens of public tool definitions and tool-use interactions.",
-      "notes": "Card provenance: the upstream card is gated (raw fetch 401), so the claims above were read from the identical official card mirrored at unsloth/functiongemma-270m-it plus Google docs; revision and license tag come from the HF API. Local GGUF evidence: general.architecture=gemma3, gemma3.context_length=32768, sliding_window=512, head_count_kv=1, file_type=7 (Q8_0), general.license=gemma."
+      "notes": "Card provenance: the upstream card is gated (raw fetch 401), so the claims above were read from the identical official card mirrored at unsloth/functiongemma-270m-it plus Google docs; revision and license tag come from the HF API. Local GGUF evidence: general.architecture=gemma3, gemma3.context_length=32768, sliding_window=512, head_count_kv=1, file_type=7 (Q8_0), general.license=gemma.",
+      "reproduced_results": [
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "exact_call_acc",
+          "value": 0.342,
+          "n": 184,
+          "receipt_id": "tool-calling-portfolio-v0:functiongemma_270m:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "BF16",
+          "adapter": "content_functiongemma:119+none:65",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:18:37Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "exact_call_acc",
+          "value": 0.0,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:functiongemma_270m:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "BF16",
+          "adapter": "content_functiongemma:119+none:65",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:18:37Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "form_exact_acc",
+          "value": 0.0,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:functiongemma_270m:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "BF16",
+          "adapter": "content_functiongemma:119+none:65",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:18:37Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "exact_call_acc",
+          "value": 0.488,
+          "n": 125,
+          "receipt_id": "tool-calling-portfolio-v0:functiongemma_270m:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "BF16",
+          "adapter": "content_functiongemma:119+none:65",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:18:37Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "irrelevance_rejection",
+          "value": 0.84,
+          "n": 25,
+          "receipt_id": "tool-calling-portfolio-v0:functiongemma_270m:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "BF16",
+          "adapter": "content_functiongemma:119+none:65",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:18:37Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "state_packet_action_selector",
+          "metric": "exact_call_acc",
+          "value": 0.182,
+          "n": 11,
+          "receipt_id": "tool-calling-portfolio-v0:functiongemma_270m:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "BF16",
+          "adapter": "content_functiongemma:119+none:65",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:18:37Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "args_validity",
+          "value": 0.798,
+          "n": 119,
+          "receipt_id": "tool-calling-portfolio-v0:functiongemma_270m:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "BF16",
+          "adapter": "content_functiongemma:119+none:65",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:18:37Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        }
+      ],
+      "local_artifact": {
+        "kind": "gguf",
+        "hf_repo": "ggml-org/functiongemma-270m-it-GGUF",
+        "hf_revision": "2566ce14aedfc14fdd0de955ba67346425e67126",
+        "file": "functiongemma-270m-it-bf16.gguf",
+        "sha256": "44090e534ddb3cfc683b696f2825b4056f413ad1e7963d69bd5196d5b3ae7ee6",
+        "bytes": 542847392
+      }
     },
     "nanojev_06b": {
       "model_id": "nanojev_06b",
@@ -726,6 +1462,318 @@
       "deployment_constraints": [],
       "mechanism": "Bounded scorer: returns calibrated probabilities over a caller-supplied candidate set and cannot invent a trajectory. Not a generative orchestrator.",
       "notes": "Reference entry. The canonical record is the decision_roster in manifests/models.z0int.json; this entry exists so the cascade can name it as a role default without duplicating fields."
+    },
+    "qwen3_8b": {
+      "model_id": "qwen3_8b",
+      "hf": "Qwen/Qwen3-8B",
+      "revision": null,
+      "role_tags": [
+        "general_local_fallback"
+      ],
+      "parameter_count": "8B",
+      "license": "apache-2.0",
+      "gated_access": false,
+      "commercial_use": true,
+      "supported_runtimes": [
+        "llama.cpp",
+        "ollama",
+        "vllm"
+      ],
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "tool_call_template": "qwen3-hermes",
+      "tool_parser": "llama.cpp native (hermes)",
+      "capabilities": {},
+      "tested_context": 8192,
+      "tested_quantization": "Q4_K_M",
+      "measurements": [
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "context": 8192,
+          "measured_vram_mib": 6004,
+          "vram_peak_mib": 6018,
+          "cold_start_ms": 8874.7,
+          "decision_p50_ms": 1068.5,
+          "decision_p95_ms": 2831.5,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_8b:7fd542f9ebe2",
+          "measured_at": "2026-10-01T00:33:55Z",
+          "notes": "host groot; -c 8192 --parallel 2 (4096/slot); VRAM = bench router processes only (GPU shared); decision latency = client wall mbp->groot over tailnet, tool-call prompts"
+        }
+      ],
+      "source_reported_benchmarks": [],
+      "local_benchmark_receipt_ids": [
+        "tool-calling-portfolio-v0:qwen3_8b:7fd542f9ebe2"
+      ],
+      "promotion_state": "candidate",
+      "deployment_constraints": [],
+      "notes": "Farm default local model (groot router id qwen3-8b-q4km). Added as a measured comparator.",
+      "reproduced_results": [
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "exact_call_acc",
+          "value": 0.826,
+          "n": 184,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:1+native:162+none:21",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:33:55Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "exact_call_acc",
+          "value": 0.604,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:1+native:162+none:21",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:33:55Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "form_exact_acc",
+          "value": 0.792,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:1+native:162+none:21",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:33:55Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "exact_call_acc",
+          "value": 0.904,
+          "n": 125,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:1+native:162+none:21",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:33:55Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "irrelevance_rejection",
+          "value": 0.76,
+          "n": 25,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:1+native:162+none:21",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:33:55Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "state_packet_action_selector",
+          "metric": "exact_call_acc",
+          "value": 0.909,
+          "n": 11,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:1+native:162+none:21",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:33:55Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "args_validity",
+          "value": 1.0,
+          "n": 163,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_8b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "content_json:1+native:162+none:21",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:33:55Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        }
+      ],
+      "local_artifact": {
+        "kind": "gguf",
+        "hf_repo": "Qwen/Qwen3-8B-GGUF",
+        "hf_revision": "7c41481",
+        "file": "Qwen3-8B-Q4_K_M.gguf",
+        "sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "bytes": 5027783488
+      }
+    },
+    "qwen3_14b": {
+      "model_id": "qwen3_14b",
+      "hf": "Qwen/Qwen3-14B",
+      "revision": null,
+      "role_tags": [
+        "general_local_fallback"
+      ],
+      "parameter_count": "14B",
+      "license": "apache-2.0",
+      "gated_access": false,
+      "commercial_use": true,
+      "supported_runtimes": [
+        "llama.cpp",
+        "ollama",
+        "vllm"
+      ],
+      "available_quantizations": [
+        "Q4_K_M"
+      ],
+      "tool_call_template": "qwen3-hermes",
+      "tool_parser": "llama.cpp native (hermes)",
+      "capabilities": {},
+      "tested_context": 8192,
+      "tested_quantization": "Q4_K_M",
+      "measurements": [
+        {
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "context": 8192,
+          "measured_vram_mib": 9872,
+          "vram_peak_mib": 9890,
+          "cold_start_ms": 18788.0,
+          "decision_p50_ms": 1601.4,
+          "decision_p95_ms": 4036.8,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_14b:7fd542f9ebe2",
+          "measured_at": "2026-10-01T00:47:15Z",
+          "notes": "host groot; -c 8192 --parallel 2 (4096/slot); VRAM = bench router processes only (GPU shared); decision latency = client wall mbp->groot over tailnet, tool-call prompts"
+        }
+      ],
+      "source_reported_benchmarks": [],
+      "local_benchmark_receipt_ids": [
+        "tool-calling-portfolio-v0:qwen3_14b:7fd542f9ebe2"
+      ],
+      "promotion_state": "candidate",
+      "deployment_constraints": [],
+      "notes": "Farm 14B (groot router id qwen3-14b-q4km); cannot co-reside with the 8B. Added as a measured comparator.",
+      "reproduced_results": [
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "exact_call_acc",
+          "value": 0.815,
+          "n": 184,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_14b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:160+none:24",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:47:15Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "exact_call_acc",
+          "value": 0.542,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_14b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:160+none:24",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:47:15Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "z0_route",
+          "metric": "form_exact_acc",
+          "value": 0.792,
+          "n": 48,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_14b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:160+none:24",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:47:15Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "exact_call_acc",
+          "value": 0.912,
+          "n": 125,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_14b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:160+none:24",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:47:15Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "bfcl_v4_subset",
+          "metric": "irrelevance_rejection",
+          "value": 0.92,
+          "n": 25,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_14b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:160+none:24",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:47:15Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "state_packet_action_selector",
+          "metric": "exact_call_acc",
+          "value": 0.909,
+          "n": 11,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_14b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:160+none:24",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:47:15Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        },
+        {
+          "suite": "tool_calling_portfolio_v0",
+          "metric": "args_validity",
+          "value": 1.0,
+          "n": 160,
+          "receipt_id": "tool-calling-portfolio-v0:qwen3_14b:7fd542f9ebe2",
+          "machine": "NVIDIA GeForce RTX 3080 Ti",
+          "runtime": "llama.cpp-b11270-router",
+          "quantization": "Q4_K_M",
+          "adapter": "native:160+none:24",
+          "comparator": "qwen3_8b",
+          "measured_at": "2026-10-01T00:47:15Z",
+          "notes": "prereg 01c6dd9; thinking off; temperature 0; benchmarks/tool_calling_portfolio/results_v0.json"
+        }
+      ],
+      "local_artifact": {
+        "kind": "gguf",
+        "hf_repo": "Qwen/Qwen3-14B-GGUF",
+        "hf_revision": "530227a",
+        "file": "Qwen3-14B-Q4_K_M.gguf",
+        "sha256": "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0",
+        "bytes": 9001752960
+      }
     }
   },
   "sources": {

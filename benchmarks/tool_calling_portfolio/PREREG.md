@@ -151,3 +151,76 @@ were committed before the scored run, and neither is item-specific:
 
 Smoke observations, not scored: all 8 arms loaded and answered. Qwen3.5-4B/9B, Qwen3-8B/14B and
 Nemotron returned native `tool_calls`. Hammer and FunctionGemma used content fallbacks.
+
+## Results (added after scoring; run 2026-09-30/10-01 on groot, 0 transport errors)
+
+Scored by `score.py`. Aggregates are in `results_v0.json` and per-item flags in `rows_v0.jsonl`.
+Comparator: qwen3_8b. McNemar is exact and two-sided, over the pooled 184 items.
+
+| arm | pooled exact | z0_route exact (form) | BFCL exact | irrelevance rejection | action selector | args valid | client p50 / p95 ms | bench VRAM MiB | cold ms | vs qwen3_8b pooled |
+|---|---|---|---|---|---|---|---|---|---|---|
+| functiongemma_270m (bf16, zero-shot) | 63/184 | 0/48 (0) | 61/125 | 0.84 | 2/11 | 95/119 | 3274 / 9781 | 892 | 2291 | worse, p=2e-22 |
+| hammer2.1_3b | 81/184 | 0/48 (0) | 78/125 | 0.88 | 3/11 | 85/96 | 619 / 2005 | 2504 | 3590 | worse, p=2e-17 |
+| qwen3.5_4b | 137/184 | 22/48 (31) | 106/125 | 0.84 | 9/11 | 155/155 | 1454 / 4204 | 3486 | 5247 | worse, p=0.028 |
+| hammer2.1_7b | 86/184 | 3/48 (6) | 81/125 | 0.84 | 2/11 | 104/138 | 658 / 1983 | 5052 | 7108 | worse, p=1e-16 |
+| **qwen3_8b** (farm default) | **152/184** | 29/48 (38) | 113/125 | 0.76 | 10/11 | 163/163 | 1069 / 2832 | 6004 | 8875 | n/a |
+| qwen3.5_9b | 121/184 | 9/48 (14) | 103/125 | 0.80 | 9/11 | 155/155 | 1697 / 5396 | 5850 | 13073 | worse, p=2e-6 |
+| qwen3_14b (farm) | 150/184 | 26/48 (38) | 114/125 | 0.92 | 10/11 | 160/160 | 1601 / 4037 | 9872 | 18788 | not distinguishable (16 vs 18, p=0.86) |
+| nemotron_orchestrator_8b (secondary) | 148/184 | 28/48 (38) | 110/125 | 0.72 | 10/11 | 164/164 | 953 / 2420 | 6004 | 14402 | not distinguishable (4 vs 8, p=0.39) |
+
+Decision rule outcome: **no candidate is better than qwen3_8b, and none is eligible for a shadow
+tool-calling role.**
+
+- **Rule 1 (better).** No arm beats qwen3_8b on any suite. Qwen3-14B and Nemotron are statistically
+  indistinguishable from it on every suite. Every new candidate (Qwen3.5-4B/9B, Hammer2.1-3B/7B,
+  FunctionGemma) is significantly worse pooled.
+- **Rule 2 (cheaper substitute).**
+  - Hammer 3B/7B pass the VRAM and p50 gates, but fail accuracy (pooled 70 and 66 items behind), z0 form
+    and argument validity.
+  - Qwen3.5-4B uses less VRAM (3.5 vs 6.0 GB) but is slower at p50 (1454 vs 1069 ms) and 15 items behind.
+  - FunctionGemma is slower than every other arm, because generation runs on to `max_tokens` in 120 of 184
+    replies.
+- **Gate defect, found while scoring.** The `z0_route form_exact >= 0.90` gate cannot be met by any arm.
+  The frozen gold for the 5 delegate_worker items compares `task` with the whole "Use provider P with
+  model M for this: …" line, and every arm put only the subtask there, which is arguably the right call. So
+  form_exact is capped at 43/48 = 0.896.
+  - A post-hoc sensitivity analysis compares those 5 items against the subtask instead. It is labelled
+    `posthoc_sensitivity` in `results_v0.json` and is not part of the pre-registered score.
+  - Under that analysis: qwen3_8b 157/184 (z0 34/48, form 43/48), qwen3_14b 155, nemotron 153,
+    qwen3.5_4b 142, qwen3.5_9b 126, hammer2.1_7b 91, hammer2.1_3b 85, functiongemma 63.
+  - The ranking and every eligibility verdict are unchanged.
+
+Findings:
+- **z0 route_worker formation is the discriminating suite.** The BFCL subset is close to saturated for the
+  Qwen-family arms: 103 to 114 of 125.
+- **Qwen3.5-9B ignores the routing instruction.** On 30/43 route_worker items it calls `delegate_worker`
+  without a named provider or model. Its ids and task copying are fine. This is why 9B scores below 4B on
+  z0_route (9 vs 22 exact). It is a no-think result only.
+- **Hammer 2.1** runs through its own GGUF chat template (Hammer's task/format instruction, JSON-list
+  output) and the content fallback.
+  - It is BFCL-competent on `multiple`: 3B 21/25, 7B 20/25.
+  - It is weak on `parallel`: 9 and 11 of 25.
+  - It almost never forms a valid z0 MCP call. Typical failures: it returns `[]`, invents a tool named after
+    the function (for example `coding_implementation`), or paraphrases or shortens `task`.
+  - Its argument validity is 0.75 to 0.89. BFCL is public, and Hammer is tuned for BFCL-style tasks, so its
+    BFCL numbers are an upper bound.
+- **FunctionGemma zero-shot is not usable off the shelf.** It made no valid z0 call. llama.cpp b11270 does
+  not parse its native tool calls, and it role-plays tool responses. Per rule 4, this does not reject it
+  from the fine-tuned tiny-specialist role.
+- **Irrelevance rejection is the weak spot of the farm default.** qwen3_8b rejects 19/25 and nemotron
+  18/25. qwen3_14b is best at 23/25.
+- **Action selector (n=11, descriptive only).** Only qwen3_14b and nemotron chose `escalate` on the single
+  conflict item. Everything else is within one item of `rule_always_act` (8/11) or below it.
+- **Latency** for z0_route items is dominated by copying the request into `task`. Requests run up to 2110
+  characters.
+- **VRAM** is the bench-router process only, at `-c 8192 --parallel 2`. The GPU was shared with Blender and
+  Ollama during the run: other processes held 0.6 to 4.3 GB. All arms, including the 14B at 9.9 GB, loaded
+  without error.
+
+The manifest records each arm's reproduced numbers as `reproduced_results`, under receipt
+`tool-calling-portfolio-v0:<arm>:7fd542f9ebe2`, plus a groot `measurements` row. `promotion_state`,
+`role_defaults`, routing config and `local_order` are unchanged. Note that the existing `role_defaults`
+in `manifests/local_cognition.v1.json` name hammer2.1_3b as the `general_function_caller` and
+`tiny_action_specialist`, qwen3.5_4b as the `semantic_orchestrator` and qwen3.5_9b as the
+`general_local_fallback`. These reproduced results do not support any of those defaults over qwen3_8b.
+Changing them is left as an explicit decision.

@@ -151,6 +151,7 @@ def test_assert_selection_is_evidence_based_flags_unmeasured_defaults():
     for model_id in raw["role_defaults"].values():
         raw["models"][model_id]["measurements"] = []
         raw["models"][model_id]["local_benchmark_receipt_ids"] = []
+        raw["models"][model_id]["reproduced_results"] = []  # receipt-linked, so stripped with the receipts
     manifest = parse_manifest(raw)
     offenders = assert_selection_is_evidence_based(manifest)
     assert set(raw["role_defaults"].values()) <= set(offenders)
