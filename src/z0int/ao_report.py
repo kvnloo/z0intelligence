@@ -535,6 +535,7 @@ def format_ao_promotion_report(report: dict[str, Any]) -> str:
     decisions = report["decisions"]
     outcomes = report["outcomes"]
     latency = report["measurements"]["decision_latency_ms"]
+    comparison = report["comparison"]
     return (
         "AO shadow promotion evidence\n"
         f"  decisions={decisions['count']} abstention={decisions['abstention_rate']} "
@@ -543,6 +544,8 @@ def format_ao_promotion_report(report: dict[str, Any]) -> str:
         f"final_disposition_join={outcomes['final_disposition_join_coverage']} "
         f"gold={outcomes['verified_positive_decisions']} negative={outcomes['verified_negative_decisions']}\n"
         f"  decision_latency_count={latency['count']} p50={latency['p50']} p95={latency['p95']}\n"
+        f"  matched_pairs={comparison['matched_pairs']} "
+        f"verified_delta={comparison['verified_positive']['delta']}\n"
         f"  snapshot={report['snapshot_sha256']}\n"
         f"  promotion={report['promotion']['decision']} gaps={len(report['promotion']['evidence_gaps'])}"
     )
