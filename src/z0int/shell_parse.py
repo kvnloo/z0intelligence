@@ -26,14 +26,16 @@ class Word:
 
 
 class Simple:
-    __slots__ = ("argv", "redirs", "heredocs", "joined_by", "nested")
+    __slots__ = ("argv", "redirs", "heredocs", "joined_by", "nested", "depth", "heredoc_quoted")
 
-    def __init__(self) -> None:
+    def __init__(self, depth: int = 0) -> None:
         self.argv: list[Word] = []
         self.redirs: list[tuple[str, Word]] = []
         self.heredocs: list[str] = []
         self.joined_by = ""  # connector before this command ("" for the first, "|" for a pipe stage, ...)
         self.nested = False  # came from a $( ) / backtick substitution
+        self.depth = depth  # ( ) subshell depth: a cd / assignment inside a subshell does not leak out
+        self.heredoc_quoted: list[bool] = []  # <<'EOF' (quoted: no expansion) vs <<EOF (shell expands $VAR)
 
     @property
     def words(self) -> list[str]:
@@ -170,16 +172,17 @@ def split(command: str, *, _depth: int = 0) -> list[Simple]:
     s, n = command, len(command)
     cmds: list[Simple] = []
     cur = Simple()
-    pending_heredocs: list[tuple[str, bool, Simple]] = []
+    pending_heredocs: list[tuple[str, bool, Simple, bool]] = []
     joined = ""
     extra: list[Simple] = []
+    depth = 0
 
     def flush(conn: str) -> None:
         nonlocal cur, joined
         if cur.argv or cur.redirs:
             cur.joined_by = joined
             cmds.append(cur)
-        cur = Simple()
+        cur = Simple(depth)
         joined = conn
 
     while sc.i < n:
@@ -196,7 +199,7 @@ def split(command: str, *, _depth: int = 0) -> list[Simple]:
             continue
         if c == "\n":
             sc.i += 1
-            for delim, strip, owner in pending_heredocs:
+            for delim, strip, owner, quoted in pending_heredocs:
                 body: list[str] = []
                 while sc.i < n:
                     k = s.find("\n", sc.i)
@@ -206,12 +209,15 @@ def split(command: str, *, _depth: int = 0) -> list[Simple]:
                         break
                     body.append(line)
                 owner.heredocs.append("\n".join(body))
+                owner.heredoc_quoted.append(quoted)
             pending_heredocs = []
             flush("\n")
             continue
         if c in "()":
-            # subshell / grouping: flatten (connectors around it still apply)
+            # subshell / grouping: flatten (connectors around it still apply); record the depth
             flush(joined if not cur.argv else ";")
+            depth = depth + 1 if c == "(" else max(0, depth - 1)
+            cur.depth = depth
             sc.i += 1
             continue
         two = s[sc.i:sc.i + 2]
@@ -239,9 +245,11 @@ def split(command: str, *, _depth: int = 0) -> list[Simple]:
                     sc.i += 1
                     sc.word()
                     continue
+                i0 = sc.i
                 target = sc.word()
                 if op in ("<<", "<<-"):
-                    pending_heredocs.append((target.text.strip(), op == "<<-", cur))
+                    raw = s[i0:sc.i]
+                    pending_heredocs.append((target.text.strip(), op == "<<-", cur, any(q in raw for q in "'\"\\")))
                 else:
                     cur.redirs.append((op, target))
                 continue

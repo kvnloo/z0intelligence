@@ -25,7 +25,10 @@ from z0int.action_authority import SessionAuthority, _tool_results, _user_text
 from z0int.action_effects import Ctx, git_default_branch, git_root
 
 PROJECTS = os.path.expanduser("~/.claude/projects")
-PRIVATE = os.path.expanduser("~/.z0int/research/action_authority_v0")
+PRIVATE = os.path.expanduser("~/.z0int/research/action_authority_v0")  # labels, sample meta, turns (v0 dev set)
+# v1: replay output of a re-run goes to its own private dir so the frozen v0 snapshot is never overwritten
+OUT = os.path.expanduser(os.environ.get("Z0INT_AA_OUT") or PRIVATE)
+BRANCH_FROM_DISK = os.environ.get("Z0INT_AA_BRANCH_DISK") == "1"  # other repos: today's checked-out branch (live-hook-like)
 HERE = os.path.dirname(os.path.abspath(__file__))
 SEED = 55
 N_RANDOM_NONCAND = 80
@@ -114,7 +117,12 @@ def replay() -> list[dict]:
             row_root = git_root(cwd)
 
             def branch_of(d, _gb=gb, _root=row_root):
-                return _gb if _gb and _root and git_root(d) == _root else None
+                if _gb and _root and git_root(d) == _root:
+                    return _gb
+                if BRANCH_FROM_DISK and (git_root(d) != _root or not _gb):
+                    from z0int.action_effects import git_branch
+                    return git_branch(d)
+                return None
 
             ctx = Ctx(cwd=cwd, scope_root=scope_root, branch_of=branch_of, default_of=git_default_branch)
             if is_main:
@@ -160,11 +168,11 @@ def replay() -> list[dict]:
                     "assistant_tail": (last_assistant or "")[-700:] if is_main else "", "qa": list(qa_since_turn)[-4:],
                 })
         _turns[session_id] = turn_texts
-    os.makedirs(PRIVATE, exist_ok=True)
-    with open(os.path.join(PRIVATE, "replay.jsonl"), "w", encoding="utf-8") as fh:
+    os.makedirs(OUT, exist_ok=True)
+    with open(os.path.join(OUT, "replay.jsonl"), "w", encoding="utf-8") as fh:
         for c in calls:
             fh.write(json.dumps(c, ensure_ascii=False, default=str) + "\n")
-    with open(os.path.join(PRIVATE, "turns.json"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(OUT, "turns.json"), "w", encoding="utf-8") as fh:
         json.dump(_turns, fh, ensure_ascii=False)
     summary = {"calls": len(calls), "sessions": len(_turns), "errors": dict(errors),
                "decision": dict(Counter(c["decision"] for c in calls)),
@@ -179,7 +187,7 @@ _turns: dict[str, list] = {}
 
 
 def load_calls() -> list[dict]:
-    with open(os.path.join(PRIVATE, "replay.jsonl"), encoding="utf-8") as fh:
+    with open(os.path.join(OUT, "replay.jsonl"), encoding="utf-8") as fh:
         return [json.loads(line) for line in fh]
 
 
@@ -311,6 +319,7 @@ def _pct(a: int, b: int) -> str:
 
 def score() -> dict:
     calls = {c["call_id"]: c for c in load_calls()}
+    missing_replayed = 0
     with open(os.path.join(PRIVATE, "sample_meta.json")) as fh:
         meta = json.load(fh)
     labels = {}
@@ -338,7 +347,10 @@ def score() -> dict:
     friction_reasons = Counter()
     for cid, lab in labels.items():
         c = calls.get(cid)
-        if c is None or cid not in cand_ids | rand_ids:
+        if cid not in cand_ids | rand_ids:
+            continue
+        if c is None:
+            missing_replayed += 1
             continue
         w = 1.0 if cid in cand_ids else weight_non
         pred = [(e["kind"], _norm_target(e["kind"], e["target"])) for e in c["effects"] if e["class"] == "privileged"]
@@ -377,7 +389,7 @@ def score() -> dict:
     res = {
         "schema": "z0int.bench.action_authority.results.v0",
         "sample": {"calls_total": meta["n_calls"], "candidates": meta["n_candidates"], "random_noncandidates": meta["n_random_noncandidates"],
-                   "labeled": len(labels), "missing_labels": len(missing)},
+                   "labeled": len(labels), "missing_labels": len(missing), "labeled_not_replayed": missing_replayed},
         "parser": {
             "privileged_kind_target": {"precision": _pct(tp_kt, n_pred), "recall": _pct(tp_kt, n_gold)},
             "privileged_kind_only": {"precision": _pct(tp_k, n_pred), "recall": _pct(tp_k, n_gold)},
@@ -452,6 +464,64 @@ def latency(n: int = 360) -> dict:
             "baseline_python_startup_ms": q([_startup() for _ in range(20)], .5)}
 
 
+def latency_ab(n: int = 360, other_src: str | None = None, only_labelled: bool = False) -> dict:
+    """v1 vs another checkout (e.g. frozen v0) on the SAME sampled calls, interleaved call by call, so machine
+    load hits both equally. Fresh interpreter per call (as Claude Code runs the hook)."""
+    calls = load_calls()
+    rnd = random.Random(SEED + 1)
+    priv = [c for c in calls if any(e["class"] == "privileged" for e in c["effects"])]
+    pick = rnd.sample(calls, min(n - 60, len(calls))) + rnd.sample(priv, min(60, len(priv)))
+    rnd.shuffle(pick)
+    by_sid = {}
+    for p in glob.glob(os.path.join(PROJECTS, "**", "*.jsonl"), recursive=True):
+        if "/subagents/" not in p:
+            by_sid[os.path.basename(p)[:-6]] = p
+    arms = {"this": None}
+    if other_src:
+        arms["other"] = other_src
+    walls: dict[str, list[float]] = {a: [] for a in arms}
+    cpu: dict[str, list[float]] = {}
+    homes = {}
+    for a in arms:
+        homes[a] = os.path.expanduser(f"~/.cache/z0int-action-latency-ab/{a}")
+        import shutil
+        shutil.rmtree(homes[a], ignore_errors=True)
+        os.makedirs(homes[a], exist_ok=True)
+    for k, c in enumerate(pick):
+        tp = by_sid.get(c["session"])
+        hook = {"session_id": c["session"], "transcript_path": tp, "cwd": c["cwd"] if os.path.isdir(c["cwd"]) else os.path.expanduser("~"),
+                "tool_name": c["tool"], "tool_input": c["input"], "permission_mode": c["permission_mode"]}
+        order = list(arms) if k % 2 == 0 else list(reversed(list(arms)))
+        for a in order:
+            env = dict(os.environ, Z0INT_HOME=homes[a])
+            if arms[a]:
+                env["PYTHONPATH"] = arms[a]
+            import resource
+            r0 = resource.getrusage(resource.RUSAGE_CHILDREN)
+            t0 = time.perf_counter()
+            subprocess.run([sys.executable, "-m", "z0int.action_hook"], input=json.dumps(hook), capture_output=True, text=True, env=env)
+            walls[a].append((time.perf_counter() - t0) * 1000)
+            r1 = resource.getrusage(resource.RUSAGE_CHILDREN)
+            cpu.setdefault(a, []).append(1000 * ((r1.ru_utime - r0.ru_utime) + (r1.ru_stime - r0.ru_stime)))
+
+    def q(xs, p):
+        xs = sorted(xs)
+        return round(xs[min(len(xs) - 1, int(p * len(xs)))], 1) if xs else None
+    out = {"n": len(pick), "python": sys.version.split()[0], "loadavg_end": os.getloadavg()}
+    for a, xs in walls.items():
+        out[a] = {"p50": q(xs, .5), "p95": q(xs, .95), "max": q(xs, 1),
+                  "cpu_ms": {"p50": q(cpu.get(a, []), .5), "p95": q(cpu.get(a, []), .95)}}
+        inproc = []
+        try:
+            for line in open(os.path.join(homes[a], "state", "claude-code", "actions.jsonl")):
+                inproc.append(json.loads(line)["latency_ms"])
+        except OSError:
+            pass
+        out[a]["in_process"] = {"p50": q(inproc, .5), "p95": q(inproc, .95)}
+    out["baseline_python_startup_ms"] = q([_startup() for _ in range(20)], .5)
+    return out
+
+
 def _startup() -> float:
     t0 = time.perf_counter()
     subprocess.run([sys.executable, "-c", "pass"])
@@ -466,12 +536,16 @@ if __name__ == "__main__":
         sample()
     elif cmd == "score":
         out = score()
-        lat = os.path.join(PRIVATE, "latency.json")
+        lat = os.path.join(OUT, "latency.json")
         out["latency"] = latency() if "--latency" in sys.argv else (json.load(open(lat)) if os.path.exists(lat) else None)
         out["concentration"] = _concentration()
-        dest = os.path.join(HERE, "results_v0.json")
+        tag = sys.argv[sys.argv.index("--tag") + 1] if "--tag" in sys.argv else "v0"
+        dest = os.path.join(HERE, "results_v0.json" if tag == "v0" else f"results_{tag}_dev.json")
         with open(dest, "w") as fh:
             json.dump(out, fh, indent=1)
         print(json.dumps(out, indent=1))
     elif cmd == "latency":
         print(json.dumps(latency(), indent=1))
+    elif cmd == "latency_ab":
+        other = sys.argv[sys.argv.index("--other") + 1] if "--other" in sys.argv else None
+        print(json.dumps(latency_ab(other_src=other), indent=1))

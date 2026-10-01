@@ -60,8 +60,8 @@ def save_session(hook: dict, sa) -> None:
     cache = _cache_path(hook)
     os.makedirs(os.path.dirname(cache), exist_ok=True)
     tmp = f"{cache}.{os.getpid()}.tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump({"path": sa._path, "offset": sa._offset, "state": sa.state()}, fh, default=str)
+    with open(tmp, "w", encoding="utf-8") as fh:  # json.dumps uses the C encoder; json.dump(fh) does not
+        fh.write(json.dumps({"path": sa._path, "offset": sa._offset, "state": sa.state()}, default=str, separators=(",", ":")))
     os.replace(tmp, cache)
 
 
@@ -126,7 +126,7 @@ def on_pretool(hook: dict, *, log: bool = True) -> dict | None:
         save_session(hook, sa)  # grants were materialised: keep them so the next call need not redo it
     parsed, decision = out["effects"], out["decision"]
     record = {
-        "schema": "z0int.claude_code.action_record.v0", "ts": time.time(), "shadow": True,
+        "schema": "z0int.claude_code.action_record.v1", "ts": time.time(), "shadow": True,
         "session": hook.get("session_id"), "prompt_id": hook.get("prompt_id") or sa.prompt_id,
         "tool_use_id": hook.get("tool_use_id"), "agent_id": hook.get("agent_id"), "tool": tool, "cwd": cwd,
         "permission_mode": mode, "effect_class": parsed["effect_class"], "effects": [_slim(e) for e in parsed["effects"]],

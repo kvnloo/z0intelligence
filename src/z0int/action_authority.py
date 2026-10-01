@@ -31,7 +31,7 @@ if TYPE_CHECKING:  # annotations only; typing is not imported at run time (hook 
 
 from .action_effects import ORDER, Ctx, parse_tool_call
 
-SCHEMA = "z0int.action_authority.v0"
+SCHEMA = "z0int.action_authority.v1"
 
 HARNESS_PREFIXES = ("<agent-message", "<task-notification", "<system-reminder", "<local-command-stdout",
                     "<local-command-caveat", "<local-command-stderr", "Caveat:", "[Request interrupted",
@@ -68,6 +68,16 @@ def covers(grant: Mapping[str, Any], effect: Mapping[str, Any]) -> bool:
         return all(str(t.get(k)) == str(v) for k, v in et.items() if k != "protected")
     if t.get("catastrophic"):
         return False
+    if kind in ("push", "force") and t.get("remote"):
+        remotes = scope.get("remotes")
+        r = str(t.get("remote")).lower()
+        if remotes and r not in {x.lower() for x in remotes}:
+            return False
+        if not remotes and r == "upstream":
+            return False  # "push it" means your own remote, not the canonical upstream
+    if kind == "publish" and t.get("tag") and scope.get("tags") is not None:
+        tags = scope.get("tags")
+        return tags == "any" or (isinstance(tags, list) and str(t.get("tag")).lower() in {x.lower() for x in tags})
     if kind in _BRANCH_KINDS or (kind == "delete" and "branch" in t):
         b = t.get("branch")
         allowed = scope.get("branches")
@@ -81,24 +91,38 @@ def covers(grant: Mapping[str, Any], effect: Mapping[str, Any]) -> bool:
             return not t.get("protected", True) if allowed == "non_default" else False
         return _norm_branch(b) in {_norm_branch(x) for x in allowed}
     if kind == "delete" and "path" in t:
-        return any(_path_under(t["path"], p) for p in scope.get("paths") or [])
+        return any(_path_under(_local_part(t), p) for p in scope.get("paths") or [])
     if kind == "delete":
         return bool(scope.get("paths") is None and scope.get("branches") in (None, "non_default") and not t)
     if kind == "fs_outside_repo":
-        return any(_path_under(t.get("path", ""), p) for p in scope.get("paths") or [])
+        return any(_path_under(_local_part(t), p) for p in scope.get("paths") or [])
+    if kind == "secret" and scope.get("paths"):
+        return bool(t.get("path")) and any(_path_under(_local_part(t), p) or str(t.get("path")).endswith("/" + p.lstrip("./"))
+                                           or str(t.get("path")) == p for p in scope["paths"])
     if kind in ("ssh",):
         hosts = scope.get("hosts")
         return isinstance(hosts, list) and _host(t.get("host")) in {_host(h) for h in hosts}
+    if kind == "sudo" and scope.get("for") and str(t.get("command") or "") not in scope["for"]:
+        return False
     if kind in ("sudo", "service"):
         hosts = scope.get("hosts")
-        if hosts and t.get("host") not in (None, "local") and _host(t.get("host")) not in {_host(h) for h in hosts}:
+        if isinstance(hosts, list) and hosts and t.get("host") not in (None, "local") and \
+                _host(t.get("host")) not in {_host(h) for h in hosts}:
             return False
         if kind == "service":
+            verbs = scope.get("verbs")
+            if verbs and t.get("verb") and str(t.get("verb")).lower() not in verbs:
+                return False
             units = scope.get("units") or []
-            return any(str(t.get("unit", "")).lower().startswith(u) or u.startswith(str(t.get("unit", "")).lower().split(".")[0])
-                       for u in units if u)
+            return any(_unit_match(t.get("unit"), u) for u in units if u)
         return True
     if kind == "install":
+        if scope.get("env") == "local":
+            return False  # "into the project .venv only": a non-local install is outside the grant
+        if scope.get("interp_paths"):
+            ip = t.get("interp")
+            if not ip or not any(_path_under(ip, x) for x in scope["interp_paths"]):
+                return False
         pk = scope.get("packages")
         if pk == "any":
             return True
@@ -112,38 +136,102 @@ def covers(grant: Mapping[str, Any], effect: Mapping[str, Any]) -> bool:
     return True  # pr, comment, issue, publish, deploy, ci, secret, upload, message, external_system: kind is the scope
 
 
+def _local_part(t: Mapping[str, Any]) -> str:
+    """Path of an effect; on a remote host the 'host:' prefix is dropped (grants name the path)."""
+    p = str(t.get("path") or "")
+    if t.get("host") and p.startswith(str(t.get("host")) + ":"):
+        p = p[len(str(t.get("host"))) + 1:]
+    return p
+
+
+def _host_loose(effect_host: Any, h: str) -> bool:
+    """Prohibitions match loosely: 'prod' forbids prod-db-1 and api.prod.internal too."""
+    e = str(effect_host or "").lower().split("@")[-1]
+    h = h.lower()
+    return _host(e) == _host(h) or e.startswith(h + "-") or e.startswith(h + ".") or ("." + h + ".") in ("." + e + ".") or \
+        h in re.split(r"[-.]", e)
+
+
 def _host(h: Any) -> str:
-    return str(h or "").lower().split("@")[-1].split(".")[0]
+    h = str(h or "").lower().split("@")[-1]
+    return h if re.match(r"^\d+(?:\.\d+){3}$", h) else h.split(".")[0]
+
+
+def _unit_match(unit: Any, u: str) -> bool:
+    a = str(unit or "").lower().removesuffix(".service").removesuffix(".timer")
+    b = u.lower().removesuffix(".service").removesuffix(".timer")
+    return bool(a and b) and (a == b or a.startswith(b + "-") or a.startswith(b + "@") or b.startswith(a + "-") or
+                              a.split("@")[0] == b.split("@")[0])
 
 
 def _path_under(path: str, prefix: str) -> bool:
     import os
     home = os.path.expanduser("~")
+    if not path or not prefix:
+        return False
     a = os.path.normpath(str(path).replace("~", home, 1)) if str(path).startswith("~") else os.path.normpath(str(path))
     b = os.path.normpath(prefix.replace("~", home, 1)) if prefix.startswith("~") else os.path.normpath(prefix)
     return a == b or a.startswith(b.rstrip("/") + "/")
 
 
+_GH_LIKE = re.compile(r"^(?:gh |git push|mcp .*github)|github", re.I)
+
+
+def _dotfile(path: str) -> bool:
+    import os
+    p = str(path or "")
+    home = os.path.expanduser("~")
+    if p.startswith(home + "/"):
+        p = "~" + p[len(home):]
+    return p.startswith("~/.")
+
+
 def _prohibited(p: Mapping[str, Any], effect: Mapping[str, Any]) -> bool:
     scope = p.get("scope") or {}
+    if scope.get("kinds"):  # umbrella: one record for several kinds sharing a target scope
+        return any(_prohibited({"scope": {**scope, "kind": k, "kinds": None}}, effect) for k in scope["kinds"])
     if "exact_target" in scope:
         return covers(p, effect)
     k = effect["kind"]
-    if scope.get("kind") != k and scope.get("kind") not in _ACCEPT.get(k, ()):
-        # "don't push" also forbids force-pushing; "no merges" forbids gh pr merge
-        if not (scope.get("kind") == "push" and k == "force"):
-            return False
+    sk = scope.get("kind")
     t = effect.get("target") or {}
+    if sk == "delete_remote":
+        return k == "delete" and bool(t.get("remote") or t.get("repo") or t.get("issue") or t.get("host") == "api.github.com")
+    if sk != k and sk not in _ACCEPT.get(k, ()):
+        # "don't push" also forbids force-pushing; "no merges" forbids gh pr merge
+        if not (sk == "push" and k == "force"):
+            return False
+    if scope.get("github"):
+        why = f"{effect.get('reason', '')} {effect.get('cmd', '')}"
+        if k == "merge" and t.get("branch") != "pr_base":
+            return False
+        if k in ("publish", "external_system", "upload") and not (_GH_LIKE.search(why) or t.get("host") == "api.github.com"
+                                                                 or (k == "publish" and t.get("remote"))):
+            return False
+    if scope.get("outside_repo") and not t.get("path"):
+        return False
+    if scope.get("dotfiles"):
+        return _dotfile(t.get("path"))
     if k in _BRANCH_KINDS and isinstance(scope.get("branches"), list) and scope["branches"]:
         return _norm_branch(t.get("branch", "")) in {_norm_branch(b) for b in scope["branches"]} or t.get("branch") in ("all", "unknown")
+    if k == "delete" and isinstance(scope.get("branches"), list) and scope["branches"]:
+        return bool(t.get("branch")) and _norm_branch(t.get("branch")) in {_norm_branch(b) for b in scope["branches"]}
     if k == "install" and isinstance(scope.get("packages"), list) and scope["packages"]:
         return bool({p.lower() for p in t.get("packages") or []} & {p.lower() for p in scope["packages"]})
-    if k in ("ssh", "sudo") and isinstance(scope.get("hosts"), list) and scope["hosts"]:
+    if k in ("ssh", "sudo", "service", "deploy") and isinstance(scope.get("hosts"), list) and scope["hosts"]:
+        if k == "deploy":
+            return any(h in str(t).lower() for h in scope["hosts"])
+        return any(_host_loose(t.get("host"), h) for h in scope["hosts"])
+    if k == "service":  # "stop the loop" / "don't restart the api" forbid only a unit (and verb) they name
+        verbs = scope.get("verbs")
+        if verbs and t.get("verb") and str(t.get("verb")).lower() not in verbs:
+            return False
+        units = scope.get("units") or []
+        return not units or any(_unit_match(t.get("unit"), u) for u in units if u)
+    if k in ("delete", "fs_outside_repo", "secret") and scope.get("paths"):
+        return any(_path_under(_local_part(t), x) for x in scope["paths"])
+    if k == "network" and isinstance(scope.get("hosts"), list) and scope["hosts"]:
         return _host(t.get("host")) in {_host(h) for h in scope["hosts"]}
-    if k == "service":  # "stop the loop" / "don't start any ..." forbid only a unit they name
-        return covers({"scope": {**scope, "kind": "service"}}, effect)
-    if k in ("delete", "fs_outside_repo") and (scope.get("paths") or isinstance(scope.get("branches"), list)):
-        return covers({"scope": {**scope, "kind": k}}, effect)
     return True
 
 
@@ -160,14 +248,24 @@ def authority_check(effects: Iterable[Mapping[str, Any]], grants: Iterable[Mappi
     grants = list(grants)
     prohibitions = list(prohibitions)
     per: list[dict[str, Any]] = []
+    holds = [p for p in prohibitions if (p.get("scope") or {}).get("kind") == "write" or "write" in ((p.get("scope") or {}).get("kinds") or ())]
+    lifts = [g for g in grants if (g.get("scope") or {}).get("kind") in ("write",) or g.get("via") == "lift_readonly"]
+    write_hold = None
+    if holds:
+        h = max(holds, key=lambda x: x.get("turn", 0))
+        if h.get("turn", 0) > max((g.get("turn", 0) for g in lifts), default=-1):
+            write_hold = h
     for e in effects:
         cls = e.get("class", "write")
         row: dict[str, Any] = {"kind": e.get("kind"), "class": cls, "target": e.get("target") or {}}
         if cls in ("read", "write"):
-            if cls in standing_effects:
-                row.update(decision="allow", reason=f"standing:{cls}")
-            else:
+            if cls not in standing_effects:
                 row.update(decision="ask", reason=f"{cls} is outside standing authority ({sorted(standing_effects)})")
+            elif cls == "write" and write_hold is not None:
+                row.update(decision="deny", reason=f"user asked for read-only ({write_hold.get('phrase')!r}, turn {write_hold.get('turn')})",
+                           provenance={"prohibition": _prov(write_hold)})
+            else:
+                row.update(decision="allow", reason=f"standing:{cls}")
             per.append(row)
             continue
         covering = [g for g in grants if covers(g, e)]
@@ -230,6 +328,20 @@ def _user_text(row: Mapping[str, Any]) -> str | None:
     return content
 
 
+def _call_key(tool: str, ti: Mapping[str, Any] | None) -> str:
+    ti = ti or {}
+    for k in ("command", "file_path", "notebook_path", "url", "path"):
+        if ti.get(k):
+            return " ".join(str(ti[k]).split())[:400]
+    return ""
+
+
+def _declines(text: str, negative) -> bool:
+    t = text.strip()
+    return bool(negative.match(t)) and len(t) <= 200 and not re.search(
+        r"\b(?:go\s+ahead|do\s+it|yes|sure|proceed|sounds\s+good|no\s+(?:worries|problem|need\s+to\s+ask)|of\s+course)\b", t, re.I)
+
+
 def _tool_results(row: Mapping[str, Any]) -> list[tuple[str, str, bool]]:
     msg = row.get("message") or {}
     content = msg.get("content")
@@ -244,6 +356,8 @@ def _tool_results(row: Mapping[str, Any]) -> list[tuple[str, str, bool]]:
     return out
 
 
+_READONLY_HINT = re.compile(r"read[- ]only|\b(?:don'?t|do\s+not|never)\s+(?:change|modify|touch|edit|write)\s+anything|"
+                           r"\bno\s+(?:changes|edits|modifications|writes)\b|look\s+but\s+don'?t\s+touch|make\s+any\s+changes", re.I)
 _ANSWERS = r'"([^"]{1,400})"\s*=\s*"([^"]{0,400})"'
 _REJECTED = r"doesn't want to proceed with this tool use|tool use was rejected|user rejected|denied by the user"
 
@@ -326,7 +440,7 @@ class SessionAuthority:
         """Extract grants/prohibitions from the recorded texts (idempotent: pending is consumed)."""
         if not self.pending:
             return
-        from .action_grants import AFFIRM, STRONG_AFFIRM
+        from .action_grants import AFFIRM, NEGATIVE, STRONG_AFFIRM, proposal_to_prohibitions
         default = branch = None
         if ctx is not None:
             try:
@@ -338,25 +452,81 @@ class SessionAuthority:
             kind, turn = item[0], item[1]
             if kind == "prompt":
                 text, assistant = item[2], item[3]
+                if assistant and _declines(text, NEGATIVE):
+                    self.prohibitions.extend(proposal_to_prohibitions(assistant, turn, ctx, default, branch, reply=text))
                 self._absorb(text, "prompt", turn, ctx, default, branch)
-                if assistant and AFFIRM.match(text) and (len(text) <= 160 or STRONG_AFFIRM.match(text)):
+                if assistant and AFFIRM.match(text) and not _declines(text, NEGATIVE) and \
+                        (len(text) <= 160 or STRONG_AFFIRM.match(text)):
                     self._absorb_proposal(assistant, turn, ctx, default, branch, reply=text)
             elif kind == "answer":
                 answer, question = item[2], item[3]
-                self._absorb(answer, "ask_answer", turn, ctx, default, branch)
-                if AFFIRM.match(answer):
-                    self._absorb_proposal(question, turn, ctx, default, branch, reply=answer)
+                self._absorb_answer(question, answer, turn, ctx, default, branch)
             elif kind == "rejected" and ctx is not None:
+                self.prohibitions.append({"source": "rejected_permission", "turn": turn + 0.95, "phrase": f"rejected {item[2]}",
+                                          "scope": {"kind": "exact_call", "tool": item[2], "key": _call_key(item[2], item[3])}})
                 parsed = parse_tool_call(item[2], item[3], ctx)
-                for e in parsed["privileged"]:
-                    self.prohibitions.append({"source": "rejected_permission", "turn": turn, "phrase": f"rejected {item[2]}",
+                for e in parsed["privileged"]:  # after the prompt that preceded it: ordered at the end of its turn
+                    self.prohibitions.append({"source": "rejected_permission", "turn": turn + 0.95, "phrase": f"rejected {item[2]}",
                                               "scope": {"kind": e["kind"], "exact_target": e["target"]}})
 
     def _absorb(self, text: str, source: str, turn: int, ctx: Ctx | None, default: str | None, branch: str | None) -> None:
         from .action_grants import extract_grants
-        g, p = extract_grants(text, source=source, turn=turn, ctx=ctx, default=default, branch=branch)
+        try:
+            g, p = extract_grants(text, source=source, turn=turn, ctx=ctx, default=default, branch=branch)
+        except Exception:  # a grant-parsing bug must not erase the session's other grants/prohibitions
+            return
         self.grants.extend(g)
         self.prohibitions.extend(p)
+
+    def _absorb_answer(self, question: str, answer: str, turn: int, ctx: Ctx | None, default: str | None,
+                       branch: str | None) -> None:
+        """AskUserQuestion: the answer chooses among what the question proposed; 'no' forbids it."""
+        from .action_grants import AFFIRM, NEGATIVE, _branches_near, _hosts_after, _paths_in, _proposal_kinds, \
+            extract_grants, proposal_to_prohibitions
+        if _declines(answer, NEGATIVE):
+            self.prohibitions.extend(proposal_to_prohibitions("Should I " + question.rstrip("?") + "?", turn, ctx, default,
+                                                              branch, reply=answer))
+            for x in _proposal_kinds(question, turn, default):
+                self.prohibitions.append({"source": "ask_answer", "turn": turn, "phrase": f"declined: {question[:80]}",
+                                          "scope": x["scope"]})
+            g, p = extract_grants(answer, source="ask_answer", turn=turn, ctx=ctx, default=default, branch=branch)
+            self.grants.extend(g)
+            self.prohibitions.extend(p)
+            return
+        g, p = extract_grants(answer, source="ask_answer", turn=turn, ctx=ctx, default=default, branch=branch)
+        self.grants.extend(g)
+        self.prohibitions.extend(p)
+        if g:
+            return
+        kinds = _proposal_kinds(question, turn, default)
+        added = False
+        for x in kinds:
+            scope = dict(x["scope"])
+            k = scope["kind"]
+            if k in ("push", "force", "merge", "commit", "rewrite", "delete"):
+                br = _branches_near(" to " + answer, 0, len(answer) + 4, default)
+                if br:
+                    scope["branches"] = br
+                elif not scope.get("branches"):
+                    scope["branches"] = "non_default"
+            if k in ("ssh", "sudo", "service"):
+                hosts = _hosts_after(" to " + answer, 0)
+                if hosts:
+                    scope["hosts"] = hosts
+                elif k == "ssh":
+                    hosts = _hosts_after(question, 0)
+                    scope["hosts"] = hosts
+            if k in ("delete", "fs_outside_repo"):
+                ps = _paths_in(answer) or _paths_in(question)
+                if ps:
+                    scope["paths"] = ps
+            if k == "install":
+                scope.setdefault("packages", "any")
+            self.grants.append({"source": "ask_answer", "turn": turn, "via": "question_answer", "phrase": f"{question[:60]} -> {answer[:40]}",
+                                "scope": scope})
+            added = True
+        if not added and AFFIRM.match(answer):
+            self._absorb_proposal("Should I " + question.rstrip("?") + "?", turn, ctx, default, branch, reply=answer)
 
     def _absorb_proposal(self, assistant_text: str, turn: int, ctx: Ctx | None, default: str | None, branch: str | None,
                          reply: str = "") -> None:
@@ -380,14 +550,30 @@ class SessionAuthority:
                     self.grants.append({"source": "ask_answer", "turn": turn, "via": "literal_command",
                                         "phrase": code[:120], "scope": {"kind": e["kind"], "exact_target": e["target"]}})
 
+    def _may_hold_writes(self) -> bool:
+        """Cheap pre-check so ordinary writes only pay for grant parsing when a read-only hold may exist."""
+        if any((p.get("scope") or {}).get("kind") == "write" or "write" in ((p.get("scope") or {}).get("kinds") or ())
+               for p in self.prohibitions):
+            return bool(self.pending)
+        return any((it[0] == "prompt" and _READONLY_HINT.search(it[2])) or it[0] == "rejected" for it in self.pending)
+
     def standing(self) -> dict[str, Any]:
         return {"effects": ["read"] if self.permission_mode == "plan" else ["read", "write"], "mode": self.permission_mode}
 
     def check(self, tool_name: str, tool_input: Mapping[str, Any], ctx: Ctx, permission_mode: str | None = None) -> dict[str, Any]:
         parsed = parse_tool_call(tool_name, tool_input, ctx)
-        if parsed["privileged"]:
+        if parsed["privileged"] or (parsed["effect_class"] == "write" and self._may_hold_writes()):
             self.materialize(ctx)
         mode = permission_mode or self.permission_mode
         standing = {"effects": ["read"] if mode == "plan" else ["read", "write"], "mode": mode}
         decision = authority_check(parsed["effects"], self.grants, standing, self.prohibitions)
+        key = _call_key(tool_name, tool_input)
+        rej = [p for p in self.prohibitions if (p.get("scope") or {}).get("kind") == "exact_call"
+               and p["scope"].get("tool") == tool_name and p["scope"].get("key") == key]
+        if rej and decision["decision"] != "deny":
+            p = max(rej, key=lambda x: x.get("turn", 0))
+            later = [g for g in self.grants if g.get("turn", 0) > p.get("turn", 0)
+                     and any(covers(g, e) for e in parsed["privileged"])]
+            if not later:
+                decision = {**decision, "decision": "deny", "reason": f"the user rejected this exact call (turn {p.get('turn')})"}
         return {"effects": parsed, "decision": decision}
