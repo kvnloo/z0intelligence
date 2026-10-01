@@ -74,6 +74,11 @@ Pure route/plan observation.
 
 - no physical z0 backend call;
 - no AgentWeb action application;
+- one `execution=shadow` DecisionReceipt is persisted for measurement;
+- that receipt carries no outcome/verification signal and `physical_call_attempted=false`;
+- exact same-trace/same-fingerprint retry replays the stored route without rerouting;
+- same trace with changed semantic fingerprint is rejected as a conflict;
+- the replay check + append are protected by a cross-process file lock;
 - transport failure means `not_attempted`;
 - incumbent AgentWeb path may continue.
 
@@ -271,8 +276,8 @@ Pinned by `tests/test_agentweb_bridge.py`:
 
 1. ~~durable dispatch fingerprint/reconcile binding~~;
 2. ~~AgentWeb TS mirror on fresh upstream~~;
-3. shadow route migration;
-4. reliability observation projection;
+3. ~~shadow route migration + durable shadow receipts~~;
+4. reliability/outcome observation projection;
 5. evidence provenance adapter;
 6. outcome-join ETL and promotion-quality gate.
 
