@@ -15,7 +15,7 @@ def envelope(*, kind="decide", capability="experiment.report_type_v1", payload=N
         "capability": capability,
         "policy": {
             "allow_remote": True,
-            "free_only": True,
+            "free_only": False,
             "experimental": True,
             "risk_class": "read",
             "approval_state": "not_required",
@@ -64,6 +64,7 @@ def test_generic_dispatch_preserves_free_only_policy():
         payload={"function": "summarization", "task": "summarize"},
     )
     request["mode"] = "active"
+    request["policy"]["free_only"] = True
     bridge, legacy = unwrap_agentweb_bridge_request("/v1/intelligence", request)
     assert bridge is not None
     assert legacy["free_only"] is True
