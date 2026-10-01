@@ -203,9 +203,9 @@ def test_user_cues_v2_are_low_and_ids_only(tmp_path, home):
     tr = Transcript()
     tr.prompt('p1', 'do it', T0)
     tr.say('done', T0 + 1)
-    tr.prompt('p2', 'can you do it again but this time actually listen to what i want', T0 + 60)
+    tr.prompt('p2', 'redo the report and please listen to me this time', T0 + 60)
     tr.say('done', T0 + 61)
-    tr.prompt('p3', 'perfect - now push', T0 + 120)
+    tr.prompt('p3', 'great work, push the branch', T0 + 120)
     tr.say('done', T0 + 121)
     tr.write(tmp_path / 'projects')
     observed(home, 'sess-1', 'p1', 'p2', 'p3')
@@ -215,16 +215,16 @@ def test_user_cues_v2_are_low_and_ids_only(tmp_path, home):
     a = next(s for s in rows['p2']['signals'] if s['kind'] == 'user_approval')
     assert a['strength'] == 'strong' and a['confidence'] == 'low'
     blob = json.dumps(rows)
-    assert 'listen to what' not in blob and 'perfect' not in blob
+    assert 'listen to me' not in blob and 'great work' not in blob
 
 
 def test_correction_v2_patterns():
-    assert vd.correction_cues_v2("lol why do u struggle so much w/ ci/cd smh") == ['why_cant_you', 'frustration']
+    assert vd.correction_cues_v2("why do you keep failing at this, ugh") == ['why_cant_you', 'frustration']
     assert vd.correction_cues_v2('it still isn’t working') == ['didnt_work', 'still_broken']
     assert vd.correction_cues_v2('how is it going? any results?') == []
     assert vd.correction_cues_v2('why do you think that is?') == []
-    assert vd.approval_cues('ya makes sense - lets set it up') == (True, True)
-    assert vd.approval_cues('ok go ahead') == (False, True)
+    assert vd.approval_cues('yes that makes sense, continue') == (True, True)
+    assert vd.approval_cues('okay proceed') == (False, True)
 
 
 def test_gh_cache_and_prefetch(tmp_path):
