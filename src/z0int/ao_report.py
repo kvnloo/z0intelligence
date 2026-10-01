@@ -69,6 +69,192 @@ def _family(row: dict[str, Any]) -> str:
     return f"{kind}:{harness}:{mode}"
 
 
+def _experiment_value(row: dict[str, Any], key: str) -> Any:
+    value = row.get(key)
+    if value is not None:
+        return value
+    extra = row.get("extra") if isinstance(row.get("extra"), dict) else {}
+    return extra.get(key)
+
+
+def _decision_cost_usd(row: dict[str, Any]) -> float | None:
+    extra = row.get("extra") if isinstance(row.get("extra"), dict) else {}
+    measurement = (
+        extra.get("decision_measurement")
+        if isinstance(extra.get("decision_measurement"), dict)
+        else None
+    )
+    if measurement is None:
+        return None
+    value = measurement.get("cost_usd")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    return None
+
+
+def _latest_outcome_value(events: list[dict[str, Any]], key: str) -> Any:
+    ordered = sorted(events, key=lambda row: float(row.get("ts") or 0.0), reverse=True)
+    for event in ordered:
+        outcome = event.get("outcome") if isinstance(event.get("outcome"), dict) else {}
+        if key in outcome:
+            return outcome[key]
+    return None
+
+
+def _trace_verdict(events: list[dict[str, Any]]) -> str:
+    tiers = {event.get("outcome_tier") for event in events}
+    has_gold = "gold" in tiers
+    has_negative = "negative" in tiers
+    if has_gold and has_negative:
+        return "mixed"
+    if has_gold:
+        return "gold"
+    if has_negative:
+        return "negative"
+    return "unscored"
+
+
+def _paired_numeric(
+    pairs: list[tuple[dict[str, Any], dict[str, Any]]],
+    getter,
+) -> dict[str, Any]:
+    candidate_values: list[float] = []
+    reference_values: list[float] = []
+    deltas: list[float] = []
+    for candidate, reference in pairs:
+        c_value = getter(candidate)
+        r_value = getter(reference)
+        if (
+            isinstance(c_value, (int, float))
+            and not isinstance(c_value, bool)
+            and isinstance(r_value, (int, float))
+            and not isinstance(r_value, bool)
+        ):
+            c_float = float(c_value)
+            r_float = float(r_value)
+            candidate_values.append(c_float)
+            reference_values.append(r_float)
+            deltas.append(c_float - r_float)
+    return {
+        "pairs": len(deltas),
+        "candidate_mean": (
+            sum(candidate_values) / len(candidate_values)
+            if candidate_values else None
+        ),
+        "reference_mean": (
+            sum(reference_values) / len(reference_values)
+            if reference_values else None
+        ),
+        "delta_mean": sum(deltas) / len(deltas) if deltas else None,
+        "delta_p50": _percentile(deltas, 0.50),
+    }
+
+
+def _matched_comparison(
+    receipts: dict[str, dict[str, Any]],
+    events_by_trace: dict[str, list[dict[str, Any]]],
+) -> dict[str, Any]:
+    grouped: dict[tuple[str, str], dict[str, list[tuple[str, dict[str, Any], str]]]] = defaultdict(
+        lambda: {"candidate": [], "reference": []}
+    )
+    excluded: Counter[str] = Counter()
+
+    for trace_id, row in receipts.items():
+        experiment_id = _experiment_value(row, "experiment_id")
+        pair_id = _experiment_value(row, "pair_id")
+        arm_id = _experiment_value(row, "arm_id")
+        task_snapshot_id = _experiment_value(row, "task_snapshot_id")
+        if experiment_id is None and pair_id is None and arm_id is None:
+            continue
+        if not all(isinstance(v, str) and v for v in (experiment_id, pair_id, arm_id)):
+            excluded["incomplete_pair_identity"] += 1
+            continue
+        if arm_id not in ("candidate", "reference"):
+            excluded["unsupported_arm"] += 1
+            continue
+        snapshot = str(task_snapshot_id) if task_snapshot_id is not None else ""
+        grouped[(experiment_id, pair_id)][arm_id].append((trace_id, row, snapshot))
+
+    valid: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    trace_pairs: list[tuple[str, str]] = []
+    for arms in grouped.values():
+        if len(arms["candidate"]) != 1 or len(arms["reference"]) != 1:
+            excluded["ambiguous_arm_cardinality"] += 1
+            continue
+        c_trace, candidate, c_snapshot = arms["candidate"][0]
+        r_trace, reference, r_snapshot = arms["reference"][0]
+        if not c_snapshot or not r_snapshot:
+            excluded["missing_task_snapshot"] += 1
+            continue
+        if c_snapshot != r_snapshot:
+            excluded["task_snapshot_mismatch"] += 1
+            continue
+        valid.append((candidate, reference))
+        trace_pairs.append((c_trace, r_trace))
+
+    candidate_positive = reference_positive = 0
+    definitive_pairs = 0
+    mixed_or_unscored = 0
+    for c_trace, r_trace in trace_pairs:
+        c_verdict = _trace_verdict(events_by_trace.get(c_trace, []))
+        r_verdict = _trace_verdict(events_by_trace.get(r_trace, []))
+        if c_verdict not in ("gold", "negative") or r_verdict not in ("gold", "negative"):
+            mixed_or_unscored += 1
+            continue
+        definitive_pairs += 1
+        candidate_positive += int(c_verdict == "gold")
+        reference_positive += int(r_verdict == "gold")
+
+    verified_candidate_rate = _rate(candidate_positive, definitive_pairs)
+    verified_reference_rate = _rate(reference_positive, definitive_pairs)
+    verified_delta = (
+        verified_candidate_rate - verified_reference_rate
+        if verified_candidate_rate is not None and verified_reference_rate is not None
+        else None
+    )
+
+    latency = _paired_numeric(valid, lambda row: row.get("latency_ms"))
+    tokens = _paired_numeric(valid, lambda row: row.get("measured_frontier_tokens"))
+    cost = _paired_numeric(valid, _decision_cost_usd)
+
+    def latest_metric(row: dict[str, Any], key: str) -> Any:
+        trace_id = str(row.get("trace_id") or "")
+        value = _latest_outcome_value(events_by_trace.get(trace_id, []), key)
+        if isinstance(value, bool):
+            return int(value)
+        return value
+
+    retries = _paired_numeric(valid, lambda row: latest_metric(row, "retries"))
+    corrections = _paired_numeric(valid, lambda row: latest_metric(row, "user_correction"))
+    reverts = _paired_numeric(valid, lambda row: latest_metric(row, "reverted"))
+
+    return {
+        "available": bool(valid),
+        "matched_pairs": len(valid),
+        "candidate_reference_outcome_pairs": definitive_pairs,
+        "outcome_pairs_mixed_or_unscored": mixed_or_unscored,
+        "excluded": dict(sorted(excluded.items())),
+        "verified_positive": {
+            "pairs": definitive_pairs,
+            "candidate_rate": verified_candidate_rate,
+            "reference_rate": verified_reference_rate,
+            "delta": verified_delta,
+        },
+        "decision_latency_ms": latency,
+        "frontier_tokens": tokens,
+        "decision_cost_usd": cost,
+        "retries": retries,
+        "corrections": corrections,
+        "reverts": reverts,
+        "promotion_decision": "not_computed",
+        "reason": (
+            "explicit experiment/pair/task-snapshot matches only; deltas are descriptive"
+            if valid
+            else "no valid explicit candidate/reference task-snapshot pairs"
+        ),
+    }
+
+
 def _snapshot_digest(
     receipts: dict[str, dict[str, Any]],
     events: list[dict[str, Any]],
@@ -234,6 +420,8 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
         # probability. Do not compute Brier/ECE from it without a defined target.
         row["calibration_ready"] = False
 
+    comparison = _matched_comparison(receipts, events_by_trace)
+
     evidence_gaps = []
     if non_abstain == 0:
         evidence_gaps.append("no_non_abstain_policy_decisions")
@@ -251,7 +439,8 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
         evidence_gaps.append("correction_measurement_unavailable")
     evidence_gaps.append("safe_coverage_gate_not_defined")
     evidence_gaps.append("per_family_calibration_target_not_defined")
-    evidence_gaps.append("counterfactual_or_control_delta_not_measured")
+    if not comparison["available"]:
+        evidence_gaps.append("counterfactual_or_control_delta_not_measured")
 
     return {
         "schema": "ao.z0int.promotion_report.v1",
@@ -332,16 +521,7 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
             },
         },
         "families": dict(sorted(family_rows.items())),
-        "comparison": {
-            "ready": False,
-            "task_success_delta": None,
-            "verifier_delta": None,
-            "retry_delta": None,
-            "correction_delta": None,
-            "token_delta": None,
-            "cost_delta": None,
-            "reason": "no matched control/counterfactual cohort is recorded for AO traffic yet",
-        },
+        "comparison": comparison,
         "promotion": {
             "decision": "not_computed",
             "reason": "report is descriptive; policy-specific promotion thresholds must be declared separately",
