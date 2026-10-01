@@ -21,6 +21,90 @@ FORBIDDEN_TOP_LEVEL_FIELDS = {
     "authorization", "cookie", "password",
 }
 
+FORBIDDEN_PAYLOAD_KEYS = {
+    "userid",
+    "accountid",
+    "sessionid",
+    "apikey",
+    "oauthtoken",
+    "authtoken",
+    "accesstoken",
+    "refreshtoken",
+    "bearertoken",
+    "authorization",
+    "cookie",
+    "password",
+    "clientsecret",
+    "privatekey",
+    "secretkey",
+    "credential",
+    "credentials",
+}
+
+MAX_PAYLOAD_DEPTH = 12
+MAX_PAYLOAD_NODES = 4096
+
+
+def _normalize_payload_key(key: str) -> str:
+    return "".join(ch for ch in key.lower() if ch.isalnum())
+
+
+def validate_payload_isolation_v1(payload: Any) -> list[str]:
+    errors: list[str] = []
+    seen: set[int] = set()
+    nodes = 0
+    stopped = False
+
+    def visit(value: Any, path: str, depth: int) -> None:
+        nonlocal nodes, stopped
+        if stopped:
+            return
+
+        nodes += 1
+        if nodes > MAX_PAYLOAD_NODES:
+            errors.append(
+                f"payload structure exceeds max node count {MAX_PAYLOAD_NODES}"
+            )
+            stopped = True
+            return
+
+        if depth > MAX_PAYLOAD_DEPTH:
+            errors.append(
+                f"payload structure exceeds max depth {MAX_PAYLOAD_DEPTH}"
+            )
+            stopped = True
+            return
+
+        if not isinstance(value, (dict, list)):
+            return
+
+        identity = id(value)
+        if identity in seen:
+            errors.append("payload must be acyclic")
+            stopped = True
+            return
+        seen.add(identity)
+
+        if isinstance(value, list):
+            for index, entry in enumerate(value):
+                visit(entry, f"{path}[{index}]", depth + 1)
+                if stopped:
+                    return
+            return
+
+        for key, entry in value.items():
+            key_text = str(key)
+            if _normalize_payload_key(key_text) in FORBIDDEN_PAYLOAD_KEYS:
+                errors.append(
+                    f"forbidden payload field at {path}.{key_text}: {key_text}"
+                )
+            visit(entry, f"{path}.{key_text}", depth + 1)
+            if stopped:
+                return
+
+    visit(payload, "payload", 0)
+    return errors
+
 KNOWN_REJECTIONS = {"validation", "policy", "trace_conflict", "http_4xx"}
 AMBIGUOUS_FAILURES = {"timeout", "transport", "http_5xx", "invalid_response"}
 
@@ -68,6 +152,8 @@ def validate_request_v1(value: Any) -> list[str]:
         errors.append("capability must be a non-empty string <= 200 characters")
     if "payload" not in value:
         errors.append("payload is required")
+    else:
+        errors.extend(validate_payload_isolation_v1(value["payload"]))
 
     policy = value.get("policy")
     if not isinstance(policy, dict):
