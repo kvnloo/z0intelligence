@@ -147,3 +147,28 @@ def test_attempted_no_effect_can_retry_only_with_evidence() -> None:
         evidence_ref="transport:failed-before-send",
     )
     assert mutation_outcome_from_dict(safe.to_dict()) == safe
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "needle"),
+    [
+        ("effect", "maybe", "effect must be"),
+        ("verification", "maybe", "verification must be"),
+        ("retry_disposition", "again", "retry_disposition must be"),
+        ("idempotency", "cache", "idempotency must be"),
+        ("mutation_hash", "not-a-hash", "mutation_hash must be"),
+        ("effect_hash", "not-a-hash", "effect_hash must be"),
+    ],
+)
+def test_wire_values_are_runtime_validated(field: str, value: str, needle: str) -> None:
+    kwargs = dict(
+        mutation_key="m",
+        authority_scope="s",
+        attempted=True,
+        effect="unknown",
+        verification="unverified",
+        retry_disposition="observe",
+    )
+    kwargs[field] = value
+    with pytest.raises(ValueError, match=needle):
+        MutationOutcome(**kwargs)
