@@ -68,8 +68,13 @@ def project_drift(
         raise ValueError("observation must be an object")
     if not isinstance(source, str) or not source:
         raise ValueError("source must be non-empty")
-    if isinstance(causal_parents, (str, bytes)) or not all(isinstance(x, str) for x in causal_parents):
+    if (
+        isinstance(causal_parents, (str, bytes))
+        or not isinstance(causal_parents, Sequence)
+        or not all(isinstance(x, str) for x in causal_parents)
+    ):
         raise ValueError("causal_parents must be strings")
+    canonical_parents = tuple(sorted(causal_parents))
 
     api = _api()
     issues = api.validate(document)
@@ -93,14 +98,14 @@ def project_drift(
         trace_id=trace_id,
         observation=observation,
         source=source,
-        causal_parents=causal_parents,
+        causal_parents=canonical_parents,
     )
     event = {
         "eventId": event_id,
         "type": "stateUpdate",
         "sourceHash": source_hash,
         "revision": revision,
-        "causalParents": list(causal_parents),
+        "causalParents": list(canonical_parents),
         "payload": {
             "traceId": trace_id,
             "drift": True,
@@ -171,7 +176,7 @@ def record_drift(
         trace_id=trace_id,
         observation=observation,
         source=source,
-        causal_parents=causal_parents,
+        causal_parents=canonical_parents,
     )
     event = projected["event"]
     prior = _previous(event["eventId"])
