@@ -132,6 +132,28 @@ Invariants the code enforces:
 - **No text is labelled.** Prompts, responses and commands are read transiently and never stored.
   Rows hold counts, cue ids, SHAs, PR numbers and hashed repo ids.
 
+## Training table export (verified loop v0)
+
+`z0int outcomes export --out PATH [--include-unjoined] [--json]` (module `z0int.loop_export`) writes
+one `z0int.loop.training_row.v0` row per turn that has an opportunity record, plus
+`PATH.manifest.json` (`z0int.loop.training_table_manifest.v0`: `table_version`, ordered `features`,
+`feature_schema_sha`, source file row counts + sha256 prefixes, label/state counts).
+
+- **features** (prompt-time only, ints over a fixed vocabulary): scope mode, required fact
+  families, claim/superseded/unknown counts (by status and family), contradiction count and
+  families, effects, authority source/grants/fingerprinted, missing authority, legal actions,
+  deterministic gate, posture factory mode, cohort (interactive / agent / harness).
+- **observed** (`post_decision: true`): the action the agent took. Evaluators use it to restrict to
+  turns that actually acted; learners must not use it as an input.
+- **label**: `state`, `label_class`, `y_success` (1 = verified_success, 0 = verified_failure or
+  contested, null = unverified: missing, not negative). The latest verified row per turn wins.
+- **ids**: `turn_key` = sha(session, trace), `group` = sha(session) for grouped cross-validation.
+  Harness messages are dropped. No prompt, response, command, path or claim value is exported;
+  `assert_private` fails closed on text-bearing keys.
+
+Changing the feature vocabulary is a `table_version` bump. The offline learner lives in
+evolution-lab (`exp/verified-loop-v0`, evolution-lab#24).
+
 ## Not yet covered (next slices)
 
 - outcomes of ABSTAIN / ESCALATE / OBSERVE (the observed row records only ASK vs not-ASK);

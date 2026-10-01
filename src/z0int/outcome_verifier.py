@@ -944,9 +944,17 @@ def _main(argv: list[str] | None = None) -> int:
     v.add_argument('--dry-run', action='store_true', help='compute and summarise; do not append')
     v.add_argument('--report', type=Path, default=None, help='also write a counts-only markdown report here')
     v.add_argument('--json', action='store_true')
+    sub.add_parser('export', add_help=False,
+                   help='privacy-safe training table for the verified loop (-> z0int.loop_export; see --help)')
     j = sub.add_parser('join', help='credit-ready join: opportunity -> gate -> observed -> verified')
     j.add_argument('--out', type=Path, default=None, help='write join rows as JSONL (default: print summary only)')
     j.add_argument('--json', action='store_true')
+    if argv is None:
+        import sys
+        argv = sys.argv[1:]
+    if argv and argv[0] == 'export':
+        from .loop_export import _main as export_main
+        return export_main(list(argv[1:]))
     args = ap.parse_args(argv)
     if args.cmd == 'verify':
         now = time.time()
