@@ -14,6 +14,7 @@ from .agentweb_context_packet import compile_agentweb_context_packet
 from .agentweb_bridge_wire import unwrap_agentweb_bridge_request, wrap_agentweb_bridge_response
 from .agentweb_bridge_capabilities import agentweb_bridge_capabilities
 from .outcome_observation import ingest_outcome_observation
+from .outcome_coverage import ingest_outcome_expectation, summarize_outcome_coverage
 
 SLOTS=threading.BoundedSemaphore(4)
 METRIC_LOCK=threading.Lock()
@@ -78,6 +79,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path=='/healthz':return self.reply(200,{'ok':True})
         if self.path=='/v1/bridge/capabilities':return self.reply(200,agentweb_bridge_capabilities())
+        if self.path=='/v1/observe/outcome/coverage':return self.reply(200,summarize_outcome_coverage())
         if self.path=='/v1/providers':
             from .provider_saturation import policy,snapshot
             config=policy()
@@ -97,7 +99,7 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404,{'error':'not_found'})
 
     def do_POST(self):
-        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/plan','/v1/worker','/v1/automatic','/v1/automatic/consumed','/v1/experimental/choice','/v1/experimental/noul','/v1/observe/reliability','/v1/observe/outcome','/v1/context/pack'):return self.reply(404,{'error':'not_found'})
+        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/plan','/v1/worker','/v1/automatic','/v1/automatic/consumed','/v1/experimental/choice','/v1/experimental/noul','/v1/observe/reliability','/v1/observe/outcome','/v1/observe/outcome/expectation','/v1/context/pack'):return self.reply(404,{'error':'not_found'})
         try:
             size=int(self.headers.get('Content-Length','0'))
             if not 0<size<=(262144 if self.path.startswith('/v1/authority/') else 40000):return self.reply(413,{'error':'request_size'})
@@ -114,6 +116,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=='/v1/automatic/consumed':return self.reply(200,consume(args))
             if self.path=='/v1/observe/reliability':return self.reply(200,ingest_observation(args))
             if self.path=='/v1/observe/outcome':return self.reply(200,ingest_outcome_observation(args))
+            if self.path=='/v1/observe/outcome/expectation':return self.reply(200,ingest_outcome_expectation(args))
             if self.path=='/v1/context/pack':return self.reply(200,compile_agentweb_context_packet(args))
             if self.path=='/v1/plan':
                 result=plan_intelligence(args)
