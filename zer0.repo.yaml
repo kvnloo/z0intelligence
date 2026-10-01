@@ -96,7 +96,7 @@ architecture:
     - id: k8s-hermes-lab
       name: Kubernetes hermes-lab execution lane
       kind: deployment
-      summary: Keeps z0int host authority, credentials and local model control outside the cluster while exposing a hardened in-cluster executor through the hermes-lab service boundary.
+      summary: Keeps z0int decision/dispatch authority and local model control host-side while exposing a hardened in-cluster executor through the hermes-lab service boundary; provider credentials may be explicitly scoped into the executor as Kubernetes secrets.
       paths:
         - deploy/k8s/intelligence-host-service.yaml
         - deploy/k8s/intelligence-executor.yaml
