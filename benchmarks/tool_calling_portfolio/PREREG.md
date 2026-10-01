@@ -193,7 +193,7 @@ tool-calling role.**
 Findings:
 - **z0 route_worker formation is the discriminating suite.** The BFCL subset is close to saturated for the
   Qwen-family arms: 103 to 114 of 125.
-- **Qwen3.5-9B ignores the routing instruction.** On 30/43 route_worker items it calls `delegate_worker`
+- **Qwen3.5-9B ignores the routing instruction.** On 24/43 route_worker items it calls `delegate_worker` (route_worker 15, no call 4)
   without a named provider or model. Its ids and task copying are fine. This is why 9B scores below 4B on
   z0_route (9 vs 22 exact). It is a no-think result only.
 - **Hammer 2.1** runs through its own GGUF chat template (Hammer's task/format instruction, JSON-list
