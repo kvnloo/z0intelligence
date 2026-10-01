@@ -111,6 +111,17 @@ class AOBridgeTests(unittest.TestCase):
         self.assertEqual(stored["extra"]["ao_outcome_id"], event["outcome_id"])
         self.assertTrue(stored["extra"]["ao_outcome_evidence"]["prs"][0]["merged"])
 
+    def test_evidence_only_termination_does_not_mint_soft_outcome(self):
+        spawn_decision(request(), root=self.root)
+        event = outcome_event()
+        event["outcome"] = {"source": "agent-orchestrator"}
+        result = join_ao_outcome(event, root=self.root)
+        self.assertIsNone(result["outcome_tier"])
+
+        stored = find_receipt("ao-spawn-s1", root=self.root)
+        self.assertIsNone(stored.get("outcome_tier"))
+        self.assertTrue(stored["extra"]["ao_outcome_evidence"]["terminated"])
+
     def test_outcome_cannot_cross_session_boundary(self):
         spawn_decision(request(), root=self.root)
         event = outcome_event(session_id="other")
