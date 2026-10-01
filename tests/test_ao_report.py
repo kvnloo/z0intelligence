@@ -70,13 +70,26 @@ class AOPromotionReportTests(unittest.TestCase):
         spawn_decision(spawn_request("ao-spawn-s1", "s1"), root=self.root)
         spawn_decision(spawn_request("ao-spawn-s2", "s2"), root=self.root)
 
-        # Only one decision has measured latency/token usage. The other must
-        # remain missing rather than silently contributing a zero.
+        # Keep one explicit measurement and strip the other's measurement
+        # fields to prove missing telemetry never becomes an implicit zero.
         row = dict(find_receipt("ao-spawn-s1", root=self.root))
         row["latency_ms"] = 120.0
         row["measured_frontier_tokens"] = 90
         row["estimated_frontier_tokens_avoided"] = 30
+        row["extra"] = dict(row["extra"])
+        row["extra"]["decision_measurement"] = dict(row["extra"]["decision_measurement"])
+        row["extra"]["decision_measurement"]["cost_usd"] = 0.25
         append_receipt(row, root=self.root)
+
+        missing = dict(find_receipt("ao-spawn-s2", root=self.root))
+        for key in (
+            "latency_ms", "input_tokens", "output_tokens", "cached_input_tokens",
+            "measured_frontier_tokens",
+        ):
+            missing.pop(key, None)
+        missing["extra"] = dict(missing["extra"])
+        missing["extra"].pop("decision_measurement", None)
+        append_receipt(missing, root=self.root)
 
         join_ao_outcome({
             "schema": OUTCOME_SCHEMA,
@@ -122,7 +135,9 @@ class AOPromotionReportTests(unittest.TestCase):
         self.assertEqual(tokens["coverage"], 0.5)
         self.assertEqual(tokens["sum"], 90)
 
-        self.assertEqual(first["measurements"]["cost"]["count"], 0)
+        self.assertEqual(first["measurements"]["cost"]["count"], 1)
+        self.assertEqual(first["measurements"]["cost"]["coverage"], 0.5)
+        self.assertEqual(first["measurements"]["cost"]["sum_usd"], 0.25)
         self.assertIsNone(first["measurements"]["cost"]["delta"])
         self.assertIsNone(first["decisions"]["safe_coverage"])
         self.assertFalse(first["comparison"]["ready"])
