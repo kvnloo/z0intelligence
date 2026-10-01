@@ -16,6 +16,7 @@ import importlib.util
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -192,42 +193,77 @@ def run_unit(task, arm, reps, args, emit):
     env = {**bench_env(), **ARMS[arm][1], 'Z0INT_HOME': str(home), 'Z0INT_PYTHON': str(PY)}
     work = SCRATCH / 'work' / args.tag / unit
     for rep in reps:
-        if not (work / '.git').exists():
-            fixture(task, work)
-        else:
-            subprocess.run(['git', '-C', str(work), 'reset', '-q', '--hard'], check=True)
-            subprocess.run(['git', '-C', str(work), 'clean', '-qfdx'], check=True)
-        cmd = claude_cmd(task, arm, task['prompt'], args)
-        t0 = time.time()
-        try:
-            proc = subprocess.run(cmd, cwd=work, env=env, capture_output=True, text=True, timeout=args.timeout,
-                                  stdin=subprocess.DEVNULL)
-            stdout, rc, err = proc.stdout, proc.returncode, proc.stderr[-400:]
-        except subprocess.TimeoutExpired as exc:
-            stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or '')
-            rc, err = 'timeout', ''
-        wall = time.time() - t0
-        ps = parse_stream(stdout)
-        res = ps.pop('result')
-        try:
-            verified, note = check.verify(task, work, env=env)
-        except Exception as exc:  # noqa: BLE001
-            verified, note = False, f'check error {exc!r}'
-        text = (res.get('result') or '') + err
-        limited = any(k in text.lower() for k in ('rate limit', 'usage limit', 'limit reached', 'overloaded'))
-        emit({'type': 'trial', 'study': 'obspack-long-v1', 'tag': args.tag, 'task': task['id'],
-              'repo': task['source']['repo'], 'family': task.get('family'), 'arm': arm, 'rep': rep, 'warm': rep > 0,
-              'model': args.model, 'effort': task.get('effort', 'medium'), 'verified': bool(verified),
-              'check_note': note[-300:], 'wall_s': round(wall, 2), 'returncode': rc, 'stderr_tail': err if rc else '',
-              'rate_limited': limited, 'cost_usd': res.get('total_cost_usd'), 'tokens': billed(res),
-              'usage': res.get('usage'), 'model_usage': res.get('modelUsage'), 'num_turns': res.get('num_turns'),
-              'is_error': res.get('is_error'), 'subtype': res.get('subtype'), 'session_id': res.get('session_id'),
-              'has_result': bool(res), 'result_text': (res.get('result') or '')[:2000], **ps,
-              'z0int_revision': subprocess.run(['git', '-C', str(ROOT), 'rev-parse', '--short', 'HEAD'],
-                                               capture_output=True, text=True).stdout.strip(),
-              'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())})
-        if limited:  # back off; the runner records it and the analysis drops nothing silently
-            time.sleep(300)
+        if (task['id'], arm, rep) in args.done:
+            continue
+        for attempt in range(40):
+            row = run_trial(task, arm, rep, work, env, args)
+            if not row['rate_limited']:
+                emit(row)
+                break
+            # Quota/session limit: not a trial. Record it, wait for the reset, retry the same rep.
+            emit({'type': 'rate_limit', 'task': task['id'], 'arm': arm, 'rep': rep, 'attempt': attempt,
+                  'message': row['result_text'][:200], 'ts': row['ts']})
+            wait_for_reset(row['result_text'])
+
+
+LIMIT_RX = re.compile(r"hit your (session|usage|weekly) limit|usage limit|rate limit|limit reached", re.I)
+_limit_lock = threading.Lock()
+
+
+def wait_for_reset(text):
+    """Sleep until the reset time Claude Code reports (e.g. 'resets 10:10pm'), +2 min; else 15 min."""
+    with _limit_lock:
+        m = re.search(r'resets (\d{1,2})(?::(\d{2}))?\s*(am|pm)', text, re.I)
+        secs = 900
+        if m:
+            h, mi, ap = int(m.group(1)) % 12, int(m.group(2) or 0), m.group(3).lower()
+            h += 12 if ap == 'pm' else 0
+            now = time.localtime()
+            target = time.mktime((now.tm_year, now.tm_mon, now.tm_mday, h, mi, 0, 0, 0, -1))
+            if target < time.time() - 6 * 3600:  # e.g. 'resets 1am' seen at 11pm
+                target += 86400
+            secs = max(60, target - time.time() + 120)  # already past (another worker waited it out): 1 min
+        print(f'rate limit: sleeping {secs / 60:.0f} min', flush=True)
+        time.sleep(secs)
+
+
+def run_trial(task, arm, rep, work, env, args):
+    if not (work / '.git').exists():
+        fixture(task, work)
+    else:
+        subprocess.run(['git', '-C', str(work), 'reset', '-q', '--hard'], check=True)
+        subprocess.run(['git', '-C', str(work), 'clean', '-qfdx'], check=True)
+    while _limit_lock.locked():  # another worker is waiting out a limit
+        time.sleep(10)
+    cmd = claude_cmd(task, arm, task['prompt'], args)
+    t0 = time.time()
+    try:
+        proc = subprocess.run(cmd, cwd=work, env=env, capture_output=True, text=True, timeout=args.timeout,
+                              stdin=subprocess.DEVNULL)
+        stdout, rc, err = proc.stdout, proc.returncode, proc.stderr[-400:]
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or '')
+        rc, err = 'timeout', ''
+    wall = time.time() - t0
+    ps = parse_stream(stdout)
+    res = ps.pop('result')
+    try:
+        verified, note = check.verify(task, work, env=env)
+    except Exception as exc:  # noqa: BLE001
+        verified, note = False, f'check error {exc!r}'
+    tokens = billed(res)
+    limited = bool(LIMIT_RX.search((res.get('result') or '') + err)) and tokens['billed_total'] == 0
+    return {'type': 'trial', 'study': 'obspack-long-v1', 'tag': args.tag, 'task': task['id'],
+            'repo': task['source']['repo'], 'family': task.get('family'), 'arm': arm, 'rep': rep, 'warm': rep > 0,
+            'model': args.model, 'effort': task.get('effort', 'medium'), 'verified': bool(verified),
+            'check_note': note[-300:], 'wall_s': round(wall, 2), 'returncode': rc, 'stderr_tail': err if rc else '',
+            'rate_limited': limited, 'cost_usd': res.get('total_cost_usd'), 'tokens': tokens,
+            'usage': res.get('usage'), 'model_usage': res.get('modelUsage'), 'num_turns': res.get('num_turns'),
+            'is_error': res.get('is_error'), 'subtype': res.get('subtype'), 'session_id': res.get('session_id'),
+            'has_result': bool(res) and not limited, 'result_text': (res.get('result') or '')[:2000], **ps,
+            'z0int_revision': subprocess.run(['git', '-C', str(ROOT), 'rev-parse', '--short', 'HEAD'],
+                                             capture_output=True, text=True).stdout.strip(),
+            'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
 
 
 def run(args):
@@ -235,6 +271,13 @@ def run(args):
     if out.exists():
         sys.exit('output exists (create-only)')
     out.parent.mkdir(parents=True, exist_ok=True)
+    # --skip: cells (task, arm, rep) that already have a real result in earlier output files are not rerun
+    args.done = set()
+    for p in args.skip or []:
+        for line in Path(p).expanduser().read_text().splitlines():
+            r = json.loads(line)
+            if r.get('type') == 'trial' and r['has_result'] and r['tokens']['billed_total'] > 0:
+                args.done.add((r['task'], r['arm'], r['rep']))
     tasks = load_repo_tasks(args.only)
     arms = args.arms
     rng = random.Random(args.seed)
@@ -248,7 +291,7 @@ def run(args):
         units += [(t, a) for a in rot]
     lock = threading.Lock()
     with out.open('x') as fh:
-        fh.write(json.dumps({'type': 'meta', 'args': vars(args), 'arms': {a: ARMS[a][0] for a in arms},
+        fh.write(json.dumps({'type': 'meta', 'args': {k: v for k, v in vars(args).items() if k != 'done'}, 'arms': {a: ARMS[a][0] for a in arms},
                              'z0int_revision': subprocess.run(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'],
                                                               capture_output=True, text=True).stdout.strip(),
                              'claude_version': subprocess.run(['claude', '--version'], capture_output=True,
@@ -259,6 +302,9 @@ def run(args):
             with lock:
                 fh.write(json.dumps(row) + '\n')
                 fh.flush()
+                if row['type'] != 'trial':
+                    print('rate-limited:', row['task'], row['arm'], row['rep'], row['message'][:80], flush=True)
+                    return
                 tk = row['tokens']
                 print(f"{row['task']:28} {row['arm']:14} r{row['rep']} ok={int(row['verified'])} "
                       f"tok={tk['billed_total']:>8} ${row['cost_usd'] or 0:.3f} calls={row['n_tool_calls']} "
@@ -287,6 +333,7 @@ def main():
     r.add_argument('--seed', type=int, default=20260930)
     r.add_argument('--tag', default='main')
     r.add_argument('--out', required=True)
+    r.add_argument('--skip', nargs='*', help='earlier output JSONL whose completed cells are not rerun')
     args = ap.parse_args()
     if args.cmd == 'validate':
         sys.exit(1 if validate(args) else 0)

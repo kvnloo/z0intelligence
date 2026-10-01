@@ -36,13 +36,19 @@ def load(paths, tag):
         for line in Path(p).expanduser().read_text().splitlines():
             r = json.loads(line)
             if r.get('type') == 'trial' and (tag is None or r.get('tag') == tag):
+                if r['tokens']['billed_total'] == 0 and r.get('is_error'):
+                    r['has_result'] = False  # quota/session-limit abort: no session ran (PREREG: counts as no result)
+                    r['rate_limited'] = True
                 rows.append(r)
     best = {}  # a later row replaces an earlier one only if the earlier had no result (pre-registered rerun)
     for r in rows:
         k = (r['task'], r['arm'], r['rep'])
         if k not in best or (not best[k]['has_result'] and r['has_result']):
             best[k] = r
-    return list(best.values())
+    aborted = sum(not r['has_result'] for r in rows)
+    print(f'loaded {len(rows)} trial rows, {aborted} without a session result (limit aborts / crashes), '
+          f'{sum(not r["has_result"] for r in best.values())} cells still without a result')
+    return [r for r in best.values() if r['has_result']]
 
 
 def cost(r):
