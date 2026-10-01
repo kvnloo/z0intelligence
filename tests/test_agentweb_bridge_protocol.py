@@ -38,6 +38,16 @@ def test_shadow_decide_timeout_requires_same_identity_reconciliation():
     }
 
 
+def test_proven_overload_is_pre_execution_in_active_and_shadow_decide():
+    expected = {
+        "status": "not_executed",
+        "reconcile_required": False,
+        "retry": "caller_may_fallback",
+    }
+    assert failure_disposition("active", "overload_pre_execution", "dispatch") == expected
+    assert failure_disposition("shadow", "overload_pre_execution", "decide") == expected
+
+
 def test_active_timeout_requires_same_identity_reconciliation():
     assert failure_disposition("active", "timeout") == {
         "status": "unknown",
