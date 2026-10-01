@@ -93,8 +93,15 @@ def test_project_drift_supports_causal_parents_without_reordering_intent():
         observation={"state": "stale"},
         causal_parents=("event-b", "event-a"),
     )
-    assert result["event"]["causalParents"] == ["event-b", "event-a"]
+    assert result["event"]["causalParents"] == ["event-a", "event-b"]
     assert result["document"]["intentGraph"] == original_graph
+    replay = project_drift(
+        doc,
+        trace_id="child",
+        observation={"state": "stale"},
+        causal_parents=("event-a", "event-b"),
+    )
+    assert replay["event"]["eventId"] == result["event"]["eventId"]
     assert doc.get("eventLog") is None
 
 
