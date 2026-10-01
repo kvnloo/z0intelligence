@@ -111,11 +111,21 @@ class AOExperimentRegistryTests(unittest.TestCase):
             candidate_trace_id="ao-spawn-candidate",
             root=self.root,
         )
+        explicit = register_pair(
+            experiment_id="exp-1",
+            pair_id="pair-1",
+            task_snapshot_id="task-1",
+            candidate_trace_id="ao-spawn-candidate",
+            reference_trace_id=first["reference_trace_id"],
+            root=self.root,
+        )
 
         self.assertFalse(first["replayed"])
         self.assertTrue(second["replayed"])
+        self.assertTrue(explicit["replayed"])
         self.assertEqual(first["reference_trace_id"], "ao-reference-task-1")
         self.assertEqual(first["pair_sha256"], second["pair_sha256"])
+        self.assertEqual(first["pair_sha256"], explicit["pair_sha256"])
         pairs = list_pairs(root=self.root)
         self.assertEqual(len(pairs), 1)
         self.assertEqual(pairs[0]["candidate_trace_id"], "ao-spawn-candidate")
