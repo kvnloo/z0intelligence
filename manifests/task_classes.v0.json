@@ -1,6 +1,6 @@
 {
   "schema": "z0int.task_classes.v0",
-  "revision": "v0-unmeasured",
+  "revision": "v0-7965e2455e82",
   "doc": "Worker task classes with evidence-backed local-vs-frontier equivalence records. Measured under benchmarks/speed_offload/PREREG.md; consumed by z0int.speed_offload (shadow).",
   "local_route": {
     "provider": "groot",
@@ -8,7 +8,7 @@
   },
   "evidence": {
     "path": "~/.z0int/evidence/speed-offload-v0.json",
-    "sha256": null
+    "sha256": "7965e2455e82833c6f64cf58edc9a1e2d3bad272958d91e64f0f663ca8b3146d"
   },
   "classes": {
     "evidence_sufficiency": {
@@ -18,7 +18,71 @@
         "\\b(sufficien\\w*|insufficient|supported|contradicted)\\b"
       ],
       "equivalence": {
-        "status": "unmeasured"
+        "status": "not_equivalent",
+        "prereg": "benchmarks/speed_offload/PREREG.md",
+        "n": 48,
+        "set_sha256": "cdff0d0729b5cd2de1f684a756664dc676438045d13ba8d56086da96d259972f",
+        "max_context_chars": 234,
+        "local": {
+          "route": "groot/qwen3-8b-q4km",
+          "pass": 31,
+          "errors": 0,
+          "p50_ms": 108,
+          "p95_ms": 146
+        },
+        "frontier": {
+          "haiku": {
+            "pass": 47,
+            "errors": 0,
+            "p50_api_ms": 2383,
+            "p95_api_ms": 4370,
+            "p95_wall_ms": 8375
+          },
+          "sonnet": {
+            "pass": 48,
+            "errors": 0,
+            "p50_api_ms": 1092,
+            "p95_api_ms": 1863,
+            "p95_wall_ms": 5368
+          }
+        },
+        "quality_comparator": "sonnet",
+        "latency_comparator": "sonnet",
+        "diff_lower_bound_95": -0.4792,
+        "margin": 0.1,
+        "speedup_p95": 12.8,
+        "receipts": {
+          "local": [
+            "e300666c86705bcc",
+            "8b04261f08ecc7ed",
+            "6f002b5e2bca0289"
+          ],
+          "haiku": [
+            "89becad225666696",
+            "ac1a255068a68dba",
+            "e3b77231d1e2570e"
+          ],
+          "sonnet": [
+            "27b4144ee73fb9bb",
+            "4e7d51d5c14f1830",
+            "a34ac6ec6bd31d65"
+          ]
+        },
+        "run_ids": {
+          "local": [
+            "local-20260930T203944-3a3192",
+            "local-20260930T204006-555cb8"
+          ],
+          "haiku": [
+            "haiku-20260930T203946-2faca5",
+            "haiku-20260930T204005-c72991",
+            "haiku-20260930T221316-91c1e3"
+          ],
+          "sonnet": [
+            "sonnet-20260930T203952-09c6b5",
+            "sonnet-20260930T222342-51f66b"
+          ]
+        }
       }
     },
     "extract_json": {
@@ -28,7 +92,71 @@
         "\\bjson\\b"
       ],
       "equivalence": {
-        "status": "unmeasured"
+        "status": "not_equivalent",
+        "prereg": "benchmarks/speed_offload/PREREG.md",
+        "n": 60,
+        "set_sha256": "fe26cdd3b5ad30c3c71b51b294c8eb3a304415279925f33db8fa01f78297f1dd",
+        "max_context_chars": 6370,
+        "local": {
+          "route": "groot/qwen3-8b-q4km",
+          "pass": 8,
+          "errors": 0,
+          "p50_ms": 1053,
+          "p95_ms": 1794
+        },
+        "frontier": {
+          "haiku": {
+            "pass": 49,
+            "errors": 0,
+            "p50_api_ms": 4904,
+            "p95_api_ms": 27107,
+            "p95_wall_ms": 30690
+          },
+          "sonnet": {
+            "pass": 60,
+            "errors": 0,
+            "p50_api_ms": 1488,
+            "p95_api_ms": 1970,
+            "p95_wall_ms": 5094
+          }
+        },
+        "quality_comparator": "sonnet",
+        "latency_comparator": "sonnet",
+        "diff_lower_bound_95": -0.9333,
+        "margin": 0.1,
+        "speedup_p95": 1.1,
+        "receipts": {
+          "local": [
+            "923e4bdfbb87f33e",
+            "3495b01682f0586c",
+            "2ea25aba6e23bdc9"
+          ],
+          "haiku": [
+            "38a72a1da75666f4",
+            "43f6fd9afe01ad5a",
+            "20d0ec05a7e2ed5a"
+          ],
+          "sonnet": [
+            "98b5e6a00c0dfe44",
+            "3b36c47ae712011d",
+            "2dbbb9f1afc67813"
+          ]
+        },
+        "run_ids": {
+          "local": [
+            "local-20260930T203944-3a3192",
+            "local-20260930T204006-555cb8"
+          ],
+          "haiku": [
+            "haiku-20260930T203946-2faca5",
+            "haiku-20260930T204005-c72991",
+            "haiku-20260930T221316-91c1e3"
+          ],
+          "sonnet": [
+            "sonnet-20260930T203952-09c6b5",
+            "sonnet-20260930T222342-51f66b"
+          ]
+        }
       }
     },
     "classify_file_type": {
@@ -38,7 +166,71 @@
         "\\bfile[ -]type\\b"
       ],
       "equivalence": {
-        "status": "unmeasured"
+        "status": "not_equivalent",
+        "prereg": "benchmarks/speed_offload/PREREG.md",
+        "n": 60,
+        "set_sha256": "817bc653586852ebc76750b0b39bdf11f4a65c82ff1f2c5e72ac7b407ebb768d",
+        "max_context_chars": 1883,
+        "local": {
+          "route": "groot/qwen3-8b-q4km",
+          "pass": 48,
+          "errors": 0,
+          "p50_ms": 227,
+          "p95_ms": 370
+        },
+        "frontier": {
+          "haiku": {
+            "pass": 59,
+            "errors": 0,
+            "p50_api_ms": 3213,
+            "p95_api_ms": 5879,
+            "p95_wall_ms": 9483
+          },
+          "sonnet": {
+            "pass": 59,
+            "errors": 0,
+            "p50_api_ms": 1038,
+            "p95_api_ms": 1419,
+            "p95_wall_ms": 4317
+          }
+        },
+        "quality_comparator": "sonnet",
+        "latency_comparator": "sonnet",
+        "diff_lower_bound_95": -0.2667,
+        "margin": 0.1,
+        "speedup_p95": 3.8,
+        "receipts": {
+          "local": [
+            "bcddba66724acc7d",
+            "85f8580c52eee7c6",
+            "c9a6eca0b1e6022c"
+          ],
+          "haiku": [
+            "3030c3ec8020b009",
+            "d4e36123d37c4bc0",
+            "f4fd3a13e2663238"
+          ],
+          "sonnet": [
+            "cf04a701bf4c092b",
+            "10e7f000c454ddb9",
+            "2b27580dce994ede"
+          ]
+        },
+        "run_ids": {
+          "local": [
+            "local-20260930T203944-3a3192",
+            "local-20260930T204006-555cb8"
+          ],
+          "haiku": [
+            "haiku-20260930T203946-2faca5",
+            "haiku-20260930T204005-c72991",
+            "haiku-20260930T221316-91c1e3"
+          ],
+          "sonnet": [
+            "sonnet-20260930T203952-09c6b5",
+            "sonnet-20260930T222342-51f66b"
+          ]
+        }
       }
     },
     "summarize_tool_output": {
@@ -48,7 +240,71 @@
         "\\b(output|commit|diff|logs?|stdout|stderr)\\b"
       ],
       "equivalence": {
-        "status": "unmeasured"
+        "status": "speed_qualified",
+        "prereg": "benchmarks/speed_offload/PREREG.md",
+        "n": 60,
+        "set_sha256": "051b0885aed8550d59c8a70cb0b3af399587c7981967d1a469e24c77d7c2e306",
+        "max_context_chars": 5333,
+        "local": {
+          "route": "groot/qwen3-8b-q4km",
+          "pass": 60,
+          "errors": 0,
+          "p50_ms": 577,
+          "p95_ms": 893
+        },
+        "frontier": {
+          "haiku": {
+            "pass": 59,
+            "errors": 0,
+            "p50_api_ms": 5618,
+            "p95_api_ms": 15798,
+            "p95_wall_ms": 19765
+          },
+          "sonnet": {
+            "pass": 37,
+            "errors": 0,
+            "p50_api_ms": 1568,
+            "p95_api_ms": 2054,
+            "p95_wall_ms": 4821
+          }
+        },
+        "quality_comparator": "haiku",
+        "latency_comparator": "sonnet",
+        "diff_lower_bound_95": 0.0,
+        "margin": 0.1,
+        "speedup_p95": 2.3,
+        "receipts": {
+          "local": [
+            "e5d59b7e8c91ebe1",
+            "f63adbeb9b2dfa99",
+            "66a1cede64089031"
+          ],
+          "haiku": [
+            "a96f521c0c4b9244",
+            "d3d2474ac1e09279",
+            "fc534b194c7eeff2"
+          ],
+          "sonnet": [
+            "e33944a3baf4c728",
+            "7d78b75a1e5cc31b",
+            "9dfdb32c3ddf7972"
+          ]
+        },
+        "run_ids": {
+          "local": [
+            "local-20260930T203944-3a3192",
+            "local-20260930T204006-555cb8"
+          ],
+          "haiku": [
+            "haiku-20260930T203946-2faca5",
+            "haiku-20260930T204005-c72991",
+            "haiku-20260930T221316-91c1e3"
+          ],
+          "sonnet": [
+            "sonnet-20260930T203952-09c6b5",
+            "sonnet-20260930T222342-51f66b"
+          ]
+        }
       }
     },
     "short_rewrite": {
@@ -58,7 +314,71 @@
         "\\bat most \\d+ words\\b"
       ],
       "equivalence": {
-        "status": "unmeasured"
+        "status": "not_equivalent",
+        "prereg": "benchmarks/speed_offload/PREREG.md",
+        "n": 53,
+        "set_sha256": "7be60d966af0f93de4c339ff578f98987ac2327017c4391f302b477d022ab6dc",
+        "max_context_chars": 349,
+        "local": {
+          "route": "groot/qwen3-8b-q4km",
+          "pass": 2,
+          "errors": 0,
+          "p50_ms": 470,
+          "p95_ms": 741
+        },
+        "frontier": {
+          "haiku": {
+            "pass": 48,
+            "errors": 0,
+            "p50_api_ms": 27894,
+            "p95_api_ms": 54980,
+            "p95_wall_ms": 56393
+          },
+          "sonnet": {
+            "pass": 22,
+            "errors": 0,
+            "p50_api_ms": 1377,
+            "p95_api_ms": 4224,
+            "p95_wall_ms": 6480
+          }
+        },
+        "quality_comparator": "haiku",
+        "latency_comparator": "sonnet",
+        "diff_lower_bound_95": -0.9434,
+        "margin": 0.1,
+        "speedup_p95": 5.7,
+        "receipts": {
+          "local": [
+            "5811b9ff9079adc4",
+            "0dbb5500e9db7471",
+            "a6ee01be8c6b27f2"
+          ],
+          "haiku": [
+            "6fde481ee16e7f00",
+            "d62b0a13bd03516f",
+            "ec5d7bac0aed29d5"
+          ],
+          "sonnet": [
+            "0821c6dce63888de",
+            "f5afc6ec54f62ea4",
+            "b95547652b5dffdc"
+          ]
+        },
+        "run_ids": {
+          "local": [
+            "local-20260930T203944-3a3192",
+            "local-20260930T204006-555cb8"
+          ],
+          "haiku": [
+            "haiku-20260930T203946-2faca5",
+            "haiku-20260930T204005-c72991",
+            "haiku-20260930T221316-91c1e3"
+          ],
+          "sonnet": [
+            "sonnet-20260930T203952-09c6b5",
+            "sonnet-20260930T222342-51f66b"
+          ]
+        }
       }
     }
   }
