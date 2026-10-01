@@ -20,6 +20,9 @@ def test_bridge_capabilities_are_bounded_static_and_versioned():
         "socket_backlog": SOCKET_BACKLOG,
         "overload_status": 503,
         "retry_after_seconds": 1,
+        "queue_policy": "reject_excess",
+        "overload_execution": "not_started",
+        "overload_execution_header": "X-Z0-Execution",
     }
     assert value["active_dispatch_supported"] is True
     assert value["receipt_schemas"] == ["z0int.decision_receipt.v1"]
