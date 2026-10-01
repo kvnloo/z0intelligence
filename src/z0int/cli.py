@@ -312,6 +312,11 @@ def build_parser() -> argparse.ArgumentParser:
     dd = data_sub.add_parser("discover", help="Find Hermes/OMP/Codex/export paths")
     _json_flag(dd)
 
+    ao = sub.add_parser("ao", help="Agent Orchestrator integration evidence")
+    ao_sub = ao.add_subparsers(dest="ao_cmd", required=True)
+    aor = ao_sub.add_parser("report", help="Frozen AO shadow promotion evidence")
+    _json_flag(aor)
+
     rc = sub.add_parser("receipt", help="Decision receipt spine (trace → outcome → tokens)")
     rc_sub = rc.add_subparsers(dest="receipt_cmd", required=True)
     re = rc_sub.add_parser("emit", help="Append a decision receipt")
@@ -862,6 +867,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "data":
         if args.data_cmd == "discover":
             return cmd_data_discover(as_json=as_json)
+    if args.cmd == "ao":
+        if args.ao_cmd == "report":
+            from .ao_report import build_ao_promotion_report, format_ao_promotion_report
+
+            report = build_ao_promotion_report()
+            _print(report, as_json=as_json, human=format_ao_promotion_report(report))
+            return 0
     if args.cmd == "receipt":
         if args.receipt_cmd == "emit":
             return cmd_receipt_emit(args=args)
