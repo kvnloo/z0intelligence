@@ -106,6 +106,7 @@ def validate_payload_isolation_v1(payload: Any) -> list[str]:
     return errors
 
 KNOWN_REJECTIONS = {"validation", "policy", "trace_conflict", "http_4xx"}
+PRE_EXECUTION_FAILURES = {"overload_pre_execution"}
 AMBIGUOUS_FAILURES = {"timeout", "transport", "http_5xx", "invalid_response"}
 
 
@@ -246,6 +247,13 @@ def failure_disposition(
     resolved_kind = kind or ("plan" if mode == "shadow" else "dispatch")
     if resolved_kind not in KINDS:
         raise ValueError(f"unsupported bridge kind: {resolved_kind}")
+
+    if failure in PRE_EXECUTION_FAILURES:
+        return {
+            "status": "not_executed",
+            "reconcile_required": False,
+            "retry": "caller_may_fallback",
+        }
 
     if failure in KNOWN_REJECTIONS:
         return {
