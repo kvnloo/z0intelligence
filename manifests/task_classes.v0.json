@@ -240,7 +240,7 @@
         "\\b(output|commit|diff|logs?|stdout|stderr)\\b"
       ],
       "equivalence": {
-        "status": "speed_qualified",
+        "status": "not_equivalent",
         "prereg": "benchmarks/speed_offload/PREREG.md",
         "n": 60,
         "set_sha256": "051b0885aed8550d59c8a70cb0b3af399587c7981967d1a469e24c77d7c2e306",
@@ -304,7 +304,23 @@
             "sonnet-20260930T203952-09c6b5",
             "sonnet-20260930T222342-51f66b"
           ]
-        }
+        },
+        "demoted_by": "faithfulness (exp/summarize-faithfulness-v0 9b8289c)"
+      },
+      "faithfulness": {
+        "verdict": "fail",
+        "branch": "exp/summarize-faithfulness-v0",
+        "results_commit": "9b8289c",
+        "prereg_commit": "2870516",
+        "hallucination_rate": {
+          "local_qwen3_8b": 0.263,
+          "haiku": 0.132
+        },
+        "critical_fact_recall": {
+          "local_qwen3_8b": 0.816,
+          "haiku": 0.893
+        },
+        "note": "v0 format-and-facts check passed but non-inferiority on faithfulness failed both margins; demoted"
       }
     },
     "short_rewrite": {
