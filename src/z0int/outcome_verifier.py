@@ -42,7 +42,7 @@ from typing import Any, Callable, Iterable, Mapping
 SCHEMA = 'z0int.claude_code.turn_outcome_verified.v0'
 JOIN_SCHEMA = 'z0int.claude_code.credit_join.v0'
 OBSERVED_SCHEMA = 'z0int.claude_code.turn_outcome.v0'
-VERIFIER = {'id': 'z0int.outcome_verifier', 'version': '0.1.0'}
+VERIFIER = {'id': 'z0int.outcome_verifier', 'version': '0.2.0'}  # 0.2.0: + verification_density signals
 HARNESS = 'claude-code'
 STATES = ('verified_success', 'verified_failure', 'contested', 'unverified')
 # z0int#54 provenance classes. Confidence is orthogonal and decides the state.
@@ -224,7 +224,9 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                        'harness_message': bool(row.get('isMeta')) or stripped.startswith(HARNESS_PREFIXES),
                        '_prompt': text, 'bash': [], 'edits': [], 'assistant_ids': set(), 'tool_calls': 0,
                        'asked_text': None, 'ask_tool': [], 'agents_spawned': 0, 'pr_created': [],
-                       'pr_merged_by_agent': [], 'interrupted': False, 'subagent_ids': []}
+                       'pr_merged_by_agent': [], 'interrupted': False, 'subagent_ids': [],
+                       # density verifiers (verification_density.py); '_'-prefixed fields hold text transiently
+                       'tool_names': Counter(), 'edit_ops': [], 'reads': set(), 'tool_seq': [], '_final_text': ''}
                 turns.append(cur)
                 continue
             if cur is None:
@@ -241,12 +243,15 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                 texts = [b.get('text', '') for b in blocks if b.get('type') == 'text' and b.get('text', '').strip()]
                 if texts:
                     cur['asked_text'] = texts[-1].rstrip().endswith('?')
+                    cur['_final_text'] = texts[-1]
                 for b in blocks:
                     if b.get('type') != 'tool_use':
                         continue
                     cur['tool_calls'] += 1
                     name, inp = str(b.get('name') or ''), b.get('input') if isinstance(b.get('input'), dict) else {}
+                    cur['tool_names'][name] += 1
                     call = {'name': name, 'turn': cur, 'cwd': row.get('cwd') or cur['cwd'], 't0': ts}
+                    cur['tool_seq'].append(call)
                     if name == 'Bash' and isinstance(inp.get('command'), str):
                         call['command'] = inp['command']
                         cur['bash'].append(call)
@@ -257,6 +262,16 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                         p = inp.get('file_path') or inp.get('notebook_path')
                         if isinstance(p, str):
                             cur['edits'].append(p)
+                            call['path'] = p
+                            call['_new'] = inp.get('new_string') if name != 'Write' else inp.get('content')
+                            call['_old'] = inp.get('old_string')
+                            for e in inp.get('edits') or [] if name == 'MultiEdit' else []:
+                                if isinstance(e, dict):
+                                    call['_new'] = (call['_new'] or '') + '\n' + str(e.get('new_string') or '')
+                                    call['_old'] = (call['_old'] or '') + '\n' + str(e.get('old_string') or '')
+                            cur['edit_ops'].append(call)
+                    elif name == 'Read' and isinstance(inp.get('file_path'), str):
+                        call['path'] = inp['file_path']
                     elif name == ASK_TOOL:
                         cur['ask_tool'].append(call)
                     elif name in ('Agent', 'Task'):
@@ -274,7 +289,14 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                         continue
                     text = _text(block.get('content'))
                     call['t1'] = ts
+                    call['error'] = bool(block.get('is_error'))
+                    tur = row.get('toolUseResult')
+                    if call['name'] in EDIT_TOOLS and isinstance(tur, dict):
+                        call['created'] = tur.get('type') == 'create' if call['name'] == 'Write' else False
+                    elif call['name'] == 'Read' and not call['error'] and call.get('path'):
+                        call['turn']['reads'].add(call['path'])
                     if call['name'] == 'Bash':
+                        call['_out_tail'] = text[-600:]
                         call['exit'] = _exit_code(block, row.get('toolUseResult'))
                         cmd = call.get('command', '')
                         if COMMIT_CMD.search(cmd):
@@ -306,7 +328,7 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                 seen.add(key)
                 prs.append(p)
         t['pr_created'] = prs
-        for c in t['bash'] + t['ask_tool']:
+        for c in t['tool_seq']:
             c.pop('turn', None)
     return turns
 
@@ -332,6 +354,8 @@ def session_turns(path: Path) -> list[dict[str, Any]]:
                     c['via'] = 'subagent'
                 t['bash'] += st['bash']
                 t['edits'] += st['edits']
+                t['edit_ops'] += [dict(e, via='subagent') for e in st['edit_ops']]
+                t['reads'] |= st['reads']
                 t['pr_created'] += [p for p in st['pr_created'] if p not in t['pr_created']]
                 t['pr_merged_by_agent'] += st['pr_merged_by_agent']
                 t['tool_calls_subagents'] = t.get('tool_calls_subagents', 0) + st['tool_calls']
@@ -420,6 +444,7 @@ class RepoIndex:
         self._top: dict[str, Path | None] = {}
         self._landed: dict[tuple[str, int], list[Landed]] = {}
         self._szz: dict[tuple[str, str], set[str]] = {}
+        self.ls_cache: dict[str, list[str]] = {}
 
     def toplevel(self, path: str | Path | None) -> Path | None:
         if not path:
@@ -522,25 +547,104 @@ def _gh_json(args: list[str]) -> Any:
         return None
 
 
-class GitHub:
-    """Only GET-shaped ``gh`` calls: ``gh pr view`` and ``gh api`` without a method/body flag."""
+def _gh_final(args: tuple, out: Any) -> bool:
+    """A lookup whose answer can no longer change: a merged/closed PR, or check-runs that all completed."""
+    if args[:2] == ('pr', 'view'):
+        return isinstance(out, dict) and out.get('state') in ('MERGED', 'CLOSED')
+    if args[:1] == ('api',) and isinstance(out, dict):
+        runs = out.get('check_runs')
+        return bool(runs) and all(r.get('status') == 'completed' for r in runs)
+    return False
 
-    def __init__(self, enabled: bool = True, runner: Callable[[list[str]], Any] = _gh_json):
+
+def default_gh_cache() -> Path:
+    base = os.environ.get('XDG_CACHE_HOME') or str(Path.home() / '.cache')
+    return Path(base) / 'z0int' / 'gh-lookups.json'
+
+
+class GitHub:
+    """Only GET-shaped ``gh`` calls: ``gh pr view`` and ``gh api`` without a method/body flag.
+
+    ``cache_path``: an on-disk cache of lookups (default off; the CLI uses ``~/.cache/z0int/gh-lookups.json``).
+    Final answers (merged/closed PRs, all-completed check-runs) are reused forever; anything else for
+    ``ttl`` seconds. Failures are never cached on disk. ``prefetch`` resolves many keys concurrently.
+    """
+
+    def __init__(self, enabled: bool = True, runner: Callable[[list[str]], Any] = _gh_json,
+                 cache_path: Path | None = None, ttl: float = 3600.0, workers: int = 8):
         self.enabled = enabled
         self.run = runner
         self.calls = 0
         self.failures = 0
+        self.disk_hits = 0
         self._cache: dict[tuple, Any] = {}
+        self.cache_path = cache_path
+        self.ttl = ttl
+        self.workers = workers
+        self.recording: list[list[str]] | None = None
+        self._disk: dict[str, Any] = {}
+        self._dirty = False
+        if cache_path is not None:
+            try:
+                self._disk = json.loads(Path(cache_path).read_text())
+            except (OSError, ValueError):
+                self._disk = {}
+
+    def _from_disk(self, key: tuple) -> tuple[bool, Any]:
+        ent = self._disk.get(json.dumps(key))
+        if isinstance(ent, dict) and (ent.get('final') or time.time() - float(ent.get('t', 0)) < self.ttl):
+            return True, ent.get('out')
+        return False, None
+
+    def _store(self, key: tuple, out: Any) -> None:
+        self._cache[key] = out
+        if out is None:
+            self.failures += 1
+        elif self.cache_path is not None:
+            self._disk[json.dumps(key)] = {'t': time.time(), 'final': _gh_final(key, out), 'out': out}
+            self._dirty = True
 
     def _get(self, args: list[str]) -> Any:
         key = tuple(args)
-        if key not in self._cache:
-            self.calls += 1
-            out = self.run(args)
-            if out is None:
-                self.failures += 1
+        if key in self._cache:
+            return self._cache[key]
+        hit, out = self._from_disk(key)
+        if hit:
+            self.disk_hits += 1
             self._cache[key] = out
+            return out
+        if self.recording is not None:  # planning pass: note the key, answer nothing
+            self.recording.append(list(args))
+            return None
+        self.calls += 1
+        self._store(key, self.run(args))
         return self._cache[key]
+
+    def prefetch(self, keys: Iterable[list[str]]) -> int:
+        from concurrent.futures import ThreadPoolExecutor
+        todo = []
+        for k in keys:
+            t = tuple(k)
+            if t not in self._cache and t not in {tuple(x) for x in todo} and not self._from_disk(t)[0]:
+                todo.append(k)
+        if not todo:
+            return 0
+        with ThreadPoolExecutor(max_workers=max(1, self.workers)) as ex:
+            outs = list(ex.map(self.run, todo))
+        for k, out in zip(todo, outs):
+            self.calls += 1
+            self._store(tuple(k), out)
+        return len(todo)
+
+    def flush(self) -> None:
+        if self.cache_path is None or not self._dirty:
+            return
+        path = Path(self.cache_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix('.tmp')
+        tmp.write_text(json.dumps(self._disk, sort_keys=True))
+        os.replace(tmp, path)
+        self._dirty = False
 
     def pr(self, repo: str, number: int) -> dict[str, Any] | None:
         if not self.enabled or not repo:
@@ -728,7 +832,7 @@ def verify_turn(turn: Mapping[str, Any], next_prompt: str | None, *, index: Repo
 
 # ----------------------------------------------------------------------------- driver
 def _rows_for_session(turns: list[dict[str, Any]], session_id: str, *, index: RepoIndex, gh: GitHub, fix_days: int,
-                      now: float) -> dict[str, dict[str, Any]]:
+                      now: float, density: bool = True) -> dict[str, dict[str, Any]]:
     """prompt_id -> verification core for every user-initiated turn in one session transcript."""
     merges = [m for t in turns for m in t['pr_merged_by_agent']]
     session_end = max((t['ended_at'] or 0 for t in turns), default=None)
@@ -740,7 +844,15 @@ def _rows_for_session(turns: list[dict[str, Any]], session_id: str, *, index: Re
         nxt = next((turns[j]['_prompt'] for j in real if j > i), None)
         core = verify_turn(t, nxt, index=index, gh=gh, fix_days=fix_days, now=now, session_merges=merges,
                            session_end=session_end)
-        core['turn'] = {'started_at': _iso(t['started_at']), 'ended_at': _iso(t['ended_at']),
+        if density:
+            from . import verification_density as vd
+            extra = vd.density_signals(turns, i, next_prompt=nxt, asked=core['asked'], existing=core['signals'],
+                                       test_re=TEST_CMD, toplevel=index.toplevel, ls_cache=index.ls_cache)
+            if extra:
+                core['signals'] = core['signals'] + extra
+                core['verification_state'], core['label_class'], core['label_confidence'] = decide(core['signals'])
+        from .verification_density import turn_type
+        core['turn'] = {'type': turn_type(t, TEST_CMD), 'started_at': _iso(t['started_at']), 'ended_at': _iso(t['ended_at']),
                         'assistant_messages': t['assistant_messages'], 'tool_calls': t['tool_calls'],
                         'bash_calls': len(t['bash']), 'bash_calls_via_subagents': sum(1 for c in t['bash'] if c.get('via')),
                         'edits': len(t['edits']),
@@ -752,10 +864,22 @@ def _rows_for_session(turns: list[dict[str, Any]], session_id: str, *, index: Re
 
 def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = False, gh: GitHub | None = None,
            fix_days: int = 7, projects: Path | None = None, now: float | None = None,
-           extra_repo_roots: Iterable[Path] = ()) -> list[dict[str, Any]]:
-    """Build verified rows for observed turns (and, with ``all_turns``, every transcript turn since ``since``)."""
+           extra_repo_roots: Iterable[Path] = (), density: bool = True) -> list[dict[str, Any]]:
+    """Build verified rows for observed turns (and, with ``all_turns``, every transcript turn since ``since``).
+
+    With GitHub enabled and a lookup cache, a planning pass records the lookups the sweep needs, resolves
+    the uncached ones concurrently, then the real pass reads them from memory."""
     now = time.time() if now is None else now
     gh = gh or GitHub()
+    if gh.enabled and gh.cache_path is not None and gh.recording is None:
+        gh.recording = []
+        try:
+            verify(root=root, since=since, all_turns=all_turns, gh=gh, fix_days=fix_days, projects=projects, now=now,
+                   extra_repo_roots=extra_repo_roots, density=False)
+            keys, gh.recording = gh.recording, None
+        finally:
+            gh.recording = None
+        gh.prefetch(keys)
     index = RepoIndex(extra_repo_roots)
     sdir = state_dir(root)
     observed = [r for r in read_jsonl(sdir / 'outcomes.jsonl') if r.get('schema') == OBSERVED_SCHEMA]
@@ -775,7 +899,7 @@ def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = Fa
     rows = []
     for sid, path in sorted(sessions.items()):
         cores = _rows_for_session(session_turns(path), sid, index=index, gh=gh, fix_days=fix_days,
-                                  now=now) if path else {}
+                                  now=now, density=density) if path else {}
         keys = [k for k in obs_by_key if k[0] == sid]
         if all_turns:
             keys += [(sid, pid) for pid, c in cores.items() if (sid, pid) not in obs_by_key
@@ -790,16 +914,18 @@ def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = Fa
                         'measurement': {'transcript': 'missing' if path is None else 'turn_not_found'}}
             core.pop('_started', None)
             obs = obs_by_key.get(key)
-            rows.append(make_row(sid, key[1], core, obs, fix_days=fix_days, gh=gh, now=now))
+            rows.append(make_row(sid, key[1], core, obs, fix_days=fix_days, gh=gh, now=now, density=density))
+    gh.flush()
     return rows
 
 
 def make_row(session_id: str, trace_id: str | None, core: Mapping[str, Any], observed: Mapping[str, Any] | None, *,
-             fix_days: int, gh: GitHub, now: float) -> dict[str, Any]:
+             fix_days: int, gh: GitHub, now: float, density: bool = True) -> dict[str, Any]:
     content = {'signals': core['signals'], 'verification_state': core['verification_state'],
                'label_class': core['label_class'], 'label_confidence': core['label_confidence']}
     row = {
-        'schema': SCHEMA, 'verifier': {**VERIFIER, 'params': {'fix_days': fix_days, 're_ask_jaccard': RE_ASK_JACCARD}},
+        'schema': SCHEMA, 'verifier': {**VERIFIER, 'params': {'fix_days': fix_days, 're_ask_jaccard': RE_ASK_JACCARD,
+                                                              'density': density}},
         'session_id': session_id, 'trace_id': trace_id,
         'observed_ref': {'schema': OBSERVED_SCHEMA, 'present': observed is not None,
                          'row_sha': _sha(observed) if observed is not None else None,
@@ -938,12 +1064,16 @@ def _main(argv: list[str] | None = None) -> int:
     v.add_argument('--all-turns', action='store_true', help='also verify transcript turns that have no observed row')
     v.add_argument('--fix-days', type=int, default=7, help='SZZ / revert observation window (days)')
     v.add_argument('--no-gh', action='store_true', help='skip read-only GitHub lookups (PR state, check-runs)')
+    v.add_argument('--no-gh-cache', action='store_true', help='do not read/write the on-disk gh lookup cache')
+    v.add_argument('--no-density', action='store_true', help='v0 signal set only (no verification_density signals)')
     v.add_argument('--projects-dir', type=Path, default=None)
     v.add_argument('--repo-root', action='append', type=Path, default=[],
                    help='extra repository to try when a commit SHA is not found in the turn cwd (repeatable)')
     v.add_argument('--dry-run', action='store_true', help='compute and summarise; do not append')
     v.add_argument('--report', type=Path, default=None, help='also write a counts-only markdown report here')
     v.add_argument('--json', action='store_true')
+    sub.add_parser('density', add_help=False,
+                   help='counts-only diagnosis: why turns are unverified, by cohort x turn type (-> verification_density)')
     sub.add_parser('export', add_help=False,
                    help='privacy-safe training table for the verified loop (-> z0int.loop_export; see --help)')
     j = sub.add_parser('join', help='credit-ready join: opportunity -> gate -> observed -> verified')
@@ -952,14 +1082,19 @@ def _main(argv: list[str] | None = None) -> int:
     if argv is None:
         import sys
         argv = sys.argv[1:]
+    if argv and argv[0] == 'density':
+        from .verification_density import _main as density_main
+        return density_main(list(argv[1:]))
     if argv and argv[0] == 'export':
         from .loop_export import _main as export_main
         return export_main(list(argv[1:]))
     args = ap.parse_args(argv)
     if args.cmd == 'verify':
         now = time.time()
-        rows = verify(since=parse_since(args.since, now), all_turns=args.all_turns, gh=GitHub(not args.no_gh),
-                      fix_days=args.fix_days, projects=args.projects_dir, now=now, extra_repo_roots=args.repo_root)
+        gh = GitHub(not args.no_gh, cache_path=None if args.no_gh_cache else default_gh_cache())
+        rows = verify(since=parse_since(args.since, now), all_turns=args.all_turns, gh=gh,
+                      fix_days=args.fix_days, projects=args.projects_dir, now=now, extra_repo_roots=args.repo_root,
+                      density=not args.no_density)
         appended, path = (0, None) if args.dry_run else append_new(rows)
         rep = summarize(rows, credit_join())
         rep['appended'] = appended
