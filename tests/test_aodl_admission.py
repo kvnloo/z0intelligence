@@ -129,6 +129,7 @@ class AodlAdmissionTests(unittest.TestCase):
         self.assertEqual(receipt["schema"], "z0int.aodl_admission.v1")
         self.assertEqual(receipt["decision"], "ALLOW")
         self.assertIn("aodl_semantic_fingerprint", receipt)
+        self.assertEqual(receipt["aodl_intent_source_hash"], "0" * 64)
         self.assertNotIn("verified_success", receipt)
         self.assertNotIn("success", receipt)
 
