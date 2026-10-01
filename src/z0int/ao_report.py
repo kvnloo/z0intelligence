@@ -162,13 +162,17 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
 
     joined_traces = traces & set(events_by_trace)
     terminal_joined = set()
+    final_disposition_joined = set()
     gold_traces = set()
     negative_traces = set()
     for trace_id, trace_events in events_by_trace.items():
         for event in trace_events:
             evidence = event.get("evidence") if isinstance(event.get("evidence"), dict) else {}
-            if evidence.get("disposition") in ("terminated", "seed_deleted"):
+            disposition = evidence.get("disposition")
+            if disposition == "terminated":
                 terminal_joined.add(trace_id)
+            if disposition in ("terminated", "seed_deleted"):
+                final_disposition_joined.add(trace_id)
             if event.get("outcome_tier") == "gold":
                 gold_traces.add(trace_id)
             if event.get("outcome_tier") == "negative":
@@ -224,6 +228,7 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
         evidence_gaps.append("retry_measurement_unavailable")
     if correction_measurements == 0:
         evidence_gaps.append("correction_measurement_unavailable")
+    evidence_gaps.append("safe_coverage_gate_not_defined")
     evidence_gaps.append("per_family_calibration_target_not_defined")
     evidence_gaps.append("counterfactual_or_control_delta_not_measured")
 
@@ -237,6 +242,8 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
             "abstention_rate": _rate(abstain, len(receipts)),
             "non_abstain": non_abstain,
             "non_abstain_coverage": _rate(non_abstain, len(receipts)),
+            "safe_coverage": None,
+            "safe_coverage_reason": "no family-specific promotion/calibration gate has been declared",
             "recommendation_comparison": {
                 "comparable": comparable,
                 "agreement": agreement,
@@ -250,6 +257,8 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
             "join_coverage": _rate(len(joined_traces), len(receipts)),
             "terminal_joined_decisions": len(terminal_joined & traces),
             "terminal_join_coverage": _rate(len(terminal_joined & traces), len(receipts)),
+            "final_disposition_joined_decisions": len(final_disposition_joined & traces),
+            "final_disposition_join_coverage": _rate(len(final_disposition_joined & traces), len(receipts)),
             "event_tiers": dict(sorted(event_tier_counts.items())),
             "dispositions": dict(sorted(disposition_counts.items())),
             "verified_positive_decisions": len(gold_traces & traces),
@@ -298,6 +307,16 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
             },
         },
         "families": dict(sorted(family_rows.items())),
+        "comparison": {
+            "ready": False,
+            "task_success_delta": None,
+            "verifier_delta": None,
+            "retry_delta": None,
+            "correction_delta": None,
+            "token_delta": None,
+            "cost_delta": None,
+            "reason": "no matched control/counterfactual cohort is recorded for AO traffic yet",
+        },
         "promotion": {
             "decision": "not_computed",
             "reason": "report is descriptive; policy-specific promotion thresholds must be declared separately",
@@ -316,6 +335,7 @@ def format_ao_promotion_report(report: dict[str, Any]) -> str:
         f"  decisions={decisions['count']} abstention={decisions['abstention_rate']} "
         f"non_abstain={decisions['non_abstain']}\n"
         f"  outcome_join={outcomes['join_coverage']} terminal_join={outcomes['terminal_join_coverage']} "
+        f"final_disposition_join={outcomes['final_disposition_join_coverage']} "
         f"gold={outcomes['verified_positive_decisions']} negative={outcomes['verified_negative_decisions']}\n"
         f"  decision_latency_count={latency['count']} p50={latency['p50']} p95={latency['p95']}\n"
         f"  snapshot={report['snapshot_sha256']}\n"
