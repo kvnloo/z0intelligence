@@ -90,6 +90,25 @@ class AOBridgeTests(unittest.TestCase):
         self.assertEqual(second["decision_id"], first["decision_id"])
         self.assertTrue(second["replayed"])
 
+    def test_spawn_baseline_records_explicit_no_model_usage(self):
+        spawn_decision(request(), root=self.root)
+        stored = find_receipt("ao-spawn-s1", root=self.root)
+        self.assertEqual(stored["measurement_state"], "complete")
+        self.assertGreaterEqual(stored["latency_ms"], 0.0)
+        self.assertEqual(stored["input_tokens"], 0)
+        self.assertEqual(stored["output_tokens"], 0)
+        self.assertEqual(stored["cached_input_tokens"], 0)
+        self.assertEqual(stored["measured_frontier_tokens"], 0)
+
+        measurement = stored["extra"]["decision_measurement"]
+        self.assertEqual(measurement["scope"], "policy_eval")
+        self.assertEqual(measurement["usage_state"], "measured_no_model")
+        self.assertEqual(measurement["cost_usd"], 0.0)
+        self.assertEqual(
+            measurement["provenance"],
+            "deterministic_baseline_no_model_call",
+        )
+
     def test_spawn_trace_conflict_fails_closed(self):
         spawn_decision(request(), root=self.root)
         changed = request()
