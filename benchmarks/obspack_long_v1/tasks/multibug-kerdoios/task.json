@@ -1,0 +1,82 @@
+{
+ "id": "multibug-kerdoios",
+ "family": "multi_bug_debug",
+ "repo": "kerdoios",
+ "effort": "medium",
+ "source": {
+  "repo": "kerdoios",
+  "sha": "fd34a48a3584548696a3fe08a5bb80038be78618",
+  "prefix": "kerdoios"
+ },
+ "sabotage": [
+  {
+   "file": "kerdoios/optimize.py",
+   "old": "        take = min(remaining, item.offer.capacity.concurrency)",
+   "new": "        take = max(remaining, item.offer.capacity.concurrency)"
+  },
+  {
+   "file": "kerdoios/score.py",
+   "old": "    if req.coding and cap.coding < req.coding:",
+   "new": "    if req.coding or cap.coding < req.coding:"
+  },
+  {
+   "file": "kerdoios/pareto.py",
+   "old": "    better_or_equal = True",
+   "new": "    better_or_equal = False"
+  },
+  {
+   "file": "kerdoios/inventory.py",
+   "old": "    if not live_rows:",
+   "new": "    if live_rows:"
+  },
+  {
+   "file": "kerdoios/explain.py",
+   "old": "    result = built or build_plan(offers, req)",
+   "new": "    result = built and build_plan(offers, req)"
+  },
+  {
+   "file": "kerdoios/pareto.py",
+   "old": "    if len(dimensions) != len(minimize):",
+   "new": "    if len(dimensions) == len(minimize):"
+  },
+  {
+   "file": "kerdoios/inventory.py",
+   "old": "    if live or free_only:",
+   "new": "    if live and free_only:"
+  },
+  {
+   "file": "kerdoios/optimize.py",
+   "old": "    if req.maximum_latency_ms is not None and offer.telemetry.latency_p50_ms > req.maximum_latency_ms:",
+   "new": "    if req.maximum_latency_ms is not None or offer.telemetry.latency_p50_ms > req.maximum_latency_ms:"
+  }
+ ],
+ "prompt": "A bad merge broke several things in the kerdoios/ package (an LLM worker-placement planner; run from the repository root, not from inside kerdoios/, since the package has a module named types.py). Run the test suite from the repository root with `python -m pytest -v --tb=long kerdoios/tests` (verbose, full tracebacks; read the complete output, do not pipe it through head, tail, or grep). There are several independent bugs in the library code. Fix them one at a time: after EACH individual fix, re-run that full verbose suite command to confirm progress, until everything passes. Do not modify the tests. Finally write FIXES.md with one line per bug (file, line, what was wrong).",
+ "check": {
+  "kind": "all",
+  "checks": [
+   {
+    "kind": "pytest",
+    "restore": [
+     "kerdoios/tests/test_optimize.py",
+     "kerdoios/tests/test_inventory.py",
+     "kerdoios/tests/__init__.py"
+    ],
+    "targets": [
+     "kerdoios/tests"
+    ],
+    "pythonpath": [
+     "."
+    ]
+   },
+   {
+    "kind": "min_lines",
+    "file": "FIXES.md",
+    "n": 7
+   }
+  ]
+ },
+ "oracle_files": {
+  "FIXES.md": "- bug 0\n- bug 1\n- bug 2\n- bug 3\n- bug 4\n- bug 5\n- bug 6\n- bug 7\n"
+ },
+ "key_derivation": "single-line mutants found by a seeded mutation search over the pinned source and killed by the module's own tests; oracle = pristine source"
+}

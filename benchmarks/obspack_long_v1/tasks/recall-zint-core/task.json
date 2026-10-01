@@ -1,0 +1,108 @@
+{
+ "id": "recall-zint-core",
+ "family": "directed_recall",
+ "repo": "z0intelligence",
+ "effort": "medium",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "b0724680bc",
+  "paths": [
+   "src"
+  ]
+ },
+ "prompt": "Audit this repository's core z0int modules. For EACH of the following 25 files, in this order, print the complete file with its own separate `cat <path>` Bash command (one file per command; no head, tail, grep, sed, awk, or the Read tool), then append a one-line summary of that file to AUDIT.md: src/z0int/automatic.py, src/z0int/cascade.py, src/z0int/claude_code.py, src/z0int/artifacts.py, src/z0int/os_context.py, src/z0int/intelligence_mcp.py, src/z0int/counterfactual.py, src/z0int/worker_routing.py, src/z0int/decision_opportunity.py, src/z0int/models_mgmt.py, src/z0int/claude_code_launch.py, src/z0int/refinement.py, src/z0int/worker_activity.py, src/z0int/onboard.py, src/z0int/routines.py, src/z0int/context_resolve.py, src/z0int/alignbench.py, src/z0int/abab.py, src/z0int/doctor.py, src/z0int/intelligence_service.py, src/z0int/task_loop.py, src/z0int/contrastive_evidence.py, src/z0int/provider_saturation.py, src/z0int/claude_code_skills.py, src/z0int/remote_executor.py. After you have printed all 25, do NOT open or print any source file again (you may use any recall helper the environment provides for earlier command output). Then write ANSWERS.json with exactly these keys, answered from what you already reviewed: q1 the default value of parameter `min_bad_reject` of function `calibrate_credit_gate` in src/z0int/abab.py (number); q2 the default value of parameter `limit` of function `mine_omp_sessions` in src/z0int/counterfactual.py (number); q3 the value of the module-level constant HOST_PROVIDER_MAX_CAP in src/z0int/worker_routing.py (number); q4 the default value of parameter `z` of function `wilson_lower` in src/z0int/routines.py (number); q5 the default value of parameter `min_rows` of function `observe_future` in src/z0int/cascade.py (number); q6 the default value of parameter `threshold` of function `select_semantic` in src/z0int/claude_code_skills.py (number); q7 the default value of parameter `limit` of function `import_from_db` in src/z0int/os_context.py (number); q8 the default value of parameter `bins` of function `ece` in src/z0int/alignbench.py (number); q9 the value of the module-level constant SERVER_VERSION in src/z0int/intelligence_mcp.py (string); q10 the value of the module-level constant CAPABILITY in src/z0int/provider_saturation.py (string).",
+ "check": {
+  "kind": "all",
+  "checks": [
+   {
+    "kind": "answer_json",
+    "file": "ANSWERS.json",
+    "expect": {
+     "q1": 0.8,
+     "q2": 5000,
+     "q3": 8,
+     "q4": 1.959963984540054,
+     "q5": 20,
+     "q6": 0.05,
+     "q7": 50000,
+     "q8": 10,
+     "q9": "1.0.0",
+     "q10": "intelligence.provider_admission"
+    }
+   },
+   {
+    "kind": "min_lines",
+    "file": "AUDIT.md",
+    "n": 25
+   }
+  ]
+ },
+ "oracle_files": {
+  "ANSWERS.json": {
+   "q1": 0.8,
+   "q2": 5000,
+   "q3": 8,
+   "q4": 1.959963984540054,
+   "q5": 20,
+   "q6": 0.05,
+   "q7": 50000,
+   "q8": 10,
+   "q9": "1.0.0",
+   "q10": "intelligence.provider_admission"
+  },
+  "AUDIT.md": "- src/z0int/automatic.py: summary\n- src/z0int/cascade.py: summary\n- src/z0int/claude_code.py: summary\n- src/z0int/artifacts.py: summary\n- src/z0int/os_context.py: summary\n- src/z0int/intelligence_mcp.py: summary\n- src/z0int/counterfactual.py: summary\n- src/z0int/worker_routing.py: summary\n- src/z0int/decision_opportunity.py: summary\n- src/z0int/models_mgmt.py: summary\n- src/z0int/claude_code_launch.py: summary\n- src/z0int/refinement.py: summary\n- src/z0int/worker_activity.py: summary\n- src/z0int/onboard.py: summary\n- src/z0int/routines.py: summary\n- src/z0int/context_resolve.py: summary\n- src/z0int/alignbench.py: summary\n- src/z0int/abab.py: summary\n- src/z0int/doctor.py: summary\n- src/z0int/intelligence_service.py: summary\n- src/z0int/task_loop.py: summary\n- src/z0int/contrastive_evidence.py: summary\n- src/z0int/provider_saturation.py: summary\n- src/z0int/claude_code_skills.py: summary\n- src/z0int/remote_executor.py: summary\n"
+ },
+ "key_derivation": "AST-extracted module-level constants / literal parameter defaults at the pinned SHA, names unique across the listed files, biased to lines outside the first 45 / last 25 of the file (so a head+tail pack hides most of them). Generator: seeded, see PREREG.md.",
+ "positions": [
+  {
+   "q": "q1",
+   "line": 293,
+   "n_lines": 522
+  },
+  {
+   "q": "q2",
+   "line": 108,
+   "n_lines": 363
+  },
+  {
+   "q": "q3",
+   "line": 51,
+   "n_lines": 435
+  },
+  {
+   "q": "q4",
+   "line": 354,
+   "n_lines": 716
+  },
+  {
+   "q": "q5",
+   "line": 392,
+   "n_lines": 469
+  },
+  {
+   "q": "q6",
+   "line": 153,
+   "n_lines": 188
+  },
+  {
+   "q": "q7",
+   "line": 262,
+   "n_lines": 489
+  },
+  {
+   "q": "q8",
+   "line": 113,
+   "n_lines": 297
+  },
+  {
+   "q": "q9",
+   "line": 27,
+   "n_lines": 124
+  },
+  {
+   "q": "q10",
+   "line": 11,
+   "n_lines": 168
+  }
+ ]
+}

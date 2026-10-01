@@ -1,0 +1,99 @@
+{
+ "id": "multibug-tokenomics-b",
+ "family": "multi_bug_debug",
+ "repo": "tokenomics",
+ "effort": "medium",
+ "source": {
+  "repo": "tokenomics",
+  "sha": "65e8f2dd9d",
+  "paths": [
+   "packages/python",
+   "pyproject.toml",
+   "README.md",
+   "fixtures",
+   "spec",
+   "docs"
+  ]
+ },
+ "sabotage": [
+  {
+   "file": "packages/python/src/tokenomics/models.py",
+   "old": "        if self.outcome is not None:",
+   "new": "        if self.outcome is None:"
+  },
+  {
+   "file": "packages/python/src/tokenomics/report.py",
+   "old": "        return \"estimated\", base if base is not None else 0, actual, est",
+   "new": "        return \"estimated\", base if base is None else 0, actual, est"
+  },
+  {
+   "file": "packages/python/src/tokenomics/coverage.py",
+   "old": "                r.tokens_avoided for r in rollups if r.savings_tier == \"estimated\"",
+   "new": "                r.tokens_avoided for r in rollups if r.savings_tier != \"estimated\""
+  },
+  {
+   "file": "packages/python/src/tokenomics/aggregate.py",
+   "old": "    if len(trace_ids) != 1:",
+   "new": "    if len(trace_ids) == 1:"
+  },
+  {
+   "file": "packages/python/src/tokenomics/adapters.py",
+   "old": "    if measurement_state not in _MEASUREMENT_STATES:",
+   "new": "    if measurement_state in _MEASUREMENT_STATES:"
+  },
+  {
+   "file": "packages/python/src/tokenomics/trace_accounting.py",
+   "old": "        avoided = max(0, int(baseline_total) - int(actual))",
+   "new": "        avoided = min(0, int(baseline_total) - int(actual))"
+  },
+  {
+   "file": "packages/python/src/tokenomics/trace_accounting.py",
+   "old": "    tiers = [e.outcome.tier() for e in events if e.outcome is not None]",
+   "new": "    tiers = [e.outcome.tier() for e in events if e.outcome is None]"
+  },
+  {
+   "file": "packages/python/src/tokenomics/trace_accounting.py",
+   "old": "        baseline_class = \"estimated\" if baseline_total is not None else \"missing\"",
+   "new": "        baseline_class = \"estimated\" if baseline_total is None else \"missing\""
+  }
+ ],
+ "prompt": "A bad merge broke several things in the tokenomics Python package under packages/python/src (an older copy of the package may be installed, so always run with the PYTHONPATH shown). Run the test suite from the repository root with `PYTHONPATH=packages/python/src python -m pytest -v --tb=long packages/python/tests/test_adapters.py packages/python/tests/test_aggregate.py packages/python/tests/test_coverage.py packages/python/tests/test_models.py packages/python/tests/test_report.py packages/python/tests/test_trace_accounting.py packages/python/tests/test_report_attribution.py` (verbose, full tracebacks; read the complete output, do not pipe it through head, tail, or grep). There are several independent bugs in the library code. Fix them one at a time: after EACH individual fix, re-run that full verbose suite command to confirm progress, until everything passes. Do not modify the tests. Finally write FIXES.md with one line per bug (file, line, what was wrong).",
+ "check": {
+  "kind": "all",
+  "checks": [
+   {
+    "kind": "pytest",
+    "restore": [
+     "packages/python/tests/test_adapters.py",
+     "packages/python/tests/test_aggregate.py",
+     "packages/python/tests/test_coverage.py",
+     "packages/python/tests/test_models.py",
+     "packages/python/tests/test_report.py",
+     "packages/python/tests/test_trace_accounting.py",
+     "packages/python/tests/test_report_attribution.py"
+    ],
+    "targets": [
+     "packages/python/tests/test_adapters.py",
+     "packages/python/tests/test_aggregate.py",
+     "packages/python/tests/test_coverage.py",
+     "packages/python/tests/test_models.py",
+     "packages/python/tests/test_report.py",
+     "packages/python/tests/test_trace_accounting.py",
+     "packages/python/tests/test_report_attribution.py"
+    ],
+    "pythonpath": [
+     "packages/python/src"
+    ]
+   },
+   {
+    "kind": "min_lines",
+    "file": "FIXES.md",
+    "n": 7
+   }
+  ]
+ },
+ "oracle_files": {
+  "FIXES.md": "- bug 0\n- bug 1\n- bug 2\n- bug 3\n- bug 4\n- bug 5\n- bug 6\n- bug 7\n"
+ },
+ "key_derivation": "single-line mutants found by a seeded mutation search over the pinned source and killed by the module's own tests; oracle = pristine source"
+}

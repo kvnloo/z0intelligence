@@ -1,0 +1,93 @@
+{
+ "id": "multibug-zint-b",
+ "family": "multi_bug_debug",
+ "repo": "z0intelligence",
+ "effort": "medium",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "b0724680bc",
+  "paths": [
+   "src",
+   "tests",
+   "pyproject.toml",
+   "README.md"
+  ]
+ },
+ "sabotage": [
+  {
+   "file": "src/z0int/context_resolve.py",
+   "old": "    required: bool = True",
+   "new": "    required: bool = False"
+  },
+  {
+   "file": "src/z0int/os_context.py",
+   "old": "    if raw is None or raw == \"\":",
+   "new": "    if raw is None or raw != \"\":"
+  },
+  {
+   "file": "src/z0int/claude_code_skills.py",
+   "old": "    skills = skills if skills is not None else load()",
+   "new": "    skills = skills if skills is None else load()"
+  },
+  {
+   "file": "src/openjev_phase1/core.py",
+   "old": "    if not required <= row.keys():",
+   "new": "    if not required < row.keys():"
+  },
+  {
+   "file": "src/openjev_phase1/serial.py",
+   "old": "    payload = turns[-1][\"content\"]",
+   "new": "    payload = turns[0][\"content\"]"
+  },
+  {
+   "file": "src/z0int/context_resolve.py",
+   "old": "        if need.kind == \"exact_path\" or need.path:",
+   "new": "        if need.kind != \"exact_path\" or need.path:"
+  },
+  {
+   "file": "src/z0int/os_context.py",
+   "old": "    if not family:",
+   "new": "    if family:"
+  },
+  {
+   "file": "src/z0int/context_resolve.py",
+   "old": "        elif need.kind == \"natural_language\":",
+   "new": "        elif need.kind != \"natural_language\":"
+  }
+ ],
+ "prompt": "A bad merge broke several things in the libraries under src/ (z0int and openjev_phase1; a different copy of z0int may be installed, so always run with the PYTHONPATH shown). Run the test suite from the repository root with `PYTHONPATH=src python -m pytest -v --tb=long -p no:cacheprovider tests/test_context_resolve.py tests/test_os_context.py tests/test_claude_code_skills.py tests/test_core.py tests/test_serial.py` (verbose, full tracebacks; read the complete output, do not pipe it through head, tail, or grep). There are several independent bugs in the library code. Fix them one at a time: after EACH individual fix, re-run that full verbose suite command to confirm progress, until everything passes. Do not modify the tests. Finally write FIXES.md with one line per bug (file, line, what was wrong).",
+ "check": {
+  "kind": "all",
+  "checks": [
+   {
+    "kind": "pytest",
+    "restore": [
+     "tests/test_context_resolve.py",
+     "tests/test_os_context.py",
+     "tests/test_claude_code_skills.py",
+     "tests/test_core.py",
+     "tests/test_serial.py"
+    ],
+    "targets": [
+     "tests/test_context_resolve.py",
+     "tests/test_os_context.py",
+     "tests/test_claude_code_skills.py",
+     "tests/test_core.py",
+     "tests/test_serial.py"
+    ],
+    "pythonpath": [
+     "src"
+    ]
+   },
+   {
+    "kind": "min_lines",
+    "file": "FIXES.md",
+    "n": 7
+   }
+  ]
+ },
+ "oracle_files": {
+  "FIXES.md": "- bug 0\n- bug 1\n- bug 2\n- bug 3\n- bug 4\n- bug 5\n- bug 6\n- bug 7\n"
+ },
+ "key_derivation": "single-line mutants found by a seeded mutation search over the pinned source and killed by the module's own tests; oracle = pristine source"
+}

@@ -1,0 +1,93 @@
+{
+ "id": "multibug-zint-c",
+ "family": "multi_bug_debug",
+ "repo": "z0intelligence",
+ "effort": "medium",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "b0724680bc",
+  "paths": [
+   "src",
+   "tests",
+   "pyproject.toml",
+   "README.md"
+  ]
+ },
+ "sabotage": [
+  {
+   "file": "src/z0int/receipt.py",
+   "old": "                if stored_tier == \"gold\" and tier != \"gold\":",
+   "new": "                if stored_tier != \"gold\" and tier != \"gold\":"
+  },
+  {
+   "file": "src/openjev_phase1/reranker.py",
+   "old": "    if not ids or len(ids) > max_tokens:",
+   "new": "    if ids or len(ids) > max_tokens:"
+  },
+  {
+   "file": "src/z0int/claude_code_launch.py",
+   "old": "            if seen['profile'] != profile:",
+   "new": "            if seen['profile'] == profile:"
+  },
+  {
+   "file": "src/z0int/contrastive_evidence.py",
+   "old": "        fact_key = str(edit.get(\"fact\") or \"\")",
+   "new": "        fact_key = str(edit.get(\"fact\") and \"\")"
+  },
+  {
+   "file": "src/z0int/decision_opportunity.py",
+   "old": "    contradictions = list(packet.get(\"contradictions\") or [])",
+   "new": "    contradictions = list(packet.get(\"contradictions\") and [])"
+  },
+  {
+   "file": "src/z0int/decision_opportunity.py",
+   "old": "    if not families:",
+   "new": "    if families:"
+  },
+  {
+   "file": "src/z0int/decision_opportunity.py",
+   "old": "    return any(key == p or (p.endswith(\".\") and key.startswith(p)) or key.startswith(p + \"[\") for p in prefixes)",
+   "new": "    return any(key == p or (p.endswith(\".\") or key.startswith(p)) or key.startswith(p + \"[\") for p in prefixes)"
+  },
+  {
+   "file": "src/z0int/receipt.py",
+   "old": "    base = find_receipt(trace_id, root=root) or {\"trace_id\": trace_id, \"schema\": SCHEMA}",
+   "new": "    base = find_receipt(trace_id, root=root) and {\"trace_id\": trace_id, \"schema\": SCHEMA}"
+  }
+ ],
+ "prompt": "A bad merge broke several things in the libraries under src/ (z0int and openjev_phase1; a different copy of z0int may be installed, so always run with the PYTHONPATH shown). Run the test suite from the repository root with `PYTHONPATH=src python -m pytest -v --tb=long -p no:cacheprovider tests/test_receipt.py tests/test_reranker.py tests/test_claude_code_launch.py tests/test_contrastive_evidence.py tests/test_decision_opportunity.py` (verbose, full tracebacks; read the complete output, do not pipe it through head, tail, or grep). There are several independent bugs in the library code. Fix them one at a time: after EACH individual fix, re-run that full verbose suite command to confirm progress, until everything passes. Do not modify the tests. Finally write FIXES.md with one line per bug (file, line, what was wrong).",
+ "check": {
+  "kind": "all",
+  "checks": [
+   {
+    "kind": "pytest",
+    "restore": [
+     "tests/test_receipt.py",
+     "tests/test_reranker.py",
+     "tests/test_claude_code_launch.py",
+     "tests/test_contrastive_evidence.py",
+     "tests/test_decision_opportunity.py"
+    ],
+    "targets": [
+     "tests/test_receipt.py",
+     "tests/test_reranker.py",
+     "tests/test_claude_code_launch.py",
+     "tests/test_contrastive_evidence.py",
+     "tests/test_decision_opportunity.py"
+    ],
+    "pythonpath": [
+     "src"
+    ]
+   },
+   {
+    "kind": "min_lines",
+    "file": "FIXES.md",
+    "n": 7
+   }
+  ]
+ },
+ "oracle_files": {
+  "FIXES.md": "- bug 0\n- bug 1\n- bug 2\n- bug 3\n- bug 4\n- bug 5\n- bug 6\n- bug 7\n"
+ },
+ "key_derivation": "single-line mutants found by a seeded mutation search over the pinned source and killed by the module's own tests; oracle = pristine source"
+}

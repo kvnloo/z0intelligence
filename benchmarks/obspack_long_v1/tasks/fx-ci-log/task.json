@@ -1,0 +1,78 @@
+{
+ "id": "fx-ci-log",
+ "family": "log_forensics",
+ "repo": "z0intelligence",
+ "effort": "medium",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "b0724680bc",
+  "paths": [
+   "README.md",
+   "pyproject.toml"
+  ]
+ },
+ "generate": "gen.py",
+ "prompt": "CI run 8812 failed and its raw log is in ci/run-8812.log (GitHub-Actions style groups; the test step ran `pytest -v --durations=15`). Triage it with shell commands and write TRIAGE.json with exactly these keys: q1 the sorted list of node ids of every FAILED test (list of strings); q2 number of PASSED tests (number); q3 number of SKIPPED tests (number); q4 node id of the slowest test call (string); q5 the version of tenacity that was installed (string); q6 number of DeprecationWarning lines (number); q7 number of ruff findings with code F401 (number); q8 for the first FAILED test in the log, the assertion message after `AssertionError: ` (string, e.g. \"expected 1 got 2\"); q9 total number of test results reported (passed+failed+skipped) (number). Also write TRIAGE.md (at least 5 lines): which steps failed, why, and what to fix first.",
+ "check": {
+  "kind": "all",
+  "checks": [
+   {
+    "kind": "answer_json",
+    "file": "TRIAGE.json",
+    "expect": {
+     "q1": [
+      "tests/test_adapters.py::test_adapters_23_roundtrip",
+      "tests/test_adapters.py::test_adapters_39_roundtrip",
+      "tests/test_adapters.py::test_adapters_49_ok",
+      "tests/test_billing.py::test_billing_00_empty",
+      "tests/test_cache.py::test_cache_36_edge",
+      "tests/test_cli.py::test_cli_34_unicode",
+      "tests/test_cli.py::test_cli_51_unicode",
+      "tests/test_cli.py::test_cli_53_unicode",
+      "tests/test_packet.py::test_packet_06_empty",
+      "tests/test_receipts.py::test_receipts_37_roundtrip"
+     ],
+     "q2": 678,
+     "q3": 19,
+     "q4": "tests/test_packet.py::test_packet_11_edge",
+     "q5": "1.28.9",
+     "q6": 19,
+     "q7": 29,
+     "q8": "expected 88 got 193",
+     "q9": 707
+    }
+   },
+   {
+    "kind": "min_lines",
+    "file": "TRIAGE.md",
+    "n": 5
+   }
+  ]
+ },
+ "oracle_files": {
+  "TRIAGE.json": {
+   "q1": [
+    "tests/test_adapters.py::test_adapters_23_roundtrip",
+    "tests/test_adapters.py::test_adapters_39_roundtrip",
+    "tests/test_adapters.py::test_adapters_49_ok",
+    "tests/test_billing.py::test_billing_00_empty",
+    "tests/test_cache.py::test_cache_36_edge",
+    "tests/test_cli.py::test_cli_34_unicode",
+    "tests/test_cli.py::test_cli_51_unicode",
+    "tests/test_cli.py::test_cli_53_unicode",
+    "tests/test_packet.py::test_packet_06_empty",
+    "tests/test_receipts.py::test_receipts_37_roundtrip"
+   ],
+   "q2": 678,
+   "q3": 19,
+   "q4": "tests/test_packet.py::test_packet_11_edge",
+   "q5": "1.28.9",
+   "q6": 19,
+   "q7": 29,
+   "q8": "expected 88 got 193",
+   "q9": 707
+  },
+  "TRIAGE.md": "a\nb\nc\nd\ne\n"
+ },
+ "key_derivation": "computed by gen.py --key (seed 9090)"
+}

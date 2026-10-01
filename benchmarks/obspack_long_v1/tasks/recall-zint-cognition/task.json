@@ -1,0 +1,108 @@
+{
+ "id": "recall-zint-cognition",
+ "family": "directed_recall",
+ "repo": "z0intelligence",
+ "effort": "medium",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "b0724680bc",
+  "paths": [
+   "src"
+  ]
+ },
+ "prompt": "Audit this repository's cognition layer and backend bench harness. For EACH of the following 25 files, in this order, print the complete file with its own separate `cat <path>` Bash command (one file per command; no head, tail, grep, sed, awk, or the Read tool), then append a one-line summary of that file to AUDIT.md: src/z0int/cognition/cascade.py, src/z0int/cognition/receipts.py, src/z0int/backends/bench/runner.py, src/z0int/cognition/manifest.py, src/z0int/cognition/cli.py, src/z0int/cognition/adapters/bounded.py, src/z0int/backends/bench/roster.py, src/z0int/cognition/adapters/dialects.py, src/z0int/cognition/registry.py, src/z0int/cognition/adapters/transport.py, src/z0int/backends/bench/tokenomics_bridge.py, src/z0int/cognition/candidates.py, src/z0int/cognition/adapters/local_slm.py, src/z0int/cognition/probe.py, src/z0int/cognition/server.py, src/z0int/cognition/orchestration.py, src/z0int/cognition/surface.py, src/z0int/cognition/actions.py, src/z0int/backends/bench/eligibility.py, src/z0int/cognition/escalation.py, src/z0int/backends/bench/analytics.py, src/z0int/backends/bench/bootstrap.py, src/z0int/backends/bench/materialize.py, src/z0int/backends/bench/pareto.py, src/z0int/cognition/shadow.py. After you have printed all 25, do NOT open or print any source file again (you may use any recall helper the environment provides for earlier command output). Then write ANSWERS.json with exactly these keys, answered from what you already reviewed: q1 the value of the module-level constant SURFACE_VERSION in src/z0int/cognition/surface.py (string); q2 the value of the module-level constant PI_AI_SOURCE in src/z0int/cognition/candidates.py (string); q3 the default value of parameter `float_tol` of function `compare_rows` in src/z0int/backends/bench/materialize.py (number); q4 the default value of parameter `repeats` of function `probe_endpoint` in src/z0int/cognition/probe.py (number); q5 the default value of parameter `n_boot` of function `bootstrap_pareto_inclusion` in src/z0int/backends/bench/bootstrap.py (number); q6 the default value of parameter `bootstrap_draws` of function `run_bench` in src/z0int/backends/bench/runner.py (number); q7 the default value of parameter `max_tokens` of function `chat` in src/z0int/cognition/adapters/transport.py (number); q8 the default value of parameter `port` of function `serve_forever` in src/z0int/cognition/server.py (number); q9 the value of the module-level constant DEFAULT_SERVER_TIMEOUT_MS in src/z0int/cognition/shadow.py (number); q10 the value of the module-level constant DEFAULT_COMPETENCE_MARGIN in src/z0int/backends/bench/eligibility.py (number).",
+ "check": {
+  "kind": "all",
+  "checks": [
+   {
+    "kind": "answer_json",
+    "file": "ANSWERS.json",
+    "expect": {
+     "q1": "surface-v1",
+     "q2": "pi_ai_catalog",
+     "q3": 0.01,
+     "q4": 3,
+     "q5": 500,
+     "q6": 500,
+     "q7": 256,
+     "q8": 11500,
+     "q9": 30000,
+     "q10": 0.05
+    }
+   },
+   {
+    "kind": "min_lines",
+    "file": "AUDIT.md",
+    "n": 25
+   }
+  ]
+ },
+ "oracle_files": {
+  "ANSWERS.json": {
+   "q1": "surface-v1",
+   "q2": "pi_ai_catalog",
+   "q3": 0.01,
+   "q4": 3,
+   "q5": 500,
+   "q6": 500,
+   "q7": 256,
+   "q8": 11500,
+   "q9": 30000,
+   "q10": 0.05
+  },
+  "AUDIT.md": "- src/z0int/cognition/cascade.py: summary\n- src/z0int/cognition/receipts.py: summary\n- src/z0int/backends/bench/runner.py: summary\n- src/z0int/cognition/manifest.py: summary\n- src/z0int/cognition/cli.py: summary\n- src/z0int/cognition/adapters/bounded.py: summary\n- src/z0int/backends/bench/roster.py: summary\n- src/z0int/cognition/adapters/dialects.py: summary\n- src/z0int/cognition/registry.py: summary\n- src/z0int/cognition/adapters/transport.py: summary\n- src/z0int/backends/bench/tokenomics_bridge.py: summary\n- src/z0int/cognition/candidates.py: summary\n- src/z0int/cognition/adapters/local_slm.py: summary\n- src/z0int/cognition/probe.py: summary\n- src/z0int/cognition/server.py: summary\n- src/z0int/cognition/orchestration.py: summary\n- src/z0int/cognition/surface.py: summary\n- src/z0int/cognition/actions.py: summary\n- src/z0int/backends/bench/eligibility.py: summary\n- src/z0int/cognition/escalation.py: summary\n- src/z0int/backends/bench/analytics.py: summary\n- src/z0int/backends/bench/bootstrap.py: summary\n- src/z0int/backends/bench/materialize.py: summary\n- src/z0int/backends/bench/pareto.py: summary\n- src/z0int/cognition/shadow.py: summary\n"
+ },
+ "key_derivation": "AST-extracted module-level constants / literal parameter defaults at the pinned SHA, names unique across the listed files, biased to lines outside the first 45 / last 25 of the file (so a head+tail pack hides most of them). Generator: seeded, see PREREG.md.",
+ "positions": [
+  {
+   "q": "q1",
+   "line": 50,
+   "n_lines": 412
+  },
+  {
+   "q": "q2",
+   "line": 414,
+   "n_lines": 966
+  },
+  {
+   "q": "q3",
+   "line": 181,
+   "n_lines": 212
+  },
+  {
+   "q": "q4",
+   "line": 188,
+   "n_lines": 361
+  },
+  {
+   "q": "q5",
+   "line": 138,
+   "n_lines": 279
+  },
+  {
+   "q": "q6",
+   "line": 301,
+   "n_lines": 502
+  },
+  {
+   "q": "q7",
+   "line": 105,
+   "n_lines": 182
+  },
+  {
+   "q": "q8",
+   "line": 344,
+   "n_lines": 387
+  },
+  {
+   "q": "q9",
+   "line": 42,
+   "n_lines": 547
+  },
+  {
+   "q": "q10",
+   "line": 11,
+   "n_lines": 232
+  }
+ ]
+}

@@ -1,0 +1,87 @@
+{
+ "id": "multibug-evo",
+ "family": "multi_bug_debug",
+ "repo": "evolution-lab",
+ "effort": "medium",
+ "source": {
+  "repo": "evolution-lab",
+  "sha": "4cf52bb101"
+ },
+ "sabotage": [
+  {
+   "file": "evolution_lab/abab_meta.py",
+   "old": "        return \"mutate_recipe\" if world.wave % 2 == 0 else \"sweep\"",
+   "new": "        return \"mutate_recipe\" if world.wave % 2 != 0 else \"sweep\""
+  },
+  {
+   "file": "evolution_lab/capacity_queue.py",
+   "old": "        if not item.fill_safe and not include_protected:",
+   "new": "        if not item.fill_safe or not include_protected:"
+  },
+  {
+   "file": "evolution_lab/coverage_metric.py",
+   "old": "        pred = (s == pos).astype(np.int32)",
+   "new": "        pred = (s != pos).astype(np.int32)"
+  },
+  {
+   "file": "evolution_lab/autoresearch_propose.py",
+   "old": "    elif knob == \"dagger_rounds\":",
+   "new": "    elif knob != \"dagger_rounds\":"
+  },
+  {
+   "file": "evolution_lab/advise.py",
+   "old": "        if value not in ACTIONS:",
+   "new": "        if value in ACTIONS:"
+  },
+  {
+   "file": "evolution_lab/abab_meta.py",
+   "old": "    if w.stopped and w.stop_reason == \"repeated_no_update\":",
+   "new": "    if w.stopped and w.stop_reason != \"repeated_no_update\":"
+  },
+  {
+   "file": "evolution_lab/coverage_metric.py",
+   "old": "    lift = (precision / base) if (precision is not None and base > 0) else None",
+   "new": "    lift = (precision / base) if (precision is None and base > 0) else None"
+  },
+  {
+   "file": "evolution_lab/autoresearch_propose.py",
+   "old": "    elif knob == \"plasticity_epochs\":",
+   "new": "    elif knob != \"plasticity_epochs\":"
+  }
+ ],
+ "prompt": "A bad merge broke several things in the evolution_lab package. Run the test suite from the repository root with `python -m pytest -v --tb=long -p no:cacheprovider tests/test_abab_meta.py tests/test_capacity_queue.py tests/test_coverage_metric.py tests/test_autoresearch_propose.py tests/test_advise.py` (verbose, full tracebacks; read the complete output, do not pipe it through head, tail, or grep). There are several independent bugs in the library code. Fix them one at a time: after EACH individual fix, re-run that full verbose suite command to confirm progress, until everything passes. Do not modify the tests. Finally write FIXES.md with one line per bug (file, line, what was wrong).",
+ "check": {
+  "kind": "all",
+  "checks": [
+   {
+    "kind": "pytest",
+    "restore": [
+     "tests/test_abab_meta.py",
+     "tests/test_capacity_queue.py",
+     "tests/test_coverage_metric.py",
+     "tests/test_autoresearch_propose.py",
+     "tests/test_advise.py"
+    ],
+    "targets": [
+     "tests/test_abab_meta.py",
+     "tests/test_capacity_queue.py",
+     "tests/test_coverage_metric.py",
+     "tests/test_autoresearch_propose.py",
+     "tests/test_advise.py"
+    ],
+    "pythonpath": [
+     "."
+    ]
+   },
+   {
+    "kind": "min_lines",
+    "file": "FIXES.md",
+    "n": 7
+   }
+  ]
+ },
+ "oracle_files": {
+  "FIXES.md": "- bug 0\n- bug 1\n- bug 2\n- bug 3\n- bug 4\n- bug 5\n- bug 6\n- bug 7\n"
+ },
+ "key_derivation": "single-line mutants found by a seeded mutation search over the pinned source and killed by the module's own tests; oracle = pristine source"
+}

@@ -1,0 +1,105 @@
+{
+ "id": "recall-evo-lab",
+ "family": "directed_recall",
+ "repo": "evolution-lab",
+ "effort": "medium",
+ "source": {
+  "repo": "evolution-lab",
+  "sha": "4cf52bb101"
+ },
+ "prompt": "Audit the evolution_lab package. For EACH of the following 25 files, in this order, print the complete file with its own separate `cat <path>` Bash command (one file per command; no head, tail, grep, sed, awk, or the Read tool), then append a one-line summary of that file to AUDIT.md: evolution_lab/task.py, evolution_lab/q_route/gate.py, evolution_lab/select.py, evolution_lab/schema.py, evolution_lab/gym.py, evolution_lab/l2_benchmark.py, evolution_lab/table.py, evolution_lab/models.py, evolution_lab/jev_distill.py, evolution_lab/q_route/qfunc.py, evolution_lab/q_route/teacher.py, evolution_lab/preflight.py, evolution_lab/tool_tournament/compositions.py, evolution_lab/coverage_metric.py, evolution_lab/tool_tournament/score.py, evolution_lab/cycle.py, evolution_lab/engine.py, evolution_lab/capacity_queue.py, evolution_lab/q_route/distill.py, evolution_lab/q_route/utility.py, evolution_lab/observe.py, evolution_lab/experiment_2x2.py, evolution_lab/q_route/analysis.py, evolution_lab/abab_state.py, evolution_lab/episode.py. After you have printed all 25, do NOT open or print any source file again (you may use any recall helper the environment provides for earlier command output). Then write ANSWERS.json with exactly these keys, answered from what you already reviewed: q1 the default value of parameter `lr` of function `fit_fly` in evolution_lab/jev_distill.py (number); q2 the default value of parameter `sealed_frac` of function `run_tournament` in evolution_lab/tool_tournament/score.py (number); q3 the default value of parameter `n_pop` of function `run_2x2` in evolution_lab/experiment_2x2.py (number); q4 the value of the module-level constant DEFAULT_RIDGE_LAMBDA in evolution_lab/q_route/qfunc.py (number); q5 the value of the module-level constant EXEC_UNIT_MS in evolution_lab/tool_tournament/compositions.py (number); q6 the default value of parameter `seed` of function `run_cycle` in evolution_lab/cycle.py (number); q7 the value of the module-level constant _MIN_RATIO_SENTINEL in evolution_lab/q_route/gate.py (number); q8 the default value of parameter `n_val` of function `sample_task` in evolution_lab/task.py (number); q9 the default value of parameter `validation_frac` of function `chronological_split` in evolution_lab/episode.py (number); q10 the default value of parameter `closed_loop_seeds` of function `run_l2_recovery_benchmark` in evolution_lab/l2_benchmark.py (number).",
+ "check": {
+  "kind": "all",
+  "checks": [
+   {
+    "kind": "answer_json",
+    "file": "ANSWERS.json",
+    "expect": {
+     "q1": 0.35,
+     "q2": 0.2,
+     "q3": 256,
+     "q4": 0.001,
+     "q5": 15.0,
+     "q6": 42,
+     "q7": 2.0,
+     "q8": 48,
+     "q9": 0.15,
+     "q10": 24
+    }
+   },
+   {
+    "kind": "min_lines",
+    "file": "AUDIT.md",
+    "n": 25
+   }
+  ]
+ },
+ "oracle_files": {
+  "ANSWERS.json": {
+   "q1": 0.35,
+   "q2": 0.2,
+   "q3": 256,
+   "q4": 0.001,
+   "q5": 15.0,
+   "q6": 42,
+   "q7": 2.0,
+   "q8": 48,
+   "q9": 0.15,
+   "q10": 24
+  },
+  "AUDIT.md": "- evolution_lab/task.py: summary\n- evolution_lab/q_route/gate.py: summary\n- evolution_lab/select.py: summary\n- evolution_lab/schema.py: summary\n- evolution_lab/gym.py: summary\n- evolution_lab/l2_benchmark.py: summary\n- evolution_lab/table.py: summary\n- evolution_lab/models.py: summary\n- evolution_lab/jev_distill.py: summary\n- evolution_lab/q_route/qfunc.py: summary\n- evolution_lab/q_route/teacher.py: summary\n- evolution_lab/preflight.py: summary\n- evolution_lab/tool_tournament/compositions.py: summary\n- evolution_lab/coverage_metric.py: summary\n- evolution_lab/tool_tournament/score.py: summary\n- evolution_lab/cycle.py: summary\n- evolution_lab/engine.py: summary\n- evolution_lab/capacity_queue.py: summary\n- evolution_lab/q_route/distill.py: summary\n- evolution_lab/q_route/utility.py: summary\n- evolution_lab/observe.py: summary\n- evolution_lab/experiment_2x2.py: summary\n- evolution_lab/q_route/analysis.py: summary\n- evolution_lab/abab_state.py: summary\n- evolution_lab/episode.py: summary\n"
+ },
+ "key_derivation": "AST-extracted module-level constants / literal parameter defaults at the pinned SHA, names unique across the listed files, biased to lines outside the first 45 / last 25 of the file (so a head+tail pack hides most of them). Generator: seeded, see PREREG.md.",
+ "positions": [
+  {
+   "q": "q1",
+   "line": 169,
+   "n_lines": 338
+  },
+  {
+   "q": "q2",
+   "line": 860,
+   "n_lines": 1059
+  },
+  {
+   "q": "q3",
+   "line": 193,
+   "n_lines": 325
+  },
+  {
+   "q": "q4",
+   "line": 92,
+   "n_lines": 239
+  },
+  {
+   "q": "q5",
+   "line": 577,
+   "n_lines": 1011
+  },
+  {
+   "q": "q6",
+   "line": 62,
+   "n_lines": 192
+  },
+  {
+   "q": "q7",
+   "line": 79,
+   "n_lines": 483
+  },
+  {
+   "q": "q8",
+   "line": 192,
+   "n_lines": 263
+  },
+  {
+   "q": "q9",
+   "line": 487,
+   "n_lines": 749
+  },
+  {
+   "q": "q10",
+   "line": 116,
+   "n_lines": 274
+  }
+ ]
+}

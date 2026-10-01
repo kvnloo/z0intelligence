@@ -1,0 +1,58 @@
+{
+ "id": "fx-fleet-logs",
+ "family": "log_forensics",
+ "repo": "z0intelligence",
+ "effort": "medium",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "b0724680bc",
+  "paths": [
+   "README.md",
+   "pyproject.toml"
+  ]
+ },
+ "generate": "gen.py",
+ "prompt": "Last night's inference-fleet incident left logs in logs/ (router.log, scheduler.log, worker-gpu0..3.log; one line per event: `<timestamp> <LEVEL> <component>[<pid>] <message>`). Investigate them with shell commands and write INCIDENT.json with exactly these keys: q1 total number of ERROR-level lines across all log files (number); q2 the component with the most ERROR-level lines (string, e.g. \"worker-gpu0\"); q3 the request id (e.g. \"r01234\") of the completed request (a `done` line) with the highest latency_ms (string); q4 that latency_ms (number); q5 number of distinct session ids that hit a CUDA out-of-memory error (number); q6 the timestamp of the first CUDA out-of-memory line, exactly as printed (string); q7 number of request ids that appear in router.log but have neither a `done` line nor an ERROR line in any worker log (number); q8 the pid of worker-gpu2 after it crashed and restarted (number); q9 number of HTTP 429 responses from upstream provider openrouter (number); q10 the hash printed by the LAST successful config reload (string). Also write a short INCIDENT.md (at least 5 lines) describing what happened, citing the log lines you relied on.",
+ "check": {
+  "kind": "all",
+  "checks": [
+   {
+    "kind": "answer_json",
+    "file": "INCIDENT.json",
+    "expect": {
+     "q1": 428,
+     "q2": "worker-gpu2",
+     "q3": "r07311",
+     "q4": 48211,
+     "q5": 81,
+     "q6": "2025-09-28T03:00:10.983Z",
+     "q7": 55,
+     "q8": 48113,
+     "q9": 53,
+     "q10": "fd91358b18"
+    }
+   },
+   {
+    "kind": "min_lines",
+    "file": "INCIDENT.md",
+    "n": 5
+   }
+  ]
+ },
+ "oracle_files": {
+  "INCIDENT.json": {
+   "q1": 428,
+   "q2": "worker-gpu2",
+   "q3": "r07311",
+   "q4": 48211,
+   "q5": 81,
+   "q6": "2025-09-28T03:00:10.983Z",
+   "q7": 55,
+   "q8": 48113,
+   "q9": 53,
+   "q10": "fd91358b18"
+  },
+  "INCIDENT.md": "a\nb\nc\nd\ne\n"
+ },
+ "key_derivation": "computed by gen.py --key from the same deterministic generator that writes the logs (seed 4242)"
+}
