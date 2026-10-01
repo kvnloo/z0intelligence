@@ -8,6 +8,7 @@ from z0int.ao_bridge import (
     join_ao_outcome,
     spawn_decision,
 )
+from z0int.receipt import find_receipt
 
 
 def request(trace="ao-spawn-s1"):
@@ -28,6 +29,46 @@ def request(trace="ao-spawn-s1"):
             "explicit_harness": False,
             "explicit_model": False,
             "explicit_mode": False,
+        },
+    }
+
+
+def outcome_event(session_id="proj-1"):
+    return {
+        "schema": OUTCOME_SCHEMA,
+        "trace_id": "ao-spawn-s1",
+        "outcome_id": "ao-outcome-proj-1-terminated",
+        "session_id": session_id,
+        "outcome": {
+            "execution_completed": True,
+            "pr_merged": True,
+            "source": "agent-orchestrator",
+            "verification_source": "ao-pr-merge",
+        },
+        "evidence": {
+            "project_id": "proj",
+            "kind": "worker",
+            "harness": "codex",
+            "mode": "chat",
+            "model": "gpt-5",
+            "activity": "idle",
+            "terminated": True,
+            "scm_complete": True,
+            "prs": [{
+                "url": "https://github.com/example/repo/pull/7",
+                "number": 7,
+                "draft": False,
+                "merged": True,
+                "closed": False,
+                "ci": "passing",
+                "review": "approved",
+                "mergeability": "mergeable",
+                "review_comments": False,
+                "external_approved": True,
+                "external_changes_requested": False,
+                "external_comments": False,
+                "head_sha": "abc123",
+            }],
         },
     }
 
@@ -58,33 +99,40 @@ class AOBridgeTests(unittest.TestCase):
 
     def test_outcome_join_is_session_bound_and_idempotent(self):
         spawn_decision(request(), root=self.root)
-        event = {
-            "schema": OUTCOME_SCHEMA,
-            "trace_id": "ao-spawn-s1",
-            "session_id": "proj-1",
-            "outcome": {
-                "execution_completed": True,
-                "test_pass": True,
-                "verification_source": "ao-ci",
-            },
-        }
+        event = outcome_event()
         first = join_ao_outcome(event, root=self.root)
         second = join_ao_outcome(event, root=self.root)
         self.assertEqual(first["outcome_tier"], "gold")
+        self.assertEqual(first["outcome_id"], event["outcome_id"])
         self.assertFalse(first["replayed"])
         self.assertEqual(second["outcome_tier"], "gold")
         self.assertTrue(second["replayed"])
 
+        stored = find_receipt("ao-spawn-s1", root=self.root)
+        self.assertEqual(stored["extra"]["ao_outcome_id"], event["outcome_id"])
+        self.assertTrue(stored["extra"]["ao_outcome_evidence"]["prs"][0]["merged"])
+
     def test_outcome_cannot_cross_session_boundary(self):
         spawn_decision(request(), root=self.root)
-        event = {
-            "schema": OUTCOME_SCHEMA,
-            "trace_id": "ao-spawn-s1",
-            "session_id": "other",
-            "outcome": {"execution_completed": True},
-        }
+        event = outcome_event(session_id="other")
         with self.assertRaisesRegex(ValueError, "session"):
             join_ao_outcome(event, root=self.root)
+
+    def test_outcome_rejects_unknown_evidence_fields(self):
+        spawn_decision(request(), root=self.root)
+        event = outcome_event()
+        event["evidence"]["transcript"] = "must never cross this boundary"
+        with self.assertRaisesRegex(ValueError, "evidence"):
+            join_ao_outcome(event, root=self.root)
+
+    def test_outcome_replay_rejects_changed_evidence(self):
+        spawn_decision(request(), root=self.root)
+        event = outcome_event()
+        join_ao_outcome(event, root=self.root)
+        changed = outcome_event()
+        changed["evidence"]["prs"][0]["ci"] = "failing"
+        with self.assertRaisesRegex(ValueError, "different payload"):
+            join_ao_outcome(changed, root=self.root)
 
 
 if __name__ == "__main__":
