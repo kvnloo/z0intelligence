@@ -117,6 +117,9 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
     measured_tokens = []
     actual_saved = []
     estimated_saved = []
+    decision_costs = []
+    decision_usage_states: Counter[str] = Counter()
+    decision_measurement_scopes: Counter[str] = Counter()
     for row in receipts.values():
         value = row.get("latency_ms")
         if isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -130,6 +133,22 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
         value = row.get("estimated_frontier_tokens_avoided")
         if isinstance(value, int) and not isinstance(value, bool):
             estimated_saved.append(value)
+        extra = row.get("extra") if isinstance(row.get("extra"), dict) else {}
+        decision_measurement = (
+            extra.get("decision_measurement")
+            if isinstance(extra.get("decision_measurement"), dict)
+            else None
+        )
+        if decision_measurement is not None:
+            state = decision_measurement.get("usage_state")
+            if isinstance(state, str) and state:
+                decision_usage_states[state] += 1
+            scope = decision_measurement.get("scope")
+            if isinstance(scope, str) and scope:
+                decision_measurement_scopes[scope] += 1
+            value = decision_measurement.get("cost_usd")
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                decision_costs.append(float(value))
 
     events_by_trace: dict[str, list[dict[str, Any]]] = defaultdict(list)
     disposition_counts: Counter[str] = Counter()
@@ -224,6 +243,8 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
         evidence_gaps.append("incomplete_outcome_join_coverage")
     if not measured_tokens:
         evidence_gaps.append("frontier_token_usage_unmeasured")
+    if not decision_costs:
+        evidence_gaps.append("decision_cost_unmeasured")
     if retry_measurements == 0:
         evidence_gaps.append("retry_measurement_unavailable")
     if correction_measurements == 0:
@@ -273,6 +294,7 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
                 "p95": _percentile(latency, 0.95),
             },
             "frontier_tokens": {
+                "scope": "policy_plane_decision",
                 "count": len(measured_tokens),
                 "coverage": _rate(len(measured_tokens), len(receipts)),
                 "sum": sum(measured_tokens) if measured_tokens else None,
@@ -282,10 +304,13 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
                 "estimated_saved_sum": sum(estimated_saved) if estimated_saved else None,
             },
             "cost": {
-                "count": 0,
-                "coverage": 0.0 if receipts else None,
+                "scope": "policy_plane_decision",
+                "count": len(decision_costs),
+                "coverage": _rate(len(decision_costs), len(receipts)),
+                "sum_usd": sum(decision_costs) if decision_costs else None,
+                "usage_states": dict(sorted(decision_usage_states.items())),
+                "measurement_scopes": dict(sorted(decision_measurement_scopes.items())),
                 "delta": None,
-                "reason": "AO bridge receipt schema does not yet carry measured cost",
             },
             "retries": {
                 "count": retry_measurements,
