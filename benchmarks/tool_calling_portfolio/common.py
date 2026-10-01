@@ -9,6 +9,7 @@ Scoring is pure: ``score_item(item, calls)`` never looks at latency or model nam
 """
 from __future__ import annotations
 
+import ast
 import difflib
 import itertools
 import json
@@ -147,12 +148,21 @@ def parse_content(content):
                 calls.append(c)
     if calls:
         return calls, 'content_hermes'
-    for m in re.finditer(r'<start_function_call>\s*call:([\w.\-]+)\{(.*?)\}\s*<end_function_call>', text, re.S):
+    # FunctionGemma's turn ends where the tool response would begin; text after that is the model
+    # role-playing the tool, not a call it made.
+    fg = text.split('<start_function_response>', 1)[0]
+    for m in re.finditer(r'<start_function_call>\s*call:([\w.\-]+)\{(.*?)\}\s*<end_function_call>', fg, re.S):
         calls.append({'name': m.group(1), 'arguments': _fg_args(m.group(2))})
     if calls:
         return calls, 'content_functiongemma'
-    body = re.sub(r'^```(?:json)?\s*|\s*```$', '', text.strip())
-    for v in _json_values(body):  # hammer: JSON array of {name, arguments}; also bare objects
+    body = re.sub(r'^```(?:json|python)?\s*|\s*```$', '', text.strip())
+    values = list(_json_values(body))
+    if not values:  # Hammer often emits a Python-literal list (single quotes) instead of JSON
+        try:
+            values = [ast.literal_eval(body)]
+        except (ValueError, SyntaxError, MemoryError, RecursionError):
+            values = []
+    for v in values:  # hammer: JSON array of {name, arguments}; also bare objects
         items = v if isinstance(v, list) else [v.get('tool_calls', v)] if isinstance(v, dict) else []
         flat = []
         for it in items:

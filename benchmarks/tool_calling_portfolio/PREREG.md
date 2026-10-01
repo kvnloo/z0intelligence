@@ -137,4 +137,17 @@ with an exact McNemar test, two-sided, over the pooled 184 items and per suite.
 
 ## Deviations
 
-(None at registration.)
+Both deviations below are adapter fixes found during the smoke run (one item per category per arm). They
+were committed before the scored run, and neither is item-specific:
+
+1. **FunctionGemma.** llama.cpp b11270 returns no native `tool_calls` for this GGUF, and generation does not
+   stop at `<end_function_call>`. The model goes on to role-play `<start_function_response>…` turns.
+   `<start_function_response>` is the model's documented turn boundary, so the FunctionGemma fallback now
+   parses only the text before the first `<start_function_response>`. The extra generation is left in the
+   latency numbers, since that is how the stock template behaves on this runtime.
+2. **Hammer 2.1.** Both sizes often emit a Python-literal list (single quotes) in a code fence instead of
+   JSON. When no JSON value parses, the JSON-array fallback now tries `ast.literal_eval` on the
+   fence-stripped body.
+
+Smoke observations, not scored: all 8 arms loaded and answered. Qwen3.5-4B/9B, Qwen3-8B/14B and
+Nemotron returned native `tool_calls`. Hammer and FunctionGemma used content fallbacks.
