@@ -130,6 +130,9 @@ def build_argv(profile, claude_args, plugin=True):
 
 def _main(argv=None):
     argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ['engagement']:
+        from .claude_code_engagement import _main as engagement_main
+        return engagement_main(argv[1:])
     if argv[:1] == ['tokenomics']:
         from .claude_code_tokenomics import run
         return run(argv[1:])
@@ -144,6 +147,7 @@ def _main(argv=None):
     la.add_argument('--dry-run', action='store_true')
     la.add_argument('claude_args', nargs=argparse.REMAINDER)
     sub.add_parser('tokenomics', help='per-turn tokenomics report (observed/attributed/estimated); --backfill for transcripts')
+    sub.add_parser('engagement', help='engagement report (count-only), lean-settings, shell-init')
     sub.add_parser('decisions', help='gate vs observed behaviour on live shadow DecisionOpportunity records')
     wa = sub.add_parser('warm', help='rank candidate directories by likely prefix-cache residency')
     wa.add_argument('dirs', nargs='+')

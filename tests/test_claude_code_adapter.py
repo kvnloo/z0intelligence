@@ -95,8 +95,10 @@ def test_turn_id_prefers_prompt_id():
     assert len(claude_code.turn_id({'session_id': 's', 'prompt': 'x'})) == 64
 
 
-def test_session_start_packet_is_opt_in(monkeypatch):
+def test_session_start_packet_is_opt_in(monkeypatch, tmp_path):
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path))  # never the host's claude-code.json
     monkeypatch.delenv('Z0INT_CLAUDE_CODE_PACKET', raising=False)
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_OFFLOAD_HINT', '0')
     assert claude_code.on_session_start('{"cwd": "/"}') is None
     import z0int.state_packet as sp
     monkeypatch.setenv('Z0INT_CLAUDE_CODE_PACKET', '1')
@@ -109,6 +111,7 @@ def test_host_config_drives_packet_and_shadow(monkeypatch, tmp_path):
     monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
     for name in ('Z0INT_CLAUDE_CODE_PACKET', 'Z0INT_CLAUDE_CODE_SHADOW'):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_OFFLOAD_HINT', '0')
     assert claude_code.shadow() is True and claude_code.config() == {}
     (tmp_path / 'config').mkdir()
     (tmp_path / 'config' / 'claude-code.json').write_text(_json.dumps({'shadow': False, 'packet': True}))

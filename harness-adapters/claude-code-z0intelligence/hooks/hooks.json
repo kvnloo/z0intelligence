@@ -43,6 +43,17 @@
           }
         ]
       }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.claude_code session-start || true",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

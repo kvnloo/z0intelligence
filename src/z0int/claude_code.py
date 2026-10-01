@@ -187,12 +187,19 @@ def process_stop(hook, root=None):
 def on_session_start(stdin_text):
     # Opt-in: measured as an aid to tools (held-out 14/14 vs 12/14, -30% input tokens),
     # not a replacement for them; off by default until a per-host A/B says otherwise.
+    # Also serves SubagentStart (opt-in `subagent_packet`) and, outside a git repo, a bounded
+    # multi-repo workspace packet; a posture-aware route_worker hint rides along whenever the
+    # packet is on (or `offload_hint: true` alone). See docs/engagement.md.
+    cfg = config()
     env = os.environ.get('Z0INT_CLAUDE_CODE_PACKET')
-    if not (env == '1' if env is not None else config().get('packet') is True):
+    packet = env == '1' if env is not None else cfg.get('packet') is True
+    hint_env = os.environ.get('Z0INT_CLAUDE_CODE_OFFLOAD_HINT')
+    hint_alone = hint_env == '1' if hint_env is not None else cfg.get('offload_hint') is True
+    if not (packet or hint_alone):
         return None
-    from .state_packet import session_start_hook
-    out = session_start_hook(stdin_text, max_tokens=int(os.environ.get('Z0INT_CLAUDE_CODE_PACKET_TOKENS', '1500')))
-    return out if out['hookSpecificOutput']['additionalContext'] else None
+    from .claude_code_engagement import session_context
+    return session_context(stdin_text, cfg=cfg, packet=packet,
+                           max_tokens=int(os.environ.get('Z0INT_CLAUDE_CODE_PACKET_TOKENS', '1500')))
 
 
 def main():

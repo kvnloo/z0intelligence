@@ -27,6 +27,14 @@ SERVER_NAME="z0intelligence"
 SERVER_VERSION="1.0.0"
 PROTOCOL_VERSION="2024-11-05"
 
+
+def server_instructions():
+    """When-to-offload guidance; Claude Code surfaces initialize.instructions to the model."""
+    if os.environ.get("Z0INT_HARNESS") != "claude-code":
+        return None
+    from .claude_code_engagement import MCP_INSTRUCTIONS
+    return MCP_INSTRUCTIONS
+
 def schema(properties, required=()):
     return {'type': 'object', 'properties': properties, 'required': list(required), 'additionalProperties': False}
 
@@ -71,6 +79,7 @@ def handle(msg: dict):
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {"tools": {}},
             "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
+            **({"instructions": server_instructions()} if server_instructions() else {}),
         })
     if method in ("notifications/initialized", "initialized"):
         return None
