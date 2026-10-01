@@ -221,6 +221,21 @@ def test_protocol_v3_allow_is_fsynced_before_dispatch_start():
     assert len(receipts_path().read_text().splitlines())==2
 
 
+def test_protocol_v3_projects_gate_latency_once_to_tokenomics():
+    from z0int.tokenomics_emit import events_path
+    req=governed();owner=secrets.token_hex(32)
+    first=protocol3(req,owner)
+    assert first['claimed']
+    rows=[json.loads(line) for line in events_path().read_text().splitlines()]
+    assert len(rows)==1
+    assert rows[0]['schema']=='z0int.aodl_gate_latency.v1'
+    assert rows[0]['allowed'] is True
+    assert rows[0]['task_success'] is None
+    assert rows[0]['verified_success'] is None
+    protocol3(req,secrets.token_hex(32))
+    assert len(events_path().read_text().splitlines())==1
+
+
 def test_protocol_v3_denied_budget_never_creates_dispatch():
     req=governed(doc=aodl_document(tokens=10),observed={'tokens':10},proposed={'tokens':1})
     owner=secrets.token_hex(32)
