@@ -84,10 +84,11 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404,{'error':'not_found'})
 
     def do_POST(self):
-        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/worker','/v1/automatic','/v1/automatic/consumed'):return self.reply(404,{'error':'not_found'})
+        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence','/v1/worker','/v1/automatic','/v1/automatic/consumed','/v1/agentweb'):return self.reply(404,{'error':'not_found'})
         try:
             size=int(self.headers.get('Content-Length','0'))
-            if not 0<size<=(262144 if self.path.startswith('/v1/authority/') else 40000):return self.reply(413,{'error':'request_size'})
+            max_size = 262144 if self.path.startswith('/v1/authority/') else (48000 if self.path=='/v1/agentweb' else 40000)
+            if not 0<size<=max_size:return self.reply(413,{'error':'request_size'})
             args=json.loads(self.rfile.read(size))
             if self.path.startswith('/v1/authority/'):
                 from .dispatch_authority import rpc
@@ -95,6 +96,9 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=='/v1/worker':
                 from .worker_routing import dispatch_worker
                 return self.reply(200,dispatch_worker(args))
+            if self.path=='/v1/agentweb':
+                from .agentweb_bridge import handle_bridge_request
+                return self.reply(200,handle_bridge_request(args))
             if self.path=='/v1/automatic/consumed':return self.reply(200,consume(args))
             started=time.monotonic()
             with METRIC_LOCK:
