@@ -46,9 +46,16 @@ Codes 101–106 intentionally match the Bend experiment:
 | 105 | budget |
 | 106 | authority |
 
-Every decision can emit a `z0int.aodl_admission.v1` receipt containing the
-versioned AODL semantic fingerprint and latency. That receipt is structural gate
-evidence only. It never claims task success or `verified_success`.
+Every decision can emit a `z0int.aodl_admission.v1` receipt containing both
+the versioned AODL semantic fingerprint and the contract's
+`provenance.sourceHash`, plus latency. They are deliberately distinct:
+
+- `aodl_semantic_fingerprint` names the full canonical semantic snapshot;
+- `aodl_intent_source_hash` preserves authored intent/source lineage.
+
+Runtime/event semantics may change the former without pretending authored intent
+was rewritten. The receipt is structural gate evidence only. It never claims
+task success or `verified_success`.
 
 If `aodl_contract` is unavailable, invalid, uses an unknown canonicalization
 version, or cannot validate/fingerprint the document, admission fails closed.
