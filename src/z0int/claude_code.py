@@ -1,8 +1,10 @@
 """Claude Code hook adapter; no provider or routing policy here.
 
 ``prompt`` handles UserPromptSubmit through the shared automatic event path.
-``stop`` projects the turn's billed usage from the Claude Code transcript into
-Tokenomics as canonical ``tokenomics.event.v0`` rows (see claude_code_tokenomics). Both read one hook JSON object on stdin and always fail open.
+``stop`` hands the payload to a detached ``stop-async`` child, which parses only the
+transcript bytes appended since the last Stop and appends canonical
+``tokenomics.event.v0`` rows (see claude_code_tokenomics). Every hook reads one JSON
+object on stdin and fails open.
 """
 import argparse
 import hashlib
@@ -11,10 +13,9 @@ import os
 from pathlib import Path
 import sys
 
-from . import automatic, paths, tokenomics_emit
+from . import paths, tokenomics_emit  # automatic is imported lazily: the Stop hook never needs it
 
 HARNESS = 'claude-code'
-USAGE_KEYS = ('input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens')
 
 
 def config():
@@ -95,6 +96,7 @@ def on_prompt(hook):
             emit_opportunity_async(hook)
     except Exception:
         pass  # shadow emission never affects the turn
+    from . import automatic
     session = hook.get('session_id') or HARNESS
     event = dict(harness=HARNESS, session_id=session, turn_id=turn_id(hook), instance_id=session, text=text)
     result = automatic.handle_event(event)
@@ -108,27 +110,6 @@ def on_prompt(hook):
     return {'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': result['context']}}
 
 
-def messages(path):
-    """Assistant messages keyed by id; streamed chunks repeat an id with growing usage."""
-    found = {}
-    try:
-        with open(path, encoding='utf-8', errors='replace') as stream:
-            for line in stream:
-                try:
-                    row = json.loads(line)
-                except ValueError:
-                    continue
-                message = row.get('message') if row.get('type') == 'assistant' else None
-                if not isinstance(message, dict) or not isinstance(message.get('usage'), dict) or not message.get('id'):
-                    continue
-                if message.get('model') == '<synthetic>':
-                    continue
-                found[message['id']] = message
-    except OSError:
-        pass
-    return found
-
-
 def transcripts(hook):
     main = Path(hook['transcript_path'])
     yield 'root', main
@@ -138,68 +119,69 @@ def transcripts(hook):
             yield 'subagent', path
 
 
-def turn_behaviour(fresh):
-    """Observed behaviour of the turn (z0int#54): what the frontier did — NOT an optimal label."""
-    ordered = [fresh[k] for k in sorted(fresh)]
-    tools = [b for m in ordered for b in (m.get('content') or []) if isinstance(b, dict) and b.get('type') == 'tool_use']
-    last_text = ''
-    for m in reversed(ordered):
-        texts = [b.get('text', '') for b in (m.get('content') or []) if isinstance(b, dict) and b.get('type') == 'text']
-        if texts:
-            last_text = texts[-1].strip()
-            break
-    asked_tool = any(t.get('name') == 'AskUserQuestion' for t in tools)
-    return {'asked_user': asked_tool or last_text.endswith('?'), 'asked_via_tool': asked_tool,
-            'tool_calls': len(tools), 'assistant_messages': len(ordered)}
-
-
 def outcomes_path(root=None):
     return paths.ensure_layout(root)['state'] / HARNESS / 'outcomes.jsonl'
 
 
 def on_stop(hook, root=None):
+    """Stop/SessionEnd hook, synchronous part: hand the payload to a detached child and return.
+
+    Parsing transcripts (O(appended bytes), but a cold 14 MB session is seconds under load)
+    and building tokenomics events never runs on the hook's critical path. Returns the
+    child (tests wait on it) or None. Fails open like every hook here.
+    """
+    if not hook.get('session_id') or not hook.get('transcript_path'):
+        return None
+    import subprocess
+    env = dict(os.environ)
+    if root is not None:
+        env['Z0INT_HOME'] = str(root)
+    child = subprocess.Popen([sys.executable, '-m', 'z0int.claude_code', 'stop-async'], stdin=subprocess.PIPE,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True, env=env)
+    child.stdin.write(json.dumps(hook).encode())
+    child.stdin.close()
+    return child
+
+
+def process_stop(hook, root=None):
+    """Off-path Stop work: incremental transcript parse -> tokenomics events + turn outcome.
+
+    Serialised per session with an exclusive lock (Stop and SessionEnd can race).
+    """
     session = hook.get('session_id')
     if not session or not hook.get('transcript_path'):
         return []
     state_path = paths.ensure_layout(root)['state'] / HARNESS / f'{session}.json'
-    try:
-        state = json.loads(state_path.read_text())
-    except (OSError, ValueError):
-        state = {}
-    seen = set(state.get('message_ids', []))
-    files = list(transcripts(hook))
-    fresh_by_role = {}
-    for role, path in files:
-        fresh = {k: v for k, v in messages(path).items() if k not in seen}
-        if fresh:
-            fresh_by_role.setdefault(role, {}).update(fresh)
-    # Canonical tokenomics.event.v0 per turn (observed usage + mechanism attribution + estimates).
-    from . import claude_code_tokenomics as cct
-    events = cct.events_for_stop(files, session_id=session, state=state,
-                                 env_profile=os.environ.get(cct.PROFILE_ENV), root=root)
-    for event in events:
-        tokenomics_emit.emit_event(event, root=root)
-    emitted = []
-    for event in events:
-        if event['name'] != 'claude_code.turn':
-            continue
-        emitted.append({'role': event['role'], 'usage': event['extra']['anthropic_usage'],
-                        'messages': event['attributes']['claude_code.api_requests']})
-    for role, fresh in fresh_by_role.items():
-        if role == 'root':
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    import fcntl
+    with open(state_path.with_suffix('.lock'), 'a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            state = json.loads(state_path.read_text())
+        except (OSError, ValueError):
+            state = {}
+        from . import claude_code_tokenomics as cct
+        events, fresh_by_role = cct.events_for_stop(list(transcripts(hook)), session_id=session, state=state,
+                                                    env_profile=os.environ.get(cct.PROFILE_ENV), root=root)
+        for event in events:
+            tokenomics_emit.emit_event(event, root=root)
+        if any(r['kind'] == 'assistant' for r in fresh_by_role.get('root', [])):
             try:  # link to the prompt's DecisionOpportunity record by trace id (prompt_id)
                 row = {'schema': 'z0int.claude_code.turn_outcome.v0', 'session_id': session,
                        'trace_id': hook.get('prompt_id'), 'label_kind': 'observed_behaviour_not_optimal',
-                       **turn_behaviour(fresh)}
+                       **cct.turn_behaviour(fresh_by_role['root'])}
                 out = outcomes_path(root)
                 out.parent.mkdir(parents=True, exist_ok=True)
                 with out.open('a', encoding='utf-8') as fh:
                     fh.write(json.dumps(row) + '\n')
             except Exception:
                 pass
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(json.dumps(state))
-    return emitted
+        tmp = state_path.with_suffix('.tmp')
+        tmp.write_text(json.dumps(state))
+        tmp.replace(state_path)
+    return [{'role': e['role'], 'usage': e['extra']['anthropic_usage'],
+             'messages': e['attributes']['claude_code.api_requests']}
+            for e in events if e['name'] == 'claude_code.turn']
 
 
 def on_session_start(stdin_text):
@@ -215,11 +197,14 @@ def on_session_start(stdin_text):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('event', choices=['prompt', 'stop', 'session-start', 'opportunity'])
+    parser.add_argument('event', choices=['prompt', 'stop', 'stop-async', 'session-start', 'opportunity'])
     args = parser.parse_args()
     try:
         if args.event == 'session-start':
             output = on_session_start(sys.stdin.read())
+        elif args.event == 'stop-async':
+            process_stop(json.load(sys.stdin))
+            output = None
         elif args.event == 'opportunity':
             on_opportunity(json.load(sys.stdin))
             output = None

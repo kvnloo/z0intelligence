@@ -90,98 +90,148 @@ def _text(content: Any) -> str:
 
 # --------------------------------------------------------------------------- parsing
 
-def parse_transcript(path: Path, start_line: int = 0) -> dict[str, Any]:
-    """Reduce one transcript file to count-only records (no text retained).
+def new_cursor() -> dict[str, Any]:
+    return {'offset': 0, 'inode': None, 'size': 0, 'pending_tools': {},
+            'session': {'packet_chars': 0, 'packet_injections': 0, 'skill_listing': False,
+                        'cwd': None, 'first_ts': None, 'last_ts': None, 'session_id': None}}
 
-    Returns ``{'records': [...], 'lines': n, 'session': {...}}``. Records are ordered; kinds:
-    ``prompt`` (turn boundary), ``assistant`` (usage per message id), ``obs`` (ObservationPack
-    compaction), ``recall`` (z0obs recall result re-entering context), ``worker_call`` /
-    ``worker_result`` (z0 worker offload), ``compact`` (context reset).
+
+_ATTACHMENT_KEEP = (b'skill_listing', b'SessionStart')
+_ROW_KINDS = (b'"assistant"', b'"user"', b'"attachment"', b'compact_boundary')
+
+
+def parse_transcript(path: Path, cursor: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Reduce the not-yet-seen bytes of one transcript to count-only records (no text retained).
+
+    ``cursor`` (persisted by the Stop hook) holds the byte offset of the last complete line
+    consumed, the file's inode/size for rotation detection, session-level facts seen so far,
+    and tool_use ids still awaiting a result. Only appended bytes are read: cost is
+    O(appended bytes). A trailing line without a newline is left for the next call. If the
+    inode changed or the file shrank, parsing restarts at 0 (message-id dedupe prevents
+    double billing).
+
+    Returns ``{'records', 'cursor', 'session', 'bytes_read', 'reset'}``. Record kinds:
+    ``prompt`` (turn boundary), ``assistant`` (usage per message id + tool names),
+    ``obs`` (ObservationPack compaction), ``recall`` (z0obs result re-entering context),
+    ``worker_call`` / ``worker_result`` (z0 worker offload), ``compact`` (context reset).
     """
+    cur = json.loads(json.dumps(cursor)) if cursor else new_cursor()
     records: list[dict[str, Any]] = []
-    session: dict[str, Any] = {'packet_chars': 0, 'packet_injections': 0, 'skill_listing': False,
-                               'cwd': None, 'first_ts': None, 'last_ts': None, 'session_id': None}
-    pending_tools: dict[str, dict[str, Any]] = {}
-    n = 0
     try:
-        stream = open(path, encoding='utf-8', errors='replace')
+        st = os.stat(path)
     except OSError:
-        return {'records': records, 'lines': 0, 'session': session}
-    with stream:
-        for n, line in enumerate(stream, 1):
-            try:
-                row = json.loads(line)
-            except ValueError:
+        return {'records': records, 'cursor': cur, 'session': cur['session'], 'bytes_read': 0, 'reset': False}
+    reset = False
+    if cur.get('inode') not in (None, st.st_ino) or st.st_size < int(cur.get('offset') or 0):
+        fresh = new_cursor()
+        cur, reset = fresh, True
+    cur['inode'] = st.st_ino
+    session = cur['session']
+    pending = cur.setdefault('pending_tools', {})
+    offset = int(cur.get('offset') or 0)
+    try:
+        with open(path, 'rb') as fh:
+            fh.seek(offset)
+            data = fh.read()
+    except OSError:
+        return {'records': records, 'cursor': cur, 'session': session, 'bytes_read': 0, 'reset': reset}
+    end = data.rfind(b'\n') + 1  # consume complete lines only
+    chunk = data[:end]
+    cur['offset'] = offset + end
+    cur['size'] = st.st_size
+    for line in chunk.split(b'\n'):
+        if not line or not any(k in line for k in _ROW_KINDS):
+            continue
+        if b'"type":"attachment"' in line and not any(k in line for k in _ATTACHMENT_KEEP):
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        ts = _ts(row.get('timestamp'))
+        if ts is not None:
+            session['first_ts'] = session['first_ts'] or ts
+            session['last_ts'] = ts
+        session['cwd'] = session['cwd'] or row.get('cwd')
+        session['session_id'] = session['session_id'] or row.get('sessionId')
+        kind = row.get('type')
+        if kind == 'attachment':
+            att = row.get('attachment') or {}
+            if att.get('type') == 'skill_listing':
+                session['skill_listing'] = True
+            if att.get('type') == 'hook_additional_context' and att.get('hookEvent') == 'SessionStart':
+                text = _text(att.get('content'))
+                if text.lstrip().startswith(PACKET_PREFIX):
+                    session['packet_injections'] += 1
+                    session['packet_chars'] += len(text)
+            continue
+        if kind == 'system' and row.get('subtype') == 'compact_boundary':
+            records.append({'kind': 'compact', 'ts': ts})
+        elif kind == 'assistant':
+            msg = row.get('message') or {}
+            if not isinstance(msg, dict) or msg.get('model') == '<synthetic>':
                 continue
-            if not isinstance(row, dict):
+            blocks = [b for b in (msg.get('content') or []) if isinstance(b, dict)]
+            texts = [b.get('text', '') for b in blocks if b.get('type') == 'text']
+            if isinstance(msg.get('usage'), dict) and msg.get('id'):
+                records.append({'kind': 'assistant', 'id': msg['id'], 'model': msg.get('model'), 'ts': ts,
+                                'usage': {k: int(msg['usage'].get(k) or 0) for k in USAGE_KEYS},
+                                'tools': [str(b.get('name') or '') for b in blocks if b.get('type') == 'tool_use'],
+                                'ends_with_question': texts[-1].strip().endswith('?') if texts else None})
+            for block in blocks:
+                if block.get('type') == 'tool_use':
+                    info = _tool_info(block)
+                    if info['worker'] or info['recall']:
+                        pending[block.get('id')] = info
+                    if info['worker']:
+                        records.append({'kind': 'worker_call', 'tool_use_id': block.get('id'), 'ts': ts,
+                                        'tool': info['name'], 'args_chars': info['args_chars']})
+        elif kind == 'user':
+            msg = row.get('message') or {}
+            content = msg.get('content')
+            results = [b for b in content if isinstance(b, dict) and b.get('type') == 'tool_result'] \
+                if isinstance(content, list) else []
+            if not results:
+                if not row.get('isMeta') and not row.get('isCompactSummary'):
+                    records.append({'kind': 'prompt', 'prompt_id': row.get('promptId'), 'ts': ts,
+                                    'harness_message': _text(content).lstrip().startswith(
+                                        ('<agent-message', '<task-notification', '<system-reminder'))})
                 continue
-            ts = _ts(row.get('timestamp'))
-            if ts is not None:
-                session['first_ts'] = session['first_ts'] or ts
-                session['last_ts'] = ts
-            session['cwd'] = session['cwd'] or row.get('cwd')
-            session['session_id'] = session['session_id'] or row.get('sessionId')
-            kind = row.get('type')
-            if kind == 'attachment':
-                att = row.get('attachment') or {}
-                if att.get('type') == 'skill_listing':
-                    session['skill_listing'] = True
-                if att.get('type') == 'hook_additional_context' and att.get('hookEvent') == 'SessionStart':
-                    text = _text(att.get('content'))
-                    if text.lstrip().startswith(PACKET_PREFIX):
-                        session['packet_injections'] += 1
-                        session['packet_chars'] += len(text)
-                continue
-            if n <= start_line:
-                # Already accounted by a previous hook run: only tool ids are needed to pair results.
-                if kind == 'assistant':
-                    for block in ((row.get('message') or {}).get('content') or []):
-                        if isinstance(block, dict) and block.get('type') == 'tool_use':
-                            pending_tools[block.get('id')] = _tool_info(block)
-                continue
-            if kind == 'system' and row.get('subtype') == 'compact_boundary':
-                records.append({'kind': 'compact', 'ts': ts})
-            elif kind == 'assistant':
-                msg = row.get('message') or {}
-                if not isinstance(msg, dict) or msg.get('model') == '<synthetic>':
-                    continue
-                if isinstance(msg.get('usage'), dict) and msg.get('id'):
-                    records.append({'kind': 'assistant', 'id': msg['id'], 'model': msg.get('model'), 'ts': ts,
-                                    'usage': {k: int(msg['usage'].get(k) or 0) for k in USAGE_KEYS}})
-                for block in msg.get('content') or []:
-                    if isinstance(block, dict) and block.get('type') == 'tool_use':
-                        info = _tool_info(block)
-                        pending_tools[block.get('id')] = info
-                        if info['worker']:
-                            records.append({'kind': 'worker_call', 'tool_use_id': block.get('id'), 'ts': ts,
-                                            'tool': info['name'], 'args_chars': info['args_chars']})
-            elif kind == 'user':
-                msg = row.get('message') or {}
-                content = msg.get('content')
-                results = [b for b in content if isinstance(b, dict) and b.get('type') == 'tool_result'] \
-                    if isinstance(content, list) else []
-                if not results:
-                    if not row.get('isMeta') and not row.get('isCompactSummary'):
-                        records.append({'kind': 'prompt', 'prompt_id': row.get('promptId'), 'ts': ts,
-                                        'harness_message': _text(content).lstrip().startswith(
-                                            ('<agent-message', '<task-notification', '<system-reminder'))})
-                    continue
-                for block in results:
-                    info = pending_tools.get(block.get('tool_use_id')) or {}
-                    text = _text(block.get('content'))
-                    if OBS_MARKER in text:
-                        same = OBS_SAME.search(text)
-                        split = OBS_SPLIT.search(text)
-                        original = int((same or split).group(2)) if (same or split) else None
-                        if original is not None:
-                            records.append({'kind': 'obs', 'ts': ts, 'identical': bool(same),
-                                            'original_chars': original, 'shown_chars': len(text)})
-                    if info.get('recall'):
-                        records.append({'kind': 'recall', 'ts': ts, 'chars': len(text)})
-                    if info.get('worker'):
-                        records.append({'kind': 'worker_result', 'ts': ts, 'tool_use_id': block.get('tool_use_id'),
-                                        'result_chars': len(text), **_worker_result(text)})
-    return {'records': records, 'lines': n, 'session': session}
+            for block in results:
+                info = pending.pop(block.get('tool_use_id'), None) or {}
+                text = _text(block.get('content'))
+                if OBS_MARKER in text:
+                    same = OBS_SAME.search(text)
+                    split = OBS_SPLIT.search(text)
+                    original = int((same or split).group(2)) if (same or split) else None
+                    if original is not None:
+                        records.append({'kind': 'obs', 'ts': ts, 'identical': bool(same),
+                                        'original_chars': original, 'shown_chars': len(text)})
+                if info.get('recall'):
+                    records.append({'kind': 'recall', 'ts': ts, 'chars': len(text)})
+                if info.get('worker'):
+                    records.append({'kind': 'worker_result', 'ts': ts, 'tool_use_id': block.get('tool_use_id'),
+                                    'result_chars': len(text), **_worker_result(text)})
+    if len(pending) > 256:  # results that never arrived (interrupted tools); keep the newest
+        cur['pending_tools'] = dict(list(pending.items())[-256:])
+    return {'records': records, 'cursor': cur, 'session': session, 'bytes_read': end, 'reset': reset}
+
+
+def turn_behaviour(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Observed behaviour of a turn (z0int#54) from count-only records; last copy per message id."""
+    last: dict[str, dict[str, Any]] = {}
+    for r in records:
+        if r['kind'] == 'assistant':
+            last.pop(r['id'], None)
+            last[r['id']] = r
+    ordered = list(last.values())
+    tools = [t for m in ordered for t in m.get('tools') or []]
+    question = next((m['ends_with_question'] for m in reversed(ordered) if m.get('ends_with_question') is not None), False)
+    asked_tool = 'AskUserQuestion' in tools
+    return {'asked_user': asked_tool or bool(question), 'asked_via_tool': asked_tool,
+            'tool_calls': len(tools), 'assistant_messages': len(ordered)}
 
 
 def _tool_info(block: dict[str, Any]) -> dict[str, Any]:
@@ -449,34 +499,42 @@ def displacement_estimate(receipt: dict[str, Any], transcript_call: dict[str, An
 # --------------------------------------------------------------------------- live hook
 
 def events_for_stop(transcript_files: list[tuple[str, Path]], *, session_id: str, state: dict[str, Any],
-                    env_profile: str | None = None, root: Path | None = None) -> list[dict[str, Any]]:
-    """Events for everything appended to the session's transcripts since the last Stop."""
-    lines = state.setdefault('lines', {})
-    lines_before = dict(lines)
+                    env_profile: str | None = None, root: Path | None = None) -> tuple[list[dict[str, Any]], dict[str, list]]:
+    """Events for bytes appended to the session's transcripts since the last Stop.
+
+    Returns ``(events, fresh_records_by_role)``; ``state`` is updated in place with per-file
+    byte cursors (``state['files']``) and billed message ids (``state['message_ids']``).
+    """
+    cursors = state.setdefault('files', {})
+    state.pop('lines', None)  # pre-release line-count cursors are superseded by byte offsets
     seen = set(state.get('message_ids', []))
-    launches = _launches(root)
+    launches = None
     events: list[dict[str, Any]] = []
+    fresh_by_role: dict[str, list] = {}
     for role, path in transcript_files:
-        start = int(lines.get(path.name, 0))
-        parsed = parse_transcript(path, start_line=start)
-        lines[path.name] = parsed['lines']
-        # Keep only message ids not yet billed (streaming/partial rows can straddle a Stop).
+        had_cursor = path.name in cursors
+        parsed = parse_transcript(path, cursors.get(path.name))
+        cursors[path.name] = parsed['cursor']
         records = parsed['records']
-        if path.name not in lines_before and seen:
-            # Migrating from id-only state: skip everything up to the last already-billed message.
+        if (not had_cursor or parsed['reset']) and seen:
+            # First run over a file already billed by id-only state (or after rotation):
+            # skip everything up to the last already-billed message.
             last = max((i for i, r in enumerate(records) if r['kind'] == 'assistant' and r['id'] in seen), default=-1)
             records = records[last + 1:]
+        # Keep only message ids not yet billed (streaming rows can straddle a Stop).
         records = [r for r in records if r['kind'] != 'assistant' or r['id'] not in seen]
         if not records:
             continue
+        if launches is None and not env_profile:
+            launches = _launches(root)
         mech = session_mechanisms(parsed['session'], role=role, env_profile=env_profile, launches=launches)
         carry = carried_requests(records)
-        # One Stop == one turn for the root; subagent files are one turn per Stop window.
         events += turn_events(records, carry, session_id=session_id, role=role, source_name=path.name,
                               mechanisms=mech, complete=True, observer_id='z0int.claude_code.stop')
         seen.update(r['id'] for r in records if r['kind'] == 'assistant')
+        fresh_by_role.setdefault(role, []).extend(records)
     state['message_ids'] = sorted(seen)
-    return events
+    return events, fresh_by_role
 
 
 # --------------------------------------------------------------------------- backfill

@@ -64,16 +64,16 @@ def test_stop_emits_deduplicated_incremental_usage(tmp_path):
           assistant('m3', model='<synthetic>', output_tokens=7),
           json.dumps({'type': 'user', 'message': {'content': 'hi'}}))
     hook = {'session_id': 'sess', 'transcript_path': str(transcript)}
-    first = claude_code.on_stop(hook, root=root)
+    first = claude_code.process_stop(hook, root=root)
     assert first == [{'role': 'root', 'messages': 2, 'usage': {
         'input_tokens': 4, 'cache_creation_input_tokens': 40, 'cache_read_input_tokens': 100, 'output_tokens': 11}}]
-    assert claude_code.on_stop(hook, root=root) == []
+    assert claude_code.process_stop(hook, root=root) == []
     with transcript.open('a') as fh:
         fh.write(assistant('m4', input_tokens=2, output_tokens=1) + '\n')
     sub = tmp_path / 'sess' / 'subagents'
     sub.mkdir(parents=True)
     write(sub / 'agent-a.jsonl', assistant('s1', model='claude-haiku-4-5', input_tokens=8, output_tokens=3))
-    second = {r['role']: r for r in claude_code.on_stop(hook, root=root)}
+    second = {r['role']: r for r in claude_code.process_stop(hook, root=root)}
     assert second['root']['usage']['input_tokens'] == 2 and second['root']['messages'] == 1
     assert second['subagent']['usage']['input_tokens'] == 8
     rows = [json.loads(l) for l in (root / 'tokenomics' / 'events.jsonl').read_text().splitlines()]
@@ -174,7 +174,7 @@ def test_stop_writes_observed_turn_behaviour(tmp_path):
                                          'content': [{'type': 'text', 'text': 'Which branch did you mean?'}]}},
     ]
     transcript.write_text('\n'.join(json.dumps(r) for r in rows) + '\n')
-    claude_code.on_stop({'session_id': 's', 'transcript_path': str(transcript), 'prompt_id': 'p9'}, root=root)
+    claude_code.process_stop({'session_id': 's', 'transcript_path': str(transcript), 'prompt_id': 'p9'}, root=root)
     out = [json.loads(l) for l in (root / 'state' / 'claude-code' / 'outcomes.jsonl').read_text().splitlines()]
     assert out == [{'schema': 'z0int.claude_code.turn_outcome.v0', 'session_id': 's', 'trace_id': 'p9',
                     'label_kind': 'observed_behaviour_not_optimal', 'asked_user': True, 'asked_via_tool': False,

@@ -206,7 +206,7 @@ def test_stop_hook_emits_mechanisms_once_and_migrates_state(tmp_path, monkeypatc
     state.parent.mkdir(parents=True)
     state.write_text(json.dumps({'message_ids': ['m1']}))
     hook = {'session_id': 'S', 'transcript_path': str(path), 'prompt_id': 'p1'}
-    out = claude_code.on_stop(hook, root=root)
+    out = claude_code.process_stop(hook, root=root)
     assert out == [{'role': 'root', 'usage': {'input_tokens': 4, 'cache_creation_input_tokens': 200,
                                               'cache_read_input_tokens': 1200, 'output_tokens': 16}, 'messages': 2}]
     ev = [json.loads(l) for l in (root / 'tokenomics' / 'events.jsonl').read_text().splitlines()]
@@ -214,13 +214,13 @@ def test_stop_hook_emits_mechanisms_once_and_migrates_state(tmp_path, monkeypatc
     assert [e['name'] for e in ev] == ['claude_code.turn', 'claude_code.obspack']
     assert ev[0]['extra']['mechanisms']['profile_basis'] == 'launch_env'
     write(path, rows)
-    claude_code.on_stop({**hook, 'prompt_id': 'p2'}, root=root)
+    claude_code.process_stop({**hook, 'prompt_id': 'p2'}, root=root)
     ev = [json.loads(l) for l in (root / 'tokenomics' / 'events.jsonl').read_text().splitlines()]
     assert [e['name'] for e in ev] == ['claude_code.turn', 'claude_code.obspack', 'claude_code.turn']
     assert ev[2]['extra']['mechanisms']['worker_offloads'] == 1
-    assert claude_code.on_stop(hook, root=root) == []
+    assert claude_code.process_stop(hook, root=root) == []
     saved = json.loads(state.read_text())
-    assert saved['lines'] == {'S.jsonl': len(rows)} and 'm5' in saved['message_ids']
+    assert saved['files']['S.jsonl']['offset'] == path.stat().st_size and 'm5' in saved['message_ids']
 
 
 def test_cli_backfill_json(tmp_path, monkeypatch, capsys):
@@ -235,3 +235,93 @@ def test_cli_backfill_json(tmp_path, monkeypatch, capsys):
     assert rep['schema'] == 'z0int.claude_code.tokenomics_report.v0'
     assert rep['window']['source'] == 'backfill:transcripts'
     assert out_events.read_text().count('tokenomics.event.v0') == len(out_events.read_text().splitlines())
+
+
+# --------------------------------------------------------------------------- incremental / off-path
+
+def test_cursor_reads_only_appended_complete_lines(tmp_path):
+    path = tmp_path / 'S.jsonl'
+    rows = session_rows()
+    write(path, rows[:9])
+    first = cct.parse_transcript(path)
+    assert first['bytes_read'] == path.stat().st_size
+    tail = json.dumps(rows[9])
+    with path.open('a') as fh:  # tool_use for the worker lands, result line half-written
+        fh.write(tail + '\n' + json.dumps(rows[10])[:30])
+    second = cct.parse_transcript(path, first['cursor'])
+    assert second['bytes_read'] == len(tail) + 1
+    assert [r['kind'] for r in second['records']] == ['assistant', 'worker_call']
+    assert second['cursor']['pending_tools']  # tool_use waits across calls for its result
+    path.write_text(path.read_text()[: -30] + json.dumps(rows[10]) + '\n' + json.dumps(rows[11]) + '\n')
+    third = cct.parse_transcript(path, second['cursor'])
+    assert [r['kind'] for r in third['records']] == ['worker_result', 'assistant']
+    assert third['records'][0]['subagent_id'] == 'sub1' and not third['cursor']['pending_tools']
+    assert third['session']['packet_injections'] == 1  # session facts persist in the cursor
+
+
+def test_rotation_restarts_without_double_billing(tmp_path):
+    root = tmp_path / 'home'
+    path = tmp_path / 'S.jsonl'
+    write(path, session_rows())
+    hook = {'session_id': 'S', 'transcript_path': str(path)}
+    assert claude_code.process_stop(hook, root=root)
+    path.unlink()
+    write(path, session_rows()[:3])  # new inode, smaller file
+    assert claude_code.process_stop(hook, root=root) == []
+    state = json.loads((root / 'state' / 'claude-code' / 'S.json').read_text())
+    assert state['files']['S.jsonl']['offset'] == path.stat().st_size
+
+
+def big_transcript(path, target_bytes):
+    """Synthetic session: repeated turns with realistic row mix, >= target_bytes."""
+    filler = 'x' * 2000
+    with path.open('w') as fh:
+        n = 0
+        while fh.tell() < target_bytes:
+            fh.write(json.dumps(prompt(f'p{n}', n)) + '\n')
+            fh.write(json.dumps({'type': 'attachment', 'attachment': {'type': 'total_tokens_reminder', 'content': filler}}) + '\n')
+            fh.write(json.dumps(assistant(f'm{n}', n, tools=[(f't{n}', 'Bash', {'command': 'ls'})],
+                                          input_tokens=1, cache_read_input_tokens=5000, output_tokens=20)) + '\n')
+            fh.write(json.dumps(result(f't{n}', n, filler * 2, pid=f'p{n}')) + '\n')
+            n += 1
+    return n
+
+
+def test_stop_hook_sync_is_fast_and_async_is_linear_in_appended_bytes(tmp_path):
+    import time
+    root = tmp_path / 'home'
+    path = tmp_path / 'S.jsonl'
+    big_transcript(path, 10 * 1024 * 1024)
+    assert path.stat().st_size >= 10 * 1024 * 1024
+    hook = {'session_id': 'S', 'transcript_path': str(path), 'prompt_id': 'pz'}
+    t = time.perf_counter()
+    child = claude_code.on_stop(hook, root=root)
+    sync_s = time.perf_counter() - t
+    assert child is not None and sync_s < 0.1, sync_s
+    assert child.wait(timeout=300) == 0
+    state = json.loads((root / 'state' / 'claude-code' / 'S.json').read_text())
+    assert state['files']['S.jsonl']['offset'] == path.stat().st_size
+    outcome = json.loads((root / 'state' / 'claude-code' / 'outcomes.jsonl').read_text().splitlines()[-1])
+    assert outcome['trace_id'] == 'pz'  # linkage survives the hand-off
+    # Async part: appended bytes only.
+    before = path.stat().st_size
+    with path.open('a') as fh:
+        fh.write(json.dumps(prompt('new', 1e6)) + '\n')
+        fh.write(json.dumps(assistant('mnew', 1e6, input_tokens=2, output_tokens=3)) + '\n')
+    appended = path.stat().st_size - before
+    reads = []
+    real = cct.parse_transcript
+    cct_parse = lambda p, c=None: reads.append(real(p, c)) or reads[-1]
+    import pytest as _pt
+    mp = _pt.MonkeyPatch()
+    mp.setattr(cct, 'parse_transcript', cct_parse)
+    try:
+        t = time.perf_counter()
+        out = claude_code.process_stop({**hook, 'prompt_id': 'new'}, root=root)
+        incr_s = time.perf_counter() - t
+    finally:
+        mp.undo()
+    assert sum(r['bytes_read'] for r in reads) == appended
+    assert out == [{'role': 'root', 'usage': {'input_tokens': 2, 'cache_creation_input_tokens': 0,
+                                              'cache_read_input_tokens': 0, 'output_tokens': 3}, 'messages': 1}]
+    assert incr_s < 1.0, incr_s  # generous for loaded hosts; typically a few ms
