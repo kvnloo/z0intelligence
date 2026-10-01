@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import fcntl
 import hashlib
 import json
 import re
+from pathlib import Path
 from typing import Any, Mapping
 
 PROTOCOL_VERSION = "agentweb.z0.bridge.v1"
@@ -270,7 +272,96 @@ def validate_bridge_request(
     _walk_forbidden_keys(correlation)
 
 
-def handle_bridge_request(request: Mapping[str, Any]) -> dict[str, Any]:
+def _append_shadow_receipt(
+    request: Mapping[str, Any],
+    projected: Mapping[str, Any],
+    selected: Mapping[str, Any],
+    *,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    """Atomically persist one non-executing shadow decision.
+
+    The caller must invoke this while holding the same shadow lock used for the
+    replay check. This helper deliberately writes no outcome or verification
+    signal.
+    """
+    from . import receipt
+
+    correlation = request.get("correlation")
+    if not isinstance(correlation, Mapping):
+        correlation = {}
+    row = receipt.build_receipt(
+        trace_id=str(request["trace_id"]),
+        session_id=str(request["parent_agent"]),
+        capability_id=str(projected["function"]),
+        prediction=str(selected.get("kind") or "unknown"),
+        action_taken="not_applied",
+        route="shadow",
+        execution="shadow",
+        measurement_state="unknown",
+        state_reason="agentweb_shadow_decision_no_outcome",
+        extra={
+            "bridge_protocol_version": PROTOCOL_VERSION,
+            "caller_request_sha256": projected["caller_request_sha256"],
+            "integration_instance": request["integration_instance"],
+            "observation_id": correlation.get("observation_id"),
+            "reliability_event_id": correlation.get("reliability_event_id"),
+            "bridge_route": dict(selected),
+            "route_reason": str(selected.get("reason") or "")[:500],
+            "physical_call_attempted": False,
+            "status": "observed",
+        },
+    )
+    return receipt.append_receipt(row, root=root)
+
+
+def _route_shadow_once(
+    request: Mapping[str, Any],
+    projected: Mapping[str, Any],
+    *,
+    root: Path | None = None,
+) -> tuple[dict[str, Any], bool]:
+    """Atomically replay or create exactly one shadow route receipt."""
+    from . import receipt
+    from .intelligence import route, routing_snapshot
+
+    lock_path = receipt.receipts_path(root).parent / "agentweb-shadow.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fingerprint = str(projected["caller_request_sha256"])
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            prior = receipt.find_receipt(str(request["trace_id"]), root=root)
+            if prior is not None:
+                extra = prior.get("extra") if isinstance(prior.get("extra"), Mapping) else {}
+                if (
+                    prior.get("execution") != "shadow"
+                    or extra.get("bridge_protocol_version") != PROTOCOL_VERSION
+                ):
+                    raise BridgeValidationError(
+                        "shadow trace already claimed by incompatible receipt"
+                    )
+                if extra.get("caller_request_sha256") != fingerprint:
+                    raise BridgeValidationError("shadow trace conflict")
+                saved = extra.get("bridge_route")
+                if not isinstance(saved, Mapping):
+                    raise BridgeValidationError("shadow replay receipt missing route")
+                return dict(saved), True
+
+            selected = route(dict(projected), routing_snapshot(dict(projected)))
+            if not isinstance(selected, Mapping):
+                raise BridgeValidationError("shadow route must be an object")
+            _append_shadow_receipt(request, projected, selected, root=root)
+            return dict(selected), False
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+def handle_bridge_request(
+    request: Mapping[str, Any],
+    *,
+    receipt_root: Path | None = None,
+) -> dict[str, Any]:
     """Execute one bridge request without creating a second authority path.
 
     Shadow mode is route-only: it may inspect current capability/provider
@@ -283,9 +374,11 @@ def handle_bridge_request(request: Mapping[str, Any]) -> dict[str, Any]:
     mode = request["mode"]
 
     if mode == "shadow":
-        from .intelligence import route, routing_snapshot
-
-        selected = route(projected, routing_snapshot(projected))
+        selected, replayed = _route_shadow_once(
+            request,
+            projected,
+            root=receipt_root,
+        )
         return {
             "ok": True,
             "protocol_version": PROTOCOL_VERSION,
@@ -294,6 +387,7 @@ def handle_bridge_request(request: Mapping[str, Any]) -> dict[str, Any]:
             "request_sha256": fingerprint,
             "executed": False,
             "reconcile_required": False,
+            "replayed": replayed,
             "route": selected,
         }
 
