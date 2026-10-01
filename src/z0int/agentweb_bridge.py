@@ -287,6 +287,10 @@ def project_intelligence_args(request: Mapping[str, Any]) -> dict[str, Any]:
         "automatic": capability.get("automatic", False),
         "integration_instance": request["integration_instance"],
         "free_only": policy["free_only"],
+        # Bind the complete bridge envelope to z0's existing durable dispatch
+        # fingerprint. This covers provenance/policy fields that are intentionally
+        # not otherwise projected into model-facing task/context/state.
+        "caller_request_sha256": canonical_request_fingerprint(request),
     }
     for key in ("context", "state", "expected_parent_tokens", "expected_parent_ms", "max_tokens"):
         if key in capability:
