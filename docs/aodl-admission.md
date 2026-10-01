@@ -59,3 +59,30 @@ task success or `verified_success`.
 
 If `aodl_contract` is unavailable, invalid, uses an unknown canonicalization
 version, or cannot validate/fingerprint the document, admission fails closed.
+
+
+## Dispatch integration
+
+The pure gate is now consumed by the single-host dispatch authority for remote
+protocol-v3 execution.
+
+Admission is intentionally before both the dispatch-start marker and provider
+capacity admission. A structural denial therefore cannot reserve provider
+capacity or create a physical-execution lineage.
+
+The authority persists an `aodl.structural_admission` decision receipt first.
+An allowed dispatch-start receipt links back through
+`extra.aodl_admission_receipt_id`.
+
+This ordering gives restart semantics:
+
+- denied admission -> replay denial; no dispatch exists;
+- allowed admission + crash before dispatch-start -> the same admission is
+  reused and dispatch may be claimed once;
+- dispatch-start + crash -> existing uncertain/no-takeover behavior applies;
+- changed contract/proposal under the same trace -> trace conflict, never silent
+  recomputation.
+
+The host package pins the exact AODL contract revision used by this canary.
+Promotion to a merged/default dependency should follow AODL #39 rather than
+retargeting to an unversioned branch.
