@@ -21,6 +21,7 @@ from .outcome_observation import ingest_outcome_observation
 from .outcome_coverage import ingest_outcome_expectation, summarize_outcome_coverage
 from .outcome_randomized_evidence import ingest_outcome_assignment, summarize_randomized_outcome_evidence
 from .verified_event_ingress import ingest_verified_event_batch
+from .agentweb_sidecar_profile import agentweb_sidecar_profile
 
 SLOTS=threading.BoundedSemaphore(MAX_ACTIVE)
 METRIC_LOCK=threading.Lock()
@@ -91,6 +92,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path=='/healthz':return self.reply(200,{'ok':True})
         if self.path=='/v1/bridge/capabilities':return self.reply(200,agentweb_bridge_capabilities())
+        if self.path=='/v1/bridge/deployment-profile':return self.reply(200,agentweb_sidecar_profile())
         if self.path=='/v1/observe/outcome/coverage':return self.reply(200,summarize_outcome_coverage())
         if self.path=='/v1/observe/outcome/randomized-evidence':return self.reply(200,summarize_randomized_outcome_evidence())
         if self.path=='/v1/providers':
@@ -107,7 +109,7 @@ class Handler(BaseHTTPRequestHandler):
             if DRAINING.is_set():return self.reply(503,{'ok':False,'draining':True})
             try:
                 registry=json.loads(REGISTRY.read_text());assert registry['entries']
-                return self.reply(200,{'ok':True,'authority_protocol_version':2,'scope':'dispatch ready; model availability checked on call','max_active':4,'socket_backlog':8,'queue_policy':'reject excess with 503'})
+                return self.reply(200,{'ok':True,'authority_protocol_version':2,'scope':'dispatch ready; model availability checked on call','max_active':MAX_ACTIVE,'socket_backlog':SOCKET_BACKLOG,'queue_policy':'reject_excess','overload_execution':'not_started','overload_execution_header':'X-Z0-Execution'})
             except Exception:return self.reply(503,{'ok':False})
         self.reply(404,{'error':'not_found'})
 
