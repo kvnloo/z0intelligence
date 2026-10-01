@@ -6,12 +6,22 @@ outcomes onto the same canonical z0intelligence receipt.
 """
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
+import os
+import time
 from typing import Any
 
 from .dispatch_authority import locked
-from .receipt import DecisionReceipt, Outcome, append_receipt, find_receipt, join_outcome
+from .receipt import (
+    DecisionReceipt,
+    Outcome,
+    append_receipt,
+    find_receipt,
+    join_outcome,
+    outcomes_path,
+)
 
 SPAWN_SCHEMA = "ao.z0int.spawn.v1"
 OUTCOME_SCHEMA = "ao.z0int.outcome.v1"
@@ -40,6 +50,37 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, allow_nan=False, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+def _ao_events_path(root=None):
+    return outcomes_path(root).with_name("ao-outcomes.jsonl")
+
+
+def _find_ao_event(trace_id: str, outcome_id: str, *, root=None) -> dict[str, Any] | None:
+    path = _ao_events_path(root)
+    if not path.is_file():
+        return None
+    found = None
+    with path.open(encoding="utf-8") as fh:
+        for line in fh:
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if row.get("trace_id") == trace_id and row.get("outcome_id") == outcome_id:
+                found = row
+    return found
+
+
+def _append_ao_event(row: dict[str, Any], *, root=None) -> None:
+    path = _ao_events_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        fh.write(json.dumps(row, sort_keys=True, allow_nan=False, default=str) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+        fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 def _text(value: Any, name: str, limit: int, *, allow_empty: bool = False) -> str:
@@ -179,7 +220,7 @@ def validate_outcome(args: dict[str, Any]) -> Outcome:
     _text(evidence.get("mode"), "evidence.mode", 100, allow_empty=True)
     _text(evidence.get("model", ""), "evidence.model", 500, allow_empty=True)
     _text(evidence.get("activity"), "evidence.activity", 100, allow_empty=True)
-    if evidence.get("disposition") not in ("terminated", "seed_deleted"):
+    if evidence.get("disposition") not in ("observed", "terminated", "seed_deleted"):
         raise ValueError("Invalid evidence.disposition")
     _bool(evidence.get("terminated"), "evidence.terminated")
     _bool(evidence.get("scm_complete"), "evidence.scm_complete")
@@ -209,9 +250,15 @@ def validate_outcome(args: dict[str, Any]) -> Outcome:
 
 
 def join_ao_outcome(args: dict[str, Any], *, root=None) -> dict[str, Any]:
-    """Join one idempotent AO lifecycle/SCM outcome onto a spawn decision."""
+    """Join one idempotent AO lifecycle/SCM event onto a spawn decision.
+
+    Idempotency is keyed by (trace_id, outcome_id), not just trace_id, so one
+    decision may accumulate bounded intermediate observations before its final
+    disposition. Reusing an outcome_id with different bytes fails closed.
+    """
     outcome = validate_outcome(args)
     trace_id = args["trace_id"]
+    outcome_id = args["outcome_id"]
     event_sha = _digest(args)
     lock_key = "ao-outcome-" + hashlib.sha256(trace_id.encode()).hexdigest()
 
@@ -221,15 +268,32 @@ def join_ao_outcome(args: dict[str, Any], *, root=None) -> dict[str, Any]:
             raise ValueError("Unknown AO decision")
         if previous.get("session_id") != args["session_id"]:
             raise ValueError("AO outcome session does not match decision")
-        extra = previous.get("extra") or {}
-        prior_sha = extra.get("ao_outcome_sha256")
-        if prior_sha is not None:
-            if prior_sha != event_sha:
-                raise ValueError("AO outcome already joined with different payload")
+
+        prior_event = _find_ao_event(trace_id, outcome_id, root=root)
+        if prior_event is not None:
+            if prior_event.get("event_sha256") != event_sha:
+                raise ValueError("AO outcome_id reused with different payload")
             return {
                 "schema": OUTCOME_SCHEMA,
                 "trace_id": trace_id,
-                "outcome_id": args["outcome_id"],
+                "outcome_id": outcome_id,
+                "outcome_tier": prior_event.get("outcome_tier"),
+                "replayed": True,
+            }
+
+        # Compatibility with the single-event P1 prototype: if a receipt already
+        # carries the same legacy outcome id/hash, replay it rather than creating
+        # a second event. A different outcome id is now allowed.
+        extra = previous.get("extra") or {}
+        legacy_id = extra.get("ao_outcome_id")
+        legacy_sha = extra.get("ao_outcome_sha256")
+        if legacy_id == outcome_id and legacy_sha is not None:
+            if legacy_sha != event_sha:
+                raise ValueError("AO outcome_id reused with different payload")
+            return {
+                "schema": OUTCOME_SCHEMA,
+                "trace_id": trace_id,
+                "outcome_id": outcome_id,
                 "outcome_tier": previous.get("outcome_tier"),
                 "replayed": True,
             }
@@ -241,20 +305,40 @@ def join_ao_outcome(args: dict[str, Any], *, root=None) -> dict[str, Any]:
             for key in raw
         )
         joined = join_outcome(trace_id, raw, root=root) if meaningful else None
+        tier = joined["outcome_tier"] if joined else None
+
+        _append_ao_event(
+            {
+                "schema": "ao.z0int.outcome.event.v1",
+                "ts": time.time(),
+                "trace_id": trace_id,
+                "session_id": args["session_id"],
+                "outcome_id": outcome_id,
+                "event_sha256": event_sha,
+                "outcome": raw,
+                "outcome_tier": tier,
+                "evidence": args["evidence"],
+            },
+            root=root,
+        )
+
         updated = find_receipt(trace_id, root=root)
         if updated is None:
             raise RuntimeError("AO outcome join lost its decision receipt")
         marked = dict(updated)
         marked_extra = dict(marked.get("extra") or {})
+        # Keep latest-event fields on the decision receipt for cheap inspection;
+        # the append-only AO event ledger is the replay/idempotency authority.
         marked_extra["ao_outcome_sha256"] = event_sha
-        marked_extra["ao_outcome_id"] = args["outcome_id"]
+        marked_extra["ao_outcome_id"] = outcome_id
         marked_extra["ao_outcome_evidence"] = args["evidence"]
         marked["extra"] = marked_extra
         append_receipt(marked, root=root)
         return {
             "schema": OUTCOME_SCHEMA,
             "trace_id": trace_id,
-            "outcome_id": args["outcome_id"],
-            "outcome_tier": joined["outcome_tier"] if joined else None,
+            "outcome_id": outcome_id,
+            "outcome_tier": tier,
             "replayed": False,
         }
+
