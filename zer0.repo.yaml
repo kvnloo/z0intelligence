@@ -93,6 +93,18 @@ architecture:
         - tests/test_tokenomics_bridge.py
       depends_on: [dispatch-authority]
 
+    - id: remote-executor-protocol
+      name: Claim-based remote executor protocol
+      kind: execution
+      summary: Keeps remote execution stateless: the executor must claim one request identity from host authority, acquire provider admission, persist ordered physical receipts through the authority, and reconcile uncertain execution instead of retrying under a new trace.
+      paths:
+        - src/z0int/remote_executor.py
+        - src/z0int/dispatch_authority.py
+        - src/z0int/provider_saturation.py
+        - src/z0int/worker_routing.py
+        - tests/test_dispatch_authority.py
+      depends_on: [dispatch-authority, local-cognition-compiler]
+
     - id: k8s-hermes-lab
       name: Kubernetes hermes-lab execution lane
       kind: deployment
@@ -101,7 +113,7 @@ architecture:
         - deploy/k8s/intelligence-host-service.yaml
         - deploy/k8s/intelligence-executor.yaml
         - src/z0int/remote_executor.py
-      depends_on: [dispatch-authority, local-cognition-compiler]
+      depends_on: [remote-executor-protocol]
 
     - id: evolution-contract
       name: Evolution Lab runtime contract
