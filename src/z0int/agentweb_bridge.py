@@ -270,6 +270,47 @@ def validate_bridge_request(
     _walk_forbidden_keys(correlation)
 
 
+def handle_bridge_request(request: Mapping[str, Any]) -> dict[str, Any]:
+    """Execute one bridge request without creating a second authority path.
+
+    Shadow mode is route-only: it may inspect current capability/provider
+    availability, but it never enters dispatch authority or performs a model/tool
+    call. Advisory/active reuse the existing receipt-backed dispatch path.
+    """
+    validate_bridge_request(request)
+    projected = project_intelligence_args(request)
+    fingerprint = projected["caller_request_sha256"]
+    mode = request["mode"]
+
+    if mode == "shadow":
+        from .intelligence import route, routing_snapshot
+
+        selected = route(projected, routing_snapshot(projected))
+        return {
+            "ok": True,
+            "protocol_version": PROTOCOL_VERSION,
+            "mode": "shadow",
+            "trace_id": request["trace_id"],
+            "request_sha256": fingerprint,
+            "executed": False,
+            "reconcile_required": False,
+            "route": selected,
+        }
+
+    from .intelligence import dispatch
+
+    result = dispatch(projected)
+    uncertain = result.get("execution_status") == "uncertain"
+    return {
+        **result,
+        "protocol_version": PROTOCOL_VERSION,
+        "mode": mode,
+        "trace_id": request["trace_id"],
+        "request_sha256": fingerprint,
+        "reconcile_required": uncertain,
+    }
+
+
 def project_intelligence_args(request: Mapping[str, Any]) -> dict[str, Any]:
     """Validate and project onto the existing z0int.intelligence contract."""
     validate_bridge_request(request)
