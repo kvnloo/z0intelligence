@@ -52,12 +52,12 @@ def _digest(value: Any) -> str:
     ).hexdigest()
 
 
-def _ao_events_path(root=None):
+def ao_events_path(root=None):
     return outcomes_path(root).with_name("ao-outcomes.jsonl")
 
 
 def _find_ao_event(trace_id: str, outcome_id: str, *, root=None) -> dict[str, Any] | None:
-    path = _ao_events_path(root)
+    path = ao_events_path(root)
     if not path.is_file():
         return None
     found = None
@@ -73,7 +73,7 @@ def _find_ao_event(trace_id: str, outcome_id: str, *, root=None) -> dict[str, An
 
 
 def _append_ao_event(row: dict[str, Any], *, root=None) -> None:
-    path = _ao_events_path(root)
+    path = ao_events_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
         fcntl.flock(fh, fcntl.LOCK_EX)
