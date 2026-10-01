@@ -24,7 +24,16 @@ _SPAWN_FIELDS = {
 }
 _CURRENT_FIELDS = {"harness", "model", "mode", "permission"}
 _CONSTRAINT_FIELDS = {"explicit_harness", "explicit_model", "explicit_mode"}
-_OUTCOME_FIELDS = {"schema", "trace_id", "session_id", "outcome"}
+_OUTCOME_FIELDS = {"schema", "trace_id", "session_id", "outcome_id", "outcome", "evidence"}
+_EVIDENCE_FIELDS = {
+    "project_id", "kind", "harness", "mode", "model", "activity",
+    "terminated", "scm_complete", "prs",
+}
+_EVIDENCE_PR_FIELDS = {
+    "url", "number", "draft", "merged", "closed", "ci", "review",
+    "mergeability", "review_comments", "external_approved",
+    "external_changes_requested", "external_comments", "head_sha",
+}
 
 
 def _digest(value: Any) -> str:
@@ -139,6 +148,11 @@ def spawn_decision(args: dict[str, Any], *, root=None) -> dict[str, Any]:
         return _response(stored, replayed=False)
 
 
+def _bool(value: Any, name: str) -> None:
+    if type(value) is not bool:
+        raise ValueError(name + " must be boolean")
+
+
 def validate_outcome(args: dict[str, Any]) -> Outcome:
     if not isinstance(args, dict) or set(args) - _OUTCOME_FIELDS:
         raise ValueError("Invalid AO outcome fields")
@@ -146,12 +160,49 @@ def validate_outcome(args: dict[str, Any]) -> Outcome:
         raise ValueError("Unsupported AO outcome schema")
     _text(args.get("trace_id"), "trace_id", 200)
     _text(args.get("session_id"), "session_id", 200)
+    _text(args.get("outcome_id"), "outcome_id", 240)
+
     raw = args.get("outcome")
     if not isinstance(raw, dict):
         raise ValueError("outcome must be an object")
     allowed = set(Outcome.__dataclass_fields__)
     if set(raw) - allowed:
         raise ValueError("Unknown outcome fields")
+
+    evidence = args.get("evidence")
+    if not isinstance(evidence, dict) or set(evidence) - _EVIDENCE_FIELDS:
+        raise ValueError("Invalid AO outcome evidence fields")
+    _text(evidence.get("project_id"), "evidence.project_id", 500)
+    if evidence.get("kind") not in ("worker", "orchestrator"):
+        raise ValueError("Invalid evidence.kind")
+    _text(evidence.get("harness"), "evidence.harness", 500, allow_empty=True)
+    _text(evidence.get("mode"), "evidence.mode", 100, allow_empty=True)
+    _text(evidence.get("model", ""), "evidence.model", 500, allow_empty=True)
+    _text(evidence.get("activity"), "evidence.activity", 100, allow_empty=True)
+    _bool(evidence.get("terminated"), "evidence.terminated")
+    _bool(evidence.get("scm_complete"), "evidence.scm_complete")
+
+    prs = evidence.get("prs")
+    if not isinstance(prs, list) or len(prs) > 64:
+        raise ValueError("evidence.prs must be a bounded list")
+    for index, pr in enumerate(prs):
+        prefix = f"evidence.prs[{index}]"
+        if not isinstance(pr, dict) or set(pr) - _EVIDENCE_PR_FIELDS:
+            raise ValueError("Invalid " + prefix + " fields")
+        _text(pr.get("url"), prefix + ".url", 4000)
+        number = pr.get("number")
+        if type(number) is not int or number < 0:
+            raise ValueError(prefix + ".number must be a non-negative integer")
+        for key in (
+            "draft", "merged", "closed", "review_comments", "external_approved",
+            "external_changes_requested", "external_comments",
+        ):
+            _bool(pr.get(key), prefix + "." + key)
+        _text(pr.get("ci"), prefix + ".ci", 100, allow_empty=True)
+        _text(pr.get("review"), prefix + ".review", 100, allow_empty=True)
+        _text(pr.get("mergeability"), prefix + ".mergeability", 100, allow_empty=True)
+        _text(pr.get("head_sha", ""), prefix + ".head_sha", 200, allow_empty=True)
+
     return Outcome(**raw)
 
 
@@ -176,6 +227,7 @@ def join_ao_outcome(args: dict[str, Any], *, root=None) -> dict[str, Any]:
             return {
                 "schema": OUTCOME_SCHEMA,
                 "trace_id": trace_id,
+                "outcome_id": args["outcome_id"],
                 "outcome_tier": previous.get("outcome_tier"),
                 "replayed": True,
             }
@@ -189,11 +241,14 @@ def join_ao_outcome(args: dict[str, Any], *, root=None) -> dict[str, Any]:
         marked = dict(updated)
         marked_extra = dict(marked.get("extra") or {})
         marked_extra["ao_outcome_sha256"] = event_sha
+        marked_extra["ao_outcome_id"] = args["outcome_id"]
+        marked_extra["ao_outcome_evidence"] = args["evidence"]
         marked["extra"] = marked_extra
         append_receipt(marked, root=root)
         return {
             "schema": OUTCOME_SCHEMA,
             "trace_id": trace_id,
+            "outcome_id": args["outcome_id"],
             "outcome_tier": joined["outcome_tier"] if joined else None,
             "replayed": False,
         }
