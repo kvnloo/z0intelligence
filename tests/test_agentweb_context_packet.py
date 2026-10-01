@@ -19,6 +19,8 @@ def source(label: str, content: str, need_ids, source_kind="private-knowledge-ba
         "content": content,
         "need_ids": list(need_ids),
         "source_kind": source_kind,
+        "retrieved_at": "2026-10-01T17:00:00Z",
+        "content_sha256": version,
     }
 
 
@@ -119,6 +121,50 @@ def test_caller_cannot_self_assign_trust_or_verification():
     args = request()
     args["evidence"][0]["trust_class"] = "authoritative_task"
     with pytest.raises(ValueError, match="unknown evidence fields"):
+        validate_agentweb_context_pack(args)
+
+
+def test_content_digest_and_version_are_verified():
+    args = request()
+    args["evidence"][0]["content_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="does not match evidence content"):
+        validate_agentweb_context_pack(args)
+
+    args = request()
+    args["evidence"][0]["source_version"] = "sha256:" + "1" * 64
+    with pytest.raises(ValueError, match="source_version must match"):
+        validate_agentweb_context_pack(args)
+
+
+def test_retrieval_timestamp_survives_into_evidence_and_aodl_projection():
+    args = request()
+    args["evidence"] = [
+        source("brand-a", "Brand positioning: fast and technical.", ["brand"]),
+        source("market-a", "Market strategy: agent GTM teams.", ["market"]),
+    ]
+    args["evidence"][0]["retrieved_at"] = "2026-09-30T21:15:00-05:00"
+    result = compile_agentweb_context_packet(args)
+    packet = result["packet"]
+    row = next(
+        item for item in packet["evidence"]
+        if item["source_id"] == args["evidence"][0]["source_id"]
+    )
+    assert row["observed_at"] == "2026-09-30T21:15:00-05:00"
+    assert "content_sha256=" + args["evidence"][0]["content_sha256"] in row["note"]
+
+    projected = next(
+        item for item in packet["aodl_projection"]["contextEvidence"]
+        if item["source_id"] == row["source_id"]
+    )
+    assert projected["observed_at"] == row["observed_at"]
+    assert projected["note"] == row["note"]
+    assert "excerpt" not in projected
+
+
+def test_retrieved_at_must_be_timezone_aware():
+    args = request()
+    args["evidence"][0]["retrieved_at"] = "2026-10-01T17:00:00"
+    with pytest.raises(ValueError, match="timezone-aware"):
         validate_agentweb_context_pack(args)
 
 
