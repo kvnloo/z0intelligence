@@ -1,0 +1,3 @@
+#!/bin/sh
+# Exact recall of an ObservationPack archive: z0obs <handle> [start_line] [count] | z0obs <handle> --grep <regex>
+exec "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.claude_code_obs recall "$@"

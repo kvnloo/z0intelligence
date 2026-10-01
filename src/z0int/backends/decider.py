@@ -142,6 +142,21 @@ class DeciderBackend:
                 detail=err,
                 diagnostics={"hf": self.hf, "manifest_id": self.model_id, "revision": self.revision},
             )
+        if not load and self._model_dir is None:
+            # health(load=False) is a filesystem probe (see `z0int backends doctor`):
+            # resolving an uncached revision would download the ~3.7 GB checkpoint.
+            from z0int.models_mgmt import model_cached
+
+            if not model_cached(self.hf, self.revision):
+                return BackendHealth(
+                    id=self.ID,
+                    configured=True,
+                    ready=False,
+                    loaded=False,
+                    model=self.model_id,
+                    detail="weights not cached locally",
+                    diagnostics={"hf": self.hf, "manifest_id": self.model_id, "revision": self.revision},
+                )
         try:
             path = self._model_path()
             present = (

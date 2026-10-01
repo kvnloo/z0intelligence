@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "z0intelligence": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/z0int-mcp",
+      "args": [],
+      "env": {
+        "Z0INT_HARNESS": "claude-code",
+        "Z0INT_SHARED_ONLY": "1"
+      }
+    }
+  }
+}

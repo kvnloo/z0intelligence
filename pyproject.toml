@@ -35,6 +35,9 @@ z0int-image-decide = "z0int.image_decision_cli:main"
 [project.optional-dependencies]
 test = ["pytest==8.4.2", "agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@2ae90511a900fdb3dcc576c9634cd8d9ee1c8d6a"]
 analytics = ["agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@2ae90511a900fdb3dcc576c9634cd8d9ee1c8d6a"]
+# KERD quota projection for z0int.quota_budget. Pinned to the first kerdoios commit that builds
+# (kvnloo/kerdoios fix/build-backend); without it quota-budgeted providers fail closed.
+quota = ["kerdoios @ git+https://github.com/kvnloo/kerdoios.git@0732f468750242bd89eb32e9840f8afe50947feb"]
 image = ["pillow>=11", "torchvision"]
 games = [
   "chess>=1.11",
@@ -48,4 +51,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "webgpu-demo"]
-markers = ["live: requires configured external or local model services"]
+markers = [
+  "live: requires configured external or local model services (opt in with --run-live)",
+  "kerdoios: requires the optional kerdoios quota backend (extra: quota)",
+]

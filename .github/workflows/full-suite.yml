@@ -1,0 +1,48 @@
+name: Full suite
+
+# The whole pytest suite on every push/PR to master. core-unit and
+# image-decision-unit stay as fast path-filtered signals; this is the gate.
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: pytest (py3.11, extras=${{ matrix.extras }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # test,quota: runs the real KERD quota projection.
+        # test: proves the kerdoios-dependent tests skip with a reason and the
+        #       quota path fails closed when the optional extra is absent.
+        extras: ["test,quota", "test"]
+    env:
+      # CPU-only torch wheels; the suite never needs CUDA.
+      UV_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
+      UV_INDEX_STRATEGY: unsafe-best-match
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - name: Create venv (python 3.11)
+        run: uv venv -p 3.11 .venv
+      - name: Install
+        run: uv pip install -p .venv/bin/python -e ".[${{ matrix.extras }}]"
+      - name: pytest
+        run: |
+          export PATH="$PWD/.venv/bin:$PATH"
+          python -m pytest -q -rs -p no:cacheprovider
