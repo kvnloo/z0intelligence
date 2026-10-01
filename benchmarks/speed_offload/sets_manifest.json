@@ -1,0 +1,52 @@
+{
+  "built_from_commit": "ac09e0cfe448c990b2d46368626b6a661247fce0",
+  "classes": {
+    "classify_file_type": {
+      "label_counts": {
+        "json": 10,
+        "markdown": 10,
+        "python": 10,
+        "shell": 10,
+        "typescript": 10,
+        "yaml": 10
+      },
+      "max_context_chars": 1883,
+      "n": 60,
+      "sha256": "817bc653586852ebc76750b0b39bdf11f4a65c82ff1f2c5e72ac7b407ebb768d",
+      "task_sha256": "653c79ddbebaf437c46baca3d7c07152e2ee711b823f53ae16bbef4ff4a65dac"
+    },
+    "evidence_sufficiency": {
+      "label_counts": {
+        "contradicted": 15,
+        "insufficient": 12,
+        "supported": 21
+      },
+      "max_context_chars": 234,
+      "n": 48,
+      "sha256": "cdff0d0729b5cd2de1f684a756664dc676438045d13ba8d56086da96d259972f",
+      "task_sha256": "8a6bd168452482fb281a19fe4a3527a040e5a3d86e1ebdcac463b72bc937cd29"
+    },
+    "extract_json": {
+      "max_context_chars": 6370,
+      "n": 60,
+      "sha256": "fe26cdd3b5ad30c3c71b51b294c8eb3a304415279925f33db8fa01f78297f1dd",
+      "source_sha256": "7fd15ccef10ae0f957aa1d03c9ebc37a6d3147d6c98d0848c28ac4003d4a51bf",
+      "strata": 9,
+      "task_sha256": "dc3407e3564aa9fe521707ccbbb1de845c798d570a00a8760ee95bb7f825e41d"
+    },
+    "short_rewrite": {
+      "max_context_chars": 349,
+      "n": 53,
+      "sha256": "7be60d966af0f93de4c339ff578f98987ac2327017c4391f302b477d022ab6dc",
+      "task_sha256": "281830fbe1778950754dba3cb42df3ce9ea910c71d6cb960884864d563e4dc57"
+    },
+    "summarize_tool_output": {
+      "max_context_chars": 5333,
+      "n": 60,
+      "sha256": "051b0885aed8550d59c8a70cb0b3af399587c7981967d1a469e24c77d7c2e306",
+      "task_sha256": "7f75a314a15e1bbcc85c7bd037a3c5f0f2f1d46b200f940d8abb0901200aee16"
+    }
+  },
+  "schema": "z0int.speed_offload.sets.v0",
+  "seed": 20260930
+}
