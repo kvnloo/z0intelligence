@@ -39,6 +39,8 @@ GATE_FIRED_REPO = {'evo-feature-capacity-max-calls', 'evo-nav-capacity-plan', 't
 
 
 def verdicts(block):
+    if not (block.get('qa', {}).get('P1', {}).get('n_pairs') and block.get('repo', {}).get('P2', {}).get('n_pairs')):
+        return {'primary': 'INCOMPLETE (a suite has no pairs)'}
     p1, p2 = block['qa']['P1'], block['repo']['P2']
     ci1, ci2 = p1['tokens_change_ci95_cluster_boot'], p2['tokens_change_ci95_cluster_boot']
     h1 = ci1[1] < NI_MARGIN and p1['quality_guard'] == 'PASS'
