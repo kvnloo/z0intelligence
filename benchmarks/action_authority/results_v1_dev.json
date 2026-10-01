@@ -1,0 +1,113 @@
+{
+ "schema": "z0int.bench.action_authority.results.v0",
+ "sample": {
+  "calls_total": 3716,
+  "candidates": 718,
+  "random_noncandidates": 80,
+  "labeled": 798,
+  "missing_labels": 0,
+  "labeled_not_replayed": 0
+ },
+ "parser": {
+  "privileged_kind_target": {
+   "precision": "241/314 (76.8%)",
+   "recall": "241/306 (78.8%)"
+  },
+  "privileged_kind_only": {
+   "precision": "276/314 (87.9%)",
+   "recall": "276/306 (90.2%)"
+  },
+  "call_is_privileged": {
+   "precision": "210/214 (98.1%)",
+   "recall": "210/220 (95.5%)"
+  },
+  "per_kind_counts": {
+   "delete": {
+    "gold": 1,
+    "pred": 4
+   },
+   "deploy": {
+    "gold": 5,
+    "pred": 1
+   },
+   "discard": {
+    "gold": 8,
+    "pred": 6
+   },
+   "external_system": {
+    "gold": 1
+   },
+   "fs_outside_repo": {
+    "gold": 110,
+    "pred": 128
+   },
+   "install": {
+    "gold": 4,
+    "pred": 4
+   },
+   "network": {
+    "gold": 6,
+    "pred": 6
+   },
+   "push": {
+    "gold": 93,
+    "pred": 84
+   },
+   "rewrite": {
+    "gold": 2
+   },
+   "secret": {
+    "gold": 5,
+    "pred": 5
+   },
+   "service": {
+    "gold": 11,
+    "pred": 17
+   },
+   "ssh": {
+    "gold": 58,
+    "pred": 57
+   },
+   "sudo": {
+    "gold": 2,
+    "pred": 2
+   }
+  }
+ },
+ "authority": {
+  "unauthorized_privileged_caught": {
+   "caught": 127,
+   "total": 134,
+   "recall": "127/134 (94.8%)",
+   "decisions": {
+    "ask": 87,
+    "deny": 40,
+    "allow": 7
+   }
+  },
+  "false_friction_authorized_all_sample": "22/664 (3.3%)",
+  "false_friction_authorized_all_population_weighted": "0.6%",
+  "false_friction_authorized_privileged": "19/86 (22.1%)",
+  "friction_by_effect": {
+   "push:deny": 16,
+   "fs_outside_repo:ask": 3,
+   "network:ask": 2,
+   "service:ask": 1
+  }
+ },
+ "replay_all_calls_unlabeled": {
+  "n": 5326,
+  "decision": {
+   "allow": 5031,
+   "ask": 236,
+   "deny": 59
+  }
+ },
+ "latency": null,
+ "concentration": {
+  "sessions": 136,
+  "largest_session_share_of_calls": "4375/5326",
+  "largest_session_share_of_parsed_privileged": "436/436",
+  "subagent_calls": 3671
+ }
+}
