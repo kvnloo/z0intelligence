@@ -121,11 +121,35 @@ def decisions_report(root=None):
             'table': {f'{g}->{o}': n for (g, o), n in sorted(table.items())}, 'disagreements': examples}
 
 
+def z0_mcp_config(plugin_dir=PLUGIN):
+    """--mcp-config JSON with ONLY the z0 route_worker server.
+
+    `--strict-mcp-config` (lean) drops every MCP server not given via --mcp-config, plugin
+    servers included (v1 savings study: route_worker never loaded in lean sessions). Passing the
+    plugin's own server explicitly keeps strictness for everything else. ${CLAUDE_PLUGIN_ROOT}
+    is not expanded outside plugins, so the command is an absolute path.
+    """
+    return json.dumps({'mcpServers': {'z0intelligence': {
+        'command': str(Path(plugin_dir) / 'bin' / 'z0int-mcp'), 'args': [],
+        'env': {'Z0INT_HARNESS': 'claude-code', 'Z0INT_SHARED_ONLY': '1'}}}}, separators=(',', ':'))
+
+
 def build_argv(profile, claude_args, plugin=True):
     argv = ['claude', *PROFILES[profile]]
     if plugin and PLUGIN.is_dir():
         argv += ['--plugin-dir', str(PLUGIN)]
+        if '--strict-mcp-config' in PROFILES[profile]:
+            argv += ['--mcp-config', z0_mcp_config()]
     return argv + list(claude_args)
+
+
+def launch_env(profile, plugin=True, base=None):
+    from .claude_code_tokenomics import PROFILE_ENV
+    env = {**(os.environ if base is None else base), PROFILE_ENV: profile}
+    if plugin and PLUGIN.is_dir() and '--strict-mcp-config' in PROFILES[profile]:
+        from .claude_code_engagement import LEAN_ROUTE_TOOL, ROUTE_TOOL_ENV
+        env[ROUTE_TOOL_ENV] = LEAN_ROUTE_TOOL  # the offload hint names the tool the model actually has
+    return env
 
 
 def _main(argv=None):
@@ -175,8 +199,7 @@ def _main(argv=None):
         print(json.dumps(cmd))
         return 0
     record(os.getcwd(), args.profile)
-    from .claude_code_tokenomics import PROFILE_ENV
-    return subprocess.call(cmd, env={**os.environ, PROFILE_ENV: args.profile})
+    return subprocess.call(cmd, env=launch_env(args.profile, plugin=not args.no_plugin))
 
 
 if __name__ == '__main__':

@@ -1452,6 +1452,79 @@ def render_additional_context(packet: dict[str, Any], *, max_tokens: int = 1500)
     return text
 
 
+def _key_in(key: str, prefixes: tuple[str, ...] | list[str]) -> bool:
+    return any(key == p or (p.endswith(".") and key.startswith(p)) or key.startswith(p + "[") for p in prefixes)
+
+
+def render_scoped_context(packet: dict[str, Any], prefixes: list[str] | tuple[str, ...], *,
+                          families: list[str] | tuple[str, ...] = (), max_tokens: int = 800) -> str:
+    """Question-scoped packet text: only claims/unknowns/contradictions under ``prefixes``.
+
+    Used by the prompt-gated mode (``packet: "gated"``): the families come from
+    ``decision_opportunity.required_families(prompt)``, so what is injected is a deterministic
+    function of the prompt and the pinned evidence. Returns "" when nothing in scope is known.
+    """
+    prefixes = tuple(prefixes)
+    name = packet["scope"]["repo_name"]
+    head = (packet.get("source_revisions") or {}).get("git") or {}
+    claims = {c["key"]: c for c in packet.get("current_claims", []) if _key_in(c["key"], prefixes)}
+    keys = [k for k in _RENDER_ORDER if k in claims] + sorted(k for k in claims if k not in _RENDER_ORDER)
+    blocking = [u for u in packet.get("blocking_unknowns") or [] if _key_in(u["key"], prefixes)]
+    other = [u for u in packet.get("unknowns") or [] if _key_in(u["key"], prefixes)
+             and u["key"] not in {b["key"] for b in blocking}]
+    contra = [c for c in packet.get("contradictions") or [] if _key_in(c.get("contests") or c["key"], prefixes)]
+    covered = {f for f in families if any(_key_in(k, (p,)) for k in claims for p in _family_prefixes(f))}
+    missing = [f for f in families if f not in covered]
+    lines = [
+        f"<z0-state-packet scope=\"{','.join(families)}\" repo={name} id={packet['packet_id'][:12]} "
+        f"built={packet['built_at']} head={str(head.get('head', ''))[:10]}>",
+        "Scoped to the facts this prompt asks about, derived from "
+        + ", ".join(sorted((packet.get("coverage") or {}).keys()))
+        + ". Facts carry [source@revision]; memory is evidence, not truth. Listed branches, worktrees and"
+        " Claude Code sessions are complete as of build; re-read a source only for facts not listed here.",
+        "NOW:",
+    ]
+    for k in keys:
+        c = claims[k]
+        lines.append(f"- {k}: {_fmt_value(k, c['value'])} [{_ptr(packet, c['evidence'])}]")
+    if missing:
+        lines.append("- no current claim for: " + ", ".join(missing) + " (unknown, not false)")
+    sections = [
+        ("BLOCKING UNKNOWNS (OBSERVE before acting):", [f"- {u['key']}: {u['reason']}" for u in blocking] + (
+            ["- RULE: if the question depends on a blocking unknown you cannot observe with the tools you have,"
+             " say it is unknown. Do not guess."] if blocking else [])),
+        ("CONTRADICTIONS (unresolved; do not pick a winner silently):", [
+            f"- {c['kind']} {c['key']}: " + " vs ".join(f"{x['value']} [{_ptr(packet, x['evidence'])}]"
+                                                         for x in c["claims"]) for c in contra[:5]]),
+        ("OTHER UNKNOWNS:", [f"- {u['key']}: {u['reason']}" for u in other[:4]]),
+    ]
+    footer = f"Refresh/verify: z0int context packet --repo {packet['scope']['repo']} --check\n</z0-state-packet>"
+    budget = int(max_tokens * 3.5)
+    text = "\n".join(lines)
+    for title, rows in sections:
+        if not rows:
+            continue
+        block = "\n" + title
+        for r in rows:
+            if len(text) + len(block) + len(r) + len(footer) + 2 > budget:
+                break
+            block += "\n" + r
+        if block != "\n" + title:
+            text += block
+    if not keys and not blocking and not contra and not other and not missing:
+        return ""
+    text += "\n" + footer
+    if len(text) > budget:
+        text = text[: budget - len(footer) - 20] + "\n…(truncated)\n" + footer
+    return text
+
+
+def _family_prefixes(family: str) -> tuple[str, ...]:
+    from .decision_opportunity import FACT_FAMILIES
+
+    return FACT_FAMILIES.get(family, ((family,), ()))[0]
+
+
 def session_start_hook(stdin_text: str | None = None, *, repo: str | None = None, max_tokens: int = 1500,
                        projects_root: str | None = None) -> dict[str, Any]:
     """Claude Code SessionStart hook payload. Fail-open: empty context on any error."""

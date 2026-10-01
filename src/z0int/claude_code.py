@@ -1,6 +1,7 @@
 """Claude Code hook adapter; no provider or routing policy here.
 
-``prompt`` handles UserPromptSubmit through the shared automatic event path.
+``prompt`` handles UserPromptSubmit through the shared automatic event path and, with
+``packet: "gated"``, injects a question-scoped State Packet only when the prompt needs it.
 ``stop`` hands the payload to a detached ``stop-async`` child, which parses only the
 transcript bytes appended since the last Stop and appends canonical
 ``tokenomics.event.v0`` rows (see claude_code_tokenomics). Every hook reads one JSON
@@ -96,18 +97,31 @@ def on_prompt(hook):
             emit_opportunity_async(hook)
     except Exception:
         pass  # shadow emission never affects the turn
+    parts = []
+    cfg = config()
+    if not is_harness_message(text):
+        from .claude_code_engagement import gated_packet, packet_mode
+        if packet_mode(cfg) == 'gated':
+            scoped = gated_packet(hook, cfg=cfg, max_tokens=int(os.environ.get('Z0INT_CLAUDE_CODE_GATED_TOKENS', '800')))
+            if scoped:
+                parts.append(scoped)
     from . import automatic
     session = hook.get('session_id') or HARNESS
     event = dict(harness=HARNESS, session_id=session, turn_id=turn_id(hook), instance_id=session, text=text)
-    result = automatic.handle_event(event)
-    if shadow() or result.get('action') != 'context':
-        # Nothing reaches the model, so nothing is recorded as delivered.
-        return None
     try:
-        automatic.post('/v1/automatic/consumed', dict(harness=HARNESS, instance_id=session, receipt_id=result['receipt_id']))
+        result = automatic.handle_event(event)
     except Exception:
-        pass
-    return {'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': result['context']}}
+        result = {}
+    if not shadow() and result.get('action') == 'context':
+        try:
+            automatic.post('/v1/automatic/consumed', dict(harness=HARNESS, instance_id=session, receipt_id=result['receipt_id']))
+        except Exception:
+            pass
+        parts.append(result['context'])
+    # In shadow mode routing context never reaches the model, so nothing is recorded as delivered.
+    if not parts:
+        return None
+    return {'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': '\n'.join(parts)}}
 
 
 def transcripts(hook):
@@ -190,9 +204,11 @@ def on_session_start(stdin_text):
     # Also serves SubagentStart (opt-in `subagent_packet`) and, outside a git repo, a bounded
     # multi-repo workspace packet; a posture-aware route_worker hint rides along whenever the
     # packet is on (or `offload_hint: true` alone). See docs/engagement.md.
+    # `packet: "gated"` keeps SessionStart free of the packet (only the offload hint, if enabled):
+    # the scoped packet arrives at UserPromptSubmit when a prompt needs current-work facts.
     cfg = config()
-    env = os.environ.get('Z0INT_CLAUDE_CODE_PACKET')
-    packet = env == '1' if env is not None else cfg.get('packet') is True
+    from .claude_code_engagement import packet_mode
+    packet = packet_mode(cfg) == 'session'
     hint_env = os.environ.get('Z0INT_CLAUDE_CODE_OFFLOAD_HINT')
     hint_alone = hint_env == '1' if hint_env is not None else cfg.get('offload_hint') is True
     if not (packet or hint_alone):

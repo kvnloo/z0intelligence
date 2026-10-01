@@ -33,6 +33,14 @@ import time
 from typing import Any
 
 ROUTE_TOOL = 'mcp__plugin_z0intelligence_z0intelligence__route_worker'
+# `z0int claude-code launch --profile lean` loads the same server via --mcp-config (plugin MCP
+# servers are dropped under --strict-mcp-config), where its tool is named after the server key.
+LEAN_ROUTE_TOOL = 'mcp__z0intelligence__route_worker'
+ROUTE_TOOL_ENV = 'Z0INT_CLAUDE_CODE_ROUTE_TOOL'
+
+
+def route_tool() -> str:
+    return os.environ.get(ROUTE_TOOL_ENV) or ROUTE_TOOL
 WORKSPACE_MAX_REPOS = 12
 
 MCP_INSTRUCTIONS = (
@@ -62,7 +70,7 @@ def offload_hint(factory: dict[str, Any] | None) -> str:
     if not factory or not factory.get('posture'):
         return ''
     posture = factory['posture']
-    load = f'(load it with ToolSearch "select:{ROUTE_TOOL}")'
+    load = f'(load it with ToolSearch "select:{route_tool()}")'
     if posture in ('OFFLOAD', 'RESERVE'):
         return (f'<z0-offload posture={posture}> Frontier capacity is tight: for bounded self-contained '
                 f'subtasks (summarize/extract/classify given text, narrow Q&A over supplied content) call '
@@ -217,6 +225,101 @@ def session_context(stdin_text: str | None, *, cfg: dict[str, Any] | None = None
     if not ctx:
         return None
     return {'hookSpecificOutput': {'hookEventName': event, 'additionalContext': ctx[:9500]}}
+
+
+# --------------------------------------------------------------------------- prompt-gated packet
+
+GATE_WORKSPACE = '__workspace__'
+
+
+def packet_mode(cfg: dict[str, Any] | None = None) -> str:
+    """'session' (SessionStart injection, v1 behaviour), 'gated' (UserPromptSubmit, scoped) or 'off'.
+
+    Config ``packet: true | "gated" | false``; env ``Z0INT_CLAUDE_CODE_PACKET`` = 1 | gated | 0 overrides.
+    """
+    raw = os.environ.get('Z0INT_CLAUDE_CODE_PACKET')
+    if raw is None:
+        raw = (cfg or {}).get('packet')
+    if raw is True or raw in ('1', 'true', 'session'):
+        return 'session'
+    if isinstance(raw, str) and raw.lower() in ('gated', 'prompt'):
+        return 'gated'
+    return 'off'
+
+
+def _gate_state_path(session: str, root: Path | None = None) -> Path:
+    from . import paths
+    safe = re.sub(r'[^A-Za-z0-9_.-]', '_', session)[:128]
+    return paths.ensure_layout(root)['state'] / 'claude-code' / 'packet-gate' / f'{safe}.json'
+
+
+def _gate_log(row: dict[str, Any], root: Path | None = None) -> None:
+    """Count-only ledger (no prompt text): which families fired, which were injected, how many chars."""
+    try:
+        from . import paths
+        p = paths.ensure_layout(root)['state'] / 'claude-code' / 'packet-gate.jsonl'
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open('a', encoding='utf-8') as fh:
+            fh.write(json.dumps({'schema': 'z0int.claude_code.packet_gate.v0', 'ts': time.time(), **row}) + '\n')
+    except OSError:
+        pass
+
+
+def gated_packet(hook: dict[str, Any], *, cfg: dict[str, Any] | None = None, root: Path | None = None,
+                 max_tokens: int = 800) -> str | None:
+    """UserPromptSubmit State Packet, injected only when the prompt needs current-work facts.
+
+    The gate is DecisionOpportunity question scoping (``required_families``): a prompt that
+    names no packet fact family gets nothing. Only the required families' facts are rendered,
+    and each family is injected at most once per session (later prompts get only families not
+    yet delivered). Outside a git repo the bounded workspace packet is injected once instead.
+    Deterministic given the prompt and the pinned evidence; never raises.
+    """
+    cfg = cfg or {}
+    try:
+        from .decision_opportunity import FACT_FAMILIES, required_families
+        prompt = hook.get('prompt')
+        if not isinstance(prompt, str):
+            return None
+        families = required_families(prompt)
+        session = hook.get('session_id') or ''
+        if not families:
+            _gate_log({'session_id': session, 'families': [], 'injected': [], 'chars': 0}, root)
+            return None
+        state_path = _gate_state_path(session, root) if session else None
+        delivered: list[str] = []
+        if state_path is not None:
+            try:
+                delivered = list(json.loads(state_path.read_text()).get('delivered') or [])
+            except (OSError, ValueError):
+                delivered = []
+        cwd = hook.get('cwd') or os.getcwd()
+        from .state_packet import build_state_packet, render_scoped_context, repo_root
+        repo = repo_root(cwd)
+        if repo is not None:
+            new = [f for f in families if f not in delivered]
+            text = ''
+            if new:
+                pkt = build_state_packet(repo)
+                prefixes = [p for f in new for p in FACT_FAMILIES[f][0]]
+                text = render_scoped_context(pkt, prefixes, families=new, max_tokens=max_tokens)
+        elif _cfg_flag(cfg, 'workspace_packet', 'Z0INT_CLAUDE_CODE_WORKSPACE_PACKET', True) and GATE_WORKSPACE not in delivered:
+            new = [GATE_WORKSPACE]
+            root_dir = Path(cwd).expanduser().resolve()
+            rows, total = workspace_repos(root_dir)
+            text = render_workspace_packet(root_dir, rows, total)
+        else:
+            new, text = [], ''
+        if state_path is not None and new:
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = state_path.with_suffix('.tmp')
+            tmp.write_text(json.dumps({'delivered': sorted(set(delivered) | set(new))}))
+            tmp.replace(state_path)
+        _gate_log({'session_id': session, 'families': families, 'injected': new if text else [],
+                   'chars': len(text or '')}, root)
+        return text or None
+    except Exception as exc:  # fail open: a gate error never blocks the turn
+        return f'<z0-state-packet error="{type(exc).__name__}"/>'
 
 
 # --------------------------------------------------------------------------- lean via settings / shell
