@@ -325,7 +325,14 @@ def summarize_outcome_coverage(
                 stats["missing"] += 1
                 continue
 
-            if int(observation.get("age_seconds", -1)) < WINDOW_SECONDS[window]:
+            observation_time = _parse_time(
+                observation.get("observation_time"),
+                "observation_time",
+            )
+            if (
+                int(observation.get("age_seconds", -1)) < WINDOW_SECONDS[window]
+                or observation_time > resolved_now
+            ):
                 stats["early_or_invalid"] += 1
                 stats["missing"] += 1
                 continue
@@ -427,12 +434,14 @@ def gated_outcome_observations(
         for row in expectations
         for window in row["required_windows"]
     }
+    resolved_now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     rows = [
         row
         for row in (_iter_rows(outcome_observations_path(root)) or [])
         if _observation_key(row) in expected
         and row.get("measurement_state") == "complete"
         and int(row.get("age_seconds", -1)) >= WINDOW_SECONDS[row["window"]]
+        and _parse_time(row.get("observation_time"), "observation_time") <= resolved_now
     ]
     return {
         "schema": "z0int.agentweb_outcome_gated_rows.v1",
