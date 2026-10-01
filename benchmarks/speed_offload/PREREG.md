@@ -85,3 +85,11 @@ failure falls back to the posture decision (fail closed to today's behaviour). T
   own request framing; an in-context parent answer would have a different (not necessarily smaller) latency.
 * The set sources are z0 artefacts but the tasks are synthetic wrappers around them; they are not a sample of
   real `route_worker` traffic (there is too little of it to sample).
+
+## Deviations (recorded after registration)
+
+1. **Session-limit outage (2026-09-30 ~20:50 CDT).** The Claude subscription hit its session limit part way
+   through the frontier arms (haiku: 74 of 281 items, sonnet: 278 of 281 items failed with "You've hit your
+   session limit"). These are not model answers, so they are re-run after the limit reset (22:10 CDT);
+   `run.py` retries only rows with that exact error and the newer row wins in `score.py`. All other error
+   handling is as registered. Local-arm rows were unaffected and are not re-run.

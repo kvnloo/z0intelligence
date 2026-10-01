@@ -24,6 +24,7 @@ CLASSES = ['evidence_sufficiency', 'extract_json', 'classify_file_type', 'summar
 LOCAL_URL = 'http://100.113.138.100:11530/v1/chat/completions'
 LOCAL_MODEL = 'qwen3-8b-q4km'
 TIMEOUT_S = 120
+QUOTA_ERROR = "RuntimeError: You've hit your session limit"
 
 
 def user_text(it):
@@ -80,7 +81,11 @@ def main():
     jobs = min(a.jobs, 3)
     RUNS.mkdir(parents=True, exist_ok=True)
     out = RUNS / f'{a.arm}.jsonl'
-    done = {json.loads(l)['item_id'] for l in out.read_text().splitlines() if l.strip()} if out.exists() else set()
+    # Resume. A row that failed on the subscription's session limit is an infrastructure outage, not a model
+    # answer: it is retried (and the newer row wins in score.py). Every other error is final.
+    rows = [json.loads(l) for l in out.read_text().splitlines() if l.strip()] if out.exists() else []
+    latest = {r['item_id']: r for r in rows}
+    done = {i for i, r in latest.items() if not (r['error'] or '').startswith(QUOTA_ERROR)}
     items = [json.loads(l) for c in a.classes for l in (SETS / f'{c}.jsonl').read_text().splitlines() if l.strip()]
     todo = [it for it in items if it['id'] not in done][:a.limit]
     run_id = f'{a.arm}-{time.strftime("%Y%m%dT%H%M%S")}-{uuid.uuid4().hex[:6]}'
@@ -91,14 +96,20 @@ def main():
         with meta.open('a') as fh:
             fh.write(json.dumps({'run_id': run_id, 'phase': 'start', **gpu_sample()}) + '\n')
 
+    quota_hit = threading.Event()
+
     def one(pair):
         seq, it = pair
+        if quota_hit.is_set():  # stop spending calls once the session limit is hit; rerun after reset
+            return
         row = {'run_id': run_id, 'seq': seq, 'receipt_id': hashlib.sha256(f'{run_id}:{it["id"]}'.encode()).hexdigest()[:16],
                'item_id': it['id'], 'cls': it['cls'], 'arm': a.arm, 'ts': time.time()}
         try:
             row.update(fn(it), error=None)
         except Exception as exc:
             row.update(output=None, wall_ms=None, api_ms=None, error=f'{type(exc).__name__}: {str(exc)[:200]}')
+            if row['error'].startswith(QUOTA_ERROR):
+                quota_hit.set()
         with lock, out.open('a') as fh:
             fh.write(json.dumps(row) + '\n')
         print(a.arm, seq, it['cls'], it['id'], 'ERR' if row['error'] else round(row['wall_ms']), flush=True)
