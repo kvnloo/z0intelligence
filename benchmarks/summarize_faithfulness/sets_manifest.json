@@ -1,0 +1,32 @@
+{
+  "built_from_commit": "535b8af088d7a5927115d5f839a3fdaf0ed13390",
+  "by_kind": {
+    "build": {
+      "critical_facts": 94,
+      "n": 40,
+      "nonzero_or_failing": 27
+    },
+    "gh": {
+      "critical_facts": 112,
+      "n": 40,
+      "nonzero_or_failing": 34
+    },
+    "git": {
+      "critical_facts": 77,
+      "n": 40,
+      "nonzero_or_failing": 0
+    },
+    "pytest": {
+      "critical_facts": 120,
+      "n": 40,
+      "nonzero_or_failing": 33
+    }
+  },
+  "item_ids_sha256": "457c48a4db0debec1c0ca1df3c71466bb2e0a3ffa6dad1081cc8ae52ec222dde",
+  "max_context_chars": 5581,
+  "n": 160,
+  "schema": "z0int.summarize_faithfulness.sets.v0",
+  "seed": 20261001,
+  "sha256": "6aaa2a3d91f214b6efa84f9c3664dc88354f2ae5e4ba376639e8eb51b6a2ced6",
+  "task_template_sha256": "8a8693d74b6408db86dc537331608a4055043649cdec86db8bf5b068705da418"
+}
