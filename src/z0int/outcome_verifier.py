@@ -42,7 +42,7 @@ from typing import Any, Callable, Iterable, Mapping
 SCHEMA = 'z0int.claude_code.turn_outcome_verified.v0'
 JOIN_SCHEMA = 'z0int.claude_code.credit_join.v0'
 OBSERVED_SCHEMA = 'z0int.claude_code.turn_outcome.v0'
-VERIFIER = {'id': 'z0int.outcome_verifier', 'version': '0.1.0'}
+VERIFIER = {'id': 'z0int.outcome_verifier', 'version': '0.2.0'}  # 0.2.0: + verification_density signals
 HARNESS = 'claude-code'
 STATES = ('verified_success', 'verified_failure', 'contested', 'unverified')
 # z0int#54 provenance classes. Confidence is orthogonal and decides the state.
@@ -53,9 +53,34 @@ HARNESS_PREFIXES = ('<agent-message', '<task-notification', '<system-reminder', 
                     '<bash-', 'Caveat: ')
 INTERRUPT = '[Request interrupted by user'
 
-TEST_CMD = re.compile(r'(^|[\s;&|(/])(pytest|py\.test|tox|nox|(npm|pnpm|yarn|bun)( run)? test|vitest|jest|cargo test|'
+_TEST_RE = re.compile(r'(^|[\s;&|(/])(pytest|py\.test|tox|nox|(npm|pnpm|yarn|bun)( run)? test|vitest|jest|cargo test|'
                       r'go test|make (test|check)|ctest|mvn test|gradle test|rspec|phpunit|just test|'
                       r'python3? -m (pytest|unittest))(?=$|[\s;&|)])')
+# Segments that mention a runner without running it (installing it, asking its version or location).
+NOT_A_RUN = re.compile(r'\b(install|uninstall|add|remove|show|freeze|download|which|whereis)\b|--version\b|\s-V\b')
+SHELL_SEPARATORS = re.compile(r'&&|\|\||;|\n')
+
+
+class CommandMatcher:
+    """``re``-like ``search`` over shell segments, skipping segments that only install / locate the runner."""
+
+    def __init__(self, rx: re.Pattern[str]):
+        self.rx, self.pattern = rx, rx.pattern
+
+    def search(self, command: str) -> re.Match[str] | None:
+        for seg in SHELL_SEPARATORS.split(command):
+            if NOT_A_RUN.search(seg):
+                continue
+            m = self.rx.search(seg)
+            if m:
+                return m
+        return None
+
+
+TEST_CMD = CommandMatcher(_TEST_RE)
+CHECK_EXTRA = re.compile(r'(^|[\s;&|(/])(ruff|flake8|pylint|mypy|pyright|basedpyright|tsc|eslint|cargo (check|clippy|build)|'
+                         r'go (vet|build)|golangci-lint|shellcheck)(?=$|[\s;&|)])')
+CHECK_ANY = CommandMatcher(re.compile(TEST_CMD.pattern + '|' + CHECK_EXTRA.pattern))
 CI_CMD = re.compile(r'\bgh (run (watch|view)|pr checks)\b')
 COMMIT_CMD = re.compile(r'\bgit(?:\s+-[Cc]\s+\S+)*\s+(commit|revert|cherry-pick)\b(?!-)')
 COMMIT_OUT = re.compile(r'^\[(?P<branch>[^\]\s]+)(?: \(root-commit\))? (?P<sha>[0-9a-f]{7,40})\]', re.M)
@@ -189,6 +214,33 @@ def _exit_code(block: Mapping[str, Any], tur: Any) -> int | None:
     return 0
 
 
+# A check whose output is piped into a filter reports the filter's exit code, not the runner's (no pipefail).
+PIPE_FILTER = re.compile(r'\|\s*(tail|head|grep|egrep|rg|sed|awk|cut|sort|uniq|wc|less|more|cat|tee|tr|jq|column)\b')
+PIPE_SAFE = re.compile(r'pipefail|PIPESTATUS')
+SUMMARY_FAIL = re.compile(r'\b\d+ (failed|errors?)\b|^FAILED |^FAIL\b|test result: FAILED|^Tests?:.*\bfailed\b|'
+                          r'\bFAILED \((failures|errors)=|^ERROR collecting|Interrupted: \d+ errors?|'
+                          r'^Found \d+ errors?|error\[E\d+\]|^error: could not compile', re.M)
+SUMMARY_PASS = re.compile(r'\b\d+ passed\b|test result: ok\.|^ok\s+\S+|^Tests?:\s+\d+ passed|^OK( \(|$)|'
+                          r'All checks passed|^Success: no issues found', re.M)
+
+
+def effective_exit(command: str, code: int | None, out_tail: str, check_re: Any) -> tuple[int | None, bool]:
+    """(exit code to trust, piped). When the check's output is piped into a filter without pipefail, the shell
+    exit code belongs to the filter: read the runner's summary line instead (fail beats pass), else unknown."""
+    if code is None:
+        return None, False
+    segs = command.split('|')
+    piped = any(check_re.search(seg) and i + 1 < len(segs) and PIPE_FILTER.match('|' + segs[i + 1])
+                for i, seg in enumerate(segs))
+    if not piped or PIPE_SAFE.search(command):
+        return code, False
+    if SUMMARY_FAIL.search(out_tail):
+        return 1, True
+    if SUMMARY_PASS.search(out_tail):
+        return 0, True
+    return None, True
+
+
 def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
     """One dict per turn. ``_prompt`` holds the prompt text transiently for cue matching; callers must not emit it."""
     turns: list[dict[str, Any]] = []
@@ -224,7 +276,9 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                        'harness_message': bool(row.get('isMeta')) or stripped.startswith(HARNESS_PREFIXES),
                        '_prompt': text, 'bash': [], 'edits': [], 'assistant_ids': set(), 'tool_calls': 0,
                        'asked_text': None, 'ask_tool': [], 'agents_spawned': 0, 'pr_created': [],
-                       'pr_merged_by_agent': [], 'interrupted': False, 'subagent_ids': []}
+                       'pr_merged_by_agent': [], 'interrupted': False, 'subagent_ids': [],
+                       # density verifiers (verification_density.py); '_'-prefixed fields hold text transiently
+                       'tool_names': Counter(), 'edit_ops': [], 'reads': set(), 'tool_seq': [], '_final_text': ''}
                 turns.append(cur)
                 continue
             if cur is None:
@@ -241,12 +295,15 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                 texts = [b.get('text', '') for b in blocks if b.get('type') == 'text' and b.get('text', '').strip()]
                 if texts:
                     cur['asked_text'] = texts[-1].rstrip().endswith('?')
+                    cur['_final_text'] = texts[-1]
                 for b in blocks:
                     if b.get('type') != 'tool_use':
                         continue
                     cur['tool_calls'] += 1
                     name, inp = str(b.get('name') or ''), b.get('input') if isinstance(b.get('input'), dict) else {}
+                    cur['tool_names'][name] += 1
                     call = {'name': name, 'turn': cur, 'cwd': row.get('cwd') or cur['cwd'], 't0': ts}
+                    cur['tool_seq'].append(call)
                     if name == 'Bash' and isinstance(inp.get('command'), str):
                         call['command'] = inp['command']
                         cur['bash'].append(call)
@@ -257,6 +314,16 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                         p = inp.get('file_path') or inp.get('notebook_path')
                         if isinstance(p, str):
                             cur['edits'].append(p)
+                            call['path'] = p
+                            call['_new'] = inp.get('new_string') if name != 'Write' else inp.get('content')
+                            call['_old'] = inp.get('old_string')
+                            for e in inp.get('edits') or [] if name == 'MultiEdit' else []:
+                                if isinstance(e, dict):
+                                    call['_new'] = (call['_new'] or '') + '\n' + str(e.get('new_string') or '')
+                                    call['_old'] = (call['_old'] or '') + '\n' + str(e.get('old_string') or '')
+                            cur['edit_ops'].append(call)
+                    elif name == 'Read' and isinstance(inp.get('file_path'), str):
+                        call['path'] = inp['file_path']
                     elif name == ASK_TOOL:
                         cur['ask_tool'].append(call)
                     elif name in ('Agent', 'Task'):
@@ -274,9 +341,19 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                         continue
                     text = _text(block.get('content'))
                     call['t1'] = ts
+                    call['error'] = bool(block.get('is_error'))
+                    tur = row.get('toolUseResult')
+                    if call['name'] in EDIT_TOOLS and isinstance(tur, dict):
+                        call['created'] = tur.get('type') == 'create' if call['name'] == 'Write' else False
+                    elif call['name'] == 'Read' and not call['error'] and call.get('path'):
+                        call['turn']['reads'].add(call['path'])
                     if call['name'] == 'Bash':
+                        call['_out_tail'] = text[-600:]
                         call['exit'] = _exit_code(block, row.get('toolUseResult'))
                         cmd = call.get('command', '')
+                        if CHECK_ANY.search(cmd):
+                            call['shell_exit'] = call['exit']
+                            call['exit'], call['piped'] = effective_exit(cmd, call['exit'], text[-2000:], CHECK_ANY)
                         if COMMIT_CMD.search(cmd):
                             call['commits'] = [m.group('sha') for m in COMMIT_OUT.finditer(text)]
                         if 'gh pr create' in cmd:
@@ -306,7 +383,7 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                 seen.add(key)
                 prs.append(p)
         t['pr_created'] = prs
-        for c in t['bash'] + t['ask_tool']:
+        for c in t['tool_seq']:
             c.pop('turn', None)
     return turns
 
@@ -332,6 +409,8 @@ def session_turns(path: Path) -> list[dict[str, Any]]:
                     c['via'] = 'subagent'
                 t['bash'] += st['bash']
                 t['edits'] += st['edits']
+                t['edit_ops'] += [dict(e, via='subagent') for e in st['edit_ops']]
+                t['reads'] |= st['reads']
                 t['pr_created'] += [p for p in st['pr_created'] if p not in t['pr_created']]
                 t['pr_merged_by_agent'] += st['pr_merged_by_agent']
                 t['tool_calls_subagents'] = t.get('tool_calls_subagents', 0) + st['tool_calls']
@@ -420,6 +499,9 @@ class RepoIndex:
         self._top: dict[str, Path | None] = {}
         self._landed: dict[tuple[str, int], list[Landed]] = {}
         self._szz: dict[tuple[str, str], set[str]] = {}
+        self.ls_cache: dict[str, list[str]] = {}
+        self.outcomes: dict[tuple, dict[str, Any]] = {}  # commit_outcome memo (planning pass + real pass)
+        self.sessions: dict[str, list[dict[str, Any]]] = {}  # session_turns memo
 
     def toplevel(self, path: str | Path | None) -> Path | None:
         if not path:
@@ -483,6 +565,14 @@ def command_paths(command: str, cwd: str | None) -> list[str]:
 def commit_outcome(index: RepoIndex, sha: str, candidates: list[str | None], *, fix_days: int, now: float,
                    own_shas: set[str]) -> dict[str, Any]:
     """Revert / SZZ-fix / survival facts for one commit the turn produced. Counts and SHAs only."""
+    key = (sha, tuple(str(c) for c in candidates), fix_days, now, tuple(sorted(own_shas)))
+    if key not in index.outcomes:
+        index.outcomes[key] = _commit_outcome(index, sha, candidates, fix_days=fix_days, now=now, own_shas=own_shas)
+    return index.outcomes[key]
+
+
+def _commit_outcome(index: RepoIndex, sha: str, candidates: list[str | None], *, fix_days: int, now: float,
+                    own_shas: set[str]) -> dict[str, Any]:
     hit = index.resolve(sha, candidates)
     if hit is None:
         return {'resolved': False}
@@ -522,25 +612,104 @@ def _gh_json(args: list[str]) -> Any:
         return None
 
 
-class GitHub:
-    """Only GET-shaped ``gh`` calls: ``gh pr view`` and ``gh api`` without a method/body flag."""
+def _gh_final(args: tuple, out: Any) -> bool:
+    """A lookup whose answer can no longer change: a merged/closed PR, or check-runs that all completed."""
+    if args[:2] == ('pr', 'view'):
+        return isinstance(out, dict) and out.get('state') in ('MERGED', 'CLOSED')
+    if args[:1] == ('api',) and isinstance(out, dict):
+        runs = out.get('check_runs')
+        return bool(runs) and all(r.get('status') == 'completed' for r in runs)
+    return False
 
-    def __init__(self, enabled: bool = True, runner: Callable[[list[str]], Any] = _gh_json):
+
+def default_gh_cache() -> Path:
+    base = os.environ.get('XDG_CACHE_HOME') or str(Path.home() / '.cache')
+    return Path(base) / 'z0int' / 'gh-lookups.json'
+
+
+class GitHub:
+    """Only GET-shaped ``gh`` calls: ``gh pr view`` and ``gh api`` without a method/body flag.
+
+    ``cache_path``: an on-disk cache of lookups (default off; the CLI uses ``~/.cache/z0int/gh-lookups.json``).
+    Final answers (merged/closed PRs, all-completed check-runs) are reused forever; anything else for
+    ``ttl`` seconds. Failures are never cached on disk. ``prefetch`` resolves many keys concurrently.
+    """
+
+    def __init__(self, enabled: bool = True, runner: Callable[[list[str]], Any] = _gh_json,
+                 cache_path: Path | None = None, ttl: float = 3600.0, workers: int = 8):
         self.enabled = enabled
         self.run = runner
         self.calls = 0
         self.failures = 0
+        self.disk_hits = 0
         self._cache: dict[tuple, Any] = {}
+        self.cache_path = cache_path
+        self.ttl = ttl
+        self.workers = workers
+        self.recording: list[list[str]] | None = None
+        self._disk: dict[str, Any] = {}
+        self._dirty = False
+        if cache_path is not None:
+            try:
+                self._disk = json.loads(Path(cache_path).read_text())
+            except (OSError, ValueError):
+                self._disk = {}
+
+    def _from_disk(self, key: tuple) -> tuple[bool, Any]:
+        ent = self._disk.get(json.dumps(key))
+        if isinstance(ent, dict) and (ent.get('final') or time.time() - float(ent.get('t', 0)) < self.ttl):
+            return True, ent.get('out')
+        return False, None
+
+    def _store(self, key: tuple, out: Any) -> None:
+        self._cache[key] = out
+        if out is None:
+            self.failures += 1
+        elif self.cache_path is not None:
+            self._disk[json.dumps(key)] = {'t': time.time(), 'final': _gh_final(key, out), 'out': out}
+            self._dirty = True
 
     def _get(self, args: list[str]) -> Any:
         key = tuple(args)
-        if key not in self._cache:
-            self.calls += 1
-            out = self.run(args)
-            if out is None:
-                self.failures += 1
+        if key in self._cache:
+            return self._cache[key]
+        hit, out = self._from_disk(key)
+        if hit:
+            self.disk_hits += 1
             self._cache[key] = out
+            return out
+        if self.recording is not None:  # planning pass: note the key, answer nothing
+            self.recording.append(list(args))
+            return None
+        self.calls += 1
+        self._store(key, self.run(args))
         return self._cache[key]
+
+    def prefetch(self, keys: Iterable[list[str]]) -> int:
+        from concurrent.futures import ThreadPoolExecutor
+        todo = []
+        for k in keys:
+            t = tuple(k)
+            if t not in self._cache and t not in {tuple(x) for x in todo} and not self._from_disk(t)[0]:
+                todo.append(k)
+        if not todo:
+            return 0
+        with ThreadPoolExecutor(max_workers=max(1, self.workers)) as ex:
+            outs = list(ex.map(self.run, todo))
+        for k, out in zip(todo, outs):
+            self.calls += 1
+            self._store(tuple(k), out)
+        return len(todo)
+
+    def flush(self) -> None:
+        if self.cache_path is None or not self._dirty:
+            return
+        path = Path(self.cache_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix('.tmp')
+        tmp.write_text(json.dumps(self._disk, sort_keys=True))
+        os.replace(tmp, path)
+        self._dirty = False
 
     def pr(self, repo: str, number: int) -> dict[str, Any] | None:
         if not self.enabled or not repo:
@@ -646,13 +815,13 @@ def verify_turn(turn: Mapping[str, Any], next_prompt: str | None, *, index: Repo
             signals.append(signal('ci_watch_in_turn', -1, 'medium', 'negative_gold', 'ci', runs=len(ci), last_exit=last))
     # 2) commits produced by the turn: revert / SZZ fix / survival / CI on the pushed commit
     commit_calls = [c for c in turn['bash'] if c.get('exit') == 0 and COMMIT_CMD.search(c.get('command', ''))]
-    by_window = 0
     for c in commit_calls:
         if not c.get('commits') and c.get('t0') and c.get('t1'):
             hit = index.committed_between(command_paths(c['command'], c.get('cwd')) + [c.get('cwd')], c['t0'], c['t1'])
             if hit:
                 c['commits'] = hit[1]
-                by_window += len(hit[1])
+                c['commits_by_window'] = True  # idempotent across the gh planning pass and the real pass
+    by_window = sum(len(c['commits']) for c in commit_calls if c.get('commits_by_window'))
     commit_calls = [c for c in commit_calls if c.get('commits')]
     shas = [s for c in commit_calls for s in c['commits']]
     resolved = 0
@@ -728,7 +897,7 @@ def verify_turn(turn: Mapping[str, Any], next_prompt: str | None, *, index: Repo
 
 # ----------------------------------------------------------------------------- driver
 def _rows_for_session(turns: list[dict[str, Any]], session_id: str, *, index: RepoIndex, gh: GitHub, fix_days: int,
-                      now: float) -> dict[str, dict[str, Any]]:
+                      now: float, density: bool = True) -> dict[str, dict[str, Any]]:
     """prompt_id -> verification core for every user-initiated turn in one session transcript."""
     merges = [m for t in turns for m in t['pr_merged_by_agent']]
     session_end = max((t['ended_at'] or 0 for t in turns), default=None)
@@ -740,7 +909,15 @@ def _rows_for_session(turns: list[dict[str, Any]], session_id: str, *, index: Re
         nxt = next((turns[j]['_prompt'] for j in real if j > i), None)
         core = verify_turn(t, nxt, index=index, gh=gh, fix_days=fix_days, now=now, session_merges=merges,
                            session_end=session_end)
-        core['turn'] = {'started_at': _iso(t['started_at']), 'ended_at': _iso(t['ended_at']),
+        if density:
+            from . import verification_density as vd
+            extra = vd.density_signals(turns, i, next_prompt=nxt, asked=core['asked'], existing=core['signals'],
+                                       test_re=TEST_CMD, toplevel=index.toplevel, ls_cache=index.ls_cache)
+            if extra:
+                core['signals'] = core['signals'] + extra
+                core['verification_state'], core['label_class'], core['label_confidence'] = decide(core['signals'])
+        from .verification_density import turn_type
+        core['turn'] = {'type': turn_type(t, TEST_CMD), 'started_at': _iso(t['started_at']), 'ended_at': _iso(t['ended_at']),
                         'assistant_messages': t['assistant_messages'], 'tool_calls': t['tool_calls'],
                         'bash_calls': len(t['bash']), 'bash_calls_via_subagents': sum(1 for c in t['bash'] if c.get('via')),
                         'edits': len(t['edits']),
@@ -752,11 +929,24 @@ def _rows_for_session(turns: list[dict[str, Any]], session_id: str, *, index: Re
 
 def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = False, gh: GitHub | None = None,
            fix_days: int = 7, projects: Path | None = None, now: float | None = None,
-           extra_repo_roots: Iterable[Path] = ()) -> list[dict[str, Any]]:
-    """Build verified rows for observed turns (and, with ``all_turns``, every transcript turn since ``since``)."""
+           extra_repo_roots: Iterable[Path] = (), density: bool = True,
+           _index: RepoIndex | None = None) -> list[dict[str, Any]]:
+    """Build verified rows for observed turns (and, with ``all_turns``, every transcript turn since ``since``).
+
+    With GitHub enabled and a lookup cache, a planning pass records the lookups the sweep needs, resolves
+    the uncached ones concurrently, then the real pass reads them from memory."""
     now = time.time() if now is None else now
     gh = gh or GitHub()
-    index = RepoIndex(extra_repo_roots)
+    index = _index or RepoIndex(extra_repo_roots)
+    if gh.enabled and gh.cache_path is not None and gh.recording is None:
+        gh.recording = []
+        try:
+            verify(root=root, since=since, all_turns=all_turns, gh=gh, fix_days=fix_days, projects=projects, now=now,
+                   extra_repo_roots=extra_repo_roots, density=False, _index=index)
+            keys, gh.recording = gh.recording, None
+        finally:
+            gh.recording = None
+        gh.prefetch(keys)
     sdir = state_dir(root)
     observed = [r for r in read_jsonl(sdir / 'outcomes.jsonl') if r.get('schema') == OBSERVED_SCHEMA]
     obs_by_key = {(r.get('session_id'), r.get('trace_id')): r for r in observed}
@@ -774,8 +964,10 @@ def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = Fa
                 continue
     rows = []
     for sid, path in sorted(sessions.items()):
-        cores = _rows_for_session(session_turns(path), sid, index=index, gh=gh, fix_days=fix_days,
-                                  now=now) if path else {}
+        if path is not None and str(path) not in index.sessions:
+            index.sessions[str(path)] = session_turns(path)
+        cores = _rows_for_session(index.sessions[str(path)], sid, index=index, gh=gh, fix_days=fix_days,
+                                  now=now, density=density) if path else {}
         keys = [k for k in obs_by_key if k[0] == sid]
         if all_turns:
             keys += [(sid, pid) for pid, c in cores.items() if (sid, pid) not in obs_by_key
@@ -790,16 +982,18 @@ def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = Fa
                         'measurement': {'transcript': 'missing' if path is None else 'turn_not_found'}}
             core.pop('_started', None)
             obs = obs_by_key.get(key)
-            rows.append(make_row(sid, key[1], core, obs, fix_days=fix_days, gh=gh, now=now))
+            rows.append(make_row(sid, key[1], core, obs, fix_days=fix_days, gh=gh, now=now, density=density))
+    gh.flush()
     return rows
 
 
 def make_row(session_id: str, trace_id: str | None, core: Mapping[str, Any], observed: Mapping[str, Any] | None, *,
-             fix_days: int, gh: GitHub, now: float) -> dict[str, Any]:
+             fix_days: int, gh: GitHub, now: float, density: bool = True) -> dict[str, Any]:
     content = {'signals': core['signals'], 'verification_state': core['verification_state'],
                'label_class': core['label_class'], 'label_confidence': core['label_confidence']}
     row = {
-        'schema': SCHEMA, 'verifier': {**VERIFIER, 'params': {'fix_days': fix_days, 're_ask_jaccard': RE_ASK_JACCARD}},
+        'schema': SCHEMA, 'verifier': {**VERIFIER, 'params': {'fix_days': fix_days, 're_ask_jaccard': RE_ASK_JACCARD,
+                                                              'density': density}},
         'session_id': session_id, 'trace_id': trace_id,
         'observed_ref': {'schema': OBSERVED_SCHEMA, 'present': observed is not None,
                          'row_sha': _sha(observed) if observed is not None else None,
@@ -938,12 +1132,16 @@ def _main(argv: list[str] | None = None) -> int:
     v.add_argument('--all-turns', action='store_true', help='also verify transcript turns that have no observed row')
     v.add_argument('--fix-days', type=int, default=7, help='SZZ / revert observation window (days)')
     v.add_argument('--no-gh', action='store_true', help='skip read-only GitHub lookups (PR state, check-runs)')
+    v.add_argument('--no-gh-cache', action='store_true', help='do not read/write the on-disk gh lookup cache')
+    v.add_argument('--no-density', action='store_true', help='v0 signal set only (no verification_density signals)')
     v.add_argument('--projects-dir', type=Path, default=None)
     v.add_argument('--repo-root', action='append', type=Path, default=[],
                    help='extra repository to try when a commit SHA is not found in the turn cwd (repeatable)')
     v.add_argument('--dry-run', action='store_true', help='compute and summarise; do not append')
     v.add_argument('--report', type=Path, default=None, help='also write a counts-only markdown report here')
     v.add_argument('--json', action='store_true')
+    sub.add_parser('density', add_help=False,
+                   help='counts-only diagnosis: why turns are unverified, by cohort x turn type (-> verification_density)')
     sub.add_parser('export', add_help=False,
                    help='privacy-safe training table for the verified loop (-> z0int.loop_export; see --help)')
     j = sub.add_parser('join', help='credit-ready join: opportunity -> gate -> observed -> verified')
@@ -952,14 +1150,19 @@ def _main(argv: list[str] | None = None) -> int:
     if argv is None:
         import sys
         argv = sys.argv[1:]
+    if argv and argv[0] == 'density':
+        from .verification_density import _main as density_main
+        return density_main(list(argv[1:]))
     if argv and argv[0] == 'export':
         from .loop_export import _main as export_main
         return export_main(list(argv[1:]))
     args = ap.parse_args(argv)
     if args.cmd == 'verify':
         now = time.time()
-        rows = verify(since=parse_since(args.since, now), all_turns=args.all_turns, gh=GitHub(not args.no_gh),
-                      fix_days=args.fix_days, projects=args.projects_dir, now=now, extra_repo_roots=args.repo_root)
+        gh = GitHub(not args.no_gh, cache_path=None if args.no_gh_cache else default_gh_cache())
+        rows = verify(since=parse_since(args.since, now), all_turns=args.all_turns, gh=gh,
+                      fix_days=args.fix_days, projects=args.projects_dir, now=now, extra_repo_roots=args.repo_root,
+                      density=not args.no_density)
         appended, path = (0, None) if args.dry_run else append_new(rows)
         rep = summarize(rows, credit_join())
         rep['appended'] = appended
