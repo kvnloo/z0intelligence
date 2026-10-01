@@ -22,6 +22,8 @@ MODES = {"shadow", "advisory", "active"}
 RISK_CLASSES = {"read", "artifact", "mutation", "external_side_effect"}
 APPROVAL_STATES = {"not_required", "required", "granted", "denied", "unknown"}
 MAX_REQUEST_BYTES = 48_000
+MAX_OBSERVATION_BYTES = 8_000
+OBSERVATION_STATES = {"completed", "failed"}
 MAX_EVIDENCE_ITEMS = 16
 MAX_EVIDENCE_CONTENT = 8_000
 
@@ -112,13 +114,13 @@ def _require_str(obj: Mapping[str, Any], key: str, *, maximum: int = 200) -> str
     return value
 
 
-def _parse_iso8601(value: str) -> datetime:
+def _parse_iso8601(value: str, field: str = "retrieved_at") -> datetime:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
-        raise BridgeValidationError("retrieved_at must be ISO-8601") from exc
+        raise BridgeValidationError(f"{field} must be ISO-8601") from exc
     if parsed.tzinfo is None:
-        raise BridgeValidationError("retrieved_at must include a timezone")
+        raise BridgeValidationError(f"{field} must include a timezone")
     return parsed
 
 
@@ -270,6 +272,185 @@ def validate_bridge_request(
     _walk_forbidden_keys(capability)
     _walk_forbidden_keys(evidence)
     _walk_forbidden_keys(correlation)
+
+
+def canonical_observation_fingerprint(observation: Mapping[str, Any]) -> str:
+    """Stable terminal-observation digest; delivery timestamp is non-semantic."""
+    semantic = dict(observation)
+    semantic.pop("observed_at", None)
+    raw = json.dumps(semantic, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def validate_agentweb_observation(observation: Mapping[str, Any]) -> None:
+    if not isinstance(observation, Mapping):
+        raise BridgeValidationError("observation must be an object")
+    try:
+        encoded = json.dumps(
+            observation,
+            allow_nan=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise BridgeValidationError("observation must be JSON-serializable") from exc
+    if len(encoded) > MAX_OBSERVATION_BYTES:
+        raise BridgeValidationError("observation too large")
+
+    allowed = {
+        "protocol_version",
+        "observation_id",
+        "state",
+        "observed_at",
+        "tool_calls",
+        "failed_tool_calls",
+        "max_same_tool_failures",
+        "claim_mismatch",
+        "llm_model",
+    }
+    extra = set(observation) - allowed
+    if extra:
+        raise BridgeValidationError(f"unknown observation fields: {sorted(extra)}")
+    if observation.get("protocol_version") != PROTOCOL_VERSION:
+        raise BridgeValidationError("unsupported protocol_version")
+
+    _require_str(observation, "observation_id")
+    state = _require_str(observation, "state", maximum=16)
+    if state not in OBSERVATION_STATES:
+        raise BridgeValidationError("unsupported observation state")
+    observed_at = _require_str(observation, "observed_at", maximum=64)
+    _parse_iso8601(observed_at, "observed_at")
+
+    for key in ("tool_calls", "failed_tool_calls", "max_same_tool_failures"):
+        if key not in observation:
+            continue
+        value = observation[key]
+        if (
+            not isinstance(value, int)
+            or isinstance(value, bool)
+            or value < 0
+            or value > 100_000
+        ):
+            raise BridgeValidationError(f"{key} must be a bounded non-negative integer")
+
+    tool_calls = observation.get("tool_calls")
+    failed_tool_calls = observation.get("failed_tool_calls")
+    if (
+        isinstance(tool_calls, int)
+        and not isinstance(tool_calls, bool)
+        and isinstance(failed_tool_calls, int)
+        and not isinstance(failed_tool_calls, bool)
+        and failed_tool_calls > tool_calls
+    ):
+        raise BridgeValidationError("failed_tool_calls cannot exceed tool_calls")
+
+    if "claim_mismatch" in observation and type(observation["claim_mismatch"]) is not bool:
+        raise BridgeValidationError("claim_mismatch must be boolean")
+    if "llm_model" in observation:
+        _require_str(observation, "llm_model", maximum=200)
+
+
+def join_agentweb_observation(
+    observation: Mapping[str, Any],
+    *,
+    receipt_root: Path | None = None,
+) -> dict[str, Any]:
+    """Join an AgentWeb terminal run fact to its prior shadow decision.
+
+    This records execution evidence only. Completed/failed run state never mints
+    a verified/gold quality signal.
+    """
+    validate_agentweb_observation(observation)
+    from . import receipt
+
+    observation_id = str(observation["observation_id"])
+    fingerprint = canonical_observation_fingerprint(observation)
+    lock_path = receipt.receipts_path(receipt_root).parent / "agentweb-observation.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            base = receipt.find_receipt_by_extra(
+                "observation_id",
+                observation_id,
+                root=receipt_root,
+            )
+            if base is None:
+                return {
+                    "ok": False,
+                    "protocol_version": PROTOCOL_VERSION,
+                    "observation_id": observation_id,
+                    "reason": "shadow_observation_not_found",
+                }
+
+            extra = (
+                dict(base.get("extra"))
+                if isinstance(base.get("extra"), Mapping)
+                else {}
+            )
+            prior_fingerprint = extra.get("agentweb_observation_sha256")
+            if prior_fingerprint is not None:
+                if prior_fingerprint != fingerprint:
+                    raise BridgeValidationError("observation replay conflict")
+                return {
+                    "ok": True,
+                    "protocol_version": PROTOCOL_VERSION,
+                    "observation_id": observation_id,
+                    "trace_id": base["trace_id"],
+                    "replayed": True,
+                    "outcome_tier": base.get("outcome_tier", "execution"),
+                    "quality_verified": False,
+                }
+
+            extra.update(
+                agentweb_observation_sha256=fingerprint,
+                agentweb_run_state=observation["state"],
+                agentweb_observed_at=observation["observed_at"],
+            )
+            for key in (
+                "tool_calls",
+                "failed_tool_calls",
+                "max_same_tool_failures",
+                "claim_mismatch",
+                "llm_model",
+            ):
+                if key in observation:
+                    extra[f"agentweb_{key}"] = observation[key]
+
+            marked = dict(base)
+            marked["extra"] = extra
+            marked["measurement_state"] = "unknown"
+            marked["state_reason"] = "agentweb_terminal_execution_observed"
+            receipt.append_receipt(marked, root=receipt_root)
+
+            state = str(observation["state"])
+            joined = receipt.join_outcome(
+                str(base["trace_id"]),
+                receipt.Outcome(
+                    execution_completed=True,
+                    source=f"agentweb_run_{state}",
+                    note=(
+                        "AgentWeb terminal run observed; execution evidence only, "
+                        "not quality verification"
+                    ),
+                ),
+                root=receipt_root,
+            )
+            return {
+                "ok": True,
+                "protocol_version": PROTOCOL_VERSION,
+                "observation_id": observation_id,
+                "trace_id": base["trace_id"],
+                "replayed": False,
+                "outcome_tier": (
+                    joined.get("outcome_tier")
+                    if isinstance(joined, Mapping)
+                    else "execution"
+                ),
+                "quality_verified": False,
+            }
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
 
 
 def _append_shadow_receipt(
