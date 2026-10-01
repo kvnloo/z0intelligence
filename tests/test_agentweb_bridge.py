@@ -75,6 +75,7 @@ def test_valid_request_projects_to_existing_intelligence_contract():
         "automatic": False,
         "integration_instance": value["integration_instance"],
         "free_only": True,
+        "caller_request_sha256": "9ca1481d7b9494c7b5ae2d75148722be73f1e99a899e7a1815cd17c5805d269d",
         "max_tokens": 256,
     }
 
@@ -98,6 +99,39 @@ def test_observation_join_id_does_not_change_request_fingerprint():
     second = copy.deepcopy(first)
     second["correlation"]["observation_id"] = "later-observation"
     assert canonical_request_fingerprint(first) == canonical_request_fingerprint(second)
+
+
+def test_bridge_only_provenance_mutation_reaches_dispatch_fingerprint():
+    from z0int import dispatch_authority
+
+    first = request()
+    second = copy.deepcopy(first)
+    second["evidence"][0]["content"] = "changed provenance payload"
+    second["evidence"][0]["sha256"] = hashlib.sha256(
+        second["evidence"][0]["content"].encode()
+    ).hexdigest()
+
+    first_projected = project_intelligence_args(first)
+    second_projected = project_intelligence_args(second)
+
+    assert first_projected["trace_id"] == second_projected["trace_id"]
+    assert first_projected["task"] == second_projected["task"]
+    assert first_projected["state"] == second_projected["state"]
+    assert first_projected["caller_request_sha256"] != second_projected["caller_request_sha256"]
+    assert dispatch_authority.fingerprint(first_projected) != dispatch_authority.fingerprint(second_projected)
+
+
+def test_observation_join_change_does_not_change_dispatch_fingerprint():
+    from z0int import dispatch_authority
+
+    first = request()
+    second = copy.deepcopy(first)
+    second["correlation"]["observation_id"] = "later-observation"
+
+    first_projected = project_intelligence_args(first)
+    second_projected = project_intelligence_args(second)
+    assert first_projected == second_projected
+    assert dispatch_authority.fingerprint(first_projected) == dispatch_authority.fingerprint(second_projected)
 
 
 def test_trace_must_be_derived_from_parent_and_operation():
