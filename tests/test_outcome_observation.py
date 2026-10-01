@@ -54,6 +54,13 @@ def test_rejects_observation_before_decision_or_execution():
         validate_outcome_observation(value)
 
 
+def test_rejects_observation_before_declared_window():
+    value = row("24h")
+    value["observation_time"] = "2026-10-01T13:00:00Z"
+    with pytest.raises(ValueError, match="earlier than the declared measurement window"):
+        validate_outcome_observation(value)
+
+
 def test_rejects_raw_subject_identity_and_quality_authority():
     value = row()
     value["subject_ref"] = "raw-customer-123"
