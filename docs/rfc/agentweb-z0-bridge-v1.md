@@ -160,8 +160,9 @@ The validated bridge request maps onto the existing `z0int.intelligence` request
 - `integration_instance`
 - `free_only`
 - `max_tokens`
+- `caller_request_sha256`: canonical bridge fingerprint used only for durable replay/conflict binding
 
-There is no second execution path.
+The host accepts the versioned envelope at `POST /v1/agentweb`. Shadow requests stop at pure routing and never enter physical dispatch. Advisory/active requests reuse the existing receipt-backed dispatch authority; there is no second execution path.
 
 ## Failure matrix
 
@@ -268,8 +269,8 @@ Pinned by `tests/test_agentweb_bridge.py`:
 
 ## Next slices
 
-1. durable dispatch fingerprint/reconcile binding;
-2. AgentWeb TS mirror on fresh upstream;
+1. ~~durable dispatch fingerprint/reconcile binding~~;
+2. ~~AgentWeb TS mirror on fresh upstream~~;
 3. shadow route migration;
 4. reliability observation projection;
 5. evidence provenance adapter;
