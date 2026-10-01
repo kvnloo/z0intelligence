@@ -100,6 +100,15 @@ class AodlAdmissionTests(unittest.TestCase):
         self.assertFalse(denied.allowed)
         self.assertEqual(set(denied.numeric_codes), {103, 105, 106})
 
+    def test_huge_budget_numeric_fails_closed(self):
+        decision = decide_spawn(
+            document(tokens=10 ** 1000),
+            request(),
+            contract_api=FakeAodl,
+        )
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.codes, ("budget-shape",))
+
     def test_unknown_parent_fails_closed(self):
         decision = decide_spawn(document(), request(parent_node_id="not-declared"), contract_api=FakeAodl)
         self.assertFalse(decision.allowed)
