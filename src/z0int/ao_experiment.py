@@ -10,6 +10,7 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -231,11 +232,9 @@ def register_pair(
     if candidate.get("capability_id") != CAPABILITY:
         raise ValueError("candidate_trace_id is not an AO decision receipt")
 
-    reference_source = "receipt"
     if reference_trace_id is None:
         materialized = materialize_reference_snapshot(task_snapshot_id, root=root)
         reference_trace_id = str(materialized["trace_id"])
-        reference_source = "counterfactual_snapshot"
     reference_trace_id = _text(reference_trace_id, "reference_trace_id")
     if reference_trace_id == candidate_trace_id:
         raise ValueError("candidate and reference traces must differ")
@@ -246,6 +245,11 @@ def register_pair(
     reference_snapshot = _receipt_task_snapshot(reference)
     if reference_snapshot != task_snapshot_id:
         raise ValueError("reference receipt task_snapshot_id does not match pair")
+    reference_source = (
+        "counterfactual_snapshot"
+        if reference.get("capability_id") == REFERENCE_CAPABILITY
+        else "receipt"
+    )
 
     core = {
         "schema": PAIR_SCHEMA,
@@ -286,7 +290,6 @@ def register_pair(
         fh.seek(0, 2)
         fh.write(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
         fh.flush()
-        import os
         os.fsync(fh.fileno())
         fcntl.flock(fh, fcntl.LOCK_UN)
 
