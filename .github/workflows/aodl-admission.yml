@@ -1,0 +1,35 @@
+name: AODL admission
+
+on:
+  pull_request:
+    paths:
+      - "src/z0int/aodl_admission.py"
+      - "tests/test_aodl_admission.py"
+      - "docs/aodl-admission.md"
+      - ".github/workflows/aodl-admission.yml"
+  push:
+    paths:
+      - "src/z0int/aodl_admission.py"
+      - "tests/test_aodl_admission.py"
+      - "docs/aodl-admission.md"
+      - ".github/workflows/aodl-admission.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  admission:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pinned AODL contract
+        run: python -m pip install "git+https://github.com/kvnloo/aodl.git@68231658f0ec0338464c0916a2329b9587444312"
+      - name: Syntax and admission tests
+        env:
+          PYTHONPATH: src
+        run: |
+          python -m py_compile src/z0int/aodl_admission.py tests/test_aodl_admission.py
+          python -m unittest tests.test_aodl_admission
