@@ -1,0 +1,148 @@
+import tempfile
+import unittest
+from pathlib import Path
+
+from z0int.ao_bridge import OUTCOME_SCHEMA, join_ao_outcome, spawn_decision
+from z0int.ao_report import build_ao_promotion_report
+from z0int.receipt import append_receipt, find_receipt
+
+
+def spawn_request(trace_id: str, session_id: str):
+    return {
+        "schema": "ao.z0int.spawn.v1",
+        "trace_id": trace_id,
+        "session_id": session_id,
+        "project_id": "proj",
+        "kind": "worker",
+        "task": "fix the retry race",
+        "current": {
+            "harness": "codex",
+            "model": "gpt-5",
+            "mode": "chat",
+            "permission": "default",
+        },
+        "constraints": {
+            "explicit_harness": False,
+            "explicit_model": False,
+            "explicit_mode": False,
+        },
+    }
+
+
+def evidence(disposition: str, *, terminated: bool, merged: bool):
+    return {
+        "project_id": "proj",
+        "kind": "worker",
+        "harness": "codex",
+        "mode": "chat",
+        "model": "gpt-5",
+        "activity": "idle",
+        "disposition": disposition,
+        "terminated": terminated,
+        "scm_complete": disposition != "seed_deleted",
+        "prs": [] if disposition == "seed_deleted" else [{
+            "url": "https://github.com/example/repo/pull/7",
+            "number": 7,
+            "draft": False,
+            "merged": merged,
+            "closed": False,
+            "ci": "passing",
+            "review": "approved",
+            "mergeability": "mergeable",
+            "review_comments": False,
+            "external_approved": True,
+            "external_changes_requested": False,
+            "external_comments": False,
+            "head_sha": "abc123",
+        }],
+    }
+
+
+class AOPromotionReportTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_report_preserves_missing_measurements_and_is_deterministic(self):
+        spawn_decision(spawn_request("ao-spawn-s1", "s1"), root=self.root)
+        spawn_decision(spawn_request("ao-spawn-s2", "s2"), root=self.root)
+
+        # Only one decision has measured latency/token usage. The other must
+        # remain missing rather than silently contributing a zero.
+        row = dict(find_receipt("ao-spawn-s1", root=self.root))
+        row["latency_ms"] = 120.0
+        row["measured_frontier_tokens"] = 90
+        row["estimated_frontier_tokens_avoided"] = 30
+        append_receipt(row, root=self.root)
+
+        join_ao_outcome({
+            "schema": OUTCOME_SCHEMA,
+            "trace_id": "ao-spawn-s1",
+            "outcome_id": "ao-outcome-s1-merged",
+            "session_id": "s1",
+            "outcome": {
+                "pr_merged": True,
+                "source": "agent-orchestrator",
+                "verification_source": "ao-pr-merge",
+            },
+            "evidence": evidence("terminated", terminated=True, merged=True),
+        }, root=self.root)
+
+        join_ao_outcome({
+            "schema": OUTCOME_SCHEMA,
+            "trace_id": "ao-spawn-s2",
+            "outcome_id": "ao-outcome-s2-seed-deleted",
+            "session_id": "s2",
+            "outcome": {"source": "agent-orchestrator"},
+            "evidence": evidence("seed_deleted", terminated=False, merged=False),
+        }, root=self.root)
+
+        first = build_ao_promotion_report(root=self.root)
+        second = build_ao_promotion_report(root=self.root)
+
+        self.assertEqual(first["snapshot_sha256"], second["snapshot_sha256"])
+        self.assertEqual(first["decisions"]["count"], 2)
+        self.assertEqual(first["decisions"]["abstain"], 2)
+        self.assertEqual(first["outcomes"]["join_coverage"], 1.0)
+        self.assertEqual(first["outcomes"]["terminal_join_coverage"], 1.0)
+        self.assertEqual(first["outcomes"]["verified_positive_decisions"], 1)
+
+        latency = first["measurements"]["decision_latency_ms"]
+        self.assertEqual(latency["count"], 1)
+        self.assertEqual(latency["coverage"], 0.5)
+        self.assertEqual(latency["p50"], 120.0)
+        self.assertEqual(latency["p95"], 120.0)
+
+        tokens = first["measurements"]["frontier_tokens"]
+        self.assertEqual(tokens["count"], 1)
+        self.assertEqual(tokens["coverage"], 0.5)
+        self.assertEqual(tokens["sum"], 90)
+
+        self.assertEqual(first["measurements"]["cost"]["count"], 0)
+        self.assertIsNone(first["measurements"]["cost"]["delta"])
+        self.assertEqual(first["promotion"]["decision"], "not_computed")
+        self.assertIn(
+            "no_non_abstain_policy_decisions",
+            first["promotion"]["evidence_gaps"],
+        )
+        family = first["families"]["worker:codex:chat"]
+        self.assertEqual(family["decisions"], 2)
+        self.assertEqual(family["outcome_join_coverage"], 1.0)
+        self.assertFalse(family["calibration_ready"])
+
+    def test_empty_report_uses_none_for_undefined_rates(self):
+        report = build_ao_promotion_report(root=self.root)
+        self.assertEqual(report["decisions"]["count"], 0)
+        self.assertIsNone(report["decisions"]["abstention_rate"])
+        self.assertIsNone(report["outcomes"]["join_coverage"])
+        self.assertIsNone(
+            report["measurements"]["decision_latency_ms"]["coverage"]
+        )
+        self.assertIsNone(report["measurements"]["frontier_tokens"]["sum"])
+
+
+if __name__ == "__main__":
+    unittest.main()
