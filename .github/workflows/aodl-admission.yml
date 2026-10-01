@@ -4,14 +4,32 @@ on:
   pull_request:
     paths:
       - "src/z0int/aodl_admission.py"
+      - "src/z0int/aodl_dispatch.py"
+      - "src/z0int/dispatch_authority.py"
+      - "src/z0int/intelligence_service.py"
+      - "src/z0int/remote_executor.py"
       - "tests/test_aodl_admission.py"
+      - "tests/test_dispatch_authority.py"
+      - "tests/test_intelligence_service.py"
       - "docs/aodl-admission.md"
+      - "docs/dispatch-authority.md"
+      - "pyproject.toml"
+      - "requirements.txt"
       - ".github/workflows/aodl-admission.yml"
   push:
     paths:
       - "src/z0int/aodl_admission.py"
+      - "src/z0int/aodl_dispatch.py"
+      - "src/z0int/dispatch_authority.py"
+      - "src/z0int/intelligence_service.py"
+      - "src/z0int/remote_executor.py"
       - "tests/test_aodl_admission.py"
+      - "tests/test_dispatch_authority.py"
+      - "tests/test_intelligence_service.py"
       - "docs/aodl-admission.md"
+      - "docs/dispatch-authority.md"
+      - "pyproject.toml"
+      - "requirements.txt"
       - ".github/workflows/aodl-admission.yml"
 
 permissions:
@@ -25,11 +43,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install pinned AODL contract
-        run: python -m pip install "git+https://github.com/kvnloo/aodl.git@68231658f0ec0338464c0916a2329b9587444312"
-      - name: Syntax and admission tests
+      - name: Install focused test dependencies
+        run: |
+          python -m pip install pytest==8.4.2
+          python -m pip install "git+https://github.com/kvnloo/aodl.git@68231658f0ec0338464c0916a2329b9587444312"
+      - name: Syntax-check admission boundary
+        run: |
+          python -m py_compile \
+            src/z0int/aodl_admission.py \
+            src/z0int/aodl_dispatch.py \
+            src/z0int/dispatch_authority.py \
+            src/z0int/intelligence_service.py \
+            src/z0int/remote_executor.py \
+            tests/test_aodl_admission.py \
+            tests/test_dispatch_authority.py \
+            tests/test_intelligence_service.py
+      - name: Admission and authority regression suite
         env:
           PYTHONPATH: src
         run: |
-          python -m py_compile src/z0int/aodl_admission.py tests/test_aodl_admission.py
-          python -m unittest tests.test_aodl_admission
+          python -m pytest -q \
+            tests/test_aodl_admission.py \
+            tests/test_dispatch_authority.py \
+            tests/test_intelligence_service.py
