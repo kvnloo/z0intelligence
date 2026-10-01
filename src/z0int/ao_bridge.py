@@ -158,7 +158,13 @@ def spawn_decision(args: dict[str, Any], *, root=None) -> dict[str, Any]:
                 raise ValueError("trace_id reused for different AO spawn request")
             return _response(previous, replayed=True)
 
+        decision_started_ns = time.perf_counter_ns()
         current = dict(args["current"])
+        recommendation = dict(current)
+        decision_latency_ms = max(
+            0.0,
+            (time.perf_counter_ns() - decision_started_ns) / 1_000_000.0,
+        )
         row = DecisionReceipt(
             trace_id=trace_id,
             session_id=args["session_id"],
@@ -168,8 +174,13 @@ def spawn_decision(args: dict[str, Any], *, root=None) -> dict[str, Any]:
             action_taken="shadow_only",
             route="shadow",
             execution="shadow",
-            measurement_state="unknown",
-            state_reason="No AO routing policy has passed a production promotion gate",
+            latency_ms=decision_latency_ms,
+            input_tokens=0,
+            output_tokens=0,
+            cached_input_tokens=0,
+            measured_frontier_tokens=0,
+            measurement_state="complete",
+            state_reason="AO shadow policy evaluation used a deterministic no-model baseline",
             extra={
                 "source": "agent-orchestrator",
                 "schema": SPAWN_SCHEMA,
@@ -181,8 +192,18 @@ def spawn_decision(args: dict[str, Any], *, root=None) -> dict[str, Any]:
                 "ao_request_sha256": request_sha,
                 "policy_revision": POLICY_REVISION,
                 "reason": "shadow_baseline_no_learned_policy",
-                "recommendation": current,
+                "recommendation": recommendation,
                 "requested_verification": [],
+                "decision_measurement": {
+                    "scope": "policy_eval",
+                    "latency_ms": decision_latency_ms,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cached_input_tokens": 0,
+                    "cost_usd": 0.0,
+                    "usage_state": "measured_no_model",
+                    "provenance": "deterministic_baseline_no_model_call",
+                },
             },
         )
         stored = append_receipt(row, root=root)
