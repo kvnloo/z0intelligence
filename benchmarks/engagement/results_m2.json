@@ -1,0 +1,240 @@
+{
+ "measure": "M2",
+ "arms": {
+  "stock": {
+   "n": 24,
+   "verified": 23,
+   "cost_total_usd": 2.6254,
+   "cost_median_usd": 0.11258,
+   "errors": 0,
+   "tokens_to_first_relevant_median": 127300.0,
+   "root_billed_in_median": 162729.5
+  },
+  "ws-packet": {
+   "n": 24,
+   "verified": 24,
+   "cost_total_usd": 2.7009,
+   "cost_median_usd": 0.1122,
+   "errors": 0,
+   "tokens_to_first_relevant_median": 94553.0,
+   "root_billed_in_median": 128098.5
+  }
+ },
+ "reached_first_relevant": {
+  "stock": 22,
+  "ws-packet": 20
+ },
+ "packet_delivered": 24,
+ "stock_contaminated": 0,
+ "ws_modified_runs": 0,
+ "primary_tokens_to_first_relevant": {
+  "n_pairs": 24,
+  "median_diff": -34580.5,
+  "median_diff_ci95": [
+   -76222.0,
+   -13865.0
+  ],
+  "mean_diff": -66344.5,
+  "median_pct": -27.988265891829435,
+  "median_pct_ci95": [
+   -50.66538878501736,
+   -9.845692820064905
+  ],
+  "sign": {
+   "neg": 18,
+   "pos": 6,
+   "p_two_sided": 0.022656
+  },
+  "wilcoxon": {
+   "n": 24,
+   "W_plus": 47.0,
+   "p_two_sided": 0.002246
+  }
+ },
+ "secondary_weighted_to_first_relevant": {
+  "n_pairs": 24,
+  "median_diff": 411.8999999999978,
+  "median_diff_ci95": [
+   -8173.4000000000015,
+   7275.900000000009
+  ],
+  "mean_diff": -388.0687500000008,
+  "median_pct": 1.2105353336591267,
+  "median_pct_ci95": [
+   -22.094121813126883,
+   25.412265183914926
+  ],
+  "sign": {
+   "neg": 12,
+   "pos": 12,
+   "p_two_sided": 1.0
+  },
+  "wilcoxon": {
+   "n": 24,
+   "W_plus": 149.0,
+   "p_two_sided": 0.988813
+  }
+ },
+ "secondary_cost_usd": {
+  "n_pairs": 24,
+  "median_diff": -0.0008545999999999762,
+  "median_diff_ci95": [
+   -0.024102000000000012,
+   0.03259139999999999
+  ],
+  "mean_diff": 0.003145908333333337,
+  "median_pct": -0.7308591526950272,
+  "median_pct_ci95": [
+   -19.603696576226035,
+   34.85174475802657
+  ],
+  "sign": {
+   "neg": 12,
+   "pos": 12,
+   "p_two_sided": 1.0
+  },
+  "wilcoxon": {
+   "n": 24,
+   "W_plus": 155.0,
+   "p_two_sided": 0.89957
+  }
+ },
+ "exploratory_by_packet_shown": {
+  "True": {
+   "n_pairs": 15,
+   "median_diff": -42245.0,
+   "median_diff_ci95": [
+    -141127.0,
+    -30932.0
+   ],
+   "mean_diff": -98717.8,
+   "median_pct": -32.467183128900366,
+   "median_pct_ci95": [
+    -55.43380791315976,
+    -25.214234602160673
+   ],
+   "sign": {
+    "neg": 14,
+    "pos": 1,
+    "p_two_sided": 0.000977
+   },
+   "wilcoxon": {
+    "n": 15,
+    "W_plus": 3.0,
+    "p_two_sided": 0.000305
+   }
+  },
+  "False": {
+   "n_pairs": 9,
+   "median_diff": 30834.0,
+   "median_diff_ci95": [
+    -76222.0,
+    32845.0
+   ],
+   "mean_diff": -12389.0,
+   "median_pct": 32.24335714061634,
+   "median_pct_ci95": [
+    -50.66538878501736,
+    52.795280653250174
+   ],
+   "sign": {
+    "neg": 4,
+    "pos": 5,
+    "p_two_sided": 1.0
+   },
+   "wilcoxon": {
+    "n": 9,
+    "W_plus": 20.0,
+    "p_two_sided": 0.820312
+   }
+  }
+ },
+ "per_task": {
+  "ws-aodl": {
+   "stock": {
+    "verified": 3,
+    "tokens_median": 121061.0
+   },
+   "ws-packet": {
+    "verified": 3,
+    "tokens_median": 86380.0
+   }
+  },
+  "ws-do": {
+   "stock": {
+    "verified": 3,
+    "tokens_median": 95436.0
+   },
+   "ws-packet": {
+    "verified": 3,
+    "tokens_median": 126463.0
+   }
+  },
+  "ws-engagement": {
+   "stock": {
+    "verified": 3,
+    "tokens_median": 181009.0
+   },
+   "ws-packet": {
+    "verified": 3,
+    "tokens_median": 95432.0
+   }
+  },
+  "ws-loa": {
+   "stock": {
+    "verified": 3,
+    "tokens_median": 193427.0
+   },
+   "ws-packet": {
+    "verified": 3,
+    "tokens_median": 62800.0
+   }
+  },
+  "ws-orch": {
+   "stock": {
+    "verified": 3,
+    "tokens_median": 62478.0
+   },
+   "ws-packet": {
+    "verified": 3,
+    "tokens_median": 95057.0
+   }
+  },
+  "ws-promsim": {
+   "stock": {
+    "verified": 3,
+    "tokens_median": 127130.0
+   },
+   "ws-packet": {
+    "verified": 3,
+    "tokens_median": 84827.0
+   }
+  },
+  "ws-t3av": {
+   "stock": {
+    "verified": 3,
+    "tokens_median": 319063.0
+   },
+   "ws-packet": {
+    "verified": 3,
+    "tokens_median": 126958.0
+   }
+  },
+  "ws-toolcall": {
+   "stock": {
+    "verified": 2,
+    "tokens_median": 223664.0
+   },
+   "ws-packet": {
+    "verified": 3,
+    "tokens_median": 85700.0
+   }
+  }
+ },
+ "decision": {
+  "ci_excludes_zero": true,
+  "direction": "saving",
+  "pass_rate_not_lower": true,
+  "claim_saving": true
+ }
+}
