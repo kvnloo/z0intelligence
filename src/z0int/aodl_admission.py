@@ -42,6 +42,7 @@ class AdmissionDecision:
     numeric_codes: tuple[int, ...]
     source: str
     semantic_fingerprint: str | None
+    intent_source_hash: str | None
     contract_revision: int | None
     request_revision: int | None
     parent_node_id: str | None
@@ -60,6 +61,7 @@ class AdmissionDecision:
             "source": self.source,
             "aodl_canon_version": REQUIRED_CANON_VERSION,
             "aodl_semantic_fingerprint": self.semantic_fingerprint,
+            "aodl_intent_source_hash": self.intent_source_hash,
             "contract_revision": self.contract_revision,
             "request_revision": self.request_revision,
             "parent_node_id": self.parent_node_id,
@@ -92,6 +94,7 @@ def _finish(
     fingerprint: str | None,
     contract_revision: int | None,
     request: SpawnRequest | None,
+    intent_source_hash: str | None = None,
     detail: str = "",
 ) -> AdmissionDecision:
     return AdmissionDecision(
@@ -100,6 +103,7 @@ def _finish(
         numeric_codes=tuple(numeric_codes),
         source=source,
         semantic_fingerprint=fingerprint,
+        intent_source_hash=intent_source_hash,
         contract_revision=contract_revision,
         request_revision=request.request_revision if request is not None else None,
         parent_node_id=request.parent_node_id if request is not None else None,
@@ -212,6 +216,10 @@ def decide_spawn(
         fingerprint = str(semantic_fingerprint(document))
         if not fingerprint.startswith(REQUIRED_CANON_VERSION + ":"):
             raise ValueError("unexpected fingerprint version")
+        provenance = document.get("provenance")
+        if not isinstance(provenance, Mapping) or not isinstance(provenance.get("sourceHash"), str):
+            raise ValueError("provenance.sourceHash must be present")
+        intent_source_hash = str(provenance["sourceHash"])
         contract_revision = _nonnegative_int(document.get("revision"), "document.revision")
         request_revision = _nonnegative_int(request.request_revision, "request_revision")
         live_children = _nonnegative_int(request.live_children, "live_children")
@@ -257,6 +265,7 @@ def decide_spawn(
             fingerprint=fingerprint if "fingerprint" in locals() else None,
             contract_revision=contract_revision if "contract_revision" in locals() else None,
             request=request,
+            intent_source_hash=intent_source_hash if "intent_source_hash" in locals() else None,
             detail=str(exc),
         )
     except Exception as exc:
@@ -268,6 +277,7 @@ def decide_spawn(
             fingerprint=fingerprint if "fingerprint" in locals() else None,
             contract_revision=contract_revision if "contract_revision" in locals() else None,
             request=request,
+            intent_source_hash=intent_source_hash if "intent_source_hash" in locals() else None,
             detail=str(exc),
         )
 
@@ -289,6 +299,7 @@ def decide_spawn(
             fingerprint=fingerprint,
             contract_revision=contract_revision,
             request=request,
+            intent_source_hash=intent_source_hash,
             detail=str(exc),
         )
     if live_children + 1 > max_children:
@@ -316,6 +327,7 @@ def decide_spawn(
             fingerprint=fingerprint,
             contract_revision=contract_revision,
             request=request,
+            intent_source_hash=intent_source_hash,
             detail=str(exc),
         )
 
@@ -333,4 +345,5 @@ def decide_spawn(
         fingerprint=fingerprint,
         contract_revision=contract_revision,
         request=request,
+        intent_source_hash=intent_source_hash,
     )
