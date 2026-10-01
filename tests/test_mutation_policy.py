@@ -35,6 +35,24 @@ def test_supersync_like_durable_identity_resends_same_mutation() -> None:
     assert out.mutation_hash == "e" * 64
 
 
+def test_relay_sealed_frame_can_resend_under_receiver_tombstone() -> None:
+    out = decide_mutation_outcome(
+        mutation_key="draft:chat:turn:42",
+        authority_scope="relay:slack",
+        attempted=True,
+        effect="unknown",
+        capabilities=MutationCapabilities(
+            can_observe=False,
+            stable_mutation_key=True,
+            receiver_durable_idempotency=True,
+        ),
+        durable_idempotency_evidence="connector:sealed-key-tombstone",
+        mutation_hash="a" * 64,
+    )
+    assert out.retry_disposition == "resend"
+    assert out.idempotency == "receiver-durable"
+
+
 def test_wger_window_guard_does_not_promote_to_durable_resend() -> None:
     out = decide_mutation_outcome(
         mutation_key="heuristic:set",
