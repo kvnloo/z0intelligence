@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Literal
+import re
 
 Effect = Literal["none", "unknown", "observed"]
 Verification = Literal["unverified", "verified"]
@@ -20,6 +21,11 @@ RetryDisposition = Literal["retry", "observe", "resend", "escalate", "stop"]
 Idempotency = Literal["none", "receiver-durable"]
 
 SCHEMA = "mutation-outcome/v0"
+_SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
+_EFFECTS = {"none", "unknown", "observed"}
+_VERIFICATIONS = {"unverified", "verified"}
+_DISPOSITIONS = {"retry", "observe", "resend", "escalate", "stop"}
+_IDEMPOTENCY = {"none", "receiver-durable"}
 
 
 @dataclass(frozen=True)
@@ -36,6 +42,18 @@ class MutationOutcome:
     effect_hash: str | None = None
 
     def __post_init__(self) -> None:
+        if self.effect not in _EFFECTS:
+            raise ValueError("effect must be none|unknown|observed")
+        if self.verification not in _VERIFICATIONS:
+            raise ValueError("verification must be unverified|verified")
+        if self.retry_disposition not in _DISPOSITIONS:
+            raise ValueError("retry_disposition must be retry|observe|resend|escalate|stop")
+        if self.idempotency not in _IDEMPOTENCY:
+            raise ValueError("idempotency must be none|receiver-durable")
+        if self.mutation_hash is not None and not _SHA256_RE.fullmatch(self.mutation_hash):
+            raise ValueError("mutation_hash must be lowercase sha256 hex")
+        if self.effect_hash is not None and not _SHA256_RE.fullmatch(self.effect_hash):
+            raise ValueError("effect_hash must be lowercase sha256 hex")
         if not self.mutation_key:
             raise ValueError("mutation_key must be non-empty")
         if not self.authority_scope:
