@@ -72,7 +72,13 @@ def _envelope(request: dict[str, Any], *, required: bool) -> tuple[object, Spawn
 def evaluate(request: dict[str, Any], *, required: bool) -> dict[str, Any] | None:
     """Return a serializable admission payload, or None for legacy ungoverned v2."""
 
-    env = _envelope(request, required=required)
+    try:
+        env = _envelope(request, required=required)
+    except (TypeError, ValueError):
+        return {
+            **_payload_for_missing(),
+            "codes": ["aodl-envelope-invalid"],
+        }
     if env is None:
         return _payload_for_missing() if required else None
     document, proposal = env
