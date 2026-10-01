@@ -35,6 +35,9 @@ architecture:
         - adapters/
         - harness-adapters/
         - omp-extensions/
+        - src/z0int/agentweb_bridge.py
+        - schemas/agentweb-z0-bridge.v1.schema.json
+        - docs/rfc/agentweb-z0-bridge-v1.md
       depends_on: [context-resolution, bounded-decision-runtime]
 
     - id: k8s-hermes-lab
@@ -73,6 +76,7 @@ architecture:
   provides_interfaces:
     - z0int.decision_receipt.v1
     - z0int.context_resolve.v1
+    - agentweb.z0.bridge.v1
 
   consumes_interfaces:
     - tokenomics.report.v1
