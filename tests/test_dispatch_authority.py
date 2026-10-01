@@ -223,13 +223,42 @@ def test_protocol_v3_allow_is_fsynced_before_dispatch_start():
 
 def test_protocol_v3_denied_budget_never_creates_dispatch():
     req=governed(doc=aodl_document(tokens=10),observed={'tokens':10},proposed={'tokens':1})
-    denied=protocol3(req,secrets.token_hex(32))
+    owner=secrets.token_hex(32)
+    denied=protocol3(req,owner)
     assert not denied['claimed']
     assert denied['result']['aodl_admission']['numeric_codes']==[105]
     rows=[json.loads(x) for x in receipts_path().read_text().splitlines()]
     assert len(rows)==1
     assert rows[0]['capability_id']=='aodl.structural_admission'
     assert not any(row['trace_id'].startswith('dispatch-') for row in rows)
+    with pytest.raises(ValueError,match='Not the claim owner'):
+        authorize(req,owner)
+
+
+def test_protocol_v3_malformed_envelope_is_durable_denial():
+    req=request();req['aodl']={'document':aodl_document()}
+    first=protocol3(req,secrets.token_hex(32))
+    assert not first['claimed']
+    assert first['result']['aodl_admission']['codes']==['aodl-envelope-invalid']
+    assert len(receipts_path().read_text().splitlines())==1
+    second=protocol3(req,secrets.token_hex(32))
+    assert second['result']==first['result']
+    assert len(receipts_path().read_text().splitlines())==1
+
+
+def test_restart_reuses_allowed_admission_before_dispatch_start():
+    from z0int import aodl_dispatch
+    req=governed();key=a.identity(req)
+    with a.locked(key):
+        admission=aodl_dispatch.ensure(req,key,a.fingerprint(req),required=True)
+    assert admission is not None and admission['extra']['aodl_admission']['allowed']
+    assert len(receipts_path().read_text().splitlines())==1
+    claimed=protocol3(req,secrets.token_hex(32))
+    assert claimed['claimed']
+    rows=[json.loads(x) for x in receipts_path().read_text().splitlines()]
+    assert len(rows)==2
+    assert rows[0]['trace_id']==claimed['aodl_admission_receipt_id']
+    assert rows[1]['extra']['aodl_admission_receipt_id']==rows[0]['trace_id']
 
 
 def test_denied_admission_trace_conflict_fails_closed():
