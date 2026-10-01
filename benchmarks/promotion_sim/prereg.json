@@ -1,0 +1,186 @@
+{
+ "schema": "z0int.promotion_sim.v0.prereg",
+ "events_file_sha": "1731cdfa104ba6d3",
+ "n_scorable": 305,
+ "split": {
+  "holdout_fraction": 0.3,
+  "holdout_from": "2026-09-21T22:58:37Z",
+  "n_train": 214,
+  "n_holdout": 91
+ },
+ "label": {
+  "fix_days": 3,
+  "strict": false,
+  "bad": "reverted or ci_broke or fix_3d"
+ },
+ "criterion": "Pre-registered criterion: most automation such that the auto-merged set's bad rate is at most\n    ``ratio`` x the pool's bad rate, with at least ``min_auto`` auto-merges.  Ties: fewer good blocked,\n    then fewer bad let through, then the shorter (simpler) rule name.",
+ "pick": "auto[all,<=inf,nonsrc]",
+ "pick_rule": "auto if ci_all green, size<=inf (docs-only auto unless red) (no-source-code changes auto unless red)",
+ "holdout_pass": "pick's auto bad rate on holdout <= 0.5 x holdout base bad rate AND pick auto-merges >= 20% of holdout events AND pick's bad_auto <= human_all's bad_through x 0.5",
+ "hypotheses": [
+  "H1 (primary): the pick passes `holdout_pass` on the holdout.",
+  "H2: Promotion Authority v0's BLOCK (ABSTAIN) is weakly discriminative: on the holdout the bad rate among ABSTAIN events is < 2x the holdout base bad rate (so as a hard gate it delays more good than bad).",
+  "H3: decision7_draft's auto-merged events have a bad rate <= the holdout base bad rate (reported, small n).",
+  "H4: pa_v0_auto's auto-merged events have a bad rate <= 0.5x the holdout base bad rate (reported)."
+ ],
+ "compare": [
+  "human_all",
+  "pa_v0",
+  "pa_v0_auto",
+  "auto_on_green",
+  "auto_on_code_green",
+  "decision7_draft"
+ ],
+ "train": {
+  "human_all": {
+   "n": 214,
+   "bad": 42,
+   "auto": 0,
+   "human_reviews": 214,
+   "blocked": 0,
+   "bad_auto": 0,
+   "bad_through": 42,
+   "bad_blocked": 0,
+   "good_blocked": 0,
+   "good_waiting_human": 172,
+   "good_auto": 0,
+   "auto_bad_rate": null,
+   "auto_bad_rate_ci95": [
+    0.0,
+    1.0
+   ],
+   "base_bad_rate": 0.1963,
+   "auto_share": 0.0,
+   "good_pr_hours_saved": 0.0
+  },
+  "pa_v0": {
+   "n": 214,
+   "bad": 42,
+   "auto": 0,
+   "human_reviews": 179,
+   "blocked": 35,
+   "bad_auto": 0,
+   "bad_through": 33,
+   "bad_blocked": 9,
+   "good_blocked": 26,
+   "good_waiting_human": 146,
+   "good_auto": 0,
+   "auto_bad_rate": null,
+   "auto_bad_rate_ci95": [
+    0.0,
+    1.0
+   ],
+   "base_bad_rate": 0.1963,
+   "auto_share": 0.0,
+   "good_pr_hours_saved": 0.0
+  },
+  "pa_v0_auto": {
+   "n": 214,
+   "bad": 42,
+   "auto": 21,
+   "human_reviews": 158,
+   "blocked": 35,
+   "bad_auto": 0,
+   "bad_through": 33,
+   "bad_blocked": 9,
+   "good_blocked": 26,
+   "good_waiting_human": 125,
+   "good_auto": 21,
+   "auto_bad_rate": 0.0,
+   "auto_bad_rate_ci95": [
+    0.0,
+    0.1546
+   ],
+   "base_bad_rate": 0.1963,
+   "auto_share": 0.0981,
+   "good_pr_hours_saved": 71.1
+  },
+  "auto_on_green": {
+   "n": 214,
+   "bad": 42,
+   "auto": 31,
+   "human_reviews": 183,
+   "blocked": 0,
+   "bad_auto": 3,
+   "bad_through": 42,
+   "bad_blocked": 0,
+   "good_blocked": 0,
+   "good_waiting_human": 144,
+   "good_auto": 28,
+   "auto_bad_rate": 0.0968,
+   "auto_bad_rate_ci95": [
+    0.0335,
+    0.249
+   ],
+   "base_bad_rate": 0.1963,
+   "auto_share": 0.1449,
+   "good_pr_hours_saved": 51.7
+  },
+  "auto_on_code_green": {
+   "n": 214,
+   "bad": 42,
+   "auto": 29,
+   "human_reviews": 185,
+   "blocked": 0,
+   "bad_auto": 1,
+   "bad_through": 42,
+   "bad_blocked": 0,
+   "good_blocked": 0,
+   "good_waiting_human": 144,
+   "good_auto": 28,
+   "auto_bad_rate": 0.0345,
+   "auto_bad_rate_ci95": [
+    0.0061,
+    0.1718
+   ],
+   "base_bad_rate": 0.1963,
+   "auto_share": 0.1355,
+   "good_pr_hours_saved": 107.2
+  },
+  "decision7_draft": {
+   "n": 214,
+   "bad": 42,
+   "auto": 5,
+   "human_reviews": 175,
+   "blocked": 34,
+   "bad_auto": 0,
+   "bad_through": 33,
+   "bad_blocked": 9,
+   "good_blocked": 25,
+   "good_waiting_human": 142,
+   "good_auto": 5,
+   "auto_bad_rate": 0.0,
+   "auto_bad_rate_ci95": [
+    0.0,
+    0.4345
+   ],
+   "base_bad_rate": 0.1963,
+   "auto_share": 0.0234,
+   "good_pr_hours_saved": 47.8
+  },
+  "auto[all,<=inf,nonsrc]": {
+   "n": 214,
+   "bad": 42,
+   "auto": 81,
+   "human_reviews": 133,
+   "blocked": 0,
+   "bad_auto": 4,
+   "bad_through": 42,
+   "bad_blocked": 0,
+   "good_blocked": 0,
+   "good_waiting_human": 95,
+   "good_auto": 77,
+   "auto_bad_rate": 0.0494,
+   "auto_bad_rate_ci95": [
+    0.0194,
+    0.1202
+   ],
+   "base_bad_rate": 0.1963,
+   "auto_share": 0.3785,
+   "good_pr_hours_saved": 258.8
+  }
+ },
+ "decision7_if_pass": "Auto-merge scope = the pick's rule: a promotion auto-merges into nightly when every check (receipt included) is green, or when it changes no source code and nothing is red; everything else waits for a human. Default branch stays human-granted via Promotion Authority (privileged effect).",
+ "decision7_if_fail": "Do not widen auto-merge on this evidence: keep human merge for source changes; at most auto-merge docs-only changes; re-run the simulator once more history (and real reverts/CI breaks) exists.",
+ "written_before_holdout": true
+}

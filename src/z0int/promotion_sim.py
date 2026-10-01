@@ -610,10 +610,12 @@ def decision7(ev: Mapping[str, Any]) -> str:
 
 
 def threshold(max_size: float, green: str = "code", need_tests: bool = False, need_wired: bool = False,
-              need_receipt: bool = False, docs_free: bool = True) -> Policy:
+              need_receipt: bool = False, docs_free: bool = True, nonsrc_free: bool = False) -> Policy:
     """Auto-merge family: CI green (``all`` / ``code`` / ``any``), size <= max_size, optional PA criteria."""
     def pol(ev: Mapping[str, Any]) -> str:
         if docs_free and ev.get("docs_only") and green != "any" and ev["ci_" + green] != "red":
+            return AUTO
+        if nonsrc_free and not ev.get("touches_src") and green != "any" and ev["ci_" + green] != "red":
             return AUTO
         if green != "any" and ev["ci_" + green] != "green":
             return HUMAN
@@ -628,7 +630,8 @@ def threshold(max_size: float, green: str = "code", need_tests: bool = False, ne
         return AUTO
     pol.__doc__ = (f"auto if ci_{green} green, size<={max_size:g}" + (", tests touched" if need_tests else "")
                    + (", wired" if need_wired else "") + (", receipt ok" if need_receipt else "")
-                   + (" (docs-only auto unless red)" if docs_free else ""))
+                   + (" (docs-only auto unless red)" if docs_free else "")
+                   + (" (no-source-code changes auto unless red)" if nonsrc_free else ""))
     return pol
 
 
@@ -641,9 +644,12 @@ def policies() -> dict[str, Policy]:
             for tests in (False, True):
                 for wired in (False, True):
                     for receipt in (False, True):
-                        name = (f"auto[{green},<={'inf' if size == math.inf else int(size)}"
-                                f"{',tests' if tests else ''}{',wired' if wired else ''}{',receipt' if receipt else ''}]")
-                        pols[name] = threshold(size, green, tests, wired, receipt)
+                        for nonsrc in (False, True):
+                            name = (f"auto[{green},<={'inf' if size == math.inf else int(size)}"
+                                    f"{',tests' if tests else ''}{',wired' if wired else ''}{',receipt' if receipt else ''}"
+                                    f"{',nonsrc' if nonsrc else ''}]")
+                            pols[name] = threshold(size, green, tests, wired, receipt, nonsrc_free=nonsrc)
+    pols["auto[nonsrc-only]"] = threshold(-1, "all", nonsrc_free=True)
     return pols
 
 
@@ -661,8 +667,11 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
 def score(events: list[Mapping[str, Any]], pol: Policy, bad: Callable[[Mapping[str, Any]], bool]) -> dict[str, Any]:
     """Route each event; human catch rate is taken as 0 (every historical bad promotion was human-merged)."""
     c = defaultdict(int)
+    saved = 0.0
     for ev in events:
         r, b = pol(ev), bad(ev)
+        if r == AUTO and not b:
+            saved += ev.get("hours_open") or 0.0
         c[r] += 1
         c[("bad" if b else "good", r)] += 1
     n = len(events)
@@ -677,6 +686,7 @@ def score(events: list[Mapping[str, Any]], pol: Policy, bad: Callable[[Mapping[s
         "auto_bad_rate_ci95": [round(lo, 4), round(hi, 4)],
         "base_bad_rate": round(n_bad / n, 4) if n else None,
         "auto_share": round(auto / n, 4) if n else 0.0,
+        "good_pr_hours_saved": round(saved, 1),   # historical PR open time of good promotions routed AUTO
     }
 
 
@@ -702,7 +712,13 @@ def select(events: list[Mapping[str, Any]], pols: Mapping[str, Policy], bad: Cal
 def dataset_rows(events: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Committed dataset: features and labels, no PR bodies (and private repos already redacted)."""
     drop = {"wired_unreached", "untested"}
-    return [{k: v for k, v in e.items() if k not in drop} for e in events]
+    rows = []
+    for e in events:
+        r = {k: v for k, v in e.items() if k not in drop}
+        if e["repo"] in PRIVATE_REPOS:
+            r["label_files"] = [_redact(e["repo"], f) for f in e.get("label_files", [])]
+        rows.append(r)
+    return rows
 
 
 def _load(path: Path) -> list[dict[str, Any]]:
@@ -724,9 +740,18 @@ def _fmt_table(table: Mapping[str, Mapping[str, Any]], names: Iterable[str]) -> 
     return "\n".join(rows)
 
 
+HYPOTHESES = [
+    "H1 (primary): the pick passes `holdout_pass` on the holdout.",
+    "H2: Promotion Authority v0's BLOCK (ABSTAIN) is weakly discriminative: on the holdout the bad rate among "
+    "ABSTAIN events is < 2x the holdout base bad rate (so as a hard gate it delays more good than bad).",
+    "H3: decision7_draft's auto-merged events have a bad rate <= the holdout base bad rate (reported, small n).",
+    "H4: pa_v0_auto's auto-merged events have a bad rate <= 0.5x the holdout base bad rate (reported).",
+]
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="z0int promote sim", description="Replay promotion policies over real history.")
-    ap.add_argument("stage", choices=["collect", "build", "relabel", "score", "prereg", "holdout"])
+    ap.add_argument("stage", choices=["collect", "build", "relabel", "export", "score", "prereg", "holdout"])
     ap.add_argument("--owner", default="kvnloo")
     ap.add_argument("--repo", action="append", dest="repos", help="repeatable; default: the z0 repos")
     ap.add_argument("--cache", default=str(Path.home() / ".cache" / "promotion-sim"))
@@ -750,6 +775,13 @@ def main(argv: list[str] | None = None) -> int:
         (out / "dataset.json").write_text(json.dumps({"schema": SCHEMA + ".dataset", "n": len(ev),
                                                       "events": dataset_rows(ev)}, indent=1))
         print(f"{len(ev)} events -> {evp}, {out / 'dataset.json'}")
+        return 0
+    if a.stage == "export":
+        out.mkdir(parents=True, exist_ok=True)
+        ev = _load(evp)
+        (out / "dataset.json").write_text(json.dumps({"schema": SCHEMA + ".dataset", "n": len(ev),
+                                                      "events_file_sha": pa._sha(ev, 16), "events": dataset_rows(ev)}, indent=1))
+        print(f"{len(ev)} events -> {out / 'dataset.json'}")
         return 0
     if a.stage == "relabel":
         ev = relabel(cache, _load(evp))
@@ -779,7 +811,7 @@ def main(argv: list[str] | None = None) -> int:
                    "pick_rule": pols[sel["pick"]].__doc__ if sel["pick"] else None,
                    "holdout_pass": ("pick's auto bad rate on holdout <= 0.5 x holdout base bad rate AND pick auto-merges "
                                     ">= 20% of holdout events AND pick's bad_auto <= human_all's bad_through x 0.5"),
-                   "compare": named, "train": {n: sel["table"][n] for n in named + [sel["pick"]] if n}}
+                   "hypotheses": HYPOTHESES, "compare": named, "train": {n: sel["table"][n] for n in named + [sel["pick"]] if n}}
             (out / "prereg.json").write_text(json.dumps(pre, indent=1))
             print(f"pre-registered -> {out / 'prereg.json'} (commit it before running `holdout`)")
         return 0
@@ -793,10 +825,18 @@ def main(argv: list[str] | None = None) -> int:
     m, base = table[pick], table["human_all"]["base_bad_rate"] or 0.0
     passed = (m["auto_bad_rate"] is not None and m["auto_bad_rate"] <= 0.5 * base and m["auto_share"] >= 0.2
               and m["bad_auto"] <= 0.5 * table["human_all"]["bad_through"])
+    ab = [e for e in hold if e["pa_v0"] == "ABSTAIN"]
+    ab_rate = sum(map(bad, ab)) / len(ab) if ab else None
+    d7, pav = table["decision7_draft"], table["pa_v0_auto"]
+    hyp = {"H1": passed,
+           "H2": None if ab_rate is None else ab_rate < 2 * base,
+           "H3": None if not d7["auto"] else d7["auto_bad_rate"] <= base,
+           "H4": None if not pav["auto"] else pav["auto_bad_rate"] <= 0.5 * base}
     res = {"schema": SCHEMA + ".holdout", "prereg": pre["pick"], "n_holdout": len(hold), "base_bad_rate": base,
-           "pass": passed, "table": table}
+           "pass": passed, "hypotheses": hyp, "pa_v0_abstain": {"n": len(ab), "bad": sum(map(bad, ab)), "bad_rate": ab_rate},
+           "table": table}
     (out / "results_holdout.json").write_text(json.dumps(res, indent=1))
-    print(f"holdout: {len(hold)} events, base bad rate {base:.3f}; pick {pick}: {'PASS' if passed else 'FAIL'}")
+    print(f"holdout: {len(hold)} events, base bad rate {base:.3f}; pick {pick}: {'PASS' if passed else 'FAIL'}; {hyp}")
     print(_fmt_table(table, names))
     return 0 if passed else 1
 

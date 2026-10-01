@@ -123,6 +123,8 @@ def test_holdout_refuses_changed_events(tmp_path):
     assert ps.main(["prereg", "--events", str(p), "--out", str(out)]) == 0
     pre = json.loads((out / "prereg.json").read_text())
     assert pre["split"]["n_holdout"] == 6
+    assert ps.main(["holdout", "--events", str(p), "--out", str(out)]) in (0, 1)
+    assert set(json.loads((out / "results_holdout.json").read_text())["hypotheses"]) == {"H1", "H2", "H3", "H4"}
     evs[0]["reverted"] = True
     p.write_text(json.dumps(evs))
     assert ps.main(["holdout", "--events", str(p), "--out", str(out)]) == 2
