@@ -135,8 +135,11 @@ def test_observation_join_change_does_not_change_dispatch_fingerprint():
     assert dispatch_authority.fingerprint(first_projected) == dispatch_authority.fingerprint(second_projected)
 
 
-def test_shadow_handler_never_enters_dispatch(monkeypatch):
-    from z0int import intelligence
+def test_shadow_handler_never_enters_dispatch_and_persists_observation(
+    monkeypatch,
+    tmp_path,
+):
+    from z0int import intelligence, receipt
 
     monkeypatch.setattr(
         intelligence,
@@ -158,13 +161,89 @@ def test_shadow_handler_never_enters_dispatch(monkeypatch):
         lambda args: pytest.fail("shadow mode entered physical dispatch"),
     )
 
-    result = handle_bridge_request(request())
+    value = request()
+    result = handle_bridge_request(value, receipt_root=tmp_path)
     assert result["ok"] is True
     assert result["mode"] == "shadow"
     assert result["executed"] is False
     assert result["reconcile_required"] is False
-    assert result["request_sha256"] == canonical_request_fingerprint(request())
+    assert result["replayed"] is False
+    assert result["request_sha256"] == canonical_request_fingerprint(value)
     assert result["route"]["kind"] == "PARENT_ONLY"
+
+    stored = receipt.find_receipt(value["trace_id"], root=tmp_path)
+    assert stored is not None
+    assert stored["execution"] == "shadow"
+    assert stored["route"] == "shadow"
+    assert stored["prediction"] == "PARENT_ONLY"
+    assert stored["action_taken"] == "not_applied"
+    assert "outcome" not in stored
+    assert stored["measurement_state"] == "unknown"
+    assert stored["extra"]["physical_call_attempted"] is False
+    assert stored["extra"]["caller_request_sha256"] == canonical_request_fingerprint(value)
+    assert stored["extra"]["observation_id"] == "obs-1"
+    assert stored["extra"]["reliability_event_id"] == "rel-1"
+
+
+def test_shadow_replay_is_idempotent_and_does_not_reroute(monkeypatch, tmp_path):
+    from z0int import intelligence, receipt
+
+    calls = {"route": 0}
+
+    monkeypatch.setattr(
+        intelligence,
+        "routing_snapshot",
+        lambda args: {"fixture": True},
+    )
+
+    def route_once(args, snapshot):
+        calls["route"] += 1
+        return {
+            "kind": "PARENT_ONLY",
+            "reason": "stable fixture",
+            "executed": False,
+        }
+
+    monkeypatch.setattr(intelligence, "route", route_once)
+    value = request()
+
+    first = handle_bridge_request(value, receipt_root=tmp_path)
+    second = handle_bridge_request(value, receipt_root=tmp_path)
+
+    assert first["replayed"] is False
+    assert second["replayed"] is True
+    assert first["route"] == second["route"]
+    assert calls["route"] == 1
+
+    rows = receipt.receipts_path(tmp_path).read_text().strip().splitlines()
+    assert len(rows) == 1
+
+
+def test_shadow_same_trace_changed_request_is_conflict(monkeypatch, tmp_path):
+    from z0int import intelligence
+
+    monkeypatch.setattr(
+        intelligence,
+        "routing_snapshot",
+        lambda args: {"fixture": True},
+    )
+    monkeypatch.setattr(
+        intelligence,
+        "route",
+        lambda args, snapshot: {
+            "kind": "PARENT_ONLY",
+            "reason": "fixture",
+            "executed": False,
+        },
+    )
+
+    first = request()
+    handle_bridge_request(first, receipt_root=tmp_path)
+
+    changed = copy.deepcopy(first)
+    changed["capability"]["task"] = "semantic mutation under same operation"
+    with pytest.raises(BridgeValidationError, match="shadow trace conflict"):
+        handle_bridge_request(changed, receipt_root=tmp_path)
 
 
 def test_trace_must_be_derived_from_parent_and_operation():
