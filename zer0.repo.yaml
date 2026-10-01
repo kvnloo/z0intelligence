@@ -108,7 +108,7 @@ architecture:
     - id: k8s-hermes-lab
       name: Kubernetes hermes-lab execution lane
       kind: deployment
-      summary: Keeps z0int decision/dispatch authority and local model control host-side while exposing a hardened in-cluster executor through the hermes-lab service boundary; provider credentials may be explicitly scoped into the executor as Kubernetes secrets.
+      summary: Current merged topology is a single-replica bounded remote-worker lane, not an autoscaled all-model fabric. z0int decision/dispatch authority and local Laya/SoL-Pi/RLM control remain host-side; the in-cluster executor defaults to the explicitly enabled OpenRouter provider, with provider credentials scoped as Kubernetes secrets.
       paths:
         - deploy/k8s/intelligence-host-service.yaml
         - deploy/k8s/intelligence-executor.yaml
