@@ -39,6 +39,7 @@ def execute(args):
     common={'request':args,'owner':owner,'protocol_version':3}
     claim=request('claim',common)
     if not claim['claimed']:return claim['result']
+    admission_id=claim.get('aodl_admission_receipt_id')
     worker,policy,providers,plan=validate_remote(args)
     if args['provider'] not in os.environ.get('Z0INT_EXECUTOR_PROVIDERS','openrouter').split(','):
         raise ValueError('Provider not enabled on this executor')
@@ -60,6 +61,8 @@ def execute(args):
     plan={**plan,'harness':args['harness'],'caller_trace_id':args['trace_id']}
     result=execute_plan(worker,policy,providers,plan,receipt_sink=sink,
         admission=RemoteAdmission(),receipt_location=os.environ.get('Z0INT_AUTHORITY_URL','http://127.0.0.1:11501')+'/canonical-receipts')
+    result={**result,'trace_id':args['trace_id']}
+    if admission_id:result['aodl_admission_receipt_id']=admission_id
     return request('complete',{**common,'result':result})
 
 

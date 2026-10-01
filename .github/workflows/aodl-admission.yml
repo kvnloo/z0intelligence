@@ -6,15 +6,27 @@ on:
       - "src/z0int/aodl_admission.py"
       - "src/z0int/aodl_dispatch.py"
       - "src/z0int/aodl_observation.py"
+      - "src/z0int/governed_worker.py"
       - "src/z0int/tokenomics_emit.py"
       - "src/z0int/dispatch_authority.py"
       - "src/z0int/intelligence_service.py"
       - "src/z0int/remote_executor.py"
       - "tests/test_aodl_admission.py"
       - "tests/test_aodl_observation.py"
+      - "tests/test_governed_worker.py"
+      - "tests/test_golden_canary_wrapper.py"
+      - "tests/test-governed-client.mjs"
       - "tests/test_dispatch_authority.py"
       - "tests/test_intelligence_service.py"
+      - "contracts/aodl/governed-worker-v1.json"
+      - "harness-adapters/governed-client.mjs"
+      - "omp-extensions/z0int-intelligence/index.ts"
+      - "scripts/prove-intelligence.py"
+      - "scripts/run-aodl-golden-canary.py"
+      - "scripts/prove-intelligence-omp.mjs"
+      - "scripts/prove-governed-omp-tool.mjs"
       - "docs/aodl-admission.md"
+      - "docs/aodl-observation.md"
       - "docs/dispatch-authority.md"
       - "pyproject.toml"
       - "requirements.txt"
@@ -24,15 +36,27 @@ on:
       - "src/z0int/aodl_admission.py"
       - "src/z0int/aodl_dispatch.py"
       - "src/z0int/aodl_observation.py"
+      - "src/z0int/governed_worker.py"
       - "src/z0int/tokenomics_emit.py"
       - "src/z0int/dispatch_authority.py"
       - "src/z0int/intelligence_service.py"
       - "src/z0int/remote_executor.py"
       - "tests/test_aodl_admission.py"
       - "tests/test_aodl_observation.py"
+      - "tests/test_governed_worker.py"
+      - "tests/test_golden_canary_wrapper.py"
+      - "tests/test-governed-client.mjs"
       - "tests/test_dispatch_authority.py"
       - "tests/test_intelligence_service.py"
+      - "contracts/aodl/governed-worker-v1.json"
+      - "harness-adapters/governed-client.mjs"
+      - "omp-extensions/z0int-intelligence/index.ts"
+      - "scripts/prove-intelligence.py"
+      - "scripts/run-aodl-golden-canary.py"
+      - "scripts/prove-intelligence-omp.mjs"
+      - "scripts/prove-governed-omp-tool.mjs"
       - "docs/aodl-admission.md"
+      - "docs/aodl-observation.md"
       - "docs/dispatch-authority.md"
       - "pyproject.toml"
       - "requirements.txt"
@@ -49,6 +73,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Install focused test dependencies
         run: |
           python -m pip install pytest==8.4.2
@@ -59,20 +86,48 @@ jobs:
             src/z0int/aodl_admission.py \
             src/z0int/aodl_dispatch.py \
             src/z0int/aodl_observation.py \
+            src/z0int/governed_worker.py \
             src/z0int/tokenomics_emit.py \
             src/z0int/dispatch_authority.py \
             src/z0int/intelligence_service.py \
             src/z0int/remote_executor.py \
             tests/test_aodl_admission.py \
             tests/test_aodl_observation.py \
+            tests/test_governed_worker.py \
+            tests/test_golden_canary_wrapper.py \
             tests/test_dispatch_authority.py \
-            tests/test_intelligence_service.py
-      - name: Admission and authority regression suite
+            tests/test_intelligence_service.py \
+            scripts/prove-intelligence.py \
+            scripts/run-aodl-golden-canary.py
+      - name: Admission and governed-worker regression suite
         env:
           PYTHONPATH: src
         run: |
           python -m pytest -q \
             tests/test_aodl_admission.py \
             tests/test_aodl_observation.py \
+            tests/test_governed_worker.py \
+            tests/test_golden_canary_wrapper.py \
             tests/test_dispatch_authority.py \
             tests/test_intelligence_service.py
+      - name: Validate governed canary contract
+        env:
+          PYTHONPATH: src
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import aodl_contract
+          path=Path("contracts/aodl/governed-worker-v1.json")
+          doc=json.loads(path.read_text())
+          issues=aodl_contract.validate(doc)
+          assert not issues, [str(i) for i in issues]
+          fp=aodl_contract.semantic_fingerprint(doc)
+          assert fp.startswith("aodl-canon-1:")
+          print(fp)
+          PY
+      - name: OMP governed selector tests
+        run: |
+          node --test tests/test-governed-client.mjs
+          node --check scripts/prove-intelligence-omp.mjs
+          node --check scripts/prove-governed-omp-tool.mjs
