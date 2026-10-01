@@ -226,6 +226,10 @@ def decide_spawn(
         parent_depth = _nonnegative_int(request.parent_depth, "parent_depth")
         if not isinstance(request.parent_node_id, str) or not request.parent_node_id:
             raise ValueError("parent_node_id must be a non-empty string")
+        if not isinstance(request.observed, Mapping) or not isinstance(request.proposed, Mapping):
+            raise ValueError("observed and proposed spend must be mappings")
+        if isinstance(request.requested, (str, bytes)) or not isinstance(request.requested, Sequence):
+            raise ValueError("requested capabilities must be a sequence of strings")
         if not all(isinstance(cap, str) for cap in request.requested):
             raise ValueError("requested capabilities must be strings")
 
