@@ -444,6 +444,18 @@ def posture_annotate(plan, route_kind='offload', policy=None, providers=None, av
     return plan
 
 
+def speed_annotate(plan, task, context, policy, providers, available_fn=None):
+    """Speed-first offload (z0int.speed_offload), shadow only: annotates ``plan['speed_offload']`` with
+    ``would_offload_for_speed`` and never changes candidates. Fail-open."""
+    try:
+        from .speed_offload import annotate
+        annotate(plan, task, context, policy, providers, available_fn)
+    except Exception as exc:
+        plan['speed_offload'] = {'action': 'defer_to_posture', 'would_offload_for_speed': False, 'shadow': True,
+                                 'reason': f'error:{type(exc).__name__}'}
+    return plan
+
+
 def route_worker(args):
     from .dispatch_authority import run,identity
     request={**args,'harness':args.get('harness','codex'),'function':'cheap_bounded_worker'}
@@ -455,6 +467,7 @@ def route_worker(args):
         plan={**plan_route(args['task'],policy,providers),'source':'z0intelligence.task_rules',
               'harness':request['harness'],'caller_trace_id':request['trace_id']}
         posture_annotate(plan,policy=policy,providers=providers)
+        speed_annotate(plan,args['task'],args.get('context',''),policy,providers)
         return execute_plan(args,policy,providers,plan,receipt_sink=sink)
     return run(request,work)
 

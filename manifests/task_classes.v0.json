@@ -1,0 +1,65 @@
+{
+  "schema": "z0int.task_classes.v0",
+  "revision": "v0-unmeasured",
+  "doc": "Worker task classes with evidence-backed local-vs-frontier equivalence records. Measured under benchmarks/speed_offload/PREREG.md; consumed by z0int.speed_offload (shadow).",
+  "local_route": {
+    "provider": "groot",
+    "model": "qwen3-8b-q4km"
+  },
+  "evidence": {
+    "path": "~/.z0int/evidence/speed-offload-v0.json",
+    "sha256": null
+  },
+  "classes": {
+    "evidence_sufficiency": {
+      "description": "Three-way judgement: does the evidence support, contradict, or not establish a claim.",
+      "patterns": [
+        "\\bevidence\\b",
+        "\\b(sufficien\\w*|insufficient|supported|contradicted)\\b"
+      ],
+      "equivalence": {
+        "status": "unmeasured"
+      }
+    },
+    "extract_json": {
+      "description": "Extract named fields from a tool output or receipt into a JSON object.",
+      "patterns": [
+        "\\bextract\\w*\\b",
+        "\\bjson\\b"
+      ],
+      "equivalence": {
+        "status": "unmeasured"
+      }
+    },
+    "classify_file_type": {
+      "description": "Classify the file type / language of a file excerpt (tool Read output).",
+      "patterns": [
+        "\\bclassify\\b",
+        "\\bfile[ -]type\\b"
+      ],
+      "equivalence": {
+        "status": "unmeasured"
+      }
+    },
+    "summarize_tool_output": {
+      "description": "Summarize a tool output (git, logs, diffs) under a word limit, keeping key facts.",
+      "patterns": [
+        "\\bsummari[sz]e\\b",
+        "\\b(output|commit|diff|logs?|stdout|stderr)\\b"
+      ],
+      "equivalence": {
+        "status": "unmeasured"
+      }
+    },
+    "short_rewrite": {
+      "description": "Rewrite a sentence under a word limit, preserving code spans verbatim.",
+      "patterns": [
+        "\\b(rewrite|shorten|condense)\\b",
+        "\\bat most \\d+ words\\b"
+      ],
+      "equivalence": {
+        "status": "unmeasured"
+      }
+    }
+  }
+}

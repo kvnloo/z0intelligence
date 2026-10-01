@@ -168,10 +168,36 @@ def execute(args, selected, *, receipt_sink):
         admission.release(permit,status,(time.monotonic()-start)*1000)
 
 
+def speed_annotate_route(args, selected, snapshot):
+    """Shadow speed-first annotation on a capability route (z0int.speed_offload); never changes the route.
+
+    The capability registry has no entry for host-local tailnet routes (groot), and plan_route only consults
+    local_order for local-only tasks, so general work can never reach groot here. The speed annotation is
+    keyed by task class, not by function/category, and records what speed-first routing would do."""
+    try:
+        from .posture import shadow_annotation
+        try:
+            ann=shadow_annotation('offload')
+        except Exception as exc:
+            ann={'available':False,'error':type(exc).__name__}
+        from .speed_offload import decide
+        avail=snapshot.get('available_providers') or set()
+        d=decide(args['task'],args.get('context',''),ann,snapshot['policy'],snapshot['providers'],lambda p,c:p in avail)
+        d['candidates']=[f"{c['provider']}/{c['model']}" for c in d['candidates']]
+        d['route_kind']=selected.get('kind');d['shadow']=True
+        selected['speed_offload']=d
+    except Exception as exc:
+        selected['speed_offload']={'action':'defer_to_posture','would_offload_for_speed':False,'shadow':True,'reason':f'error:{type(exc).__name__}'}
+    return selected
+
+
 def dispatch(args):
     """Execution and routing delegate all claim/ledger ownership to the authority."""
     from .dispatch_authority import run
     validate(args)
     def work(receipt_sink):
-        return execute(args,route(args,routing_snapshot(args)),receipt_sink=receipt_sink)
+        snapshot=routing_snapshot(args)
+        selected=route(args,snapshot)
+        speed_annotate_route(args,selected,snapshot)
+        return execute(args,selected,receipt_sink=receipt_sink)
     return run(args,work)

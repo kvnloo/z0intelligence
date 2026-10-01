@@ -101,6 +101,7 @@ def load(arm):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--write-evidence', action='store_true')
+    ap.add_argument('--write-registry', action='store_true', help='also record equivalence in manifests/task_classes.v0.json')
     a = ap.parse_args()
     arms = {arm: load(arm) for arm in ['local'] + FRONTIER}
     report = {'schema': 'z0int.speed_offload.evidence.v0', 'prereg': 'benchmarks/speed_offload/PREREG.md',
@@ -156,6 +157,34 @@ def main():
         EVIDENCE.parent.mkdir(parents=True, exist_ok=True)
         EVIDENCE.write_text(text)
         print('evidence', EVIDENCE, hashlib.sha256(text.encode()).hexdigest())
+    if a.write_registry:
+        write_registry(report, hashlib.sha256(text.encode()).hexdigest())
+
+
+def write_registry(report, evidence_sha256):
+    path = ROOT / 'manifests/task_classes.v0.json'
+    reg = json.loads(path.read_text())
+    sets = json.loads((HERE / 'sets_manifest.json').read_text())['classes']
+    reg['revision'] = 'v0-' + evidence_sha256[:12]
+    reg['evidence'] = {'path': str(EVIDENCE).replace(str(Path.home()), '~'), 'sha256': evidence_sha256}
+    for cls, r in report['classes'].items():
+        arms = r['arms']
+        q, l = r['quality_comparator'], r['latency_comparator']
+        reg['classes'][cls]['equivalence'] = {
+            'status': r['status'], 'prereg': report['prereg'], 'n': arms['local']['n'],
+            'set_sha256': sets[cls]['sha256'], 'max_context_chars': sets[cls]['max_context_chars'],
+            'local': {'route': report['local_route'], 'pass': arms['local']['pass'], 'errors': arms['local']['errors'],
+                      'p50_ms': round(arms['local']['p50_ms']), 'p95_ms': round(arms['local']['p95_ms'])},
+            'frontier': {f: {'pass': arms[f]['pass'], 'errors': arms[f]['errors'], 'p50_api_ms': round(arms[f]['p50_ms']),
+                             'p95_api_ms': round(arms[f]['p95_ms']), 'p95_wall_ms': round(arms[f]['wall_p95_ms'])}
+                         for f in FRONTIER},
+            'quality_comparator': q, 'latency_comparator': l,
+            'diff_lower_bound_95': round(r['diff_lower_bound_95'], 4), 'margin': DELTA,
+            'speedup_p95': round(r['speedup_p95'], 1) if r['speedup_p95'] else None,
+            'receipts': {arm: arms[arm]['receipt_ids'][:3] for arm in arms},
+            'run_ids': {arm: report['run_files'][arm]['run_ids'] for arm in report['run_files']}}
+    path.write_text(json.dumps(reg, indent=2) + '\n')
+    print('registry', path, reg['revision'])
 
 
 if __name__ == '__main__':
