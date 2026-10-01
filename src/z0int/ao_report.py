@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .ao_bridge import CAPABILITY, ao_events_path
+from .ao_experiment import list_pairs
 from .receipt import receipts_path
 
 
@@ -32,16 +33,21 @@ def _iter_jsonl(path: Path):
                 yield row
 
 
-def _latest_ao_receipts(root: Path | None = None) -> dict[str, dict[str, Any]]:
+def _latest_receipts(root: Path | None = None) -> dict[str, dict[str, Any]]:
     latest: dict[str, dict[str, Any]] = {}
     for row in _iter_jsonl(receipts_path(root)) or []:
         trace_id = row.get("trace_id")
-        if not isinstance(trace_id, str) or not trace_id:
-            continue
-        if row.get("capability_id") != CAPABILITY:
-            continue
-        latest[trace_id] = row
+        if isinstance(trace_id, str) and trace_id:
+            latest[trace_id] = row
     return latest
+
+
+def _latest_ao_receipts(root: Path | None = None) -> dict[str, dict[str, Any]]:
+    return {
+        trace_id: row
+        for trace_id, row in _latest_receipts(root).items()
+        if row.get("capability_id") == CAPABILITY
+    }
 
 
 def _ao_events(root: Path | None = None) -> list[dict[str, Any]]:
@@ -112,6 +118,123 @@ def _trace_verdict(events: list[dict[str, Any]]) -> str:
     if has_negative:
         return "negative"
     return "unscored"
+
+
+def _receipt_verdict(row: dict[str, Any]) -> str:
+    tier = row.get("outcome_tier")
+    if tier == "gold":
+        return "gold"
+    if tier == "negative":
+        return "negative"
+    return "unscored"
+
+
+def _trace_metric(
+    trace_id: str,
+    row: dict[str, Any],
+    events_by_trace: dict[str, list[dict[str, Any]]],
+    key: str,
+) -> Any:
+    value = _latest_outcome_value(events_by_trace.get(trace_id, []), key)
+    if value is None:
+        outcome = row.get("outcome") if isinstance(row.get("outcome"), dict) else {}
+        value = outcome.get(key)
+    if isinstance(value, bool):
+        return int(value)
+    return value
+
+
+def _registry_comparison(
+    pair_rows: list[dict[str, Any]],
+    ao_receipts: dict[str, dict[str, Any]],
+    all_receipts: dict[str, dict[str, Any]],
+    events_by_trace: dict[str, list[dict[str, Any]]],
+) -> dict[str, Any]:
+    valid: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    trace_pairs: list[tuple[str, str]] = []
+    excluded: Counter[str] = Counter()
+
+    for pair in pair_rows:
+        candidate_trace = pair.get("candidate_trace_id")
+        reference_trace = pair.get("reference_trace_id")
+        if not isinstance(candidate_trace, str) or not isinstance(reference_trace, str):
+            excluded["invalid_registry_trace"] += 1
+            continue
+        candidate = ao_receipts.get(candidate_trace)
+        if candidate is None:
+            excluded["candidate_receipt_missing"] += 1
+            continue
+        reference = all_receipts.get(reference_trace)
+        if reference is None:
+            excluded["reference_receipt_missing"] += 1
+            continue
+        valid.append((candidate, reference))
+        trace_pairs.append((candidate_trace, reference_trace))
+
+    candidate_positive = reference_positive = 0
+    definitive_pairs = 0
+    mixed_or_unscored = 0
+    for (candidate, reference), (candidate_trace, reference_trace) in zip(valid, trace_pairs):
+        candidate_events = events_by_trace.get(candidate_trace, [])
+        c_verdict = _trace_verdict(candidate_events) if candidate_events else _receipt_verdict(candidate)
+        r_verdict = _receipt_verdict(reference)
+        if c_verdict not in ("gold", "negative") or r_verdict not in ("gold", "negative"):
+            mixed_or_unscored += 1
+            continue
+        definitive_pairs += 1
+        candidate_positive += int(c_verdict == "gold")
+        reference_positive += int(r_verdict == "gold")
+
+    candidate_rate = _rate(candidate_positive, definitive_pairs)
+    reference_rate = _rate(reference_positive, definitive_pairs)
+    verified_delta = (
+        candidate_rate - reference_rate
+        if candidate_rate is not None and reference_rate is not None
+        else None
+    )
+
+    latency = _paired_numeric(valid, lambda row: row.get("latency_ms"))
+    tokens = _paired_numeric(valid, lambda row: row.get("measured_frontier_tokens"))
+    cost = _paired_numeric(valid, _decision_cost_usd)
+
+    paired_with_traces = list(zip(valid, trace_pairs))
+
+    def paired_metric(key: str) -> dict[str, Any]:
+        projected = []
+        for (candidate, reference), (candidate_trace, reference_trace) in paired_with_traces:
+            c_row = dict(candidate)
+            r_row = dict(reference)
+            c_row["_metric"] = _trace_metric(candidate_trace, candidate, events_by_trace, key)
+            r_row["_metric"] = _trace_metric(reference_trace, reference, events_by_trace, key)
+            projected.append((c_row, r_row))
+        return _paired_numeric(projected, lambda row: row.get("_metric"))
+
+    return {
+        "source": "pair_registry",
+        "available": bool(valid),
+        "matched_pairs": len(valid),
+        "candidate_reference_outcome_pairs": definitive_pairs,
+        "outcome_pairs_mixed_or_unscored": mixed_or_unscored,
+        "excluded": dict(sorted(excluded.items())),
+        "verified_positive": {
+            "pairs": definitive_pairs,
+            "candidate_rate": candidate_rate,
+            "reference_rate": reference_rate,
+            "delta": verified_delta,
+        },
+        "decision_latency_ms": latency,
+        "frontier_tokens": tokens,
+        "decision_cost_usd": cost,
+        "retries": paired_metric("retries"),
+        "corrections": paired_metric("user_correction"),
+        "reverts": paired_metric("reverted"),
+        "promotion_decision": "not_computed",
+        "reason": (
+            "append-only pair registry; candidate/reference traces explicitly bound"
+            if valid
+            else "pair registry contains no resolvable candidate/reference receipts"
+        ),
+    }
 
 
 def _paired_numeric(
@@ -229,6 +352,7 @@ def _matched_comparison(
     reverts = _paired_numeric(valid, lambda row: latest_metric(row, "reverted"))
 
     return {
+        "source": "inline_receipt_metadata",
         "available": bool(valid),
         "matched_pairs": len(valid),
         "candidate_reference_outcome_pairs": definitive_pairs,
@@ -258,7 +382,14 @@ def _matched_comparison(
 def _snapshot_digest(
     receipts: dict[str, dict[str, Any]],
     events: list[dict[str, Any]],
+    pair_rows: list[dict[str, Any]],
+    all_receipts: dict[str, dict[str, Any]],
 ) -> str:
+    reference_ids = {
+        str(row.get("reference_trace_id"))
+        for row in pair_rows
+        if isinstance(row.get("reference_trace_id"), str)
+    }
     payload = {
         "receipts": [receipts[key] for key in sorted(receipts)],
         "events": sorted(
@@ -269,14 +400,32 @@ def _snapshot_digest(
                 str(row.get("event_sha256") or ""),
             ),
         ),
+        "pairs": sorted(
+            pair_rows,
+            key=lambda row: (
+                str(row.get("experiment_id") or ""),
+                str(row.get("pair_id") or ""),
+            ),
+        ),
+        "references": [
+            all_receipts[key]
+            for key in sorted(reference_ids)
+            if key in all_receipts
+        ],
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
     return hashlib.sha256(raw).hexdigest()
 
 
 def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
-    receipts = _latest_ao_receipts(root)
+    all_receipts = _latest_receipts(root)
+    receipts = {
+        trace_id: row
+        for trace_id, row in all_receipts.items()
+        if row.get("capability_id") == CAPABILITY
+    }
     events = _ao_events(root)
+    pair_rows = list_pairs(root=root)
     traces = set(receipts)
 
     action_counts = Counter(str(row.get("prediction") or "unknown") for row in receipts.values())
@@ -420,7 +569,11 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
         # probability. Do not compute Brier/ECE from it without a defined target.
         row["calibration_ready"] = False
 
-    comparison = _matched_comparison(receipts, events_by_trace)
+    comparison = (
+        _registry_comparison(pair_rows, receipts, all_receipts, events_by_trace)
+        if pair_rows
+        else _matched_comparison(receipts, events_by_trace)
+    )
 
     evidence_gaps = []
     if non_abstain == 0:
@@ -444,7 +597,7 @@ def build_ao_promotion_report(*, root: Path | None = None) -> dict[str, Any]:
 
     return {
         "schema": "ao.z0int.promotion_report.v1",
-        "snapshot_sha256": _snapshot_digest(receipts, events),
+        "snapshot_sha256": _snapshot_digest(receipts, events, pair_rows, all_receipts),
         "decisions": {
             "count": len(receipts),
             "actions": dict(sorted(action_counts.items())),
