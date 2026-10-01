@@ -27,7 +27,7 @@ _CONSTRAINT_FIELDS = {"explicit_harness", "explicit_model", "explicit_mode"}
 _OUTCOME_FIELDS = {"schema", "trace_id", "session_id", "outcome_id", "outcome", "evidence"}
 _EVIDENCE_FIELDS = {
     "project_id", "kind", "harness", "mode", "model", "activity",
-    "terminated", "scm_complete", "prs",
+    "disposition", "terminated", "scm_complete", "prs",
 }
 _EVIDENCE_PR_FIELDS = {
     "url", "number", "draft", "merged", "closed", "ci", "review",
@@ -179,6 +179,8 @@ def validate_outcome(args: dict[str, Any]) -> Outcome:
     _text(evidence.get("mode"), "evidence.mode", 100, allow_empty=True)
     _text(evidence.get("model", ""), "evidence.model", 500, allow_empty=True)
     _text(evidence.get("activity"), "evidence.activity", 100, allow_empty=True)
+    if evidence.get("disposition") not in ("terminated", "seed_deleted"):
+        raise ValueError("Invalid evidence.disposition")
     _bool(evidence.get("terminated"), "evidence.terminated")
     _bool(evidence.get("scm_complete"), "evidence.scm_complete")
 
