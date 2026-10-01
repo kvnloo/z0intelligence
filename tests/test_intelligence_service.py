@@ -46,3 +46,35 @@ def test_metrics_track_real_dispatch_and_replay(tmp_path,monkeypatch):
         assert 'z0intelligence_dispatch_active 0\n' in text
         assert '# TYPE z0intelligence_dispatch_active gauge' in text
     finally:server.shutdown();server.server_close();thread.join()
+
+def test_readyz_requires_aodl_canon_v1(monkeypatch):
+    import json
+    import z0int.intelligence_service as svc
+    monkeypatch.setattr(svc,'aodl_admission_state',lambda:{'aodl_admission_ready':False,'aodl_canon_version':None})
+    server=Service(('127.0.0.1',0),Handler)
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        url=f'http://127.0.0.1:{server.server_address[1]}/readyz'
+        try:
+            urllib.request.urlopen(url)
+            assert False,'readyz unexpectedly succeeded without AODL'
+        except urllib.error.HTTPError as exc:
+            assert exc.code==503
+    finally:server.shutdown();server.server_close();thread.join()
+
+
+def test_readyz_reports_protocol_v3_with_aodl(monkeypatch):
+    import json
+    import z0int.intelligence_service as svc
+    monkeypatch.setattr(svc,'aodl_admission_state',lambda:{'aodl_admission_ready':True,'aodl_canon_version':'aodl-canon-1'})
+    server=Service(('127.0.0.1',0),Handler)
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        with urllib.request.urlopen(f'http://127.0.0.1:{server.server_address[1]}/readyz') as response:
+            body=json.load(response)
+        assert body['authority_protocol_version']==3
+        assert body['supported_authority_protocol_versions']==[2,3]
+        assert body['aodl_admission_ready'] is True
+        assert body['aodl_canon_version']=='aodl-canon-1'
+    finally:server.shutdown();server.server_close();thread.join()
+
