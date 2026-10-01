@@ -51,6 +51,7 @@ def outcome_event(session_id="proj-1"):
             "mode": "chat",
             "model": "gpt-5",
             "activity": "idle",
+            "disposition": "terminated",
             "terminated": True,
             "scm_complete": True,
             "prs": [{
@@ -121,6 +122,24 @@ class AOBridgeTests(unittest.TestCase):
         stored = find_receipt("ao-spawn-s1", root=self.root)
         self.assertIsNone(stored.get("outcome_tier"))
         self.assertTrue(stored["extra"]["ao_outcome_evidence"]["terminated"])
+
+    def test_seed_deleted_evidence_is_retained_without_outcome_tier(self):
+        spawn_decision(request(), root=self.root)
+        event = outcome_event()
+        event["outcome_id"] = "ao-outcome-proj-1-seed-deleted"
+        event["outcome"] = {"source": "agent-orchestrator"}
+        event["evidence"]["disposition"] = "seed_deleted"
+        event["evidence"]["terminated"] = False
+        event["evidence"]["scm_complete"] = False
+        event["evidence"]["prs"] = []
+
+        result = join_ao_outcome(event, root=self.root)
+        self.assertIsNone(result["outcome_tier"])
+        stored = find_receipt("ao-spawn-s1", root=self.root)
+        self.assertEqual(
+            stored["extra"]["ao_outcome_evidence"]["disposition"],
+            "seed_deleted",
+        )
 
     def test_outcome_cannot_cross_session_boundary(self):
         spawn_decision(request(), root=self.root)
