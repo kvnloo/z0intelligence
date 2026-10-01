@@ -107,7 +107,8 @@ class AOPromotionReportTests(unittest.TestCase):
         self.assertEqual(first["decisions"]["count"], 2)
         self.assertEqual(first["decisions"]["abstain"], 2)
         self.assertEqual(first["outcomes"]["join_coverage"], 1.0)
-        self.assertEqual(first["outcomes"]["terminal_join_coverage"], 1.0)
+        self.assertEqual(first["outcomes"]["terminal_join_coverage"], 0.5)
+        self.assertEqual(first["outcomes"]["final_disposition_join_coverage"], 1.0)
         self.assertEqual(first["outcomes"]["verified_positive_decisions"], 1)
 
         latency = first["measurements"]["decision_latency_ms"]
@@ -123,6 +124,9 @@ class AOPromotionReportTests(unittest.TestCase):
 
         self.assertEqual(first["measurements"]["cost"]["count"], 0)
         self.assertIsNone(first["measurements"]["cost"]["delta"])
+        self.assertIsNone(first["decisions"]["safe_coverage"])
+        self.assertFalse(first["comparison"]["ready"])
+        self.assertIsNone(first["comparison"]["task_success_delta"])
         self.assertEqual(first["promotion"]["decision"], "not_computed")
         self.assertIn(
             "no_non_abstain_policy_decisions",
