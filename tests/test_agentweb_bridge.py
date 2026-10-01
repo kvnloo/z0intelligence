@@ -15,7 +15,7 @@ from z0int.agentweb_bridge import (
 
 
 def request():
-    parent = "agentweb:" + "a" * 24
+    parent = "agentweb:b9c84322f82434cb46e239d2"
     operation = "op-1"
     content = "source-backed evidence"
     return {
@@ -23,7 +23,7 @@ def request():
         "mode": "shadow",
         "operation_id": operation,
         "trace_id": derive_trace_id(parent, operation),
-        "integration_instance": "agentweb-instance:" + "b" * 16,
+        "integration_instance": "agentweb-instance:e759e9548f57a639a875c728",
         "parent_agent": parent,
         "deadline_unix_ms": 4_102_444_800_000,
         "capability": {
@@ -77,6 +77,12 @@ def test_valid_request_projects_to_existing_intelligence_contract():
         "free_only": True,
         "max_tokens": 256,
     }
+
+
+def test_cross_language_semantic_fingerprint_vector():
+    assert canonical_request_fingerprint(request()) == (
+        "9ca1481d7b9494c7b5ae2d75148722be73f1e99a899e7a1815cd17c5805d269d"
+    )
 
 
 def test_same_operation_changed_request_changes_fingerprint_but_not_trace():
