@@ -2,9 +2,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from z0int import paths
 from z0int.ao_bridge import OUTCOME_SCHEMA, join_ao_outcome, spawn_decision
+from z0int.ao_experiment import register_pair
 from z0int.ao_report import build_ao_promotion_report
-from z0int.receipt import append_receipt, attach_experiment, find_receipt
+from z0int.counterfactual import SNAPSHOTS_NAME
+from z0int.receipt import append_receipt, attach_experiment, find_receipt, join_outcome
 
 
 def spawn_request(trace_id: str, session_id: str):
@@ -237,6 +240,86 @@ class AOPromotionReportTests(unittest.TestCase):
         self.assertNotIn(
             "counterfactual_or_control_delta_not_measured",
             report["promotion"]["evidence_gaps"],
+        )
+
+    def test_report_consumes_registry_pair_with_materialized_reference(self):
+        spawn_decision(
+            spawn_request("ao-spawn-registry-candidate", "candidate"),
+            root=self.root,
+        )
+        replay_dir = paths.ensure_layout(self.root)["replay"]
+        snapshot = {
+            "schema": "z0int.task_snapshot.v1",
+            "task_snapshot_id": "registry-task",
+            "arm_id": "reference",
+            "selection_policy": "historical_replay",
+            "replay_grade": "B",
+            "session_id": "historical",
+            "provider": "xai",
+            "model": "grok-reference",
+            "treatment_hash": "reference-treatment",
+            "prompt_hash": "prompt-hash",
+            "output_hash": "output-hash",
+            "usage": {
+                "input": 30,
+                "output": 20,
+                "cacheRead": 0,
+                "totalTokens": 50,
+                "cost_total": 0.05,
+            },
+        }
+        (replay_dir / SNAPSHOTS_NAME).write_text(
+            __import__("json").dumps(snapshot) + "\n",
+            encoding="utf-8",
+        )
+
+        pair = register_pair(
+            experiment_id="registry-exp",
+            pair_id="registry-pair",
+            task_snapshot_id="registry-task",
+            candidate_trace_id="ao-spawn-registry-candidate",
+            root=self.root,
+        )
+        reference_trace = pair["reference_trace_id"]
+
+        join_ao_outcome({
+            "schema": OUTCOME_SCHEMA,
+            "trace_id": "ao-spawn-registry-candidate",
+            "outcome_id": "ao-outcome-registry-candidate-merged",
+            "session_id": "candidate",
+            "outcome": {
+                "pr_merged": True,
+                "source": "agent-orchestrator",
+                "verification_source": "ao-pr-merge",
+            },
+            "evidence": evidence("terminated", terminated=True, merged=True),
+        }, root=self.root)
+        join_outcome(
+            reference_trace,
+            {
+                "ci_failed": True,
+                "source": "historical_verifier",
+                "verification_source": "frozen_reference",
+            },
+            root=self.root,
+        )
+
+        first = build_ao_promotion_report(root=self.root)
+        second = build_ao_promotion_report(root=self.root)
+        comparison = first["comparison"]
+
+        self.assertEqual(first["snapshot_sha256"], second["snapshot_sha256"])
+        self.assertEqual(comparison["source"], "pair_registry")
+        self.assertTrue(comparison["available"])
+        self.assertEqual(comparison["matched_pairs"], 1)
+        self.assertEqual(comparison["candidate_reference_outcome_pairs"], 1)
+        self.assertEqual(comparison["verified_positive"]["delta"], 1.0)
+        self.assertEqual(comparison["frontier_tokens"]["pairs"], 1)
+        self.assertEqual(comparison["frontier_tokens"]["delta_mean"], -50.0)
+        self.assertEqual(comparison["decision_cost_usd"]["pairs"], 1)
+        self.assertAlmostEqual(
+            comparison["decision_cost_usd"]["delta_mean"],
+            -0.05,
         )
 
     def test_report_rejects_pair_with_mismatched_task_snapshot(self):
