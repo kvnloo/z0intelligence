@@ -1,0 +1,7 @@
+{
+  "exact_context_preserved": true,
+  "input_context_chars": 12588,
+  "max_chars": 12588,
+  "scope": "real native collection/spill; controlled hook return; no transport",
+  "spill_notice_present": false
+}

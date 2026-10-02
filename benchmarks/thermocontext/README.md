@@ -11,6 +11,25 @@ frontier with lower measured CPU overhead. This rejects the present promotion
 case, not thermodynamic computation in general. Broader real-evidence usefulness
 remains UNKNOWN; no sampler is activated in Hermes.
 
+## Reverification and native Hermes follow-up
+
+The October 2 round-three rerun preserves the decision above. The original
+432 rows and all 2,520 small-N comparison rows match their prior non-timing
+outputs; all 2,628 retained trace/auxiliary files have identical SHA-256 hashes.
+This repeats the same tasks and seeds and does not increase independent sample
+size. The separately contributed wave at `46d93b0` has 2,060 independently checked
+selected outputs and remains a distinct experiment; its retained trajectories
+are unavailable. Both N=32 stop decisions remain intact. See
+`results/reverification-round3-20261002/audit/THRML_AUDIT_DECISION.json`.
+
+Separately, native Hermes now has a verified factual development-task answer
+through an explicitly priced Nous route. A later five-case context cohort passed
+0/5 strict outcomes, and a separately frozen source-claim prompt clarification
+passed 1/5. Neither smaller-context pair preserves verified success. No useful
+consumed-token saving or Hermes speedup is established. These studies preserve
+exact request bytes, failed work, independent checking and replay; THRML is not
+on their execution path. See `hermes_phase_c/results/` and its README.
+
 This directory is an isolated experiment. It does not change routing, authority,
 production context resolution, or promotion semantics.
 

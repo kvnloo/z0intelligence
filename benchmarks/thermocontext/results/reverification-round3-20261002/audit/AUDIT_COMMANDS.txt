@@ -1,0 +1,45 @@
+Portable no-sampling audit commands (write NEW create-only output files):
+
+Set task-specific paths to the saved result trees after copying or publication:
+  audit_repo=/path/to/z0intelligence
+  audit_review=/path/to/saved/thrml-review
+  audit_python=/workspace/hermes-factory/venvs/thermocontext/bin/python
+  export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+
+Original 432-row reproduction, independent arithmetic and prior-row comparison:
+  "$audit_python" "$audit_review/audit_saved_waves.py" --repo "$audit_repo" \
+    --mode reproduction --root "$audit_review/reproduction" \
+    --prior "$audit_repo/benchmarks/thermocontext/results/next-wave/reproduction/original-20261002" \
+    --out /new/path/reproduction-independent-audit.json
+
+Completed small-N 2520-row cohort, exhaustive references and retained traces:
+  "$audit_python" "$audit_review/audit_saved_waves.py" --repo "$audit_repo" \
+    --mode small --root "$audit_review/small-full" \
+    --prior "$audit_repo/benchmarks/thermocontext/results/next-wave/small-full-20261002" \
+    --out /new/path/small-full-independent-audit.json
+
+Retained trace/auxiliary graph SHA256 equality (timings/provenance excluded):
+  "$audit_python" "$audit_review/compare_trace_artifacts.py" \
+    --prior "$audit_repo/benchmarks/thermocontext/results/next-wave/small-full-20261002" \
+    --rerun "$audit_review/small-full" --out /new/path/small-full-trace-comparison.json
+
+Independent remote wave, separately exported from exact 46d93b02881d73bfab581a7f17c8d0dbc6feb249:
+  "$audit_python" "$audit_review/independent-wave-source/benchmarks/thermocontext/unpack_results.py" \
+    --output /new/path/independent-wave-raw
+  "$audit_python" "$audit_review/audit_saved_waves.py" --repo "$audit_repo" \
+    --mode independent --root /new/path/independent-wave-raw \
+    --prior "$audit_repo/benchmarks/thermocontext/results/next-wave/reproduction/original-20261002" \
+    --exported-source "$audit_review/independent-wave-source" \
+    --out /new/path/remote-wave-independent-audit.json
+
+The remote unpacker validates all archive parts, archive hash, member names and
+file hashes before writing. Its source snapshot and raw archive stay distinct
+from the local next-wave. It preserves selected outputs but no retained traces.
+
+Compact decision synthesis reads the four completed audit receipts by their
+original filenames under --review and writes a NEW report:
+  "$audit_python" "$audit_review/summarize_saved_audits.py" --repo "$audit_repo" \
+    --review "$audit_review" --out /new/path/THRML_AUDIT_DECISION.json
+
+Do not run sampling commands. N32 failure remains the stop; N64/N128 NOT_RUN.
+Repeated same-task/same-seed matches are reproducibility, not new independent trials.

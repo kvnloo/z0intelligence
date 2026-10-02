@@ -1,0 +1,16 @@
+{
+  "citations": [
+    "limits",
+    "source-identity",
+    "gates",
+    "baseline",
+    "guarded",
+    "task_verified_ms",
+    "input_tokens",
+    "output_tokens"
+  ],
+  "hermes_speedup_established": false,
+  "reason": "supported",
+  "status": "SUPPORTED",
+  "tested_source": "a0bca744067d04f05904319d3d919be30c336556"
+}

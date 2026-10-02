@@ -1,0 +1,23 @@
+{
+  "dependency_parity": "UNKNOWN; current versions recorded, historical pins unavailable",
+  "devices": [
+    "cpu:0"
+  ],
+  "packages": {
+    "equinox": "0.13.8",
+    "jax": "0.11.2",
+    "jaxlib": "0.11.2",
+    "jaxtyping": "0.3.11",
+    "numpy": "2.2.6",
+    "thrml": "0.1.4"
+  },
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "published_dependency_versions": "NOT_RECORDED in the published tree",
+  "python": "3.12.14",
+  "thread_environment": {
+    "MKL_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "XLA_FLAGS": null
+  }
+}

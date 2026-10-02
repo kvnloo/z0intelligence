@@ -1,0 +1,521 @@
+{
+  "auditor_sha256": "8b6b3537325a67215babbe74f8732979ed4a2d3d5f93cc12a93896cfb3288c6b",
+  "backend_causal_attribution": false,
+  "cross_study": {
+    "full-complete": {
+      "contexts_and_selections_byte_identical": true,
+      "full_system_byte_identical": true,
+      "raw_forwarded_prompt_only_difference": true,
+      "raw_native_prompt_only_difference": true
+    },
+    "full-missing_source_identity": {
+      "contexts_and_selections_byte_identical": true,
+      "full_system_byte_identical": true,
+      "raw_forwarded_prompt_only_difference": true,
+      "raw_native_prompt_only_difference": true
+    },
+    "minimal-complete": {
+      "contexts_and_selections_byte_identical": true,
+      "full_system_byte_identical": true,
+      "raw_forwarded_prompt_only_difference": true,
+      "raw_native_prompt_only_difference": true
+    },
+    "minimal-contradictory_source_identity": {
+      "contexts_and_selections_byte_identical": true,
+      "full_system_byte_identical": true,
+      "raw_forwarded_prompt_only_difference": true,
+      "raw_native_prompt_only_difference": true
+    },
+    "minimal-missing_source_identity": {
+      "contexts_and_selections_byte_identical": true,
+      "full_system_byte_identical": true,
+      "raw_forwarded_prompt_only_difference": true,
+      "raw_native_prompt_only_difference": true
+    }
+  },
+  "limits": [
+    "One inspected task with controls and a changed prompt contract; no population or holdout inference",
+    "Response provider is null; exact request control does not identify backend or remove temporal/service variation",
+    "Public mode can replay scientific artifacts while explicitly reporting omitted profiles/logs"
+  ],
+  "no_answer_repair_or_changed_judge": true,
+  "no_new_inference": true,
+  "predecessor_immutability": {
+    "all_198_locally_rechecked": true,
+    "all_available_bound_files_unchanged": true,
+    "checked_files": 198,
+    "expected_files": 198,
+    "omissions_are_not_verified_by_this_replay": false,
+    "omitted_local_runtime_files": []
+  },
+  "schema": "hermes.dual_study_saved_audit.v1",
+  "status": "PASS",
+  "studies_not_pooled": true,
+  "unique_source_snapshots_checked": 18,
+  "v1": {
+    "physical_posts": 5,
+    "reported_completion_tokens": 305,
+    "reported_cost_usd_decimal": "0.00107041",
+    "reported_prompt_tokens": 20937,
+    "rows": {
+      "full-complete": {
+        "answer": {
+          "citations": [
+            "source-identity",
+            "limits",
+            "baseline",
+            "guarded",
+            "task_verified_ms",
+            "input_tokens",
+            "output_tokens"
+          ],
+          "hermes_speedup_established": null,
+          "reason": "missing_evidence",
+          "status": "ABSTAIN",
+          "tested_source": null
+        },
+        "context_sha256": "e3a286f8d6ea0c3a2091f8495c9ca3b6b2a56da9c3bc5de122782aa91d271472",
+        "native_wire_sha256": "6ab7acbff920e5d0620a698027ab1f9275dc552e992b370eba304f0cebcc0a68",
+        "problems": [
+          "incorrect:status",
+          "incorrect:tested_source",
+          "incorrect:hermes_speedup_established",
+          "incorrect:reason"
+        ],
+        "served_provider": null,
+        "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+        "usage": {
+          "completion_tokens": 72,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "cost": 0.0003966,
+          "cost_details": {
+            "floor_applied": false,
+            "rate_source": "openrouter_catalog",
+            "source": "openrouter_list"
+          },
+          "prompt_tokens": 7644,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "video_tokens": 0
+          },
+          "total_tokens": 7716
+        },
+        "verified_success": false
+      },
+      "full-missing_source_identity": {
+        "answer": {
+          "citations": [
+            "limits",
+            "gates",
+            "baseline",
+            "guarded",
+            "task_verified_ms",
+            "input_tokens",
+            "output_tokens"
+          ],
+          "hermes_speedup_established": null,
+          "reason": "missing_evidence",
+          "status": "ABSTAIN",
+          "tested_source": null
+        },
+        "context_sha256": "549603e9f834952bb46e9da80aaef0f434fa2f44b3947dab484b34ab4127dcc8",
+        "native_wire_sha256": "a054cc21a2135cdad35f5a6918b84d2f955e17ece472e2a12d837c59441efc42",
+        "problems": [
+          "incorrect:hermes_speedup_established"
+        ],
+        "served_provider": null,
+        "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+        "usage": {
+          "completion_tokens": 72,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "cost": 0.0003519,
+          "cost_details": {
+            "floor_applied": false,
+            "rate_source": "openrouter_catalog",
+            "source": "openrouter_list"
+          },
+          "prompt_tokens": 6750,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "video_tokens": 0
+          },
+          "total_tokens": 6822
+        },
+        "verified_success": false
+      },
+      "minimal-complete": {
+        "answer": {
+          "citations": [
+            "limits",
+            "source-identity"
+          ],
+          "hermes_speedup_established": null,
+          "reason": "missing_evidence",
+          "status": "ABSTAIN",
+          "tested_source": null
+        },
+        "context_sha256": "6355305b6943f931c1042dd14812d74de4d1e32def09639dc522ece573425307",
+        "native_wire_sha256": "6d858b12f31565760b81f380fad9f3a1001a892d0728692cce22ab35471a440a",
+        "problems": [
+          "incorrect:status",
+          "incorrect:tested_source",
+          "incorrect:hermes_speedup_established",
+          "incorrect:reason"
+        ],
+        "served_provider": null,
+        "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+        "usage": {
+          "completion_tokens": 51,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "cost": 0.0001206,
+          "cost_details": {
+            "floor_applied": false,
+            "rate_source": "openrouter_catalog",
+            "source": "openrouter_list"
+          },
+          "prompt_tokens": 2208,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "video_tokens": 0
+          },
+          "total_tokens": 2259
+        },
+        "verified_success": false
+      },
+      "minimal-contradictory_source_identity": {
+        "answer": {
+          "citations": [
+            "limits",
+            "source-identity",
+            "source-identity-conflict"
+          ],
+          "hermes_speedup_established": null,
+          "reason": "missing_evidence",
+          "status": "ABSTAIN",
+          "tested_source": null
+        },
+        "context_sha256": "67a3b51645da0e6c4961764b3155e7c4519c4865925c1af21083fda0fdb29209",
+        "native_wire_sha256": "c3a05fc8bceaa259468a5710f6e6e396680478e1eb738ca644e10fcb9702e17f",
+        "problems": [
+          "incorrect:hermes_speedup_established",
+          "incorrect:reason"
+        ],
+        "served_provider": null,
+        "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+        "usage": {
+          "completion_tokens": 63,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "cost": 0.00016365,
+          "cost_details": {
+            "floor_applied": false,
+            "rate_source": "openrouter_catalog",
+            "source": "openrouter_list"
+          },
+          "prompt_tokens": 3021,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "video_tokens": 0
+          },
+          "total_tokens": 3084
+        },
+        "verified_success": false
+      },
+      "minimal-missing_source_identity": {
+        "answer": {
+          "citations": [
+            "limits"
+          ],
+          "hermes_speedup_established": null,
+          "reason": "missing_evidence",
+          "status": "ABSTAIN",
+          "tested_source": null
+        },
+        "context_sha256": "58f9e3e8b37129d6b54dcfe8f46f7b80ebedaa0c254f92f0ccf24eec44057f77",
+        "native_wire_sha256": "e872d57c0013e29ca1cd9f78b51674af1b8e4eb44c599f49a0b23d39c04c0afa",
+        "problems": [
+          "incorrect:hermes_speedup_established"
+        ],
+        "served_provider": null,
+        "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+        "usage": {
+          "completion_tokens": 47,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "cost": 3.766e-05,
+          "cost_details": {
+            "floor_applied": false,
+            "rate_source": "openrouter_catalog",
+            "source": "openrouter_list"
+          },
+          "prompt_tokens": 1314,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 832,
+            "video_tokens": 0
+          },
+          "total_tokens": 1361
+        },
+        "verified_success": false
+      }
+    },
+    "unchanged_frozen_judge_replay": true,
+    "verified_successes": 0
+  },
+  "v2": {
+    "physical_posts": 5,
+    "reported_completion_tokens": 404,
+    "reported_cost_usd_decimal": "0.00114690",
+    "reported_prompt_tokens": 21322,
+    "rows": {
+      "full-complete": {
+        "answer": {
+          "citations": [
+            "limits",
+            "source-identity",
+            "gates",
+            "baseline",
+            "guarded",
+            "task_verified_ms",
+            "input_tokens",
+            "output_tokens"
+          ],
+          "hermes_speedup_established": false,
+          "reason": "supported",
+          "status": "SUPPORTED",
+          "tested_source": "a0bca744067d04f05904319d3d919be30c336556"
+        },
+        "context_sha256": "e3a286f8d6ea0c3a2091f8495c9ca3b6b2a56da9c3bc5de122782aa91d271472",
+        "native_wire_sha256": "6d237b8d1b54116a3f85c915e177b01a599aeebe04952a543006c8b9872798fc",
+        "problems": [],
+        "served_provider": null,
+        "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+        "usage": {
+          "completion_tokens": 121,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "cost": 0.00041025,
+          "cost_details": {
+            "floor_applied": false,
+            "rate_source": "openrouter_catalog",
+            "source": "openrouter_list"
+          },
+          "prompt_tokens": 7721,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "video_tokens": 0
+          },
+          "total_tokens": 7842
+        },
+        "verified_success": true
+      },
+      "full-missing_source_identity": {
+        "answer": {
+          "citations": [
+            "limits",
+            "gates",
+            "baseline",
+            "guarded",
+            "task_verified_ms",
+            "input_tokens",
+            "output_tokens"
+          ],
+          "hermes_speedup_established": null,
+          "reason": "missing_evidence",
+          "status": "ABSTAIN",
+          "tested_source": null
+        },
+        "context_sha256": "549603e9f834952bb46e9da80aaef0f434fa2f44b3947dab484b34ab4127dcc8",
+        "native_wire_sha256": "91e99c9e0585b6b7807a4a414e509b076fcc6ae8c83ac8b7d43b70f2400d12bd",
+        "problems": [
+          "incorrect:hermes_speedup_established"
+        ],
+        "served_provider": null,
+        "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+        "usage": {
+          "completion_tokens": 82,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "cost": 0.00035775,
+          "cost_details": {
+            "floor_applied": false,
+            "rate_source": "openrouter_catalog",
+            "source": "openrouter_list"
+          },
+          "prompt_tokens": 6827,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "video_tokens": 0
+          },
+          "total_tokens": 6909
+        },
+        "verified_success": false
+      },
+      "minimal-complete": {
+        "answer": {
+          "citations": [
+            "limits",
+            "source-identity"
+          ],
+          "hermes_speedup_established": null,
+          "reason": "supported",
+          "status": "SUPPORTED",
+          "tested_source": "a0bca744067d04f05904319d3d919be30c336556"
+        },
+        "context_sha256": "6355305b6943f931c1042dd14812d74de4d1e32def09639dc522ece573425307",
+        "native_wire_sha256": "0f9e041de8c672b7173ab56f393409f248860059323f455a7c85cd7c545185ef",
+        "problems": [
+          "incorrect:hermes_speedup_established"
+        ],
+        "served_provider": null,
+        "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+        "usage": {
+          "completion_tokens": 90,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "cost": 0.00013225,
+          "cost_details": {
+            "floor_applied": false,
+            "rate_source": "openrouter_catalog",
+            "source": "openrouter_list"
+          },
+          "prompt_tokens": 2285,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "video_tokens": 0
+          },
+          "total_tokens": 2375
+        },
+        "verified_success": false
+      },
+      "minimal-contradictory_source_identity": {
+        "answer": {
+          "citations": [
+            "limits",
+            "source-identity",
+            "source-identity-conflict"
+          ],
+          "hermes_speedup_established": null,
+          "reason": "conflicting_evidence",
+          "status": "ABSTAIN",
+          "tested_source": null
+        },
+        "context_sha256": "67a3b51645da0e6c4961764b3155e7c4519c4865925c1af21083fda0fdb29209",
+        "native_wire_sha256": "083ad2832f9e77682b641bc5909595670fcde5a1ace5e6bb25e2999afd800ad9",
+        "problems": [
+          "incorrect:hermes_speedup_established"
+        ],
+        "served_provider": null,
+        "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+        "usage": {
+          "completion_tokens": 64,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "cost": 0.0001677,
+          "cost_details": {
+            "floor_applied": false,
+            "rate_source": "openrouter_catalog",
+            "source": "openrouter_list"
+          },
+          "prompt_tokens": 3098,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "video_tokens": 0
+          },
+          "total_tokens": 3162
+        },
+        "verified_success": false
+      },
+      "minimal-missing_source_identity": {
+        "answer": {
+          "citations": [
+            "limits"
+          ],
+          "hermes_speedup_established": null,
+          "reason": "missing_evidence",
+          "status": "ABSTAIN",
+          "tested_source": null
+        },
+        "context_sha256": "58f9e3e8b37129d6b54dcfe8f46f7b80ebedaa0c254f92f0ccf24eec44057f77",
+        "native_wire_sha256": "138460564f095c84cda6d8fca3c1ebc2c413b7ceb304d66af6e867e13be674be",
+        "problems": [
+          "incorrect:hermes_speedup_established"
+        ],
+        "served_provider": null,
+        "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+        "usage": {
+          "completion_tokens": 47,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          },
+          "cost": 7.895e-05,
+          "cost_details": {
+            "floor_applied": false,
+            "rate_source": "openrouter_catalog",
+            "source": "openrouter_list"
+          },
+          "prompt_tokens": 1391,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "video_tokens": 0
+          },
+          "total_tokens": 1438
+        },
+        "verified_success": false
+      }
+    },
+    "unchanged_frozen_judge_replay": true,
+    "verified_successes": 1
+  }
+}

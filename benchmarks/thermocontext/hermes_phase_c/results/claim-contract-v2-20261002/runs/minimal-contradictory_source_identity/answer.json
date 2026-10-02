@@ -1,0 +1,11 @@
+{
+  "citations": [
+    "limits",
+    "source-identity",
+    "source-identity-conflict"
+  ],
+  "hermes_speedup_established": null,
+  "reason": "conflicting_evidence",
+  "status": "ABSTAIN",
+  "tested_source": null
+}

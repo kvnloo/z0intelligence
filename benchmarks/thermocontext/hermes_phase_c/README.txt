@@ -241,3 +241,35 @@ Raw request-body artifacts bind actual native and forwarded bytes; they contain 
 HTTP headers. A bounded upstream error summary preserves quota/capacity evidence.
 Use a new output directory and preserve every failed attempt; provider changes are
 separate requalifications and cannot establish a context-selection speedup.
+
+
+Round-three verified-context results (2026-10-02)
+
+The earlier separately frozen Solar JSON factual baseline succeeded on one
+inspected development task. Its checker and result remain unchanged.
+
+verified_context_cohort then exercised five cases with constant full native
+system text, one post each, and independently replayed actual wire and usage.
+All five failed the frozen checker: 20,937 prompt +305 completion tokens,
+reported cost $0.00107041. Both smaller-context pairs used 5,436 fewer prompt
+tokens but failed verified success, so these are not useful efficiency gains.
+
+claim_contract_v2 is a separately versioned prompt-only clarification targeting
+source-grounded reporting, not independent proof the historical experiment ran.
+The first forwarding was checked against the preceding complete native request
+with only prompt text changed. All five source/status/reason/citation results
+passed, but four scope fields remained null; full-complete alone passed the
+entire unchanged checker. This study used 21,322 prompt +404 completion tokens,
+reported cost $0.0011469. No pair preserved verified success. Old failures are
+not regraded, and outcomes are not pooled across the two operational contracts.
+
+Results are in results/verified-context-cohort-20261002 and
+results/claim-contract-v2-20261002. Public requests, responses, independent
+outcomes, failures and costs are retained; auth stores, runtime profiles and
+worker logs are excluded. The raw provider field is null: the configured endpoint
+and reported model do not establish underlying backend identity. This is a small
+inspected development cohort, not holdout or population certification.
+
+The most useful remaining uncertainty is scope representation and preservation,
+not a need to add more sampling. No further inference is authorized by these
+completed protocols. No production context selection or routing was activated.
