@@ -1,0 +1,30 @@
+{
+  "schema": "hermes.verified_context_cohort.protocol.v1",
+  "scope": "Five inspected development cases from one evidence task; not a holdout or population certification",
+  "source_base_revision": "c6003984f8d44bc6fa549cf11dd3e30ca061222f",
+  "case_order": ["full-complete", "minimal-complete", "full-missing_source_identity", "minimal-missing_source_identity", "minimal-contradictory_source_identity"],
+  "offline_exclusion": {"case_id": "full-contradictory_source_identity", "reason": "The unchanged full conflict context plus previously observed full native boilerplate exceeds the immutable 20000-byte request cap; excluded before inference", "comparison_scope": "Two matched token-efficiency pairs (complete and missing); minimal contradiction is a separate negative control"},
+  "minimal_optional_ids": ["source-identity", "source-identity-conflict"],
+  "pinned_ids": ["limits"],
+  "selection_policy": "Host-declared exact-ref subset through existing legal materialize; retain every available identity declaration and all contradictions and gaps; no learned selector or judge input",
+  "mutation_axes": {
+    "evidence_use_within_size": "Only source-identity availability or the existing synthetic contradiction intervention",
+    "efficiency_within_evidence_state": "Only optional EvidenceRef membership; excerpts, provenance, contradiction and gap arrays unchanged"
+  },
+  "max_physical_posts_total": 5,
+  "max_physical_posts_per_case": 1,
+  "max_output_tokens": 4096,
+  "max_serialized_request_bytes": 20000,
+  "max_wall_seconds_per_case": 120,
+  "automatic_retries": false,
+  "fallbacks": false,
+  "response_format": {"type": "json_object"},
+  "model": "upstage/solar-mini4",
+  "provider_endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+  "estimated_cost_at_all_token_caps_usd": 0.009096,
+  "estimate_is_billing_cap": false,
+  "wire_policy": "A single physical staging/profile path with fresh state each time; first admitted full native request freezes the comparison template. Before every forwarding, the entire native request must match after replacing only its exact evidence block. No other normalization.",
+  "stop": "Stop on transport, accounting, wire, source, identity, or resource ineligibility. Retain semantic failures and continue planned remaining cases. Never retry or replace a case.",
+  "falsifiers": ["Incorrect source or scope", "Failure to abstain on missing or contradictory identity", "Citation absent from visible evidence", "Minimal-ref answer loses verified success", "No lower actual prompt-token use in the minimal pair", "Any full system or non-evidence request change", "Missing or over-cap usage/cost", "Changed response model identity", "Unaccounted physical attempt"],
+  "no_claims": ["Backend-provider causal attribution when provider is null", "Population noninferiority", "Holdout certification", "Hermes speedup", "Thermal benefit", "Learned selection", "Model necessity"]
+}
