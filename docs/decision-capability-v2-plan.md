@@ -21,7 +21,20 @@ Build ~50–100 **independently labeled, replayable** decision examples per capa
 | 2 | `context_compress_needed` | 50–100 | High tokenomics leverage |
 | 3 | `verification_needed` | 50–100 | Laya CPU niche; ship-gate signal |
 | 4 | `tool_family_select` | 50–100 | Routing quality vs latency |
-| 5 | `retry_or_escalate` | 50–100 | Currently no safe model; needs real failure taxonomy |
+| 5 | `mutation_retry_disposition` | 50–100 | World-mutation safety: distinguish retry / observe / same-ID resend / unresolved escalation / stop |
+| 6 | `retry_or_escalate` | 50–100 | Generic planner/provider failure routing; keep separate from world-mutation effects |
+
+## Mutation-retry labeling rule
+
+Do not source `mutation_retry_disposition` gold labels from generic exception classes such as timeout, 429, 5xx, or "transient." The label comes from the **effect boundary**:
+
+- `retry`: independent evidence proves the prior mutation effect is absent;
+- `observe`: effect is unknown and target state can be reconciled;
+- `resend`: effect is unknown but the receiver durably binds the same mutation identity/content;
+- `escalate`: effect is unknown and neither reliable observation nor durable resend exists;
+- `stop`: effect is independently observed/verified.
+
+The initial smoke fixture lives at `benchmarks/fixtures/mutation-retry-v0/examples.jsonl` and is intentionally kept separate from the original v1 fixture count.
 
 ## Sourcing pipeline (minimal v2)
 
