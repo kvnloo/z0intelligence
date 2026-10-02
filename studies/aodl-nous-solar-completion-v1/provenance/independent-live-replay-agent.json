@@ -1,0 +1,31 @@
+{
+  "schema": "z0eval.independent_study_check.v1",
+  "study_id": "aodl-nous-solar-completion-v1",
+  "passed": true,
+  "errors": [],
+  "live_evidence": true,
+  "evidence_mode": "captured_study_artifacts",
+  "root_trace_id": "remote-public-proof",
+  "stages": {
+    "governed_preparation": "governed-request-dd57184f9f5526fe2c03e53ef32d4e3bc958b672493c1793d3897c8ff9e31421",
+    "aodl_admission": "aodl-admission-dd57184f9f5526fe2c03e53ef32d4e3bc958b672493c1793d3897c8ff9e31421",
+    "dispatch": "dispatch-dd57184f9f5526fe2c03e53ef32d4e3bc958b672493c1793d3897c8ff9e31421",
+    "provider_admission": "admission-7604f7a6a6b6b74cb545af60c0733c4a791905cdf2cb8ced850c827c27e4505e",
+    "physical_execution": "05a29d253ff348fcbbb10d9f2aa6f0c9",
+    "verified_outcome": "05a29d253ff348fcbbb10d9f2aa6f0c9"
+  },
+  "output_sha256": "52b9673ac9905ffde88b68a6cb409915cef976ad0280e30a5eb6178bd2bb94d6",
+  "input_tokens": 112,
+  "output_tokens": 5,
+  "provider_reported_cost_usd": 6.6e-06,
+  "verification_source": "exact_string_CANONICAL_OK",
+  "physical_call_count": 1,
+  "task_a_pass": false,
+  "task_b_import_allowed": false,
+  "replay_restart_scope": "authority_and_executor_HTTP_services_reconstructed_same_process",
+  "limitations": [
+    "Checks local artifact consistency and exact public literal output; does not authenticate provider origin.",
+    "Conflict rejection and OMP invocation claims include producer summary evidence; this checker makes no provider calls.",
+    "Service restart evidence is limited to the producer's stated scope."
+  ]
+}

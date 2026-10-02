@@ -1,0 +1,8 @@
+{
+  "inference_calls": 0,
+  "mock_provider_responses": 1,
+  "real_provider_calls": 0,
+  "status": "OFFLINE_ONLY_SYNTHETIC_TRANSPORT",
+  "task_a_pass": false,
+  "task_b_import_allowed": false
+}

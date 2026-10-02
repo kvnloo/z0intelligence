@@ -1,0 +1,19 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "message": {
+        "content": "CANONICAL_OK",
+        "role": "assistant"
+      }
+    }
+  ],
+  "id": "offline-fixture-only",
+  "model": "upstage/solar-mini4",
+  "usage": {
+    "completion_tokens": 5,
+    "cost": 1e-05,
+    "prompt_tokens": 67,
+    "total_tokens": 72
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "aodl_admission_receipt_id": "aodl-admission-dd57184f9f5526fe2c03e53ef32d4e3bc958b672493c1793d3897c8ff9e31421",
+  "governed_remote": true,
+  "output": "CANONICAL_OK",
+  "output_verified_exact": true,
+  "parent_model_called": false,
+  "root_trace_id": "remote-public-proof",
+  "runtime": "OMP ExtensionRunner.getRegisteredTool().definition.execute",
+  "session_id": "01a0fddd-a9cc-7390-9213-3d9cd903d7be",
+  "tool": "z0int_route_worker"
+}

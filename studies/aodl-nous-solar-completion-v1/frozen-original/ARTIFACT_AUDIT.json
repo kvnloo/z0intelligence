@@ -1,0 +1,14 @@
+{
+  "files_scanned": 26,
+  "frozen_trace_schema_validated": [
+    "live-01",
+    "live-02"
+  ],
+  "known_credential_value_present": false,
+  "public_report_sha256": {
+    "LIVE_RESULT.json": "5e1ced71e8da53926af964277040752b7652f5f3896580e59ed5cca45cfd7e5e",
+    "LIVE_RESULT.txt": "9a06fbf39a2b582e2084246f6f36e0c101012941220cbe24f08afff7c3118382"
+  },
+  "raw_state_imported": false,
+  "schema": "aodl-canary-artifact-audit.v1"
+}

@@ -1,0 +1,24 @@
+{
+  "claims": "One public CANONICAL_OK diagnostic through actual OMP and governed authority passed. Original TaskA remains failed; TaskB remains blocked. No general task quality, savings, backend stability or production claim.",
+  "commands": [
+    {
+      "command": "python3 -B studies/aodl-nous-solar-completion-v1/replay.py",
+      "effects": "Read-only artifact hash checking and independent evidence replay; no credentials or network required.",
+      "expected": "passed=true, historical_physical_calls=1, physical_calls_in_this_replay=0"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q studies/aodl-nous-solar-completion-v1/test_independent_study_check.py",
+      "expected": "80 passed",
+      "optional": true
+    }
+  ],
+  "do_not_repeat_live_call": "The historical one-call budget is exhausted. This bundle is for offline replay only; do not reset the fuse or rerun live scripts.",
+  "requirements": {
+    "optional_mutation_tests": "pytest",
+    "replay": "Python3.10+ standard library only"
+  },
+  "retained_historical_protocol": "PROTOCOL.json is an exact copy of the reviewed execution protocol. Its original absolute paths are provenance, not replay dependencies.",
+  "sanitization": "EXPORT_PROVENANCE.json records original/public hashes and named transformations. authority_payload_sha256 remains an original raw-payload digest, not the sanitized-row digest.",
+  "schema": "aodl.replay_instructions.v1",
+  "working_directory": "Repository root; replay.py can also be invoked by absolute path from any directory. No original /workspace path is used by replay."
+}

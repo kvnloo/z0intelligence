@@ -1,0 +1,8 @@
+{
+  "study_id": "aodl-nous-solar-completion-v1",
+  "returncode": 0,
+  "raw": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/live-solar-v1/raw",
+  "independent_check_still_required": true,
+  "original_task_a_unchanged": true,
+  "task_b_import_allowed": false
+}

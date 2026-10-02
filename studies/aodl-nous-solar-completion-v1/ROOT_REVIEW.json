@@ -1,0 +1,8 @@
+{
+  "protocol_sha256": "1fb9e3942b6f1c97141d0a1eec3f20a5f4d648141d77cbfecf68b02581d18f93",
+  "review": "one fixed named-model call admitted after code/protocol/independent-checker review",
+  "provider_calls_authorized": 1,
+  "no_retry": true,
+  "old_task_a_unchanged": true,
+  "task_b_import_allowed": false
+}

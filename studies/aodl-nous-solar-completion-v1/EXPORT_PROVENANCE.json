@@ -1,0 +1,323 @@
+{
+  "excluded": [
+    "state/run/** lock files",
+    "health.json",
+    "stdout.log",
+    "stderr.log",
+    "credential files",
+    "environment files",
+    "cache trees"
+  ],
+  "known_secret_value_scan": "Root owns the final known-key scan before any remote publication; this export did not read a credential value.",
+  "publication_files": [
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "live-solar-v1/raw/public-request.json",
+      "original_sha256": "1c25d02ad0e21df5ae534a3c8fd743f6566bc9011f29238c196d0706bf7e527e",
+      "path": "live/public-request.json",
+      "public_sha256": "1c25d02ad0e21df5ae534a3c8fd743f6566bc9011f29238c196d0706bf7e527e",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "live-solar-v1/raw/public-response.json",
+      "original_sha256": "7c798cf6f42eb14d1fdfc83f2f84ab383bebc1965216300f3a4c229a55b68e5b",
+      "path": "live/public-response.json",
+      "public_sha256": "7c798cf6f42eb14d1fdfc83f2f84ab383bebc1965216300f3a4c229a55b68e5b",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "live-solar-v1/raw/summary.json",
+      "original_sha256": "b183202fb8968f77cd40a396c5e8d801e76df4d4807fcc95eb72ace9f7ac7c2a",
+      "path": "live/summary.json",
+      "public_sha256": "97c3a767d028df7a29b758305620ff9160a7f7e09bbe3a029e09765c55dd3705",
+      "transformation_counts": {
+        "implementation_sources_made_relative": 1
+      }
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "live-solar-v1/raw/omp-governed.json",
+      "original_sha256": "4ebcfa69d67eda03cf9a677e434963db49b7e7d2a0bbbf8dd42e5b00119d60ce",
+      "path": "live/omp-governed.json",
+      "public_sha256": "584b997138a10e697761dfd6a093bb99b5ac2f0a500532a98064e3eec22a2e5c",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "live-solar-v1/raw/replay.json",
+      "original_sha256": "020f73b6af4e79a3762578f71df562edab5e057221159f6914a0f436dad3c6c6",
+      "path": "live/replay.json",
+      "public_sha256": "3b6fe12ac956e921ae83f1b727f7e508f5278dbc8079f98e39a3c4b0440e7091",
+      "transformation_counts": {
+        "quota_headers_removed": 1,
+        "receipt_paths_made_relative": 1
+      }
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "live-solar-v1/raw/capped.json",
+      "original_sha256": "a047591016932636c176234877cc760edbe267a6092465f77c3eb1fa720bcc5f",
+      "path": "live/capped.json",
+      "public_sha256": "33a2b5e548aeb3b8a9476593f7ff51f711b34dcf6c146b8ac4bdf9c55b09b7e0",
+      "transformation_counts": {
+        "receipt_paths_made_relative": 1
+      }
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "live-solar-v1/raw/uncertain.json",
+      "original_sha256": "44f6ebfd347b3c877103a65c88bf13ef4536312ca4ca274d44a8b59e4be8e73b",
+      "path": "live/uncertain.json",
+      "public_sha256": "1bd3f7020f38ff386c08da6b7a3d6bd42cd8dde36f78d4ee01893cae578bbdea",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "live-solar-v1/raw/state/receipts/decisions.jsonl",
+      "original_sha256": "be32dfcff6c1f6d26789e94a130a263a0b2b102ba641fdd17ac90814d2cc9151",
+      "path": "live/state/receipts/decisions.jsonl",
+      "public_sha256": "27aba8f4c499d567385273086184c3684ea19ad03f65fe2326e27dca93fab526",
+      "transformation_counts": {
+        "quota_headers_removed": 3,
+        "receipt_paths_made_relative": 2
+      }
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "live-solar-v1/raw/state/receipts/outcomes.jsonl",
+      "original_sha256": "ee5f935970ca417ea9d9dd58d06bca08f6411ade3df88bf0e80aa6ecbc89f259",
+      "path": "live/state/receipts/outcomes.jsonl",
+      "public_sha256": "3e57396b04d301a7afebb7a1e3c690afe9c6a44b91dccfb884fe000fed27ed50",
+      "transformation_counts": {
+        "quota_headers_removed": 1
+      }
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "live-solar-v1/raw/state/tokenomics/events.jsonl",
+      "original_sha256": "a8bd19e56049ec9397a59ea5742caca3304183d826debbc0e929956e668a8b21",
+      "path": "live/state/tokenomics/events.jsonl",
+      "public_sha256": "2881f1ba064e3c34464b604c6903b4cfa4a1d7f71110762ffb4e93c43de09dfb",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "offline-integration-final/run-01/public-request.json",
+      "original_sha256": "1c25d02ad0e21df5ae534a3c8fd743f6566bc9011f29238c196d0706bf7e527e",
+      "path": "offline-integration-final/run-01/public-request.json",
+      "public_sha256": "1c25d02ad0e21df5ae534a3c8fd743f6566bc9011f29238c196d0706bf7e527e",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "offline-integration-final/run-01/public-response.json",
+      "original_sha256": "6ed06a437f5a6d51a12978a3838420a62eba94c737ba145b0180399e3e84e063",
+      "path": "offline-integration-final/run-01/public-response.json",
+      "public_sha256": "6ed06a437f5a6d51a12978a3838420a62eba94c737ba145b0180399e3e84e063",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "offline-integration-final/run-01/summary.json",
+      "original_sha256": "27687b7cdd5296e1be772e94a6c1b28e4ca216ce2004e609d6755f05acf3d9dc",
+      "path": "offline-integration-final/run-01/summary.json",
+      "public_sha256": "2ad873765254494c52a78770121a2de4cfcb57529135b337f70bd14a659ea44d",
+      "transformation_counts": {
+        "implementation_sources_made_relative": 1
+      }
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "offline-integration-final/run-01/omp-governed.json",
+      "original_sha256": "5ac3033daae4e4e7c915cc8b1578c53c6fc152366b36806b1045e45e0a7d06b5",
+      "path": "offline-integration-final/run-01/omp-governed.json",
+      "public_sha256": "cd66c7dfe16e71ee727ebdd8871fd9ff89119c9e8b83ba15af471fdcca519e6b",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "offline-integration-final/run-01/replay.json",
+      "original_sha256": "167a23b5553cdf85d3eea339ee44ba194b2e69846149a227678f63cdf1a36f6c",
+      "path": "offline-integration-final/run-01/replay.json",
+      "public_sha256": "d7563cda0f3eb4f32851ec772b64d0f2b3dfa5f3194a6c1c59ddf5ba49d42994",
+      "transformation_counts": {
+        "quota_headers_removed": 1,
+        "receipt_paths_made_relative": 1
+      }
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "offline-integration-final/run-01/capped.json",
+      "original_sha256": "aa4f6379b8ee4cb8df9a7073d189051cc028ae9972fb514088e8baecf82ca25c",
+      "path": "offline-integration-final/run-01/capped.json",
+      "public_sha256": "009584e4f407c9c7524b89d50625727d7b6d0c039775a5500fe4e45332d8d46b",
+      "transformation_counts": {
+        "receipt_paths_made_relative": 1
+      }
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "offline-integration-final/run-01/uncertain.json",
+      "original_sha256": "44f6ebfd347b3c877103a65c88bf13ef4536312ca4ca274d44a8b59e4be8e73b",
+      "path": "offline-integration-final/run-01/uncertain.json",
+      "public_sha256": "1bd3f7020f38ff386c08da6b7a3d6bd42cd8dde36f78d4ee01893cae578bbdea",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "offline-integration-final/run-01/state/receipts/decisions.jsonl",
+      "original_sha256": "d383a3531bb9bfca26c57a5cf8457c00aea93a14463345b8f520c9f0cef16def",
+      "path": "offline-integration-final/run-01/state/receipts/decisions.jsonl",
+      "public_sha256": "c04d09b68a895b5984cd58063df7e35a50a5b712849ed19016321efead92cbd2",
+      "transformation_counts": {
+        "quota_headers_removed": 3,
+        "receipt_paths_made_relative": 2
+      }
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "offline-integration-final/run-01/state/receipts/outcomes.jsonl",
+      "original_sha256": "40a58835cd011a38d114b02a17378af8d3a416e12bb6936c2e8c1b5acadbf13d",
+      "path": "offline-integration-final/run-01/state/receipts/outcomes.jsonl",
+      "public_sha256": "765cca078ae10b87c14a320188afc1d98416d295dd1d58d55d09913acf28e470",
+      "transformation_counts": {
+        "quota_headers_removed": 1
+      }
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "offline-integration-final/run-01/state/tokenomics/events.jsonl",
+      "original_sha256": "ec94cff53706ca0a32271c2f179d8d04e669c6789f6d75c3a73625b9190472b3",
+      "path": "offline-integration-final/run-01/state/tokenomics/events.jsonl",
+      "public_sha256": "ea7d69e8300680f817e099530e5abdb7e172e13d28dc4161df8d5315b91134db",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": false,
+      "original_relative_to_review": "offline-integration-final/run-01/OFFLINE_ONLY.json",
+      "original_sha256": "97aa879854d2fef5f2d7b8063a795cd109cc01769c421ae16b85fa16af74c713",
+      "path": "offline-integration-final/run-01/OFFLINE_ONLY.json",
+      "public_sha256": "840813ab226c6b35f987b936c4650f96c53e017c47dbaaa0a2fe41b9090496d7",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "PROTOCOL.json",
+      "original_sha256": "1fb9e3942b6f1c97141d0a1eec3f20a5f4d648141d77cbfecf68b02581d18f93",
+      "path": "PROTOCOL.json",
+      "public_sha256": "1fb9e3942b6f1c97141d0a1eec3f20a5f4d648141d77cbfecf68b02581d18f93",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "ROOT_REVIEW.json",
+      "original_sha256": "cdeefe3763e59ebae3c50066b30f3cbb2659a98e06f1f0ca0b420f6716f581d5",
+      "path": "ROOT_REVIEW.json",
+      "public_sha256": "cdeefe3763e59ebae3c50066b30f3cbb2659a98e06f1f0ca0b420f6716f581d5",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "root-launch-preflight-01.json",
+      "original_sha256": "5a00534dd4fcc74f3f0b0292ecbd7d22e6b7c0afcacf7ffdc2134accc2f3424d",
+      "path": "root-launch-preflight-01.json",
+      "public_sha256": "5a00534dd4fcc74f3f0b0292ecbd7d22e6b7c0afcacf7ffdc2134accc2f3424d",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "independent_study_check.py",
+      "original_sha256": "128201771ba55ae57a7c18c4626b9780ef68da4b6ca3967eeaa1538683040269",
+      "path": "independent_study_check.py",
+      "public_sha256": "128201771ba55ae57a7c18c4626b9780ef68da4b6ca3967eeaa1538683040269",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "test_independent_study_check.py",
+      "original_sha256": "c4f8526d4321fff1ceeb302f99ad304445c04d8f3da2da96924f53d63a466322",
+      "path": "test_independent_study_check.py",
+      "public_sha256": "c4f8526d4321fff1ceeb302f99ad304445c04d8f3da2da96924f53d63a466322",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "run_reviewed_study.py",
+      "original_sha256": "4acb11d416687c8e8a02c6f87d2e29de4396f9e2af825348c2c3447dcc3f1d61",
+      "path": "run_reviewed_study.py",
+      "public_sha256": "4acb11d416687c8e8a02c6f87d2e29de4396f9e2af825348c2c3447dcc3f1d61",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "OFFLINE_VALIDATION.json",
+      "original_sha256": "f305fe1f8fdee89c49fb5f5ff35ba192ba5738dae96a62ece0d77a566883d014",
+      "path": "OFFLINE_VALIDATION.json",
+      "public_sha256": "f305fe1f8fdee89c49fb5f5ff35ba192ba5738dae96a62ece0d77a566883d014",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "conformance-audit.json",
+      "original_sha256": "8018f39ead3714ad7fbedfd8f749672daace9795a2ed715fa0c8549f257da0bd",
+      "path": "conformance-audit.json",
+      "public_sha256": "8018f39ead3714ad7fbedfd8f749672daace9795a2ed715fa0c8549f257da0bd",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "live-solar-v1/strict-independent-check.json",
+      "original_sha256": "d3461bbb4916bc54587fe6d075fe3d95e812c73ce8b3b6ce549836d472cdaba1",
+      "path": "provenance/strict-independent-check.json",
+      "public_sha256": "d3461bbb4916bc54587fe6d075fe3d95e812c73ce8b3b6ce549836d472cdaba1",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "live-solar-v1/launch-result.json",
+      "original_sha256": "818526ec5af1986fa4aa0cb97025ba0cc8d8c4ebd0901adf2349680862c3d655",
+      "path": "provenance/launch-result.json",
+      "public_sha256": "818526ec5af1986fa4aa0cb97025ba0cc8d8c4ebd0901adf2349680862c3d655",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "independent-live-replay-agent.json",
+      "original_sha256": "d3461bbb4916bc54587fe6d075fe3d95e812c73ce8b3b6ce549836d472cdaba1",
+      "path": "provenance/independent-live-replay-agent.json",
+      "public_sha256": "d3461bbb4916bc54587fe6d075fe3d95e812c73ce8b3b6ce549836d472cdaba1",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "frozen-study/LIVE_RESULT.json",
+      "original_sha256": "5e1ced71e8da53926af964277040752b7652f5f3896580e59ed5cca45cfd7e5e",
+      "path": "frozen-original/LIVE_RESULT.json",
+      "public_sha256": "5e1ced71e8da53926af964277040752b7652f5f3896580e59ed5cca45cfd7e5e",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "frozen-study/LIVE_RESULT.txt",
+      "original_sha256": "9a06fbf39a2b582e2084246f6f36e0c101012941220cbe24f08afff7c3118382",
+      "path": "frozen-original/LIVE_RESULT.txt",
+      "public_sha256": "9a06fbf39a2b582e2084246f6f36e0c101012941220cbe24f08afff7c3118382",
+      "transformation_counts": {}
+    },
+    {
+      "copied_exactly": true,
+      "original_relative_to_review": "frozen-study/ARTIFACT_AUDIT.json",
+      "original_sha256": "ab6484330f328c646f1d17da9d41420dc16195f63c02b45b8da130086ca24cc1",
+      "path": "frozen-original/ARTIFACT_AUDIT.json",
+      "public_sha256": "ab6484330f328c646f1d17da9d41420dc16195f63c02b45b8da130086ca24cc1",
+      "transformation_counts": {}
+    }
+  ],
+  "redaction_rule": "Apply named transformations consistently to all copies. Existing authority_payload_sha256 remains the original unsanitized payload digest; do not interpret it as a digest of the sanitized derivative row. Original raw records remain local.",
+  "reviewed_protocol_sha256": "1fb9e3942b6f1c97141d0a1eec3f20a5f4d648141d77cbfecf68b02581d18f93",
+  "schema": "aodl.sanitized_export.v1",
+  "source_execution_commit": "293129b57ed6cc2b8ddab9d5a8b44bcb213d4be4",
+  "study_id": "aodl-nous-solar-completion-v1"
+}

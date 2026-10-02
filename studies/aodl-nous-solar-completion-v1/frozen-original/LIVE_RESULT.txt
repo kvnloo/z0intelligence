@@ -1,0 +1,9 @@
+Task A FAIL on the frozen 16-token completion contract. Task B remains BLOCKED.
+
+Two bounded launches were preserved. Live-01 recorded a transport attempt with unknown usage and failed because the local launcher omitted the required egress proxy. Its exact launcher, raw receipts and incomplete independent trace are retained. This is infrastructure evidence, not a model-quality result.
+
+Live-02 corrected proxy/TLS environment passthrough only. The unchanged registered OMP tool traversed governed preparation, AODL admission, dispatch, provider permit, and the remote executor. The exact named free route returned a real response with 67 input tokens, 16 output tokens and provider-reported cost $0. finish_reason=length failed the frozen completion gate. No retry, fallback, alternate route, completion-cap increase, or verifier change occurred.
+
+The independent frozen z0evals collector confirms the stage links and known usage for live-02, but no gold verified outcome. The exact-output verifier and later replay/conflict/cap/no-takeover checks were not reached because the entry tool failed. Do not claim a passing golden canary, general task correctness, or Hermes integration from these records.
+
+The two launches are separate from the Hermes baseline contract and judge. Any follow-up that changes this canary's model or request policy needs its own versioned study. Public reporting should use LIVE_RESULT.json and artifact hashes; raw/ remains local.

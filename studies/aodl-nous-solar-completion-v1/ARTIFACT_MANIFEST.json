@@ -1,0 +1,273 @@
+{
+  "artifacts": [
+    {
+      "bytes": 15246,
+      "path": "EXPORT_PROVENANCE.json",
+      "sha256": "3838bf4ac5dfeae7ed81be970921220d4ffd29e5db61f0efbd535c6afbdfdea3"
+    },
+    {
+      "bytes": 1335,
+      "path": "LIVE_RESULT.json",
+      "sha256": "fffa23884d603a99ea4d5d316e2197275761073b5f74e1bd03402b2d18a5a01c"
+    },
+    {
+      "bytes": 4512,
+      "path": "OFFLINE_VALIDATION.json",
+      "sha256": "f305fe1f8fdee89c49fb5f5ff35ba192ba5738dae96a62ece0d77a566883d014"
+    },
+    {
+      "bytes": 12248,
+      "path": "PROTOCOL.json",
+      "sha256": "1fb9e3942b6f1c97141d0a1eec3f20a5f4d648141d77cbfecf68b02581d18f93"
+    },
+    {
+      "bytes": 1229,
+      "path": "PUBLICATION_AUDIT.json",
+      "sha256": "20f753adcc7b5ee5470d36a134912ce950e70cf9b588347da2dea4e096e72f9b"
+    },
+    {
+      "bytes": 1630,
+      "path": "REPLAY.json",
+      "sha256": "b83a3584820f209ee88a3f988572d5acdb0f362ca1d4a3cb25105ed427bb3907"
+    },
+    {
+      "bytes": 310,
+      "path": "ROOT_REVIEW.json",
+      "sha256": "cdeefe3763e59ebae3c50066b30f3cbb2659a98e06f1f0ca0b420f6716f581d5"
+    },
+    {
+      "bytes": 24116,
+      "path": "conformance-audit.json",
+      "sha256": "8018f39ead3714ad7fbedfd8f749672daace9795a2ed715fa0c8549f257da0bd"
+    },
+    {
+      "bytes": 431,
+      "path": "frozen-original/ARTIFACT_AUDIT.json",
+      "sha256": "ab6484330f328c646f1d17da9d41420dc16195f63c02b45b8da130086ca24cc1"
+    },
+    {
+      "bytes": 6631,
+      "path": "frozen-original/LIVE_RESULT.json",
+      "sha256": "5e1ced71e8da53926af964277040752b7652f5f3896580e59ed5cca45cfd7e5e"
+    },
+    {
+      "bytes": 1463,
+      "path": "frozen-original/LIVE_RESULT.txt",
+      "sha256": "9a06fbf39a2b582e2084246f6f36e0c101012941220cbe24f08afff7c3118382"
+    },
+    {
+      "bytes": 27883,
+      "path": "independent_study_check.py",
+      "sha256": "128201771ba55ae57a7c18c4626b9780ef68da4b6ca3967eeaa1538683040269"
+    },
+    {
+      "bytes": 3598,
+      "path": "live/capped.json",
+      "sha256": "33a2b5e548aeb3b8a9476593f7ff51f711b34dcf6c146b8ac4bdf9c55b09b7e0"
+    },
+    {
+      "bytes": 442,
+      "path": "live/omp-governed.json",
+      "sha256": "584b997138a10e697761dfd6a093bb99b5ac2f0a500532a98064e3eec22a2e5c"
+    },
+    {
+      "bytes": 610,
+      "path": "live/public-request.json",
+      "sha256": "1c25d02ad0e21df5ae534a3c8fd743f6566bc9011f29238c196d0706bf7e527e"
+    },
+    {
+      "bytes": 996,
+      "path": "live/public-response.json",
+      "sha256": "7c798cf6f42eb14d1fdfc83f2f84ab383bebc1965216300f3a4c229a55b68e5b"
+    },
+    {
+      "bytes": 4993,
+      "path": "live/replay.json",
+      "sha256": "3b6fe12ac956e921ae83f1b727f7e508f5278dbc8079f98e39a3c4b0440e7091"
+    },
+    {
+      "bytes": 39120,
+      "path": "live/state/receipts/decisions.jsonl",
+      "sha256": "27aba8f4c499d567385273086184c3684ea19ad03f65fe2326e27dca93fab526"
+    },
+    {
+      "bytes": 3264,
+      "path": "live/state/receipts/outcomes.jsonl",
+      "sha256": "3e57396b04d301a7afebb7a1e3c690afe9c6a44b91dccfb884fe000fed27ed50"
+    },
+    {
+      "bytes": 2108,
+      "path": "live/state/tokenomics/events.jsonl",
+      "sha256": "2881f1ba064e3c34464b604c6903b4cfa4a1d7f71110762ffb4e93c43de09dfb"
+    },
+    {
+      "bytes": 1181,
+      "path": "live/summary.json",
+      "sha256": "97c3a767d028df7a29b758305620ff9160a7f7e09bbe3a029e09765c55dd3705"
+    },
+    {
+      "bytes": 230,
+      "path": "live/uncertain.json",
+      "sha256": "1bd3f7020f38ff386c08da6b7a3d6bd42cd8dde36f78d4ee01893cae578bbdea"
+    },
+    {
+      "bytes": 193,
+      "path": "offline-integration-final/run-01/OFFLINE_ONLY.json",
+      "sha256": "840813ab226c6b35f987b936c4650f96c53e017c47dbaaa0a2fe41b9090496d7"
+    },
+    {
+      "bytes": 3598,
+      "path": "offline-integration-final/run-01/capped.json",
+      "sha256": "009584e4f407c9c7524b89d50625727d7b6d0c039775a5500fe4e45332d8d46b"
+    },
+    {
+      "bytes": 442,
+      "path": "offline-integration-final/run-01/omp-governed.json",
+      "sha256": "cd66c7dfe16e71ee727ebdd8871fd9ff89119c9e8b83ba15af471fdcca519e6b"
+    },
+    {
+      "bytes": 610,
+      "path": "offline-integration-final/run-01/public-request.json",
+      "sha256": "1c25d02ad0e21df5ae534a3c8fd743f6566bc9011f29238c196d0706bf7e527e"
+    },
+    {
+      "bytes": 335,
+      "path": "offline-integration-final/run-01/public-response.json",
+      "sha256": "6ed06a437f5a6d51a12978a3838420a62eba94c737ba145b0180399e3e84e063"
+    },
+    {
+      "bytes": 4942,
+      "path": "offline-integration-final/run-01/replay.json",
+      "sha256": "d7563cda0f3eb4f32851ec772b64d0f2b3dfa5f3194a6c1c59ddf5ba49d42994"
+    },
+    {
+      "bytes": 38991,
+      "path": "offline-integration-final/run-01/state/receipts/decisions.jsonl",
+      "sha256": "c04d09b68a895b5984cd58063df7e35a50a5b712849ed19016321efead92cbd2"
+    },
+    {
+      "bytes": 3220,
+      "path": "offline-integration-final/run-01/state/receipts/outcomes.jsonl",
+      "sha256": "765cca078ae10b87c14a320188afc1d98416d295dd1d58d55d09913acf28e470"
+    },
+    {
+      "bytes": 2108,
+      "path": "offline-integration-final/run-01/state/tokenomics/events.jsonl",
+      "sha256": "ea7d69e8300680f817e099530e5abdb7e172e13d28dc4161df8d5315b91134db"
+    },
+    {
+      "bytes": 1181,
+      "path": "offline-integration-final/run-01/summary.json",
+      "sha256": "2ad873765254494c52a78770121a2de4cfcb57529135b337f70bd14a659ea44d"
+    },
+    {
+      "bytes": 230,
+      "path": "offline-integration-final/run-01/uncertain.json",
+      "sha256": "1bd3f7020f38ff386c08da6b7a3d6bd42cd8dde36f78d4ee01893cae578bbdea"
+    },
+    {
+      "bytes": 1544,
+      "path": "provenance/independent-live-replay-agent.json",
+      "sha256": "d3461bbb4916bc54587fe6d075fe3d95e812c73ce8b3b6ce549836d472cdaba1"
+    },
+    {
+      "bytes": 281,
+      "path": "provenance/launch-result.json",
+      "sha256": "818526ec5af1986fa4aa0cb97025ba0cc8d8c4ebd0901adf2349680862c3d655"
+    },
+    {
+      "bytes": 1544,
+      "path": "provenance/strict-independent-check.json",
+      "sha256": "d3461bbb4916bc54587fe6d075fe3d95e812c73ce8b3b6ce549836d472cdaba1"
+    },
+    {
+      "bytes": 4578,
+      "path": "replay.py",
+      "sha256": "8a6e049edc82679ece1c0e2b1a51efd88b1b3ffea92574043fd081b41373d14f"
+    },
+    {
+      "bytes": 268,
+      "path": "root-launch-preflight-01.json",
+      "sha256": "5a00534dd4fcc74f3f0b0292ecbd7d22e6b7c0afcacf7ffdc2134accc2f3424d"
+    },
+    {
+      "bytes": 3954,
+      "path": "run_reviewed_study.py",
+      "sha256": "4acb11d416687c8e8a02c6f87d2e29de4396f9e2af825348c2c3447dcc3f1d61"
+    },
+    {
+      "bytes": 10593,
+      "path": "test_independent_study_check.py",
+      "sha256": "c4f8526d4321fff1ceeb302f99ad304445c04d8f3da2da96924f53d63a466322"
+    }
+  ],
+  "implementation_source_binding": [
+    {
+      "path": "manifests/aodl-nous-solar-completion.v1.json",
+      "root": "repo",
+      "sha256": "2b62b8c96bd4689f83a742844586bd3f16d6bc3dac4fa64e1fee778269d33256"
+    },
+    {
+      "path": "scripts/aodl_nous_transport_recording.py",
+      "root": "repo",
+      "sha256": "99733ee933304a40174af75040413be068dedb6be56114a79a9079c280e3324c"
+    },
+    {
+      "path": "scripts/prove-aodl-nous-omp-tool.mjs",
+      "root": "repo",
+      "sha256": "d27c9a5fa41facec0980fdcba8f762ed2f6ed3ab19cc290e80e4a3efef19bd00"
+    },
+    {
+      "path": "scripts/prove-aodl-nous-study.py",
+      "root": "repo",
+      "sha256": "0852bd022576b99065f67c83fad7e128bb631db4bd4e429bbbc9452fa542ca43"
+    },
+    {
+      "path": "src/z0int/aodl_canary_study.py",
+      "root": "repo",
+      "sha256": "92295eb873841d1eb6679ad01c9e33fd965121864d4b52d6f1c492b4cebd6c31"
+    },
+    {
+      "path": "src/z0int/aodl_observation.py",
+      "root": "repo",
+      "sha256": "7043d9da5d0e20a65e43a76c52d9aa374197fda981c245ab6dcd3b869a907c4f"
+    },
+    {
+      "path": "src/z0int/dispatch_authority.py",
+      "root": "repo",
+      "sha256": "51a1d262b7be5e1e7f0ba8bcf0a84f84a53d6d131534c5f2c71d2a5afd7f91b3"
+    },
+    {
+      "path": "src/z0int/governed_worker.py",
+      "root": "repo",
+      "sha256": "799a63a017ad3da1ef70886e1bedd453e0918dc64283a9f576582f7ae3bfcbe4"
+    },
+    {
+      "path": "src/z0int/worker_routing.py",
+      "root": "repo",
+      "sha256": "0e01f368bd76511d14dbc1ad99a93ce7ce1027d9e5020be672df375bbb4bfed9"
+    },
+    {
+      "path": "tests/test_aodl_nous_study.py",
+      "root": "repo",
+      "sha256": "b46679f713808afb5d6ac61e0f3b83956f24fbb1a3e22d67612eb652dc942189"
+    },
+    {
+      "path": "run_reviewed_study.py",
+      "root": "bundle",
+      "sha256": "4acb11d416687c8e8a02c6f87d2e29de4396f9e2af825348c2c3447dcc3f1d61"
+    },
+    {
+      "path": "independent_study_check.py",
+      "root": "bundle",
+      "sha256": "128201771ba55ae57a7c18c4626b9780ef68da4b6ca3967eeaa1538683040269"
+    },
+    {
+      "path": "test_independent_study_check.py",
+      "root": "bundle",
+      "sha256": "c4f8526d4321fff1ceeb302f99ad304445c04d8f3da2da96924f53d63a466322"
+    }
+  ],
+  "schema": "aodl.sealed_artifact_manifest.v1",
+  "self_binding": "Manifest is bound by the publication commit; it does not contain its own hash."
+}

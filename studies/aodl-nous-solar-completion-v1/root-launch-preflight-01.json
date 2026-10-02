@@ -1,0 +1,7 @@
+{
+  "status": "LOCAL_IMPORT_FAILURE_BEFORE_CREDENTIAL_OR_PROVIDER_ACCESS",
+  "error": "missing explicit z0int PYTHONPATH",
+  "physical_posts": 0,
+  "fuse_created": false,
+  "remedy": "use existing pinned source on PYTHONPATH; no experiment source or protocol edits"
+}

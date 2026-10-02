@@ -1,0 +1,9 @@
+{
+  "executed": false,
+  "execution_status": "uncertain",
+  "governed_remote": true,
+  "ok": false,
+  "reason": "Previous dispatch interrupted or uncertain; not re-executed",
+  "requires_parent": true,
+  "trace_id": "uncertain"
+}

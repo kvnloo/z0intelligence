@@ -1,0 +1,18 @@
+{
+  "endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+  "payload": {
+    "max_tokens": 128,
+    "messages": [
+      {
+        "content": "Complete the bounded task using supplied context. Return your answer to the Codex parent. You have no filesystem, shell, or external tools.",
+        "role": "system"
+      },
+      {
+        "content": "Public synthetic diagnostic. Return exactly CANONICAL_OK and nothing else.\n\nContext supplied by parent:\nPublic synthetic diagnostic only.",
+        "role": "user"
+      }
+    ],
+    "model": "upstage/solar-mini4",
+    "temperature": 0
+  }
+}

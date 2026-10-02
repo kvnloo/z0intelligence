@@ -1,0 +1,30 @@
+{
+  "credential_values_read_for_audit": false,
+  "forbidden_key_names": [
+    "owner",
+    "api_key",
+    "Authorization",
+    "access_token",
+    "refresh_token",
+    "password",
+    "secret",
+    "cookie"
+  ],
+  "forbidden_raw_key_names_found": [],
+  "known_secret_value_scan": "Root performs this final scan before remote publication; this audit does not claim that scan occurred.",
+  "public_evidence_scope": "Public fixed synthetic task only; no human conversation, private prompts, environment, credentials, health output, logs or lock files exported.",
+  "removed_live_metadata": {
+    "implementation_source_path_made_relative": 1,
+    "local_receipt_paths_replaced": 4,
+    "quota_headers_copies": 5
+  },
+  "retained_authority_fields": {
+    "admission_token": "deterministic receipt identifier, not raw owner capability or provider credential",
+    "authority_owner_sha256": "hash only; raw owner capability not exported",
+    "authority_payload_sha256": "digest of original local payload, not sanitized derivative",
+    "permit_owner_sha256": "hash link only"
+  },
+  "schema": "aodl.publication_field_audit.v1",
+  "status": "FIELD_ALLOWLIST_AUDITED_PENDING_ROOT_KNOWN_KEY_SCAN",
+  "suspicious_values_printed": false
+}

@@ -1,0 +1,28 @@
+{
+  "backend_provider_identity": "unknown",
+  "default_manifest_unchanged": true,
+  "execution_commit": "293129b57ed6cc2b8ddab9d5a8b44bcb213d4be4",
+  "frozen_task_a_status": "FAIL_FROZEN_COMPLETION_CAP",
+  "independent_replay": true,
+  "input_tokens": 112,
+  "local_preflight_failure_physical_calls": 0,
+  "new_physical_calls_for_sealing": 0,
+  "observation_fix_commit": "3f8f804731e1582f9efb1651f583497f04b98012",
+  "output_tokens": 5,
+  "physical_calls": 1,
+  "privacy": "Allowlisted sanitized derivatives; root known-key scan remains required before remote publication.",
+  "production_activated": false,
+  "reported_cost_usd": 6.6e-06,
+  "retries_after_physical_call": 0,
+  "reviewed_protocol_sha256": "1fb9e3942b6f1c97141d0a1eec3f20a5f4d648141d77cbfecf68b02581d18f93",
+  "schema": "aodl.sealed_public_result.v1",
+  "scope": "Exact public CANONICAL_OK diagnostic; deterministic legality, host authority, physical usage, exact outcome, and reconstructed-service replay. No broad semantic intent/performance/generalization claim.",
+  "status": "SEPARATE_STUDY_LIVE_PASS_DEFAULT_OFF",
+  "study_id": "aodl-nous-solar-completion-v1",
+  "task_b_status": "BLOCKED",
+  "validation": {
+    "focused_runtime_tests_passed": 122,
+    "independent_checker_mutation_tests_passed": 80,
+    "offline_real_omp_fixture_rejected_as_live": true
+  }
+}

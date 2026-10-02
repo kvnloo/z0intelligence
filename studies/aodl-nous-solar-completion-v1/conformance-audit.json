@@ -1,0 +1,336 @@
+{
+  "schema": "z0eval.offline_conformance_audit.v1",
+  "audit_date_utc": "2026-10-02",
+  "status": "complete",
+  "scope": {
+    "network_calls": false,
+    "model_inference": false,
+    "secret_files_read": false,
+    "frozen_sources_modified": false,
+    "old_artifacts_modified": false
+  },
+  "frozen_root": "/workspace/hermes-factory/experiments/aodl-canary-next",
+  "source_pins": {
+    "aodl": "68231658f0ec0338464c0916a2329b9587444312",
+    "z0intelligence": "28db1eecbe9fa9921c52945e15d4894b6dddae3d",
+    "z0evals": "6652713e25fb159a047457acfe348bd5ec98e146"
+  },
+  "interpreter": {
+    "path": "/workspace/hermes-factory/venvs/aodl-canary-next/bin/python",
+    "python": "3.12.14",
+    "pytest": "8.4.2",
+    "aodl_import": "/workspace/hermes-factory/experiments/aodl-canary-next/aodl/aodl_contract/__init__.py",
+    "z0int_import": "/workspace/hermes-factory/experiments/aodl-canary-next/z0intelligence/src/z0int/__init__.py"
+  },
+  "checks": [
+    {
+      "id": "aodl_pytest",
+      "cwd": "/workspace/hermes-factory/experiments/aodl-canary-next/aodl",
+      "command": "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 /workspace/hermes-factory/venvs/aodl-canary-next/bin/python -B -m pytest -p no:cacheprovider -q tests/test_aodl_contract_api.py tests/test_validate_untrusted_values.py tests/test_canonical.py",
+      "exit_code": 0,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "result": "13 passed in 0.75s"
+    },
+    {
+      "id": "z0intelligence_focused_pytest",
+      "cwd": "/workspace/hermes-factory/experiments/aodl-canary-next/z0intelligence",
+      "command": "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 /workspace/hermes-factory/venvs/aodl-canary-next/bin/python -B -m pytest -p no:cacheprovider -q tests/test_aodl_admission.py tests/test_aodl_observation.py tests/test_dispatch_authority.py tests/test_governed_worker.py tests/test_cognition_compiler.py tests/test_cognition_cascade.py tests/test_z0int_aodl.py tests/test_task_loop.py tests/test_hermes_adapter.py",
+      "exit_code": 1,
+      "passed": 106,
+      "failed": 3,
+      "skipped": 0,
+      "result": "3 failed, 106 passed in 0.50s"
+    },
+    {
+      "id": "z0evals_golden_trace",
+      "cwd": "/workspace/hermes-factory/experiments/aodl-canary-next/z0evals",
+      "command": "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 /workspace/hermes-factory/venvs/aodl-canary-next/bin/python -B -m pytest -p no:cacheprovider -q tests/test_golden_trace.py",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "result": "11 passed in 0.06s"
+    },
+    {
+      "id": "aodl_validation_corpus",
+      "cwd": "/workspace/hermes-factory/experiments/aodl-canary-next/aodl",
+      "command": "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /workspace/hermes-factory/venvs/aodl-canary-next/bin/python -B tests/validate.py",
+      "exit_code": 0,
+      "valid_fixtures": 11,
+      "invalid_fixtures": 19,
+      "result": "encodings OK; 11 valid fixtures accepted; 19 invalid fixtures rejected; schema cross-check OK: 1 valid 0.1 accepted; 10 valid 0.2 accepted; JSON schema catches 3/18 invalid 0.2 documents, remaining policy/graph/catalog constraints live in Python."
+    },
+    {
+      "id": "aodl_compile_corpus",
+      "cwd": "/workspace/hermes-factory/experiments/aodl-canary-next/aodl",
+      "command": "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /workspace/hermes-factory/venvs/aodl-canary-next/bin/python -B tests/compile.py",
+      "exit_code": 0,
+      "compiled_fixtures": 9,
+      "expected_stops": 4,
+      "skipped_legacy_fixtures": 1,
+      "result": "compile corpus matched; message/mesh/auction/payment stopped; HOTL 0.1 compile skipped."
+    }
+  ],
+  "frozen_failure": {
+    "path": "z0intelligence/src/z0int/aodl_observation.py",
+    "line": 179,
+    "exception": "NameError: name 'canonical_parents' is not defined",
+    "explanation": "record_drift references a local defined only inside project_drift, so drift receipt recording fails before validation or persistence.",
+    "tests": [
+      "tests/test_aodl_observation.py::test_drift_projects_stateupdate_without_mutating_intent",
+      "tests/test_aodl_observation.py::test_drift_replay_is_idempotent_for_event_and_receipt",
+      "tests/test_aodl_observation.py::test_invalid_contract_fails_before_observation_receipt"
+    ]
+  },
+  "evidence": [
+    {
+      "topic": "Static intent representation and authority separation",
+      "paths": [
+        "aodl/tests/validate.py:28",
+        "aodl/tests/compile.py:187",
+        "aodl/examples/invalid/hidden-privilege.json",
+        "aodl/examples/invalid/verifier-merge-grant.json",
+        "aodl/examples/invalid/gate-identity-delegated.json",
+        "aodl/examples/invalid/payment-execution.json"
+      ],
+      "tested": "Python validator rejects the named invalid graph/policy fixtures, including unknown version, privilege leakage, verifier merge grant, delegated humanGate identity, payment execution, graph cycles, unknown harness; compiler preserves intentGraph/eventLog and determinism.",
+      "limit": "Static IR contract and fixture semantics, not natural-language intent extraction or proof of human authorization."
+    },
+    {
+      "topic": "Canonical semantic identity",
+      "paths": [
+        "aodl/tests/test_canonical.py:63",
+        "aodl/tests/test_canonical.py:77",
+        "aodl/tests/test_canonical.py:86",
+        "aodl/tests/test_canonical.py:109",
+        "aodl/tests/test_canonical.py:124"
+      ],
+      "tested": "Non-semantic permutations retain fingerprint; valid budgets/authority/lifecycle mutations change fingerprint; event order matters; invalid/legacy documents fail canonicalization; sourceHash is distinct from semantic fingerprint.",
+      "limit": "Semantic fingerprint means canonical full document identity, not equivalence to the user's intended task; sourceHash is lineage metadata, not proof of authenticated authorship."
+    },
+    {
+      "topic": "Structural admission",
+      "paths": [
+        "z0intelligence/tests/test_aodl_admission.py:79",
+        "z0intelligence/tests/test_aodl_admission.py:94",
+        "z0intelligence/tests/test_aodl_admission.py:128",
+        "z0intelligence/tests/test_aodl_admission.py:147",
+        "z0intelligence/tests/test_aodl_admission.py:157"
+      ],
+      "tested": "Denial codes 101\u2013106, contract-bound limits, malformed proposal rejection, invalid contracts, future canonical version, unknown parent, no success minted by admission receipt; real AODL API allow case passed.",
+      "limit": "Most isolated admission tests use FakeAodl.validate returning []; they test gate mechanics rather than independent structural validation. Real validator corpus and one real API allow case are separate evidence."
+    },
+    {
+      "topic": "Host-owned governance and durable authority",
+      "paths": [
+        "z0intelligence/tests/test_governed_worker.py:58",
+        "z0intelligence/tests/test_governed_worker.py:65",
+        "z0intelligence/tests/test_governed_worker.py:138",
+        "z0intelligence/tests/test_governed_worker.py:253",
+        "z0intelligence/tests/test_dispatch_authority.py:193",
+        "z0intelligence/tests/test_dispatch_authority.py:209",
+        "z0intelligence/tests/test_dispatch_authority.py:239",
+        "z0intelligence/tests/test_dispatch_authority.py:264",
+        "z0intelligence/tests/test_dispatch_authority.py:306"
+      ],
+      "tested": "Rejects missing remote consent, wrong harness, caller-supplied provider/model/authority, unknown observed token spend, changed-task replay; protocol-v3 missing/malformed AODL durable denial; admission ordering, budget denial without dispatch, replay/restart idempotence, legacy-v2 compatibility.",
+      "limit": "Tests verify local ledger contents/order and replay behavior; fsync durability across a real machine crash is not fault-injected. Protocol v2 intentionally remains usable without AODL."
+    },
+    {
+      "topic": "Unauthorized action negative controls",
+      "paths": [
+        "z0intelligence/tests/test_cognition_compiler.py:122",
+        "z0intelligence/tests/test_cognition_compiler.py:141",
+        "z0intelligence/tests/test_cognition_compiler.py:210",
+        "z0intelligence/tests/test_cognition_cascade.py:95",
+        "z0intelligence/tests/test_cognition_cascade.py:109",
+        "z0intelligence/tests/test_cognition_cascade.py:119"
+      ],
+      "tested": "Compiler eliminates disallowed risk classes; explicit grants change legality; deterministic rule cannot revive filtered action; model stub receives only legal choices and an out-of-set selected action is rejected.",
+      "limit": "These are synthetic local action graphs and stub backends. They do not establish rejection of a semantically wrong action that remains inside the allowed set."
+    },
+    {
+      "topic": "Intent/implementation separation",
+      "paths": [
+        "z0intelligence/tests/test_z0int_aodl.py:60",
+        "z0intelligence/tests/test_z0int_aodl.py:93",
+        "z0intelligence/tests/test_z0int_aodl.py:120",
+        "z0intelligence/tests/test_dispatch_authority.py:287",
+        "z0intelligence/tests/test_aodl_observation.py:87"
+      ],
+      "tested": "Implementation selectors/thresholds stay in plan; implementation changes preserve sourceHash; changing plan changes semantic fingerprint while preserving lineage; direct project_drift causal-parent canonicalization passed.",
+      "limit": "record_drift persisted-observation invariants were not proven at the frozen pin because three tests fail."
+    },
+    {
+      "topic": "Wrong outcome and completed-versus-verified separation",
+      "paths": [
+        "z0intelligence/tests/test_task_loop.py:62",
+        "z0intelligence/tests/test_task_loop.py:86",
+        "z0intelligence/tests/test_cognition_cascade.py:334",
+        "z0intelligence/tests/test_hermes_adapter.py:25",
+        "z0evals/tests/test_golden_trace.py:91",
+        "z0evals/tests/test_golden_trace.py:102",
+        "z0evals/tests/test_golden_trace.py:264"
+      ],
+      "tested": "One bounded local patch fixture verifies independently; marking unpatched fixture execution_completed produces verified_success false; admission/selection/close receipts do not create success; golden collector separates structural completion from presence of gold outcome and rejects a mismatched dispatch link.",
+      "limit": "No integrated intent-grounded wrong-but-authorized action cohort was found in the inspected AODL/governed-worker/admission/golden-trace tests. Existing task fixture negative control omits required patch; it is not an arbitrary semantic task oracle."
+    },
+    {
+      "topic": "Existing exact-output live canary is narrow",
+      "paths": [
+        "z0intelligence/scripts/prove-governed-omp-tool.mjs:52",
+        "z0intelligence/scripts/prove-intelligence.py:92",
+        "z0intelligence/scripts/prove-intelligence.py:131",
+        "z0intelligence/docs/aodl-governed-worker.md:164"
+      ],
+      "tested": "Source inspection found an exact-string CANONICAL_OK check before joining a gold outcome.",
+      "limit": "Not run in this offline audit; literal diagnostic and trace wiring do not establish general user-intent correctness."
+    }
+  ],
+  "gaps": [
+    "Natural-language intent parsing, participation preferences, acceptance semantics, evidence sufficiency and user-intent equivalence are described by profiles/intent-contract.md but are not automatically established by schema/graph validation.",
+    "No inspected integrated negative test supplies a legal, structurally admitted action that is semantically wrong for an independently fixed intent and proves the full governed path rejects it.",
+    "tests/test_validate_untrusted_values.py iterates non-scalar mutations and asserts only no TypeError plus mutation count; despite its name it does not assert every malformed mutation returns issues.",
+    "tests/test_aodl_contract_api.py::test_source_hash_stable_on_plan_only_fields_not_required_here only validates a fixture; actual implementation-mutation sourceHash coverage is in z0intelligence tests/test_z0int_aodl.py.",
+    "z0evals collect_golden.py marks verified_outcome_complete when a matching gold outcome with a non-null verification field exists; it is outcome-presence reporting, not a fresh content verifier or a guarantee the outcome is true.",
+    "Frozen z0intelligence record_drift fails three observation tests at line 179.",
+    "z0evals study run.py embeds z0int revision ba43be05c450035929804cf4f8e1f4588c871777 and run_runtime.py embeds 1ef20610334c39f41e798c30072650fd023ee1b2; neither runner checks actual checkout identity before labeling generated output. Frozen inspected z0int checkout is 28db1eecbe9fa9921c52945e15d4894b6dddae3d. These runners were not used to mint mislabeled artifacts.",
+    "No model quality, network/provider execution, real crash-durability, or generalized intent success is claimed by this audit.",
+    "Synthetic fixture negative controls confirmed collector+validate_bundle acceptance of false gold outcome, unrelated verifier identity, boolean usage, and negative usage. Consequently independent collector/importer completion flags alone do not prove a positive exact verified outcome or valid metering."
+  ],
+  "isolated_fix": {
+    "worktree": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence",
+    "base_revision": "28db1eecbe9fa9921c52945e15d4894b6dddae3d",
+    "allowed_files": [
+      "src/z0int/aodl_observation.py"
+    ],
+    "status": "applied_and_focused_tests_passed",
+    "planned_change": "Forward record_drift causal_parents to project_drift, where validation and sorting already live.",
+    "committed": false,
+    "change": "record_drift now passes causal_parents to project_drift, whose existing validation and canonical sorting remain authoritative.",
+    "tests_modified": false,
+    "source_sha256_before": "612555b0801db6a0f01b13fbb894fe1b10f16c5d6e9576682173d42861f2301b",
+    "source_sha256_after": "7043d9da5d0e20a65e43a76c52d9aa374197fda981c245ab6dcd3b869a907c4f",
+    "diff": "diff --git a/src/z0int/aodl_observation.py b/src/z0int/aodl_observation.py\nindex 3dd23ec..db62e37 100644\n--- a/src/z0int/aodl_observation.py\n+++ b/src/z0int/aodl_observation.py\n@@ -176,7 +176,7 @@ def record_drift(\n         trace_id=trace_id,\n         observation=observation,\n         source=source,\n-        causal_parents=canonical_parents,\n+        causal_parents=causal_parents,\n     )\n     event = projected[\"event\"]\n     prior = _previous(event[\"eventId\"])\n",
+    "validation": {
+      "cwd": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence",
+      "command": "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONPATH=/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/src:/workspace/hermes-factory/experiments/aodl-canary-next/aodl /workspace/hermes-factory/venvs/aodl-canary-next/bin/python -B -c 'import aodl_contract,z0int.aodl_observation,pytest; print(\"aodl_import=\" + aodl_contract.__file__); print(\"observation_import=\" + z0int.aodl_observation.__file__); raise SystemExit(pytest.main([\"-p\", \"no:cacheprovider\", \"-q\", \"tests/test_aodl_observation.py\"]))'",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "result": "5 passed in 0.03s",
+      "import_paths_confirmed": {
+        "aodl_contract": "/workspace/hermes-factory/experiments/aodl-canary-next/aodl/aodl_contract/__init__.py",
+        "aodl_observation": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/src/z0int/aodl_observation.py"
+      },
+      "git_diff_check": "passed",
+      "note": "Explicit PYTHONPATH avoids accidentally testing frozen editable z0int installed in the existing venv. Existing 5 observation tests cover the 3 previously failing paths; no repeated full suite or live runtime test was performed by this audit agent."
+    }
+  },
+  "frozen_test_totals": {
+    "pytest_passed": 130,
+    "pytest_failed": 3,
+    "pytest_skipped": 0,
+    "plus_validation_corpus": true,
+    "plus_compile_corpus": true
+  },
+  "final_frozen_git_status": {
+    "aodl": "clean",
+    "z0intelligence": "clean",
+    "z0evals": "clean"
+  },
+  "collector_negative_controls": {
+    "cwd": "/workspace/hermes-factory/experiments/aodl-canary-next/z0evals",
+    "command": "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /workspace/hermes-factory/venvs/aodl-canary-next/bin/python -B - <<'PY'\nimport importlib.util\nimport json\nimport tempfile\nfrom pathlib import Path\n\ntest_path = Path(\"tests/test_golden_trace.py\").resolve()\nspec = importlib.util.spec_from_file_location(\"offline_golden_fixtures\", test_path)\nfixtures = importlib.util.module_from_spec(spec)\nspec.loader.exec_module(fixtures)\ncases = (\n    (\"false_exact_outcome\", False, \"exact_string_CANONICAL_OK\", 100, 20),\n    (\"wrong_verifier_identity\", True, \"unrelated_fixture_verifier\", 100, 20),\n    (\"boolean_usage\", True, \"exact_string_CANONICAL_OK\", True, False),\n    (\"negative_usage\", True, \"exact_string_CANONICAL_OK\", -1, -20),\n)\nresults = []\nfor case, success, verifier, input_tokens, output_tokens in cases:\n    receipts, _, tokenomics = fixtures.base_rows()\n    physical = next(row for row in receipts if row.get(\"trace_id\") == fixtures.PHYSICAL)\n    physical[\"input_tokens\"] = input_tokens\n    physical[\"output_tokens\"] = output_tokens\n    outcomes = [{\n        \"trace_id\": fixtures.PHYSICAL,\n        \"outcome_tier\": \"gold\",\n        \"outcome\": {\"verified_success\": success, \"verification_source\": verifier},\n    }]\n    proof = fixtures.G.collect(receipts, outcomes, tokenomics, fixtures.ROOT_TRACE)\n    proof[\"root_trace_id\"] = \"remote-public-proof\"\n    with tempfile.TemporaryDirectory(prefix=\"aodl-audit-negative-\") as temp:\n        bundle = Path(temp) / \"synthetic-bundle\"\n        fixtures.make_bundle(bundle)\n        (bundle / \"golden-trace.json\").write_text(json.dumps(proof) + \"\\n\")\n        try:\n            fixtures.I.validate_bundle(bundle)\n            imported_validation = \"accepted\"\n        except Exception as exc:\n            imported_validation = type(exc).__name__ + \": \" + str(exc)\n    results.append({\n        \"case\": case,\n        \"structural_execution_complete\": proof[\"structural_execution_complete\"],\n        \"verified_outcome_complete\": proof[\"verified_outcome_complete\"],\n        \"usage_known\": proof[\"checks\"][\"usage_known\"],\n        \"actual_outcome_verified_success\": success,\n        \"verification_source\": verifier,\n        \"validate_bundle\": imported_validation,\n        \"scope\": \"existing public synthetic fixtures; no import/publish CLI invoked\",\n    })\nprint(json.dumps(results, indent=2))\nPY",
+    "exit_code": 0,
+    "results": [
+      {
+        "case": "false_exact_outcome",
+        "structural_execution_complete": true,
+        "verified_outcome_complete": true,
+        "usage_known": true,
+        "actual_outcome_verified_success": false,
+        "verification_source": "exact_string_CANONICAL_OK",
+        "validate_bundle": "accepted",
+        "scope": "existing public synthetic fixtures; no import/publish CLI invoked"
+      },
+      {
+        "case": "wrong_verifier_identity",
+        "structural_execution_complete": true,
+        "verified_outcome_complete": true,
+        "usage_known": true,
+        "actual_outcome_verified_success": true,
+        "verification_source": "unrelated_fixture_verifier",
+        "validate_bundle": "accepted",
+        "scope": "existing public synthetic fixtures; no import/publish CLI invoked"
+      },
+      {
+        "case": "boolean_usage",
+        "structural_execution_complete": true,
+        "verified_outcome_complete": true,
+        "usage_known": true,
+        "actual_outcome_verified_success": true,
+        "verification_source": "exact_string_CANONICAL_OK",
+        "validate_bundle": "accepted",
+        "scope": "existing public synthetic fixtures; no import/publish CLI invoked"
+      },
+      {
+        "case": "negative_usage",
+        "structural_execution_complete": true,
+        "verified_outcome_complete": true,
+        "usage_known": true,
+        "actual_outcome_verified_success": true,
+        "verification_source": "exact_string_CANONICAL_OK",
+        "validate_bundle": "accepted",
+        "scope": "existing public synthetic fixtures; no import/publish CLI invoked"
+      }
+    ],
+    "interpretation": "Four synthetic invalid cases were accepted, documenting a verification gap, not passing rejection controls. Neither the old results tree nor source was changed; temporary synthetic bundles were removed automatically and importer main/publish was not run.",
+    "sources": [
+      {
+        "path": "studies/aodl-admission-v1/collect_golden.py:39",
+        "finding": "verified_outcome treats any non-null verification field in a joined gold row as outcome presence, including verified_success=false, and does not bind verification_source."
+      },
+      {
+        "path": "studies/aodl-admission-v1/collect_golden.py:101",
+        "finding": "usage_known accepts isinstance(value,int); Python bool passes and negative integers pass."
+      },
+      {
+        "path": "studies/aodl-admission-v1/collect_golden.py:218",
+        "finding": "CLI passed combines structural completion with verified outcome presence when --require-verified is set; it does not independently require a positive outcome."
+      },
+      {
+        "path": "studies/aodl-admission-v1/import_golden.py:92",
+        "finding": "Bundle validation checks schema, pin, root identity and matching completion booleans; it does not independently require positive verified_success with exact_string_CANONICAL_OK verifier identity."
+      },
+      {
+        "path": "studies/aodl-admission-v1/golden-trace.schema.json:23",
+        "finding": "Nested stages are required as objects but content predicates and token numeric types/ranges are not specified."
+      },
+      {
+        "path": "z0intelligence/scripts/prove-intelligence.py:92",
+        "finding": "Separate exact-output live proof script asserts CANONICAL_OK before joining gold. Audit does not claim the existing live canary result is false; independent collector acceptance is weaker than that proof script."
+      }
+    ]
+  },
+  "independent_study_checker": {
+    "files_sha256": {
+      "independent_study_check.py": "128201771ba55ae57a7c18c4626b9780ef68da4b6ca3967eeaa1538683040269",
+      "test_independent_study_check.py": "c4f8526d4321fff1ceeb302f99ad304445c04d8f3da2da96924f53d63a466322"
+    },
+    "fixture": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/offline-integration-final/run-01",
+    "fixture_source_revision": "293129b57ed6cc2b8ddab9d5a8b44bcb213d4be4",
+    "test_command": "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /workspace/hermes-factory/venvs/aodl-canary-next/bin/python -B -m pytest -p no:cacheprovider -q test_independent_study_check.py",
+    "test_result": "80 passed in 0.15s",
+    "cli": "python -B independent_study_check.py --output-dir <run-dir> [--require-live] [--out <new-report.json>]",
+    "baseline_contract_pass": true,
+    "baseline_live_evidence": false,
+    "independent_review": "No remaining material scope blocker. Five independently identified preparation/request/permit/owner/terminal-completion mutations now rejected.",
+    "network_calls": 0,
+    "inference_calls": 0,
+    "frozen_sources_changed": false,
+    "scope": "Stdlib-only independent request/response/authority/receipt/positive exact-verifier checker. It checks local recorded evidence consistency, not authenticated provider origin. Frozen task A remains failed; task B import remains disallowed."
+  }
+}

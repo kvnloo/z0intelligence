@@ -1,0 +1,89 @@
+{
+  "aodl_admission_receipt_id": "aodl-admission-28c9bb2090b18d828375d743127df71085dff289fc61fa6f3205402bdcb6c763",
+  "attempts": [
+    {
+      "capability_id": "codex.delegated_text",
+      "execution": "live",
+      "extra": {
+        "admission_reason": "inflight_cap",
+        "admission_token": "admission-5cb4b5988d8c3a5c353b1bfc43bd3f2bff0b59e5db3dc533f8549b3f9df207cc",
+        "attempt_index": 0,
+        "authority_dispatch_id": "dispatch-28c9bb2090b18d828375d743127df71085dff289fc61fa6f3205402bdcb6c763",
+        "authority_event_index": 0,
+        "authority_payload_sha256": "75b59dca3cb56c4f3255e80b799816ab2c7c7c4d56a9b33c8f761f5c261a82f6",
+        "caller_trace_id": "capped",
+        "cap": 1,
+        "capped": true,
+        "category": "explicit",
+        "context_sha256": "a88c59733d9659ad8654fd07fc0e788e4a62e85b48c25a0889d1405acc909e88",
+        "execution_source": "z0intelligence",
+        "expected_cost": null,
+        "free_only": false,
+        "free_tier_evidence": null,
+        "free_tier_validated": false,
+        "harness": "omp",
+        "inflight_at_admission": 1,
+        "parent_agent": "01a0fddd-a9cc-7390-9213-3d9cd903d7be",
+        "physical_call_attempted": false,
+        "policy_revision": "aodl-nous-solar-completion-v1",
+        "policy_sha256": "2b62b8c96bd4689f83a742844586bd3f16d6bc3dac4fa64e1fee778269d33256",
+        "reason": "host-governed AODL remote worker canary",
+        "route_source": "codex_explicit_selection",
+        "status": "capped",
+        "subagent_id": "3abbd0011cd04714a05fa45ce024c970",
+        "subtask": "Public synthetic diagnostic. Return exactly CANONICAL_OK and nothing else.",
+        "task_sha256": "621d7a9c6397dc270da1315566185d1d817430f83238a58e42b1987534fe2636",
+        "task_trace_id": "3abbd0011cd04714a05fa45ce024c970",
+        "usage_source": "unknown",
+        "validated_price_usd": null
+      },
+      "fallbacks": 0,
+      "model": "upstage/solar-mini4",
+      "provider": "nous",
+      "route": "model",
+      "schema": "z0int.decision_receipt.v1",
+      "session_id": "01a0fddd-a9cc-7390-9213-3d9cd903d7be",
+      "trace_id": "39a5812ba4a44dcda5e8e540bffd79d6",
+      "ts": 1790965559.8947697
+    }
+  ],
+  "baseline": {
+    "description": "Estimated tokens for the same worker messages and delivered output if handled by the Codex parent; not measured savings or currency.",
+    "method": "ceil_utf8_bytes_div_4_v1",
+    "model": "codex-parent"
+  },
+  "dispatch_receipt_id": "dispatch-28c9bb2090b18d828375d743127df71085dff289fc61fa6f3205402bdcb6c763",
+  "estimated_frontier_tokens_avoided": null,
+  "free_only": false,
+  "governed_remote": true,
+  "input_tokens": 0,
+  "latency_ms": 6.867276009870693,
+  "model": "upstage/solar-mini4",
+  "note": "Execution is not quality verification; savings use a declared text-size estimate, not a measured counterfactual.",
+  "ok": false,
+  "output": "",
+  "output_tokens": 0,
+  "provider": "nous",
+  "receipt_path": "state/receipts/decisions.jsonl",
+  "refusal_reason": "No candidate completed; no paid overflow",
+  "requires_parent": true,
+  "route": {
+    "caller_trace_id": "capped",
+    "candidates": [
+      {
+        "model": "upstage/solar-mini4",
+        "provider": "nous"
+      }
+    ],
+    "category": "explicit",
+    "harness": "omp",
+    "policy_revision": "aodl-nous-solar-completion-v1",
+    "primary_provider": "nous",
+    "reason": "host-governed AODL remote worker canary",
+    "skipped": [],
+    "source": "codex_explicit_selection"
+  },
+  "subagent_id": "3abbd0011cd04714a05fa45ce024c970",
+  "trace_id": "capped",
+  "unmetered_attempts": 1
+}

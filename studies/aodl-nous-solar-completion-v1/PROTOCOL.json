@@ -1,0 +1,235 @@
+{
+  "budgets": {
+    "automatic_retry_after_failure": false,
+    "conservative_cost_at_declared_byte_and_output_caps_usd": 0.000128,
+    "create_only_durable_fuse": "/workspace/hermes-factory/experiments/aodl-intent-round3/physical-call-consumed.v1.json",
+    "estimated_cost_acceptance_ceiling_usd": 0.001,
+    "fuse_consumed_before_transport": true,
+    "max_physical_calls_total": 1,
+    "pricing": {
+      "catalog_sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+      "completion_usd_per_million": 0.2,
+      "prompt_usd_per_million": 0.05
+    },
+    "provider_enforced_billing_cap": false,
+    "unknown_cost_or_usage": "fail_closed_and_preserve_unknown_not_zero"
+  },
+  "execution": {
+    "bun_bin_directory": "/workspace/hermes-factory/experiments/aodl-canary-next/tools/node_modules/.bin",
+    "credential_supply": "root supplies NOUS_API_KEY in process environment after protocol review; no file reads by launcher",
+    "launcher": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/run_reviewed_study.py",
+    "omp_root": "/workspace/hermes-factory/experiments/aodl-canary-next/oh-my-pi/packages/coding-agent",
+    "output_create_only": true,
+    "python": "/workspace/hermes-factory/venvs/aodl-canary-next/bin/python",
+    "retain_proxy_and_tls_environment": true,
+    "timeout_seconds": 180
+  },
+  "frozen_conformance_audit": {
+    "path": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/conformance-audit.json",
+    "sha256": "8018f39ead3714ad7fbedfd8f749672daace9795a2ed715fa0c8549f257da0bd"
+  },
+  "frozen_sources": {
+    "aodl": {
+      "commit": "68231658f0ec0338464c0916a2329b9587444312",
+      "path": "/workspace/hermes-factory/experiments/aodl-canary-next/aodl"
+    },
+    "oh-my-pi": {
+      "commit": "38bb1aa2fde9d89870c3d8231a5c4aabc0a83b60",
+      "path": "/workspace/hermes-factory/experiments/aodl-canary-next/oh-my-pi"
+    },
+    "z0evals": {
+      "commit": "6652713e25fb159a047457acfe348bd5ec98e146",
+      "path": "/workspace/hermes-factory/experiments/aodl-canary-next/z0evals"
+    },
+    "z0intelligence": {
+      "commit": "28db1eecbe9fa9921c52945e15d4894b6dddae3d",
+      "path": "/workspace/hermes-factory/experiments/aodl-canary-next/z0intelligence"
+    }
+  },
+  "implementation": {
+    "base_commit": "28db1eecbe9fa9921c52945e15d4894b6dddae3d",
+    "commit": "293129b57ed6cc2b8ddab9d5a8b44bcb213d4be4",
+    "default_manifest_unchanged": true,
+    "new_host_policy_only": true,
+    "observation_fix_commit": "3f8f804731e1582f9efb1651f583497f04b98012",
+    "worktree": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence"
+  },
+  "independent_judge": {
+    "acceptance_command": "/workspace/hermes-factory/venvs/aodl-canary-next/bin/python -B /workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/independent_study_check.py --output-dir <new-output>/raw --require-live --out <new-output>/strict-independent-check.json",
+    "implementation": {
+      "path": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/independent_study_check.py",
+      "sha256": "128201771ba55ae57a7c18c4626b9780ef68da4b6ca3967eeaa1538683040269"
+    },
+    "mutation_tests": {
+      "path": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/test_independent_study_check.py",
+      "sha256": "c4f8526d4321fff1ceeb302f99ad304445c04d8f3da2da96924f53d63a466322"
+    },
+    "old_frozen_collector_unmodified": true,
+    "pass_not_sufficient_for_task_b_import": true,
+    "provider_calls": 0,
+    "runtime_imports": false,
+    "source_origin_authentication": "not independently authenticated; validates captured artifacts and exact predicate, with root launcher/source/fuse providing execution provenance",
+    "test_result": "80 passed"
+  },
+  "intent": {
+    "aodl_contract": {
+      "path": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/contracts/aodl/governed-worker-v1.json",
+      "sha256": "3d79aee4b1f33b7aeb705d1a146508cf13459a55a452360df7ba3b119c715f10"
+    },
+    "aodl_token_budget": 4096,
+    "authority_owner": "unchanged durable dispatch claim + permit + receipt owner protocolv3",
+    "context": "Public synthetic diagnostic only.",
+    "exact_verifier": "exact_string_CANONICAL_OK",
+    "legality_owner": "unchanged aodl_contract validation and admission under aodl-canon-1",
+    "max_children": 1,
+    "max_depth": 1,
+    "original_verifier_not_weakened": true,
+    "pass_predicate": "content.strip() == CANONICAL_OK AND finish_reason == stop AND no tool_calls AND all strict independent gates",
+    "requested_authority": [
+      "execute"
+    ],
+    "task": "Public synthetic diagnostic. Return exactly CANONICAL_OK and nothing else."
+  },
+  "offline_and_zero_additional_call_controls": [
+    "wrong intent and context rejected before dispatch",
+    "caller provider/model/aodl/observed overrides rejected",
+    "direct executor wrong intent/model/cap rejects",
+    "ungranted deploy capability denies before dispatch",
+    "exact replay after local HTTP service reconstruction",
+    "same trace conflicting task rejects",
+    "provider cap refuses",
+    "uncertain authority claim refuses takeover",
+    "semantically wrong completed output rejected by independent exact oracle",
+    "failed gold and unrelated verifier labels rejected",
+    "bool/negative/unknown usage rejected",
+    "unknown/nonfinite/negative/excess cost rejected",
+    "served model and receipt output/usage/cost binding required"
+  ],
+  "offline_validation": {
+    "path": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/OFFLINE_VALIDATION.json",
+    "sha256": "f305fe1f8fdee89c49fb5f5ff35ba192ba5738dae96a62ece0d77a566883d014"
+  },
+  "old_study": {
+    "all_attempt_usage_complete": false,
+    "immutable": true,
+    "later_live_negative_controls": "NOT_REACHED",
+    "result": {
+      "path": "/workspace/hermes-factory/experiments/aodl-canary-next/LIVE_RESULT.json",
+      "sha256": "5e1ced71e8da53926af964277040752b7652f5f3896580e59ed5cca45cfd7e5e"
+    },
+    "status": "FAIL_FROZEN_COMPLETION_CAP",
+    "task_b_status": "BLOCKED"
+  },
+  "physical_call_plan": [
+    {
+      "no_second_provider_call_for_controls": true,
+      "ordinal": 1,
+      "output_cap": 128,
+      "path": "real OMP registered z0int_route_worker -> governed preparation -> AODL structural admission -> dispatch authority -> provider permit -> existing OpenAI-compatible transport",
+      "task_and_context": "exact intent fields above"
+    }
+  ],
+  "prior_route_evidence": {
+    "pricing_catalog_provenance": {
+      "path": "/workspace/hermes-factory/reviews/nous-provider-next/inventory-stack/catalog-provenance.json",
+      "sha256": "a8d19f2d6f9886431246e19b87e8ad05ab32507d29455c3a05a7ca103e276aa5"
+    },
+    "qualification_scope": "A different Hermes task completed on same requested model using JSON mode. This exact-output plain-text synthetic prompt is not yet run; backend identity remains unknown.",
+    "result": {
+      "path": "/workspace/hermes-factory/reviews/nous-provider-next/RESULT.json",
+      "sha256": "9f93f7f554cf0fae6138995a51bba4568c88bf51a3898b89378af412113e6219"
+    },
+    "successful_hermes_receipt": {
+      "path": "/workspace/hermes-factory/reviews/nous-provider-next/runs/nous-cheap-solar-json-object/receipt.json",
+      "sha256": "c0d27b59a4a1fe89f0ef4ed83c12018171b608181b83aceb20dd1677420e4186"
+    },
+    "successful_hermes_route": {
+      "path": "/workspace/hermes-factory/reviews/nous-provider-next/runs/nous-cheap-solar-json-object/route.json",
+      "sha256": "cffb6efe186d4cd6ac3097115c550f359c33ead136c333aa3eb6a883d81bfe97"
+    }
+  },
+  "purpose": "Remove transport/completion-policy uncertainty for one governed public exact-output diagnostic on a previously responsive cheap route. No semantic generalization, task-quality, speedup, population, or production claim.",
+  "route": {
+    "actual_backend_provider": "unknown_unless_response_reports_it",
+    "client_fallbacks": 0,
+    "client_retries": 0,
+    "endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+    "free_only": false,
+    "output_token_cap": 128,
+    "parent_model_calls": 0,
+    "prompt_byte_cap": 2048,
+    "provider": "nous",
+    "requested_model": "upstage/solar-mini4",
+    "response_format": "plain_text_no_json_mode",
+    "temperature": 0
+  },
+  "schema": "aodl.separate_completion_study_protocol.v1",
+  "scope_limits": [
+    "AODL validates structural legality and bounded authority; independent oracle establishes this exact synthetic intent only.",
+    "Service reconstruction replay runs in the same process and is not a process-death or multi-host result.",
+    "No backend-provider-stability or price guarantee; current catalog estimates are not billing caps.",
+    "Frozen collector completeness flags do not independently establish positive task success; strict separate checker required."
+  ],
+  "source_files": [
+    {
+      "path": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/manifests/aodl-nous-solar-completion.v1.json",
+      "sha256": "2b62b8c96bd4689f83a742844586bd3f16d6bc3dac4fa64e1fee778269d33256"
+    },
+    {
+      "path": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/scripts/aodl_nous_transport_recording.py",
+      "sha256": "99733ee933304a40174af75040413be068dedb6be56114a79a9079c280e3324c"
+    },
+    {
+      "path": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/scripts/prove-aodl-nous-omp-tool.mjs",
+      "sha256": "d27c9a5fa41facec0980fdcba8f762ed2f6ed3ab19cc290e80e4a3efef19bd00"
+    },
+    {
+      "path": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/scripts/prove-aodl-nous-study.py",
+      "sha256": "0852bd022576b99065f67c83fad7e128bb631db4bd4e429bbbc9452fa542ca43"
+    },
+    {
+      "path": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/src/z0int/aodl_canary_study.py",
+      "sha256": "92295eb873841d1eb6679ad01c9e33fd965121864d4b52d6f1c492b4cebd6c31"
+    },
+    {
+      "path": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/src/z0int/aodl_observation.py",
+      "sha256": "7043d9da5d0e20a65e43a76c52d9aa374197fda981c245ab6dcd3b869a907c4f"
+    },
+    {
+      "path": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/src/z0int/dispatch_authority.py",
+      "sha256": "51a1d262b7be5e1e7f0ba8bcf0a84f84a53d6d131534c5f2c71d2a5afd7f91b3"
+    },
+    {
+      "path": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/src/z0int/governed_worker.py",
+      "sha256": "799a63a017ad3da1ef70886e1bedd453e0918dc64283a9f576582f7ae3bfcbe4"
+    },
+    {
+      "path": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/src/z0int/worker_routing.py",
+      "sha256": "0e01f368bd76511d14dbc1ad99a93ce7ce1027d9e5020be672df375bbb4bfed9"
+    },
+    {
+      "path": "/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/tests/test_aodl_nous_study.py",
+      "sha256": "b46679f713808afb5d6ac61e0f3b83956f24fbb1a3e22d67612eb652dc942189"
+    },
+    {
+      "path": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/run_reviewed_study.py",
+      "sha256": "4acb11d416687c8e8a02c6f87d2e29de4396f9e2af825348c2c3447dcc3f1d61"
+    },
+    {
+      "path": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/independent_study_check.py",
+      "sha256": "128201771ba55ae57a7c18c4626b9780ef68da4b6ca3967eeaa1538683040269"
+    },
+    {
+      "path": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/test_independent_study_check.py",
+      "sha256": "c4f8526d4321fff1ceeb302f99ad304445c04d8f3da2da96924f53d63a466322"
+    }
+  ],
+  "status": "FROZEN_PENDING_ROOT_REVIEW_NO_INFERENCE_AUTHORIZATION_FOR_AGENTS",
+  "stops": [
+    "Any failed or uncertain attempt consumes the single slot; preserve evidence and stop.",
+    "No cap, model, prompt, predicate, authority, or study policy edits within this study.",
+    "No TaskB import through the frozen weak collector, even if this new study passes.",
+    "No automatic routing, runtime activation, model download, remote write, or promotion."
+  ],
+  "study_id": "aodl-nous-solar-completion-v1"
+}

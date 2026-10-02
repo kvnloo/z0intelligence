@@ -1,0 +1,71 @@
+{
+  "commits": {
+    "isolated_study": "293129b57ed6cc2b8ddab9d5a8b44bcb213d4be4",
+    "observation_fix": "3f8f804731e1582f9efb1651f583497f04b98012"
+  },
+  "external_provider_calls": 0,
+  "focused_test_result": {
+    "command": "env -i PATH=/usr/local/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/workspace/hermes-factory/experiments/aodl-intent-round3/z0intelligence/src /workspace/hermes-factory/venvs/aodl-canary-next/bin/python -m pytest -q -p no:cacheprovider tests/test_aodl_nous_study.py tests/test_governed_worker.py tests/test_free_only.py tests/test_dispatch_authority.py tests/test_aodl_admission.py tests/test_aodl_observation.py tests/test_z0int_aodl.py tests/test_worker_routing.py tests/test_golden_canary_wrapper.py",
+    "failed": 0,
+    "new_tests": 35,
+    "passed": 122
+  },
+  "frozen_task_a_status": "FAIL_FROZEN_COMPLETION_CAP",
+  "full_omp_offline_integration": {
+    "artifact_sha256": {
+      "OFFLINE_ONLY.json": "97aa879854d2fef5f2d7b8063a795cd109cc01769c421ae16b85fa16af74c713",
+      "capped.json": "aa4f6379b8ee4cb8df9a7073d189051cc028ae9972fb514088e8baecf82ca25c",
+      "health.json": "6a43c58ac3f6280c6cb8088930f3f20ce60941a4b0b7a3209148944a5044637d",
+      "omp-governed.json": "5ac3033daae4e4e7c915cc8b1578c53c6fc152366b36806b1045e45e0a7d06b5",
+      "public-request.json": "1c25d02ad0e21df5ae534a3c8fd743f6566bc9011f29238c196d0706bf7e527e",
+      "public-response.json": "6ed06a437f5a6d51a12978a3838420a62eba94c737ba145b0180399e3e84e063",
+      "replay.json": "167a23b5553cdf85d3eea339ee44ba194b2e69846149a227678f63cdf1a36f6c",
+      "summary.json": "27687b7cdd5296e1be772e94a6c1b28e4ca216ce2004e609d6755f05acf3d9dc",
+      "uncertain.json": "44f6ebfd347b3c877103a65c88bf13ef4536312ca4ca274d44a8b59e4be8e73b"
+    },
+    "commit": "293129b57ed6cc2b8ddab9d5a8b44bcb213d4be4",
+    "conflict_cap_and_uncertain_refusals": true,
+    "external_provider_calls": 0,
+    "mock_provider_responses": 1,
+    "path": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/offline-integration-final/run-01",
+    "real_local_authority_and_executor_http_services": true,
+    "real_omp_registered_tool": true,
+    "replay_after_http_service_reconstruction": true,
+    "restart_scope": "same_process_not_process_death"
+  },
+  "independent_checker_tests": {
+    "checker_sha256": "128201771ba55ae57a7c18c4626b9780ef68da4b6ca3967eeaa1538683040269",
+    "command": "env -i PATH=/usr/local/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /workspace/hermes-factory/venvs/aodl-canary-next/bin/python -m pytest -q -p no:cacheprovider test_independent_study_check.py",
+    "failed": 0,
+    "fixture_contract_check": {
+      "live_evidence": false,
+      "passed": true,
+      "path": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/strict-offline-check.json",
+      "sha256": "3e448f59c90221a1147b7ac7447c93b31054363da69505022e6a4813c454c350"
+    },
+    "live_promotion_negative": {
+      "expected_cli_exit_code": 1,
+      "path": "/workspace/hermes-factory/reviews/original-goal-round3/aodl-intent/strict-offline-require-live-negative.json",
+      "rejected": true,
+      "sha256": "aeadc85148a7dbbf18ab3a6ed82f47379c2faa1d3d14a0e2055be7f52ba85b9f"
+    },
+    "passed": 80,
+    "tests_sha256": "c4f8526d4321fff1ceeb302f99ad304445c04d8f3da2da96924f53d63a466322"
+  },
+  "new_study_status": "OFFLINE_READY_PENDING_ROOT_PROTOCOL_REVIEW",
+  "notes": [
+    "One intermediate expanded test command referenced absent tests/test_remote_executor.py and ran no tests; corrected explicit list passed122.",
+    "Initial new negative control exposed nonfinite cost serialization exception; cost normalization now records null+invalid flag and preserves fail-closed rejection.",
+    "No general semantic-intent or action-correctness claim: exact CANONICAL_OK oracle is separate from structural legality.",
+    "Full OMP fixture rerun after local commit to bind integration evidence to exact implementation revision; first precommit fixture preserved separately."
+  ],
+  "original_artifacts": {
+    "ARTIFACT_AUDIT.json": "ab6484330f328c646f1d17da9d41420dc16195f63c02b45b8da130086ca24cc1",
+    "LIVE_RESULT.json": "5e1ced71e8da53926af964277040752b7652f5f3896580e59ed5cca45cfd7e5e",
+    "LIVE_RESULT.txt": "9a06fbf39a2b582e2084246f6f36e0c101012941220cbe24f08afff7c3118382"
+  },
+  "production_activation": false,
+  "schema": "aodl.intent_round3.offline_validation.v1",
+  "secret_files_read": false,
+  "task_b_status": "BLOCKED_ON_TASK_A_PASS_AND_STRICT_INDEPENDENT_ACCEPTANCE"
+}
