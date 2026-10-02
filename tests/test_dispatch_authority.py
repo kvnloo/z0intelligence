@@ -154,3 +154,159 @@ def test_terminal_receipt_survives_policy_change(monkeypatch):
     monkeypatch.setattr(w,'require_free_route',lambda *x:pytest.fail('terminal receipt rechecked mutable free policy'))
     row=a.emit(req,owner,1,event(req,'completed'))
     assert row['extra']['status']=='completed'
+
+def aodl_document(*, tokens=1000, max_children=4, max_depth=2, allowed=True, ceiling=None, plan=None):
+    doc={
+        'specVersion':'0.2','graphId':'dispatch-gate','revision':3,
+        'intentGraph':{'nodes':[{
+            'id':'parent','kind':'task',
+            'ports':[{'id':'out','direction':'out','schema':'Task'}],
+            'capabilities':['execute'],
+            'authorityCeiling':list(ceiling or ['execute','verify']),
+            'lifecycle':'declared',
+        }],'edges':[]},
+        'policies':{'kinds':['sequence'],'fanIn':'all','dynamic':{
+            'allowed':allowed,'maxChildren':max_children,'maxDepth':max_depth}},
+        'constraints':{'budgets':{'tokens':tokens},'termination':{'on':'done'}},
+        'provenance':{'source':'test','sourceHash':'0'*64},
+    }
+    if plan is not None:doc['plan']=plan
+    return doc
+
+
+def governed(*, trace='race', doc=None, **spawn):
+    req=request()
+    req['trace_id']=trace
+    proposal={
+        'request_revision':3,'parent_node_id':'parent','live_children':0,'parent_depth':0,
+        'observed':{'tokens':0},'proposed':{'tokens':1},'requested':['execute'],
+    }
+    proposal.update(spawn)
+    req['aodl']={'document':doc or aodl_document(),'spawn':proposal}
+    return req
+
+
+def protocol3(req, owner):
+    return a.rpc('claim',{'protocol_version':3,'request':req,'owner':owner})
+
+
+def test_protocol_v3_missing_aodl_is_durable_denial():
+    req=request();owner=secrets.token_hex(32)
+    first=protocol3(req,owner)
+    assert not first['claimed']
+    assert first['result']['execution_status']=='denied'
+    assert first['result']['aodl_admission']['codes']==['aodl-required']
+    rows=[json.loads(x) for x in receipts_path().read_text().splitlines()]
+    assert len(rows)==1
+    assert rows[0]['capability_id']=='aodl.structural_admission'
+    assert rows[0]['schema']=='z0int.decision_receipt.v1'
+    assert 'success' not in rows[0] and 'verified_success' not in rows[0]
+    again=protocol3(req,secrets.token_hex(32))
+    assert again['result']==first['result']
+    assert len(receipts_path().read_text().splitlines())==1
+
+
+def test_protocol_v3_allow_is_fsynced_before_dispatch_start():
+    req=governed();owner=secrets.token_hex(32)
+    claimed=protocol3(req,owner)
+    assert claimed['claimed']
+    rows=[json.loads(x) for x in receipts_path().read_text().splitlines()]
+    assert [row['capability_id'] for row in rows]==['aodl.structural_admission','intelligence.dispatch']
+    admission,dispatch=rows
+    assert admission['extra']['aodl_admission']['allowed'] is True
+    assert dispatch['extra']['aodl_admission_receipt_id']==admission['trace_id']
+    assert claimed['aodl_admission_receipt_id']==admission['trace_id']
+    replayed=protocol3(req,secrets.token_hex(32))
+    assert replayed['result']['execution_status']=='uncertain'
+    assert len(receipts_path().read_text().splitlines())==2
+
+
+def test_protocol_v3_projects_gate_latency_once_to_tokenomics():
+    from z0int.tokenomics_emit import events_path
+    req=governed();owner=secrets.token_hex(32)
+    first=protocol3(req,owner)
+    assert first['claimed']
+    rows=[json.loads(line) for line in events_path().read_text().splitlines()]
+    assert len(rows)==1
+    assert rows[0]['schema']=='z0int.aodl_gate_latency.v1'
+    assert rows[0]['allowed'] is True
+    assert rows[0]['task_success'] is None
+    assert rows[0]['verified_success'] is None
+    protocol3(req,secrets.token_hex(32))
+    assert len(events_path().read_text().splitlines())==1
+
+
+def test_protocol_v3_denied_budget_never_creates_dispatch():
+    req=governed(doc=aodl_document(tokens=10),observed={'tokens':10},proposed={'tokens':1})
+    owner=secrets.token_hex(32)
+    denied=protocol3(req,owner)
+    assert not denied['claimed']
+    assert denied['result']['aodl_admission']['numeric_codes']==[105]
+    rows=[json.loads(x) for x in receipts_path().read_text().splitlines()]
+    assert len(rows)==1
+    assert rows[0]['capability_id']=='aodl.structural_admission'
+    assert not any(row['trace_id'].startswith('dispatch-') for row in rows)
+    with pytest.raises(ValueError,match='Not the claim owner'):
+        authorize(req,owner)
+
+
+def test_protocol_v3_malformed_envelope_is_durable_denial():
+    req=request();req['aodl']={'document':aodl_document()}
+    first=protocol3(req,secrets.token_hex(32))
+    assert not first['claimed']
+    assert first['result']['aodl_admission']['codes']==['aodl-envelope-invalid']
+    assert len(receipts_path().read_text().splitlines())==1
+    second=protocol3(req,secrets.token_hex(32))
+    assert second['result']==first['result']
+    assert len(receipts_path().read_text().splitlines())==1
+
+
+def test_restart_reuses_allowed_admission_before_dispatch_start():
+    from z0int import aodl_dispatch
+    req=governed();key=a.identity(req)
+    with a.locked(key):
+        admission=aodl_dispatch.ensure(req,key,a.fingerprint(req),required=True)
+    assert admission is not None and admission['extra']['aodl_admission']['allowed']
+    assert len(receipts_path().read_text().splitlines())==1
+    claimed=protocol3(req,secrets.token_hex(32))
+    assert claimed['claimed']
+    rows=[json.loads(x) for x in receipts_path().read_text().splitlines()]
+    assert len(rows)==2
+    assert rows[0]['trace_id']==claimed['aodl_admission_receipt_id']
+    assert rows[1]['extra']['aodl_admission_receipt_id']==rows[0]['trace_id']
+
+
+def test_denied_admission_trace_conflict_fails_closed():
+    req=governed(doc=aodl_document(tokens=0),proposed={'tokens':1})
+    assert not protocol3(req,secrets.token_hex(32))['claimed']
+    changed={**req,'aodl':{'document':aodl_document(tokens=1),'spawn':req['aodl']['spawn']}}
+    with pytest.raises(ValueError,match='different AODL admission request'):
+        protocol3(changed,secrets.token_hex(32))
+
+
+def test_runtime_semantic_drift_does_not_rewrite_intent_lineage():
+    first=governed(trace='drift-a',doc=aodl_document(plan={'generation':1}))
+    second=governed(trace='drift-b',doc=aodl_document(plan={'generation':2}))
+    assert protocol3(first,secrets.token_hex(32))['claimed']
+    assert protocol3(second,secrets.token_hex(32))['claimed']
+    rows=[json.loads(x) for x in receipts_path().read_text().splitlines()]
+    admissions=[row['extra']['aodl_admission'] for row in rows if row.get('capability_id')=='aodl.structural_admission']
+    assert len(admissions)==2
+    assert admissions[0]['aodl_semantic_fingerprint']!=admissions[1]['aodl_semantic_fingerprint']
+    assert admissions[0]['aodl_intent_source_hash']==admissions[1]['aodl_intent_source_hash']=='0'*64
+
+
+def test_validate_remote_strips_aodl_before_worker_contract():
+    req=governed()
+    worker,_,_,_=a.validate_remote(req)
+    assert 'aodl' not in worker
+    assert worker['task']==req['task']
+
+
+def test_protocol_v2_remains_legacy_compatible_without_aodl():
+    req=request();owner=secrets.token_hex(32)
+    result=a.rpc('claim',{'protocol_version':2,'request':req,'owner':owner})
+    assert result['claimed']
+    rows=[json.loads(x) for x in receipts_path().read_text().splitlines()]
+    assert [row['capability_id'] for row in rows]==['intelligence.dispatch']
+

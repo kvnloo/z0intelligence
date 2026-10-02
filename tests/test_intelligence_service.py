@@ -46,3 +46,96 @@ def test_metrics_track_real_dispatch_and_replay(tmp_path,monkeypatch):
         assert 'z0intelligence_dispatch_active 0\n' in text
         assert '# TYPE z0intelligence_dispatch_active gauge' in text
     finally:server.shutdown();server.server_close();thread.join()
+
+def test_readyz_requires_aodl_canon_v1(monkeypatch):
+    import json
+    import z0int.intelligence_service as svc
+    monkeypatch.setattr(svc,'aodl_admission_state',lambda:{'aodl_admission_ready':False,'aodl_canon_version':None})
+    server=Service(('127.0.0.1',0),Handler)
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        url=f'http://127.0.0.1:{server.server_address[1]}/readyz'
+        try:
+            urllib.request.urlopen(url)
+            assert False,'readyz unexpectedly succeeded without AODL'
+        except urllib.error.HTTPError as exc:
+            assert exc.code==503
+    finally:server.shutdown();server.server_close();thread.join()
+
+
+def test_readyz_reports_protocol_v3_with_aodl(monkeypatch):
+    import json
+    import z0int.intelligence_service as svc
+    monkeypatch.setattr(svc,'aodl_admission_state',lambda:{'aodl_admission_ready':True,'aodl_canon_version':'aodl-canon-1'})
+    server=Service(('127.0.0.1',0),Handler)
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        with urllib.request.urlopen(f'http://127.0.0.1:{server.server_address[1]}/readyz') as response:
+            body=json.load(response)
+        assert body['authority_protocol_version']==3
+        assert body['supported_authority_protocol_versions']==[2,3]
+        assert body['aodl_admission_ready'] is True
+        assert body['aodl_canon_version']=='aodl-canon-1'
+    finally:server.shutdown();server.server_close();thread.join()
+
+def test_readyz_fails_when_enabled_governed_contract_is_unavailable(monkeypatch):
+    import z0int.intelligence_service as svc
+    monkeypatch.setattr(svc,'aodl_admission_state',lambda:{'aodl_admission_ready':True,'aodl_canon_version':'aodl-canon-1'})
+    monkeypatch.setattr(svc,'governed_worker_state',lambda:{'governed_remote_enabled':True,'governed_remote_ready':False,'governed_remote_error':'ValueError'})
+    server=Service(('127.0.0.1',0),Handler)
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        try:
+            urllib.request.urlopen(f'http://127.0.0.1:{server.server_address[1]}/readyz')
+            assert False,'readyz unexpectedly succeeded with broken governed contract'
+        except urllib.error.HTTPError as exc:
+            assert exc.code==503
+    finally:server.shutdown();server.server_close();thread.join()
+
+
+def test_readyz_reports_governed_contract_identity(monkeypatch):
+    import json
+    import z0int.intelligence_service as svc
+    monkeypatch.setattr(svc,'aodl_admission_state',lambda:{'aodl_admission_ready':True,'aodl_canon_version':'aodl-canon-1'})
+    monkeypatch.setattr(svc,'governed_worker_state',lambda:{
+        'governed_remote_enabled':True,
+        'governed_remote_ready':True,
+        'governed_contract_graph_id':'z0int-governed-worker-canary',
+        'governed_contract_revision':1,
+        'governed_contract_fingerprint':'aodl-canon-1:'+'a'*64,
+        'governed_contract_source_hash':'0'*64,
+    })
+    server=Service(('127.0.0.1',0),Handler)
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        with urllib.request.urlopen(f'http://127.0.0.1:{server.server_address[1]}/readyz') as response:
+            body=json.load(response)
+        assert body['governed_remote_enabled'] is True
+        assert body['governed_remote_ready'] is True
+        assert body['governed_contract_graph_id']=='z0int-governed-worker-canary'
+        assert body['governed_contract_revision']==1
+    finally:server.shutdown();server.server_close();thread.join()
+
+
+def test_governed_worker_endpoint_delegates_to_host_owned_adapter(monkeypatch):
+    import json
+    import z0int.governed_worker as governed
+    captured={}
+    def fake_execute(args):
+        captured.update(args)
+        return {'ok':True,'trace_id':args['trace_id'],'governed_remote':True}
+    monkeypatch.setattr(governed,'execute',fake_execute)
+    server=Service(('127.0.0.1',0),Handler)
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        payload={'harness':'omp','trace_id':'service-canary','parent_agent':'session','task':'public text','max_tokens':64,'allow_remote':True}
+        req=urllib.request.Request(
+            f'http://127.0.0.1:{server.server_address[1]}/v1/governed-worker',
+            data=json.dumps(payload).encode(),
+            headers={'Content-Type':'application/json'},
+        )
+        with urllib.request.urlopen(req) as response:body=json.load(response)
+        assert body=={'ok':True,'trace_id':'service-canary','governed_remote':True}
+        assert captured==payload
+    finally:server.shutdown();server.server_close();thread.join()
+

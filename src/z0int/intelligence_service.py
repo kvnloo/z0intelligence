@@ -35,6 +35,39 @@ METRICS=Counter({name:0 for name in METRIC_TYPES})
 DRAINING=threading.Event()
 
 
+def aodl_admission_state():
+    try:
+        import aodl_contract
+        version=getattr(aodl_contract,'CANON_VERSION',None)
+        return {'aodl_admission_ready':version=='aodl-canon-1','aodl_canon_version':version}
+    except Exception as exc:
+        return {'aodl_admission_ready':False,'aodl_canon_version':None,'aodl_error':type(exc).__name__}
+
+
+def governed_worker_state():
+    import os
+    if os.environ.get('Z0INT_GOVERNED_REMOTE') != '1':
+        return {'governed_remote_enabled':False,'governed_remote_ready':False}
+    try:
+        from .governed_worker import load_contract
+        import aodl_contract
+        doc=load_contract()
+        return {
+            'governed_remote_enabled':True,
+            'governed_remote_ready':True,
+            'governed_contract_graph_id':doc.get('graphId'),
+            'governed_contract_revision':doc.get('revision'),
+            'governed_contract_fingerprint':aodl_contract.semantic_fingerprint(doc),
+            'governed_contract_source_hash':doc.get('provenance',{}).get('sourceHash'),
+        }
+    except Exception as exc:
+        return {
+            'governed_remote_enabled':True,
+            'governed_remote_ready':False,
+            'governed_remote_error':type(exc).__name__,
+        }
+
+
 def metric(name, amount=1):
     with METRIC_LOCK: METRICS[name] += amount
 
@@ -97,7 +130,8 @@ class Handler(BaseHTTPRequestHandler):
             from .provider_saturation import policy,snapshot
             config=policy()
             states={p:{k:v for k,v in snapshot(p).items() if k!='held_tokens'} for p in policy()['provider_caps']}
-            return self.reply(200,{'authority_protocol_version':2,'providers':states,
+            aodl=aodl_admission_state();governed=governed_worker_state()
+            return self.reply(200,{'authority_protocol_version':3,'supported_authority_protocol_versions':[2,3],**aodl,**governed,'providers':states,
                 'free_only':config.get('free_only',False),
                 'validated_free_models':{p:[e['model'] for e in config.get('validated_free_routes',[]) if e['provider']==p and e.get('validated') and e.get('price_usd')==0] for p in states}})
         if self.path=='/metrics':
@@ -107,12 +141,16 @@ class Handler(BaseHTTPRequestHandler):
             if DRAINING.is_set():return self.reply(503,{'ok':False,'draining':True})
             try:
                 registry=json.loads(REGISTRY.read_text());assert registry['entries']
-                return self.reply(200,{'ok':True,'authority_protocol_version':2,'scope':'dispatch ready; model availability checked on call','max_active':4,'socket_backlog':8,'queue_policy':'reject excess with 503'})
+                aodl=aodl_admission_state();governed=governed_worker_state()
+                if not aodl['aodl_admission_ready']:raise ValueError('AODL admission unavailable')
+                if governed['governed_remote_enabled'] and not governed['governed_remote_ready']:
+                    raise ValueError('governed remote contract unavailable')
+                return self.reply(200,{'ok':True,'authority_protocol_version':3,'supported_authority_protocol_versions':[2,3],**aodl,**governed,'scope':'dispatch ready; model availability checked on call','max_active':4,'socket_backlog':8,'queue_policy':'reject excess with 503'})
             except Exception:return self.reply(503,{'ok':False})
         self.reply(404,{'error':'not_found'})
 
     def do_POST(self):
-        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence', '/v1/worker', '/v1/automatic', '/v1/automatic/consumed', '/v1/integrations/agent-orchestrator/spawn-decision', '/v1/integrations/agent-orchestrator/outcome', '/v1/plan', '/v1/experimental/choice', '/v1/experimental/noul', '/v1/observe/reliability', '/v1/observe/outcome', '/v1/observe/outcome/expectation', '/v1/observe/outcome/assignment', '/v1/observe/event-batch', '/v1/context/pack'):return self.reply(404,{'error':'not_found'})
+        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence', '/v1/worker', '/v1/automatic', '/v1/automatic/consumed', '/v1/integrations/agent-orchestrator/spawn-decision', '/v1/integrations/agent-orchestrator/outcome', '/v1/plan', '/v1/experimental/choice', '/v1/experimental/noul', '/v1/observe/reliability', '/v1/observe/outcome', '/v1/observe/outcome/expectation', '/v1/observe/outcome/assignment', '/v1/observe/event-batch', '/v1/context/pack', '/v1/governed-worker'):return self.reply(404,{'error':'not_found'})
         try:
             size=int(self.headers.get('Content-Length','0'))
             if not 0<size<=(262144 if self.path.startswith('/v1/authority/') else 40000):return self.reply(413,{'error':'request_size'})
@@ -132,6 +170,9 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=='/v1/integrations/agent-orchestrator/outcome':
                 from .ao_bridge import join_ao_outcome
                 return self.reply(200,join_ao_outcome(args))
+            if self.path=='/v1/governed-worker':
+                from .governed_worker import execute as execute_governed_worker
+                return self.reply(200,execute_governed_worker(args))
             if self.path=='/v1/automatic/consumed':return self.reply(200,consume(args))
             if self.path=='/v1/observe/reliability':return self.reply(200,ingest_observation(args))
             if self.path=='/v1/observe/outcome':return self.reply(200,ingest_outcome_observation(args))

@@ -20,6 +20,7 @@ dependencies = [
   "numpy==2.2.6",
   "sentencepiece==0.2.1",
   "protobuf==7.36.1",
+  "aodl-contract @ git+https://github.com/kvnloo/aodl.git@68231658f0ec0338464c0916a2329b9587444312",
 ]
 
 [project.scripts]
