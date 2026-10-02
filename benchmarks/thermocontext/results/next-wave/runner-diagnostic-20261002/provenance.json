@@ -1,0 +1,326 @@
+{
+  "arm_config": {
+    "arms": [
+      "champion",
+      "topk",
+      "greedy",
+      "pair_greedy",
+      "component_dp",
+      "exact",
+      "prototype",
+      "thrml_static",
+      "adaptive",
+      "slack",
+      "thrml_projected",
+      "prototype_projected",
+      "random_projected"
+    ],
+    "chains": 64,
+    "implied_controls": [
+      "slack_initial"
+    ],
+    "mode": "diagnostic",
+    "projection": "Identical constrained_budget.project_budget for all three projected arms",
+    "random_control": {
+      "draws": [
+        80,
+        64,
+        "N"
+      ],
+      "generator": "numpy.default_rng",
+      "probability": 0.35
+    },
+    "retained_sweeps": 80,
+    "seed_schedule": "10000+task_seed*100+sampler_seed",
+    "seeds": 1,
+    "sizes": [
+      8
+    ],
+    "sweeps": 160,
+    "tasks": 1,
+    "tie_rule": "strict original float32 energy improvement; first encountered exact tie"
+  },
+  "arm_config_sha256": "4a4620ad4c6eb6a33d1575de25bc32e24941291bae390b2c95f4d2919bf9f018",
+  "command": [
+    "/workspace/hermes-factory/venvs/thermocontext/bin/python",
+    "/workspace/hermes-factory/experiments/thermocontext-next/z0intelligence/benchmarks/thermocontext/next_wave.py",
+    "--mode",
+    "diagnostic",
+    "--sizes",
+    "8",
+    "--tasks",
+    "1",
+    "--seeds",
+    "1",
+    "--out",
+    "benchmarks/thermocontext/results/next-wave/runner-diagnostic-20261002",
+    "--timing-mode",
+    "contended",
+    "--concurrent-jobs",
+    "Root Hermes network request on CPU3; experiment pinned CPU0; shared host"
+  ],
+  "concurrent_jobs": "Root Hermes network request on CPU3; experiment pinned CPU0; shared host",
+  "cpu_affinity": [
+    0
+  ],
+  "dependency_versions": {
+    "equinox": "0.13.8",
+    "jax": "0.11.2",
+    "jaxlib": "0.11.2",
+    "jaxtyping": "0.3.11",
+    "numpy": "2.2.6",
+    "thrml": "0.1.4"
+  },
+  "devices": [
+    "cpu:0"
+  ],
+  "dirty_paths": [
+    "?? benchmarks/thermocontext/NEXT_WAVE_PLAN.txt",
+    "?? benchmarks/thermocontext/adaptive_budget.py",
+    "?? benchmarks/thermocontext/audit_next_wave.py",
+    "?? benchmarks/thermocontext/constrained_budget.py",
+    "?? benchmarks/thermocontext/hermes_phase_c/",
+    "?? benchmarks/thermocontext/next_wave.py",
+    "?? benchmarks/thermocontext/next_wave_protocol.json",
+    "?? benchmarks/thermocontext/pair_greedy.py",
+    "?? benchmarks/thermocontext/reproduce.py",
+    "?? benchmarks/thermocontext/requirements-next-wave.txt",
+    "?? benchmarks/thermocontext/results/",
+    "?? benchmarks/thermocontext/slack_budget.py",
+    "?? benchmarks/thermocontext/thrml_backend.py",
+    "?? tests/test_thermocontext_adaptive_budget.py",
+    "?? tests/test_thermocontext_audit.py",
+    "?? tests/test_thermocontext_constrained_budget.py",
+    "?? tests/test_thermocontext_next_wave.py",
+    "?? tests/test_thermocontext_pair_greedy.py",
+    "?? tests/test_thermocontext_slack_budget.py",
+    "?? tests/test_thermocontext_thrml_backend.py"
+  ],
+  "environment_limits": {
+    "MKL_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "XLA_FLAGS": "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1"
+  },
+  "git_revision": "456ff17a734206bb5558d0b063cde5cd74f1a6ae",
+  "jax_backend": "cpu",
+  "limitations": [
+    "Synthetic verifier and token labels; no consumed model tokens or Hermes outcome.",
+    "JAX CPU simulation; no Z1/TSU speed or energy claim.",
+    "Task is the statistical unit; seeds and chain draws are not independent tasks.",
+    "Compilation caches are shared across arms in the recorded order; per-arm incurred compilation is not isolated cold-start latency.",
+    "First-valid diagnostic and trace writing are included in experiment wall, separately reported.",
+    "Exact/component oracle construction is separate evaluation infrastructure, never sampler input.",
+    "Any scale stage requires manual preceding-gate review; this runner does not auto-promote."
+  ],
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "protocol": {
+    "adaptive_arm_configuration": {
+      "burn_in_per_stage": 20,
+      "continuation": "Each next stage starts at the last retained states of previous stage; retain all stages for frozen-objective final ranking, including empty states.",
+      "empty_fraction_safeguard_threshold": 0.5,
+      "first_stage_added_price": 0,
+      "limitation": "This changes the sampler schedule, not the frozen scoring objective. Host price adaptation remains global software work.",
+      "overfilled_threshold_budget_fraction": 0.95,
+      "price_bounds": [
+        0,
+        64
+      ],
+      "second_stage_initializer": "16 bisections of independent-spin expected occupancy toward 0.8 * budget, ignoring pair interactions explicitly",
+      "seed_for_stage": "base_seed + stage * 1000003",
+      "stages": 4,
+      "sweeps_per_stage": 40,
+      "underfilled_threshold_budget_fraction": 0.65
+    },
+    "frozen": {
+      "beta": 3.5,
+      "budget": "Task.budget, unchanged",
+      "chains": 64,
+      "generator": "make_task(N, task_seed)",
+      "jax_seed": "10000 + task_seed * 100 + sampler_seed",
+      "maximum_retained_draws_per_arm_seed": 5120,
+      "prototype_path": "benchmarks/thermocontext/phase_a_prototype.py",
+      "prototype_sha256": "69e1b4537858c06f87968093c41f11118af8d842c95edd49cd71897767044a00",
+      "retained_sweeps": 80,
+      "sample_order": "retained sweep major, then chain; chain draws are correlated and not independent tasks",
+      "sampler_seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "scale_ladder": [
+        32,
+        64,
+        128
+      ],
+      "score": "Task.energy: TOKEN_PRICE=2.50, REL_W=0.80, frozen Task.J",
+      "small_N": [
+        8,
+        12,
+        16
+      ],
+      "source_revision": "456ff17a734206bb5558d0b063cde5cd74f1a6ae",
+      "task_seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "total_sweeps_per_arm_seed": 160,
+      "verifier": "Task.verify, unchanged; token feasibility reported separately"
+    },
+    "hybrid_controls": {
+      "auxiliary_initialization": "Report the initial item pack, initial original score, auxiliary constraint satisfaction, and whether sampler states ever change, to detect frozen slack chains.",
+      "label": "A host repair/projection of THRML draws is not exact constrained Gibbs and does not prove that constraints are implemented on a TSU.",
+      "requirement": "For a host-projected THRML proposal arm, include identical projection of prototype proposals and random proposals; isolate proposal quality from deterministic repair."
+    },
+    "integrity": {
+      "adaptive_budget": "All adaptation rounds share the same total sweep and retained-draw budget. No additional samples after observed failure.",
+      "auxiliary_penalty": "Sampler Hamiltonians may add preregistered budget penalties; report their energy separately. Every output is rescored by the identical original Task.energy.",
+      "exact_reference": "Minimum frozen energy over all token-feasible subsets, including empty; never condition on verifier success.",
+      "oracle_separation": "Sampler and its warm start may use only item relevance, tokens, sparse interactions and budget. Required_ids, necessary, expected, facts and verifier outputs are evaluation-only.",
+      "parameters": "Publish complete fixed arm configurations and hashes before full-cohort measurement. Engineering smoke tests are reported separately; no choosing parameters from oracle-cohort outcomes without declaring a new exploratory wave.",
+      "randomness": "Same seed schedule does not imply identical PRNG draws or transition kernels. Distributional/cohort parity is distinct from bitwise trajectory reproduction.",
+      "recording": "Emit every task x stochastic arm x seed, including failures; do not select the best seed. Deterministic arms run once per task and are not replicated into independent statistical observations.",
+      "selection": "Return lowest frozen-energy token-feasible retained proposal, independent of Task.verify and required_ids. Report no feasible proposal explicitly. No hidden exact optimizer or verifier-based reranker."
+    },
+    "interpretation": {
+      "decision_GO": "GO means advance a sparse candidate that passes empirical gates to separately frozen real-evidence replay, subject to deterministic frontier and full overhead; never production activation or Hermes benefit.",
+      "decision_KILL": "Deterministic alternatives, including separately labeled component-DP, dominate at equal verified quality and lower measured overhead, or the claimed signal fails reproduction or depends on forbidden oracle information/dense coupling. Scope the rejection to tested mechanism and cohort.",
+      "decision_MODIFY": "The signal remains bounded but the current formulation, controls, sparsity or scale gates fail. State a narrow falsifiable next modification, without claiming acceptance.",
+      "statistical_unit": "Task, not chain or seed. Report paired task-level results; 12 related synthetic tasks per N cannot certify a small population noninferiority margin.",
+      "synthetic_scope": "Generator deliberately rewards a known three-item synergy and traps one-step greedy. Issue intent pins required evidence outside sampler, but this frozen reproduction does not. Preserve this mismatch as a limitation; do not silently repair it mid-experiment."
+    },
+    "question": "Does genuine THRML preserve the frozen small-N signal, and can sparse budget formulations preserve it at larger N without selecting empty or over-budget context?",
+    "reproducibility": {
+      "capture": [
+        "git_revision",
+        "dirty_paths",
+        "source_sha256",
+        "protocol_sha256",
+        "arm_config_sha256",
+        "dependency_versions",
+        "thrml_distribution_origin",
+        "jax_backend",
+        "devices",
+        "python_version",
+        "command",
+        "timestamps",
+        "environment_limits",
+        "result_rows_sha256"
+      ],
+      "independent_audit": "Independently enumerate small-N oracle, rescore returned masks, validate complete grid, audit trajectory selection where traces available, and distinguish verified audit facts from uncheckable claims.",
+      "outputs": "Create-only row-level results; retain failed runs and negative results. Include sampler input/returned mask so frozen score, tokens and verifier can be recomputed offline.",
+      "sampling_trace": "Persist retained item masks or lossless packed masks sufficient to independently check first-valid sample, selection and sample budgets; final masks alone cannot validate trajectory-derived claims."
+    },
+    "required_comparators": [
+      "full-context champion (report token infeasibility)",
+      "frozen top-k",
+      "frozen one-step greedy",
+      "exact frozen constrained optimum for N <= 16",
+      "frozen prototype JAX colored block-Gibbs",
+      "real THRML with the same fixed small-N Hamiltonian",
+      "sparse adaptive token-price formulation",
+      "sparse explicit slack/auxiliary formulation",
+      "constrained or bucket formulation where implementable; host projection must be labeled hybrid",
+      "pair-lookahead deterministic greedy, using no oracle facts",
+      "explicit deterministic connected-component enumeration plus token-knapsack DP; independently validate against exhaustive small-N optimum before using as labeled large-N exact reference"
+    ],
+    "scale_gates": {
+      "diagnosis": "Report feasibility rate, emptiness, output correctness, mean/worst task loss, constraint violations, chain motion, clipping/saturation, and relevant host work. Do not hide a bounded-budget failure by increasing sampling.",
+      "mean_frozen_energy_at_most_greedy_plus": 1e-05,
+      "minimum_successes_per_task_out_of_8": 7,
+      "missing_or_invalid_outputs": 0,
+      "only_advance_small_N_passing_budget_candidates": true,
+      "returned_empty_packs": 0,
+      "returned_over_budget_packs": 0,
+      "same_task_and_seed_counts_and_sampling_budget": true,
+      "stop_rule": "Complete preregistered independent arms at the current N. At the first N where an advancing budget candidate clearly fails, stop the entire scale ladder and mark all larger N NOT_RUN. Expected failure of the fixed-price prototype reference is a control, not a new-candidate scale failure.",
+      "verified_success_rate_at_least": 0.95
+    },
+    "schema": "thermocontext.next-wave-protocol.v1",
+    "small_N_gates": {
+      "budget_candidate_pass": {
+        "all_N_must_pass": true,
+        "mean_frozen_energy_gap_at_most_greedy_plus": 1e-05,
+        "mean_frozen_energy_gap_at_most_same_run_prototype_plus": 1e-05,
+        "missing_or_invalid_outputs": 0,
+        "returned_empty_packs": 0,
+        "returned_over_budget_packs": 0,
+        "verified_success_count_at_least_same_run_prototype": true
+      },
+      "genuine_THRML_parity_label": "Compare real fixed-Hamiltonian THRML against same-run frozen prototype on verified successes and fixed-energy gaps. Also report disagreement with historical published aggregate results without silently rewriting history.",
+      "report_additionally": "Report each seed and task, worst-task success, energy-gap median/max/tails, successful-pack token frontier, samples-to-first-valid including censored failures, and pair-lookahead baseline performance. Failing low-token packs are not a savings frontier.",
+      "scope": "Each N separately, 12 tasks x 8 seeds = 96 stochastic rows. These are empirical screening rules, not certified population noninferiority."
+    },
+    "sparsity": {
+      "claim_limit": "The degree screen is a chosen sparse CPU-experiment criterion, not an Extropic hardware topology or supported TSU limit. No Z1/TSU latency or energy claim.",
+      "degree_scope": "All variables and all interaction/factor scopes, including auxiliary/carry/slack nodes. Report item-only and full-expanded graphs separately, with node count, edge count, mean degree, maximum degree and coloring blocks.",
+      "higher_order_factors": "Report factor arity and induced variable-neighbor degree; do not hide all-to-all coupling in a single global factor.",
+      "host_constraints": "Report nonlocal CPU projection/controller work explicitly; graph sparsity alone does not establish local execution of a budget constraint.",
+      "no_dense_all_to_all_budget_couplings": true,
+      "preregistered_max_degree_screen": 32
+    },
+    "status": "preregistered_before_next_wave_results",
+    "timing": {
+      "capture": [
+        "construction_ms",
+        "jax_compile_ms",
+        "first_execution_ms",
+        "warm_sampling_ms",
+        "host_postprocess_ms",
+        "verification_ms",
+        "total_wall_ms"
+      ],
+      "compile_accounting": "Report actual new executables, cache hits and static specialization keys. Do not call first compile plus execution warm latency.",
+      "contention": "Record CPU affinity/thread limits, platform/devices, concurrent jobs and timing mode. Contended parallel runs are not isolated latency benchmarks; report the limitation rather than attributing resource differences to algorithm performance.",
+      "end_to_end": "Total wall includes construction, compile when incurred, sampling, host budget control/repair, scoring and verification. Exact reference construction is reported separately as evaluation infrastructure.",
+      "no_production_claim": "Synthetic selected tokens are not actual consumed model tokens, and this synthetic verifier is not a downstream Hermes model outcome.",
+      "synchronization": "Block on JAX outputs before stopping each sampling timer; avoid measuring asynchronous dispatch only."
+    }
+  },
+  "protocol_sha256": "235c25f2a94196170aae67bde7716aa47622b8a7471f5f709cbc8756d96638b1",
+  "python_version": "3.12.14",
+  "schema": "thermocontext.next-wave-run.v1",
+  "source_sha256": {
+    "benchmarks/thermocontext/adaptive_budget.py": "0c9a815b39039cc01a941d6c7289d8cb41a42c3d56748b589cd94720aa560f98",
+    "benchmarks/thermocontext/audit_next_wave.py": "eea9b38893011a9be711295396e798cd8c7ebff2fa89dd5adc659ad239fdc3c4",
+    "benchmarks/thermocontext/constrained_budget.py": "a51ab7810ea47b2db64ec49bdfe9dc3fe74da76ceaf163ef3fcfe917f44dfa49",
+    "benchmarks/thermocontext/next_wave.py": "dcdddfe377d61b98812be01007cfcfcfd705a3b4e3bccf7a9d5723b3c05fc74c",
+    "benchmarks/thermocontext/pair_greedy.py": "1a2935e9e253f43eb5989a072ce687e9a80734cb7601b41cac5f25995b58c979",
+    "benchmarks/thermocontext/phase_a_prototype.py": "69e1b4537858c06f87968093c41f11118af8d842c95edd49cd71897767044a00",
+    "benchmarks/thermocontext/reproduce.py": "7fe7779b13c86bd9ee73800677033c69c262d76e16db8ed4e6eb2c8ee1f13a2f",
+    "benchmarks/thermocontext/slack_budget.py": "9a3197970782351a44b60e6c35ce4823837f5a838a13d98e81fd18cecb048b82",
+    "benchmarks/thermocontext/thrml_backend.py": "b8b9f54ee53f01a2c65cb9191c4f3c3c8dc3be3c0a76140bbba6c6cdd2b23e47"
+  },
+  "started_at": "2026-10-02T07:37:59.063668+00:00",
+  "thrml_distribution_origin": {
+    "equinox": "0.13.8",
+    "expected_revision": "dfb3bde16962f9637a1845ccb2bea80aaa19e4bd",
+    "hardware_claim": false,
+    "installed_python_sha256": "0b7b943b566c987f79baa0cf0c767a85f0f8633cc17cbb3e1af5e962f48de781",
+    "jax": "0.11.2",
+    "jaxlib": "0.11.2",
+    "numpy": "2.2.6",
+    "package": "thrml",
+    "platform": "cpu",
+    "revision": "dfb3bde16962f9637a1845ccb2bea80aaa19e4bd",
+    "revision_verified": true,
+    "upstream": "https://github.com/extropic-ai/thrml",
+    "version": "0.1.4"
+  },
+  "timing_mode": "contended"
+}

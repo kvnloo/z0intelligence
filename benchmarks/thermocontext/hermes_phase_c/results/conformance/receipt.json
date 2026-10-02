@@ -1,0 +1,22 @@
+{
+  "actual_provider_tokens": null,
+  "classification": "OFFLINE_CONFORMANCE_ONLY",
+  "constructed_request_contains_context": true,
+  "frozen_phase_a_modified": false,
+  "hermes_revision": "3536d56cf45b5d19c19675e2e576637edc267946",
+  "pool_file_sha256": "5780cabab15705f67a25268b96612b61015d9906d4815c98f29dd06a57f5fa8b",
+  "provider_calls": 0,
+  "runtime_activation": false,
+  "sampler_calls": 0,
+  "source_manifest_sha256": "7334619674af88cef91aed96361a72b33d0534be76147a39b446887b1cff72ed",
+  "speedup_or_savings_claim": false,
+  "study_files": {
+    "baseline_check.py": "8a1a37449c1f33a0028866b49316f6815aaa74881b35b08768748faf1698343d",
+    "live_baseline.py": "c2060a5e26dbd0b39fb5b64eedb26ed02dd329aec94c78fe360fdbcc14af98e1",
+    "replay_bridge.py": "591497b86aa5a4729af1263ccc9a0106174202cc2fedf96ba32e80bc86018f36",
+    "selection_boundary.py": "c31dda3d32ed5ac77413763b0df216574c04d335a59532c15725e9ee08108c31",
+    "test_baseline.py": "6cd8deab11caa4bb73e0f0e4ccc8b0438cc7070b555fe87c27ee657bb13061c4",
+    "test_selection_boundary.py": "5812c0c8c096ae693bb81c5ad37dc7400084d6fafcc2a3966970c2482be5855a"
+  },
+  "verified_task_success": null
+}

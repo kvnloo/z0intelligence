@@ -1,0 +1,28 @@
+{
+  "context_packet_source_file": "src/z0int/context_resolve.py",
+  "context_packet_source_sha256": "04d3da59e850c6488613a5b23ee2e8312cb19d00c49a9d0fcde7696e04ac7c1c",
+  "hermes_composition_source_sha256": "b838c191eb44e8fd99a768bb782438b2b8751c775df67599dbc4b5892ea344ce",
+  "hermes_revision": "3536d56cf45b5d19c19675e2e576637edc267946",
+  "hermes_source_file": "agent/turn_context.py",
+  "optional_ids": [
+    "gates",
+    "baseline",
+    "guarded",
+    "task_verified_ms",
+    "input_tokens",
+    "output_tokens"
+  ],
+  "pinned_ids": [
+    "limits",
+    "source-identity"
+  ],
+  "pool_file": "development_pool.json",
+  "pool_file_sha256": "5780cabab15705f67a25268b96612b61015d9906d4815c98f29dd06a57f5fa8b",
+  "purpose": "Inspected public development evidence, not a protected holdout or provider result. Derived excerpts only; no personalized histories.",
+  "source_files": {
+    "https://github.com/kvnloo/cua/blob/6bab214abb707a3db9e8a7d641d160c3f58e08d5/docs/experiments/r2-03-2026-10-01/README.md": "fc77cdfc0f9e9edc32da8960d65be6ec1a0549bb40ced945e227c006b5af9f6c",
+    "https://github.com/kvnloo/cua/blob/6bab214abb707a3db9e8a7d641d160c3f58e08d5/docs/experiments/r2-03-2026-10-01/provenance.json": "767f453625406f80b8cbf8785e6267487bc7de117cf11275c4d398c68b576891",
+    "https://github.com/kvnloo/cua/blob/6bab214abb707a3db9e8a7d641d160c3f58e08d5/docs/experiments/r2-03-2026-10-01/r2-03-summary.json": "8a83c1cf3a38f612b1c73fe824664644cc51a68cb19469339971e5967502c161"
+  },
+  "source_publication_revision": "6bab214abb707a3db9e8a7d641d160c3f58e08d5"
+}
