@@ -1,0 +1,54 @@
+{
+  "answer_parsed": false,
+  "classification": "REAL_PROVIDER_ATTEMPT",
+  "configured_max_output_tokens": 4096,
+  "error_type": null,
+  "estimated_cost_at_token_caps_usd": 0.0018191999999999998,
+  "exact_selected_context_in_forwarded_request": true,
+  "execution_window_wall_ns": 5706691372,
+  "freeze_sha256": "cfd1baa022dfbba8c2f76ff7e2739880fd9d800ddbe4de076aaea33a839909e8",
+  "local_metadata_calls": 2,
+  "outcome": {
+    "problems": [
+      "answer_not_object"
+    ],
+    "verified_success": false
+  },
+  "preparation_wall_ns": 1213914443,
+  "provider_calls": 1,
+  "provider_identity_source": "configured_endpoint_only",
+  "reported_cost": 0.00041715,
+  "reported_zero_cost": false,
+  "requested_model": "upstage/solar-mini4",
+  "requested_provider": "nous",
+  "resource_comparison_eligible": true,
+  "returncode": 0,
+  "route_sha256": "9637b2389150128ce3e40901aa8296193d5f309ca09104b4f506ec562a7e6b20",
+  "sampler_enabled": false,
+  "served_model": "upstage/solar-mini4",
+  "served_provider": null,
+  "speedup_or_noninferiority_claim": false,
+  "total_wall_ns": 7032513200,
+  "usage": {
+    "completion_tokens": 176,
+    "completion_tokens_details": {
+      "audio_tokens": 0,
+      "image_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "cost": 0.00041715,
+    "cost_details": {
+      "floor_applied": false,
+      "rate_source": "openrouter_catalog",
+      "source": "openrouter_list"
+    },
+    "prompt_tokens": 7639,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    },
+    "total_tokens": 7815
+  }
+}

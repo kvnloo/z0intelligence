@@ -1,0 +1,458 @@
+{
+  "note": "Offline evidence audit. Catalog estimates are not billing caps. No speedup, noninferiority, context-selection or output-cap causal claim.",
+  "provider_calls": 0,
+  "runs": [
+    {
+      "comparisons": {
+        "answer_parse": true,
+        "catalog_estimate": true,
+        "cost": true,
+        "declared_output_cap": true,
+        "estimate_not_billing_cap": true,
+        "exact_context_witness": true,
+        "exact_original_prompt_and_context_on_wire": true,
+        "explicit_response_format": true,
+        "fixed_requalification_output_cap": true,
+        "fixed_request_byte_cap": true,
+        "independent_outcome": true,
+        "local_metadata_count": true,
+        "no_fallbacks_tools_or_streaming": true,
+        "no_repeated_local_inference": true,
+        "no_sampler_or_comparison_claim": true,
+        "one_physical_post": true,
+        "original_task_scope": true,
+        "protected_checker": true,
+        "provider_identity_provenance": true,
+        "provider_output_binding": true,
+        "provider_specific_forwarding": true,
+        "resource_eligibility": true,
+        "route_and_endpoint": true,
+        "saved_answer": true,
+        "served_identity": true,
+        "usage": true,
+        "usage_sum_when_known": true
+      },
+      "disposition": [
+        "NO_VERIFIED_ANSWER"
+      ],
+      "exact_context": true,
+      "exact_driver_snapshot": "live_baseline.py",
+      "finish_reason": "stop",
+      "http_status": 200,
+      "independent_outcome": {
+        "problems": [
+          "answer_not_object"
+        ],
+        "verified_success": false
+      },
+      "input_sha256": {
+        "answer.json": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "forwarded-request.bin": "05ab88a882c3d99016bf00b261022544831bdd25f52d4136e04cab9b3e3c3b89",
+        "freeze.json": "ac1079667742f2f4dc360974e6e52161f3046b3f534d0d32efee01741f13ee00",
+        "native-request.bin": "05ab88a882c3d99016bf00b261022544831bdd25f52d4136e04cab9b3e3c3b89",
+        "physical-calls.json": "6bf12267b04cc89b62a9c705be583bee289b03a30962a5285e2894dcd1143a8c",
+        "prepared/selection.json": "6cf9e2235ec4adc395097f7ad54d4f626e22bc0fd2db02a39eb5edf75646ae07",
+        "prompt.txt": "d6ac8bcb93d8157f5396f81b9c54a038fc38952382b7c92fb1db6bd6eadc72f6",
+        "receipt.json": "d7f691941e18a4aa1de9a0a936398fcda1835a70714a464072859a43837d5652",
+        "route.json": "48eac5302b9a83eb7f7f8aa81b76baa6a477734248139d9d771864abb7fa8668",
+        "worker-result.json": "7e43287d260d86ea1ef8d5b611a813a3a733243916d0e5a5bc2c26db9e5275f5"
+      },
+      "new_speedup_or_cap_causality_claim": false,
+      "provider_calls_during_replay": 0,
+      "provider_identity_source": "configured_endpoint_only",
+      "replay_matches_saved_evidence": true,
+      "reported_cost": 0,
+      "reported_cost_known_within_policy": true,
+      "reported_usage": {
+        "completion_tokens": 2951,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0,
+        "cost_details": {
+          "floor_applied": false,
+          "rate_source": "nas_model_override",
+          "source": "nas_model_override"
+        },
+        "prompt_tokens": 6323,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 9274
+      },
+      "reported_zero_cost": true,
+      "requested_provider": "nous",
+      "resource_comparison_eligible_recomputed": true,
+      "response_format_requested": null,
+      "route_audit": {
+        "catalog_completion_usd_per_million": 0.0,
+        "catalog_model": "stepfun/step-3.7-flash:free",
+        "catalog_prompt_usd_per_million": 0.0,
+        "catalog_row_sha256": "197273b3a03a3483bf71e18c142671364106ac2af7a31f541402b69e69ad98ff",
+        "catalog_sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+        "cost_control": "fixed_model_catalog_estimate_only",
+        "endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+        "estimate_is_billing_cap": false,
+        "estimated_cost_at_token_caps_usd": 0.0,
+        "model": "stepfun/step-3.7-flash:free",
+        "provider": "nous",
+        "route_sha256": "d0bd74a49240cf6a68ee9648a64632f0134bd22c2682b1c174ddec049b6e3645"
+      },
+      "run": "nous-free-stepfun",
+      "served_model": "stepfun/step-3.7-flash:free",
+      "served_provider": null,
+      "source_bindings": {
+        "exact_driver_bytes": true,
+        "forwarded_wire_bytes": true,
+        "freeze_digest": true,
+        "frozen_original_checker": true,
+        "frozen_original_context": true,
+        "frozen_original_prompt": true,
+        "native_wire_bytes": true,
+        "route_digest": true,
+        "route_snapshot": true
+      },
+      "upstream_reached_evidence": "observed_http_response",
+      "verified_success": false
+    },
+    {
+      "comparisons": {
+        "answer_parse": true,
+        "catalog_estimate": true,
+        "cost": true,
+        "declared_output_cap": true,
+        "estimate_not_billing_cap": true,
+        "exact_context_witness": true,
+        "exact_original_prompt_and_context_on_wire": true,
+        "explicit_response_format": true,
+        "fixed_requalification_output_cap": true,
+        "fixed_request_byte_cap": true,
+        "independent_outcome": true,
+        "local_metadata_count": true,
+        "no_fallbacks_tools_or_streaming": true,
+        "no_repeated_local_inference": true,
+        "no_sampler_or_comparison_claim": true,
+        "one_physical_post": true,
+        "original_task_scope": true,
+        "protected_checker": true,
+        "provider_identity_provenance": true,
+        "provider_output_binding": true,
+        "provider_specific_forwarding": true,
+        "resource_eligibility": true,
+        "route_and_endpoint": true,
+        "saved_answer": true,
+        "served_identity": true,
+        "usage": true,
+        "usage_sum_when_known": true
+      },
+      "disposition": [
+        "RATE_LIMITED_RESOURCE_ADEQUACY_UNRESOLVED",
+        "USAGE_AND_COST_UNKNOWN",
+        "NO_VERIFIED_ANSWER"
+      ],
+      "exact_context": true,
+      "exact_driver_snapshot": "live_baseline.py",
+      "finish_reason": null,
+      "http_status": 429,
+      "independent_outcome": {
+        "problems": [
+          "answer_not_object"
+        ],
+        "verified_success": false
+      },
+      "input_sha256": {
+        "answer.json": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "forwarded-request.bin": "a272aae1e38323f4201148cf1d6c42a8080557c57fd81f74cc3c8849467ab048",
+        "freeze.json": "b0cad43250dd11d0bd5d59332dfdba3974e8cc78eaa0459ca2646ab7f5d48d6b",
+        "native-request.bin": "b7c17d0bbd0812d5e578e19f88525fedb76d0025a3a44642026c2c4fa0906ef3",
+        "physical-calls.json": "b98d5fc531e5be0e34cdf3ec59d5a6d604828acb66a0ae26d4d0417c0cf01d0c",
+        "prepared/selection.json": "6cf9e2235ec4adc395097f7ad54d4f626e22bc0fd2db02a39eb5edf75646ae07",
+        "prompt.txt": "d6ac8bcb93d8157f5396f81b9c54a038fc38952382b7c92fb1db6bd6eadc72f6",
+        "receipt.json": "7aba8f584ecb8e8846e857e4cc46aea893e5ce2fd148f88a49ac90d81075d972",
+        "route.json": "4fb7781564470320272c0b1690ee31c2a52dbb8aa48e852a872d2e453c43dcac",
+        "worker-result.json": "008ea696d458abcb6ac2cb105e890e0dbcab020ca1ef4d891fc1c1a511b51b69"
+      },
+      "new_speedup_or_cap_causality_claim": false,
+      "provider_calls_during_replay": 0,
+      "provider_identity_source": "configured_endpoint_only",
+      "replay_matches_saved_evidence": true,
+      "reported_cost": null,
+      "reported_cost_known_within_policy": false,
+      "reported_usage": null,
+      "reported_zero_cost": null,
+      "requested_provider": "openrouter",
+      "resource_comparison_eligible_recomputed": false,
+      "response_format_requested": null,
+      "route_audit": {
+        "catalog_completion_usd_per_million": 0.0,
+        "catalog_model": "qwen/qwen3.8-27b:free",
+        "catalog_prompt_usd_per_million": 0.0,
+        "catalog_row_sha256": "51eea05e730bfcfee580732e2268c714527866765f13d2a4fb8b06e50e1a38c9",
+        "catalog_sha256": "b977932ba24fbe28009345b51a26be01fa8c308b3b1e5f11635363f48265eb60",
+        "cost_control": "openrouter_max_price_zero",
+        "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+        "estimate_is_billing_cap": false,
+        "estimated_cost_at_token_caps_usd": 0.0,
+        "model": "qwen/qwen3.8-27b:free",
+        "provider": "openrouter",
+        "route_sha256": "2bcaf3bed175afcf350f29416a61b309ef88946249cfde019cab88f22456d8cc"
+      },
+      "run": "openrouter-free-qwen",
+      "served_model": null,
+      "served_provider": null,
+      "source_bindings": {
+        "exact_driver_bytes": true,
+        "forwarded_wire_bytes": true,
+        "freeze_digest": true,
+        "frozen_original_checker": true,
+        "frozen_original_context": true,
+        "frozen_original_prompt": true,
+        "native_wire_bytes": true,
+        "route_digest": true,
+        "route_snapshot": true
+      },
+      "upstream_reached_evidence": "observed_http_response",
+      "verified_success": false
+    },
+    {
+      "comparisons": {
+        "answer_parse": true,
+        "catalog_estimate": true,
+        "cost": true,
+        "declared_output_cap": true,
+        "estimate_not_billing_cap": true,
+        "exact_context_witness": true,
+        "exact_original_prompt_and_context_on_wire": true,
+        "explicit_response_format": true,
+        "fixed_requalification_output_cap": true,
+        "fixed_request_byte_cap": true,
+        "independent_outcome": true,
+        "local_metadata_count": true,
+        "no_fallbacks_tools_or_streaming": true,
+        "no_repeated_local_inference": true,
+        "no_sampler_or_comparison_claim": true,
+        "one_physical_post": true,
+        "original_task_scope": true,
+        "protected_checker": true,
+        "provider_identity_provenance": true,
+        "provider_output_binding": true,
+        "provider_specific_forwarding": true,
+        "resource_eligibility": true,
+        "route_and_endpoint": true,
+        "saved_answer": true,
+        "served_identity": true,
+        "usage": true,
+        "usage_sum_when_known": true
+      },
+      "disposition": [
+        "NO_VERIFIED_ANSWER"
+      ],
+      "exact_context": true,
+      "exact_driver_snapshot": "live_baseline.py",
+      "finish_reason": "stop",
+      "http_status": 200,
+      "independent_outcome": {
+        "problems": [
+          "answer_not_object"
+        ],
+        "verified_success": false
+      },
+      "input_sha256": {
+        "answer.json": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "forwarded-request.bin": "1f7bd0b878c6d0c279e2f263094770fff48a255a7e319a27bef7d32fdf5a8a40",
+        "freeze.json": "cfd1baa022dfbba8c2f76ff7e2739880fd9d800ddbe4de076aaea33a839909e8",
+        "native-request.bin": "1f7bd0b878c6d0c279e2f263094770fff48a255a7e319a27bef7d32fdf5a8a40",
+        "physical-calls.json": "f68d38c2ba7cbfc582dd52d035c1ec4203ccb513b35c5076e18daefaea50c413",
+        "prepared/selection.json": "6cf9e2235ec4adc395097f7ad54d4f626e22bc0fd2db02a39eb5edf75646ae07",
+        "prompt.txt": "d6ac8bcb93d8157f5396f81b9c54a038fc38952382b7c92fb1db6bd6eadc72f6",
+        "receipt.json": "afd03bec0f4ce8c959d3da674c47ca3c84b250692e2396c6a355d60342e0fc54",
+        "route.json": "cffb6efe186d4cd6ac3097115c550f359c33ead136c333aa3eb6a883d81bfe97",
+        "worker-result.json": "c4e2670d892f4103f7d6031164e8189ce046cbbd1d40b2806247d8188b5c2fec"
+      },
+      "new_speedup_or_cap_causality_claim": false,
+      "provider_calls_during_replay": 0,
+      "provider_identity_source": "configured_endpoint_only",
+      "replay_matches_saved_evidence": true,
+      "reported_cost": 0.00041715,
+      "reported_cost_known_within_policy": true,
+      "reported_usage": {
+        "completion_tokens": 176,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.00041715,
+        "cost_details": {
+          "floor_applied": false,
+          "rate_source": "openrouter_catalog",
+          "source": "openrouter_list"
+        },
+        "prompt_tokens": 7639,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 7815
+      },
+      "reported_zero_cost": false,
+      "requested_provider": "nous",
+      "resource_comparison_eligible_recomputed": true,
+      "response_format_requested": null,
+      "route_audit": {
+        "catalog_completion_usd_per_million": 0.2,
+        "catalog_model": "upstage/solar-mini4",
+        "catalog_prompt_usd_per_million": 0.05,
+        "catalog_row_sha256": "5f0129325f15b8b27a1358d10ce9d66b40fc8e3650d206081ebb883511002a2d",
+        "catalog_sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+        "cost_control": "fixed_model_catalog_estimate_only",
+        "endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+        "estimate_is_billing_cap": false,
+        "estimated_cost_at_token_caps_usd": 0.0018192,
+        "model": "upstage/solar-mini4",
+        "provider": "nous",
+        "route_sha256": "9637b2389150128ce3e40901aa8296193d5f309ca09104b4f506ec562a7e6b20"
+      },
+      "run": "nous-cheap-solar",
+      "served_model": "upstage/solar-mini4",
+      "served_provider": null,
+      "source_bindings": {
+        "exact_driver_bytes": true,
+        "forwarded_wire_bytes": true,
+        "freeze_digest": true,
+        "frozen_original_checker": true,
+        "frozen_original_context": true,
+        "frozen_original_prompt": true,
+        "native_wire_bytes": true,
+        "route_digest": true,
+        "route_snapshot": true
+      },
+      "upstream_reached_evidence": "observed_http_response",
+      "verified_success": false
+    },
+    {
+      "comparisons": {
+        "answer_parse": true,
+        "catalog_estimate": true,
+        "cost": true,
+        "declared_output_cap": true,
+        "estimate_not_billing_cap": true,
+        "exact_context_witness": true,
+        "exact_original_prompt_and_context_on_wire": true,
+        "explicit_response_format": true,
+        "fixed_requalification_output_cap": true,
+        "fixed_request_byte_cap": true,
+        "independent_outcome": true,
+        "local_metadata_count": true,
+        "no_fallbacks_tools_or_streaming": true,
+        "no_repeated_local_inference": true,
+        "no_sampler_or_comparison_claim": true,
+        "one_physical_post": true,
+        "original_task_scope": true,
+        "protected_checker": true,
+        "provider_identity_provenance": true,
+        "provider_output_binding": true,
+        "provider_specific_forwarding": true,
+        "resource_eligibility": true,
+        "route_and_endpoint": true,
+        "saved_answer": true,
+        "served_identity": true,
+        "usage": true,
+        "usage_sum_when_known": true
+      },
+      "disposition": [],
+      "exact_context": true,
+      "exact_driver_snapshot": "live_baseline_json_object.py",
+      "finish_reason": "stop",
+      "http_status": 200,
+      "independent_outcome": {
+        "problems": [],
+        "scope": "one_inspected_development_claim_not_population_noninferiority",
+        "verified_success": true
+      },
+      "input_sha256": {
+        "answer.json": "9e73f96ca3290cb6cc9b985728e6dc42d1bf4b9b97219b4d76bc6e8fbe342856",
+        "forwarded-request.bin": "83cb0aa21355961dcb069c5ccd33ad08f7e21646760759f88f73f8015056416c",
+        "freeze.json": "48d075cad72c77684fdb400f50def759afdffd0dbe34687e4ade399e166c2da9",
+        "native-request.bin": "83cb0aa21355961dcb069c5ccd33ad08f7e21646760759f88f73f8015056416c",
+        "physical-calls.json": "cefb190c31c1859d62f3fc30b36c71d329c4c441b784639abd88e3606c1d0d81",
+        "prepared/selection.json": "6cf9e2235ec4adc395097f7ad54d4f626e22bc0fd2db02a39eb5edf75646ae07",
+        "prompt.txt": "d6ac8bcb93d8157f5396f81b9c54a038fc38952382b7c92fb1db6bd6eadc72f6",
+        "receipt.json": "c0d27b59a4a1fe89f0ef4ed83c12018171b608181b83aceb20dd1677420e4186",
+        "route.json": "cffb6efe186d4cd6ac3097115c550f359c33ead136c333aa3eb6a883d81bfe97",
+        "worker-result.json": "fc433ad110ffaba22dd321161a7851f9ae97a9b32ff969e1a60701c760f7b509"
+      },
+      "new_speedup_or_cap_causality_claim": false,
+      "provider_calls_during_replay": 0,
+      "provider_identity_source": "configured_endpoint_only",
+      "replay_matches_saved_evidence": true,
+      "reported_cost": 0.00041885,
+      "reported_cost_known_within_policy": true,
+      "reported_usage": {
+        "completion_tokens": 183,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.00041885,
+        "cost_details": {
+          "floor_applied": false,
+          "rate_source": "openrouter_catalog",
+          "source": "openrouter_list"
+        },
+        "prompt_tokens": 7645,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 7828
+      },
+      "reported_zero_cost": false,
+      "requested_provider": "nous",
+      "resource_comparison_eligible_recomputed": true,
+      "response_format_requested": {
+        "type": "json_object"
+      },
+      "route_audit": {
+        "catalog_completion_usd_per_million": 0.2,
+        "catalog_model": "upstage/solar-mini4",
+        "catalog_prompt_usd_per_million": 0.05,
+        "catalog_row_sha256": "5f0129325f15b8b27a1358d10ce9d66b40fc8e3650d206081ebb883511002a2d",
+        "catalog_sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+        "cost_control": "fixed_model_catalog_estimate_only",
+        "endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+        "estimate_is_billing_cap": false,
+        "estimated_cost_at_token_caps_usd": 0.0018192,
+        "model": "upstage/solar-mini4",
+        "provider": "nous",
+        "route_sha256": "9637b2389150128ce3e40901aa8296193d5f309ca09104b4f506ec562a7e6b20"
+      },
+      "run": "nous-cheap-solar-json-object",
+      "served_model": "upstage/solar-mini4",
+      "served_provider": null,
+      "source_bindings": {
+        "exact_driver_bytes": true,
+        "forwarded_wire_bytes": true,
+        "freeze_digest": true,
+        "frozen_original_checker": true,
+        "frozen_original_context": true,
+        "frozen_original_prompt": true,
+        "native_wire_bytes": true,
+        "route_digest": true,
+        "route_snapshot": true
+      },
+      "upstream_reached_evidence": "observed_http_response",
+      "verified_success": true
+    }
+  ]
+}

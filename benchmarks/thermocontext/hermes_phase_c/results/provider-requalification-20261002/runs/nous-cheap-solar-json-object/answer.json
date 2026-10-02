@@ -1,0 +1,21 @@
+{
+  "baseline_attempted": 40,
+  "baseline_provider_requests_per_task": 2,
+  "baseline_verified": 40,
+  "citations": [
+    "limits",
+    "source-identity",
+    "gates",
+    "baseline",
+    "guarded",
+    "task_verified_ms",
+    "input_tokens",
+    "output_tokens"
+  ],
+  "guarded_attempted": 40,
+  "guarded_provider_requests_per_task": 1,
+  "guarded_verified": 40,
+  "hermes_speedup_established": false,
+  "scope": "single_fixture_python_typesafe",
+  "tested_source": "a0bca744067d04f05904319d3d919be30c336556"
+}

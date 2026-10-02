@@ -1,0 +1,14 @@
+{
+  "endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+  "max_estimated_cost_usd": 0.02,
+  "model": "stepfun/step-3.7-flash:free",
+  "pricing": {
+    "catalog_sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+    "completion_usd_per_million": 0.0,
+    "prompt_usd_per_million": 0.0,
+    "retrieved_at": "2026-10-02T17:17:15.046581+00:00",
+    "source_url": "https://inference-api.nousresearch.com/v1/models"
+  },
+  "provider": "nous",
+  "schema_version": 1
+}

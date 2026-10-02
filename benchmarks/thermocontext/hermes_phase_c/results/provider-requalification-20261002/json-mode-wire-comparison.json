@@ -1,0 +1,18 @@
+{
+  "baseline": "nous-cheap-solar",
+  "candidate": "nous-cheap-solar-json-object",
+  "interpretation": "JSON-mode request supports one successful inspected task. Runtime profile path changed too, so no perfectly controlled full-prompt causal claim, population result, speedup or savings claim.",
+  "normalization_was_not_applied_to_provider_requests": true,
+  "provider_calls": 0,
+  "raw_changed_top_level_fields": [
+    "messages",
+    "response_format"
+  ],
+  "remaining_changed_fields_after_diagnostic_normalization": [
+    "response_format"
+  ],
+  "same_system_prompt_raw": false,
+  "same_user_messages": true,
+  "system_difference": "Two native runtime boilerplate mentions of each isolated run profile directory; preserved in exact wire artifacts.",
+  "system_equal_after_exact_profile_path_normalization": true
+}

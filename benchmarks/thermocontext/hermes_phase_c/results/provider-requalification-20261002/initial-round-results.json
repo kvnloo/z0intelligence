@@ -1,0 +1,97 @@
+{
+  "authentication": "Nous OAuth connected in isolated test profile; catalogGETHTTP200",
+  "distinct_catalog_model_ids": 512,
+  "free_openrouter_router_failure_not_global_inventory_evidence": true,
+  "full_system_claim": false,
+  "inventory_rows": 890,
+  "next_experiment": "One separately preregistered native JSON mode Solar request, unchanged verifier; json-object-preregistration.json",
+  "one_observed_named_openrouter_failure_scope": "Qwen3.8-27bfree returned429with ModelRun provider_name. Other named routes remain UNKNOWN; no account-wide conclusion.",
+  "provider_calls": 3,
+  "published_price_not_availability": true,
+  "runs": [
+    {
+      "exact_context": true,
+      "http_status": 200,
+      "model": "stepfun/step-3.7-flash:free",
+      "provider": "nous",
+      "provider_error": null,
+      "receipt_sha256": "d7f691941e18a4aa1de9a0a936398fcda1835a70714a464072859a43837d5652",
+      "reported_cost": 0,
+      "run": "nous-free-stepfun",
+      "usage": {
+        "completion_tokens": 2951,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0,
+        "cost_details": {
+          "floor_applied": false,
+          "rate_source": "nas_model_override",
+          "source": "nas_model_override"
+        },
+        "prompt_tokens": 6323,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 9274
+      },
+      "verified_success": false
+    },
+    {
+      "exact_context": true,
+      "http_status": 429,
+      "model": "qwen/qwen3.8-27b:free",
+      "provider": "openrouter",
+      "provider_error": {
+        "code": "429",
+        "message": "Provider returned error",
+        "provider_name": "ModelRun"
+      },
+      "receipt_sha256": "7aba8f584ecb8e8846e857e4cc46aea893e5ce2fd148f88a49ac90d81075d972",
+      "reported_cost": null,
+      "run": "openrouter-free-qwen",
+      "usage": null,
+      "verified_success": false
+    },
+    {
+      "exact_context": true,
+      "http_status": 200,
+      "model": "upstage/solar-mini4",
+      "provider": "nous",
+      "provider_error": null,
+      "receipt_sha256": "afd03bec0f4ce8c959d3da674c47ca3c84b250692e2396c6a355d60342e0fc54",
+      "reported_cost": 0.00041715,
+      "run": "nous-cheap-solar",
+      "usage": {
+        "completion_tokens": 176,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.00041715,
+        "cost_details": {
+          "floor_applied": false,
+          "rate_source": "openrouter_catalog",
+          "source": "openrouter_list"
+        },
+        "prompt_tokens": 7639,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 7815
+      },
+      "verified_success": false
+    }
+  ],
+  "schema": "hermes.provider_requalification.observations.v1",
+  "status": "THREE_PREREGISTERED_ATTEMPTS_COMPLETE"
+}

@@ -1,7 +1,25 @@
 ThermoContext -> z0 ContextPacket -> native Hermes: Phase-C discriminator
 
-Current experimental outcome: PARTIAL. Three real-provider attempts are preserved
-under results/live-baseline-*. No verified model answer was obtained:
+Current experimental outcome: ONE VERIFIED DEVELOPMENT TASK, DEFAULT-OFF.
+The separately frozen provider requalification in
+results/provider-requalification-20261002/RESULT.json records four additional
+requests. Nous Solar Mini4 passed the unchanged independent checker when the
+native Hermes request explicitly selected JSON object mode: 7645 input tokens,
+183 output tokens, reported cost $0.00041885. Exact model-visible context, raw
+request bytes, source snapshots and offline receipt reconstruction are preserved.
+This is one inspected factual task, not a protected holdout, a savings result,
+proof of causal evidence use, a thermal-selection benefit or production activation.
+
+The preceding Nous free and cheap attempts returned HTTP 200 but failed strict
+output admission; their failures remain failures. A named OpenRouter free route
+returned HTTP 429 from ModelRun; other named routes remain untested. The native
+system prompt includes a different isolated profile directory for each run, so
+this is not a perfectly controlled full-prompt comparison. Raw model catalog
+caches and credential/profile state stay outside Git; price replay requires the
+separately cached catalogs identified by their frozen SHA256 digests.
+
+Historical attempts, before that requalification, remain preserved under
+results/live-baseline-*. None of these original three obtained a verified answer:
 
   01: context admission failed due native hook spill; output also truncated at
       1024 tokens. Reported 1143 input + 1024 output tokens, cost zero.
@@ -11,9 +29,10 @@ under results/live-baseline-*. No verified model answer was obtained:
   03: separately frozen 4096 output-cap test; exact context admitted, HTTP 429.
       No served model, usage, cost or semantic result is known. No retry.
 
-The closed verified real-provider loop remains UNPROVEN. Failed attempts are
-consumed work, not savings. The context admission repair is validated; increasing
-the output cap is unresolved. Source snapshots preserve each executed driver.
+Those original attempts did not close a verified real-provider loop. Failed
+attempts are consumed work, not savings. The context admission repair is validated;
+the original free-router output-cap question remains unresolved. Source snapshots
+preserve each executed driver.
 The THRML promotion case was independently killed for the tested synthetic cohort;
 none of these native Hermes attempts enables or measures the sampler.
 
@@ -194,3 +213,31 @@ The default prepared_case=None preserves the original baseline task. Prepared
 cases cannot override routing, request count, price or output limits. The common
 OneRequestPolicy requires expected_context; all cases share the same admission
 guard instead of copying transport logic. Use a fresh output/profile per case.
+
+Separate provider requalification
+
+--route-file accepts one explicit Nous model or named zero-price OpenRouter model.
+The default remains openrouter/free. A route freezes schema_version=1, provider,
+model, exact allowlisted endpoint, max_estimated_cost_usd and pricing evidence:
+prompt_usd_per_million, completion_usd_per_million, source_url, retrieved_at and
+catalog_sha256. Bind the rates to the cached catalog row in the independent replay.
+Nous rates must be at most $0.20/$0.50 per million input/output tokens; the estimate
+at 20,000 input tokens and the configured output cap must fit at most $0.02.
+This is a catalog estimate, not an enforced billing cap. Actual missing cost stays
+unknown, including on catalog-free Nous models. Named OpenRouter models retain
+provider.allow_fallbacks=false and provider.max_price prompt/completion zero.
+
+For Nous, supply --nous-auth-home /secure/native-hermes-profile instead of a
+credential file. The parent uses the native Hermes credential resolver and checks
+its returned endpoint against the frozen route. Only the parent proxy holds the
+real bearer; the isolated worker uses a dummy local key. No auth store or bearer
+is copied into the run. Auth profiles and credential files must be outside this
+repository. Preparation never resolves credentials or performs network requests.
+
+Each new run freezes route.json and its canonical digest alongside the unchanged
+prompt/context/checker. One fixed-model POST, no redirects/retries/fallback, exact
+context admission, a 20,000-byte request limit and output <=4096 still apply.
+Raw request-body artifacts bind actual native and forwarded bytes; they contain no
+HTTP headers. A bounded upstream error summary preserves quota/capacity evidence.
+Use a new output directory and preserve every failed attempt; provider changes are
+separate requalifications and cannot establish a context-selection speedup.

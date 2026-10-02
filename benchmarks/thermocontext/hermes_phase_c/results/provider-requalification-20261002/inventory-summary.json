@@ -1,0 +1,61 @@
+{
+  "advertised_zero_prompt_and_completion_by_transport": {
+    "nous": 9,
+    "openrouter": 22
+  },
+  "cache_path": "/workspace/hermes-factory/reviews/nous-provider-next/inventory-stack/kerdoios-isolated-cache/inventory.json",
+  "catalog_rows": 890,
+  "catalogs": [
+    {
+      "path": "/home/agent/.z0int/state/provider-inventory/20261002-openrouter/catalog.json",
+      "rows": 465,
+      "sha256": "b977932ba24fbe28009345b51a26be01fa8c308b3b1e5f11635363f48265eb60",
+      "transport": "openrouter"
+    },
+    {
+      "path": "/home/agent/.z0int/state/provider-inventory/20261002-nous/catalog.json",
+      "rows": 425,
+      "sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+      "transport": "nous"
+    }
+  ],
+  "cheap_le_1_per_million_each_by_transport": {
+    "nous": 170,
+    "openrouter": 181
+  },
+  "inference_calls": 0,
+  "metadata_network_calls": 0,
+  "production_activated": false,
+  "publication_boundary": "Raw catalog caches, account state and per-run native profiles remain outside Git. Independent price replay reads separately cached raw catalogs by recorded SHA256. These are provider/model rows, not independently verified model capabilities.",
+  "resource_offer_roundtrip_rows": 890,
+  "zero_rates_excluded_by_current_kerdoios_is_free": [
+    {
+      "model": "inclusionai/ling-3.1-flash",
+      "provider": "openrouter"
+    },
+    {
+      "model": "stealth/space-bunny-alpha",
+      "provider": "openrouter"
+    },
+    {
+      "model": "google/lyria-3-pro-preview",
+      "provider": "openrouter"
+    },
+    {
+      "model": "google/lyria-3-clip-preview",
+      "provider": "openrouter"
+    },
+    {
+      "model": "openrouter/free",
+      "provider": "openrouter"
+    },
+    {
+      "model": "inclusionai/ling-3.1-flash",
+      "provider": "nous"
+    },
+    {
+      "model": "stealth/space-bunny-alpha",
+      "provider": "nous"
+    }
+  ]
+}

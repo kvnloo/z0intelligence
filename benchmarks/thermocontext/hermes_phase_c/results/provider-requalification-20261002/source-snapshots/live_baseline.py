@@ -206,13 +206,12 @@ def error_summary(data: object, secret: str) -> dict:
 
 class OneRequestPolicy:
     def __init__(self, *, expected_context: str, max_output_tokens: int = MAX_OUTPUT_TOKENS,
-                 route: dict | None = None, require_json_object: bool = False):
+                 route: dict | None = None):
         if not isinstance(expected_context, str) or not expected_context:
             raise BudgetRejected("exact expected context is required")
         self.expected_context = expected_context
         self.max_output_tokens = output_limit(max_output_tokens)
         self.route = validate_route(default_route() if route is None else route, self.max_output_tokens)
-        self.response_format = {"type": "json_object"} if require_json_object else None
         self.used = False
 
     def admit(self, raw: bytes) -> dict:
@@ -231,9 +230,6 @@ class OneRequestPolicy:
             raise BudgetRejected("model fallback/routing override is forbidden")
         if type(body.get("n", 1)) is not int or body.get("n", 1) != 1:
             raise BudgetRejected("multiple completions are forbidden")
-        if (body.get("response_format") != self.response_format
-                or self.response_format is None and "response_format" in body):
-            raise BudgetRejected("frozen response format contract violated")
         if type(body.get("max_tokens")) is not int or not 1 <= body["max_tokens"] <= self.max_output_tokens:
             raise BudgetRejected("output token limit missing or excessive")
         forwarded = dict(body)
@@ -257,7 +253,6 @@ def study_spill_config(context: str) -> dict:
 def worker(args: argparse.Namespace) -> None:
     output_cap = output_limit(getattr(args, "max_output_tokens", MAX_OUTPUT_TOKENS))
     route = load_route(args, output_cap)
-    overrides = {"response_format": {"type": "json_object"}} if getattr(args, "require_json_object", False) else None
     sys.path.insert(0, str(args.hermes_repo))
     from hermes_state import SessionDB
     from hermes_cli.plugins import discover_plugins
@@ -269,7 +264,6 @@ def worker(args: argparse.Namespace) -> None:
         agent = AIAgent(api_key=LOCAL_WORKER_KEY, base_url=args.proxy_url,
                         provider="openai-compat", api_mode="chat_completions", model=route["model"],
                         enabled_toolsets=[], max_iterations=1, max_tokens=output_cap,
-                        request_overrides=overrides,
                         quiet_mode=True, skip_context_files=True, skip_memory=True,
                         skip_background_review=True, save_trajectories=False,
                         session_db=db, session_id="thermocontext-claim-baseline",
@@ -318,7 +312,6 @@ def prepare_inputs(args: argparse.Namespace, prepared_case: dict | None = None) 
 def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
     output_cap = output_limit(getattr(args, "max_output_tokens", MAX_OUTPUT_TOKENS))
     route = load_route(args, output_cap)
-    require_json_object = getattr(args, "require_json_object", False)
     overall_started = time.perf_counter_ns()
     args.out.mkdir(parents=True, exist_ok=False)
     selection, prompt, grade_answer, checker_source, case_metadata = prepare_inputs(args, prepared_case)
@@ -330,7 +323,6 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
               "estimated_cost_at_token_caps_usd": estimated_cost(route, output_cap),
               "cost_control": "openrouter_max_price_zero" if route["provider"] == "openrouter" else "fixed_model_catalog_estimate_only",
               "catalog_estimate_is_billing_cap": False,
-              "response_format_requested": {"type": "json_object"} if require_json_object else None,
               "max_physical_inference_attempts": 1, "max_output_tokens": output_cap,
               "max_serialized_request_bytes": MAX_REQUEST_BYTES, "max_wall_seconds": MAX_WALL_SECONDS,
               "input_token_cap": {"value": MAX_INPUT_TOKENS, "enforcement": "post-response eligibility; no preflight tokenizer guarantee"},
@@ -349,8 +341,7 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
         return {"status": "PREPARED_NOT_EXECUTED", "provider_calls": 0}
     preparation_wall_ns = time.perf_counter_ns() - overall_started
     secret = resolve_secret(args, route)
-    policy = OneRequestPolicy(expected_context=selection["context"], max_output_tokens=output_cap,
-                              route=route, require_json_object=require_json_object)
+    policy = OneRequestPolicy(expected_context=selection["context"], max_output_tokens=output_cap, route=route)
     lock, calls = threading.Lock(), []
     started = time.perf_counter_ns()
     deadline = time.monotonic() + MAX_WALL_SECONDS - 1
@@ -394,13 +385,6 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
             forwarded_raw = serialize_request(body)
             (args.out / "native-request.bin").write_bytes(raw)
             (args.out / "forwarded-request.bin").write_bytes(forwarded_raw)
-            timeout = min(100, deadline - time.monotonic())
-            if timeout <= 0:
-                with lock:
-                    calls.append({"kind": "blocked_inference", "upstream_sent": False,
-                                  "error_type": "BudgetRejected"})
-                self.reply(400, {"error": {"message": "experiment deadline expired before upstream attempt"}})
-                return
             call = {"kind": "inference", "upstream_sent": True, "physical_attempt": 1,
                     "method": "POST", "endpoint": route["endpoint"],
                     "native_request": json.loads(raw), "forwarded_request": body,
@@ -413,6 +397,9 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
             before = time.perf_counter_ns()
             try:
                 # One physical POST: verified TLS, no redirect/retry, total async deadline.
+                timeout = min(100, deadline - time.monotonic())
+                if timeout <= 0:
+                    raise TimeoutError("experiment deadline expired")
                 response = asyncio.run(post_once(route["endpoint"], forwarded_raw, secret, timeout))
                 call["status_code"] = response.status_code
                 try:
@@ -470,8 +457,6 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
                "--max-output-tokens", str(output_cap),
                "--route-file", str(args.out / "route.json"),
                "--proxy-url", f"http://127.0.0.1:{server.server_port}/v1"]
-    if require_json_object:
-        command.append("--require-json-object")
     returncode, error_type = None, None
     try:
         completed = subprocess.run(command, env=environment, capture_output=True, text=True,
@@ -541,8 +526,6 @@ if __name__ == "__main__":
     parser.add_argument("--nous-auth-home", type=Path,
                         help="Native Nous authentication profile outside the repository; read only by parent")
     parser.add_argument("--execute", action="store_true")
-    parser.add_argument("--require-json-object", action="store_true",
-                        help="Separately frozen native response_format=json_object; default remains absent")
     parser.add_argument("--max-output-tokens", type=int, default=MAX_OUTPUT_TOKENS,
                         help="Explicit output cap, default 1024, maximum 4096; freeze separately when changed")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
