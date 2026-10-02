@@ -152,6 +152,12 @@ def observed_spawn_state(document: Mapping[str, Any], parent: str) -> dict[str, 
 
 
 def _provider_model(policy: Mapping[str, Any], providers: Mapping[str, Any]) -> tuple[str, str]:
+    from .aodl_canary_study import bounds
+    study = bounds(policy, providers)
+    if study is not None:
+        if os.environ.get("Z0INT_GOVERNED_PROVIDER", "nous") != "nous":
+            raise ValueError("governed study provider override is forbidden")
+        return "nous", str(study["model"])
     provider = os.environ.get("Z0INT_GOVERNED_PROVIDER")
     if not provider:
         order = policy.get("free_provider_order")
@@ -202,9 +208,16 @@ def build_remote_request(args: object) -> dict[str, Any]:
     if args.get("allow_remote") is not True:
         raise ValueError("governed remote execution requires explicit allow_remote=true")
 
+    from .aodl_canary_study import bounds, validate_worker
+    policy, providers = configuration()
+    study = bounds(policy, providers)
+    if study is not None and args.get("free_only") is True:
+        raise ValueError("paid study cannot satisfy free_only=true")
     worker = {key: args[key] for key in ("task", "context", "parent_agent", "max_tokens", "free_only") if key in args}
-    worker["free_only"] = True
+    worker["free_only"] = study is None
     validate_request(worker)
+    if study is not None:
+        validate_worker(worker, study, messages_for(worker))
 
     document = load_contract()
     parent = parent_node_id(document)
@@ -217,7 +230,6 @@ def build_remote_request(args: object) -> dict[str, Any]:
     ):
         raise ValueError("prior governed token spend is unknown; reconcile usage before another spawn")
 
-    policy, providers = configuration()
     provider, model = _provider_model(policy, providers)
     prompt_tokens = estimate(json.dumps(messages_for(worker), ensure_ascii=False, separators=(",", ":")))
     max_tokens = int(worker.get("max_tokens", 512))
@@ -238,7 +250,7 @@ def build_remote_request(args: object) -> dict[str, Any]:
         "model": model,
         "reason": "host-governed AODL remote worker canary",
         "max_tokens": max_tokens,
-        "free_only": True,
+        "free_only": worker["free_only"],
         "aodl": {
             "document": document,
             "spawn": {
@@ -291,7 +303,7 @@ def prepare_remote_request(args: object) -> dict[str, Any]:
                 "model": frozen["model"],
                 "reason": frozen["reason"],
                 "max_tokens": int(args.get("max_tokens", 512)),
-                "free_only": True,
+                "free_only": frozen.get("free_only", True),
                 "aodl": json.loads(json.dumps(frozen["aodl"])),
             }
 
@@ -300,6 +312,7 @@ def prepare_remote_request(args: object) -> dict[str, Any]:
             "provider": remote["provider"],
             "model": remote["model"],
             "reason": remote["reason"],
+            "free_only": remote["free_only"],
             "aodl": remote["aodl"],
         }
         append_receipt({

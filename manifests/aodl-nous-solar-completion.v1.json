@@ -1,0 +1,140 @@
+{
+  "allow_paid_jev_verification": true,
+  "baseline": {
+    "description": "Estimated tokens for the same worker messages and delivered output if handled by the Codex parent; not measured savings or currency.",
+    "method": "ceil_utf8_bytes_div_4_v1",
+    "model": "codex-parent"
+  },
+  "default_provider": "nous",
+  "defaults": {
+    "nous": "upstage/solar-mini4"
+  },
+  "fallback_order": [
+    "nous"
+  ],
+  "free_only": false,
+  "free_policy_exclusions": {
+    "other_providers": "No explicitly validated zero-priced route imported for this policy",
+    "vercel": "Recovered transport and cap8, but measured positive gateway cost: free credit is not a zero-priced route"
+  },
+  "free_provider_order": [],
+  "function_orders": {
+    "structured": [
+      "nous"
+    ],
+    "text": [
+      "nous"
+    ]
+  },
+  "governed_study": {
+    "billing_cap_enforced_by_provider": false,
+    "context": "Public synthetic diagnostic only.",
+    "id": "aodl-nous-solar-completion-v1",
+    "max_estimated_cost_usd": 0.001,
+    "max_output_tokens": 128,
+    "max_physical_calls": 1,
+    "max_prompt_bytes": 2048,
+    "model": "upstage/solar-mini4",
+    "pricing": {
+      "catalog_sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+      "completion_usd_per_million": 0.2,
+      "prompt_usd_per_million": 0.05
+    },
+    "provider": "nous",
+    "task": "Public synthetic diagnostic. Return exactly CANONICAL_OK and nothing else."
+  },
+  "health_cooldown_seconds": 60,
+  "health_error_ttl_seconds": 30,
+  "max_attempts": 1,
+  "policy_revision": "aodl-nous-solar-completion-v1",
+  "provider_caps": {
+    "nous": 1
+  },
+  "provider_caps_source": {
+    "affected_update": {
+      "evidence_path": "preserved-local-evidence:dsh-evidence.json",
+      "openrouter": 1,
+      "sha256": "26e6bbbdef2ef9343c5440ec6b728e998eccb53b5cbd54e503142e9f1cb5a53d",
+      "vercel": 8
+    },
+    "kind": "operator_handoff",
+    "path": "preserved-local-evidence:pasted-text.txt",
+    "referenced_report": "provider-saturation-and-scaling-policy.md",
+    "verification": "Referenced report not located; supplied measurements are policy inputs, not independently reproduced here."
+  },
+  "providers": {
+    "nous": {
+      "api_key_env": "NOUS_API_KEY",
+      "auth": "environment",
+      "base_url": "https://inference-api.nousresearch.com",
+      "models": [
+        {
+          "id": "upstage/solar-mini4",
+          "label": "upstage/solar-mini4"
+        }
+      ]
+    }
+  },
+  "quota_budgets": {
+    "groq": {
+      "limits": {
+        "rpd": 1000,
+        "rpm": 30,
+        "tpd": 200000,
+        "tpm": 8000
+      },
+      "model": "openai/gpt-oss-20b",
+      "no_paid_spill": true
+    }
+  },
+  "rules": [
+    {
+      "category": "local",
+      "pattern": "\\blocal-only\\b",
+      "provider": "local",
+      "remote_fallback": false
+    },
+    {
+      "category": "code",
+      "pattern": "\\b(python|javascript|sql|function|code|regex)\\b",
+      "provider": "cerebras"
+    },
+    {
+      "category": "structured",
+      "pattern": "\\b(json|csv|extract|sort|sum|calculate|arithmetic)\\b",
+      "provider": "groq"
+    },
+    {
+      "category": "language",
+      "pattern": "\\b(translate|translation|summarize|summary)\\b",
+      "provider": "deepseek"
+    },
+    {
+      "category": "critique",
+      "pattern": "\\b(critique|counterargument|weakness)\\b",
+      "provider": "grok"
+    },
+    {
+      "category": "comparison",
+      "pattern": "\\b(compare|comparison|tradeoffs)\\b",
+      "provider": "nous"
+    },
+    {
+      "category": "classification",
+      "pattern": "\\b(classify|classification|sentiment)\\b",
+      "provider": "nvidia"
+    },
+    {
+      "category": "rewrite",
+      "pattern": "\\b(rewrite|proofread|grammar)\\b",
+      "provider": "openrouter"
+    }
+  ],
+  "schema": "z0int.worker_routing.v1",
+  "structured_functions": [
+    "tool_selection",
+    "coding_implementation"
+  ],
+  "timeout_s": 20,
+  "validated_free_routes": []
+}

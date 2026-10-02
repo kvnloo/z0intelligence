@@ -103,6 +103,11 @@ def validate_remote(request, *, enforce_free=False):
     worker={k:v for k,v in request.items() if k not in ('harness','trace_id','function','aodl')}
     validate_request(worker,automatic=False)
     policy,providers=configuration()
+    from .aodl_canary_study import bounds, validate_worker
+    from .worker_routing import messages_for
+    study=bounds(policy,providers)
+    if study is not None:
+        validate_worker(worker,study,messages_for(worker))
     plan=explicit_plan(worker,policy,providers)
     config=providers[request['provider']]
     if config.get('auth','environment')!='environment' or not isinstance(config.get('api_key_env'),str) or not config['base_url'].startswith('https://'):

@@ -222,6 +222,22 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         row.extra['provider_reported_cost_usd'] = cost
         cost_violation = (free_required(policy,args) or row.extra.get('free_only')) and cost is not None and (type(cost) not in (int,float) or cost != 0)
         ok = complete and metered and identified and not cost_violation
+        from .aodl_canary_study import bounds
+        study = bounds(policy, policy['providers'])
+        if study is not None:
+            cost_known = type(cost) in (int, float) and math.isfinite(cost) and cost >= 0
+            study_metered = cost_known and cost <= study['max_estimated_cost_usd']
+            study_identity = response.raw.get('model') == model
+            ok = ok and study_metered and study_identity
+            if type(cost) is float and not math.isfinite(cost):
+                row.extra['provider_reported_cost_usd'] = None
+                row.extra['provider_cost_invalid_nonfinite'] = True
+            row.extra.update(study_id=study['id'], study_cost_known=cost_known,
+                             study_cost_within_bound=study_metered,
+                             study_model_identity_matches=study_identity,
+                             billing_cap_enforced_by_provider=False)
+            if not study_metered or not study_identity:
+                cost_violation = True
         row.outcome = {'execution_completed': complete, 'source': 'codex_plugin'}
         row.extra.update(status='completed' if ok else ('failed' if cost_violation else 'completed_unmetered_or_unidentified' if complete else 'incomplete'),
                          response_model=response.raw.get('model'), response_id=response.raw.get('id'), finish_reason=finish,
