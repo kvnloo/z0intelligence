@@ -4,6 +4,7 @@ import itertools
 import unittest
 
 import numpy as np
+import pytest
 
 from benchmarks.thermocontext.slack_budget import build_slack_qubo, initial_states
 
@@ -94,6 +95,8 @@ class SparseSlackTests(unittest.TestCase):
             build_slack_qubo([1], [[0]], [1.5], 1)
 
     def test_real_thrml_smoke_has_only_public_construction_inputs(self):
+        pytest.importorskip("jax", exc_type=ModuleNotFoundError)
+        pytest.importorskip("thrml", exc_type=ModuleNotFoundError)
         from types import SimpleNamespace
         from benchmarks.thermocontext.slack_budget import propose
 

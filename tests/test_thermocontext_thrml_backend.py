@@ -1,10 +1,12 @@
 """Independent energy/distribution checks for the real THRML adapter."""
 import itertools
 
-import jax
-import jax.numpy as jnp
 import numpy as np
 import pytest
+
+jax = pytest.importorskip("jax", exc_type=ModuleNotFoundError)
+pytest.importorskip("thrml", exc_type=ModuleNotFoundError)
+import jax.numpy as jnp
 
 from benchmarks.thermocontext.thrml_backend import (
     THRML_REVISION,

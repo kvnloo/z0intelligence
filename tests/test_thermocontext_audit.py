@@ -9,6 +9,9 @@ import tempfile
 import unittest
 
 import numpy as np
+import pytest
+
+pytest.importorskip("jax", exc_type=ModuleNotFoundError)
 
 from benchmarks.thermocontext import audit_next_wave as audit
 

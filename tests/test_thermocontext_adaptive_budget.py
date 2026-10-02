@@ -3,6 +3,9 @@ import types
 import numpy as np
 import pytest
 
+pytest.importorskip("jax", exc_type=ModuleNotFoundError)
+pytest.importorskip("thrml", exc_type=ModuleNotFoundError)
+
 from benchmarks.thermocontext import adaptive_budget
 
 

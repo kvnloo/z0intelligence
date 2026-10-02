@@ -106,7 +106,8 @@ def test_task_wrapper_uses_only_public_objective_and_token_costs():
 
 
 def test_propose_uses_one_backend_call_and_preserves_raw_proposals(monkeypatch):
-    pytest.importorskip("thrml")
+    pytest.importorskip("jax", exc_type=ModuleNotFoundError)
+    pytest.importorskip("thrml", exc_type=ModuleNotFoundError)
     from benchmarks.thermocontext import thrml_backend
 
     calls = []
@@ -136,7 +137,8 @@ def test_propose_uses_one_backend_call_and_preserves_raw_proposals(monkeypatch):
 
 
 def test_genuine_thrml_integration_preserves_fixed_sample_count_and_sparse_graph():
-    pytest.importorskip("thrml")
+    pytest.importorskip("jax", exc_type=ModuleNotFoundError)
+    pytest.importorskip("thrml", exc_type=ModuleNotFoundError)
     task = SimpleNamespace(
         unary=lambda: np.array([0.1, 0.2, 0.5]),
         J=np.array([[0.0, -0.5, 0.0], [-0.5, 0.0, 0.0], [0.0, 0.0, 0.0]]),

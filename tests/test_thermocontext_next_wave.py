@@ -4,6 +4,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+pytest.importorskip("jax", exc_type=ModuleNotFoundError)
+
 from benchmarks.thermocontext.next_wave import (
     first_valid_sample,
     select_original_energy,
