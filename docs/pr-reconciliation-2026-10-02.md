@@ -2,7 +2,7 @@
 
 Baseline: `0563ed7a52071cca63ccc91b8c9040207ad23e5d` on `master`.
 
-All 59 pull requests were inspected, including their descriptions, changed-file inventories, review history and recorded owner constraints. At the audit snapshot, 21 were closed (18 already merged; three superseded documentation proposals) and 38 were open. This reconciliation integrates the original heads of **35 relevant open PRs**, including their stacked dependencies, with merge commits. The remaining three are intentional archives, not missing production features.
+All 59 pull requests were inspected, including their descriptions, changed-file inventories, review history and recorded owner constraints. At the audit snapshot, 21 were closed (18 already merged; three superseded documentation proposals) and 38 were open. The [reconciliation PR #109](https://github.com/kvnloo/z0intelligence/pull/109) integrates the original heads of **35 relevant open PRs**, including their stacked dependencies. Its branch preserves the merge history; GitHub required a squash merge into master (`b345aa2bef199779cac8672b08d535cb28526fd7`). Donor PRs are closed as integrated, without claiming separate GitHub merge events. The remaining three are intentional archives, not missing production features.
 
 The non-PR `hermes-opportunities` branch at `f80da33700f1db2472571845c782928bd931e834` is also integrated. It supplies the State Packet and Decision Opportunity implementation that README previously described without containing the source. Its authored benchmark records remain historical evidence, not new measurements.
 
@@ -45,7 +45,9 @@ python benchmarks/verify_published.py
 
 Final results: **920 Python tests passed**, 8 skipped and 5 live tests deselected; **12 OMP tests passed** (46 assertions); **4 governed-client tests passed**; all published raw checksums passed and **69 published summary claims verified**. The baseline, tested separately, had nine failures, including missing optional quota test setup and obsolete workstation/mock assumptions. No headline result or frozen raw evidence was changed.
 
-CI now schedules the full offline suite on Python 3.11 and 3.13 for relevant source/test/manifest changes, using the exact Kerdoios revision. Local results above qualify Python 3.13; the matrix results must be checked independently on GitHub. The Avrea comparison is available only by explicit workflow-dispatch opt-in; no third-party runner configuration or timing advantage is claimed.
+The initial CI revision used a runner context at job scope that GitHub rejected before job scheduling; the follow-up uses the permitted workspace context. CI now schedules the full offline suite on Python 3.11 and 3.13 for relevant source/test/manifest changes, using the exact Kerdoios revision. Local results above qualify Python 3.13; the matrix results must be checked independently on GitHub. The Avrea comparison is available only by explicit workflow-dispatch opt-in; no third-party runner configuration or timing advantage is claimed.
+
+The installed Bend-native plugin at `e85e65e5d2e11caba8412d6dbd19aad03fd785ad` was also exercised against the reconciled service: authority protocol 3, local-only `PARENT_ONLY`, no execution and exact-request replay. The lightweight CI unittest selection passes 36 tests.
 
 ## Explicitly retained PRs
 
@@ -55,7 +57,7 @@ CI now schedules the full offline suite on Python 3.11 and 3.13 for relevant sou
 
 ## Complete pull-request disposition
 
-The head pins below refer to the audited PR heads. “Integrated” means that exact head is an ancestor of the reconciliation branch; GitHub may close stacked PRs as integrated rather than assign each an independent merge event. Closed PRs are reported as historical dispositions and were not reopened.
+The head pins below refer to the audited PR heads. Original commits remain reachable on `integrate/pr-reconciliation-20261002`; squash-merged master contains their reconciled content. “Integrated” means that exact head is an ancestor of the reconciliation branch; GitHub may close stacked PRs as integrated rather than assign each an independent merge event. Closed PRs are reported as historical dispositions and were not reopened.
 
 | PR | Audited scope | Head | Disposition |
 | --- | --- | --- | --- |
