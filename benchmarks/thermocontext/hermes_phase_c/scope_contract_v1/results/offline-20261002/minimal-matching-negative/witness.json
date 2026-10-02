@@ -1,0 +1,19 @@
+{
+  "actual_provider_tokens": null,
+  "context_sha256": "4ee6a0c648c7b89b8dd8d3a5a2b657076ed02b1d054f1eceb7bd86fd6eb1881b",
+  "model_consumed_context": null,
+  "native_admission": {
+    "exact_context_preserved": true,
+    "input_context_chars": 1078,
+    "max_chars": 20000,
+    "scope": "real native collection/spill; controlled hook return; no transport",
+    "spill_notice_present": false
+  },
+  "occurrences": 1,
+  "pool_sha256": "e16e133eed5478d74fb61b808d62819ad954ded20bc0295006e74dcbc0acaacf",
+  "request_contains_exact_context": true,
+  "request_origin": "offline native hook/composition with prior observed system; not transport",
+  "request_sha256": "80237a8aea4fb7555fc0566408cfffda185153d56a24c8150c38c9165504b6db",
+  "transmitted": false,
+  "verified_success": null
+}

@@ -1,0 +1,29 @@
+{
+  "answer": {
+    "scope": {
+      "citations": [],
+      "status": "unknown",
+      "value": null
+    },
+    "tested_source": {
+      "citations": [
+        "source-identity"
+      ],
+      "status": "declared",
+      "value": "a0bca744067d04f05904319d3d919be30c336556"
+    }
+  },
+  "independent_outcome_verified": false,
+  "inventory": [
+    {
+      "excerpt_sha256": "8635ff6ac46fa4d8539248c67102189f5ea2e801bc4094bf0b4090c58a0759f1",
+      "json_pointer": "/tested_source",
+      "kind": "tested_source",
+      "locator": "https://github.com/kvnloo/cua/blob/6bab214abb707a3db9e8a7d641d160c3f58e08d5/docs/experiments/r2-03-2026-10-01/provenance.json#/shas_kept_separate",
+      "source_id": "source-identity",
+      "source_version": "sha256:767f453625406f80b8cbf8785e6267487bc7de117cf11275c4d398c68b576891",
+      "value": "a0bca744067d04f05904319d3d919be30c336556"
+    }
+  ],
+  "runtime_authority": false
+}

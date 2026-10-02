@@ -1,0 +1,41 @@
+{
+  "answer": {
+    "scope": {
+      "citations": [],
+      "status": "unknown",
+      "value": null
+    },
+    "tested_source": {
+      "citations": [
+        "record-1"
+      ],
+      "status": "declared",
+      "value": "1234567890abcdef1234567890abcdef12345678"
+    }
+  },
+  "independent_outcome_verified": false,
+  "inventory": [
+    {
+      "excerpt_sha256": "2339b9d5f5b611a618497cf05c748dac7c04f848e9d72fd99492c773b5678c8e",
+      "json_pointer": "/tested_source",
+      "kind": "tested_source",
+      "locator": "fixture://scope-contract/record-1",
+      "source_id": "record-1",
+      "source_version": "sha256:2339b9d5f5b611a618497cf05c748dac7c04f848e9d72fd99492c773b5678c8e",
+      "value": "1234567890abcdef1234567890abcdef12345678"
+    },
+    {
+      "excerpt_sha256": "b42d4ca2bd5a6374e32e31e88e9a08db1c081d85b31dfbdd45fbbd4f07583e28",
+      "json_pointer": "/declared_value",
+      "kind": "scope",
+      "locator": "fixture://scope-contract/record-2",
+      "matches_target": false,
+      "predicate": "speedup_established",
+      "source_id": "record-2",
+      "source_version": "sha256:b42d4ca2bd5a6374e32e31e88e9a08db1c081d85b31dfbdd45fbbd4f07583e28",
+      "subject": "hermes:synthetic-suite-b:latency",
+      "value": true
+    }
+  ],
+  "runtime_authority": false
+}

@@ -1,0 +1,233 @@
+{
+  "actual_provider_cost_usd": 0,
+  "actual_provider_tokens": null,
+  "arms_passed": 14,
+  "artifact_bindings": {
+    "full-conflicting-scope/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "full-conflicting-scope/context.txt": "763e4ce0198e764fe81f6c14876b1b670fb17e7af10ab0093407b2b91b9a6782",
+    "full-conflicting-scope/declarations.json": "82f091b5508fb1f2f005d33334fc9f1351e489c7bf7bc53ebfc1192dda53b700",
+    "full-conflicting-scope/request.json": "5536470d9a8c9780eea675babb7bf6c8e326044027c712946253549e80188f3f",
+    "full-conflicting-scope/selection.json": "353a4c5fb4ea4747a1c9003c8815cfc2990b1d2f1e12d6e481f729128327f28c",
+    "full-conflicting-scope/witness.json": "9e00575a97cee8d3b2233a3cf7d26a66cc1ed19c4667bb4c8a9a875fc1b5cce6",
+    "full-historical-prose-only/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "full-historical-prose-only/context.txt": "a5d7f52d401ca4ba3bd51d77f9d73f602ed55202c40c5af1a1abbd01f112b0e6",
+    "full-historical-prose-only/declarations.json": "bf020140d099e8abf9f3cc1439b0fb24106f8b4bb6d903a0718030a18d212410",
+    "full-historical-prose-only/request.json": "35baddd95cac2de4821f418158cd2047c36eaff457b10507c2e3d58273d91690",
+    "full-historical-prose-only/selection.json": "59caeceb3c4e398ec41b7ea929791c8a563002edb9d7d3bd80ca04400e9334bf",
+    "full-historical-prose-only/witness.json": "949a3ca1aabaae3e7d66bea14645925074712f9f029dbc1eec738807d38263bc",
+    "full-matching-negative/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "full-matching-negative/context.txt": "6d0eb87c3932969c3111298d38a8f64f7510b1e26f043e639b258e1ec2853f6b",
+    "full-matching-negative/declarations.json": "ffead003a94e3f703ff25a47e59bb00846f390b5b346eefe38fa21e330d86981",
+    "full-matching-negative/request.json": "b302382e1c48c7440bede3cba68de21f6048280eacca5f959f9bf3a8a9e6cf11",
+    "full-matching-negative/selection.json": "d903079a99a19dcfea0f7922f739e9eeaab55e17f5d1a073c480df8e5bc577cd",
+    "full-matching-negative/witness.json": "8628574e7789de5d5a0611f45c76ab6043b3645650d4e193488a3a31c1f6224c",
+    "full-matching-positive/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "full-matching-positive/context.txt": "bc7f50548b8343099885340b5ceb7ab69adae9b8a65f5ce66f4cdebdddfcd5db",
+    "full-matching-positive/declarations.json": "ce7ff5914b18fb8ce134e2a67008d560e73ec41c9b84d4574143cf1ce061d1ac",
+    "full-matching-positive/request.json": "2b361b7c708f0c991f65fe3dfadee1b39601e07eab5df2f734b1fc3adb79061f",
+    "full-matching-positive/selection.json": "4bdfea68b39b85b51992e821b1f6cbc1c0136dae31014baf9a61de03be8cd01b",
+    "full-matching-positive/witness.json": "e41cd3d386f27dc6b44709a37f88378d6169d9e3121cf4c106afe745e72026ec",
+    "full-missing-scope/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "full-missing-scope/context.txt": "003e2dc17a7ca8c653f5dd5469f6d776f5a7e35b7dd5bd6b3d0e1d7e9713cfa0",
+    "full-missing-scope/declarations.json": "6e0dcd958a42c999271cf4aa434d7eabfbdffb9ffbdd6df61d53282a24dc9d68",
+    "full-missing-scope/request.json": "8cb575e9029129dff232a528a4c566653f78483cd2adc61db8182881fe89ca63",
+    "full-missing-scope/selection.json": "a33def01b6c97406500607456de1a4304d18fe155ed8ca67d4cf267b88ca672e",
+    "full-missing-scope/witness.json": "18283e2cb0b7a847fe320eaca60fac4a9af1fd0ddce327fd7de2d94462a154be",
+    "full-missing-source-known-negative/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "full-missing-source-known-negative/context.txt": "d6f6d839a6c11bf114c96bb5e8cf4dc380611914eb2567e69ab13ec18bb977ad",
+    "full-missing-source-known-negative/declarations.json": "d457cc6c4930135bff2ef10c5f30a21dc155d1a104ff34da272713637ac03b3b",
+    "full-missing-source-known-negative/request.json": "0f60c8b64dc40b4eb66b19c0aa6fb009b0ec906a8697f7d3e69c8f9fb9c75769",
+    "full-missing-source-known-negative/selection.json": "3dfcad9a336f7b21cb0bc339063470c7742c0670ac36e332587e936e5978db0d",
+    "full-missing-source-known-negative/witness.json": "23f4b1dc0fb7c169d9c888a446675d9e304e0929dfaa2e97397a7a4e3bdfe7d3",
+    "full-wrong-subject-positive/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "full-wrong-subject-positive/context.txt": "fe4edcb4ae21d02b84fc08ed1942380ed686505413ff83e770547bf7b131eae7",
+    "full-wrong-subject-positive/declarations.json": "efb9bc667cd661cb42d7a2773b8fa933029baa6ac71ff535d518f5883e2dd2a7",
+    "full-wrong-subject-positive/request.json": "d2006f5e273cc7cd089e180c1d636b5c15e16577bbfe7cf47aacb5a4b4e30719",
+    "full-wrong-subject-positive/selection.json": "06e41d8f7b0edf2184922ac3ccf1ee2f5898c8b93faeda40786c2d6adfd42ed7",
+    "full-wrong-subject-positive/witness.json": "2219007ebd7bd12061656b30ec664d48779adbab98d6319f285a1537ac31314d",
+    "minimal-conflicting-scope/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "minimal-conflicting-scope/context.txt": "ea774f60997c0615ae810355c0e665db5850a09d62005707a72efadada083528",
+    "minimal-conflicting-scope/declarations.json": "82f091b5508fb1f2f005d33334fc9f1351e489c7bf7bc53ebfc1192dda53b700",
+    "minimal-conflicting-scope/request.json": "3b484bc2f925f98aea740ecca94be5793704da60621317c40d9f9f51ddfa8ae9",
+    "minimal-conflicting-scope/selection.json": "227d25c2215f250092df9ba77e404e220657822e81e910cb44bdbc0767a363f0",
+    "minimal-conflicting-scope/witness.json": "a988eada51677318953246894bdc29570505406a37c1fcf520e962916c512867",
+    "minimal-historical-prose-only/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "minimal-historical-prose-only/context.txt": "6355305b6943f931c1042dd14812d74de4d1e32def09639dc522ece573425307",
+    "minimal-historical-prose-only/declarations.json": "bf020140d099e8abf9f3cc1439b0fb24106f8b4bb6d903a0718030a18d212410",
+    "minimal-historical-prose-only/request.json": "54999593b51a2d54d0b06b1396ef1ee8117fc8699b25e1ea6bcc902735d29591",
+    "minimal-historical-prose-only/selection.json": "09c8b085ada97c20fba38316ffcb20fff6d85b6ef4c3ea3ed99dd31efd2bee82",
+    "minimal-historical-prose-only/witness.json": "17f1043c746e7037af44524664ed8c9b56c8edfd90cdc9e4d78d39e182f51801",
+    "minimal-matching-negative/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "minimal-matching-negative/context.txt": "4ee6a0c648c7b89b8dd8d3a5a2b657076ed02b1d054f1eceb7bd86fd6eb1881b",
+    "minimal-matching-negative/declarations.json": "ffead003a94e3f703ff25a47e59bb00846f390b5b346eefe38fa21e330d86981",
+    "minimal-matching-negative/request.json": "ee8a2515dd2d9918609cb58d565858bce8e6f657c8584b69caee0c7a8b321032",
+    "minimal-matching-negative/selection.json": "e919d3730e85b7b24c1477b5a54891f9f68907a0cce264471aa2f5baf2f19188",
+    "minimal-matching-negative/witness.json": "6b1f1d74b9347a31edb37bbe35ffd88793273c77d4a3b8c268822b97d306ada9",
+    "minimal-matching-positive/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "minimal-matching-positive/context.txt": "48d6586f76bcffefb389d476e40b00f63bfa3498e6acc7e91aef556586b38316",
+    "minimal-matching-positive/declarations.json": "ce7ff5914b18fb8ce134e2a67008d560e73ec41c9b84d4574143cf1ce061d1ac",
+    "minimal-matching-positive/request.json": "9e460d86dc905cc11fa2b0d954b402def6fe25eac12ece7543cb9424352249ab",
+    "minimal-matching-positive/selection.json": "aa49c2cf93638207a0d79a78d10c6d6d71a3a0c049044a200b81f933ddd71d22",
+    "minimal-matching-positive/witness.json": "201570af7fcd5b75c8ad65cba7f5f5f544d4cb1d1c7cf87cae9853ebff50b31d",
+    "minimal-missing-scope/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "minimal-missing-scope/context.txt": "6b87c6688d3e866d2cc1935f72f6ec4082f1caab59e9d081a288173c2bb724a4",
+    "minimal-missing-scope/declarations.json": "6e0dcd958a42c999271cf4aa434d7eabfbdffb9ffbdd6df61d53282a24dc9d68",
+    "minimal-missing-scope/request.json": "87a08cd2fe2e2800893bb39059fec0c39c06f2d4140fc5c1fcab9b917464bddf",
+    "minimal-missing-scope/selection.json": "fca0bde3a9da3f67eb23911a66bc23a9cf2d2a9a2a6f6244894de5c6959ddb80",
+    "minimal-missing-scope/witness.json": "4fae685259dc082acff2733e6b787fbb79c65cba8e6248ef26dd43832aa1cc22",
+    "minimal-missing-source-known-negative/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "minimal-missing-source-known-negative/context.txt": "eb0cc1423c19be14943530037a180487cc11e07c0a3146607cfd703a209b8662",
+    "minimal-missing-source-known-negative/declarations.json": "d457cc6c4930135bff2ef10c5f30a21dc155d1a104ff34da272713637ac03b3b",
+    "minimal-missing-source-known-negative/request.json": "f24004b5780fc0234ee1359637afd31cbfaaa1889cf1c6b5b9e465f04cf5027e",
+    "minimal-missing-source-known-negative/selection.json": "fc7a99b957a3c2170f98d4b305d38be92c768950145d66e353c7f24ec932edb5",
+    "minimal-missing-source-known-negative/witness.json": "3fbb3ac4f9fcb715a359e9e5a9f3e98b5b16fa1a7423d95773303aa85be3ebbd",
+    "minimal-wrong-subject-positive/check.json": "1f23195ff75b5126b322ca5a63a46ef4839293dd5f19b9efe0fe066af23c0ed0",
+    "minimal-wrong-subject-positive/context.txt": "96350de6d347e9dac0dff98ae5238c928c697b91534034d39cacd45ff7750853",
+    "minimal-wrong-subject-positive/declarations.json": "efb9bc667cd661cb42d7a2773b8fa933029baa6ac71ff535d518f5883e2dd2a7",
+    "minimal-wrong-subject-positive/request.json": "3a00445fce9a907313c15c954eabf1acf7e33bc7d93d063db4d6c19ca74c2719",
+    "minimal-wrong-subject-positive/selection.json": "64d6e9c0e62814d17188fe06dad814e6064eff4cc220527381a181699f9a15b6",
+    "minimal-wrong-subject-positive/witness.json": "1caabd14d3b3b3bce748b54c7d7fd23f7522998aaaaab62cbc3d818f66e48666"
+  },
+  "cases": {
+    "full-conflicting-scope": {
+      "context_utf8_bytes": 3833,
+      "offline_serialized_request_bytes": 8300,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "full-historical-prose-only": {
+      "context_utf8_bytes": 5751,
+      "offline_serialized_request_bytes": 10288,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "full-matching-negative": {
+      "context_utf8_bytes": 3231,
+      "offline_serialized_request_bytes": 7640,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "full-matching-positive": {
+      "context_utf8_bytes": 3230,
+      "offline_serialized_request_bytes": 7639,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "full-missing-scope": {
+      "context_utf8_bytes": 2775,
+      "offline_serialized_request_bytes": 7130,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "full-missing-source-known-negative": {
+      "context_utf8_bytes": 2890,
+      "offline_serialized_request_bytes": 7265,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "full-wrong-subject-positive": {
+      "context_utf8_bytes": 3230,
+      "offline_serialized_request_bytes": 7639,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "minimal-conflicting-scope": {
+      "context_utf8_bytes": 1680,
+      "offline_serialized_request_bytes": 5907,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "minimal-historical-prose-only": {
+      "context_utf8_bytes": 3598,
+      "offline_serialized_request_bytes": 7895,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "minimal-matching-negative": {
+      "context_utf8_bytes": 1078,
+      "offline_serialized_request_bytes": 5247,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "minimal-matching-positive": {
+      "context_utf8_bytes": 1077,
+      "offline_serialized_request_bytes": 5246,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "minimal-missing-scope": {
+      "context_utf8_bytes": 622,
+      "offline_serialized_request_bytes": 4737,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "minimal-missing-source-known-negative": {
+      "context_utf8_bytes": 737,
+      "offline_serialized_request_bytes": 4872,
+      "passed": true,
+      "within_byte_cap": true
+    },
+    "minimal-wrong-subject-positive": {
+      "context_utf8_bytes": 1077,
+      "offline_serialized_request_bytes": 5246,
+      "passed": true,
+      "within_byte_cap": true
+    }
+  },
+  "mutants_rejected": {
+    "always_false_scope": [
+      "matching-positive",
+      "missing-scope",
+      "conflicting-scope",
+      "wrong-subject-positive",
+      "historical-prose-only"
+    ],
+    "always_unknown_scope": [
+      "matching-positive",
+      "matching-negative",
+      "conflicting-scope",
+      "missing-source-known-negative"
+    ],
+    "copy_other_subject_positive": [
+      "wrong-subject-positive"
+    ],
+    "couple_scope_to_source_missingness": [
+      "missing-source-known-negative"
+    ],
+    "select_one_conflicting_scope_declaration": [
+      "conflicting-scope"
+    ]
+  },
+  "native_composition_sha256": "b838c191eb44e8fd99a768bb782438b2b8751c775df67599dbc4b5892ea344ce",
+  "native_hermes_revision": "3536d56cf45b5d19c19675e2e576637edc267946",
+  "native_source_files": {
+    "agent/turn_context.py": "b838c191eb44e8fd99a768bb782438b2b8751c775df67599dbc4b5892ea344ce",
+    "tools/hook_output_spill.py": "3e2ab6e5f088920065c22549f34d072526aa793246096cef8656d8810f6012a0"
+  },
+  "normalized_offline_wire_sha256": "d34a493bd8e1e657f5139831106490259d49d184c91f2bc91b8bfea4ee033664",
+  "old_files_unchanged": 262,
+  "preimplementation_freeze_sha256": "354533b1812105db27e7c5274a38c359d41201b85e8f2ba0752491615ad8400e",
+  "prospective_live": "NOT_EXECUTED; finalize execution freeze and root bounded execution decision",
+  "provider_calls": 0,
+  "schema": "scope_contract.offline_qualification.v1",
+  "scope": "Synthetic exact source reporting and byte preservation; no real performance or model claim",
+  "source_bindings": {
+    "benchmarks/thermocontext/hermes_phase_c/causal_context/fixtures/sources.json": "7334619674af88cef91aed96361a72b33d0534be76147a39b446887b1cff72ed",
+    "benchmarks/thermocontext/hermes_phase_c/results/verified-context-cohort-20261002/runs/full-complete/native-request.bin": "6ab7acbff920e5d0620a698027ab1f9275dc552e992b370eba304f0cebcc0a68",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/README.md": "317b07b6b6f70ea7f55496e8e8a17e717c83e483e3de0a4eac397c6ac8b33830",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/baseline-bindings.json": "9532cc00a5de395eb683295de5098a1c5bdb6ff50868a21d06960024bee2c925",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/check_fixture.py": "b1444d81a44086c35438efeb2d2dc561f0ea092ca3953b019019371120becf7a",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/contract.py": "2fe9e03e616ec41569fb6a2dc0ff1f557d7908553dbfeea6cda75c5e56a263e3",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/fixtures.json": "efbd7669836e74441ef1d1b6112c355e6ba91fd4360848da54df74457a797ac4",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/freeze.json": "354533b1812105db27e7c5274a38c359d41201b85e8f2ba0752491615ad8400e",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/oracle.json": "fef9069524e856c88e52be8e0121335ecb05a46a3a157a5cee7bc6a954d6897e",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/prompt.txt": "158beabcd3211240ef3825327797382fd6fef512eaeb808fcab896fb31f5dca8",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/protocol.json": "b352394d5a627f05f08613e797c26db9a138d9ad306153972ba053a4a06a050f",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/qualify.py": "b4839435adb0cfa327e97f132d6552acd29f9a483ef52689fed02f3809b14c2f",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/test_contract.py": "eabb02770bb465224644fa3e765330824b34945cbf5216d3757664e8589a889f",
+    "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/test_saved_replay.py": "565d3580b1dc24aeec1ed60b823170f52040af114c85508993e103c53d3dec5c",
+    "benchmarks/thermocontext/hermes_phase_c/verified_context_cohort/run_cohort.py": "0e0a03315f238d0c3c68c8d3f6d32ff8041200aaac653dbaade5a7d0a6e8f641"
+  },
+  "status": "OFFLINE_CONTRACT_QUALIFIED",
+  "study_id": "state-packet-scope-contract"
+}

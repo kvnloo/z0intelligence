@@ -1,0 +1,50 @@
+{
+  "earlier_smoke_receipt": "External implementation-smoke artifact remains historical; implementation changed during independent review. Final source binding is RESULT.json beside this validation.",
+  "full_suite": {
+    "collection_errors": 12,
+    "exit_code": 2,
+    "missing_dependencies": [
+      "numpy",
+      "torch",
+      "tokenomics"
+    ],
+    "tests_executed": false
+  },
+  "new_suite": {
+    "independent_reviewer": "/root/hermes_verified_cohort/scope_contract_review",
+    "passed": 19,
+    "review": "PASS; no remaining blockers after summary and bound-reference replay hardening",
+    "subtests_passed": 53
+  },
+  "older_v2_explicit_archive_run": {
+    "archive": "/workspace/hermes-factory/reviews/hermes-verified-cohort-01",
+    "note": "Four skipped integration checks exercised successfully here; two other checks overlap previous run.",
+    "passed": 6,
+    "skipped": 0
+  },
+  "portable_replay": {
+    "arms": 14,
+    "old_files_unchanged": 262,
+    "relocation_test": "Original checkout reads forbidden; no Git or Hermes checkout required.",
+    "status": "REPLAY_PASS"
+  },
+  "provider_calls": 0,
+  "published_raw_checksums": {
+    "passed": 19
+  },
+  "published_summary_claims": {
+    "status": "ok",
+    "verified": 69
+  },
+  "related_regression_run": {
+    "passed": 104,
+    "skip_reason": "Older v2 integration requires HERMES_PRIOR_COHORT",
+    "skipped": 4,
+    "subtests_passed": 135
+  },
+  "review_fixes": [
+    "Recompute summary values and exact source/artifact membership",
+    "Replay full requests against pinned reference as well as each other"
+  ],
+  "schema": "scope_contract.validation.v1"
+}

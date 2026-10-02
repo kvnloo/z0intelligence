@@ -1,0 +1,14 @@
+{
+  "base_revision": "987022a0e876db608247c46f28e9c3ba33af875c",
+  "created_utc": "2026-10-02T18:54:48.771947+00:00",
+  "deterministic_feasibility": "Exact typed JSON declarations are extractable. Historical scope exists only as prose/gaps and remains raw with unknown under this new contract.",
+  "frozen_inputs": {
+    "baseline-bindings.json": "9532cc00a5de395eb683295de5098a1c5bdb6ff50868a21d06960024bee2c925",
+    "fixtures.json": "efbd7669836e74441ef1d1b6112c355e6ba91fd4360848da54df74457a797ac4",
+    "oracle.json": "fef9069524e856c88e52be8e0121335ecb05a46a3a157a5cee7bc6a954d6897e",
+    "prompt.txt": "158beabcd3211240ef3825327797382fd6fef512eaeb808fcab896fb31f5dca8",
+    "protocol.json": "b352394d5a627f05f08613e797c26db9a138d9ad306153972ba053a4a06a050f"
+  },
+  "implementation_present": false,
+  "schema": "scope_contract.preimplementation_freeze.v1"
+}

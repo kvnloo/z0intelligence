@@ -1,0 +1,34 @@
+{
+  "base_revision": "987022a0e876db608247c46f28e9c3ba33af875c",
+  "decision": "OFFLINE_CONTRACT_QUALIFIED_NO_MODEL_COMPARISON_SELECTED",
+  "final_result": {
+    "path": "benchmarks/thermocontext/hermes_phase_c/scope_contract_v1/results/offline-20261002/RESULT.json",
+    "sha256": "cba9347396e5cf8f0fa260b4a7db3294c51c5036385070e81c73d7ad5543eaeb"
+  },
+  "limits": [
+    "Exact source-declared values, not authenticated facts or actual-world experiment verification",
+    "Synthetic fixture positive and negative controls; historical prose retained as unknown in this new contract",
+    "Separate revision and scope inventories do not establish a relationship between them",
+    "No arbitrary prose conflict parser, semantic selector, runtime activation, model necessity or performance claim",
+    "Current implementation source files are bound by relative-path hashes in RESULT; publication may map the same tested tree to another commit without changing scientific source pins."
+  ],
+  "next_action": "Inspect at most three genuine downstream tasks using existing planning/plan.json U0; freeze one semantic residual plus independent outcome and deterministic comparator, or stop model comparison when deterministic reporting suffices.",
+  "observed": {
+    "independent_fixture_arms_passed": 14,
+    "minimal_context_byte_reduction_each_pair": 2153,
+    "named_bad_behavior_mutants_rejected": 5,
+    "predecessor_files_unchanged": 262,
+    "provider_calls": 0,
+    "provider_token_reduction": null,
+    "verified_speedup": null
+  },
+  "old_scores_preserved": {
+    "v1": "0/5",
+    "v2": "1/5"
+  },
+  "preimplementation_freeze_sha256": "354533b1812105db27e7c5274a38c359d41201b85e8f2ba0752491615ad8400e",
+  "preimplementation_protocol_sha256": "b352394d5a627f05f08613e797c26db9a138d9ad306153972ba053a4a06a050f",
+  "prospective_live_status": "NOT_EXECUTED; optional bound of eight calls retained, not automatically selected",
+  "schema": "scope_contract.decision.v1",
+  "study_id": "state-packet-scope-contract"
+}

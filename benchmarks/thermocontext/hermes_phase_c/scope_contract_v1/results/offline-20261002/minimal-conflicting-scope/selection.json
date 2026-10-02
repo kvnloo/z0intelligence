@@ -1,0 +1,113 @@
+{
+  "budget": 20000,
+  "budget_units": 1680,
+  "context": "{\"contradictions\": [\"record-2 and record-3 explicitly disagree about the same scope declaration; no precedence is supplied.\"], \"evidence\": [{\"excerpt\": \"{\\\"tested_source\\\": \\\"1234567890abcdef1234567890abcdef12345678\\\"}\", \"locator\": \"fixture://scope-contract/record-1\", \"note\": \"Synthetic source statement; not evidence of a real performance result.\", \"observed_at\": \"2026-10-02T00:00:00Z\", \"source_id\": \"record-1\", \"source_version\": \"sha256:2339b9d5f5b611a618497cf05c748dac7c04f848e9d72fd99492c773b5678c8e\", \"trust_class\": \"unknown\"}, {\"excerpt\": \"{\\\"declared_value\\\": true, \\\"predicate\\\": \\\"speedup_established\\\", \\\"schema\\\": \\\"z0int.source_scope_declaration.v1\\\", \\\"subject\\\": \\\"hermes:synthetic-suite-a:latency\\\"}\", \"locator\": \"fixture://scope-contract/record-2\", \"note\": \"Synthetic source statement; not evidence of a real performance result.\", \"observed_at\": \"2026-10-02T00:00:00Z\", \"source_id\": \"record-2\", \"source_version\": \"sha256:b9accb676705848b4d3eabb1f030ec86126f46413a0f240f704703b06719a7cd\", \"trust_class\": \"unknown\"}, {\"excerpt\": \"{\\\"declared_value\\\": false, \\\"predicate\\\": \\\"speedup_established\\\", \\\"schema\\\": \\\"z0int.source_scope_declaration.v1\\\", \\\"subject\\\": \\\"hermes:synthetic-suite-a:latency\\\"}\", \"locator\": \"fixture://scope-contract/record-3\", \"note\": \"Synthetic source statement; not evidence of a real performance result.\", \"observed_at\": \"2026-10-02T00:00:00Z\", \"source_id\": \"record-3\", \"source_version\": \"sha256:721abc77bf3571656b1b05c127d0af7ade673d0f561610fdf5820a2b6d2d4414\", \"trust_class\": \"unknown\"}], \"unresolved_gaps\": [\"Synthetic declarations report source claims only; no real Hermes execution or independent outcome verification is supplied.\"]}",
+  "context_sha256": "ea774f60997c0615ae810355c0e665db5850a09d62005707a72efadada083528",
+  "packet": {
+    "aodl_projection": {
+      "constraints": {
+        "contradictions": [
+          "record-2 and record-3 explicitly disagree about the same scope declaration; no precedence is supplied."
+        ],
+        "unresolved_gaps": [
+          "Synthetic declarations report source claims only; no real Hermes execution or independent outcome verification is supplied."
+        ]
+      },
+      "evidence": [
+        {
+          "excerpt": "{\"tested_source\": \"1234567890abcdef1234567890abcdef12345678\"}",
+          "locator": "fixture://scope-contract/record-1",
+          "note": "Synthetic source statement; not evidence of a real performance result.",
+          "observed_at": "2026-10-02T00:00:00Z",
+          "source_id": "record-1",
+          "source_version": "sha256:2339b9d5f5b611a618497cf05c748dac7c04f848e9d72fd99492c773b5678c8e",
+          "trust_class": "unknown"
+        },
+        {
+          "excerpt": "{\"declared_value\": true, \"predicate\": \"speedup_established\", \"schema\": \"z0int.source_scope_declaration.v1\", \"subject\": \"hermes:synthetic-suite-a:latency\"}",
+          "locator": "fixture://scope-contract/record-2",
+          "note": "Synthetic source statement; not evidence of a real performance result.",
+          "observed_at": "2026-10-02T00:00:00Z",
+          "source_id": "record-2",
+          "source_version": "sha256:b9accb676705848b4d3eabb1f030ec86126f46413a0f240f704703b06719a7cd",
+          "trust_class": "unknown"
+        },
+        {
+          "excerpt": "{\"declared_value\": false, \"predicate\": \"speedup_established\", \"schema\": \"z0int.source_scope_declaration.v1\", \"subject\": \"hermes:synthetic-suite-a:latency\"}",
+          "locator": "fixture://scope-contract/record-3",
+          "note": "Synthetic source statement; not evidence of a real performance result.",
+          "observed_at": "2026-10-02T00:00:00Z",
+          "source_id": "record-3",
+          "source_version": "sha256:721abc77bf3571656b1b05c127d0af7ade673d0f561610fdf5820a2b6d2d4414",
+          "trust_class": "unknown"
+        }
+      ],
+      "observation": {
+        "measurements": {}
+      },
+      "provenance": {
+        "recipe_signature": null,
+        "resolver": "z0int.context_resolve.v1",
+        "source_epochs": {},
+        "task_id": "scope-contract-development"
+      }
+    },
+    "contradictions": [
+      "record-2 and record-3 explicitly disagree about the same scope declaration; no precedence is supplied."
+    ],
+    "evidence": [
+      {
+        "excerpt": "{\"tested_source\": \"1234567890abcdef1234567890abcdef12345678\"}",
+        "locator": "fixture://scope-contract/record-1",
+        "note": "Synthetic source statement; not evidence of a real performance result.",
+        "observed_at": "2026-10-02T00:00:00Z",
+        "source_id": "record-1",
+        "source_version": "sha256:2339b9d5f5b611a618497cf05c748dac7c04f848e9d72fd99492c773b5678c8e",
+        "trust_class": "unknown"
+      },
+      {
+        "excerpt": "{\"declared_value\": true, \"predicate\": \"speedup_established\", \"schema\": \"z0int.source_scope_declaration.v1\", \"subject\": \"hermes:synthetic-suite-a:latency\"}",
+        "locator": "fixture://scope-contract/record-2",
+        "note": "Synthetic source statement; not evidence of a real performance result.",
+        "observed_at": "2026-10-02T00:00:00Z",
+        "source_id": "record-2",
+        "source_version": "sha256:b9accb676705848b4d3eabb1f030ec86126f46413a0f240f704703b06719a7cd",
+        "trust_class": "unknown"
+      },
+      {
+        "excerpt": "{\"declared_value\": false, \"predicate\": \"speedup_established\", \"schema\": \"z0int.source_scope_declaration.v1\", \"subject\": \"hermes:synthetic-suite-a:latency\"}",
+        "locator": "fixture://scope-contract/record-3",
+        "note": "Synthetic source statement; not evidence of a real performance result.",
+        "observed_at": "2026-10-02T00:00:00Z",
+        "source_id": "record-3",
+        "source_version": "sha256:721abc77bf3571656b1b05c127d0af7ade673d0f561610fdf5820a2b6d2d4414",
+        "trust_class": "unknown"
+      }
+    ],
+    "measurements": {},
+    "needs": [
+      {
+        "description": "Report exact source declarations for the requested subject and predicate.",
+        "id": "scope",
+        "kind": "natural_language",
+        "path": null,
+        "required": true,
+        "symbol": null
+      }
+    ],
+    "recipe": null,
+    "schema": "z0int.context_resolve.v1",
+    "task_id": "scope-contract-development",
+    "unresolved_gaps": [
+      "Synthetic declarations report source claims only; no real Hermes execution or independent outcome verification is supplied."
+    ]
+  },
+  "pool_sha256": "32a79e30f2a11f7d8bc3605c0b657da35706570a055610b746c0b1f53dddbe57",
+  "runtime_authority": false,
+  "selected_ids": [
+    "record-1",
+    "record-2",
+    "record-3"
+  ],
+  "tokenizer_identity": "fixture_utf8_bytes_not_provider_tokens"
+}

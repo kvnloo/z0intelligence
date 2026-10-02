@@ -1,0 +1,32 @@
+{
+  "answer": {
+    "scope": {
+      "citations": [
+        "record-2"
+      ],
+      "status": "declared",
+      "value": false
+    },
+    "tested_source": {
+      "citations": [],
+      "status": "unknown",
+      "value": null
+    }
+  },
+  "independent_outcome_verified": false,
+  "inventory": [
+    {
+      "excerpt_sha256": "721abc77bf3571656b1b05c127d0af7ade673d0f561610fdf5820a2b6d2d4414",
+      "json_pointer": "/declared_value",
+      "kind": "scope",
+      "locator": "fixture://scope-contract/record-2",
+      "matches_target": true,
+      "predicate": "speedup_established",
+      "source_id": "record-2",
+      "source_version": "sha256:721abc77bf3571656b1b05c127d0af7ade673d0f561610fdf5820a2b6d2d4414",
+      "subject": "hermes:synthetic-suite-a:latency",
+      "value": false
+    }
+  ],
+  "runtime_authority": false
+}

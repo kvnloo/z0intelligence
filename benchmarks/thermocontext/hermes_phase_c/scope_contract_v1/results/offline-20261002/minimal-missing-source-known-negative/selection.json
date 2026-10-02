@@ -1,0 +1,73 @@
+{
+  "budget": 20000,
+  "budget_units": 737,
+  "context": "{\"contradictions\": [], \"evidence\": [{\"excerpt\": \"{\\\"declared_value\\\": false, \\\"predicate\\\": \\\"speedup_established\\\", \\\"schema\\\": \\\"z0int.source_scope_declaration.v1\\\", \\\"subject\\\": \\\"hermes:synthetic-suite-a:latency\\\"}\", \"locator\": \"fixture://scope-contract/record-2\", \"note\": \"Synthetic source statement; not evidence of a real performance result.\", \"observed_at\": \"2026-10-02T00:00:00Z\", \"source_id\": \"record-2\", \"source_version\": \"sha256:721abc77bf3571656b1b05c127d0af7ade673d0f561610fdf5820a2b6d2d4414\", \"trust_class\": \"unknown\"}], \"unresolved_gaps\": [\"Synthetic declarations report source claims only; no real Hermes execution or independent outcome verification is supplied.\", \"No tested source revision declaration is supplied.\"]}",
+  "context_sha256": "eb0cc1423c19be14943530037a180487cc11e07c0a3146607cfd703a209b8662",
+  "packet": {
+    "aodl_projection": {
+      "constraints": {
+        "contradictions": [],
+        "unresolved_gaps": [
+          "Synthetic declarations report source claims only; no real Hermes execution or independent outcome verification is supplied.",
+          "No tested source revision declaration is supplied."
+        ]
+      },
+      "evidence": [
+        {
+          "excerpt": "{\"declared_value\": false, \"predicate\": \"speedup_established\", \"schema\": \"z0int.source_scope_declaration.v1\", \"subject\": \"hermes:synthetic-suite-a:latency\"}",
+          "locator": "fixture://scope-contract/record-2",
+          "note": "Synthetic source statement; not evidence of a real performance result.",
+          "observed_at": "2026-10-02T00:00:00Z",
+          "source_id": "record-2",
+          "source_version": "sha256:721abc77bf3571656b1b05c127d0af7ade673d0f561610fdf5820a2b6d2d4414",
+          "trust_class": "unknown"
+        }
+      ],
+      "observation": {
+        "measurements": {}
+      },
+      "provenance": {
+        "recipe_signature": null,
+        "resolver": "z0int.context_resolve.v1",
+        "source_epochs": {},
+        "task_id": "scope-contract-development"
+      }
+    },
+    "contradictions": [],
+    "evidence": [
+      {
+        "excerpt": "{\"declared_value\": false, \"predicate\": \"speedup_established\", \"schema\": \"z0int.source_scope_declaration.v1\", \"subject\": \"hermes:synthetic-suite-a:latency\"}",
+        "locator": "fixture://scope-contract/record-2",
+        "note": "Synthetic source statement; not evidence of a real performance result.",
+        "observed_at": "2026-10-02T00:00:00Z",
+        "source_id": "record-2",
+        "source_version": "sha256:721abc77bf3571656b1b05c127d0af7ade673d0f561610fdf5820a2b6d2d4414",
+        "trust_class": "unknown"
+      }
+    ],
+    "measurements": {},
+    "needs": [
+      {
+        "description": "Report exact source declarations for the requested subject and predicate.",
+        "id": "scope",
+        "kind": "natural_language",
+        "path": null,
+        "required": true,
+        "symbol": null
+      }
+    ],
+    "recipe": null,
+    "schema": "z0int.context_resolve.v1",
+    "task_id": "scope-contract-development",
+    "unresolved_gaps": [
+      "Synthetic declarations report source claims only; no real Hermes execution or independent outcome verification is supplied.",
+      "No tested source revision declaration is supplied."
+    ]
+  },
+  "pool_sha256": "077a3f6ac6bd12844c2412412651ac40c22b309338ccd25e78467def65a1e001",
+  "runtime_authority": false,
+  "selected_ids": [
+    "record-2"
+  ],
+  "tokenizer_identity": "fixture_utf8_bytes_not_provider_tokens"
+}

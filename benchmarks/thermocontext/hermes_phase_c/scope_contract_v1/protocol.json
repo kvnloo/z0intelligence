@@ -1,0 +1,100 @@
+{
+  "base_revision": "987022a0e876db608247c46f28e9c3ba33af875c",
+  "catalog_owner": "priority_refresh_round3",
+  "falsifiers": [
+    "positive becomes false or unknown",
+    "explicit negative becomes unknown",
+    "missing/wrong-subject becomes false",
+    "contradictory scope chooses one value",
+    "source missingness collapses a definite scope declaration",
+    "raw provenance, relevant evidence, contradictions or gaps are dropped",
+    "model-visible context contains oracle labels or a derived answer",
+    "byte reduction misreported as provider tokens or observed speedup"
+  ],
+  "fixed": [
+    "prompt",
+    "target subject and predicate",
+    "independent fixture oracle",
+    "source excerpts and provenance",
+    "all potentially relevant evidence refs",
+    "contradictions and unresolved_gaps",
+    "existing ContextPacket and materialize renderer"
+  ],
+  "limits": [
+    "Inspected development fixtures, not holdout or population certification",
+    "Synthetic source claims, not real Hermes speedup evidence",
+    "One new typed reporting contract, not a rescue/regrade/causal comparison of v1 or v2",
+    "No model necessity, provider-token reduction, latency reduction, or independent outcome verification established by offline checks",
+    "Fixture-owned ancillary membership is not a production semantic selector",
+    "Conflicting unstructured prose remains raw; no comprehensive natural-language contradiction detection",
+    "Future producer metadata requires independently reviewed evidence; cannot infer typed authority from a model response"
+  ],
+  "mutation_axis": "Within each fixture, full versus minimal exact EvidenceRef membership. Only the preregistered ancillary telemetry ref is removable.",
+  "offline_arms": [
+    "full",
+    "minimal"
+  ],
+  "offline_cases": [
+    "matching-positive",
+    "matching-negative",
+    "missing-scope",
+    "conflicting-scope",
+    "missing-source-known-negative",
+    "wrong-subject-positive",
+    "historical-prose-only"
+  ],
+  "oracle_visible_to_renderer_or_model": false,
+  "prospective_live": {
+    "automatic_retries": false,
+    "case_order": [
+      "full-matching-positive",
+      "minimal-matching-positive",
+      "full-matching-negative",
+      "minimal-matching-negative",
+      "minimal-missing-scope",
+      "minimal-conflicting-scope",
+      "minimal-missing-source-known-negative",
+      "minimal-wrong-subject-positive"
+    ],
+    "comparisons": "Only two preregistered matched full/minimal pairs (positive and negative); four separate minimal negative controls. No provider attribution when provider identity is null.",
+    "driver": "Reuse existing native live_baseline/verified_context_cohort driver; no new network client.",
+    "fallbacks": false,
+    "max_output_tokens": 4096,
+    "max_physical_posts_per_case": 1,
+    "max_physical_posts_total": 8,
+    "max_serialized_request_bytes": 20000,
+    "max_wall_seconds_per_case": 120,
+    "model": "upstage/solar-mini4",
+    "record": [
+      "raw native and forwarded wire",
+      "fixed system boilerplate hash",
+      "actual usage and cost including failed calls",
+      "wall time and caps",
+      "independent replay and every failure"
+    ],
+    "route": "existing Nous route; root binds catalog and route SHA before any call",
+    "status": "NOT_IMPLEMENTED_OR_AUTHORIZED; root review and a new execution freeze required",
+    "wire_guard": "One fixed physical staging/profile path; fresh state per case; archive completed artifacts before next call; compare entire native and forwarded requests with only exact context replaced by sentinel; reject any other difference before forwarding. No template fallback."
+  },
+  "qualification": [
+    "all seven independent fixture outputs match exactly in both arms",
+    "full and minimal preserve all pinned evidence byte-exact and contradiction/gap lists exactly",
+    "rendered model-visible context contains only evidence, contradictions, unresolved_gaps",
+    "deterministic reporter outputs match between arms",
+    "all five named wrong-behavior mutants fail at least one oracle control",
+    "native Hermes hook/compose witness retains exact context without transport",
+    "historical answers, checkers, receipts, and scores remain unchanged"
+  ],
+  "schema": "scope_contract.protocol.v1",
+  "semantics": {
+    "independence": "Tested-source identity status never changes an independently unambiguous scope declaration.",
+    "negative": "Only an explicit matching source-declared false reports false. Missing proof does not imply false.",
+    "positive": "Matching source-declared true reports true, without establishing real-world truth.",
+    "prose": "Raw historical prose/provenance retained; typed scope unknown. No universal prose parser.",
+    "trust": "Source records carry no execution authority. Typed reporting does not authenticate a producer or resolve undeclared prose conflicts.",
+    "wrong_subject": "Even explicit true for another subject gives unknown for requested subject."
+  },
+  "status": "OFFLINE_ONLY_NO_PROVIDER_CALLS_AUTHORIZED",
+  "study_id": "state-packet-scope-contract",
+  "task": "Exact source-declaration reporting under an explicit typed contract; not actual-world verification"
+}

@@ -1,0 +1,118 @@
+{
+  "expected": {
+    "conflicting-scope": {
+      "scope": {
+        "citations": [
+          "record-2",
+          "record-3"
+        ],
+        "status": "conflict",
+        "value": null
+      },
+      "tested_source": {
+        "citations": [
+          "record-1"
+        ],
+        "status": "declared",
+        "value": "1234567890abcdef1234567890abcdef12345678"
+      }
+    },
+    "historical-prose-only": {
+      "scope": {
+        "citations": [],
+        "status": "unknown",
+        "value": null
+      },
+      "tested_source": {
+        "citations": [
+          "source-identity"
+        ],
+        "status": "declared",
+        "value": "a0bca744067d04f05904319d3d919be30c336556"
+      }
+    },
+    "matching-negative": {
+      "scope": {
+        "citations": [
+          "record-2"
+        ],
+        "status": "declared",
+        "value": false
+      },
+      "tested_source": {
+        "citations": [
+          "record-1"
+        ],
+        "status": "declared",
+        "value": "1234567890abcdef1234567890abcdef12345678"
+      }
+    },
+    "matching-positive": {
+      "scope": {
+        "citations": [
+          "record-2"
+        ],
+        "status": "declared",
+        "value": true
+      },
+      "tested_source": {
+        "citations": [
+          "record-1"
+        ],
+        "status": "declared",
+        "value": "1234567890abcdef1234567890abcdef12345678"
+      }
+    },
+    "missing-scope": {
+      "scope": {
+        "citations": [],
+        "status": "unknown",
+        "value": null
+      },
+      "tested_source": {
+        "citations": [
+          "record-1"
+        ],
+        "status": "declared",
+        "value": "1234567890abcdef1234567890abcdef12345678"
+      }
+    },
+    "missing-source-known-negative": {
+      "scope": {
+        "citations": [
+          "record-2"
+        ],
+        "status": "declared",
+        "value": false
+      },
+      "tested_source": {
+        "citations": [],
+        "status": "unknown",
+        "value": null
+      }
+    },
+    "wrong-subject-positive": {
+      "scope": {
+        "citations": [],
+        "status": "unknown",
+        "value": null
+      },
+      "tested_source": {
+        "citations": [
+          "record-1"
+        ],
+        "status": "declared",
+        "value": "1234567890abcdef1234567890abcdef12345678"
+      }
+    }
+  },
+  "mutants_required_to_fail": [
+    "always_false_scope",
+    "always_unknown_scope",
+    "copy_other_subject_positive",
+    "couple_scope_to_source_missingness",
+    "select_one_conflicting_scope_declaration"
+  ],
+  "not_model_visible": true,
+  "schema": "scope_contract.independent_fixture_oracle.v1"
+}
