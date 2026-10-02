@@ -67,7 +67,7 @@ jobs:
     env:
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
-      Z0INT_HOME: ${{ runner.temp }}/z0int-tests
+      Z0INT_HOME: ${{ github.workspace }}/.test-state/z0int-tests
       Z0INT_PYTHON: python
       Z0INT_KERDOIOS_ROOT: ${{ github.workspace }}/.test-deps/kerdoios
     steps:
@@ -84,7 +84,7 @@ jobs:
       - name: Install pinned CPU test environment
         run: |
           python -m pip install torch==2.10.0+cpu --index-url https://download.pytorch.org/whl/cpu
-          python -m pip install -e '.[test]' PyYAML
+          python -m pip install -e '.[test]'
       - name: Complete offline suite
         run: python -m pytest -q -m 'not live'
       - name: Verify published evidence
