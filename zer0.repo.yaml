@@ -16,6 +16,7 @@ architecture:
     paths:
     - src/z0int/context_resolve.py
     - tests/test_context_resolve.py
+    depends_on: []
   - id: capability-router
     name: Evidence-gated capability router
     kind: decision
@@ -88,9 +89,14 @@ architecture:
     - src/z0int/worker_routing.py
     - tests/test_worker_activity.py
     - tests/test_worker_routing.py
+    - src/z0int/agentweb_bridge.py
+    - schemas/agentweb-z0-bridge.v1.schema.json
+    - docs/rfc/agentweb-z0-bridge-v1.md
     depends_on:
     - dispatch-authority
     - typed-decision-backends
+    - context-resolution
+    - capability-router
   - id: tokenomics-bridge
     name: Measurement-complete Tokenomics bridge
     kind: measurement
@@ -131,6 +137,7 @@ architecture:
     - src/z0int/remote_executor.py
     depends_on:
     - remote-executor-protocol
+    - capability-router
   - id: evolution-contract
     name: Evolution Lab runtime contract
     kind: learning
@@ -145,6 +152,7 @@ architecture:
     depends_on:
     - typed-decision-backends
     - tokenomics-bridge
+    - capability-router
   - id: aodl-contract
     name: AODL compilation and runtime contract
     kind: orchestration
@@ -158,6 +166,7 @@ architecture:
     - context-resolution
     - local-cognition-compiler
     - dispatch-authority
+    - capability-router
   - id: agentweb-shadow-planner
     name: AgentWeb shadow planner
     kind: integration
@@ -195,6 +204,7 @@ architecture:
   provides_interfaces:
   - z0int.decision_receipt.v1
   - z0int.context_resolve.v1
+  - agentweb.z0.bridge.v1
   consumes_interfaces:
   - tokenomics.report.v1
   - aodl.intent.v1
@@ -219,6 +229,7 @@ architecture:
     - z0int deployment topology
     - z0 routing, idempotency, request fingerprinting, dispatch claims, and decision receipts.
     - Remote-context and specialist eligibility policy.
+    - bounded decision backends and receipts
     not_here:
     - source memory database authority
     - harness execution ownership

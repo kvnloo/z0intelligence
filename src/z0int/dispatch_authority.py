@@ -64,6 +64,8 @@ def started(request,key,owner=None,admission_id=None):
         'capability_id':'intelligence.dispatch','execution':'orchestration',
         'extra':{'harness':request['harness'],'caller_trace_id':request['trace_id'],
                  'request_sha256':fingerprint(request),'status':'started'}}
+    if request.get('caller_request_sha256'):
+        row['extra']['caller_request_sha256']=request['caller_request_sha256']
     if owner:row['extra']['authority_owner_sha256']=hashlib.sha256(owner.encode()).hexdigest()
     if admission_id:row['extra']['aodl_admission_receipt_id']=admission_id
     return append_receipt(row)

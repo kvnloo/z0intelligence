@@ -139,3 +139,36 @@ def test_governed_worker_endpoint_delegates_to_host_owned_adapter(monkeypatch):
         assert captured==payload
     finally:server.shutdown();server.server_close();thread.join()
 
+
+
+def test_agentweb_bridge_endpoint_is_explicit_and_separate(monkeypatch):
+    import json
+    from z0int import agentweb_bridge
+
+    monkeypatch.setattr(
+        agentweb_bridge,
+        "handle_bridge_request",
+        lambda args: {
+            "ok": True,
+            "protocol_version": "agentweb.z0.bridge.v1",
+            "mode": "shadow",
+            "executed": False,
+        },
+    )
+    server=Service(('127.0.0.1',0),Handler)
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        url=f'http://127.0.0.1:{server.server_address[1]}'
+        data=json.dumps({"protocol_version":"fixture"}).encode()
+        request=urllib.request.Request(
+            url+'/v1/agentweb',
+            data=data,
+            headers={'Content-Type':'application/json'},
+        )
+        with urllib.request.urlopen(request) as response:
+            result=json.load(response)
+            assert response.status==200
+            assert result["mode"]=="shadow"
+            assert result["executed"] is False
+    finally:
+        server.shutdown();server.server_close();thread.join()

@@ -18,7 +18,7 @@ _LAYA = None
 
 
 def validate(args):
-    allowed={'harness','trace_id','parent_agent','function','task','context','state','expected_parent_tokens','expected_parent_ms','allow_remote','experimental','max_tokens','automatic','integration_instance','free_only'}
+    allowed={'harness','trace_id','parent_agent','function','task','context','state','expected_parent_tokens','expected_parent_ms','allow_remote','experimental','max_tokens','automatic','integration_instance','free_only','caller_request_sha256'}
     if not isinstance(args,dict) or set(args)-allowed:
         raise ValueError('Unknown request fields')
     for key in ['harness','trace_id','parent_agent','function','task']:
@@ -30,6 +30,11 @@ def validate(args):
         value=args.get(key,0)
         if type(value) not in (int,float) or not math.isfinite(value) or value<0:raise ValueError('Invalid '+key)
     if 'integration_instance' in args and (not isinstance(args['integration_instance'],str) or not 1<=len(args['integration_instance'])<=200):raise ValueError('Invalid integration instance')
+    if 'caller_request_sha256' in args and (
+        not isinstance(args['caller_request_sha256'],str)
+        or len(args['caller_request_sha256'])!=64
+        or any(c not in '0123456789abcdef' for c in args['caller_request_sha256'])
+    ):raise ValueError('Invalid caller request fingerprint')
     validate_request({'task':args['task'],'context':args.get('context',''),'parent_agent':args['parent_agent'],'max_tokens':args.get('max_tokens',1024)})
     if len(json.dumps(args,allow_nan=False))>40000:raise ValueError('Request too large')
 
