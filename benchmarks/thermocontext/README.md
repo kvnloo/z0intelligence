@@ -227,3 +227,8 @@ Before any real z0 replay:
 6. only then freeze real `ContextPacket` replay cases.
 
 No TSU speed or energy claim is supported by these JAX results.
+
+
+## Independent CPU qualification wave (2026-10-02)
+
+A separately executed, frozen-source wave is preserved in [THRML_RESULTS_2026-10-02.md](THRML_RESULTS_2026-10-02.md), with [reproduction and lossless raw-data restoration](REPRODUCE.md). It independently recommends KILL for sampling investment on this engineered disconnected cohort. Its partial N32 cohort, paired-prefix stopping rule, and timings are distinct from the studies above; do not combine their counts. This addition preserves all existing Phase-C and native Hermes evidence unchanged.

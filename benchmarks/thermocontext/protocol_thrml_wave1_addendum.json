@@ -1,0 +1,11 @@
+{
+  "registered_utc": "2026-10-02T07:25:00Z",
+  "stage": "Before any new formulation cohort; one N8 real-THRML API smoke already completed and is disclosed",
+  "initialization": {"fixed_and_adaptive": "Independent Bernoulli(0.35) item bits; same declared seed mapping, distinct backend PRNG trajectories", "token_prefix": "Bernoulli(0.35) item bits; prefix sums clipped at B, slack max(B-sum,0). This is label-blind and may begin inconsistent when overbudget", "cardinality": "Chain index cycles across allowed positive K buckets; random K-subset initialized without labels; exact prefix counts, final count clamped K"},
+  "epoch_accounting": "Carry complete item and auxiliary state between 8 epochs; each epoch has20 updates and10 retained observations. All8 penalty levels together use160 updates and80 observations per chain. No8x budget expansion",
+  "sparsity_limits": {"maximum_primal_degree_including_auxiliaries":6,"maximum_factor_arity":3,"maximum_categorical_domain":255,"maximum_materialized_factor_table_bytes":67108864,"on_limit_exceeded":"Stop and report unsupported resource/formulation boundary; do not replace with dense budget coupling"},
+  "table_accounting": "Report every domain size and actual table entries/bytes; local ternary prefix factors have2*D*D entries each. Bounded graph degree is not a binary hardware cost claim",
+  "cost_accounting": "Report assembly, lowering, compilation, sample execution, feasibility/decode/rank, final winner verification, and diagnostic first-valid scan separately. Like-for-like decision uses optimizer plus one final verifier; diagnostic scan is excluded from both comparison totals but retained in whole experiment wall time. First execution of each compiled shape is identified separately from later warm executions",
+  "structure": "Original graph is one6-node connected semantic core plus disjoint noise pairs/singletons. Component knapsack DP is an exact original-objective comparator at every planned size; report component sizes and DP assembly/solve/final verification cost",
+  "smoke": {"N":8,"task_seed":0,"sampler_seed":10000,"shape":[80,64,8],"selected_tokens":135,"selected_energy":-1.747609257698059,"purpose":"API wiring only; no parameters changed in response"}
+}

@@ -1,0 +1,24 @@
+{
+  "schema": "thermocontext.predeclared.v1",
+  "registered_utc": "2026-10-02T07:05:00Z",
+  "source_head": "456ff17a734206bb5558d0b063cde5cd74f1a6ae",
+  "thrml_source": "extropic-ai/thrml@dfb3bde16962f9637a1845ccb2bea80aaa19e4bd",
+  "frozen": "phase_a_prototype.py make_task, Task.energy, Task.verify, baselines and original sampler unchanged",
+  "cohort": {"N": [8,12,16], "task_seeds": [0,1,2,3,4,5,6,7,8,9,10,11], "sampler_seed_indices": [0,1,2,3,4,5,6,7], "seed_formula": "10000 + task_seed*100 + sampler_seed_index"},
+  "ceilings": {"chains":64,"sweeps":160,"retained_samples_per_chain":80,"adaptive_epochs":8,"sweeps_per_epoch":20,"samples_per_epoch":10,"beta":3.5,"retries_after_scientific_failure":0},
+  "formulations": [
+    {"name":"fixed_original","price":"Original TOKEN_PRICE=2.5 in frozen objective; no additional price","schedule":"THRML warmup81 then80 observations at step1, totaling160 updates, matches original retained update indices81..160"},
+    {"name":"adaptive_price","lambda_start":0.0,"lambda_max":4.0,"update":"clip(lambda + (mean_tokens/B - 1)/sqrt(epoch+1),0,4); halve lambda when mean selected count<1","ranking":"retain best budget-feasible nonempty candidate under ORIGINAL energy across all epochs; never rank by lambda-adjusted energy"},
+    {"name":"prefix_token_slack","constraint":"local prefix y_i=y_(i-1)+tokens_i*x_i; y_0=0; y_i in0..B; final y_N+slack=B; nonempty final y_N","penalty":"1+sum(abs(original_unary))+sum(abs(upper_triangle_J))","penalty_fractions":[0.02,0.05,0.1,0.2,0.35,0.5,0.75,1.0],"sparsity":"local factors only; report primal degree INCLUDING auxiliaries and factor arity"},
+    {"name":"prefix_cardinality_buckets","constraint":"local prefix count with final count bucket1..min(N,floor(B/min_item_tokens)); allocate64 chains evenly over buckets; retain only exact auxiliary-consistent, weighted-budget-feasible candidates","penalty_fractions":[0.02,0.05,0.1,0.2,0.35,0.5,0.75,1.0],"sparsity":"local prefix factors, no dense global quadratic penalty"}
+  ],
+  "baselines":["champion","topk","greedy","exact_small_N","unchanged_prototype_JAX","real_THRML","component_knapsack_DP_diagnostic"],
+  "energy_tolerance":1e-5,
+  "energy_tolerance_basis":"Existing prototype exact-hit criterion; float32 objective resolution, not fitted to new results",
+  "healthy_gate":"zero observed selected-pack verifier failures, empty packs, or weighted-budget violations; mean original-energy gap no worse than reproduced prototype by more than1e-5; sparse graph remains bounded/local",
+  "statistical_claim":"Issue has no numeric noninferiority margin; report raw paired outcomes/per-seed uncertainty, never claim formal statistical noninferiority",
+  "scale":{"N":[32,64,128],"task_seeds":[0,1,2,3,4,5,6,7,8,9,10,11],"sampler_seed_indices":[0,1,2,3,4,5,6,7],"admission":"only a formulation passing all small-N healthy gates","stop":"stop formulation at first failing size; immediately stop within size on any task with all8seeds infeasible/empty/invalid; no increased samples or retuning"},
+  "selection_blinding":"No sampler/controller uses Task.required_ids, expected or verify to propose/rank states; verifier only scores generated packs",
+  "decision":"KILL current sampling investment if exact component-DP matches quality/frontier at lower measured overhead on this engineered cohort; otherwise MODIFY on failed mechanism/scale gate; GO only within explicitly measured scope, never hardware or production claim",
+  "unchanged_limitations":"Synthetic cohort uses sampled fixture-required bits despite issue architectural sketch; do not pin these labels and trivialize the barrier. Easy/monotone control generation is not present in original branch, so original exact reproduction covers committed engineered cohort only. Original adaptive-scale code/raw rows are also absent; no claim of exact reproduction for those prose-only results."
+}
