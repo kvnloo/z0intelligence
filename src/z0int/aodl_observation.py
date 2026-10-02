@@ -176,7 +176,7 @@ def record_drift(
         trace_id=trace_id,
         observation=observation,
         source=source,
-        causal_parents=canonical_parents,
+        causal_parents=causal_parents,
     )
     event = projected["event"]
     prior = _previous(event["eventId"])
