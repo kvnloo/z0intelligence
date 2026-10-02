@@ -1,0 +1,312 @@
+{
+  "schema": "thermocontext.independent-audit.v1",
+  "frozen_prototype_sha256": "69e1b4537858c06f87968093c41f11118af8d842c95edd49cd71897767044a00",
+  "rows_audited": 2520,
+  "exact_tasks_independently_enumerated": 36,
+  "all_row_checks_pass": true,
+  "complete_present_arm_grids": true,
+  "failures": [],
+  "grids": [
+    {
+      "N": 8,
+      "arm": "adaptive",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "champion",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "component_dp",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "exact",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "greedy",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "pair_greedy",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "prototype",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "prototype_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "random_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "slack",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "slack_initial",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "thrml_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "thrml_static",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 8,
+      "arm": "topk",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "adaptive",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "champion",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "component_dp",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "exact",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "greedy",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "pair_greedy",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "prototype",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "prototype_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "random_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "slack",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "slack_initial",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "thrml_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "thrml_static",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 12,
+      "arm": "topk",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "adaptive",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "champion",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "component_dp",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "exact",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "greedy",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "pair_greedy",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "prototype",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "prototype_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "random_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "slack",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "slack_initial",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "thrml_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "thrml_static",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 16,
+      "arm": "topk",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    }
+  ],
+  "limits": [
+    "Grid checks cover arms present in data; compare missing whole arms/stages against protocol separately.",
+    "Output arithmetic and retained trajectories do not establish transition-kernel correctness or prove absence of oracle leakage in implementation.",
+    "This is synthetic-cohort replay, not independently observed real Hermes task success."
+  ],
+  "results_sha256": "a8b36054ee1d9725bdffd52fa520c744719766f24d3c34a154342652b6dd78cf",
+  "auditor_sha256": "eea9b38893011a9be711295396e798cd8c7ebff2fa89dd5adc659ad239fdc3c4"
+}

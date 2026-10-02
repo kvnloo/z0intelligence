@@ -1,0 +1,4 @@
+{
+  "preparation_wall_ns": 1150722682,
+  "scope": "offline preparation including binding checks and serialization; not total task cost or model tokens"
+}

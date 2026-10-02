@@ -1,0 +1,281 @@
+{
+  "all_cases_verified": false,
+  "all_pairs_verified_prompt_token_reduction": false,
+  "automatic_retry_authorized": false,
+  "backend_provider_causal_attribution": false,
+  "backend_provider_limit": "Nous response provider may be null; configured endpoint is not backend identity",
+  "case_outcomes": {
+    "full-complete": {
+      "case_id": "full-complete",
+      "completed": true,
+      "eligible": true,
+      "execution_wall_ns": 5987615188,
+      "forwarded_wire_bytes": 19456,
+      "issues": [],
+      "native_wire_bytes": 19456,
+      "normalized_wire_sha256": "7a6e7d0adf4a622701272cb90755c13d6f34cbc877ed4cdab779c7756b85ef61",
+      "outcome": {
+        "problems": [
+          "incorrect:status",
+          "incorrect:tested_source",
+          "incorrect:hermes_speedup_established",
+          "incorrect:reason"
+        ],
+        "scope": "one_inspected_development_task_and_synthetic_controls",
+        "verified_success": false
+      },
+      "physical_posts": 1,
+      "preparation_wall_ns": 2567809,
+      "provider_wall_ns": 2227019439,
+      "served_model": "upstage/solar-mini4",
+      "served_provider": null,
+      "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+      "total_wall_ns": 8006404033,
+      "usage": {
+        "completion_tokens": 72,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.0003966,
+        "cost_details": {
+          "floor_applied": false,
+          "rate_source": "openrouter_catalog",
+          "source": "openrouter_list"
+        },
+        "prompt_tokens": 7644,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 7716
+      }
+    },
+    "full-missing_source_identity": {
+      "case_id": "full-missing_source_identity",
+      "completed": true,
+      "eligible": true,
+      "execution_wall_ns": 5685612867,
+      "forwarded_wire_bytes": 17530,
+      "issues": [],
+      "native_wire_bytes": 17530,
+      "normalized_wire_sha256": "7a6e7d0adf4a622701272cb90755c13d6f34cbc877ed4cdab779c7756b85ef61",
+      "outcome": {
+        "problems": [
+          "incorrect:hermes_speedup_established"
+        ],
+        "scope": "one_inspected_development_task_and_synthetic_controls",
+        "verified_success": false
+      },
+      "physical_posts": 1,
+      "preparation_wall_ns": 2167691,
+      "provider_wall_ns": 2234337813,
+      "served_model": "upstage/solar-mini4",
+      "served_provider": null,
+      "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+      "total_wall_ns": 5694274602,
+      "usage": {
+        "completion_tokens": 72,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.0003519,
+        "cost_details": {
+          "floor_applied": false,
+          "rate_source": "openrouter_catalog",
+          "source": "openrouter_list"
+        },
+        "prompt_tokens": 6750,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 6822
+      }
+    },
+    "minimal-complete": {
+      "case_id": "minimal-complete",
+      "completed": true,
+      "eligible": true,
+      "execution_wall_ns": 4976774589,
+      "forwarded_wire_bytes": 7190,
+      "issues": [],
+      "native_wire_bytes": 7190,
+      "normalized_wire_sha256": "7a6e7d0adf4a622701272cb90755c13d6f34cbc877ed4cdab779c7756b85ef61",
+      "outcome": {
+        "problems": [
+          "incorrect:status",
+          "incorrect:tested_source",
+          "incorrect:hermes_speedup_established",
+          "incorrect:reason"
+        ],
+        "scope": "one_inspected_development_task_and_synthetic_controls",
+        "verified_success": false
+      },
+      "physical_posts": 1,
+      "preparation_wall_ns": 3782199,
+      "provider_wall_ns": 1310284685,
+      "served_model": "upstage/solar-mini4",
+      "served_provider": null,
+      "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+      "total_wall_ns": 4988204121,
+      "usage": {
+        "completion_tokens": 51,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.0001206,
+        "cost_details": {
+          "floor_applied": false,
+          "rate_source": "openrouter_catalog",
+          "source": "openrouter_list"
+        },
+        "prompt_tokens": 2208,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 2259
+      }
+    },
+    "minimal-contradictory_source_identity": {
+      "case_id": "minimal-contradictory_source_identity",
+      "completed": true,
+      "eligible": true,
+      "execution_wall_ns": 5196756563,
+      "forwarded_wire_bytes": 9124,
+      "issues": [],
+      "native_wire_bytes": 9124,
+      "normalized_wire_sha256": "7a6e7d0adf4a622701272cb90755c13d6f34cbc877ed4cdab779c7756b85ef61",
+      "outcome": {
+        "problems": [
+          "incorrect:hermes_speedup_established",
+          "incorrect:reason"
+        ],
+        "scope": "one_inspected_development_task_and_synthetic_controls",
+        "verified_success": false
+      },
+      "physical_posts": 1,
+      "preparation_wall_ns": 2478865,
+      "provider_wall_ns": 1488139054,
+      "served_model": "upstage/solar-mini4",
+      "served_provider": null,
+      "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+      "total_wall_ns": 5209712124,
+      "usage": {
+        "completion_tokens": 63,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.00016365,
+        "cost_details": {
+          "floor_applied": false,
+          "rate_source": "openrouter_catalog",
+          "source": "openrouter_list"
+        },
+        "prompt_tokens": 3021,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 3084
+      }
+    },
+    "minimal-missing_source_identity": {
+      "case_id": "minimal-missing_source_identity",
+      "completed": true,
+      "eligible": true,
+      "execution_wall_ns": 5662885551,
+      "forwarded_wire_bytes": 5264,
+      "issues": [],
+      "native_wire_bytes": 5264,
+      "normalized_wire_sha256": "7a6e7d0adf4a622701272cb90755c13d6f34cbc877ed4cdab779c7756b85ef61",
+      "outcome": {
+        "problems": [
+          "incorrect:hermes_speedup_established"
+        ],
+        "scope": "one_inspected_development_task_and_synthetic_controls",
+        "verified_success": false
+      },
+      "physical_posts": 1,
+      "preparation_wall_ns": 2923369,
+      "provider_wall_ns": 1840515304,
+      "served_model": "upstage/solar-mini4",
+      "served_provider": null,
+      "system_sha256": "dffcb76df1a8009df56985bd872c347a9c963db98e72dbfda1ca6487478adff9",
+      "total_wall_ns": 5672965984,
+      "usage": {
+        "completion_tokens": 47,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 3.766e-05,
+        "cost_details": {
+          "floor_applied": false,
+          "rate_source": "openrouter_catalog",
+          "source": "openrouter_list"
+        },
+        "prompt_tokens": 1314,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 832,
+          "video_tokens": 0
+        },
+        "total_tokens": 1361
+      }
+    }
+  },
+  "cohort_freeze_sha256": "077a4b768630d6b6792f3a7a467f66c8ce4c65b728e394275f62f02ba4e39fc3",
+  "full_wire_comparison_eligible": true,
+  "holdout": false,
+  "known_recorded_physical_posts": 5,
+  "known_work_completion_tokens": 305,
+  "known_work_prompt_tokens": 20937,
+  "known_work_reported_cost_usd": 0.00107041,
+  "offline_preparation_wall_ns": 1161146707,
+  "pairs": {
+    "complete": {
+      "both_verified_success": false,
+      "eligible": true,
+      "observed_total_wall_reduction_ns": 3018199912,
+      "prompt_token_reduction": 5436,
+      "reported_cost_reduction_usd": 0.000276,
+      "verified_prompt_token_reduction": false
+    },
+    "missing_source_identity": {
+      "both_verified_success": false,
+      "eligible": true,
+      "observed_total_wall_reduction_ns": 21308618,
+      "prompt_token_reduction": 5436,
+      "reported_cost_reduction_usd": 0.00031424,
+      "verified_prompt_token_reduction": false
+    }
+  },
+  "physical_attempt_accounting_complete": true,
+  "physical_posts_including_failures": 5,
+  "replay_provider_calls": 0,
+  "schema": "hermes.verified_context_cohort.result.v1",
+  "scope": "Five inspected development cases from one evidence task; not a holdout or population certification",
+  "speedup_or_population_claim": false,
+  "status": "COMPLETE",
+  "sum_driver_total_wall_ns": 29571560864,
+  "usage_complete_for_every_physical_post": true
+}

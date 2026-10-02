@@ -1,0 +1,60 @@
+{
+  "status": "PASS",
+  "sources": {
+    "unchanged_original": {
+      "rows": 432,
+      "exact_predeclared_or_partial_stop_grid": true,
+      "N32_tasks": null
+    },
+    "fixed-thrml": {
+      "rows": 324,
+      "exact_predeclared_or_partial_stop_grid": true,
+      "N32_tasks": null
+    },
+    "adaptive-price": {
+      "rows": 736,
+      "exact_predeclared_or_partial_stop_grid": true,
+      "N32_tasks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    "prefix-token": {
+      "rows": 192,
+      "exact_predeclared_or_partial_stop_grid": true,
+      "N32_tasks": null
+    },
+    "prefix-cardinality": {
+      "rows": 192,
+      "exact_predeclared_or_partial_stop_grid": true,
+      "N32_tasks": null
+    },
+    "deterministic-frontier": {
+      "rows": 184,
+      "exact_predeclared_or_partial_stop_grid": true,
+      "N32_tasks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    }
+  },
+  "no_new_sampling": true,
+  "no_N64_or_N128_rows": true,
+  "partial_N32_stop_preserved": true
+}

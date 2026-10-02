@@ -1,0 +1,335 @@
+...........................................F............................ [ 12%]
+........................................................................ [ 25%]
+........................................................................ [ 37%]
+........................................................................ [ 50%]
+.......................................F................................ [ 63%]
+F.ssss..........ss.......................F....F...F..FF.F............... [ 75%]
+....................s.s................................................. [ 88%]
+...................................................................      [100%]
+=================================== FAILURES ===================================
+___ BridgeWorkerProcessTests.test_worker_hello_self_check_reload_fail_closed ___
+
+self = <test_bridge_worker.BridgeWorkerProcessTests testMethod=test_worker_hello_self_check_reload_fail_closed>
+
+    def test_worker_hello_self_check_reload_fail_closed(self) -> None:
+        env = os.environ.copy()
+        root = Path(__file__).resolve().parents[1]
+        env["PYTHONPATH"] = str(root / "src")
+        env["Z0INT_ROOT"] = str(root)
+        with tempfile.TemporaryDirectory() as tmp:
+            env["Z0INT_HOME"] = tmp
+            py = os.environ.get("Z0INT_PYTHON") or "/home/kvn/tmp/openjev/.venv/bin/python"
+>           proc = subprocess.Popen(
+                [py, "-u", "-m", "z0int.bridge.worker", "--generation", "7"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+                cwd=str(root),
+            )
+
+tests/test_bridge_worker.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: 255 args: ['/home/kvn/tmp/openjev/.venv/bin/python', '-u...>
+args = ['/home/kvn/tmp/openjev/.venv/bin/python', '-u', '-m', 'z0int.bridge.worker', '--generation', '7']
+executable = b'/home/kvn/tmp/openjev/.venv/bin/python', preexec_fn = None
+close_fds = True, pass_fds = ()
+cwd = '/workspace/hermes-factory/experiments/thermocontext-next/z0intelligence'
+env = {'BROWSER_MANAGEMENT_SOCKET_PATH': '/home/agent/.local/run/browser-management/socket', 'CAAS_DIND_STORAGE_DRIVER': 'vf..._GIT_COMMIT_SHA': '8f4f3df6e62b78be6e6f4def1fdb1a1649eeddb7', 'CAAS_IMAGE_VERSION': '20260927172045-8f4f3df6e62b', ...}
+startupinfo = None, creationflags = 0, shell = False, p2cread = 19
+p2cwrite = 20, c2pread = 21, c2pwrite = 22, errread = 26, errwrite = 27
+restore_signals = True, gid = None, gids = None, uid = None, umask = -1
+start_new_session = False, process_group = -1
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       restore_signals,
+                       gid, gids, uid, umask,
+                       start_new_session, process_group):
+        """Execute program (POSIX version)"""
+    
+        if isinstance(args, (str, bytes)):
+            args = [args]
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = [args]
+        else:
+            args = list(args)
+    
+        if shell:
+            # On Android the default shell is at '/system/bin/sh'.
+            unix_shell = ('/system/bin/sh' if
+                      hasattr(sys, 'getandroidapilevel') else '/bin/sh')
+            args = [unix_shell, "-c"] + args
+            if executable:
+                args[0] = executable
+    
+        if executable is None:
+            executable = args[0]
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        if (_USE_POSIX_SPAWN
+                and os.path.dirname(executable)
+                and preexec_fn is None
+                and not close_fds
+                and not pass_fds
+                and cwd is None
+                and (p2cread == -1 or p2cread > 2)
+                and (c2pwrite == -1 or c2pwrite > 2)
+                and (errwrite == -1 or errwrite > 2)
+                and not start_new_session
+                and process_group == -1
+                and gid is None
+                and gids is None
+                and uid is None
+                and umask < 0):
+            self._posix_spawn(args, executable, env, restore_signals,
+                              p2cread, p2cwrite,
+                              c2pread, c2pwrite,
+                              errread, errwrite)
+            return
+    
+        orig_executable = executable
+    
+        # For transferring possible exec failure from child to parent.
+        # Data format: "exception name:hex errno:description"
+        # Pickle is not used; it is complex and involves memory allocation.
+        errpipe_read, errpipe_write = os.pipe()
+        # errpipe_write must not be in the standard io 0, 1, or 2 fd range.
+        low_fds_to_close = []
+        while errpipe_write < 3:
+            low_fds_to_close.append(errpipe_write)
+            errpipe_write = os.dup(errpipe_write)
+        for low_fd in low_fds_to_close:
+            os.close(low_fd)
+        try:
+            try:
+                # We must avoid complex work that could involve
+                # malloc or free in the child process to avoid
+                # potential deadlocks, thus we do all this here.
+                # and pass it to fork_exec()
+    
+                if env is not None:
+                    env_list = []
+                    for k, v in env.items():
+                        k = os.fsencode(k)
+                        if b'=' in k:
+                            raise ValueError("illegal environment variable name")
+                        env_list.append(k + b'=' + os.fsencode(v))
+                else:
+                    env_list = None  # Use execv instead of execve.
+                executable = os.fsencode(executable)
+                if os.path.dirname(executable):
+                    executable_list = (executable,)
+                else:
+                    # This matches the behavior of os._execvpe().
+                    executable_list = tuple(
+                        os.path.join(os.fsencode(dir), executable)
+                        for dir in os.get_exec_path(env))
+                fds_to_keep = set(pass_fds)
+                fds_to_keep.add(errpipe_write)
+                self.pid = _fork_exec(
+                        args, executable_list,
+                        close_fds, tuple(sorted(map(int, fds_to_keep))),
+                        cwd, env_list,
+                        p2cread, p2cwrite, c2pread, c2pwrite,
+                        errread, errwrite,
+                        errpipe_read, errpipe_write,
+                        restore_signals, start_new_session,
+                        process_group, gid, gids, uid, umask,
+                        preexec_fn, _USE_VFORK)
+                self._child_created = True
+            finally:
+                # be sure the FD is closed no matter what
+                os.close(errpipe_write)
+    
+            self._close_pipe_fds(p2cread, p2cwrite,
+                                 c2pread, c2pwrite,
+                                 errread, errwrite)
+    
+            # Wait for exec to fail or succeed; possibly raising an
+            # exception (limited in size)
+            errpipe_data = bytearray()
+            while True:
+                part = os.read(errpipe_read, 50000)
+                errpipe_data += part
+                if not part or len(errpipe_data) > 50000:
+                    break
+        finally:
+            # be sure the FD is closed no matter what
+            os.close(errpipe_read)
+    
+        if errpipe_data:
+            try:
+                pid, sts = os.waitpid(self.pid, 0)
+                if pid == self.pid:
+                    self._handle_exitstatus(sts)
+                else:
+                    self.returncode = sys.maxsize
+            except ChildProcessError:
+                pass
+    
+            try:
+                exception_name, hex_errno, err_msg = (
+                        errpipe_data.split(b':', 2))
+                # The encoding here should match the encoding
+                # written in by the subprocess implementations
+                # like _posixsubprocess
+                err_msg = err_msg.decode()
+            except ValueError:
+                exception_name = b'SubprocessError'
+                hex_errno = b'0'
+                err_msg = 'Bad exception data from child: {!r}'.format(
+                              bytes(errpipe_data))
+            child_exception_type = getattr(
+                    builtins, exception_name.decode('ascii'),
+                    SubprocessError)
+            if issubclass(child_exception_type, OSError) and hex_errno:
+                errno_num = int(hex_errno, 16)
+                if err_msg == "noexec:chdir":
+                    err_msg = ""
+                    # The error must be from chdir(cwd).
+                    err_filename = cwd
+                elif err_msg == "noexec":
+                    err_msg = ""
+                    err_filename = None
+                else:
+                    err_filename = orig_executable
+                if errno_num != 0:
+                    err_msg = os.strerror(errno_num)
+                if err_filename is not None:
+>                   raise child_exception_type(errno_num, err_msg, err_filename)
+E                   FileNotFoundError: [Errno 2] No such file or directory: '/home/kvn/tmp/openjev/.venv/bin/python'
+
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py:1955: FileNotFoundError
+______________ test_jev_requires_explicit_remote_and_exact_state _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f3358347ec0>
+
+    def test_jev_requires_explicit_remote_and_exact_state(monkeypatch):
+        from types import SimpleNamespace
+        monkeypatch.setattr(i, "create_backend", lambda name: SimpleNamespace(health=lambda: SimpleNamespace(configured=True)))
+        assert route(args(function='evidence_sufficiency'))['kind']=='PARENT_ONLY'
+        with pytest.raises(ValueError):route(args(function='evidence_sufficiency',allow_remote=True))
+>       assert route(args(function='evidence_sufficiency',allow_remote=True,state={'question':'claim','evidence':'text'}))['kind']=='JEV_FUNCTION'
+E       AssertionError: assert 'PARENT_ONLY' == 'JEV_FUNCTION'
+E         
+E         - JEV_FUNCTION
+E         + PARENT_ONLY
+
+tests/test_intelligence.py:29: AssertionError
+__________ JuliaBackendOfflineTests.test_unavailable_without_checkout __________
+
+self = <test_julia_backend.JuliaBackendOfflineTests testMethod=test_unavailable_without_checkout>
+
+    def test_unavailable_without_checkout(self):
+        backend = JuliaBackend(hf="SupersonicLabs/Julia-1", revision=REVISION,
+                               model_dir=Path("/nonexistent/julia"))
+        health = backend.health(load=False)
+        self.assertFalse(health.ready)
+        self.assertFalse(health.loaded)
+>       self.assertIn("incomplete Julia checkout", health.detail)
+E       AssertionError: 'incomplete Julia checkout' not found in 'no usable interpreter: /home/kvn/tmp/julia-venv/bin/python: interpreter not found: /home/kvn/tmp/julia-venv/bin/python; /home/agent/.z0int/julia-venv/bin/python: interpreter not found: /home/agent/.z0int/julia-venv/bin/python; /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3: probe failed: Traceback (most recent call last):\n  File "<string>", line 1, in <module>\nModuleNotFoundError: No module named \'transformers\''
+
+tests/test_julia_backend.py:195: AssertionError
+____________________ test_health_429_ttl_403_operator_only _____________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f335cd07560>
+
+    def test_health_429_ttl_403_operator_only(monkeypatch):
+>       first=p.acquire('groq','one',{'quota_model':'openai/gpt-oss-20b','quota_reserved_tokens':100});p.release(first['token'],'groq',429,100)
+                                                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_provider_saturation.py:99: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+token = 'admission-13783ac83c7994e7a43db5b8161fe99bc36c5ef0cd3beffb5c371eb3dec7531b'
+provider = 'groq', http_status = 429, latency_ms = 100, context = {}
+retry_after = None, attempted = True
+
+    def release(token,provider,http_status,latency_ms,context=None,retry_after=None,attempted=True):
+        provider=name(provider);context=context or {}
+        if type(attempted) is not bool:raise ValueError('Invalid attempt flag')
+        if type(http_status) is not int or http_status<0 or http_status>599:raise ValueError('Invalid HTTP status')
+        if type(latency_ms) not in (int,float) or not math.isfinite(latency_ms) or latency_ms<0:raise ValueError('Invalid latency')
+        with locked('provider-'+provider):
+            rows=_rows();matches=[r for r in rows if r['trace_id']==token]
+>           if not matches or matches[0]['provider']!=provider or matches[0]['extra']['status']!='acquired':raise ValueError('No acquired permit')
+                                                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: No acquired permit
+
+src/z0int/provider_saturation.py:96: ValueError
+________________________ test_empty_authority_capacity _________________________
+
+>   def test_empty_authority_capacity():assert project([])['allowed']
+                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert False
+
+tests/test_quota_budget.py:10: AssertionError
+________________ test_daily_tokens_bind_even_with_empty_minute _________________
+
+    def test_daily_tokens_bind_even_with_empty_minute():
+     r=project([call(90000,199000)])
+>    assert not r['allowed'];assert r['quota']['dimensions']['tpm']['remaining']==8000
+                                    ^^^^^^^^^^
+E    KeyError: 'quota'
+
+tests/test_quota_budget.py:16: KeyError
+_________________ test_latest_physical_row_not_double_counted __________________
+
+    def test_latest_physical_row_not_double_counted():
+     a=call(99990,500);b={**a,'input_tokens':1000}
+>    assert project([a,b])['tokens_24h']==1000
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E    KeyError: 'tokens_24h'
+
+tests/test_quota_budget.py:22: KeyError
+______________________ test_groq_requests_header_is_daily ______________________
+
+    def test_groq_requests_header_is_daily():
+     r=project([call(99990,1,{'x-ratelimit-remaining-requests':'0','x-ratelimit-limit-requests':'1000','x-ratelimit-reset-requests':'30m'})])
+>    assert not r['allowed'];assert r['quota']['dimensions']['rpd']['remaining']==0
+                                    ^^^^^^^^^^
+E    KeyError: 'quota'
+
+tests/test_quota_budget.py:25: KeyError
+_______________ test_unknown_usage_reserved_until_window_passes ________________
+
+    def test_unknown_usage_reserved_until_window_passes():
+     row={'trace_id':'a','provider':'groq','capability_id':'intelligence.provider_admission','ts':99990,'extra':{'status':'acquired','quota_model':MODEL,'quota_reserved_tokens':7500}}
+     assert not project([row])['allowed']
+>    assert project([row],now=100100)['allowed']
+E    assert False
+
+tests/test_quota_budget.py:33: AssertionError
+=============================== warnings summary ===============================
+tests/shadow/test_p07a_regression.py::test_zero_cost_shadow
+  /workspace/hermes-factory/venvs/z0int/lib/python3.12/site-packages/_pytest/python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but tests/shadow/test_p07a_regression.py::test_zero_cost_shadow returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_bridge_worker.py::BridgeWorkerProcessTests::test_worker_hello_self_check_reload_fail_closed
+FAILED tests/test_intelligence.py::test_jev_requires_explicit_remote_and_exact_state
+FAILED tests/test_julia_backend.py::JuliaBackendOfflineTests::test_unavailable_without_checkout
+FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+FAILED tests/test_quota_budget.py::test_empty_authority_capacity - assert False
+FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily - KeyEr...
+FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+9 failed, 554 passed, 8 skipped, 5 deselected, 1 warning in 74.26s (0:01:14)

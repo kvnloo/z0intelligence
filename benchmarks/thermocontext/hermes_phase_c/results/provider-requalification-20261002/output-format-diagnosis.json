@@ -1,0 +1,32 @@
+{
+  "interpretation": "Inspect failure causes only. No canonicalization is installed and no historical result is promoted.",
+  "provider_calls": 0,
+  "rows": [
+    {
+      "actual_receipt_unchanged": true,
+      "actual_verified_success": false,
+      "diagnostic_only_not_a_rescore": true,
+      "run": "nous-free-stepfun",
+      "single_markdown_json_fence": true,
+      "unchanged_checker_on_inner_object_only": {
+        "problems": [
+          "unexpected_or_missing_fields"
+        ],
+        "scope": "one_inspected_development_claim_not_population_noninferiority",
+        "verified_success": false
+      }
+    },
+    {
+      "actual_receipt_unchanged": true,
+      "actual_verified_success": false,
+      "diagnostic_only_not_a_rescore": true,
+      "run": "nous-cheap-solar",
+      "single_markdown_json_fence": true,
+      "unchanged_checker_on_inner_object_only": {
+        "problems": [],
+        "scope": "one_inspected_development_claim_not_population_noninferiority",
+        "verified_success": true
+      }
+    }
+  ]
+}

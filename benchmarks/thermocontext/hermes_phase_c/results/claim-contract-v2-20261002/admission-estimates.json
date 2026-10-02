@@ -1,0 +1,39 @@
+{
+  "cases": {
+    "full-complete": {
+      "context_bytes": 14340,
+      "estimated_serialized_request_bytes": 19920,
+      "within_unchanged_byte_cap": true
+    },
+    "full-contradictory_source_identity": {
+      "context_bytes": 16096,
+      "estimated_serialized_request_bytes": 21854,
+      "within_unchanged_byte_cap": false
+    },
+    "full-missing_source_identity": {
+      "context_bytes": 12590,
+      "estimated_serialized_request_bytes": 17994,
+      "within_unchanged_byte_cap": true
+    },
+    "minimal-complete": {
+      "context_bytes": 3598,
+      "estimated_serialized_request_bytes": 7654,
+      "within_unchanged_byte_cap": true
+    },
+    "minimal-contradictory_source_identity": {
+      "context_bytes": 5354,
+      "estimated_serialized_request_bytes": 9588,
+      "within_unchanged_byte_cap": true
+    },
+    "minimal-missing_source_identity": {
+      "context_bytes": 1848,
+      "estimated_serialized_request_bytes": 5728,
+      "within_unchanged_byte_cap": true
+    }
+  },
+  "excluded_before_inference": [
+    "full-contradictory_source_identity"
+  ],
+  "reference_wire_sha256": "83cb0aa21355961dcb069c5ccd33ad08f7e21646760759f88f73f8015056416c",
+  "scope": "Prior observed native boilerplate plus candidate prompt/context; NOT actual cohort transport"
+}

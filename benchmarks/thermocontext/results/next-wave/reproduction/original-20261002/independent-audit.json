@@ -1,0 +1,15 @@
+{
+  "schema": "thermocontext.reproduction-independent-audit.v1",
+  "results_sha256": "be670f3280814cbfda68f2c0ba6cdd34ceb6f6302891b407c600e220b8c37234",
+  "auditor_sha256": "e7038b64b173a04b91d183a147b8630a8140820c987d3c65c0b18b7648cff2c0",
+  "frozen_sha256": "69e1b4537858c06f87968093c41f11118af8d842c95edd49cd71897767044a00",
+  "rows_audited": 432,
+  "independent_exhaustive_tasks": 36,
+  "maximum_energy_rounding_difference": 2.384185791015625e-07,
+  "errors": [],
+  "pass": true,
+  "limits": [
+    "Original reproduction has no saved retained trajectories; first-valid indices and output membership are not independently trace-audited here.",
+    "Prototype historical match is observed for this exact synthetic cohort; no population noninferiority certification."
+  ]
+}

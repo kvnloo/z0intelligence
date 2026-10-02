@@ -1,0 +1,910 @@
+{
+  "artifact_hashes": {
+    "all_pass": true,
+    "checked": 2632,
+    "failures": [],
+    "present": true
+  },
+  "auditor_sha256": "8aac7c8570f550ad57eaa50dd2e24d3971217a229570898fb0ae6207a808907f",
+  "comparison": {
+    "compared_fields": [
+      "N",
+      "mask",
+      "ids",
+      "count",
+      "energy",
+      "tokens",
+      "budget",
+      "verified",
+      "energy_gap",
+      "exact_energy",
+      "first_valid_sample",
+      "sample_count",
+      "feasible",
+      "empty",
+      "no_feasible",
+      "selected_sample",
+      "feasible_sample_count",
+      "empty_sample_count"
+    ],
+    "exact_non_timing_equality": true,
+    "mismatches": [],
+    "new_rows": 2520,
+    "prior_rows": 2520,
+    "same_identity_grid": true,
+    "timing_equality_tested": false
+  },
+  "frozen_prototype_sha256": "69e1b4537858c06f87968093c41f11118af8d842c95edd49cd71897767044a00",
+  "mode": "small",
+  "no_new_sampling": true,
+  "no_provider_calls": true,
+  "result_sha256": "8f72c96cf648bd5469e80475d2d14ee1d0dd899eda4ae82ed8eba7c6832a668a",
+  "retained_trace_audit": {
+    "all_row_checks_pass": true,
+    "complete_present_arm_grids": true,
+    "exact_tasks_independently_enumerated": 36,
+    "failures": [],
+    "frozen_prototype_sha256": "69e1b4537858c06f87968093c41f11118af8d842c95edd49cd71897767044a00",
+    "grids": [
+      {
+        "N": 8,
+        "arm": "adaptive",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "champion",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "component_dp",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "exact",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "greedy",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "pair_greedy",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "prototype",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "prototype_projected",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "random_projected",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "slack",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "slack_initial",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "thrml_projected",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "thrml_static",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 8,
+        "arm": "topk",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "adaptive",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "champion",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "component_dp",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "exact",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "greedy",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "pair_greedy",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "prototype",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "prototype_projected",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "random_projected",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "slack",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "slack_initial",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "thrml_projected",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "thrml_static",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 12,
+        "arm": "topk",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "adaptive",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "champion",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "component_dp",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "exact",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "greedy",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "pair_greedy",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "prototype",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "prototype_projected",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "random_projected",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "slack",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "slack_initial",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "thrml_projected",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "thrml_static",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      },
+      {
+        "N": 16,
+        "arm": "topk",
+        "complete": true,
+        "extra": [],
+        "missing": []
+      }
+    ],
+    "limits": [
+      "Grid checks cover arms present in data; compare missing whole arms/stages against protocol separately.",
+      "Output arithmetic and retained trajectories do not establish transition-kernel correctness or prove absence of oracle leakage in implementation.",
+      "This is synthetic-cohort replay, not independently observed real Hermes task success."
+    ],
+    "rows_audited": 2520,
+    "schema": "thermocontext.independent-audit.v1"
+  },
+  "selected_arithmetic": {
+    "all_selected_checks_pass": true,
+    "failures": [],
+    "groups": [
+      {
+        "N": 8,
+        "arm": "adaptive",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 4.423782229423523e-09,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 8,
+        "arm": "champion",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 1.158659159593905,
+        "overbudget": 12,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 12,
+        "verified_feasible": 0
+      },
+      {
+        "N": 8,
+        "arm": "component_dp",
+        "empty": 0,
+        "exact_hits": 12,
+        "mean_energy_gap": 4.423782229423523e-09,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 12,
+        "verified_feasible": 12
+      },
+      {
+        "N": 8,
+        "arm": "exact",
+        "empty": 0,
+        "exact_hits": 12,
+        "mean_energy_gap": 4.423782229423523e-09,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 12,
+        "verified_feasible": 12
+      },
+      {
+        "N": 8,
+        "arm": "greedy",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 0.6693343812754998,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 0,
+        "verified_feasible": 0
+      },
+      {
+        "N": 8,
+        "arm": "pair_greedy",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 0.6693343812754998,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 0,
+        "verified_feasible": 0
+      },
+      {
+        "N": 8,
+        "arm": "prototype",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 4.423782229423523e-09,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 8,
+        "arm": "prototype_projected",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 4.423782229423523e-09,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 8,
+        "arm": "random_projected",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 4.423782229423523e-09,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 8,
+        "arm": "slack",
+        "empty": 0,
+        "exact_hits": 29,
+        "mean_energy_gap": 0.2663318757743885,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 81,
+        "verified_feasible": 81
+      },
+      {
+        "N": 8,
+        "arm": "slack_initial",
+        "empty": 0,
+        "exact_hits": 29,
+        "mean_energy_gap": 0.2663318757743885,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 81,
+        "verified_feasible": 81
+      },
+      {
+        "N": 8,
+        "arm": "thrml_projected",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 4.423782229423523e-09,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 8,
+        "arm": "thrml_static",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 4.423782229423523e-09,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 8,
+        "arm": "topk",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 1.3328420613737155,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 0,
+        "verified_feasible": 0
+      },
+      {
+        "N": 12,
+        "arm": "adaptive",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 2.2351741790771484e-08,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 12,
+        "arm": "champion",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 1.4140658602118492,
+        "overbudget": 12,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 12,
+        "verified_feasible": 0
+      },
+      {
+        "N": 12,
+        "arm": "component_dp",
+        "empty": 0,
+        "exact_hits": 12,
+        "mean_energy_gap": 2.2351741790771484e-08,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 12,
+        "verified_feasible": 12
+      },
+      {
+        "N": 12,
+        "arm": "exact",
+        "empty": 0,
+        "exact_hits": 12,
+        "mean_energy_gap": 2.2351741790771484e-08,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 12,
+        "verified_feasible": 12
+      },
+      {
+        "N": 12,
+        "arm": "greedy",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 0.5059018259247144,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 0,
+        "verified_feasible": 0
+      },
+      {
+        "N": 12,
+        "arm": "pair_greedy",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 0.5059018259247144,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 0,
+        "verified_feasible": 0
+      },
+      {
+        "N": 12,
+        "arm": "prototype",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 2.2351741790771484e-08,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 12,
+        "arm": "prototype_projected",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 2.2351741790771484e-08,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 12,
+        "arm": "random_projected",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 2.2351741790771484e-08,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 12,
+        "arm": "slack",
+        "empty": 0,
+        "exact_hits": 10,
+        "mean_energy_gap": 0.483821547900637,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 59,
+        "verified_feasible": 59
+      },
+      {
+        "N": 12,
+        "arm": "slack_initial",
+        "empty": 0,
+        "exact_hits": 10,
+        "mean_energy_gap": 0.483821547900637,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 59,
+        "verified_feasible": 59
+      },
+      {
+        "N": 12,
+        "arm": "thrml_projected",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 2.2351741790771484e-08,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 12,
+        "arm": "thrml_static",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 2.2351741790771484e-08,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 12,
+        "arm": "topk",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 0.6223579024275144,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 0,
+        "verified_feasible": 0
+      },
+      {
+        "N": 16,
+        "arm": "adaptive",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 4.718701044718424e-08,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 16,
+        "arm": "champion",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 1.5277540584405263,
+        "overbudget": 12,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 12,
+        "verified_feasible": 0
+      },
+      {
+        "N": 16,
+        "arm": "component_dp",
+        "empty": 0,
+        "exact_hits": 12,
+        "mean_energy_gap": 4.718701044718424e-08,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 12,
+        "verified_feasible": 12
+      },
+      {
+        "N": 16,
+        "arm": "exact",
+        "empty": 0,
+        "exact_hits": 12,
+        "mean_energy_gap": 4.718701044718424e-08,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 12,
+        "verified_feasible": 12
+      },
+      {
+        "N": 16,
+        "arm": "greedy",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 0.40284733722607297,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 0,
+        "verified_feasible": 0
+      },
+      {
+        "N": 16,
+        "arm": "pair_greedy",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 0.40284733722607297,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 0,
+        "verified_feasible": 0
+      },
+      {
+        "N": 16,
+        "arm": "prototype",
+        "empty": 0,
+        "exact_hits": 86,
+        "mean_energy_gap": 0.015604076286156973,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 95,
+        "verified_feasible": 95
+      },
+      {
+        "N": 16,
+        "arm": "prototype_projected",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 4.718701044718424e-08,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 16,
+        "arm": "random_projected",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 4.718701044718424e-08,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 16,
+        "arm": "slack",
+        "empty": 0,
+        "exact_hits": 3,
+        "mean_energy_gap": 0.6292271967977285,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 27,
+        "verified_feasible": 27
+      },
+      {
+        "N": 16,
+        "arm": "slack_initial",
+        "empty": 0,
+        "exact_hits": 3,
+        "mean_energy_gap": 0.6292271967977285,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 27,
+        "verified_feasible": 27
+      },
+      {
+        "N": 16,
+        "arm": "thrml_projected",
+        "empty": 0,
+        "exact_hits": 96,
+        "mean_energy_gap": 4.718701044718424e-08,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 16,
+        "arm": "thrml_static",
+        "empty": 0,
+        "exact_hits": 80,
+        "mean_energy_gap": 0.012477553139130274,
+        "overbudget": 0,
+        "rows": 96,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 96,
+        "verified_feasible": 96
+      },
+      {
+        "N": 16,
+        "arm": "topk",
+        "empty": 0,
+        "exact_hits": 0,
+        "mean_energy_gap": 0.6749742751320204,
+        "overbudget": 0,
+        "rows": 12,
+        "source": "rerun",
+        "tasks": 12,
+        "verified": 0,
+        "verified_feasible": 0
+      }
+    ],
+    "large_tasks_component_enumerated": 0,
+    "rows_audited": 2520,
+    "small_tasks_independently_enumerated": 36,
+    "tasks_reconstructed": 36
+  },
+  "source_bindings_match_prior": false,
+  "timing_equality_tested": false
+}

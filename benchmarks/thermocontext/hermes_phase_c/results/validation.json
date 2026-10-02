@@ -1,0 +1,33 @@
+{
+  "classification": "OFFLINE_CONFORMANCE_ONLY",
+  "exact_replay": {
+    "receipt.json": {
+      "identical": true,
+      "sha256": "6dadedd8e5f24672ee330ffdc82555d35b142c8343367c5eb2ab48f820ca8088"
+    },
+    "selection.json": {
+      "identical": true,
+      "sha256": "6cf9e2235ec4adc395097f7ad54d4f626e22bc0fd2db02a39eb5edf75646ae07"
+    },
+    "wire-witness.json": {
+      "identical": true,
+      "sha256": "d94a69ab66ce991d959fc825b4e0258a149ac700be0c66f0fb1b44b7197ec3f0"
+    }
+  },
+  "limits": "Native SDK/proxy live driver prepared; no real-provider or end-to-end speed/quality claim.",
+  "live_run_status": "NOT_RUN_IN_THIS_RECEIPT",
+  "prepare_only": {
+    "provider_calls": 0,
+    "status": "PREPARED_NOT_EXECUTED"
+  },
+  "tests_with_native_hermes": {
+    "passed": 19,
+    "run": 19,
+    "skipped": 0
+  },
+  "tests_without_hermes": {
+    "passed": 18,
+    "run": 19,
+    "skipped": 1
+  }
+}

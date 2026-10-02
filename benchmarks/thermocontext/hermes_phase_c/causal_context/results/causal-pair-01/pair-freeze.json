@@ -1,0 +1,69 @@
+{
+  "allow_fallbacks": false,
+  "automatic_retries": false,
+  "case_order": [
+    "complete",
+    "missing_source_identity"
+  ],
+  "checker_outside_worker_context": true,
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "fixed_pairing": "full evidence versus source-identity withheld; same prompt and renderer",
+  "fresh_profile_per_arm": true,
+  "max_output_tokens": 1024,
+  "max_paid_cost_usd": 0,
+  "max_physical_posts_per_arm": 1,
+  "max_physical_posts_total": 2,
+  "max_serialized_request_bytes": 20000,
+  "max_wall_seconds_per_arm": 120,
+  "no_claims": [
+    "population noninferiority",
+    "speedup",
+    "thermal advantage",
+    "model necessity"
+  ],
+  "provider_calls_at_freeze": 0,
+  "requested_model": "openrouter/free",
+  "same_actual_model_and_provider_required": true,
+  "schema": "hermes.context_pair_preregistration.v1",
+  "source_files": {
+    "checker": {
+      "path": "/workspace/hermes-factory/experiments/hermes-context-next/frozen_check.py",
+      "sha256": "7c646ba5040a0a5c3090c8f9132aefcf4b7a9f93d243271b35cbc45428fcfdb5"
+    },
+    "context_resolver": {
+      "path": "/workspace/hermes-factory/experiments/thermocontext-next/z0intelligence/src/z0int/context_resolve.py",
+      "sha256": "04d3da59e850c6488613a5b23ee2e8312cb19d00c49a9d0fcde7696e04ac7c1c"
+    },
+    "discriminator": {
+      "path": "/workspace/hermes-factory/experiments/hermes-context-next/discriminator.py",
+      "sha256": "72b585e5ebe59e4a4d26f091ec32479c469f2d886aac3e5a0e7792657c9ec9c4"
+    },
+    "native_composition": {
+      "path": "/workspace/hermes-factory/experiments/hermes-state-v0/hermes/agent/turn_context.py",
+      "sha256": "b838c191eb44e8fd99a768bb782438b2b8751c775df67599dbc4b5892ea344ce"
+    },
+    "native_recorder": {
+      "path": "/workspace/hermes-factory/experiments/hermes-state-v0/hermes/evals/factory_state/driver.py",
+      "sha256": "4f80efb3f43bf56af97eb1d305b3a680a992d31f08921ce96ad2c624530fbe62"
+    },
+    "native_spill": {
+      "path": "/workspace/hermes-factory/experiments/hermes-state-v0/hermes/tools/hook_output_spill.py",
+      "sha256": "3e2ab6e5f088920065c22549f34d072526aa793246096cef8656d8810f6012a0"
+    },
+    "pair_runner": {
+      "path": "/workspace/hermes-factory/experiments/hermes-context-next/run_pair.py",
+      "sha256": "5657d0b4b7e3131a5946272ca8e4efacdab06091b2753767cb5425bca74f887e"
+    },
+    "shared_boundary": {
+      "path": "/workspace/hermes-factory/experiments/thermocontext-next/z0intelligence/benchmarks/thermocontext/hermes_phase_c/selection_boundary.py",
+      "sha256": "4bdffce967ed17ffc2b082c91a38e294a41959d179a4bb4a4499e435fd364790"
+    },
+    "shared_driver": {
+      "path": "/workspace/hermes-factory/experiments/thermocontext-next/z0intelligence/benchmarks/thermocontext/hermes_phase_c/live_baseline.py",
+      "sha256": "fed804679d26bf882bc1ccb6f085851919032be8024b5eeebc08b9dc6dcedc5f"
+    }
+  },
+  "status": "FROZEN_BEFORE_PROVIDER_CALLS",
+  "stop": "Stop after one pair. Do not spend the second attempt after an ineligible first run. Never retry to repair a failed result.",
+  "study_freeze_sha256": "23e33a2e85bf7636b2b9285a8cc124e81ea077b84edfae0bbb72a28d369b5ca6"
+}

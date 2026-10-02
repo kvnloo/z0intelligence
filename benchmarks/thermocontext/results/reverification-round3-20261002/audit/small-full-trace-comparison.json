@@ -1,0 +1,14 @@
+{
+  "all_artifact_sha256_equal": true,
+  "all_decoded_trace_arrays_equal": true,
+  "comparison_scope": "traces and auxiliary graphs; row timings/provenance intentionally excluded",
+  "decoded_array_differences": [],
+  "hash_differences": [],
+  "identical_file_sets": true,
+  "interpretation": "Repeated-seed reproducibility, not a new independent trial",
+  "no_new_sampling": true,
+  "prior_files": 2628,
+  "rerun_files": 2628,
+  "schema": "thermocontext.repeated_seed_artifact_comparison.v1",
+  "script_sha256": "22f525d64c31b1a43b15cb47900b439e0259f00b925057dd59faf4315cdcf273"
+}

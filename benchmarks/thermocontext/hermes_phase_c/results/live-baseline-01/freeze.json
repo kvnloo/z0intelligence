@@ -1,0 +1,23 @@
+{
+  "checker_sha256": "8a1a37449c1f33a0028866b49316f6815aaa74881b35b08768748faf1698343d",
+  "cohort": "one_inspected_development_claim",
+  "context_sha256": "e3a286f8d6ea0c3a2091f8495c9ca3b6b2a56da9c3bc5de122782aa91d271472",
+  "driver_sha256": "284437b00baf4002f0861202cab362cba6a9410e6574437121cc3b62ca88edb6",
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "execute_requested": true,
+  "input_token_cap": {
+    "enforcement": "post-response eligibility; tokenizer unknown before free-router selection",
+    "value": 20000
+  },
+  "max_output_tokens": 1024,
+  "max_paid_cost_usd": 0,
+  "max_physical_inference_attempts": 1,
+  "max_serialized_request_bytes": 20000,
+  "max_wall_seconds": 120,
+  "model": "openrouter/free",
+  "native_recorder_sha256": "4f80efb3f43bf56af97eb1d305b3a680a992d31f08921ce96ad2c624530fbe62",
+  "prompt_sha256": "d6ac8bcb93d8157f5396f81b9c54a038fc38952382b7c92fb1db6bd6eadc72f6",
+  "protected_checker_visible_to_worker_model": false,
+  "provider_calls": 0,
+  "sampler_enabled": false
+}

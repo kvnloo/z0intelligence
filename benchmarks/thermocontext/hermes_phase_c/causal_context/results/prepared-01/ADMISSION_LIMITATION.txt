@@ -1,0 +1,10 @@
+Preserved earlier OFFLINE SERIALIZATION-ONLY result.
+
+After this preparation, the actual baseline identified Hermes's default
+10,000-character pre_llm hook spill. These larger contexts become previews before
+composition. Therefore this receipt is not evidence of end-to-end native context
+admission and must not justify provider execution with default settings.
+
+The next preparation additionally tests real collection/spill behavior and pins
+an explicit study-only context admission configuration. No provider was called
+by this earlier artifact; no semantic-use, success, or savings claim is valid.

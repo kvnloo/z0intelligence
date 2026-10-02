@@ -1,0 +1,18 @@
+# Tested with Python 3.12.14 on CPU. No model weights or TSU runtime.
+# Direct upstream source pin, rather than the local clone used to build the venv.
+thrml @ git+https://github.com/extropic-ai/thrml@dfb3bde16962f9637a1845ccb2bea80aaa19e4bd
+jax==0.11.2
+jaxlib==0.11.2
+equinox==0.13.8
+jaxtyping==0.3.11
+numpy==2.2.6
+scipy==1.18.1
+ml_dtypes==0.6.0
+opt_einsum==3.4.0
+typing_extensions==4.16.0
+wadler_lindig==0.1.7
+pytest==8.4.2
+iniconfig==2.3.0
+packaging==26.3
+pluggy==1.6.0
+Pygments==2.21.0

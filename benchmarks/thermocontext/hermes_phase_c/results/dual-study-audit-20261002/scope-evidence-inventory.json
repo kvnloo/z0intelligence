@@ -1,0 +1,95 @@
+{
+  "all_limits_excerpt_bytes_identical": true,
+  "cases": {
+    "full-complete": {
+      "JSON_decodable_evidence_refs": [
+        "source-identity",
+        "gates",
+        "baseline",
+        "guarded",
+        "task_verified_ms",
+        "input_tokens",
+        "output_tokens"
+      ],
+      "direct_hermes_speedup_established_fields": [],
+      "limits_excerpt_sha256": "98ba14777ecbeec37c88d1fd55b8bc3c55f4c981ce051990f64f1ab188ce8312",
+      "scope_gap_text": [
+        "No real Hermes provider or end-to-end task result exists for this pool."
+      ],
+      "source_declarations": [
+        {
+          "path": "excerpt JSON $.tested_source",
+          "source_id": "source-identity",
+          "value": "a0bca744067d04f05904319d3d919be30c336556"
+        }
+      ]
+    },
+    "full-missing_source_identity": {
+      "JSON_decodable_evidence_refs": [
+        "gates",
+        "baseline",
+        "guarded",
+        "task_verified_ms",
+        "input_tokens",
+        "output_tokens"
+      ],
+      "direct_hermes_speedup_established_fields": [],
+      "limits_excerpt_sha256": "98ba14777ecbeec37c88d1fd55b8bc3c55f4c981ce051990f64f1ab188ce8312",
+      "scope_gap_text": [
+        "No real Hermes provider or end-to-end task result exists for this pool."
+      ],
+      "source_declarations": []
+    },
+    "minimal-complete": {
+      "JSON_decodable_evidence_refs": [
+        "source-identity"
+      ],
+      "direct_hermes_speedup_established_fields": [],
+      "limits_excerpt_sha256": "98ba14777ecbeec37c88d1fd55b8bc3c55f4c981ce051990f64f1ab188ce8312",
+      "scope_gap_text": [
+        "No real Hermes provider or end-to-end task result exists for this pool."
+      ],
+      "source_declarations": [
+        {
+          "path": "excerpt JSON $.tested_source",
+          "source_id": "source-identity",
+          "value": "a0bca744067d04f05904319d3d919be30c336556"
+        }
+      ]
+    },
+    "minimal-contradictory_source_identity": {
+      "JSON_decodable_evidence_refs": [
+        "source-identity",
+        "source-identity-conflict"
+      ],
+      "direct_hermes_speedup_established_fields": [],
+      "limits_excerpt_sha256": "98ba14777ecbeec37c88d1fd55b8bc3c55f4c981ce051990f64f1ab188ce8312",
+      "scope_gap_text": [
+        "No real Hermes provider or end-to-end task result exists for this pool."
+      ],
+      "source_declarations": [
+        {
+          "path": "excerpt JSON $.tested_source",
+          "source_id": "source-identity",
+          "value": "a0bca744067d04f05904319d3d919be30c336556"
+        },
+        {
+          "path": "excerpt JSON $.tested_source",
+          "source_id": "source-identity-conflict",
+          "value": "ffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
+    },
+    "minimal-missing_source_identity": {
+      "JSON_decodable_evidence_refs": [],
+      "direct_hermes_speedup_established_fields": [],
+      "limits_excerpt_sha256": "98ba14777ecbeec37c88d1fd55b8bc3c55f4c981ce051990f64f1ab188ce8312",
+      "scope_gap_text": [
+        "No real Hermes provider or end-to-end task result exists for this pool."
+      ],
+      "source_declarations": []
+    }
+  },
+  "scope": "Read-only inventory of supplied fields; no answer repair or new judge",
+  "scope_is_not_a_typed_boolean_in_the_context": true
+}

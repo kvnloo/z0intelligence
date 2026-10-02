@@ -1,0 +1,99 @@
+ThermoContext next wave and the shared Hermes goal
+
+Owner: z0intelligence issue #106, draft PR #108.
+Experiment branch: experiment/thermocontext-phase-a.
+Frozen starting revision: 456ff17a734206bb5558d0b063cde5cd74f1a6ae.
+
+One objective: verified, intent-matched task completion with less total cognition,
+latency, consumed tokens and human correction. ThermoContext is one candidate
+selector behind the existing z0 intelligence boundary. Its fate must not block
+the native Hermes baseline or require another orchestrator.
+
+Concurrent work allocation
+
+Coordinator: freeze scope/configuration, schedule CPU measurement, integrate,
+compare gates, commit reproducible evidence, and publish issue/PR disposition.
+
+Oracle/runner worker: reproduce the original exact cohort, retain negative cases,
+build the common create-only row/trajectory runner and aggregate results.
+
+THRML worker: install pinned upstream THRML, prove representation/sampling parity,
+measure compile/execution separately, implement safeguarded adaptive token price.
+
+Auxiliary worker: local slack/carry budget constraints, mathematical equivalence,
+full expanded graph degree, coefficient range and chain-motion diagnostics.
+
+Constrained worker: explicitly host-side budget projection with identical
+prototype/random controls; stronger deterministic pair-greedy and component-DP
+baselines to test whether sampling adds value beyond a deliberately weak control.
+
+Independent audit worker: preregister gates, independently recompute exact
+energies/verifier outcomes, validate complete grids and retained sample traces,
+challenge oracle leaks, hidden work and claims unsupported by this cohort.
+
+Hermes worker: exercise the existing ContextPacket/native hook/sidecar boundary,
+prepare a frozen factual real-evidence task and independent checker, and prepare
+one genuine native Hermes request via the user's selected openrouter/free route.
+
+All six workers operate on disjoint files; the coordinator owns repository and
+GitHub mutations. Code/review/construction work is parallel. Timed sampling is
+reserved on one CPU with fixed thread settings; concurrent timing contamination
+must be reported rather than interpreted as algorithm performance.
+
+Execution dependencies
+
+1. Reproduce N8/12/16 with the original generator, objective, verifier, task seeds,
+   sampler seeds, 64 chains and 160 sweeps. Preserve the frozen source hash.
+2. Validate real THRML's QUBO conversion and transition/retention schedule before
+   accepting its results. Pin actual installed source, not just a package label.
+3. Freeze next_wave_protocol.json and every formulation configuration before
+   full-cohort measurement. Tiny engineering smoke tests are separate evidence.
+4. Run the same small-N cohort for real THRML and each budget formulation, with
+   exact/top-k/greedy/prototype comparators, stronger deterministic controls and
+   initialization-only/random-projection controls where needed.
+5. Independently audit retained masks and every final output. Select only by the
+   original frozen energy among feasible proposals; the verifier never reranks.
+6. Advance only passing budget candidates through N32, then N64, then N128.
+   Finish the fixed arms at the current N; stop the ladder at the first clear
+   failure of an advancing candidate. Do not add rescue samples or execute later
+   sizes speculatively. Mark unexecuted stages NOT_RUN and diagnose the failure.
+7. Compare verified quality, energy, tokens and full cost. A sparse graph and
+   successful samples do not establish a useful optimization. Keep the simpler
+   deterministic path if it dominates. GO/MODIFY/KILL is scoped to this mechanism,
+   implementation and cohort; it is not a universal judgment on thermodynamics.
+
+Exact sampling caps and empirical gates live in next_wave_protocol.json. They
+are finite-cohort screening criteria, not a certified population noninferiority
+claim. Report correlated seeds by task; count every failed attempt.
+
+Shared-system continuation
+
+The earlier native Hermes study proved transport, hooks, checking and replay with
+a scripted provider. The separate hermes_phase_c work reuses those boundaries and
+cached real evidence. Its offline serialization tests remain conformance evidence.
+Prepared context is not consumed context, and synthetic token weights or byte
+counts are not provider-reported token savings.
+
+For the genuine Hermes baseline, use openrouter/free with no paid fallback,
+bounded request/output/wall limits, protected factual outcome checking, actual
+served-model identity and physical-attempt accounting. Credentials are runtime
+secrets, never committed. A missing legitimate credential is a BLOCKED live run,
+not a synthetic substitute. A provider/model change confounds a paired selector
+comparison and must be recorded.
+
+Phase A samples all item IDs, including the synthetic verifier's required IDs.
+Issue #106's intended real-context boundary pins required evidence OUTSIDE the
+sampler. These are different experimental problems. Keep Phase A unchanged and
+register a separate Phase C cohort if the earlier gates justify it.
+
+ThermoContext can earn one optional selector ablation through z0intelligence and
+Hermes's existing pre_llm_call seam only after its gates pass. Failure leaves the
+known-good context path in place. Independently, the real Hermes baseline can
+identify cheaper deterministic context preparation or another removable cost.
+
+Long-term work remains receipt-driven: each stage has a fixed cohort, bounded
+resources, current champion, explicit falsifier, independent outcome and stopping
+condition. Persist source/configuration hashes, row evidence and disposition for
+later resumption. This plan does not claim an unattended service or future work
+is running merely because it is documented. No production activation, upstream
+Hermes PR, or Z1/TSU speed/energy claim follows from CPU JAX simulation.

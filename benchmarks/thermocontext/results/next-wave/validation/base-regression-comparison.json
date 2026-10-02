@@ -1,0 +1,84 @@
+{
+  "schema": "thermocontext.base-regression-comparison.v1",
+  "base_revision": "456ff17a734206bb5558d0b063cde5cd74f1a6ae",
+  "original_failure_count": 9,
+  "base_failure_count": 9,
+  "all_original_failures_reproduced": true,
+  "all_error_text_identical": true,
+  "rows": [
+    {
+      "failure": "BridgeWorkerProcessTests.test_worker_hello_self_check_reload_fail_closed",
+      "same_exception_or_assertion_text": true,
+      "base_error_lines": [
+        "FileNotFoundError: [Errno 2] No such file or directory: '/home/kvn/tmp/openjev/.venv/bin/python'"
+      ]
+    },
+    {
+      "failure": "test_jev_requires_explicit_remote_and_exact_state",
+      "same_exception_or_assertion_text": true,
+      "base_error_lines": [
+        "AssertionError: assert 'PARENT_ONLY' == 'JEV_FUNCTION'",
+        "",
+        "- JEV_FUNCTION",
+        "+ PARENT_ONLY"
+      ]
+    },
+    {
+      "failure": "JuliaBackendOfflineTests.test_unavailable_without_checkout",
+      "same_exception_or_assertion_text": true,
+      "base_error_lines": [
+        "AssertionError: 'incomplete Julia checkout' not found in 'no usable interpreter: /home/kvn/tmp/julia-venv/bin/python: interpreter not found: /home/kvn/tmp/julia-venv/bin/python; /home/agent/.z0int/julia-venv/bin/python: interpreter not found: /home/agent/.z0int/julia-venv/bin/python; /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3: probe failed: Traceback (most recent call last):\\n  File \"<string>\", line 1, in <module>\\nModuleNotFoundError: No module named \\'transformers\\''"
+      ]
+    },
+    {
+      "failure": "test_health_429_ttl_403_operator_only",
+      "same_exception_or_assertion_text": true,
+      "base_error_lines": [
+        "ValueError: No acquired permit"
+      ]
+    },
+    {
+      "failure": "test_empty_authority_capacity",
+      "same_exception_or_assertion_text": true,
+      "base_error_lines": [
+        "assert False"
+      ]
+    },
+    {
+      "failure": "test_daily_tokens_bind_even_with_empty_minute",
+      "same_exception_or_assertion_text": true,
+      "base_error_lines": [
+        "KeyError: 'quota'"
+      ]
+    },
+    {
+      "failure": "test_latest_physical_row_not_double_counted",
+      "same_exception_or_assertion_text": true,
+      "base_error_lines": [
+        "KeyError: 'tokens_24h'"
+      ]
+    },
+    {
+      "failure": "test_groq_requests_header_is_daily",
+      "same_exception_or_assertion_text": true,
+      "base_error_lines": [
+        "KeyError: 'quota'"
+      ]
+    },
+    {
+      "failure": "test_unknown_usage_reserved_until_window_passes",
+      "same_exception_or_assertion_text": true,
+      "base_error_lines": [
+        "assert False"
+      ]
+    }
+  ],
+  "logs_sha256": {
+    "existing-suite.log": "9e134017ced99de82553083314851a28320994a1f189f9a3b2f465ac7429e1e8",
+    "base-regression.log": "8d0e2981432c26b91a69df0537977d0c9eb884babdfb138df8fa2ed57fafa72a"
+  },
+  "limits": [
+    "Only the nine original failures were rerun on clean base, not the entire baseline suite.",
+    "No unrelated code was changed; this identifies preexisting/environment failures, not their fixes."
+  ]
+}

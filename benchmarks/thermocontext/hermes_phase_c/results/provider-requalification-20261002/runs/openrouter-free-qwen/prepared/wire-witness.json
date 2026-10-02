@@ -1,0 +1,12 @@
+{
+  "actual_provider_tokens": null,
+  "context_sha256": "e3a286f8d6ea0c3a2091f8495c9ca3b6b2a56da9c3bc5de122782aa91d271472",
+  "model_consumed_context": null,
+  "occurrences": 1,
+  "pool_sha256": "b168345bedba35d61e62eb9bdb9a33c01e59d79d8abf3065d3ffb625a3d962f4",
+  "request_contains_exact_context": true,
+  "request_origin": "offline_native_serialization_not_transport",
+  "request_sha256": "89c46fa293d56ae15cd2cc392f322f3cc564f4212d808cc43e0df7b7256dabc4",
+  "transmitted": false,
+  "verified_success": null
+}

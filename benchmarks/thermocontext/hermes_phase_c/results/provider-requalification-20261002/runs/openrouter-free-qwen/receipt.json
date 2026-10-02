@@ -1,0 +1,33 @@
+{
+  "answer_parsed": false,
+  "classification": "REAL_PROVIDER_ATTEMPT",
+  "configured_max_output_tokens": 4096,
+  "error_type": null,
+  "estimated_cost_at_token_caps_usd": 0.0,
+  "exact_selected_context_in_forwarded_request": true,
+  "execution_window_wall_ns": 4006049071,
+  "freeze_sha256": "b0cad43250dd11d0bd5d59332dfdba3974e8cc78eaa0459ca2646ab7f5d48d6b",
+  "local_metadata_calls": 1,
+  "outcome": {
+    "problems": [
+      "answer_not_object"
+    ],
+    "verified_success": false
+  },
+  "preparation_wall_ns": 1223881040,
+  "provider_calls": 1,
+  "provider_identity_source": "configured_endpoint_only",
+  "reported_cost": null,
+  "reported_zero_cost": null,
+  "requested_model": "qwen/qwen3.8-27b:free",
+  "requested_provider": "openrouter",
+  "resource_comparison_eligible": false,
+  "returncode": 0,
+  "route_sha256": "2bcaf3bed175afcf350f29416a61b309ef88946249cfde019cab88f22456d8cc",
+  "sampler_enabled": false,
+  "served_model": null,
+  "served_provider": null,
+  "speedup_or_noninferiority_claim": false,
+  "total_wall_ns": 5230086065,
+  "usage": null
+}

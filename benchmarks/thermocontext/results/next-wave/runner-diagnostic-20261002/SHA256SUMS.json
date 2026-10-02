@@ -1,0 +1,16 @@
+{
+  "cohort.json": "4a99122d3a23df347415f97dd96fd27dca153cdfc9b56b1a4336b6e0aa870b13",
+  "graphs/N8-s0--slack.json": "bf2a6ae26deed4b0ecb52062dab32f10b06e2f51d23753f3423431267e7c4fd5",
+  "provenance.json": "9672dbfe1e337a3af27b5688b484bc907ce15722f3f14d3f0059dc962619d7a7",
+  "rows.jsonl": "1cb3e3ae5869f3ce97b5180d0481378cbd30cfdfb7fbf6146f1964e3f4e25ae1",
+  "summary.json": "f258fb4a7d486ef7b8b47496debeabe7bf8888e954ee5881f36c3035a5f365b7",
+  "traces/N8-s0--adaptive--s0.npz": "aed7635c29f7256ec43b24d294cb72bedc483583bb59ae201696a15e9e977ac5",
+  "traces/N8-s0--prototype--s0.npz": "b370fe03ce2fc9565297b251c8e0153bfcebff40c2379ff612dbf8e95233c6f6",
+  "traces/N8-s0--prototype_projected--s0.npz": "1e1c2ae0aa8e28bee175b6a4e073f5958391079a1b4d531407e11002ee63d814",
+  "traces/N8-s0--random_projected--s0.npz": "88f47f6d5aed6b87515895404ea845199fdaa41020a9d6e21b493aa7113f43b3",
+  "traces/N8-s0--slack--s0--auxiliary.npz": "14dc39a5fdde930dca310eba4fc6ad2f18c8356d6fb06acd132bd9a01a8908d6",
+  "traces/N8-s0--slack--s0.npz": "cb0ca9ca40aca05422c1e5575681f6de0e954ffa0aba313cb22f9359cfc0301d",
+  "traces/N8-s0--slack_initial--s0.npz": "a5042a4399b158328722d1a1ef7a376fb2d27e122a3fbbc5ed6e50d70c052c1f",
+  "traces/N8-s0--thrml_projected--s0.npz": "98ac8dc1feb8cce02e2a4e485d9915ff692ec7ce74c62df006e8b971f3ea626c",
+  "traces/N8-s0--thrml_static--s0.npz": "ecd2104194523e7cc6049f16adf41b33e537a4cea07ebfd9aa4b0e4e3df4f89f"
+}

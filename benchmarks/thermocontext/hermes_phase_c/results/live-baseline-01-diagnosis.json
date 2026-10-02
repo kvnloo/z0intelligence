@@ -1,0 +1,44 @@
+{
+  "actual_native_tools": null,
+  "classification": "INVALID_CONTEXT_ADMISSION",
+  "completion_tokens": 1024,
+  "conclusions": [
+    "The exact-context witness correctly failed; the content was a plain string, not a multimodal escaping issue.",
+    "Native spill removed decisive evidence while zero tools prevented recovery.",
+    "This receipt cannot measure semantic efficacy or thermal selection.",
+    "Output also ended with length after spending its completion budget primarily on reasoning; no successful answer exists.",
+    "resource_comparison_eligible in original receipt only checked counters/cost and is insufficient; retain original but annotate semantic comparison invalid."
+  ],
+  "conservative_full_context_request_json_bytes": 19560,
+  "context_prepared_chars": 14338,
+  "counterfactual_request_note": "Offline replacement of native spill preview with unchanged context, not transmitted. Actual next native wire must still pass byte cap and context admission.",
+  "finish_reason": "length",
+  "forwarded_user_chars": 2100,
+  "message_content_type": "str",
+  "native_default_spill": {
+    "head_chars": 500,
+    "max_chars": 10000,
+    "tail_chars": 500
+  },
+  "physical_inference_attempts": 1,
+  "prepared_context_present": false,
+  "reasoning_tokens": 1014,
+  "reported_cost": 0,
+  "run": "live-baseline-01",
+  "served_model": "nvidia/nemotron-3.5-lightning:free",
+  "served_provider": "Nvidia",
+  "smallest_next_experiment": "Qualify context admission offline through the actual native hook including spill. Set an isolated study-only spill max_chars >= unchanged context length while retaining request byte cap. Require exact full context in actual request before forwarding. Keep original task/checker/output budget unchanged for first repaired-admission attempt; consider a separately preregistered reasoning-budget experiment only if complete-context inference still truncates.",
+  "source_id_markers_visible": {
+    "baseline": false,
+    "gates": false,
+    "guarded": false,
+    "input_tokens": false,
+    "limits": false,
+    "output_tokens": true,
+    "source-identity": false,
+    "task_verified_ms": false
+  },
+  "spill_implementation_sha256": "3e2ab6e5f088920065c22549f34d072526aa793246096cef8656d8810f6012a0",
+  "spilled_file_matches_prepared_context": true,
+  "tested_source_visible": false
+}

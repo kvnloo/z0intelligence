@@ -1,0 +1,17 @@
+{
+  "actual_provider_tokens": null,
+  "canonical_original_user_message_unchanged": true,
+  "context_sha256": "de1b5af801b10a3d79b9d8551bd709284dadc87520b3ecb484e317b60bb2612f",
+  "end_byte_in_user_content": 16934,
+  "model_consumed_context": null,
+  "model_visible_context_utf8_bytes": 16096,
+  "model_visible_context_utf8_sha256": "de1b5af801b10a3d79b9d8551bd709284dadc87520b3ecb484e317b60bb2612f",
+  "occurrences": 1,
+  "pool_sha256": "ec625d95c52e95ddc73c5769da32c1a20b94293d2c234fdce26fc0f0846e0afc",
+  "request_contains_exact_context": true,
+  "request_origin": "offline_native_serialization_not_transport",
+  "request_sha256": "b7d1cbbc29278d99d2703544d4305655ae6397c2820ac37471bebd9950cc470a",
+  "start_byte_in_user_content": 838,
+  "transmitted": false,
+  "verified_success": null
+}
