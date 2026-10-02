@@ -9,6 +9,7 @@ CAPABILITIES = (
     "rlm.worker_needed",
     "tool_family_select",
     "retry_or_escalate",
+    "mutation_retry_disposition",
     "context_compress_needed",
     "verification_needed",
 )
@@ -22,4 +23,16 @@ ROSTER_CANDIDATES = (
     "openjev_06b",
     "openjev_4b",
     "local_mb",
+    "julia_1",
+    "llama_http",
 )
+
+#: Dynamic candidates: ``llama_http:<arm>`` for each GGUF arm configured under
+#: ``backends.llama_http.arms`` in ``~/.z0int/config/z0int.json``.
+LLAMA_HTTP_ARM_PREFIX = "llama_http:"
+
+
+def is_roster_candidate(candidate_id: str) -> bool:
+    return candidate_id in ROSTER_CANDIDATES or (
+        candidate_id.startswith(LLAMA_HTTP_ARM_PREFIX) and len(candidate_id) > len(LLAMA_HTTP_ARM_PREFIX)
+    )

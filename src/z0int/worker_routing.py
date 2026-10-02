@@ -19,10 +19,95 @@ HERMES_ROOT = os.environ.get('Z0INT_HERMES_ROOT', '')
 SYSTEM = 'Complete the bounded task using supplied context. Return your answer to the Codex parent. You have no filesystem, shell, or external tools.'
 
 
+def _host_config():
+    try:
+        from . import paths
+        return json.loads((paths.home() / 'config' / 'worker_routing.local.json').read_text())
+    except (OSError, ValueError, ImportError):
+        return {}
+
+
+def _host_overrides():
+    """Per-host endpoint for keyless local providers: ~/.z0int/config/worker_routing.local.json.
+
+    Only providers the manifest marks cohort=local and auth=none may be repointed, so a
+    host file can never redirect a keyed provider (and its credential) to another URL.
+    """
+    return _host_config().get('providers') or {}
+
+
+def _host_local_order(providers):
+    """Host-chosen order for local-only work (e.g. a faster tailnet GPU box before this host's
+    own model). Only keyless local providers are kept, so it can never add a remote fallback."""
+    order = _host_config().get('local_order')
+    if not isinstance(order, list):
+        return None
+    kept = [n for n in order if isinstance(n, str) and (providers.get(n) or {}).get('cohort') == 'local'
+            and (providers.get(n) or {}).get('auth') == 'none']
+    return list(dict.fromkeys(kept)) or None
+
+
+HOST_PROVIDER_NAME = re.compile(r'^[a-z][a-z0-9_-]{0,31}$')
+HOST_PROVIDER_MAX_CAP = 8
+
+
+def _host_local_provider(name, override):
+    """A keyless local provider the manifest does not know (e.g. a tailnet GPU box).
+
+    The host file must declare it cohort=local and auth=none; the result is built from
+    whitelisted keys only, so it never carries a credential reference. Its cap is taken
+    from the override (default 1, clamped to HOST_PROVIDER_MAX_CAP).
+    """
+    if (not HOST_PROVIDER_NAME.match(name) or override.get('cohort') != 'local' or override.get('auth') != 'none'
+            or not isinstance(override.get('base_url'), str) or not override['base_url'].startswith('http')
+            or not isinstance(override.get('worker_default_model'), str) or not isinstance(override.get('models'), list)):
+        return None
+    cap = override.get('cap', 1)
+    cap = min(cap, HOST_PROVIDER_MAX_CAP) if type(cap) is int and cap > 0 else 1
+    return {'cohort': 'local', 'auth': 'none', 'base_url': override['base_url'], 'models': override['models'],
+            'worker_default_model': override['worker_default_model'], 'host_defined': True}, cap
+
+
 def configuration():
     policy = json.loads(POLICY_PATH.read_text())
     providers = policy['providers']
+    for name, override in _host_overrides().items():
+        if not isinstance(override, dict):
+            continue
+        if name not in providers:
+            added = _host_local_provider(name, override)
+            if not added:
+                continue
+            providers[name], cap = added
+            policy.setdefault('provider_caps', {})[name] = cap
+            policy.setdefault('defaults', {})[name] = override['worker_default_model']
+            policy.setdefault('host_local_providers', []).append(name)
+        base = providers.get(name)
+        if not base or base.get('cohort') != 'local' or base.get('auth') != 'none':
+            continue
+        merged = {**base, **{k: v for k, v in override.items() if k in ('base_url', 'models', 'worker_default_model')}}
+        providers[name] = merged
+        if 'worker_default_model' in override and isinstance(policy.get('defaults'), dict):
+            policy['defaults'][name] = override['worker_default_model']
+        # Host-validated $0 routes for local hardware: evidence file must exist and match its sha256.
+        for route in override.get('validated_free_routes') or []:
+            if _local_route_evidenced(name, route):
+                policy.setdefault('validated_free_routes', []).append({**route, 'provider': name})
+    local_order = _host_local_order(providers)
+    if local_order:
+        policy['local_order'] = local_order
     return policy, providers
+
+
+def _local_route_evidenced(provider, route):
+    import hashlib
+    try:
+        path = Path(route['evidence_path']).expanduser()
+        ok = hashlib.sha256(path.read_bytes()).hexdigest() == route['evidence_sha256']
+    except (KeyError, OSError, TypeError):
+        return False
+    return (ok and route.get('validated') is True and route.get('price_usd') == 0
+            and isinstance(route.get('model'), str) and route.get('provider', provider) == provider)
 
 
 def oauth_module():
@@ -105,7 +190,10 @@ def plan_route(task, policy, providers, available_providers=None, function=None)
     rule = next((r for r in policy['rules'] if re.search(r['pattern'], task, re.I)), None)
     category = rule['category'] if rule else 'general'
     if category=='local':
-        primary='local';order=['local']
+        # Host-defined keyless local providers (e.g. a tailnet GPU box) are the offload
+        # tier behind this host's own local model; still no remote fallback.
+        order=policy.get('local_order') or ['local']+list(policy.get('host_local_providers',[]))
+        primary=order[0]
     else:
         family='structured' if function in policy.get('structured_functions',[]) or category=='structured' else 'text'
         order=list(policy.get('function_orders',{}).get(family,policy['fallback_order']))
@@ -176,6 +264,7 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
                'route_source': plan['source'], 'execution_source': 'z0intelligence',
                'policy_revision': policy['policy_revision'], 'policy_sha256': hashlib.sha256(POLICY_PATH.read_bytes()).hexdigest(),
                'category': plan['category'], 'reason': plan['reason'], 'physical_call_attempted': False,
+               'resource_posture': plan.get('resource_posture'),
                'task_sha256': hashlib.sha256(args['task'].encode()).hexdigest(),
                'context_sha256': hashlib.sha256(args.get('context', '').encode()).hexdigest(),
                'usage_source': 'unknown', 'expected_cost': None})
@@ -254,6 +343,24 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
     return {'ok': ok, 'output': output, 'receipt': receipt}
 
 
+def posture_annotate(plan, route_kind='offload'):
+    """Shadow resource posture on a routing decision (z0int.posture). Annotates, never changes the plan,
+    unless ~/.z0int/config/posture.local.json sets posture_enforce: true (default false). Fail-open."""
+    try:
+        from .posture import shadow_annotation
+        ann = shadow_annotation(route_kind)
+    except Exception as exc:
+        ann = {'available': False, 'error': type(exc).__name__, 'enforce': False}
+    plan['resource_posture'] = ann
+    if ann.get('enforce') is True and ann.get('available') and not ann.get('agrees') and route_kind == 'offload':
+        # Enforced BURN: frontier surplus perishes, so hand bounded work back to the parent instead of offloading.
+        plan['skipped'] = plan.get('skipped', []) + [{'provider': c['provider'], 'reason': 'posture_burn_parent_should_absorb'}
+                                                     for c in plan.get('candidates', [])]
+        plan['candidates'] = []
+        ann['enforced'] = True
+    return plan
+
+
 def route_worker(args):
     from .dispatch_authority import run,identity
     request={**args,'harness':args.get('harness','codex'),'function':'cheap_bounded_worker'}
@@ -264,6 +371,7 @@ def route_worker(args):
         policy,providers=configuration()
         plan={**plan_route(args['task'],policy,providers),'source':'z0intelligence.task_rules',
               'harness':request['harness'],'caller_trace_id':request['trace_id']}
+        posture_annotate(plan)
         return execute_plan(args,policy,providers,plan,receipt_sink=sink)
     return run(request,work)
 
@@ -316,7 +424,8 @@ def execute_plan(args, policy, providers, plan, *, receipt_sink, receipt_locatio
             'provider': attempts[-1]['provider'] if attempts else None,
             'model': attempts[-1]['model'] if attempts else None,
             'free_only':free_required(policy,args),'requires_parent':not result['ok'],
-            'refusal_reason':None if result['ok'] else 'No candidate completed; no paid overflow',
+            'refusal_reason':None if result['ok'] else ('Resource posture BURN (enforced): frontier surplus perishes; parent should absorb'
+                                                        if (plan.get('resource_posture') or {}).get('enforced') else 'No candidate completed; no paid overflow'),
             'attempts': attempts, 'receipt_path': receipt_location if receipt_location is not None else str(receipts_path()),
             'latency_ms': (time.monotonic() - started) * 1000,
             'input_tokens': sum(a.get('input_tokens') or 0 for a in attempts),

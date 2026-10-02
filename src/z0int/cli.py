@@ -312,6 +312,27 @@ def build_parser() -> argparse.ArgumentParser:
     dd = data_sub.add_parser("discover", help="Find Hermes/OMP/Codex/export paths")
     _json_flag(dd)
 
+    ao = sub.add_parser("ao", help="Agent Orchestrator integration evidence")
+    ao_sub = ao.add_subparsers(dest="ao_cmd", required=True)
+    aor = ao_sub.add_parser("report", help="Frozen AO shadow promotion evidence")
+    _json_flag(aor)
+    aop = ao_sub.add_parser("pair", help="Register an explicit AO candidate/reference pair")
+    _json_flag(aop)
+    aop.add_argument("--experiment-id", required=True)
+    aop.add_argument("--pair-id", required=True)
+    aop.add_argument("--task-snapshot-id", required=True)
+    aop.add_argument("--candidate-trace-id", required=True)
+    aop.add_argument(
+        "--reference-trace-id",
+        default=None,
+        help="Existing reference receipt; omit to materialize the frozen task snapshot",
+    )
+    aops = ao_sub.add_parser("pairs", help="List registered AO experiment pairs")
+    _json_flag(aops)
+    aoref = ao_sub.add_parser("reference", help="Materialize a frozen counterfactual snapshot as a reference receipt")
+    _json_flag(aoref)
+    aoref.add_argument("task_snapshot_id")
+
     rc = sub.add_parser("receipt", help="Decision receipt spine (trace → outcome → tokens)")
     rc_sub = rc.add_subparsers(dest="receipt_cmd", required=True)
     re = rc_sub.add_parser("emit", help="Append a decision receipt")
@@ -436,6 +457,20 @@ def build_parser() -> argparse.ArgumentParser:
     cxr.add_argument("--no-qmd", action="store_true")
     cxr.add_argument("--allow-memory", action="store_true")
     cxr.add_argument("--input", default=None, help="JSON file with needs[]")
+    cxp = cx_sub.add_parser("packet", help="State Packet v0 — current-work state from git + docs + Claude Code history")
+    cxp.add_argument("--repo", default=None, help="Target repository (default: cwd)")
+    cxp.add_argument("--json", action="store_true", help="Print the full packet JSON (default)")
+    cxp.add_argument("--intent", default="resume", choices=["resume", "status", "plan"])
+    cxp.add_argument("--require", action="append", default=[], help="Required fact key (overrides intent preset)")
+    cxp.add_argument("--projects-root", default=None, help="Claude Code projects dir (default ~/.claude/projects)")
+    cxp.add_argument("--no-cache", action="store_true", help="Rebuild even if source revisions are unchanged")
+    cxp.add_argument("--no-store", action="store_true", help="Do not persist latest packet / history")
+    cxp.add_argument("--render", action="store_true", help="Print SessionStart additionalContext text")
+    cxp.add_argument("--max-tokens", type=int, default=1500)
+    cxp.add_argument("--check", default=None, metavar="PACKET_JSON", help="Validate a saved packet against live sources")
+    cxp.add_argument("--authorize", default=None, metavar="ACTION", help="With --check: gate a transition")
+    cxp.add_argument("--hook", choices=["session-start"], default=None,
+                     help="Emit Claude Code hook JSON (reads hook stdin for cwd); fail-open")
 
 
     osc = sub.add_parser(
@@ -579,6 +614,14 @@ def build_parser() -> argparse.ArgumentParser:
     kerde.add_argument("--output", default=None)
     _json_flag(kerde)
 
+    po = sub.add_parser("posture", help="Resource posture: BURN / BALANCED / OFFLOAD / RESERVE per budget pool")
+    po.add_argument("--now", default=None, help="ISO time to evaluate at (default: now)")
+    po.add_argument("--codexbar", default=None, help="codexbar last.json (default ~/.cache/codexbar-waybar/last.json)")
+    po.add_argument("--config", default=None, help="posture config (default ~/.z0int/config/posture.local.json)")
+    po.add_argument("--no-kerdoios", action="store_true", help="Skip the Kerdoios inventory cache source")
+    po.add_argument("--log", action="store_true", help="Append a snapshot to ~/.z0int/state/posture/history.jsonl")
+    _json_flag(po)
+
     pf = sub.add_parser("preflight", help="z0intelligence production preflight (no Evolution Lab)")
     pf.add_argument("prompt")
     pf.add_argument("--capability-id", default=None)
@@ -590,6 +633,8 @@ def build_parser() -> argparse.ArgumentParser:
         ("aodl", "Bind routines/cascades into AODL strategy docs (→ z0int.aodl)"),
         ("repair", "Counterexample-driven routine repair (→ z0int.refinement)"),
         ("abab", "ABAB experiment archive helpers (→ z0int.abab)"),
+        ("claude-code", "Claude Code launch profiles + prefix-cache residency (→ z0int.claude_code_launch)"),
+        ("hermes", "Hermes shadow DecisionOpportunity records + turn outcomes (→ z0int.hermes_decisions)"),
     ):
         sp = sub.add_parser(name, help=help_txt)
         sp.add_argument(
@@ -734,6 +779,40 @@ def _cmd_backends(args: argparse.Namespace) -> int:
 
 
 
+def _cmd_context_packet(args: argparse.Namespace) -> int:
+    import os
+    from pathlib import Path
+
+    from z0int import state_packet as sp
+
+    if args.hook == "session-start":
+        stdin_text = None if sys.stdin is None or sys.stdin.isatty() else sys.stdin.read()
+        print(json.dumps(sp.session_start_hook(stdin_text, repo=args.repo, max_tokens=args.max_tokens,
+                                               projects_root=args.projects_root), ensure_ascii=False))
+        return 0
+    if args.check:
+        packet = json.loads(Path(args.check).expanduser().read_text(encoding="utf-8"))
+        out = sp.check_packet(packet, args.projects_root)
+        if args.authorize:
+            out["authorization"] = sp.authorize_transition(packet, args.authorize, projects_root=args.projects_root)
+        print(json.dumps(out, indent=2))
+        return 0 if out["valid"] else 3
+    repo = args.repo or os.getcwd()
+    packet = sp.build_state_packet(
+        repo,
+        intent=args.intent,
+        require=tuple(args.require) or None,
+        projects_root=args.projects_root,
+        use_cache=not args.no_cache,
+        store=not args.no_store,
+    )
+    if args.render:
+        print(sp.render_additional_context(packet, max_tokens=args.max_tokens))
+    else:
+        print(json.dumps(packet, indent=2, ensure_ascii=False, default=str))
+    return 0
+
+
 def _cmd_context(args: argparse.Namespace) -> int:
     from z0int.context_resolve import (
         InformationNeed,
@@ -741,6 +820,8 @@ def _cmd_context(args: argparse.Namespace) -> int:
         resolve_context,
     )
 
+    if args.context_cmd == "packet":
+        return _cmd_context_packet(args)
     if args.context_cmd != "resolve":
         print(f"unknown context command: {args.context_cmd}", file=sys.stderr)
         return 2
@@ -862,6 +943,39 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "data":
         if args.data_cmd == "discover":
             return cmd_data_discover(as_json=as_json)
+    if args.cmd == "ao":
+        if args.ao_cmd == "report":
+            from .ao_report import build_ao_promotion_report, format_ao_promotion_report
+
+            report = build_ao_promotion_report()
+            _print(report, as_json=as_json, human=format_ao_promotion_report(report))
+            return 0
+        if args.ao_cmd == "pair":
+            from .ao_experiment import register_pair
+
+            pair = register_pair(
+                experiment_id=args.experiment_id,
+                pair_id=args.pair_id,
+                task_snapshot_id=args.task_snapshot_id,
+                candidate_trace_id=args.candidate_trace_id,
+                reference_trace_id=args.reference_trace_id,
+            )
+            _print(pair, as_json=True)
+            return 0
+        if args.ao_cmd == "pairs":
+            from .ao_experiment import list_pairs
+
+            _print(
+                {"schema": "ao.z0int.experiment_pairs.v1", "pairs": list_pairs()},
+                as_json=True,
+            )
+            return 0
+        if args.ao_cmd == "reference":
+            from .ao_experiment import materialize_reference_snapshot
+
+            result = materialize_reference_snapshot(args.task_snapshot_id)
+            _print(result, as_json=True)
+            return 0
     if args.cmd == "receipt":
         if args.receipt_cmd == "emit":
             return cmd_receipt_emit(args=args)
@@ -1008,6 +1122,18 @@ def main(argv: list[str] | None = None) -> int:
             _print(out, as_json=as_json)
             return 0 if out.get("ok") else 1
 
+    if args.cmd == "posture":
+        from .posture import main as posture_main
+        argv2 = ["--json"] if as_json else []
+        for flag in ("now", "codexbar", "config"):
+            if getattr(args, flag, None):
+                argv2 += [f"--{flag}", getattr(args, flag)]
+        if getattr(args, "no_kerdoios", False):
+            argv2.append("--no-kerdoios")
+        if getattr(args, "log", False):
+            argv2.append("--log")
+        return posture_main(argv2)
+
     if args.cmd == "kerdoios":
         from .kerdoios_export import export_observations
         if args.kerdoios_cmd == "export-observations":
@@ -1042,7 +1168,7 @@ def main(argv: list[str] | None = None) -> int:
         _print(out, as_json=as_json)
         return 0
 
-    if args.cmd in ("routine", "cascade", "aodl", "repair", "abab"):
+    if args.cmd in ("routine", "cascade", "aodl", "repair", "abab", "claude-code", "hermes"):
         rest = list(getattr(args, "module_argv", None) or [])
         # argparse REMAINDER keeps a leading "--" when users write: z0int routine -- compile ...
         if rest and rest[0] == "--":
@@ -1058,6 +1184,10 @@ def main(argv: list[str] | None = None) -> int:
             from .aodl import _main as _mod_main
         elif args.cmd == "repair":
             from .refinement import main as _mod_main
+        elif args.cmd == "claude-code":
+            from .claude_code_launch import _main as _mod_main
+        elif args.cmd == "hermes":
+            from .hermes_decisions import _main as _mod_main
         else:
             from .abab import _main as _mod_main
         return int(_mod_main(rest))

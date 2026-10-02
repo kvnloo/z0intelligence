@@ -1,0 +1,1 @@
+{"id": "fix-bug", "prompt": "The test suite in this directory fails. Fix the bug in the library code (not the tests) so `python -m pytest -q` passes.", "check": ["python3", "-m", "pytest", "-q"], "family": "coding"}

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { route, delivered } from "../../harness-adapters/automatic-client.mjs";
+import { buildIntelligenceRequest } from "../../harness-adapters/governed-client.mjs";
 import { readFileSync } from "node:fs";
 
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
@@ -23,14 +24,15 @@ export default function(pi: ExtensionAPI) {
   if (typeof schema !== "object" || schema === null || Array.isArray(schema)) throw new Error("Invalid canonical tool schema");
   pi.registerTool({
     name: "z0int_route_worker", label: "z0intelligence", loadMode: "essential",
-    description: "Use the shared capability router for bounded delegation and typed decisions. Tiny tasks return PARENT_ONLY. Remote context requires explicit authorization. Stable trace_id permits safe replay; consume and verify returned output. Do not inflate estimates to force delegation.",
+    description: "Use the shared capability router for bounded delegation and typed decisions. With function=cheap_bounded_worker, allow_remote=true, and operator-enabled governed remote mode, the host attaches AODL authority before off-host execution. Tiny tasks otherwise return PARENT_ONLY. Stable trace_id permits safe replay; consume and verify returned output.",
     parameters: schema,
     async execute(_id: string, args: unknown, signal?: AbortSignal) {
       try {
         if (typeof args !== "object" || args === null || Array.isArray(args)) throw new Error("Invalid tool arguments");
-        const response = await fetch((process.env.Z0INT_SERVICE_URL || "http://127.0.0.1:11501") + "/v1/intelligence", {
+        const {path, body} = buildIntelligenceRequest(args as Record<string, unknown>, process.env);
+        const response = await fetch((process.env.Z0INT_SERVICE_URL || "http://127.0.0.1:11501") + path, {
           method: "POST", headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({...args, harness:"omp"}),
+          body: JSON.stringify(body),
           signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000),
         });
         if (!response.ok) throw new Error("HTTP " + response.status);

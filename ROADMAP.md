@@ -562,3 +562,16 @@ The project succeeds when **verified outcomes improve while expensive generic in
 ## Compiler stack status (2026-09-18 integration)
 
 The routine → cascade → ABAB credit → AODL plan → repair loop is **implemented in source** on branch `integrate/z0int-future-stack`. See README “Future compiler stack” for the honesty split (synthetic measured vs not product-validated). Live promotion still requires sealed private cohorts and independent full-cascade credit before traffic.
+
+## Reconciliation — 2026-10-02
+
+The integrated State Packet/DecisionOpportunity, EventLog/OptMem/scoped-memory,
+AODL admission/drift/governed canary, AgentWeb and AO reporting surfaces now
+have a joint offline verification path. This is code integration and structural
+qualification; configured model inference, real canary deployment, causal task
+benefit and mechanism promotion remain separate work. See
+[the complete PR disposition](docs/pr-reconciliation-2026-10-02.md).
+
+The stopped ThermoContext cohort remains an experimental archive (#108).
+Oversized historical source branches #10 and #21 remain salvage references,
+consistent with their owner's recorded instructions.

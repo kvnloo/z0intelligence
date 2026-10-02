@@ -101,7 +101,7 @@ def _probe(python: str) -> tuple[bool, str]:
     return True, f"transformers {tv}"
 
 
-def _resolve_model_dir(*, hf: str, revision: str, model_dir: Path | None = None) -> Path:
+def _resolve_model_dir(*, hf: str, revision: str, model_dir: Path | None = None, local_files_only: bool = False) -> Path:
     """Locate the Julia checkout.
 
     ``Z0INT_JULIA_MODEL_DIR`` lets an operator pin the complete repository
@@ -114,9 +114,15 @@ def _resolve_model_dir(*, hf: str, revision: str, model_dir: Path | None = None)
     override = os.environ.get("Z0INT_JULIA_MODEL_DIR")
     if override:
         return Path(override).expanduser()
+    # scripts/setup-julia.sh's default target: use it when it is a complete checkout.
+    from z0int import paths
+
+    managed = paths.home() / "models" / "julia_1"
+    if managed.is_dir() and not missing_entries(managed):
+        return managed
     from huggingface_hub import snapshot_download
 
-    return Path(snapshot_download(repo_id=hf, revision=revision))
+    return Path(snapshot_download(repo_id=hf, revision=revision, local_files_only=local_files_only))
 
 
 def _required_entries() -> tuple[str, ...]:
@@ -213,13 +219,13 @@ class JuliaBackend:
         )
 
     # -------------------------------------------------------------------- health
-    def _model_path(self) -> Path:
-        return _resolve_model_dir(hf=self.hf, revision=self.revision, model_dir=self._model_dir)
+    def _model_path(self, *, local_files_only: bool = False) -> Path:
+        return _resolve_model_dir(hf=self.hf, revision=self.revision, model_dir=self._model_dir, local_files_only=local_files_only)
 
     def _select_python(self) -> tuple[str, str]:
         if self._python:
             ok, detail = _probe(self._python)
-            return self._python, detail
+            return (self._python if ok else ""), detail
         details = []
         for cand in _candidate_pythons():
             ok, detail = _probe(cand)
@@ -248,16 +254,9 @@ class JuliaBackend:
             "license": "apache-2.0",
             "commercial_use": True,
         }
-        python, detail = self._select_python()
-        diags["python"] = python
-        diags["python_detail"] = detail
-        if not python:
-            return BackendHealth(
-                id=self.ID, configured=True, ready=False, loaded=False,
-                model=self.model_id, detail=f"no usable interpreter: {detail}", diagnostics=diags,
-            )
+        diags["python"] = self._python or ""
         try:
-            path = self._model_path()
+            path = self._model_path(local_files_only=not load)
         except Exception as exc:  # noqa: BLE001
             return BackendHealth(
                 id=self.ID, configured=True, ready=False, loaded=False, model=self.model_id,
@@ -270,6 +269,14 @@ class JuliaBackend:
             return BackendHealth(
                 id=self.ID, configured=True, ready=False, loaded=False, model=self.model_id,
                 detail=f"incomplete Julia checkout, missing {missing}", diagnostics=diags,
+            )
+        python, detail = self._select_python()
+        diags["python"] = python
+        diags["python_detail"] = detail
+        if not python:
+            return BackendHealth(
+                id=self.ID, configured=True, ready=False, loaded=False,
+                model=self.model_id, detail=f"no usable interpreter: {detail}", diagnostics=diags,
             )
         if load:
             try:
@@ -369,6 +376,11 @@ class JuliaBackend:
                 if not out.get("ok", False) and out.get("error"):
                     raise ValueError(f"julia: {out['error']}")
                 return out
+
+    def resident_pids(self) -> list[int]:
+        """Out-of-process memory the bench should attribute to this backend."""
+        w = self._worker
+        return [w.process.pid] if w is not None and w.process.poll() is None else []
 
     def close(self) -> None:
         with self._lock:

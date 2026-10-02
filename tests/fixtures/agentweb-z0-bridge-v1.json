@@ -1,0 +1,53 @@
+{
+  "schema": "agentweb.z0.bridge.fixtures.v1",
+  "cases": [
+    {
+      "name": "shadow_decision_minimal",
+      "request": {
+        "schema": "agentweb.z0.bridge.v1",
+        "operation_id": "fixture-op-1",
+        "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "parent_agent": "agentweb:bbbbbbbbbbbbbbbbbbbbbbbb",
+        "mode": "shadow",
+        "kind": "decide",
+        "capability": "experiment.report_type_v1",
+        "policy": {
+          "allow_remote": false,
+          "free_only": true,
+          "experimental": true,
+          "risk_class": "read",
+          "approval_state": "not_required"
+        },
+        "payload": {
+          "filename": "report.html",
+          "excerpt": "CTR ROAS spend"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "active_external_side_effect_requires_confirmation",
+      "request": {
+        "schema": "agentweb.z0.bridge.v1",
+        "operation_id": "fixture-op-2",
+        "trace_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "parent_agent": "agentweb:dddddddddddddddddddddddd",
+        "mode": "active",
+        "kind": "dispatch",
+        "capability": "social.publish",
+        "policy": {
+          "allow_remote": true,
+          "free_only": true,
+          "experimental": false,
+          "risk_class": "external_side_effect",
+          "approval_state": "required"
+        },
+        "payload": {
+          "draft_id": "draft-1"
+        }
+      },
+      "valid": false,
+      "error": "active external_side_effect dispatch requires confirmed AgentWeb approval"
+    }
+  ]
+}

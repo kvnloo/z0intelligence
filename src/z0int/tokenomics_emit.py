@@ -100,3 +100,47 @@ def measurement_gaps(*, range_spec: str = "7d", limit: int = 24) -> list[dict[st
         return gaps[:limit]
     except Exception:
         return []
+
+
+
+def emit_aodl_admission_once(
+    *,
+    receipt_id: str,
+    caller_trace_id: str | None,
+    session_id: str | None,
+    harness: str | None,
+    admission: dict[str, Any],
+    root: Path | None = None,
+) -> bool:
+    """Record structural-gate latency once; never represents task success."""
+
+    p = events_path(root)
+    if p.exists():
+        with p.open(encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if row.get("schema") == "z0int.aodl_gate_latency.v1" and row.get("trace_id") == receipt_id:
+                    return False
+    row = {
+        "schema": "z0int.aodl_gate_latency.v1",
+        "event_kind": "structural_admission",
+        "trace_id": receipt_id,
+        "caller_trace_id": caller_trace_id,
+        "session_id": session_id,
+        "harness": harness,
+        "allowed": admission.get("allowed") is True,
+        "codes": list(admission.get("codes") or []),
+        "latency_ms": float(admission.get("latency_us") or 0.0) / 1000.0,
+        "aodl_canon_version": admission.get("aodl_canon_version"),
+        "aodl_semantic_fingerprint": admission.get("aodl_semantic_fingerprint"),
+        "aodl_intent_source_hash": admission.get("aodl_intent_source_hash"),
+        "measurement_state": "complete",
+        "measurement_scope": "gate_latency",
+        "task_success": None,
+        "verified_success": None,
+    }
+    emit_raw(row, root=root)
+    return True

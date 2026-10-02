@@ -4,7 +4,8 @@ from unittest.mock import patch
 from z0int import worker_routing as r
 class RoutingTests(unittest.TestCase):
  def setUp(self):
-  self.policy,self.providers=r.configuration();self.policy['free_only']=False
+  with patch.object(r,'_host_overrides',return_value={}): self.policy,self.providers=r.configuration()  # repo policy, not this host's
+  self.policy['free_only']=False
  def plan(self,task):
   with patch.object(r,'available',return_value=True): return r.plan_route(task,self.policy,self.providers)
  def test_task_changes_provider(self):

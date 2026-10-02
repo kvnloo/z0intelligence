@@ -14,16 +14,18 @@ The current repository is much more than the original OpenJev prototype.
 
 | Surface | Current role |
 | --- | --- |
-| Provenance-backed context resolution | Resolves explicit information needs into bounded `ContextPacket` / State Packet-style evidence without becoming another memory database |
+| Provenance-backed context and state | ContextPacket resolver plus source-backed State Packets, question-scoped DecisionOpportunities and explicit invalidation; retrieval is not authority |
 | Capability router | `z0int.intelligence.route(request, snapshot)` chooses only from evidence-backed eligible capabilities; missing evidence returns `PARENT_ONLY` |
 | Dispatch authority | Owns execution identity, replay/conflict protection, canonical receipts, and “do not execute twice when prior execution is uncertain” semantics |
 | Local cognition | Deterministic legal-action compiler + provider-neutral candidate model + risk/quality gates + escalation + shadow cascade |
 | Decision backends | Jev, Laya, OpenJev/direct logits, Decider, legacy NanoJev, Julia-1, plus a separate image-decision protocol |
-| Harness bridges | OMP bridge/runtime plus Hermes/DSH-oriented adapter surfaces and a harness-independent worker-activity projection |
+| Harness bridges | OMP, Hermes, Claude Code, DSH, AgentWeb and Agent Orchestrator seams; experimental routes remain explicitly gated |
 | Compiler stack | Routines, cascades, counterexample repair, ABAB experiment helpers, AODL plan bindings |
 | Evaluation | Backend Pareto harness, RLCDAlignBench-style detector lane, Image JevBench entry, observer/outcome receipts, Decision Dataset v2 |
 | Economics | Measurement-complete Tokenomics emission and provider-usage accounting; incomplete measurements stay explicitly partial |
 | Deployment | Host-owned z0int authority with a hardened Kubernetes `hermes-lab` executor lane |
+| Memory foundations | Append-only EventLog, rebuildable OptMem structural projection, scoped/bitemporal memory contracts; no migration of production stores |
+| AODL admission | Pinned canonical Python structural gate, authority protocol v3, immutable drift observations and opt-in host-governed remote worker |
 | Architecture export | `zer0.repo.yaml` exposes exact-ref subsystem boundaries to z0archy |
 
 The source of truth for the current architectural boundary is [zer0.repo.yaml](zer0.repo.yaml).
@@ -153,15 +155,15 @@ The old README described “bring your history” as if the main missing step we
 
 **raw history is evidence, not current truth; retrieval is not belief; memory is not instruction authority.**
 
-Master already contains provenance-backed context resolution and the existing State Packet / context compiler surfaces. The current memory program is being built additively without replacing the existing stores.
+Master contains the provenance-backed resolver, source-revision-keyed State Packet reducer and question-scoped DecisionOpportunity builder. The current memory program is being built additively without replacing the existing stores.
 
-### Active memory work — not merged into master yet
+### Memory foundations and remaining design work
 
 | Work | Status | Purpose |
 | --- | --- | --- |
-| #67 canonical event ledger | open PR | Append-only canonical event truth, checksums, blobs, replayable index |
-| #69 OptMem temporal projection | open PR, stacked on #67 | Age-decay TREE cover, raw recent tail, exact `zoom()`, hard token budget |
-| #68 lifelong-memory contract v1 | open PR | Stable source identity, hierarchical scopes, bitemporal claims, snapshots, memory-use receipts |
+| #67 canonical event ledger | integrated | Append-only canonical event truth, checksums, blobs, replayable index |
+| #69 OptMem temporal projection | integrated | Age-decay TREE cover, raw recent tail, exact `zoom()`, hard token budget |
+| #68 lifelong-memory contract v1 | integrated | Stable source identity, hierarchical scopes, bitemporal claims, snapshots, memory-use receipts |
 | #63 memory control-plane RFC | open | Defines EventLog → OptMem / FTS5 / AgentsView / TencentDB → StatePacket split |
 | #66 belief/scope/credit RFC | open | Defines the evidence→claim→state→outcome→procedure lifecycle |
 
@@ -225,17 +227,20 @@ See #56 and #59.
 
 Current compiler support lives in `src/z0int/aodl.py` and [docs/aodl-integration.md](docs/aodl-integration.md).
 
-Bend is being evaluated separately in #48 as an **optional proof kernel for pure structural checks**:
+The canonical Python structural gate now lives in [aodl_admission.py](src/z0int/aodl_admission.py).
+Authority protocol v3 persists admission before remote dispatch/provider ownership;
+protocol v2 remains accepted for historical compatibility. Runtime drift is recorded
+without rewriting authored intent or minting task success. The host-governed remote
+worker is an explicitly enabled OMP canary, not a default all-model fabric.
+See [admission](docs/aodl-admission.md), [drift](docs/aodl-observation.md), and
+[governed worker](docs/aodl-governed-worker.md).
 
-~~~text
-AODL contract
-   -> Bend fast structural filter
-   -> canonical validator / fail-closed fallback
-   -> resource placement
-   -> dispatch authority
-~~~
-
-Bend does not replace AODL, the dispatch authority, Tokenomics, Kerdoios, or the harness. It only earns a hot-path role if differential testing shows zero unexplained semantic divergence and a material latency/verification advantage.
+The #48 Bend experiment established differential parity for its stated laws but
+**did not establish a hot-path latency advantage**. Bend remains an independent
+specification/CI verifier. The native [Bend/Hermes plugin](https://github.com/kvnloo/bend-native)
+provides captured proof inputs, private kernels, receipt replay and optional z0
+shadow evidence composition. Its emitted-book PASS is neither source equivalence,
+whole-task success nor an AODL admission grant.
 
 ## Harness integrations
 
@@ -246,12 +251,23 @@ Bend does not replace AODL, the dispatch authority, Tokenomics, Kerdoios, or the
 - **DSH / other harnesses**: harness-neutral identity/activity/context seams are present; cross-harness DecisionOpportunity/credit standardization is tracked in #62.
 - **Kubernetes hermes-lab**: host z0int authority stays outside the cluster while a hardened executor runs behind the service boundary.
 
-### Active labs — not production claims
+### Integrated experimental surfaces — explicit gates remain
 
-- **AgentWeb / Emma** — PR #50: downstream-only first-class harness lab with pure plan, shadow Jev Choice/Noul experiments, bounded context packets, reliability observations, privacy-safe identity, and no authority expansion.
-- **Official TypeSafe SDK** — PR #52: replace the hidden local Jev transport dependency with the official SDK while preserving z0 authorization/receipt semantics.
-- **Agent Orchestrator** — PR #61: shadow `DecisionOpportunity` + outcome bridge with session fencing, replay/conflict protection, and no routing authority.
-- **OMP / Hermes / DSH common cognition records** — #62: one semantic DecisionOpportunity + episode/credit contract across harnesses.
+- **AgentWeb / Emma**: bounded context packets, pure planning, opt-in Choice/Noul experiments,
+  bridge validation/capabilities, provenance, backpressure and separate observational outcome ledgers.
+- **Official TypeSafe SDK**: pinned `typesafe-sdk==0.7.2`, zero SDK retries, served-model
+  validation and usage capture. Missing credentials are a blocker, not live model evidence.
+- **Agent Orchestrator**: shadow decision/outcome bridge, frozen coverage/economics reports,
+  matched comparisons and sidecar experiment-pair registry; no automatic promotion.
+- **Hermes / Claude Code**: source-backed State Packet/DecisionOpportunity shadow hooks and
+  observed-behavior records. Observed behavior is not an optimal-action label.
+- **Memory**: EventLog/OptMem and the scoped memory contract are structural foundations.
+  Existing personal stores are not automatically migrated or granted instruction authority.
+- **Mutation receipts**: a pure disposition kernel distinguishes provider retries from
+  ambiguous world effects; it does not itself retry tools or authorize execution.
+
+For exact source PRs, integrated/retained status, verification and reproducible test setup,
+see [the current reconciliation audit](docs/pr-reconciliation-2026-10-02.md).
 
 ## Experience → outcome → learning
 

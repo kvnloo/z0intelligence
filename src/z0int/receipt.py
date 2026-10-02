@@ -464,6 +464,32 @@ def find_receipt(trace_id: str, *, root: Path | None = None) -> dict[str, Any] |
     return hits[-1] if hits else None
 
 
+def find_receipt_by_extra(
+    key: str,
+    value: Any,
+    *,
+    root: Path | None = None,
+) -> dict[str, Any] | None:
+    """Last receipt whose extra mapping contains an exact opaque correlation value."""
+    if not isinstance(key, str) or not key or value is None:
+        return None
+    hits: list[dict[str, Any]] = []
+    paths_home = paths.home() if root is None else root
+    for path in (
+        receipts_path(root),
+        paths_home / "stream" / "bridge.jsonl",
+        paths_home / "stream" / "raw.jsonl",
+    ):
+        for row in _iter_jsonl(path) or []:
+            rec = row.get("receipt") if isinstance(row.get("receipt"), dict) else row
+            if not isinstance(rec, dict):
+                continue
+            extra = rec.get("extra")
+            if isinstance(extra, dict) and extra.get(key) == value:
+                hits.append(rec)
+    return hits[-1] if hits else None
+
+
 def join_outcome(
     trace_id: str,
     outcome: Outcome | dict[str, Any],

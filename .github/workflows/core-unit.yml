@@ -2,25 +2,10 @@ name: Core unit
 
 on:
   push:
-    paths:
-      - "src/z0int/receipt.py"
-      - "src/z0int/bridge/**"
-      - "src/z0int/tokenomics_emit.py"
-      - "omp-extensions/z0int-bridge/**"
-      - "tests/test_receipt.py"
-      - "tests/test_bridge_worker.py"
-      - "tests/test_tokenomics_emit.py"
-      - ".github/workflows/core-unit.yml"
+    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
   pull_request:
-    paths:
-      - "src/z0int/receipt.py"
-      - "src/z0int/bridge/**"
-      - "src/z0int/tokenomics_emit.py"
-      - "omp-extensions/z0int-bridge/**"
-      - "tests/test_receipt.py"
-      - "tests/test_bridge_worker.py"
-      - "tests/test_tokenomics_emit.py"
-      - ".github/workflows/core-unit.yml"
+    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -29,7 +14,7 @@ jobs:
   core-unit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -37,6 +22,10 @@ jobs:
         run: |
           python -m py_compile \
             src/z0int/receipt.py \
+            src/z0int/ao_bridge.py \
+            src/z0int/memory/event_log.py \
+            src/z0int/memory/optmem_tree.py \
+            src/z0int/intelligence_service.py \
             src/z0int/tokenomics_emit.py \
             src/z0int/bridge/worker.py \
             src/z0int/bridge/runtime.py \
@@ -49,7 +38,10 @@ jobs:
           python -m unittest \
             tests.test_receipt.ReceiptBuild \
             tests.test_receipt.ReceiptClose \
-            tests.test_bridge_worker.BridgeRuntimeTests
+            tests.test_bridge_worker.BridgeRuntimeTests \
+            tests.test_memory_event_log.EventLogTests \
+            tests.test_memory_optmem_tree.OptMemTreeTests \
+            tests.test_ao_bridge.AOBridgeTests
       - name: Tokenomics emitter fallback tests
         env:
           PYTHONPATH: src
@@ -66,3 +58,36 @@ jobs:
           module.test_provider_usage_preserves_explicit_measurement_state()
           module.test_provider_usage_does_not_invent_measurement_state()
           PY
+
+  offline-suite:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.13"]
+    env:
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      Z0INT_HOME: ${{ runner.temp }}/z0int-tests
+      Z0INT_PYTHON: python
+      Z0INT_KERDOIOS_ROOT: ${{ github.workspace }}/.test-deps/kerdoios
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/checkout@v7
+        with:
+          repository: kvnloo/kerdoios
+          ref: cdb43b05a328a50649d5120bffcdecea09492219
+          path: .test-deps/kerdoios
+          persist-credentials: false
+      - name: Install pinned CPU test environment
+        run: |
+          python -m pip install torch==2.10.0+cpu --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e '.[test]' PyYAML
+      - name: Complete offline suite
+        run: python -m pytest -q -m 'not live'
+      - name: Verify published evidence
+        run: |
+          (cd results/raw && sha256sum -c SHA256SUMS)
+          python benchmarks/verify_published.py

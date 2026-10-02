@@ -117,6 +117,22 @@ class JevBoundedToolBackend:
                 ),
             )
 
+        if len(ids) == 1:
+            # A choice question needs >= 2 options; with one legal action there is
+            # nothing to score, and asking would raise. The compiler already decided.
+            return ToolDecision(
+                backend=self._backend_id,
+                model=caps.id,
+                revision=None,
+                selected_action=ids[0],
+                arguments={},
+                confidence=1.0,
+                distribution={ids[0]: 1.0},
+                latency_ms=0.0,
+                abstained=False,
+                candidate_action_count=1,
+                diagnostics={"reason": "single legal action; scorer not consulted"},
+            )
         question = DecisionQuestion(
             id="select_action",
             type="choice",
