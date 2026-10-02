@@ -23,3 +23,14 @@ Key invariants:
 
 The fixture corpus in `tests/fixtures/agentweb-z0-bridge-v1.json` is byte-for-byte aligned
 with the AgentWeb-side seed corpus. Exact-head cross-repo CI must remain green before active promotion.
+
+## Compatibility during reconciliation
+
+This schema/payload dialect is accepted on the existing `/v1/plan`,
+`/v1/intelligence` and experimental decision endpoints. The transport-independent
+RFC dialect in `agentweb_bridge.py` uses `protocol_version` and explicit
+`/v1/agentweb` / `/v1/agentweb/observation` endpoints. Both originated with a v1
+name; their envelopes are **not interchangeable**. Use the endpoint's validator
+and corresponding fixtures. Both dispatch through the same canonical authority;
+neither grants AgentWeb tool or credential authority. Unifying the wire dialects
+requires a versioned client migration, not silently accepting the other shape.

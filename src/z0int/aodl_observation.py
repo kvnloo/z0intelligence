@@ -176,32 +176,35 @@ def record_drift(
         trace_id=trace_id,
         observation=observation,
         source=source,
-        causal_parents=canonical_parents,
+        causal_parents=causal_parents,
     )
     event = projected["event"]
-    prior = _previous(event["eventId"])
-    if prior is not None:
-        extra = prior.get("extra")
-        if not isinstance(extra, dict) or extra.get("event") != event:
-            raise ValueError("observation receipt identity conflict")
-        return {**projected, "receipt": prior, "receipt_replayed": True}
+    from .dispatch_authority import locked
 
-    row = append_receipt(
-        {
-            "trace_id": _receipt_trace(event["eventId"]),
-            "capability_id": "aodl.observation",
-            "prediction": "DRIFT",
-            "action_taken": "record_observation",
-            "route": "observation",
-            "execution": "log_only",
-            "extra": {
-                "status": "recorded",
-                "caller_trace_id": trace_id,
-                "event": event,
-                "aodl_intent_source_hash": projected["aodl_intent_source_hash"],
-                "semantic_fingerprint_before": projected["semantic_fingerprint_before"],
-                "semantic_fingerprint_after": projected["semantic_fingerprint_after"],
-            },
-        }
-    )
-    return {**projected, "receipt": row, "receipt_replayed": False}
+    with locked(_receipt_trace(event["eventId"])):
+        prior = _previous(event["eventId"])
+        if prior is not None:
+            extra = prior.get("extra")
+            if not isinstance(extra, dict) or extra.get("event") != event:
+                raise ValueError("observation receipt identity conflict")
+            return {**projected, "receipt": prior, "receipt_replayed": True}
+
+        row = append_receipt(
+            {
+                "trace_id": _receipt_trace(event["eventId"]),
+                "capability_id": "aodl.observation",
+                "prediction": "DRIFT",
+                "action_taken": "record_observation",
+                "route": "observation",
+                "execution": "log_only",
+                "extra": {
+                    "status": "recorded",
+                    "caller_trace_id": trace_id,
+                    "event": event,
+                    "aodl_intent_source_hash": projected["aodl_intent_source_hash"],
+                    "semantic_fingerprint_before": projected["semantic_fingerprint_before"],
+                    "semantic_fingerprint_after": projected["semantic_fingerprint_after"],
+                },
+            }
+        )
+        return {**projected, "receipt": row, "receipt_replayed": False}

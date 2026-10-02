@@ -6,6 +6,7 @@ import io
 import json
 import os
 import re
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -257,8 +258,9 @@ class StatePacketTests(_Base):
         prs = [{"number": 9, "title": "SYNTHETIC pr", "headRefName": "feat/x", "isDraft": True,
                 "updatedAt": "2026-01-01T00:00:00Z"}]
         script = bindir / "gh"
-        script.write_text("#!/bin/sh\nif [ \"$1\" = issue ]; then echo '%s'; else echo '%s'; fi\n"
-                          % (json.dumps(issues), json.dumps(prs)), encoding="utf-8")
+        script.write_text("#!/bin/sh\nif [ \"$1\" = issue ]; then printf '%s\\n' "
+                          + shlex.quote(json.dumps(issues)) + "; else printf '%s\\n' "
+                          + shlex.quote(json.dumps(prs)) + "; fi\n", encoding="utf-8")
         script.chmod(0o755)
         prev = os.environ["PATH"]
         os.environ["PATH"] = f"{bindir}{os.pathsep}{prev}"

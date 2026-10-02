@@ -53,6 +53,8 @@ class BenchExample:
 
     def dangerous_prediction(self, pred: str) -> bool:
         raw = self.raw or {}
+        if pred in (raw.get("dangerous_labels") or []):
+            return True
         if self.gold == "worker":
             bad = raw.get("dangerous_if_gold_worker") or []
             return pred in bad

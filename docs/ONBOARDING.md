@@ -12,7 +12,7 @@ Do **not** reproduce install steps from memory — run the CLI.
 
 ```bash
 git clone https://github.com/kvnloo/z0intelligence
-cd z0int
+cd z0intelligence
 ./scripts/bootstrap.sh          # creates venv, installs package, runs doctor
 z0int onboard --auto            # resumable; safe to re-run
 z0int status
@@ -110,3 +110,17 @@ python -m z0int status --json
 ```
 
 Network, CUDA wheels, and HF downloads are **out of scope** for the default smoke.
+
+## Current stack and optional activation
+
+Read [the PR reconciliation audit](pr-reconciliation-2026-10-02.md) for current
+master capabilities and reproducible offline verification. State Packets and
+DecisionOpportunities are available through `z0int context packet` and the
+existing harness shadow adapters. Memory modules do not migrate personal stores.
+
+The local intelligence service retains canonical execution/receipt ownership.
+AgentWeb paid shadow decisions, automatic routing, governed remote workers,
+model downloads and model inference each require their existing explicit
+configuration; installing the package is not a production activation.
+Hermes can use the standalone [bend-native plugin](https://github.com/kvnloo/bend-native)
+for native Bend verification and opt-in z0 shadow composition.

@@ -92,8 +92,13 @@ class BenchHarnessTests(unittest.TestCase):
         examples = load_fixtures()
         self.assertGreaterEqual(len(examples), 10)
         caps = {e.capability for e in examples}
+        # Mutation retry has its own cohort; keep the frozen v1 cohort unchanged.
+        mutation = load_fixtures(Path(__file__).resolve().parents[1] /
+                                 'benchmarks/fixtures/mutation-retry-v0/examples.jsonl')
+        all_caps = caps | {e.capability for e in mutation}
         for c in CAPABILITIES:
-            self.assertIn(c, caps)
+            self.assertIn(c, all_caps)
+        self.assertNotIn('mutation_retry_disposition', caps)
 
     def test_score_example_brier(self):
         ex = BenchExample(

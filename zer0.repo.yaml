@@ -198,6 +198,62 @@ architecture:
     - src/z0int/reliability_observation.py
     depends_on:
     - dispatch-authority
+  - id: state-packet
+    name: State Packet
+    kind: context-compiler
+    summary: Compiles provenance-bearing bounded repository and session state; missing or stale facts do not authorize
+      actions.
+    paths:
+    - src/z0int/state_packet.py
+    - tests/test_state_packet.py
+    depends_on:
+    - context-resolution
+  - id: decision-opportunity
+    name: Decision Opportunity
+    kind: decision
+    summary: Projects bounded opportunities from State Packets and records opt-in harness decisions.
+    paths:
+    - src/z0int/decision_opportunity.py
+    - src/z0int/hermes_decisions.py
+    - tests/test_decision_opportunity.py
+    depends_on:
+    - state-packet
+    - dispatch-authority
+  - id: memory-foundation
+    name: Memory Foundation
+    kind: memory
+    summary: Append-only event evidence and deterministic scoped OptMem reductions under the bitemporal memory contract.
+    paths:
+    - src/z0int/memory/
+    - docs/memory-control-plane-contract.md
+    - tests/test_memory_contract.py
+    depends_on:
+    - context-resolution
+  - id: agent-orchestrator
+    name: Agent Orchestrator
+    kind: harness
+    summary: Authority-bound spawn decisions, outcomes and offline reports; activation remains explicit.
+    paths:
+    - src/z0int/ao_bridge.py
+    - src/z0int/ao_experiment.py
+    - src/z0int/ao_report.py
+    - tests/test_ao_bridge.py
+    depends_on:
+    - dispatch-authority
+  - id: aodl-admission
+    name: Aodl Admission
+    kind: authority
+    summary: Canonical Python admission, drift replay and optional governed-worker transport consume the pinned
+      AODL ontology.
+    paths:
+    - src/z0int/aodl_admission.py
+    - src/z0int/aodl_observation.py
+    - src/z0int/aodl_dispatch.py
+    - src/z0int/governed_worker.py
+    - tests/test_aodl_admission.py
+    - tests/test_aodl_observation.py
+    depends_on:
+    - dispatch-authority
   implements_mechanisms:
   - jev-typed-decision
   - unified-memory-evidence-path
@@ -250,6 +306,7 @@ architecture:
     - docs/observer-evaluation.md
     - adapters/hermes-z0int/README.md
     - docs/agentweb-emma-integration.md
+    - docs/pr-reconciliation-2026-10-02.md
     tests:
     - tests/test_context_resolve.py
     - tests/test_intelligence.py
@@ -264,6 +321,7 @@ architecture:
     - tests/test_agentweb_choice_experiment.py
     - tests/test_agentweb_reliability_observation.py
     - tests/test_agentweb_context_packet.py
+    - tests/test_architecture_manifest.py
     schemas:
     - manifests/
     - manifests/capabilities.v1.json

@@ -24,6 +24,7 @@ def test_tiny_and_unknown_stay_parent():
 def test_jev_requires_explicit_remote_and_exact_state(monkeypatch):
     from types import SimpleNamespace
     monkeypatch.setattr(i, "create_backend", lambda name: SimpleNamespace(health=lambda: SimpleNamespace(configured=True)))
+    monkeypatch.setattr(i, "ensure_credential", lambda: "test-only")
     assert route(args(function='evidence_sufficiency'))['kind']=='PARENT_ONLY'
     with pytest.raises(ValueError):route(args(function='evidence_sufficiency',allow_remote=True))
     assert route(args(function='evidence_sufficiency',allow_remote=True,state={'question':'claim','evidence':'text'}))['kind']=='JEV_FUNCTION'

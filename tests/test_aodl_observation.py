@@ -136,3 +136,14 @@ def test_gate_latency_tokenomics_is_one_time_and_non_success():
     assert row["measurement_scope"] == "gate_latency"
     assert row["task_success"] is None
     assert row["verified_success"] is None
+
+
+def test_concurrent_drift_records_one_canonical_receipt():
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        rows = list(pool.map(lambda _: record_drift(document(), trace_id='same-drift',
+                                                   observation={'worker_status': 'failed'}), range(24)))
+    assert sum(not row['receipt_replayed'] for row in rows) == 1
+    receipts = [json.loads(line) for line in receipts_path().read_text().splitlines()]
+    assert len(receipts) == 1
+    assert len({row['receipt']['trace_id'] for row in rows}) == 1
