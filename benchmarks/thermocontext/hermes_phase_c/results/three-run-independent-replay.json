@@ -1,0 +1,214 @@
+{
+  "note": "Original receipts unchanged. Free-router model/provider changes prohibit attributing differences to output cap.",
+  "provider_calls": 0,
+  "runs": [
+    {
+      "comparisons": {
+        "answer_parse": true,
+        "cost": true,
+        "declared_output_cap": true,
+        "exact_context_witness": true,
+        "independent_outcome": true,
+        "local_metadata_count": true,
+        "no_tools": true,
+        "provider_attempt_count": true,
+        "recorded_request_byte_cap": true,
+        "route_and_constraints": true,
+        "saved_answer": true,
+        "served_identity": true,
+        "usage": true,
+        "usage_sum": true
+      },
+      "disposition": [
+        "INVALID_CONTEXT_ADMISSION",
+        "OUTPUT_BUDGET_EXHAUSTED",
+        "NO_VERIFIED_ANSWER"
+      ],
+      "exact_context": false,
+      "exact_driver_snapshot": "live_baseline_01.py",
+      "finish_reason": "length",
+      "historical_eligibility_discrepancy_preserved": true,
+      "http_status": 200,
+      "input_sha256": {
+        "answer.json": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "freeze.json": "ef305bf8ab21b0a9bafc6025964504de03946f01a383be348a236668787ab939",
+        "physical-calls.json": "c33ec4da2a8ce1cf6e2f336fb65aced6cd5a375c6961d16d0d3d55ac95e4e9e2",
+        "prepared/selection.json": "6cf9e2235ec4adc395097f7ad54d4f626e22bc0fd2db02a39eb5edf75646ae07",
+        "prompt.txt": "d6ac8bcb93d8157f5396f81b9c54a038fc38952382b7c92fb1db6bd6eadc72f6",
+        "receipt.json": "c82c4b40c1e1f9f4c56f984be16d84493419d8844f4f7e9d24f8472f03fc7b1f",
+        "worker-result.json": "859954ba879a4f72062782470e2100c0f760abdd364a3bc811af737f896c621e"
+      },
+      "native_wire_bytes_binding": "UNKNOWN_RAW_BYTES_NOT_SAVED; captured parsed request object checked",
+      "new_speedup_or_cap_causality_claim": false,
+      "provider_calls_during_replay": 0,
+      "replay_matches_saved_evidence": true,
+      "reported_usage": {
+        "completion_tokens": 1024,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 1014
+        },
+        "cost": 0,
+        "cost_details": {
+          "upstream_inference_completions_cost": 0,
+          "upstream_inference_cost": 0,
+          "upstream_inference_prompt_cost": 0
+        },
+        "is_byok": false,
+        "prompt_tokens": 1143,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 2167
+      },
+      "reported_zero_cost": true,
+      "resource_comparison_eligible_recomputed": false,
+      "run": "live-baseline-01",
+      "served_model": "nvidia/nemotron-3.5-lightning:free",
+      "served_provider": "Nvidia",
+      "source_bindings": {
+        "checker_source": true,
+        "context_digest": true,
+        "exact_driver_bytes": true,
+        "freeze_digest": true,
+        "prompt_digest": true
+      },
+      "verified_success": false
+    },
+    {
+      "comparisons": {
+        "answer_parse": true,
+        "cost": true,
+        "declared_output_cap": true,
+        "exact_context_witness": true,
+        "independent_outcome": true,
+        "local_metadata_count": true,
+        "no_tools": true,
+        "provider_attempt_count": true,
+        "recorded_request_byte_cap": true,
+        "route_and_constraints": true,
+        "saved_answer": true,
+        "served_identity": true,
+        "usage": true,
+        "usage_sum": true
+      },
+      "disposition": [
+        "OUTPUT_BUDGET_EXHAUSTED",
+        "NO_VERIFIED_ANSWER"
+      ],
+      "exact_context": true,
+      "exact_driver_snapshot": "live_baseline_02.py",
+      "finish_reason": "length",
+      "historical_eligibility_discrepancy_preserved": false,
+      "http_status": 200,
+      "input_sha256": {
+        "answer.json": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "freeze.json": "8028e75bc13b2b866a72ab043546ddd3fc5b49adf1f7c24ff64ea799a1273642",
+        "physical-calls.json": "7a3ed2dfca6a6397b6a84962d5738b3f9ead261f5f830ce00f7e8ff0661ddf57",
+        "prepared/selection.json": "6cf9e2235ec4adc395097f7ad54d4f626e22bc0fd2db02a39eb5edf75646ae07",
+        "prompt.txt": "d6ac8bcb93d8157f5396f81b9c54a038fc38952382b7c92fb1db6bd6eadc72f6",
+        "receipt.json": "e5ae00130b08b1a36919bb8edb5de38dce55165ec808a8c6564ce46bb320e1a0",
+        "worker-result.json": "695a6d5ba8e31f87f5832dd79dc05be4ce1b612c1fb3d2d818d890b873535b2a"
+      },
+      "native_wire_bytes_binding": "UNKNOWN_RAW_BYTES_NOT_SAVED; captured parsed request object checked",
+      "new_speedup_or_cap_causality_claim": false,
+      "provider_calls_during_replay": 0,
+      "replay_matches_saved_evidence": true,
+      "reported_usage": {
+        "completion_tokens": 1024,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 906
+        },
+        "cost": 0,
+        "cost_details": {
+          "upstream_inference_completions_cost": 0,
+          "upstream_inference_cost": 0,
+          "upstream_inference_prompt_cost": 0
+        },
+        "is_byok": false,
+        "prompt_tokens": 7547,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 8571
+      },
+      "reported_zero_cost": true,
+      "resource_comparison_eligible_recomputed": true,
+      "run": "live-baseline-02",
+      "served_model": "apodex/apodex-1.1-mini:free",
+      "served_provider": "Novita",
+      "source_bindings": {
+        "checker_source": true,
+        "context_digest": true,
+        "exact_driver_bytes": true,
+        "freeze_digest": true,
+        "prompt_digest": true
+      },
+      "verified_success": false
+    },
+    {
+      "comparisons": {
+        "answer_parse": true,
+        "cost": true,
+        "declared_output_cap": true,
+        "exact_context_witness": true,
+        "independent_outcome": true,
+        "local_metadata_count": true,
+        "no_tools": true,
+        "provider_attempt_count": true,
+        "recorded_request_byte_cap": true,
+        "route_and_constraints": true,
+        "saved_answer": true,
+        "served_identity": true,
+        "usage": true,
+        "usage_sum": true
+      },
+      "disposition": [
+        "RATE_LIMITED_RESOURCE_ADEQUACY_UNRESOLVED",
+        "USAGE_AND_COST_UNKNOWN",
+        "NO_VERIFIED_ANSWER"
+      ],
+      "exact_context": true,
+      "exact_driver_snapshot": "live_baseline_03.py",
+      "finish_reason": null,
+      "historical_eligibility_discrepancy_preserved": false,
+      "http_status": 429,
+      "input_sha256": {
+        "answer.json": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "freeze.json": "9d2f6eb65d75335983d0b06bd54cf7aaebe546c6d5e2d1d4f03d4544eaa74e61",
+        "physical-calls.json": "32e84b21958c7786c79407fc4cef4e68b135eb3f9bbbbbc787c1c4a054b5fa5b",
+        "prepared/selection.json": "6cf9e2235ec4adc395097f7ad54d4f626e22bc0fd2db02a39eb5edf75646ae07",
+        "prompt.txt": "d6ac8bcb93d8157f5396f81b9c54a038fc38952382b7c92fb1db6bd6eadc72f6",
+        "receipt.json": "54f74787fda079efbd43aa9f75c21bd6f0746e4081f7dae9a00eddcc417659cb",
+        "worker-result.json": "5706a9db4ff1d12e09c3c7eacfcd6e09c2d17e1d1f8313d657df9f4fe11cf80b"
+      },
+      "native_wire_bytes_binding": "UNKNOWN_RAW_BYTES_NOT_SAVED; captured parsed request object checked",
+      "new_speedup_or_cap_causality_claim": false,
+      "provider_calls_during_replay": 0,
+      "replay_matches_saved_evidence": true,
+      "reported_usage": null,
+      "reported_zero_cost": null,
+      "resource_comparison_eligible_recomputed": false,
+      "run": "live-baseline-03-resource4096",
+      "served_model": null,
+      "served_provider": null,
+      "source_bindings": {
+        "checker_source": true,
+        "context_digest": true,
+        "exact_driver_bytes": true,
+        "freeze_digest": true,
+        "prompt_digest": true
+      },
+      "verified_success": false
+    }
+  ]
+}

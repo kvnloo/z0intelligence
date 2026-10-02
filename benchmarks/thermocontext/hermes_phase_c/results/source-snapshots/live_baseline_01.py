@@ -16,7 +16,6 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from selection_boundary import request_context_occurrences
 
 HERE = Path(__file__).resolve().parent
 MODEL = "openrouter/free"
@@ -49,18 +48,8 @@ class BudgetRejected(RuntimeError):
     pass
 
 
-def output_limit(value: int) -> int:
-    if type(value) is not int or not 1 <= value <= 4096:
-        raise BudgetRejected("output cap must be an integer from 1 through 4096")
-    return value
-
-
 class OneRequestPolicy:
-    def __init__(self, *, expected_context: str, max_output_tokens: int = MAX_OUTPUT_TOKENS):
-        if not isinstance(expected_context, str) or not expected_context:
-            raise BudgetRejected("exact expected context is required")
-        self.expected_context = expected_context
-        self.max_output_tokens = output_limit(max_output_tokens)
+    def __init__(self):
         self.used = False
 
     def admit(self, raw: bytes) -> dict:
@@ -69,13 +58,11 @@ class OneRequestPolicy:
         if len(raw) > MAX_REQUEST_BYTES:
             raise BudgetRejected("native serialized request exceeds byte cap")
         body = json.loads(raw)
-        if request_context_occurrences(self.expected_context, body) != 1:
-            raise BudgetRejected("exact frozen context missing, changed or duplicated")
         if body.get("model") != MODEL or body.get("tools") or body.get("stream"):
             raise BudgetRejected("route, zero-tool or nonstreaming contract violated")
         if body.get("models") or body.get("route"):
             raise BudgetRejected("model fallback/routing override is forbidden")
-        if type(body.get("max_tokens")) is not int or not 1 <= body["max_tokens"] <= self.max_output_tokens:
+        if type(body.get("max_tokens")) is not int or not 1 <= body["max_tokens"] <= MAX_OUTPUT_TOKENS:
             raise BudgetRejected("output token limit missing or excessive")
         forwarded = dict(body)
         forwarded["provider"] = {"allow_fallbacks": False, "max_price": {"prompt": 0, "completion": 0}}
@@ -86,14 +73,7 @@ class OneRequestPolicy:
         return forwarded
 
 
-def study_spill_config(context: str) -> dict:
-    """Preserve this bounded frozen addition; all other Hermes profiles stay unchanged."""
-    return {"enabled": True, "max_chars": max(10000, len(context)),
-            "preview_head": 500, "preview_tail": 500}
-
-
 def worker(args: argparse.Namespace) -> None:
-    output_cap = output_limit(getattr(args, "max_output_tokens", MAX_OUTPUT_TOKENS))
     sys.path.insert(0, str(args.hermes_repo))
     from hermes_state import SessionDB
     from hermes_cli.plugins import discover_plugins
@@ -106,7 +86,7 @@ def worker(args: argparse.Namespace) -> None:
         key = args.credential_file.read_text().strip()
         agent = AIAgent(api_key=key, base_url=args.proxy_url,
                         provider="openai-compat", api_mode="chat_completions", model=MODEL,
-                        enabled_toolsets=[], max_iterations=1, max_tokens=output_cap,
+                        enabled_toolsets=[], max_iterations=1, max_tokens=MAX_OUTPUT_TOKENS,
                         quiet_mode=True, skip_context_files=True, skip_memory=True,
                         skip_background_review=True, save_trajectories=False,
                         session_db=db, session_id="thermocontext-claim-baseline",
@@ -122,55 +102,26 @@ def worker(args: argparse.Namespace) -> None:
         db.close()
 
 
-def prepare_inputs(args: argparse.Namespace, prepared_case: dict | None = None) -> tuple:
-    """Keep host checker/case metadata out of the worker's prompt and context."""
-    from replay_bridge import replay, verify_native_sources
-    prepared = args.out / "prepared"
-    if prepared_case is None:
-        replay(HERE / "development_pool.json", HERE / "sources.json", prepared, args.hermes_repo)
-        pool = json.loads((HERE / "development_pool.json").read_text())
-        selection = json.loads((prepared / "selection.json").read_text())
-        prompt = pool["needs"][0]["description"] + "\n\n" + OUTPUT_CONTRACT
-        from baseline_check import grade
-        return selection, prompt, grade, HERE / "baseline_check.py", None
-    if set(prepared_case) != {"selection", "prompt", "checker", "checker_source", "metadata"}:
-        raise ValueError("prepared_case fields must be explicit and complete")
-    selection, prompt = prepared_case["selection"], prepared_case["prompt"]
-    checker, checker_source = prepared_case["checker"], Path(prepared_case["checker_source"])
-    metadata = prepared_case["metadata"]
-    if not callable(checker) or not checker_source.is_file() or not isinstance(metadata, dict):
-        raise ValueError("host checker source and case metadata are required")
-    if not isinstance(prompt, str) or not prompt or not isinstance(selection.get("context"), str):
-        raise ValueError("prepared prompt and context must be explicit strings")
-    if digest(selection["context"].encode()) != selection.get("context_sha256"):
-        raise ValueError("prepared context digest mismatch")
-    verify_native_sources(args.hermes_repo, json.loads((HERE / "sources.json").read_text()))
-    prepared.mkdir()
-    save(prepared / "selection.json", selection)
-    save(prepared / "host-case.json", {"metadata": metadata,
-                                       "checker_sha256": digest(checker_source.read_bytes())})
-    return selection, prompt, checker, checker_source, metadata
-
-
-def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
-    output_cap = output_limit(getattr(args, "max_output_tokens", MAX_OUTPUT_TOKENS))
+def run(args: argparse.Namespace) -> dict:
     overall_started = time.perf_counter_ns()
+    from replay_bridge import replay
     args.out.mkdir(parents=True, exist_ok=False)
-    selection, prompt, grade_answer, checker_source, case_metadata = prepare_inputs(args, prepared_case)
+    prepared = args.out / "prepared"
+    replay(HERE / "development_pool.json", HERE / "sources.json", prepared, args.hermes_repo)
+    pool = json.loads((HERE / "development_pool.json").read_text())
+    selection = json.loads((prepared / "selection.json").read_text())
+    prompt = pool["needs"][0]["description"] + "\n\n" + OUTPUT_CONTRACT
     (args.out / "prompt.txt").write_text(prompt)
     freeze = {"model": MODEL, "endpoint": ENDPOINT, "max_paid_cost_usd": 0,
-              "max_physical_inference_attempts": 1, "max_output_tokens": output_cap,
+              "max_physical_inference_attempts": 1, "max_output_tokens": MAX_OUTPUT_TOKENS,
               "max_serialized_request_bytes": MAX_REQUEST_BYTES, "max_wall_seconds": 120,
               "input_token_cap": {"value": 20000, "enforcement": "post-response eligibility; tokenizer unknown before free-router selection"},
               "prompt_sha256": digest(prompt.encode()), "context_sha256": selection["context_sha256"],
-              "checker_sha256": digest(checker_source.read_bytes()),
+              "checker_sha256": digest((HERE / "baseline_check.py").read_bytes()),
               "driver_sha256": digest(Path(__file__).read_bytes()),
               "native_recorder_sha256": digest((args.hermes_repo / "evals/factory_state/driver.py").read_bytes()),
-              "hook_output_spill": study_spill_config(selection["context"]),
-              "exact_context_required_before_forwarding": True,
               "protected_checker_visible_to_worker_model": False,
-              "cohort": "one_inspected_development_claim" if case_metadata is None else "host_prepared_case",
-              "case_metadata": case_metadata, "sampler_enabled": False,
+              "cohort": "one_inspected_development_claim", "sampler_enabled": False,
               "provider_calls": 0, "execute_requested": args.execute}
     save(args.out / "freeze.json", freeze)
     if not args.execute:
@@ -181,7 +132,7 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
     secret = args.credential_file.read_text().strip()
     if not secret:
         raise ValueError("credential file is empty")
-    policy, lock, calls = OneRequestPolicy(expected_context=selection["context"], max_output_tokens=output_cap), threading.Lock(), []
+    policy, lock, calls = OneRequestPolicy(), threading.Lock(), []
     import httpx
     started = time.perf_counter_ns()
 
@@ -258,7 +209,6 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
     config = json.loads(config_path.read_text())
     config["model"].update(default=MODEL, base_url=f"http://127.0.0.1:{server.server_port}/v1")
     config["agent"] = {"api_max_retries": 1}
-    config["hooks"] = {"output_spill": study_spill_config(selection["context"])}
     save(config_path, config)
     environment = {k: v for k, v in os.environ.items() if k in
                    {"PATH", "HOME", "LANG", "TZ", "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE",
@@ -269,7 +219,6 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
     environment["NO_PROXY"] = ",".join(filter(None, [environment.get("NO_PROXY", ""), "127.0.0.1", "localhost"]))
     command = [sys.executable, str(Path(__file__).resolve()), "--worker", "--hermes-repo", str(args.hermes_repo),
                "--out", str(args.out), "--profile", str(profile), "--prompt", str(args.out / "prompt.txt"),
-               "--max-output-tokens", str(output_cap),
                "--proxy-url", f"http://127.0.0.1:{server.server_port}/v1", "--credential-file", str(args.credential_file)]
     returncode, error_type = None, None
     try:
@@ -285,6 +234,7 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
         server.server_close()
         thread.join(timeout=5)
     save(args.out / "physical-calls.json", calls, secret=secret)
+    from baseline_check import grade
     answer, parsed = None, False
     worker_result_path = args.out / "worker-result.json"
     if worker_result_path.exists():
@@ -294,14 +244,14 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
             parsed = True
         except (ValueError, KeyError, TypeError):
             pass
-    verdict = grade_answer(answer)
+    verdict = grade(answer)
     inferences = [c for c in calls if c["kind"] == "inference"]
     usage = inferences[0].get("usage") if len(inferences) == 1 else None
     cost = usage.get("cost") if isinstance(usage, dict) else None
     input_tokens = usage.get("prompt_tokens") if isinstance(usage, dict) else None
     output_tokens = usage.get("completion_tokens") if isinstance(usage, dict) else None
-    exact_context = bool(inferences) and request_context_occurrences(
-        selection["context"], inferences[0]["forwarded_request"]) == 1
+    exact_context = bool(inferences) and any(selection["context"] in str(m.get("content", ""))
+                                            for m in inferences[0]["forwarded_request"].get("messages", []))
     receipt = {"classification": "REAL_PROVIDER_ATTEMPT", "returncode": returncode,
                "error_type": error_type, "answer_parsed": parsed, "outcome": verdict,
                "provider_calls": len(inferences), "local_metadata_calls": sum(c["kind"] == "local_metadata_non_inference" for c in calls),
@@ -309,9 +259,8 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
                "served_provider": inferences[0].get("served_provider") if inferences else None,
                "usage": usage, "reported_cost": cost,
                "reported_zero_cost": cost == 0 if type(cost) in (int, float) else None,
-               "resource_comparison_eligible": exact_context and type(input_tokens) is int and 0 <= input_tokens <= 20000
-                   and type(output_tokens) is int and 0 <= output_tokens <= output_cap and type(cost) in (int, float) and cost == 0,
-               "configured_max_output_tokens": output_cap,
+               "resource_comparison_eligible": type(input_tokens) is int and 0 <= input_tokens <= 20000
+                   and type(output_tokens) is int and 0 <= output_tokens <= 1024 and type(cost) in (int, float) and cost == 0,
                "exact_selected_context_in_forwarded_request": exact_context,
                "preparation_wall_ns": preparation_wall_ns,
                "execution_window_wall_ns": time.perf_counter_ns() - started,
@@ -329,8 +278,6 @@ if __name__ == "__main__":
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--credential-file", type=Path)
     parser.add_argument("--execute", action="store_true")
-    parser.add_argument("--max-output-tokens", type=int, default=MAX_OUTPUT_TOKENS,
-                        help="Explicit output cap, default 1024, maximum 4096; freeze separately when changed")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--profile", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--prompt", type=Path, help=argparse.SUPPRESS)

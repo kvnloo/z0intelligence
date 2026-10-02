@@ -1,0 +1,50 @@
+{
+  "source_bytes_recovered": true,
+  "files": [
+    {
+      "file": "live_baseline_01.py",
+      "sha256": "284437b00baf4002f0861202cab362cba6a9410e6574437121cc3b62ca88edb6",
+      "bytes": 15828,
+      "source": "git:74af422e51ffab78d8a5521186cf50c9b8f2c042"
+    },
+    {
+      "file": "live_baseline_02.py",
+      "sha256": "eef8549cbf5bc423a75c2106d43db121791bde1b8f665089a0832476064bdaa0",
+      "bytes": 18563,
+      "source": "Exact inverse of separately logged output-cap edit; reconstructed digest matches pre-run freeze"
+    },
+    {
+      "file": "live_baseline_03.py",
+      "sha256": "fed804679d26bf882bc1ccb6f085851919032be8024b5eeebc08b9dc6dcedc5f",
+      "bytes": 19374,
+      "source": "Current source at live-baseline-03-resource4096 freeze"
+    }
+  ],
+  "shared_sources": [
+    {
+      "file": "baseline_check.py",
+      "sha256": "8a1a37449c1f33a0028866b49316f6815aaa74881b35b08768748faf1698343d",
+      "bytes": 1956
+    },
+    {
+      "file": "replay_bridge.py",
+      "sha256": "3b066231185ba34d5346d4def8f9a4b7311c45996b80aa29113743689005bd71",
+      "bytes": 4346
+    },
+    {
+      "file": "replay_bridge_01.py",
+      "sha256": "591497b86aa5a4729af1263ccc9a0106174202cc2fedf96ba32e80bc86018f36",
+      "bytes": 4108
+    },
+    {
+      "file": "selection_boundary.py",
+      "sha256": "4bdffce967ed17ffc2b082c91a38e294a41959d179a4bb4a4499e435fd364790",
+      "bytes": 5894
+    },
+    {
+      "file": "selection_boundary_01.py",
+      "sha256": "c31dda3d32ed5ac77413763b0df216574c04d335a59532c15725e9ee08108c31",
+      "bytes": 5284
+    }
+  ]
+}

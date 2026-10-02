@@ -1,0 +1,27 @@
+{
+  "actual_consumed_completion_tokens": null,
+  "actual_consumed_prompt_tokens": null,
+  "attribution_problems": [
+    "provider_rate_limit_prevented_execution"
+  ],
+  "case_evidence_sha256": {},
+  "case_outcomes": {
+    "complete": null,
+    "missing_source_identity": null
+  },
+  "decision": "NOT_RUN",
+  "decision_boundary": "Retain the deterministic same-ref context implementation. No additional RLM architecture is justified by byte-identical rendering.",
+  "model_necessity_established": false,
+  "pair_freeze_sha256": "cbe9c965515f5209bea338e295fc21c529b06465ca36ab57def6793c8dabf097",
+  "provider_block_sha256": "dc2125b832d06b5043b571dbbf1423333d7a79ab6ad03d4942280a3d80d6c77c",
+  "provider_calls": 0,
+  "replay_is_new_provider_work": false,
+  "retry_authorized": false,
+  "schema": "hermes.context_causal_pair.v1",
+  "scope": "one inspected development pair; semantic evidence-dependence discriminator only",
+  "served_models": [],
+  "served_providers": [],
+  "speedup_or_noninferiority_claim": false,
+  "status": "BLOCKED_PROVIDER_RATE_LIMIT",
+  "thermal_selection_claim": false
+}

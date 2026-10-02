@@ -80,31 +80,18 @@ def materialize(packet: ContextPacket, optional_ids: Sequence[str], *,
             "runtime_authority": False}
 
 
-def request_context_occurrences(context: str, request: dict) -> int:
-    """Count exact user-context text without stringifying multimodal dictionaries."""
-    if not isinstance(context, str) or not context:
-        return 0
-    texts = []
-    for message in request.get("messages", []):
-        if not isinstance(message, dict) or message.get("role") != "user":
-            continue
-        content = message.get("content")
-        if isinstance(content, str):
-            texts.append(content)
-        elif isinstance(content, list):
-            texts.extend(block["text"] for block in content if isinstance(block, dict)
-                         and block.get("type") in {"text", "input_text"}
-                         and isinstance(block.get("text"), str))
-    return sum(text.count(context) for text in texts)
-
-
 def witness(selection: dict, request: dict) -> dict:
     """Record exact request presence separately from real consumption or usefulness.
 
     Pass an observed transport request for real evidence. Locally constructed
     requests only exercise serialization; callers must preserve this distinction.
     """
-    occurrences = request_context_occurrences(selection["context"], request)
+    texts = []
+    for message in request.get("messages", []):
+        content = message.get("content")
+        if message.get("role") == "user" and isinstance(content, str):
+            texts.append(content)
+    occurrences = sum(text.count(selection["context"]) for text in texts)
     return {"pool_sha256": selection["pool_sha256"],
             "context_sha256": selection["context_sha256"],
             "request_sha256": _digest(request),

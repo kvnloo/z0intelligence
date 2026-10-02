@@ -1,0 +1,42 @@
+{
+  "schema": "thermocontext.decision.v1",
+  "decision": "KILL",
+  "scope": "Current frozen synthetic cohort as justification for adding THRML complexity to Hermes",
+  "frozen_implementation_revision": "74af422e51ffab78d8a5521186cf50c9b8f2c042",
+  "results_revision": "103c8223752c07736110f4dfffd9701787661bca",
+  "original_objective_and_verifier_unchanged": true,
+  "real_thrml_executed": true,
+  "audited_new_wave_rows": 3156,
+  "original_reproduction_rows": 432,
+  "scale_stop": {
+    "N": 32,
+    "failing_candidate": "adaptive",
+    "verified": 57,
+    "attempted": 96,
+    "minimum_task_verified_out_of_8": 1,
+    "larger_sizes": {
+      "64": "NOT_RUN",
+      "128": "NOT_RUN"
+    }
+  },
+  "surviving_quality_result": "Host projected THRML, prototype and random controls each attain 96/96 exact verified feasible outputs through N32; no incremental THRML advantage is demonstrated.",
+  "deterministic_frontier": "Component enumeration plus token knapsack reaches the same frozen optimum for all 48 tasks at lower measured CPU experiment overhead. Large connected real-evidence applicability is unproven.",
+  "slack_disposition": "Small-N gate failed; all288 selected packs match initialization-only controls, despite sparse degree and correct ground-state encoding.",
+  "promotion_allowed": false,
+  "hermes_sampler_enabled": false,
+  "tsu_or_z1_speed_or_energy_claim": false,
+  "population_noninferiority_certified": false,
+  "real_consumed_token_savings_established": false,
+  "future_research": "A different real-evidence problem requires a new frozen cohort and independent economic/quality justification. These negative results do not reject thermodynamic computation generally.",
+  "shared_goal_next_step": "Complete the separately frozen real Hermes task and causal-evidence pair when provider capacity permits; retain deterministic context and protected checker. Do not expand the THRML integration from these results.",
+  "inputs_sha256": {
+    "benchmarks/thermocontext/results/next-wave/small-full-20261002/summary.json": "c0fd0b31d099d6cbcc7e3041dc65f07bbcbfc3772458e64f50639640f796ba71",
+    "benchmarks/thermocontext/results/next-wave/scale32-20261002/summary.json": "0b8feae77df4f29db2c602a14f91bfc3de0b16b9e8c33dbecb98ebed354b509b",
+    "benchmarks/thermocontext/results/next-wave/small-full-20261002/independent-audit.json": "361ac8f0e087dd3555c7093457d353e1ccc3b5577f9c9c916b20b79b96ca0965",
+    "benchmarks/thermocontext/results/next-wave/scale32-20261002/independent-audit.json": "73c4ee753e97f3d75846200177ac79cc692ce8a45a8b0499161b66f3d56d1685",
+    "benchmarks/thermocontext/results/next-wave/scale32-20261002/milp-reference-audit.json": "51508d93c79cc6d8dbd679a5736089f8efa8bd89564d239b0ba3366409a6f2fd",
+    "benchmarks/thermocontext/results/next-wave/analysis/small-frozen-gates.json": "ee858e56bca0bccd74d8c374e6e773376809028398e32f7266d2a4b79002d464",
+    "benchmarks/thermocontext/results/next-wave/analysis/scale32-frozen-gates.json": "aef1a78b2084faaadb51fc68e60f1fac1f3677471351531dee34f4ad05e4c337",
+    "benchmarks/thermocontext/next_wave_protocol.json": "235c25f2a94196170aae67bde7716aa47622b8a7471f5f709cbc8756d96638b1"
+  }
+}

@@ -1,6 +1,23 @@
 ThermoContext -> z0 ContextPacket -> native Hermes: Phase-C discriminator
 
-Status: VALIDATED BUT NOT WIRED. Default-off: these scripts are invoked manually;
+Current experimental outcome: PARTIAL. Three real-provider attempts are preserved
+under results/live-baseline-*. No verified model answer was obtained:
+
+  01: context admission failed due native hook spill; output also truncated at
+      1024 tokens. Reported 1143 input + 1024 output tokens, cost zero.
+  02: exact full context admitted; apodex/apodex-1.1-mini:free exhausted the 1024
+      output cap (906 reasoning tokens). Reported 7547 input + 1024 output tokens,
+      cost zero; independent answer checker failed.
+  03: separately frozen 4096 output-cap test; exact context admitted, HTTP 429.
+      No served model, usage, cost or semantic result is known. No retry.
+
+The closed verified real-provider loop remains UNPROVEN. Failed attempts are
+consumed work, not savings. The context admission repair is validated; increasing
+the output cap is unresolved. Source snapshots preserve each executed driver.
+The THRML promotion case was independently killed for the tested synthetic cohort;
+none of these native Hermes attempts enables or measures the sampler.
+
+Bridge conformance: VALIDATED BUT NOT WIRED. Default-off: scripts run manually;
 there is no installed plugin, runtime registration or background job. The bridge
 replay never calls a provider. The separate native baseline makes one real call
 ONLY with --execute and a legitimate credential file. This directory does not
@@ -60,8 +77,8 @@ The native-composition test is explicitly skipped unless HERMES_SOURCE_TREE is s
 
 Repeat with a fresh output directory: selection.json, wire-witness.json and
 receipt.json must match byte-for-byte. Outputs are create-only; no timestamps or
-random IDs affect replay. The committed results/ directory contains one offline
-conformance run and its validation record, not real-provider results.
+random IDs affect replay. The committed results/ directory contains the offline
+conformance run alongside separately labeled real-provider attempts and validation.
 
 Shared goal and smallest next step
 
@@ -114,6 +131,15 @@ evidence. The checker is run by the parent after native Hermes exits and is not
 included in the context. No source-reading tools are enabled for this one-answer
 task: the entire frozen source pool is already supplied to the native hook.
 
+Admission correction: the initial live run exposed native hook spilling at 10,000
+characters. Its 14,338-character addition became a head/tail preview plus an
+inaccessible file pointer in the zero-tool request. That failed receipt is retained
+and cannot support a semantic comparison. This isolated study now sets spill
+max_chars to at least the unchanged frozen addition length. The physical POST
+guard rejects missing, changed or duplicated context BEFORE any upstream attempt.
+The shared exact-context witness reads actual user strings/text blocks. No Hermes
+production default, task, original checker, prompt or output cap changes.
+
 After reviewing the frozen task/checker and provisioning an authorized secret:
 
   PYTHONPATH=src python benchmarks/thermocontext/hermes_phase_c/live_baseline.py \
@@ -123,7 +149,7 @@ After reviewing the frozen task/checker and provisioning an authorized secret:
 The existing native recorder and SDK run through an isolated measurement proxy.
 Only one upstream inference POST is allowed, to OpenRouter's HTTPS endpoint with
 model=openrouter/free, provider allow_fallbacks=false, max_price prompt/completion
-both zero, usage.include=true, max_tokens<=1024 and serialized request <=20,000
+both zero, usage.include=true, max_tokens<=1024 by default and serialized request <=20,000
 bytes. TLS verification and inherited proxy/CA settings remain enabled. Known
 model metadata GETs are answered locally and labeled synthetic non-inference;
 they cannot appear as actual model work. SDK retry/fallback attempts are blocked
@@ -143,3 +169,28 @@ is invalid for attributing a context-selection effect.
 A successful baseline is one verified inspected factual task. It is not causal
 proof the evidence was necessary, non-inferiority, a speedup, or a thermal-selection
 result. Compare these only in the separately frozen next phase.
+
+One separate resource-adequacy experiment may explicitly use
+--max-output-tokens 4096. The default remains 1024, all caps must be integers in
+1..4096, and the configured cap binds proxy admission, native worker, freeze and
+receipt accounting. This changes only the output allowance: prompt, full context,
+checker, free route, one physical attempt, 120-second limit and 20k request-byte
+limit remain fixed. The free router may serve another model/provider, so attaining
+a closed verified loop would not establish a causal benefit from the larger cap.
+The separate causal-control pair retains its frozen 1024 allowance.
+
+Separately frozen controls can reuse the same driver from a parent process:
+
+  run(args, prepared_case={
+      "selection": selection_with_context_and_context_sha256,
+      "prompt": frozen_prompt,
+      "checker": parent_only_checker_callback,
+      "checker_source": path_to_frozen_checker,
+      "metadata": frozen_case_metadata,
+  })
+
+The callback/source stay in the parent; only prompt and context reach the worker.
+The default prepared_case=None preserves the original baseline task. Prepared
+cases cannot override routing, request count, price or output limits. The common
+OneRequestPolicy requires expected_context; all cases share the same admission
+guard instead of copying transport logic. Use a fresh output/profile per case.

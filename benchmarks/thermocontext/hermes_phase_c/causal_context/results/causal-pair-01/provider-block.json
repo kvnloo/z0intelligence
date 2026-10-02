@@ -1,0 +1,12 @@
+{
+  "automatic_retry_authorized": false,
+  "clear_condition": "Root confirms free quota is available before explicitly clearing this block; keep the original two-call protocol and checker frozen.",
+  "model_quality_result": null,
+  "pair_provider_calls": 0,
+  "root_directive": "No further provider execution; preserve prepared pair and wait for available free quota.",
+  "source_physical_calls_sha256": "32e84b21958c7786c79407fc4cef4e68b135eb3f9bbbbbc787c1c4a054b5fa5b",
+  "source_receipt": "/workspace/hermes-factory/reviews/thermocontext-next/hermes/live-baseline-03-resource4096/receipt.json",
+  "source_receipt_sha256": "54f74787fda079efbd43aa9f75c21bd6f0746e4081f7dae9a00eddcc417659cb",
+  "status": "BLOCKED_PROVIDER_RATE_LIMIT",
+  "upstream_status_code": 429
+}

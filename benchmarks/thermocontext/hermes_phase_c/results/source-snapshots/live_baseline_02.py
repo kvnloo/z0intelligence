@@ -49,18 +49,11 @@ class BudgetRejected(RuntimeError):
     pass
 
 
-def output_limit(value: int) -> int:
-    if type(value) is not int or not 1 <= value <= 4096:
-        raise BudgetRejected("output cap must be an integer from 1 through 4096")
-    return value
-
-
 class OneRequestPolicy:
-    def __init__(self, *, expected_context: str, max_output_tokens: int = MAX_OUTPUT_TOKENS):
+    def __init__(self, *, expected_context: str):
         if not isinstance(expected_context, str) or not expected_context:
             raise BudgetRejected("exact expected context is required")
         self.expected_context = expected_context
-        self.max_output_tokens = output_limit(max_output_tokens)
         self.used = False
 
     def admit(self, raw: bytes) -> dict:
@@ -75,7 +68,7 @@ class OneRequestPolicy:
             raise BudgetRejected("route, zero-tool or nonstreaming contract violated")
         if body.get("models") or body.get("route"):
             raise BudgetRejected("model fallback/routing override is forbidden")
-        if type(body.get("max_tokens")) is not int or not 1 <= body["max_tokens"] <= self.max_output_tokens:
+        if type(body.get("max_tokens")) is not int or not 1 <= body["max_tokens"] <= MAX_OUTPUT_TOKENS:
             raise BudgetRejected("output token limit missing or excessive")
         forwarded = dict(body)
         forwarded["provider"] = {"allow_fallbacks": False, "max_price": {"prompt": 0, "completion": 0}}
@@ -93,7 +86,6 @@ def study_spill_config(context: str) -> dict:
 
 
 def worker(args: argparse.Namespace) -> None:
-    output_cap = output_limit(getattr(args, "max_output_tokens", MAX_OUTPUT_TOKENS))
     sys.path.insert(0, str(args.hermes_repo))
     from hermes_state import SessionDB
     from hermes_cli.plugins import discover_plugins
@@ -106,7 +98,7 @@ def worker(args: argparse.Namespace) -> None:
         key = args.credential_file.read_text().strip()
         agent = AIAgent(api_key=key, base_url=args.proxy_url,
                         provider="openai-compat", api_mode="chat_completions", model=MODEL,
-                        enabled_toolsets=[], max_iterations=1, max_tokens=output_cap,
+                        enabled_toolsets=[], max_iterations=1, max_tokens=MAX_OUTPUT_TOKENS,
                         quiet_mode=True, skip_context_files=True, skip_memory=True,
                         skip_background_review=True, save_trajectories=False,
                         session_db=db, session_id="thermocontext-claim-baseline",
@@ -153,13 +145,12 @@ def prepare_inputs(args: argparse.Namespace, prepared_case: dict | None = None) 
 
 
 def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
-    output_cap = output_limit(getattr(args, "max_output_tokens", MAX_OUTPUT_TOKENS))
     overall_started = time.perf_counter_ns()
     args.out.mkdir(parents=True, exist_ok=False)
     selection, prompt, grade_answer, checker_source, case_metadata = prepare_inputs(args, prepared_case)
     (args.out / "prompt.txt").write_text(prompt)
     freeze = {"model": MODEL, "endpoint": ENDPOINT, "max_paid_cost_usd": 0,
-              "max_physical_inference_attempts": 1, "max_output_tokens": output_cap,
+              "max_physical_inference_attempts": 1, "max_output_tokens": MAX_OUTPUT_TOKENS,
               "max_serialized_request_bytes": MAX_REQUEST_BYTES, "max_wall_seconds": 120,
               "input_token_cap": {"value": 20000, "enforcement": "post-response eligibility; tokenizer unknown before free-router selection"},
               "prompt_sha256": digest(prompt.encode()), "context_sha256": selection["context_sha256"],
@@ -181,7 +172,7 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
     secret = args.credential_file.read_text().strip()
     if not secret:
         raise ValueError("credential file is empty")
-    policy, lock, calls = OneRequestPolicy(expected_context=selection["context"], max_output_tokens=output_cap), threading.Lock(), []
+    policy, lock, calls = OneRequestPolicy(expected_context=selection["context"]), threading.Lock(), []
     import httpx
     started = time.perf_counter_ns()
 
@@ -269,7 +260,6 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
     environment["NO_PROXY"] = ",".join(filter(None, [environment.get("NO_PROXY", ""), "127.0.0.1", "localhost"]))
     command = [sys.executable, str(Path(__file__).resolve()), "--worker", "--hermes-repo", str(args.hermes_repo),
                "--out", str(args.out), "--profile", str(profile), "--prompt", str(args.out / "prompt.txt"),
-               "--max-output-tokens", str(output_cap),
                "--proxy-url", f"http://127.0.0.1:{server.server_port}/v1", "--credential-file", str(args.credential_file)]
     returncode, error_type = None, None
     try:
@@ -310,8 +300,7 @@ def run(args: argparse.Namespace, *, prepared_case: dict | None = None) -> dict:
                "usage": usage, "reported_cost": cost,
                "reported_zero_cost": cost == 0 if type(cost) in (int, float) else None,
                "resource_comparison_eligible": exact_context and type(input_tokens) is int and 0 <= input_tokens <= 20000
-                   and type(output_tokens) is int and 0 <= output_tokens <= output_cap and type(cost) in (int, float) and cost == 0,
-               "configured_max_output_tokens": output_cap,
+                   and type(output_tokens) is int and 0 <= output_tokens <= 1024 and type(cost) in (int, float) and cost == 0,
                "exact_selected_context_in_forwarded_request": exact_context,
                "preparation_wall_ns": preparation_wall_ns,
                "execution_window_wall_ns": time.perf_counter_ns() - started,
@@ -329,8 +318,6 @@ if __name__ == "__main__":
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--credential-file", type=Path)
     parser.add_argument("--execute", action="store_true")
-    parser.add_argument("--max-output-tokens", type=int, default=MAX_OUTPUT_TOKENS,
-                        help="Explicit output cap, default 1024, maximum 4096; freeze separately when changed")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--profile", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--prompt", type=Path, help=argparse.SUPPRESS)

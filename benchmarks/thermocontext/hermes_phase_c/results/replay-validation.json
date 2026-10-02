@@ -1,0 +1,13 @@
+{
+  "exact_historical_driver_bytes_recovered": true,
+  "live_receipts_recomputed": 3,
+  "mutation_controls_rejected": {
+    "context_removed": true,
+    "reported_cost": true,
+    "verified_success": true
+  },
+  "original_receipts_modified": false,
+  "provider_calls": 0,
+  "raw_native_wire_digest_status": "UNKNOWN: original driver saved decoded request objects and digest, not the corresponding raw byte sequence.",
+  "replay_source_sha256": "3eeba65e28c7d98be84eb02bbfc1aa008553abfa3ee25846003993d93b98f56d"
+}

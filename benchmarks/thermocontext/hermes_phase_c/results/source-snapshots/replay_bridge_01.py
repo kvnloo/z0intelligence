@@ -18,8 +18,10 @@ def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def verify_native_sources(hermes_repo: Path, manifest: dict) -> str:
-    """Shared source admission for baseline and separately frozen host-owned cases."""
+def replay(pool_path: Path, manifest_path: Path, out: Path, hermes_repo: Path) -> dict:
+    manifest = json.loads(manifest_path.read_text())
+    if sha(pool_path) != manifest["pool_file_sha256"]:
+        raise ValueError("frozen pool hash mismatch")
     hermes_source = hermes_repo / manifest["hermes_source_file"]
     if sha(hermes_source) != manifest["hermes_composition_source_sha256"]:
         raise ValueError("Hermes composition source changed; requalify explicitly")
@@ -30,14 +32,6 @@ def verify_native_sources(hermes_repo: Path, manifest: dict) -> str:
     import z0int.context_resolve as resolver
     if sha(Path(resolver.__file__)) != manifest["context_packet_source_sha256"]:
         raise ValueError("ContextPacket source changed; requalify explicitly")
-    return revision
-
-
-def replay(pool_path: Path, manifest_path: Path, out: Path, hermes_repo: Path) -> dict:
-    manifest = json.loads(manifest_path.read_text())
-    if sha(pool_path) != manifest["pool_file_sha256"]:
-        raise ValueError("frozen pool hash mismatch")
-    revision = verify_native_sources(hermes_repo, manifest)
     raw = json.loads(pool_path.read_text())
     packet = ContextPacket(task_id=raw["task_id"], needs=[InformationNeed(**n) for n in raw["needs"]],
                            evidence=[EvidenceRef(**e) for e in raw["evidence"]],
