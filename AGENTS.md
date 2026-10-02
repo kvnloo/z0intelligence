@@ -59,6 +59,11 @@ Product name **z0intelligence** (stochastic-parrot play; abundance under finite 
 - Primitive: `z0int.context_resolve.resolve_context` — provenance packet, not authorization.
 - Do not flip z0int-bridge `log_only` live without host consumption + verifier.
 - See `docs/critical-path-phase0.md`.
+- State Packet v0 (#22): `z0int context packet --repo PATH [--json|--render|--check FILE [--authorize ACTION]]`;
+  primitive `z0int.state_packet.build_state_packet`. Read-only adapters: git, repo docs, local Claude Code
+  transcripts (opt-in GitHub via `Z0INT_PACKET_GH=1`). Missing required fact => `OBSERVE`; stale packet cannot
+  authorize. SessionStart hook: `python -m z0int.state_packet --hook`. Bench + results: `benchmarks/state_packet/`.
+  Raw conversation text never enters the repo or fixtures.
 
 ## Verified task loop
 

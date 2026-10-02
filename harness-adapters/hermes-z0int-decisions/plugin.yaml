@@ -1,0 +1,12 @@
+name: z0int-decisions
+version: 0.1.0
+manifest_version: 1
+kind: standalone
+description: "z0intelligence shadow decision layer: record DecisionOpportunities for user turns and observed turn outcomes. Never alters a turn."
+license: MIT
+provides_tools: []
+provides_hooks:
+  - pre_llm_call
+  - post_llm_call
+  - on_session_end
+  - pre_approval_request

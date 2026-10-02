@@ -1,0 +1,19 @@
+{
+  "name": "z0intelligence",
+  "description": "z0intelligence harness plugins for Claude Code (measured in z0evals claude-code-savings-v0)",
+  "owner": {
+    "name": "kvnloo"
+  },
+  "plugins": [
+    {
+      "name": "z0intelligence",
+      "source": "./harness-adapters/claude-code-z0intelligence",
+      "description": "z0 harness adapter: usage receipts, State Packet (opt-in), shadow routing, route_worker MCP"
+    },
+    {
+      "name": "z0-obspack",
+      "source": "./harness-adapters/claude-code-z0-obspack",
+      "description": "ObservationPack for long output-heavy sessions (measured -30%)"
+    }
+  ]
+}

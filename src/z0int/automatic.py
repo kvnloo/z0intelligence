@@ -14,7 +14,7 @@ import urllib.request
 from . import paths
 from .receipt import append_receipt, find_receipt, receipts_path
 
-HARNESSES = {'omp', 'hermes', 'dsh', 'agentweb'}
+HARNESSES = {'omp', 'hermes', 'dsh', 'agentweb', 'claude-code'}
 
 
 def evidenced(entry):
@@ -34,7 +34,7 @@ def settings(harness):
     except (OSError, ValueError):
         value = {}
     enabled = value.get('enabled') is True
-    if os.environ.get('Z0INT_AUTO_'+harness.upper()) == '0':
+    if os.environ.get('Z0INT_AUTO_'+harness.upper().replace('-','_')) == '0':
         enabled = False
     # Outbound permission is operator/session configuration, never inferred from prompt text.
     return enabled, os.environ.get('Z0INT_AUTO_ALLOW_REMOTE') == '1'

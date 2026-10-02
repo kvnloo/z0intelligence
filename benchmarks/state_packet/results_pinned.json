@@ -1,0 +1,211 @@
+{
+ "schema": "z0int.state_packet.results.v0",
+ "label": "Lane E pinned held-out 2x2: questions_pinned.json (11 Qs, keys frozen before run) on pinned fixtures + pinned transcripts, GitHub adapter OFF, no raw gh, 2 reps, sonnet low effort",
+ "run_meta": {
+  "stock": {
+   "z0int_revision": "7ec0158",
+   "started_at": "2026-09-30T10:16:51Z",
+   "ended_at": "2026-09-30T10:19:58Z",
+   "drift": {
+    "z0intelligence": [],
+    "z0evals": [],
+    "aodl": []
+   },
+   "github_adapter": false
+  },
+  "lean": {
+   "z0int_revision": "7ec0158",
+   "started_at": "2026-09-30T10:16:51Z",
+   "ended_at": "2026-09-30T10:19:23Z",
+   "drift": {
+    "z0intelligence": [],
+    "z0evals": [],
+    "aodl": []
+   },
+   "github_adapter": false
+  }
+ },
+ "cells": {
+  "stock_raw_tools": {
+   "trials": 22,
+   "correct": "21/22",
+   "abstain_ok": "4/4",
+   "protocol_failures": 0,
+   "errors": 0,
+   "hook_seen": "0/22",
+   "tool_calls_mean": 5.55,
+   "tool_calls_median": 4.5,
+   "tool_result_bytes_mean": 4329,
+   "input_tokens_mean": 184844,
+   "input_tokens_median": 144609.5,
+   "cost_usd_total": 2.186,
+   "cost_usd_median": 0.0999,
+   "latency_s_mean": 13.8,
+   "latency_s_median": 11.8
+  },
+  "stock_packet_tools": {
+   "trials": 22,
+   "correct": "22/22",
+   "abstain_ok": "4/4",
+   "protocol_failures": 0,
+   "errors": 0,
+   "hook_seen": "22/22",
+   "tool_calls_mean": 3.23,
+   "tool_calls_median": 2.0,
+   "tool_result_bytes_mean": 1476,
+   "input_tokens_mean": 132808,
+   "input_tokens_median": 105149.5,
+   "cost_usd_total": 1.815,
+   "cost_usd_median": 0.0896,
+   "latency_s_mean": 10.7,
+   "latency_s_median": 8.4
+  },
+  "lean_raw_tools": {
+   "trials": 22,
+   "correct": "20/22",
+   "abstain_ok": "4/4",
+   "protocol_failures": 0,
+   "errors": 0,
+   "hook_seen": "0/22",
+   "tool_calls_mean": 4.95,
+   "tool_calls_median": 3.5,
+   "tool_result_bytes_mean": 3258,
+   "input_tokens_mean": 115253,
+   "input_tokens_median": 91352.0,
+   "cost_usd_total": 1.063,
+   "cost_usd_median": 0.0369,
+   "latency_s_mean": 11.7,
+   "latency_s_median": 8.5
+  },
+  "lean_packet_tools": {
+   "trials": 22,
+   "correct": "22/22",
+   "abstain_ok": "4/4",
+   "protocol_failures": 0,
+   "errors": 0,
+   "hook_seen": "22/22",
+   "tool_calls_mean": 2.73,
+   "tool_calls_median": 1.5,
+   "tool_result_bytes_mean": 2005,
+   "input_tokens_mean": 85499,
+   "input_tokens_median": 59948.5,
+   "cost_usd_total": 0.861,
+   "cost_usd_median": 0.0332,
+   "latency_s_mean": 8.5,
+   "latency_s_median": 7.0
+  }
+ },
+ "per_question_correct": {
+  "p01-z0int-worktrees": {
+   "stock_raw_tools": "2/2",
+   "stock_packet_tools": "2/2",
+   "lean_raw_tools": "2/2",
+   "lean_packet_tools": "2/2"
+  },
+  "p02-z0int-furthest-ahead": {
+   "stock_raw_tools": "1/2",
+   "stock_packet_tools": "2/2",
+   "lean_raw_tools": "2/2",
+   "lean_packet_tools": "2/2"
+  },
+  "p03-z0int-worktree-upstream": {
+   "stock_raw_tools": "2/2",
+   "stock_packet_tools": "2/2",
+   "lean_raw_tools": "2/2",
+   "lean_packet_tools": "2/2"
+  },
+  "p04-aodl-stash": {
+   "stock_raw_tools": "2/2",
+   "stock_packet_tools": "2/2",
+   "lean_raw_tools": "2/2",
+   "lean_packet_tools": "2/2"
+  },
+  "p05-z0evals-dirty": {
+   "stock_raw_tools": "2/2",
+   "stock_packet_tools": "2/2",
+   "lean_raw_tools": "2/2",
+   "lean_packet_tools": "2/2"
+  },
+  "p06-z0evals-external-worktree": {
+   "stock_raw_tools": "2/2",
+   "stock_packet_tools": "2/2",
+   "lean_raw_tools": "2/2",
+   "lean_packet_tools": "2/2"
+  },
+  "p07-z0int-priority-conflict": {
+   "stock_raw_tools": "2/2",
+   "stock_packet_tools": "2/2",
+   "lean_raw_tools": "2/2",
+   "lean_packet_tools": "2/2"
+  },
+  "p08-z0int-bend-session-file": {
+   "stock_raw_tools": "2/2",
+   "stock_packet_tools": "2/2",
+   "lean_raw_tools": "0/2",
+   "lean_packet_tools": "2/2"
+  },
+  "p09-z0int-session-count": {
+   "stock_raw_tools": "2/2",
+   "stock_packet_tools": "2/2",
+   "lean_raw_tools": "2/2",
+   "lean_packet_tools": "2/2"
+  },
+  "p10-aodl-abstain-session": {
+   "stock_raw_tools": "2/2",
+   "stock_packet_tools": "2/2",
+   "lean_raw_tools": "2/2",
+   "lean_packet_tools": "2/2"
+  },
+  "p11-z0evals-abstain-ci": {
+   "stock_raw_tools": "2/2",
+   "stock_packet_tools": "2/2",
+   "lean_raw_tools": "2/2",
+   "lean_packet_tools": "2/2"
+  }
+ },
+ "factors": {
+  "packet_cost_factor_stock": 0.83,
+  "packet_cost_factor_lean": 0.81,
+  "lean_cost_factor_raw": 0.486,
+  "lean_cost_factor_packet": 0.474,
+  "combined_vs_stock_raw": 0.394,
+  "multiplicative_prediction": 0.404,
+  "packet_input_token_factor_stock": 0.718,
+  "packet_input_token_factor_lean": 0.742
+ },
+ "fixtures": {
+  "z0intelligence": {
+   "head": "24424d1a18a5d8fa2329a97abdd4c1bd6ce2c009",
+   "branch": "feat/claude-code-harness",
+   "linked_worktrees": 4
+  },
+  "aodl": {
+   "head": "ddcea2ed2e62340d9579b802de1c27d0ca301c56",
+   "branch": "ai-native/oss-loop",
+   "linked_worktrees": 1,
+   "synthetic": "1 stash entry"
+  },
+  "z0evals": {
+   "head": "bb8ad2c0bd7dc7c73c2e66bcbf4ede5a2ced62da",
+   "branch": "main",
+   "linked_worktrees": 1,
+   "synthetic": "1 uncommitted README.md edit"
+  },
+  "transcripts": "4 subagent transcripts (cwd inside z0intelligence), paths rewritten to the fixture root; kept under ~/.z0int only"
+ },
+ "freeze": {
+  "questions_commit": "7ec0158",
+  "committed_at": "2026-09-30T10:16:30Z",
+  "runs_started_at": "2026-09-30T10:16:51Z",
+  "note": "questions_pinned.json frozen_at field was hand-written as 10:18Z; the authoritative freeze time is the commit time (10:16:30Z), before both runs."
+ },
+ "verdict": "Lean and packet still compose multiplicatively on pinned held-out data: predicted lean*packet cost factor 0.404 vs observed 0.394 (lean+packet $0.861 vs stock+raw $2.186, -61%). Both factors are weaker than on the dev set (packet ~0.81-0.83 vs 0.70; lean ~0.47-0.49 vs 0.38). Correctness: packet arms 22/22 in both profiles vs raw 21/22 (stock) and 20/22 (lean); abstention 4/4 everywhere. Zero fixture drift.",
+ "caveats": [
+  "n=2 reps x 11 Qs per cell; single run; small correctness gaps (1-2 trials) are not significant",
+  "set is near ceiling for raw tools, so correctness separation is weak; cost is the main signal",
+  "conversation questions (p09 session count, p10 abstain) dominate cost in all cells; packet saves little or costs more there (lean p10: packet $0.118 vs raw $0.091)",
+  "stock profile loads the user's SessionStart hooks/MCP/skills; fixture origin URLs are dead paths so gh-based hooks see nothing live",
+  "stock_raw p02 failure was an abstain after git Bash calls were refused, i.e. a permission artefact rather than a recall error",
+  "the 4 pinned transcripts are the author's own overnight lane sessions; transcript subset is small (7.2MB)"
+ ]
+}

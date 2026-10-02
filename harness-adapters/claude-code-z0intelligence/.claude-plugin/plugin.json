@@ -1,0 +1,7 @@
+{
+  "name": "z0intelligence",
+  "version": "0.1.0",
+  "description": "z0intelligence harness adapter for Claude Code: shadow-first automatic routing on prompt submit, Tokenomics usage receipts on turn end, and the canonical route_worker MCP tool.",
+  "license": "MIT",
+  "author": {"name": "kvnloo"}
+}

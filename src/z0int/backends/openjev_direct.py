@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -30,6 +31,9 @@ class OpenJevDirectBackend:
         self.model_id = model_id
         self.hf = hf
         self.revision = revision
+        from .device import default_device
+
+        self.device = default_device("Z0INT_OPENJEV_DEVICE")
         self._loaded: _Loaded | None = None
 
     @classmethod
@@ -81,7 +85,8 @@ class OpenJevDirectBackend:
             loaded=loaded,
             model=self.model_id,
             detail=detail,
-            diagnostics={"hf": self.hf, "manifest_id": self.model_id, "revision": self.revision},
+            diagnostics={"hf": self.hf, "manifest_id": self.model_id, "revision": self.revision,
+                         "device": self.device},
         )
 
     def _ensure_loaded(self) -> _Loaded:
@@ -91,7 +96,7 @@ class OpenJevDirectBackend:
         from openjev_phase1.direct import score as direct_score
 
         self._direct_score = direct_score
-        model, tokenizer, metadata = load_causal_model(self.hf, self.revision)
+        model, tokenizer, metadata = load_causal_model(self.hf, self.revision, device=self.device)
         self._loaded = _Loaded(model=model, tokenizer=tokenizer, metadata=metadata)
         return self._loaded
 

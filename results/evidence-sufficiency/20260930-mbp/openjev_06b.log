@@ -1,0 +1,10 @@
+Loading weights:   0%|          | 0/311 [00:00<?, ?it/s]Loading weights:  24%|██▍       | 75/311 [00:00<00:00, 660.37it/s]Loading weights:  46%|████▌     | 142/311 [00:00<00:00, 199.12it/s]Loading weights:  57%|█████▋    | 177/311 [00:00<00:00, 156.09it/s]Loading weights:  65%|██████▍   | 201/311 [00:01<00:00, 145.15it/s]Loading weights:  71%|███████   | 220/311 [00:01<00:00, 136.33it/s]Loading weights:  76%|███████▌  | 237/311 [00:01<00:00, 129.26it/s]Loading weights:  81%|████████  | 252/311 [00:01<00:00, 122.38it/s]Loading weights:  85%|████████▌ | 265/311 [00:01<00:00, 115.65it/s]Loading weights:  90%|█████████ | 281/311 [00:01<00:00, 124.49it/s]Loading weights:  95%|█████████▌| 296/311 [00:02<00:00, 119.23it/s]Loading weights: 100%|██████████| 311/311 [00:02<00:00, 149.69it/s]
+a3f18f3a63d45345942b contradicted supported 11.9 s
+f40beba9088c8db8bbd6 supported supported 1.5 s
+0b43ea8e24e74d621f1b supported supported 2.0 s
+942ec65dac0bfb9874f9 insufficient supported 1.9 s
+e0c140e9222d1bce5647 supported supported 1.7 s
+8e8c3804a3c15ebb31e3 contradicted supported 1.7 s
+56c419b12cd37cbe790c contradicted supported 2.4 s
+75b470586834df8c568d insufficient supported 2.5 s
+834f3b3e10cc61b33d25 contradicted supported 2.8 s

@@ -1,0 +1,268 @@
+{
+  "schema": "z0int.backends_bench.analytics.v1",
+  "quality": {
+    "by_capability": {
+      "tool_family_select": {
+        "n": 693,
+        "correct": 208,
+        "accuracy": 0.30014430014430016,
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "mean_brier": 0.9426627303417325,
+        "latency_ms_p50": 5067.826211998181,
+        "latency_ms_p95": 24585.362250400067,
+        "startup_ms_p50": 9082.051231998776
+      }
+    }
+  },
+  "safety": {
+    "by_capability": {
+      "tool_family_select": {
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0
+      }
+    }
+  },
+  "latency": {
+    "decider_2b": {
+      "overall": {
+        "n": 77,
+        "correct": 31,
+        "accuracy": 0.4025974025974026,
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "mean_brier": 0.7859294515818177,
+        "latency_ms_p50": 19519.355311000254,
+        "latency_ms_p95": 29081.853256396433,
+        "startup_ms_p50": 8536.33677099424
+      },
+      "by_capability": {
+        "tool_family_select": {
+          "n": 77,
+          "correct": 31,
+          "accuracy": 0.4025974025974026,
+          "dangerous_false_count": 0,
+          "dangerous_false_rate": 0.0,
+          "mean_brier": 0.7859294515818177,
+          "latency_ms_p50": 19519.355311000254,
+          "latency_ms_p95": 29081.853256396433,
+          "startup_ms_p50": 8536.33677099424
+        }
+      }
+    },
+    "julia_1": {
+      "overall": {
+        "n": 77,
+        "correct": 8,
+        "accuracy": 0.1038961038961039,
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "mean_brier": 1.547937411587832,
+        "latency_ms_p50": 953.4032899973681,
+        "latency_ms_p95": 1541.5761803975329,
+        "startup_ms_p50": 66389.72240099974
+      },
+      "by_capability": {
+        "tool_family_select": {
+          "n": 77,
+          "correct": 8,
+          "accuracy": 0.1038961038961039,
+          "dangerous_false_count": 0,
+          "dangerous_false_rate": 0.0,
+          "mean_brier": 1.547937411587832,
+          "latency_ms_p50": 953.4032899973681,
+          "latency_ms_p95": 1541.5761803975329,
+          "startup_ms_p50": 66389.72240099974
+        }
+      }
+    },
+    "laya_421m": {
+      "overall": {
+        "n": 77,
+        "correct": 15,
+        "accuracy": 0.19480519480519481,
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "mean_brier": 1.0080131963428205,
+        "latency_ms_p50": 6234.562204997928,
+        "latency_ms_p95": 8383.705539803486,
+        "startup_ms_p50": 60426.90959399624
+      },
+      "by_capability": {
+        "tool_family_select": {
+          "n": 77,
+          "correct": 15,
+          "accuracy": 0.19480519480519481,
+          "dangerous_false_count": 0,
+          "dangerous_false_rate": 0.0,
+          "mean_brier": 1.0080131963428205,
+          "latency_ms_p50": 6234.562204997928,
+          "latency_ms_p95": 8383.705539803486,
+          "startup_ms_p50": 60426.90959399624
+        }
+      }
+    },
+    "llama_http:functiongemma_270m_q8": {
+      "overall": {
+        "n": 77,
+        "correct": 0,
+        "accuracy": 0.0,
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "mean_brier": 1.1373870599457405,
+        "latency_ms_p50": 629.2374969998491,
+        "latency_ms_p95": 737.6298675982981,
+        "startup_ms_p50": 4583.646163999219
+      },
+      "by_capability": {
+        "tool_family_select": {
+          "n": 77,
+          "correct": 0,
+          "accuracy": 0.0,
+          "dangerous_false_count": 0,
+          "dangerous_false_rate": 0.0,
+          "mean_brier": 1.1373870599457405,
+          "latency_ms_p50": 629.2374969998491,
+          "latency_ms_p95": 737.6298675982981,
+          "startup_ms_p50": 4583.646163999219
+        }
+      }
+    },
+    "llama_http:hammer21_15b_q4": {
+      "overall": {
+        "n": 77,
+        "correct": 36,
+        "accuracy": 0.4675324675324675,
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "mean_brier": 0.7557287031144552,
+        "latency_ms_p50": 4685.756614002457,
+        "latency_ms_p95": 5437.945960994693,
+        "startup_ms_p50": 13266.98369699443
+      },
+      "by_capability": {
+        "tool_family_select": {
+          "n": 77,
+          "correct": 36,
+          "accuracy": 0.4675324675324675,
+          "dangerous_false_count": 0,
+          "dangerous_false_rate": 0.0,
+          "mean_brier": 0.7557287031144552,
+          "latency_ms_p50": 4685.756614002457,
+          "latency_ms_p95": 5437.945960994693,
+          "startup_ms_p50": 13266.98369699443
+        }
+      }
+    },
+    "llama_http:qwen3_06b_q8": {
+      "overall": {
+        "n": 77,
+        "correct": 28,
+        "accuracy": 0.36363636363636365,
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "mean_brier": 0.8922147847938784,
+        "latency_ms_p50": 1152.5687180037494,
+        "latency_ms_p95": 1359.6248039975762,
+        "startup_ms_p50": 7066.681845004496
+      },
+      "by_capability": {
+        "tool_family_select": {
+          "n": 77,
+          "correct": 28,
+          "accuracy": 0.36363636363636365,
+          "dangerous_false_count": 0,
+          "dangerous_false_rate": 0.0,
+          "mean_brier": 0.8922147847938784,
+          "latency_ms_p50": 1152.5687180037494,
+          "latency_ms_p95": 1359.6248039975762,
+          "startup_ms_p50": 7066.681845004496
+        }
+      }
+    },
+    "llama_http:qwen3_17b_q4": {
+      "overall": {
+        "n": 77,
+        "correct": 44,
+        "accuracy": 0.5714285714285714,
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "mean_brier": 0.6655112079151118,
+        "latency_ms_p50": 5067.826211998181,
+        "latency_ms_p95": 9113.11851480423,
+        "startup_ms_p50": 9082.051231998776
+      },
+      "by_capability": {
+        "tool_family_select": {
+          "n": 77,
+          "correct": 44,
+          "accuracy": 0.5714285714285714,
+          "dangerous_false_count": 0,
+          "dangerous_false_rate": 0.0,
+          "mean_brier": 0.6655112079151118,
+          "latency_ms_p50": 5067.826211998181,
+          "latency_ms_p95": 9113.11851480423,
+          "startup_ms_p50": 9082.051231998776
+        }
+      }
+    },
+    "nanojev_06b": {
+      "overall": {
+        "n": 77,
+        "correct": 14,
+        "accuracy": 0.18181818181818182,
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "mean_brier": 0.8396436021470031,
+        "latency_ms_p50": 19652.289826000924,
+        "latency_ms_p95": 36472.149590002664,
+        "startup_ms_p50": 35184.94464799733
+      },
+      "by_capability": {
+        "tool_family_select": {
+          "n": 77,
+          "correct": 14,
+          "accuracy": 0.18181818181818182,
+          "dangerous_false_count": 0,
+          "dangerous_false_rate": 0.0,
+          "mean_brier": 0.8396436021470031,
+          "latency_ms_p50": 19652.289826000924,
+          "latency_ms_p95": 36472.149590002664,
+          "startup_ms_p50": 35184.94464799733
+        }
+      }
+    },
+    "openjev_06b": {
+      "overall": {
+        "n": 77,
+        "correct": 32,
+        "accuracy": 0.4155844155844156,
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "mean_brier": 0.8515991556469334,
+        "latency_ms_p50": 6582.700762999593,
+        "latency_ms_p95": 13705.161822201628,
+        "startup_ms_p50": 6120.521773998917
+      },
+      "by_capability": {
+        "tool_family_select": {
+          "n": 77,
+          "correct": 32,
+          "accuracy": 0.4155844155844156,
+          "dangerous_false_count": 0,
+          "dangerous_false_rate": 0.0,
+          "mean_brier": 0.8515991556469334,
+          "latency_ms_p50": 6582.700762999593,
+          "latency_ms_p95": 13705.161822201628,
+          "startup_ms_p50": 6120.521773998917
+        }
+      }
+    }
+  },
+  "reliability": {
+    "rows_total": 693,
+    "rows_ok": 693,
+    "rows_unavailable": 0,
+    "rows_error": 0
+  }
+}
