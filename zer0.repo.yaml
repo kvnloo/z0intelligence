@@ -3,6 +3,7 @@ repo: kvnloo/z0intelligence
 id: z0intelligence
 component: z0intelligence
 kind: component
+<<<<<<< HEAD
 summary: Provenance-backed cognition and control plane for resolving evidence, compiling legal state/action spaces, routing among evidence-eligible capabilities, enforcing dispatch authority, and emitting auditable decisions and outcomes.
 
 architecture:
@@ -199,3 +200,73 @@ architecture:
       - tests/test_tokenomics_emit.py
     schemas:
       - manifests/
+=======
+summary: >
+  z0intelligence decision/routing authority with an experimental AgentWeb harness and
+  side-effect-free shadow planning surface on this exact ref.
+architecture:
+  subsystems:
+    - id: dispatch-authority
+      name: Canonical dispatch and receipt authority
+      kind: authority
+      paths:
+        - src/z0int/dispatch_authority.py
+        - src/z0int/intelligence.py
+        - src/z0int/receipt.py
+    - id: agentweb-shadow-planner
+      name: AgentWeb shadow planner
+      kind: integration
+      paths:
+        - src/z0int/automatic.py
+        - src/z0int/intelligence_service.py
+      depends_on:
+        - dispatch-authority
+    - id: agentweb-choice-experiments
+      name: AgentWeb bounded decision experiment lane
+      kind: experimental-decision
+      paths:
+        - src/z0int/decision_experiment.py
+        - src/z0int/functions/jev.py
+      depends_on:
+        - dispatch-authority
+    - id: agentweb-context-packet
+      name: AgentWeb preselected-evidence ContextPacket compiler
+      kind: context-compiler
+      paths:
+        - src/z0int/agentweb_context_packet.py
+        - src/z0int/context_resolve.py
+      depends_on:
+        - dispatch-authority
+    - id: agentweb-reliability-observations
+      name: AgentWeb reliability observation ingest
+      kind: evidence-ingest
+      paths:
+        - src/z0int/reliability_observation.py
+      depends_on:
+        - dispatch-authority
+  implements_mechanisms:
+    - jev-typed-decision
+  provides_interfaces:
+    - z0int.decision_receipt.v1
+  produces_representations:
+    - decision-receipt
+  consumes_representations:
+    - compiled-decision-state
+  boundaries:
+    owns:
+      - z0 routing, idempotency, request fingerprinting, dispatch claims, and decision receipts.
+      - Remote-context and specialist eligibility policy.
+    not_here:
+      - AgentWeb user identity or account authorization.
+      - AgentWeb confirmation, evaluation-workspace, funding, scheduling, or publish policy.
+  evidence:
+    docs:
+      - docs/agentweb-emma-integration.md
+    tests:
+      - tests/test_agentweb_integration.py
+      - tests/test_agentweb_choice_experiment.py
+      - tests/test_agentweb_reliability_observation.py
+      - tests/test_agentweb_context_packet.py
+    schemas:
+      - manifests/capabilities.v1.json
+>>>>>>> origin/pr/103

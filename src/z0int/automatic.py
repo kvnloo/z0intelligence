@@ -14,7 +14,7 @@ import urllib.request
 from . import paths
 from .receipt import append_receipt, find_receipt, receipts_path
 
-HARNESSES = {'omp', 'hermes', 'dsh'}
+HARNESSES = {'omp', 'hermes', 'dsh', 'agentweb'}
 
 
 def evidenced(entry):
@@ -47,8 +47,11 @@ def normalize(event):
         if not isinstance(event.get(name), str) or not event[name].strip():
             raise ValueError('Missing '+name)
     task = event['text']
-    request = dict(harness=event['harness'], parent_agent=event['session_id'],
-        trace_id=hashlib.sha256((event['session_id']+'\0'+event['turn_id']).encode()).hexdigest(),
+    parent_agent = event['session_id']
+    if event['harness'] == 'agentweb':
+        parent_agent = 'agentweb:' + hashlib.sha256(parent_agent.encode()).hexdigest()[:24]
+    request = dict(harness=event['harness'], parent_agent=parent_agent,
+        trace_id=hashlib.sha256((parent_agent+'\0'+event['turn_id']).encode()).hexdigest(),
         integration_instance=event['instance_id'], automatic=True,
         task=task, function='native_turn', allow_remote=event.get('allow_remote') is True)
     # A lossless structured task contract, not an LLM intent guess.
