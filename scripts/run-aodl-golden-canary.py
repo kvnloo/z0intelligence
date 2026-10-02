@@ -135,8 +135,25 @@ def main() -> int:
     )
 
     proof = json.loads(golden.read_text(encoding="utf-8"))
-    if not proof.get("structural_execution_complete") or not proof.get("verified_outcome_complete"):
-        raise RuntimeError("golden trace did not satisfy the full synthetic canary")
+    # A complete gold outcome can be a verified failure. Only this fixture's
+    # positive verifier outcome permits the success claim in bundle.json.
+    stages = proof.get("stages") or {}
+    verified = stages.get("verified_outcome") or {}
+    outcome = verified.get("outcome") or {}
+    physical_id = (stages.get("physical_execution") or {}).get("receipt_id")
+    if not (
+        proof.get("structural_execution_complete") is True
+        and proof.get("verified_outcome_complete") is True
+        and proof.get("root_trace_id") == "remote-public-proof"
+        and verified.get("present") is True
+        and verified.get("outcome_tier") == "gold"
+        and isinstance(physical_id, str) and bool(physical_id)
+        and verified.get("trace_id") == physical_id
+        and outcome.get("verified_success") is True
+        and outcome.get("verified") is True
+        and outcome.get("verification_source") == "exact_string_CANONICAL_OK"
+    ):
+        raise RuntimeError("golden trace did not verify the exact CANONICAL_OK canary")
 
     # Copy only small, human-reviewable summaries to the bundle root. Raw
     # receipts remain under raw/ and are never implicitly committed anywhere.
