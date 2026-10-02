@@ -1,0 +1,22 @@
+{
+  "schema": "hermes.claim_contract_prompt_study.v2",
+  "study_id": "hermes-source-claim-contract-v2",
+  "scope": "Inspected development contract clarification; source-grounded claim reconciliation, not actual-world experiment verification",
+  "mutation_axis": "Prompt contract only, including explicit tested-declaration and independent scope-field semantics",
+  "predecessor": "verified_context_cohort v1; preserve all five semantic failures and all consumed work",
+  "base_implementation_revision": "a49face9fa9d518ae9dac281e121e3963cf4a9d2",
+  "case_order": ["full-complete", "minimal-complete", "full-missing_source_identity", "minimal-missing_source_identity", "minimal-contradictory_source_identity"],
+  "max_physical_posts_total": 5,
+  "max_physical_posts_per_case": 1,
+  "max_output_tokens": 4096,
+  "max_serialized_request_bytes": 20000,
+  "max_wall_seconds_per_case": 120,
+  "automatic_retries": false,
+  "fallbacks": false,
+  "unchanged": ["Exact five ContextPacket contexts", "Original independent checker and visibility wrapper", "Native live_baseline driver", "Model, route, JSON-object format and caps", "Entire system boilerplate", "No new network client"],
+  "execution_resource": "Reuse predecessor cwd and its now-absent staging/profile path with fresh state; move completed artifacts into the new study output",
+  "first_forward_guard": "Seed new native-wire template from predecessor template by replacing only the exact prompt text; pin it before inference; no baseline-template fallback",
+  "freeze": "Bind all predecessor artifacts and source hashes plus the new prompt, adapter and protocol before root execution",
+  "interpretation": "A new contract, not a rescue or regrading of the predecessor. Do not pool outcomes across studies. Backend provider identity may remain unknown.",
+  "no_claims": ["Actual-world rerun verification", "Population certification", "Holdout performance", "Backend causal attribution", "Hermes speedup", "Model necessity"]
+}
