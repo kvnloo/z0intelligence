@@ -170,7 +170,8 @@ def test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview(t
     assert rows['t3']['verification_state'] == 'verified_success'
     assert next(s for s in rows['t4']['signals'] if s['kind'] == 'pr_merged')['merged_by_agent']
     assert rows['t4']['verification_state'] == 'unverified'
-    assert rows['t5']['verification_state'] == 'contested'
+    # t5: the passing rerun vs the correction cue; without exit evidence for a pass only the correction is left
+    assert rows['t5']['verification_state'] == ('contested' if polarity == 'both' else 'verified_failure')
     assert next(s for s in rows['t5']['signals'] if s['kind'] == 'user_correction')['cues'] == ['undo', 'thats_wrong']
     blob = json.dumps(report['rows'])
     assert 'parser' not in blob and 'undo it' not in blob and 'pytest' not in blob
