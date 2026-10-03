@@ -299,7 +299,10 @@ export function buildShadowPayload(event: ToolCallLike, toolNames: string[]): Js
 		op: "cognition_shadow",
 		trace_id: randomUUID().replaceAll("-", ""),
 		session_id: process.env.OMP_SESSION_ID ?? null,
+		// The bounded tool input goes to the served-only local shadow model as its question; the receipt
+		// (cognition/shadow.py) persists the structured actual_tool below and never this state text.
 		state: `OMP tool_call: ${toolName}\ninput: ${safeJson(input).slice(0, MAX_STATE_CHARS)}`,
+		actual_tool: { name: toolName, risk_class: riskFor(toolName) },
 		actions: buildActions(toolNames),
 		granted_capabilities: toolNames,
 		authority: authorityList(),

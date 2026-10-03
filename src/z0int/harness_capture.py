@@ -264,8 +264,9 @@ def begin_turn(harness: str, payload: Mapping[str, Any], *, env: Mapping[str, st
 
     A user message opens the session's next work item (an ordinal persisted per session, so every hook
     process agrees); a payload ``retry: true`` keeps the work item and counts one more attempt. A
-    harness-injected prompt gets cohort ``harness`` and a work item of its own. A repeated hook for the same
-    turn changes nothing here; its duplicate row is caught when it is appended.
+    harness-injected prompt gets cohort ``harness`` and a work item of its own. A prompt in a subagent's own
+    session (a bridge payload naming ``parent_id`` or ``agent_kind: sub``) is cohort ``agent``. A repeated hook
+    for the same turn changes nothing here; its duplicate row is caught when it is appended.
     """
     if not supported(harness, root):
         return None
@@ -281,8 +282,9 @@ def begin_turn(harness: str, payload: Mapping[str, Any], *, env: Mapping[str, st
             if not (payload.get('retry') is True and st.get('ordinal')):
                 st['ordinal'], st['attempt'] = st.get('ordinal', 0) + 1, -1
             st['attempt'] = st.get('attempt', -1) + 1
+            subagent = payload.get('parent_id') not in (None, '') or payload.get('agent_kind') == 'sub'
             wi, attempt, cohort = _h({'harness': harness, 'session': session, 'ordinal': st['ordinal']}), \
-                st['attempt'], 'interactive'
+                st['attempt'], 'agent' if subagent else 'interactive'
         turn = {'work_item_id': wi, 'attempt_id': attempt, 'cohort': cohort}
         return dict(st, turn_id=tid, **turn, turns=_keep(st.get('turns') or {}, {tid: turn}))
 
