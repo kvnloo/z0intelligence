@@ -644,18 +644,22 @@ def _cache_path(key: str) -> Path:
 def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: int = 600,
                  required: Iterable[str] = ('lexical',), use_cache: bool = True, limit: int = 8,
                  config: Mapping[str, Any] | None = None, av_db: str | Path | None = None,
-                 ledger_root: str | Path | None = None) -> dict[str, Any]:
+                 ledger_root: str | Path | None = None, layers: Iterable[str] = LAYERS) -> dict[str, Any]:
     """A bounded, scrubbed, provenance-carrying brief. ``use_cache=False`` skips the lookup but still stores.
-    With the TencentDB gateway reachable (``unversioned``) the cache is bypassed: no lookup, no store."""
+    With the TencentDB gateway reachable (``unversioned``) the cache is bypassed: no lookup, no store.
+    ``layers`` narrows the sources (a host that already injects TencentDB memory passes the other two)."""
     t0 = time.perf_counter()
     policy = policy or ScopePolicy()
     cfg = load_config() if config is None else config
     required = tuple(required)
+    layers = tuple(layer for layer in LAYERS if layer in set(layers))
     gateway = TencentDBClient(cfg)  # one deadline budget for the snapshot probe and the search
-    revisions = source_revisions(av_db=av_db, config=cfg, ledger_root=ledger_root, gateway=gateway)
+    revisions = source_revisions(av_db=av_db, config=cfg, ledger_root=ledger_root, gateway=gateway,
+                                 probe_gateway='semantic' in layers)
     snap = _snapshot_of(policy.scope, revisions)
-    cacheable = revisions['tencentdb'] != UNVERSIONED
-    key = _sha('\x1f'.join((POLICY_VERSION, policy.key(), _normalize(query), str(max_tokens), ','.join(required), snap)))
+    cacheable = 'semantic' not in layers or revisions['tencentdb'] != UNVERSIONED
+    key = _sha('\x1f'.join((POLICY_VERSION, policy.key(), _normalize(query), str(max_tokens), ','.join(required),
+                            ','.join(layers), snap)))
     if use_cache and cacheable:
         try:
             cached = json.loads(_cache_path(key).read_text(encoding='utf-8'))
@@ -663,8 +667,8 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
             cached = None
         if isinstance(cached, dict) and cached.get('memory_snapshot_id') == snap:
             return {**cached, 'cache': 'hit'}
-    res = search(query, policy, limit=limit, required=required, av_db=av_db, config=cfg, ledger_root=ledger_root,
-                 snapshot_id=snap, gateway=gateway)
+    res = search(query, policy, layers=layers, limit=limit, required=required, av_db=av_db, config=cfg,
+                 ledger_root=ledger_root, snapshot_id=snap, gateway=gateway)
     gaps = [f"{layer}: unavailable ({st.get('reason')})" for layer, st in res['layers'].items()
             if st['status'] != 'ok']
     abstained = any(res['layers'].get(r, {}).get('status') != 'ok' for r in required)
@@ -701,7 +705,8 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
         'cache': 'miss' if cacheable else 'bypass:tencentdb_unversioned',
         'current_claims': [{k: c.get(k) for k in ('claim_id', 'subject', 'predicate', 'value')} for c in used
                            if c.get('claim_id')],
-        'evidence': [e['locator'] for e in used], 'scrubbed': res['scrubbed'], 'receipt': receipt.to_dict(),
+        'evidence': [e['locator'] for e in used], 'evidence_refs': [e['evidence_ref'] for e in used],
+        'scrubbed': res['scrubbed'], 'receipt': receipt.to_dict(),
     }
     if used and not abstained and cacheable:  # an empty or abstained brief is never cached: an outage must not persist
         path = _cache_path(key)

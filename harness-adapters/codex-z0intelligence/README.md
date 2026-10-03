@@ -2,7 +2,11 @@
 
 Hooks-only Codex plugin: shadow capture of each Codex turn into the shared z0int record family
 (`z0int.codex.{opportunity_record,turn_outcome,failure}.v0` under `$Z0INT_HOME/state/codex/`).
-It carries no MCP server, no skills and no environment plumbing, and prints nothing into the turn.
+It also carries the z0 memory seam (a second `UserPromptSubmit` entry, `python -m z0int.memory.hook --harness
+codex prompt`; shadow by default, so nothing is printed into the turn) and the memory-only `z0-memory` MCP server
+(`.mcp.json`, `--profile memory`; no route_worker). `Z0INT_MEMORY_INJECT=canary|on` injects `additionalContext`
+(parity with Claude Code: INFERRED, live B unverified) only into a loopback model (`OPENAI_BASE_URL`) unless the
+owner sets `{"inject": {"codex": {"allow_cloud_injection": true}}}` in `~/.z0int/config/memory.json`.
 
 | Codex hook | Command |
 | --- | --- |

@@ -12,7 +12,13 @@ used by the Codex and Grok shims); `z0int.claude_code` keeps only what is Claude
 | `Stop`, `SessionEnd` | `stop` → Tokenomics `claude-code.provider_usage.v0` + `z0int.claude_code.turn_outcome.v0` | on |
 | `SubagentStart`, `SubagentStop` | `subagent-start` / `subagent-stop` → cohort `agent` opportunity + outcome, joined on `turn_key` | on |
 | `SessionStart` | `session-start` → opt-in State Packet (`Z0INT_CLAUDE_CODE_PACKET=1`) | off |
+| `UserPromptSubmit` (second entry) | `python -m z0int.memory.hook --harness claude-code prompt` → z0 memory brief as `additionalContext` | `Z0INT_MEMORY_INJECT` unset = shadow (detached, prints nothing) |
 | MCP `route_worker` | `z0int.intelligence_mcp` with `Z0INT_HARNESS=claude-code` | on |
+| MCP `z0-memory` | `bin/z0int-mcp --profile memory`: memory_search, orient, inspect, history, unknowns, verify | on |
+
+The memory seam is its own hook entry, so capture and memory fail independently. `Z0INT_MEMORY_INJECT=canary|on`
+injects only into a loopback model (`ANTHROPIC_BASE_URL`) unless the owner sets
+`{"inject": {"claude-code": {"allow_cloud_injection": true}}}` in `~/.z0int/config/memory.json`.
 
 A turn's outcome is measured from the transcript messages of its own prompt (`promptId`). When Claude Code
 fires `Stop` before the reply is flushed, the outcome comes from the payload with a `partial_measurement`

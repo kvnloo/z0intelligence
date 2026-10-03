@@ -32,6 +32,8 @@ injected system turns. `z0int hermes decisions` reports gate vs observed behavio
 | `z0int_python` | (empty) | interpreter of the installed z0int; else `Z0INT_PYTHON`, else `$Z0INT_HOME/config/hermes.json` `python` |
 | `z0int_home` | (empty) | else `Z0INT_HOME`, else `~/.z0int` |
 | `persist_packet_text` | `false` | see privacy below |
+| `memory_inject` | (empty) | z0 memory seam: `off`, `shadow`, `canary`, `on`; empty follows `mode` (see Memory) |
+| `memory_injector` | (empty) | owner id for the single-injector guard (default `z0-memory:hermes`) |
 
 There is no service host or port: capture writes files only and opens no socket. A host/port/url setting (for
 example bend's `stack_service_port`) is ignored and written down as a counted `config_warning`. Kill switch:
@@ -74,6 +76,26 @@ The routing call (`z0int.automatic`) is registered only while `<z0int_home>/conf
 it runs the same interpreter as capture (`z0int_python` / `Z0INT_PYTHON`) with `Z0INT_HOME` set to that home.
 
 The API-attempt scorer/evaluator and the `hermes z0` runtime CLI move here in a later step (C4b).
+
+## Memory (C8, `memory.py`)
+
+The z0 memory seam shares the one `pre_llm_call` with capture and automatic (their contexts are joined), and the
+one `post_llm_call` (capture's outcome, then the memory-use receipt of an injected turn). Hermes puts a
+`pre_llm_call` context into the current user message at API time only; the plugin never writes the session store.
+
+| `memory_inject` | What happens per user turn |
+| --- | --- |
+| `off` | nothing |
+| `shadow` (default with `mode: shadow`) | one detached `z0int_python -m z0int.memory.seam shadow` child; the hook returns at once; a `z0int.memory_seam.v0` row with `would_inject` and the MemoryUseReceipt |
+| `canary` / `on` | `... seam turn` within 300 ms (counted from the job start); the brief joins the user message; past the deadline or on any failure the turn is native and a `timeout` / `error` row is counted |
+
+Canary/on inject only into a loopback model (`model.base_url`) unless the owner sets
+`{"inject": {"hermes": {"allow_cloud_injection": true}}}` in `<z0int_home>/config/memory.json`. With Hermes's own
+`memory.provider: memory_tencentdb` the z0 brief leaves TencentDB out (that provider already injects it). A
+replayed turn never injects twice; a second injector for the same turn refuses (`double_inject_guard`). Rows:
+`<z0int_home>/state/memory/seam/hermes.jsonl`. Memory reads go through the z0 memory surface only; the memory
+tools for the model are the `z0-memory` MCP server (Hermes toolsets carry `no_mcp`, so that is for MCP-enabled
+profiles). Activation target profile: chiefstaff/clean (owner decision; not activated here).
 
 ## Install (activation step A3; owner-approved, after backups)
 
