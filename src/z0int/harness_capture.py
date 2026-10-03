@@ -463,9 +463,14 @@ def opportunity_record(harness: str, payload: Mapping[str, Any], ctx: Mapping[st
     extra = {} if packet_text is None else {'packet_text': packet_text}
     if packet_text == 'redacted':
         opp = redact_packet_text(opp)
-    return {'schema': schema(harness, 'opportunity_record'), **ctx,
-            'capture': ctx.get('capture') or capture_flags(request), 'repo': str(repo) if repo else None,
-            'gate': gate, **extra, 'opportunity': opp}
+    row = {'schema': schema(harness, 'opportunity_record'), **ctx,
+           'capture': ctx.get('capture') or capture_flags(request), 'repo': str(repo) if repo else None,
+           'gate': gate, **extra, 'opportunity': opp}
+    if ctx.get('memory') is not None:  # the turn's MemoryUseReceipt, validated (no instruction authority)
+        from .memory_contract import MemoryUseReceipt
+        mem = ctx['memory']
+        row['memory'] = (mem if isinstance(mem, MemoryUseReceipt) else MemoryUseReceipt.from_dict(mem)).to_dict()
+    return row
 
 
 def record_opportunity(harness: str, payload: Mapping[str, Any], ctx: Mapping[str, Any], *,
