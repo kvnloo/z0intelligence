@@ -992,6 +992,7 @@ def append_new(rows: list[dict[str, Any]], root: Path | None = None, harness: st
 
 # ----------------------------------------------------------------------------- every harness (z0int#56 M1)
 DEGRADING = ('reader_unavailable', 'label_source_empty')  # a label source that cannot answer: never "success"
+EXIT_DEGRADED = 3  # `outcomes verify` exit status for a degraded report (rows are still written unless --dry-run)
 
 
 def _failure(harness: str, kind: str, detail: Mapping[str, Any], turn: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -1055,7 +1056,10 @@ def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Pat
             for turn, j in zip(turns, joins):
                 cohort = tr.classify_cohort(harness, meta, capture=turn)
                 core = cores.get(f"#{j['ordinal']}") if j['state'] == 'joined' else None
-                if core is not None and (core['_started'] or 0) < since:
+                started = _ts(turn.get('recorded_at'))  # one window for joined, unjoined and pending turns
+                if started is None and core is not None:
+                    started = core['_started']
+                if (started or 0) < since:
                     continue
                 join[j['state']] += 1
                 if core is None:
@@ -1084,8 +1088,9 @@ def verify_harness(harness: str, *, root: Path | None = None, agentsview: str | 
     claude-code: ``verify`` over Claude transcripts (rows unchanged), plus a ``label_source_empty`` failure when
     captured sessions exist but the resolved projects dir holds none of them (e.g. CLAUDE_CONFIG_DIR unset in a
     timer). Every other harness: its AgentsView rows through ``turn_readers`` and the harness join rule, with the
-    same signal semantics. A label source that cannot answer makes the status ``degraded``, never ``success``.
-    With ``write`` the rows and failure rows are appended (both idempotent: a re-run appends nothing new).
+    same signal semantics; ``since`` applies to every captured turn by its capture time (``all_turns`` is
+    claude-code only: the other harnesses verify every captured turn). A label source that cannot answer makes the
+    status ``degraded``, never ``success``. With ``write`` the rows and failure rows are appended (both idempotent: a re-run appends nothing new).
     """
     from . import turn_readers as tr
     now = time.time() if now is None else now
@@ -1228,7 +1233,8 @@ def _main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest='cmd', required=True)
     v = sub.add_parser('verify', help='append turn_outcome_verified.v0 rows (observed rows are never touched)')
     v.add_argument('--since', default=None, help="only turns started after this ('7d', '36h', ISO date); default all")
-    v.add_argument('--all-turns', action='store_true', help='also verify transcript turns that have no observed row')
+    v.add_argument('--all-turns', action='store_true',
+                   help='claude-code: also verify transcript turns that have no observed row')
     v.add_argument('--fix-days', type=int, default=7, help='SZZ / revert observation window (days)')
     v.add_argument('--no-gh', action='store_true', help='skip read-only GitHub lookups (PR state, check-runs)')
     v.add_argument('--no-gh-cache', action='store_true', help='do not read/write the on-disk gh lookup cache')
@@ -1295,7 +1301,7 @@ def _main(argv: list[str] | None = None) -> int:
             print('states: ' + ', '.join(f'{s}={rep["states"].get(s, 0)}' for s in STATES))
             print(f"status: {rep['status']} ({args.harness}); failures: {rep['failures'] or 'none'}"
                   + (f"; join: {rep['label_join']}" if rep['label_join'] else ''))
-        return 0
+        return 0 if out['status'] == 'success' else EXIT_DEGRADED
     joined = credit_join()
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

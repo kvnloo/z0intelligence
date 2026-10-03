@@ -25,6 +25,7 @@ from . import outcome_verifier as ov
 # The Claude Code transcript reader is the outcome verifier's own; re-exported so both readers live in one place.
 from .outcome_verifier import find_transcript, session_turns, turns_from_transcript  # noqa: F401
 
+ALIGN_TOLERANCE_S = 60.0  # hook clock vs AgentsView message clock (same host); INFERRED, pinned by the tests
 STALE_HOURS = 6.0  # the AgentsView sync timer runs hourly (C6); older than this, a missing turn is pending, not lost
 COHORTS = ('interactive', 'agent', 'automated', 'harness', 'eval', 'unknown')
 AUTOMATED_KINDS = ('non-interactive', 'roborev')  # AgentsView session_kind values (parser/types.go)
@@ -36,7 +37,9 @@ PATCH_FILE = re.compile(r'^\*\*\* (?:Update|Add) File: (\S+)', re.M)
 
 _ORDINAL = ('the n-th captured prompt turn of the session (capture order; subagent turns excluded) is the n-th '
             'AgentsView user message of that session. Ambiguous: more than one AgentsView row claims the session '
-            '(id or source_session_id), or the row holds more user messages than turns were captured.')
+            '(id or source_session_id), the row holds more user messages than turns were captured, or a turn was '
+            'captured more than ALIGN_TOLERANCE_S before the message it would join (from that turn on: '
+            'ordinal_misaligned).')
 
 
 @dataclass(frozen=True)
@@ -54,8 +57,8 @@ JOIN_RULES = {
     'hermes': JoinRule('hermes', 'hermes', 'hermes.session_user_ordinal.v0',
                        'Hermes session id -> AgentsView hermes:<sid> (hermes.go: "hermes:" + state.db id); ' + _ORDINAL),
     'codex': JoinRule('codex', 'codex', 'codex.session_user_ordinal.v0',
-                      'hook session_id is the Codex thread (rollout) id -> codex:<thread>; turn_id orders the captured '
-                      'turns. The id mapping is INFERRED from the AgentsView codex parser and pinned by '
+                      'hook session_id is the Codex thread (rollout) id -> codex:<thread>; the captured turns are '
+                      'ordered by capture time (recorded_at), not by turn_id. The id mapping is INFERRED from the AgentsView codex parser and pinned by '
                       'tests/test_turn_readers.py; ' + _ORDINAL),
     'grok': JoinRule('grok', 'grok', 'grok.session_user_ordinal.v0',
                      'GROK_SESSION_ID (the hook env) -> grok:<id>; ' + _ORDINAL),
@@ -117,7 +120,7 @@ def captured_turns(harness: str, root: str | Path | None = None) -> dict[Any, li
             key = (r.get('session_id'), r['trace_id'])
             order = (str(r.get('recorded_at') or ''), wanted[r['schema']], i)
             t = turns.setdefault(key, {'session_id': key[0], 'trace_id': key[1], '_order': order})
-            t['_order'] = min(t['_order'], order)
+            t['_order'] = min(t['_order'], order)  # the earliest row: its recorded_at is the capture time
             for k in ('turn_key', 'cohort', 'capture'):
                 if t.get(k) is None and r.get(k) is not None:
                     t[k] = r[k]
@@ -125,7 +128,7 @@ def captured_turns(harness: str, root: str | Path | None = None) -> dict[Any, li
                 t['observed'] = r
     out: dict[Any, list[dict[str, Any]]] = {}
     for t in sorted(turns.values(), key=lambda t: t['_order']):
-        t.pop('_order')
+        t['recorded_at'] = t.pop('_order')[0] or None
         t.setdefault('turn_key', hc.turn_key(harness, t['session_id'], t['trace_id']))
         out.setdefault(t['session_id'], []).append(t)
     return out
@@ -272,10 +275,16 @@ def join_session(rule: JoinRule, reader: AgentsViewReader, turns: list[dict[str,
     av_turns = reader.turns(meta['id'], meta.get('cwd') or None)
     if len(av_turns) > len(turns):
         return [dict(base, state='unjoined', reason='ordinal_mismatch') for _ in turns], meta, []
-    joins = []
-    for k, _ in enumerate(turns, 1):
-        if k <= len(av_turns):
-            joins.append(dict(base, state='joined', ordinal=k))
-        else:
+    joins, misaligned = [], False
+    for k, turn in enumerate(turns, 1):
+        if k > len(av_turns):
             joins.append(dict(base, state='pending_index' if stale else 'unjoined', reason='ordinal_missing'))
+            continue
+        # fewer AgentsView user messages than captured turns (e.g. an injected prompt stored as is_system) would
+        # put this turn on a LATER message: a capture before that message is a misalignment, never a label
+        captured, message = ov._ts(turn.get('recorded_at')), av_turns[k - 1]['started_at']
+        misaligned = misaligned or (captured is not None and message is not None
+                                    and captured < message - ALIGN_TOLERANCE_S)
+        joins.append(dict(base, state='unjoined', reason='ordinal_misaligned') if misaligned
+                     else dict(base, state='joined', ordinal=k))
     return joins, meta, av_turns

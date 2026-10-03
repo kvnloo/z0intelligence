@@ -8,7 +8,8 @@ Rows carry hashed ids and closed-vocabulary values only: no prompt, state, tool 
 copied. The only legacy label is the effective tier of an OMP v1 outcome (gold -> 1, negative -> 0; ambient or
 execution-only closes are never a success); shadow decisions have ``y`` null. Each source is read incrementally
 from a byte-offset watermark (state/<harness>/import_watermarks.json), so a re-run reads nothing new, appends
-nothing and returns the same manifest hash. Sources under /workspace/hermes-home are refused unopened.
+nothing and returns the same manifest hash. Sources under /workspace/hermes-home (also through a symlink) are
+refused unopened.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -35,6 +37,8 @@ ACTUAL_TOOL = re.compile(r'^OMP tool_call: ([A-Za-z0-9_.:-]{1,64})')
 # omp-extensions/local-cognition riskFor(): these tools are "write", every other tool "read".
 WRITE_TOOLS = frozenset({'bash', 'write', 'edit', 'multiedit', 'apply_patch', 'notebook_edit', 'write_file', 'create_file'})
 HEAD = 4096
+JEV_TAIL_LINES = 64  # a jev_decision is held for its model_request only near the end of the file ...
+JEV_GRACE_S = 600.0  # ... and only this soon after it was written; past that its request is not coming (a crash)
 
 
 def _h(obj: Any, n: int = 16) -> str:
@@ -58,9 +62,11 @@ def _day(ts: Any) -> str | None:
 
 
 def _guard(path: Path) -> Path:
-    """Refuse a source under a live harness home before anything touches it (abspath does no I/O)."""
+    """Refuse a source under a live harness home before anything opens it. realpath resolves symlinks (lstat and
+    readlink only), so a link that points into the home is refused as well."""
     p = os.path.abspath(os.path.expanduser(str(path)))
-    if any(p == r or p.startswith(r + '/') for r in REFUSED_ROOTS):
+    roots = {*REFUSED_ROOTS, *map(os.path.realpath, REFUSED_ROOTS)}
+    if any(q == r or q.startswith(r + '/') for q in (p, os.path.realpath(p)) for r in roots):
         raise ValueError(f'refusing to read {p}: legacy imports never read /workspace/hermes-home')
     return Path(p)
 
@@ -80,12 +86,17 @@ class _Run:
         self.read_lines = 0
         self.counts: dict[str, int] = {}
         self._pending: dict[str, dict[str, Any]] = {}
+        self._seen: dict[str, tuple[int, set[int]]] = {}  # per key: counted up to, offsets held last run
 
     def count(self, key: str, n: int = 1) -> None:
         self.counts[key] = self.counts.get(key, 0) + n
 
     def lines(self, path: Path, key: str) -> list[tuple[int, dict[str, Any]]]:
-        """(byte offset, row) for every complete line past the watermark; the mark moves only in ``finish``."""
+        """(byte offset, row) for every complete line past the watermark; the mark moves only in ``finish``.
+
+        A held line (``hold``) keeps the watermark at its offset, so the lines after it are read again next run:
+        their rows dedupe by content in ``finish`` and ``is_new`` keeps their counts from being added twice.
+        """
         path = _guard(path)
         try:
             fh = open(path, 'rb')
@@ -94,7 +105,9 @@ class _Run:
         with fh:
             mark = self.marks.get(key) or {}
             head = hashlib.sha256(fh.read(mark.get('head_len', 0))).hexdigest()[:16]
-            start = mark.get('offset', 0) if head == mark.get('head') else 0  # rewritten file: start over
+            same = head == mark.get('head')
+            start = mark.get('offset', 0) if same else 0  # rewritten file: start over
+            self._seen[key] = (mark.get('counted', start), set(mark.get('held', []))) if same else (0, set())
             fh.seek(start)
             data = fh.read()
             fh.seek(0)
@@ -110,12 +123,18 @@ class _Run:
                 out.append((pos, row))
             pos += len(raw) + 1
         self.read_lines += len(out)
-        self._pending[key] = {'offset': pos, 'head': new_head, 'head_len': head_len}
+        self._pending[key] = {'offset': pos, 'counted': pos, 'held': [], 'head': new_head, 'head_len': head_len}
         return out
+
+    def is_new(self, key: str, offset: int) -> bool:
+        """True for a line no earlier run has counted (past the last read, or held last time)."""
+        counted, held = self._seen.get(key, (0, set()))
+        return offset >= counted or offset in held
 
     def hold(self, key: str, offset: int) -> None:
         """Keep the watermark at ``offset`` (a row whose partner line has not been written yet)."""
         self._pending[key]['offset'] = min(self._pending[key]['offset'], offset)
+        self._pending[key]['held'].append(offset)
 
     def finish(self, rows: Iterable[dict[str, Any]], id_key: str) -> dict[str, Any]:
         latest: dict[str, str] = {}
@@ -228,10 +247,27 @@ JEV_FIELDS = ('tier', 'specialty', 'model_routing', 'selected_provider', 'select
 JEV_FLAGS = ('costly_mistake', 'kept_current', 'route_changed', 'effort_changed')
 
 
-def import_dsh_jev(path: Path, *, root: str | Path | None = None) -> dict[str, Any]:
+def _epoch(ts: Any) -> float | None:
+    if isinstance(ts, (int, float)) and not isinstance(ts, bool):
+        return float(ts)
+    try:
+        t = dt.datetime.fromisoformat(ts.replace('Z', '+00:00'))
+    except (AttributeError, ValueError):
+        return None
+    return (t if t.tzinfo else t.replace(tzinfo=dt.timezone.utc)).timestamp()
+
+
+def import_dsh_jev(path: Path, *, root: str | Path | None = None, now: float | None = None) -> dict[str, Any]:
     """jev_decision rows, with the lineage of the routed model_request that follows each of them, ->
     z0int.dsh.shadow_decision.v0 (y null: a JEV routing answer is never a label). Other model_request rows are
-    counted (model_request_only). A jev_decision whose model_request is not written yet holds the watermark."""
+    counted (model_request_only).
+
+    A jev_decision with no later line of its agent may still get its model_request (the same handler writes it
+    next): it holds the watermark while it is within the last JEV_TAIL_LINES lines and younger than JEV_GRACE_S.
+    Every other decision without a routed request (e.g. a crash between the two lines) is imported with an
+    ``agent:<hash>`` session and counted no_lineage. A held decision never stops the rows after it.
+    """
+    now = time.time() if now is None else now
     run = _Run('dsh', 'dsh-jev', 'shadow_decisions.jsonl', root)
     lines = run.lines(_guard(path), 'dsh-jev')
     used: set[int] = set()
@@ -243,11 +279,14 @@ def import_dsh_jev(path: Path, *, root: str | Path | None = None) -> dict[str, A
         later = [(j, r) for j, (_, r) in enumerate(lines[i + 1:], i + 1) if r.get('agentId') == agent]
         lineage = next(((j, r) for j, r in later if r.get('type') == 'model_request' and r.get('turn') == turn
                         and r.get('routed') and j not in used), None)
-        if lineage is None and not later:
+        written = _epoch(rec.get('ts'))
+        if (lineage is None and not later and len(lines) - i - 1 < JEV_TAIL_LINES and written is not None
+                and now - written < JEV_GRACE_S):
             run.hold('dsh-jev', offset)  # its model_request comes in the same handler: read it next run
-            break
+            continue
         if lineage is None:
-            run.count('no_lineage')
+            if run.is_new('dsh-jev', offset):
+                run.count('no_lineage')
             session = f'agent:{_h(agent, 12)}'
         else:
             used.add(lineage[0])
@@ -261,9 +300,8 @@ def import_dsh_jev(path: Path, *, root: str | Path | None = None) -> dict[str, A
                      'challenger': {'id': 'jev', 'policy': _id(rec.get('policy'))}, 'decision': decision,
                      'confidence': _num(rec.get('confidence')), 'latency_ms': _num(rec.get('jev_latency_ms')),
                      'y': None, 'label': None})
-    held = run._pending['dsh-jev']['offset'] if lines else None
     run.count('model_request_only', sum(1 for j, (off, r) in enumerate(lines) if r.get('type') == 'model_request'
-                                        and j not in used and (held is None or off < held)))
+                                        and j not in used and run.is_new('dsh-jev', off)))
     return run.finish(rows, 'decision_id')
 
 

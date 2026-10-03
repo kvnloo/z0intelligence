@@ -417,6 +417,15 @@ def imported_row(r: Mapping[str, Any]) -> dict[str, Any]:
             'verifier': None, 'source': r.get('source'), 'privacy': 'features_counts_and_hashed_ids_only'}
 
 
+def _latest(rows: Iterable[Mapping[str, Any]], key: str) -> list[Mapping[str, Any]]:
+    """The current row per id of an append-only store: an importer appends a row again when its content changes
+    (e.g. a scrub_contaminated_outcomes correction), so the last row per ``key`` wins, in first-seen order."""
+    latest: dict[Any, Mapping[str, Any]] = {}
+    for r in rows:
+        latest[r.get(key)] = r
+    return list(latest.values())
+
+
 def _split(rows: Iterable[Mapping[str, Any]], kind: str) -> dict[tuple[str, str], Table]:
     groups: dict[tuple[str, str], list] = {}
     for r in rows:
@@ -437,14 +446,15 @@ def build_tables(root: str | Path | None = None, *, projects: Path | None = None
         legacy = [r for r in _read_jsonl(state / 'imported_turns.jsonl')
                   if r.get('schema') == hc.schema(harness, 'imported_turn')]
         assert_private(legacy)  # fail closed on the stored rows, not only on their projection
-        rows += [imported_row(r) for r in legacy]
+        rows += [imported_row(r) for r in _latest(legacy, 'turn_key')]
     return _split(rows, 'training')
 
 
 def shadow_tables(root: str | Path | None = None) -> dict[tuple[str, str], Table]:
     """Shadow-decision tables (counterfactual answers, label null) keyed (harness, cohort)."""
-    rows = [r for h in hc.HARNESSES for r in _read_jsonl(hc.state_dir(h, root) / 'shadow_decisions.jsonl')
-            if r.get('schema') == hc.schema(h, 'shadow_decision')]
+    rows = [r for h in hc.HARNESSES for r in _latest(
+        (r for r in _read_jsonl(hc.state_dir(h, root) / 'shadow_decisions.jsonl')
+         if r.get('schema') == hc.schema(h, 'shadow_decision')), 'decision_id')]
     return _split(rows, 'shadow')
 
 
