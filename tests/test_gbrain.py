@@ -53,6 +53,12 @@ class GBrainBridgeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             client.call("context_pack", {"entities": "x", "include_private": True})
 
+        client.delta(since="2026-10-03T00:00:00Z", since_slug="projects/z0intelligence")
+        delta_payload = json.loads(calls[-1][0][5])
+        self.assertEqual(delta_payload["since_slug"], "projects/z0intelligence")
+        with self.assertRaises(ValueError):
+            client.delta(since_slug="projects/z0intelligence")
+
     def test_protocol_errors_fail_closed(self) -> None:
         def runner(argv, **kwargs):
             return SimpleNamespace(returncode=0, stdout='{"protocol_version":2}', stderr="")
