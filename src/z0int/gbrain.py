@@ -24,7 +24,7 @@ from .context_resolve import ContextPacket, EvidenceRef, InformationNeed, projec
 
 SCHEMA = "z0int.gbrain_shadow.v1"
 GBRAIN_PROTOCOL_VERSION = 1
-READ_VERBS = frozenset({"entity", "recall", "context_pack", "delta"})
+READ_VERBS = frozenset({"context_pack", "delta"})
 
 
 class GBrainProtocolError(RuntimeError):
@@ -52,7 +52,7 @@ def resolve_gbrain_binary() -> str | None:
 
 
 class GBrainClient:
-    """Small CLI transport for the frozen MEMORY_VERBS v1 surface."""
+    """Small CLI transport for the world-only ambient MEMORY_VERBS v1 surface.\n\n    The trusted-local CLI can return unredacted data from ``recall``. Until a\n    remote/scoped transport is wired, this adapter therefore exposes only the\n    two verbs whose protocol contract is world-only by default: ``context_pack``\n    and ``delta``.\n    """
 
     def __init__(
         self,
