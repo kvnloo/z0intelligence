@@ -96,12 +96,18 @@ class GBrainBridgeTests(unittest.TestCase):
             "pages": [],
             "facts": [],
             "has_more": False,
+            "since": "2026-10-03T00:00:00Z",
+            "next_cursor": {"since": "2026-10-03T00:01:00Z", "slug": "projects/z0intelligence"},
         }
         candidate = build_shadow_candidate(response, verb="delta")
         self.assertTrue(candidate["shadow_only"])
         self.assertFalse(candidate["traffic_eligible"])
         self.assertEqual(candidate["attention"]["action"], "PREPARE")
         self.assertEqual(candidate["authority"]["granted"], [])
+        self.assertEqual(
+            candidate["context_packet"]["measurements"]["next_cursor"]["slug"],
+            "projects/z0intelligence",
+        )
         self.assertTrue(candidate["candidate_id"].startswith("gb:"))
         linked = attach_shadow_candidate(
             {"trace_id": "t-1", "extra": {"experiment_id": "exp-1"}, "success": True},
