@@ -194,6 +194,43 @@ class AodlBindingTests(unittest.TestCase):
         self.assertEqual(without["plan"]["route"]["order"][0], "routine-service")
         self.assertFalse(without["plan"]["bindings"]["routine-service"]["enabled"])
 
+    def test_gbrain_memory_is_stable_intent_and_binding_is_plan_detail(self) -> None:
+        base = compile_aodl(
+            capability_id="coding.needs_verification",
+            cascade=self.cascade(),
+            routines=[self.routine()],
+            config=AodlBindingConfig(
+                memory_id="personal-memory",
+                memory_schema="MemoryContext",
+                memory_binding={
+                    "runtime": "gbrain",
+                    "protocol": "MEMORY_VERBS_v1",
+                    "readVerbs": ["entity", "recall", "context_pack", "delta"],
+                    "worldOnlyDefault": True,
+                },
+            ),
+        )
+        nodes = {n["id"]: n for n in base["intentGraph"]["nodes"]}
+        self.assertEqual(nodes["personal-memory"]["kind"], "memory")
+        self.assertEqual(nodes["personal-memory"]["authorityCeiling"], ["recall"])
+        memory_edge = next(e for e in base["intentGraph"]["edges"] if e["id"] == "e-memory-runtime")
+        self.assertEqual(memory_edge["relation"], "data")
+        self.assertEqual(memory_edge["authority"]["grant"], [])
+        self.assertEqual(base["plan"]["bindings"]["personal-memory"]["runtime"], "gbrain")
+
+        changed_binding = compile_aodl(
+            capability_id="coding.needs_verification",
+            cascade=self.cascade(),
+            routines=[self.routine()],
+            config=AodlBindingConfig(
+                memory_id="personal-memory",
+                memory_schema="MemoryContext",
+                memory_binding={"runtime": "gbrain", "protocol": "MEMORY_VERBS_v1", "source": "team"},
+            ),
+        )
+        self.assertEqual(base["provenance"]["sourceHash"], changed_binding["provenance"]["sourceHash"])
+        self.assertNotEqual(base["plan"]["planHash"], changed_binding["plan"]["planHash"])
+
     def test_runtime_consumes_the_same_aodl_contract(self) -> None:
         doc = compile_aodl(
             capability_id="coding.needs_verification",
