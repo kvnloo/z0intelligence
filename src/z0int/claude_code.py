@@ -1,17 +1,20 @@
 """Claude Code hook adapter; no provider or routing policy here.
 
-``prompt`` handles UserPromptSubmit through the shared automatic event path.
-``stop`` projects the turn's billed usage from the Claude Code transcript into
-Tokenomics. Both read one hook JSON object on stdin and always fail open.
+A thin wrapper over the shared capture core (``harness_capture``, reached through
+``python -m z0int.hook_adapter --harness claude-code``). What stays Claude Code specific:
+``prompt`` keeps the shared automatic event path (the only harness that does), ``stop`` projects the
+turn's billed usage from the Claude Code transcript into Tokenomics and measures the turn's behaviour
+from it, and ``session-start`` serves the opt-in State Packet. Every hook always fails open.
 """
-import argparse
 import hashlib
 import json
 import os
 from pathlib import Path
 import sys
 
-from . import automatic, paths, tokenomics_emit
+from . import automatic, harness_capture, paths, tokenomics_emit
+# Moved to the capture core; re-exported for existing callers.
+from .harness_capture import HARNESS_MESSAGE_PREFIXES, is_harness_message, turn_id  # noqa: F401
 
 HARNESS = 'claude-code'
 USAGE_KEYS = ('input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens')
@@ -31,67 +34,36 @@ def shadow():
     return env != '0' if env is not None else config().get('shadow', True) is not False
 
 
-def turn_id(hook):
-    if isinstance(hook.get('prompt_id'), str) and hook['prompt_id']:
-        return hook['prompt_id']
-    # Older Claude Code sends no prompt_id; transcript size at submit time is stable per turn.
-    try:
-        size = Path(hook['transcript_path']).stat().st_size
-    except (KeyError, OSError, TypeError):
-        size = -1
-    return hashlib.sha256(f"{hook.get('session_id')}\0{size}\0{hook.get('prompt')}".encode()).hexdigest()
-
-
-def opportunities_path(root=None):
-    return paths.ensure_layout(root)['state'] / HARNESS / 'opportunities.jsonl'
-
-
 def emit_opportunity_async(hook):
     """z0int#62 shadow emission: build a DecisionOpportunity for this prompt OFF the hot path.
 
-    The hook returns immediately; a detached child builds the record (1-3 s) and appends it to a
-    private local file. Nothing is injected, routed or sent anywhere.
+    The hook only fixes the turn's ids and work item (harness_capture.begin_turn) and returns; a detached
+    child builds the record (1-3 s) and appends it to a private local file. Nothing is injected, routed or
+    sent anywhere.
     """
     if os.environ.get('Z0INT_CLAUDE_CODE_OPPORTUNITIES', '1' if config().get('opportunities', True) else '0') == '0':
         return False
-    import subprocess
-    child = subprocess.Popen([sys.executable, '-m', 'z0int.claude_code', 'opportunity'], stdin=subprocess.PIPE,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-    child.stdin.write(json.dumps(hook).encode())
-    child.stdin.close()
+    ctx = harness_capture.begin_turn(HARNESS, hook)
+    harness_capture.spawn_detached(harness_capture.child_argv(HARNESS), {'payload': hook, 'ctx': ctx})
     return True
 
 
-HARNESS_MESSAGE_PREFIXES = ('<agent-message', '<task-notification', '<system-reminder')
-
-
-def is_harness_message(text):
-    """Subagent hand-backs and task notifications arrive as prompts but carry no user intent."""
-    return isinstance(text, str) and text.lstrip().startswith(HARNESS_MESSAGE_PREFIXES)
-
-
 def on_opportunity(hook, root=None):
-    from .decision_opportunity import build_decision_opportunity, deterministic_gate
-    from .state_packet import repo_root
-    repo = repo_root(hook.get('cwd') or os.getcwd())
-    # Sessions often run outside a repo; record them with empty state rather than dropping them (as Hermes does).
-    opp = build_decision_opportunity(repo or '.', hook['prompt'], harness=HARNESS, trace_id=turn_id(hook),
-                                     packet=None if repo else {})
-    record = {'schema': 'z0int.claude_code.opportunity_record.v0', 'session_id': hook.get('session_id'),
-              'repo': str(repo) if repo else None, 'gate': deterministic_gate(opp), 'opportunity': opp}
-    path = opportunities_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open('a', encoding='utf-8') as fh:
-        fh.write(json.dumps(record, ensure_ascii=False, default=str) + '\n')
-    return record
+    """One opportunity record through the shared core (also the body of older in-flight children).
+
+    Sessions often run outside a repo; those are recorded with empty state rather than dropped.
+    """
+    ctx = harness_capture.begin_turn(HARNESS, hook, root=root)
+    return harness_capture.record_opportunity(HARNESS, hook, ctx, root=root)
 
 
-def on_prompt(hook):
+def on_prompt(hook, capture=None):
     text = hook.get('prompt')
     if not isinstance(text, str) or not text.strip():
         return None
     try:
-        if not is_harness_message(text):
+        # Claude Code keeps 6fee859's rule: harness-injected prompts get no opportunity record here.
+        if (harness_capture.enabled() if capture is None else capture) and not is_harness_message(text):
             emit_opportunity_async(hook)
     except Exception:
         pass  # shadow emission never affects the turn
@@ -157,7 +129,12 @@ def outcomes_path(root=None):
     return paths.ensure_layout(root)['state'] / HARNESS / 'outcomes.jsonl'
 
 
-def on_stop(hook, root=None):
+def on_stop(hook, root=None, record=None, outcome=True):
+    """Usage receipts for every fresh transcript message, plus the root turn's observed outcome row.
+
+    ``record`` (the capture core's outcome context) writes the outcome in the shared record family; without
+    it the 6fee859 row is written (direct callers). ``outcome=False`` (capture off) writes usage only.
+    """
     session = hook.get('session_id')
     if not session or not hook.get('transcript_path'):
         return []
@@ -182,15 +159,21 @@ def on_stop(hook, root=None):
             extra={'message_count': len(fresh)}, root=root)
         seen.update(fresh)
         emitted.append({'role': role, 'usage': usage, 'messages': len(fresh)})
-        if role == 'root':
+        if role == 'root' and outcome:
             try:  # link to the prompt's DecisionOpportunity record by trace id (prompt_id)
-                row = {'schema': 'z0int.claude_code.turn_outcome.v0', 'session_id': session,
-                       'trace_id': hook.get('prompt_id'), 'label_kind': 'observed_behaviour_not_optimal',
-                       **turn_behaviour(fresh)}
-                out = outcomes_path(root)
-                out.parent.mkdir(parents=True, exist_ok=True)
-                with out.open('a', encoding='utf-8') as fh:
-                    fh.write(json.dumps(row) + '\n')
+                if record is None:
+                    row = {'schema': 'z0int.claude_code.turn_outcome.v0', 'session_id': session,
+                           'trace_id': hook.get('prompt_id'), 'label_kind': 'observed_behaviour_not_optimal',
+                           **turn_behaviour(fresh)}
+                    out = outcomes_path(root)
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    with out.open('a', encoding='utf-8') as fh:
+                        fh.write(json.dumps(row) + '\n')
+                elif record.get('trace_id') is not None:
+                    ctx = dict(record, model_id=','.join(models)) if models else record
+                    cwd = hook.get('cwd')
+                    harness_capture.record_outcome(HARNESS, ctx, turn_behaviour(fresh), root=root,
+                                                   seen_revisions=harness_capture.observed_revisions(cwd) if cwd else None)
             except Exception:
                 pass
     state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -210,23 +193,19 @@ def on_session_start(stdin_text):
 
 
 def main():
+    import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('event', choices=['prompt', 'stop', 'session-start', 'opportunity'])
     args = parser.parse_args()
+    if args.event != 'opportunity':
+        # Older installed hooks call this module: they take the shared hook adapter path now.
+        from .hook_entry import main as hook_main
+        return hook_main(['--harness', HARNESS, args.event])
     try:
-        if args.event == 'session-start':
-            output = on_session_start(sys.stdin.read())
-        elif args.event == 'opportunity':
-            on_opportunity(json.load(sys.stdin))
-            output = None
-        else:
-            hook = json.load(sys.stdin)
-            output = on_prompt(hook) if args.event == 'prompt' else (on_stop(hook) and None)
+        on_opportunity(json.load(sys.stdin))
     except Exception:
-        # A hook failure must never block or alter the native turn.
-        output = None
-    if output:
-        print(json.dumps(output, ensure_ascii=False))
+        pass  # a hook failure must never block or alter the native turn
+    return 0
 
 
 if __name__ == '__main__':

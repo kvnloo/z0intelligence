@@ -39,6 +39,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
+# Command classes live in check_class (shared by every harness); re-exported here for existing callers.
+from .check_class import (CHECK_ANY, CHECK_EXTRA, CI_CMD, COMMIT_CMD, NOT_A_RUN, PIPE_FILTER, PIPE_SAFE,  # noqa: F401
+                          PR_MERGE, SHELL_SEPARATORS, SUMMARY_FAIL, SUMMARY_PASS, TEST_CMD, CommandMatcher,
+                          _TEST_RE, classify, effective_exit)
+
 SCHEMA = 'z0int.claude_code.turn_outcome_verified.v0'
 JOIN_SCHEMA = 'z0int.claude_code.credit_join.v0'
 OBSERVED_SCHEMA = 'z0int.claude_code.turn_outcome.v0'
@@ -53,39 +58,8 @@ HARNESS_PREFIXES = ('<agent-message', '<task-notification', '<system-reminder', 
                     '<bash-', 'Caveat: ')
 INTERRUPT = '[Request interrupted by user'
 
-_TEST_RE = re.compile(r'(^|[\s;&|(/])(pytest|py\.test|tox|nox|(npm|pnpm|yarn|bun)( run)? test|vitest|jest|cargo test|'
-                      r'go test|make (test|check)|ctest|mvn test|gradle test|rspec|phpunit|just test|'
-                      r'python3? -m (pytest|unittest))(?=$|[\s;&|)])')
-# Segments that mention a runner without running it (installing it, asking its version or location).
-NOT_A_RUN = re.compile(r'\b(install|uninstall|add|remove|show|freeze|download|which|whereis)\b|--version\b|\s-V\b')
-SHELL_SEPARATORS = re.compile(r'&&|\|\||;|\n')
-
-
-class CommandMatcher:
-    """``re``-like ``search`` over shell segments, skipping segments that only install / locate the runner."""
-
-    def __init__(self, rx: re.Pattern[str]):
-        self.rx, self.pattern = rx, rx.pattern
-
-    def search(self, command: str) -> re.Match[str] | None:
-        for seg in SHELL_SEPARATORS.split(command):
-            if NOT_A_RUN.search(seg):
-                continue
-            m = self.rx.search(seg)
-            if m:
-                return m
-        return None
-
-
-TEST_CMD = CommandMatcher(_TEST_RE)
-CHECK_EXTRA = re.compile(r'(^|[\s;&|(/])(ruff|flake8|pylint|mypy|pyright|basedpyright|tsc|eslint|cargo (check|clippy|build)|'
-                         r'go (vet|build)|golangci-lint|shellcheck)(?=$|[\s;&|)])')
-CHECK_ANY = CommandMatcher(re.compile(TEST_CMD.pattern + '|' + CHECK_EXTRA.pattern))
-CI_CMD = re.compile(r'\bgh (run (watch|view)|pr checks)\b')
-COMMIT_CMD = re.compile(r'\bgit(?:\s+-[Cc]\s+\S+)*\s+(commit|revert|cherry-pick)\b(?!-)')
 COMMIT_OUT = re.compile(r'^\[(?P<branch>[^\]\s]+)(?: \(root-commit\))? (?P<sha>[0-9a-f]{7,40})\]', re.M)
 PR_URL = re.compile(r'https://github\.com/([\w.-]+/[\w.-]+)/pull/(\d+)')
-PR_MERGE = re.compile(r'\bgh pr merge\b(?:\s+(\d+))?(?:.*?(?:-R|--repo)[ =]([\w.-]+/[\w.-]+))?')
 TEST_PATH = re.compile(r'(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]*\.py$|_test\.(py|go)$|\.(test|spec)\.[jt]sx?$')
 CD_ARG = re.compile(r'(?:^|[;&|(]\s*|\s)cd\s+([^\s;&|)]+)')
 GIT_C = re.compile(r'\bgit\s+-C\s+([^\s;&|)]+)')
@@ -214,33 +188,6 @@ def _exit_code(block: Mapping[str, Any], tur: Any) -> int | None:
     return 0
 
 
-# A check whose output is piped into a filter reports the filter's exit code, not the runner's (no pipefail).
-PIPE_FILTER = re.compile(r'\|\s*(tail|head|grep|egrep|rg|sed|awk|cut|sort|uniq|wc|less|more|cat|tee|tr|jq|column)\b')
-PIPE_SAFE = re.compile(r'pipefail|PIPESTATUS')
-SUMMARY_FAIL = re.compile(r'\b\d+ (failed|errors?)\b|^FAILED |^FAIL\b|test result: FAILED|^Tests?:.*\bfailed\b|'
-                          r'\bFAILED \((failures|errors)=|^ERROR collecting|Interrupted: \d+ errors?|'
-                          r'^Found \d+ errors?|error\[E\d+\]|^error: could not compile', re.M)
-SUMMARY_PASS = re.compile(r'\b\d+ passed\b|test result: ok\.|^ok\s+\S+|^Tests?:\s+\d+ passed|^OK( \(|$)|'
-                          r'All checks passed|^Success: no issues found', re.M)
-
-
-def effective_exit(command: str, code: int | None, out_tail: str, check_re: Any) -> tuple[int | None, bool]:
-    """(exit code to trust, piped). When the check's output is piped into a filter without pipefail, the shell
-    exit code belongs to the filter: read the runner's summary line instead (fail beats pass), else unknown."""
-    if code is None:
-        return None, False
-    segs = command.split('|')
-    piped = any(check_re.search(seg) and i + 1 < len(segs) and PIPE_FILTER.match('|' + segs[i + 1])
-                for i, seg in enumerate(segs))
-    if not piped or PIPE_SAFE.search(command):
-        return code, False
-    if SUMMARY_FAIL.search(out_tail):
-        return 1, True
-    if SUMMARY_PASS.search(out_tail):
-        return 0, True
-    return None, True
-
-
 def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
     """One dict per turn. ``_prompt`` holds the prompt text transiently for cue matching; callers must not emit it."""
     turns: list[dict[str, Any]] = []
@@ -351,9 +298,11 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                         call['_out_tail'] = text[-600:]
                         call['exit'] = _exit_code(block, row.get('toolUseResult'))
                         cmd = call.get('command', '')
+                        cls = classify(cmd, call['exit'], text[-2000:])
+                        call['check_class'] = cls['check_class']
                         if CHECK_ANY.search(cmd):
                             call['shell_exit'] = call['exit']
-                            call['exit'], call['piped'] = effective_exit(cmd, call['exit'], text[-2000:], CHECK_ANY)
+                            call['exit'], call['piped'] = cls['exit'], cls['piped']
                         if COMMIT_CMD.search(cmd):
                             call['commits'] = [m.group('sha') for m in COMMIT_OUT.finditer(text)]
                         if 'gh pr create' in cmd:
