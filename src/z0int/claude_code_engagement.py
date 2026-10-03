@@ -384,7 +384,11 @@ def scan(path: Path) -> dict[str, Any]:
                 a = d.get('attachment') or {}
                 if a.get('type') == 'skill_listing':
                     s['skill_listing'] = True
-                if a.get('hookEvent') in ('SessionStart', 'SubagentStart') and 'z0int.claude_code' in (a.get('command') or ''):
+                command = a.get('command') or ''
+                # the z0 SessionStart hook, before and after it moved to the shared hook adapter (the adapter's
+                # capture-only SubagentStart hook is not a session-start hook)
+                if a.get('hookEvent') in ('SessionStart', 'SubagentStart') and (
+                        'z0int.claude_code' in command or 'z0int.hook_adapter --harness claude-code session-start' in command):
                     s['z0_session_start'] = True
                 if a.get('type') == 'hook_additional_context':
                     s['packet'] |= '<z0-state-packet' in line

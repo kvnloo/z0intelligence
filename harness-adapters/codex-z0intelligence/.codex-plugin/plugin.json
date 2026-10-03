@@ -1,0 +1,15 @@
+{
+  "name": "codex-z0intelligence",
+  "version": "0.1.0",
+  "description": "z0intelligence capture for Codex: shadow DecisionOpportunity and turn outcome records from plugin hooks. Hooks only; observe-only.",
+  "author": {
+    "name": "kvnloo"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/kvnloo/z0intelligence",
+  "keywords": [
+    "z0intelligence",
+    "capture",
+    "hooks"
+  ]
+}

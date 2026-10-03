@@ -19,9 +19,23 @@ def packet(**over):
     return p
 
 
-def opp_record(session, trace, request=SECRET, **pkt):
+def legacy_record(session, trace, request=SECRET, **pkt):
+    """The pre-capture-flag shape (integrate/claude-code-z0-stack era): request text kept, no ``capture``."""
     opp = build_decision_opportunity('/nonexistent', request, packet=packet(**pkt), harness='claude-code', trace_id=trace)
     return {'schema': le.OPP_SCHEMA, 'session_id': session, 'gate': deterministic_gate(opp), 'opportunity': opp}
+
+
+def opp_record(session, trace, request=SECRET, **pkt):
+    """A user prompt as the capture core writes it: content-free capture flags."""
+    return dict(legacy_record(session, trace, request, **pkt), capture={'is_harness_message': False})
+
+
+def harness_record(session, trace, request):
+    """A harness-injected prompt as the capture core writes it: flagged at capture, request text not stored."""
+    rec = legacy_record(session, trace, request=request)
+    rec['opportunity']['intent']['request'] = None
+    rec['capture'] = {'is_harness_message': True}
+    return rec
 
 
 def verified(session, trace, state, oracle='test_runner'):
@@ -44,7 +58,7 @@ def state(tmp_path):
         opp_record('s1', 't1'),
         opp_record('s1', 't2', request='which branch is checked out?',
                    contradictions=[{'key': 'priority', 'contests': 'git.branch'}]),
-        opp_record('s2', 't3', request='<task-notification>done</task-notification>'),
+        harness_record('s2', 't3', request='<task-notification>done</task-notification>'),
         opp_record('s2', 't4', request='is the CI status green on the pull request?'),
     ])
     write(s / 'outcomes.jsonl', [
@@ -71,14 +85,31 @@ def test_feature_vocabulary_is_stable_and_versioned():
     assert list(f) == list(le.FEATURES) and all(isinstance(v, int) for v in f.values())
 
 
-def test_join_drops_harness_messages_and_latest_verified_row_wins(state):
+def test_join_keeps_harness_messages_in_their_own_cohort_and_latest_verified_row_wins(state):
     rows = {r['turn_key']: r for r in table(state)}
-    assert len(rows) == 3  # t3 is a harness message
-    by = {(r['observed'] or {}).get('action'): r for r in rows.values()}
+    assert len(rows) == 4
+    (harness,) = [r for r in rows.values() if r['cohort'] == 'harness']  # t3: flagged at capture, not dropped
+    assert harness['features']['cohort=harness'] == 1 and harness['label']['present'] is False
+    by = {(r['observed'] or {}).get('action'): r for r in rows.values() if r['cohort'] != 'harness'}
     assert by['ACT']['label']['state'] == 'verified_success' and by['ACT']['label']['y_success'] == 1
     assert by['ASK']['label']['y_success'] == 0 and by['ASK']['observed']['post_decision'] is True
     unlabeled = by[None]
     assert unlabeled['label']['present'] is False and unlabeled['label']['y_success'] is None
+
+
+def test_legacy_rows_without_capture_flags_are_never_user_rows(tmp_path):
+    """Rows written before capture flags (6fee859 dropped the harness ones by reading the request at export):
+    the export reads no request text, so an unflagged row is cohort unknown until the capture-side backfill
+    (harness_capture.backfill_capture) flags it; it never becomes an interactive or agent training row."""
+    s = tmp_path / 'state'
+    s.mkdir()
+    write(s / 'opportunities.jsonl', [legacy_record('s1', 't1'),
+                                      legacy_record('s1', 't2', request='<task-notification>done</task-notification>'),
+                                      opp_record('s1', 't3')])
+    rows = {r['turn_key']: r for r in le.build_table(s, cohort_fn=lambda sid: 'interactive')}
+    by_trace = {t: rows[le._sha({'session': 's1', 'trace': t})] for t in ('t1', 't2', 't3')}
+    assert by_trace['t1']['cohort'] == by_trace['t2']['cohort'] == 'unknown'
+    assert by_trace['t1']['features']['cohort=unknown'] == 1 and by_trace['t3']['cohort'] == 'interactive'
 
 
 def test_features_reflect_scope_contradiction_gate_posture(state):
@@ -111,7 +142,7 @@ def test_no_private_text_reaches_the_table(state, tmp_path):
     blob = (tmp_path / 'out' / 't.jsonl').read_text() + (tmp_path / 'out' / 't.manifest.json').read_text()
     for needle in ('payments', 'secret', 'branch is checked', 'task-notification', 's1', 't1', '/home/'):
         assert needle not in blob, needle
-    assert man['counts']['with_features'] == 3 and man['counts']['resolved'] == 2
+    assert man['counts']['with_features'] == 4 and man['counts']['resolved'] == 2
     assert man['feature_schema_sha'] == le.FEATURE_SCHEMA_SHA and man['features'] == list(le.FEATURES)
 
 

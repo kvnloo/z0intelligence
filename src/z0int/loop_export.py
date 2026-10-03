@@ -8,8 +8,8 @@ Joins, per Claude Code turn ``(session_id, trace_id)``:
 
 into one privacy-safe row per turn with a fixed, versioned feature vocabulary. Rows carry
 counts, booleans, small closed-vocabulary categoricals and hashed ids. No prompt, response,
-command, path or claim value is ever written; the request text is read only to drop harness
-messages (subagent hand-backs) and is discarded.
+command, path or claim value is ever written, and request text is never read: harness-injected
+prompts and subagent turns are recognised from the capture-time cohort and flags (``harness_capture``).
 
 Feature columns are prompt-time only (what the gate saw). ``observed`` is post-decision and is
 exported so an offline evaluator can restrict to turns where the agent actually acted; a learner
@@ -198,22 +198,31 @@ def label_of(verified: Mapping[str, Any] | None) -> dict[str, Any]:
             'oracles': sorted({s.get('oracle') for s in verified.get('signals') or [] if s.get('polarity')} - {None})}
 
 
+def capture_cohort(record: Mapping[str, Any] | None) -> str | None:
+    """The cohort fixed at capture when it is not the session's (harness-injected prompt, subagent turn).
+
+    A row without capture flags predates them (its request text is the only clue, and the export never reads
+    it): cohort unknown, never a user row, until ``z0int outcomes backfill-capture`` flags it.
+    """
+    if not record:
+        return None
+    if not isinstance(record.get('capture'), Mapping):
+        return 'unknown'
+    if record['capture'].get('is_harness_message'):
+        return 'harness'
+    return record.get('cohort') if record.get('cohort') in ('agent', 'harness') else None
+
+
 def build_table(state: Path, *, projects: Path | None = None, include_unjoined: bool = False,
                 cohort_fn=None) -> list[dict[str, Any]]:
     """One row per turn that has an opportunity record (or, with include_unjoined, any verified turn)."""
-    from .claude_code import is_harness_message
     cohort_fn = cohort_fn or (lambda sid: transcript_cohort(sid, projects))
     opps: dict[tuple, dict[str, Any]] = {}
-    harness_keys = set()
     for r in _read_jsonl(state / 'opportunities.jsonl'):
         if r.get('schema') != OPP_SCHEMA:
             continue
         opp = r.get('opportunity') or {}
-        key = (r.get('session_id'), (opp.get('trace') or {}).get('trace_id'))
-        if is_harness_message((opp.get('intent') or {}).get('request')):
-            harness_keys.add(key)  # recorded before emission skipped them; not user intent
-            continue
-        opps[key] = r  # latest wins
+        opps[(r.get('session_id'), (opp.get('trace') or {}).get('trace_id'))] = r  # latest wins
     observed = {(r.get('session_id'), r.get('trace_id')): r for r in _read_jsonl(state / 'outcomes.jsonl')
                 if r.get('schema') == OBSERVED_SCHEMA}
     verified: dict[tuple, dict[str, Any]] = {}
@@ -222,7 +231,7 @@ def build_table(state: Path, *, projects: Path | None = None, include_unjoined: 
             verified[(r.get('session_id'), r.get('trace_id'))] = r  # append-only: latest row wins
     keys = list(opps)
     if include_unjoined:
-        keys += [k for k in verified if k not in opps and k not in harness_keys]
+        keys += [k for k in verified if k not in opps]
     cohorts: dict[str, str] = {}
     rows = []
     for key in keys:
@@ -230,6 +239,7 @@ def build_table(state: Path, *, projects: Path | None = None, include_unjoined: 
         if sid not in cohorts:
             cohorts[sid] = cohort_fn(sid)
         rec, obs, ver = opps.get(key), observed.get(key), verified.get(key)
+        cohort = capture_cohort(rec) or cohorts[sid]
         opp = (rec or {}).get('opportunity') or {}
         started = ((ver or {}).get('turn') or {}).get('started_at') or (opp.get('provenance') or {}).get('built_at')
         rows.append({
@@ -238,10 +248,10 @@ def build_table(state: Path, *, projects: Path | None = None, include_unjoined: 
             'group': _sha({'session': sid}, 12),
             'day': started[:10] if isinstance(started, str) else None,
             'harness': (opp.get('trace') or {}).get('harness') or HARNESS,
-            'cohort': cohorts[sid],
+            'cohort': cohort,
             'has_opportunity': rec is not None,
             'gate': (rec or {}).get('gate'),
-            'features': opportunity_features(rec, cohorts[sid]) if rec is not None else None,
+            'features': opportunity_features(rec, cohort) if rec is not None else None,
             'observed': None if obs is None else {
                 'post_decision': True, 'action': 'ASK' if obs.get('asked_user') else 'ACT',
                 'asked_via_tool': bool(obs.get('asked_via_tool')), 'tool_calls': int(obs.get('tool_calls') or 0)},
