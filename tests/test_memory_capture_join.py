@@ -267,3 +267,39 @@ def test_the_hermes_memory_seam_reads_the_capture_kill_switch(env, monkeypatch, 
         (home / 'config').mkdir(parents=True, exist_ok=True)
         (home / 'config' / 'capture.json').write_text('{"enabled": false}')
     assert mod.create({'memory_inject': 'on'}, home, sys.executable, {}) is None
+
+
+# ----------------------------------------------------------------------------- the first turn on a fresh home
+def _late_turn_joins(env, harness):
+    task = env / 'z0'
+    p = payload(harness, task=task)
+    ctx = hc.begin_turn(harness, p)
+    late = threading.Timer(1.5, lambda: seam.turn(harness, turn_key=ctx['turn_key'], query=QUERY, mode='shadow',
+                                                   cwd=str(task), detach=False))
+    late.start()
+    try:
+        return hc.opportunity_record(harness, p, ctx).get('memory')
+    finally:
+        late.join()
+
+
+def test_a_js_shim_marks_its_seam_installed_so_the_first_late_turn_still_joins(env):
+    """Round-3 e2e: the very first OMP shadow turn on a fresh home was not joined (no seam row existed yet, so no
+    grace). A JS memory client that is not off marks its harness's seam installed when it is created."""
+    script = ("import {createMemoryClient} from %s;\n"
+              "createMemoryClient({harness: 'omp', mode: 'shadow', env: {Z0INT_HOME: %s}});\n"
+              "createMemoryClient({harness: 'dsh', mode: 'off', env: {Z0INT_HOME: %s}});") % (
+        json.dumps((HA / 'memory-client.mjs').as_uri()), json.dumps(str(env / 'z0')), json.dumps(str(env / 'z0')))
+    proc = subprocess.run(['node', '--input-type=module', '-e', script], capture_output=True, text=True, timeout=30)
+    assert proc.returncode == 0, proc.stderr
+    assert _late_turn_joins(env, 'omp'), 'the first late shadow turn of an installed JS seam was not joined'
+    assert not (env / 'z0' / 'state' / 'memory' / 'seam' / 'dsh.active').exists()  # off: nothing marked
+
+
+def test_the_hermes_memory_seam_marks_itself_installed(env):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('hz_memory_active', HA / 'hermes-z0intelligence' / 'memory.py')
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.create({'memory_inject': 'shadow'}, env / 'z0', sys.executable, {}) is not None
+    assert _late_turn_joins(env, 'hermes'), 'the first late shadow turn of the Hermes seam was not joined'
