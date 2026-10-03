@@ -609,8 +609,13 @@ def merge(inputs: Iterable[Path], out_dir: Path) -> dict[str, Any]:
                              f'{sorted(map(str, tables | rows))}')
         merged.append(merge_tables([t for t, _, _ in parts], [h for _, h, _ in parts]))
     all_hosts = sorted({h for parts in groups.values() for _, h, _ in parts})
+    cohorts: dict[tuple[str, Any], set[str]] = {}  # a turn two hosts classified differently (e.g. v0.39 vs v0.44)
+    for t in merged:
+        for r in t.rows if t.kind == 'training' else ():
+            cohorts.setdefault((t.harness, r.get('turn_key')), set()).add(t.cohort)
     index = {'schema': INDEX_SCHEMA, 'merged': True, 'hosts': all_hosts, 'table_version': TABLE_VERSION,
-             'feature_schema_sha': FEATURE_SCHEMA_SHA, 'tables': {}, 'shadow_tables': {}}
+             'feature_schema_sha': FEATURE_SCHEMA_SHA, 'tables': {}, 'shadow_tables': {},
+             'cross_cohort_turn_keys': _count(h for (h, _), c in cohorts.items() if len(c) > 1)}
     now = time.time()
     index['generated_at'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(now))
     return _write_tables(Path(out_dir), merged, generated_at=now, index=index,
