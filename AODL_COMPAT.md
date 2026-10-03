@@ -1,7 +1,8 @@
 # AODL compatibility target
 
-z0int's future Routine/Cascade compiler targets the **AODL intent-contract
-semantics**, not `aodl/main` as of 2026-09-18.
+z0int's Routine/Cascade compiler targets the **AODL intent-contract semantics**
+at the exact `aodl-contract` commit pinned in `pyproject.toml`. Main and the
+rolling channels are references, not implicit runtime upgrades.
 
 ## Relevant upstream refs checked
 
