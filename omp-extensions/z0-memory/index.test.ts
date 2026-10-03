@@ -5,7 +5,7 @@
  * of this tree (Z0INT_PYTHON) over a synthetic AgentsView fixture. The `context` result is model-visible only:
  * the host's canonical history is the event's message list, which must come back untouched.
  */
-import { expect, test } from "bun:test";
+import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,7 +13,17 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const ROOT = join(import.meta.dir, "..", "..");
-const PY = process.env.Z0INT_PYTHON || "python3";
+// bun runs every test file in one process: another file may already have pointed Z0INT_PYTHON at a missing
+// interpreter, so take it only when it exists, and put back every variable these tests change.
+const PY = [process.env.Z0INT_PYTHON].find(p => p && existsSync(p)) ?? "python3";
+const KEYS = ["Z0INT_HOME", "AGENTSVIEW_DATA_DIR", "Z0INT_PYTHON", "Z0INT_MEMORY_INJECT"] as const;
+const saved = Object.fromEntries(KEYS.map(k => [k, process.env[k]]));
+afterEach(() => {
+	for (const k of KEYS) {
+		if (saved[k] === undefined) delete process.env[k];
+		else process.env[k] = saved[k];
+	}
+});
 const QUERY = "how do we deploy the quokka gateway";
 const LOOPBACK = { provider: "sandbox", id: "fake", baseUrl: "http://127.0.0.1:11547/v1" };
 
