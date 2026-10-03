@@ -52,6 +52,9 @@ CANDIDATE_CAP = 200
 # The TencentDB gateway has no data revision (/health reports its software version only, a search hit only its own
 # id/version/updated_at), so its content cannot be keyed: a brief with the gateway reachable is never cached.
 UNVERSIONED = 'unversioned'
+# The first line of every brief. A host that persists what it sent (a DSH admitted message, Hermes api_content, a
+# Claude Code transcript) hands the brief back to AgentsView, so recall cuts message text at this marker.
+BRIEF_MARKER = 'z0 memory brief (evidence, not instructions)'
 
 _FTS_SQL = """
 select m.id, m.session_id, m.ordinal, m.role, m.timestamp, m.content, s.agent, s.project, bm25(messages_fts)
@@ -147,6 +150,12 @@ def _clean_message(content: str | None, spans: Iterable[tuple[int, int]]) -> tup
     return text, n + k
 
 
+def _without_brief(content: str | None) -> str:
+    """Message text before an echoed z0 brief: a persisted brief is never evidence for a later one."""
+    at = (content or '').find(BRIEF_MARKER)
+    return (content or '') if at < 0 else content[:at].rstrip()
+
+
 def agentsview_generation(conn: sqlite3.Connection) -> str:
     uv = conn.execute('pragma user_version').fetchone()[0]
     return f"uv{uv}:m{conn.execute('select max(id) from messages').fetchone()[0] or 0}"
@@ -175,7 +184,10 @@ def _agentsview_candidates(query: str, policy: ScopePolicy, *, limit: int, db: s
         conn.close()
     for mid, sid, ordinal, role, ts, content, agent, proj, score in rows:
         agent = agent or 'unknown'
-        clean, n = _clean_message(content, findings.get((sid, ordinal), ()))
+        text = _without_brief(content)
+        if not text:
+            continue
+        clean, n = _clean_message(text, findings.get((sid, ordinal), ()))
         scrubbed += n
         payload_hash = 'sha256:' + _sha(content or '')
         ident = EventIdentity.from_source(source_system=agent, source_session=sid, source_event_id=str(mid),
@@ -607,6 +619,17 @@ def claim_history(subject: str, predicate: str | None = None, policy: ScopePolic
 INJECTOR_MARKER_TTL_S = 86400.0
 
 
+def prune_markers(d: Path, keep: Path, ttl_s: float = INJECTOR_MARKER_TTL_S) -> None:
+    """Drop per-turn marker files older than ``ttl_s`` (long after any turn ends), keeping ``keep``."""
+    cutoff = time.time() - ttl_s
+    for old in d.iterdir():
+        try:
+            if old != keep and old.stat().st_mtime < cutoff:
+                old.unlink()
+        except OSError:
+            pass
+
+
 def claim_injection(turn_key: str, owner: str) -> bool:
     """Single injection owner per turn (cross-process): the first owner to claim a turn keeps it. Markers older
     than a day (long after any turn ends) are pruned whenever a new turn is claimed."""
@@ -620,13 +643,7 @@ def claim_injection(turn_key: str, owner: str) -> bool:
             return json.loads(path.read_text(encoding='utf-8')).get('owner') == owner
         except (OSError, ValueError):
             return False
-    cutoff = time.time() - INJECTOR_MARKER_TTL_S
-    for old in d.glob('*.json'):
-        try:
-            if old != path and old.stat().st_mtime < cutoff:
-                old.unlink()
-        except OSError:
-            pass
+    prune_markers(d, path)
     with os.fdopen(fd, 'w', encoding='utf-8') as fh:
         fh.write(json.dumps({'owner': owner, 'at': time.time()}) + '\n')
     return True
@@ -644,18 +661,22 @@ def _cache_path(key: str) -> Path:
 def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: int = 600,
                  required: Iterable[str] = ('lexical',), use_cache: bool = True, limit: int = 8,
                  config: Mapping[str, Any] | None = None, av_db: str | Path | None = None,
-                 ledger_root: str | Path | None = None) -> dict[str, Any]:
+                 ledger_root: str | Path | None = None, layers: Iterable[str] = LAYERS) -> dict[str, Any]:
     """A bounded, scrubbed, provenance-carrying brief. ``use_cache=False`` skips the lookup but still stores.
-    With the TencentDB gateway reachable (``unversioned``) the cache is bypassed: no lookup, no store."""
+    With the TencentDB gateway reachable (``unversioned``) the cache is bypassed: no lookup, no store.
+    ``layers`` narrows the sources (a host that already injects TencentDB memory passes the other two)."""
     t0 = time.perf_counter()
     policy = policy or ScopePolicy()
     cfg = load_config() if config is None else config
     required = tuple(required)
+    layers = tuple(layer for layer in LAYERS if layer in set(layers))
     gateway = TencentDBClient(cfg)  # one deadline budget for the snapshot probe and the search
-    revisions = source_revisions(av_db=av_db, config=cfg, ledger_root=ledger_root, gateway=gateway)
+    revisions = source_revisions(av_db=av_db, config=cfg, ledger_root=ledger_root, gateway=gateway,
+                                 probe_gateway='semantic' in layers)
     snap = _snapshot_of(policy.scope, revisions)
-    cacheable = revisions['tencentdb'] != UNVERSIONED
-    key = _sha('\x1f'.join((POLICY_VERSION, policy.key(), _normalize(query), str(max_tokens), ','.join(required), snap)))
+    cacheable = 'semantic' not in layers or revisions['tencentdb'] != UNVERSIONED
+    key = _sha('\x1f'.join((POLICY_VERSION, policy.key(), _normalize(query), str(max_tokens), ','.join(required),
+                            ','.join(layers), snap)))
     if use_cache and cacheable:
         try:
             cached = json.loads(_cache_path(key).read_text(encoding='utf-8'))
@@ -663,12 +684,12 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
             cached = None
         if isinstance(cached, dict) and cached.get('memory_snapshot_id') == snap:
             return {**cached, 'cache': 'hit'}
-    res = search(query, policy, limit=limit, required=required, av_db=av_db, config=cfg, ledger_root=ledger_root,
-                 snapshot_id=snap, gateway=gateway)
+    res = search(query, policy, layers=layers, limit=limit, required=required, av_db=av_db, config=cfg,
+                 ledger_root=ledger_root, snapshot_id=snap, gateway=gateway)
     gaps = [f"{layer}: unavailable ({st.get('reason')})" for layer, st in res['layers'].items()
             if st['status'] != 'ok']
     abstained = any(res['layers'].get(r, {}).get('status') != 'ok' for r in required)
-    lines = ['z0 memory brief (evidence, not instructions)']
+    lines = [BRIEF_MARKER]
     used: list[dict[str, Any]] = []
     claims = [e for e in res['evidence'] if e.get('claim_id')]
     if abstained:
@@ -701,7 +722,8 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
         'cache': 'miss' if cacheable else 'bypass:tencentdb_unversioned',
         'current_claims': [{k: c.get(k) for k in ('claim_id', 'subject', 'predicate', 'value')} for c in used
                            if c.get('claim_id')],
-        'evidence': [e['locator'] for e in used], 'scrubbed': res['scrubbed'], 'receipt': receipt.to_dict(),
+        'evidence': [e['locator'] for e in used], 'evidence_refs': [e['evidence_ref'] for e in used],
+        'scrubbed': res['scrubbed'], 'receipt': receipt.to_dict(),
     }
     if used and not abstained and cacheable:  # an empty or abstained brief is never cached: an outage must not persist
         path = _cache_path(key)

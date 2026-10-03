@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {captureEnabled,registerCapture,z0Home} from './capture.mjs';
+import {registerMemory} from './memory.mjs';
 export {counters} from './capture.mjs';
 export {canonicalTurnKey} from './lineage.mjs';
 export {sampleHash} from './shadow.mjs';
@@ -42,5 +43,6 @@ export function apply(ctx, config, deps={}) {
   config=config ?? {};
   const env=deps.env ?? process.env;
   if(config.capture!==false && captureEnabled(env))registerCapture(ctx,config,{...deps,env});
+  registerMemory(ctx,config,{...deps,env}); // C8 memory seam: memory_inject off|shadow|canary|on (default shadow)
   if(routerEnabled(config,env))registerRouter(ctx);
 }

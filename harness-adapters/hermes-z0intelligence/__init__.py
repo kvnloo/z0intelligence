@@ -10,9 +10,13 @@ opens a socket; there is no service host or port setting. A full queue, an unava
 
 Automatic (#95): the existing ``pre_llm_call`` routing call runs only while ``$Z0INT_HOME/config/automatic.json``
 has ``hermes.enabled: true`` at load; otherwise it is not called and nothing is spawned for it.
+
+Memory (C8, ``memory.py``): the z0 memory seam shares the same one ``pre_llm_call`` (``memory_inject``; unset it
+follows ``mode``). Capture, automatic and memory are one callback; their contexts are joined.
 """
 import atexit
 import fcntl
+import importlib.util
 import json
 import logging
 import math
@@ -39,7 +43,8 @@ MAX_REQUEST_CHARS = 8192  # longer requests are captured as turns but not projec
 OBSERVED = ('pre_api_request', 'post_api_request', 'api_request_error', 'pre_auxiliary_call', 'post_auxiliary_call')
 CAPTURE_HOOKS = ('on_session_start', 'pre_llm_call', 'post_llm_call', 'on_session_end', 'pre_approval_request',
                  'post_tool_call', *OBSERVED, 'subagent_stop')
-SETTINGS = ('mode', 'opportunities', 'z0int_python', 'z0int_home', 'persist_packet_text')
+SETTINGS = ('mode', 'opportunities', 'z0int_python', 'z0int_home', 'persist_packet_text', 'memory_inject',
+            'memory_injector')
 SERVICE_KEYS = ('stack_service_port', 'service_port', 'service_host', 'service_url', 'host', 'port', 'url')
 # Keep in sync with z0int.hermes_decisions (tests/test_hermes_decisions.py checks parity).
 NON_USER_PLATFORMS = frozenset({'cron', 'subagent', 'curator', 'kanban', 'batch', 'raft'})
@@ -656,6 +661,25 @@ def before_turn(python, home, session_id='', turn_id=None, user_message='', **kw
         return None
 
 
+# ----------------------------------------------------------------------------- memory (C8; memory.py)
+def _memory_module():
+    """memory.py next to this file, loaded by path (Hermes may load the plugin without a package context)."""
+    spec = importlib.util.spec_from_file_location(f'{__name__}_memory', Path(__file__).with_name('memory.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _non_user_turn(kw):
+    """Cron/subagent/batch/... platforms and child sessions get no memory seam (as capture and the DSH shim)."""
+    return (kw.get('platform') or '').lower() in NON_USER_PLATFORMS or bool(kw.get('parent_session_id'))
+
+
+def _joined(*results):
+    parts = [r['context'] for r in results if isinstance(r, dict) and r.get('context')]
+    return {'context': '\n\n'.join(parts)} if parts else None
+
+
 # ----------------------------------------------------------------------------- registration
 def register(ctx):
     """Mode off (the default) registers no capture hook; a settings error fails open (no hook at all)."""
@@ -683,16 +707,38 @@ def register(ctx):
                 capture.failure('double_capture_guard', {'vehicle': vehicle})
         except Exception:
             capture = None
+    memory = None
+    try:
+        memory = _memory_module().create(settings, home, python, _profile_config())
+    except Exception:
+        log.warning('%s: memory seam unavailable; turns keep native context', PLUGIN)
     if capture is not None:
         for event in CAPTURE_HOOKS:
-            if event != 'pre_llm_call':
+            if event not in ('pre_llm_call', 'post_llm_call'):
                 ctx.register_hook(event, capture.hook(event))
         ctx.on_unload(capture.close)
         atexit.register(capture.close)  # `hermes chat -q` exits right after its turn: drain, bounded, then stop
-    if capture is not None or automatic:
-        def pre_llm_call(**kw):
+    if capture is not None or memory is not None:
+        captured = capture.hook('post_llm_call') if capture is not None else None
+
+        def post_llm_call(**kw):  # one post_llm_call too: capture's outcome, then memory's use receipt
+            if captured is not None:
+                captured(**kw)
+            if memory is not None:
+                memory.post_llm_call(**kw)
+            return None
+        ctx.register_hook('post_llm_call', post_llm_call)
+    if capture is not None or automatic or memory is not None:
+        def pre_llm_call(**kw):  # the one pre_llm_call: capture, automatic and memory (single owner of this hook)
             if capture is not None:
                 capture.on_pre_llm_call(**kw)
-            return before_turn(python, home, **kw) if automatic else None
+            auto = before_turn(python, home, **kw) if automatic else None
+            mem = None
+            if memory is not None and not _non_user_turn(kw):
+                try:
+                    mem = memory.pre_llm_call(cwd=_hermes_workspace_root(kw.get('task_id')), **kw)
+                except Exception:
+                    mem = None
+            return _joined(auto, mem)
         ctx.register_hook('pre_llm_call', pre_llm_call)
     return capture

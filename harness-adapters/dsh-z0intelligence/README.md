@@ -12,6 +12,7 @@ lineage, sampling and in-flight cap over to the z0 contracts.
 | `agent/error` | closes an open root turn: `z0int.dsh.drop.v0` `turn_errored` (counted), no outcome | on |
 | shadow plane | `POST <shadow.url origin>/v1/plan` (pure shadow route, never executed; the route is fixed, not configurable) → `z0int.dsh.shadow_decision.v0` | off (no URL) |
 | `llm/stream` router (`z0int.automatic`) | governed routing | off: needs `router: true` and `automatic.json` `{"dsh": {"enabled": true}}` (z0intelligence#95) |
+| `agent/pre-step` (waterfall, `memory.mjs`) | z0 memory seam (`../memory-client.mjs` → `python -m z0int.memory.seam`): root agent, step 1 | `memory_inject: shadow` (detached, decision unchanged) |
 
 The turn id is the DSH lineage turn_key `<agent id>:<turn>` (alias `dsh.lineage_turn_key`), so
 `turn_key = harness_id.turn_key('dsh', <session id>, <agent id>:<turn>)`. Subagent requests get lineage rows
@@ -29,7 +30,19 @@ config:
     sample_rate: 0.1     # deterministic per turn key
     max_inflight: 1      # extra turns are recorded queue_saturated, never queued
     timeout_ms: 60000
+  memory_inject: shadow  # off | shadow | canary | on
+  model_endpoint: null   # the profile model's base URL; unset = cloud, so canary/on stay native without opt-in
 ```
+
+Memory (C8): in canary/on the z0 memory brief (bounded, scrubbed, evidence not instructions) is one extra
+user-role message (`source.kind: z0-memory`, `form: recall`) after the step's admitted batch, within 300 ms, else
+the native decision and a counted `timeout`. DSH commits every admitted message to its session log and its
+agent-loop invariant requires every loop-built request to equal that durable derivation, so there is no
+non-durable request seam for a plugin: the brief is in the DSH log (recorded deviation). It starts with the brief
+marker, which z0 recall cuts, so AgentsView re-indexing it never feeds a later brief. A session without a cwd gets
+no brief (`no_scope`). `model_endpoint` is the only endpoint the egress gate sees. A non-loopback model needs
+`{"inject": {"dsh": {"allow_cloud_injection": true}}}` in the z0 memory config (owner opt-in). Rows:
+`$Z0INT_HOME/state/memory/seam/dsh.jsonl`. `z0-memory.cordis.yml` is the memory-only MCP entry for a profile.
 
 Behaviour change from `hermes-jev-dsh`: no JEV route call and no reasoning-effort or model change on any turn;
 the online Jev shadow lanes stop until `shadow.url` names a z0 service, so DSH learning is offline shadow-slot

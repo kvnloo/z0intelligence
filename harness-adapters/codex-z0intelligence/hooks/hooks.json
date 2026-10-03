@@ -9,6 +9,15 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.memory.hook --harness codex prompt || true",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [

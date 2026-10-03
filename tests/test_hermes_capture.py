@@ -614,7 +614,8 @@ def test_automatic_path_is_inert_and_spawns_nothing_while_automatic_json_has_her
         assert ctx.hooks == {} and cap is None  # mode off + automatic off: nothing to dispatch per turn
         mod = load_plugin()
         monkeypatch.setattr(mod, 'invoke', lambda *a, **k: pytest.fail('automatic invoke while hermes is off'), raising=False)
-        ctx, cap = start(mod, shadow(opportunities=False), monkeypatch)
+        # memory_inject off isolates the automatic path (the memory seam's own shadow child is C8's, tested there)
+        ctx, cap = start(mod, shadow(opportunities=False, memory_inject='off'), monkeypatch)
         monkeypatch.setattr(cap, '_deliver', lambda batch: len(batch))
         assert ctx.call('pre_llm_call', session_id='s', turn_id='t', user_message='hello', platform='cli') == [None]
         cap.close()
