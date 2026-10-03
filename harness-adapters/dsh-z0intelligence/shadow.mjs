@@ -5,8 +5,10 @@
 // per turn key and bounded by an in-flight cap. Fire-and-forget: the turn never waits and nothing it returns
 // reaches the request, the model or the user. Rows (z0int.dsh.shadow_decision.v0) carry ids and the route kind,
 // never prompt text. The live service port 11501 is refused unless shadow.allow_live_service is true.
+// The route is fixed: /v1/worker and /v1/intelligence on the same service execute work (gated by #95).
 const SCHEMA = 'z0int.dsh.shadow_decision.v0'
 const LIVE_PORT = '11501'
+const SHADOW_ROUTE = '/v1/plan'
 const offRecorded = new Set() // shadow_plane=off is written once per process (per reason)
 
 /** Stable [0,1) FNV-1a hash of a turn key: a replay of the same turn makes the same sampling decision. */
@@ -27,7 +29,7 @@ function serviceUrl(s) {
   try { url = new URL(String(s.url)) } catch { return {off: 'invalid_service_url'} }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return {off: 'invalid_service_url'}
   if (url.port === LIVE_PORT && s.allow_live_service !== true) return {off: 'live_service_refused'}
-  return {endpoint: new URL(s.path ?? '/v1/plan', url).href}
+  return {endpoint: new URL(SHADOW_ROUTE, url).href}
 }
 
 /** decide({sessionId, lineageKey, turnKey, prompt}) for one root user turn; a no-op when the plane is off. */
@@ -69,8 +71,10 @@ export function createShadow(config, {fetch, write, counters, now = Date.now}) {
       .then(async (res) => {
         if (!res.ok) throw Object.assign(new Error('http'), {name: 'HttpError', http_status: res.status})
         const j = await res.json()
-        write({...base, status: 'ok', latency_ms: now() - started,
-               decision: {mode: j?.mode ?? null, executed: j?.executed === true, kind: j?.route?.kind ?? null}})
+        const executed = j?.executed === true || j?.route?.executed === true
+        if (executed) counters.shadow_executed++ // the pure route broke its contract: never a usable decision
+        write({...base, status: executed ? 'executed_unexpectedly' : 'ok', latency_ms: now() - started,
+               decision: {mode: j?.mode ?? null, executed, kind: j?.route?.kind ?? null}})
       })
       .catch((e) => {
         counters.backend_unavailable++

@@ -9,7 +9,8 @@ lineage, sampling and in-flight cap over to the z0 contracts.
 | --- | --- | --- |
 | `agent/request` (waterfall, returns `next()` unchanged) | root user turn, step 1: `python -m z0int.hook_adapter --harness dsh prompt` (detached) → `z0int.dsh.opportunity_record.v0`; every request: `z0int.dsh.lineage.v0` | on |
 | `agent/turn-stopping` (returns nothing) | `... --harness dsh stop` → `z0int.dsh.turn_outcome.v0`, joined on `turn_key` | on |
-| shadow plane | `POST <shadow.url>/v1/plan` (pure shadow route, never executed) → `z0int.dsh.shadow_decision.v0` | off (no URL) |
+| `agent/error` | closes an open root turn: `z0int.dsh.drop.v0` `turn_errored` (counted), no outcome | on |
+| shadow plane | `POST <shadow.url origin>/v1/plan` (pure shadow route, never executed; the route is fixed, not configurable) → `z0int.dsh.shadow_decision.v0` | off (no URL) |
 | `llm/stream` router (`z0int.automatic`) | governed routing | off: needs `router: true` and `automatic.json` `{"dsh": {"enabled": true}}` (z0intelligence#95) |
 
 The turn id is the DSH lineage turn_key `<agent id>:<turn>` (alias `dsh.lineage_turn_key`), so
@@ -38,4 +39,13 @@ direct Hermes memory reader are gone (memory comes from the z0 memory seam).
 Failures never reach the turn: a missing `Z0INT_PYTHON` or a failed spawn writes a `z0int.dsh.drop.v0` row
 (`spawn_failed`); a shadow service that is down writes `backend_unavailable`. `Z0INT_CAPTURE=0` or
 `$Z0INT_HOME/config/capture.json` `{"enabled": false}` turns capture off. Rows live under
-`$Z0INT_HOME/state/dsh/`.
+`$Z0INT_HOME/state/dsh/`. A shadow response that says it executed is recorded `executed_unexpectedly` and
+counted (`shadow_executed`), never `ok`.
+
+Known limits of the outcome row (labels come from the AgentsView `deepseek-harness` rows, C2):
+- The outcome is sent on the first `agent/turn-stopping` of a turn. A listener can steer from that hook and DSH
+  then runs more steps, so the outcome can be sent before the turn really ends. The stop event carries ids only
+  (every DSH outcome already has `partial_measurement` and `missing_verifier` rows), so only its timing is early.
+- A turn that errors gets a `turn_errored` drop row instead of an outcome. A turn aborted without `agent/error`
+  never reaches the stop boundary and stays open until it is evicted (the 256 most recent turns are kept); it
+  gets no row from this plugin.

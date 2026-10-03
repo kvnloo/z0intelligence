@@ -5,36 +5,8 @@
 // Pure and dependency-free apart from node:crypto; no prompt text ever enters a lineage record.
 import {createHash} from 'node:crypto'
 
-const MAX_DEPTH = 64
-
-/** Walk `parentSession` to the tree root; cycle- and missing-parent-safe, never re-rooted at a wrong ancestor. */
-export function resolveRootSession(sessionId, parentOf) {
-  if (sessionId == null) return {root: null, depth: 0, cycle: false, missing_parent: null}
-  let cur = sessionId
-  const seen = new Set()
-  for (let depth = 0; depth < MAX_DEPTH; depth++) {
-    if (seen.has(cur)) return {root: cur, depth, cycle: true, missing_parent: null}
-    seen.add(cur)
-    let parent
-    try { parent = parentOf(cur) } catch { parent = null }
-    if (parent == null) return {root: cur, depth, cycle: false, missing_parent: null}
-    cur = parent
-  }
-  return {root: cur, depth: MAX_DEPTH, cycle: false, missing_parent: null, truncated: true}
-}
-
-/** Deterministic task trace id from the root session id (stable across replays, one per tree). */
-export function mintTraceId(rootSessionId) {
-  return hash32(`task:${rootSessionId ?? 'unknown'}`)
-}
-
-export function traceIdFor(sessionId, parentOf) {
-  const r = resolveRootSession(sessionId, parentOf)
-  return {trace_id: mintTraceId(r.root), root_session_id: r.root, ...r}
-}
-
 /** One physical inference; session-scoped because (turn, step, attempt) recurs in every session of a tree. */
-export function operationId(sessionId, turn, step, attempt) {
+function operationId(sessionId, turn, step, attempt) {
   return `${sessionId ?? 'unknown'}:${num(turn)}:${num(step)}:${num(attempt)}`
 }
 
@@ -52,7 +24,7 @@ function hash32(s) {
   return (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0')).repeat(2).slice(0, 32)
 }
 
-export function lineageOf(header) {
+function lineageOf(header) {
   if (!header || typeof header !== 'object') {
     return {session_id: null, parent_session_id: null, origin: null, delegation_depth: null}
   }
@@ -65,7 +37,7 @@ export function lineageOf(header) {
 }
 
 /** Role from proven evidence only; anything unrecognized stays `subagent`. */
-export function roleFor({depth, origin}) {
+function roleFor({depth, origin}) {
   if (depth === 0) return 'root'
   if (origin === 'rlm_worker' || origin === 'rlm_synthesis' || origin === 'verifier') return origin
   return 'subagent'
@@ -99,9 +71,9 @@ export function attribution(agent, turn, step, attempt = 0) {
   let rootSessionId = null, traceId = null, depth = null, rootResolution
   if (sessionId === null) rootResolution = 'no_session_metadata'
   else if (lin.parent_session_id == null) {
-    const resolved = traceIdFor(sessionId, () => null)
-    rootSessionId = resolved.root_session_id
-    traceId = resolved.trace_id
+    // A root is its own tree root; the task trace id is stable across replays, one per tree.
+    rootSessionId = sessionId
+    traceId = hash32(`task:${sessionId}`)
     depth = 0
     rootResolution = 'self_root'
   } else rootResolution = 'unresolved_in_hook'

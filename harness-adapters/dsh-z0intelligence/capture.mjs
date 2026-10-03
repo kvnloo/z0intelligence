@@ -4,7 +4,8 @@
 // user turn: one `prompt` event at step 1 and one `stop` event at the turn's stop boundary, each in a detached
 // child, so the shared capture core writes z0int.dsh.opportunity_record.v0 + turn_outcome.v0 joined on the
 // canonical turn_key (turn id = the DSH lineage turn_key). Every request also leaves a content-free
-// z0int.dsh.lineage.v0 row. Any failure is counted and the turn proceeds unchanged (fail-open).
+// z0int.dsh.lineage.v0 row. Any failure is counted and the turn proceeds unchanged (fail-open). A turn that
+// errors (agent/error) never reaches its stop boundary: it is closed with a counted turn_errored drop row.
 import {spawn as nodeSpawn} from 'node:child_process'
 import {appendFile, mkdir} from 'node:fs/promises'
 import {readFileSync} from 'node:fs'
@@ -18,7 +19,7 @@ const SRC = fileURLToPath(new URL('../../src', import.meta.url))
 const OPEN_TURNS_MAX = 256
 
 export const counters = {hook_spawn_failed: 0, write_failed: 0, observe_failed: 0, backend_unavailable: 0,
-                         queue_saturated: 0, sampled_out: 0}
+                         queue_saturated: 0, sampled_out: 0, shadow_executed: 0, turn_errored: 0}
 
 export const z0Home = (env) => env.Z0INT_HOME || join(homedir(), '.z0int')
 
@@ -45,7 +46,7 @@ export function registerCapture(ctx, config, {env, spawn = nodeSpawn, fetch = gl
   const decide = createShadow(config, {fetch, counters, write: (row) => write('shadow_decisions.jsonl', row)})
   const python = env.Z0INT_PYTHON || 'python3'
   const childEnv = {...env, PYTHONPATH: SRC + (env.PYTHONPATH ? ':' + env.PYTHONPATH : '')}
-  const open = new Map() // lineage turn_key -> {session_id, model}, from the prompt event to the stop event
+  const open = new Map() // lineage turn_key -> {session_id, model, turn_key}, from the prompt event to the stop event
 
   function failed(event) {
     counters.hook_spawn_failed++
@@ -80,7 +81,7 @@ export function registerCapture(ctx, config, {env, spawn = nodeSpawn, fetch = gl
     const prompt = latestUserText(agent)
     if (!prompt || !prompt.trim()) return
     const model = cfg?.model ?? null
-    open.set(key, {session_id: sessionId, model})
+    open.set(key, {session_id: sessionId, model, turn_key: turnKey})
     if (open.size > OPEN_TURNS_MAX) open.delete(open.keys().next().value)
     send('prompt', {session_id: sessionId, turn_id: key, prompt, model, cwd: cwdOf(agent)})
     decide({sessionId, lineageKey: key, turnKey, prompt})
@@ -99,6 +100,18 @@ export function registerCapture(ctx, config, {env, spawn = nodeSpawn, fetch = gl
       if (!turn) return
       open.delete(key)
       send('stop', {session_id: turn.session_id, turn_id: key, model: turn.model, cwd: cwdOf(payload.agent)})
+    } catch { counters.observe_failed++ }
+  })
+
+  ctx.on('agent/error', (payload) => {
+    try {
+      const key = lineageTurnKey(payload?.agent, payload?.turn)
+      const turn = open.get(key)
+      if (!turn) return
+      open.delete(key)
+      counters.turn_errored++
+      write('drops.jsonl', {schema: 'z0int.dsh.drop.v0', harness: 'dsh', kind: 'turn_outcome', reason: 'turn_errored',
+                            count: 1, turn_key: turn.turn_key})
     } catch { counters.observe_failed++ }
   })
 }
