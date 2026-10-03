@@ -123,16 +123,21 @@ class GBrainClient:
         *,
         session_id: str | None = None,
         since: str | None = None,
+        since_slug: str | None = None,
         entities: Sequence[str] | str | None = None,
         budget_tokens: int = 1200,
     ) -> dict[str, Any]:
         if not session_id and not since:
             raise ValueError("delta requires session_id or since")
+        if since_slug and not since:
+            raise ValueError("since_slug requires since")
         params: dict[str, Any] = {"budget_tokens": int(budget_tokens)}
         if session_id:
             params["session_id"] = session_id
         if since:
             params["since"] = since
+        if since_slug:
+            params["since_slug"] = since_slug
         if entities:
             params["entities"] = entities if isinstance(entities, str) else ",".join(entities)
         return self.call("delta", params)
