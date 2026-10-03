@@ -158,9 +158,9 @@ def test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview(t
             assert (signals(av), av['verification_state'], av['label_class']) == \
                 (signals(ref), ref['verification_state'], ref['label_class']), f't{i}'
         elif polarity == 'failure_only':  # a failing run is labelled, a passing one is unknown
-            assert all(s[1] == -1 for s in tests(av)), f't{i}'
-        else:  # no exit evidence: a test run is never a label
-            assert tests(av) == [], f't{i}'
+            assert all(s[1] in (-1, 0) for s in tests(av)), f't{i}'  # 0: execution_only, no label
+        else:  # no exit evidence: a test run is never a label (at most execution_only)
+            assert all(s[1] == 0 for s in tests(av)), f't{i}'
     if polarity in ('both', 'failure_only'):
         assert rows['t1']['verification_state'] == 'verified_failure'
     else:
