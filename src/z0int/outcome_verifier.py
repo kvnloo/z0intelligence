@@ -1300,6 +1300,8 @@ def _main(argv: list[str] | None = None) -> int:
         rep = summarize(rows, credit_join() if args.harness == HARNESS else None)
         rep.update(appended=appended, harness=args.harness, status=out['status'], label_join=out['join'],
                    failures=dict(Counter(f['kind'] for f in out['failures'])))
+        if 'test_label_polarity' in out:
+            rep['test_label_polarity'] = out['test_label_polarity']
         if args.report:
             args.report.parent.mkdir(parents=True, exist_ok=True)
             args.report.write_text(format_markdown(rep, meta={
