@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from z0int.gbrain import (
     GBrainClient,
     GBrainProtocolError,
+    attach_shadow_candidate,
     build_shadow_candidate,
     response_to_context_packet,
 )
@@ -95,6 +96,15 @@ class GBrainBridgeTests(unittest.TestCase):
         self.assertFalse(candidate["traffic_eligible"])
         self.assertEqual(candidate["attention"]["action"], "PREPARE")
         self.assertEqual(candidate["authority"]["granted"], [])
+        self.assertTrue(candidate["candidate_id"].startswith("gb:"))
+        linked = attach_shadow_candidate(
+            {"trace_id": "t-1", "extra": {"experiment_id": "exp-1"}, "success": True},
+            candidate,
+        )
+        self.assertEqual(linked["success"], True)
+        self.assertEqual(linked["extra"]["experiment_id"], "exp-1")
+        self.assertEqual(linked["extra"]["gbrain_candidate_id"], candidate["candidate_id"])
+        self.assertEqual(linked["extra"]["gbrain_shadow_action"], "PREPARE")
 
         empty = build_shadow_candidate(
             {"protocol_version": 1, "threads": [], "pages": [], "facts": []},
