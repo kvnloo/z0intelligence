@@ -28,8 +28,16 @@ const z0Home = (env) => env.Z0INT_HOME || join(homedir(), '.z0int')
 const seamDir = (env) => join(z0Home(env), 'state', 'memory', 'seam')
 
 export function memoryMode(value, env = process.env) {
+  if (killed(env)) return 'off'
   const mode = value || env.Z0INT_MEMORY_INJECT || 'shadow'
   return MODES.includes(mode) ? mode : 'off'
+}
+
+/** The capture kill switch (Z0INT_CAPTURE=0 or config/capture.json {"enabled": false}) keeps memory native too. */
+function killed(env) {
+  if (env.Z0INT_CAPTURE === '0') return true
+  try { return JSON.parse(readFileSync(join(z0Home(env), 'config', 'capture.json'), 'utf8'))?.enabled === false }
+  catch { return false }
 }
 
 /** A counted shim-side row (the z0 side writes every other row); never throws. */
@@ -40,6 +48,15 @@ async function row(env, harness, mode, fields) {
       schema: 'z0int.memory_seam.v0', harness, mode, injected: false, would_inject: false, source: 'shim',
       ...fields, recorded_at: new Date().toISOString()}) + '\n')
   } catch { /* a read-only home only loses the row */ }
+}
+
+/** seam/<harness>.active: the capture side's opportunity build then waits briefly for a turn this seam has not
+ * marked yet (a cold shadow child), even before the seam's first row. Never throws. */
+function markInstalled(env, harness) {
+  try {
+    mkdirSync(seamDir(env), {recursive: true})
+    writeFileSync(join(seamDir(env), `${harness}.active`), '')
+  } catch { /* a read-only home only loses the grace */ }
 }
 
 /** Whether the host has a model-visible push seam (recorded for the acceptance eval: B=UNSUPPORTED otherwise). */
@@ -56,6 +73,7 @@ export function recordPushStatus(env, harness, status) {
 export function createMemoryClient({harness, mode, env = process.env, spawn = nodeSpawn, injector,
                                     deadlineMs = DEADLINE_MS} = {}) {
   mode = memoryMode(mode, env)
+  if (mode !== 'off') markInstalled(env, harness)
   // Read per call: a long-lived host may change its environment after the extension loaded.
   const python = () => env.Z0INT_PYTHON || 'python3'
   const childEnv = () => ({...env, PYTHONPATH: SRC + (env.PYTHONPATH ? ':' + env.PYTHONPATH : '')})

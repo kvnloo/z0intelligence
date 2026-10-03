@@ -37,7 +37,7 @@ injected system turns. `z0int hermes decisions` reports gate vs observed behavio
 
 There is no service host or port: capture writes files only and opens no socket. A host/port/url setting (for
 example bend's `stack_service_port`) is ignored and written down as a counted `config_warning`. Kill switch:
-`Z0INT_CAPTURE=0`, or `$Z0INT_HOME/config/capture.json` `{"enabled": false}`.
+`Z0INT_CAPTURE=0`, or `$Z0INT_HOME/config/capture.json` `{"enabled": false}` (it turns the memory seam off too).
 
 ## Privacy classes
 
@@ -100,7 +100,9 @@ Canary/on inject only into a loopback model (`model.base_url`) unless the owner 
 replayed turn never injects twice; a second injector for the same turn refuses (`double_inject_guard`). Rows:
 `<z0int_home>/state/memory/seam/hermes.jsonl`. Memory reads go through the z0 memory surface only; the memory
 tools for the model are the `z0-memory` MCP server (Hermes toolsets carry `no_mcp`, so that is for MCP-enabled
-profiles). Activation target profile: chiefstaff/clean (owner decision; not activated here).
+profiles). Activation target profile: `clean` only (owner decision; chiefstaff is retired and never targeted).
+Activation also sets clean's `memory.provider: memory_tencentdb` (owner-deferred; runbook only, not activated here),
+so z0 briefs there leave TencentDB items to that provider.
 
 ## Install (activation step A3; owner-approved, after backups)
 

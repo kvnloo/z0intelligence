@@ -90,4 +90,4 @@ def test_grok_hooks_file_is_capture_only_and_names_its_harness():
     for needle in FORBIDDEN:
         assert needle not in text, needle
     assert sorted(p.name for p in GROK_HOOKS.parent.parent.rglob('*') if p.is_file()) == [
-        'README.md', 'z0-capture.json', 'z0-memory.toml']  # C8: the pull-only memory MCP table
+        'README.md', 'z0-capture.json', 'z0-memory.json', 'z0-memory.toml']  # C8: memory MCP table + receipt-only hook

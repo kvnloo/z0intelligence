@@ -51,7 +51,7 @@ direct Hermes memory reader are gone (memory comes from the z0 memory seam).
 
 Failures never reach the turn: a missing `Z0INT_PYTHON` or a failed spawn writes a `z0int.dsh.drop.v0` row
 (`spawn_failed`); a shadow service that is down writes `backend_unavailable`. `Z0INT_CAPTURE=0` or
-`$Z0INT_HOME/config/capture.json` `{"enabled": false}` turns capture off. Rows live under
+`$Z0INT_HOME/config/capture.json` `{"enabled": false}` turns capture and the memory seam off. Rows live under
 `$Z0INT_HOME/state/dsh/`. A shadow response that says it executed is recorded `executed_unexpectedly` and
 counted (`shadow_executed`), never `ok`.
 

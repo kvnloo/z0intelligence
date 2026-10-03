@@ -24,7 +24,7 @@ function fixture() {
                            join(h, 'av', 'sessions.db'), join(ROOT, 'tests'), join(ROOT, 'src')], {encoding: 'utf8'})
   assert.equal(r.status, 0, r.stderr)
   return {h, env: {...process.env, Z0INT_HOME: join(h, 'z0'), AGENTSVIEW_DATA_DIR: join(h, 'av'), Z0INT_PYTHON: PY,
-                   Z0INT_MEMORY_INJECT: '', Z0INT_CAPTURE: '0'}}
+                   Z0INT_MEMORY_INJECT: '', Z0INT_CAPTURE: ''}}
 }
 
 function slowPython(h) {
@@ -202,4 +202,25 @@ test('shadow children are bounded: past the cap a turn writes a counted queue_sa
   for (let i = 0; i < MAX_SHADOW_CHILDREN + 2; i++) await client.turn({sessionId: 's', turnId: `t${i}`, query: QUERY, cwd: '/w/z0'})
   assert.equal(spawned.length, MAX_SHADOW_CHILDREN)
   assert.deepEqual((await waitRows(h, 2)).map((r) => r.outcome), ['queue_saturated', 'queue_saturated'])
+})
+
+// ----------------------------------------------------------------------------- round 3 (D3: receipt joins the opportunity)
+test('one root turn: the capture prompt and the memory job name the same session and turn (one canonical turn_key)', async () => {
+  const capture = await import(pathToFileURL(join(PLUGIN_DIR, 'capture.mjs')).href)
+  const jobs = []
+  const spawn = (cmd, args) => {
+    const child = {on() { return child }, unref() {}, stdin: {on() {}, end(s) { jobs.push({args, job: JSON.parse(s)}) }}}
+    return child
+  }
+  const env = {Z0INT_HOME: join(mkdtempSync(join(process.env.TMPDIR || tmpdir(), 'c8-dsh-key-')), 'z0'), Z0INT_PYTHON: PY}
+  const ctx = fakeCtx()
+  capture.registerCapture(ctx, {}, {env, spawn, fetch: async () => { throw new Error('no shadow service') }})
+  memory.registerMemory(ctx, {memory_inject: 'shadow'}, {env, spawn})
+  const agent = {...rootAgent('k1'), frozenMessages: [userMessage(QUERY)]}
+  await ctx.handlers['agent/request'][0]({agent, turn: 3, step: 1}, async () => ({provider: 'p', model: 'm'}))
+  await preStep(ctx, {agent, messages: [userMessage(QUERY)], turn: 3, step: 1})
+  const prompt = jobs.find((j) => j.args.includes('z0int.hook_adapter'))?.job
+  const mem = jobs.find((j) => j.args.includes('z0int.memory.seam'))?.job
+  assert.ok(prompt && mem, JSON.stringify(jobs.map((j) => j.args)))
+  assert.deepEqual([mem.session_id, mem.turn_id], [prompt.session_id, prompt.turn_id])
 })

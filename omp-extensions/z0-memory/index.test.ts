@@ -198,3 +198,48 @@ test("OMP turn key is the user message's own id: a new turn after compaction sti
 	expect(counters.replay).toBe(before + 1);
 	expect(seamRows(h, "omp").map(r => r.outcome)).toEqual(["injected", "injected"]);
 }, 30000);
+
+// ----------------------------------------------------------------------------- round 3 (D3: receipt joins the opportunity)
+for (const harness of ["omp", "omo"] as const) {
+	test(`${harness}: with the capture bridge loaded, the memory seam keys the turn the bridge opened (one canonical turn_key)`, async () => {
+		const h = fixture("canary");
+		const bridge = await import("../z0int-bridge/index.ts");
+		const log = join(h, "worker-frames.jsonl");
+		const worker = join(h, "fake-worker.py");
+		writeFileSync(worker, [
+			"#!/usr/bin/env python3",
+			"import json, sys",
+			`log = open(${JSON.stringify(log)}, "a")`,
+			"for line in sys.stdin:",
+			"    req = json.loads(line)",
+			"    log.write(line); log.flush()",
+			"    out = {'id': req.get('id'), 'ok': True, 'protocol': 'z0int.bridge.v2', 'generation': 1,",
+			"           'instance_id': 'fake', 'build_id': 'fake'}",
+			"    sys.stdout.write(json.dumps(out) + '\\n'); sys.stdout.flush()",
+			"    if req.get('op') == 'shutdown':",
+			"        break",
+		].join("\n"));
+		chmodSync(worker, 0o755);
+		const pi = fakePi();
+		process.env.Z0INT_PYTHON = worker;
+		try {
+			bridge.registerBridgeCapture(pi as never, { harness });
+			(harness === "omp" ? omp : omo)(pi);
+			const [open] = pi.handlers.get("before_agent_start")!;
+			await open({ prompt: QUERY }, hctx());
+		} finally {
+			process.env.Z0INT_PYTHON = PY;
+		}
+		try {
+			expect((await context(pi, [user(QUERY, 4242)]))?.messages?.length).toBe(2);
+			const opened = readFileSync(log, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l))
+				.find(f => f.op === "turn_open");
+			expect(opened?.session_id).toBe("sess-1");
+			const want = spawnSync(PY, ["-c", "import sys; sys.path[:0] = [sys.argv[1]]; from z0int.harness_id import turn_key; print(turn_key(*sys.argv[2:]))",
+				join(ROOT, "src"), harness, "sess-1", opened.trace_id], { encoding: "utf8" }).stdout.trim();
+			expect(seamRows(h, harness).map(r => r.turn_key)).toEqual([want]);
+		} finally {
+			await bridge.stopWorker();
+		}
+	}, 30000);
+}
