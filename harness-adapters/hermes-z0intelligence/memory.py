@@ -7,12 +7,14 @@ Hermes injects a ``pre_llm_call`` result's ``context`` into the current user mes
 capture, off with a plugin that is off), so a profile with the plugin off keeps Hermes dispatch untouched.
 
 * shadow: one detached ``z0int_python -m z0int.memory.seam shadow`` child per user turn; the hook returns at once.
+  At most MAX_SHADOW_CHILDREN run at once; past that the turn writes a counted ``queue_saturated`` row instead.
 * canary/on: ``z0int_python -m z0int.memory.seam turn`` within the 300 ms deadline (the child counts it from the
   job's ``started_at``; this side kills it a little later as a backstop). Past it, or on any failure, the turn
   keeps its native context and a counted ``timeout`` / ``error`` row is written.
 
-The z0 side decides everything else (replay, cloud-egress opt-in per harness, single injection owner, scrub). The
-model endpoint is the profile's ``model.base_url``; with Hermes's own ``memory.provider: memory_tencentdb`` the z0
+The plugin calls this only for user turns (not cron/subagent/kanban/batch platforms or child sessions). The z0 side
+decides everything else (replay, task-project scope, cloud-egress opt-in per harness, single injection owner,
+scrub). The model endpoint is the profile's ``model.base_url`` and nothing else; with Hermes's own ``memory.provider: memory_tencentdb`` the z0
 brief leaves TencentDB out (that provider already injects it). ``post_llm_call`` records the memory-use receipt of
 an injected turn.
 """
@@ -28,6 +30,7 @@ MODES = ('off', 'shadow', 'canary', 'on')
 DEADLINE_MS = 300
 BACKSTOP_S = 0.15  # after the child's own deadline: interpreter start-up and exit
 MAX_QUERY_CHARS = 2000
+MAX_SHADOW_CHILDREN = 4  # as C1 capture's harness_capture.MAX_CHILDREN
 SCHEMA = 'z0int.memory_seam.v0'
 
 
@@ -48,6 +51,7 @@ class Memory:
         self.exclude_layers = ['semantic'] if provider == 'memory_tencentdb' else []
         self._injected = {}  # (session, turn) -> the turn's seam result, until post_llm_call
         self._lock = threading.Lock()
+        self._shadows = []  # running shadow children (Popen), bounded by MAX_SHADOW_CHILDREN
 
     def _job(self, session_id, turn_id, user_message, cwd):
         return {'session_id': session_id or 'hermes', 'turn_id': str(turn_id or ''), 'query': user_message[:MAX_QUERY_CHARS],
@@ -76,9 +80,17 @@ class Memory:
         argv = [self.python or 'python3', '-m', 'z0int.memory.seam']
         try:
             if self.mode == 'shadow':
+                with self._lock:
+                    self._shadows = [c for c in self._shadows if c.poll() is None]
+                    if len(self._shadows) >= MAX_SHADOW_CHILDREN:
+                        self._row({'outcome': 'queue_saturated', 'injected': False, 'would_inject': False,
+                                   'source': 'shim', 'in_flight': len(self._shadows)})
+                        return None
                 child = subprocess.Popen([*argv, 'shadow', '--harness', HARNESS], stdin=subprocess.PIPE,
                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=self._env(),
                                          start_new_session=True)
+                with self._lock:
+                    self._shadows.append(child)
                 child.stdin.write(json.dumps(job).encode())
                 child.stdin.close()
                 return None

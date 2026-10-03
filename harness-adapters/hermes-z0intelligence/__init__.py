@@ -670,6 +670,11 @@ def _memory_module():
     return mod
 
 
+def _non_user_turn(kw):
+    """Cron/subagent/batch/... platforms and child sessions get no memory seam (as capture and the DSH shim)."""
+    return (kw.get('platform') or '').lower() in NON_USER_PLATFORMS or bool(kw.get('parent_session_id'))
+
+
 def _joined(*results):
     parts = [r['context'] for r in results if isinstance(r, dict) and r.get('context')]
     return {'context': '\n\n'.join(parts)} if parts else None
@@ -729,7 +734,7 @@ def register(ctx):
                 capture.on_pre_llm_call(**kw)
             auto = before_turn(python, home, **kw) if automatic else None
             mem = None
-            if memory is not None:
+            if memory is not None and not _non_user_turn(kw):
                 try:
                     mem = memory.pre_llm_call(cwd=_hermes_workspace_root(kw.get('task_id')), **kw)
                 except Exception:

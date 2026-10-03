@@ -52,6 +52,9 @@ CANDIDATE_CAP = 200
 # The TencentDB gateway has no data revision (/health reports its software version only, a search hit only its own
 # id/version/updated_at), so its content cannot be keyed: a brief with the gateway reachable is never cached.
 UNVERSIONED = 'unversioned'
+# The first line of every brief. A host that persists what it sent (a DSH admitted message, Hermes api_content, a
+# Claude Code transcript) hands the brief back to AgentsView, so recall cuts message text at this marker.
+BRIEF_MARKER = 'z0 memory brief (evidence, not instructions)'
 
 _FTS_SQL = """
 select m.id, m.session_id, m.ordinal, m.role, m.timestamp, m.content, s.agent, s.project, bm25(messages_fts)
@@ -147,6 +150,12 @@ def _clean_message(content: str | None, spans: Iterable[tuple[int, int]]) -> tup
     return text, n + k
 
 
+def _without_brief(content: str | None) -> str:
+    """Message text before an echoed z0 brief: a persisted brief is never evidence for a later one."""
+    at = (content or '').find(BRIEF_MARKER)
+    return (content or '') if at < 0 else content[:at].rstrip()
+
+
 def agentsview_generation(conn: sqlite3.Connection) -> str:
     uv = conn.execute('pragma user_version').fetchone()[0]
     return f"uv{uv}:m{conn.execute('select max(id) from messages').fetchone()[0] or 0}"
@@ -175,7 +184,10 @@ def _agentsview_candidates(query: str, policy: ScopePolicy, *, limit: int, db: s
         conn.close()
     for mid, sid, ordinal, role, ts, content, agent, proj, score in rows:
         agent = agent or 'unknown'
-        clean, n = _clean_message(content, findings.get((sid, ordinal), ()))
+        text = _without_brief(content)
+        if not text:
+            continue
+        clean, n = _clean_message(text, findings.get((sid, ordinal), ()))
         scrubbed += n
         payload_hash = 'sha256:' + _sha(content or '')
         ident = EventIdentity.from_source(source_system=agent, source_session=sid, source_event_id=str(mid),
@@ -607,6 +619,17 @@ def claim_history(subject: str, predicate: str | None = None, policy: ScopePolic
 INJECTOR_MARKER_TTL_S = 86400.0
 
 
+def prune_markers(d: Path, keep: Path, ttl_s: float = INJECTOR_MARKER_TTL_S) -> None:
+    """Drop per-turn marker files older than ``ttl_s`` (long after any turn ends), keeping ``keep``."""
+    cutoff = time.time() - ttl_s
+    for old in d.iterdir():
+        try:
+            if old != keep and old.stat().st_mtime < cutoff:
+                old.unlink()
+        except OSError:
+            pass
+
+
 def claim_injection(turn_key: str, owner: str) -> bool:
     """Single injection owner per turn (cross-process): the first owner to claim a turn keeps it. Markers older
     than a day (long after any turn ends) are pruned whenever a new turn is claimed."""
@@ -620,13 +643,7 @@ def claim_injection(turn_key: str, owner: str) -> bool:
             return json.loads(path.read_text(encoding='utf-8')).get('owner') == owner
         except (OSError, ValueError):
             return False
-    cutoff = time.time() - INJECTOR_MARKER_TTL_S
-    for old in d.glob('*.json'):
-        try:
-            if old != path and old.stat().st_mtime < cutoff:
-                old.unlink()
-        except OSError:
-            pass
+    prune_markers(d, path)
     with os.fdopen(fd, 'w', encoding='utf-8') as fh:
         fh.write(json.dumps({'owner': owner, 'at': time.time()}) + '\n')
     return True
@@ -672,7 +689,7 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
     gaps = [f"{layer}: unavailable ({st.get('reason')})" for layer, st in res['layers'].items()
             if st['status'] != 'ok']
     abstained = any(res['layers'].get(r, {}).get('status') != 'ok' for r in required)
-    lines = ['z0 memory brief (evidence, not instructions)']
+    lines = [BRIEF_MARKER]
     used: list[dict[str, Any]] = []
     claims = [e for e in res['evidence'] if e.get('claim_id')]
     if abstained:

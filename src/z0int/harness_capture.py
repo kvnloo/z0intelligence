@@ -593,22 +593,24 @@ def child_argv(harness: str) -> list[str]:
     return [sys.executable, '-m', 'z0int.hook_adapter', '--harness', harness, 'opportunity']
 
 
-def spawn_detached(argv: list[str], payload: Mapping[str, Any]) -> None:
-    """Hand one job to a detached child (own session, no stdio): the hook returns while the child builds."""
+def spawn_detached(argv: list[str], payload: Mapping[str, Any], *, pass_fds: tuple[int, ...] = ()) -> None:
+    """Hand one job to a detached child (own session, no stdio): the hook returns while the child builds.
+    ``pass_fds``: e.g. a locked slot file the child holds until it exits."""
     child = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             start_new_session=True)
+                             start_new_session=True, pass_fds=pass_fds)
     child.stdin.write(json.dumps(payload, default=str).encode())
     child.stdin.close()
 
 
-def slot_path(i: int, root: str | Path | None = None) -> Path:
-    return _base(root) / 'runtime' / 'capture-slots' / f'{i}.lock'
+def slot_path(i: int, root: str | Path | None = None, pool: str = 'capture-slots') -> Path:
+    return _base(root) / 'runtime' / pool / f'{i}.lock'
 
 
-def try_slot(root: str | Path | None = None) -> Any:
-    """A free build slot now (its locked file; the lock lasts while any process holds the file open), else None."""
+def try_slot(root: str | Path | None = None, pool: str = 'capture-slots') -> Any:
+    """A free build slot now (its locked file; the lock lasts while any process holds the file open), else None.
+    ``pool`` names an independent set of MAX_CHILDREN slots (capture builds, memory shadow briefs)."""
     for i in range(MAX_CHILDREN):
-        path = slot_path(i, root)
+        path = slot_path(i, root, pool)
         path.parent.mkdir(parents=True, exist_ok=True)
         fh = open(path, 'a')
         try:

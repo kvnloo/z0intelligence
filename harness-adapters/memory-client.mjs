@@ -1,11 +1,14 @@
 // The z0 memory seam for JS hosts (DSH, OMP, OMO): one harness-agnostic client over `python -m z0int.memory.seam`.
 //
 // memory_inject off | shadow | canary | on (default shadow; env Z0INT_MEMORY_INJECT when the shim config is unset):
-//   shadow     one detached child per turn (`seam shadow`), never awaited: the host turn does not wait.
+//   shadow     one detached child per turn (`seam shadow`), never awaited: the host turn does not wait. At most
+//              MAX_SHADOW_CHILDREN run at once per host; past that a turn writes a counted queue_saturated row.
 //   canary/on  `seam turn` answers {"context"} within the 300 ms deadline it counts from `started_at` (stamped
 //              here, so interpreter start-up is inside the budget); this side kills it a little later as a
 //              backstop. Past it, or on any failure, the caller gets undefined (native context) and a counted row.
-// The z0 side owns replay, cloud-egress opt-in per harness, the single injection owner and the scrub.
+// The z0 side owns replay, the task-project scope, cloud-egress opt-in per harness, the single injection owner and
+// the scrub. `endpoint` must be the harness's own model setting (never a generic env var); a replayed turn is counted
+// here (counters.replay) and writes nothing.
 import {spawn as nodeSpawn} from 'node:child_process'
 import {appendFile, mkdir} from 'node:fs/promises'
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs'
@@ -18,7 +21,8 @@ export const MODES = ['off', 'shadow', 'canary', 'on']
 export const DEADLINE_MS = 300
 const BACKSTOP_MS = 150
 const MAX_QUERY_CHARS = 2000
-export const counters = {shadow: 0, injected: 0, timeout: 0, error: 0}
+export const MAX_SHADOW_CHILDREN = 4  // as C1 capture's harness_capture.MAX_CHILDREN
+export const counters = {shadow: 0, injected: 0, timeout: 0, error: 0, replay: 0, queue_saturated: 0}
 
 const z0Home = (env) => env.Z0INT_HOME || join(homedir(), '.z0int')
 const seamDir = (env) => join(z0Home(env), 'state', 'memory', 'seam')
@@ -62,11 +66,21 @@ export function createMemoryClient({harness, mode, env = process.env, spawn = no
             injector: injector ?? null, exclude_layers: excludeLayers ?? [], started_at: Date.now() / 1000}
   }
 
+  let inFlight = 0
   function shadow(j) {
+    if (inFlight >= MAX_SHADOW_CHILDREN) {
+      counters.queue_saturated++
+      void row(env, harness, mode, {outcome: 'queue_saturated', in_flight: inFlight})
+      return undefined
+    }
     try {
       const child = spawn(python(), ['-m', 'z0int.memory.seam', 'shadow', '--harness', harness],
                           {detached: true, stdio: ['pipe', 'ignore', 'ignore'], env: childEnv()})
-      child.on?.('error', () => { counters.error++; void row(env, harness, mode, {outcome: 'error', error: 'spawn'}) })
+      inFlight++
+      let released = false
+      const release = () => { if (!released) { released = true; inFlight-- } }
+      child.on?.('exit', release)
+      child.on?.('error', () => { release(); counters.error++; void row(env, harness, mode, {outcome: 'error', error: 'spawn'}) })
       child.stdin.on?.('error', () => {})
       child.stdin.end(JSON.stringify(j))
       child.unref?.()
@@ -106,6 +120,7 @@ export function createMemoryClient({harness, mode, env = process.env, spawn = no
         let res
         try { res = JSON.parse(out) } catch { done(undefined, {outcome: 'error', error: 'bad_output'}); return }
         if (res?.context) counters.injected++
+        else if (res?.outcome === 'replay') counters.replay++
         done(res?.context || undefined)
       })
       child.stdin.end(JSON.stringify(j))

@@ -36,8 +36,11 @@ config:
 
 Memory (C8): in canary/on the z0 memory brief (bounded, scrubbed, evidence not instructions) is one extra
 user-role message (`source.kind: z0-memory`, `form: recall`) after the step's admitted batch, within 300 ms, else
-the native decision and a counted `timeout`. DSH commits every admitted message to its session log (model-visible
-content goes through logged channels), so the brief is in the DSH log too. A non-loopback model needs
+the native decision and a counted `timeout`. DSH commits every admitted message to its session log and its
+agent-loop invariant requires every loop-built request to equal that durable derivation, so there is no
+non-durable request seam for a plugin: the brief is in the DSH log (recorded deviation). It starts with the brief
+marker, which z0 recall cuts, so AgentsView re-indexing it never feeds a later brief. A session without a cwd gets
+no brief (`no_scope`). `model_endpoint` is the only endpoint the egress gate sees. A non-loopback model needs
 `{"inject": {"dsh": {"allow_cloud_injection": true}}}` in the z0 memory config (owner opt-in). Rows:
 `$Z0INT_HOME/state/memory/seam/dsh.jsonl`. `z0-memory.cordis.yml` is the memory-only MCP entry for a profile.
 

@@ -81,7 +81,12 @@ The API-attempt scorer/evaluator and the `hermes z0` runtime CLI move here in a 
 
 The z0 memory seam shares the one `pre_llm_call` with capture and automatic (their contexts are joined), and the
 one `post_llm_call` (capture's outcome, then the memory-use receipt of an injected turn). Hermes puts a
-`pre_llm_call` context into the current user message at API time only; the plugin never writes the session store.
+`pre_llm_call` context into the current user message at API time; the plugin never writes the session store, but
+Hermes core stamps the bytes it sent (brief included) on the user row's `api_content` sidecar in `state.db` and
+replays them on later turns of the session (`agent/turn_context.py` `_stamp_api_content_sidecar`): the brief is
+persisted by host design (recorded deviation, owner decision pending). Only user turns run the seam (no cron,
+subagent, kanban, batch platforms, no child sessions); a turn without a workspace root gets no brief (`no_scope`);
+at most 4 shadow children run at once (`queue_saturated` past that).
 
 | `memory_inject` | What happens per user turn |
 | --- | --- |

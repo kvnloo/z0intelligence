@@ -38,14 +38,16 @@ _CLAIM_RE = re.compile(r'^([\w.-]+)=(\S+)$')
 
 
 # ----------------------------------------------------------------------------- the synthetic substrate
-def seed_cohort(cohort: Mapping[str, Any], *, av_db: str | Path, ledger_root: str | Path | None = None,
-                project: str = 'z0') -> None:
-    """Write the cohort's evidence into a synthetic AgentsView DB and the z0 ledger: ``name=value`` claims that
-    share a name become scoped BitemporalClaims (recorded at their observed_at, so the newest is current); every
+def seed_cohort(cohort: Mapping[str, Any], *, av_db: str | Path, ledger_root: str | Path, project: str = 'z0') -> None:
+    """Write the cohort's evidence into a NEW synthetic AgentsView DB and the given z0 ledger: ``name=value`` claims
+    that share a name become scoped BitemporalClaims (recorded at their observed_at, so the newest is current); every
     other claim is one message (the claim, then its cohort locator) of a session of its own harness. No real
-    transcript text."""
+    transcript text. An existing DB file is refused and there is no default ledger, so a live AgentsView DB or the
+    live ledger under Z0INT_HOME is never written."""
     import sqlite3
     av_db = Path(av_db)
+    if av_db.exists():
+        raise FileExistsError(f'refusing to seed an existing database: {av_db}')
     av_db.parent.mkdir(parents=True, exist_ok=True)
     evidence = list(cohort.get('evidence') or [])
     names: dict[str, int] = {}
@@ -112,8 +114,9 @@ def _b_note(harness: str, push_supported: bool | None, observed: bool | None, in
 
 def run(harness: str, cohort: Mapping[str, Any], *, revision: str, schema: str | None = None,
         observed: Mapping[str, bool] | None = None, push_supported: bool | None = None,
-        endpoint: str = EVAL_ENDPOINT, session_id: str | None = None) -> list[dict[str, Any]]:
-    """One row per cohort question, through the harness's real seam path (gates, cache, replay)."""
+        endpoint: str = EVAL_ENDPOINT, session_id: str | None = None, cwd: str | None = None) -> list[dict[str, Any]]:
+    """One row per cohort question, through the harness's real seam path (gates, scope, cache, replay). ``cwd`` is
+    the task directory whose project scopes recall (none: every turn is no_scope)."""
     schema = schema or (STUDY_SCHEMA if harness in STUDY_HARNESSES else ACCEPTANCE_SCHEMA)
     if schema == STUDY_SCHEMA and harness not in STUDY_HARNESSES:
         raise ValueError(f'{harness} is not in the z0evals fb14919 harness enum {list(STUDY_HARNESSES)}: its rows are '
@@ -123,9 +126,9 @@ def run(harness: str, cohort: Mapping[str, Any], *, revision: str, schema: str |
     for q in cohort['questions']:
         key = f'{harness}:{session}:{q["id"]}'
         t0 = time.perf_counter()
-        res = seam.turn(harness, turn_key=key, query=q['prompt'], mode='on', endpoint=endpoint)
+        res = seam.turn(harness, turn_key=key, query=q['prompt'], mode='on', endpoint=endpoint, cwd=cwd)
         latency = round((time.perf_counter() - t0) * 1000, 3)
-        replay = seam.turn(harness, turn_key=key, query=q['prompt'], mode='on', endpoint=endpoint)
+        replay = seam.turn(harness, turn_key=key, query=q['prompt'], mode='on', endpoint=endpoint, cwd=cwd)
         brief = res.get('brief') or {}
         context = res.get('context') or ''
         claims = brief.get('current_claims') or []

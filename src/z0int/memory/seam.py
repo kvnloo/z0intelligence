@@ -7,14 +7,16 @@
               model-visible context within a hard deadline (300 ms, counted from the job start the shim stamps);
               past it, or on any error, the turn keeps its native context and the row says why.
 
-Gates, in order, before anything model-visible: a replayed ``turn_key`` is a no-op (no row, no spawn); a
+Gates, in order, before anything model-visible: a replayed ``turn_key`` is a no-op (no row, no spawn); a turn
+without a task project (no usable ``cwd``) gets nothing in every mode (``no_scope``: a brief is always scoped to one
+project, never built from all of them); a shadow turn past MAX_CHILDREN running briefs is ``queue_saturated``; a
 non-loopback model endpoint needs ``allow_cloud_injection`` for that harness in ``$Z0INT_HOME/config/memory.json``
 (default false, owner opt-in per harness); one injection owner per turn (``surface.claim_injection``, shared with
 ``context_resolve``) or ``double_inject_guard``. Rows are content-free (ids, outcome, receipt), scrubbed anyway.
 
 Shims outside Python call ``python -m z0int.memory.seam {turn,shadow} --harness <h>`` with one JSON job on stdin
-(``session_id``/``turn_id`` or ``turn_key``, ``query``, ``mode``, ``endpoint``, ``cwd``, ``injector``,
-``exclude_layers``, ``started_at``); ``turn`` prints ``{"context", "outcome", "turn_key", ...}``.
+(``session_id``/``turn_id`` or ``turn_key``, ``query``, ``mode``, ``endpoint`` (the harness's own model setting),
+``cwd``, ``injector``, ``exclude_layers``, ``started_at``); ``turn`` prints ``{"context", "outcome", "turn_key", ...}``.
 """
 
 from __future__ import annotations
@@ -42,6 +44,7 @@ DEFAULT_MODE = 'shadow'
 DEADLINE_MS = 300
 MAX_TOKENS = 600
 MAX_QUERY_CHARS = 2000
+SLOT_POOL = 'memory-slots'  # harness_capture.try_slot pool: at most MAX_CHILDREN shadow briefs at once
 
 
 def _config() -> dict[str, Any]:
@@ -104,24 +107,58 @@ def counts(harness: str) -> Counter:
 
 
 def _first_time(harness: str, injector: str, turn_key: str) -> bool:
-    """Idempotency marker per (harness, injector, turn): only the first call of a turn does anything."""
+    """Idempotency marker per (harness, injector, turn): only the first call of a turn does anything. Markers are
+    pruned after the same TTL as the injection-owner markers."""
+    from .surface import prune_markers
     d = _seam_dir() / 'turns'
     d.mkdir(parents=True, exist_ok=True)
-    name = hashlib.sha256('\0'.join((harness, injector, turn_key)).encode()).hexdigest()[:32]
+    path = d / hashlib.sha256('\0'.join((harness, injector, turn_key)).encode()).hexdigest()[:32]
     try:
-        os.close(os.open(d / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
+        os.close(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
     except FileExistsError:
         return False
+    prune_markers(d, path)
     return True
+
+
+def project_of(cwd: Any) -> str | None:
+    """The task's project as AgentsView names it (parser.ExtractProjectFromCwd): the git repo root's name, a linked
+    worktree's main checkout, else the directory's own name; '-' becomes '_'. None without an absolute cwd."""
+    if not cwd or not str(cwd).strip():
+        return None
+    p = Path(str(cwd)).expanduser()
+    if not p.is_absolute():
+        return None
+    root = p
+    for d in (p, *p.parents):
+        git = d / '.git'
+        if git.is_dir():
+            root = d
+            break
+        if git.is_file():
+            root = d
+            try:
+                target = git.read_text(encoding='utf-8').strip()
+            except OSError:
+                break
+            gitdir = Path(target[len('gitdir:'):].strip()) if target.startswith('gitdir:') else None
+            if gitdir is not None:
+                gitdir = gitdir if gitdir.is_absolute() else d / gitdir
+                if gitdir.parent.name == 'worktrees' and gitdir.parent.parent.name == '.git':
+                    root = gitdir.parent.parent.parent  # <main>/.git/worktrees/<name>
+            break
+    return root.name.replace('-', '_') or None
 
 
 # ----------------------------------------------------------------------------- resolve
 def resolve(job: Mapping[str, Any]) -> dict[str, Any]:
-    """The brief for one job: C7 ``memory_brief`` (scope from the turn's project, cross-harness recall)."""
+    """The brief for one job: C7 ``memory_brief`` scoped to the turn's project (cross-harness recall). A job without
+    a project never gets an unscoped brief."""
     from ..memory_contract import MemoryScope
     from .surface import DEFAULT_USER, LAYERS, ScopePolicy, memory_brief
-    cwd = job.get('cwd')
-    scope = MemoryScope(user=DEFAULT_USER, project=Path(cwd).name) if cwd and Path(cwd).name else None
+    if not job.get('project'):
+        raise ValueError('no task project')
+    scope = MemoryScope(user=DEFAULT_USER, project=job['project'])
     policy = ScopePolicy(scope=scope, requester=job['harness'], cross_harness=True)
     layers = [layer for layer in LAYERS if layer not in set(job.get('exclude_layers') or ())]
     return memory_brief(str(job['query'])[:MAX_QUERY_CHARS], policy, max_tokens=int(job.get('max_tokens') or MAX_TOKENS),
@@ -170,9 +207,11 @@ def run_shadow(job: Mapping[str, Any]) -> None:
     _write(job['harness'], {**base, 'outcome': 'shadow', 'would_inject': _would_inject(brief), **_brief_row(brief)})
 
 
-def _spawn_shadow(job: Mapping[str, Any]) -> None:
+def _spawn_shadow(job: Mapping[str, Any], slot: Any) -> None:
+    """The detached child inherits the locked ``slot`` file, so the slot stays held until it exits."""
     from ..harness_capture import spawn_detached
-    spawn_detached([sys.executable, '-m', 'z0int.memory.seam', 'child', '--harness', job['harness']], job)
+    spawn_detached([sys.executable, '-m', 'z0int.memory.seam', 'child', '--harness', job['harness']], job,
+                   pass_fds=(slot.fileno(),))
 
 
 def turn(harness: str, *, turn_key: str, query: str, mode: str | None = None, endpoint: str | None = None,
@@ -187,11 +226,23 @@ def turn(harness: str, *, turn_key: str, query: str, mode: str | None = None, en
         return {**out, 'outcome': 'off' if cfg['mode'] == 'off' else 'no_query'}
     if not _first_time(harness, injector, turn_key):
         return {**out, 'outcome': 'replay'}
-    job = {'harness': harness, 'turn_key': turn_key, 'query': str(query)[:MAX_QUERY_CHARS], 'cwd': cwd,
+    project = project_of(cwd)
+    if project is None:  # fail closed: never a brief built from every project
+        _write(harness, {'mode': cfg['mode'], 'turn_key': turn_key, 'injector': injector, 'outcome': 'no_scope',
+                         'injected': False, 'would_inject': False})
+        return {**out, 'outcome': 'no_scope'}
+    job = {'harness': harness, 'turn_key': turn_key, 'query': str(query)[:MAX_QUERY_CHARS], 'project': project,
            'injector': injector, 'exclude_layers': list(exclude_layers), 'max_tokens': cfg['max_tokens']}
     if cfg['mode'] == 'shadow':
+        from ..harness_capture import try_slot
         try:
-            _spawn_shadow(job) if detach else run_shadow(job)
+            slot = try_slot(pool=SLOT_POOL)
+            if slot is None:
+                _write(harness, {'mode': 'shadow', 'turn_key': turn_key, 'injector': injector,
+                                 'outcome': 'queue_saturated', 'injected': False, 'would_inject': False})
+                return {**out, 'outcome': 'queue_saturated'}
+            with slot:
+                _spawn_shadow(job, slot) if detach else run_shadow(job)
         except Exception as exc:  # noqa: BLE001 - fail open: counted, never raised into the turn
             _write(harness, {'mode': 'shadow', 'turn_key': turn_key, 'injector': injector, 'outcome': 'error',
                              'injected': False, 'would_inject': False, 'error': type(exc).__name__})

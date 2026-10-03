@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -46,7 +47,10 @@ def main(argv: list[str] | None = None) -> int:
                                     f'{acceptance.ACCEPTANCE_SCHEMA}); the study label is refused for other harnesses')
     e.add_argument('--observed', help='JSON {question_id: bool}: the brief was seen in the recorded model request')
     e.add_argument('--endpoint', default=acceptance.EVAL_ENDPOINT, help='the model endpoint the seam gate sees')
-    e.add_argument('--seed-av-db', help='first write the cohort evidence into this synthetic AgentsView DB')
+    e.add_argument('--cwd', default=os.getcwd(), help='task directory whose project scopes recall (default: here)')
+    e.add_argument('--seed-av-db', help='first write the cohort evidence into this NEW synthetic AgentsView DB '
+                                        '(an existing file is refused); needs --seed-ledger')
+    e.add_argument('--seed-ledger', help='the z0 ledger directory the seeded claims go to (no default)')
     r = sub.add_parser('rules', help='Grok only, opt-in: write a scrubbed project-scoped memory rule file')
     r.add_argument('--harness', required=True, choices=['grok'])
     r.add_argument('--scope', choices=['project'], help='required: project (a global rules file is never written)')
@@ -56,13 +60,18 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     if args.cmd == 'eval':
         cohort = acceptance.load_json(args.cohort)
-        if args.seed_av_db:
-            acceptance.seed_cohort(cohort, av_db=args.seed_av_db)
+        if args.seed_av_db or args.seed_ledger:
+            if not (args.seed_av_db and args.seed_ledger):
+                p.error('--seed-av-db and --seed-ledger go together')
+            try:
+                acceptance.seed_cohort(cohort, av_db=args.seed_av_db, ledger_root=args.seed_ledger)
+            except FileExistsError as exc:
+                p.error(str(exc))
         status = _push_status().get(args.harness) or {}
         rows = acceptance.run(args.harness, cohort, revision=args.revision, schema=args.schema,
                               observed=acceptance.load_json(args.observed) if args.observed else None,
                               push_supported=False if status.get('status') == 'UNSUPPORTED' else None,
-                              endpoint=args.endpoint)
+                              endpoint=args.endpoint, cwd=args.cwd)
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         with open(args.out, 'a', encoding='utf-8') as fh:
             for row in rows:
