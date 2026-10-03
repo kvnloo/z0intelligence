@@ -79,6 +79,8 @@ filesystem activity". Known upstream ctx behaviour on every invocation:
 
 - it opens `search/lexical/.ctx-generation-lease-coordinator-init-v2.lock` and
   `.ctx-generation-read-leases-v2.lock` for writing (content unchanged);
+- it opens `install.json` in the data root for writing (content, size and
+  mtime unchanged);
 - it bumps the ctime of `~/.local/state/ctx/analytics-outbox-v1.lock`, outside
   `CTX_DATA_ROOT`, even with `CTX_ANALYTICS_ENABLED=false`.
 
