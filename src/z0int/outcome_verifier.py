@@ -135,9 +135,9 @@ def parse_since(spec: str | None, now: float | None = None) -> float:
     return t
 
 
-def state_dir(root: Path | None = None) -> Path:
+def state_dir(root: Path | None = None, harness: str = HARNESS) -> Path:
     from . import paths
-    return paths.ensure_layout(root)['state'] / HARNESS
+    return paths.ensure_layout(root)['state'] / harness
 
 
 def projects_dir() -> Path:
@@ -188,6 +188,51 @@ def _exit_code(block: Mapping[str, Any], tur: Any) -> int | None:
     return 0
 
 
+def new_turn(prompt_id: Any, session_id: Any, ts: float | None, cwd: Any, text: str,
+             harness_message: bool) -> dict[str, Any]:
+    """One empty turn as every turn reader builds it (Claude transcripts here, AgentsView in turn_readers)."""
+    return {'prompt_id': prompt_id, 'session_id': session_id, 'started_at': ts, 'ended_at': ts, 'cwd': cwd,
+            'harness_message': harness_message,
+            '_prompt': text, 'bash': [], 'edits': [], 'assistant_ids': set(), 'tool_calls': 0,
+            'asked_text': None, 'ask_tool': [], 'agents_spawned': 0, 'pr_created': [],
+            'pr_merged_by_agent': [], 'interrupted': False, 'subagent_ids': [],
+            # density verifiers (verification_density.py); '_'-prefixed fields hold text transiently
+            'tool_names': Counter(), 'edit_ops': [], 'reads': set(), 'tool_seq': [], '_final_text': ''}
+
+
+def bash_result(call: dict[str, Any], text: str, exit_code: int | None) -> None:
+    """Attach a shell call's result: exit (check-class aware), commits it printed, PRs it opened."""
+    call['_out_tail'] = text[-600:]
+    call['exit'] = exit_code
+    cmd = call.get('command', '')
+    cls = classify(cmd, call['exit'], text[-2000:])
+    call['check_class'] = cls['check_class']
+    if CHECK_ANY.search(cmd):
+        call['shell_exit'] = call['exit']
+        call['exit'], call['piped'] = cls['exit'], cls['piped']
+    if COMMIT_CMD.search(cmd):
+        call['commits'] = [m.group('sha') for m in COMMIT_OUT.finditer(text)]
+    if 'gh pr create' in cmd:
+        call['turn']['pr_created'] += [{'repo': m.group(1), 'number': int(m.group(2))}
+                                       for m in PR_URL.finditer(text)]
+
+
+def finish_turns(turns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Close a reader's turns: count assistant messages, dedupe PRs, drop the call->turn back references."""
+    for t in turns:
+        t['assistant_messages'] = len(t.pop('assistant_ids'))
+        seen, prs = set(), []
+        for p in t['pr_created']:
+            key = (p['repo'], p['number'])
+            if key not in seen:
+                seen.add(key)
+                prs.append(p)
+        t['pr_created'] = prs
+        for c in t['tool_seq']:
+            c.pop('turn', None)
+    return turns
+
+
 def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
     """One dict per turn. ``_prompt`` holds the prompt text transiently for cue matching; callers must not emit it."""
     turns: list[dict[str, Any]] = []
@@ -218,14 +263,8 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                     if cur is not None:
                         cur['interrupted'] = True
                     continue
-                cur = {'prompt_id': row.get('promptId'), 'session_id': row.get('sessionId'), 'started_at': ts,
-                       'ended_at': ts, 'cwd': row.get('cwd'),
-                       'harness_message': bool(row.get('isMeta')) or stripped.startswith(HARNESS_PREFIXES),
-                       '_prompt': text, 'bash': [], 'edits': [], 'assistant_ids': set(), 'tool_calls': 0,
-                       'asked_text': None, 'ask_tool': [], 'agents_spawned': 0, 'pr_created': [],
-                       'pr_merged_by_agent': [], 'interrupted': False, 'subagent_ids': [],
-                       # density verifiers (verification_density.py); '_'-prefixed fields hold text transiently
-                       'tool_names': Counter(), 'edit_ops': [], 'reads': set(), 'tool_seq': [], '_final_text': ''}
+                cur = new_turn(row.get('promptId'), row.get('sessionId'), ts, row.get('cwd'), text,
+                               bool(row.get('isMeta')) or stripped.startswith(HARNESS_PREFIXES))
                 turns.append(cur)
                 continue
             if cur is None:
@@ -295,19 +334,7 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                     elif call['name'] == 'Read' and not call['error'] and call.get('path'):
                         call['turn']['reads'].add(call['path'])
                     if call['name'] == 'Bash':
-                        call['_out_tail'] = text[-600:]
-                        call['exit'] = _exit_code(block, row.get('toolUseResult'))
-                        cmd = call.get('command', '')
-                        cls = classify(cmd, call['exit'], text[-2000:])
-                        call['check_class'] = cls['check_class']
-                        if CHECK_ANY.search(cmd):
-                            call['shell_exit'] = call['exit']
-                            call['exit'], call['piped'] = cls['exit'], cls['piped']
-                        if COMMIT_CMD.search(cmd):
-                            call['commits'] = [m.group('sha') for m in COMMIT_OUT.finditer(text)]
-                        if 'gh pr create' in cmd:
-                            call['turn']['pr_created'] += [{'repo': m.group(1), 'number': int(m.group(2))}
-                                                           for m in PR_URL.finditer(text)]
+                        bash_result(call, text, _exit_code(block, row.get('toolUseResult')))
                     elif call['name'] == ASK_TOOL:
                         call['answered'] = not block.get('is_error')
                     elif call['name'] in ('Agent', 'Task'):
@@ -323,18 +350,7 @@ def turns_from_transcript(path: Path) -> list[dict[str, Any]]:
                 owner = t
         if owner is not None:
             owner['pr_created'].append({'repo': link['repo'], 'number': int(link['number'])})
-    for t in turns:
-        t['assistant_messages'] = len(t.pop('assistant_ids'))
-        seen, prs = set(), []
-        for p in t['pr_created']:
-            key = (p['repo'], p['number'])
-            if key not in seen:
-                seen.add(key)
-                prs.append(p)
-        t['pr_created'] = prs
-        for c in t['tool_seq']:
-            c.pop('turn', None)
-    return turns
+    return finish_turns(turns)
 
 
 def session_turns(path: Path) -> list[dict[str, Any]]:
@@ -959,9 +975,9 @@ def make_row(session_id: str, trace_id: str | None, core: Mapping[str, Any], obs
     return row
 
 
-def append_new(rows: list[dict[str, Any]], root: Path | None = None) -> tuple[int, Path]:
+def append_new(rows: list[dict[str, Any]], root: Path | None = None, harness: str = HARNESS) -> tuple[int, Path]:
     """Append rows whose content changed since the latest verified row for the same turn. Never rewrites."""
-    path = state_dir(root) / 'outcomes_verified.jsonl'
+    path = state_dir(root, harness) / 'outcomes_verified.jsonl'
     latest = {}
     for r in read_jsonl(path):
         latest[(r.get('session_id'), r.get('trace_id'))] = r.get('content_sha')
@@ -972,6 +988,140 @@ def append_new(rows: list[dict[str, Any]], root: Path | None = None) -> tuple[in
             for r in fresh:
                 fh.write(json.dumps(r, sort_keys=True) + '\n')
     return len(fresh), path
+
+
+# ----------------------------------------------------------------------------- every harness (z0int#56 M1)
+DEGRADING = ('reader_unavailable', 'label_source_empty')  # a label source that cannot answer: never "success"
+
+
+def _failure(harness: str, kind: str, detail: Mapping[str, Any], turn: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    from . import harness_capture as hc
+    return {'schema': hc.schema(harness, 'failure'), 'kind': kind, 'harness': harness,
+            **{k: turn[k] for k in ('session_id', 'trace_id', 'turn_key', 'cohort') if turn and turn.get(k) is not None},
+            'detail': dict(detail)}
+
+
+def _failure_key(row: Mapping[str, Any]) -> tuple:
+    return row.get('kind'), row.get('turn_key'), json.dumps(row.get('detail'), sort_keys=True, default=str)
+
+
+def write_failures(harness: str, failures: Iterable[Mapping[str, Any]], root: Path | None = None) -> int:
+    """Append the verifier's failure rows that are not on file yet (same kind, turn and detail): re-runs add none."""
+    from . import harness_capture as hc
+    seen = {_failure_key(r) for r in read_jsonl(hc.state_dir(harness, root) / 'failures.jsonl')}
+    n = 0
+    for f in failures:
+        if _failure_key(f) not in seen:
+            seen.add(_failure_key(f))
+            hc.record_failure(harness, f['kind'], ctx=f, detail=f['detail'], root=root)
+            n += 1
+    return n
+
+
+def _harness_row(harness: str, turn: Mapping[str, Any], core: Mapping[str, Any], cohort: str,
+                 join: Mapping[str, Any], **kw: Any) -> dict[str, Any]:
+    """make_row for a non-Claude harness: its own schema names, turn_key, cohort and how the label was joined."""
+    from . import harness_capture as hc
+    row = make_row(turn['session_id'], turn['trace_id'], core, turn.get('observed'), **kw)
+    content = {k: row[k] for k in ('signals', 'verification_state', 'label_class', 'label_confidence')}
+    row.update(schema=hc.schema(harness, 'turn_outcome_verified'), harness=harness, turn_key=turn['turn_key'],
+               cohort=cohort, join=dict(join), content_sha=_sha({**content, 'cohort': cohort, 'join': join['state']}))
+    row['observed_ref']['schema'] = hc.schema(harness, 'turn_outcome')
+    row['verification_id'] = _sha({'session': turn['session_id'], 'trace': turn['trace_id'],
+                                   'content': row['content_sha'], 'verifier': VERIFIER}, 20)
+    return row
+
+
+def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Path | None, since: float, gh: GitHub,
+                       fix_days: int, now: float, stale_hours: float, density: bool, extra_repo_roots: Iterable[Path],
+                       failures: list[dict[str, Any]], join: Counter) -> list[dict[str, Any]]:
+    from . import turn_readers as tr
+    rule = tr.JOIN_RULES[harness]
+    reader = tr.AgentsViewReader(agentsview, now=now)
+    rows: list[dict[str, Any]] = []
+    try:
+        if not reader.available:
+            failures.append(_failure(harness, 'reader_unavailable', {'reason': reader.unavailable.reason}))
+            return rows
+        if not reader.has_agent(rule.agent):
+            failures.append(_failure(harness, 'reader_unavailable', {'reason': 'agent_missing', 'agent': rule.agent}))
+            return rows
+        stale = reader.staleness is None or reader.staleness > stale_hours
+        index = RepoIndex(extra_repo_roots)
+        for sid, turns in tr.captured_turns(harness, root).items():
+            joins, meta, av_turns = tr.join_session(rule, reader, turns, stale=stale)
+            cores = _rows_for_session(av_turns, sid, index=index, gh=gh, fix_days=fix_days, now=now,
+                                      density=density) if av_turns else {}
+            for turn, j in zip(turns, joins):
+                cohort = tr.classify_cohort(harness, meta, capture=turn)
+                core = cores.get(f"#{j['ordinal']}") if j['state'] == 'joined' else None
+                if core is not None and (core['_started'] or 0) < since:
+                    continue
+                join[j['state']] += 1
+                if core is None:
+                    core = {'signals': [], 'label_class': 'unknown', 'label_confidence': None, 'turn': None,
+                            'verification_state': 'pending_index' if j['state'] == 'pending_index' else 'unverified',
+                            'asked': None, 'measurement': {'transcript': j['state']}}
+                else:
+                    core['measurement'] = {**core['measurement'], 'label_source': 'agentsview'}
+                core.pop('_started', None)
+                if j['state'] == 'unjoined':
+                    failures.append(_failure(harness, 'unjoined', {'reason': j['reason'], 'rule': rule.name,
+                                                                   'candidates': j['candidates']}, dict(turn, cohort=cohort)))
+                rows.append(_harness_row(harness, turn, core, cohort, j, fix_days=fix_days, gh=gh, now=now,
+                                         density=density))
+    finally:
+        reader.close()
+    return rows
+
+
+def verify_harness(harness: str, *, root: Path | None = None, agentsview: str | Path | None = None,
+                   projects: Path | None = None, since: float = 0.0, all_turns: bool = False, gh: GitHub | None = None,
+                   fix_days: int = 7, now: float | None = None, stale_hours: float | None = None, density: bool = True,
+                   extra_repo_roots: Iterable[Path] = (), write: bool = False) -> dict[str, Any]:
+    """Verified rows for one harness plus a counts-only report (status, failures, join counts, manifest).
+
+    claude-code: ``verify`` over Claude transcripts (rows unchanged), plus a ``label_source_empty`` failure when
+    captured sessions exist but the resolved projects dir holds none of them (e.g. CLAUDE_CONFIG_DIR unset in a
+    timer). Every other harness: its AgentsView rows through ``turn_readers`` and the harness join rule, with the
+    same signal semantics. A label source that cannot answer makes the status ``degraded``, never ``success``.
+    With ``write`` the rows and failure rows are appended (both idempotent: a re-run appends nothing new).
+    """
+    from . import turn_readers as tr
+    now = time.time() if now is None else now
+    gh = gh or GitHub()
+    failures: list[dict[str, Any]] = []
+    join: Counter = Counter({'joined': 0, 'unjoined': 0, 'pending_index': 0})
+    if harness == HARNESS:
+        rows = verify(root=root, since=since, all_turns=all_turns, gh=gh, fix_days=fix_days, projects=projects,
+                      now=now, extra_repo_roots=extra_repo_roots, density=density)
+        sids = {r.get('session_id') for name in ('opportunities.jsonl', 'outcomes.jsonl')
+                for r in read_jsonl(state_dir(root) / name)} - {None}
+        if sids and not any(find_transcript(sid, projects) for sid in sids):
+            failures.append(_failure(harness, 'label_source_empty', {'resolved_dir': str(projects or projects_dir()),
+                                                                     'sessions': len(sids)}))
+        join = Counter()
+    elif harness in tr.JOIN_RULES:
+        rows = _verify_agentsview(harness, root=root, agentsview=agentsview, since=since, gh=gh, fix_days=fix_days,
+                                  now=now, stale_hours=tr.STALE_HOURS if stale_hours is None else stale_hours,
+                                  density=density, extra_repo_roots=extra_repo_roots, failures=failures, join=join)
+    else:
+        raise ValueError(f'no label source for harness {harness!r}')
+    appended = 0
+    if write:
+        appended = append_new(rows, root, harness)[0]
+        write_failures(harness, failures, root)
+    sdir = state_dir(root, harness)
+    files = {}
+    for name in ('outcomes_verified.jsonl', 'failures.jsonl'):
+        try:
+            files[name] = hashlib.sha256((sdir / name).read_bytes()).hexdigest()[:16]
+        except OSError:
+            files[name] = None
+    manifest = {'harness': harness, 'verifier': VERIFIER['version'], 'files': files}
+    manifest['manifest_sha256'] = _sha(manifest, 64)
+    return {'harness': harness, 'status': 'degraded' if any(f['kind'] in DEGRADING for f in failures) else 'success',
+            'rows': rows, 'failures': failures, 'join': dict(join), 'appended': appended, 'manifest': manifest}
 
 
 # ----------------------------------------------------------------------------- credit-ready join
@@ -1089,6 +1239,12 @@ def _main(argv: list[str] | None = None) -> int:
     v.add_argument('--dry-run', action='store_true', help='compute and summarise; do not append')
     v.add_argument('--report', type=Path, default=None, help='also write a counts-only markdown report here')
     v.add_argument('--json', action='store_true')
+    v.add_argument('--harness', default=HARNESS,
+                   help='claude-code (transcripts) or hermes/codex/grok/omp/omo/dsh (AgentsView, read-only)')
+    v.add_argument('--agentsview-db', type=Path, default=None,
+                   help='AgentsView sessions.db (default $AGENTSVIEW_DATA_DIR/sessions.db); opened mode=ro')
+    v.add_argument('--stale-hours', type=float, default=None,
+                   help='index older than this: turns it has not reached are pending_index (default 6)')
     sub.add_parser('density', add_help=False,
                    help='counts-only diagnosis: why turns are unverified, by cohort x turn type (-> verification_density)')
     sub.add_parser('export', add_help=False,
@@ -1117,12 +1273,15 @@ def _main(argv: list[str] | None = None) -> int:
     if args.cmd == 'verify':
         now = time.time()
         gh = GitHub(not args.no_gh, cache_path=None if args.no_gh_cache else default_gh_cache())
-        rows = verify(since=parse_since(args.since, now), all_turns=args.all_turns, gh=gh,
-                      fix_days=args.fix_days, projects=args.projects_dir, now=now, extra_repo_roots=args.repo_root,
-                      density=not args.no_density)
-        appended, path = (0, None) if args.dry_run else append_new(rows)
-        rep = summarize(rows, credit_join())
-        rep['appended'] = appended
+        out = verify_harness(args.harness, since=parse_since(args.since, now), all_turns=args.all_turns, gh=gh,
+                             fix_days=args.fix_days, projects=args.projects_dir, now=now,
+                             extra_repo_roots=args.repo_root, density=not args.no_density,
+                             agentsview=args.agentsview_db, stale_hours=args.stale_hours, write=not args.dry_run)
+        rows, appended = out['rows'], out['appended']
+        path = None if args.dry_run else state_dir(None, args.harness) / 'outcomes_verified.jsonl'
+        rep = summarize(rows, credit_join() if args.harness == HARNESS else None)
+        rep.update(appended=appended, harness=args.harness, status=out['status'], label_join=out['join'],
+                   failures=dict(Counter(f['kind'] for f in out['failures'])))
         if args.report:
             args.report.parent.mkdir(parents=True, exist_ok=True)
             args.report.write_text(format_markdown(rep, meta={
@@ -1134,6 +1293,8 @@ def _main(argv: list[str] | None = None) -> int:
         else:
             print(f"verified {rep['turns']} turns; appended {appended} -> {path or '(dry run)'}")
             print('states: ' + ', '.join(f'{s}={rep["states"].get(s, 0)}' for s in STATES))
+            print(f"status: {rep['status']} ({args.harness}); failures: {rep['failures'] or 'none'}"
+                  + (f"; join: {rep['label_join']}" if rep['label_join'] else ''))
         return 0
     joined = credit_join()
     if args.out:
