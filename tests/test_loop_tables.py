@@ -192,3 +192,20 @@ def test_merge_of_table_less_sets_writes_an_empty_index(tmp_path):
 def test_loop_cli_export_on_an_empty_home_exits_zero(tmp_path):
     assert le._main(['export', '--root', str(tmp_path / 'empty'), '--host', 'h', '--out-dir', str(tmp_path / 'o')]) == 0
     assert (tmp_path / 'o' / 'manifest.json').is_file()
+
+
+def test_merge_counts_turn_keys_that_hosts_placed_in_different_cohorts(tmp_path):
+    """A v0.39 host cannot tell a `codex exec` run apart (unknown) where a v0.44 host says automated: the merge keeps
+    both rows (never pooled into interactive) and counts the turn keys so the disagreement is visible."""
+    a, b = tmp_path / 'host-a', tmp_path / 'host-b'
+    put(a, 'codex', 'opportunities.jsonl', [opp('codex', 'th-1', 'x'), opp('codex', 'th-2', 'y')])
+    put(a, 'codex', 'outcomes_verified.jsonl', [ver('codex', 'th-1', 'x', 'verified_success', cohort='automated'),
+                                                ver('codex', 'th-2', 'y', 'verified_success', cohort='interactive')])
+    put(b, 'codex', 'opportunities.jsonl', [opp('codex', 'th-1', 'x'), opp('codex', 'th-2', 'y')])
+    put(b, 'codex', 'outcomes_verified.jsonl', [ver('codex', 'th-1', 'x', 'verified_success', cohort='unknown'),
+                                                ver('codex', 'th-2', 'y', 'verified_success', cohort='interactive')])
+    le.export_tables(tmp_path / 'tA', root=a, host='host-a')
+    le.export_tables(tmp_path / 'tB', root=b, host='host-b')
+    index = le.merge([tmp_path / 'tA', tmp_path / 'tB'], tmp_path / 'm')
+    assert sorted(index['tables']) == ['codex/automated', 'codex/interactive', 'codex/unknown']
+    assert index['cross_cohort_turn_keys'] == {'codex': 1}
