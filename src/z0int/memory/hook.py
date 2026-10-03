@@ -7,8 +7,9 @@ request; in shadow (the default) it detaches the brief and prints nothing. The m
 sees is the harness's own setting only: its base-URL variable, else its public API (cloud: injection then needs
 ``allow_cloud_injection`` for that harness in memory.json; no other variable can mark a turn loopback). The 300 ms
 canary/on budget counts from this process's start, like the JS and Hermes shims. There is no SessionStart seam: a
-session start carries no user query to brief (recorded deviation). Grok has no push seam (pull-only via MCP).
-Always exits 0 and fails open.
+session start carries no user query to brief (recorded deviation). Grok has no push seam (pull-only via MCP; it
+ignores UserPromptSubmit stdout): ``--harness grok`` only records the turn's shadow receipt (whatever mode is set,
+unless off), so its capture opportunity carries it, and never prints. Always exits 0 and fails open.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from . import seam  # noqa: E402
 
 ENDPOINTS = {'claude-code': ('ANTHROPIC_BASE_URL', 'https://api.anthropic.com'),
              'codex': ('OPENAI_BASE_URL', 'https://api.openai.com/v1')}
+SHADOW_ONLY = ('grok',)  # no model-visible push seam: receipts only
 
 
 def endpoint(harness: str, env: Mapping[str, str]) -> str:
@@ -50,7 +52,7 @@ def handle(event: str, raw: str, harness: str, *, env: Mapping[str, str] | None 
            started_at: float | None = None) -> str | None:
     """One hook event -> stdout text (None prints nothing)."""
     env = os.environ if env is None else env
-    if event != 'prompt' or harness not in ENDPOINTS:
+    if event != 'prompt' or harness not in (*ENDPOINTS, *SHADOW_ONLY):
         return None
     try:
         payload = json.loads(raw)
@@ -63,8 +65,13 @@ def handle(event: str, raw: str, harness: str, *, env: Mapping[str, str] | None 
     text = prompt_of(payload)
     if not text.strip() or is_harness_message(text):
         return None
-    out = seam.turn(harness, turn_key=turn_key(harness, session_id_of(payload, env), turn_id(payload)), query=text,
-                    endpoint=endpoint(harness, env), cwd=payload.get('cwd'), started_at=started_at)
+    key = turn_key(harness, session_id_of(payload, env), turn_id(payload))
+    if harness in SHADOW_ONLY:
+        if seam.settings(harness, env=env)['mode'] != 'off':
+            seam.turn(harness, turn_key=key, query=text, mode='shadow', cwd=payload.get('cwd'))
+        return None
+    out = seam.turn(harness, turn_key=key, query=text, endpoint=endpoint(harness, env), cwd=payload.get('cwd'),
+                    started_at=started_at)
     if not out.get('context'):
         return None
     return json.dumps({'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit',

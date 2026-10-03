@@ -28,8 +28,16 @@ const z0Home = (env) => env.Z0INT_HOME || join(homedir(), '.z0int')
 const seamDir = (env) => join(z0Home(env), 'state', 'memory', 'seam')
 
 export function memoryMode(value, env = process.env) {
+  if (killed(env)) return 'off'
   const mode = value || env.Z0INT_MEMORY_INJECT || 'shadow'
   return MODES.includes(mode) ? mode : 'off'
+}
+
+/** The capture kill switch (Z0INT_CAPTURE=0 or config/capture.json {"enabled": false}) keeps memory native too. */
+function killed(env) {
+  if (env.Z0INT_CAPTURE === '0') return true
+  try { return JSON.parse(readFileSync(join(z0Home(env), 'config', 'capture.json'), 'utf8'))?.enabled === false }
+  catch { return false }
 }
 
 /** A counted shim-side row (the z0 side writes every other row); never throws. */

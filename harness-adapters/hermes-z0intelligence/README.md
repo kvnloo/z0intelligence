@@ -37,7 +37,7 @@ injected system turns. `z0int hermes decisions` reports gate vs observed behavio
 
 There is no service host or port: capture writes files only and opens no socket. A host/port/url setting (for
 example bend's `stack_service_port`) is ignored and written down as a counted `config_warning`. Kill switch:
-`Z0INT_CAPTURE=0`, or `$Z0INT_HOME/config/capture.json` `{"enabled": false}`.
+`Z0INT_CAPTURE=0`, or `$Z0INT_HOME/config/capture.json` `{"enabled": false}` (it turns the memory seam off too).
 
 ## Privacy classes
 

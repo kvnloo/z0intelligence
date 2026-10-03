@@ -24,6 +24,7 @@ import os
 import subprocess
 import threading
 import time
+from pathlib import Path
 
 HARNESS = 'hermes'
 MODES = ('off', 'shadow', 'canary', 'on')
@@ -123,9 +124,19 @@ class Memory:
         return None
 
 
+def killed(home):
+    """The capture kill switch (Z0INT_CAPTURE=0 or config/capture.json {"enabled": false}) keeps memory native too."""
+    if os.environ.get('Z0INT_CAPTURE') == '0':
+        return True
+    try:
+        return json.loads((Path(home) / 'config' / 'capture.json').read_text(encoding='utf-8')).get('enabled') is False
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 def create(settings, home, python, profile):
-    """A Memory for this profile, or None when memory_inject resolves to off."""
+    """A Memory for this profile, or None when memory_inject resolves to off or the kill switch is set."""
     mode = mode_of(settings)
-    if mode == 'off':
+    if mode == 'off' or killed(home):
         return None
     return Memory(home=home, python=python, mode=mode, profile=profile, injector=settings.get('memory_injector'))

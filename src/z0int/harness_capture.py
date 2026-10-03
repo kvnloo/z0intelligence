@@ -466,10 +466,18 @@ def opportunity_record(harness: str, payload: Mapping[str, Any], ctx: Mapping[st
     row = {'schema': schema(harness, 'opportunity_record'), **ctx,
            'capture': ctx.get('capture') or capture_flags(request), 'repo': str(repo) if repo else None,
            'gate': gate, **extra, 'opportunity': opp}
+    from .memory_contract import MemoryUseReceipt
     if ctx.get('memory') is not None:  # the turn's MemoryUseReceipt, validated (no instruction authority)
-        from .memory_contract import MemoryUseReceipt
         mem = ctx['memory']
         row['memory'] = (mem if isinstance(mem, MemoryUseReceipt) else MemoryUseReceipt.from_dict(mem)).to_dict()
+        return row
+    from .memory.seam import receipt_for  # else the receipt the turn's memory seam settled (C8, D3)
+    mem = receipt_for(harness, ctx.get('turn_key'))
+    if mem is not None:
+        try:
+            row['memory'] = MemoryUseReceipt.from_dict(mem).to_dict()
+        except (TypeError, ValueError, KeyError, AttributeError):  # left out; the opportunity is still recorded
+            pass
     return row
 
 

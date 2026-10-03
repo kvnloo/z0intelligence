@@ -36,8 +36,8 @@ register both pairs: each subagent would be captured twice.
 Opportunity rows written before capture flags existed export as cohort `unknown` until
 `z0int outcomes backfill-capture` flags them and drops their stored request text (one-shot, idempotent).
 
-Capture records live under `$Z0INT_HOME/state/claude-code/`; `Z0INT_CAPTURE=0` turns capture off, and
-request text is stored only with `Z0INT_CAPTURE_PRIVACY=request_opt_in`.
+Capture records live under `$Z0INT_HOME/state/claude-code/`; `Z0INT_CAPTURE=0` turns capture off (and the
+memory seam: one kill switch), and request text is stored only with `Z0INT_CAPTURE_PRIVACY=request_opt_in`.
 
 Requires `pip install -e .` of this repo (or `Z0INT_PYTHON` pointing at that
 environment). Every hook fails open.

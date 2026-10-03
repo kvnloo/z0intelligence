@@ -14,6 +14,11 @@ non-loopback model endpoint needs ``allow_cloud_injection`` for that harness in 
 (default false, owner opt-in per harness); one injection owner per turn (``surface.claim_injection``, shared with
 ``context_resolve``) or ``double_inject_guard``. Rows are content-free (ids, outcome, receipt), scrubbed anyway.
 
+Every terminal row of a turn also settles that turn's receipt (``state/memory/receipts``, keyed by harness +
+``turn_key``): the capture side's detached opportunity build reads it into ``opportunity_record.memory`` (D3),
+waiting up to RECEIPT_WAIT_S for a turn whose brief is still running. The capture kill switch (``Z0INT_CAPTURE=0`` or
+``config/capture.json`` ``{"enabled": false}``) keeps this seam off too: one switch makes every hook native.
+
 Shims outside Python call ``python -m z0int.memory.seam {turn,shadow} --harness <h>`` with one JSON job on stdin
 (``session_id``/``turn_id`` or ``turn_key``, ``query``, ``mode``, ``endpoint`` (the harness's own model setting),
 ``cwd``, ``injector``, ``exclude_layers``, ``started_at``); ``turn`` prints ``{"context", "outcome", "turn_key", ...}``.
@@ -45,6 +50,8 @@ DEADLINE_MS = 300
 MAX_TOKENS = 600
 MAX_QUERY_CHARS = 2000
 SLOT_POOL = 'memory-slots'  # harness_capture.try_slot pool: at most MAX_CHILDREN shadow briefs at once
+RECEIPT_WAIT_S = 10.0  # an opportunity build (detached) waits this long for a turn's brief that is still running
+RECEIPT_GRACE_S = 1.0  # ... and this long for a seam that has run before but has not marked this turn yet
 
 
 def _config() -> dict[str, Any]:
@@ -56,9 +63,12 @@ def settings(harness: str, *, mode: str | None = None, env: Mapping[str, str] | 
     """Mode: the shim's value, else ``Z0INT_MEMORY_INJECT``, else ``memory.json`` inject.<harness>.mode, else shadow.
     ``allow_cloud_injection`` comes from ``memory.json`` only (an owner decision per harness, never an env var)."""
     env = os.environ if env is None else env
+    from ..harness_capture import enabled
     own = ((_config().get('inject') or {}).get(harness) or {})
     own = own if isinstance(own, dict) else {}
     chosen = mode or env.get('Z0INT_MEMORY_INJECT') or own.get('mode') or DEFAULT_MODE
+    if not enabled(env):  # the capture kill switch keeps memory native as well
+        chosen = 'off'
     return {'mode': chosen if chosen in MODES else 'off', 'allow_cloud_injection': own.get('allow_cloud_injection') is True,
             'deadline_ms': int(own.get('deadline_ms') or DEADLINE_MS), 'max_tokens': int(own.get('max_tokens') or MAX_TOKENS)}
 
@@ -92,6 +102,59 @@ def _write(harness: str, row: Mapping[str, Any]) -> None:
     with open(path, 'a', encoding='utf-8') as fh:
         fcntl.flock(fh, fcntl.LOCK_EX)
         fh.write(json.dumps(clean, ensure_ascii=False) + '\n')
+    if clean.get('turn_key'):
+        _settle(harness, clean['turn_key'], clean.get('memory'))
+
+
+# ----------------------------------------------------------------------------- the turn's receipt, for capture
+def _receipt_path(harness: str, turn_key: str, suffix: str) -> Path:
+    name = hashlib.sha256('\0'.join((harness, str(turn_key))).encode()).hexdigest()[:32]
+    return _seam_dir().parent / 'receipts' / f'{name}.{suffix}'
+
+
+def _expect(harness: str, turn_key: str) -> None:
+    """Mark the turn's receipt as pending, before anything can take time."""
+    from .surface import prune_markers
+    path = _receipt_path(harness, turn_key, 'pending')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch()
+    prune_markers(path.parent, path)
+
+
+def _settle(harness: str, turn_key: str, receipt: Any) -> None:
+    """The turn's receipt (None: the turn used no memory). The first receipt wins: a later row of the same turn
+    (a second injector's guard, a replayed shim) never replaces it."""
+    path = _receipt_path(harness, turn_key, 'json')
+    try:
+        if json.loads(path.read_text(encoding='utf-8')).get('memory') is not None or receipt is None:
+            return
+    except (OSError, ValueError, AttributeError):
+        pass
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f'{path.name}.{os.getpid()}.tmp')
+    tmp.write_text(json.dumps({'memory': receipt}, ensure_ascii=False), encoding='utf-8')
+    os.replace(tmp, path)
+
+
+def receipt_for(harness: str, turn_key: Any) -> dict[str, Any] | None:
+    """The MemoryUseReceipt the seam settled for this turn, or None. Called from the detached opportunity build:
+    a pending turn is waited for up to RECEIPT_WAIT_S; an unmarked turn of a harness whose seam has run here before
+    gets RECEIPT_GRACE_S (the two hooks of one turn start together); otherwise it returns at once. Never raises."""
+    try:
+        if not turn_key:
+            return None
+        final, pending = _receipt_path(harness, turn_key, 'json'), _receipt_path(harness, turn_key, 'pending')
+        t0 = time.monotonic()
+        seen = (_seam_dir() / f'{harness}.jsonl').exists()
+        while True:
+            if final.exists():
+                return json.loads(final.read_text(encoding='utf-8')).get('memory')
+            waited = time.monotonic() - t0
+            if waited >= (RECEIPT_WAIT_S if pending.exists() else RECEIPT_GRACE_S if seen else 0):
+                return None
+            time.sleep(0.05)
+    except Exception:  # noqa: BLE001 - the opportunity is recorded without memory rather than lost
+        return None
 
 
 def rows(harness: str) -> list[dict[str, Any]]:
@@ -226,6 +289,7 @@ def turn(harness: str, *, turn_key: str, query: str, mode: str | None = None, en
         return {**out, 'outcome': 'off' if cfg['mode'] == 'off' else 'no_query'}
     if not _first_time(harness, injector, turn_key):
         return {**out, 'outcome': 'replay'}
+    _expect(harness, turn_key)
     project = project_of(cwd)
     if project is None:  # fail closed: never a brief built from every project
         _write(harness, {'mode': cfg['mode'], 'turn_key': turn_key, 'injector': injector, 'outcome': 'no_scope',

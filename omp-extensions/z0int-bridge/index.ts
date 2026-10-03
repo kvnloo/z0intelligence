@@ -98,6 +98,12 @@ let generation = 0;
 let reloadPromise: Promise<Jsonish> | null = null;
 // One open turn per session: an in-process subagent's turn never closes (or replaces) its parent's.
 const activeTurns = new Map<string, ActiveTurn>();
+// The z0-memory extension (a separate module) keys its seam by the turn this bridge opened, through this global
+// lookup: one canonical turn_key, so the turn's MemoryUseReceipt joins its opportunity_record (C8, D3).
+(globalThis as Record<symbol, unknown>)[Symbol.for("z0int.bridge.openTurn")] = (harness: string, sessionId: string) => {
+	const turn = activeTurns.get(sessionId);
+	return turn && turn.harness === harness ? turn.traceId : undefined;
+};
 
 // --- capture accounting (content-free) -----------------------------------------------------------------
 const CAPTURE_EVENTS = ["input", "before_agent_start", "turn_end", "agent_end"] as const;
