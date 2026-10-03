@@ -1,7 +1,21 @@
 import {route,delivered} from '../automatic-client.mjs';
 import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {captureEnabled,registerCapture,z0Home} from './capture.mjs';
+export {counters} from './capture.mjs';
+export {canonicalTurnKey} from './lineage.mjs';
+export {sampleHash} from './shadow.mjs';
 export const name='z0intelligence-automatic';
-export function apply(ctx) {
+
+// Governed routing stays off until z0intelligence#95 closes: both the profile config and automatic.json must opt in.
+function routerEnabled(config, env) {
+  if(config.router!==true || env.Z0INT_AUTO_DSH==='0')return false;
+  try{return JSON.parse(readFileSync(join(z0Home(env),'config','automatic.json'),'utf8'))?.dsh?.enabled===true;}
+  catch{return false;}
+}
+
+function registerRouter(ctx) {
   ctx.on('llm/stream',async function*(options,next){
     if(options.purpose){yield* next();return;}
     const last=options.messages?.at(-1);
@@ -21,4 +35,12 @@ export function apply(ctx) {
     await delivered('dsh',result);
     yield {type:'finish',reason:'stop'};
   });
+}
+
+// cordis calls apply(ctx, config); `deps` (env, spawn, fetch) exists for tests only.
+export function apply(ctx, config, deps={}) {
+  config=config ?? {};
+  const env=deps.env ?? process.env;
+  if(config.capture!==false && captureEnabled(env))registerCapture(ctx,config,{...deps,env});
+  if(routerEnabled(config,env))registerRouter(ctx);
 }

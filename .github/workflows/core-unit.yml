@@ -2,9 +2,9 @@ name: Core unit
 
 on:
   push:
-    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
+    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "harness-adapters/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
   pull_request:
-    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
+    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "harness-adapters/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
   workflow_dispatch:
 
 permissions:
@@ -87,6 +87,11 @@ jobs:
           python -m pip install -e '.[test]'
       - name: Complete offline suite
         run: python -m pytest -q -m 'not live'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: DSH plugin contract tests
+        run: node --unhandled-rejections=strict --test tests/test-dsh-plugin.mjs
       - name: Verify published evidence
         run: |
           (cd results/raw && sha256sum -c SHA256SUMS)
