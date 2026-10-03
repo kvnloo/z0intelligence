@@ -41,6 +41,17 @@ because local recall can return unredacted stored values; a later remote/scoped
 transport can add explicit recall safely. It also rejects writes, `synthesize`,
 and `include_private=true`.
 
+## Try the slice
+
+```bash
+z0int context gbrain-pack --entity z0intelligence --session-id demo
+z0int context gbrain-delta --session-id demo
+```
+
+Both commands print a shadow candidate plus its provenance-preserving context
+packet. Pass `--aodl contract.json` to correlate the candidate with a compiled
+AODL contract. Neither command executes an action or surfaces an interruption.
+
 ## AODL binding
 
 A GBrain-backed contract can declare a stable memory participant without putting
