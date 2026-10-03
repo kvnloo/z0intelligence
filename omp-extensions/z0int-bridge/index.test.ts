@@ -20,15 +20,23 @@ type AnyFn = (...args: unknown[]) => unknown;
 
 function fakePi() {
 	const handlers = new Map<string, AnyFn[]>();
+	const tools: string[] = [];
+	const commands: string[] = [];
 	return {
 		handlers,
+		tools,
+		commands,
 		events: {},
 		on: (event: string, handler: AnyFn) => {
 			handlers.set(event, [...(handlers.get(event) ?? []), handler]);
 		},
 		setLabel: () => undefined,
-		registerCommand: () => undefined,
-		registerTool: () => undefined,
+		registerCommand: (name: string) => {
+			commands.push(name);
+		},
+		registerTool: (tool: { name?: string }) => {
+			tools.push(String(tool?.name));
+		},
 	};
 }
 
@@ -81,6 +89,27 @@ test("the extension loads and registers with a missing interpreter", async () =>
 	await settle();
 	expect(rejections).toEqual([]);
 	expect(errors).toEqual([]);
+});
+
+test("the default export is capture plus the bridge commands only: no routing handler, no route_worker tool", () => {
+	// Routing stays with the separate z0int-intelligence link (its own tree), so retargeting the bridge to the
+	// pinned checkout never moves live routing with it.
+	const pi = fakePi();
+	m.default(pi as never);
+	expect(pi.tools).toEqual([]);
+	expect(pi.handlers.get("before_agent_start")?.length).toBe(1);
+	expect(Reflect.get(pi.events, Symbol.for("z0intelligence.omp.registration"))).toBeUndefined();
+	expect(pi.commands.sort()).toEqual(["z0int-bridge-status", "z0int-bridge-reload", "z0int-close"].sort());
+});
+
+test("routing loaded from its own z0int-intelligence link registers exactly once next to the bridge", async () => {
+	const intelligence = (await import("../z0int-intelligence/index.ts")).default as (pi: unknown) => void;
+	const pi = fakePi();
+	m.default(pi as never);
+	intelligence(pi);
+	intelligence(pi); // a second copy on the same bus is a no-op (the Symbol guard)
+	expect(pi.tools).toEqual(["z0int_route_worker"]);
+	expect(pi.handlers.get("before_agent_start")?.length).toBe(2); // one capture, one routing
 });
 
 test("capture handlers return undefined and fail open, counted, when the worker cannot start", async () => {
@@ -212,4 +241,71 @@ test("frames reach the worker and a turn per session closes on its own agent_end
 	}
 	expect(rejections).toEqual([]);
 	expect(errors).toEqual([]);
+});
+
+test("an unclosed turn whose agent_end never arrives stops blocking reload after the age bound", async () => {
+	const worker = join(home, "fake-worker-reload.py");
+	writeFileSync(
+		worker,
+		[
+			"#!/usr/bin/env python3",
+			"import json, sys",
+			"for line in sys.stdin:",
+			"    req = json.loads(line)",
+			"    out = {'id': req.get('id'), 'ok': True, 'protocol': 'z0int.bridge.v2', 'generation': 1,",
+			"           'instance_id': 'fake', 'build_id': 'fake'}",
+			"    sys.stdout.write(json.dumps(out) + '\\n'); sys.stdout.flush()",
+			"    if req.get('op') == 'shutdown':",
+			"        break",
+		].join("\n"),
+	);
+	chmodSync(worker, 0o755);
+	process.env.Z0INT_PYTHON = worker;
+	process.env.Z0INT_BRIDGE_TURN_TTL_MS = "200";
+	try {
+		const pi = fakePi();
+		m.registerBridgeCapture(pi as never, { harness: "omp" });
+		const [open] = pi.handlers.get("before_agent_start")!;
+		// a killed subagent: its turn opens and its agent_end never reaches this module
+		const sub = ctx({
+			sessionManager: { getSessionId: () => "killed-sub" },
+			agent: { kind: "sub", id: "0-Task", name: "task", depth: 1, parentId: "Main" },
+		});
+		expect(await open({ prompt: "sub prompt" }, sub)).toBeUndefined();
+		const fresh = await m.reload("test");
+		expect(fresh).toMatchObject({ ok: false, error: "turn_in_flight" }); // a live turn still defers reload
+		await settle(300);
+		const stale = await m.reload("test");
+		expect(stale.ok).toBe(true);
+		expect(m.captureStatus().counters.stale_turn).toBe(1);
+		expect(drops("omp").filter(r => r.reason === "stale_turn")).toHaveLength(1);
+		expect(JSON.stringify(drops("omp"))).not.toContain("sub prompt");
+		await m.stopWorker();
+	} finally {
+		process.env.Z0INT_PYTHON = join(home, "no-such-python");
+		delete process.env.Z0INT_BRIDGE_TURN_TTL_MS;
+	}
+	expect(rejections).toEqual([]);
+	expect(errors).toEqual([]);
+});
+
+test("a new turn in a session whose last turn never closed is counted, not silently replaced", async () => {
+	const worker = join(home, "fake-worker-reload.py"); // written by the test above
+	process.env.Z0INT_PYTHON = worker;
+	try {
+		const pi = fakePi();
+		m.registerBridgeCapture(pi as never, { harness: "omp" });
+		const [open] = pi.handlers.get("before_agent_start")!;
+		const [agentEnd] = pi.handlers.get("agent_end")!;
+		const before = m.captureStatus().counters.unclosed_turn ?? 0;
+		const s = ctx({ sessionManager: { getSessionId: () => "no-end-session" } });
+		expect(await open({ prompt: "first" }, s)).toBeUndefined();
+		expect(await open({ prompt: "second" }, s)).toBeUndefined(); // agent_end for "first" never came
+		expect(m.captureStatus().counters.unclosed_turn).toBe(before + 1);
+		expect(drops("omp").some(r => r.reason === "unclosed_turn" && r.kind === "turn_outcome")).toBe(true);
+		expect(await agentEnd({ messages: [] }, s)).toBeUndefined();
+		await m.stopWorker();
+	} finally {
+		process.env.Z0INT_PYTHON = join(home, "no-such-python");
+	}
 });

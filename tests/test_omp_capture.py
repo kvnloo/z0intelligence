@@ -508,6 +508,9 @@ def test_install_dry_run_lists_only_the_bridge_and_local_cognition_retargets(age
     assert set(retargets) == {"z0int-bridge", "local-cognition"}
     assert retargets["z0int-bridge"]["to"] == str((pinned / "omp-extensions" / "z0int-bridge").resolve())
     assert retargets["z0int-bridge"]["from"] == str(old / "omp-extensions" / "z0int-bridge")
+    # live routing stays on its own link and is reported as kept (the bridge no longer carries routing)
+    kept = [a for a in plan["actions"] if a["name"] == "z0int-intelligence"]
+    assert kept == [{"name": "z0int-intelligence", "action": "kept", "target": before["z0int-intelligence"]}]
     assert _links(agent_dir / "extensions") == before  # nothing changed
     assert not list(agent_dir.glob("extensions.links.bak-*"))  # a dry run writes nothing
 
@@ -528,7 +531,7 @@ def test_install_writes_the_links_backup_first_and_is_idempotent(agent):
     stamp = backup.read_text()
     again = _install("--target", str(pinned), "--agent-dir", str(agent_dir))
     assert again.returncode == 0, again.stderr
-    assert {a["action"] for a in json.loads(again.stdout)["actions"]} == {"unchanged"}
+    assert {a["action"] for a in json.loads(again.stdout)["actions"]} == {"unchanged", "kept"}
     assert backup.read_text() == stamp and _links(agent_dir / "extensions") == after
 
 
@@ -549,3 +552,20 @@ def test_install_touches_z0int_intelligence_only_with_include_routing(agent):
     assert proc.returncode == 0, proc.stderr
     names = {a["name"] for a in json.loads(proc.stdout)["actions"] if a["action"] == "retarget"}
     assert names == {"z0int-bridge", "local-cognition", "z0int-intelligence"}
+
+
+def test_install_refuses_when_no_z0int_intelligence_link_would_carry_routing(agent):
+    # The bridge registers capture only; without its own z0int-intelligence link live routing would vanish.
+    agent_dir, _, pinned = agent
+    (agent_dir / "extensions" / "z0int-intelligence").unlink()
+    before = _links(agent_dir / "extensions")
+    for extra in ((), ("--dry-run",)):
+        proc = _install("--target", str(pinned), "--agent-dir", str(agent_dir), *extra)
+        assert proc.returncode != 0 and "z0int-intelligence" in (proc.stderr + proc.stdout)
+    assert _links(agent_dir / "extensions") == before
+    assert not list(agent_dir.glob("extensions.links.bak-*"))
+    # an explicit owner choice proceeds and says routing is absent
+    proc = _install("--target", str(pinned), "--agent-dir", str(agent_dir), "--dry-run", "--allow-no-routing")
+    assert proc.returncode == 0, proc.stderr
+    routing = [a for a in json.loads(proc.stdout)["actions"] if a["name"] == "z0int-intelligence"]
+    assert routing == [{"name": "z0int-intelligence", "action": "absent"}]
