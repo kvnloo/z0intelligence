@@ -1,14 +1,16 @@
 """Point the OMP agent's capture extensions at one pinned z0intelligence checkout (activation step A2).
 
     python scripts/omp_bridge_install.py --target /mnt/zer0models/z0-wt/pinned/z0intelligence [--dry-run]
-        [--agent-dir DIR] [--include-routing] [--backup PATH]
+        [--agent-dir DIR] [--include-routing] [--allow-no-routing] [--backup PATH]
 
 Each extension stays ONE symlink ``<agent-dir>/extensions/<name> -> <target>/omp-extensions/<name>`` (a link,
 never a copy: the shim imports its siblings and finds ``src/z0int`` through its real path). Salvaged from
 feat/omp-bridge-ready@815c680 and narrowed to the wiring plan:
 
 - only ``z0int-bridge`` and ``local-cognition`` move; ``z0int-intelligence`` (live routing) moves only with
-  ``--include-routing``, and no other entry under ``extensions/`` is ever touched;
+  ``--include-routing``, and no other entry under ``extensions/`` is ever touched. The bridge registers capture
+  only, so routing comes from the ``z0int-intelligence`` link alone: the plan reports it as ``kept``, and a
+  missing link is refused (routing would vanish) unless the owner passes ``--allow-no-routing``;
 - the target must be a clean git checkout that carries each extension it will point at (a dirty tree is
   refused, in a dry run too) and an entry that is not a symlink is refused, never replaced;
 - before the first change the full listing of ``extensions/`` (name -> link target) is saved to
@@ -86,9 +88,22 @@ def plan(agent_dir: Path, target: Path, names: tuple[str, ...]) -> list[dict]:
     return actions
 
 
+def routing_entry(agent_dir: Path, allow_missing: bool) -> dict:
+    """The routing link this run leaves alone: reported ``kept``; a missing one is refused unless allowed."""
+    link = agent_dir / "extensions" / ROUTING[0]
+    if link.is_symlink():
+        return {"name": ROUTING[0], "action": "kept", "target": os.readlink(link)}
+    if link.exists():
+        return {"name": ROUTING[0], "action": "kept", "target": None}
+    if not allow_missing:
+        refuse(f"{link} does not exist: the bridge carries no routing, so live routing would vanish; "
+               "restore the z0int-intelligence link, pass --include-routing, or --allow-no-routing")
+    return {"name": ROUTING[0], "action": "absent"}
+
+
 def apply(agent_dir: Path, actions: list[dict], backup: Path) -> bool:
     """Save the listing (once), then swap each link atomically. Returns whether a backup was written."""
-    if not any(a["action"] != "unchanged" for a in actions):
+    if not any(a["action"] in ("create", "retarget") for a in actions):
         return False
     ext = agent_dir / "extensions"
     ext.mkdir(parents=True, exist_ok=True)
@@ -99,7 +114,7 @@ def apply(agent_dir: Path, actions: list[dict], backup: Path) -> bool:
                                       **listing(ext)}, indent=2) + "\n")
         wrote = True
     for action in actions:
-        if action["action"] == "unchanged":
+        if action["action"] in ("unchanged", "kept", "absent"):
             continue
         tmp = ext / f".{action['name']}.z0wiring-tmp"
         if tmp.is_symlink():
@@ -114,6 +129,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--target", type=Path, required=True, help="pinned z0intelligence checkout (clean)")
     ap.add_argument("--agent-dir", type=Path, default=None)
     ap.add_argument("--include-routing", action="store_true", help="also move z0int-intelligence (live routing)")
+    ap.add_argument("--allow-no-routing", action="store_true",
+                    help="proceed although no z0int-intelligence link exists (OMP then runs without routing)")
     ap.add_argument("--backup", type=Path, default=None, help="links backup path (default: dated, in agent dir)")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
@@ -122,6 +139,8 @@ def main(argv: list[str] | None = None) -> int:
     names = CAPTURE + (ROUTING if args.include_routing else ())
     check_target(target, names)
     actions = plan(agent_dir, target, names)
+    if not args.include_routing:
+        actions.append(routing_entry(agent_dir, args.allow_no_routing))
     backup = (args.backup or default_backup(agent_dir)).expanduser()
     wrote = False if args.dry_run else apply(agent_dir, actions, backup)
     print(json.dumps({"agent_dir": str(agent_dir), "target": str(target), "dry_run": args.dry_run,

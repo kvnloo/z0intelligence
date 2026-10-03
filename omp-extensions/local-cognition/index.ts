@@ -30,6 +30,7 @@ const DEFAULT_TIMEOUT_MS = 4000;
 const DEFAULT_MODELS = ["nemotron_orchestrator_8b", "functiongemma_270m"];
 const DEFAULT_AUTHORITY = ["read"];
 const DEFAULT_TOOL_NAMES = ["bash", "read", "write", "edit", "grep", "glob"];
+const MAX_STATE_CHARS = 2000;
 const STATUS_RING = 100;
 
 /** Tool names whose call has real filesystem/process side effects. */
@@ -196,6 +197,14 @@ export function authorityList(): string[] {
 
 // --- payload ------------------------------------------------------------
 
+function safeJson(value: unknown): string {
+	try {
+		return JSON.stringify(value) ?? "";
+	} catch {
+		return String(value);
+	}
+}
+
 function riskFor(toolName: string): string {
 	return WRITE_TOOLS.has(toolName) ? "write" : "read";
 }
@@ -285,12 +294,14 @@ function buildActions(toolNames: string[]): Jsonish[] {
 
 export function buildShadowPayload(event: ToolCallLike, toolNames: string[]): Jsonish {
 	const toolName = typeof event?.toolName === "string" ? event.toolName : "";
+	const input = event?.input && typeof event.input === "object" ? event.input : {};
 	return {
 		op: "cognition_shadow",
 		trace_id: randomUUID().replaceAll("-", ""),
 		session_id: process.env.OMP_SESSION_ID ?? null,
-		// The tool input never leaves the host: the shadow sees the tool name and the legal set only.
-		state: `OMP tool_call: ${toolName}`,
+		// The bounded tool input goes to the served-only local shadow model as its question; the receipt
+		// (cognition/shadow.py) persists the structured actual_tool below and never this state text.
+		state: `OMP tool_call: ${toolName}\ninput: ${safeJson(input).slice(0, MAX_STATE_CHARS)}`,
 		actual_tool: { name: toolName, risk_class: riskFor(toolName) },
 		actions: buildActions(toolNames),
 		granted_capabilities: toolNames,

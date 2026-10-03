@@ -16,9 +16,9 @@
  * the worker can write the z0int#62 record family; every capture handler returns undefined and fails open
  * (a worker that cannot start is a counted drop in $Z0INT_HOME/state/<harness>/drops.jsonl).
  * `registerBridgeCapture` is the capture alone (the OMO/senpi entry `omo.ts` uses only that); the default
- * export adds the canonical z0int-intelligence routing and the bridge commands for OMP.
+ * export adds the bridge commands for OMP. Routing is NOT registered here: it stays with the separate
+ * z0int-intelligence extension link, so pointing this bridge at another checkout never moves live routing.
  */
-import registerIntelligence from "../z0int-intelligence/index.ts";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -73,6 +73,7 @@ type ActiveTurn = {
 	traceId: string;
 	sessionId: string;
 	harness: string;
+	openedAt: number;
 	openedGeneration: number;
 	turnsSeen: number;
 	turnsWithProviderUsage: number;
@@ -108,7 +109,7 @@ export function captureStatus(): { counters: Record<string, number>; harnesses: 
 }
 
 /** Count a lost capture and persist it in the shared drop file (same row shape as harness_capture). */
-function recordDrop(harness: string, reason: string): void {
+function recordDrop(harness: string, reason: string, kind = "opportunity_record"): void {
 	counters[reason] = (counters[reason] ?? 0) + 1;
 	try {
 		const dir = join(z0Home(), "state", harness);
@@ -116,7 +117,7 @@ function recordDrop(harness: string, reason: string): void {
 		const row = {
 			schema: `z0int.${harness.replaceAll("-", "_")}.drop.v0`,
 			harness,
-			kind: "opportunity_record",
+			kind,
 			reason,
 			count: 1,
 			recorded_at: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
@@ -343,9 +344,26 @@ async function stopWorker(): Promise<void> {
 	if (h) await drainAndStop(h);
 }
 
+/** An open turn older than this whose agent_end never arrived (killed subagent, host error) stops blocking reload. */
+function turnTtlMs(): number {
+	const v = Number(process.env.Z0INT_BRIDGE_TURN_TTL_MS);
+	return Number.isFinite(v) && v > 0 ? v : 2 * 60 * 60 * 1000;
+}
+
+/** Forget open turns past the age bound; each is a counted, content-free drop (its outcome is lost). */
+function evictStaleTurns(now = Date.now()): void {
+	const ttl = turnTtlMs();
+	for (const [sessionId, turn] of activeTurns) {
+		if (now - turn.openedAt <= ttl) continue;
+		activeTurns.delete(sessionId);
+		recordDrop(turn.harness, "stale_turn", "turn_outcome");
+	}
+}
+
 async function reload(reason: string): Promise<Jsonish> {
 	if (reloadPromise) return reloadPromise;
 	reloadPromise = (async () => {
+		evictStaleTurns();
 		if (activeTurns.size) {
 			return {
 				ok: false,
@@ -761,10 +779,14 @@ export function registerBridgeCapture(
 					recordDrop(harness, "worker_unavailable");
 					return undefined;
 				}
+				// A session's previous turn that never saw agent_end (a diverged host API, a killed run) is counted.
+				const unclosed = activeTurns.get(sessionId);
+				if (unclosed) recordDrop(unclosed.harness, "unclosed_turn", "turn_outcome");
 				const turn: ActiveTurn = {
 					traceId: randomUUID().replaceAll("-", ""),
 					sessionId,
 					harness,
+					openedAt: Date.now(),
 					openedGeneration: h.generation,
 					turnsSeen: 0,
 					turnsWithProviderUsage: 0,
@@ -835,8 +857,7 @@ export function registerBridgeCapture(
 }
 
 export default function z0intBridge(pi: ExtensionAPI) {
-	registerIntelligence(pi);
-	pi.setLabel("z0int bridge v2 + canonical intelligence");
+	pi.setLabel("z0int bridge v2 (capture)");
 	registerBridgeCapture(pi, { harness: "omp" });
 
 	pi.registerCommand("z0int-bridge-status", {
