@@ -106,6 +106,9 @@ class AodlBindingConfig:
     allow_uncredited_shadow: bool = False
     include_candidate_routines_in_shadow: bool = False
     source: str = "z0int"
+    memory_id: str | None = None
+    memory_schema: str = "MemoryContext"
+    memory_binding: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         for value in (
@@ -121,6 +124,10 @@ class AodlBindingConfig:
                 f"unknown/non-executor AODL harness_id {self.harness_id!r}; "
                 f"expected one of {sorted(AODL_EXECUTOR_HARNESS_IDS)}"
             )
+        if self.memory_id is not None:
+            _require_id(self.memory_id)
+            if not self.memory_schema.strip():
+                raise ValueError("memory_schema must be non-empty when memory_id is set")
         if self.revision < 0:
             raise ValueError("revision must be >= 0")
         if not 0.0 < self.precision_floor <= 1.0:
@@ -342,11 +349,20 @@ def compile_aodl(
         "objective": cascade.objective,
         "privacy": {"personalArtifacts": "local_only", "receipts": "confidential"},
     }
+    if cfg.memory_id is not None:
+        intent_material["memory"] = {"id": cfg.memory_id, "schema": cfg.memory_schema}
     sh = source_hash(intent_material)
 
     task_id = _safe_id("capability-", capability_id)
     # Stable intent/participation graph. Do not put routine/model cascade stages
     # here: they are strategy and belong to the compiled plan.
+    executor_ports = [
+        _port("in", "in", "DecisionRequest"),
+        _port("decision", "out", "DecisionResult"),
+    ]
+    if cfg.memory_id is not None:
+        executor_ports.append(_port("memory", "in", cfg.memory_schema, classification="sanitized"))
+
     nodes: list[dict[str, Any]] = [
         _node(
             task_id,
@@ -358,10 +374,7 @@ def compile_aodl(
         _node(
             cfg.executor_id,
             "executor",
-            [
-                _port("in", "in", "DecisionRequest"),
-                _port("decision", "out", "DecisionResult"),
-            ],
+            executor_ports,
             ["execute"],
             authority=["execute"],
             harness=cfg.harness_id,
@@ -384,6 +397,17 @@ def compile_aodl(
             authority=["store"],
         ),
     ]
+    if cfg.memory_id is not None:
+        nodes.append(
+            _node(
+                cfg.memory_id,
+                "memory",
+                [_port("out", "out", cfg.memory_schema, classification="sanitized")],
+                ["recall"],
+                authority=["recall"],
+            )
+        )
+
     edges: list[dict[str, Any]] = [
         _edge(
             "e-task-runtime",
@@ -416,6 +440,19 @@ def compile_aodl(
             grant=["store"],
         ),
     ]
+    if cfg.memory_id is not None:
+        edges.append(
+            _edge(
+                "e-memory-runtime",
+                "data",
+                cfg.memory_id,
+                cfg.executor_id,
+                "out",
+                "memory",
+                sh,
+                grant=[],
+            )
+        )
 
     # Everything below is strategy/implementation and therefore compiled plan.
     bindings: dict[str, Any] = {
@@ -427,6 +464,12 @@ def compile_aodl(
         cfg.verifier_id: {"runtime": "z0int", "entrypoint": "outcome"},
         cfg.receipt_store_id: {"runtime": "z0int", "uri": "z0int://receipts"},
     }
+    if cfg.memory_id is not None:
+        bindings[cfg.memory_id] = {
+            "kind": "memory",
+            "schema": cfg.memory_schema,
+            **dict(cfg.memory_binding),
+        }
     execution_nodes: list[dict[str, Any]] = []
     route_order: list[str] = []
 

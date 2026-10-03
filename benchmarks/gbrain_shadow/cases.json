@@ -1,0 +1,149 @@
+{
+  "schema": "z0int.gbrain_shadow_eval.v1",
+  "source_revision": "garrytan/gbrain MEMORY_VERBS_v1 ambient semantics",
+  "cases": [
+    {
+      "id": "empty-delta",
+      "verb": "delta",
+      "response": {
+        "protocol_version": 1,
+        "pages": [],
+        "facts": [],
+        "threads": [],
+        "has_more": false,
+        "dropped_count": 0
+      },
+      "expected_action": "IGNORE",
+      "expected_reason": "no_change"
+    },
+    {
+      "id": "fact-change",
+      "verb": "delta",
+      "response": {
+        "protocol_version": 1,
+        "pages": [],
+        "facts": [
+          {
+            "fact_id": "f1",
+            "fact": "project status changed"
+          }
+        ],
+        "threads": [],
+        "has_more": false,
+        "dropped_count": 0
+      },
+      "expected_action": "OBSERVE",
+      "expected_reason": "memory_change"
+    },
+    {
+      "id": "page-change",
+      "verb": "delta",
+      "response": {
+        "protocol_version": 1,
+        "pages": [
+          {
+            "slug": "projects/example",
+            "updated_at": "2026-10-03T12:00:00Z"
+          }
+        ],
+        "facts": [],
+        "threads": [],
+        "has_more": false,
+        "dropped_count": 0
+      },
+      "expected_action": "OBSERVE",
+      "expected_reason": "memory_change"
+    },
+    {
+      "id": "open-thread",
+      "verb": "delta",
+      "response": {
+        "protocol_version": 1,
+        "pages": [],
+        "facts": [],
+        "threads": [
+          {
+            "loop_id": "l1",
+            "kind": "commitment",
+            "status": "open"
+          }
+        ],
+        "has_more": false,
+        "dropped_count": 0
+      },
+      "expected_action": "PREPARE",
+      "expected_reason": "open_thread"
+    },
+    {
+      "id": "pack-open-thread",
+      "verb": "context_pack",
+      "response": {
+        "protocol_version": 1,
+        "cards": [],
+        "facts": [],
+        "open_threads": [
+          {
+            "loop_id": "l2",
+            "kind": "commitment",
+            "status": "open"
+          }
+        ],
+        "dropped_count": 0
+      },
+      "expected_action": "PREPARE",
+      "expected_reason": "open_thread"
+    },
+    {
+      "id": "budget-dropped-empty",
+      "verb": "delta",
+      "response": {
+        "protocol_version": 1,
+        "pages": [],
+        "facts": [],
+        "threads": [],
+        "has_more": true,
+        "dropped_count": 2,
+        "next_cursor": {
+          "since": "2026-10-03T12:00:00Z",
+          "slug": "projects/a"
+        }
+      },
+      "expected_action": "OBSERVE",
+      "expected_reason": "incomplete_memory"
+    },
+    {
+      "id": "degraded-empty-pack",
+      "verb": "context_pack",
+      "response": {
+        "protocol_version": 1,
+        "cards": [],
+        "facts": [],
+        "open_threads": [],
+        "degraded_reason": "server_budget",
+        "dropped_count": 0
+      },
+      "expected_action": "OBSERVE",
+      "expected_reason": "incomplete_memory"
+    },
+    {
+      "id": "thread-dominates-degraded",
+      "verb": "delta",
+      "response": {
+        "protocol_version": 1,
+        "pages": [],
+        "facts": [],
+        "threads": [
+          {
+            "loop_id": "l3",
+            "kind": "commitment",
+            "status": "open"
+          }
+        ],
+        "has_more": true,
+        "dropped_count": 3
+      },
+      "expected_action": "PREPARE",
+      "expected_reason": "open_thread"
+    }
+  ]
+}
