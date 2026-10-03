@@ -17,7 +17,10 @@ writes never queue behind it (A4). Shell tool calls keep only their check class 
 output reach this process in memory and are never written.
 """
 
+import contextlib
+import fcntl
 import json
+import os
 import subprocess
 import sys
 
@@ -61,18 +64,59 @@ def _spawn_project(job, slot):
     child.stdin.close()
 
 
+@contextlib.contextmanager
+def plugin_gate(path):
+    """Yields True while the plugin that asked for this build is loaded (P-2: nothing is written after close).
+
+    ``path`` is the plugin's per-instance gate file. A build holds it shared while it writes and then appends one
+    settle line; the plugin's close() takes it exclusively, counts the builds that never settled as dropped and
+    unlinks it, so a build that finishes later finds it gone and writes nothing. No path: not gated."""
+    if not path:
+        yield True
+        return
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND)
+    except OSError:
+        yield False
+        return
+    with os.fdopen(fd, 'a') as fh:
+        fcntl.flock(fh, fcntl.LOCK_SH)
+        live = os.fstat(fh.fileno()).st_nlink > 0
+        try:
+            yield live
+        finally:
+            if live:
+                fh.write('1\n')
+
+
 def project(job, root=None):
     """One opportunity build. The State Packet reads the task repo's git and docs only (never another harness's
-    transcript store) and keeps its own snapshot (latest.json, history.jsonl) only with persist_packet_text (P-9)."""
+    transcript store) and keeps its own snapshot (latest.json, history.jsonl) only with persist_packet_text (P-9).
+    The build is tied to the plugin's lifetime through its gate: after the plugin closed, nothing is written."""
+    gate = job.get('gate')
+    if gate and not os.path.exists(gate):  # closed before the build started: skip it
+        return None
     keep = bool(job.get('persist_packet_text'))
     no_transcripts = hc.state_dir(HARNESS, root) / 'no-transcripts'  # never created: the revision probe scans nothing
-    return hc.record_opportunity(HARNESS, job['payload'], job['ctx'], root=root,
-                                 packet_text='opt_in' if keep else 'redacted',
-                                 packet_args={'adapters': PACKET_ADAPTERS, 'projects_root': no_transcripts,
-                                              'use_cache': keep, 'store': keep})
+    try:
+        record, error = hc.opportunity_record(HARNESS, job['payload'], job['ctx'],
+                                              packet_text='opt_in' if keep else 'redacted',
+                                              packet_args={'adapters': PACKET_ADAPTERS, 'projects_root': no_transcripts,
+                                                           'use_cache': keep, 'store': keep}), None
+    except Exception as exc:
+        record, error = None, type(exc).__name__
+    with plugin_gate(gate) as live:
+        if not live:
+            return None
+        if record is None:
+            hc.record_failure(HARNESS, 'capture_error', ctx=job.get('ctx'), root=root,
+                              detail={'job': 'opportunity', 'error': error})
+            return None
+        return hc.record_built_opportunity(HARNESS, record, root=root)
 
 
 def _turn(job, root):
+    """Record the turn; 'p' when a projection child was started for it."""
     payload = dict(_ids(job), user_message=job.get('text') or '', cwd=job.get('cwd'))
     ctx = hc.begin_turn(HARNESS, payload, root=root, cohort=job.get('cohort'))
     _event(job, root, cohort=job.get('cohort'), excluded=job.get('excluded'))
@@ -83,7 +127,9 @@ def _turn(job, root):
         hc.record_drop(HARNESS, 'opportunity_record', 'fanout_cap', root=root)
         return
     with slot:
-        _spawn_project({'payload': payload, 'ctx': ctx, 'persist_packet_text': job.get('persist_packet_text')}, slot)
+        _spawn_project({'payload': payload, 'ctx': ctx, 'persist_packet_text': job.get('persist_packet_text'),
+                        'gate': job.get('gate')}, slot)
+    return 'p'  # the plugin counts the builds it must account for at close
 
 
 def _outcome(job, root):
@@ -105,8 +151,8 @@ def _tool(job, root):
 def process(job, root=None):
     kind = job.get('kind')
     if kind == 'turn':
-        _turn(job, root)
-    elif kind == 'outcome':
+        return _turn(job, root)
+    if kind == 'outcome':
         _outcome(job, root)
     elif kind == 'tool':
         _tool(job, root)
@@ -117,20 +163,22 @@ def process(job, root=None):
 
 
 def batch(lines, out, root=None):
-    """Process each job in order; ack each one with a line (the plugin counts what was never acked as dropped)."""
+    """Process each job in order; ack each one with a line (the plugin counts what was never acked as dropped).
+    The ack is ``p`` when a projection child was started for the job, else ``.``."""
     capture = hc.enabled()
     for line in lines:
         try:
             job = json.loads(line)
         except ValueError:
             job = None
+        ack = '.'
         if capture and isinstance(job, dict):
             try:
-                process(job, root)
+                ack = process(job, root) or '.'
             except Exception as exc:  # a broken row never stops the batch; it is a failure row, not a silent loss
                 hc.record_failure(HARNESS, 'capture_error', root=root,
                                   detail={'job': str(job.get('kind')), 'error': type(exc).__name__})
-        out.write('.\n')
+        out.write(ack + '\n')
         out.flush()
 
 

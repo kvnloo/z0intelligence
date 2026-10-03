@@ -471,8 +471,14 @@ def record_opportunity(harness: str, payload: Mapping[str, Any], ctx: Mapping[st
                        packet_args: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
     if not supported(harness, root):
         return None
-    row = append(harness, 'opportunity_record', opportunity_record(harness, payload, ctx, packet_text=packet_text,
-                                                                   packet_args=packet_args), root=root)
+    return record_built_opportunity(harness, opportunity_record(harness, payload, ctx, packet_text=packet_text,
+                                                                packet_args=packet_args), root=root)
+
+
+def record_built_opportunity(harness: str, record: Mapping[str, Any], *,
+                             root: str | Path | None = None) -> dict[str, Any] | None:
+    """Append an opportunity built by ``opportunity_record`` (the write half; a host can gate it)."""
+    row = append(harness, 'opportunity_record', record, root=root)
     revisions = (((row or {}).get('opportunity') or {}).get('invalidation') or {}).get('source_revisions')
     if revisions:  # what the stale-evidence check compares with at Stop time, without reading this file
         _update_session(harness, row.get('session_id'), root, lambda st: dict(

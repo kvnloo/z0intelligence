@@ -20,7 +20,6 @@ import os
 import queue
 import re
 import subprocess
-import sys
 import threading
 import time
 import uuid
@@ -254,8 +253,21 @@ class Capture:
         self._sealed = self._stopping = self._closed = False
         self._child = self._last_child = self._inflight = None
         self._retry_at, self._reason = 0.0, 'child_failed'
+        self._launched = 0  # projection children started for this instance (acked 'p' by the batch child)
+        self.gate = self._open_gate()
         self._writer = threading.Thread(target=self._run, name='z0int-hermes-capture', daemon=True)
         self._writer.start()
+
+    def _open_gate(self):
+        """The per-instance gate a projection child must find (and lock) to write; close() unlinks it."""
+        path = self.home / 'runtime' / 'hermes-gates' / f'{uuid.uuid4().hex}.gate'
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+            return str(path)
+        except OSError:
+            self.opportunities = False  # an ungated build could outlive the plugin: build none
+            return None
 
     # ------------------------------------------------------------------ hooks (each returns None, never raises)
     def on_pre_llm_call(self, session_id='', turn_id='', user_message='', platform='', model='', task_id='',
@@ -271,7 +283,7 @@ class Capture:
                    'fields': _fields({'platform': platform, 'task_id': task_id})}
             # Opportunities are for user intent only: automated, subagent and injected turns get outcomes, no build.
             if key and text and cohort == 'interactive' and len(text) <= MAX_REQUEST_CHARS and self.opportunities:
-                job.update(opportunity=True, persist_packet_text=self.persist_packet_text,
+                job.update(opportunity=True, persist_packet_text=self.persist_packet_text, gate=self.gate,
                            cwd=cwd if isinstance(cwd, str) and cwd else _hermes_workspace_root(task_id))
             if key:
                 with self._lock:
@@ -512,7 +524,9 @@ class Capture:
             out, _ = child.communicate()
         finally:
             self._child = None
+        acks = out.split(b'\n')[:len(jobs)]
         acked = min(out.count(b'\n'), len(jobs))
+        self._launched += acks.count(b'p')
         if acked == 0 and child.returncode != 0 and not self._stopping:
             return self._unavailable(jobs)
         self._reason = 'child_failed'
@@ -533,9 +547,10 @@ class Capture:
         return not self.queue.unfinished_tasks and not self._drops
 
     def close(self):
-        """Bounded unload (P-2): drain while time remains, then stop the child; whatever is left is counted as
-        dropped before this returns, and nothing is written after it. Runs at plugin unload and at exit; the
-        second call does nothing."""
+        """Bounded unload (P-2): drain while time remains, then stop the child and wait for running projections;
+        whatever is left (jobs, and projections that did not finish) is counted as dropped before this returns,
+        and nothing is written after it (projections write only under the gate this removes). Runs at plugin
+        unload and at exit; the second call does nothing."""
         deadline = time.monotonic() + CLOSE_TIMEOUT
         with self._put_lock:
             if self._sealed:
@@ -557,9 +572,46 @@ class Capture:
                 break
         for job in left:
             self._count_drop(job.get('kind'), 'closed')
+        unsettled = self._seal_gate(deadline)
+        if unsettled:
+            self._count_drop('opportunity_record', 'closed', unsettled)
         self._write_drops()
         with self._put_lock, self._io:
             self._closed = True
+
+    def _settled(self):
+        try:
+            return os.path.getsize(self.gate) // 2  # one '1\n' per projection that wrote (or failed) in time
+        except (OSError, TypeError):
+            return 0
+
+    def _seal_gate(self, deadline):
+        """Wait (within the close budget) for running projections, then unlink the gate under its exclusive lock:
+        a projection still running finds it gone and writes nothing. Returns how many never settled."""
+        if not self.gate:
+            return 0
+        while self._settled() < self._launched and time.monotonic() < deadline - 0.1:
+            time.sleep(0.01)
+        try:
+            fd = os.open(self.gate, os.O_RDONLY)
+        except OSError:
+            return 0
+        try:
+            while True:  # a writer holds it only for one append; never past the budget
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        break
+                    time.sleep(0.005)
+            settled = self._settled()
+            os.unlink(self.gate)
+        except OSError:
+            settled = self._launched
+        finally:
+            os.close(fd)
+        return max(0, self._launched - settled)
 
     def stats(self):
         with self._dlock:
@@ -579,24 +631,26 @@ def automatic_enabled(home):
     return isinstance(value, dict) and value.get('enabled') is True and os.environ.get('Z0INT_AUTO_HERMES') != '0'
 
 
-def invoke(operation, value):
-    env = {**os.environ, 'PYTHONPATH': str(Path(__file__).resolve().parents[2] / 'src') + os.pathsep +
-           os.environ.get('PYTHONPATH', '')}
-    result = subprocess.run([os.environ.get('Z0INT_PYTHON', sys.executable), '-m', 'z0int.automatic', operation],
-                            input=json.dumps(value), text=True, capture_output=True, timeout=30, env=env, check=True)
+def invoke(operation, value, python, home):
+    """The installed z0int (the interpreter capture uses), on the z0 home whose automatic.json gated this call."""
+    if not python:
+        raise RuntimeError('no z0int interpreter (z0int_python / Z0INT_PYTHON)')
+    result = subprocess.run([python, '-m', 'z0int.automatic', operation], input=json.dumps(value), text=True,
+                            capture_output=True, timeout=30, env=dict(os.environ, Z0INT_HOME=str(home)), check=True)
     return json.loads(result.stdout)
 
 
-def before_turn(session_id='', turn_id=None, user_message='', **kwargs):
+def before_turn(python, home, session_id='', turn_id=None, user_message='', **kwargs):
     if not isinstance(user_message, str) or not user_message.strip():
         return None
     try:
         result = invoke('event', dict(harness='hermes', session_id=session_id or 'hermes',
                                       turn_id=str(turn_id) if turn_id is not None else uuid.uuid4().hex,
-                                      instance_id=INSTANCE_ID, text=user_message))
+                                      instance_id=INSTANCE_ID, text=user_message), python, home)
         context = {'context': result['context']} if result.get('action') == 'context' else None
         if result.get('receipt_id'):
-            invoke('consume', dict(harness='hermes', instance_id=INSTANCE_ID, receipt_id=result['receipt_id']))
+            invoke('consume', dict(harness='hermes', instance_id=INSTANCE_ID, receipt_id=result['receipt_id']),
+                   python, home)
         return context
     except Exception:
         return None
@@ -613,10 +667,10 @@ def register(ctx):
     except Exception:
         log.warning('%s: settings unreadable; plugin stays inert', PLUGIN)
         return None
-    capture = None
+    capture, python = None, _python(settings, home)
     if settings.get('mode') == 'shadow' and os.environ.get('Z0INT_CAPTURE') != '0':
         try:
-            capture = Capture(home=home, python=_python(settings, home),
+            capture = Capture(home=home, python=python,
                               opportunities=settings.get('opportunities') is not False,
                               persist_packet_text=settings.get('persist_packet_text') is True)
             if ignored:  # P-1: capture never talks to a service; a host/port setting is a counted warning
@@ -639,6 +693,6 @@ def register(ctx):
         def pre_llm_call(**kw):
             if capture is not None:
                 capture.on_pre_llm_call(**kw)
-            return before_turn(**kw) if automatic else None
+            return before_turn(python, home, **kw) if automatic else None
         ctx.register_hook('pre_llm_call', pre_llm_call)
     return capture

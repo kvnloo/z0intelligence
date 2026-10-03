@@ -52,20 +52,26 @@ example bend's `stack_service_port`) is ignored and written down as a counted `c
 Hooks put a small job on a bounded in-process queue (4,096). One writer thread hands batches, in order, to
 `<z0int_python> -m z0int.hermes_capture batch` (a detached child), which writes through `z0int.harness_capture`.
 A projection runs in a detached `project` child holding one of `MAX_CHILDREN` build slots; when none is free it is
-refused and counted (`fanout_cap`), so event writes never wait for it. `close()` (plugin unload) returns within
-2 s: it drains while time remains, stops the child and counts what is left. A projection already running may still
-finish its one opportunity row. If z0int is missing or broken, hooks still return at once, the turn completes, and
+refused and counted (`fanout_cap`), so event writes never wait for it. `close()` (plugin unload, and interpreter
+exit) returns within 2 s: it drains while time remains, stops the child, waits for running projections while time
+remains and counts what is left. Projections are tied to the plugin's lifetime by a per-instance gate file
+(`$Z0INT_HOME/runtime/hermes-gates/`): a projection writes only while holding the gate, and `close()` removes it, so
+nothing is written after `close()` returns; a projection cut off this way is counted as a `closed` drop. If z0int is
+missing or broken, hooks still return at once, the turn completes, and
 the batch is counted as `z0int_unavailable` (retried after 30 s).
 
 ## One capture vehicle
 
 If `z0int-decisions` is enabled, or `bend` is enabled with `stack_opportunities: true`, in the same profile, this
 plugin emits no opportunities and writes one `double_capture_guard` failure row. Outcomes and events continue.
+The retired `z0int-decisions` child (`z0int hermes opportunity`) no longer records anything but one content-free
+`retired_vehicle` failure row per call, so a stale install shows up in `failures.jsonl` and writes no opportunity.
 
 ## Automatic path (#95)
 
-The routing call (`z0int.automatic`) is registered only while `$Z0INT_HOME/config/automatic.json` has
-`{"hermes": {"enabled": true}}` at load; today it is off, so no subprocess is spawned for it on any turn.
+The routing call (`z0int.automatic`) is registered only while `<z0int_home>/config/automatic.json` has
+`{"hermes": {"enabled": true}}` at load; today it is off, so no subprocess is spawned for it on any turn. When on,
+it runs the same interpreter as capture (`z0int_python` / `Z0INT_PYTHON`) with `Z0INT_HOME` set to that home.
 
 The API-attempt scorer/evaluator and the `hermes z0` runtime CLI move here in a later step (C4b).
 
@@ -76,3 +82,14 @@ hermes plugins install https://github.com/kvnloo/z0intelligence/tree/<sha>/harne
 ```
 
 then set `mode: shadow`, `z0int_python` and `z0int_home` in the plugin settings.
+
+Unverified: this GitHub-URL install has not been run (Hermes PM syncs its runtime from the network first; the
+isolated e2e had no network). A local path (`hermes plugins install <dir>`) is parsed as GitHub `owner/repo`
+shorthand by this Hermes, so it does not install a checkout. Fallback, the layout the e2e installs and runs:
+
+```bash
+git -C <z0intelligence checkout> archive <sha> harness-adapters/hermes-z0intelligence | tar -x -C <scratch>
+mv <scratch>/harness-adapters/hermes-z0intelligence <profile>/plugins/hermes-z0intelligence
+```
+
+then add `hermes-z0intelligence` to `plugins.enabled` in `<profile>/config.yaml` with the settings above.
