@@ -22,11 +22,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import socket
+import sys
 import time
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 
+from . import harness_capture as hc
 from .decision_opportunity import ACTIONS, EFFECTS, FACT_FAMILIES
 
 SCHEMA = 'z0int.loop.training_row.v0'
@@ -42,8 +46,15 @@ SCOPE_MODES = ('question', 'unscoped', 'repo')
 UNKNOWN_STATUSES = ('unknown', 'source_unavailable', 'no_match')
 POSTURE_FACTORY = ('BURN', 'BALANCED', 'CONSERVE', 'other', 'absent')
 AUTHORITY_SOURCES = ('aodl', 'harness-default')
-COHORTS = ('interactive', 'agent', 'harness', 'unknown')
+COHORTS = ('interactive', 'agent', 'harness', 'unknown')  # the cohort= feature one-hot (a TABLE_VERSION bump to change)
+# Tables are split by cohort, so the full classifier vocabulary needs no feature change: automated / eval / legacy
+# rows carry cohort=unknown in the one-hot and their own cohort in the row, the table and the manifest.
+TABLE_COHORTS = ('interactive', 'agent', 'automated', 'harness', 'eval', 'unknown', 'legacy')
 STATES = ('verified_success', 'verified_failure', 'contested', 'unverified')
+# Record kinds the export reads from state/<harness>/ (z0int.<harness>.<kind>.v0); any other schema is counted.
+RECORD_KINDS = ('opportunity_record', 'turn_outcome', 'turn_outcome_verified', 'failure', 'drop', 'imported_turn',
+                'shadow_decision')
+INDEX_SCHEMA = 'z0int.loop.table_index.v0'
 
 # Ordered feature vocabulary. Changing it is a TABLE_VERSION bump.
 FEATURES: tuple[str, ...] = (
@@ -210,25 +221,32 @@ def capture_cohort(record: Mapping[str, Any] | None) -> str | None:
         return 'unknown'
     if record['capture'].get('is_harness_message'):
         return 'harness'
-    return record.get('cohort') if record.get('cohort') in ('agent', 'harness') else None
+    return record.get('cohort') if record.get('cohort') in ('agent', 'harness', 'automated', 'eval') else None
 
 
 def build_table(state: Path, *, projects: Path | None = None, include_unjoined: bool = False,
-                cohort_fn=None) -> list[dict[str, Any]]:
-    """One row per turn that has an opportunity record (or, with include_unjoined, any verified turn)."""
-    cohort_fn = cohort_fn or (lambda sid: transcript_cohort(sid, projects))
+                cohort_fn=None, harness: str = HARNESS) -> list[dict[str, Any]]:
+    """One row per turn that has an opportunity record (or, with include_unjoined, any verified turn).
+
+    Claude Code sessions are cohorted from their transcript; other harnesses from the cohort the verifier's
+    classifier put on their verified rows (``turn_readers.classify_cohort``), else unknown."""
     opps: dict[tuple, dict[str, Any]] = {}
     for r in _read_jsonl(state / 'opportunities.jsonl'):
-        if r.get('schema') != OPP_SCHEMA:
+        if r.get('schema') != hc.schema(harness, 'opportunity_record'):
             continue
         opp = r.get('opportunity') or {}
         opps[(r.get('session_id'), (opp.get('trace') or {}).get('trace_id'))] = r  # latest wins
     observed = {(r.get('session_id'), r.get('trace_id')): r for r in _read_jsonl(state / 'outcomes.jsonl')
-                if r.get('schema') == OBSERVED_SCHEMA}
+                if r.get('schema') == hc.schema(harness, 'turn_outcome')}
     verified: dict[tuple, dict[str, Any]] = {}
     for r in _read_jsonl(state / 'outcomes_verified.jsonl'):
-        if r.get('schema') == VERIFIED_SCHEMA:
+        if r.get('schema') == hc.schema(harness, 'turn_outcome_verified'):
             verified[(r.get('session_id'), r.get('trace_id'))] = r  # append-only: latest row wins
+    if cohort_fn is None and harness == HARNESS:
+        cohort_fn = lambda sid: transcript_cohort(sid, projects)  # noqa: E731
+    elif cohort_fn is None:
+        by_session = {k[0]: r['cohort'] for k, r in verified.items() if r.get('cohort') in TABLE_COHORTS}
+        cohort_fn = lambda sid: by_session.get(sid, 'unknown')  # noqa: E731
     keys = list(opps)
     if include_unjoined:
         keys += [k for k in verified if k not in opps]
@@ -239,15 +257,17 @@ def build_table(state: Path, *, projects: Path | None = None, include_unjoined: 
         if sid not in cohorts:
             cohorts[sid] = cohort_fn(sid)
         rec, obs, ver = opps.get(key), observed.get(key), verified.get(key)
-        cohort = capture_cohort(rec) or cohorts[sid]
+        cohort = capture_cohort(rec) or (ver or {}).get('cohort') or cohorts[sid]
         opp = (rec or {}).get('opportunity') or {}
         started = ((ver or {}).get('turn') or {}).get('started_at') or (opp.get('provenance') or {}).get('built_at')
         rows.append({
             'schema': SCHEMA, 'table_version': TABLE_VERSION, 'feature_schema_sha': FEATURE_SCHEMA_SHA,
-            'turn_key': _sha({'session': sid, 'trace': tid}),
+            # claude-code keeps its 6fee859 key (byte-identical tables); every other harness the canonical one,
+            # the key its verified, imported and failure rows carry
+            'turn_key': _sha({'session': sid, 'trace': tid}) if harness == HARNESS else hc.turn_key(harness, sid, tid),
             'group': _sha({'session': sid}, 12),
             'day': started[:10] if isinstance(started, str) else None,
-            'harness': (opp.get('trace') or {}).get('harness') or HARNESS,
+            'harness': harness,
             'cohort': cohort,
             'has_opportunity': rec is not None,
             'gate': (rec or {}).get('gate'),
@@ -310,8 +330,10 @@ def sweep_counts(verified_rows: Iterable[Mapping[str, Any]], state: Path, *, sin
                 for r in _read_jsonl(state / 'opportunities.jsonl') if r.get('schema') == OPP_SCHEMA}
     obs_keys = {(r.get('session_id'), r.get('trace_id')) for r in _read_jsonl(state / 'outcomes.jsonl')
                 if r.get('schema') == OBSERVED_SCHEMA}
-    first_opp = min((((r.get('opportunity') or {}).get('provenance') or {}).get('built_at') or '~')
-                    for r in _read_jsonl(state / 'opportunities.jsonl')) if opp_keys else None
+    # A non-repo turn builds no packet (built_at null): its capture time stands in, never a sentinel that sorts last.
+    first_opp = min((((r.get('opportunity') or {}).get('provenance') or {}).get('built_at') or r.get('recorded_at')
+                     for r in _read_jsonl(state / 'opportunities.jsonl') if r.get('schema') == OPP_SCHEMA),
+                    key=lambda v: v or '~', default=None) if opp_keys else None
     cohort_fn = cohort_fn or (lambda sid: 'unknown')
     days: dict[str, Counter] = {}
     cohorts: dict[str, Counter] = {}
@@ -366,6 +388,240 @@ def assert_private(rows: Iterable[Mapping[str, Any]]) -> None:
         walk(r, r.get('turn_key', '?'))
 
 
+# ----------------------------------------------------------------------------- per harness x cohort (z0int#56 M1)
+@dataclass(frozen=True)
+class Table:
+    """One harness x cohort table. Every row must belong to it: there is no way to pool harnesses or cohorts."""
+    harness: str
+    cohort: str
+    rows: tuple = ()
+    kind: str = 'training'  # training | shadow
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, 'rows', tuple(self.rows))
+        if self.harness not in hc.HARNESSES or self.cohort not in TABLE_COHORTS:
+            raise ValueError(f'no table for harness {self.harness!r} x cohort {self.cohort!r}')
+        stray = sum(1 for r in self.rows if (r.get('harness'), r.get('cohort')) != (self.harness, self.cohort))
+        if stray:
+            raise ValueError(f'{stray} rows of another harness or cohort in {self.harness}/{self.cohort}: '
+                             'tables are never pooled')
+
+
+def imported_row(r: Mapping[str, Any]) -> dict[str, Any]:
+    """A legacy imported_turn.v0 row as a training row: no features (no opportunity), its tier as the label."""
+    lab = r.get('label') or {}
+    return {'schema': SCHEMA, 'table_version': TABLE_VERSION, 'feature_schema_sha': FEATURE_SCHEMA_SHA,
+            'turn_key': r.get('turn_key'), 'group': r.get('group'), 'day': r.get('day'), 'harness': r.get('harness'),
+            'cohort': r.get('cohort'), 'has_opportunity': False, 'gate': None, 'features': None, 'observed': None,
+            'label': {'present': True, 'state': lab.get('state'), 'label_class': lab.get('tier'),
+                      'label_confidence': None, 'y_success': lab.get('y_success'),
+                      'resolved': lab.get('y_success') is not None, 'oracles': ['effective_tier']},
+            'verifier': None, 'source': r.get('source'), 'privacy': 'features_counts_and_hashed_ids_only'}
+
+
+def _latest(rows: Iterable[Mapping[str, Any]], key: str) -> list[Mapping[str, Any]]:
+    """The current row per id of an append-only store: an importer appends a row again when its content changes
+    (e.g. a scrub_contaminated_outcomes correction), so the last row per ``key`` wins, in first-seen order."""
+    latest: dict[Any, Mapping[str, Any]] = {}
+    for r in rows:
+        latest[r.get(key)] = r
+    return list(latest.values())
+
+
+def _split(rows: Iterable[Mapping[str, Any]], kind: str) -> dict[tuple[str, str], Table]:
+    groups: dict[tuple[str, str], list] = {}
+    for r in rows:
+        groups.setdefault((r.get('harness'), r.get('cohort')), []).append(r)
+    return {k: Table(k[0], k[1], v, kind) for k, v in sorted(groups.items())}
+
+
+def build_tables(root: str | Path | None = None, *, projects: Path | None = None, include_unjoined: bool = False,
+                 cohort_fns: Mapping[str, Callable[[Any], str]] | None = None) -> dict[tuple[str, str], Table]:
+    """Training tables for every harness with state under ``root``, keyed (harness, cohort)."""
+    rows: list[dict[str, Any]] = []
+    for harness in hc.HARNESSES:
+        state = hc.state_dir(harness, root)
+        if not state.is_dir():
+            continue
+        rows += build_table(state, projects=projects, include_unjoined=include_unjoined, harness=harness,
+                            cohort_fn=(cohort_fns or {}).get(harness))
+        legacy = [r for r in _read_jsonl(state / 'imported_turns.jsonl')
+                  if r.get('schema') == hc.schema(harness, 'imported_turn')]
+        assert_private(legacy)  # fail closed on the stored rows, not only on their projection
+        rows += [imported_row(r) for r in _latest(legacy, 'turn_key')]
+    return _split(rows, 'training')
+
+
+def shadow_tables(root: str | Path | None = None) -> dict[tuple[str, str], Table]:
+    """Shadow-decision tables (counterfactual answers, label null) keyed (harness, cohort)."""
+    rows = [r for h in hc.HARNESSES for r in _latest(
+        (r for r in _read_jsonl(hc.state_dir(h, root) / 'shadow_decisions.jsonl')
+         if r.get('schema') == hc.schema(h, 'shadow_decision')), 'decision_id')]
+    return _split(rows, 'shadow')
+
+
+def scan_records(root: str | Path | None = None) -> dict[str, dict[str, dict[str, int]]]:
+    """Per harness: rows by accepted v0 schema, failure rows by kind, and every other schema (unsupported_schema)."""
+    out = {}
+    for harness in hc.HARNESSES:
+        state = hc.state_dir(harness, root)
+        if not state.is_dir():
+            continue
+        accepted, unsupported, failures = Counter(), Counter(), Counter()
+        for path in sorted(state.glob('*.jsonl')):
+            for r in _read_jsonl(path):
+                parsed = hc.parse_schema(r.get('schema'))
+                if parsed and parsed[0] == harness and parsed[1] in RECORD_KINDS and parsed[2] == hc.VERSION:
+                    accepted[r['schema']] += 1
+                    if parsed[1] == 'failure':
+                        failures[str(r.get('kind'))] += 1
+                else:
+                    unsupported[str(r.get('schema'))] += 1
+        out[harness] = {'accepted': dict(sorted(accepted.items())), 'unsupported_schema': dict(sorted(unsupported.items())),
+                        'failures': dict(sorted(failures.items()))}
+    return out
+
+
+def _stamp(man: dict[str, Any]) -> dict[str, Any]:
+    man['manifest_sha256'] = _sha({k: v for k, v in man.items() if k not in ('generated_at', 'manifest_sha256')}, 64)
+    return man
+
+
+def _body(rows: Iterable[Mapping[str, Any]]) -> str:
+    return ''.join(json.dumps(r, sort_keys=True) + '\n' for r in rows)
+
+
+def _table_manifest(t: Table, body: str, *, generated_at: float, **extra: Any) -> dict[str, Any]:
+    if t.kind == 'training':
+        man = manifest(list(t.rows), sources={}, generated_at=generated_at)
+    else:
+        man = {'schema': MANIFEST_SCHEMA, 'row_schema': hc.schema(t.harness, 'shadow_decision'),
+               'table_version': TABLE_VERSION, 'feature_schema_sha': FEATURE_SCHEMA_SHA, 'label': {'y': 'always null'},
+               'generated_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(generated_at)),
+               'counts': {'rows': len(t.rows)}, 'privacy': 'no prompt/response/command/path/claim text'}
+    man.pop('sources', None)
+    man.update(harness=t.harness, cohort=t.cohort, kind=t.kind,
+               rows_sha256=hashlib.sha256(body.encode()).hexdigest(), **extra)
+    from .turn_readers import JOIN_RULES
+    if t.kind == 'training' and t.cohort == 'legacy':  # imported labels: the OMP v1 effective tier, no shell exits
+        man['label_source'] = 'effective_tier'
+    elif t.kind == 'training' and t.harness in JOIN_RULES:  # one-sided test labels must not read as class balance
+        man['test_label_polarity'] = JOIN_RULES[t.harness].test_labels
+    return _stamp(man)
+
+
+def _write_tables(out_dir: Path, tables: Iterable[Table], *, generated_at: float, index: dict[str, Any],
+                  **extra: Any) -> dict[str, Any]:
+    """Privacy-check every table first, then write <harness>/<cohort>[.shadow].jsonl + manifests + the index."""
+    tables = list(tables)
+    for t in tables:
+        assert_private(t.rows)
+    out_dir.mkdir(parents=True, exist_ok=True)  # no table at all still writes the counts index
+    for t in tables:
+        name = t.cohort if t.kind == 'training' else f'{t.cohort}.shadow'
+        body = _body(t.rows)
+        man = _table_manifest(t, body, generated_at=generated_at, **extra.get(t.harness, {}))
+        (out_dir / t.harness).mkdir(parents=True, exist_ok=True)
+        (out_dir / t.harness / f'{name}.jsonl').write_text(body)
+        (out_dir / t.harness / f'{name}.manifest.json').write_text(json.dumps(man, indent=1, sort_keys=True) + '\n')
+        index['tables' if t.kind == 'training' else 'shadow_tables'][f'{t.harness}/{t.cohort}'] = {
+            'rows': len(t.rows), 'rows_sha256': man['rows_sha256'], 'manifest_sha256': man['manifest_sha256']}
+    _stamp(index)
+    (out_dir / 'manifest.json').write_text(json.dumps(index, indent=1, sort_keys=True) + '\n')
+    return index
+
+
+def export_tables(out_dir: Path, *, root: str | Path | None = None, host: str | None = None,
+                  projects: Path | None = None, include_unjoined: bool = False,
+                  cohort_fns: Mapping[str, Callable[[Any], str]] | None = None) -> dict[str, Any]:
+    """Write one training table (and one shadow-decision table) per harness x cohort, never a pooled one.
+
+    The index manifest counts, per harness, the rows of every accepted record schema, failure rows by kind and
+    every schema it cannot use (``unsupported_schema``): nothing is dropped silently.
+    """
+    host = host or socket.gethostname()
+    now = time.time()
+    tables = list(build_tables(root, projects=projects, include_unjoined=include_unjoined,
+                               cohort_fns=cohort_fns).values()) + list(shadow_tables(root).values())
+    records = scan_records(root)
+    index = {'schema': INDEX_SCHEMA, 'host': host, 'table_version': TABLE_VERSION,
+             'feature_schema_sha': FEATURE_SCHEMA_SHA, 'records': records, 'tables': {}, 'shadow_tables': {},
+             'generated_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(now))}
+    return _write_tables(Path(out_dir), tables, generated_at=now, index=index,
+                         **{h: {'host': host, 'records': records.get(h, {})} for h in hc.HARNESSES})
+
+
+# ----------------------------------------------------------------------------- loop merge (across hosts)
+def _rank(row: Mapping[str, Any]) -> tuple:
+    lab = row.get('label') or {}
+    return (bool(lab.get('resolved')), bool(lab.get('present')), bool(row.get('has_opportunity')))
+
+
+def merge_tables(tables: Iterable[Table], hosts: Iterable[str | None] | None = None) -> Table:
+    """Merge one harness x cohort table from several hosts by turn_key; ``hosts`` provenance is kept per row.
+
+    Two hosts with the same turn keep the row with the more resolved label (ties: a fixed content order), so the
+    result does not depend on the input order. Different harnesses or cohorts are refused.
+    """
+    tables = list(tables)
+    hosts = list(hosts) if hosts is not None else [None] * len(tables)
+    if not tables:
+        raise ValueError('nothing to merge')
+    if len({t.harness for t in tables}) > 1:
+        raise ValueError('refusing to merge across harness: ' + ', '.join(sorted({t.harness for t in tables})))
+    if len({t.cohort for t in tables}) > 1:
+        raise ValueError('refusing to merge across cohort: ' + ', '.join(sorted({t.cohort for t in tables})))
+    if len({t.kind for t in tables}) > 1:
+        raise ValueError('refusing to merge training and shadow tables')
+    merged: dict[str, dict[str, Any]] = {}
+    for t, host in zip(tables, hosts):
+        for r in t.rows:
+            key = r.get('decision_id') or r['turn_key']
+            own = set(r.get('hosts') or ([host] if host else []))
+            row = {k: v for k, v in r.items() if k != 'hosts'}
+            cur = merged.get(key)
+            if cur is not None:
+                own |= set(cur.pop('hosts'))
+                row = max(cur, row, key=lambda x: (_rank(x), _sha(x, 64)))
+            merged[key] = dict(row, hosts=sorted(own))
+    rows = sorted(merged.values(), key=lambda r: (r.get('day') or '', r.get('decision_id') or r['turn_key']))
+    return Table(tables[0].harness, tables[0].cohort, rows, tables[0].kind)
+
+
+def merge(inputs: Iterable[Path], out_dir: Path) -> dict[str, Any]:
+    """`z0int loop merge`: per harness x cohort, merge the table sets exported on several hosts (z0int#56 M1).
+
+    Refused before anything is written: tables whose table_version / feature schema / row schema differ, rows that
+    do not belong to their table, and any text-bearing key."""
+    groups: dict[tuple, list[tuple[Table, str, dict]]] = {}
+    for d in inputs:
+        for mpath in sorted(Path(d).glob('*/*.manifest.json')):
+            man = json.loads(mpath.read_text())
+            rows = _read_jsonl(mpath.with_name(mpath.name.replace('.manifest.json', '.jsonl')))
+            t = Table(man['harness'], man['cohort'], rows, man.get('kind', 'training'))
+            groups.setdefault((t.harness, t.cohort, t.kind), []).append((t, man.get('host') or Path(d).name, man))
+    merged = []
+    for (harness, cohort, kind), parts in sorted(groups.items()):
+        tables = {(m.get('table_version'), m.get('feature_schema_sha'), m.get('row_schema')) for _, _, m in parts}
+        rows = {(r.get('schema'), r.get('table_version'), r.get('feature_schema_sha')) for t, _, _ in parts for r in t.rows}
+        if len(tables) > 1 or len(rows) > 1:
+            raise ValueError(f'refusing to merge {harness}/{cohort}: schema versions differ '
+                             f'{sorted(map(str, tables | rows))}')
+        merged.append(merge_tables([t for t, _, _ in parts], [h for _, h, _ in parts]))
+    all_hosts = sorted({h for parts in groups.values() for _, h, _ in parts})
+    cohorts: dict[tuple[str, Any], set[str]] = {}  # a turn two hosts classified differently (e.g. v0.39 vs v0.44)
+    for t in merged:
+        for r in t.rows if t.kind == 'training' else ():
+            cohorts.setdefault((t.harness, r.get('turn_key')), set()).add(t.cohort)
+    index = {'schema': INDEX_SCHEMA, 'merged': True, 'hosts': all_hosts, 'table_version': TABLE_VERSION,
+             'feature_schema_sha': FEATURE_SCHEMA_SHA, 'tables': {}, 'shadow_tables': {},
+             'cross_cohort_turn_keys': _count(h for (h, _), c in cohorts.items() if len(c) > 1)}
+    now = time.time()
+    index['generated_at'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(now))
+    return _write_tables(Path(out_dir), merged, generated_at=now, index=index,
+                         **{h: {'hosts': all_hosts} for h in hc.HARNESSES})
+
+
 def export(out: Path, *, state: Path | None = None, projects: Path | None = None,
            include_unjoined: bool = False, sweep_since: str | None = None, gh: bool = True) -> dict[str, Any]:
     from .outcome_verifier import state_dir
@@ -387,7 +643,44 @@ def export(out: Path, *, state: Path | None = None, projects: Path | None = None
     return man
 
 
+def _tables_main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(prog='z0int loop export', description=export_tables.__doc__)
+    ap.add_argument('--out-dir', type=Path, required=True, help='<harness>/<cohort>.jsonl + manifests + manifest.json')
+    ap.add_argument('--root', type=Path, default=None, help='Z0INT_HOME to read state/<harness>/ from')
+    ap.add_argument('--host', default=None, help='host label for merge provenance (default: hostname)')
+    ap.add_argument('--projects-dir', type=Path, default=None)
+    ap.add_argument('--include-unjoined', action='store_true')
+    args = ap.parse_args(argv)
+    index = export_tables(args.out_dir, root=args.root, host=args.host, projects=args.projects_dir,
+                          include_unjoined=args.include_unjoined)
+    print(json.dumps({k: index[k] for k in ('host', 'tables', 'shadow_tables', 'manifest_sha256')}, indent=1))
+    return 0
+
+
+def _merge_main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(prog='z0int loop merge', description=merge.__doc__)
+    ap.add_argument('--in', dest='inputs', type=Path, action='append', required=True,
+                    help='a table set from `z0int loop export` (repeat per host)')
+    ap.add_argument('--out', type=Path, required=True)
+    args = ap.parse_args(argv)
+    try:
+        index = merge(args.inputs, args.out)
+    except ValueError as exc:
+        print(f'refused: {exc}')
+        return 2
+    print(json.dumps({k: index[k] for k in ('hosts', 'tables', 'shadow_tables', 'manifest_sha256')}, indent=1))
+    return 0
+
+
 def _main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ['export']:
+        return _tables_main(argv[1:])
+    if argv[:1] == ['merge']:
+        return _merge_main(argv[1:])
+    if argv[:1] == ['import']:
+        from .legacy_import import _main as import_main
+        return import_main(argv[1:])
     ap = argparse.ArgumentParser(prog='z0int outcomes export', description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--out', type=Path, required=True, help='training table JSONL (manifest written beside it)')
