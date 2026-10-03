@@ -96,6 +96,33 @@ event identity later resolves to different payload bytes, the existing
 `EventIdentity.has_payload_conflict()` path exposes the conflict instead of
 silently minting a second event identity.
 
+### Opt-in `resolve_context` seam
+
+`z0int.context_resolve.resolve_context` reaches ctx only when the caller passes
+`allow_ctx=True`. With the default `allow_ctx=False` the packet, operations,
+measurements and gap strings are unchanged and the adapter is never constructed.
+
+When enabled:
+
+- only `natural_language` and `memory` needs search ctx; exact paths and other
+  kinds never do;
+- `ctx_backend` defaults to `lexical`; `hybrid`/`semantic` raise `ValueError`
+  unless `allow_ctx_semantic=True` is also passed;
+- hits are appended as the adapter's `conversation` `EvidenceRef`s, deduplicated
+  only by exact `(source_id, source_version, locator)`; QMD and ctx evidence for
+  similar text are both kept;
+- the Core `generation_id` is stored as `ResolutionRecipe.source_epochs["ctx_generation"]`;
+  a different generation within one resolve is recorded as a contradiction;
+- each need gets a `ctx_search` operation (status, effective mode, hit count,
+  added count, latency), and `measurements` gains `ctx_status`, `ctx_results`,
+  `ctx_latency_ms` and `ctx_effective_modes`;
+- a missing CLI (`ctx_status=absent`) or failing call (`ctx_status=error`) is a
+  recorded miss that leaves the need as a gap, never an exception or fabricated
+  evidence;
+- the resolver issues `ctx search --refresh off` only: no `show`, `setup`,
+  `import`, `index` or other maintenance command; AODL authority,
+  `verified_success` and transition authorization are untouched.
+
 ## Explicit non-goals
 
 This adapter does not call `ctx setup`, `ctx import`, `ctx index`, or semantic
