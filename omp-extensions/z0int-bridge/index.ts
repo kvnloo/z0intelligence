@@ -11,30 +11,42 @@
  * Python edits take effect via /reload-plugins (transactional generation swap).
  *
  * execution remains log_only until host consume is authorized.
+ *
+ * Capture (oh-my-pi#109): turn_open carries the task cwd, the harness, the subagent parent and the model so
+ * the worker can write the z0int#62 record family; every capture handler returns undefined and fails open
+ * (a worker that cannot start is a counted drop in $Z0INT_HOME/state/<harness>/drops.jsonl).
+ * `registerBridgeCapture` is the capture alone (the OMO/senpi entry `omo.ts` uses only that); the default
+ * export adds the bridge commands for OMP. Routing is NOT registered here: it stays with the separate
+ * z0int-intelligence extension link, so pointing this bridge at another checkout never moves live routing.
  */
-import registerIntelligence from "../z0int-intelligence/index.ts";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface, type Interface } from "node:readline";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
 const BRIDGE_PROTOCOL = "z0int.bridge.v2";
-const Z0 = process.env.Z0INT_HOME || join(homedir(), ".z0int");
-const RUNTIME = join(Z0, "runtime");
-const CURRENT = join(RUNTIME, "bridge-current.json");
-
-const Z0_PY =
-	process.env.Z0INT_PYTHON ||
-	"python3";
+// Read per use, not at import, so the host env at spawn time decides (and tests can point it elsewhere).
+function z0Home(env: NodeJS.ProcessEnv = process.env): string {
+	return env.Z0INT_HOME || join(homedir(), ".z0int");
+}
 const Z0_ROOT =
 	process.env.Z0INT_ROOT ||
 	// Prefer the tree that owns this extension when possible.
 	process.env.Z0INT_BRIDGE_ROOT ||
 	fileURLToPath(new URL("../../", import.meta.url));
+
+/** Z0INT_PYTHON, else the owning checkout's .venv, else the z0int runtime, else python3 (salvaged, 815c680). */
+export function resolvePython(env: NodeJS.ProcessEnv = process.env, root = Z0_ROOT, z0 = z0Home(env)): string {
+	if (env.Z0INT_PYTHON) return env.Z0INT_PYTHON;
+	for (const candidate of [join(root, ".venv", "bin", "python"), join(z0, "bin", "python")]) {
+		if (existsSync(candidate)) return candidate;
+	}
+	return "python3";
+}
 
 const WORKER_TIMEOUT_MS = Number(process.env.Z0INT_BRIDGE_TIMEOUT_MS || 45_000);
 const HANDSHAKE_TIMEOUT_MS = 20_000;
@@ -60,6 +72,8 @@ type Pending = {
 type ActiveTurn = {
 	traceId: string;
 	sessionId: string;
+	harness: string;
+	openedAt: number;
 	openedGeneration: number;
 	turnsSeen: number;
 	turnsWithProviderUsage: number;
@@ -79,16 +93,48 @@ type WorkerHandle = {
 };
 
 let current: WorkerHandle | null = null;
+let starting: Promise<WorkerHandle> | null = null;
 let generation = 0;
 let reloadPromise: Promise<Jsonish> | null = null;
-let activeTurn: ActiveTurn | null = null;
+// One open turn per session: an in-process subagent's turn never closes (or replaces) its parent's.
+const activeTurns = new Map<string, ActiveTurn>();
+
+// --- capture accounting (content-free) -----------------------------------------------------------------
+const CAPTURE_EVENTS = ["input", "before_agent_start", "turn_end", "agent_end"] as const;
+const counters: Record<string, number> = {};
+const harnessStatus: Record<string, { status: "SUPPORTED" | "UNSUPPORTED"; missing: string[] }> = {};
+
+export function captureStatus(): { counters: Record<string, number>; harnesses: typeof harnessStatus } {
+	return { counters: { ...counters }, harnesses: { ...harnessStatus } };
+}
+
+/** Count a lost capture and persist it in the shared drop file (same row shape as harness_capture). */
+function recordDrop(harness: string, reason: string, kind = "opportunity_record"): void {
+	counters[reason] = (counters[reason] ?? 0) + 1;
+	try {
+		const dir = join(z0Home(), "state", harness);
+		mkdirSync(dir, { recursive: true });
+		const row = {
+			schema: `z0int.${harness.replaceAll("-", "_")}.drop.v0`,
+			harness,
+			kind,
+			reason,
+			count: 1,
+			recorded_at: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
+		};
+		appendFileSync(join(dir, "drops.jsonl"), JSON.stringify(row) + "\n", "utf8");
+	} catch {
+		/* a lost drop marker never affects the host */
+	}
+}
 
 function ensureDir(path: string): void {
 	mkdirSync(path, { recursive: true });
 }
 
-function publishCurrent(h: WorkerHandle): void {
-	ensureDir(RUNTIME);
+export function publishCurrent(h: Pick<WorkerHandle, "generation" | "instanceId" | "buildId">): void {
+	const runtime = join(z0Home(), "runtime");
+	ensureDir(runtime);
 	const blob = {
 		protocol: BRIDGE_PROTOCOL,
 		generation: h.generation,
@@ -97,7 +143,7 @@ function publishCurrent(h: WorkerHandle): void {
 		activated_at: Date.now() / 1000,
 		omp_pid: process.pid,
 	};
-	writeFileSync(CURRENT, JSON.stringify(blob, null, 2) + "\n", "utf8");
+	writeFileSync(join(runtime, "bridge-current.json"), JSON.stringify(blob, null, 2) + "\n", "utf8");
 }
 
 function failAll(h: WorkerHandle, err: Error): void {
@@ -108,6 +154,17 @@ function failAll(h: WorkerHandle, err: Error): void {
 	h.pending.clear();
 }
 
+function unrefChild(child: ChildProcess): void {
+	try {
+		child.unref();
+		for (const stream of [child.stdin, child.stdout, child.stderr]) {
+			(stream as { unref?: () => void } | null)?.unref?.();
+		}
+	} catch {
+		/* fail-open: a host without unref keeps the old behaviour */
+	}
+}
+
 function spawnWorker(nextGen: number): Promise<WorkerHandle> {
 	return new Promise((resolve, reject) => {
 		const env = {
@@ -116,10 +173,24 @@ function spawnWorker(nextGen: number): Promise<WorkerHandle> {
 			PYTHONPATH: join(Z0_ROOT, "src") + (process.env.PYTHONPATH ? `:${process.env.PYTHONPATH}` : ""),
 			Z0INT_BRIDGE_GENERATION: String(nextGen),
 		};
-		const child = spawn(Z0_PY, ["-u", "-m", "z0int.bridge.worker", "--generation", String(nextGen)], {
-			cwd: Z0_ROOT,
-			env,
-			stdio: ["pipe", "pipe", "pipe"],
+		let child: ChildProcess;
+		try {
+			child = spawn(resolvePython(), ["-u", "-m", "z0int.bridge.worker", "--generation", String(nextGen)], {
+				cwd: Z0_ROOT,
+				env,
+				stdio: ["pipe", "pipe", "pipe"],
+			});
+		} catch (e) {
+			reject(e instanceof Error ? e : new Error(String(e)));
+			return;
+		}
+		// A resident helper never keeps its host alive: a host that exits when its event loop drains (senpi print
+		// mode) would otherwise hang after its last turn. In-flight requests hold their own timers; the worker
+		// exits on stdin EOF once the host is gone.
+		unrefChild(child);
+		// A worker that never started (missing interpreter) or died must not raise into the host.
+		child.stdin?.on("error", () => {
+			/* fail-open: the pending requests are failed by exit/error below */
 		});
 		const pending = new Map<string, Pending>();
 		const lines = createInterface({ input: child.stdout! });
@@ -258,25 +329,57 @@ async function drainAndStop(h: WorkerHandle): Promise<void> {
 
 async function ensureWorker(): Promise<WorkerHandle> {
 	if (current && current.child.exitCode === null) return current;
-	const nextGen = generation + 1 || 1;
-	const h = await spawnWorker(nextGen);
-	const check = await selfCheck(h);
-	if (check.ok !== true) {
-		await drainAndStop(h);
-		throw new Error(`self_check failed: ${JSON.stringify(check.errors || check.error)}`);
+	// One start at a time: the eager start and a first turn must not spawn two workers.
+	if (starting) return starting;
+	starting = (async () => {
+		const nextGen = generation + 1 || 1;
+		const h = await spawnWorker(nextGen);
+		const check = await selfCheck(h);
+		if (check.ok !== true) {
+			await drainAndStop(h);
+			throw new Error(`self_check failed: ${JSON.stringify(check.errors || check.error)}`);
+		}
+		current = h;
+		generation = h.generation;
+		publishCurrent(h);
+		publishShadowTransport(h);
+		maybePrewarmDecider(h);
+		return h;
+	})().finally(() => {
+		starting = null;
+	});
+	return starting;
+}
+
+/** Stop the resident worker (tests, and hosts that unload the extension). */
+async function stopWorker(): Promise<void> {
+	const h = current;
+	current = null;
+	publishShadowTransport(null);
+	if (h) await drainAndStop(h);
+}
+
+/** An open turn older than this whose agent_end never arrived (killed subagent, host error) stops blocking reload. */
+function turnTtlMs(): number {
+	const v = Number(process.env.Z0INT_BRIDGE_TURN_TTL_MS);
+	return Number.isFinite(v) && v > 0 ? v : 2 * 60 * 60 * 1000;
+}
+
+/** Forget open turns past the age bound; each is a counted, content-free drop (its outcome is lost). */
+function evictStaleTurns(now = Date.now()): void {
+	const ttl = turnTtlMs();
+	for (const [sessionId, turn] of activeTurns) {
+		if (now - turn.openedAt <= ttl) continue;
+		activeTurns.delete(sessionId);
+		recordDrop(turn.harness, "stale_turn", "turn_outcome");
 	}
-	current = h;
-	generation = h.generation;
-	publishCurrent(h);
-	publishShadowTransport(h);
-	maybePrewarmDecider(h);
-	return h;
 }
 
 async function reload(reason: string): Promise<Jsonish> {
 	if (reloadPromise) return reloadPromise;
 	reloadPromise = (async () => {
-		if (activeTurn) {
+		evictStaleTurns();
+		if (activeTurns.size) {
 			return {
 				ok: false,
 				error: "turn_in_flight",
@@ -328,12 +431,75 @@ async function reload(reason: string): Promise<Jsonish> {
 	return reloadPromise;
 }
 
-function resolveSessionId(ctx: unknown): string {
-	if (ctx && typeof ctx === "object" && "sessionId" in ctx) {
-		const s = (ctx as { sessionId?: unknown }).sessionId;
-		if (typeof s === "string" && s) return s;
+/** The host session id: OMP and senpi expose it through ctx.sessionManager.getSessionId() (salvaged, 815c680). */
+export function resolveSessionId(ctx: unknown): string {
+	try {
+		if (ctx && typeof ctx === "object") {
+			const sm = (ctx as { sessionManager?: { getSessionId?: () => unknown } }).sessionManager;
+			const id = typeof sm?.getSessionId === "function" ? sm.getSessionId() : undefined;
+			if (typeof id === "string" && id) return id;
+			const s = (ctx as { sessionId?: unknown }).sessionId;
+			if (typeof s === "string" && s) return s;
+		}
+	} catch {
+		/* fall through */
 	}
 	return process.env.OMP_SESSION_ID || `omp-${process.pid}`;
+}
+
+export type TurnInfo = { cwd: string | null; agentKind: string | null; parentId: string | null; model: string | null };
+
+/** What the capture needs from the handler ctx: the task cwd, the agent identity and the model. Never throws. */
+export function turnContext(ctx: unknown): TurnInfo {
+	const c = (ctx && typeof ctx === "object" ? ctx : {}) as Record<string, unknown>;
+	const read = (key: string): unknown => {
+		try {
+			return c[key];
+		} catch {
+			return undefined;
+		}
+	};
+	const text = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+	const agent = (read("agent") ?? {}) as { kind?: unknown; parentId?: unknown };
+	const model = (read("model") ?? {}) as { provider?: unknown; id?: unknown };
+	const id = text(model?.id);
+	return {
+		cwd: text(read("cwd")),
+		agentKind: text(agent?.kind),
+		parentId: text(agent?.parentId),
+		model: id && text(model?.provider) ? `${model.provider}/${id}` : id,
+	};
+}
+
+type FrameTurn = { traceId: string; sessionId: string; pid: number };
+
+export function turnOpenFrame(turn: FrameTurn, prompt: string, info: Partial<TurnInfo>, harness: string): Jsonish {
+	return {
+		op: "turn_open",
+		trace_id: turn.traceId,
+		session_id: turn.sessionId,
+		omp_pid: turn.pid,
+		payload: {
+			prompt,
+			session_id: turn.sessionId,
+			omp_pid: turn.pid,
+			harness,
+			cwd: info.cwd ?? null,
+			parent_id: info.parentId ?? null,
+			agent_kind: info.agentKind ?? null,
+			model: info.model ?? null,
+		},
+	};
+}
+
+export function turnCloseFrame(turn: FrameTurn, op: string, fields: Jsonish, harness: string): Jsonish {
+	return {
+		op,
+		trace_id: turn.traceId,
+		session_id: turn.sessionId,
+		omp_pid: turn.pid,
+		payload: { trace_id: turn.traceId, session_id: turn.sessionId, omp_pid: turn.pid, harness, ...fields },
+	};
 }
 
 function estimateMeasuredFromMessages(messages: unknown[]): {
@@ -513,119 +679,54 @@ function maybePrewarmDecider(h: WorkerHandle): void {
 	});
 }
 
-export default function z0intBridge(pi: ExtensionAPI) {
-	registerIntelligence(pi);
-	pi.setLabel("z0int bridge v2 + canonical intelligence");
+function eventField(event: unknown, key: string): unknown {
+	return event && typeof event === "object" && key in event ? (event as Record<string, unknown>)[key] : undefined;
+}
 
-	// Eager start so first turn is warm.
-	void ensureWorker().catch(() => {
-		/* fail-open; next turn retries */
-	});
+async function closeActive(sessionId: string, messages: unknown[], source: string, completed: boolean): Promise<void> {
+	const turn = activeTurns.get(sessionId);
+	if (!turn) return;
+	activeTurns.delete(sessionId);
 
-	// /reload-plugins interception: hot-swap worker, then let OMP continue.
-	pi.on("input", async (event, ctx) => {
-		const text =
-			event && typeof event === "object" && "text" in event
-				? String((event as { text?: unknown }).text ?? "").trim()
-				: "";
-		if (text !== "/reload-plugins") return;
-		// Do NOT return { handled: true } — OMP must still run builtin reload.
-		try {
-			const result = await reload("omp_reload_plugins");
-			const ok = result.ok === true;
-			const gen = result.generation;
-			const build = result.build_id;
-			ctx.ui?.notify?.(
-				ok
-					? `z0int bridge → generation ${gen} build=${build}`
-					: `z0int bridge reload failed (${result.error}); keeping generation ${generation}`,
-				ok ? "info" : "warning",
-			);
-		} catch (e) {
-			ctx.ui?.notify?.(`z0int bridge reload error: ${e}`, "warning");
-		}
-	});
+	let inputTokens = turn.inputTokens;
+	let outputTokens = turn.outputTokens;
+	let provider = turn.provider;
+	let model = turn.model;
+	let measurementState: "complete" | "partial";
+	let stateReason: string;
 
-	pi.on("before_agent_start", async (event, ctx) => {
-		const prompt =
-			event && typeof event === "object" && "prompt" in event
-				? String((event as { prompt?: unknown }).prompt ?? "").trim()
-				: "";
-		const sessionId = resolveSessionId(ctx);
-		if (!prompt || prompt.startsWith("/")) return;
+	if (turn.turnsSeen > 0) {
+		measurementState =
+			turn.turnsWithProviderUsage === turn.turnsSeen ? "complete" : "partial";
+		stateReason =
+			measurementState === "complete"
+				? "all_turns_provider_usage"
+				: "missing_turn_provider_usage";
+	} else {
+		const fallback = estimateMeasuredFromMessages(messages);
+		inputTokens = fallback.input_tokens;
+		outputTokens = fallback.output_tokens;
+		provider = fallback.provider;
+		model = fallback.model;
+		measurementState = "partial";
+		stateReason =
+			fallback.usage_source === "provider_usage"
+				? "agent_end_last_message_provider_usage"
+				: "agent_end_char_count_proxy";
+	}
 
-		try {
-			const h = await ensureWorker();
-			const turn: ActiveTurn = {
-				traceId: randomUUID().replaceAll("-", ""),
-				sessionId,
-				openedGeneration: h.generation,
-				turnsSeen: 0,
-				turnsWithProviderUsage: 0,
-				inputTokens: 0,
-				outputTokens: 0,
-				provider: null,
-				model: null,
-			};
-			activeTurn = turn;
-			await request(h, {
-				op: "turn_open",
-				trace_id: turn.traceId,
-				session_id: turn.sessionId,
-				omp_pid: process.pid,
-				payload: { prompt, session_id: turn.sessionId, omp_pid: process.pid },
-			});
-		} catch {
-			activeTurn = null;
-		}
-	});
-
-	async function closeActive(messages: unknown[], source: string): Promise<void> {
-		const turn = activeTurn;
-		if (!turn) return;
-
-		let inputTokens = turn.inputTokens;
-		let outputTokens = turn.outputTokens;
-		let provider = turn.provider;
-		let model = turn.model;
-		let measurementState: "complete" | "partial";
-		let stateReason: string;
-
-		if (turn.turnsSeen > 0) {
-			measurementState =
-				turn.turnsWithProviderUsage === turn.turnsSeen ? "complete" : "partial";
-			stateReason =
-				measurementState === "complete"
-					? "all_turns_provider_usage"
-					: "missing_turn_provider_usage";
-		} else {
-			const fallback = estimateMeasuredFromMessages(messages);
-			inputTokens = fallback.input_tokens;
-			outputTokens = fallback.output_tokens;
-			provider = fallback.provider;
-			model = fallback.model;
-			measurementState = "partial";
-			stateReason =
-				fallback.usage_source === "provider_usage"
-					? "agent_end_last_message_provider_usage"
-					: "agent_end_char_count_proxy";
-		}
-
-		try {
-			const h = await ensureWorker();
-			await request(h, {
-				op: source === "bridge_agent_end" ? "agent_end" : "turn_close",
-				trace_id: turn.traceId,
-				session_id: turn.sessionId,
-				omp_pid: process.pid,
-				payload: {
-					trace_id: turn.traceId,
-					session_id: turn.sessionId,
-					omp_pid: process.pid,
+	try {
+		const h = await ensureWorker();
+		await request(
+			h,
+			turnCloseFrame(
+				{ traceId: turn.traceId, sessionId: turn.sessionId, pid: process.pid },
+				source === "bridge_agent_end" ? "agent_end" : "turn_close",
+				{
 					measured: inputTokens + outputTokens,
 					input_tokens: inputTokens,
 					output_tokens: outputTokens,
-					execution_completed: true,
+					execution_completed: completed,
 					// verified_success stays null until async join
 					source,
 					provider,
@@ -637,47 +738,142 @@ export default function z0intBridge(pi: ExtensionAPI) {
 					opened_generation: turn.openedGeneration,
 					close_generation: h.generation,
 				},
-			});
+				turn.harness,
+			),
+		);
+	} catch {
+		/* fail-open */
+	}
+}
+
+/**
+ * The capture handlers alone, for any pi-family host (OMP, OMO/senpi). Every handler returns undefined and
+ * never throws. A host whose API lacks a needed event is recorded UNSUPPORTED (status + a counted drop row)
+ * instead of half-capturing.
+ */
+export function registerBridgeCapture(
+	pi: ExtensionAPI,
+	opts: { harness?: string } = {},
+): { status: "SUPPORTED" | "UNSUPPORTED"; missing: string[] } {
+	const harness = opts.harness || "omp";
+	const handlers: Record<(typeof CAPTURE_EVENTS)[number], (event: unknown, ctx: unknown) => Promise<undefined>> = {
+		// /reload-plugins interception: hot-swap worker, then let the host continue.
+		input: async (event, ctx) => {
+			try {
+				const text = String(eventField(event, "text") ?? "").trim();
+				if (text !== "/reload-plugins") return undefined;
+				// Do NOT return { handled: true } — OMP must still run builtin reload.
+				const notify = (ctx as { ui?: { notify?: (m: string, l?: string) => void } } | undefined)?.ui?.notify;
+				try {
+					const result = await reload("omp_reload_plugins");
+					const ok = result.ok === true;
+					notify?.(
+						ok
+							? `z0int bridge → generation ${result.generation} build=${result.build_id}`
+							: `z0int bridge reload failed (${result.error}); keeping generation ${generation}`,
+						ok ? "info" : "warning",
+					);
+				} catch (e) {
+					notify?.(`z0int bridge reload error: ${e}`, "warning");
+				}
+			} catch {
+				counters.handler_errors = (counters.handler_errors ?? 0) + 1;
+			}
+			return undefined;
+		},
+		before_agent_start: async (event, ctx) => {
+			try {
+				const prompt = String(eventField(event, "prompt") ?? "").trim();
+				if (!prompt || prompt.startsWith("/")) return undefined;
+				const sessionId = resolveSessionId(ctx);
+				const info = turnContext(ctx);
+				let h: WorkerHandle;
+				try {
+					h = await ensureWorker();
+				} catch {
+					recordDrop(harness, "worker_unavailable");
+					return undefined;
+				}
+				// A session's previous turn that never saw agent_end (a diverged host API, a killed run) is counted.
+				const unclosed = activeTurns.get(sessionId);
+				if (unclosed) recordDrop(unclosed.harness, "unclosed_turn", "turn_outcome");
+				const turn: ActiveTurn = {
+					traceId: randomUUID().replaceAll("-", ""),
+					sessionId,
+					harness,
+					openedAt: Date.now(),
+					openedGeneration: h.generation,
+					turnsSeen: 0,
+					turnsWithProviderUsage: 0,
+					inputTokens: 0,
+					outputTokens: 0,
+					provider: null,
+					model: null,
+				};
+				activeTurns.set(sessionId, turn);
+				try {
+					await request(h, turnOpenFrame({ traceId: turn.traceId, sessionId, pid: process.pid }, prompt, info, harness));
+				} catch {
+					if (activeTurns.get(sessionId)?.traceId === turn.traceId) activeTurns.delete(sessionId);
+					recordDrop(harness, "worker_unavailable");
+				}
+			} catch {
+				counters.handler_errors = (counters.handler_errors ?? 0) + 1;
+			}
+			return undefined;
+		},
+		turn_end: async (event, ctx) => {
+			try {
+				const turn = activeTurns.get(resolveSessionId(ctx));
+				if (turn) accumulateTurnUsage(turn, eventField(event, "message") ?? null);
+			} catch {
+				counters.handler_errors = (counters.handler_errors ?? 0) + 1;
+			}
+			return undefined;
+		},
+		agent_end: async (event, ctx) => {
+			try {
+				// OMP says willContinue, senpi says willRetry: either way the turn is not over yet.
+				if (eventField(event, "willContinue") === true || eventField(event, "willRetry") === true) return undefined;
+				const messages = eventField(event, "messages");
+				await closeActive(
+					resolveSessionId(ctx),
+					Array.isArray(messages) ? messages : [],
+					"bridge_agent_end",
+					eventField(event, "aborted") !== true,
+				);
+			} catch {
+				counters.handler_errors = (counters.handler_errors ?? 0) + 1;
+			}
+			return undefined;
+		},
+	};
+	const missing: string[] = [];
+	const on = (pi as { on?: unknown } | undefined)?.on;
+	for (const [event, handler] of Object.entries(handlers)) {
+		try {
+			if (typeof on !== "function") throw new Error("no on()");
+			(on as (e: string, h: unknown) => void).call(pi, event, handler);
 		} catch {
-			/* fail-open */
-		} finally {
-			if (activeTurn?.traceId === turn.traceId) activeTurn = null;
+			missing.push(event);
 		}
 	}
+	const status = missing.length ? "UNSUPPORTED" : "SUPPORTED";
+	harnessStatus[harness] = { status, missing };
+	if (status === "UNSUPPORTED") {
+		recordDrop(harness, "unsupported_api");
+	} else {
+		// Eager start so the first turn is warm.
+		void ensureWorker().catch(() => {
+			/* fail-open; next turn retries */
+		});
+	}
+	return harnessStatus[harness];
+}
 
-	pi.on("turn_end", async event => {
-		try {
-			const turn = activeTurn;
-			if (!turn) return;
-			const msg =
-				event && typeof event === "object" && "message" in event
-					? (event as { message?: unknown }).message
-					: null;
-			accumulateTurnUsage(turn, msg);
-		} catch {
-			/* */
-		}
-	});
-
-	pi.on("agent_end", async event => {
-		try {
-			if (
-				event &&
-				typeof event === "object" &&
-				"willContinue" in event &&
-				(event as { willContinue?: boolean }).willContinue
-			) {
-				return;
-			}
-			const messages =
-				event && typeof event === "object" && "messages" in event
-					? ((event as { messages?: unknown[] }).messages || [])
-					: [];
-			await closeActive(messages, "bridge_agent_end");
-		} catch {
-			/* */
-		}
-	});
+export default function z0intBridge(pi: ExtensionAPI) {
+	pi.setLabel("z0int bridge v2 (capture)");
+	registerBridgeCapture(pi, { harness: "omp" });
 
 	pi.registerCommand("z0int-bridge-status", {
 		description: "Show resident z0int bridge worker generation/build",
@@ -711,7 +907,7 @@ export default function z0intBridge(pi: ExtensionAPI) {
 	pi.registerCommand("z0int-close", {
 		description: "Close active z0int turn with optional --verified",
 		async handler(args, ctx) {
-			const turn = activeTurn;
+			const turn = activeTurns.get(resolveSessionId(ctx));
 			if (!turn) {
 				ctx.ui.notify("z0int close: no active turn in this session", "warning");
 				return;
@@ -725,20 +921,22 @@ export default function z0intBridge(pi: ExtensionAPI) {
 			}
 			try {
 				const h = await ensureWorker();
-				const closed = await request(h, {
-					op: "turn_close",
-					trace_id: turn.traceId,
-					session_id: turn.sessionId,
-					omp_pid: process.pid,
-					payload: {
-						measured: measured ?? null,
-						execution_completed: true,
-						verified_success: verified ? true : null,
-						source: verified ? "bridge_verified" : "z0int-close-cmd",
-						verification_source: verified ? "operator" : null,
-					},
-				});
-				if (activeTurn?.traceId === turn.traceId) activeTurn = null;
+				const closed = await request(
+					h,
+					turnCloseFrame(
+						{ traceId: turn.traceId, sessionId: turn.sessionId, pid: process.pid },
+						"turn_close",
+						{
+							measured: measured ?? null,
+							execution_completed: true,
+							verified_success: verified ? true : null,
+							source: verified ? "bridge_verified" : "z0int-close-cmd",
+							verification_source: verified ? "operator" : null,
+						},
+						turn.harness,
+					),
+				);
+				if (activeTurns.get(turn.sessionId)?.traceId === turn.traceId) activeTurns.delete(turn.sessionId);
 				ctx.ui.notify(
 					`z0int close: ${JSON.stringify({ ok: closed.ok !== false, trace: turn.traceId, gen: h.generation })}`,
 					closed.ok === false ? "error" : "info",
@@ -750,4 +948,4 @@ export default function z0intBridge(pi: ExtensionAPI) {
 	});
 }
 
-export { reload, ensureWorker, request, BRIDGE_PROTOCOL, publishShadowTransport };
+export { reload, ensureWorker, stopWorker, request, BRIDGE_PROTOCOL, publishShadowTransport };

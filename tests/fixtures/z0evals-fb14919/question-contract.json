@@ -1,0 +1,11 @@
+{
+  "schema": "z0eval.unified_memory_questions.v0",
+  "questions": [
+    {"id": "exact-identifier", "kind": "exact", "expected": "supported"},
+    {"id": "supersession", "kind": "temporal", "expected": "newest-supported"},
+    {"id": "cross-harness", "kind": "cross-harness", "expected": "supported"},
+    {"id": "contradiction", "kind": "contradiction", "expected": "explicit-conflict"},
+    {"id": "missing-evidence", "kind": "abstention", "expected": "abstain"},
+    {"id": "minimal-context", "kind": "efficiency", "expected": "supported"}
+  ]
+}

@@ -9,7 +9,7 @@ from pathlib import Path
 from z0int import harness_id
 from z0int.harness_id import detect_hook_harness, turn_key, turn_key_from_alias
 
-PLUGIN_DIR = Path(__file__).resolve().parents[1] / 'harness-adapters' / 'hermes-z0int-decisions'
+PLUGIN_DIR = Path(__file__).resolve().parents[1] / 'harness-adapters' / 'hermes-z0intelligence'  # z0int-decisions moved here (C4a)
 
 
 def sha(*parts):

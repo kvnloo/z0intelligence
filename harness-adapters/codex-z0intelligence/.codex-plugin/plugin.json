@@ -1,7 +1,7 @@
 {
   "name": "codex-z0intelligence",
   "version": "0.1.0",
-  "description": "z0intelligence capture for Codex: shadow DecisionOpportunity and turn outcome records from plugin hooks. Hooks only; observe-only.",
+  "description": "z0intelligence for Codex: shadow capture of DecisionOpportunity and turn outcome records from plugin hooks, the z0 memory push seam (UserPromptSubmit, shadow by default) and the memory-only z0-memory MCP server.",
   "author": {
     "name": "kvnloo"
   },
@@ -10,6 +10,8 @@
   "keywords": [
     "z0intelligence",
     "capture",
-    "hooks"
-  ]
+    "hooks",
+    "memory"
+  ],
+  "mcpServers": "./.mcp.json"
 }
