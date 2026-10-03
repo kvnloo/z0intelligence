@@ -1,0 +1,265 @@
+{
+ "arms": {
+  "control": {
+   "abstained": 0,
+   "answered": 6,
+   "answered_covered": 6,
+   "answered_fresh": 5,
+   "by_category": {
+    "fact": {
+     "answered": 5,
+     "n": 18
+    },
+    "identifier": {
+     "answered": 1,
+     "n": 4
+    },
+    "issue-open": {
+     "answered": 0,
+     "n": 4
+    }
+   },
+   "bytes_opened": {
+    "median": 457753.5,
+    "p90": 925296.0,
+    "sum": 14190103.0
+   },
+   "excerpt_chars": {
+    "median": 2357.5,
+    "p90": 2407.0,
+    "sum": 59470.0
+   },
+   "excerpt_tokens": {
+    "median": 590.0,
+    "p90": 602.0,
+    "sum": 14879.0
+   },
+   "latency_cold_ms": {
+    "median": 697.0,
+    "p90": 876.1,
+    "sum": 19283.0
+   },
+   "latency_warm_ms": {
+    "median": 628.0,
+    "p90": 773.6,
+    "sum": 16188.1
+   },
+   "ok": 26,
+   "rows": 26,
+   "status_counts": {
+    "ok": 26
+   }
+  },
+  "ctx_exact_hydration": {
+   "abstained": 0,
+   "answered": 3,
+   "answered_covered": 3,
+   "answered_fresh": 3,
+   "by_category": {
+    "fact": {
+     "answered": 1,
+     "n": 18
+    },
+    "identifier": {
+     "answered": 1,
+     "n": 4
+    },
+    "issue-open": {
+     "answered": 1,
+     "n": 4
+    }
+   },
+   "bytes_opened": {
+    "median": 1088834.0,
+    "p90": 1983250.0,
+    "sum": 31176875.0
+   },
+   "excerpt_chars": {
+    "median": 7577.5,
+    "p90": 7585.0,
+    "sum": 196992.0
+   },
+   "excerpt_tokens": {
+    "median": 1895.0,
+    "p90": 1897.0,
+    "sum": 49258.0
+   },
+   "latency_cold_ms": {
+    "median": 1518.4,
+    "p90": 2191.4,
+    "sum": 45952.5
+   },
+   "latency_warm_ms": {
+    "median": 1014.5,
+    "p90": 1169.9,
+    "sum": 28818.2
+   },
+   "ok": 26,
+   "rows": 26,
+   "status_counts": {
+    "ok": 26
+   },
+   "vs_control": {
+    "losses": [
+     "Q05",
+     "Q06",
+     "Q07",
+     "Q10",
+     "Q24",
+     "Q25"
+    ],
+    "ties": 17,
+    "wins": [
+     "Q03",
+     "Q19",
+     "Q20"
+    ]
+   }
+  },
+  "ctx_hybrid": {
+   "abstained": 0,
+   "answered": 0,
+   "answered_covered": 0,
+   "answered_fresh": 0,
+   "by_category": {},
+   "bytes_opened": {
+    "median": null,
+    "p90": null,
+    "sum": 0
+   },
+   "excerpt_chars": {
+    "median": null,
+    "p90": null,
+    "sum": 0
+   },
+   "excerpt_tokens": {
+    "median": null,
+    "p90": null,
+    "sum": 0
+   },
+   "latency_cold_ms": {
+    "median": null,
+    "p90": null,
+    "sum": 0
+   },
+   "latency_warm_ms": {
+    "median": null,
+    "p90": null,
+    "sum": 0
+   },
+   "ok": 0,
+   "rows": 26,
+   "status_counts": {
+    "not_run:semantic_opt_in_absent": 26
+   }
+  },
+  "ctx_lexical": {
+   "abstained": 0,
+   "answered": 0,
+   "answered_covered": 0,
+   "answered_fresh": 0,
+   "by_category": {
+    "fact": {
+     "answered": 0,
+     "n": 18
+    },
+    "identifier": {
+     "answered": 0,
+     "n": 4
+    },
+    "issue-open": {
+     "answered": 0,
+     "n": 4
+    }
+   },
+   "bytes_opened": {
+    "median": 13039.0,
+    "p90": 13273.0,
+    "sum": 338588.0
+   },
+   "excerpt_chars": {
+    "median": 1577.5,
+    "p90": 1585.0,
+    "sum": 40992.0
+   },
+   "excerpt_tokens": {
+    "median": 395.0,
+    "p90": 397.0,
+    "sum": 10258.0
+   },
+   "latency_cold_ms": {
+    "median": 218.1,
+    "p90": 428.4,
+    "sum": 8994.4
+   },
+   "latency_warm_ms": {
+    "median": 180.4,
+    "p90": 198.6,
+    "sum": 4628.6
+   },
+   "ok": 26,
+   "rows": 26,
+   "status_counts": {
+    "ok": 26
+   },
+   "vs_control": {
+    "losses": [
+     "Q05",
+     "Q06",
+     "Q07",
+     "Q10",
+     "Q24",
+     "Q25"
+    ],
+    "ties": 20,
+    "wins": []
+   }
+  }
+ },
+ "arms_requested": [
+  "control",
+  "ctx_lexical",
+  "ctx_exact_hydration",
+  "ctx_hybrid"
+ ],
+ "control": {
+  "memory_surface": true,
+  "src_head": "05e50151ec04ea40892be46645fb208aff2a1f70"
+ },
+ "ctx": {
+  "certified_sources": 2437,
+  "commands": {
+   "search": 52
+  },
+  "covered_providers": [
+   "claude",
+   "hermes"
+  ],
+  "data_root_changed_files": 0,
+  "generation_id": "f1404f74b6c9ee1c25167bebcfd174549dd5a5adea2f61acab759f6b652c4630",
+  "hydration_commands": {
+   "search": 52,
+   "show event": 156
+  },
+  "indexed_documents": 395108,
+  "indexing_mode": "manual",
+  "semantic_reason": "semantic_disabled",
+  "semantic_status": "disabled",
+  "version": "ctx 2.2.7"
+ },
+ "harness_head": "c441aba55e25797eed5299f2fd0d8ba09b0c66f3",
+ "n_questions": 26,
+ "params": {
+  "allow_ctx_semantic": false,
+  "ctx_caller": "neutral",
+  "ctx_limit": 5,
+  "cutoff": "2026-10-03T22:50:00Z",
+  "fresh_cutoff": "2026-10-03T22:09:30Z",
+  "hydrate_cap": 2000,
+  "hydrate_top": 3,
+  "repeats": 2
+ },
+ "question_set_sha": "f2e288a018b49e5f",
+ "run_id": "2026-10-03-local-caller-neutral",
+ "schema": "z0int.ctx_history_bakeoff.v1"
+}
