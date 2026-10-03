@@ -53,6 +53,7 @@ class Memory:
         self._injected = {}  # (session, turn) -> the turn's seam result, until post_llm_call
         self._lock = threading.Lock()
         self._shadows = []  # running shadow children (Popen), bounded by MAX_SHADOW_CHILDREN
+        self._marked = False
 
     def _job(self, session_id, turn_id, user_message, cwd):
         return {'session_id': session_id or 'hermes', 'turn_id': str(turn_id or ''), 'query': user_message[:MAX_QUERY_CHARS],
@@ -73,10 +74,24 @@ class Memory:
         except OSError:
             pass
 
+    def _mark_installed(self):
+        """seam/hermes.active, once, before the first cold shadow child: capture's opportunity build then waits
+        briefly for a turn this seam has not marked yet."""
+        if self._marked:
+            return
+        self._marked = True
+        try:
+            marker = Path(self.home) / 'state' / 'memory' / 'seam' / f'{HARNESS}.active'
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.touch()
+        except OSError:
+            pass
+
     def pre_llm_call(self, session_id='', turn_id='', user_message='', cwd=None, **_):
         """{'context': brief} for the next model request, or None (native). Never raises."""
         if self.mode == 'off' or not isinstance(user_message, str) or not user_message.strip():
             return None
+        self._mark_installed()
         job = self._job(session_id, turn_id, user_message, cwd)
         argv = [self.python or 'python3', '-m', 'z0int.memory.seam']
         try:
@@ -139,10 +154,4 @@ def create(settings, home, python, profile):
     mode = mode_of(settings)
     if mode == 'off' or killed(home):
         return None
-    try:  # seam/hermes.active: capture's opportunity build waits briefly for a turn this seam has not marked yet
-        marker = Path(home) / 'state' / 'memory' / 'seam' / f'{HARNESS}.active'
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.touch()
-    except OSError:
-        pass
     return Memory(home=home, python=python, mode=mode, profile=profile, injector=settings.get('memory_injector'))
