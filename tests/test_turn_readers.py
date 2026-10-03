@@ -94,8 +94,9 @@ def signals(row):
 
 
 # ----------------------------------------------------------------------------- 1. same signal semantics as CC
+@pytest.mark.parametrize('version', [113, 74])  # 74: the real v0.39 schema (no sessions.session_kind)
 @pytest.mark.parametrize('harness', AV_HARNESSES)
-def test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview(tmp_path, home, harness):
+def test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview(tmp_path, home, harness, version):
     repo = tmp_path / 'repo'
     repo.mkdir()
     gitc(repo, 'init', '-q', '-b', 'main')
@@ -114,7 +115,7 @@ def test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview(t
     cc = {r['trace_id']: r for r in ov.verify(root=cc_home, projects=tmp_path / 'projects', now=now,
                                                gh=ov.GitHub(True, fake_gh()))}
 
-    fx = AVFixture(tmp_path / 'sessions.db')
+    fx = AVFixture(tmp_path / 'sessions.db', user_version=version)
     sid = fx.session(AGENT[harness], 'S1', started=T0, cwd=str(repo))
     scenario(AVWriter(fx, sid), {'sha': sha})
     db = fx.close()
@@ -150,8 +151,9 @@ def two_turn_session(fx, harness, raw, t=T0, **kw):
     return sid
 
 
-def test_join_rule_hermes_session_plus_user_message_ordinal(tmp_path, home):
-    fx = AVFixture(tmp_path / 'sessions.db')
+@pytest.mark.parametrize('version', [113, 74])
+def test_join_rule_hermes_session_plus_user_message_ordinal(tmp_path, home, version):
+    fx = AVFixture(tmp_path / 'sessions.db', user_version=version)
     two_turn_session(fx, 'hermes', '20260930_101010_ab12')
     db = fx.close()
     tids = ['20260930_101010_ab12:task:u1', '20260930_101010_ab12:task:u2']
@@ -290,8 +292,9 @@ def test_cohort_classifier_capture_flags_win_and_no_metadata_is_unknown():
     assert tr.classify_cohort('hermes', None) == 'unknown'
 
 
-def test_cohort_lands_on_verified_rows_and_never_pools_into_interactive(tmp_path, home):
-    fx = AVFixture(tmp_path / 'sessions.db')
+@pytest.mark.parametrize('version', [113, 74])
+def test_cohort_lands_on_verified_rows_and_never_pools_into_interactive(tmp_path, home, version):
+    fx = AVFixture(tmp_path / 'sessions.db', user_version=version)
     two_turn_session(fx, 'hermes', 'cron_job1_20260930', project='hermes-cron')
     two_turn_session(fx, 'hermes', 'cli-1', project='hermes-cli')
     db = fx.close()
@@ -412,3 +415,114 @@ def test_since_windows_every_captured_turn_and_the_join_counts(tmp_path, home, m
     assert sorted(by_trace(report)) == ['new']
     assert report['join'] == {'joined': 1, 'unjoined': 0, 'pending_index': 0}
     assert not [f for f in report['failures'] if f['kind'] == 'unjoined']
+
+
+# ----------------------------------------------------------------------------- 9. shell results without a status
+# The pi (OMP/OMO), Hermes and deepseek-harness parsers write no tool_result_events row: the only evidence is
+# tool_calls.result_content in each harness's own shape. A run without a status and without an exit code is
+# unknown, never a pass.
+SHELL_TOOL = {'omp': 'bash', 'omo': 'bash', 'hermes': 'terminal', 'dsh': 'bash'}
+
+
+def one_command_turn(tmp_path, home, harness, command, result):
+    fx = AVFixture(tmp_path / 'sessions.db')
+    sid = fx.session(AGENT[harness], 'S1', started=T0, cwd=str(tmp_path))
+    fx.user(sid, 'run the tests', T0)
+    fx.tool(sid, SHELL_TOOL[harness], 'Bash', {'command': command}, result, T0 + 5, status=None)
+    fx.say(sid, 'Done.', T0 + 30)
+    db = fx.close()
+    capture(home, harness, 'S1', ['t1'])
+    (row,) = verify(harness, home, db, now=T0 + DAY)['rows']
+    assert row['join']['state'] == 'joined'
+    return row
+
+
+OMP_FAILURES = [  # oh-my-pi bash tool: formatExitCodeNotice -> "Command exited with code N"
+    ('pytest -q', '..F..\n1 failed, 4 passed in 0.12s\n\nCommand exited with code 1'),
+    ('make test', 'make: *** [Makefile:3: test] Error 2\n\nCommand exited with code 2'),
+    ('cargo test', 'test result: FAILED. 3 passed; 1 failed\n\nCommand exited with code 101'),
+    ('npm test', 'npm ERR! Test failed.  See above for more details.\n\nCommand exited with code 1'),
+]
+
+
+@pytest.mark.parametrize('harness', ['omp', 'omo'])
+@pytest.mark.parametrize('command,result', OMP_FAILURES, ids=[c for c, _ in OMP_FAILURES])
+def test_omp_failing_test_run_without_result_event_is_a_verified_failure(tmp_path, home, harness, command, result):
+    row = one_command_turn(tmp_path, home, harness, command, result)
+    assert row['verification_state'] == 'verified_failure', (command, row['signals'])
+
+
+def test_exit_code_reads_the_omp_notice_and_is_unknown_without_status_or_code():
+    assert tr.exit_code('1 failed\n\nCommand exited with code 1', None) == 1
+    assert tr.exit_code('oops\nCommand exited with code 101', 'completed') == 101
+    assert tr.exit_code('5 passed', None) is None  # no status, no code: unknown, never a pass
+    assert tr.exit_code('5 passed', 'completed') == 0  # an explicit completed status is a pass
+    assert tr.exit_code('{"output": "1 failed", "exit_code": 1, "error": null}', None) == 1
+
+
+@pytest.mark.parametrize('harness,command,result', [
+    ('omp', 'pytest -q', '..F..\n1 failed, 4 passed in 0.12s'),  # no notice at all
+    ('omo', 'npm test', 'npm ERR! Test failed.'),
+    ('hermes', 'pytest -q', '{"output": "..F..\\n1 failed, 4 passed in 0.12s", "error": null}'),  # no exit_code
+    ('dsh', 'pytest -q', '..F..\n1 failed, 4 passed in 0.12s'),  # DSH: isError never becomes a status
+    ('dsh', 'cargo test', 'error: test failed, to rerun pass `--lib`'),
+], ids=['omp-no-notice', 'omo-no-notice', 'hermes-json-no-exit-code', 'dsh-pytest', 'dsh-cargo'])
+def test_shell_result_without_status_or_exit_code_is_never_verified_success(tmp_path, home, harness, command,
+                                                                            result):
+    row = one_command_turn(tmp_path, home, harness, command, result)
+    assert row['verification_state'] != 'verified_success', row['signals']
+    assert not [s for s in row['signals'] if s['kind'] == 'tests_in_turn' and s['polarity'] == 1]
+
+
+def test_hermes_terminal_json_exit_code_gives_the_label(tmp_path, home):
+    row = one_command_turn(tmp_path, home, 'hermes', 'pytest -q',
+                           '{"output": "1 failed, 4 passed", "exit_code": 1, "error": null}')
+    assert row['verification_state'] == 'verified_failure'
+
+
+# ----------------------------------------------------------------------------- 10. reader errors and v0.39
+def test_v039_schema_without_session_kind_joins_and_classifies(tmp_path, home):
+    fx = AVFixture(tmp_path / 'sessions.db', user_version=74)
+    assert 'session_kind' not in fx.columns  # the real v0.39 schema
+    two_turn_session(fx, 'codex', 'th-39')
+    two_turn_session(fx, 'codex', 'th-39-auto', is_automated=1)
+    two_turn_session(fx, 'omp', 'sub-39', relationship_type='subagent', parent_session_id='omp:root')
+    db = fx.close()
+    capture(home, 'codex', 'th-39', ['a', 'b'])
+    capture(home, 'codex', 'th-39-auto', ['c', 'd'])
+    capture(home, 'omp', 'sub-39', ['e', 'f'])
+    codex = verify('codex', home, db)
+    assert codex['status'] == 'success'
+    assert {r['trace_id']: r['cohort'] for r in codex['rows']} == {'a': 'interactive', 'b': 'interactive',
+                                                                    'c': 'automated', 'd': 'automated'}
+    assert {r['join']['state'] for r in codex['rows']} == {'joined'}
+    assert {r['cohort'] for r in verify('omp', home, db)['rows']} == {'agent'}
+
+
+@pytest.mark.parametrize('broken', ['drop table tool_result_events', 'drop table messages',
+                                    'alter table sessions drop column cwd'])
+def test_reader_sqlite_error_is_a_reader_unavailable_row_never_an_exception(tmp_path, home, broken):
+    fx = AVFixture(tmp_path / 'sessions.db')
+    two_turn_session(fx, 'omp', 'b1')
+    fx.conn.execute(broken)
+    db = fx.close()
+    capture(home, 'omp', 'b1', ['a', 'b'])
+    report = verify('omp', home, db, write=True)
+    assert report['status'] == 'degraded' and report['rows'] == []
+    (fail,) = [f for f in report['failures'] if f['kind'] == 'reader_unavailable']
+    assert fail['detail']['reason'] in ('error', 'schema')
+    assert any(f['kind'] == 'reader_unavailable' for f in hc._read_jsonl(hc.state_dir('omp', home) / 'failures.jsonl'))
+
+
+# ----------------------------------------------------------------------------- 11. one turn key per harness
+@pytest.mark.parametrize('harness', ['omp', 'hermes', 'dsh'])
+def test_non_cc_training_rows_carry_the_canonical_turn_key(tmp_path, home, harness):
+    fx = AVFixture(tmp_path / 'sessions.db')
+    two_turn_session(fx, harness, 'k1')
+    db = fx.close()
+    capture(home, harness, 'k1', ['k1:x', 'k1:y'])
+    report = verify(harness, home, db, write=True)
+    canonical = {harness_id.turn_key(harness, 'k1', t) for t in ('k1:x', 'k1:y')}
+    assert {r['turn_key'] for r in report['rows']} == canonical
+    rows = [r for (h, _), t in le.build_tables(home, include_unjoined=True).items() if h == harness for r in t.rows]
+    assert len(rows) == 2 and {r['turn_key'] for r in rows} == canonical
