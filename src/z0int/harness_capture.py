@@ -259,31 +259,37 @@ def note_session(harness: str, payload: Mapping[str, Any], *, env: Mapping[str, 
 
 
 def begin_turn(harness: str, payload: Mapping[str, Any], *, env: Mapping[str, str] | None = None,
-               root: str | Path | None = None) -> dict[str, Any] | None:
+               root: str | Path | None = None, cohort: str | None = None) -> dict[str, Any] | None:
     """Prompt time, on the hook's hot path: canonical ids, work item + attempt, cohort and capture flags.
 
     A user message opens the session's next work item (an ordinal persisted per session, so every hook
     process agrees); a payload ``retry: true`` keeps the work item and counts one more attempt. A
-    harness-injected prompt gets cohort ``harness`` and a work item of its own. A repeated hook for the same
-    turn changes nothing here; its duplicate row is caught when it is appended.
+    harness-injected prompt gets cohort ``harness`` and a work item of its own. A prompt in a subagent's own
+    session (a bridge payload naming ``parent_id`` or ``agent_kind: sub``) is cohort ``agent``. A repeated hook
+    for the same turn changes nothing here; its duplicate row is caught when it is appended. ``cohort`` is the
+    shim's own capture-time cohort when it knows more than the prompt text (Hermes: ``automated`` sources,
+    injected system turns as ``harness``); when given, it wins over the subagent rule.
     """
     if not supported(harness, root):
         return None
     session, tid = session_id_of(payload, env), turn_id(payload)
     flags = capture_flags(prompt_of(payload))
+    if cohort == 'harness':
+        flags['is_harness_message'] = True
 
     def step(st: dict[str, Any]) -> dict[str, Any]:
         if st.get('turn_id') == tid:
             return st
         if flags['is_harness_message']:
-            wi, attempt, cohort = _h({'harness': harness, 'session': session, 'injected': tid}), 0, 'harness'
+            wi, attempt, kind = _h({'harness': harness, 'session': session, 'injected': tid}), 0, 'harness'
         else:
             if not (payload.get('retry') is True and st.get('ordinal')):
                 st['ordinal'], st['attempt'] = st.get('ordinal', 0) + 1, -1
             st['attempt'] = st.get('attempt', -1) + 1
-            wi, attempt, cohort = _h({'harness': harness, 'session': session, 'ordinal': st['ordinal']}), \
-                st['attempt'], 'interactive'
-        turn = {'work_item_id': wi, 'attempt_id': attempt, 'cohort': cohort}
+            subagent = payload.get('parent_id') not in (None, '') or payload.get('agent_kind') == 'sub'
+            wi, attempt, kind = _h({'harness': harness, 'session': session, 'ordinal': st['ordinal']}), \
+                st['attempt'], cohort or ('agent' if subagent else 'interactive')
+        turn = {'work_item_id': wi, 'attempt_id': attempt, 'cohort': kind}
         return dict(st, turn_id=tid, **turn, turns=_keep(st.get('turns') or {}, {tid: turn}))
 
     st = _update_session(harness, session, root, step)
@@ -401,7 +407,28 @@ def _git_marker(cwd: Path) -> bool:
     return any((p / '.git').exists() for p in (cwd, *cwd.parents))
 
 
-def opportunity_record(harness: str, payload: Mapping[str, Any], ctx: Mapping[str, Any]) -> dict[str, Any]:
+def redact_packet_text(opp: Mapping[str, Any]) -> dict[str, Any]:
+    """The opportunity without State Packet text (P-9): every claim, superseded-claim and contradiction value
+    (branch names, commit subjects, README open items) becomes its digest, so a change is still visible."""
+    state = dict(opp.get('state') or {})
+    for section in ('claims', 'superseded', 'contradictions'):
+        state[section] = [_digest_values(c) for c in state.get(section) or []]
+    return dict(opp, state=state)
+
+
+def _digest_values(entry: Any) -> Any:
+    if not isinstance(entry, Mapping):
+        return {'sha256': _h(entry)}
+    out = dict(entry)
+    if 'value' in out:
+        out['value'] = {'sha256': _h(out['value'])}
+    if isinstance(out.get('values'), list):
+        out['values'] = [_digest_values(v) for v in out['values']]
+    return out
+
+
+def opportunity_record(harness: str, payload: Mapping[str, Any], ctx: Mapping[str, Any], *,
+                       packet_text: str | None = None, packet_args: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Build one opportunity record (1-3 s; runs in the detached child).
 
     P-7: state comes from the payload's task cwd, never the process cwd. Outside any repository the turn is
@@ -421,7 +448,7 @@ def opportunity_record(harness: str, payload: Mapping[str, Any], ctx: Mapping[st
         if _git_marker(Path(cwd).resolve()):
             packet, scoped = _git_unreadable_packet('git cannot read the repository at the task cwd'), False
     else:
-        packet = sp.build_state_packet(repo)
+        packet = sp.build_state_packet(repo, **(packet_args or {}))
         if not any(str(c.get('key', '')).startswith('git.') for c in packet.get('current_claims') or []):
             packet = dict(packet, blocking_unknowns=[*(packet.get('blocking_unknowns') or []),
                                                      dict(GIT_UNKNOWN, reason='no git fact could be read')])
@@ -432,9 +459,13 @@ def opportunity_record(harness: str, payload: Mapping[str, Any], ctx: Mapping[st
     gate = deterministic_gate(opp)
     if ctx.get('privacy_class') != 'request_opt_in':
         opp['intent'] = dict(opp['intent'], request=None)
+    # packet_text (P-9): None keeps the record as before; 'redacted' digests State Packet text, 'opt_in' keeps it.
+    extra = {} if packet_text is None else {'packet_text': packet_text}
+    if packet_text == 'redacted':
+        opp = redact_packet_text(opp)
     row = {'schema': schema(harness, 'opportunity_record'), **ctx,
            'capture': ctx.get('capture') or capture_flags(request), 'repo': str(repo) if repo else None,
-           'gate': gate, 'opportunity': opp}
+           'gate': gate, **extra, 'opportunity': opp}
     if ctx.get('memory') is not None:  # the turn's MemoryUseReceipt, validated (no instruction authority)
         from .memory_contract import MemoryUseReceipt
         mem = ctx['memory']
@@ -443,10 +474,18 @@ def opportunity_record(harness: str, payload: Mapping[str, Any], ctx: Mapping[st
 
 
 def record_opportunity(harness: str, payload: Mapping[str, Any], ctx: Mapping[str, Any], *,
-                       root: str | Path | None = None) -> dict[str, Any] | None:
+                       root: str | Path | None = None, packet_text: str | None = None,
+                       packet_args: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
     if not supported(harness, root):
         return None
-    row = append(harness, 'opportunity_record', opportunity_record(harness, payload, ctx), root=root)
+    return record_built_opportunity(harness, opportunity_record(harness, payload, ctx, packet_text=packet_text,
+                                                                packet_args=packet_args), root=root)
+
+
+def record_built_opportunity(harness: str, record: Mapping[str, Any], *,
+                             root: str | Path | None = None) -> dict[str, Any] | None:
+    """Append an opportunity built by ``opportunity_record`` (the write half; a host can gate it)."""
+    row = append(harness, 'opportunity_record', record, root=root)
     revisions = (((row or {}).get('opportunity') or {}).get('invalidation') or {}).get('source_revisions')
     if revisions:  # what the stale-evidence check compares with at Stop time, without reading this file
         _update_session(harness, row.get('session_id'), root, lambda st: dict(
@@ -566,20 +605,28 @@ def slot_path(i: int, root: str | Path | None = None) -> Path:
     return _base(root) / 'runtime' / 'capture-slots' / f'{i}.lock'
 
 
+def try_slot(root: str | Path | None = None) -> Any:
+    """A free build slot now (its locked file; the lock lasts while any process holds the file open), else None."""
+    for i in range(MAX_CHILDREN):
+        path = slot_path(i, root)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fh = open(path, 'a')
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            fh.close()
+            continue
+        return fh
+    return None
+
+
 @contextlib.contextmanager
 def build_slot(root: str | Path | None = None) -> Iterator[bool]:
     """One of MAX_CHILDREN build slots (flock, shared by every hook process); False after SLOT_WAIT_S."""
     deadline = time.monotonic() + SLOT_WAIT_S
     while True:
-        for i in range(MAX_CHILDREN):
-            path = slot_path(i, root)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            fh = open(path, 'a')
-            try:
-                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError:
-                fh.close()
-                continue
+        fh = try_slot(root)
+        if fh is not None:
             try:
                 yield True
             finally:

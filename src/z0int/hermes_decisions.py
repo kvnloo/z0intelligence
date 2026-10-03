@@ -1,12 +1,12 @@
 """Hermes decision layer (shadow): DecisionOpportunity records + observed turn outcomes.
 
-Mirrors the Claude Code integration (``z0int.claude_code``): the Hermes plugin in
-``harness-adapters/hermes-z0int-decisions`` classifies each turn on the hot path (string checks
-only), hands user turns to ``python -m z0int.hermes_decisions opportunity`` in a detached child,
-and appends turn outcomes itself. Nothing is injected, routed or sent anywhere.
+The records are written by the Hermes plugin ``harness-adapters/hermes-z0intelligence`` through its child
+``z0int.hermes_capture`` (the shared #62 capture core). This module classifies turns the same way the plugin
+does and reports the gate against observed behaviour. Nothing is injected, routed or sent anywhere.
 
   z0int hermes decisions        # gate vs observed behaviour, joined by trace_id
   z0int hermes paths            # where the records live
+  z0int hermes opportunity      # retired (old z0int-decisions child): a retired_vehicle failure row, nothing else
 """
 import argparse
 import json
@@ -54,25 +54,15 @@ def state_dir(root=None):
     return paths.ensure_layout(root)['state'] / HARNESS
 
 
-def on_opportunity(payload, root=None):
-    """Child-process body: build + append one DecisionOpportunity record (1-3 s, off the hot path)."""
-    from .decision_opportunity import build_decision_opportunity, deterministic_gate
-    from .state_packet import repo_root
-    reason, text = classify(payload.get('user_message'), payload.get('platform', ''))
-    if reason:
-        return None
-    repo = repo_root(payload['cwd']) if payload.get('cwd') else None
-    # Factory turns often run outside a repo; record them with empty state rather than dropping them.
-    opp = build_decision_opportunity(repo or '.', text, harness=HARNESS, trace_id=payload.get('trace_id'),
-                                     packet=None if repo else {})
-    record = {'schema': 'z0int.hermes.opportunity_record.v0', 'session_id': payload.get('session_id'),
-              'platform': payload.get('platform'), 'repo': str(repo) if repo else None,
-              'gate': deterministic_gate(opp), 'opportunity': opp}
-    path = state_dir(root) / 'opportunities.jsonl'
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open('a', encoding='utf-8') as fh:
-        fh.write(json.dumps(record, ensure_ascii=False, default=str) + '\n')
-    return record
+def retired_vehicle(root=None):
+    """The retired z0int-decisions plugin's child entry point. One capture vehicle: a stale install records a
+    content-free ``retired_vehicle`` failure per turn (so it is visible) and never an opportunity."""
+    from . import harness_capture as hc
+    try:
+        if hc.enabled(root=root):
+            hc.record_failure(HARNESS, 'retired_vehicle', root=root, detail={'vehicle': 'z0int-decisions'})
+    except Exception:
+        pass  # shadow emission never surfaces errors into the harness
 
 
 def _rows(path):
@@ -106,6 +96,7 @@ def decisions_report(root=None):
         elif r.get('trace_id') and r['trace_id'] not in outcomes:
             outcomes[r['trace_id']] = r
     table, unlinked, examples, tools, overhead = {}, 0, [], 0, []
+    dropped = sum(int(r.get('count') or 0) for r in _rows(base / 'drops.jsonl'))
     for rec in _rows(base / 'opportunities.jsonl'):
         opp = rec['opportunity']
         out = outcomes.get(opp['trace'].get('trace_id'))
@@ -121,9 +112,9 @@ def decisions_report(root=None):
         if GATE_EXPECTS.get(rec['gate']) != obs and len(examples) < 10:
             examples.append({'gate': rec['gate'], 'observed': obs, 'scope': opp['scope'].get('mode'),
                              'families': opp['scope'].get('families'), 'platform': rec.get('platform'),
-                             'request': opp['intent']['request'][:80]})
+                             'request': (opp['intent'].get('request') or '')[:80] or None})
     overhead.sort()
-    return {'harness': HARNESS, 'linked': sum(table.values()), 'unlinked': unlinked,
+    return {'harness': HARNESS, 'linked': sum(table.values()), 'unlinked': unlinked, 'rows_dropped': dropped,
             'non_user_turns_excluded': excluded, 'tool_calls_on_linked_turns': tools,
             'hook_ms_p50': overhead[len(overhead) // 2] if overhead else None,
             'hook_ms_max': overhead[-1] if overhead else None,
@@ -136,19 +127,20 @@ def _main(argv=None):
     sub = ap.add_subparsers(dest='cmd', required=True)
     sub.add_parser('decisions', help='gate vs observed behaviour on live shadow DecisionOpportunity records')
     sub.add_parser('paths', help='print the opportunity/outcome record paths')
-    sub.add_parser('opportunity', help='(plugin child) read one turn payload on stdin and record it')
+    sub.add_parser('opportunity', help='retired (z0int-decisions child): records a retired_vehicle failure only')
     args = ap.parse_args(argv)
     if args.cmd == 'decisions':
         print(json.dumps(decisions_report(), indent=1, ensure_ascii=False))
     elif args.cmd == 'paths':
         base = state_dir()
-        print(json.dumps({'opportunities': str(base / 'opportunities.jsonl'),
-                          'outcomes': str(base / 'outcomes.jsonl')}, indent=1))
+        print(json.dumps({name: str(base / f'{name}.jsonl')
+                          for name in ('opportunities', 'outcomes', 'events', 'failures', 'drops')}, indent=1))
     else:
         try:
-            on_opportunity(json.load(sys.stdin))
-        except Exception:
-            pass  # shadow emission never surfaces errors into the harness
+            sys.stdin.read()  # the stale plugin's payload is read (so its write never fails) and discarded unparsed
+        except (OSError, ValueError):
+            pass
+        retired_vehicle()
     return 0
 
 

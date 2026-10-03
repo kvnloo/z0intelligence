@@ -298,7 +298,9 @@ def test_no_models_served_still_returns_the_compiled_legal_set(tmp_path, monkeyp
     assert result["shadow"] == []
     assert set(result["legal_ids"]) == {"read", "grep"}
     assert result["graph_digest"]
-    assert Path(result["receipts_path"]).is_file()
+    # Nothing served: no shadow answer row is written, the miss is counted (oh-my-pi#109 hygiene).
+    assert result["receipts_path"] is None and result["backend_unavailable"] == 1
+    assert not (tmp_path / "shadow" / "cognition-shadow.jsonl").exists()
 
 
 def test_no_serving_config_yields_empty_shadow_list(tmp_path, monkeypatch):
