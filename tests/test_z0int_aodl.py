@@ -205,7 +205,7 @@ class AodlBindingTests(unittest.TestCase):
                 memory_binding={
                     "runtime": "gbrain",
                     "protocol": "MEMORY_VERBS_v1",
-                    "readVerbs": ["entity", "recall", "context_pack", "delta"],
+                    "readVerbs": ["context_pack", "delta"],
                     "worldOnlyDefault": True,
                 },
             ),
