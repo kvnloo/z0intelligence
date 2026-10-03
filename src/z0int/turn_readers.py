@@ -33,9 +33,11 @@ AUTOMATED_KINDS = ('non-interactive', 'roborev')  # AgentsView session_kind valu
 HERMES_AUTOMATED_SOURCES = ('cron', 'kanban', 'cluster')  # Hermes session source -> AgentsView project hermes-<src>
 ASK_TOOLS = (ov.ASK_TOOL, 'ask_question', 'ask_followup_question', 'clarify')
 EDIT_CATEGORIES = {'Edit': 'Edit', 'Write': 'Write'}
-# Claude/Codex "Exit code N", Hermes terminal JSON, Codex "Process exited", OMP/OMO "Command exited" (oh-my-pi bash.ts)
-EXIT_RE = re.compile(r'^\s*Exit code (\d+)|"exit_code"\s*:\s*(-?\d+)|(?:Process|Command) exited with code (-?\d+)',
-                     re.M)
+# Each harness's own exit frame (never the command output inside it): OMP/OMO append "Command exited with code N"
+# as the LAST line (oh-my-pi bash.ts); Codex heads its result with "Process exited with code N" / "Exit code: N"
+# before "Output:"; Hermes terminal and DSH results are JSON with a top-level exit_code.
+OMP_EXIT = re.compile(r'(?:\A|\n)Command exited with code (-?\d+)\s*\Z')
+CODEX_EXIT = re.compile(r'^(?:Process exited with code|Exit code:?) (-?\d+)\s*$', re.M)
 PATCH_FILE = re.compile(r'^\*\*\* (?:Update|Add) File: (\S+)', re.M)
 
 _ORDINAL = ('the n-th captured prompt turn of the session (capture order; subagent turns excluded) is the n-th '
@@ -45,7 +47,7 @@ _ORDINAL = ('the n-th captured prompt turn of the session (capture order; subage
             'ordinal_misaligned).')
 
 
-# Which test-run labels a harness's shell results can give (exit evidence is the text's exit-code line only):
+# Which test-run labels a harness's shell results can give (exit evidence is the harness's own exit frame only):
 #   both          every run carries its code (Codex 'Process exited with code N', Hermes terminal JSON exit_code)
 #   failure_only  only a failing run does (oh-my-pi prints 'Command exited with code N' on failure only): OMP, OMO
 #   sparse        almost no run does (DSH: exit_code JSON on a handful of results)
@@ -73,7 +75,8 @@ JOIN_RULES = {
     'codex': JoinRule('codex', 'codex', 'codex.session_user_ordinal.v0',
                       'hook session_id is the Codex thread (rollout) id -> codex:<thread>; the captured turns are '
                       'ordered by capture time (recorded_at), not by turn_id. The id mapping is INFERRED from the AgentsView codex parser and pinned by '
-                      'tests/test_turn_readers.py; ' + _ORDINAL, 'both'),
+                      'tests/test_turn_readers.py; ' + _ORDINAL + ' Cohort: without sessions.session_kind (v0.39) '
+                      'an exec run cannot be told apart, so an unflagged session is unknown.', 'both'),
     'grok': JoinRule('grok', 'grok', 'grok.session_user_ordinal.v0',
                      'GROK_SESSION_ID (the hook env) -> grok:<id>; ' + _ORDINAL, 'none'),
     'omp': JoinRule('omp', 'omp', 'omp.session_user_ordinal.v0',
@@ -100,7 +103,8 @@ def classify_cohort(harness: str, meta: Mapping[str, Any] | None, capture: Mappi
     What the capture fixed wins (a harness-injected prompt, a subagent turn, an automated or eval run). Otherwise
     the AgentsView session decides: a subagent relationship is ``agent``; a non-interactive session_kind
     (``codex exec``, roborev), AgentsView's own automation flag, or a Hermes cron/kanban/cluster source is
-    ``automated``. A turn whose session is not known is ``unknown`` and is never pooled into interactive.
+    ``automated``. A turn whose session is not known is ``unknown`` and is never pooled into interactive; so is a
+    Codex session on a schema without session_kind (v0.39) that AgentsView does not flag as automated.
     """
     cap = capture or {}
     if (cap.get('capture') or {}).get('is_harness_message') or cap.get('cohort') == 'harness':
@@ -113,6 +117,8 @@ def classify_cohort(harness: str, meta: Mapping[str, Any] | None, capture: Mappi
         return 'agent'
     if meta.get('session_kind') in AUTOMATED_KINDS or meta.get('is_automated'):
         return 'automated'
+    if harness == 'codex' and 'session_kind' not in meta:  # v0.39 has none: a `codex exec` run looks interactive
+        return 'unknown'
     if harness == 'hermes' and _hermes_automated(meta):
         return 'automated'
     return 'interactive'
@@ -149,15 +155,28 @@ def captured_turns(harness: str, root: str | Path | None = None) -> dict[Any, li
 
 
 # ----------------------------------------------------------------------------- AgentsView (read-only)
-def exit_code(text: str, status: str | None) -> int | None:
-    """N from a shell tool result's exit-code line, else None (unknown).
+def exit_code(text: str, status: str | None, harness: str) -> int | None:
+    """N from the harness's own exit frame around a shell tool result, else None (unknown).
 
-    ``status`` is never exit evidence: no AgentsView parser maps a non-zero exit to ``errored`` (Grok's ACP
-    ``completed`` and Codex's default ``completed`` only say the call finished), and the pi (OMP/OMO), Hermes and
-    deepseek-harness parsers record none. Execution completing is never a pass.
+    Only the frame counts: exit-like text in the command's output (a JSON assertion diff, a nested process's
+    notice) never does. ``status`` is never exit evidence: no AgentsView parser maps a non-zero exit to
+    ``errored`` (Grok's ACP ``completed`` and Codex's default ``completed`` only say the call finished), and the pi
+    (OMP/OMO), Hermes and deepseek-harness parsers record none. Execution completing is never a pass.
     """
-    m = EXIT_RE.search(text)
-    return int(next(g for g in m.groups() if g is not None)) if m else None
+    if harness in ('omp', 'omo'):
+        m = OMP_EXIT.search(text)
+    elif harness == 'codex':
+        head, sep, _ = text.partition('\nOutput:')
+        m = CODEX_EXIT.search(head if sep else head.partition('\n')[0])
+    elif harness in ('hermes', 'dsh'):
+        try:
+            code = json.loads(text).get('exit_code')
+        except (ValueError, AttributeError):
+            return None
+        return code if isinstance(code, int) and not isinstance(code, bool) else None
+    else:  # grok: the ACP result carries no exit code
+        return None
+    return int(m.group(1)) if m else None
 
 
 def _command(inp: Mapping[str, Any]) -> str | None:
@@ -208,7 +227,7 @@ class AgentsViewReader:
         cols = [c[0] for c in cur.description]
         return [dict(zip(cols, row)) for row in cur.fetchall()]
 
-    def turns(self, av_id: str, cwd: str | None = None) -> list[dict[str, Any]]:
+    def turns(self, av_id: str, cwd: str | None, harness: str) -> list[dict[str, Any]]:
         """The session's turns in the Claude transcript reader's shape: one per user message (ids ``#<ordinal>``)."""
         events = {}
         for ordinal, idx, status, content, ts in self.conn.execute(
@@ -244,12 +263,12 @@ class AgentsViewReader:
                 cur['asked_text'] = text.rstrip().endswith('?')
                 cur['_final_text'] = text
             for name, cat, inp, result, idx in calls.get(mid, []):
-                self._tool(cur, name, cat, inp, result, events.get((ordinal, idx)), t, cwd)
+                self._tool(cur, name, cat, inp, result, events.get((ordinal, idx)), t, cwd, harness)
         return ov.finish_turns(turns)
 
     @staticmethod
     def _tool(cur: dict[str, Any], name: str, cat: str, raw_inp: str | None, result: str | None,
-              event: tuple | None, t: float | None, cwd: str | None) -> None:
+              event: tuple | None, t: float | None, cwd: str | None, harness: str) -> None:
         try:
             inp = json.loads(raw_inp or '{}')
         except ValueError:
@@ -267,7 +286,7 @@ class AgentsViewReader:
             cur['bash'].append(call)
             for m in ov.PR_MERGE.finditer(cmd):
                 cur['pr_merged_by_agent'].append({'number': int(m.group(1)) if m.group(1) else None, 'repo': m.group(2)})
-            ov.bash_result(call, text, exit_code(text, status))
+            ov.bash_result(call, text, exit_code(text, status, harness))
             if call['exit'] is None and call.get('commits'):
                 call['committed'] = True  # git printed '[branch sha] subject', which it does only once committed
         elif kind in ('Edit', 'Write'):
@@ -307,7 +326,7 @@ def join_session(rule: JoinRule, reader: AgentsViewReader, turns: list[dict[str,
         state = 'pending_index' if stale else 'unjoined'
         return [dict(base, state=state, reason='session_missing') for _ in turns], None, []
     meta = cands[0]
-    av_turns = reader.turns(meta['id'], meta.get('cwd') or None)
+    av_turns = reader.turns(meta['id'], meta.get('cwd') or None, rule.harness)
     if len(av_turns) > len(turns):
         return [dict(base, state='unjoined', reason='ordinal_mismatch') for _ in turns], meta, []
     joins, misaligned = [], False
