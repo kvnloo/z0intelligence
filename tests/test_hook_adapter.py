@@ -263,18 +263,25 @@ def test_subagent_turns_are_agent_cohort_and_join_on_turn_key(home, inline, tmp_
     assert opps[agent]['cohort'] == outs[agent]['cohort'] == 'agent'
     assert outs[agent]['tool_calls'] == 1  # measured from the agent transcript
     assert opps[turn_key('claude-code', 's1', 'p1')]['cohort'] == 'interactive'
-    # fallback opportunity source: PreToolUse on Agent|Task (keyed by the tool_use id), never interactive
-    pre = {'hook_event_name': 'PreToolUse', 'session_id': 's2', 'cwd': str(tmp_path), 'tool_name': 'Task',
-           'tool_use_id': 'tu-1', 'tool_input': {'description': 'd', 'prompt': 'look into it', 'subagent_type': 'g'}}
-    hook('subagent-start', pre, 'claude-code')
-    hook('subagent-start', dict(pre, tool_name='Bash', tool_use_id='tu-2'), 'claude-code')
-    hook('subagent-stop', {'hook_event_name': 'SubagentStop', 'session_id': 's2', 'tool_use_id': 'tu-1',
-                           'cwd': str(tmp_path), 'last_assistant_message': 'ok'}, 'claude-code')
+    # Fallback pair for Claude Code builds without SubagentStart/SubagentStop: PreToolUse(Agent|Task) opens and
+    # PostToolUse(Agent|Task) closes, both keyed by the tool_use id (real hook payload shapes, no agent id).
+    base = {'session_id': 's2', 'cwd': str(tmp_path), 'transcript_path': str(tmp_path / 's2.jsonl'),
+            'permission_mode': 'default', 'tool_name': 'Task', 'tool_use_id': 'tu-1',
+            'tool_input': {'description': 'd', 'prompt': 'look into it', 'subagent_type': 'g'}}
+    hook('subagent-start', dict(base, hook_event_name='PreToolUse'), 'claude-code')
+    hook('subagent-start', dict(base, hook_event_name='PreToolUse', tool_name='Bash', tool_use_id='tu-2'), 'claude-code')
+    hook('subagent-stop', dict(base, hook_event_name='PostToolUse',
+                               tool_response={'content': [{'type': 'text', 'text': 'done'}], 'totalDurationMs': 5}),
+         'claude-code')
     fallback = turn_key('claude-code', 's2', 'agent:tu-1')
     assert {r['turn_key'] for r in rows(home, 'claude-code', 'opportunities.jsonl')} >= {fallback}
     assert turn_key('claude-code', 's2', 'agent:tu-2') not in {r['turn_key'] for r in
                                                                  rows(home, 'claude-code', 'opportunities.jsonl')}
     assert any(r['turn_key'] == fallback and r['cohort'] == 'agent' for r in rows(home, 'claude-code', 'outcomes.jsonl'))
+    # a real SubagentStop names the agent id only: it closes that agent's turn, never a tool_use-keyed one
+    hook('subagent-stop', {'hook_event_name': 'SubagentStop', 'session_id': 's2', 'agent_id': 'a9', 'cwd': str(tmp_path),
+                           'last_assistant_message': 'ok', 'stop_hook_active': False}, 'claude-code')
+    assert turn_key('claude-code', 's2', 'agent:a9') in {r['turn_key'] for r in rows(home, 'claude-code', 'outcomes.jsonl')}
     table = le.build_table(home / 'state' / 'claude-code', cohort_fn=lambda sid: 'interactive')
     by_trace = {r['turn_key']: r['cohort'] for r in table}
     assert sorted(by_trace.values()) == ['agent', 'agent', 'interactive']
@@ -370,3 +377,81 @@ def test_detached_builds_share_a_bounded_set_of_slots(home, monkeypatch, tmp_pat
         fh.close()
     he.handle('opportunity', json.dumps(job), 'codex')
     assert len(rows(home, 'codex', 'opportunities.jsonl')) == 1
+
+
+# ----------------------------------------------------------------------------- Claude Code Stop: measured per prompt
+def cc_line(path, row):
+    with path.open('a') as fh:
+        fh.write(json.dumps(row) + '\n')
+
+
+def cc_user(path, pid, content):
+    cc_line(path, {'type': 'user', 'promptId': pid, 'message': {'role': 'user', 'content': content}})
+
+
+def cc_assistant(path, mid, text='', tools=0):
+    content = [{'type': 'tool_use', 'id': f'tu-{mid}', 'name': 'Agent', 'input': {}}] * tools
+    content += [{'type': 'text', 'text': text}] if text else []
+    cc_line(path, {'type': 'assistant', 'message': {'id': mid, 'model': 'm-1', 'content': content,
+                                                    'usage': {'input_tokens': 1, 'output_tokens': 1}}})
+
+
+def test_claude_code_stop_measures_its_own_prompt_and_closes_a_lagging_turn_explicitly(home, inline, tmp_path):
+    """Real CC 2.1.288 race: the Stop for p1 fires before its reply is flushed, and the next prompt (a
+    task-notification) arrives before that. p1 still gets its outcome (from the payload, with a
+    partial_measurement row); its late messages are not credited to p2, they close p1 with an explicit row."""
+    plain = tmp_path / 'work'
+    plain.mkdir()
+    t = tmp_path / 'cc.jsonl'
+    base = {'session_id': 's1', 'cwd': str(plain), 'transcript_path': str(t)}
+    hook('prompt', dict(base, hook_event_name='UserPromptSubmit', prompt_id='p1', prompt='hand one subtask on'),
+         'claude-code')
+    cc_user(t, 'p1', 'hand one subtask on')
+    hook('stop', dict(base, hook_event_name='Stop', prompt_id='p1', stop_hook_active=False,
+                      last_assistant_message='final: the subagent finished.'), 'claude-code')
+    cc_assistant(t, 'm1', tools=1)
+    cc_user(t, 'p1', [{'type': 'tool_result', 'tool_use_id': 'tu-m1', 'content': 'ok'}])
+    cc_assistant(t, 'm2', text='final: the subagent finished.')
+    note = '<task-notification><task-id>a1</task-id></task-notification>'
+    hook('prompt', dict(base, hook_event_name='UserPromptSubmit', prompt_id='p2', prompt=note), 'claude-code')
+    cc_user(t, 'p2', note)
+    cc_assistant(t, 'm3', text='Noted.')
+    hook('stop', dict(base, hook_event_name='Stop', prompt_id='p2', stop_hook_active=False,
+                      last_assistant_message='Noted.'), 'claude-code')
+
+    outs = {r['trace_id']: r for r in rows(home, 'claude-code', 'outcomes.jsonl')}
+    assert set(outs) == {'p1', 'p2'}
+    p1, p2 = outs['p1'], outs['p2']
+    assert p1['cohort'] == 'interactive' and p1['work_item_id'] and p1['asked_user'] is False
+    assert p1['tool_calls'] is None and p1['assistant_messages'] is None  # nothing measurable at its Stop
+    # the harness-injected prompt has no opportunity (6fee859 rule) but its outcome is cohort harness, own work item
+    assert p2['cohort'] == 'harness' and p2['work_item_id'] not in (None, p1['work_item_id'])
+    assert (p2['tool_calls'], p2['assistant_messages']) == (0, 1)  # only its own message, nothing of p1's
+    assert not [r for r in rows(home, 'claude-code', 'opportunities.jsonl') if r['trace_id'] == 'p2']
+    fails = rows(home, 'claude-code', 'failures.jsonl')
+    k1 = turn_key('claude-code', 's1', 'p1')
+    assert any(f['kind'] == 'partial_measurement' and f['turn_key'] == k1 and f['detail'].get('missing') for f in fails)
+    (late,) = [f for f in fails if 'late_messages' in f['detail']]
+    assert late['kind'] == 'partial_measurement' and late['turn_key'] == k1 and late['detail']['late_messages'] == 2
+    assert late['work_item_id'] == p1['work_item_id'] and late['cohort'] == 'interactive'
+    assert not [f for f in fails if f['turn_key'] == p2['turn_key']]
+
+
+def test_claude_code_stop_measurement_errors_are_failure_rows_not_silent(home, inline, tmp_path, monkeypatch):
+    from z0int import claude_code
+    t = tmp_path / 'cc.jsonl'
+    base = {'session_id': 's1', 'cwd': str(tmp_path), 'transcript_path': str(t)}
+    hook('prompt', dict(base, hook_event_name='UserPromptSubmit', prompt_id='p1', prompt='fix it'), 'claude-code')
+    cc_user(t, 'p1', 'fix it')
+    cc_assistant(t, 'm1', text='Done?')
+
+    def broken(fresh):
+        raise RuntimeError('unexpected transcript shape')
+    monkeypatch.setattr(claude_code, 'turn_behaviour', broken)
+    hook('stop', dict(base, hook_event_name='Stop', prompt_id='p1', stop_hook_active=False,
+                      last_assistant_message='Done?'), 'claude-code')
+    (out,) = rows(home, 'claude-code', 'outcomes.jsonl')
+    assert out['trace_id'] == 'p1' and out['asked_user'] is True and out['tool_calls'] is None
+    (err,) = [f for f in rows(home, 'claude-code', 'failures.jsonl') if 'error' in f['detail']]
+    assert err['kind'] == 'partial_measurement' and err['detail']['error'] == 'RuntimeError'
+    assert err['turn_key'] == out['turn_key'] and 'unexpected' not in json.dumps(err)

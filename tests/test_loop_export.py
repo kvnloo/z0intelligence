@@ -19,14 +19,20 @@ def packet(**over):
     return p
 
 
-def opp_record(session, trace, request=SECRET, **pkt):
+def legacy_record(session, trace, request=SECRET, **pkt):
+    """The pre-capture-flag shape (integrate/claude-code-z0-stack era): request text kept, no ``capture``."""
     opp = build_decision_opportunity('/nonexistent', request, packet=packet(**pkt), harness='claude-code', trace_id=trace)
     return {'schema': le.OPP_SCHEMA, 'session_id': session, 'gate': deterministic_gate(opp), 'opportunity': opp}
 
 
+def opp_record(session, trace, request=SECRET, **pkt):
+    """A user prompt as the capture core writes it: content-free capture flags."""
+    return dict(legacy_record(session, trace, request, **pkt), capture={'is_harness_message': False})
+
+
 def harness_record(session, trace, request):
     """A harness-injected prompt as the capture core writes it: flagged at capture, request text not stored."""
-    rec = opp_record(session, trace, request=request)
+    rec = legacy_record(session, trace, request=request)
     rec['opportunity']['intent']['request'] = None
     rec['capture'] = {'is_harness_message': True}
     return rec
@@ -89,6 +95,21 @@ def test_join_keeps_harness_messages_in_their_own_cohort_and_latest_verified_row
     assert by['ASK']['label']['y_success'] == 0 and by['ASK']['observed']['post_decision'] is True
     unlabeled = by[None]
     assert unlabeled['label']['present'] is False and unlabeled['label']['y_success'] is None
+
+
+def test_legacy_rows_without_capture_flags_are_never_user_rows(tmp_path):
+    """Rows written before capture flags (6fee859 dropped the harness ones by reading the request at export):
+    the export reads no request text, so an unflagged row is cohort unknown until the capture-side backfill
+    (harness_capture.backfill_capture) flags it; it never becomes an interactive or agent training row."""
+    s = tmp_path / 'state'
+    s.mkdir()
+    write(s / 'opportunities.jsonl', [legacy_record('s1', 't1'),
+                                      legacy_record('s1', 't2', request='<task-notification>done</task-notification>'),
+                                      opp_record('s1', 't3')])
+    rows = {r['turn_key']: r for r in le.build_table(s, cohort_fn=lambda sid: 'interactive')}
+    by_trace = {t: rows[le._sha({'session': 's1', 'trace': t})] for t in ('t1', 't2', 't3')}
+    assert by_trace['t1']['cohort'] == by_trace['t2']['cohort'] == 'unknown'
+    assert by_trace['t1']['features']['cohort=unknown'] == 1 and by_trace['t3']['cohort'] == 'interactive'
 
 
 def test_features_reflect_scope_contradiction_gate_posture(state):

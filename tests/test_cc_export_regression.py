@@ -26,7 +26,8 @@ def verified_row(session, trace, state):
             'verifier': {'id': 'x', 'version': '0.2.0'}}
 
 
-def test_claude_code_export_equals_the_6fee859_export(monkeypatch, tmp_path):
+def replay(monkeypatch, tmp_path):
+    """The fixture's hook payloads through the new hook path; returns the claude-code state dir."""
     monkeypatch.setenv('Z0INT_HOME', str(tmp_path / 'z0'))
     for name in ('Z0INT_CAPTURE', 'Z0INT_CAPTURE_PRIVACY', 'Z0INT_CLAUDE_CODE_OPPORTUNITIES', 'Z0INT_CLAUDE_CODE_SHADOW'):
         monkeypatch.delenv(name, raising=False)
@@ -53,6 +54,15 @@ def test_claude_code_export_equals_the_6fee859_export(monkeypatch, tmp_path):
     state = tmp_path / 'z0' / 'state' / 'claude-code'
     with (state / 'outcomes_verified.jsonl').open('w') as fh:
         fh.write(''.join(json.dumps(verified_row(*v)) + '\n' for v in GOLDEN['verified']))
+    return state
+
+
+def export(state):
+    return le.build_table(state, cohort_fn=lambda sid: GOLDEN['cohorts'].get(sid, 'unknown'))
+
+
+def test_claude_code_export_equals_the_6fee859_export(monkeypatch, tmp_path):
+    state = replay(monkeypatch, tmp_path)
     rows = le.build_table(state, cohort_fn=lambda sid: GOLDEN['cohorts'].get(sid, 'unknown'))
     le.assert_private(rows)
     counts = le.manifest(rows, sources={}, generated_at=0)['counts']
@@ -60,3 +70,33 @@ def test_claude_code_export_equals_the_6fee859_export(monkeypatch, tmp_path):
     assert counts == GOLDEN['expected']['counts']
     raw = (state / 'opportunities.jsonl').read_text()
     assert 'payments' not in raw  # the raw rows did change: request text is no longer stored by default
+
+
+def test_legacy_rows_never_export_as_user_rows_and_the_backfill_restores_the_6fee859_export(monkeypatch, tmp_path):
+    """Opportunity rows written before capture flags existed (request text, no ``capture``) next to the hook path.
+
+    6fee859 dropped the legacy harness-injected row by reading its request at export. The export no longer reads
+    request text, so an unflagged row is never a user (interactive/agent) row; the capture-side backfill flags it
+    and drops the stored text, after which the user rows equal the 6fee859 export again.
+    """
+    state = replay(monkeypatch, tmp_path)
+    with (state / 'opportunities.jsonl').open('a') as fh:
+        fh.write(''.join(json.dumps(r) + '\n' for r in GOLDEN['legacy_rows']))
+    with (state / 'outcomes_verified.jsonl').open('a') as fh:
+        fh.write(''.join(json.dumps(verified_row(*v)) + '\n' for v in GOLDEN['legacy_verified']))
+    legacy_keys = {le._sha({'session': r['session_id'], 'trace': r['opportunity']['trace']['trace_id']})
+                   for r in GOLDEN['legacy_rows']}
+    before = [r for r in export(state) if r['turn_key'] in legacy_keys]
+    assert len(before) == 2 and all(r['cohort'] not in ('interactive', 'agent') for r in before)
+
+    assert hc.backfill_capture('claude-code') == {'rows': 7, 'flagged': 2, 'redacted': 2}
+    assert hc.backfill_capture('claude-code') == {'rows': 7, 'flagged': 0, 'redacted': 0}  # idempotent
+    raw = (state / 'opportunities.jsonl').read_text()
+    assert 'run the test suite' not in raw and 'agent y finished' not in raw
+    rows = export(state)
+    le.assert_private(rows)
+    user = [r for r in rows if r['cohort'] != 'harness']
+    assert json.loads(json.dumps(user)) == GOLDEN['expected_with_legacy']['rows']
+    assert le.manifest(user, sources={}, generated_at=0)['counts'] == GOLDEN['expected_with_legacy']['counts']
+    (harness,) = [r for r in rows if r['cohort'] == 'harness']  # 6fee859 dropped it; now its own cohort
+    assert harness['turn_key'] in legacy_keys and harness['features']['cohort=harness'] == 1

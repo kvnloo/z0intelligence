@@ -2,7 +2,8 @@
  "about": "C1-loop-core regression guard: exported CC training rows + cohorts from 6fee859 capture",
  "cohorts": {
   "A": "interactive",
-  "B": "agent"
+  "B": "agent",
+  "L": "interactive"
  },
  "expected": {
   "counts": {
@@ -585,7 +586,982 @@
    }
   ]
  },
+ "expected_with_legacy": {
+  "counts": {
+   "cohort": {
+    "agent": 2,
+    "interactive": 4
+   },
+   "days": {
+    "2026-09-30": 6
+   },
+   "gate": {
+    "ACT": 4,
+    "ASK": 2
+   },
+   "groups": 3,
+   "groups_with_resolved": 3,
+   "observed_action": {
+    "ACT": 3,
+    "ASK": 2,
+    "none": 1
+   },
+   "resolved": 5,
+   "rows": 6,
+   "states": {
+    "contested": 1,
+    "unverified": 1,
+    "verified_failure": 1,
+    "verified_success": 3
+   },
+   "with_features": 6,
+   "with_label_row": 6
+  },
+  "rows": [
+   {
+    "cohort": "interactive",
+    "day": "2026-09-30",
+    "feature_schema_sha": "69d7eef44ba1707e",
+    "features": {
+     "authority_fingerprinted": 0,
+     "authority_source=aodl": 0,
+     "authority_source=harness-default": 1,
+     "cohort=agent": 0,
+     "cohort=harness": 0,
+     "cohort=interactive": 1,
+     "cohort=unknown": 0,
+     "contradiction_family.conv": 0,
+     "contradiction_family.docs.priority": 0,
+     "contradiction_family.gh": 0,
+     "contradiction_family.git.branch": 0,
+     "contradiction_family.git.branches_ahead": 0,
+     "contradiction_family.git.dirty": 0,
+     "contradiction_family.git.head": 0,
+     "contradiction_family.git.history": 0,
+     "contradiction_family.git.remote": 0,
+     "contradiction_family.git.stash": 0,
+     "contradiction_family.git.upstream": 0,
+     "contradiction_family.git.worktrees": 0,
+     "effect.privileged": 0,
+     "effect.read": 1,
+     "effect.write": 0,
+     "family.conv": 0,
+     "family.docs.priority": 0,
+     "family.gh": 0,
+     "family.git.branch": 0,
+     "family.git.branches_ahead": 0,
+     "family.git.dirty": 0,
+     "family.git.head": 0,
+     "family.git.history": 0,
+     "family.git.remote": 0,
+     "family.git.stash": 0,
+     "family.git.upstream": 0,
+     "family.git.worktrees": 0,
+     "gate=ABSTAIN": 0,
+     "gate=ACT": 1,
+     "gate=ASK": 0,
+     "gate=ESCALATE": 0,
+     "gate=OBSERVE": 0,
+     "grant.privileged": 0,
+     "grant.read": 1,
+     "grant.write": 0,
+     "legal.ABSTAIN": 1,
+     "legal.ACT": 1,
+     "legal.ASK": 0,
+     "legal.ESCALATE": 0,
+     "legal.OBSERVE": 0,
+     "n_claims": 2,
+     "n_contradictions": 0,
+     "n_families": 0,
+     "n_missing_authority": 0,
+     "n_superseded": 0,
+     "n_unknowns": 1,
+     "n_unknowns_blocking": 0,
+     "n_unknowns_status=no_match": 0,
+     "n_unknowns_status=source_unavailable": 0,
+     "n_unknowns_status=unknown": 1,
+     "posture_factory=BALANCED": 0,
+     "posture_factory=BURN": 1,
+     "posture_factory=CONSERVE": 0,
+     "posture_factory=absent": 0,
+     "posture_factory=other": 0,
+     "scope_mode=question": 0,
+     "scope_mode=repo": 0,
+     "scope_mode=unscoped": 1,
+     "unknown_family.conv": 0,
+     "unknown_family.docs.priority": 0,
+     "unknown_family.gh": 1,
+     "unknown_family.git.branch": 0,
+     "unknown_family.git.branches_ahead": 0,
+     "unknown_family.git.dirty": 0,
+     "unknown_family.git.head": 0,
+     "unknown_family.git.history": 0,
+     "unknown_family.git.remote": 0,
+     "unknown_family.git.stash": 0,
+     "unknown_family.git.upstream": 0,
+     "unknown_family.git.worktrees": 0
+    },
+    "gate": "ACT",
+    "group": "5b716d7460f4",
+    "harness": "claude-code",
+    "has_opportunity": true,
+    "label": {
+     "label_class": "deterministic_gold",
+     "label_confidence": null,
+     "oracles": [
+      "test_runner"
+     ],
+     "present": true,
+     "resolved": true,
+     "state": "verified_success",
+     "y_success": 1
+    },
+    "observed": null,
+    "privacy": "features_counts_and_hashed_ids_only",
+    "schema": "z0int.loop.training_row.v0",
+    "table_version": "0.1.0",
+    "turn_key": "1f63f28058615277",
+    "verifier": "0.2.0"
+   },
+   {
+    "cohort": "interactive",
+    "day": "2026-09-30",
+    "feature_schema_sha": "69d7eef44ba1707e",
+    "features": {
+     "authority_fingerprinted": 0,
+     "authority_source=aodl": 0,
+     "authority_source=harness-default": 1,
+     "cohort=agent": 0,
+     "cohort=harness": 0,
+     "cohort=interactive": 1,
+     "cohort=unknown": 0,
+     "contradiction_family.conv": 0,
+     "contradiction_family.docs.priority": 0,
+     "contradiction_family.gh": 0,
+     "contradiction_family.git.branch": 0,
+     "contradiction_family.git.branches_ahead": 0,
+     "contradiction_family.git.dirty": 0,
+     "contradiction_family.git.head": 0,
+     "contradiction_family.git.history": 0,
+     "contradiction_family.git.remote": 0,
+     "contradiction_family.git.stash": 0,
+     "contradiction_family.git.upstream": 0,
+     "contradiction_family.git.worktrees": 0,
+     "effect.privileged": 0,
+     "effect.read": 1,
+     "effect.write": 0,
+     "family.conv": 0,
+     "family.docs.priority": 0,
+     "family.gh": 1,
+     "family.git.branch": 0,
+     "family.git.branches_ahead": 0,
+     "family.git.dirty": 0,
+     "family.git.head": 0,
+     "family.git.history": 0,
+     "family.git.remote": 0,
+     "family.git.stash": 0,
+     "family.git.upstream": 0,
+     "family.git.worktrees": 0,
+     "gate=ABSTAIN": 0,
+     "gate=ACT": 0,
+     "gate=ASK": 1,
+     "gate=ESCALATE": 0,
+     "gate=OBSERVE": 0,
+     "grant.privileged": 0,
+     "grant.read": 1,
+     "grant.write": 0,
+     "legal.ABSTAIN": 1,
+     "legal.ACT": 0,
+     "legal.ASK": 1,
+     "legal.ESCALATE": 0,
+     "legal.OBSERVE": 0,
+     "n_claims": 2,
+     "n_contradictions": 0,
+     "n_families": 1,
+     "n_missing_authority": 0,
+     "n_superseded": 0,
+     "n_unknowns": 1,
+     "n_unknowns_blocking": 1,
+     "n_unknowns_status=no_match": 0,
+     "n_unknowns_status=source_unavailable": 0,
+     "n_unknowns_status=unknown": 1,
+     "posture_factory=BALANCED": 0,
+     "posture_factory=BURN": 1,
+     "posture_factory=CONSERVE": 0,
+     "posture_factory=absent": 0,
+     "posture_factory=other": 0,
+     "scope_mode=question": 1,
+     "scope_mode=repo": 0,
+     "scope_mode=unscoped": 0,
+     "unknown_family.conv": 0,
+     "unknown_family.docs.priority": 0,
+     "unknown_family.gh": 1,
+     "unknown_family.git.branch": 0,
+     "unknown_family.git.branches_ahead": 0,
+     "unknown_family.git.dirty": 0,
+     "unknown_family.git.head": 0,
+     "unknown_family.git.history": 0,
+     "unknown_family.git.remote": 0,
+     "unknown_family.git.stash": 0,
+     "unknown_family.git.upstream": 0,
+     "unknown_family.git.worktrees": 0
+    },
+    "gate": "ASK",
+    "group": "7729c983f339",
+    "harness": "claude-code",
+    "has_opportunity": true,
+    "label": {
+     "label_class": "unknown",
+     "label_confidence": null,
+     "oracles": [],
+     "present": true,
+     "resolved": false,
+     "state": "unverified",
+     "y_success": null
+    },
+    "observed": {
+     "action": "ACT",
+     "asked_via_tool": false,
+     "post_decision": true,
+     "tool_calls": 1
+    },
+    "privacy": "features_counts_and_hashed_ids_only",
+    "schema": "z0int.loop.training_row.v0",
+    "table_version": "0.1.0",
+    "turn_key": "375fe9ea6c418000",
+    "verifier": "0.2.0"
+   },
+   {
+    "cohort": "agent",
+    "day": "2026-09-30",
+    "feature_schema_sha": "69d7eef44ba1707e",
+    "features": {
+     "authority_fingerprinted": 0,
+     "authority_source=aodl": 0,
+     "authority_source=harness-default": 1,
+     "cohort=agent": 1,
+     "cohort=harness": 0,
+     "cohort=interactive": 0,
+     "cohort=unknown": 0,
+     "contradiction_family.conv": 0,
+     "contradiction_family.docs.priority": 0,
+     "contradiction_family.gh": 0,
+     "contradiction_family.git.branch": 0,
+     "contradiction_family.git.branches_ahead": 0,
+     "contradiction_family.git.dirty": 0,
+     "contradiction_family.git.head": 0,
+     "contradiction_family.git.history": 0,
+     "contradiction_family.git.remote": 0,
+     "contradiction_family.git.stash": 0,
+     "contradiction_family.git.upstream": 0,
+     "contradiction_family.git.worktrees": 0,
+     "effect.privileged": 0,
+     "effect.read": 1,
+     "effect.write": 0,
+     "family.conv": 0,
+     "family.docs.priority": 0,
+     "family.gh": 0,
+     "family.git.branch": 1,
+     "family.git.branches_ahead": 0,
+     "family.git.dirty": 0,
+     "family.git.head": 0,
+     "family.git.history": 0,
+     "family.git.remote": 0,
+     "family.git.stash": 0,
+     "family.git.upstream": 0,
+     "family.git.worktrees": 0,
+     "gate=ABSTAIN": 0,
+     "gate=ACT": 0,
+     "gate=ASK": 1,
+     "gate=ESCALATE": 0,
+     "gate=OBSERVE": 0,
+     "grant.privileged": 0,
+     "grant.read": 1,
+     "grant.write": 0,
+     "legal.ABSTAIN": 1,
+     "legal.ACT": 0,
+     "legal.ASK": 1,
+     "legal.ESCALATE": 0,
+     "legal.OBSERVE": 0,
+     "n_claims": 0,
+     "n_contradictions": 0,
+     "n_families": 1,
+     "n_missing_authority": 0,
+     "n_superseded": 0,
+     "n_unknowns": 1,
+     "n_unknowns_blocking": 1,
+     "n_unknowns_status=no_match": 0,
+     "n_unknowns_status=source_unavailable": 1,
+     "n_unknowns_status=unknown": 0,
+     "posture_factory=BALANCED": 0,
+     "posture_factory=BURN": 0,
+     "posture_factory=CONSERVE": 0,
+     "posture_factory=absent": 1,
+     "posture_factory=other": 0,
+     "scope_mode=question": 1,
+     "scope_mode=repo": 0,
+     "scope_mode=unscoped": 0,
+     "unknown_family.conv": 0,
+     "unknown_family.docs.priority": 0,
+     "unknown_family.gh": 0,
+     "unknown_family.git.branch": 1,
+     "unknown_family.git.branches_ahead": 0,
+     "unknown_family.git.dirty": 0,
+     "unknown_family.git.head": 0,
+     "unknown_family.git.history": 0,
+     "unknown_family.git.remote": 0,
+     "unknown_family.git.stash": 0,
+     "unknown_family.git.upstream": 0,
+     "unknown_family.git.worktrees": 0
+    },
+    "gate": "ASK",
+    "group": "732234193b2e",
+    "harness": "claude-code",
+    "has_opportunity": true,
+    "label": {
+     "label_class": "deterministic_gold",
+     "label_confidence": null,
+     "oracles": [
+      "test_runner"
+     ],
+     "present": true,
+     "resolved": true,
+     "state": "verified_success",
+     "y_success": 1
+    },
+    "observed": {
+     "action": "ASK",
+     "asked_via_tool": false,
+     "post_decision": true,
+     "tool_calls": 0
+    },
+    "privacy": "features_counts_and_hashed_ids_only",
+    "schema": "z0int.loop.training_row.v0",
+    "table_version": "0.1.0",
+    "turn_key": "6473f0c8e3d71857",
+    "verifier": "0.2.0"
+   },
+   {
+    "cohort": "interactive",
+    "day": "2026-09-30",
+    "feature_schema_sha": "69d7eef44ba1707e",
+    "features": {
+     "authority_fingerprinted": 0,
+     "authority_source=aodl": 0,
+     "authority_source=harness-default": 1,
+     "cohort=agent": 0,
+     "cohort=harness": 0,
+     "cohort=interactive": 1,
+     "cohort=unknown": 0,
+     "contradiction_family.conv": 0,
+     "contradiction_family.docs.priority": 0,
+     "contradiction_family.gh": 0,
+     "contradiction_family.git.branch": 0,
+     "contradiction_family.git.branches_ahead": 0,
+     "contradiction_family.git.dirty": 0,
+     "contradiction_family.git.head": 0,
+     "contradiction_family.git.history": 0,
+     "contradiction_family.git.remote": 0,
+     "contradiction_family.git.stash": 0,
+     "contradiction_family.git.upstream": 0,
+     "contradiction_family.git.worktrees": 0,
+     "effect.privileged": 0,
+     "effect.read": 1,
+     "effect.write": 0,
+     "family.conv": 0,
+     "family.docs.priority": 0,
+     "family.gh": 0,
+     "family.git.branch": 1,
+     "family.git.branches_ahead": 0,
+     "family.git.dirty": 0,
+     "family.git.head": 0,
+     "family.git.history": 0,
+     "family.git.remote": 0,
+     "family.git.stash": 0,
+     "family.git.upstream": 0,
+     "family.git.worktrees": 0,
+     "gate=ABSTAIN": 0,
+     "gate=ACT": 1,
+     "gate=ASK": 0,
+     "gate=ESCALATE": 0,
+     "gate=OBSERVE": 0,
+     "grant.privileged": 0,
+     "grant.read": 1,
+     "grant.write": 0,
+     "legal.ABSTAIN": 1,
+     "legal.ACT": 1,
+     "legal.ASK": 0,
+     "legal.ESCALATE": 0,
+     "legal.OBSERVE": 0,
+     "n_claims": 2,
+     "n_contradictions": 0,
+     "n_families": 1,
+     "n_missing_authority": 0,
+     "n_superseded": 0,
+     "n_unknowns": 1,
+     "n_unknowns_blocking": 0,
+     "n_unknowns_status=no_match": 0,
+     "n_unknowns_status=source_unavailable": 0,
+     "n_unknowns_status=unknown": 1,
+     "posture_factory=BALANCED": 0,
+     "posture_factory=BURN": 1,
+     "posture_factory=CONSERVE": 0,
+     "posture_factory=absent": 0,
+     "posture_factory=other": 0,
+     "scope_mode=question": 1,
+     "scope_mode=repo": 0,
+     "scope_mode=unscoped": 0,
+     "unknown_family.conv": 0,
+     "unknown_family.docs.priority": 0,
+     "unknown_family.gh": 1,
+     "unknown_family.git.branch": 0,
+     "unknown_family.git.branches_ahead": 0,
+     "unknown_family.git.dirty": 0,
+     "unknown_family.git.head": 0,
+     "unknown_family.git.history": 0,
+     "unknown_family.git.remote": 0,
+     "unknown_family.git.stash": 0,
+     "unknown_family.git.upstream": 0,
+     "unknown_family.git.worktrees": 0
+    },
+    "gate": "ACT",
+    "group": "7729c983f339",
+    "harness": "claude-code",
+    "has_opportunity": true,
+    "label": {
+     "label_class": "deterministic_gold",
+     "label_confidence": null,
+     "oracles": [
+      "test_runner"
+     ],
+     "present": true,
+     "resolved": true,
+     "state": "verified_success",
+     "y_success": 1
+    },
+    "observed": {
+     "action": "ASK",
+     "asked_via_tool": false,
+     "post_decision": true,
+     "tool_calls": 0
+    },
+    "privacy": "features_counts_and_hashed_ids_only",
+    "schema": "z0int.loop.training_row.v0",
+    "table_version": "0.1.0",
+    "turn_key": "6d8ffc964f1629d3",
+    "verifier": "0.2.0"
+   },
+   {
+    "cohort": "interactive",
+    "day": "2026-09-30",
+    "feature_schema_sha": "69d7eef44ba1707e",
+    "features": {
+     "authority_fingerprinted": 0,
+     "authority_source=aodl": 0,
+     "authority_source=harness-default": 1,
+     "cohort=agent": 0,
+     "cohort=harness": 0,
+     "cohort=interactive": 1,
+     "cohort=unknown": 0,
+     "contradiction_family.conv": 0,
+     "contradiction_family.docs.priority": 0,
+     "contradiction_family.gh": 0,
+     "contradiction_family.git.branch": 0,
+     "contradiction_family.git.branches_ahead": 0,
+     "contradiction_family.git.dirty": 0,
+     "contradiction_family.git.head": 0,
+     "contradiction_family.git.history": 0,
+     "contradiction_family.git.remote": 0,
+     "contradiction_family.git.stash": 0,
+     "contradiction_family.git.upstream": 0,
+     "contradiction_family.git.worktrees": 0,
+     "effect.privileged": 0,
+     "effect.read": 1,
+     "effect.write": 0,
+     "family.conv": 0,
+     "family.docs.priority": 0,
+     "family.gh": 0,
+     "family.git.branch": 0,
+     "family.git.branches_ahead": 0,
+     "family.git.dirty": 0,
+     "family.git.head": 0,
+     "family.git.history": 0,
+     "family.git.remote": 0,
+     "family.git.stash": 0,
+     "family.git.upstream": 0,
+     "family.git.worktrees": 0,
+     "gate=ABSTAIN": 0,
+     "gate=ACT": 1,
+     "gate=ASK": 0,
+     "gate=ESCALATE": 0,
+     "gate=OBSERVE": 0,
+     "grant.privileged": 0,
+     "grant.read": 1,
+     "grant.write": 0,
+     "legal.ABSTAIN": 1,
+     "legal.ACT": 1,
+     "legal.ASK": 0,
+     "legal.ESCALATE": 0,
+     "legal.OBSERVE": 0,
+     "n_claims": 2,
+     "n_contradictions": 0,
+     "n_families": 0,
+     "n_missing_authority": 0,
+     "n_superseded": 0,
+     "n_unknowns": 1,
+     "n_unknowns_blocking": 0,
+     "n_unknowns_status=no_match": 0,
+     "n_unknowns_status=source_unavailable": 0,
+     "n_unknowns_status=unknown": 1,
+     "posture_factory=BALANCED": 0,
+     "posture_factory=BURN": 1,
+     "posture_factory=CONSERVE": 0,
+     "posture_factory=absent": 0,
+     "posture_factory=other": 0,
+     "scope_mode=question": 0,
+     "scope_mode=repo": 0,
+     "scope_mode=unscoped": 1,
+     "unknown_family.conv": 0,
+     "unknown_family.docs.priority": 0,
+     "unknown_family.gh": 1,
+     "unknown_family.git.branch": 0,
+     "unknown_family.git.branches_ahead": 0,
+     "unknown_family.git.dirty": 0,
+     "unknown_family.git.head": 0,
+     "unknown_family.git.history": 0,
+     "unknown_family.git.remote": 0,
+     "unknown_family.git.stash": 0,
+     "unknown_family.git.upstream": 0,
+     "unknown_family.git.worktrees": 0
+    },
+    "gate": "ACT",
+    "group": "7729c983f339",
+    "harness": "claude-code",
+    "has_opportunity": true,
+    "label": {
+     "label_class": "deterministic_gold",
+     "label_confidence": null,
+     "oracles": [
+      "test_runner"
+     ],
+     "present": true,
+     "resolved": true,
+     "state": "verified_failure",
+     "y_success": 0
+    },
+    "observed": {
+     "action": "ACT",
+     "asked_via_tool": false,
+     "post_decision": true,
+     "tool_calls": 3
+    },
+    "privacy": "features_counts_and_hashed_ids_only",
+    "schema": "z0int.loop.training_row.v0",
+    "table_version": "0.1.0",
+    "turn_key": "c1aef9bd9fb7cfd7",
+    "verifier": "0.2.0"
+   },
+   {
+    "cohort": "agent",
+    "day": "2026-09-30",
+    "feature_schema_sha": "69d7eef44ba1707e",
+    "features": {
+     "authority_fingerprinted": 0,
+     "authority_source=aodl": 0,
+     "authority_source=harness-default": 1,
+     "cohort=agent": 1,
+     "cohort=harness": 0,
+     "cohort=interactive": 0,
+     "cohort=unknown": 0,
+     "contradiction_family.conv": 0,
+     "contradiction_family.docs.priority": 0,
+     "contradiction_family.gh": 0,
+     "contradiction_family.git.branch": 0,
+     "contradiction_family.git.branches_ahead": 0,
+     "contradiction_family.git.dirty": 0,
+     "contradiction_family.git.head": 0,
+     "contradiction_family.git.history": 0,
+     "contradiction_family.git.remote": 0,
+     "contradiction_family.git.stash": 0,
+     "contradiction_family.git.upstream": 0,
+     "contradiction_family.git.worktrees": 0,
+     "effect.privileged": 0,
+     "effect.read": 1,
+     "effect.write": 0,
+     "family.conv": 0,
+     "family.docs.priority": 0,
+     "family.gh": 0,
+     "family.git.branch": 0,
+     "family.git.branches_ahead": 0,
+     "family.git.dirty": 0,
+     "family.git.head": 0,
+     "family.git.history": 0,
+     "family.git.remote": 0,
+     "family.git.stash": 0,
+     "family.git.upstream": 0,
+     "family.git.worktrees": 0,
+     "gate=ABSTAIN": 0,
+     "gate=ACT": 1,
+     "gate=ASK": 0,
+     "gate=ESCALATE": 0,
+     "gate=OBSERVE": 0,
+     "grant.privileged": 0,
+     "grant.read": 1,
+     "grant.write": 0,
+     "legal.ABSTAIN": 1,
+     "legal.ACT": 1,
+     "legal.ASK": 0,
+     "legal.ESCALATE": 0,
+     "legal.OBSERVE": 0,
+     "n_claims": 0,
+     "n_contradictions": 0,
+     "n_families": 0,
+     "n_missing_authority": 0,
+     "n_superseded": 0,
+     "n_unknowns": 0,
+     "n_unknowns_blocking": 0,
+     "n_unknowns_status=no_match": 0,
+     "n_unknowns_status=source_unavailable": 0,
+     "n_unknowns_status=unknown": 0,
+     "posture_factory=BALANCED": 0,
+     "posture_factory=BURN": 0,
+     "posture_factory=CONSERVE": 0,
+     "posture_factory=absent": 1,
+     "posture_factory=other": 0,
+     "scope_mode=question": 0,
+     "scope_mode=repo": 0,
+     "scope_mode=unscoped": 1,
+     "unknown_family.conv": 0,
+     "unknown_family.docs.priority": 0,
+     "unknown_family.gh": 0,
+     "unknown_family.git.branch": 0,
+     "unknown_family.git.branches_ahead": 0,
+     "unknown_family.git.dirty": 0,
+     "unknown_family.git.head": 0,
+     "unknown_family.git.history": 0,
+     "unknown_family.git.remote": 0,
+     "unknown_family.git.stash": 0,
+     "unknown_family.git.upstream": 0,
+     "unknown_family.git.worktrees": 0
+    },
+    "gate": "ACT",
+    "group": "732234193b2e",
+    "harness": "claude-code",
+    "has_opportunity": true,
+    "label": {
+     "label_class": "deterministic_gold",
+     "label_confidence": null,
+     "oracles": [
+      "test_runner"
+     ],
+     "present": true,
+     "resolved": true,
+     "state": "contested",
+     "y_success": 0
+    },
+    "observed": {
+     "action": "ACT",
+     "asked_via_tool": false,
+     "post_decision": true,
+     "tool_calls": 0
+    },
+    "privacy": "features_counts_and_hashed_ids_only",
+    "schema": "z0int.loop.training_row.v0",
+    "table_version": "0.1.0",
+    "turn_key": "e657083b5acc9fea",
+    "verifier": "0.2.0"
+   }
+  ]
+ },
  "generated_by": "6fee8594e67dcd63684f50f6ec0c5445c5a98bed",
+ "legacy_rows": [
+  {
+   "gate": "ACT",
+   "opportunity": {
+    "action_space": [
+     {
+      "action": "proceed",
+      "blocked_by": [],
+      "kind": "ACT",
+      "legal": true,
+      "why": "all required facts present, uncontested, and within authored authority"
+     },
+     {
+      "about": [],
+      "action": "ask_user",
+      "blocked_by": [
+       "nothing_to_ask"
+      ],
+      "kind": "ASK",
+      "legal": false,
+      "why": "only the user can supply a missing fact, pick between conflicting sources, or grant authority"
+     },
+     {
+      "action": "surface_conflict",
+      "blocked_by": [
+       "no_conflict"
+      ],
+      "kind": "ESCALATE",
+      "legal": false,
+      "why": "sources conflict; do not pick a winner silently"
+     },
+     {
+      "action": "state_unknown",
+      "blocked_by": [],
+      "kind": "ABSTAIN",
+      "legal": true,
+      "why": "always legal: saying 'unknown' never exceeds authority"
+     }
+    ],
+    "authority": {
+     "fingerprint": null,
+     "grants": [
+      "read"
+     ],
+     "source": "harness-default"
+    },
+    "expected_outcome": {
+     "verifier": null
+    },
+    "fallback": {
+     "always": "ABSTAIN",
+     "on_conflict": "ESCALATE",
+     "on_uncertain": "ASK"
+    },
+    "intent": {
+     "effects": [
+      "read"
+     ],
+     "request": "run the test suite and report",
+     "revision": "d3bf2957d2cf"
+    },
+    "invalidation": {
+     "source_revisions": {
+      "git": {
+       "head": "abc123",
+       "refs": "r",
+       "status": "s"
+      },
+      "resource": {
+       "factory": "BURN",
+       "posture": "p"
+      }
+     }
+    },
+    "provenance": {
+     "built_at": "2026-09-30T10:00:00Z",
+     "evidence": [],
+     "packet_id": "p-fixture",
+     "packet_schema": "z0int.state_packet.v0"
+    },
+    "schema": "z0int.decision_opportunity.v0",
+    "scope": {
+     "families": [],
+     "missing": [],
+     "mode": "unscoped",
+     "prefixes": []
+    },
+    "semantic_id": "d07601694e398706fa9c",
+    "state": {
+     "claims": [
+      {
+       "evidence": [
+        "e:1"
+       ],
+       "key": "git.branch",
+       "status": "observed",
+       "value": "feat/fixture"
+      },
+      {
+       "evidence": [
+        "e:2"
+       ],
+       "key": "git.head",
+       "status": "observed",
+       "value": "abc123"
+      }
+     ],
+     "contradictions": [],
+     "superseded": [],
+     "unknowns": [
+      {
+       "blocking": false,
+       "key": "gh.issues",
+       "reason": "gh unavailable",
+       "status": "unknown"
+      }
+     ]
+    },
+    "trace": {
+     "attempt": 0,
+     "harness": "claude-code",
+     "opportunity_id": "c40cc1733e453ff8bf7e",
+     "trace_id": "l1"
+    }
+   },
+   "repo": "/mnt/zer0models/z0-wt/wiring/homes/C1-loop-core/golden2/out/tmpp48k68jj/repo",
+   "schema": "z0int.claude_code.opportunity_record.v0",
+   "session_id": "L"
+  },
+  {
+   "gate": "ASK",
+   "opportunity": {
+    "action_space": [
+     {
+      "action": "proceed",
+      "blocked_by": [
+       "unknown:conv"
+      ],
+      "kind": "ACT",
+      "legal": false,
+      "why": "blocked until the listed conditions are resolved"
+     },
+     {
+      "about": [
+       "unknown:conv"
+      ],
+      "action": "ask_user",
+      "blocked_by": [],
+      "kind": "ASK",
+      "legal": true,
+      "why": "only the user can supply a missing fact, pick between conflicting sources, or grant authority"
+     },
+     {
+      "action": "surface_conflict",
+      "blocked_by": [
+       "no_conflict"
+      ],
+      "kind": "ESCALATE",
+      "legal": false,
+      "why": "sources conflict; do not pick a winner silently"
+     },
+     {
+      "action": "state_unknown",
+      "blocked_by": [],
+      "kind": "ABSTAIN",
+      "legal": true,
+      "why": "always legal: saying 'unknown' never exceeds authority"
+     }
+    ],
+    "authority": {
+     "fingerprint": null,
+     "grants": [
+      "read"
+     ],
+     "source": "harness-default"
+    },
+    "expected_outcome": {
+     "verifier": null
+    },
+    "fallback": {
+     "always": "ABSTAIN",
+     "on_conflict": "ESCALATE",
+     "on_uncertain": "ASK"
+    },
+    "intent": {
+     "effects": [
+      "read"
+     ],
+     "request": "<task-notification>agent y finished</task-notification>",
+     "revision": "4adc4c3f87fc"
+    },
+    "invalidation": {
+     "source_revisions": {
+      "git": {
+       "head": "abc123",
+       "refs": "r",
+       "status": "s"
+      },
+      "resource": {
+       "factory": "BURN",
+       "posture": "p"
+      }
+     }
+    },
+    "provenance": {
+     "built_at": "2026-09-30T10:00:00Z",
+     "evidence": [],
+     "packet_id": "p-fixture",
+     "packet_schema": "z0int.state_packet.v0"
+    },
+    "schema": "z0int.decision_opportunity.v0",
+    "scope": {
+     "families": [
+      "conv"
+     ],
+     "missing": [
+      {
+       "key": "conv",
+       "reason": "required by the request; no conv claim in the state",
+       "source_status": "source_unavailable"
+      }
+     ],
+     "mode": "question",
+     "prefixes": [
+      "conv."
+     ]
+    },
+    "semantic_id": "0a90d291900cd064d08b",
+    "state": {
+     "claims": [
+      {
+       "evidence": [
+        "e:1"
+       ],
+       "key": "git.branch",
+       "status": "observed",
+       "value": "feat/fixture"
+      },
+      {
+       "evidence": [
+        "e:2"
+       ],
+       "key": "git.head",
+       "status": "observed",
+       "value": "abc123"
+      }
+     ],
+     "contradictions": [],
+     "superseded": [],
+     "unknowns": [
+      {
+       "blocking": false,
+       "key": "gh.issues",
+       "reason": "gh unavailable",
+       "status": "unknown"
+      },
+      {
+       "blocking": true,
+       "key": "conv",
+       "reason": "required by the request; no conv claim in the state",
+       "status": "source_unavailable"
+      }
+     ]
+    },
+    "trace": {
+     "attempt": 0,
+     "harness": "claude-code",
+     "opportunity_id": "7f6ed57383e6145d64e1",
+     "trace_id": "l2"
+    }
+   },
+   "repo": "/mnt/zer0models/z0-wt/wiring/homes/C1-loop-core/golden2/out/tmpp48k68jj/repo",
+   "schema": "z0int.claude_code.opportunity_record.v0",
+   "session_id": "L"
+  }
+ ],
+ "legacy_verified": [
+  [
+   "L",
+   "l1",
+   "verified_success"
+  ],
+  [
+   "L",
+   "l2",
+   "verified_failure"
+  ]
+ ],
  "packet": {
   "allowed_transitions": [],
   "blocking_unknowns": [],

@@ -345,3 +345,51 @@ def test_request_text_is_stored_only_with_request_opt_in(home, plain, monkeypatc
     _, rec = capture('codex', payload('codex', 2, cwd=plain, prompt=secret))
     assert rec['opportunity']['intent']['request'] == secret and rec['privacy_class'] == 'request_opt_in'
     assert 'payments' not in json.dumps(rows(home, 'codex', 'failures.jsonl'))
+
+
+# ----------------------------------------------------------------------------- cost per append + spool race
+def test_append_and_the_stale_check_read_no_record_history(home, tmp_path, monkeypatch):
+    """The duplicate check and the stale-evidence check run inside synchronous Stop hooks: they must not read
+    the record files (whose size grows with every turn ever captured), only small per-session state."""
+    from pathlib import Path
+    repo = git_repo(tmp_path / 'repo')
+    p = payload('codex', cwd=repo, prompt='what branch am I on?')
+    ctx, _ = capture('codex', p)
+    octx = hc.outcome_context('codex', p)
+    (repo / 'g').write_text('y')
+    git(repo, 'add', '-A')
+    git(repo, 'commit', '-qm', 'second')
+    reads = []
+
+    def spy(path, mode='r', *a, **k):
+        if Path(path).name in hc.RECORD_FILES.values() and mode != 'a':
+            reads.append((Path(path).name, mode))
+        return open(path, mode, *a, **k)
+    monkeypatch.setattr(hc, 'open', spy, raising=False)
+    behaviour = {'asked_user': False, 'tool_calls': 1, 'assistant_messages': 1}
+    assert hc.record_outcome('codex', octx, behaviour, seen_revisions=hc.observed_revisions(repo))
+    assert hc.record_outcome('codex', octx, behaviour) is None  # duplicate: still a counted no-op
+    assert hc.append('codex', 'opportunity_record', {'schema': hc.schema('codex', 'opportunity_record'), **ctx}) is None
+    assert reads == []
+    kinds = [f['kind'] for f in rows(home, 'codex', 'failures.jsonl')]
+    assert kinds.count('stale_evidence') == 1 and kinds.count('duplicate_event') == 2
+    assert len(rows(home, 'codex', 'opportunities.jsonl')) == len(rows(home, 'codex', 'outcomes.jsonl')) == 1
+
+
+def test_spool_put_racing_close_is_written_or_counted_never_lost(home):
+    written = []
+    spool = hc.Spool('codex', write=lambda kind, row: written.append(row), close_timeout=1.0)
+    real_put, closers = spool._queue.put_nowait, []
+
+    def racing(item):  # close() runs between put's closed-check and its enqueue
+        closer = threading.Thread(target=spool.close)
+        closers.append(closer)
+        closer.start()
+        closer.join(timeout=0.5)
+        real_put(item)
+    spool._queue.put_nowait = racing
+    spool.put('turn_outcome', {'turn_key': 'k'})
+    closers[0].join(timeout=5)
+    assert not closers[0].is_alive()
+    assert len(written) + spool.dropped == 1
+    assert hc.drop_count('codex') == spool.dropped
