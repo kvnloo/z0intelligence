@@ -5,7 +5,10 @@
 The tick takes flock(2) LOCK_SH on the quiet-lane lock in-process (the same kernel lock ``flock -s`` takes; a POSIX
 fcntl/lockf record lock would not interact with a quiet-timed ``flock -x``). When an exclusive window holds the lock
 past ``--lock-wait-s`` it writes a ``skipped_exclusive_window`` report and exits 0. The hold is bounded by
-``--budget-s``: an exhausted budget stops between steps, releases the lock and reports ``partial_measurement``.
+``--budget-s`` plus at most one unit of work already in flight: verify stops between harnesses, import between
+legacy sources, the shadow slot between opportunities and the learner subprocess is killed at the deadline, but one
+harness's verify, one source's import or the single export call is never cut in half. An exhausted budget releases
+the lock and reports ``partial_measurement``; the next tick resumes (every step is idempotent).
 
 Steps (each reuses its module; nothing here re-derives a label or a threshold the learner owns):
   verify       outcome_verifier.verify_harness per captured harness (Claude transcripts from CLAUDE_CONFIG_DIR,
@@ -47,8 +50,11 @@ REQUEST_SCHEMA = 'z0int.loop.promotion_request.v0'
 COST_SCHEMA = 'z0int.loop_tick.cost.v0'
 QUIET_LANE_LOCK = '/mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock'
 # The sufficiency gate of evolution-lab docs/prereg/verified-loop-v0.md, reported here for every stratum (with a
-# projection) so strata without a learner run still show how far they are; the learner's own run decides.
+# projection) so strata without a learner run still show how far they are; the learner's own run decides. These are
+# the fallback only: once the pinned learner is probed, its own MIN_ROWS/MIN_NEG/MIN_GROUPS/K are used and any
+# difference is reported as learner.threshold_mismatch.
 MIN_ROWS, MIN_NEG, MIN_GROUPS, K = 300, 30, 10, 5
+THRESHOLDS = {'MIN_ROWS': MIN_ROWS, 'MIN_NEG': MIN_NEG, 'MIN_GROUPS': MIN_GROUPS, 'K': K}
 PREREGS = {'claude-code': 'evolution-lab docs/prereg/verified-loop-v0.md'}  # others after C11 (G-PREREG)
 LIFECYCLE = {'ref': 'kvnloo/z0 registry/lifecycles.yaml#evolution-lab-promotion',
              'stages': ['sanity', 'replay', 'shadow', 'promoted']}
@@ -59,7 +65,9 @@ EXIT_REFUSED, EXIT_DEGRADED = 2, 3
 LEARNER_PROBE = ('import json, os, importlib.metadata as md\nimport evolution_lab.verified_loop as m\nsha = None\n'
                  'try:\n    sha = json.loads(md.distribution("evolution-lab").read_text("direct_url.json") or "{}")'
                  '.get("vcs_info", {}).get("commit_id")\nexcept Exception:\n    pass\n'
-                 'print(json.dumps({"dir": os.path.dirname(os.path.abspath(m.__file__)), "dist_sha": sha}))')
+                 'print(json.dumps({"dir": os.path.dirname(os.path.abspath(m.__file__)), "dist_sha": sha,\n'
+                 '                  "thresholds": {k: getattr(m, k, None) for k in ("MIN_ROWS", "MIN_NEG", '
+                 '"MIN_GROUPS", "K")}}))')
 
 
 def _iso(t: float) -> str:
@@ -113,7 +121,11 @@ def learner_status(cfg: Mapping[str, Any], python: str) -> dict[str, Any]:
     if not pinned or not found or not (found.startswith(pinned) or pinned.startswith(found)):
         reason = 'no_pin' if not pinned else 'sha_unknown' if not found else 'sha_mismatch'
         return {'status': 'learner_missing', 'reason': reason, 'pinned': pinned, 'found': found}
-    return {'status': 'ok', 'sha': found}
+    th = info.get('thresholds') or {}
+    th = th if set(th) == set(THRESHOLDS) and all(type(v) is int for v in th.values()) else None
+    return {'status': 'ok', 'sha': found, 'thresholds': th,
+            'threshold_mismatch': None if th is None else
+            {k: [THRESHOLDS[k], th[k]] for k in THRESHOLDS if th[k] != THRESHOLDS[k]}}
 
 
 # ----------------------------------------------------------------------------- sufficiency
@@ -123,25 +135,27 @@ def analysis_rows(rows: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
             and (r.get('label') or {}).get('resolved') and (r.get('observed') or {}).get('action') == 'ACT']
 
 
-def sufficiency(ana: list[Mapping[str, Any]]) -> dict[str, Any]:
+def sufficiency(ana: list[Mapping[str, Any]], thresholds: Mapping[str, int] | None = None) -> dict[str, Any]:
+    th = dict(thresholds or THRESHOLDS)
+    min_rows, min_neg, min_groups, k_want = th['MIN_ROWS'], th['MIN_NEG'], th['MIN_GROUPS'], th['K']
     y = [int(r['label']['y_success']) for r in ana]
     groups = sorted({r['group'] for r in ana})
-    k = min(K, len(groups))
+    k = min(k_want, len(groups))
     fold = {g: i % k for i, g in enumerate(groups)} if k else {}
     classes: dict[int, set[int]] = {}
     for r, yi in zip(ana, y):
         classes.setdefault(fold[r['group']], set()).add(yi)
     observed = {'rows': len(ana), 'not_success': y.count(0), 'groups': len(groups)}
-    checks = {'rows>=300': observed['rows'] >= MIN_ROWS, 'not_success>=30': observed['not_success'] >= MIN_NEG,
-              'groups>=10': observed['groups'] >= MIN_GROUPS,
-              'k==5_and_every_test_fold_has_both_classes': k == K and all(c == {0, 1} for c in classes.values())}
+    need = {f'rows>={min_rows}': (min_rows, 'rows'), f'not_success>={min_neg}': (min_neg, 'not_success'),
+            f'groups>={min_groups}': (min_groups, 'groups')}
+    checks = {name: observed[key] >= target for name, (target, key) in need.items()}
+    checks[f'k=={k_want}_and_every_test_fold_has_both_classes'] = k == k_want and all(
+        c == {0, 1} for c in classes.values())
     days = sorted({r['day'] for r in ana if r.get('day')})
     proj: dict[str, Any] = {'days_observed': 0, 'days_to_sufficiency': None, 'binding': None}
     if days:
         span = (time.mktime(time.strptime(days[-1], '%Y-%m-%d')) - time.mktime(time.strptime(days[0], '%Y-%m-%d')))
         proj['days_observed'] = int(round(span / 86400)) + 1
-        need = {'rows>=300': (MIN_ROWS, 'rows'), 'not_success>=30': (MIN_NEG, 'not_success'),
-                'groups>=10': (MIN_GROUPS, 'groups')}
         waits = {}
         for name, (target, key) in need.items():
             rate = observed[key] / proj['days_observed']
@@ -151,7 +165,7 @@ def sufficiency(ana: list[Mapping[str, Any]]) -> dict[str, Any]:
         proj['days_to_sufficiency'] = None if waits[proj['binding']] == float('inf') else waits[proj['binding']]
     return {'decision': 'sufficient' if all(checks.values()) else 'INSUFFICIENT_DATA', 'checks': checks,
             'observed': observed, 'projection': proj,
-            'thresholds': {'MIN_ROWS': MIN_ROWS, 'MIN_NEG': MIN_NEG, 'MIN_GROUPS': MIN_GROUPS, 'K': K}}
+            'thresholds': th, 'thresholds_source': 'learner' if thresholds else 'prereg_v0_fallback'}
 
 
 def discrimination(ana: list[Mapping[str, Any]]) -> dict[str, Any] | None:
@@ -312,24 +326,39 @@ def _ledger(path: Path, acquired: float, released: float) -> None:
 
 
 # ----------------------------------------------------------------------------- steps
-def _verify(home: Path, out: Path, cfg: Mapping, st: dict, *, agentsview: Any, projects: Any, **_: Any) -> None:
+def _spent(st: dict, step: str, deadline: float) -> bool:
+    """True (and the step marked partial) once the budget is spent: stop before the next harness or source."""
+    if time.monotonic() < deadline:
+        return False
+    st[f'{step}_partial'] = True
+    return True
+
+
+def _verify(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, agentsview: Any, projects: Any,
+            **_: Any) -> None:
     from . import outcome_verifier as ov
     for h in hc.HARNESSES:
         if _captured(home, h):
+            if _spent(st, 'verify', deadline):
+                return
             st['verify'][h] = ov.verify_harness(h, root=home, agentsview=agentsview,
                                                 projects=Path(projects) if projects else None, gh=ov.GitHub(False),
                                                 write=True)
 
 
-def _import(home: Path, out: Path, cfg: Mapping, st: dict, **_: Any) -> None:
+def _import(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, **_: Any) -> None:
     from . import legacy_import as li
     src = _legacy_sources(home, cfg)
-    if Path(src['omp-v1']['decisions']).exists():
-        st['imports']['omp-v1'] = li.import_omp_v1(src['omp-v1']['decisions'], src['omp-v1']['outcomes'], root=home)
-    if Path(src['omp-cognition-shadow']).exists():
-        st['imports']['omp-cognition-shadow'] = li.import_cognition_shadow(src['omp-cognition-shadow'], root=home)
-    if Path(src['dsh-jev']).exists():
-        st['imports']['dsh-jev'] = li.import_dsh_jev(src['dsh-jev'], root=home)
+    todo = [('omp-v1', Path(src['omp-v1']['decisions']),
+             lambda: li.import_omp_v1(src['omp-v1']['decisions'], src['omp-v1']['outcomes'], root=home)),
+            ('omp-cognition-shadow', Path(src['omp-cognition-shadow']),
+             lambda: li.import_cognition_shadow(src['omp-cognition-shadow'], root=home)),
+            ('dsh-jev', Path(src['dsh-jev']), lambda: li.import_dsh_jev(src['dsh-jev'], root=home))]
+    for name, path, run in todo:
+        if path.exists():
+            if _spent(st, 'import', deadline):
+                return
+            st['imports'][name] = run()
 
 
 def _shadow(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, projects: Any, **_: Any) -> None:
@@ -346,7 +375,7 @@ def _sufficiency(home: Path, out: Path, cfg: Mapping, st: dict, **_: Any) -> Non
     for key, entry in (st['index'] or {}).get('tables', {}).items():
         harness, cohort = key.split('/')
         rows = le._read_jsonl(out / 'tables' / harness / f'{cohort}.jsonl')
-        ana = analysis_rows(rows)
+        ana = st.setdefault('analysis', {})[key] = analysis_rows(rows)
         st['strata'][key] = {'harness': harness, 'cohort': cohort, 'rows': len(rows), 'analysis_rows': len(ana),
                              'sufficiency': sufficiency(ana), 'discrimination': discrimination(ana),
                              'prereg': preregs.get(harness) if cohort != 'legacy' else None,
@@ -360,6 +389,9 @@ def _learn(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, **
         return
     python = cfg.get('learner_python') or sys.executable
     st['learner'] = learner_status(cfg, python)
+    if st['learner'].get('thresholds'):  # the pinned learner's own gate, for every stratum's report
+        for k, s in st['strata'].items():
+            s['sufficiency'] = sufficiency(st['analysis'][k], st['learner']['thresholds'])
     for key in todo:
         s = st['strata'][key]
         if st['learner']['status'] != 'ok':

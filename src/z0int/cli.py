@@ -637,7 +637,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("claude-code", "Claude Code launch profiles + prefix-cache residency (→ z0int.claude_code_launch)"),
         ("hermes", "Hermes shadow DecisionOpportunity records + turn outcomes (→ z0int.hermes_decisions)"),
         ("outcomes", "Verified turn outcomes + credit join (→ z0int.outcome_verifier)"),
-        ("loop", "Export the privacy-safe loop training table (→ z0int.loop_export)"),
+        ("loop", "Verified learning loop: export tables, merge hosts, scheduled tick (→ z0int.loop_export)"),
         ("memory", "z0 memory surface: doctor, bench, eval, rules (→ z0int.memory.cli)"),
     ):
         sp = sub.add_parser(name, help=help_txt)
