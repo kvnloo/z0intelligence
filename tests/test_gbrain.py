@@ -37,6 +37,8 @@ class GBrainBridgeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             client.call("remember", {"fact": "nope"})
         with self.assertRaises(ValueError):
+            client.call("recall", {"query": "secret"})
+        with self.assertRaises(ValueError):
             client.call("context_pack", {"entities": "x", "include_private": True})
 
     def test_protocol_errors_fail_closed(self) -> None:
