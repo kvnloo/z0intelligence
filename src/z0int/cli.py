@@ -486,6 +486,7 @@ def build_parser() -> argparse.ArgumentParser:
     cursor = cxd.add_mutually_exclusive_group(required=True)
     cursor.add_argument("--session-id", default=None)
     cursor.add_argument("--since", default=None, help="ISO-8601 cursor for stateless wake")
+    cxd.add_argument("--since-slug", default=None, help="Keyset slug paired with --since")
     cxd.add_argument("--budget-tokens", type=int, default=1200)
     cxd.add_argument("--binary", default=None, help="Override gbrain executable")
     cxd.add_argument("--aodl", default=None, help="Optional compiled AODL JSON for correlation")
@@ -861,6 +862,7 @@ def _cmd_context(args: argparse.Namespace) -> int:
                 response = client.delta(
                     session_id=args.session_id,
                     since=args.since,
+                    since_slug=args.since_slug,
                     entities=args.entity or None,
                     budget_tokens=args.budget_tokens,
                 )
