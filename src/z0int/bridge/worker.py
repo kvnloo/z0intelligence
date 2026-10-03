@@ -1,7 +1,9 @@
 """Resident JSONL bridge worker: python -u -m z0int.bridge.worker
 
 Protocol: one JSON object per line on stdin; one JSON response per line on stdout.
-Request ids are required for concurrent ops.
+Request ids are required for concurrent ops. turn_open/turn_close payloads may carry the capture fields
+``harness`` (omp|omo), ``cwd``, ``parent_id``, ``agent_kind`` and ``model``; a frame without them (the a9cbbed
+shim) is still served, and captured with unknown task facts.
 """
 
 from __future__ import annotations
@@ -16,6 +18,11 @@ from typing import Any
 from z0int.bridge.generation import publish_current
 from z0int.bridge.protocol import BRIDGE_PROTOCOL, OPS, compute_build_id
 from z0int.bridge.runtime import BridgeRuntime
+
+
+def _text(payload: dict[str, Any], key: str) -> str | None:
+    value = payload.get(key)
+    return value if isinstance(value, str) and value else None
 
 
 def _respond(req_id: str | None, body: dict[str, Any]) -> None:
@@ -89,6 +96,7 @@ def serve(generation: int | None = None) -> int:
                 _respond(req_id, rt.cognition_shadow(payload))
                 continue
             if op == "shutdown":
+                rt.close_capture()
                 _respond(req_id, {"ok": True, "shutdown": True, **rt.identity()})
                 return 0
             if op == "turn_open":
@@ -102,6 +110,11 @@ def serve(generation: int | None = None) -> int:
                     writer_generation=req.get("bridge_generation")
                     if isinstance(req.get("bridge_generation"), int)
                     else rt.generation,
+                    cwd=_text(payload, "cwd"),
+                    harness=_text(payload, "harness") or "omp",
+                    parent_id=_text(payload, "parent_id"),
+                    agent_kind=_text(payload, "agent_kind"),
+                    model=_text(payload, "model"),
                 )
                 _respond(req_id, result)
                 continue
@@ -125,12 +138,14 @@ def serve(generation: int | None = None) -> int:
                     writer_generation=req.get("bridge_generation")
                     if isinstance(req.get("bridge_generation"), int)
                     else rt.generation,
+                    harness=_text(payload, "harness") or "omp",
                 )
                 _respond(req_id, result)
                 continue
             _respond(req_id, {"ok": False, "error": f"unhandled_op:{op}"})
         except Exception as exc:  # noqa: BLE001
             _respond(req_id if isinstance(req_id, str) else None, {"ok": False, "error": str(exc)})
+    rt.close_capture()  # stdin closed (host exit): bounded drain of the capture spools
     return 0
 
 

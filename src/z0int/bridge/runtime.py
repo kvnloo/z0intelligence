@@ -2,6 +2,12 @@
 
 Production preflight is owned by z0intelligence (no Evolution Lab on live path).
 Kerdoios remains optional residual planner via subprocess when configured.
+
+Capture (oh-my-pi#109, z0int#62): every OMP/OMO user turn also lands in the shared record family
+``$Z0INT_HOME/state/<harness>/``: turn_open queues a ``z0int.<harness>.opportunity_record.v0`` (built in a
+detached child, from the task cwd the shim sends) and turn_close a ``turn_outcome.v0`` on the same turn key.
+Both go through one bounded spool per harness, so the reply never waits for capture; nothing a capture row
+holds reaches the host.
 """
 
 from __future__ import annotations
@@ -10,11 +16,13 @@ import json
 import os
 import sys
 import subprocess
+import threading
 import time
 import uuid
 from pathlib import Path
 from typing import Any
 
+from z0int import harness_capture as hc
 from z0int import paths
 from z0int.bridge import generation as gen
 from z0int.bridge.decision_cache import ResidentDecisionCache
@@ -224,6 +232,7 @@ class BridgeRuntime:
         generation: int,
         instance_id: str | None = None,
         build_id: str | None = None,
+        capture_spawn: Any = None,
     ) -> None:
         self.generation = int(generation)
         self.instance_id = instance_id or uuid.uuid4().hex[:12]
@@ -233,6 +242,46 @@ class BridgeRuntime:
         self.draining = False
         # Per-generation resident DecisionBackend instances (not shared across reloads).
         self._decision_backends = ResidentDecisionCache()
+        # Capture: the detached opportunity build (tests pass an in-process stand-in) and one spool per harness.
+        self._capture_spawn = capture_spawn or hc.spawn_detached
+        self._spools: dict[str, hc.Spool] = {}
+        self._spool_lock = threading.Lock()
+
+    # --- capture (shadow: nothing here reaches the host) ---------------------
+    def _capture(self, harness: str, kind: str, job: dict[str, Any]) -> None:
+        """Queue one capture job; never raises and never waits (a full queue is a persisted drop)."""
+        try:
+            if harness not in hc.HARNESSES:
+                hc.supported(harness)  # an explicit unsupported_harness failure row
+                return
+            if not hc.enabled():
+                return
+            with self._spool_lock:
+                spool = self._spools.get(harness)
+                if spool is None:
+                    spool = self._spools[harness] = hc.Spool(harness, write=self._capture_write(harness))
+            spool.put(kind, job)
+        except Exception:  # noqa: BLE001 - capture is shadow-only
+            pass
+
+    def _capture_write(self, harness: str):
+        def write(kind: str, job: dict[str, Any]) -> None:
+            if kind == "opportunity_record":
+                ctx = hc.begin_turn(harness, job)
+                if ctx:
+                    self._capture_spawn(hc.child_argv(harness), {"payload": job, "ctx": ctx})
+            else:
+                ctx = hc.outcome_context(harness, job["turn"])
+                if ctx and ctx.get("trace_id") is not None:
+                    hc.record_outcome(harness, ctx, job["behaviour"], ended=job["ended"], extra=job["extra"])
+        return write
+
+    def close_capture(self) -> None:
+        """Drain and stop every capture spool (bounded: ``Spool.close`` returns within its close timeout)."""
+        with self._spool_lock:
+            spools, self._spools = list(self._spools.values()), {}
+        for spool in spools:
+            spool.close()
 
     def identity(self) -> dict[str, Any]:
         return {
@@ -335,6 +384,11 @@ class BridgeRuntime:
         prompt: str,
         omp_pid: int | None = None,
         writer_generation: int | None = None,
+        cwd: str | None = None,
+        harness: str = "omp",
+        parent_id: str | None = None,
+        agent_kind: str | None = None,
+        model: str | None = None,
     ) -> dict[str, Any]:
         if self.draining:
             return {"ok": False, "error": "draining"}
@@ -352,6 +406,10 @@ class BridgeRuntime:
             row = {"op": "turn_open", "error": "generation_mismatch", **stamp, "writer_generation": writer_generation}
             gen.quarantine(row, reason="open_generation_mismatch")
             return {"ok": False, "error": "generation_mismatch", **stamp}
+        # The user turn happened whatever the bridge's own bookkeeping decides below: capture it first.
+        self._capture(harness, "opportunity_record", {
+            "session_id": session_id, "turn_id": trace_id, "prompt": prompt, "cwd": cwd, "model": model,
+            "parent_id": parent_id, "agent_kind": agent_kind})
 
         pf = preflight(prompt)
         capability_id = pf.get("capability_id") if isinstance(pf.get("capability_id"), str) else "coding.next_action"
@@ -415,7 +473,7 @@ class BridgeRuntime:
         row = {
             "schema": SCHEMA_EVENT,
             "ts": receipt["ts"],
-            "prompt": prompt[:400],
+            "capture": hc.capture_flags(prompt),  # content-free; the prompt itself is never stored here
             "preflight": pf,
             "kerdoios_plan": plan,
             "latency_ms": latency_ms,
@@ -480,6 +538,7 @@ class BridgeRuntime:
         measurement_state: str | None = None,
         state_reason: str | None = None,
         writer_generation: int | None = None,
+        harness: str = "omp",
     ) -> dict[str, Any]:
         stamp = _meta_stamp(
             generation=self.generation,
@@ -499,6 +558,15 @@ class BridgeRuntime:
         if trace_id in self.closing:
             return {"ok": True, "already_closed": True, "trace_id": trace_id, **stamp}
         self.closing.add(trace_id)
+        # Observed behaviour only: execution_completed is what the host saw; verified_success stays null in the
+        # capture row until a verifier labels the turn (an operator claim lives in the heart row below).
+        self._capture(harness, "turn_outcome", {
+            "turn": {"session_id": session_id, "turn_id": trace_id, "model": model},
+            "behaviour": {"asked_user": None, "tool_calls": None, "assistant_messages": None},
+            "ended": "completed" if execution_completed else "interrupted",
+            "extra": {"execution_completed": bool(execution_completed), "verified_success": None,
+                      "measurement_state": measurement_state, "input_tokens": input_tokens,
+                      "output_tokens": output_tokens}})
 
         # Close may carry a different generation than open — record both.
         open_gen = open_row.get("bridge_generation") if open_row else None
