@@ -49,8 +49,10 @@ z0int context gbrain-delta --session-id demo
 ```
 
 Both commands print a shadow candidate plus its provenance-preserving context
-packet. Pass `--aodl contract.json` to correlate the candidate with a compiled
-AODL contract. Each candidate carries a deterministic `candidate_id` and
+packet. Stateless delta callers should resume with both values from GBrain's
+`next_cursor`: `--since <timestamp> --since-slug <slug>`; session callers get
+that keyset cursor automatically. Pass `--aodl contract.json` to correlate the
+candidate with a compiled AODL contract. Each candidate carries a deterministic `candidate_id` and
 `receipt_extra`; `attach_shadow_candidate()` joins those opaque fields to an
 existing z0int receipt without changing action, authority, success, or verifier
 state. Neither command executes an action or surfaces an interruption.
