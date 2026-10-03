@@ -88,3 +88,21 @@ def test_cli_verify_exits_nonzero_when_the_report_is_degraded(tmp_path, monkeypa
     empty.mkdir()
     assert main(['outcomes', 'verify', '--no-gh', '--no-gh-cache', '--dry-run', '--projects-dir', str(empty)]) == 3
     assert 'status: degraded' in capsys.readouterr().out
+
+
+def test_cli_verify_json_names_the_test_label_polarity(tmp_path, monkeypatch, capsys):
+    """The A0 dry run reads the CLI JSON: a one-sided label source must say so there too (CC output unchanged)."""
+    from z0int.cli import main
+    home = tmp_path / 'z0home'
+    monkeypatch.setenv('Z0INT_HOME', str(home))
+    fx = AVFixture(tmp_path / 'sessions.db')
+    fx.session('grok', 'g1', started=T0)
+    db = fx.close()
+    for harness, polarity in (('grok', 'none'), ('omp', 'failure_only')):
+        main(['outcomes', 'verify', '--harness', harness, '--agentsview-db', str(db), '--no-gh', '--no-gh-cache',
+              '--dry-run', '--json'])
+        assert json.loads(capsys.readouterr().out)['test_label_polarity'] == polarity
+    empty = tmp_path / 'projects'
+    empty.mkdir()
+    main(['outcomes', 'verify', '--no-gh', '--no-gh-cache', '--dry-run', '--json', '--projects-dir', str(empty)])
+    assert 'test_label_polarity' not in json.loads(capsys.readouterr().out)
