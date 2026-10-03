@@ -310,3 +310,13 @@ def test_legacy_import_cli(tmp_path, spine, capsys):
     rc = li._main(['omp-v1', '--decisions', str(spine / 'decisions.jsonl'), '--outcomes', str(spine / 'outcomes.jsonl'),
                    '--root', str(tmp_path / 'z0')])
     assert rc == 0 and json.loads(capsys.readouterr().out)['rows_added'] == 4
+
+
+def test_legacy_table_manifest_names_its_label_source_not_an_agentsview_polarity(tmp_path, spine):
+    """omp/legacy rows are labelled by the OMP v1 effective tier, not by AgentsView shell exits."""
+    home = tmp_path / 'z0'
+    li.import_omp_v1(spine / 'decisions.jsonl', spine / 'outcomes.jsonl', root=home)
+    le.export_tables(tmp_path / 'out', root=home, host='h')
+    man = json.loads((tmp_path / 'out' / 'omp' / 'legacy.manifest.json').read_text())
+    assert 'test_label_polarity' not in man
+    assert man['label_source'] == 'effective_tier'

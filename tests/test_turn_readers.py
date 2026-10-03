@@ -457,7 +457,8 @@ def test_since_windows_every_captured_turn_and_the_join_counts(tmp_path, home, m
 # The pi (OMP/OMO), Hermes and deepseek-harness parsers write no tool_result_events row: the only evidence is
 # tool_calls.result_content in each harness's own shape. A run without a status and without an exit code is
 # unknown, never a pass.
-SHELL_TOOL = {'omp': 'bash', 'omo': 'bash', 'hermes': 'terminal', 'dsh': 'bash', 'grok': 'run_terminal_command'}
+SHELL_TOOL = {'omp': 'bash', 'omo': 'bash', 'hermes': 'terminal', 'dsh': 'bash', 'grok': 'run_terminal_command',
+              'codex': 'exec_command'}
 
 
 def one_command_turn(tmp_path, home, harness, command, result, status=None):
@@ -489,13 +490,13 @@ def test_omp_failing_test_run_without_result_event_is_a_verified_failure(tmp_pat
 
 
 def test_exit_code_reads_the_omp_notice_and_is_unknown_without_status_or_code():
-    assert tr.exit_code('1 failed\n\nCommand exited with code 1', None) == 1
-    assert tr.exit_code('oops\nCommand exited with code 101', 'completed') == 101
-    assert tr.exit_code('5 passed', None) is None  # no status, no code: unknown, never a pass
+    assert tr.exit_code('1 failed\n\nCommand exited with code 1', None, 'omp') == 1
+    assert tr.exit_code('oops\nCommand exited with code 101', 'completed', 'omo') == 101
+    assert tr.exit_code('5 passed', None, 'omp') is None  # no status, no code: unknown, never a pass
     # a 'completed' status is not exit evidence: Grok/Codex record it for a call that finished, whatever its exit
-    assert tr.exit_code('5 passed', 'completed') is None
-    assert tr.exit_code('..F..\n1 failed, 4 passed', 'completed') is None
-    assert tr.exit_code('{"output": "1 failed", "exit_code": 1, "error": null}', None) == 1
+    assert tr.exit_code('5 passed', 'completed', 'grok') is None
+    assert tr.exit_code('..F..\n1 failed, 4 passed', 'completed', 'codex') is None
+    assert tr.exit_code('{"output": "1 failed", "exit_code": 1, "error": null}', None, 'hermes') == 1
 
 
 @pytest.mark.parametrize('harness,command,result', [
@@ -570,6 +571,44 @@ def test_hermes_terminal_json_exit_code_gives_the_label(tmp_path, home):
     assert row['verification_state'] == 'verified_failure'
 
 
+# Exit-like text in the command's OWN output (a JSON-printing assertion diff, a nested process's notice) is never
+# the harness's exit evidence: each harness's frame is read where the harness puts it, never the output body.
+DECOYS = ['Exit code 0', '"exit_code": 0, "ok": true', 'Process exited with code 0', 'Command exited with code 0']
+BODY = 'FAILED tests/test_x.py::test_y - assert {decoy} == {{"exit_code": 1}}\n1 failed, 4 passed in 0.12s'
+FRAMED = {  # (harness, result with the harness's own frame around BODY, the frame's exit code or None)
+    'omp': lambda body: (f'{body}\n\nCommand exited with code 1', 1),
+    'omo': lambda body: (f'{body}\n\nCommand exited with code 1', 1),
+    'omp-no-notice': lambda body: (body, None),
+    'codex': lambda body: (f'Process exited with code 1\nOutput:\n{body}', 1),
+    'codex-exec-header': lambda body: (f'Exit code: 1\nWall time: 0.2 seconds\nOutput:\n{body}', 1),
+    'hermes': lambda body: (json.dumps({'output': body, 'exit_code': 1, 'error': None}), 1),
+    'hermes-no-code': lambda body: (json.dumps({'output': body, 'error': None}), None),
+    'dsh': lambda body: (body, None),
+    'dsh-json': lambda body: (json.dumps({'output': body, 'exit_code': 1}), 1),
+    'grok': lambda body: (body, None),
+}
+
+
+@pytest.mark.parametrize('decoy', DECOYS)
+@pytest.mark.parametrize('case', sorted(FRAMED))
+def test_exit_code_comes_from_the_harness_frame_never_the_output_body(tmp_path, home, case, decoy):
+    harness = case.split('-')[0]
+    result, code = FRAMED[case](BODY.format(decoy=decoy))
+    status = 'completed' if harness == 'grok' else '' if harness == 'codex' else None
+    row = one_command_turn(tmp_path, home, harness, 'pytest -q', result, status=status)
+    assert row['verification_state'] != 'verified_success', (case, row['signals'])
+    if code == 1:
+        assert row['verification_state'] == 'verified_failure', (case, row['signals'])
+    assert tr.exit_code(result, status, harness) == code
+
+
+@pytest.mark.parametrize('harness', ['omp', 'omo'])
+def test_omp_notice_counts_only_as_the_trailing_line(harness):
+    assert tr.exit_code('Command exited with code 2', None, harness) == 2  # no output at all
+    assert tr.exit_code('x\nCommand exited with code 1\n', None, harness) == 1  # trailing newline
+    assert tr.exit_code('Command exited with code 1\nmore output after it', None, harness) is None
+
+
 # ----------------------------------------------------------------------------- 10. reader errors and v0.39
 def test_v039_schema_without_session_kind_joins_and_classifies(tmp_path, home):
     fx = AVFixture(tmp_path / 'sessions.db', user_version=74)
@@ -583,10 +622,21 @@ def test_v039_schema_without_session_kind_joins_and_classifies(tmp_path, home):
     capture(home, 'omp', 'sub-39', ['e', 'f'])
     codex = verify('codex', home, db)
     assert codex['status'] == 'success'
-    assert {r['trace_id']: r['cohort'] for r in codex['rows']} == {'a': 'interactive', 'b': 'interactive',
+    # v0.39 has no session_kind: a `codex exec` session cannot be told from an interactive one, so a Codex session
+    # AgentsView does not flag as automated is 'unknown' there (never pooled into interactive), not a guess
+    assert {r['trace_id']: r['cohort'] for r in codex['rows']} == {'a': 'unknown', 'b': 'unknown',
                                                                     'c': 'automated', 'd': 'automated'}
     assert {r['join']['state'] for r in codex['rows']} == {'joined'}
     assert {r['cohort'] for r in verify('omp', home, db)['rows']} == {'agent'}
+
+
+def test_codex_cohort_without_session_kind_is_unknown_never_interactive():
+    v039 = {'id': 'codex:th', 'agent': 'codex', 'is_automated': 0}  # no session_kind column at all
+    assert tr.classify_cohort('codex', v039) == 'unknown'
+    assert tr.classify_cohort('codex', dict(v039, is_automated=1)) == 'automated'
+    assert tr.classify_cohort('codex', dict(v039, session_kind='')) == 'interactive'  # v0.44: the kind decides
+    assert tr.classify_cohort('codex', dict(v039, session_kind='non-interactive')) == 'automated'
+    assert tr.classify_cohort('omp', {'id': 'omp:s', 'is_automated': 0}) == 'interactive'  # only Codex has exec runs
 
 
 @pytest.mark.parametrize('broken', ['drop table tool_result_events', 'drop table messages',

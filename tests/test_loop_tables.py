@@ -167,3 +167,28 @@ def test_loop_cli_export_and_merge(tmp_path, capsys):
     assert le._main(['export', '--root', str(tmp_path / 'host-a'), '--host', 'host-a',
                      '--out-dir', str(tmp_path / 'ec')]) == 0
     assert (tmp_path / 'ec' / 'codex' / 'interactive.jsonl').is_file()
+
+
+# ----------------------------------------------------------------------------- 12b. no table at all
+def test_export_with_only_failure_rows_writes_the_index_and_counts_them(tmp_path):
+    """A fresh host, or one whose only state is failure rows: the counts index is still written, nothing dropped."""
+    home = tmp_path / 'z0'
+    hc.record_failure('dsh', 'reader_unavailable', detail={'reason': 'agent_missing'}, root=home)
+    out = tmp_path / 'never' / 'created'
+    index = le.export_tables(out, root=home, host='h1')
+    assert index['tables'] == {} and index['shadow_tables'] == {}
+    assert index['records']['dsh']['failures'] == {'reader_unavailable': 1}
+    assert json.loads((out / 'manifest.json').read_text())['records']['dsh']['failures'] == {'reader_unavailable': 1}
+
+
+def test_merge_of_table_less_sets_writes_an_empty_index(tmp_path):
+    le.export_tables(tmp_path / 'tA', root=tmp_path / 'empty-a', host='host-a')
+    le.export_tables(tmp_path / 'tB', root=tmp_path / 'empty-b', host='host-b')
+    index = le.merge([tmp_path / 'tA', tmp_path / 'tB'], tmp_path / 'm' / 'new')
+    assert index['tables'] == {} and index['shadow_tables'] == {}
+    assert json.loads((tmp_path / 'm' / 'new' / 'manifest.json').read_text())['merged'] is True
+
+
+def test_loop_cli_export_on_an_empty_home_exits_zero(tmp_path):
+    assert le._main(['export', '--root', str(tmp_path / 'empty'), '--host', 'h', '--out-dir', str(tmp_path / 'o')]) == 0
+    assert (tmp_path / 'o' / 'manifest.json').is_file()
