@@ -188,6 +188,19 @@ def test_turn_close_writes_an_outcome_joined_by_turn_key_and_never_claims_verifi
     assert "missing_verifier" in kinds  # OMP has no verifier at capture time: said explicitly
 
 
+def test_outcome_model_id_matches_the_opportunity_model_id(home, tmp_path):
+    """The shim sends ctx.model as provider/id at open; the close frame splits provider and model."""
+    rt = BridgeRuntime(generation=1, instance_id="t", build_id="b", capture_spawn=inline_spawn)
+    rt.turn_open(trace_id="trace-model", session_id="s-model", prompt=PROMPT, omp_pid=1, writer_generation=1,
+                 cwd=str(tmp_path), model="sandbox/bridge-fake")
+    rt.turn_close(trace_id="trace-model", session_id="s-model", omp_pid=1, provider="sandbox", model="bridge-fake",
+                  writer_generation=1)
+    rt.close_capture()
+    (opp,) = rows(home, "omp", "opportunities.jsonl")
+    (out,) = rows(home, "omp", "outcomes.jsonl")
+    assert opp["model_id"] == out["model_id"] == "sandbox/bridge-fake"
+
+
 def test_omo_turns_land_in_their_own_record_family(home, tmp_path):
     rt = BridgeRuntime(generation=1, instance_id="t", build_id="b", capture_spawn=inline_spawn)
     open_close(rt, "trace-omo", "omo-sess", cwd=str(tmp_path), harness="omo")

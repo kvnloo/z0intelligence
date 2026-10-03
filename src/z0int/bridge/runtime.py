@@ -561,7 +561,9 @@ class BridgeRuntime:
         # Observed behaviour only: execution_completed is what the host saw; verified_success stays null in the
         # capture row until a verifier labels the turn (an operator claim lives in the heart row below).
         self._capture(harness, "turn_outcome", {
-            "turn": {"session_id": session_id, "turn_id": trace_id, "model": model},
+            # model_id as the shim names it at open (provider/id); the close frame carries the two apart
+            "turn": {"session_id": session_id, "turn_id": trace_id,
+                     "model": f"{provider}/{model}" if provider and model else model},
             "behaviour": {"asked_user": None, "tool_calls": None, "assistant_messages": None},
             "ended": "completed" if execution_completed else "interrupted",
             "extra": {"execution_completed": bool(execution_completed), "verified_success": None,
