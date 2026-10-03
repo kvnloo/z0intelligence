@@ -170,12 +170,17 @@ def test_dsh_importer_never_reads_hermes_home(tmp_path, monkeypatch):
     opened = []
     real_open, real_path_open = builtins.open, Path.open
 
+    def refuse(name):  # the spy itself never lets an open reach the live home (or the link that points there)
+        opened.append(name)
+        if 'hermes-home' in name or name.endswith('innocent.jsonl'):
+            raise PermissionError(f'test spy refused {name}')
+
     def spy(file, *a, **k):
-        opened.append(str(file))
+        refuse(str(file))
         return real_open(file, *a, **k)
 
     def spy_path(self, *a, **k):
-        opened.append(str(self))
+        refuse(str(self))
         return real_path_open(self, *a, **k)
     monkeypatch.setattr(builtins, 'open', spy)
     monkeypatch.setattr(Path, 'open', spy_path)
@@ -184,6 +189,88 @@ def test_dsh_importer_never_reads_hermes_home(tmp_path, monkeypatch):
     assert opened and not any(p.startswith('/workspace/hermes-home') for p in opened)
     with pytest.raises(ValueError, match='hermes-home'):
         li.import_dsh_jev(Path('/workspace/hermes-home/jev/receipts.jsonl'), root=tmp_path / 'z0')
+    link = tmp_path / 'innocent.jsonl'  # a link INTO hermes-home is refused too (the link is resolved, not opened)
+    link.symlink_to('/workspace/hermes-home/jev/receipts.jsonl')
+    opened.clear()
+    with pytest.raises(ValueError, match='hermes-home'):
+        li.import_dsh_jev(link, root=tmp_path / 'z0')
+    assert not any('hermes-home' in p or p == str(link) for p in opened)
+
+
+def jev_pair(agent, turn, ts, session):
+    lineage = {'session_id': session, 'root_session_id': session, 'trace_id': f'tr-{session}', 'role': 'root'}
+    return [{'ts': ts, 'harness': 'dsh', 'type': 'jev_decision', 'agentId': agent, 'turn': turn, 'policy': 'jev-v3',
+             'tier': 'easy', 'route_changed': False, 'effort_changed': False},
+            {'ts': ts, 'harness': 'dsh', 'type': 'model_request', 'agentId': agent, 'turn': turn, 'step': 1,
+             'routed': True, **lineage}]
+
+
+def test_dsh_jev_orphan_decision_never_stalls_the_import(tmp_path):
+    """A jev_decision whose model_request never came (a crash) must not hold back every later agent's rows."""
+    src = tmp_path / 'legacy' / 'jev.jsonl'
+    home = tmp_path / 'z0'
+    t = 1_780_000_000.0
+    orphan = {'ts': '2026-05-28T20:26:40.000Z', 'harness': 'dsh', 'type': 'jev_decision', 'agentId': 'crashed',
+              'turn': 1, 'policy': 'jev-v3', 'tier': 'hard'}
+    unrouted = {'ts': '2026-05-28T20:26:41.000Z', 'harness': 'dsh', 'type': 'model_request', 'agentId': 'z',
+                'turn': 1, 'routed': False, 'session_id': 'dsh-z'}
+    write(src, [orphan, unrouted] + jev_pair('b', 1, '2026-05-28T20:26:42.000Z', 'dsh-b')
+          + jev_pair('c', 1, '2026-05-28T20:26:43.000Z', 'dsh-c'))
+    out = hc.state_dir('dsh', home) / 'shadow_decisions.jsonl'
+    # while the orphan is fresh and at the tail it is held, but the other agents' rows are imported now
+    first = li.import_dsh_jev(src, root=home, now=t + 60)
+    assert first['rows_added'] == 2 and len(rows_of(out)) == 2
+    assert first['counts'].get('no_lineage', 0) == 0 and first['counts']['model_request_only'] == 1
+    again = li.import_dsh_jev(src, root=home, now=t + 60)  # re-reading from the held line counts nothing twice
+    assert again['rows_added'] == 0 and again['manifest_sha256'] == first['manifest_sha256']
+    # past the grace window its request is not coming: imported as no_lineage, the watermark moves past it
+    late = li.import_dsh_jev(src, root=home, now=t + 3600)
+    assert late['rows_added'] == 1 and late['counts']['no_lineage'] == 1 and late['totals']['model_request_only'] == 1
+    rows = rows_of(out)
+    assert len(rows) == 3 and len({r['decision_id'] for r in rows}) == 3
+    done = li.import_dsh_jev(src, root=home, now=t + 7200)
+    assert done['rows_added'] == 0 and done['run']['read_lines'] == 0 and done['manifest_sha256'] == late['manifest_sha256']
+
+
+def test_dsh_jev_orphan_that_is_no_longer_the_tail_is_imported(tmp_path, monkeypatch):
+    monkeypatch.setattr(li, 'JEV_TAIL_LINES', 2)
+    src = tmp_path / 'legacy' / 'jev.jsonl'
+    home = tmp_path / 'z0'
+    orphan = {'ts': '2026-05-28T20:26:40.000Z', 'harness': 'dsh', 'type': 'jev_decision', 'agentId': 'crashed',
+              'turn': 1, 'tier': 'hard'}
+    write(src, [orphan] + jev_pair('b', 1, '2026-05-28T20:26:42.000Z', 'dsh-b')
+          + jev_pair('c', 1, '2026-05-28T20:26:43.000Z', 'dsh-c'))
+    man = li.import_dsh_jev(src, root=home, now=1_780_000_000.0 + 1)  # fresh, but four lines follow it
+    assert man['rows_added'] == 3 and man['counts']['no_lineage'] == 1
+
+
+def test_scrub_correction_leaves_one_row_per_turn_with_the_corrected_label(tmp_path, spine):
+    """receipt.scrub_contaminated_outcomes appends a downgraded outcome_join.v1: only the latest row is exported."""
+    home = tmp_path / 'z0'
+    li.import_omp_v1(spine / 'decisions.jsonl', spine / 'outcomes.jsonl', root=home)
+    write(spine / 'outcomes.jsonl', [join('tr-gold', {'user_correction': True, 'source': 'scrub'}, 'negative')])
+    assert li.import_omp_v1(spine / 'decisions.jsonl', spine / 'outcomes.jsonl', root=home)['rows_added'] == 1
+    gold = harness_id.turn_key('omp', 'omp-s1', 'tr-gold')
+    le.export_tables(tmp_path / 'tA', root=home, host='host-a')
+    le.export_tables(tmp_path / 'tB', root=home, host='host-b')
+    le.merge([tmp_path / 'tA', tmp_path / 'tB'], tmp_path / 'm')
+    for d in ('tA', 'm'):
+        rows = [json.loads(x) for x in (tmp_path / d / 'omp' / 'legacy.jsonl').read_text().splitlines()]
+        assert len(rows) == len({r['turn_key'] for r in rows}) == 4
+        assert [r['label']['y_success'] for r in rows if r['turn_key'] == gold] == [0]
+
+
+def test_shadow_tables_keep_the_latest_row_per_decision(tmp_path):
+    src = tmp_path / 'legacy' / 'cs.jsonl'
+    write(src, [shadow_receipt(i, served=True) for i in range(2)])
+    home = tmp_path / 'z0'
+    li.import_cognition_shadow(src, root=home)
+    path = hc.state_dir('omp', home) / 'shadow_decisions.jsonl'
+    rows = rows_of(path)
+    write(path, [dict(rows[0], latency_ms=99.0)])  # a re-import that changed this decision's content
+    (table,) = le.shadow_tables(home).values()
+    assert len(table.rows) == 2
+    assert [r['latency_ms'] for r in table.rows if r['decision_id'] == rows[0]['decision_id']] == [99.0]
 
 
 # ----------------------------------------------------------------------------- 16/17. privacy + idempotency

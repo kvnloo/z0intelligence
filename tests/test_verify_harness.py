@@ -68,3 +68,23 @@ def test_reader_rerun_is_idempotent_by_watermark(tmp_path):
     assert first['manifest']['manifest_sha256'] == second['manifest']['manifest_sha256']
     assert {p.name: p.read_bytes() for p in hc.state_dir('codex', home).glob('*.jsonl')} == files
     assert json.loads(json.dumps(first['manifest']))['harness'] == 'codex'
+
+
+def test_cli_verify_exits_nonzero_when_the_report_is_degraded(tmp_path, monkeypatch, capsys):
+    """A timer or script that checks the exit code must not read a degraded label source as success."""
+    from z0int.cli import main
+    home = tmp_path / 'z0home'
+    monkeypatch.setenv('Z0INT_HOME', str(home))
+    fx = AVFixture(tmp_path / 'sessions.db')
+    fx.session('hermes', 'S1', started=T0)
+    db = fx.close()
+    ctx = hc.begin_turn('dsh', {'session_id': 'd1', 'turn_id': 't1', 'prompt': 'x'}, env={}, root=home)
+    hc.record_outcome('dsh', ctx, hc.payload_behaviour({}), root=home)
+    assert main(['outcomes', 'verify', '--harness', 'dsh', '--agentsview-db', str(db), '--no-gh', '--no-gh-cache',
+                 '--dry-run', '--json']) == 3  # agent_missing
+    assert json.loads(capsys.readouterr().out)['status'] == 'degraded'
+    cc_opportunity(home, 'cc-1', 'p1')
+    empty = tmp_path / 'projects'
+    empty.mkdir()
+    assert main(['outcomes', 'verify', '--no-gh', '--no-gh-cache', '--dry-run', '--projects-dir', str(empty)]) == 3
+    assert 'status: degraded' in capsys.readouterr().out

@@ -359,3 +359,56 @@ def test_stale_index_gives_pending_index_never_negative(tmp_path, home):
     (row,) = fresh['rows']
     assert row['verification_state'] == 'unverified' and row['join']['state'] == 'unjoined'
     assert le.label_of(stale['rows'][0])['y_success'] is None
+
+
+def capture_at(monkeypatch, home, harness, session, turns):
+    """Captured turns with a fixed capture time each: [(trace, epoch seconds)]."""
+    from agentsview_fixture import iso
+    for tid, t in turns:
+        monkeypatch.setattr(hc, '_now', lambda t=t: iso(t)[:19] + 'Z')
+        capture(home, harness, session, [tid])
+
+
+def test_ordinal_join_checks_capture_time_alignment(tmp_path, home, monkeypatch):
+    """AgentsView has FEWER user messages than were captured (an injected prompt it stores as is_system): turns
+    must not be joined one position off; the misaligned ones are unjoined(ordinal_misaligned)."""
+    fx = AVFixture(tmp_path / 'sessions.db')
+    sid = fx.session('codex', 'th-al', started=T0)
+    fx.user(sid, '<injected harness context>', T0, is_system=1)
+    fx.user(sid, 'run the tests', T0 + 600)
+    fx.bash(sid, 'pytest', T0 + 605, exit=1)
+    fx.user(sid, 'thanks', T0 + 1200)
+    fx.say(sid, 'ok', T0 + 1201)
+    db = fx.close()
+    capture_at(monkeypatch, home, 'codex', 'th-al', [('inj', T0), ('t1', T0 + 600), ('t2', T0 + 1200)])
+    report = verify('codex', home, db, now=T0 + 3600)
+    rows = by_trace(report)
+    assert rows['inj']['join']['state'] == rows['t1']['join']['state'] == 'unjoined'
+    assert rows['inj']['join']['reason'] == rows['t1']['join']['reason'] == 'ordinal_misaligned'
+    assert not rows['inj']['signals'] and not rows['t1']['signals']  # no label borrowed from the wrong turn
+    assert report['join'] == {'joined': 0, 'unjoined': 3, 'pending_index': 0}
+
+
+def test_ordinal_join_alignment_accepts_capture_close_to_the_message(tmp_path, home, monkeypatch):
+    fx = AVFixture(tmp_path / 'sessions.db')
+    two_turn_session(fx, 'grok', 'g-al', t=T0)
+    db = fx.close()
+    capture_at(monkeypatch, home, 'grok', 'g-al', [('a', T0 - 2), ('b', T0 + 12)])  # hook clock vs message clock
+    rows = by_trace(verify('grok', home, db, now=T0 + 3600))
+    assert [rows[t]['join'].get('ordinal') for t in ('a', 'b')] == [1, 2]
+
+
+def test_since_windows_every_captured_turn_and_the_join_counts(tmp_path, home, monkeypatch):
+    fx = AVFixture(tmp_path / 'sessions.db')
+    sid = fx.session('omp', 'w1', started=T0)
+    fx.user(sid, 'old turn', T0)
+    fx.say(sid, 'ok', T0 + 1)
+    fx.user(sid, 'new turn', T0 + 2 * DAY)
+    fx.say(sid, 'ok', T0 + 2 * DAY + 1)
+    db = fx.close()
+    capture_at(monkeypatch, home, 'omp', 'w1', [('old', T0), ('new', T0 + 2 * DAY)])
+    capture_at(monkeypatch, home, 'omp', 'never-indexed', [('gone', T0)])  # unjoined, but outside the window
+    report = verify('omp', home, db, now=T0 + 2 * DAY + 3600, since=T0 + DAY)
+    assert sorted(by_trace(report)) == ['new']
+    assert report['join'] == {'joined': 1, 'unjoined': 0, 'pending_index': 0}
+    assert not [f for f in report['failures'] if f['kind'] == 'unjoined']
