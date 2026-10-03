@@ -1,0 +1,10 @@
+# AgentsView sync every 30 minutes (shared quiet-lane lock, bounded wait).
+[Unit]
+Description=AgentsView sync every 30 minutes
+
+[Timer]
+OnCalendar=*:0/30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

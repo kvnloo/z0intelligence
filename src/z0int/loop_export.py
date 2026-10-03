@@ -681,6 +681,9 @@ def _main(argv: list[str] | None = None) -> int:
     if argv[:1] == ['import']:
         from .legacy_import import _main as import_main
         return import_main(argv[1:])
+    if argv[:1] == ['tick']:
+        from .loop_tick import _main as tick_main
+        return tick_main(argv[1:])
     ap = argparse.ArgumentParser(prog='z0int outcomes export', description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--out', type=Path, required=True, help='training table JSONL (manifest written beside it)')
