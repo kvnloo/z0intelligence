@@ -51,7 +51,7 @@ MAX_TOKENS = 600
 MAX_QUERY_CHARS = 2000
 SLOT_POOL = 'memory-slots'  # harness_capture.try_slot pool: at most MAX_CHILDREN shadow briefs at once
 RECEIPT_WAIT_S = 10.0  # an opportunity build (detached) waits this long for a turn's brief that is still running
-RECEIPT_GRACE_S = 1.0  # ... and this long for a seam that has run before but has not marked this turn yet
+RECEIPT_GRACE_S = 3.0  # ... and this long for a seam that has run here but not marked this turn yet (a cold child)
 
 
 def _config() -> dict[str, Any]:
