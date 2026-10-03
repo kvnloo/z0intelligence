@@ -26,7 +26,7 @@ Pre-push scan of every new commit or file:
 - No secret-shaped strings (AWS, OpenAI/Anthropic, GitHub, Slack, JWT, private-key, Google, HF patterns) except the known false positives listed under §5.
 - No `.env`, `auth.json`, keys or pem files.
 - No emails other than veeman961@gmail.com, noreply addresses and `example.invalid`.
-- No `/home/kvn` paths: `~` replaced them in the copied artifacts, and `<local-host>` replaced the host name.
+- No home-directory paths: `~` replaced them in the copied artifacts, and `<local-host>` replaced the host name.
 - No blob over 20 MB. The largest new packet blob is about 6.7 MB (`b-07…/raw/browser/*.tar.gz`). The 5 to 13 MB images listed come from the upstream tree.
 
 ## 3. Repos and branches (session scope)
@@ -124,3 +124,8 @@ Known false positives kept after the scan:
    - The un-pushed hermes-home branches (`promote/terminal-ambiguous-421`, `study/hermes-unified-memory-56`).
    - The dirty CUA lane leftovers listed in §3.
    - Pruning missing worktrees (z0intelligence 1, openjev 8, newton 20, workspace hermes-agent 8, and others).
+
+## 7. Hermes-agent addendum (2026-10-03, later pass)
+- `/workspace/hermes-home/hermes-agent` -> kvnloo/hermes-agent, new branches: `promote/terminal-ambiguous-421` (e414eff), `study/hermes-unified-memory-56` (c846638), `local/rebuild-127143` (c3d70f9), `local/rebuild-127152` (85efed2), `local/rebuild-127170` (62bee68; same patch as fork `promote/tui-theme-leaves-v2`; 127143/127152 are earlier drafts of fork `promote/tui-queue-scope-v2` / `promote/tui-agents-idle-clock-v2`).
+- `oss/hermes-agent` (kanban lane, Aug-Sep): 261 local branches missing on fork; 142 hold commits not on any fork/origin ref (422 commits). Pushed 126 as new branches (list: `hermes-oss/push-list.txt`). 119 with no unique commits not pushed (nothing new).
+- **Excluded (16 branches, `hermes-oss/bad-branches.txt`)**: they carry raw evidence that failed the privacy scan: `evidence/firstmate-causality/v3/raw/*` (raw model responses incl. encrypted reasoning), `.cu-perf-report/phase9/**` (incl. `live/lease.env`), `plugins/kanban/evidence/attention-responsive/electron-e2e-v2/**` (kanban.db, emails), `tests/kanban_hold_harness/artifacts/matrix-results.json` and `finalize_v3.py` (home paths). Owner decision: push after sanitising (new branch without those paths) or keep local.

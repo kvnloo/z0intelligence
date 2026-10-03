@@ -2,6 +2,8 @@
 
 This branch (`experiments/session-20261003`) is an archive. It copies the experiment data from one multi-day agent session so the owner can review it from GitHub. The files are documents and evidence. Nothing here is wired into the package, and nothing here should be merged to master as-is.
 
+**Start with [`META.md`](META.md)**: a one-page index of every program in the session, with verdicts, code and data links, open owner decisions and what is still running.
+
 Snapshot taken 2026-10-03 at about 14:20 CDT. Three workflows were still running then: wiring round 3, the TencentDB model-select run and the bend-perf triage. Their folders hold the state as of that time only.
 
 | Folder | What it is | State at snapshot | Source on host |
