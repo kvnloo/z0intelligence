@@ -74,6 +74,26 @@ def test_shadow_tables_carry_the_slot_decisions_per_harness_and_cohort(tmp_path)
     assert all(len(t.rows) == 4 * (2 if t.harness == 'hermes' else 1) for t in tables.values())
 
 
+def test_shadow_rows_take_the_cohort_of_their_training_rows(tmp_path):
+    """A cron session the capture wrote as interactive but the verifier classified automated: both tables agree."""
+    home = tmp_path / 'z0'
+    rec = dict(opp('hermes', 'cron_1', 'c1'), cohort='interactive')
+    put(home, 'hermes', 'opportunities.jsonl', [rec, dict(opp('hermes', 'cli_1', 'i1'), cohort='interactive')])
+    put(home, 'hermes', 'outcomes_verified.jsonl', [
+        dict(verified('cron_1', 'c1', 'verified_success'), schema=hc.schema('hermes', 'turn_outcome_verified'),
+             harness='hermes', cohort='automated'),
+        dict(verified('cli_1', 'i1', 'verified_failure'), schema=hc.schema('hermes', 'turn_outcome_verified'),
+             harness='hermes', cohort='interactive')])
+    put(home, 'claude-code', 'opportunities.jsonl', [dict(opp('claude-code', 'cc-1', 'p1'),
+                                                          schema='z0int.claude_code.opportunity_record.v0')])
+    slot().replay(home)
+    train = {k: {r['turn_key'] for r in t.rows} for k, t in le.build_tables(home).items()}
+    shadow = {k: {r['turn_key'] for r in t.rows} for k, t in le.shadow_tables(home).items()}
+    assert sorted(shadow) == sorted(train) == [('claude-code', 'unknown'), ('hermes', 'automated'),
+                                               ('hermes', 'interactive')]
+    assert shadow == train
+
+
 # ----------------------------------------------------------------------------- 7. fail-open, no retry storm
 class FakeBackend:
     def __init__(self, calls, ready):
