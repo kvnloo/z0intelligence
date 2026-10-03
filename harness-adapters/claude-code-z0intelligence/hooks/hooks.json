@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.claude_code prompt || true",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code prompt || true",
             "timeout": 30
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.claude_code stop || true",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code stop || true",
             "timeout": 30
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.claude_code stop || true",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code stop || true",
             "timeout": 30
           }
         ]
@@ -38,7 +38,29 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.claude_code session-start || true",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code session-start || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code subagent-start || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code subagent-stop || true",
             "timeout": 30
           }
         ]

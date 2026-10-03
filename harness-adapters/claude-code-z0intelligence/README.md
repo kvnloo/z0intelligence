@@ -3,11 +3,19 @@
 Thin Claude Code plugin over the canonical `z0int.automatic` path, the same seam
 Hermes (`pre_llm_call`), OMP (`before_agent_start`) and DSH (`llm/stream`) use.
 
+Every hook runs `python -m z0int.hook_adapter --harness claude-code <event>` (the lean shared entry, also
+used by the Codex and Grok shims); `z0int.claude_code` keeps only what is Claude Code specific.
+
 | Claude Code seam | z0int surface | Default |
 | --- | --- | --- |
-| `UserPromptSubmit` | `z0int.claude_code prompt` → `automatic.handle_event` | shadow: routed and receipted, never injected |
-| `Stop`, `SessionEnd` | `z0int.claude_code stop` → Tokenomics `claude-code.provider_usage.v0` | on |
+| `UserPromptSubmit` | `prompt` → capture ids + detached DecisionOpportunity build; `automatic.handle_event` | shadow: routed and receipted, never injected |
+| `Stop`, `SessionEnd` | `stop` → Tokenomics `claude-code.provider_usage.v0` + `z0int.claude_code.turn_outcome.v0` | on |
+| `SubagentStart`, `SubagentStop` | `subagent-start` / `subagent-stop` → cohort `agent` opportunity + outcome, joined on `turn_key` | on |
+| `SessionStart` | `session-start` → opt-in State Packet (`Z0INT_CLAUDE_CODE_PACKET=1`) | off |
 | MCP `route_worker` | `z0int.intelligence_mcp` with `Z0INT_HARNESS=claude-code` | on |
+
+Capture records live under `$Z0INT_HOME/state/claude-code/`; `Z0INT_CAPTURE=0` turns capture off, and
+request text is stored only with `Z0INT_CAPTURE_PRIVACY=request_opt_in`.
 
 Requires `pip install -e .` of this repo (or `Z0INT_PYTHON` pointing at that
 environment). Every hook fails open.
