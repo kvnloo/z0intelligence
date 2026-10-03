@@ -363,7 +363,7 @@ def test_an_exhausted_budget_stops_releases_the_lock_and_is_partial(world, learn
     rep = tick(world, budget_s=2.0)
     assert rep['status'] == 'partial_measurement' and rep['exit'] != 0
     status = {s['name']: s['status'] for s in rep['steps']}
-    assert status['shadow'] == 'done'
+    assert status['shadow'] == 'partial'  # the slot itself stops at the deadline; the rest waits for the next tick
     assert [status[n] for n in STEPS[3:]] == ['skipped_budget'] * 4
     assert lock_is_free(world.lock)
     assert summary_file(world.home)['status'] == 'partial_measurement'
@@ -509,6 +509,8 @@ def test_units_pass_systemd_analyze_verify_with_a_stub_exec(tmp_path):
                 line = f'ExecStart={stub} ' + line.split('=', 1)[1]  # same arguments, an executable that exists
             lines.append(line)
         (tmp_path / name).write_text('\n'.join(lines) + '\n')
+    (tmp_path / 'rt').mkdir()  # user-manager mode needs a runtime dir; a scratch one, never the session's
     p = subprocess.run(['systemd-analyze', '--user', 'verify', *(str(tmp_path / n) for n in names)],
-                       capture_output=True, text=True)
-    assert p.returncode == 0 and p.stderr.strip() == '' and p.stdout.strip() == '', p.stderr + p.stdout
+                       capture_output=True, text=True, env=dict(os.environ, XDG_RUNTIME_DIR=str(tmp_path / 'rt')))
+    ours = [x for x in (p.stderr + p.stdout).splitlines() if any(n.split('.')[0] in x for n in names)]
+    assert p.returncode == 0 and ours == [], p.stderr + p.stdout  # warnings about our units fail; host units' do not
