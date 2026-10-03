@@ -309,10 +309,12 @@ def test_the_hook_fails_open_on_garbage_input(env, monkeypatch):
 
 
 def test_grok_has_no_push_seam(env, monkeypatch):
+    """Round 3: Grok's hook records the turn's shadow receipt for its capture opportunity (D3), never more."""
     monkeypatch.setenv('Z0INT_MEMORY_INJECT', 'on')
     monkeypatch.setenv('Z0INT_MEMORY_ENDPOINT', 'http://127.0.0.1:9')
     assert hook('prompt', PAYLOAD, 'grok') is None
-    assert rows('grok') == []
+    found = wait_rows('grok')
+    assert found and all(r['outcome'] == 'shadow' and r['injected'] is False and 'context' not in r for r in found)
 
 
 def test_a_shadow_spawn_failure_is_a_counted_error_not_an_exception(env, monkeypatch):
