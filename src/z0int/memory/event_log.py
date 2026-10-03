@@ -7,6 +7,14 @@ The index may be rebuilt freely. The event file is never rewritten by this
 module. A malformed committed line fails closed. An incomplete trailing write
 is ignored by readers but blocks further append until an operator repairs or
 copies the log, avoiding silent history mutation.
+
+Source-derived events enter through ``append(identity=EventIdentity)``, the one
+canonical ingestion path (z0int#23): idempotent on ``event_uid`` (an exact
+duplicate is a no-op, a changed ``payload_hash`` is a conflict), references and
+locators only for harness transcript sources, and off until the owner confirms
+(``Z0INT_MEMORY_SOURCE_INGEST=references`` or ``eventlog_source_ingest`` in
+``$Z0INT_HOME/config/memory.json``). A read-only log (the worker-facing view)
+refuses every write.
 """
 
 from __future__ import annotations
@@ -22,6 +30,7 @@ from pathlib import Path
 from typing import Any, Iterator, Mapping
 
 from .. import paths
+from ..memory_contract import EventIdentity
 
 SCHEMA = "z0int.memory.event.v1"
 INDEX_SCHEMA = "z0int.memory.event_index.v1"
@@ -29,10 +38,46 @@ STATE_SCHEMA = "z0int.memory.event_state.v1"
 BLOB_SCHEMA = "z0int.memory.blob_ref.v1"
 BLOB_THRESHOLD_BYTES = 16 * 1024
 _EVENT_TYPE = re.compile(r"^[a-z][a-z0-9_.-]{0,127}$")
+#: AgentsView agent names: their events enter the ledger as references, never as transcript bodies.
+HARNESS_TRANSCRIPT_SOURCES = frozenset({
+    "claude", "claude-code", "codex", "grok", "hermes", "omp", "omo", "dsh", "deepseek-harness", "chatgpt",
+    "kimi", "gemini", "cursor", "opencode", "antigravity-cli",
+})
+BODY_FIELDS = frozenset({"body", "content", "text", "message", "prompt", "response", "thinking", "thinking_text",
+                         "output", "transcript", "command"})
 
 
 class EventLogCorruption(RuntimeError):
     """Committed memory history is malformed or inconsistent."""
+
+
+class EventIdentityConflict(ValueError):
+    """The same source event (event_uid) arrived with a different payload_hash."""
+
+
+class SourceIngestDisabled(PermissionError):
+    """Source-derived ingestion is off until the owner confirms references-only scope."""
+
+
+def source_ingest_enabled() -> bool:
+    if os.environ.get("Z0INT_MEMORY_SOURCE_INGEST") == "references":
+        return True
+    try:
+        cfg = json.loads((paths.home() / "config" / "memory.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(cfg, dict) and cfg.get("eventlog_source_ingest") == "references"
+
+
+def _body_keys(value: Any) -> set[str]:
+    if isinstance(value, Mapping):
+        found = {str(k) for k in value if str(k).lower() in BODY_FIELDS}
+        for v in value.values():
+            found |= _body_keys(v)
+        return found
+    if isinstance(value, (list, tuple)):
+        return set().union(*(_body_keys(v) for v in value)) if value else set()
+    return set()
 
 
 @dataclass(frozen=True)
@@ -47,7 +92,12 @@ class MemoryEvent:
     session_id: str | None
     parent_event_ids: tuple[int, ...]
     checksum: str
+    identity: dict[str, Any] | None = None
     schema: str = SCHEMA
+
+    def event_identity(self) -> EventIdentity | None:
+        """The source identity with this ledger's position as ``ledger_seq`` (never part of ``event_uid``)."""
+        return None if self.identity is None else EventIdentity(**self.identity, ledger_seq=self.event_id)
 
     def to_dict(self) -> dict[str, Any]:
         row: dict[str, Any] = {
@@ -66,6 +116,8 @@ class MemoryEvent:
             row["project"] = self.project
         if self.session_id is not None:
             row["session_id"] = self.session_id
+        if self.identity is not None:
+            row["identity"] = dict(self.identity)
         return row
 
     @classmethod
@@ -82,6 +134,7 @@ class MemoryEvent:
             session_id=str(row["session_id"]) if row.get("session_id") is not None else None,
             parent_event_ids=tuple(int(x) for x in row.get("parent_event_ids") or []),
             checksum=str(row["checksum"]),
+            identity=dict(row["identity"]) if isinstance(row.get("identity"), Mapping) else None,
         )
 
 
@@ -130,13 +183,17 @@ def validate_event_dict(row: dict[str, Any]) -> None:
             raise EventLogCorruption("invalid blob checksum")
         if type(blob.get("bytes")) is not int or blob["bytes"] < 0:
             raise EventLogCorruption("invalid blob length")
+    ident = row.get("identity")
+    if ident is not None and (not isinstance(ident, dict) or not isinstance(ident.get("event_uid"), str)):
+        raise EventLogCorruption("invalid event identity")
     expected = _checksum(_event_without_checksum(row))
     if row.get("checksum") != expected:
         raise EventLogCorruption("event checksum mismatch")
 
 
 class EventLog:
-    def __init__(self, root: Path | None = None, *, blob_threshold: int = BLOB_THRESHOLD_BYTES):
+    def __init__(self, root: Path | None = None, *, blob_threshold: int = BLOB_THRESHOLD_BYTES,
+                 read_only: bool = False):
         base = Path(root) if root is not None else paths.home() / "memory"
         self.root = base
         self.events_path = base / "events.jsonl"
@@ -144,7 +201,29 @@ class EventLog:
         self.state_path = base / "events.state.json"
         self.blobs_dir = base / "blobs"
         self.blob_threshold = max(1, int(blob_threshold))
-        self._ensure_layout()
+        self.read_only = bool(read_only)
+        self._uids: dict[str, tuple[int, str]] = {}  # event_uid -> (event_id, payload_hash), in-process
+        self._uids_end = 0  # events.jsonl offset the uid map reflects
+        if not self.read_only:
+            self._ensure_layout()
+
+    def _writable(self) -> None:
+        if self.read_only:
+            raise PermissionError("read-only view of the canonical ledger: workers cannot write it")
+
+    def _identity_index_locked(self, events, committed_end: int) -> dict[str, tuple[int, str]]:
+        """Bring the uid map up to ``committed_end`` by reading only the bytes appended since last time."""
+        if self._uids_end > committed_end:
+            self._uids, self._uids_end = {}, 0
+        events.seek(self._uids_end)
+        while events.tell() < committed_end:
+            raw = events.readline()
+            row = self._decode_committed_line(raw)
+            ident = row.get("identity")
+            if ident:
+                self._uids.setdefault(ident["event_uid"], (row["event_id"], str(ident.get("payload_hash"))))
+        self._uids_end = committed_end
+        return self._uids
 
     def _ensure_layout(self) -> None:
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -366,17 +445,33 @@ class EventLog:
         session_id: str | None = None,
         parent_event_ids: tuple[int, ...] | list[int] = (),
         ts: float | None = None,
+        identity: EventIdentity | None = None,
     ) -> MemoryEvent:
+        self._writable()
         if not isinstance(event_type, str) or not _EVENT_TYPE.fullmatch(event_type):
             raise ValueError("invalid event_type")
         if not isinstance(source, str) or not source.strip() or len(source) > 512:
             raise ValueError("source must be nonempty text")
+        ident_row = None
+        if identity is not None:
+            if not source_ingest_enabled():
+                raise SourceIngestDisabled("source-derived ingestion is off until the owner confirms references-only")
+            if identity.source_system in HARNESS_TRANSCRIPT_SOURCES and (body := _body_keys(payload)):
+                raise ValueError(f"references only for {identity.source_system}: body field(s) {sorted(body)}")
+            ident_row = {k: v for k, v in identity.to_dict().items() if k not in ("ledger_seq", "schema")}
         payload_bytes = _canonical(payload)
 
         self.events_path.touch(mode=0o600, exist_ok=True)
         with self.events_path.open("r+b") as events:
             fcntl.flock(events, fcntl.LOCK_EX)
             event_id, committed_end = self._append_state_locked(events)
+            if ident_row is not None:
+                seen = self._identity_index_locked(events, committed_end).get(ident_row["event_uid"])
+                if seen is not None:
+                    if seen[1] != ident_row["payload_hash"]:
+                        raise EventIdentityConflict(f"{ident_row['event_uid']} already ingested with another payload_hash")
+                    events.seek(0)
+                    return self._event_at_locked(events, seen[0])
             parents = tuple(int(x) for x in parent_event_ids)
             if any(x < 0 or x >= event_id for x in parents):
                 raise ValueError("parent_event_ids must reference earlier events")
@@ -402,6 +497,8 @@ class EventLog:
                 base["project"] = str(project)
             if session_id is not None:
                 base["session_id"] = str(session_id)
+            if ident_row is not None:
+                base["identity"] = ident_row
             base["checksum"] = _checksum(base)
             line = _canonical(base) + b"\n"
 
@@ -429,7 +526,16 @@ class EventLog:
                 last_offset=offset,
                 last_length=len(line),
             )
+            if ident_row is not None and self._uids_end == offset:
+                self._uids[ident_row["event_uid"]] = (event_id, ident_row["payload_hash"])
+                self._uids_end = offset + len(line)
             return MemoryEvent.from_dict(base)
+
+    def _event_at_locked(self, events, event_id: int) -> MemoryEvent:
+        for row, _offset, _length in self._scan_locked(events):
+            if row["event_id"] == event_id:
+                return MemoryEvent.from_dict(row)
+        raise KeyError(event_id)
 
     def _append_index_row(self, row: dict[str, Any]) -> None:
         self.index_path.touch(mode=0o600, exist_ok=True)
@@ -456,6 +562,7 @@ class EventLog:
 
     def rebuild_index(self) -> int:
         """Rebuild derived offset/state files without mutating events.jsonl."""
+        self._writable()
         self.events_path.touch(mode=0o600, exist_ok=True)
         with self.events_path.open("r+b") as events:
             fcntl.flock(events, fcntl.LOCK_EX)
@@ -500,6 +607,13 @@ class EventLog:
     def get(self, event_id: int, *, resolve_blob: bool = False) -> MemoryEvent:
         if type(event_id) is not int or event_id < 0:
             raise KeyError(event_id)
+        if self.read_only:  # a read-only view never repairs derived files; scan the canonical log instead
+            event = next((e for e in self.iter_events() if e.event_id == event_id), None)
+            if event is None:
+                raise KeyError(event_id)
+            if not resolve_blob or event.blob is None:
+                return event
+            return MemoryEvent(**{**event.__dict__, "payload": self.read_blob(event.blob)})
         rows = self._index_rows()
         if event_id >= len(rows):
             # Index may be stale after a crash between event fsync and index fsync.
@@ -530,6 +644,7 @@ class EventLog:
             session_id=event.session_id,
             parent_event_ids=event.parent_event_ids,
             checksum=event.checksum,
+            identity=event.identity,
         )
 
     def read_blob(self, ref: Mapping[str, Any]) -> Any:
