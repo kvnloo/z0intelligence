@@ -209,3 +209,26 @@ def test_merge_counts_turn_keys_that_hosts_placed_in_different_cohorts(tmp_path)
     index = le.merge([tmp_path / 'tA', tmp_path / 'tB'], tmp_path / 'm')
     assert sorted(index['tables']) == ['codex/automated', 'codex/interactive', 'codex/unknown']
     assert index['cross_cohort_turn_keys'] == {'codex': 1}
+
+
+# ----------------------------------------------------------------------------- 12c. the DSH live shadow plane's rows
+def dsh_plane_row(turn):
+    """The row shape harness-adapters/dsh-z0intelligence/shadow.mjs writes: no cohort and no decision_id."""
+    return {'schema': hc.schema('dsh', 'shadow_decision'), 'harness': 'dsh', 'shadow_plane': 'on', 'session_id': 's1',
+            'turn_key': hc.turn_key('dsh', 's1', turn), 'lineage_turn_key': turn, 'backend': 'z0_service',
+            'sample_rate': 1, 'student_changed_execution': False, 'recorded_at': '2026-09-30T10:00:00Z',
+            'status': 'ok', 'latency_ms': 3, 'decision': {'mode': 'shadow', 'executed': False, 'kind': 'local'}}
+
+
+def test_export_keeps_dsh_shadow_plane_rows_without_cohort_or_decision_id(tmp_path):
+    """Found by the round-3 integration e2e: one DSH shadow-plane row made `loop export` (and so the tick) raise.
+    A row whose cohort the producer did not fix is never pooled into a known cohort, and rows without a
+    decision_id are each kept, never collapsed into one."""
+    home = tmp_path / 'z0'
+    put(home, 'dsh', 'opportunities.jsonl', [opp('dsh', 's1', 't1'), opp('dsh', 's1', 't2')])
+    put(home, 'dsh', 'shadow_decisions.jsonl', [dsh_plane_row('t1'), dsh_plane_row('t2')])
+    index = le.export_tables(tmp_path / 'out', root=home, host='h1')
+    assert {k: v['rows'] for k, v in index['shadow_tables'].items()} == {'dsh/unknown': 2}
+    body = (tmp_path / 'out' / 'dsh' / 'unknown.shadow.jsonl').read_text()
+    assert 's1' not in body.replace(hc.turn_key('dsh', 's1', 't1'), '').replace(hc.turn_key('dsh', 's1', 't2'), '')
+    assert le._main(['export', '--root', str(home), '--host', 'h', '--out-dir', str(tmp_path / 'o')]) == 0
