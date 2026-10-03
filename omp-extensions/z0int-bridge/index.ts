@@ -154,6 +154,17 @@ function failAll(h: WorkerHandle, err: Error): void {
 	h.pending.clear();
 }
 
+function unrefChild(child: ChildProcess): void {
+	try {
+		child.unref();
+		for (const stream of [child.stdin, child.stdout, child.stderr]) {
+			(stream as { unref?: () => void } | null)?.unref?.();
+		}
+	} catch {
+		/* fail-open: a host without unref keeps the old behaviour */
+	}
+}
+
 function spawnWorker(nextGen: number): Promise<WorkerHandle> {
 	return new Promise((resolve, reject) => {
 		const env = {
@@ -173,6 +184,10 @@ function spawnWorker(nextGen: number): Promise<WorkerHandle> {
 			reject(e instanceof Error ? e : new Error(String(e)));
 			return;
 		}
+		// A resident helper never keeps its host alive: a host that exits when its event loop drains (senpi print
+		// mode) would otherwise hang after its last turn. In-flight requests hold their own timers; the worker
+		// exits on stdin EOF once the host is gone.
+		unrefChild(child);
 		// A worker that never started (missing interpreter) or died must not raise into the host.
 		child.stdin?.on("error", () => {
 			/* fail-open: the pending requests are failed by exit/error below */
