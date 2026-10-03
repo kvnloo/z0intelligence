@@ -13,6 +13,17 @@ from z0int.gbrain import (
 
 
 class GBrainBridgeTests(unittest.TestCase):
+    def test_root_cli_exposes_shadow_only_gbrain_commands(self) -> None:
+        from z0int.cli import build_parser
+
+        parser = build_parser()
+        pack = parser.parse_args(["context", "gbrain-pack", "--entity", "z0intelligence"])
+        self.assertEqual(pack.context_cmd, "gbrain-pack")
+        self.assertEqual(pack.entity, ["z0intelligence"])
+        wake = parser.parse_args(["context", "gbrain-delta", "--session-id", "wake-1"])
+        self.assertEqual(wake.context_cmd, "gbrain-delta")
+        self.assertEqual(wake.session_id, "wake-1")
+
     def test_cli_transport_is_read_only_and_world_only(self) -> None:
         calls = []
 
