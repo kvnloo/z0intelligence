@@ -72,13 +72,25 @@ ctx 2.2.7 upserts `<data-root>/usage.sqlite` (observed on real local history),
 so a z0 read would still write ctx state. The rest of the caller's environment,
 including `CTX_DATA_ROOT`, is passed through.
 
+Verified guarantee (ctx 2.2.7, inotify plus sha256/mtime snapshots of a real
+data root across search, `show event` and seam calls): no file content or mtime
+changes under the data root, and no index or provider mutation. It is not "zero
+filesystem activity". Known upstream ctx behaviour on every invocation:
+
+- it opens `search/lexical/.ctx-generation-lease-coordinator-init-v2.lock` and
+  `.ctx-generation-read-leases-v2.lock` for writing (content unchanged);
+- it bumps the ctime of `~/.local/state/ctx/analytics-outbox-v1.lock`, outside
+  `CTX_DATA_ROOT`, even with `CTX_ANALYTICS_ENABLED=false`.
+
 A hit is treated as conversation evidence. Its search score/rank is diagnostic
 only; it does not upgrade the evidence into a verified claim.
 
 Lexical retrieval is the only mode enabled implicitly. `hybrid` and `semantic`
 require `allow_semantic=True` because ctx can be configured with an external
 semantic executor; z0 must not widen private-history exposure merely by choosing
-a retrieval backend.
+a retrieval backend. The reported `retrieval.effective_mode` must be the
+requested backend or `lexical` (ctx may narrow hybrid to lexical); anything
+wider, and any non-integer `result_window.returned`, is a `CtxProtocolError`.
 
 ### Exact event hydration
 
@@ -107,7 +119,8 @@ When enabled:
 - only `natural_language` and `memory` needs search ctx; exact paths and other
   kinds never do;
 - `ctx_backend` defaults to `lexical`; `hybrid`/`semantic` raise `ValueError`
-  unless `allow_ctx_semantic=True` is also passed;
+  unless `allow_ctx_semantic=True` is also passed. This check runs first, before
+  any QMD or ctx subprocess;
 - hits are appended as the adapter's `conversation` `EvidenceRef`s, deduplicated
   only by exact `(source_id, source_version, locator)`; QMD and ctx evidence for
   similar text are both kept;
@@ -115,7 +128,9 @@ When enabled:
   a different generation within one resolve is recorded as a contradiction;
 - each need gets a `ctx_search` operation (status, effective mode, hit count,
   added count, latency), and `measurements` gains `ctx_status`, `ctx_results`,
-  `ctx_latency_ms` and `ctx_effective_modes`;
+  `ctx_latency_ms` and `ctx_effective_modes`. `ctx_status` is the worst status
+  across needs (one failing need marks it `error`); per-need outcomes are in the
+  operations;
 - a missing CLI (`ctx_status=absent`) or failing call (`ctx_status=error`) is a
   recorded miss that leaves the need as a gap, never an exception or fabricated
   evidence;
@@ -127,7 +142,7 @@ When enabled:
 
 This adapter does not call `ctx setup`, `ctx import`, `ctx index`, or semantic
 enablement. It does not wake maintenance through search, migrate history,
-write ctx state, write z0 memory, publish claims, alter StatePacket routing, or
+write ctx content (see the verified guarantee above), write z0 memory, publish claims, alter StatePacket routing, or
 grant tool/execution authority.
 
 The first promotion decision belongs to evaluation, not integration.

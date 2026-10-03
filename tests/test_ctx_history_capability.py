@@ -243,10 +243,36 @@ class CtxHistoryCapabilityTests(unittest.TestCase):
         with self.assertRaisesRegex(CtxProtocolError, "refresh=off"):
             cap.search("x")
 
+    def test_search_rejects_non_integer_returned_count(self):
+        for returned in (None, [], "1", True, 1.5):
+            bad = {**SEARCH, "result_window": {**SEARCH["result_window"], "returned": returned}}
+            cap = CtxHistoryCapability(binary="ctx", runner=_Runner([bad]))
+            with self.subTest(returned=returned), self.assertRaisesRegex(CtxProtocolError, "returned"):
+                cap.search("x")
+
     def test_semantic_retrieval_requires_explicit_opt_in(self):
         cap = CtxHistoryCapability(binary="ctx", runner=_Runner([]))
         with self.assertRaisesRegex(ValueError, "allow_semantic=True"):
             cap.search("conceptual recall", backend="hybrid")
+
+    def test_effective_mode_cannot_widen_past_the_request(self):
+        def answer(requested: str, effective: str) -> dict:
+            return {
+                **SEARCH,
+                "retrieval": {**SEARCH["retrieval"], "requested_mode": requested, "effective_mode": effective},
+            }
+
+        for effective in ("hybrid", "semantic"):
+            cap = CtxHistoryCapability(binary="ctx", runner=_Runner([answer("lexical", effective)]))
+            with self.subTest(effective=effective), self.assertRaisesRegex(CtxProtocolError, "effective"):
+                cap.search("x")
+        cap = CtxHistoryCapability(binary="ctx", runner=_Runner([answer("hybrid", "semantic")]))
+        with self.assertRaisesRegex(CtxProtocolError, "effective"):
+            cap.search("x", backend="hybrid", allow_semantic=True)
+
+        # A hybrid request may fall back to lexical (ctx contract); that narrows, never widens.
+        cap = CtxHistoryCapability(binary="ctx", runner=_Runner([answer("hybrid", "lexical")]))
+        self.assertEqual(cap.search("x", backend="hybrid", allow_semantic=True).effective_mode, "lexical")
 
     def test_show_event_maps_stable_identity_and_detects_payload_change(self):
         changed = {

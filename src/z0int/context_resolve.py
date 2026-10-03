@@ -316,7 +316,15 @@ def resolve_context(
     history search (#116). Lexical is the default; ``ctx_backend`` of
     ``hybrid``/``semantic`` also needs ``allow_ctx_semantic``. Hits stay
     conversation evidence; a missing or failing ctx is a recorded miss.
+    ``measurements["ctx_status"]`` is the worst status across needs; per-need
+    outcomes are the ``ctx_search`` operations.
     """
+    if allow_ctx:
+        # Fail fast, before qmd or ctx subprocesses run.
+        if ctx_backend not in _CTX_BACKENDS:
+            raise ValueError(f"unsupported ctx backend: {ctx_backend}")
+        if ctx_backend != "lexical" and not allow_ctx_semantic:
+            raise ValueError("ctx semantic/hybrid retrieval requires allow_ctx_semantic=True")
     t0 = time.perf_counter()
     root = Path(project_root).expanduser().resolve() if project_root else None
     need_list: list[InformationNeed] = list(needs or [])
@@ -361,10 +369,6 @@ def resolve_context(
     ctx = None
     ctx_meas: dict[str, Any] = {}
     if allow_ctx:
-        if ctx_backend not in _CTX_BACKENDS:
-            raise ValueError(f"unsupported ctx backend: {ctx_backend}")
-        if ctx_backend != "lexical" and not allow_ctx_semantic:
-            raise ValueError("ctx semantic/hybrid retrieval requires allow_ctx_semantic=True")
         ctx = _ctx_capability()
         ctx_meas = {
             "allow_ctx": True,

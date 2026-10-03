@@ -197,6 +197,11 @@ class CtxHistoryCapability:
             raise CtxProtocolError("ctx search response missing Core generation_id")
         requested_mode = str(retrieval.get("requested_mode") or backend)
         effective_mode = str(retrieval.get("effective_mode") or requested_mode)
+        # ctx may narrow hybrid to lexical; it must never widen past the request.
+        if effective_mode not in {backend, "lexical"}:
+            raise CtxProtocolError(
+                f"ctx effective_mode {effective_mode!r} exceeds requested backend {backend!r}"
+            )
         freshness = payload.get("freshness")
         if not isinstance(freshness, dict) or freshness.get("mode") != "off":
             raise CtxProtocolError("ctx search did not confirm refresh=off")
@@ -246,7 +251,9 @@ class CtxHistoryCapability:
             window = {}
         if not isinstance(window, dict):
             raise CtxProtocolError("ctx result_window must be an object")
-        returned = int(window.get("returned", len(evidence)))
+        returned = window.get("returned", len(evidence))
+        if type(returned) is not int:
+            raise CtxProtocolError("ctx result_window.returned must be an integer")
         if returned != len(evidence):
             raise CtxProtocolError("ctx returned count does not match results[]")
         more_available = bool(window.get("more_available", False))

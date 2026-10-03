@@ -78,7 +78,7 @@ def _search(*hits: tuple[str, str, str], generation: str = "gen-7", mode: str = 
 
 def _patch_ctx(runner: _Runner | None = None, *, binary: str = "/usr/bin/ctx"):
     cap = CtxHistoryCapability(binary=binary, runner=runner or _Runner([]))
-    return mock.patch("z0int.context_resolve._ctx_capability", create=True, return_value=cap)
+    return mock.patch("z0int.context_resolve._ctx_capability", return_value=cap)
 
 
 def _ctx_ops(packet) -> list[dict[str, Any]]:
@@ -95,7 +95,6 @@ class CtxSeamOffTests(unittest.TestCase):
     def test_off_is_unchanged_and_never_touches_ctx(self):
         never = mock.patch(
             "z0int.context_resolve._ctx_capability",
-            create=True,
             side_effect=AssertionError("ctx must not be constructed when allow_ctx=False"),
         )
         needs = [
@@ -241,9 +240,18 @@ class CtxSeamOnTests(unittest.TestCase):
         self.assertNotIn("ctx_generation", packet.recipe.source_epochs)
 
     def test_ctx_failures_are_explicit_misses(self):
+        def window(returned: Any) -> dict:
+            ok = _search(("evt-1", "ses-1", "x"))
+            return {**ok, "result_window": {**ok["result_window"], "returned": returned}}
+
+        widened = _search(("evt-1", "ses-1", "x"))
+        widened["retrieval"]["effective_mode"] = "hybrid"
         for response, err in (
             (_Proc(returncode=2, stderr="boom"), "CtxCommandError"),
             (_Proc(stdout="not json"), "CtxProtocolError"),
+            (window(None), "CtxProtocolError"),
+            (window([]), "CtxProtocolError"),
+            (widened, "CtxProtocolError"),
         ):
             with self.subTest(err=err), _patch_ctx(_Runner([response])):
                 packet = resolve_context(query="q", allow_qmd=False, allow_ctx=True, use_cache=False)
@@ -253,6 +261,29 @@ class CtxSeamOnTests(unittest.TestCase):
             self.assertEqual(op["status"], "error")
             self.assertTrue(op["error"].startswith(err))
             self.assertEqual(packet.unresolved_gaps, ["q0: no lexical hits for 'q' (qmd=absent, ctx=error)"])
+
+    def test_backend_guard_fails_before_any_subprocess(self):
+        with (
+            mock.patch("z0int.context_resolve._qmd_bin", return_value="/usr/bin/qmd"),
+            mock.patch(
+                "z0int.context_resolve.subprocess.run",
+                side_effect=AssertionError("no subprocess may run before the ctx backend guard"),
+            ),
+            _patch_ctx(_Runner([])),
+        ):
+            for backend in ("hybrid", "semantic", "bogus"):
+                with self.subTest(backend=backend), self.assertRaises(ValueError):
+                    resolve_context(query="q", allow_qmd=True, allow_ctx=True, ctx_backend=backend, use_cache=False)
+
+    def test_ctx_status_is_worst_status_across_needs(self):
+        runner = _Runner([_Proc(returncode=2, stderr="boom"), _search(("evt-2", "ses-2", "y"))])
+        needs = [InformationNeed(id="a", description="first"), InformationNeed(id="b", description="second")]
+        with _patch_ctx(runner):
+            packet = resolve_context(needs=needs, allow_qmd=False, allow_ctx=True, use_cache=False)
+        self.assertEqual([op["status"] for op in _ctx_ops(packet)], ["error", "ok"])
+        self.assertEqual(packet.measurements["ctx_status"], "error")
+        self.assertEqual(packet.measurements["ctx_results"], 1)
+        self.assertEqual([e.locator for e in packet.evidence], ["ctx:event:evt-2"])
 
     def test_dedup_only_by_exact_source_identity(self):
         same_text = "identical snippet text"
