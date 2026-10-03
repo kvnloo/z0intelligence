@@ -1,0 +1,1036 @@
+{
+ "checks": {
+  "capture.claude-code.content_free_by_default": {
+   "ok": true
+  },
+  "capture.claude-code.every_opportunity_joined_on_turn_key": {
+   "detail": {
+    "joined": 4,
+    "opportunities": 4
+   },
+   "ok": true
+  },
+  "capture.claude-code.identity_fields": {
+   "ok": true
+  },
+  "capture.claude-code.rows": {
+   "detail": {
+    "opportunities": 4,
+    "outcomes": 4
+   },
+   "ok": true
+  },
+  "capture.claude-code.schemas": {
+   "detail": [
+    "z0int.claude_code.opportunity_record.v0",
+    "z0int.claude_code.turn_outcome.v0"
+   ],
+   "ok": true
+  },
+  "capture.claude-code.subagent_turns_are_agent_cohort": {
+   "detail": {
+    "agent": 2,
+    "interactive": 2
+   },
+   "ok": true
+  },
+  "capture.codex.content_free_by_default": {
+   "ok": true
+  },
+  "capture.codex.every_opportunity_joined_on_turn_key": {
+   "detail": {
+    "joined": 2,
+    "opportunities": 2
+   },
+   "ok": true
+  },
+  "capture.codex.identity_fields": {
+   "ok": true
+  },
+  "capture.codex.rows": {
+   "detail": {
+    "opportunities": 2,
+    "outcomes": 2
+   },
+   "ok": true
+  },
+  "capture.codex.schemas": {
+   "detail": [
+    "z0int.codex.opportunity_record.v0",
+    "z0int.codex.turn_outcome.v0"
+   ],
+   "ok": true
+  },
+  "capture.dsh.content_free_by_default": {
+   "ok": true
+  },
+  "capture.dsh.every_opportunity_joined_on_turn_key": {
+   "detail": {
+    "joined": 3,
+    "opportunities": 3
+   },
+   "ok": true
+  },
+  "capture.dsh.identity_fields": {
+   "ok": true
+  },
+  "capture.dsh.rows": {
+   "detail": {
+    "opportunities": 3,
+    "outcomes": 3
+   },
+   "ok": true
+  },
+  "capture.dsh.schemas": {
+   "detail": [
+    "z0int.dsh.opportunity_record.v0",
+    "z0int.dsh.turn_outcome.v0"
+   ],
+   "ok": true
+  },
+  "capture.grok.content_free_by_default": {
+   "ok": true
+  },
+  "capture.grok.every_opportunity_joined_on_turn_key": {
+   "detail": {
+    "joined": 6,
+    "opportunities": 6
+   },
+   "ok": true
+  },
+  "capture.grok.identity_fields": {
+   "ok": true
+  },
+  "capture.grok.rows": {
+   "detail": {
+    "opportunities": 6,
+    "outcomes": 6
+   },
+   "ok": true
+  },
+  "capture.grok.schemas": {
+   "detail": [
+    "z0int.grok.opportunity_record.v0",
+    "z0int.grok.turn_outcome.v0"
+   ],
+   "ok": true
+  },
+  "capture.grok.subagent_turns_are_agent_cohort": {
+   "detail": {
+    "agent": 3,
+    "interactive": 3
+   },
+   "ok": true
+  },
+  "capture.hermes.content_free_by_default": {
+   "ok": true
+  },
+  "capture.hermes.every_opportunity_joined_on_turn_key": {
+   "detail": {
+    "joined": 3,
+    "opportunities": 3
+   },
+   "ok": true
+  },
+  "capture.hermes.identity_fields": {
+   "ok": true
+  },
+  "capture.hermes.rows": {
+   "detail": {
+    "opportunities": 3,
+    "outcomes": 3
+   },
+   "ok": true
+  },
+  "capture.hermes.schemas": {
+   "detail": [
+    "z0int.hermes.opportunity_record.v0",
+    "z0int.hermes.turn_outcome.v0"
+   ],
+   "ok": true
+  },
+  "capture.omo.content_free_by_default": {
+   "ok": true
+  },
+  "capture.omo.every_opportunity_joined_on_turn_key": {
+   "detail": {
+    "joined": 2,
+    "opportunities": 2
+   },
+   "ok": true
+  },
+  "capture.omo.identity_fields": {
+   "ok": true
+  },
+  "capture.omo.rows": {
+   "detail": {
+    "opportunities": 2,
+    "outcomes": 2
+   },
+   "ok": true
+  },
+  "capture.omo.schemas": {
+   "detail": [
+    "z0int.omo.opportunity_record.v0",
+    "z0int.omo.turn_outcome.v0"
+   ],
+   "ok": true
+  },
+  "capture.omp.content_free_by_default": {
+   "ok": true
+  },
+  "capture.omp.every_opportunity_joined_on_turn_key": {
+   "detail": {
+    "joined": 2,
+    "opportunities": 2
+   },
+   "ok": true
+  },
+  "capture.omp.identity_fields": {
+   "ok": true
+  },
+  "capture.omp.rows": {
+   "detail": {
+    "opportunities": 2,
+    "outcomes": 2
+   },
+   "ok": true
+  },
+  "capture.omp.schemas": {
+   "detail": [
+    "z0int.omp.opportunity_record.v0",
+    "z0int.omp.turn_outcome.v0"
+   ],
+   "ok": true
+  },
+  "inert.claude-code.every_run_produced_output": {
+   "detail": [
+    "out-off-1.json",
+    "out-off-2.json",
+    "out-on-1.json",
+    "out-on-2.json"
+   ],
+   "ok": true
+  },
+  "inert.claude-code.model_requests_on_vs_off": {
+   "detail": {
+    "arms": [
+     "off-1",
+     "off-2",
+     "on-1",
+     "on-2"
+    ],
+    "identical_to_first_off_arm": [
+     "off-1",
+     "off-2",
+     "on-1",
+     "on-2"
+    ],
+    "requests_per_run": 3
+   },
+   "ok": true
+  },
+  "inert.codex.every_run_produced_output": {
+   "detail": [
+    "out-off-1.txt",
+    "out-off-2.txt",
+    "out-on-1.txt",
+    "out-on-2.txt"
+   ],
+   "ok": true
+  },
+  "inert.codex.model_requests_on_vs_off": {
+   "detail": {
+    "arms": [
+     "off-1",
+     "off-2",
+     "on-1",
+     "on-2"
+    ],
+    "identical_to_first_off_arm": [
+     "off-1",
+     "off-2",
+     "on-1",
+     "on-2"
+    ],
+    "requests_per_run": 1
+   },
+   "ok": true
+  },
+  "inert.dsh.host_transcript_on_vs_off": {
+   "detail": {
+    "steps": 10
+   },
+   "ok": true
+  },
+  "inert.dsh.shadow_decisions_never_executed": {
+   "detail": {
+    "counters": {
+     "backend_unavailable": 0,
+     "hook_spawn_failed": 0,
+     "observe_failed": 0,
+     "queue_saturated": 0,
+     "sampled_out": 0,
+     "shadow_executed": 0,
+     "turn_errored": 0,
+     "write_failed": 0
+    },
+    "shadow_rows": 3
+   },
+   "ok": true
+  },
+  "inert.grok.hook_stdout_on_vs_off": {
+   "detail": {
+    "hook_calls": 12
+   },
+   "ok": true
+  },
+  "inert.hermes.every_run_exit_0": {
+   "detail": [
+    [
+     "off",
+     1,
+     0,
+     8168
+    ],
+    [
+     "shadow",
+     1,
+     0,
+     3143
+    ],
+    [
+     "shadow",
+     2,
+     0,
+     3117
+    ],
+    [
+     "off",
+     2,
+     0,
+     3346
+    ],
+    [
+     "off",
+     3,
+     0,
+     3048
+    ],
+    [
+     "shadow",
+     3,
+     0,
+     3187
+    ],
+    [
+     "unavailable",
+     1,
+     0,
+     3035
+    ]
+   ],
+   "ok": true
+  },
+  "inert.hermes.model_requests_shadow_vs_off": {
+   "detail": {
+    "arms": [
+     "off-1",
+     "off-2",
+     "off-3",
+     "shadow-1",
+     "shadow-2",
+     "shadow-3",
+     "unavailable-1"
+    ],
+    "identical_to_first_off_arm": [
+     "off-1",
+     "off-2",
+     "off-3",
+     "shadow-1",
+     "shadow-2",
+     "shadow-3"
+    ],
+    "requests_per_run": 4
+   },
+   "ok": true
+  },
+  "inert.off_arms_write_no_capture_rows": {
+   "detail": {
+    "claude-code": 0,
+    "codex": 0,
+    "dsh": 0,
+    "grok": 0,
+    "hermes": 0,
+    "omo": 0,
+    "omp": 0
+   },
+   "ok": true
+  },
+  "inert.omo.every_run_exit_0": {
+   "detail": [
+    [
+     "on",
+     1,
+     0,
+     20228
+    ],
+    [
+     "off",
+     1,
+     0,
+     19533
+    ],
+    [
+     "none",
+     1,
+     0,
+     19664
+    ],
+    [
+     "none",
+     2,
+     0,
+     19648
+    ],
+    [
+     "off",
+     2,
+     0,
+     19735
+    ],
+    [
+     "on",
+     2,
+     0,
+     19672
+    ]
+   ],
+   "ok": true
+  },
+  "inert.omo.model_requests_on_vs_off_vs_no_extension": {
+   "detail": {
+    "arms": [
+     "none-1",
+     "none-2",
+     "off-1",
+     "off-2",
+     "on-1",
+     "on-2"
+    ],
+    "identical_to_first_off_arm": [
+     "none-1",
+     "none-2",
+     "off-1",
+     "off-2",
+     "on-1",
+     "on-2"
+    ],
+    "requests_per_run": 1
+   },
+   "ok": true
+  },
+  "inert.omp.every_run_exit_0": {
+   "detail": [
+    [
+     "on",
+     1,
+     0,
+     2080
+    ],
+    [
+     "off",
+     1,
+     0,
+     1554
+    ],
+    [
+     "none",
+     1,
+     0,
+     1561
+    ],
+    [
+     "none",
+     2,
+     0,
+     1532
+    ],
+    [
+     "off",
+     2,
+     0,
+     1622
+    ],
+    [
+     "on",
+     2,
+     0,
+     1619
+    ]
+   ],
+   "ok": true
+  },
+  "inert.omp.model_requests_on_vs_off_vs_no_extension": {
+   "detail": {
+    "arms": [
+     "none-1",
+     "none-2",
+     "off-1",
+     "off-2",
+     "on-1",
+     "on-2"
+    ],
+    "identical_to_first_off_arm": [
+     "none-1",
+     "none-2",
+     "off-1",
+     "off-2",
+     "on-1",
+     "on-2"
+    ],
+    "requests_per_run": 1
+   },
+   "ok": true
+  },
+  "isolation.hermes_live_homes_masked": {
+   "detail": "## masks inside: hermes-home entries=0 z0int entries=0",
+   "ok": true
+  },
+  "isolation.socket_guard_logs_empty": {
+   "detail": [],
+   "ok": true
+  },
+  "learn.claude_code_export_has_rows": {
+   "detail": {
+    "cohort": {
+     "agent": 4
+    },
+    "days": {
+     "2026-10-03": 2,
+     "none": 2
+    },
+    "gate": {
+     "ACT": 2,
+     "ASK": 2
+    },
+    "groups": 2,
+    "groups_with_resolved": 0,
+    "observed_action": {
+     "ACT": 4
+    },
+    "resolved": 0,
+    "rows": 4,
+    "states": {
+     "unverified": 4
+    },
+    "with_features": 4,
+    "with_label_row": 4
+   },
+   "ok": true
+  },
+  "learn.frozen_bundle_covers_all_seven_harnesses": {
+   "detail": {
+    "z0int.claude_code.failure.v0": 3,
+    "z0int.claude_code.opportunity_record.v0": 4,
+    "z0int.claude_code.turn_outcome.v0": 4,
+    "z0int.codex.failure.v0": 4,
+    "z0int.codex.opportunity_record.v0": 2,
+    "z0int.codex.turn_outcome.v0": 2,
+    "z0int.dsh.failure.v0": 6,
+    "z0int.dsh.opportunity_record.v0": 3,
+    "z0int.dsh.turn_outcome.v0": 3,
+    "z0int.grok.failure.v0": 12,
+    "z0int.grok.opportunity_record.v0": 6,
+    "z0int.grok.turn_outcome.v0": 6,
+    "z0int.hermes.failure.v0": 10,
+    "z0int.hermes.opportunity_record.v0": 3,
+    "z0int.hermes.turn_outcome.v0": 3,
+    "z0int.omo.failure.v0": 4,
+    "z0int.omo.opportunity_record.v0": 2,
+    "z0int.omo.turn_outcome.v0": 2,
+    "z0int.omp.failure.v0": 4,
+    "z0int.omp.opportunity_record.v0": 2,
+    "z0int.omp.turn_outcome.v0": 2
+   },
+   "ok": true
+  },
+  "learn.learner_reports_insufficient_data_honestly": {
+   "detail": {
+    "decision": "INSUFFICIENT_DATA",
+    "sufficiency": {
+     "checks": {
+      "groups>=10": false,
+      "k==5_and_every_test_fold_has_both_classes": false,
+      "not_success>=30": false,
+      "rows>=300": false
+     },
+     "observed": {
+      "groups": 0,
+      "k": null,
+      "not_success": 0,
+      "rows": 0,
+      "success": 0
+     },
+     "passed": false
+    }
+   },
+   "ok": true
+  },
+  "learn.verify_ran": {
+   "detail": {
+    "appended": 4,
+    "join": {
+     "full_chain": 4,
+     "gate_x_state": {
+      "ACT->unverified": 2,
+      "ASK->unverified": 2
+     },
+     "observed_action_x_state": {
+      "ACT->unverified": 4
+     },
+     "observed_rows": 4,
+     "with_opportunity": 4,
+     "with_verified": 4
+    },
+    "label_classes": {
+     "unknown": 4
+    },
+    "measurement": {
+     "commits_produced": 0,
+     "commits_resolved": 0,
+     "transcript_missing": 2,
+     "turns_with_unexamined_subagents": 0
+    },
+    "signals": {},
+    "states": {
+     "unverified": 4
+    },
+    "turns": 4,
+    "turns_with_any_signal": 0,
+    "with_observed_row": 4
+   },
+   "ok": true
+  },
+  "memory.unified_memory_from_every_harness_seam": {
+   "detail": "no harness seam reaches a z0 memory surface: C7-memory-core and C8-memory-wiring are not verified and not merged; the only z0 MCP server is the route_worker profile (no memory tools)",
+   "ok": false,
+   "status": "PARTIAL"
+  },
+  "privacy.exported_and_frozen_rows_carry_no_path": {
+   "ok": true
+  },
+  "privacy.loop_export_assert_private_accepts_every_exported_row": {
+   "detail": 4,
+   "ok": true
+  },
+  "privacy.no_marker_text_in_exports_or_frozen_bundle": {
+   "detail": {},
+   "ok": true
+  },
+  "privacy.no_marker_text_in_shared_z0int_home": {
+   "detail": {},
+   "ok": true
+  },
+  "privacy.outcome_and_failure_rows_carry_no_path": {
+   "detail": [],
+   "ok": true
+  }
+ },
+ "failed": [],
+ "report": {
+  "capture": {
+   "claude-code": {
+    "cohorts": {
+     "agent": 2,
+     "interactive": 2
+    },
+    "drops_by_reason": {},
+    "failure_kinds": {
+     "duplicate_event": 2,
+     "partial_measurement": 1
+    },
+    "joined": 4,
+    "model_ids": [
+     "unknown"
+    ],
+    "opportunities": 4,
+    "outcomes": 4,
+    "policy_revisions": [
+     "unknown"
+    ],
+    "privacy_classes": [
+     "content_free"
+    ],
+    "schemas": [
+     "z0int.claude_code.opportunity_record.v0",
+     "z0int.claude_code.turn_outcome.v0"
+    ]
+   },
+   "codex": {
+    "cohorts": {
+     "interactive": 2
+    },
+    "drops_by_reason": {},
+    "failure_kinds": {
+     "missing_verifier": 2,
+     "partial_measurement": 2
+    },
+    "joined": 2,
+    "model_ids": [
+     "gpt-stub"
+    ],
+    "opportunities": 2,
+    "outcomes": 2,
+    "policy_revisions": [
+     "unknown"
+    ],
+    "privacy_classes": [
+     "content_free"
+    ],
+    "schemas": [
+     "z0int.codex.opportunity_record.v0",
+     "z0int.codex.turn_outcome.v0"
+    ]
+   },
+   "dsh": {
+    "cohorts": {
+     "interactive": 3
+    },
+    "drops_by_reason": {},
+    "failure_kinds": {
+     "missing_verifier": 3,
+     "partial_measurement": 3
+    },
+    "joined": 3,
+    "model_ids": [
+     "deepseek-flash"
+    ],
+    "opportunities": 3,
+    "outcomes": 3,
+    "policy_revisions": [
+     "unknown"
+    ],
+    "privacy_classes": [
+     "content_free"
+    ],
+    "schemas": [
+     "z0int.dsh.opportunity_record.v0",
+     "z0int.dsh.turn_outcome.v0"
+    ]
+   },
+   "grok": {
+    "cohorts": {
+     "agent": 3,
+     "interactive": 3
+    },
+    "drops_by_reason": {},
+    "failure_kinds": {
+     "missing_verifier": 6,
+     "partial_measurement": 6
+    },
+    "joined": 6,
+    "model_ids": [
+     "grok-fixture"
+    ],
+    "opportunities": 6,
+    "outcomes": 6,
+    "policy_revisions": [
+     "unknown"
+    ],
+    "privacy_classes": [
+     "content_free"
+    ],
+    "schemas": [
+     "z0int.grok.opportunity_record.v0",
+     "z0int.grok.turn_outcome.v0"
+    ]
+   },
+   "hermes": {
+    "cohorts": {
+     "interactive": 3
+    },
+    "drops_by_reason": {
+     "z0int_unavailable": 8
+    },
+    "failure_kinds": {
+     "missing_verifier": 3,
+     "z0int_unavailable": 7
+    },
+    "joined": 3,
+    "model_ids": [
+     "c4a-stub"
+    ],
+    "opportunities": 3,
+    "outcomes": 3,
+    "policy_revisions": [
+     "hermes-z0intelligence@0.2.0"
+    ],
+    "privacy_classes": [
+     "content_free"
+    ],
+    "schemas": [
+     "z0int.hermes.opportunity_record.v0",
+     "z0int.hermes.turn_outcome.v0"
+    ]
+   },
+   "omo": {
+    "cohorts": {
+     "interactive": 2
+    },
+    "drops_by_reason": {},
+    "failure_kinds": {
+     "missing_verifier": 2,
+     "partial_measurement": 2
+    },
+    "joined": 2,
+    "model_ids": [
+     "sandbox/bridge-fake"
+    ],
+    "opportunities": 2,
+    "outcomes": 2,
+    "policy_revisions": [
+     "unknown"
+    ],
+    "privacy_classes": [
+     "content_free"
+    ],
+    "schemas": [
+     "z0int.omo.opportunity_record.v0",
+     "z0int.omo.turn_outcome.v0"
+    ]
+   },
+   "omp": {
+    "cohorts": {
+     "interactive": 2
+    },
+    "drops_by_reason": {},
+    "failure_kinds": {
+     "missing_verifier": 2,
+     "partial_measurement": 2
+    },
+    "joined": 2,
+    "model_ids": [
+     "sandbox/bridge-fake"
+    ],
+    "opportunities": 2,
+    "outcomes": 2,
+    "policy_revisions": [
+     "unknown"
+    ],
+    "privacy_classes": [
+     "content_free"
+    ],
+    "schemas": [
+     "z0int.omp.opportunity_record.v0",
+     "z0int.omp.turn_outcome.v0"
+    ]
+   }
+  },
+  "export_counts": {
+   "claude-code": {
+    "cohort": {
+     "agent": 4
+    },
+    "days": {
+     "2026-10-03": 2,
+     "none": 2
+    },
+    "gate": {
+     "ACT": 2,
+     "ASK": 2
+    },
+    "groups": 2,
+    "groups_with_resolved": 0,
+    "observed_action": {
+     "ACT": 4
+    },
+    "resolved": 0,
+    "rows": 4,
+    "states": {
+     "unverified": 4
+    },
+    "with_features": 4,
+    "with_label_row": 4
+   },
+   "codex": {
+    "cohort": {},
+    "days": {},
+    "gate": {},
+    "groups": 0,
+    "groups_with_resolved": 0,
+    "observed_action": {},
+    "resolved": 0,
+    "rows": 0,
+    "states": {},
+    "with_features": 0,
+    "with_label_row": 0
+   },
+   "dsh": {
+    "cohort": {},
+    "days": {},
+    "gate": {},
+    "groups": 0,
+    "groups_with_resolved": 0,
+    "observed_action": {},
+    "resolved": 0,
+    "rows": 0,
+    "states": {},
+    "with_features": 0,
+    "with_label_row": 0
+   },
+   "grok": {
+    "cohort": {},
+    "days": {},
+    "gate": {},
+    "groups": 0,
+    "groups_with_resolved": 0,
+    "observed_action": {},
+    "resolved": 0,
+    "rows": 0,
+    "states": {},
+    "with_features": 0,
+    "with_label_row": 0
+   },
+   "hermes": {
+    "cohort": {},
+    "days": {},
+    "gate": {},
+    "groups": 0,
+    "groups_with_resolved": 0,
+    "observed_action": {},
+    "resolved": 0,
+    "rows": 0,
+    "states": {},
+    "with_features": 0,
+    "with_label_row": 0
+   },
+   "omo": {
+    "cohort": {},
+    "days": {},
+    "gate": {},
+    "groups": 0,
+    "groups_with_resolved": 0,
+    "observed_action": {},
+    "resolved": 0,
+    "rows": 0,
+    "states": {},
+    "with_features": 0,
+    "with_label_row": 0
+   },
+   "omp": {
+    "cohort": {},
+    "days": {},
+    "gate": {},
+    "groups": 0,
+    "groups_with_resolved": 0,
+    "observed_action": {},
+    "resolved": 0,
+    "rows": 0,
+    "states": {},
+    "with_features": 0,
+    "with_label_row": 0
+   }
+  },
+  "learner": {
+   "decision": "INSUFFICIENT_DATA",
+   "learner_sha": "1b80a4e44972a9069248fb58a82ca2926143cde6",
+   "sufficiency": {
+    "checks": {
+     "groups>=10": false,
+     "k==5_and_every_test_fold_has_both_classes": false,
+     "not_success>=30": false,
+     "rows>=300": false
+    },
+    "observed": {
+     "groups": 0,
+     "k": null,
+     "not_success": 0,
+     "rows": 0,
+     "success": 0
+    },
+    "passed": false
+   }
+  },
+  "memory": {
+   "contract_present": {
+    "EventIdentity": true,
+    "MemoryScope": true,
+    "MemoryUseReceipt": true
+   },
+   "harness": {
+    "claude-code": {
+     "mcp_servers": [
+      "z0-memory",
+      "z0intelligence"
+     ],
+     "memory_read_possible": true,
+     "memory_seam_files": [],
+     "rows_with_memory_receipt": 0,
+     "z0_memory_server": true
+    },
+    "codex": {
+     "mcp_servers": [
+      "z0-memory"
+     ],
+     "memory_read_possible": true,
+     "memory_seam_files": [],
+     "rows_with_memory_receipt": 0,
+     "z0_memory_server": true
+    },
+    "dsh": {
+     "mcp_servers": [],
+     "memory_read_possible": true,
+     "memory_seam_files": [
+      "harness-adapters/dsh-z0intelligence/memory.mjs",
+      "harness-adapters/dsh-z0intelligence/z0-memory.cordis.yml"
+     ],
+     "rows_with_memory_receipt": 0,
+     "z0_memory_server": false
+    },
+    "grok": {
+     "mcp_servers": [],
+     "memory_read_possible": true,
+     "memory_seam_files": [
+      "harness-adapters/grok-z0intelligence/mcp/z0-memory.toml"
+     ],
+     "rows_with_memory_receipt": 0,
+     "z0_memory_server": false
+    },
+    "hermes": {
+     "mcp_servers": [],
+     "memory_read_possible": true,
+     "memory_seam_files": [
+      "harness-adapters/hermes-z0intelligence/memory.py"
+     ],
+     "rows_with_memory_receipt": 0,
+     "z0_memory_server": false
+    },
+    "omo": {
+     "mcp_servers": [],
+     "memory_read_possible": false,
+     "memory_seam_files": [],
+     "rows_with_memory_receipt": 0,
+     "z0_memory_server": false
+    },
+    "omp": {
+     "mcp_servers": [],
+     "memory_read_possible": false,
+     "memory_seam_files": [],
+     "rows_with_memory_receipt": 0,
+     "z0_memory_server": false
+    }
+   },
+   "mcp_memory_tools": [],
+   "mcp_server": "z0intelligence",
+   "mcp_tools": [
+    "delegate_worker",
+    "list_models",
+    "route_worker"
+   ],
+   "memory_e2e": "PARTIAL",
+   "reason": "no harness seam reaches a z0 memory surface: C7-memory-core and C8-memory-wiring are not verified and not merged; the only z0 MCP server is the route_worker profile (no memory tools)"
+  }
+ },
+ "verdict": "PASS (capture/inertness/privacy/learn); memory BLOCKED"
+}

@@ -1,0 +1,12 @@
+✔ governed canary requires all three gates (4.469819ms)
+✔ non-governed calls preserve the original payload plus OMP identity (0.146737ms)
+✔ harness cannot smuggle provider model or AODL into governed body (0.127602ms)
+✔ rejects non-object arguments (0.314753ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 71.432354

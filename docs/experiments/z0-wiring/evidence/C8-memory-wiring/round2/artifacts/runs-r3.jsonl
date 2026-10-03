@@ -1,0 +1,77 @@
+{"leg": "cc", "arm": "off", "qid": "exact-identifier", "rc": 0, "wall_ms": 782}
+{"leg": "hermes", "arm": "off", "qid": "exact-identifier", "rc": 0, "wall_ms": 7996}
+{"leg": "omp", "arm": "off", "qid": "exact-identifier", "rc": 0, "wall_ms": 2290}
+{"leg": "cc", "arm": "shadow", "qid": "exact-identifier", "rc": 0, "wall_ms": 676}
+{"leg": "hermes", "arm": "shadow", "qid": "exact-identifier", "rc": 0, "wall_ms": 2979}
+{"leg": "omp", "arm": "shadow", "qid": "exact-identifier", "rc": 0, "wall_ms": 1688}
+{"leg": "cc", "arm": "canary", "qid": "exact-identifier", "rc": 0, "wall_ms": 580}
+{"leg": "hermes", "arm": "canary", "qid": "exact-identifier", "rc": 0, "wall_ms": 3212}
+{"leg": "omp", "arm": "canary", "qid": "exact-identifier", "rc": 0, "wall_ms": 1757}
+{"leg": "cc", "arm": "canary", "qid": "supersession", "rc": 0, "wall_ms": 587}
+{"leg": "hermes", "arm": "canary", "qid": "supersession", "rc": 0, "wall_ms": 3067}
+{"leg": "omp", "arm": "canary", "qid": "supersession", "rc": 0, "wall_ms": 1742}
+{"leg": "cc", "arm": "shadow", "qid": "supersession", "rc": 0, "wall_ms": 574}
+{"leg": "hermes", "arm": "shadow", "qid": "supersession", "rc": 0, "wall_ms": 3000}
+{"leg": "omp", "arm": "shadow", "qid": "supersession", "rc": 0, "wall_ms": 1742}
+{"leg": "cc", "arm": "off", "qid": "supersession", "rc": 0, "wall_ms": 606}
+{"leg": "hermes", "arm": "off", "qid": "supersession", "rc": 0, "wall_ms": 3310}
+{"leg": "omp", "arm": "off", "qid": "supersession", "rc": 0, "wall_ms": 1626}
+{"leg": "cc", "arm": "off", "qid": "cross-harness", "rc": 0, "wall_ms": 568}
+{"leg": "hermes", "arm": "off", "qid": "cross-harness", "rc": 0, "wall_ms": 2948}
+{"leg": "omp", "arm": "off", "qid": "cross-harness", "rc": 0, "wall_ms": 1685}
+{"leg": "cc", "arm": "shadow", "qid": "cross-harness", "rc": 0, "wall_ms": 613}
+{"leg": "hermes", "arm": "shadow", "qid": "cross-harness", "rc": 0, "wall_ms": 3046}
+{"leg": "omp", "arm": "shadow", "qid": "cross-harness", "rc": 0, "wall_ms": 1671}
+{"leg": "cc", "arm": "canary", "qid": "cross-harness", "rc": 0, "wall_ms": 581}
+{"leg": "hermes", "arm": "canary", "qid": "cross-harness", "rc": 0, "wall_ms": 3062}
+{"leg": "omp", "arm": "canary", "qid": "cross-harness", "rc": 0, "wall_ms": 1807}
+{"leg": "cc", "arm": "canary", "qid": "contradiction", "rc": 0, "wall_ms": 584}
+{"leg": "hermes", "arm": "canary", "qid": "contradiction", "rc": 0, "wall_ms": 3090}
+{"leg": "omp", "arm": "canary", "qid": "contradiction", "rc": 0, "wall_ms": 1721}
+{"leg": "cc", "arm": "shadow", "qid": "contradiction", "rc": 0, "wall_ms": 568}
+{"leg": "hermes", "arm": "shadow", "qid": "contradiction", "rc": 0, "wall_ms": 2972}
+{"leg": "omp", "arm": "shadow", "qid": "contradiction", "rc": 0, "wall_ms": 1641}
+{"leg": "cc", "arm": "off", "qid": "contradiction", "rc": 0, "wall_ms": 567}
+{"leg": "hermes", "arm": "off", "qid": "contradiction", "rc": 0, "wall_ms": 3005}
+{"leg": "omp", "arm": "off", "qid": "contradiction", "rc": 0, "wall_ms": 1657}
+{"leg": "cc", "arm": "off", "qid": "missing-evidence", "rc": 0, "wall_ms": 569}
+{"leg": "hermes", "arm": "off", "qid": "missing-evidence", "rc": 0, "wall_ms": 2994}
+{"leg": "omp", "arm": "off", "qid": "missing-evidence", "rc": 0, "wall_ms": 1676}
+{"leg": "cc", "arm": "shadow", "qid": "missing-evidence", "rc": 0, "wall_ms": 582}
+{"leg": "hermes", "arm": "shadow", "qid": "missing-evidence", "rc": 0, "wall_ms": 3013}
+{"leg": "omp", "arm": "shadow", "qid": "missing-evidence", "rc": 0, "wall_ms": 1647}
+{"leg": "cc", "arm": "canary", "qid": "missing-evidence", "rc": 0, "wall_ms": 584}
+{"leg": "hermes", "arm": "canary", "qid": "missing-evidence", "rc": 0, "wall_ms": 3057}
+{"leg": "omp", "arm": "canary", "qid": "missing-evidence", "rc": 0, "wall_ms": 1817}
+{"leg": "cc", "arm": "canary", "qid": "minimal-context", "rc": 0, "wall_ms": 602}
+{"leg": "hermes", "arm": "canary", "qid": "minimal-context", "rc": 0, "wall_ms": 3151}
+{"leg": "omp", "arm": "canary", "qid": "minimal-context", "rc": 0, "wall_ms": 1842}
+{"leg": "cc", "arm": "shadow", "qid": "minimal-context", "rc": 0, "wall_ms": 628}
+{"leg": "hermes", "arm": "shadow", "qid": "minimal-context", "rc": 0, "wall_ms": 2992}
+{"leg": "omp", "arm": "shadow", "qid": "minimal-context", "rc": 0, "wall_ms": 1657}
+{"leg": "cc", "arm": "off", "qid": "minimal-context", "rc": 0, "wall_ms": 562}
+{"leg": "hermes", "arm": "off", "qid": "minimal-context", "rc": 0, "wall_ms": 3025}
+{"leg": "omp", "arm": "off", "qid": "minimal-context", "rc": 0, "wall_ms": 1733}
+{"leg": "cc", "arm": "cloud", "qid": "exact-identifier", "rc": 124, "wall_ms": 45163}
+{"leg": "hook-cloud", "arm": "claude-code", "rc": 0}
+{"leg": "hook-cloud", "arm": "codex", "rc": 0}
+{"leg": "cc", "arm": "probe", "qid": "probe-secret", "rc": 0, "wall_ms": 786}
+{"leg": "hermes", "arm": "probe", "qid": "probe-secret", "rc": 0, "wall_ms": 3468}
+{"leg": "omp", "arm": "probe", "qid": "probe-secret", "rc": 0, "wall_ms": 2167}
+{"leg": "cc", "arm": "sibling", "qid": "sibling", "rc": 0, "wall_ms": 578}
+{"leg": "hermes", "arm": "sibling", "qid": "sibling", "rc": 0, "wall_ms": 3138}
+{"leg": "omp", "arm": "sibling", "qid": "sibling", "rc": 0, "wall_ms": 1721}
+{"leg": "dsh", "rc": 0}
+{"leg": "dsh-node-test", "rc": 0}
+{"leg": "mcp", "rc": 0}
+{"leg": "cc", "arm": "join", "qid": "exact-identifier", "rc": 0, "wall_ms": 575}
+{"leg": "hermes", "arm": "join", "qid": "exact-identifier", "rc": 0, "wall_ms": 3090}
+{"leg": "join-hooks", "arm": "codex", "qid": "exact-identifier", "rc": 0}
+{"leg": "join-hooks", "arm": "grok", "qid": "exact-identifier", "rc": 0}
+{"leg": "cc", "arm": "join", "qid": "supersession", "rc": 0, "wall_ms": 570}
+{"leg": "hermes", "arm": "join", "qid": "supersession", "rc": 0, "wall_ms": 3086}
+{"leg": "join-hooks", "arm": "codex", "qid": "supersession", "rc": 0}
+{"leg": "join-hooks", "arm": "grok", "qid": "supersession", "rc": 0}
+{"leg": "omo-join", "rc": 0}
+{"leg": "dsh-join", "rc": 0}
+{"leg": "cc", "arm": "killed", "qid": "exact-identifier", "rc": 0, "wall_ms": 553}

@@ -1,0 +1,93 @@
+# C8-memory-wiring round-2 isolated e2e (2026-10-03), head 41aec0fa5795ba77054347813c7b1303ba0b6868
+
+## Command
+  flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock \
+    evidence/C8-memory-wiring/round2/scripts/e2e.sh /mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring   # log: round2/e2e-run.log
+Same harness as round 1 (bwrap, private net namespace with loopback only, /workspace/hermes-home and ~/.z0int masked
+by empty tmpfs, every home under homes/C8-memory-wiring/e2e-r2; real `claude -p` against an Anthropic-Messages stub,
+real `hermes chat -q` (C4a fork-export venv) and `omp -p -e omp-extensions/z0-memory` against chat-completions stubs,
+DSH plugin on a mock cordis host, MCP stdio round-trips, C7 fake TencentDB on 127.0.0.1:11548; synthetic data only).
+Round-2 additions (drivers in round2/scripts): cloud arm (real CC with ANTHROPIC_BASE_URL=203.0.113.9 + loopback
+Z0INT_MEMORY_ENDPOINT, and the CC/Codex hook command directly with a cloud base URL + loopback env), sibling-project
+leak canary (project zebra_other, token SIBLINGLEAKTOKEN7) asked in canary on CC/Hermes/OMP/DSH, DSH cloud-env and
+nocwd arms, per-shim persistence assertion, AgentsView echo re-index probe (the run's own briefs written back into the
+substrate as DSH / Hermes api_content / CC transcript rows, then a new brief), eval with --cwd (project z0).
+No live path, port or service was touched; no socket-guard violation.
+
+## Verdict: PASS 45/45 checks (artifacts/e2e-check.json)
+OK  runs.every_leg_exit_0
+OK  isolation.masks_empty_inside
+OK  claude-code.shadow_requests_identical_to_off
+OK  claude-code.canary_brief_in_next_model_request
+OK  claude-code.off_requests_carry_no_brief
+OK  claude-code.secret_probe_brief_is_scrubbed
+OK  claude-code.shadow_rows_would_inject_with_snapshot
+OK  claude-code.no_secret_in_seam_rows
+OK  hermes.shadow_requests_identical_to_off
+OK  hermes.canary_brief_in_next_model_request
+OK  hermes.off_requests_carry_no_brief
+OK  hermes.secret_probe_brief_is_scrubbed
+OK  hermes.shadow_rows_would_inject_with_snapshot
+OK  hermes.no_secret_in_seam_rows
+OK  omp.shadow_requests_identical_to_off
+OK  omp.canary_brief_in_next_model_request
+OK  omp.off_requests_carry_no_brief
+OK  omp.secret_probe_brief_is_scrubbed
+OK  omp.shadow_rows_would_inject_with_snapshot
+OK  omp.no_secret_in_seam_rows
+OK  cloud.generic_env_never_marks_cc_or_codex_loopback (hook command, direct)
+    {"claude-code": {"rows": [["cloud_injection_blocked", false]], "hook_stdout": ""}, "codex": {"rows": [["cloud_injection_blocked", false]], "hook_stdout": ""}}
+OK  cloud.real_cc_run_with_cloud_base_url_and_loopback_env_is_blocked
+    {"cc_cloud_run": [{"leg": "cc", "arm": "cloud", "qid": "exact-identifier", "rc": 124, "wall_ms": 45931}], "blocked_rows": 1, "injected_non_loopback": 0}
+OK  default.allow_cloud_injection_false_for_every_harness
+OK  hermes.plugin_writes_nothing_in_hermes_home_and_transcript_content_is_clean
+OK  persistence.per_shim_matches_recorded_deviations (spec clause met for omp only)
+    {"observed": {"omp": false, "hermes": true, "claude-code": true, "dsh": true}, "expected": {"omp": false, "hermes": true, "claude-code": true, "dsh": true}, "hermes.messages.api_content_with_brief": 7, "claude-code.files_with_brief": 8, "omp.files_with_brief": [], "dsh.canary_admitted_briefs (durable in the DSH log)": 7}
+OK  scope.sibling_project_canary_never_reaches_a_model_request
+    {"leaks": {"cc": 0, "hermes": 0, "omp": 0, "dsh": 0, "seam_rows": 0}, "sibling_question_asked": {"cc": true, "hermes": true, "omp": true}}
+OK  dsh.off_and_shadow_admit_the_native_batch
+OK  dsh.canary_admits_one_z0_memory_message
+OK  dsh.generic_env_never_marks_a_profile_without_model_endpoint_loopback
+OK  dsh.a_session_without_cwd_gets_no_brief_and_a_counted_no_scope
+    {"no_scope_rows": 7}
+OK  dsh.memory_node_tests_pass
+OK  mcp.every_harness_has_z0_memory
+OK  mcp.memory_tools_only_no_route_worker
+OK  mcp.orient_returns_cohort_evidence
+OK  mcp.no_secret_in_responses
+OK  rows.dsh.written_and_valid_against_fb14919_schema
+OK  rows.hermes.written_and_valid_against_fb14919_schema
+OK  rows.omo.written_and_valid_against_fb14919_schema
+OK  rows.omp.written_and_valid_against_fb14919_schema
+OK  rows.claude-code.written_and_labelled_z0_memory_acceptance
+OK  rows.codex.written_and_labelled_z0_memory_acceptance
+OK  rows.grok.written_and_labelled_z0_memory_acceptance
+OK  rows.refuse_study_label_for_claude_code_codex_grok
+OK  echo_guard.reindexed_briefs_are_never_evidence
+    {"outcome": "injected", "evidence": ["eventlog:1", "agentsview:cohort-c9bdbb4340b4#1", "agentsview:echo-hermes#10", "agentsview:cohort-89218e54bc95#3", "agentsview:probe-secret#7"]}
+OK  observation.seam_outcomes_and_turn_markers
+    {"outcomes": {"claude-code": {"shadow": 6, "injected": 14, "cloud_injection_blocked": 2}, "codex": {"cloud_injection_blocked": 1, "injected": 6}, "hermes": {"shadow": 6, "injected": 14, "used": 7, "timeout": 1}, "omp": {"shadow": 6, "injected": 14}, "dsh": {"queue_saturated": 3, "shadow": 4, "injected": 13, "cloud_injection_blocked": 7, "no_scope": 7}}, "turn_markers": 113}
+
+## Reading
+- The verifier's reproduction is closed: with a non-loopback harness endpoint, a loopback Z0INT_MEMORY_ENDPOINT no
+  longer yields injected (CC/Codex hook: cloud_injection_blocked, endpoint_loopback=false, nothing printed; the real
+  CC cloud run: one blocked row, no stub request; it exits 124 because no model is reachable, recorded, not gated).
+- Sibling project text never reached any model request, DSH brief or seam row; DSH sessions without cwd got no_scope.
+- Persistence per shim equals the recorded deviations (NOTES.md): OMP clean; Hermes 7 api_content cells, Claude Code
+  8 transcript files, DSH 7 durable admitted briefs (host design, owner decision pending). The spec clause is met for
+  OMP only and is reported as such, not redefined.
+- Echo guard: the re-indexed briefs (echo-dsh, echo-cc) were not cited; echo-hermes is cited only for its user text
+  before the cut (the brief part is dropped); the new brief carries the marker once.
+- DSH shadow arm: 3 of 7 rapid shadow turns were queue_saturated (the new 4-child cap, counted rows, turn native).
+  Hermes: 1 canary timeout under load (counted, native turn).
+
+## Acceptance (z0evals#56 A-F, rows in artifacts/rows-<harness>.jsonl)
+harness      schema                              A  B               B_inj C  C_ver D     E  F
+dsh          z0eval.unified_memory_receipt.v0    6  B=VERIFIED      6     6  6     True  0  True
+hermes       z0eval.unified_memory_receipt.v0    6  B=VERIFIED      6     6  6     True  0  True
+omo          z0eval.unified_memory_receipt.v0    6  B=UNVERIFIED    0     6  6     True  0  True
+omp          z0eval.unified_memory_receipt.v0    6  B=VERIFIED      6     6  6     True  0  True
+claude-code  z0int.memory_acceptance.v0          6  B=VERIFIED      6     6  6     True  0  True
+codex        z0int.memory_acceptance.v0          6  B=UNVERIFIED    0     6  6     True  0  True
+grok         z0int.memory_acceptance.v0          6  B=UNSUPPORTED   0     6  6     True  0  True
+Codex/OMO B UNVERIFIED and Grok B UNSUPPORTED (pull-only) are not counted toward G-MEM56/G-MEMZ0 (as planned).

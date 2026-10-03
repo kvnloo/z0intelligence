@@ -1,0 +1,12 @@
+# C8 fix rounds during the build (each: a test that fails first, then the fix)
+
+## 1. a failed shadow spawn must be a counted error, not an exception (seam.turn)
+# red (4b1b..ada3368 + new test):
+FAILED tests/test_memory_seam.py::test_a_shadow_spawn_failure_is_a_counted_error_not_an_exception (OSError fork failed raised into the turn)
+# green @4b9a286: tests/test_memory_seam.py 24 passed
+
+## 2. an acceptance row without an observed model request must not claim injected (acceptance._b_note)
+# red @4b9a286: FAILED tests/test_memory_acceptance.py::test_cohort_cases_on_the_synthetic_fixture (assert False: injected True on B=UNVERIFIED rows), 15 passed
+# green @c875c6b: tests/test_memory_acceptance.py 16 passed
+
+## 3. e2e driver defects (no product change): claude -p and hermes read the cohort TSV from stdin (now < /dev/null); acceptance rows were computed after the fake TencentDB stopped (now inside the sandbox)

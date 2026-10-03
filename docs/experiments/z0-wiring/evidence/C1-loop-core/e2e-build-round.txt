@@ -1,0 +1,60 @@
+# C1-loop-core isolated e2e (2026-10-03). Homes: /mnt/zer0models/z0-wt/wiring/homes/C1-loop-core/<leg>/ (HOME, Z0INT_HOME,
+# CLAUDE_CONFIG_DIR, CODEX_HOME, GROK_HOME). Every leg ran under flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock.
+# Live-binary legs ran under hostless + "unshare -rn" (private user+net namespace: loopback only, so neither the live
+# z0 service nor any network was reachable) with stubs on private ports 11541/11542 and dummy keys.
+# Scripts: evidence/C1-loop-core/scripts/ (copied from scratch/C1-loop-core/).
+
+## (1) Replay synthetic hook payloads through the EXACT command strings in each shim hooks file
+cmd: flock -s quiet-lane.lock scripts/run.sh <wt> e2e-replay-runner --guard -- <venv-python> scripts/e2e_replay.py <wt> homes/C1-loop-core/e2e-replay <venv-python>
+each hook command is run as: sh -c <command> (Z0INT_PYTHON=<venv python>, PYTHONPATH=<wt>/src); 3 turns x (prompt, SubagentStart, SubagentStop, Stop) per harness (+ SessionStart for claude-code); Grok with GROK_HOOK_EVENT / GROK_SESSION_ID env and camelCase+snake_case payload keys
+  claude-code: SessionEnd -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness claude-code stop || true; SessionStart -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness claude-code session-start || true; Stop -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness claude-code stop || true; SubagentStart -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness claude-code subagent-start || true; SubagentStop -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness claude-code subagent-stop || true; UserPromptSubmit -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness claude-code prompt || true
+  codex: Stop -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness codex stop || true; SubagentStart -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness codex subagent-start || true; SubagentStop -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness codex subagent-stop || true; UserPromptSubmit -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness codex prompt || true
+  grok: Stop -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness grok stop || true; StopCancelled -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness grok stop || true; StopFailure -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness grok stop || true; SubagentStart -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness grok subagent-start || true; SubagentStop -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness grok subagent-stop || true; UserPromptSubmit -> "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.hook_adapter --harness grok prompt || true
+bare python wall ms (same run): {'median': 10.0, 'p95': 12.3}
+  claude-code: ok=True opportunities=6 outcomes=6 joined_on_turn_key=6 by_cohort={'agent': 3, 'interactive': 3} drops=0 failures={} prompt_hook_wall_ms={'median': 40.4, 'p95': 40.4} model_ids=['claude-fixture'] schemas=['z0int.claude_code.opportunity_record.v0', 'z0int.claude_code.turn_outcome.v0'] non_empty_stdout=0
+  codex: ok=True opportunities=6 outcomes=6 joined_on_turn_key=6 by_cohort={'agent': 3, 'interactive': 3} drops=0 failures={'missing_verifier': 6, 'partial_measurement': 6} prompt_hook_wall_ms={'median': 39.3, 'p95': 39.3} model_ids=['gpt-fixture'] schemas=['z0int.codex.opportunity_record.v0', 'z0int.codex.turn_outcome.v0'] non_empty_stdout=0
+  grok: ok=True opportunities=6 outcomes=6 joined_on_turn_key=6 by_cohort={'agent': 3, 'interactive': 3} drops=0 failures={'missing_verifier': 6, 'partial_measurement': 6} prompt_hook_wall_ms={'median': 43.5, 'p95': 43.5} model_ids=['grok-fixture'] schemas=['z0int.grok.opportunity_record.v0', 'z0int.grok.turn_outcome.v0'] non_empty_stdout=0
+RESULT (1): PASS (joined opportunity+outcome for every turn incl. agent cohort, drops=0, no stdout, prompt-hook p95 <= bare-python p95 + 40 ms)
+
+## (2) Claude Code 2.1.288, no subscription and no network
+cmd: env -i PATH=... HOME=homes/C1-loop-core/e2e-claude-outer flock -s quiet-lane.lock scripts/e2e_claude.sh <wt> homes/C1-loop-core/e2e-claude <venv-python> 11541 < /dev/null
+  inside: hostless unshare -rn bash inner.sh -> ip link set lo up; anthropic_stub.py 11541 &; env -i HOME=<h>/home CLAUDE_CONFIG_DIR=<h>/claude ANTHROPIC_BASE_URL=http://127.0.0.1:11541 ANTHROPIC_API_KEY=<dummy> CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 DISABLE_AUTOUPDATER=1 Z0INT_PYTHON=<venv> PYTHONPATH=<wt>/src Z0INT_HOME=<h>/z0 claude -p "MAIN-MARKER-c1: delegate one small subtask to a subagent, then report." --plugin-dir <wt>/harness-adapters/claude-code-z0intelligence --output-format json --max-turns 6 --permission-mode default --allowedTools Agent Task
+  the stub scripts one Agent tool_use (run_in_background=false), answers the subagent, then answers the tool result;
+  test-only: <h>/claude/settings.json tees every hook payload into <h>/payloads/ to record the real payload shapes
+check: python3 scripts/e2e_claude_check.py homes/C1-loop-core/e2e-claude
+  claude result: {'type': 'result', 'subtype': 'success', 'is_error': False, 'num_turns': 2}; stub replies: ['delegate', 'subagent', 'final']
+  opportunities (cohort, schema, gate, model_id): [['interactive', 'z0int.claude_code.opportunity_record.v0', 'ASK', 'unknown'], ['agent', 'z0int.claude_code.opportunity_record.v0', 'ACT', 'unknown']]
+  outcomes (cohort, asked_user, tool_calls, assistant_messages, model_id): [['agent', False, None, None, 'unknown'], ['interactive', False, 1, 2, 'claude-opus-5-5']]
+  joined on turn_key (opp cohort, trace prefix, outcome cohort): [['interactive', '6f5795f0-a5d', 'interactive'], ['agent', 'agent:a62229', 'agent']]
+  failures: [['partial_measurement', {'missing': ['assistant_messages', 'tool_calls']}]]; drops: 0
+  real CC 2.1.288 payload keys: {'SubagentStart': ['agent_id', 'agent_type', 'cwd', 'hook_event_name', 'prompt_id', 'session_id', 'transcript_path'], 'SubagentStop': ['agent_id', 'agent_transcript_path', 'agent_type', 'background_tasks', 'cwd', 'effort', 'hook_event_name', 'last_assistant_message', 'permission_mode', 'prompt_id', 'session_crons', 'session_id', 'stop_hook_active', 'transcript_path']}
+RESULT (2): PASS (interactive opportunity+outcome and agent-cohort subagent opportunity+outcome, each joined on turn_key)
+  observed across runs: CC can fire Stop / SubagentStop before the final transcript line is flushed. The outcome then
+  uses payload-only behaviour plus an explicit partial_measurement row (this run: the subagent), and a later SessionEnd
+  re-close of the same turn is a counted duplicate_event no-op (seen in an earlier run). Fail-open, nothing silent.
+
+## (3) Codex 0.153.4 against an OpenAI-Responses stub (custom model provider; INFERRED config keys, accepted by the binary)
+cmd: env -i PATH=... HOME=homes/C1-loop-core/e2e-codex-outer flock -s quiet-lane.lock scripts/e2e_codex.sh <wt> homes/C1-loop-core/e2e-codex <venv-python> 11542 < /dev/null
+  CODEX_HOME=<h>/codex/config.toml: model_provider="c1stub"; [model_providers.c1stub] base_url="http://127.0.0.1:11542/v1" env_key="C1_STUB_KEY" wire_api="responses"; [features] hooks=true
+  codex plugin marketplace add <wt>   (reads <wt>/.agents/plugins/marketplace.json)
+  codex plugin add codex-z0intelligence@z0intelligence
+  codex exec --skip-git-repo-check -s read-only --dangerously-bypass-hook-trust "Tidy the changelog please" < /dev/null
+  (hook trust bypassed only for this isolated invocation of our own worktree hooks; live activation A5 uses the normal
+   one-time hook trust review)
+  observed: plugin installed into <h>/codex/plugins/cache/z0intelligence/codex-z0intelligence/0.1.0; codex stderr 'hook: UserPromptSubmit Completed', 'hook: Stop Completed'; stdout 'Which file should I tidy?'
+  rows: opportunities=1 outcomes=1 joined=[['interactive', 'z0int.codex.opportunity_record.v0', 'gpt-stub']] outcome=[{'cohort': 'interactive', 'asked_user': True, 'ended': 'completed', 'model_id': 'gpt-stub', 'work_item_id': 'e0ce11eca236f99f1ad5', 'attempt_id': 0}] failures=['missing_verifier', 'partial_measurement'] drops=0
+RESULT (3): PASS - VERIFIED with the real codex binary
+
+## (4) Grok: fixtures only (the real CLI is paid)
+  covered by (1) (the exact z0-capture.json command strings with GROK_HOOK_EVENT / GROK_SESSION_ID env and camelCase +
+  snake_case payloads), tests/test_hook_adapter.py (attribution from GROK_HOOK_EVENT even for a Claude-shaped payload fired
+  from ~/.claude/settings.json; #62 A1 round trip) and tests/test_capture_shims.py.
+RESULT (4): PASS on fixtures; a live Grok turn remains an owner-run activation step (A5).
+
+## (5) Full suite under flock -s quiet-lane.lock with the socket guard on
+  see suite.txt: base 6fee859 = 11 failed / 968 passed / 4 skipped; head = 11 failed / 1016 passed / 4 skipped;
+  identical failure sets; socket-guard violation logs empty for both runs (no connect to :11501 or a non-loopback
+  address). RESULT (5): PASS
+
+Nothing live was touched: no reads/writes of ~/.claude-home, ~/.codex, ~/.grok, ~/.z0int or ~/.hermes; no HTTP to
+:11501; no systemd; no DSH wrapper; no paid API call (dummy keys against local stubs in a private network namespace).

@@ -1,0 +1,30 @@
+# C4a-hermes-capture full suite after the verifier REVISE fix: head vs base (fresh runs, 2026-10-03)
+# Runner scripts/run.sh: env -i, isolated HOME/Z0INT_HOME/HERMES_HOME/TMPDIR under homes/C4a-hermes-capture/<tag>,
+# PYTHONPATH=<tree>/src, suite socket guard on, every run under flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock,
+# python = venv-claude-code 3.13. The head run sets Z0INT_TEST_HERMES_PYTHON=<homes>/hermes-venv/bin/python (2 host tests run).
+# cmd: flock -s quiet-lane.lock scripts/run.sh <tree> <tag> --guard -- python -m pytest -q -p no:cacheprovider -rfE --tb=no tests
+base: feat/wire-loop-core-20261003 @ 914dc99 (temporary detached worktree wt/C4a-hermes-capture-base, removed after)
+  11 failed, 1018 passed, 4 skipped in 152.09s (0:02:32)      raw: suite-base-fix.raw.txt
+head: feat/wire-hermes-capture-20261003 @ ee7cae0 (clean tree)
+  11 failed, 1048 passed, 4 skipped in 225.16s (0:03:45)      raw: suite-head-fix.raw.txt
+head - base collected: +30 (1063 vs 1033) = tests/test_hermes_capture.py (27 incl. parametrized; 3 new this round)
+  + tests/test_hermes_capture_host.py (2) + test_hermes_decisions.py +1 (the retired-command test; the opportunity
+  regression guard was retargeted to the one capture path, not added).
+socket-guard violations: base 0, head 0
+
+## failure sets: IDENTICAL (diff of the sorted FAILED lines is empty)
+FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+FAILED tests/test_quota_budget.py::test_empty_authority_capacity - assert False
+FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily - KeyEr...
+FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+
+No extra failure this time. In round 1 (07a2272) each head run had one extra timing-flaky failure
+(test_hook_adapter p99 latency, test_agentweb_bridge_overload), both also flaky on base: see suite-round1-07a2272.txt
+and suite-flaky-*.txt.

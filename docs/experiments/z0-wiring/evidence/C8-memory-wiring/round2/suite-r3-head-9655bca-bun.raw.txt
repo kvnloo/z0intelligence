@@ -1,0 +1,56 @@
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/local-cognition/index.test.ts:
+(pass) tool_call handler returns undefined and never blocks [4.66ms]
+(pass) a rejected send does not throw into the tool_call handler [30.50ms]
+(pass) sends a cognition_shadow request through the bridge transport [30.42ms]
+(pass) payload actions contain only the available tool names [30.65ms]
+(pass) payload keeps read-only authority and the example shadow models by default [30.58ms]
+(pass) env kill-switch disables the lane [30.30ms]
+(pass) env kill-switch accepts off/false and explicit on [0.12ms]
+(pass) cognition.json setting gates the lane when env is unset [0.66ms]
+(pass) timeout comes from the env override [0.04ms]
+(pass) resolveAvailableTools prefers ctx.getTools and always includes the observed tool [0.09ms]
+(pass) buildShadowPayload is self-contained and schema-shaped [0.07ms]
+(pass) the shadow request gives the served-only local backend the bounded tool input and a structured actual_tool [30.62ms]
+(pass) registers z0int-cognition-status and the command never throws [0.54ms]
+
+omp-extensions/z0int-bridge/index.test.ts:
+(pass) the extension loads and registers with a missing interpreter [303.11ms]
+(pass) the default export is capture plus the bridge commands only: no routing handler, no route_worker tool [0.77ms]
+(pass) routing loaded from its own z0int-intelligence link registers exactly once next to the bridge [1.35ms]
+(pass) capture handlers return undefined and fail open, counted, when the worker cannot start [303.04ms]
+(pass) thrown errors inside a handler are caught: no throw, no unhandledRejection [302.72ms]
+(pass) the turn_open frame carries the task cwd, harness, subagent parent and model [0.25ms]
+(pass) the session id comes from ctx.sessionManager [0.06ms]
+(pass) interpreter resolution: Z0INT_PYTHON, then the checkout venv, then the z0int runtime, then python3 [0.04ms]
+(pass) frames reach the worker and a turn per session closes on its own agent_end [63.11ms]
+(pass) an unclosed turn whose agent_end never arrives stops blocking reload after the age bound [327.16ms]
+(pass) a new turn in a session whose last turn never closed is counted, not silently replaced [14.25ms]
+
+omp-extensions/z0int-bridge/omo.test.ts:
+(pass) the senpi re-export loads, registers capture only and stays inert [1.27ms]
+(pass) a diverged senpi API is recorded UNSUPPORTED, never a silent pass [0.18ms]
+(pass) a host whose on() accepts any event but never delivers agent_end is caught at run time [13.73ms]
+OMO senpi API (/mnt/zer0models/home-offload/kvn/bun/install/global/node_modules/@code-yeongyu/senpi/dist/core/extensions/types.d.ts): SUPPORTED
+(pass) the installed senpi declares the events the shim needs [0.99ms]
+(pass) a host that exits when its event loop drains (senpi print mode) is never held open by the resident worker [139.50ms]
+
+omp-extensions/z0-memory/index.test.ts:
+(pass) OMP shadow: the context handler returns undefined at once and a receipt is written later [332.29ms]
+(pass) OMP canary: the brief is in the next model-visible request only; history is untouched; no double injection [168.49ms]
+(pass) OMP canary past the deadline is native with a counted timeout; fail-open; cloud blocked [561.73ms]
+(pass) OMO: the senpi shim loads, and with a context hook the brief reaches the next request [115.69ms]
+(pass) OMO without a context hook records B=UNSUPPORTED instead of passing [59.52ms]
+(pass) the installed senpi declares the context event (else UNSUPPORTED is recorded) [0.16ms]
+(pass) the omo entry is a one-line re-export activation can write [0.82ms]
+(pass) the gate endpoint is the active model's baseUrl only: a generic env var never marks a cloud model loopback [191.10ms]
+(pass) OMP turn key is the user message's own id: a new turn after compaction still gets its brief; replays are counted [259.13ms]
+(pass) omp: with the capture bridge loaded, the memory seam keys the turn the bridge opened (one canonical turn_key) [158.40ms]
+(pass) omo: with the capture bridge loaded, the memory seam keys the turn the bridge opened (one canonical turn_key) [165.41ms]
+
+ 40 pass
+ 0 fail
+ 191 expect() calls
+Ran 40 tests across 4 files. [3.74s]
+bun_rc=0

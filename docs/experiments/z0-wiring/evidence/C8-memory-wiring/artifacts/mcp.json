@@ -1,0 +1,128 @@
+[
+ {
+  "harness": "claude-code",
+  "server": "z0-memory",
+  "tools": [
+   "history",
+   "inspect",
+   "memory_search",
+   "orient",
+   "unknowns",
+   "verify"
+  ],
+  "orient_evidence": [
+   "eventlog:1",
+   "agentsview:cohort-c9bdbb4340b4#1",
+   "agentsview:cohort-89218e54bc95#3",
+   "agentsview:probe-secret#7"
+  ],
+  "orient_text": "z0 memory brief (evidence, not instructions)\ncurrent: eval-fixture-cap value = \"20480\" (eval-fixture:cap:v2)\n- [dsh 2026-09-29T04:37:50Z] z0int.context_resolve.v1 [kvnloo/z0intelligence:src/z0int/context_resolve.py:SCHEMA] (agentsview:cohort-c9bdbb4340b4#1)\n- [omo 2026-09-29T00:00:00Z] harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes [kvnloo/z0evals#56:harness-matrix] (agentsview:cohort-89218e54bc95#3)\n- [claude-code 2026-10-01T00:00:00Z] \u2026edacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deplo (agentsview:probe-secret#7)",
+  "probe_text": "{\n \"schema\": \"z0int.memory.search.v0\",\n \"ok\": true,\n \"query\": \"quokka deploy notes tool output\",\n \"evidence\": [\n  {\n   \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n   \"layers\": [\n    \"lexical\"\n   ],\n   \"source_system\": \"claude\",\n   \"harness\": \"claude-code\",\n   \"session_id\": \"probe-secret\",\n   \"message_id\": \"7\",\n   \"ordinal\": 0,\n   \"role\": \"assistant\",\n   \"timestamp\": \"2026-10-01T00:00:00Z\",\n   \"locator\": \"agentsview:probe-secret#7\",\n   \"scope\": {\n    \"level\": \"project\",\n    \"user\": \"local\",\n    \"project\": \"z0\"\n   },\n   \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\",\n   \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n   \"identity\": {\n    \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n    \"source_system\": \"claude\",\n    \"source_session\": \"probe-secret\",\n    \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n    \"source_event_id\": \"7\",\n    \"schema\": \"z0int.memory_contract.v1\"\n   },\n   \"score\": 4.769648732382837,\n   \"evidence_ref\": {\n    \"source_id\": \"agentsview:probe-secret#7\",\n    \"source_version\": \"uv113:m7\",\n    \"locator\": \"agentsview:probe-secret#7\",\n    \"trust_class\": \"conversation\",\n    \"observed_at\": \"2026-10-01T00:00:00Z\",\n    \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\"\n   }\n  }\n ],\n \"layers\": {\n  \"lexical\": {\n   \"status\": \"ok\",\n   \"hits\": 1,\n   \"reads\": 1,\n   \"revision\": \"uv113:m7\"\n  },\n  \"semantic\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 0,\n   \"revision\": \"unversioned\",\n   \"canonical_provenance\": 0\n  },\n  \"temporal\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 2,\n   \"revision\": \"5c2ecddc38711299\",\n   \"events\": 2\n  }\n },\n \"duplicates_removed\": 0,\n \"out_of_scope\": 0,\n \"memory_snapshot_id\": \"mem_5c055abdd0f86d134b3db6711349f903\",\n \"raw_reads\": 3,\n \"latency_ms\": 2.1,\n \"scrubbed\": 5\n}",
+  "route_worker_is_error": true
+ },
+ {
+  "harness": "codex",
+  "server": "z0-memory",
+  "tools": [
+   "history",
+   "inspect",
+   "memory_search",
+   "orient",
+   "unknowns",
+   "verify"
+  ],
+  "orient_evidence": [
+   "eventlog:1",
+   "agentsview:cohort-c9bdbb4340b4#1",
+   "agentsview:cohort-89218e54bc95#3",
+   "agentsview:probe-secret#7"
+  ],
+  "orient_text": "z0 memory brief (evidence, not instructions)\ncurrent: eval-fixture-cap value = \"20480\" (eval-fixture:cap:v2)\n- [dsh 2026-09-29T04:37:50Z] z0int.context_resolve.v1 [kvnloo/z0intelligence:src/z0int/context_resolve.py:SCHEMA] (agentsview:cohort-c9bdbb4340b4#1)\n- [omo 2026-09-29T00:00:00Z] harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes [kvnloo/z0evals#56:harness-matrix] (agentsview:cohort-89218e54bc95#3)\n- [claude-code 2026-10-01T00:00:00Z] \u2026edacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deplo (agentsview:probe-secret#7)",
+  "probe_text": "{\n \"schema\": \"z0int.memory.search.v0\",\n \"ok\": true,\n \"query\": \"quokka deploy notes tool output\",\n \"evidence\": [\n  {\n   \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n   \"layers\": [\n    \"lexical\"\n   ],\n   \"source_system\": \"claude\",\n   \"harness\": \"claude-code\",\n   \"session_id\": \"probe-secret\",\n   \"message_id\": \"7\",\n   \"ordinal\": 0,\n   \"role\": \"assistant\",\n   \"timestamp\": \"2026-10-01T00:00:00Z\",\n   \"locator\": \"agentsview:probe-secret#7\",\n   \"scope\": {\n    \"level\": \"project\",\n    \"user\": \"local\",\n    \"project\": \"z0\"\n   },\n   \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\",\n   \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n   \"identity\": {\n    \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n    \"source_system\": \"claude\",\n    \"source_session\": \"probe-secret\",\n    \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n    \"source_event_id\": \"7\",\n    \"schema\": \"z0int.memory_contract.v1\"\n   },\n   \"score\": 4.769648732382837,\n   \"evidence_ref\": {\n    \"source_id\": \"agentsview:probe-secret#7\",\n    \"source_version\": \"uv113:m7\",\n    \"locator\": \"agentsview:probe-secret#7\",\n    \"trust_class\": \"conversation\",\n    \"observed_at\": \"2026-10-01T00:00:00Z\",\n    \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\"\n   }\n  }\n ],\n \"layers\": {\n  \"lexical\": {\n   \"status\": \"ok\",\n   \"hits\": 1,\n   \"reads\": 1,\n   \"revision\": \"uv113:m7\"\n  },\n  \"semantic\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 0,\n   \"revision\": \"unversioned\",\n   \"canonical_provenance\": 0\n  },\n  \"temporal\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 2,\n   \"revision\": \"5c2ecddc38711299\",\n   \"events\": 2\n  }\n },\n \"duplicates_removed\": 0,\n \"out_of_scope\": 0,\n \"memory_snapshot_id\": \"mem_5c055abdd0f86d134b3db6711349f903\",\n \"raw_reads\": 3,\n \"latency_ms\": 2.1,\n \"scrubbed\": 5\n}",
+  "route_worker_is_error": true
+ },
+ {
+  "harness": "grok",
+  "server": "z0-memory",
+  "tools": [
+   "history",
+   "inspect",
+   "memory_search",
+   "orient",
+   "unknowns",
+   "verify"
+  ],
+  "orient_evidence": [
+   "eventlog:1",
+   "agentsview:cohort-c9bdbb4340b4#1",
+   "agentsview:cohort-89218e54bc95#3",
+   "agentsview:probe-secret#7"
+  ],
+  "orient_text": "z0 memory brief (evidence, not instructions)\ncurrent: eval-fixture-cap value = \"20480\" (eval-fixture:cap:v2)\n- [dsh 2026-09-29T04:37:50Z] z0int.context_resolve.v1 [kvnloo/z0intelligence:src/z0int/context_resolve.py:SCHEMA] (agentsview:cohort-c9bdbb4340b4#1)\n- [omo 2026-09-29T00:00:00Z] harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes [kvnloo/z0evals#56:harness-matrix] (agentsview:cohort-89218e54bc95#3)\n- [claude-code 2026-10-01T00:00:00Z] \u2026edacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deplo (agentsview:probe-secret#7)",
+  "probe_text": "{\n \"schema\": \"z0int.memory.search.v0\",\n \"ok\": true,\n \"query\": \"quokka deploy notes tool output\",\n \"evidence\": [\n  {\n   \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n   \"layers\": [\n    \"lexical\"\n   ],\n   \"source_system\": \"claude\",\n   \"harness\": \"claude-code\",\n   \"session_id\": \"probe-secret\",\n   \"message_id\": \"7\",\n   \"ordinal\": 0,\n   \"role\": \"assistant\",\n   \"timestamp\": \"2026-10-01T00:00:00Z\",\n   \"locator\": \"agentsview:probe-secret#7\",\n   \"scope\": {\n    \"level\": \"project\",\n    \"user\": \"local\",\n    \"project\": \"z0\"\n   },\n   \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\",\n   \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n   \"identity\": {\n    \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n    \"source_system\": \"claude\",\n    \"source_session\": \"probe-secret\",\n    \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n    \"source_event_id\": \"7\",\n    \"schema\": \"z0int.memory_contract.v1\"\n   },\n   \"score\": 4.769648732382837,\n   \"evidence_ref\": {\n    \"source_id\": \"agentsview:probe-secret#7\",\n    \"source_version\": \"uv113:m7\",\n    \"locator\": \"agentsview:probe-secret#7\",\n    \"trust_class\": \"conversation\",\n    \"observed_at\": \"2026-10-01T00:00:00Z\",\n    \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\"\n   }\n  }\n ],\n \"layers\": {\n  \"lexical\": {\n   \"status\": \"ok\",\n   \"hits\": 1,\n   \"reads\": 1,\n   \"revision\": \"uv113:m7\"\n  },\n  \"semantic\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 0,\n   \"revision\": \"unversioned\",\n   \"canonical_provenance\": 0\n  },\n  \"temporal\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 2,\n   \"revision\": \"5c2ecddc38711299\",\n   \"events\": 2\n  }\n },\n \"duplicates_removed\": 0,\n \"out_of_scope\": 0,\n \"memory_snapshot_id\": \"mem_5c055abdd0f86d134b3db6711349f903\",\n \"raw_reads\": 3,\n \"latency_ms\": 2.14,\n \"scrubbed\": 5\n}",
+  "route_worker_is_error": true
+ },
+ {
+  "harness": "omp",
+  "server": "z0-memory",
+  "tools": [
+   "history",
+   "inspect",
+   "memory_search",
+   "orient",
+   "unknowns",
+   "verify"
+  ],
+  "orient_evidence": [
+   "eventlog:1",
+   "agentsview:cohort-c9bdbb4340b4#1",
+   "agentsview:cohort-89218e54bc95#3",
+   "agentsview:probe-secret#7"
+  ],
+  "orient_text": "z0 memory brief (evidence, not instructions)\ncurrent: eval-fixture-cap value = \"20480\" (eval-fixture:cap:v2)\n- [dsh 2026-09-29T04:37:50Z] z0int.context_resolve.v1 [kvnloo/z0intelligence:src/z0int/context_resolve.py:SCHEMA] (agentsview:cohort-c9bdbb4340b4#1)\n- [omo 2026-09-29T00:00:00Z] harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes [kvnloo/z0evals#56:harness-matrix] (agentsview:cohort-89218e54bc95#3)\n- [claude-code 2026-10-01T00:00:00Z] \u2026edacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deplo (agentsview:probe-secret#7)",
+  "probe_text": "{\n \"schema\": \"z0int.memory.search.v0\",\n \"ok\": true,\n \"query\": \"quokka deploy notes tool output\",\n \"evidence\": [\n  {\n   \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n   \"layers\": [\n    \"lexical\"\n   ],\n   \"source_system\": \"claude\",\n   \"harness\": \"claude-code\",\n   \"session_id\": \"probe-secret\",\n   \"message_id\": \"7\",\n   \"ordinal\": 0,\n   \"role\": \"assistant\",\n   \"timestamp\": \"2026-10-01T00:00:00Z\",\n   \"locator\": \"agentsview:probe-secret#7\",\n   \"scope\": {\n    \"level\": \"project\",\n    \"user\": \"local\",\n    \"project\": \"z0\"\n   },\n   \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\",\n   \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n   \"identity\": {\n    \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n    \"source_system\": \"claude\",\n    \"source_session\": \"probe-secret\",\n    \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n    \"source_event_id\": \"7\",\n    \"schema\": \"z0int.memory_contract.v1\"\n   },\n   \"score\": 4.769648732382837,\n   \"evidence_ref\": {\n    \"source_id\": \"agentsview:probe-secret#7\",\n    \"source_version\": \"uv113:m7\",\n    \"locator\": \"agentsview:probe-secret#7\",\n    \"trust_class\": \"conversation\",\n    \"observed_at\": \"2026-10-01T00:00:00Z\",\n    \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\"\n   }\n  }\n ],\n \"layers\": {\n  \"lexical\": {\n   \"status\": \"ok\",\n   \"hits\": 1,\n   \"reads\": 1,\n   \"revision\": \"uv113:m7\"\n  },\n  \"semantic\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 0,\n   \"revision\": \"unversioned\",\n   \"canonical_provenance\": 0\n  },\n  \"temporal\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 2,\n   \"revision\": \"5c2ecddc38711299\",\n   \"events\": 2\n  }\n },\n \"duplicates_removed\": 0,\n \"out_of_scope\": 0,\n \"memory_snapshot_id\": \"mem_5c055abdd0f86d134b3db6711349f903\",\n \"raw_reads\": 3,\n \"latency_ms\": 2.06,\n \"scrubbed\": 5\n}",
+  "route_worker_is_error": true
+ },
+ {
+  "harness": "omo",
+  "server": "z0-memory",
+  "tools": [
+   "history",
+   "inspect",
+   "memory_search",
+   "orient",
+   "unknowns",
+   "verify"
+  ],
+  "orient_evidence": [
+   "eventlog:1",
+   "agentsview:cohort-c9bdbb4340b4#1",
+   "agentsview:cohort-89218e54bc95#3",
+   "agentsview:probe-secret#7"
+  ],
+  "orient_text": "z0 memory brief (evidence, not instructions)\ncurrent: eval-fixture-cap value = \"20480\" (eval-fixture:cap:v2)\n- [dsh 2026-09-29T04:37:50Z] z0int.context_resolve.v1 [kvnloo/z0intelligence:src/z0int/context_resolve.py:SCHEMA] (agentsview:cohort-c9bdbb4340b4#1)\n- [omo 2026-09-29T00:00:00Z] harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes [kvnloo/z0evals#56:harness-matrix] (agentsview:cohort-89218e54bc95#3)\n- [claude-code 2026-10-01T00:00:00Z] \u2026edacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deplo (agentsview:probe-secret#7)",
+  "probe_text": "{\n \"schema\": \"z0int.memory.search.v0\",\n \"ok\": true,\n \"query\": \"quokka deploy notes tool output\",\n \"evidence\": [\n  {\n   \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n   \"layers\": [\n    \"lexical\"\n   ],\n   \"source_system\": \"claude\",\n   \"harness\": \"claude-code\",\n   \"session_id\": \"probe-secret\",\n   \"message_id\": \"7\",\n   \"ordinal\": 0,\n   \"role\": \"assistant\",\n   \"timestamp\": \"2026-10-01T00:00:00Z\",\n   \"locator\": \"agentsview:probe-secret#7\",\n   \"scope\": {\n    \"level\": \"project\",\n    \"user\": \"local\",\n    \"project\": \"z0\"\n   },\n   \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\",\n   \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n   \"identity\": {\n    \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n    \"source_system\": \"claude\",\n    \"source_session\": \"probe-secret\",\n    \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n    \"source_event_id\": \"7\",\n    \"schema\": \"z0int.memory_contract.v1\"\n   },\n   \"score\": 4.769648732382837,\n   \"evidence_ref\": {\n    \"source_id\": \"agentsview:probe-secret#7\",\n    \"source_version\": \"uv113:m7\",\n    \"locator\": \"agentsview:probe-secret#7\",\n    \"trust_class\": \"conversation\",\n    \"observed_at\": \"2026-10-01T00:00:00Z\",\n    \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\"\n   }\n  }\n ],\n \"layers\": {\n  \"lexical\": {\n   \"status\": \"ok\",\n   \"hits\": 1,\n   \"reads\": 1,\n   \"revision\": \"uv113:m7\"\n  },\n  \"semantic\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 0,\n   \"revision\": \"unversioned\",\n   \"canonical_provenance\": 0\n  },\n  \"temporal\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 2,\n   \"revision\": \"5c2ecddc38711299\",\n   \"events\": 2\n  }\n },\n \"duplicates_removed\": 0,\n \"out_of_scope\": 0,\n \"memory_snapshot_id\": \"mem_5c055abdd0f86d134b3db6711349f903\",\n \"raw_reads\": 3,\n \"latency_ms\": 2.0,\n \"scrubbed\": 5\n}",
+  "route_worker_is_error": true
+ },
+ {
+  "harness": "dsh",
+  "server": "z0-memory",
+  "tools": [
+   "history",
+   "inspect",
+   "memory_search",
+   "orient",
+   "unknowns",
+   "verify"
+  ],
+  "orient_evidence": [
+   "eventlog:1",
+   "agentsview:cohort-c9bdbb4340b4#1",
+   "agentsview:cohort-89218e54bc95#3",
+   "agentsview:probe-secret#7"
+  ],
+  "orient_text": "z0 memory brief (evidence, not instructions)\ncurrent: eval-fixture-cap value = \"20480\" (eval-fixture:cap:v2)\n- [dsh 2026-09-29T04:37:50Z] z0int.context_resolve.v1 [kvnloo/z0intelligence:src/z0int/context_resolve.py:SCHEMA] (agentsview:cohort-c9bdbb4340b4#1)\n- [omo 2026-09-29T00:00:00Z] harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes [kvnloo/z0evals#56:harness-matrix] (agentsview:cohort-89218e54bc95#3)\n- [claude-code 2026-10-01T00:00:00Z] \u2026edacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deplo (agentsview:probe-secret#7)",
+  "probe_text": "{\n \"schema\": \"z0int.memory.search.v0\",\n \"ok\": true,\n \"query\": \"quokka deploy notes tool output\",\n \"evidence\": [\n  {\n   \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n   \"layers\": [\n    \"lexical\"\n   ],\n   \"source_system\": \"claude\",\n   \"harness\": \"claude-code\",\n   \"session_id\": \"probe-secret\",\n   \"message_id\": \"7\",\n   \"ordinal\": 0,\n   \"role\": \"assistant\",\n   \"timestamp\": \"2026-10-01T00:00:00Z\",\n   \"locator\": \"agentsview:probe-secret#7\",\n   \"scope\": {\n    \"level\": \"project\",\n    \"user\": \"local\",\n    \"project\": \"z0\"\n   },\n   \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\",\n   \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n   \"identity\": {\n    \"event_uid\": \"evt_9d5cb4973829863caff6433bd125f716\",\n    \"source_system\": \"claude\",\n    \"source_session\": \"probe-secret\",\n    \"payload_hash\": \"sha256:4b6221e5c946be4766432366a0356aa7\",\n    \"source_event_id\": \"7\",\n    \"schema\": \"z0int.memory_contract.v1\"\n   },\n   \"score\": 4.769648732382837,\n   \"evidence_ref\": {\n    \"source_id\": \"agentsview:probe-secret#7\",\n    \"source_version\": \"uv113:m7\",\n    \"locator\": \"agentsview:probe-secret#7\",\n    \"trust_class\": \"conversation\",\n    \"observed_at\": \"2026-10-01T00:00:00Z\",\n    \"excerpt\": \"tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end\"\n   }\n  }\n ],\n \"layers\": {\n  \"lexical\": {\n   \"status\": \"ok\",\n   \"hits\": 1,\n   \"reads\": 1,\n   \"revision\": \"uv113:m7\"\n  },\n  \"semantic\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 0,\n   \"revision\": \"unversioned\",\n   \"canonical_provenance\": 0\n  },\n  \"temporal\": {\n   \"status\": \"ok\",\n   \"hits\": 0,\n   \"reads\": 2,\n   \"revision\": \"5c2ecddc38711299\",\n   \"events\": 2\n  }\n },\n \"duplicates_removed\": 0,\n \"out_of_scope\": 0,\n \"memory_snapshot_id\": \"mem_5c055abdd0f86d134b3db6711349f903\",\n \"raw_reads\": 3,\n \"latency_ms\": 2.08,\n \"scrubbed\": 5\n}",
+  "route_worker_is_error": true
+ }
+]

@@ -1,0 +1,1179 @@
+# C4a fix round (verifier REVISE) red run: HEAD 07a2272 + uncommitted new/adjusted tests only; 2026-10-03T11:25:22Z
+# cmd: flock -s quiet-lane.lock scripts/run.sh <wt> fix-red --guard -- /mnt/zer0models/z0-wt/venv-claude-code/bin/python -m pytest -v -p no:cacheprovider -rfE --tb=short <5 selected tests>
+# expected: 4 fail on missing behaviour (in-flight projection writes after close; guard misses loopback/AF_UNIX; automatic invoke ignores z0int_python/z0int_home; retired opportunity command still writes an opportunity); the retargeted regression guard (test_opportunity_record_for_repo_and_non_repo, now through the one capture path) passes
+============================= test session starts ==============================
+platform linux -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0 -- /mnt/zer0models/z0-wt/venv-claude-code/bin/python
+rootdir: /mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 5 items
+
+tests/test_hermes_capture.py::test_p1_the_child_socket_guard_logs_every_connect_including_loopback_and_unix FAILED [ 20%]
+tests/test_hermes_capture.py::test_p2_a_projection_in_flight_at_close_writes_nothing_after_close FAILED [ 40%]
+tests/test_hermes_capture.py::test_automatic_invoke_runs_the_configured_z0int_with_the_same_home_as_its_gate FAILED [ 60%]
+tests/test_hermes_decisions.py::test_the_retired_opportunity_command_writes_no_opportunity FAILED [ 80%]
+tests/test_hermes_decisions.py::test_opportunity_record_for_repo_and_non_repo PASSED [100%]
+
+=================================== FAILURES ===================================
+_ test_p1_the_child_socket_guard_logs_every_connect_including_loopback_and_unix _
+tests/test_hermes_capture.py:208: in test_p1_the_child_socket_guard_logs_every_connect_including_loopback_and_unix
+    assert log.exists() and len(log.read_text().splitlines()) == 4
+E   AssertionError: assert (False)
+E    +  where False = exists()
+E    +    where exists = PosixPath('/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_p1_the_child_socket_guard0/sockets.log').exists
+______ test_p2_a_projection_in_flight_at_close_writes_nothing_after_close ______
+tests/test_hermes_capture.py:285: in test_p2_a_projection_in_flight_at_close_writes_nothing_after_close
+    assert closed >= 1 and built + closed == turns
+E   assert (0 >= 1)
+_ test_automatic_invoke_runs_the_configured_z0int_with_the_same_home_as_its_gate _
+tests/test_hermes_capture.py:650: in test_automatic_invoke_runs_the_configured_z0int_with_the_same_home_as_its_gate
+    assert argv == ['/opt/z0int/bin/python', '-m', 'z0int.automatic', 'event']
+E   AssertionError: assert ['/mnt/zer0models/z0-wt/venv-claude-code/bin/python', '-m', 'z0int.automatic', 'event'] == ['/opt/z0int/bin/python', '-m', 'z0int.automatic', 'event']
+E     
+E     At index 0 diff: '/mnt/zer0models/z0-wt/venv-claude-code/bin/python' != '/opt/z0int/bin/python'
+E     
+E     Full diff:
+E       [
+E     -     '/opt/z0int/bin/python',
+E     +     '/mnt/zer0models/z0-wt/venv-claude-code/bin/python',
+E           '-m',
+E           'z0int.automatic',
+E           'event',
+E       ]
+__________ test_the_retired_opportunity_command_writes_no_opportunity __________
+tests/test_hermes_decisions.py:190: in test_the_retired_opportunity_command_writes_no_opportunity
+    assert rows(tmp_path, 'opportunities.jsonl') == []
+E   assert [{'schema': 'z0int.hermes.opportunity_record.v0', 'session_id': 's', 'platform': 'cli', 'repo': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo', 'gate': 'ACT', 'opportunity': {'schema': 'z0int.decision_opportunity.v0', 'intent': {'request': 'what branch am I on? c4a-retired-canary-5d6e', 'revision': 'fb0e62c3b5d4', 'effects': ['read']}, 'authority': {'source': 'harness-default', 'grants': ['read'], 'fingerprint': None}, 'state': {'claims': [{'key': 'git.branch', 'value': 'main', 'evidence': ['e:58d47fc3b1'], 'status': 'observed'}, {'key': 'git.head', 'value': {'sha': '0c7720c', 'date': '2026-10-03T06:25:22-05:00', 'subject': 'init'}, 'evidence': ['e:975652d7e8'], 'status': 'observed'}, {'key': 'git.recent_commits', 'value': [{'sha': '0c7720c', 'date': '2026-10-03T06:25:22-05:00', 'subject': 'init'}], 'evidence': ['e:636e55b23d'], 'status': 'observed'}, {'key': 'git.default_branch', 'value': 'main', 'evidence': ['e:8222164a6c'], 'status': 'observed'}, {'key': 'git.dirty', 'value': {'clean': True, 'modified': [], 'untracked': [], 'modified_count': 0, 'untracked_count': 0}, 'evidence': ['e:348bdbf36d'], 'status': 'observed'}, {'key': 'git.branches_ahead', 'value': {'vs': 'main', 'complete': True, 'local_branches': 1, 'ahead': []}, 'evidence': ['e:cde560a9a7'], 'status': 'observed'}], 'superseded': [], 'contradictions': [], 'unknowns': [{'key': 'conv.latest_session', 'status': 'source_unavailable', 'blocking': False, 'reason': 'Claude Code history is unavailable on this host (no readable transcripts); session facts are UNKNOWN - abstain on questions that depend on them'}, {'key': 'docs.any', 'status': 'unknown', 'blocking': False, 'reason': 'no top-level AGENTS/README/ROADMAP docs'}, {'key': 'resource.posture', 'status': 'source_unavailable', 'blocking': False, 'reason': 'no metered budget pool observed (codexbar cache / posture.local.json); budget posture is UNKNOWN'}]}, 'invalidation': {'source_revisions': {'git': {'head': '0c7720c8ec64b01f46e77a9775d1e0f7733573bc', 'status': 'e3b0c44298fc', 'refs': 'f87e0308f412'}, 'docs': {}, 'claude_code': {}, 'resource': {'posture': 'b08a902bc853', 'factory': 'BALANCED'}}}, 'scope': {'mode': 'question', 'families': ['git.branch'], 'prefixes': ['git.branch'], 'missing': []}, 'action_space': [{'kind': 'ACT', 'action': 'proceed', 'legal': True, 'blocked_by': [], 'why': 'all required facts present, uncontested, and within authored authority'}, {'kind': 'OBSERVE', 'action': 'refresh_packet', 'legal': True, 'blocked_by': [], 'why': 'always legal; re-reads changed sources only'}, {'kind': 'OBSERVE', 'action': 'resolve_unknown:conv.latest_session', 'legal': True, 'blocked_by': [], 'why': 'Claude Code history is unavailable on this host (no readable transcripts); session facts are UNKNOWN - abstain on questions that depend on them'}, {'kind': 'ASK', 'action': 'ask_user', 'legal': False, 'blocked_by': ['nothing_to_ask'], 'why': 'only the user can supply a missing fact, pick between conflicting sources, or grant authority', 'about': []}, {'kind': 'ESCALATE', 'action': 'surface_conflict', 'legal': False, 'blocked_by': ['no_conflict'], 'why': 'sources conflict; do not pick a winner silently'}, {'kind': 'ABSTAIN', 'action': 'state_unknown', 'legal': True, 'blocked_by': [], 'why': "always legal: saying 'unknown' never exceeds authority"}], 'semantic_id': '7b6599227d7fd392defd', 'trace': {'harness': 'hermes', 'trace_id': 's:1', 'attempt': 0, 'opportunity_id': '4f9e73cb563e21b881c9'}, 'provenance': {'packet_id': '8b3d03620eb7b30b72d0', 'packet_schema': 'z0int.state_packet.v0', 'evidence': {'e:58d47fc3b1': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git branch --show-current', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:975652d7e8': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git log -1 0c7720c', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:636e55b23d': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git log -n 8', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:8222164a6c': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:refs/remotes/origin/HEAD', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:348bdbf36d': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64+ste3b0c44298fc', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git status --porcelain', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:cde560a9a7': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git for-each-ref refs/heads', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}}, 'built_at': '2026-10-03T11:25:23Z'}, 'fallback': {'on_uncertain': 'ASK', 'on_conflict': 'ESCALATE', 'always': 'ABSTAIN'}, 'expected_outcome': {'verifier': None}}}, {'schema': 'z0int.hermes.opportunity_record.v0', 'session_id': 's', 'platform': 'cli', 'repo': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo', 'gate': 'ACT', 'opportunity': {'schema': 'z0int.decision_opportunity.v0', 'intent': {'request': 'what branch am I on? c4a-retired-canary-5d6e', 'revision': 'fb0e62c3b5d4', 'effects': ['read']}, 'authority': {'source': 'harness-default', 'grants': ['read'], 'fingerprint': None}, 'state': {'claims': [{'key': 'git.branch', 'value': 'main', 'evidence': ['e:58d47fc3b1'], 'status': 'observed'}, {'key': 'git.head', 'value': {'sha': '0c7720c', 'date': '2026-10-03T06:25:22-05:00', 'subject': 'init'}, 'evidence': ['e:975652d7e8'], 'status': 'observed'}, {'key': 'git.recent_commits', 'value': [{'sha': '0c7720c', 'date': '2026-10-03T06:25:22-05:00', 'subject': 'init'}], 'evidence': ['e:636e55b23d'], 'status': 'observed'}, {'key': 'git.default_branch', 'value': 'main', 'evidence': ['e:8222164a6c'], 'status': 'observed'}, {'key': 'git.dirty', 'value': {'clean': True, 'modified': [], 'untracked': [], 'modified_count': 0, 'untracked_count': 0}, 'evidence': ['e:348bdbf36d'], 'status': 'observed'}, {'key': 'git.branches_ahead', 'value': {'vs': 'main', 'complete': True, 'local_branches': 1, 'ahead': []}, 'evidence': ['e:cde560a9a7'], 'status': 'observed'}], 'superseded': [], 'contradictions': [], 'unknowns': [{'key': 'conv.latest_session', 'status': 'source_unavailable', 'blocking': False, 'reason': 'Claude Code history is unavailable on this host (no readable transcripts); session facts are UNKNOWN - abstain on questions that depend on them'}, {'key': 'docs.any', 'status': 'unknown', 'blocking': False, 'reason': 'no top-level AGENTS/README/ROADMAP docs'}, {'key': 'resource.posture', 'status': 'source_unavailable', 'blocking': False, 'reason': 'no metered budget pool observed (codexbar cache / posture.local.json); budget posture is UNKNOWN'}]}, 'invalidation': {'source_revisions': {'git': {'head': '0c7720c8ec64b01f46e77a9775d1e0f7733573bc', 'status': 'e3b0c44298fc', 'refs': 'f87e0308f412'}, 'docs': {}, 'claude_code': {}, 'resource': {'posture': 'b08a902bc853', 'factory': 'BALANCED'}}}, 'scope': {'mode': 'question', 'families': ['git.branch'], 'prefixes': ['git.branch'], 'missing': []}, 'action_space': [{'kind': 'ACT', 'action': 'proceed', 'legal': True, 'blocked_by': [], 'why': 'all required facts present, uncontested, and within authored authority'}, {'kind': 'OBSERVE', 'action': 'refresh_packet', 'legal': True, 'blocked_by': [], 'why': 'always legal; re-reads changed sources only'}, {'kind': 'OBSERVE', 'action': 'resolve_unknown:conv.latest_session', 'legal': True, 'blocked_by': [], 'why': 'Claude Code history is unavailable on this host (no readable transcripts); session facts are UNKNOWN - abstain on questions that depend on them'}, {'kind': 'ASK', 'action': 'ask_user', 'legal': False, 'blocked_by': ['nothing_to_ask'], 'why': 'only the user can supply a missing fact, pick between conflicting sources, or grant authority', 'about': []}, {'kind': 'ESCALATE', 'action': 'surface_conflict', 'legal': False, 'blocked_by': ['no_conflict'], 'why': 'sources conflict; do not pick a winner silently'}, {'kind': 'ABSTAIN', 'action': 'state_unknown', 'legal': True, 'blocked_by': [], 'why': "always legal: saying 'unknown' never exceeds authority"}], 'semantic_id': '7b6599227d7fd392defd', 'trace': {'harness': 'hermes', 'trace_id': 's:1', 'attempt': 0, 'opportunity_id': '4f9e73cb563e21b881c9'}, 'provenance': {'packet_id': '8b3d03620eb7b30b72d0', 'packet_schema': 'z0int.state_packet.v0', 'evidence': {'e:58d47fc3b1': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git branch --show-current', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:975652d7e8': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git log -1 0c7720c', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:636e55b23d': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git log -n 8', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:8222164a6c': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:refs/remotes/origin/HEAD', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:348bdbf36d': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64+ste3b0c44298fc', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git status --porcelain', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:cde560a9a7': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git for-each-ref refs/heads', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}}, 'built_at': '2026-10-03T11:25:23Z'}, 'fallback': {'on_uncertain': 'ASK', 'on_conflict': 'ESCALATE', 'always': 'ABSTAIN'}, 'expected_outcome': {'verifier': None}}}] == []
+E     
+E     Left contains 2 more items, first extra item: {'gate': 'ACT', 'opportunity': {'action_space': [{'action': 'proceed', 'blocked_by': [], 'kind': 'ACT', 'legal': True,...ls/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo', ...}
+E     
+E     Full diff:
+E     - []
+E     + [
+E     +     {
+E     +         'gate': 'ACT',
+E     +         'opportunity': {
+E     +             'action_space': [
+E     +                 {
+E     +                     'action': 'proceed',
+E     +                     'blocked_by': [],
+E     +                     'kind': 'ACT',
+E     +                     'legal': True,
+E     +                     'why': 'all required facts present, uncontested, and within '
+E     +                     'authored authority',
+E     +                 },
+E     +                 {
+E     +                     'action': 'refresh_packet',
+E     +                     'blocked_by': [],
+E     +                     'kind': 'OBSERVE',
+E     +                     'legal': True,
+E     +                     'why': 'always legal; re-reads changed sources only',
+E     +                 },
+E     +                 {
+E     +                     'action': 'resolve_unknown:conv.latest_session',
+E     +                     'blocked_by': [],
+E     +                     'kind': 'OBSERVE',
+E     +                     'legal': True,
+E     +                     'why': 'Claude Code history is unavailable on this host (no '
+E     +                     'readable transcripts); session facts are UNKNOWN - '
+E     +                     'abstain on questions that depend on them',
+E     +                 },
+E     +                 {
+E     +                     'about': [],
+E     +                     'action': 'ask_user',
+E     +                     'blocked_by': [
+E     +                         'nothing_to_ask',
+E     +                     ],
+E     +                     'kind': 'ASK',
+E     +                     'legal': False,
+E     +                     'why': 'only the user can supply a missing fact, pick between '
+E     +                     'conflicting sources, or grant authority',
+E     +                 },
+E     +                 {
+E     +                     'action': 'surface_conflict',
+E     +                     'blocked_by': [
+E     +                         'no_conflict',
+E     +                     ],
+E     +                     'kind': 'ESCALATE',
+E     +                     'legal': False,
+E     +                     'why': 'sources conflict; do not pick a winner silently',
+E     +                 },
+E     +                 {
+E     +                     'action': 'state_unknown',
+E     +                     'blocked_by': [],
+E     +                     'kind': 'ABSTAIN',
+E     +                     'legal': True,
+E     +                     'why': "always legal: saying 'unknown' never exceeds authority",
+E     +                 },
+E     +             ],
+E     +             'authority': {
+E     +                 'fingerprint': None,
+E     +                 'grants': [
+E     +                     'read',
+E     +                 ],
+E     +                 'source': 'harness-default',
+E     +             },
+E     +             'expected_outcome': {
+E     +                 'verifier': None,
+E     +             },
+E     +             'fallback': {
+E     +                 'always': 'ABSTAIN',
+E     +                 'on_conflict': 'ESCALATE',
+E     +                 'on_uncertain': 'ASK',
+E     +             },
+E     +             'intent': {
+E     +                 'effects': [
+E     +                     'read',
+E     +                 ],
+E     +                 'request': 'what branch am I on? c4a-retired-canary-5d6e',
+E     +                 'revision': 'fb0e62c3b5d4',
+E     +             },
+E     +             'invalidation': {
+E     +                 'source_revisions': {
+E     +                     'claude_code': {},
+E     +                     'docs': {},
+E     +                     'git': {
+E     +                         'head': '0c7720c8ec64b01f46e77a9775d1e0f7733573bc',
+E     +                         'refs': 'f87e0308f412',
+E     +                         'status': 'e3b0c44298fc',
+E     +                     },
+E     +                     'resource': {
+E     +                         'factory': 'BALANCED',
+E     +                         'posture': 'b08a902bc853',
+E     +                     },
+E     +                 },
+E     +             },
+E     +             'provenance': {
+E     +                 'built_at': '2026-10-03T11:25:23Z',
+E     +                 'evidence': {
+E     +                     'e:348bdbf36d': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+E     +                         'status --porcelain',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64+ste3b0c44298fc',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                     'e:58d47fc3b1': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+E     +                         'branch --show-current',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                     'e:636e55b23d': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+E     +                         'log -n 8',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                     'e:8222164a6c': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:refs/remotes/origin/HEAD',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                     'e:975652d7e8': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+E     +                         'log -1 0c7720c',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                     'e:cde560a9a7': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+E     +                         'for-each-ref refs/heads',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                 },
+E     +                 'packet_id': '8b3d03620eb7b30b72d0',
+E     +                 'packet_schema': 'z0int.state_packet.v0',
+E     +             },
+E     +             'schema': 'z0int.decision_opportunity.v0',
+E     +             'scope': {
+E     +                 'families': [
+E     +                     'git.branch',
+E     +                 ],
+E     +                 'missing': [],
+E     +                 'mode': 'question',
+E     +                 'prefixes': [
+E     +                     'git.branch',
+E     +                 ],
+E     +             },
+E     +             'semantic_id': '7b6599227d7fd392defd',
+E     +             'state': {
+E     +                 'claims': [
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:58d47fc3b1',
+E     +                         ],
+E     +                         'key': 'git.branch',
+E     +                         'status': 'observed',
+E     +                         'value': 'main',
+E     +                     },
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:975652d7e8',
+E     +                         ],
+E     +                         'key': 'git.head',
+E     +                         'status': 'observed',
+E     +                         'value': {
+E     +                             'date': '2026-10-03T06:25:22-05:00',
+E     +                             'sha': '0c7720c',
+E     +                             'subject': 'init',
+E     +                         },
+E     +                     },
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:636e55b23d',
+E     +                         ],
+E     +                         'key': 'git.recent_commits',
+E     +                         'status': 'observed',
+E     +                         'value': [
+E     +                             {
+E     +                                 'date': '2026-10-03T06:25:22-05:00',
+E     +                                 'sha': '0c7720c',
+E     +                                 'subject': 'init',
+E     +                             },
+E     +                         ],
+E     +                     },
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:8222164a6c',
+E     +                         ],
+E     +                         'key': 'git.default_branch',
+E     +                         'status': 'observed',
+E     +                         'value': 'main',
+E     +                     },
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:348bdbf36d',
+E     +                         ],
+E     +                         'key': 'git.dirty',
+E     +                         'status': 'observed',
+E     +                         'value': {
+E     +                             'clean': True,
+E     +                             'modified': [],
+E     +                             'modified_count': 0,
+E     +                             'untracked': [],
+E     +                             'untracked_count': 0,
+E     +                         },
+E     +                     },
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:cde560a9a7',
+E     +                         ],
+E     +                         'key': 'git.branches_ahead',
+E     +                         'status': 'observed',
+E     +                         'value': {
+E     +                             'ahead': [],
+E     +                             'complete': True,
+E     +                             'local_branches': 1,
+E     +                             'vs': 'main',
+E     +                         },
+E     +                     },
+E     +                 ],
+E     +                 'contradictions': [],
+E     +                 'superseded': [],
+E     +                 'unknowns': [
+E     +                     {
+E     +                         'blocking': False,
+E     +                         'key': 'conv.latest_session',
+E     +                         'reason': 'Claude Code history is unavailable on this host (no '
+E     +                         'readable transcripts); session facts are UNKNOWN - '
+E     +                         'abstain on questions that depend on them',
+E     +                         'status': 'source_unavailable',
+E     +                     },
+E     +                     {
+E     +                         'blocking': False,
+E     +                         'key': 'docs.any',
+E     +                         'reason': 'no top-level AGENTS/README/ROADMAP docs',
+E     +                         'status': 'unknown',
+E     +                     },
+E     +                     {
+E     +                         'blocking': False,
+E     +                         'key': 'resource.posture',
+E     +                         'reason': 'no metered budget pool observed (codexbar cache / '
+E     +                         'posture.local.json); budget posture is UNKNOWN',
+E     +                         'status': 'source_unavailable',
+E     +                     },
+E     +                 ],
+E     +             },
+E     +             'trace': {
+E     +                 'attempt': 0,
+E     +                 'harness': 'hermes',
+E     +                 'opportunity_id': '4f9e73cb563e21b881c9',
+E     +                 'trace_id': 's:1',
+E     +             },
+E     +         },
+E     +         'platform': 'cli',
+E     +         'repo': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo',
+E     +         'schema': 'z0int.hermes.opportunity_record.v0',
+E     +         'session_id': 's',
+E     +     },
+E     +     {
+E     +         'gate': 'ACT',
+E     +         'opportunity': {
+E     +             'action_space': [
+E     +                 {
+E     +                     'action': 'proceed',
+E     +                     'blocked_by': [],
+E     +                     'kind': 'ACT',
+E     +                     'legal': True,
+E     +                     'why': 'all required facts present, uncontested, and within '
+E     +                     'authored authority',
+E     +                 },
+E     +                 {
+E     +                     'action': 'refresh_packet',
+E     +                     'blocked_by': [],
+E     +                     'kind': 'OBSERVE',
+E     +                     'legal': True,
+E     +                     'why': 'always legal; re-reads changed sources only',
+E     +                 },
+E     +                 {
+E     +                     'action': 'resolve_unknown:conv.latest_session',
+E     +                     'blocked_by': [],
+E     +                     'kind': 'OBSERVE',
+E     +                     'legal': True,
+E     +                     'why': 'Claude Code history is unavailable on this host (no '
+E     +                     'readable transcripts); session facts are UNKNOWN - '
+E     +                     'abstain on questions that depend on them',
+E     +                 },
+E     +                 {
+E     +                     'about': [],
+E     +                     'action': 'ask_user',
+E     +                     'blocked_by': [
+E     +                         'nothing_to_ask',
+E     +                     ],
+E     +                     'kind': 'ASK',
+E     +                     'legal': False,
+E     +                     'why': 'only the user can supply a missing fact, pick between '
+E     +                     'conflicting sources, or grant authority',
+E     +                 },
+E     +                 {
+E     +                     'action': 'surface_conflict',
+E     +                     'blocked_by': [
+E     +                         'no_conflict',
+E     +                     ],
+E     +                     'kind': 'ESCALATE',
+E     +                     'legal': False,
+E     +                     'why': 'sources conflict; do not pick a winner silently',
+E     +                 },
+E     +                 {
+E     +                     'action': 'state_unknown',
+E     +                     'blocked_by': [],
+E     +                     'kind': 'ABSTAIN',
+E     +                     'legal': True,
+E     +                     'why': "always legal: saying 'unknown' never exceeds authority",
+E     +                 },
+E     +             ],
+E     +             'authority': {
+E     +                 'fingerprint': None,
+E     +                 'grants': [
+E     +                     'read',
+E     +                 ],
+E     +                 'source': 'harness-default',
+E     +             },
+E     +             'expected_outcome': {
+E     +                 'verifier': None,
+E     +             },
+E     +             'fallback': {
+E     +                 'always': 'ABSTAIN',
+E     +                 'on_conflict': 'ESCALATE',
+E     +                 'on_uncertain': 'ASK',
+E     +             },
+E     +             'intent': {
+E     +                 'effects': [
+E     +                     'read',
+E     +                 ],
+E     +                 'request': 'what branch am I on? c4a-retired-canary-5d6e',
+E     +                 'revision': 'fb0e62c3b5d4',
+E     +             },
+E     +             'invalidation': {
+E     +                 'source_revisions': {
+E     +                     'claude_code': {},
+E     +                     'docs': {},
+E     +                     'git': {
+E     +                         'head': '0c7720c8ec64b01f46e77a9775d1e0f7733573bc',
+E     +                         'refs': 'f87e0308f412',
+E     +                         'status': 'e3b0c44298fc',
+E     +                     },
+E     +                     'resource': {
+E     +                         'factory': 'BALANCED',
+E     +                         'posture': 'b08a902bc853',
+E     +                     },
+E     +                 },
+E     +             },
+E     +             'provenance': {
+E     +                 'built_at': '2026-10-03T11:25:23Z',
+E     +                 'evidence': {
+E     +                     'e:348bdbf36d': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+E     +                         'status --porcelain',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64+ste3b0c44298fc',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                     'e:58d47fc3b1': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+E     +                         'branch --show-current',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                     'e:636e55b23d': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+E     +                         'log -n 8',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                     'e:8222164a6c': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:refs/remotes/origin/HEAD',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                     'e:975652d7e8': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+E     +                         'log -1 0c7720c',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                     'e:cde560a9a7': {
+E     +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+E     +                         'for-each-ref refs/heads',
+E     +                         'observed_at': '2026-10-03T11:25:23Z',
+E     +                         'source_id': 'git:repo',
+E     +                         'source_version': '0c7720c8ec64',
+E     +                         'trust_class': 'code',
+E     +                     },
+E     +                 },
+E     +                 'packet_id': '8b3d03620eb7b30b72d0',
+E     +                 'packet_schema': 'z0int.state_packet.v0',
+E     +             },
+E     +             'schema': 'z0int.decision_opportunity.v0',
+E     +             'scope': {
+E     +                 'families': [
+E     +                     'git.branch',
+E     +                 ],
+E     +                 'missing': [],
+E     +                 'mode': 'question',
+E     +                 'prefixes': [
+E     +                     'git.branch',
+E     +                 ],
+E     +             },
+E     +             'semantic_id': '7b6599227d7fd392defd',
+E     +             'state': {
+E     +                 'claims': [
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:58d47fc3b1',
+E     +                         ],
+E     +                         'key': 'git.branch',
+E     +                         'status': 'observed',
+E     +                         'value': 'main',
+E     +                     },
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:975652d7e8',
+E     +                         ],
+E     +                         'key': 'git.head',
+E     +                         'status': 'observed',
+E     +                         'value': {
+E     +                             'date': '2026-10-03T06:25:22-05:00',
+E     +                             'sha': '0c7720c',
+E     +                             'subject': 'init',
+E     +                         },
+E     +                     },
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:636e55b23d',
+E     +                         ],
+E     +                         'key': 'git.recent_commits',
+E     +                         'status': 'observed',
+E     +                         'value': [
+E     +                             {
+E     +                                 'date': '2026-10-03T06:25:22-05:00',
+E     +                                 'sha': '0c7720c',
+E     +                                 'subject': 'init',
+E     +                             },
+E     +                         ],
+E     +                     },
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:8222164a6c',
+E     +                         ],
+E     +                         'key': 'git.default_branch',
+E     +                         'status': 'observed',
+E     +                         'value': 'main',
+E     +                     },
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:348bdbf36d',
+E     +                         ],
+E     +                         'key': 'git.dirty',
+E     +                         'status': 'observed',
+E     +                         'value': {
+E     +                             'clean': True,
+E     +                             'modified': [],
+E     +                             'modified_count': 0,
+E     +                             'untracked': [],
+E     +                             'untracked_count': 0,
+E     +                         },
+E     +                     },
+E     +                     {
+E     +                         'evidence': [
+E     +                             'e:cde560a9a7',
+E     +                         ],
+E     +                         'key': 'git.branches_ahead',
+E     +                         'status': 'observed',
+E     +                         'value': {
+E     +                             'ahead': [],
+E     +                             'complete': True,
+E     +                             'local_branches': 1,
+E     +                             'vs': 'main',
+E     +                         },
+E     +                     },
+E     +                 ],
+E     +                 'contradictions': [],
+E     +                 'superseded': [],
+E     +                 'unknowns': [
+E     +                     {
+E     +                         'blocking': False,
+E     +                         'key': 'conv.latest_session',
+E     +                         'reason': 'Claude Code history is unavailable on this host (no '
+E     +                         'readable transcripts); session facts are UNKNOWN - '
+E     +                         'abstain on questions that depend on them',
+E     +                         'status': 'source_unavailable',
+E     +                     },
+E     +                     {
+E     +                         'blocking': False,
+E     +                         'key': 'docs.any',
+E     +                         'reason': 'no top-level AGENTS/README/ROADMAP docs',
+E     +                         'status': 'unknown',
+E     +                     },
+E     +                     {
+E     +                         'blocking': False,
+E     +                         'key': 'resource.posture',
+E     +                         'reason': 'no metered budget pool observed (codexbar cache / '
+E     +                         'posture.local.json); budget posture is UNKNOWN',
+E     +                         'status': 'source_unavailable',
+E     +                     },
+E     +                 ],
+E     +             },
+E     +             'trace': {
+E     +                 'attempt': 0,
+E     +                 'harness': 'hermes',
+E     +                 'opportunity_id': '4f9e73cb563e21b881c9',
+E     +                 'trace_id': 's:1',
+E     +             },
+E     +         },
+E     +         'platform': 'cli',
+E     +         'repo': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo',
+E     +         'schema': 'z0int.hermes.opportunity_record.v0',
+E     +         'session_id': 's',
+E     +     },
+E     + ]
+=========================== short test summary info ============================
+FAILED tests/test_hermes_capture.py::test_p1_the_child_socket_guard_logs_every_connect_including_loopback_and_unix - AssertionError: assert (False)
+ +  where False = exists()
+ +    where exists = PosixPath('/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_p1_the_child_socket_guard0/sockets.log').exists
+FAILED tests/test_hermes_capture.py::test_p2_a_projection_in_flight_at_close_writes_nothing_after_close - assert (0 >= 1)
+FAILED tests/test_hermes_capture.py::test_automatic_invoke_runs_the_configured_z0int_with_the_same_home_as_its_gate - AssertionError: assert ['/mnt/zer0models/z0-wt/venv-claude-code/bin/python', '-m', 'z0int.automatic', 'event'] == ['/opt/z0int/bin/python', '-m', 'z0int.automatic', 'event']
+  
+  At index 0 diff: '/mnt/zer0models/z0-wt/venv-claude-code/bin/python' != '/opt/z0int/bin/python'
+  
+  Full diff:
+    [
+  -     '/opt/z0int/bin/python',
+  +     '/mnt/zer0models/z0-wt/venv-claude-code/bin/python',
+        '-m',
+        'z0int.automatic',
+        'event',
+    ]
+FAILED tests/test_hermes_decisions.py::test_the_retired_opportunity_command_writes_no_opportunity - assert [{'schema': 'z0int.hermes.opportunity_record.v0', 'session_id': 's', 'platform': 'cli', 'repo': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo', 'gate': 'ACT', 'opportunity': {'schema': 'z0int.decision_opportunity.v0', 'intent': {'request': 'what branch am I on? c4a-retired-canary-5d6e', 'revision': 'fb0e62c3b5d4', 'effects': ['read']}, 'authority': {'source': 'harness-default', 'grants': ['read'], 'fingerprint': None}, 'state': {'claims': [{'key': 'git.branch', 'value': 'main', 'evidence': ['e:58d47fc3b1'], 'status': 'observed'}, {'key': 'git.head', 'value': {'sha': '0c7720c', 'date': '2026-10-03T06:25:22-05:00', 'subject': 'init'}, 'evidence': ['e:975652d7e8'], 'status': 'observed'}, {'key': 'git.recent_commits', 'value': [{'sha': '0c7720c', 'date': '2026-10-03T06:25:22-05:00', 'subject': 'init'}], 'evidence': ['e:636e55b23d'], 'status': 'observed'}, {'key': 'git.default_branch', 'value': 'main', 'evidence': ['e:8222164a6c'], 'status': 'observed'}, {'key': 'git.dirty', 'value': {'clean': True, 'modified': [], 'untracked': [], 'modified_count': 0, 'untracked_count': 0}, 'evidence': ['e:348bdbf36d'], 'status': 'observed'}, {'key': 'git.branches_ahead', 'value': {'vs': 'main', 'complete': True, 'local_branches': 1, 'ahead': []}, 'evidence': ['e:cde560a9a7'], 'status': 'observed'}], 'superseded': [], 'contradictions': [], 'unknowns': [{'key': 'conv.latest_session', 'status': 'source_unavailable', 'blocking': False, 'reason': 'Claude Code history is unavailable on this host (no readable transcripts); session facts are UNKNOWN - abstain on questions that depend on them'}, {'key': 'docs.any', 'status': 'unknown', 'blocking': False, 'reason': 'no top-level AGENTS/README/ROADMAP docs'}, {'key': 'resource.posture', 'status': 'source_unavailable', 'blocking': False, 'reason': 'no metered budget pool observed (codexbar cache / posture.local.json); budget posture is UNKNOWN'}]}, 'invalidation': {'source_revisions': {'git': {'head': '0c7720c8ec64b01f46e77a9775d1e0f7733573bc', 'status': 'e3b0c44298fc', 'refs': 'f87e0308f412'}, 'docs': {}, 'claude_code': {}, 'resource': {'posture': 'b08a902bc853', 'factory': 'BALANCED'}}}, 'scope': {'mode': 'question', 'families': ['git.branch'], 'prefixes': ['git.branch'], 'missing': []}, 'action_space': [{'kind': 'ACT', 'action': 'proceed', 'legal': True, 'blocked_by': [], 'why': 'all required facts present, uncontested, and within authored authority'}, {'kind': 'OBSERVE', 'action': 'refresh_packet', 'legal': True, 'blocked_by': [], 'why': 'always legal; re-reads changed sources only'}, {'kind': 'OBSERVE', 'action': 'resolve_unknown:conv.latest_session', 'legal': True, 'blocked_by': [], 'why': 'Claude Code history is unavailable on this host (no readable transcripts); session facts are UNKNOWN - abstain on questions that depend on them'}, {'kind': 'ASK', 'action': 'ask_user', 'legal': False, 'blocked_by': ['nothing_to_ask'], 'why': 'only the user can supply a missing fact, pick between conflicting sources, or grant authority', 'about': []}, {'kind': 'ESCALATE', 'action': 'surface_conflict', 'legal': False, 'blocked_by': ['no_conflict'], 'why': 'sources conflict; do not pick a winner silently'}, {'kind': 'ABSTAIN', 'action': 'state_unknown', 'legal': True, 'blocked_by': [], 'why': "always legal: saying 'unknown' never exceeds authority"}], 'semantic_id': '7b6599227d7fd392defd', 'trace': {'harness': 'hermes', 'trace_id': 's:1', 'attempt': 0, 'opportunity_id': '4f9e73cb563e21b881c9'}, 'provenance': {'packet_id': '8b3d03620eb7b30b72d0', 'packet_schema': 'z0int.state_packet.v0', 'evidence': {'e:58d47fc3b1': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git branch --show-current', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:975652d7e8': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git log -1 0c7720c', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:636e55b23d': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git log -n 8', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:8222164a6c': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:refs/remotes/origin/HEAD', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:348bdbf36d': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64+ste3b0c44298fc', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git status --porcelain', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:cde560a9a7': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git for-each-ref refs/heads', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}}, 'built_at': '2026-10-03T11:25:23Z'}, 'fallback': {'on_uncertain': 'ASK', 'on_conflict': 'ESCALATE', 'always': 'ABSTAIN'}, 'expected_outcome': {'verifier': None}}}, {'schema': 'z0int.hermes.opportunity_record.v0', 'session_id': 's', 'platform': 'cli', 'repo': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo', 'gate': 'ACT', 'opportunity': {'schema': 'z0int.decision_opportunity.v0', 'intent': {'request': 'what branch am I on? c4a-retired-canary-5d6e', 'revision': 'fb0e62c3b5d4', 'effects': ['read']}, 'authority': {'source': 'harness-default', 'grants': ['read'], 'fingerprint': None}, 'state': {'claims': [{'key': 'git.branch', 'value': 'main', 'evidence': ['e:58d47fc3b1'], 'status': 'observed'}, {'key': 'git.head', 'value': {'sha': '0c7720c', 'date': '2026-10-03T06:25:22-05:00', 'subject': 'init'}, 'evidence': ['e:975652d7e8'], 'status': 'observed'}, {'key': 'git.recent_commits', 'value': [{'sha': '0c7720c', 'date': '2026-10-03T06:25:22-05:00', 'subject': 'init'}], 'evidence': ['e:636e55b23d'], 'status': 'observed'}, {'key': 'git.default_branch', 'value': 'main', 'evidence': ['e:8222164a6c'], 'status': 'observed'}, {'key': 'git.dirty', 'value': {'clean': True, 'modified': [], 'untracked': [], 'modified_count': 0, 'untracked_count': 0}, 'evidence': ['e:348bdbf36d'], 'status': 'observed'}, {'key': 'git.branches_ahead', 'value': {'vs': 'main', 'complete': True, 'local_branches': 1, 'ahead': []}, 'evidence': ['e:cde560a9a7'], 'status': 'observed'}], 'superseded': [], 'contradictions': [], 'unknowns': [{'key': 'conv.latest_session', 'status': 'source_unavailable', 'blocking': False, 'reason': 'Claude Code history is unavailable on this host (no readable transcripts); session facts are UNKNOWN - abstain on questions that depend on them'}, {'key': 'docs.any', 'status': 'unknown', 'blocking': False, 'reason': 'no top-level AGENTS/README/ROADMAP docs'}, {'key': 'resource.posture', 'status': 'source_unavailable', 'blocking': False, 'reason': 'no metered budget pool observed (codexbar cache / posture.local.json); budget posture is UNKNOWN'}]}, 'invalidation': {'source_revisions': {'git': {'head': '0c7720c8ec64b01f46e77a9775d1e0f7733573bc', 'status': 'e3b0c44298fc', 'refs': 'f87e0308f412'}, 'docs': {}, 'claude_code': {}, 'resource': {'posture': 'b08a902bc853', 'factory': 'BALANCED'}}}, 'scope': {'mode': 'question', 'families': ['git.branch'], 'prefixes': ['git.branch'], 'missing': []}, 'action_space': [{'kind': 'ACT', 'action': 'proceed', 'legal': True, 'blocked_by': [], 'why': 'all required facts present, uncontested, and within authored authority'}, {'kind': 'OBSERVE', 'action': 'refresh_packet', 'legal': True, 'blocked_by': [], 'why': 'always legal; re-reads changed sources only'}, {'kind': 'OBSERVE', 'action': 'resolve_unknown:conv.latest_session', 'legal': True, 'blocked_by': [], 'why': 'Claude Code history is unavailable on this host (no readable transcripts); session facts are UNKNOWN - abstain on questions that depend on them'}, {'kind': 'ASK', 'action': 'ask_user', 'legal': False, 'blocked_by': ['nothing_to_ask'], 'why': 'only the user can supply a missing fact, pick between conflicting sources, or grant authority', 'about': []}, {'kind': 'ESCALATE', 'action': 'surface_conflict', 'legal': False, 'blocked_by': ['no_conflict'], 'why': 'sources conflict; do not pick a winner silently'}, {'kind': 'ABSTAIN', 'action': 'state_unknown', 'legal': True, 'blocked_by': [], 'why': "always legal: saying 'unknown' never exceeds authority"}], 'semantic_id': '7b6599227d7fd392defd', 'trace': {'harness': 'hermes', 'trace_id': 's:1', 'attempt': 0, 'opportunity_id': '4f9e73cb563e21b881c9'}, 'provenance': {'packet_id': '8b3d03620eb7b30b72d0', 'packet_schema': 'z0int.state_packet.v0', 'evidence': {'e:58d47fc3b1': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git branch --show-current', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:975652d7e8': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git log -1 0c7720c', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:636e55b23d': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git log -n 8', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:8222164a6c': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:refs/remotes/origin/HEAD', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:348bdbf36d': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64+ste3b0c44298fc', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git status --porcelain', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}, 'e:cde560a9a7': {'source_id': 'git:repo', 'source_version': '0c7720c8ec64', 'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git for-each-ref refs/heads', 'trust_class': 'code', 'observed_at': '2026-10-03T11:25:23Z'}}, 'built_at': '2026-10-03T11:25:23Z'}, 'fallback': {'on_uncertain': 'ASK', 'on_conflict': 'ESCALATE', 'always': 'ABSTAIN'}, 'expected_outcome': {'verifier': None}}}] == []
+  
+  Left contains 2 more items, first extra item: {'gate': 'ACT', 'opportunity': {'action_space': [{'action': 'proceed', 'blocked_by': [], 'kind': 'ACT', 'legal': True,...ls/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo', ...}
+  
+  Full diff:
+  - []
+  + [
+  +     {
+  +         'gate': 'ACT',
+  +         'opportunity': {
+  +             'action_space': [
+  +                 {
+  +                     'action': 'proceed',
+  +                     'blocked_by': [],
+  +                     'kind': 'ACT',
+  +                     'legal': True,
+  +                     'why': 'all required facts present, uncontested, and within '
+  +                     'authored authority',
+  +                 },
+  +                 {
+  +                     'action': 'refresh_packet',
+  +                     'blocked_by': [],
+  +                     'kind': 'OBSERVE',
+  +                     'legal': True,
+  +                     'why': 'always legal; re-reads changed sources only',
+  +                 },
+  +                 {
+  +                     'action': 'resolve_unknown:conv.latest_session',
+  +                     'blocked_by': [],
+  +                     'kind': 'OBSERVE',
+  +                     'legal': True,
+  +                     'why': 'Claude Code history is unavailable on this host (no '
+  +                     'readable transcripts); session facts are UNKNOWN - '
+  +                     'abstain on questions that depend on them',
+  +                 },
+  +                 {
+  +                     'about': [],
+  +                     'action': 'ask_user',
+  +                     'blocked_by': [
+  +                         'nothing_to_ask',
+  +                     ],
+  +                     'kind': 'ASK',
+  +                     'legal': False,
+  +                     'why': 'only the user can supply a missing fact, pick between '
+  +                     'conflicting sources, or grant authority',
+  +                 },
+  +                 {
+  +                     'action': 'surface_conflict',
+  +                     'blocked_by': [
+  +                         'no_conflict',
+  +                     ],
+  +                     'kind': 'ESCALATE',
+  +                     'legal': False,
+  +                     'why': 'sources conflict; do not pick a winner silently',
+  +                 },
+  +                 {
+  +                     'action': 'state_unknown',
+  +                     'blocked_by': [],
+  +                     'kind': 'ABSTAIN',
+  +                     'legal': True,
+  +                     'why': "always legal: saying 'unknown' never exceeds authority",
+  +                 },
+  +             ],
+  +             'authority': {
+  +                 'fingerprint': None,
+  +                 'grants': [
+  +                     'read',
+  +                 ],
+  +                 'source': 'harness-default',
+  +             },
+  +             'expected_outcome': {
+  +                 'verifier': None,
+  +             },
+  +             'fallback': {
+  +                 'always': 'ABSTAIN',
+  +                 'on_conflict': 'ESCALATE',
+  +                 'on_uncertain': 'ASK',
+  +             },
+  +             'intent': {
+  +                 'effects': [
+  +                     'read',
+  +                 ],
+  +                 'request': 'what branch am I on? c4a-retired-canary-5d6e',
+  +                 'revision': 'fb0e62c3b5d4',
+  +             },
+  +             'invalidation': {
+  +                 'source_revisions': {
+  +                     'claude_code': {},
+  +                     'docs': {},
+  +                     'git': {
+  +                         'head': '0c7720c8ec64b01f46e77a9775d1e0f7733573bc',
+  +                         'refs': 'f87e0308f412',
+  +                         'status': 'e3b0c44298fc',
+  +                     },
+  +                     'resource': {
+  +                         'factory': 'BALANCED',
+  +                         'posture': 'b08a902bc853',
+  +                     },
+  +                 },
+  +             },
+  +             'provenance': {
+  +                 'built_at': '2026-10-03T11:25:23Z',
+  +                 'evidence': {
+  +                     'e:348bdbf36d': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+  +                         'status --porcelain',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64+ste3b0c44298fc',
+  +                         'trust_class': 'code',
+  +                     },
+  +                     'e:58d47fc3b1': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+  +                         'branch --show-current',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64',
+  +                         'trust_class': 'code',
+  +                     },
+  +                     'e:636e55b23d': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+  +                         'log -n 8',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64',
+  +                         'trust_class': 'code',
+  +                     },
+  +                     'e:8222164a6c': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:refs/remotes/origin/HEAD',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64',
+  +                         'trust_class': 'code',
+  +                     },
+  +                     'e:975652d7e8': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+  +                         'log -1 0c7720c',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64',
+  +                         'trust_class': 'code',
+  +                     },
+  +                     'e:cde560a9a7': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+  +                         'for-each-ref refs/heads',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64',
+  +                         'trust_class': 'code',
+  +                     },
+  +                 },
+  +                 'packet_id': '8b3d03620eb7b30b72d0',
+  +                 'packet_schema': 'z0int.state_packet.v0',
+  +             },
+  +             'schema': 'z0int.decision_opportunity.v0',
+  +             'scope': {
+  +                 'families': [
+  +                     'git.branch',
+  +                 ],
+  +                 'missing': [],
+  +                 'mode': 'question',
+  +                 'prefixes': [
+  +                     'git.branch',
+  +                 ],
+  +             },
+  +             'semantic_id': '7b6599227d7fd392defd',
+  +             'state': {
+  +                 'claims': [
+  +                     {
+  +                         'evidence': [
+  +                             'e:58d47fc3b1',
+  +                         ],
+  +                         'key': 'git.branch',
+  +                         'status': 'observed',
+  +                         'value': 'main',
+  +                     },
+  +                     {
+  +                         'evidence': [
+  +                             'e:975652d7e8',
+  +                         ],
+  +                         'key': 'git.head',
+  +                         'status': 'observed',
+  +                         'value': {
+  +                             'date': '2026-10-03T06:25:22-05:00',
+  +                             'sha': '0c7720c',
+  +                             'subject': 'init',
+  +                         },
+  +                     },
+  +                     {
+  +                         'evidence': [
+  +                             'e:636e55b23d',
+  +                         ],
+  +                         'key': 'git.recent_commits',
+  +                         'status': 'observed',
+  +                         'value': [
+  +                             {
+  +                                 'date': '2026-10-03T06:25:22-05:00',
+  +                                 'sha': '0c7720c',
+  +                                 'subject': 'init',
+  +                             },
+  +                         ],
+  +                     },
+  +                     {
+  +                         'evidence': [
+  +                             'e:8222164a6c',
+  +                         ],
+  +                         'key': 'git.default_branch',
+  +                         'status': 'observed',
+  +                         'value': 'main',
+  +                     },
+  +                     {
+  +                         'evidence': [
+  +                             'e:348bdbf36d',
+  +                         ],
+  +                         'key': 'git.dirty',
+  +                         'status': 'observed',
+  +                         'value': {
+  +                             'clean': True,
+  +                             'modified': [],
+  +                             'modified_count': 0,
+  +                             'untracked': [],
+  +                             'untracked_count': 0,
+  +                         },
+  +                     },
+  +                     {
+  +                         'evidence': [
+  +                             'e:cde560a9a7',
+  +                         ],
+  +                         'key': 'git.branches_ahead',
+  +                         'status': 'observed',
+  +                         'value': {
+  +                             'ahead': [],
+  +                             'complete': True,
+  +                             'local_branches': 1,
+  +                             'vs': 'main',
+  +                         },
+  +                     },
+  +                 ],
+  +                 'contradictions': [],
+  +                 'superseded': [],
+  +                 'unknowns': [
+  +                     {
+  +                         'blocking': False,
+  +                         'key': 'conv.latest_session',
+  +                         'reason': 'Claude Code history is unavailable on this host (no '
+  +                         'readable transcripts); session facts are UNKNOWN - '
+  +                         'abstain on questions that depend on them',
+  +                         'status': 'source_unavailable',
+  +                     },
+  +                     {
+  +                         'blocking': False,
+  +                         'key': 'docs.any',
+  +                         'reason': 'no top-level AGENTS/README/ROADMAP docs',
+  +                         'status': 'unknown',
+  +                     },
+  +                     {
+  +                         'blocking': False,
+  +                         'key': 'resource.posture',
+  +                         'reason': 'no metered budget pool observed (codexbar cache / '
+  +                         'posture.local.json); budget posture is UNKNOWN',
+  +                         'status': 'source_unavailable',
+  +                     },
+  +                 ],
+  +             },
+  +             'trace': {
+  +                 'attempt': 0,
+  +                 'harness': 'hermes',
+  +                 'opportunity_id': '4f9e73cb563e21b881c9',
+  +                 'trace_id': 's:1',
+  +             },
+  +         },
+  +         'platform': 'cli',
+  +         'repo': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo',
+  +         'schema': 'z0int.hermes.opportunity_record.v0',
+  +         'session_id': 's',
+  +     },
+  +     {
+  +         'gate': 'ACT',
+  +         'opportunity': {
+  +             'action_space': [
+  +                 {
+  +                     'action': 'proceed',
+  +                     'blocked_by': [],
+  +                     'kind': 'ACT',
+  +                     'legal': True,
+  +                     'why': 'all required facts present, uncontested, and within '
+  +                     'authored authority',
+  +                 },
+  +                 {
+  +                     'action': 'refresh_packet',
+  +                     'blocked_by': [],
+  +                     'kind': 'OBSERVE',
+  +                     'legal': True,
+  +                     'why': 'always legal; re-reads changed sources only',
+  +                 },
+  +                 {
+  +                     'action': 'resolve_unknown:conv.latest_session',
+  +                     'blocked_by': [],
+  +                     'kind': 'OBSERVE',
+  +                     'legal': True,
+  +                     'why': 'Claude Code history is unavailable on this host (no '
+  +                     'readable transcripts); session facts are UNKNOWN - '
+  +                     'abstain on questions that depend on them',
+  +                 },
+  +                 {
+  +                     'about': [],
+  +                     'action': 'ask_user',
+  +                     'blocked_by': [
+  +                         'nothing_to_ask',
+  +                     ],
+  +                     'kind': 'ASK',
+  +                     'legal': False,
+  +                     'why': 'only the user can supply a missing fact, pick between '
+  +                     'conflicting sources, or grant authority',
+  +                 },
+  +                 {
+  +                     'action': 'surface_conflict',
+  +                     'blocked_by': [
+  +                         'no_conflict',
+  +                     ],
+  +                     'kind': 'ESCALATE',
+  +                     'legal': False,
+  +                     'why': 'sources conflict; do not pick a winner silently',
+  +                 },
+  +                 {
+  +                     'action': 'state_unknown',
+  +                     'blocked_by': [],
+  +                     'kind': 'ABSTAIN',
+  +                     'legal': True,
+  +                     'why': "always legal: saying 'unknown' never exceeds authority",
+  +                 },
+  +             ],
+  +             'authority': {
+  +                 'fingerprint': None,
+  +                 'grants': [
+  +                     'read',
+  +                 ],
+  +                 'source': 'harness-default',
+  +             },
+  +             'expected_outcome': {
+  +                 'verifier': None,
+  +             },
+  +             'fallback': {
+  +                 'always': 'ABSTAIN',
+  +                 'on_conflict': 'ESCALATE',
+  +                 'on_uncertain': 'ASK',
+  +             },
+  +             'intent': {
+  +                 'effects': [
+  +                     'read',
+  +                 ],
+  +                 'request': 'what branch am I on? c4a-retired-canary-5d6e',
+  +                 'revision': 'fb0e62c3b5d4',
+  +             },
+  +             'invalidation': {
+  +                 'source_revisions': {
+  +                     'claude_code': {},
+  +                     'docs': {},
+  +                     'git': {
+  +                         'head': '0c7720c8ec64b01f46e77a9775d1e0f7733573bc',
+  +                         'refs': 'f87e0308f412',
+  +                         'status': 'e3b0c44298fc',
+  +                     },
+  +                     'resource': {
+  +                         'factory': 'BALANCED',
+  +                         'posture': 'b08a902bc853',
+  +                     },
+  +                 },
+  +             },
+  +             'provenance': {
+  +                 'built_at': '2026-10-03T11:25:23Z',
+  +                 'evidence': {
+  +                     'e:348bdbf36d': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+  +                         'status --porcelain',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64+ste3b0c44298fc',
+  +                         'trust_class': 'code',
+  +                     },
+  +                     'e:58d47fc3b1': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+  +                         'branch --show-current',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64',
+  +                         'trust_class': 'code',
+  +                     },
+  +                     'e:636e55b23d': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+  +                         'log -n 8',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64',
+  +                         'trust_class': 'code',
+  +                     },
+  +                     'e:8222164a6c': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:refs/remotes/origin/HEAD',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64',
+  +                         'trust_class': 'code',
+  +                     },
+  +                     'e:975652d7e8': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+  +                         'log -1 0c7720c',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64',
+  +                         'trust_class': 'code',
+  +                     },
+  +                     'e:cde560a9a7': {
+  +                         'locator': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo:git '
+  +                         'for-each-ref refs/heads',
+  +                         'observed_at': '2026-10-03T11:25:23Z',
+  +                         'source_id': 'git:repo',
+  +                         'source_version': '0c7720c8ec64',
+  +                         'trust_class': 'code',
+  +                     },
+  +                 },
+  +                 'packet_id': '8b3d03620eb7b30b72d0',
+  +                 'packet_schema': 'z0int.state_packet.v0',
+  +             },
+  +             'schema': 'z0int.decision_opportunity.v0',
+  +             'scope': {
+  +                 'families': [
+  +                     'git.branch',
+  +                 ],
+  +                 'missing': [],
+  +                 'mode': 'question',
+  +                 'prefixes': [
+  +                     'git.branch',
+  +                 ],
+  +             },
+  +             'semantic_id': '7b6599227d7fd392defd',
+  +             'state': {
+  +                 'claims': [
+  +                     {
+  +                         'evidence': [
+  +                             'e:58d47fc3b1',
+  +                         ],
+  +                         'key': 'git.branch',
+  +                         'status': 'observed',
+  +                         'value': 'main',
+  +                     },
+  +                     {
+  +                         'evidence': [
+  +                             'e:975652d7e8',
+  +                         ],
+  +                         'key': 'git.head',
+  +                         'status': 'observed',
+  +                         'value': {
+  +                             'date': '2026-10-03T06:25:22-05:00',
+  +                             'sha': '0c7720c',
+  +                             'subject': 'init',
+  +                         },
+  +                     },
+  +                     {
+  +                         'evidence': [
+  +                             'e:636e55b23d',
+  +                         ],
+  +                         'key': 'git.recent_commits',
+  +                         'status': 'observed',
+  +                         'value': [
+  +                             {
+  +                                 'date': '2026-10-03T06:25:22-05:00',
+  +                                 'sha': '0c7720c',
+  +                                 'subject': 'init',
+  +                             },
+  +                         ],
+  +                     },
+  +                     {
+  +                         'evidence': [
+  +                             'e:8222164a6c',
+  +                         ],
+  +                         'key': 'git.default_branch',
+  +                         'status': 'observed',
+  +                         'value': 'main',
+  +                     },
+  +                     {
+  +                         'evidence': [
+  +                             'e:348bdbf36d',
+  +                         ],
+  +                         'key': 'git.dirty',
+  +                         'status': 'observed',
+  +                         'value': {
+  +                             'clean': True,
+  +                             'modified': [],
+  +                             'modified_count': 0,
+  +                             'untracked': [],
+  +                             'untracked_count': 0,
+  +                         },
+  +                     },
+  +                     {
+  +                         'evidence': [
+  +                             'e:cde560a9a7',
+  +                         ],
+  +                         'key': 'git.branches_ahead',
+  +                         'status': 'observed',
+  +                         'value': {
+  +                             'ahead': [],
+  +                             'complete': True,
+  +                             'local_branches': 1,
+  +                             'vs': 'main',
+  +                         },
+  +                     },
+  +                 ],
+  +                 'contradictions': [],
+  +                 'superseded': [],
+  +                 'unknowns': [
+  +                     {
+  +                         'blocking': False,
+  +                         'key': 'conv.latest_session',
+  +                         'reason': 'Claude Code history is unavailable on this host (no '
+  +                         'readable transcripts); session facts are UNKNOWN - '
+  +                         'abstain on questions that depend on them',
+  +                         'status': 'source_unavailable',
+  +                     },
+  +                     {
+  +                         'blocking': False,
+  +                         'key': 'docs.any',
+  +                         'reason': 'no top-level AGENTS/README/ROADMAP docs',
+  +                         'status': 'unknown',
+  +                     },
+  +                     {
+  +                         'blocking': False,
+  +                         'key': 'resource.posture',
+  +                         'reason': 'no metered budget pool observed (codexbar cache / '
+  +                         'posture.local.json); budget posture is UNKNOWN',
+  +                         'status': 'source_unavailable',
+  +                     },
+  +                 ],
+  +             },
+  +             'trace': {
+  +                 'attempt': 0,
+  +                 'harness': 'hermes',
+  +                 'opportunity_id': '4f9e73cb563e21b881c9',
+  +                 'trace_id': 's:1',
+  +             },
+  +         },
+  +         'platform': 'cli',
+  +         'repo': '/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/fix-red/tmp/pytest-of-kvn/pytest-0/test_the_retired_opportunity_c0/repo',
+  +         'schema': 'z0int.hermes.opportunity_record.v0',
+  +         'session_id': 's',
+  +     },
+  + ]
+========================= 4 failed, 1 passed in 0.72s ==========================
+
+# re-run 1 of the P-2 in-flight test after setting its close budget to 0.05 s (still HEAD 07a2272, no implementation); 2026-10-03T11:25:39Z
+F                                                                        [100%]
+=================================== FAILURES ===================================
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:282: AssertionError: assert {'/mnt/zer0mo...7.json': 1252} == {'/mnt/zer0mo...f7.json': 416}
+=========================== short test summary info ============================
+FAILED tests/test_hermes_capture.py::test_p2_a_projection_in_flight_at_close_writes_nothing_after_close
+1 failed in 0.28s
+
+# re-run 2 of the P-2 in-flight test after setting its close budget to 0.05 s (still HEAD 07a2272, no implementation); 2026-10-03T11:25:40Z
+F                                                                        [100%]
+=================================== FAILURES ===================================
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:282: AssertionError: assert {'/mnt/zer0mo...7.json': 1252} == {'/mnt/zer0mo...f7.json': 416}
+=========================== short test summary info ============================
+FAILED tests/test_hermes_capture.py::test_p2_a_projection_in_flight_at_close_writes_nothing_after_close
+1 failed in 0.21s
+
+# re-run 3 of the P-2 in-flight test after setting its close budget to 0.05 s (still HEAD 07a2272, no implementation); 2026-10-03T11:25:41Z
+F                                                                        [100%]
+=================================== FAILURES ===================================
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:282: AssertionError: assert {'/mnt/zer0mo...7.json': 1252} == {'/mnt/zer0mo...f7.json': 416}
+=========================== short test summary info ============================
+FAILED tests/test_hermes_capture.py::test_p2_a_projection_in_flight_at_close_writes_nothing_after_close
+1 failed in 0.24s

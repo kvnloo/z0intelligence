@@ -1,0 +1,18 @@
+## masks: --tmpfs /workspace/hermes-home --tmpfs ~/.z0int
+## hermes --version
+Hermes Agent vunknown (2026.9.24)
+Install directory: /mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/hermes-src
+## hermes plugins install file://<wt>#harness-adapters/hermes-z0intelligence --ref ee7cae0d9b82d3fe24c8de9eb51c4eb6e5384034 --enable --no-deps
+download failed from 
+https://hermes-assets.nousresearch.com/upstream/sha256/0ab3305457051cd3e7c031857
+e005f1bda17c218a1990567dacaaac6dd1d14f0: <urlopen error [Errno 111] Connection 
+refused> — retry, or run `hermes pm doctor`
+install exit=1 (offline: Hermes PM cannot sync its runtime environment without network)
+## fallback: the same plugin tree at the pinned SHA in plugins/, enabled in config.yaml (no Python deps to sync)
+## masks inside: hermes-home entries=0 z0int entries=0
+## installed tree
+.
+./hermes-z0intelligence
+./hermes-z0intelligence/__init__.py
+./hermes-z0intelligence/plugin.yaml
+./hermes-z0intelligence/README.md

@@ -1,0 +1,55 @@
+# C5 isolated e2e (unit-level + unmocked hook spawn), REVISE round, head 73fe3d7, 2026-10-03T05:48:55-05:00
+# cmd: bash evidence/C5-dsh-plugin/scripts/e2e.sh (each step under flock -s quiet-lane.lock, env -i isolated homes homes/C5-dsh-plugin/e2e-{on,off}, socket guards on)
+on exit=0
+off exit=0
+{
+ "counts": {
+  "opportunities": 3,
+  "outcomes": 3,
+  "failures_by_kind": {
+   "missing_verifier": 3,
+   "partial_measurement": 3
+  },
+  "shadow": 3,
+  "lineage": 7,
+  "drops": 0
+ }
+}
+PASS alias == canonical
+PASS plugin keys == python keys
+PASS 3 opportunity rows, schema
+PASS 3 outcome rows, schema
+PASS joined on turn_key
+PASS cohort interactive, model
+PASS work items: s1 two items, s2 one
+PASS drops == 0
+PASS no misattribution/unsupported failures
+PASS shadow: 3 ok rows, decision kind only
+PASS shadow requests == 3 to /v1/plan
+PASS lineage rows: 7 (6 root + 1 child)
+PASS no synthetic text in any dsh row
+PASS counters clean
+PASS replay transcript identical (capture on vs off)
+PASS capture off: no shadow requests
+check exit=0
+## state/dsh files (e2e-on):
+total 24
+-rw-r--r-- 1 kvn kvn 2376 Oct  3 05:48 failures.jsonl
+-rw-r--r-- 1 kvn kvn 3733 Oct  3 05:48 lineage.jsonl
+-rw-r--r-- 1 kvn kvn 6075 Oct  3 05:48 opportunities.jsonl
+-rw-r--r-- 1 kvn kvn 1485 Oct  3 05:48 outcomes.jsonl
+drwxr-xr-x 1 kvn kvn   84 Oct  3 05:48 sessions
+-rw-r--r-- 1 kvn kvn 1185 Oct  3 05:48 shadow_decisions.jsonl
+## e2e-off state: none
+## socket guard logs:
+(end)
+## failure rows by kind:
+3 missing_verifier {"record": "turn_outcome"}
+3 partial_measurement {"missing": ["asked_user", "assistant_messages", "tool_calls"]}
+## stderr on/off:
+(end)
+
+## DSH-source e2e (headless profile + packages/test-support/llm-replay in a scratch deepseek-harness copy): NOT RUN.
+The spec requires owner approval for it. DSH G-CAP is therefore recorded as "unit-proven only".
+Nothing here ran the dsh binary, the /usr/bin/dsh wrapper or ~/.dsh/bin/*.
+lineage.jsonl is 3733 bytes in both rounds: the lineage.mjs refactor left trace_id and every other field unchanged.

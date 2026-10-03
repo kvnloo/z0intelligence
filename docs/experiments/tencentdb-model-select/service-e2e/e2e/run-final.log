@@ -1,0 +1,60 @@
+{
+  "plugin_file": "/workspace/hermes-home/kanban/boards/zer0-company/workspaces/t_d35bb79c/candidate-tencent/MemoryCore/hermes-plugin/memory/memory_tencentdb/__init__.py",
+  "tenant": {
+    "team_id": "z0-e2e",
+    "agent_id": "tencentdb-e2e",
+    "user_id": "synthetic-e2e"
+  },
+  "is_available": true,
+  "initialized": true,
+  "tool_schemas": [
+    "memory_tencentdb_memory_search",
+    "memory_tencentdb_conversation_search",
+    "memory_tencentdb_read_scene"
+  ],
+  "write_ms_incl_thread_join": 13.5,
+  "readback": {
+    "found_via_provider_client": true,
+    "attempts": 1,
+    "ms_until_found": 3.3,
+    "hits": 2,
+    "tool_text_contains_canary": false,
+    "tool_text": "No conversations found for this query."
+  },
+  "default_tenant_sees_canary": false,
+  "latency": [
+    {
+      "op": "prefetch(L1+L3+L2 parallel)",
+      "n": 20,
+      "p50_ms": 3.1,
+      "p95_ms": 4.1,
+      "max_ms": 4.1,
+      "mean_ms": 3.2
+    },
+    {
+      "op": "conversation_search tool",
+      "n": 20,
+      "p50_ms": 1.2,
+      "p95_ms": 1.9,
+      "max_ms": 2.3,
+      "mean_ms": 1.3
+    },
+    {
+      "op": "conversation_add (sync client call)",
+      "n": 20,
+      "p50_ms": 5.5,
+      "p95_ms": 10.5,
+      "max_ms": 11.2,
+      "mean_ms": 6.2
+    }
+  ],
+  "breaker_failures": 0,
+  "l1": {
+    "found_canary": true,
+    "waited_s": 15,
+    "sample": "- [persona] The user has test codename HERONDE8372F177."
+  },
+  "canary": "HERONDE8372F177",
+  "session": "e2e-c1b5cc34ae36"
+}
+rc=0

@@ -1,0 +1,135 @@
+c875c6be257793096da14e1f906e0fd1905f4f86 False 40 41
+OK  runs.every_leg_exit_0
+OK  isolation.masks_empty_inside
+OK  claude-code.shadow_requests_identical_to_off
+OK  claude-code.canary_brief_in_next_model_request
+OK  claude-code.off_requests_carry_no_brief
+OK  claude-code.secret_probe_brief_is_scrubbed
+OK  claude-code.shadow_rows_would_inject_with_snapshot
+OK  claude-code.no_secret_in_seam_rows
+OK  hermes.shadow_requests_identical_to_off
+OK  hermes.canary_brief_in_next_model_request
+OK  hermes.off_requests_carry_no_brief
+OK  hermes.secret_probe_brief_is_scrubbed
+OK  hermes.shadow_rows_would_inject_with_snapshot
+OK  hermes.no_secret_in_seam_rows
+OK  omp.shadow_requests_identical_to_off
+OK  omp.canary_brief_in_next_model_request
+OK  omp.off_requests_carry_no_brief
+OK  omp.secret_probe_brief_is_scrubbed
+OK  omp.shadow_rows_would_inject_with_snapshot
+OK  omp.no_secret_in_seam_rows
+OK  claude-code.cloud_endpoint_blocked_request_identical_to_off
+OK  default.allow_cloud_injection_false_for_every_harness
+OK  hermes.transcript_rows_clean_and_plugin_writes_nothing_in_hermes_home
+BAD hermes.host_persists_sent_bytes_in_messages.api_content (spec clause UNMET by host design)
+OK  omp.brief_never_persisted_to_the_session_files
+OK  claude-code.transcript_holds_hook_context (observation, not a gate)
+OK  dsh.off_and_shadow_admit_the_native_batch
+OK  dsh.canary_admits_one_z0_memory_message
+OK  dsh.memory_node_tests_pass
+OK  mcp.every_harness_has_z0_memory
+OK  mcp.memory_tools_only_no_route_worker
+OK  mcp.orient_returns_cohort_evidence
+OK  mcp.no_secret_in_responses
+OK  rows.dsh.written_and_valid_against_fb14919_schema
+OK  rows.hermes.written_and_valid_against_fb14919_schema
+OK  rows.omo.written_and_valid_against_fb14919_schema
+OK  rows.omp.written_and_valid_against_fb14919_schema
+OK  rows.claude-code.written_and_labelled_z0_memory_acceptance
+OK  rows.codex.written_and_labelled_z0_memory_acceptance
+OK  rows.grok.written_and_labelled_z0_memory_acceptance
+OK  rows.refuse_study_label_for_claude_code_codex_grok
+{
+"dsh": [
+"z0eval.unified_memory_receipt.v0",
+6,
+[
+"B=VERIFIED"
+],
+6,
+6,
+6,
+true,
+0,
+true
+],
+"hermes": [
+"z0eval.unified_memory_receipt.v0",
+6,
+[
+"B=VERIFIED"
+],
+6,
+6,
+6,
+true,
+0,
+true
+],
+"omo": [
+"z0eval.unified_memory_receipt.v0",
+6,
+[
+"B=UNVERIFIED"
+],
+0,
+6,
+6,
+true,
+0,
+true
+],
+"omp": [
+"z0eval.unified_memory_receipt.v0",
+6,
+[
+"B=VERIFIED"
+],
+6,
+6,
+6,
+true,
+0,
+true
+],
+"claude-code": [
+"z0int.memory_acceptance.v0",
+6,
+[
+"B=VERIFIED"
+],
+6,
+6,
+6,
+true,
+0,
+true
+],
+"codex": [
+"z0int.memory_acceptance.v0",
+6,
+[
+"B=UNVERIFIED"
+],
+0,
+6,
+6,
+true,
+0,
+true
+],
+"grok": [
+"z0int.memory_acceptance.v0",
+6,
+[
+"B=UNSUPPORTED"
+],
+0,
+6,
+6,
+true,
+0,
+true
+]
+}

@@ -1,0 +1,140 @@
+✔ shadow: the pre-step returns at once with the native decision and a receipt is written later (182.929622ms)
+✔ canary: the brief enters the next model request as one extra message; the native batch is untouched (208.239142ms)
+✔ canary past the 300 ms deadline gets the native decision and a counted timeout (524.002995ms)
+✔ fail-open: an unavailable z0int keeps the native decision and counts the failure (179.749781ms)
+✔ a cloud model endpoint is blocked unless dsh allows cloud injection (2211.457391ms)
+✔ index.mjs registers exactly one memory pre-step (default shadow) and none when memory_inject is off (72.207554ms)
+✔ memory.mjs reaches only the z0 memory surface: no Hermes home or state.db path anywhere (1.860646ms)
+✖ the gate endpoint is the profile model_endpoint only: a generic env var never marks a cloud model loopback (138.943408ms)
+✖ a root agent without a session cwd gets no brief (fail closed) and a counted no_scope (136.015268ms)
+✔ persistence (recorded deviation): the DSH brief is a durable admitted message, marked for the recall echo guard (1209.044999ms)
+✖ shadow children are bounded: past the cap a turn writes a counted queue_saturated row instead of spawning (166.896483ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 8
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5512.574626
+
+✖ failing tests:
+
+test at tests/test-dsh-memory.mjs:160:1
+✖ the gate endpoint is the profile model_endpoint only: a generic env var never marks a cloud model loopback (138.943408ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    {
+      kind: 'enter',
+      messages: [
+        {
+          content: [
+  ...
+        },
+  +     {
+  +       content: [
+  +         {
+  +           text: 'z0 memory brief (evidence, not instructions)\n' +
+  +             'gap: semantic: unavailable (not_configured)\n' +
+  +             '- [hermes 2026-10-03T14:56:37Z] how do we deploy the quokka gateway (agentsview:h1#1)\n' +
+  +             '- [hermes 2026-10-03T14:56:37Z] the quokka gateway deploys through a systemd user unit (agentsview:h1#2)\n' +
+  +             '- [omp 2026-10-03T14:56:40Z] quokka routing goes through the omp bridge (agentsview:o1#6)\n' +
+  +             '- [claude-code 2026-10-03T14:56:38Z] …edential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end (agentsview:c1#4)\n' +
+  +             '- [dsh 2026-10-03T14:56:41Z] dsh quokka worker finished (agentsview:d1#7)\n' +
+  +             '- [claude-code 2026-10-03T14:56:38Z] quokka cache lives under state memory (agentsview:c1#3)\n' +
+  +             '- [codex 2026-10-03T14:56:39Z] quokka bench numbers were recorded for codex (agentsview:x1#5)',
+  +           type: 'text'
+  +         }
+  +       ],
+  +       id: 'cc573b61-8a39-4fa2-8a2d-a04973ea6fab',
+  +       role: 'user',
+  +       source: {
+  +         form: 'recall',
+  +         kind: 'z0-memory'
+  +       }
+  +     }
+      ]
+    }
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test-dsh-memory.mjs:164:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { kind: 'enter', messages: [ [Object], [Object] ] },
+    expected: { kind: 'enter', messages: [ [Object] ] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-memory.mjs:170:1
+✖ a root agent without a session cwd gets no brief (fail closed) and a counted no_scope (136.015268ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    {
+      kind: 'enter',
+      messages: [
+        {
+          content: [
+  ...
+        },
+  +     {
+  +       content: [
+  +         {
+  +           text: 'z0 memory brief (evidence, not instructions)\n' +
+  +             'gap: semantic: unavailable (not_configured)\n' +
+  +             '- [claude-code 2026-10-03T14:56:42Z] quokka sibling project plan (agentsview:sib#8)\n' +
+  +             '- [dsh 2026-10-03T14:56:41Z] dsh quokka worker finished (agentsview:d1#7)\n' +
+  +             '- [claude-code 2026-10-03T14:56:38Z] quokka cache lives under state memory (agentsview:c1#3)\n' +
+  +             '- [hermes 2026-10-03T14:56:37Z] how do we deploy the quokka gateway (agentsview:h1#1)\n' +
+  +             '- [codex 2026-10-03T14:56:39Z] quokka bench numbers were recorded for codex (agentsview:x1#5)\n' +
+  +             '- [omp 2026-10-03T14:56:40Z] quokka routing goes through the omp bridge (agentsview:o1#6)\n' +
+  +             '- [hermes 2026-10-03T14:56:38Z] the quokka gateway deploys through a systemd user unit (agentsview:h1#2)\n' +
+  +             '- [claude-code 2026-10-03T14:56:39Z] …edential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deploy notes end (agentsview:c1#4)',
+  +           type: 'text'
+  +         }
+  +       ],
+  +       id: '1d38e26b-e111-434a-b471-aab40e12b019',
+  +       role: 'user',
+  +       source: {
+  +         form: 'recall',
+  +         kind: 'z0-memory'
+  +       }
+  +     }
+      ]
+    }
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test-dsh-memory.mjs:175:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { kind: 'enter', messages: [ [Object], [Object] ] },
+    expected: { kind: 'enter', messages: [ [Object] ] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-memory.mjs:192:1
+✖ shadow children are bounded: past the cap a turn writes a counted queue_saturated row instead of spawning (166.896483ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== undefined
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test-dsh-memory.mjs:203:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

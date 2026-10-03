@@ -1,0 +1,4 @@
+# C1 test files + regression guards at HEAD 914dc99, 2026-10-03T09:53:14Z, isolated run.sh --guard under flock -s quiet-lane.lock
+........................................................................ [ 59%]
+..................................................                       [100%]
+122 passed in 12.25s

@@ -1,0 +1,403 @@
+# C8 red run: tests written, skeleton modules empty (no implementation)
+# tree: /mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring @ 3028e0c (+ working tree changes: 11 paths)
+# cmd: flock -s quiet-lane.lock run.sh <wt> red --guard -- python -m pytest -v -p no:cacheprovider -rfE --tb=line tests/test_memory_seam.py tests/test_memory_acceptance.py tests/test_memory_mcp_entries.py tests/test_hermes_memory.py
+============================= test session starts ==============================
+platform linux -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0 -- /mnt/zer0models/z0-wt/wiring/venv-integrate/bin/python
+rootdir: /mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 57 items
+
+tests/test_memory_seam.py::test_shadow_returns_without_waiting_and_writes_the_receipt_asynchronously FAILED [  1%]
+tests/test_memory_seam.py::test_off_is_inert_and_writes_nothing FAILED   [  3%]
+tests/test_memory_seam.py::test_default_mode_is_shadow_and_cloud_injection_is_off_for_every_harness FAILED [  5%]
+tests/test_memory_seam.py::test_canary_and_on_return_the_brief_for_the_next_request FAILED [  7%]
+tests/test_memory_seam.py::test_deadline_exceeded_gives_native_context_and_a_counted_timeout FAILED [  8%]
+tests/test_memory_seam.py::test_the_deadline_counts_from_the_job_start_the_shim_stamped FAILED [ 10%]
+tests/test_memory_seam.py::test_a_second_process_serves_the_brief_from_the_snapshot_cache_until_a_source_changes FAILED [ 12%]
+tests/test_memory_seam.py::test_replaying_a_turn_key_never_injects_twice_and_has_no_side_effect FAILED [ 14%]
+tests/test_memory_seam.py::test_replaying_a_shadow_turn_spawns_nothing FAILED [ 15%]
+tests/test_memory_seam.py::test_a_second_injector_for_the_same_turn_refuses_and_writes_double_inject_guard FAILED [ 17%]
+tests/test_memory_seam.py::test_context_resolve_owning_the_turn_blocks_the_seam FAILED [ 19%]
+tests/test_memory_seam.py::test_tencentdb_items_are_excluded_when_the_host_already_has_the_tencentdb_provider FAILED [ 21%]
+tests/test_memory_seam.py::test_a_resolver_exception_gives_native_context_and_a_counted_failure FAILED [ 22%]
+tests/test_memory_seam.py::test_with_the_required_source_removed_the_brief_states_the_gap_and_invents_nothing FAILED [ 24%]
+tests/test_memory_seam.py::test_supersession_shows_the_newer_fact_as_current_and_history_shows_both FAILED [ 26%]
+tests/test_memory_seam.py::test_fixture_secrets_never_reach_the_request_the_receipt_or_the_mcp_response FAILED [ 28%]
+tests/test_memory_seam.py::test_canary_on_refuse_a_non_loopback_endpoint_unless_that_harness_allows_cloud_injection FAILED [ 29%]
+tests/test_memory_seam.py::test_claude_code_hook_shadow_prints_nothing_and_returns_fast FAILED [ 31%]
+tests/test_memory_seam.py::test_claude_compatible_hook_injects_additional_context_in_on_mode[claude-code-ANTHROPIC_BASE_URL] FAILED [ 33%]
+tests/test_memory_seam.py::test_claude_compatible_hook_injects_additional_context_in_on_mode[codex-OPENAI_BASE_URL] FAILED [ 35%]
+tests/test_memory_seam.py::test_claude_code_hook_with_the_default_cloud_endpoint_injects_nothing FAILED [ 36%]
+tests/test_memory_seam.py::test_the_hook_fails_open_on_garbage_input FAILED [ 38%]
+tests/test_memory_seam.py::test_grok_has_no_push_seam FAILED             [ 40%]
+tests/test_memory_acceptance.py::test_the_vendored_study_files_are_the_pinned_fb14919_blobs PASSED [ 42%]
+tests/test_memory_acceptance.py::test_the_pinned_study_enum_is_exactly_dsh_hermes_omo_omp FAILED [ 43%]
+tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[dsh] ERROR [ 45%]
+tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[hermes] ERROR [ 47%]
+tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[omo] ERROR [ 49%]
+tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[omp] ERROR [ 50%]
+tests/test_memory_acceptance.py::test_cohort_cases_on_the_synthetic_fixture ERROR [ 52%]
+tests/test_memory_acceptance.py::test_an_observed_model_request_upgrades_b ERROR [ 54%]
+tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[claude-code] ERROR [ 56%]
+tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[codex] ERROR [ 57%]
+tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[grok] ERROR [ 59%]
+tests/test_memory_acceptance.py::test_grok_case_b_is_unsupported_pull_only ERROR [ 61%]
+tests/test_memory_acceptance.py::test_omo_case_b_is_unsupported_when_the_senpi_api_lacks_a_context_hook ERROR [ 63%]
+tests/test_memory_acceptance.py::test_eval_cli_writes_validated_rows_under_the_given_out ERROR [ 64%]
+tests/test_memory_acceptance.py::test_grok_rules_need_project_scope_and_owner_approval_and_write_only_scrubbed_project_content FAILED [ 66%]
+tests/test_memory_acceptance.py::test_a_grok_turn_never_writes_a_rules_file ERROR [ 68%]
+tests/test_memory_mcp_entries.py::test_every_harness_has_exactly_one_z0_memory_server_on_the_memory_profile FAILED [ 70%]
+tests/test_memory_mcp_entries.py::test_claude_code_keeps_its_route_worker_server_unchanged FAILED [ 71%]
+tests/test_memory_mcp_entries.py::test_codex_plugin_manifest_points_at_its_mcp_file FAILED [ 73%]
+tests/test_memory_mcp_entries.py::test_each_entry_serves_the_memory_tools_only_over_stdio FAILED [ 75%]
+tests/test_memory_mcp_entries.py::test_memory_push_seam_is_its_own_user_prompt_submit_entry[claude-code] FAILED [ 77%]
+tests/test_memory_mcp_entries.py::test_memory_push_seam_is_its_own_user_prompt_submit_entry[codex] FAILED [ 78%]
+tests/test_memory_mcp_entries.py::test_grok_registers_no_memory_push_hook PASSED [ 80%]
+tests/test_hermes_memory.py::test_shadow_hook_returns_without_waiting_and_the_request_is_identical_to_off FAILED [ 82%]
+tests/test_hermes_memory.py::test_shadow_writes_a_would_inject_receipt_asynchronously FAILED [ 84%]
+tests/test_hermes_memory.py::test_canary_brief_reaches_the_next_request_and_never_the_session_store FAILED [ 85%]
+tests/test_hermes_memory.py::test_canary_deadline_gives_native_context_and_a_counted_timeout FAILED [ 87%]
+tests/test_hermes_memory.py::test_fail_open_when_z0int_is_unavailable FAILED [ 89%]
+tests/test_hermes_memory.py::test_replaying_the_turn_never_injects_twice FAILED [ 91%]
+tests/test_hermes_memory.py::test_a_cloud_model_is_blocked_unless_hermes_allows_cloud_injection FAILED [ 92%]
+tests/test_hermes_memory.py::test_automatic_capture_and_memory_share_one_pre_llm_call FAILED [ 94%]
+tests/test_hermes_memory.py::test_memory_follows_the_capture_mode_when_unset FAILED [ 96%]
+tests/test_hermes_memory.py::test_tencentdb_items_are_excluded_when_hermes_uses_the_tencentdb_memory_provider FAILED [ 98%]
+tests/test_hermes_memory.py::test_post_llm_call_writes_the_memory_use_receipt_of_the_injected_turn FAILED [100%]
+
+==================================== ERRORS ====================================
+_ ERROR at setup of test_study_harness_rows_validate_against_the_pinned_receipt_schema[dsh] _
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+_ ERROR at setup of test_study_harness_rows_validate_against_the_pinned_receipt_schema[hermes] _
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+_ ERROR at setup of test_study_harness_rows_validate_against_the_pinned_receipt_schema[omo] _
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+_ ERROR at setup of test_study_harness_rows_validate_against_the_pinned_receipt_schema[omp] _
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+_________ ERROR at setup of test_cohort_cases_on_the_synthetic_fixture _________
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+_________ ERROR at setup of test_an_observed_model_request_upgrades_b __________
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+_ ERROR at setup of test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[claude-code] _
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+_ ERROR at setup of test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[codex] _
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+_ ERROR at setup of test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[grok] _
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+_________ ERROR at setup of test_grok_case_b_is_unsupported_pull_only __________
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+_ ERROR at setup of test_omo_case_b_is_unsupported_when_the_senpi_api_lacks_a_context_hook _
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+__ ERROR at setup of test_eval_cli_writes_validated_rows_under_the_given_out ___
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+_________ ERROR at setup of test_a_grok_turn_never_writes_a_rules_file _________
+E   AttributeError: module 'z0int.memory.acceptance' has no attribute 'seed_cohort'
+=================================== FAILURES ===================================
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:69: AttributeError: <module 'z0int.memory.seam' from '/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/src/z0int/memory/seam.py'> has no attribute 'resolve'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:85: AttributeError: module 'z0int.memory.seam' has no attribute 'turn'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:93: AttributeError: module 'z0int.memory.seam' has no attribute 'settings'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:58: AttributeError: module 'z0int.memory.seam' has no attribute 'turn'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:109: AttributeError: <module 'z0int.memory.seam' from '/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/src/z0int/memory/seam.py'> has no attribute 'resolve'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:118: AttributeError: <module 'z0int.memory.seam' from '/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/src/z0int/memory/seam.py'> has no attribute 'resolve'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:137: AssertionError: Traceback (most recent call last):
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:58: AttributeError: module 'z0int.memory.seam' has no attribute 'turn'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:164: AttributeError: module 'z0int.memory.seam' has no attribute 'turn'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:58: AttributeError: module 'z0int.memory.seam' has no attribute 'turn'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:58: AttributeError: module 'z0int.memory.seam' has no attribute 'turn'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:58: AttributeError: module 'z0int.memory.seam' has no attribute 'turn'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:203: AttributeError: <module 'z0int.memory.seam' from '/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/src/z0int/memory/seam.py'> has no attribute 'resolve'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:58: AttributeError: module 'z0int.memory.seam' has no attribute 'turn'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:58: AttributeError: module 'z0int.memory.seam' has no attribute 'turn'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:58: AttributeError: module 'z0int.memory.seam' has no attribute 'turn'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:58: AttributeError: module 'z0int.memory.seam' has no attribute 'turn'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:265: AttributeError: module 'z0int.memory.hook' has no attribute 'handle'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:265: AttributeError: module 'z0int.memory.hook' has no attribute 'handle'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:265: AttributeError: module 'z0int.memory.hook' has no attribute 'handle'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:265: AttributeError: module 'z0int.memory.hook' has no attribute 'handle'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:298: AttributeError: module 'z0int.memory.hook' has no attribute 'handle'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_seam.py:265: AttributeError: module 'z0int.memory.hook' has no attribute 'handle'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:53: AttributeError: module 'z0int.memory.acceptance' has no attribute 'STUDY_HARNESSES'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:138: AssertionError: usage: z0int memory [-h] {doctor,bench} ...
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_local.py:537: FileNotFoundError: [Errno 2] No such file or directory: '/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/harness-adapters/codex-z0intelligence/.mcp.json'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_mcp_entries.py:60: KeyError: 'z0-memory'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_mcp_entries.py:65: KeyError: 'mcpServers'
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_local.py:537: FileNotFoundError: [Errno 2] No such file or directory: '/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/harness-adapters/codex-z0intelligence/.mcp.json'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_mcp_entries.py:99: assert (0 == 1)
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_mcp_entries.py:99: assert (0 == 1)
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:93: KeyError: 'pre_llm_call'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:104: IndexError: list index out of range
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:115: AssertionError: assert ('z0 memory brief (evidence, not instructions)' in 'how do we deploy the quokka gateway')
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:127: AssertionError: assert [] == ['timeout']
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:134: AssertionError: assert [] == ['error']
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:140: AssertionError: assert 'agentsview:h1#' in 'how do we deploy the quokka gateway'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:149: IndexError: list index out of range
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:160: AssertionError: assert ('AUTOMATIC-CONTEXT' in 'how do we deploy the quokka gateway\n\nAUTOMATIC-CONTEXT' and 'agentsview:h1#' in 'how do we deploy the quokka gateway\n\nAUTOMATIC-CONTEXT')
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:169: assert False
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:183: AssertionError: assert ('agentsview:h1#' in 'how do we deploy the quokka gateway')
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:194: assert (0 == 1)
+=========================== short test summary info ============================
+FAILED tests/test_memory_seam.py::test_shadow_returns_without_waiting_and_writes_the_receipt_asynchronously
+FAILED tests/test_memory_seam.py::test_off_is_inert_and_writes_nothing - Attr...
+FAILED tests/test_memory_seam.py::test_default_mode_is_shadow_and_cloud_injection_is_off_for_every_harness
+FAILED tests/test_memory_seam.py::test_canary_and_on_return_the_brief_for_the_next_request
+FAILED tests/test_memory_seam.py::test_deadline_exceeded_gives_native_context_and_a_counted_timeout
+FAILED tests/test_memory_seam.py::test_the_deadline_counts_from_the_job_start_the_shim_stamped
+FAILED tests/test_memory_seam.py::test_a_second_process_serves_the_brief_from_the_snapshot_cache_until_a_source_changes
+FAILED tests/test_memory_seam.py::test_replaying_a_turn_key_never_injects_twice_and_has_no_side_effect
+FAILED tests/test_memory_seam.py::test_replaying_a_shadow_turn_spawns_nothing
+FAILED tests/test_memory_seam.py::test_a_second_injector_for_the_same_turn_refuses_and_writes_double_inject_guard
+FAILED tests/test_memory_seam.py::test_context_resolve_owning_the_turn_blocks_the_seam
+FAILED tests/test_memory_seam.py::test_tencentdb_items_are_excluded_when_the_host_already_has_the_tencentdb_provider
+FAILED tests/test_memory_seam.py::test_a_resolver_exception_gives_native_context_and_a_counted_failure
+FAILED tests/test_memory_seam.py::test_with_the_required_source_removed_the_brief_states_the_gap_and_invents_nothing
+FAILED tests/test_memory_seam.py::test_supersession_shows_the_newer_fact_as_current_and_history_shows_both
+FAILED tests/test_memory_seam.py::test_fixture_secrets_never_reach_the_request_the_receipt_or_the_mcp_response
+FAILED tests/test_memory_seam.py::test_canary_on_refuse_a_non_loopback_endpoint_unless_that_harness_allows_cloud_injection
+FAILED tests/test_memory_seam.py::test_claude_code_hook_shadow_prints_nothing_and_returns_fast
+FAILED tests/test_memory_seam.py::test_claude_compatible_hook_injects_additional_context_in_on_mode[claude-code-ANTHROPIC_BASE_URL]
+FAILED tests/test_memory_seam.py::test_claude_compatible_hook_injects_additional_context_in_on_mode[codex-OPENAI_BASE_URL]
+FAILED tests/test_memory_seam.py::test_claude_code_hook_with_the_default_cloud_endpoint_injects_nothing
+FAILED tests/test_memory_seam.py::test_the_hook_fails_open_on_garbage_input
+FAILED tests/test_memory_seam.py::test_grok_has_no_push_seam - AttributeError...
+FAILED tests/test_memory_acceptance.py::test_the_pinned_study_enum_is_exactly_dsh_hermes_omo_omp
+FAILED tests/test_memory_acceptance.py::test_grok_rules_need_project_scope_and_owner_approval_and_write_only_scrubbed_project_content
+FAILED tests/test_memory_mcp_entries.py::test_every_harness_has_exactly_one_z0_memory_server_on_the_memory_profile
+FAILED tests/test_memory_mcp_entries.py::test_claude_code_keeps_its_route_worker_server_unchanged
+FAILED tests/test_memory_mcp_entries.py::test_codex_plugin_manifest_points_at_its_mcp_file
+FAILED tests/test_memory_mcp_entries.py::test_each_entry_serves_the_memory_tools_only_over_stdio
+FAILED tests/test_memory_mcp_entries.py::test_memory_push_seam_is_its_own_user_prompt_submit_entry[claude-code]
+FAILED tests/test_memory_mcp_entries.py::test_memory_push_seam_is_its_own_user_prompt_submit_entry[codex]
+FAILED tests/test_hermes_memory.py::test_shadow_hook_returns_without_waiting_and_the_request_is_identical_to_off
+FAILED tests/test_hermes_memory.py::test_shadow_writes_a_would_inject_receipt_asynchronously
+FAILED tests/test_hermes_memory.py::test_canary_brief_reaches_the_next_request_and_never_the_session_store
+FAILED tests/test_hermes_memory.py::test_canary_deadline_gives_native_context_and_a_counted_timeout
+FAILED tests/test_hermes_memory.py::test_fail_open_when_z0int_is_unavailable
+FAILED tests/test_hermes_memory.py::test_replaying_the_turn_never_injects_twice
+FAILED tests/test_hermes_memory.py::test_a_cloud_model_is_blocked_unless_hermes_allows_cloud_injection
+FAILED tests/test_hermes_memory.py::test_automatic_capture_and_memory_share_one_pre_llm_call
+FAILED tests/test_hermes_memory.py::test_memory_follows_the_capture_mode_when_unset
+FAILED tests/test_hermes_memory.py::test_tencentdb_items_are_excluded_when_hermes_uses_the_tencentdb_memory_provider
+FAILED tests/test_hermes_memory.py::test_post_llm_call_writes_the_memory_use_receipt_of_the_injected_turn
+ERROR tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[dsh]
+ERROR tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[hermes]
+ERROR tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[omo]
+ERROR tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[omp]
+ERROR tests/test_memory_acceptance.py::test_cohort_cases_on_the_synthetic_fixture
+ERROR tests/test_memory_acceptance.py::test_an_observed_model_request_upgrades_b
+ERROR tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[claude-code]
+ERROR tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[codex]
+ERROR tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[grok]
+ERROR tests/test_memory_acceptance.py::test_grok_case_b_is_unsupported_pull_only
+ERROR tests/test_memory_acceptance.py::test_omo_case_b_is_unsupported_when_the_senpi_api_lacks_a_context_hook
+ERROR tests/test_memory_acceptance.py::test_eval_cli_writes_validated_rows_under_the_given_out
+ERROR tests/test_memory_acceptance.py::test_a_grok_turn_never_writes_a_rules_file
+=================== 42 failed, 2 passed, 13 errors in 43.57s ===================
+pytest_rc=1
+# cmd: run.sh <wt> red-node -- node --test tests/test-dsh-memory.mjs
+✖ shadow: the pre-step returns at once with the native decision and a receipt is written later (20114.610667ms)
+✖ canary: the brief enters the next model request as one extra message; the native batch is untouched (54.649667ms)
+✖ canary past the 300 ms deadline gets the native decision and a counted timeout (54.767668ms)
+✖ fail-open: an unavailable z0int keeps the native decision and counts the failure (20096.892464ms)
+✖ a cloud model endpoint is blocked unless dsh allows cloud injection (68.507472ms)
+✖ index.mjs registers exactly one memory pre-step (default shadow) and none when memory_inject is off (63.037231ms)
+✖ memory.mjs reaches only the z0 memory surface: no Hermes home or state.db path anywhere (0.272725ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 0
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 40513.357817
+
+✖ failing tests:
+
+test at tests/test-dsh-memory.mjs:69:1
+✖ shadow: the pre-step returns at once with the native decision and a receipt is written later (20114.610667ms)
+  TypeError: Cannot read properties of undefined (reading 'outcome')
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test-dsh-memory.mjs:81:20)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at tests/test-dsh-memory.mjs:86:1
+✖ canary: the brief enters the next model request as one extra message; the native batch is untouched (54.649667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 2
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test-dsh-memory.mjs:92:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-memory.mjs:108:1
+✖ canary past the 300 ms deadline gets the native decision and a counted timeout (54.767668ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   'timeout'
+  - ]
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test-dsh-memory.mjs:116:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'timeout' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-memory.mjs:119:1
+✖ fail-open: an unavailable z0int keeps the native decision and counts the failure (20096.892464ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   'error'
+  - ]
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test-dsh-memory.mjs:124:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'error' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-memory.mjs:127:1
+✖ a cloud model endpoint is blocked unless dsh allows cloud injection (68.507472ms)
+  TypeError: Cannot read properties of undefined (reading 'outcome')
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test-dsh-memory.mjs:132:34)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests/test-dsh-memory.mjs:135:1
+✖ index.mjs registers exactly one memory pre-step (default shadow) and none when memory_inject is off (63.037231ms)
+  TypeError: Cannot read properties of undefined (reading 'length')
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test-dsh-memory.mjs:137:57)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests/test-dsh-memory.mjs:145:1
+✖ memory.mjs reaches only the z0 memory surface: no Hermes home or state.db path anywhere (0.272725ms)
+  Error: ENOENT: no such file or directory, open '/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/harness-adapters/memory-client.mjs'
+      at readFileSync (node:fs:539:20)
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test-dsh-memory.mjs:147:17)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/harness-adapters/memory-client.mjs'
+  }
+node_rc=1
+# cmd: run.sh <wt> red-bun -- env SENPI_TYPES=<installed senpi types.d.ts> bun test omp-extensions/z0-memory/
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/z0-memory/index.test.ts:
+56 | const user = (text: string, ts = 1) => ({ role: "user", content: [{ type: "text", text }], timestamp: ts });
+57 | const hctx = (model = LOOPBACK, sid = "sess-1") => ({ cwd: "/w/z0", model, sessionManager: { getSessionId: () => sid } });
+58 | 
+59 | async function context(pi: ReturnType<typeof fakePi>, messages: unknown[], ctx = hctx()) {
+60 | 	const [handler] = pi.handlers.get("context") ?? [];
+61 | 	return (await handler({ type: "context", messages }, ctx)) as { messages?: any[] } | undefined;
+                    ^
+TypeError: handler is not a function. (In 'handler({ type: "context", messages }, ctx)', 'handler' is undefined)
+      at context (/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/omp-extensions/z0-memory/index.test.ts:61:16)
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/omp-extensions/z0-memory/index.test.ts:82:15)
+(fail) OMP shadow: the context handler returns undefined at once and a receipt is written later [126.72ms]
+56 | const user = (text: string, ts = 1) => ({ role: "user", content: [{ type: "text", text }], timestamp: ts });
+57 | const hctx = (model = LOOPBACK, sid = "sess-1") => ({ cwd: "/w/z0", model, sessionManager: { getSessionId: () => sid } });
+58 | 
+59 | async function context(pi: ReturnType<typeof fakePi>, messages: unknown[], ctx = hctx()) {
+60 | 	const [handler] = pi.handlers.get("context") ?? [];
+61 | 	return (await handler({ type: "context", messages }, ctx)) as { messages?: any[] } | undefined;
+                    ^
+TypeError: handler is not a function. (In 'handler({ type: "context", messages }, ctx)', 'handler' is undefined)
+      at context (/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/omp-extensions/z0-memory/index.test.ts:61:16)
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/omp-extensions/z0-memory/index.test.ts:97:20)
+(fail) OMP canary: the brief is in the next model-visible request only; history is untouched; no double injection [56.65ms]
+56 | const user = (text: string, ts = 1) => ({ role: "user", content: [{ type: "text", text }], timestamp: ts });
+57 | const hctx = (model = LOOPBACK, sid = "sess-1") => ({ cwd: "/w/z0", model, sessionManager: { getSessionId: () => sid } });
+58 | 
+59 | async function context(pi: ReturnType<typeof fakePi>, messages: unknown[], ctx = hctx()) {
+60 | 	const [handler] = pi.handlers.get("context") ?? [];
+61 | 	return (await handler({ type: "context", messages }, ctx)) as { messages?: any[] } | undefined;
+                    ^
+TypeError: handler is not a function. (In 'handler({ type: "context", messages }, ctx)', 'handler' is undefined)
+      at context (/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/omp-extensions/z0-memory/index.test.ts:61:16)
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/omp-extensions/z0-memory/index.test.ts:117:15)
+(fail) OMP canary past the deadline is native with a counted timeout; fail-open; cloud blocked [56.75ms]
+127 | 
+128 | test("OMO: the senpi shim loads, and with a context hook the brief reaches the next request", async () => {
+129 | 	const h = fixture("canary");
+130 | 	const pi = fakePi(SENPI_EVENTS);
+131 | 	const out = omo(pi);
+132 | 	expect(out).toEqual({ status: "SUPPORTED", missing: [] });
+                   ^
+error: expect(received).toEqual(expected)
+
+  {
+    "missing": [],
+-   "status": "SUPPORTED",
++   "status": "UNSUPPORTED",
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/omp-extensions/z0-memory/index.test.ts:132:14)
+(fail) OMO: the senpi shim loads, and with a context hook the brief reaches the next request [57.26ms]
+136 | }, 30000);
+137 | 
+138 | test("OMO without a context hook records B=UNSUPPORTED instead of passing", () => {
+139 | 	const h = fixture("canary");
+140 | 	const out = omo(fakePi(SENPI_EVENTS.filter(e => e !== "context")));
+141 | 	expect(out).toEqual({ status: "UNSUPPORTED", missing: ["context"] });
+                   ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "missing": [
+-     "context",
+-   ],
++   "missing": [],
+    "status": "UNSUPPORTED",
+  }
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/omp-extensions/z0-memory/index.test.ts:141:14)
+(fail) OMO without a context hook records B=UNSUPPORTED instead of passing [59.55ms]
+(pass) the installed senpi declares the context event (else UNSUPPORTED is recorded) [3.32ms]
+(pass) the omo entry is a one-line re-export activation can write [0.97ms]
+
+ 2 pass
+ 5 fail
+ 9 expect() calls
+Ran 7 tests across 1 file. [494.00ms]
+bun_rc=1

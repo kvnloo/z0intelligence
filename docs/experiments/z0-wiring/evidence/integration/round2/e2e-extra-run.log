@@ -1,0 +1,10 @@
+{
+ "passed": 13,
+ "total": 17,
+ "failed": [
+  "memory.opportunity_record_memory_joined (DoD D3 \"MemoryUseReceipt in opportunity records\")",
+  "learn.harness_generic_export_nonzero_rows_all_7",
+  "learn.harness_generic_verify_all_7",
+  "learn.tick_entry_point_runs_once"
+ ]
+}

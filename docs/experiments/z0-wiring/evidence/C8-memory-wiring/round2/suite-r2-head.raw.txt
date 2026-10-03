@@ -1,0 +1,34 @@
+tree=/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring head=41aec0fa5795ba77054347813c7b1303ba0b6868 start=2026-10-03T16:00:22Z
+........................................................................ [  5%]
+........................................................................ [ 11%]
+........................................................................ [ 17%]
+........................................................................ [ 23%]
+........................................................................ [ 28%]
+........................................................................ [ 34%]
+........................................................................ [ 40%]
+...........FFFFF........................................................ [ 46%]
+..........ss...........................x................F............... [ 52%]
+........................................................................ [ 57%]
+........................................................................ [ 63%]
+........................................................................ [ 69%]
+..............................................ss........................ [ 75%]
+........................................................................ [ 81%]
+.........F....F...F..FF.F............................................... [ 86%]
+.........s.s............................................................ [ 92%]
+........................................................................ [ 98%]
+...................                                                      [100%]
+=========================== short test summary info ============================
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+FAILED tests/test_hook_adapter.py::test_hook_subprocess_wall_time_is_within_bare_python_plus_40ms
+FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+FAILED tests/test_quota_budget.py::test_empty_authority_capacity - assert False
+FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily - KeyEr...
+FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+12 failed, 1224 passed, 6 skipped, 1 xfailed in 297.57s (0:04:57)
+pytest_rc=1 end=2026-10-03T16:05:23Z

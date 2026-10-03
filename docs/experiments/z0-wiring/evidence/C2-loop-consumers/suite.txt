@@ -1,0 +1,19 @@
+# C2 full suite, round 2 (isolated runner, socket guard, flock -s quiet-lane.lock):
+#   python -m pytest -q -p no:cacheprovider -rfE --tb=no tests     (scripts/suite.sh; raw: suite-base.raw.txt, suite-head.raw.txt)
+base 914dc99 (temporary worktree wt/C2-loop-consumers-base, removed after the run): 11 failed, 1018 passed, 4 skipped
+head 352edf2:                                                                        13 failed, 1084 passed, 4 skipped
+
+Base failure set (11) = C1's recorded set: test_functions_verify live x5, test_provider_saturation x1, test_quota_budget x5.
+Head = the same 11 + 2:
+  tests/test_agentweb_bridge_overload.py::test_host_overload_is_503_before_handler_execution
+  tests/test_intelligence_service.py::test_health_and_bounded_admission
+Both are load/timing-sensitive service tests in files and modules C2 does not touch (C2 diff vs 914dc99: legacy_import,
+loop_export, outcome_verifier, turn_readers + their tests/fixtures only). The head suite ran while the C3 and C7
+suites were running on the shared lane. Isolated rerun (suite-isolated.raw.txt, under the lock): those 2 plus the round 1
+timing test test_hook_adapter::test_prompt_handler_returns_under_5ms_p99_with_the_build_detached -> 3 passed on head
+352edf2 AND 3 passed on base 914dc99. The round 1 timing failure did not recur in this head suite.
+=> No new deterministic failures; the persistent failure set is identical (11) on base and head.
+
+Regression guard: cc-verify-head.json (352edf2) == cc-verify-6fee859.json, sha256 fc8b94c2...e655; test_cc_export_regression green in the head suite.
+Note: round 1's suite.sh wrote its raw output relative to the tree it cd'd into; fixed (realpath of the out arg).
+Round 1 raw files are kept as suite-*-r1.raw.txt (head 6f5855f: 12 failed / 1077 passed; base was never completed).

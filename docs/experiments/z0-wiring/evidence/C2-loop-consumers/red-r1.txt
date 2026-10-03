@@ -1,0 +1,192 @@
+# C2-loop-consumers: RED run at test commit 0bceec9 (tests only, on C1 head 914dc99; no implementation) (2026-10-03T10:27:26Z) HEAD 0bceec9 + worktree changes
+# cmd: flock -s quiet-lane.lock run.sh <wt> red --guard -- python -m pytest -v -p no:cacheprovider -rfE --tb=line tests/test_turn_readers.py tests/test_verify_harness.py tests/test_loop_tables.py tests/test_legacy_import.py (cwd=<wt>)
+============================= test session starts ==============================
+platform linux -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0 -- /mnt/zer0models/z0-wt/venv-claude-code/bin/python
+rootdir: /mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 60 items
+
+tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[hermes] FAILED [  1%]
+tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[codex] FAILED [  3%]
+tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[grok] FAILED [  5%]
+tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[omp] FAILED [  6%]
+tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[omo] FAILED [  8%]
+tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[dsh] FAILED [ 10%]
+tests/test_turn_readers.py::test_join_rule_hermes_session_plus_user_message_ordinal FAILED [ 11%]
+tests/test_turn_readers.py::test_join_rule_hermes_two_candidate_rows_are_unjoined_and_counted FAILED [ 13%]
+tests/test_turn_readers.py::test_join_rule_codex_hook_session_and_turn_id_by_user_message_ordinal FAILED [ 15%]
+tests/test_turn_readers.py::test_join_rule_codex_ordinal_mismatch_is_unjoined FAILED [ 16%]
+tests/test_turn_readers.py::test_join_rule_grok_session_env_by_user_message_ordinal FAILED [ 18%]
+tests/test_turn_readers.py::test_join_rule_grok_ambiguity_is_unjoined FAILED [ 20%]
+tests/test_turn_readers.py::test_join_rule_omp_omo_bridge_session_by_user_message_ordinal[omp] FAILED [ 21%]
+tests/test_turn_readers.py::test_join_rule_omp_omo_bridge_session_by_user_message_ordinal[omo] FAILED [ 23%]
+tests/test_turn_readers.py::test_join_rule_dsh_lineage_turn_key_joins_deepseek_harness FAILED [ 25%]
+tests/test_turn_readers.py::test_join_rule_dsh_without_the_deepseek_harness_agent_is_reader_unavailable FAILED [ 26%]
+tests/test_turn_readers.py::test_cohort_classifier_per_harness[hermes-meta0-automated] FAILED [ 28%]
+tests/test_turn_readers.py::test_cohort_classifier_per_harness[hermes-meta1-automated] FAILED [ 30%]
+tests/test_turn_readers.py::test_cohort_classifier_per_harness[hermes-meta2-automated] FAILED [ 31%]
+tests/test_turn_readers.py::test_cohort_classifier_per_harness[hermes-meta3-interactive] FAILED [ 33%]
+tests/test_turn_readers.py::test_cohort_classifier_per_harness[codex-meta4-automated] FAILED [ 35%]
+tests/test_turn_readers.py::test_cohort_classifier_per_harness[codex-meta5-automated] FAILED [ 36%]
+tests/test_turn_readers.py::test_cohort_classifier_per_harness[codex-meta6-interactive] FAILED [ 38%]
+tests/test_turn_readers.py::test_cohort_classifier_per_harness[grok-meta7-automated] FAILED [ 40%]
+tests/test_turn_readers.py::test_cohort_classifier_per_harness[omp-meta8-agent] FAILED [ 41%]
+tests/test_turn_readers.py::test_cohort_classifier_per_harness[omo-meta9-agent] FAILED [ 43%]
+tests/test_turn_readers.py::test_cohort_classifier_per_harness[dsh-meta10-interactive] FAILED [ 45%]
+tests/test_turn_readers.py::test_cohort_classifier_capture_flags_win_and_no_metadata_is_unknown FAILED [ 46%]
+tests/test_turn_readers.py::test_cohort_lands_on_verified_rows_and_never_pools_into_interactive FAILED [ 48%]
+tests/test_turn_readers.py::test_claude_code_transcript_cohort_is_unchanged PASSED [ 50%]
+tests/test_turn_readers.py::test_reader_is_read_only FAILED              [ 51%]
+tests/test_turn_readers.py::test_reader_supports_both_known_user_versions[74] FAILED [ 53%]
+tests/test_turn_readers.py::test_reader_supports_both_known_user_versions[113] FAILED [ 55%]
+tests/test_turn_readers.py::test_unknown_user_version_is_a_reader_unavailable_row_not_empty_success FAILED [ 56%]
+tests/test_turn_readers.py::test_stale_index_gives_pending_index_never_negative FAILED [ 58%]
+tests/test_verify_harness.py::test_label_source_empty_names_the_resolved_dir_and_degrades_the_report FAILED [ 60%]
+tests/test_verify_harness.py::test_claude_code_rows_through_verify_harness_equal_verify FAILED [ 61%]
+tests/test_verify_harness.py::test_reader_rerun_is_idempotent_by_watermark FAILED [ 63%]
+tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[claude-code] FAILED [ 65%]
+tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[codex] FAILED [ 66%]
+tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[grok] FAILED [ 68%]
+tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[hermes] FAILED [ 70%]
+tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[omp] FAILED [ 71%]
+tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[omo] FAILED [ 73%]
+tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[dsh] FAILED [ 75%]
+tests/test_loop_tables.py::test_export_tables_split_by_harness_and_cohort_and_count_what_they_cannot_use FAILED [ 76%]
+tests/test_loop_tables.py::test_the_table_api_cannot_pool_harnesses_or_cohorts FAILED [ 78%]
+tests/test_loop_tables.py::test_first_opportunity_falls_back_to_recorded_at_when_no_packet_was_built FAILED [ 80%]
+tests/test_loop_tables.py::test_loop_merge_keeps_host_provenance_and_is_reproducible FAILED [ 81%]
+tests/test_loop_tables.py::test_loop_merge_refuses_to_pool_harnesses_cohorts_or_schema_versions FAILED [ 83%]
+tests/test_loop_tables.py::test_merged_tables_refuse_text_keys FAILED    [ 85%]
+tests/test_loop_tables.py::test_loop_cli_export_and_merge FAILED         [ 86%]
+tests/test_legacy_import.py::test_omp_v1_spine_imports_gold_and_negative_tiers_as_the_only_labels FAILED [ 88%]
+tests/test_legacy_import.py::test_omp_v1_rerun_adds_zero_rows_and_keeps_the_manifest FAILED [ 90%]
+tests/test_legacy_import.py::test_cognition_shadow_keeps_served_answers_only FAILED [ 91%]
+tests/test_legacy_import.py::test_dsh_jev_receipts_become_legacy_shadow_decisions_never_gold FAILED [ 93%]
+tests/test_legacy_import.py::test_dsh_importer_never_reads_hermes_home FAILED [ 95%]
+tests/test_legacy_import.py::test_every_importer_is_idempotent_by_watermark FAILED [ 96%]
+tests/test_legacy_import.py::test_new_tables_refuse_text_keys FAILED     [ 98%]
+tests/test_legacy_import.py::test_legacy_import_cli FAILED               [100%]
+
+=================================== FAILURES ===================================
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:282: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:282: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:282: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:282: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:282: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:282: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:282: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:282: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:282: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:282: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:282: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:286: AttributeError: 'NoneType' object has no attribute 'classify_cohort'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:323: AttributeError: 'NoneType' object has no attribute 'AgentsViewReader'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_turn_readers.py:43: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_verify_harness.py:23: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_verify_harness.py:48: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_verify_harness.py:64: AttributeError: module 'z0int.outcome_verifier' has no attribute 'verify_harness'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:42: AttributeError: module 'z0int.loop_export' has no attribute 'export_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:42: AttributeError: module 'z0int.loop_export' has no attribute 'export_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:42: AttributeError: module 'z0int.loop_export' has no attribute 'export_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:42: AttributeError: module 'z0int.loop_export' has no attribute 'export_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:42: AttributeError: module 'z0int.loop_export' has no attribute 'export_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:42: AttributeError: module 'z0int.loop_export' has no attribute 'export_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:42: AttributeError: module 'z0int.loop_export' has no attribute 'export_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:63: AttributeError: module 'z0int.loop_export' has no attribute 'export_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:84: AttributeError: module 'z0int.loop_export' has no attribute 'build_tables'. Did you mean: 'build_table'?
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:105: AssertionError: assert '~' == '2026-09-30T09:00:00Z'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:118: AttributeError: module 'z0int.loop_export' has no attribute 'export_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:140: AttributeError: module 'z0int.loop_export' has no attribute 'merge_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:118: AttributeError: module 'z0int.loop_export' has no attribute 'export_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_loop_tables.py:118: AttributeError: module 'z0int.loop_export' has no attribute 'export_tables'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_legacy_import.py:61: AttributeError: 'NoneType' object has no attribute 'import_omp_v1'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_legacy_import.py:79: AttributeError: 'NoneType' object has no attribute 'import_omp_v1'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_legacy_import.py:108: AttributeError: 'NoneType' object has no attribute 'import_cognition_shadow'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_legacy_import.py:152: AttributeError: 'NoneType' object has no attribute 'import_dsh_jev'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_legacy_import.py:183: AttributeError: 'NoneType' object has no attribute 'import_dsh_jev'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_legacy_import.py:196: AttributeError: 'NoneType' object has no attribute 'import_omp_v1'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_legacy_import.py:209: AttributeError: 'NoneType' object has no attribute 'import_omp_v1'
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers-red/tests/test_legacy_import.py:223: AttributeError: 'NoneType' object has no attribute '_main'
+=========================== short test summary info ============================
+FAILED tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[hermes]
+FAILED tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[codex]
+FAILED tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[grok]
+FAILED tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[omp]
+FAILED tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[omo]
+FAILED tests/test_turn_readers.py::test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview[dsh]
+FAILED tests/test_turn_readers.py::test_join_rule_hermes_session_plus_user_message_ordinal
+FAILED tests/test_turn_readers.py::test_join_rule_hermes_two_candidate_rows_are_unjoined_and_counted
+FAILED tests/test_turn_readers.py::test_join_rule_codex_hook_session_and_turn_id_by_user_message_ordinal
+FAILED tests/test_turn_readers.py::test_join_rule_codex_ordinal_mismatch_is_unjoined
+FAILED tests/test_turn_readers.py::test_join_rule_grok_session_env_by_user_message_ordinal
+FAILED tests/test_turn_readers.py::test_join_rule_grok_ambiguity_is_unjoined
+FAILED tests/test_turn_readers.py::test_join_rule_omp_omo_bridge_session_by_user_message_ordinal[omp]
+FAILED tests/test_turn_readers.py::test_join_rule_omp_omo_bridge_session_by_user_message_ordinal[omo]
+FAILED tests/test_turn_readers.py::test_join_rule_dsh_lineage_turn_key_joins_deepseek_harness
+FAILED tests/test_turn_readers.py::test_join_rule_dsh_without_the_deepseek_harness_agent_is_reader_unavailable
+FAILED tests/test_turn_readers.py::test_cohort_classifier_per_harness[hermes-meta0-automated]
+FAILED tests/test_turn_readers.py::test_cohort_classifier_per_harness[hermes-meta1-automated]
+FAILED tests/test_turn_readers.py::test_cohort_classifier_per_harness[hermes-meta2-automated]
+FAILED tests/test_turn_readers.py::test_cohort_classifier_per_harness[hermes-meta3-interactive]
+FAILED tests/test_turn_readers.py::test_cohort_classifier_per_harness[codex-meta4-automated]
+FAILED tests/test_turn_readers.py::test_cohort_classifier_per_harness[codex-meta5-automated]
+FAILED tests/test_turn_readers.py::test_cohort_classifier_per_harness[codex-meta6-interactive]
+FAILED tests/test_turn_readers.py::test_cohort_classifier_per_harness[grok-meta7-automated]
+FAILED tests/test_turn_readers.py::test_cohort_classifier_per_harness[omp-meta8-agent]
+FAILED tests/test_turn_readers.py::test_cohort_classifier_per_harness[omo-meta9-agent]
+FAILED tests/test_turn_readers.py::test_cohort_classifier_per_harness[dsh-meta10-interactive]
+FAILED tests/test_turn_readers.py::test_cohort_classifier_capture_flags_win_and_no_metadata_is_unknown
+FAILED tests/test_turn_readers.py::test_cohort_lands_on_verified_rows_and_never_pools_into_interactive
+FAILED tests/test_turn_readers.py::test_reader_is_read_only - AttributeError:...
+FAILED tests/test_turn_readers.py::test_reader_supports_both_known_user_versions[74]
+FAILED tests/test_turn_readers.py::test_reader_supports_both_known_user_versions[113]
+FAILED tests/test_turn_readers.py::test_unknown_user_version_is_a_reader_unavailable_row_not_empty_success
+FAILED tests/test_turn_readers.py::test_stale_index_gives_pending_index_never_negative
+FAILED tests/test_verify_harness.py::test_label_source_empty_names_the_resolved_dir_and_degrades_the_report
+FAILED tests/test_verify_harness.py::test_claude_code_rows_through_verify_harness_equal_verify
+FAILED tests/test_verify_harness.py::test_reader_rerun_is_idempotent_by_watermark
+FAILED tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[claude-code]
+FAILED tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[codex]
+FAILED tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[grok]
+FAILED tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[hermes]
+FAILED tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[omp]
+FAILED tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[omo]
+FAILED tests/test_loop_tables.py::test_export_accepts_every_harness_v0_record_family[dsh]
+FAILED tests/test_loop_tables.py::test_export_tables_split_by_harness_and_cohort_and_count_what_they_cannot_use
+FAILED tests/test_loop_tables.py::test_the_table_api_cannot_pool_harnesses_or_cohorts
+FAILED tests/test_loop_tables.py::test_first_opportunity_falls_back_to_recorded_at_when_no_packet_was_built
+FAILED tests/test_loop_tables.py::test_loop_merge_keeps_host_provenance_and_is_reproducible
+FAILED tests/test_loop_tables.py::test_loop_merge_refuses_to_pool_harnesses_cohorts_or_schema_versions
+FAILED tests/test_loop_tables.py::test_merged_tables_refuse_text_keys - Attri...
+FAILED tests/test_loop_tables.py::test_loop_cli_export_and_merge - AttributeE...
+FAILED tests/test_legacy_import.py::test_omp_v1_spine_imports_gold_and_negative_tiers_as_the_only_labels
+FAILED tests/test_legacy_import.py::test_omp_v1_rerun_adds_zero_rows_and_keeps_the_manifest
+FAILED tests/test_legacy_import.py::test_cognition_shadow_keeps_served_answers_only
+FAILED tests/test_legacy_import.py::test_dsh_jev_receipts_become_legacy_shadow_decisions_never_gold
+FAILED tests/test_legacy_import.py::test_dsh_importer_never_reads_hermes_home
+FAILED tests/test_legacy_import.py::test_every_importer_is_idempotent_by_watermark
+FAILED tests/test_legacy_import.py::test_new_tables_refuse_text_keys - Attrib...
+FAILED tests/test_legacy_import.py::test_legacy_import_cli - AttributeError: ...
+========================= 59 failed, 1 passed in 2.81s =========================
+# socket guard violations: 0

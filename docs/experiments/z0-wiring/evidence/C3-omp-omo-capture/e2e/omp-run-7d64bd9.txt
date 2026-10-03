@@ -1,0 +1,74 @@
+# C3 isolated e2e at 7d64bd9fdba95a4fd6d8af87303230c22999998b (committed, clean tree: 0 changed paths)
+# omp omp/18.4.2; cmd: flock -s quiet-lane.lock scripts/e2e_omp.sh <wt> /mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/e2e <venv python> 11548 11549 3
+## omp run 1
+omp exit=0 wall_s=2.5888
+## omp run 2
+omp exit=0 wall_s=1.65012
+## omp run 3
+omp exit=0 wall_s=1.65468
+## baseline omp run 1 (no extensions)
+omp exit=0 wall_s=1.55818
+## baseline omp run 2 (no extensions)
+omp exit=0 wall_s=1.65734
+## baseline omp run 3 (no extensions)
+omp exit=0 wall_s=1.74891
+# check: e2e_check.py /mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/e2e 3
+{
+  "ok": true,
+  "checks": {
+    "one_opportunity_per_run": true,
+    "one_outcome_per_run": true,
+    "all_joined_on_turn_key": true,
+    "join_fields_agree": true,
+    "schemas": true,
+    "cohort_interactive": true,
+    "task_cwd_repo": true,
+    "request_text_not_stored": true,
+    "execution_completed_true_verified_null": true,
+    "session_id_from_omp_session_manager": true,
+    "no_drops": true,
+    "bridge_jsonl_rows": true,
+    "bridge_jsonl_no_prompt_field": true,
+    "no_marker_text_anywhere_in_z0home": true,
+    "backend_unavailable_counted": true,
+    "no_shadow_answer_rows_for_dead_backend": true
+  },
+  "counts": {
+    "opportunities": 3,
+    "outcomes": 3,
+    "failure_kinds": [
+      "missing_verifier",
+      "partial_measurement"
+    ],
+    "failures": 6,
+    "drops": 0,
+    "bridge_rows": 3,
+    "counters": {
+      "backend_unavailable": 3
+    }
+  },
+  "gates": [
+    "ACT",
+    "ACT",
+    "ACT"
+  ],
+  "marker_leaks": {}
+}
+check exit=0
+# stub request log (roles only, no text):
+{"ts": 1791025882.2127194, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user"], "tools": 12}
+{"ts": 1791025882.299839, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user", "assistant", "tool"], "tools": 12}
+{"ts": 1791025883.892185, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user"], "tools": 12}
+{"ts": 1791025883.9518282, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user", "assistant", "tool"], "tools": 12}
+{"ts": 1791025885.553434, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user"], "tools": 12}
+{"ts": 1791025885.6119666, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user", "assistant", "tool"], "tools": 12}
+{"ts": 1791025887.1042552, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user"], "tools": 11}
+{"ts": 1791025887.1614947, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user", "assistant", "tool"], "tools": 11}
+{"ts": 1791025888.7716317, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user"], "tools": 11}
+{"ts": 1791025888.8299239, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user", "assistant", "tool"], "tools": 11}
+{"ts": 1791025890.521557, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user"], "tools": 11}
+{"ts": 1791025890.5810544, "path": "/v1/chat/completions", "model": "bridge-fake", "roles": ["system", "user", "assistant", "tool"], "tools": 11}
+# omp stderr tails:
+omp-err-1.txt: 
+omp-err-2.txt: 
+omp-err-3.txt: 

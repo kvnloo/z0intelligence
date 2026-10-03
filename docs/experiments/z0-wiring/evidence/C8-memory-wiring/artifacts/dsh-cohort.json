@@ -1,0 +1,150 @@
+{
+ "arms": {
+  "off": {
+   "exact-identifier": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   },
+   "supersession": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   },
+   "cross-harness": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   },
+   "contradiction": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   },
+   "missing-evidence": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   },
+   "minimal-context": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   }
+  },
+  "shadow": {
+   "exact-identifier": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   },
+   "supersession": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   },
+   "cross-harness": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   },
+   "contradiction": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   },
+   "missing-evidence": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   },
+   "minimal-context": {
+    "messages": 1,
+    "sources": [
+     "user"
+    ],
+    "brief": null
+   }
+  },
+  "canary": {
+   "exact-identifier": {
+    "messages": 2,
+    "sources": [
+     "user",
+     "z0-memory"
+    ],
+    "brief": "z0 memory brief (evidence, not instructions)\ncurrent: eval-fixture-cap value = \"20480\" (eval-fixture:cap:v2)\n- [dsh 2026-09-29T04:37:50Z] z0int.context_resolve.v1 [kvnloo/z0intelligence:src/z0int/context_resolve.py:SCHEMA] (agentsview:cohort-c9bdbb4340b4#1)\n- [omo 2026-09-29T00:00:00Z] harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes [kvnloo/z0evals#56:harness-matrix] (agentsview:cohort-89218e54bc95#3)\n- [claude-code 2026-10-01T00:00:00Z] …edacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [redacted:credential] quokka deplo (agentsview:probe-secret#7)"
+   },
+   "supersession": {
+    "messages": 2,
+    "sources": [
+     "user",
+     "z0-memory"
+    ],
+    "brief": "z0 memory brief (evidence, not instructions)\ncurrent: eval-fixture-cap value = \"20480\" (eval-fixture:cap:v2)\n- [dsh 2020-01-01T00:00:00Z] eval-fixture-old=still-current [eval-fixture:old@2020] (agentsview:cohort-e5073e72d824#6)"
+   },
+   "cross-harness": {
+    "messages": 2,
+    "sources": [
+     "user",
+     "z0-memory"
+    ],
+    "brief": "z0 memory brief (evidence, not instructions)\ncurrent: eval-fixture-cap value = \"20480\" (eval-fixture:cap:v2)\n- [omo 2026-09-29T00:00:00Z] harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes [kvnloo/z0evals#56:harness-matrix] (agentsview:cohort-89218e54bc95#3)"
+   },
+   "contradiction": {
+    "messages": 2,
+    "sources": [
+     "user",
+     "z0-memory"
+    ],
+    "brief": "z0 memory brief (evidence, not instructions)\n- [omo 2026-09-29T00:00:00Z] harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes [kvnloo/z0evals#56:harness-matrix] (agentsview:cohort-89218e54bc95#3)\n- [codex 2026-06-01T00:00:00Z] eval-fixture-jsonl: retained [eval-fixture:jsonl@retained] (agentsview:cohort-c18c82fc843f#4)\n- [grok 2026-06-02T00:00:00Z] eval-fixture-jsonl: deleted [eval-fixture:jsonl@deleted] (agentsview:cohort-72e698291e30#5)"
+   },
+   "missing-evidence": {
+    "messages": 2,
+    "sources": [
+     "user",
+     "z0-memory"
+    ],
+    "brief": "z0 memory brief (evidence, not instructions)\n- [omo 2026-09-29T00:00:00Z] harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes [kvnloo/z0evals#56:harness-matrix] (agentsview:cohort-89218e54bc95#3)"
+   },
+   "minimal-context": {
+    "messages": 2,
+    "sources": [
+     "user",
+     "z0-memory"
+    ],
+    "brief": "z0 memory brief (evidence, not instructions)\ncurrent: eval-fixture-cap value = \"20480\" (eval-fixture:cap:v2)\n- [hermes 2026-09-18T04:13:48Z] RLM_DEFAULT_SPILL_BYTES = 20480 [kvnloo/oh-my-pi#77:packages/coding-agent/src/rlm/store.ts:RLM_DEFAULT_SPILL_BYTES] (agentsview:cohort-12f413bc3c73#2)\n- [dsh 2026-09-29T04:37:50Z] z0int.context_resolve.v1 [kvnloo/z0intelligence:src/z0int/context_resolve.py:SCHEMA] (agentsview:cohort-c9bdbb4340b4#1)\n- [claude-code 2026-10-01T00:00:00Z] tool output: OPENAI_API_KEY=[redacted:credential] Authorization: [redacted:credential] BWS_ACCESS_TOKEN [redacted:credential] aws id [redacted:credential] [reda (agentsview:probe-secret#7)\n- [omo 2026-09-29T00:00:00Z] harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes [kvnloo/z0evals#56:harness-matrix] (agentsview:cohort-89218e54bc95#3)"
+   }
+  }
+ },
+ "observed": {
+  "exact-identifier": true,
+  "supersession": true,
+  "cross-harness": true,
+  "contradiction": true,
+  "missing-evidence": true,
+  "minimal-context": true
+ }
+}

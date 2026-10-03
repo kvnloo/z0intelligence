@@ -1,0 +1,74 @@
+integrate HEAD b99bc316e2d23e3f0d901b5fe7542d4ce1058060 clean=0 start 2026-10-03T16:47:16Z
+### claude-code
+claude on-1 exit=0
+claude off-1 exit=0
+claude off-2 exit=0
+claude on-2 exit=0
+### codex
+## codex plugin marketplace add
+Added marketplace `z0intelligence` from /mnt/zer0models/z0-wt/wiring/wt/integrate.
+Installed marketplace root: /mnt/zer0models/z0-wt/wiring/wt/integrate
+## codex plugin add
+Added plugin `codex-z0intelligence` from marketplace `z0intelligence`.
+Installed plugin root: /mnt/zer0models/z0-wt/wiring/homes/integration-r2/e2e/codex/codex/plugins/cache/z0intelligence/codex-z0intelligence/0.1.0
+codex on-1 exit=0
+codex off-1 exit=0
+codex off-2 exit=0
+codex on-2 exit=0
+### grok
+{"rc_nonzero": {"on": 0, "off": 0}, "hook_calls": {"on": 12, "off": 12}}
+### omp
+omp on-1 exit=0
+omp off-1 exit=0
+omp none-1 exit=0
+omp none-2 exit=0
+omp off-2 exit=0
+omp on-2 exit=0
+### omo
+omo on-1 exit=0
+omo off-1 exit=0
+omo none-1 exit=0
+omo none-2 exit=0
+omo off-2 exit=0
+omo on-2 exit=0
+### hermes
+## hermes --version
+Hermes Agent vunknown (2026.9.24)
+Install directory: /mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/hermes-src
+## masks inside: hermes-home entries=0 z0int entries=0
+hermes off-1 exit=0
+hermes shadow-1 exit=0
+hermes shadow-2 exit=0
+hermes off-2 exit=0
+hermes off-3 exit=0
+hermes shadow-3 exit=0
+hermes unavailable-1 exit=0
+### dsh
+dsh on exit=0
+dsh off exit=0
+### learn
+## 1 verify (claude-code)
+verify exit=0
+## 1b verify --harness for the other harnesses (C2-loop-consumers is not verified, so no such option exists here)
+verify --harness codex exit=2 (z0int outcomes: error: unrecognized arguments: --harness codex)
+## 2 export per harness
+export claude-code exit=0 {"rows":4,"with_features":4,"with_label_row":4,"resolved":0,"states":{"unverified":4},"groups":2,"groups_with_resolved":0,"gate":{"ACT":2,"ASK":2},"observed_action":{"ACT":4},"cohort":{"agent":4},"day
+export codex exit=0 {"rows":0,"with_features":0,"with_label_row":0,"resolved":0,"states":{},"groups":0,"groups_with_resolved":0,"gate":{},"observed_action":{},"cohort":{},"days":{}}
+export grok exit=0 {"rows":0,"with_features":0,"with_label_row":0,"resolved":0,"states":{},"groups":0,"groups_with_resolved":0,"gate":{},"observed_action":{},"cohort":{},"days":{}}
+export hermes exit=0 {"rows":0,"with_features":0,"with_label_row":0,"resolved":0,"states":{},"groups":0,"groups_with_resolved":0,"gate":{},"observed_action":{},"cohort":{},"days":{}}
+export omp exit=0 {"rows":0,"with_features":0,"with_label_row":0,"resolved":0,"states":{},"groups":0,"groups_with_resolved":0,"gate":{},"observed_action":{},"cohort":{},"days":{}}
+export omo exit=0 {"rows":0,"with_features":0,"with_label_row":0,"resolved":0,"states":{},"groups":0,"groups_with_resolved":0,"gate":{},"observed_action":{},"cohort":{},"days":{}}
+export dsh exit=0 {"rows":0,"with_features":0,"with_label_row":0,"resolved":0,"states":{},"groups":0,"groups_with_resolved":0,"gate":{},"observed_action":{},"cohort":{},"days":{}}
+## 3 cross-harness frozen bundle (harness_capture.freeze)
+{"rows": 87, "by_schema": {"z0int.claude_code.failure.v0": 3, "z0int.claude_code.opportunity_record.v0": 4, "z0int.claude_code.turn_outcome.v0": 4, "z0int.codex.failure.v0": 4, "z0int.codex.opportunity_record.v0": 2, "z0int.codex.turn_outcome.v0": 2, "z0int.dsh.failure.v0": 6, "z0int.dsh.opportunity_record.v0": 3, "z0int.dsh.turn_outcome.v0": 3, "z0int.grok.failure.v0": 12, "z0int.grok.opportunity_record.v0": 6, "z0int.grok.turn_outcome.v0": 6, "z0int.hermes.failure.v0": 10, "z0int.hermes.opportunity_record.v0": 3, "z0int.hermes.turn_outcome.v0": 3, "z0int.omo.failure.v0": 4, "z0int.omo.opportunity_record.v0": 2, "z0int.omo.turn_outcome.v0": 2, "z0int.omp.failure.v0": 4, "z0int.omp.opportunity_record.v0": 2, "z0int.omp.turn_outcome.v0": 2}, "unsupported_schemas": {}, "rebuild_same_hash": true}
+## 4 evolution-lab learner (verified_loop v0), one run
+learner exit=0 sha=1b80a4e44972a9069248fb58a82ca2926143cde6
+decision None sufficiency null
+## socket guard log: none
+### memory probe
+probe exit=0 "memory_e2e": "PARTIAL"
+### check
+check exit=0
+ "verdict": "PASS (capture/inertness/privacy/learn); memory BLOCKED"
+failed: []
+end 2026-10-03T16:50:42Z

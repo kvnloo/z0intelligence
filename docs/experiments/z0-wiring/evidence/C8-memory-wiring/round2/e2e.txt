@@ -1,0 +1,26 @@
+# C8 round 3 isolated e2e (DoD D3 join + kill switch), FINAL head 73ff88e
+Command: flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock bash round2/scripts/e2e-r3.sh <C8 worktree>
+  (round-2 e2e.sh copy; root homes/C8-memory-wiring/e2e-r3; one bwrap: private netns (loopback only), /workspace/hermes-home and
+  ~/.z0int masked by empty tmpfs; synthetic AgentsView fixture + fake TencentDB on 11548; stubs on 11550-11552; synthetic prompts only;
+  no live z0 service, no TencentDB default tenant, no dsh binary.)
+Changes vs round 2: CC arms run with capture ON (Z0INT_CAPTURE=0 removed: the kill switch now turns memory off too); OMP loads
+  -e z0int-bridge -e z0-memory; a join stage per harness (2 cohort questions, memory shadow):
+  CC real `claude -p` + plugin; Hermes real `hermes chat -q` with plugin capture mode shadow; Codex and Grok the real
+  UserPromptSubmit commands (z0int.hook_adapter + z0int.memory.hook, separate processes, in parallel); OMO the real bridge omo.ts +
+  z0-memory omo.ts on a fake senpi API with the real bridge worker (e2e_omo_join.ts); DSH the real plugin with capture on a mock
+  cordis host with real spawns (e2e_dsh_join.mjs); plus a kill-switch arm (CC canary with Z0INT_CAPTURE=0).
+Logs: e2e-run.log (final); artifacts/{e2e-check-r3.json, join-check-r3.json, kill-r3.json, runs-r3.jsonl, check-r3.log, join-check-r3.log}.
+
+Result (sha 73ff88e):
+- e2e_check.py (round-2 memory checks, unchanged): 45/45 OK.
+- e2e_join_check.py: 10/10 OK.
+  opportunity_record.memory == that turn's seam MemoryUseReceipt (validated, instruction_capability false), 0 missing,
+  0 foreign/mismatched, per harness (joined): claude-code 16, codex 2, grok 2, hermes 2, omp 14, omo 2, dsh 2.
+  (Opportunities without a seam receipt are the off-arm turns and turns the seam skipped: no memory field, as required.)
+  Kill switch: CC canary with Z0INT_CAPTURE=0 -> seam + capture rows 41 before / 41 after; its model request carries no brief.
+  All join legs exit 0.
+
+Earlier attempts (kept): attempt1 hung (a bare `wait` in the new codex/grok leg also waited for the stubs; fixed to wait on the two
+PIDs), e2e-run-attempt1-hung.log. attempt2 (057091c..a1863fe) and attempt3 (9655bca): 45/45 + 9/10, one OMP shadow turn unjoined
+(first turn on a fresh home, cold shadow child) -> fixed by 9655bca + 5e69533/73ff88e (red tests first); artifacts/join-check-attempt{2,3,4}.json.
+attempt4 (5e69533): 45/45 + 10/10, but the suite showed the Hermes regression fixed in 73ff88e.

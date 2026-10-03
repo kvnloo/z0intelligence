@@ -1,0 +1,38 @@
+# C2 isolated e2e, round 3 (HEAD 9de0d53)
+# cmd: flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock /mnt/zer0models/github/cua-lanes/bin/hostless bash scripts/e2e.sh
+#   (schema-only read of the live sessions.db via mode=ro .schema; everything else synthetic under homes/C2-loop-consumers/e2e)
+# raw: e2e.raw.txt (full report), e2e.report.json; script: ../scripts/e2e_c2.py (previous round: e2e_c2.r2b.py)
+# exit 0; socket guard violations 0; privacy_leaks {} (and 0 synthetic secrets in every round-3 table dir)
+
+## Blocker: exit evidence from the harness frame only (host D, one failing pytest run per harness;
+## output body contains '{"exit_code": 0, "ok": true}', 'Exit code 0', 'Process exited with code 0', 'Command exited with code 0')
+  codex   states={'verified_failure': 1} label_classes=['negative_gold'] join=1 exit=0
+  dsh     states={'unverified': 1} label_classes=['execution_only'] join=1 exit=0
+  grok    states={'unverified': 1} label_classes=['execution_only'] join=1 exit=0
+  hermes  states={'verified_failure': 1} label_classes=['negative_gold'] join=1 exit=0
+  omo     states={'verified_failure': 1} label_classes=['negative_gold'] join=1 exit=0
+  omp     states={'verified_failure': 1} label_classes=['negative_gold'] join=1 exit=0
+  => no verified_success anywhere; OMP/OMO/Codex/Hermes frames say 1 -> verified_failure; DSH plain text and Grok -> unverified/execution_only.
+
+## Major: table-less export/merge (hosts E, F)
+  export_empty_home: {"exit": 0, "manifest_written": true, "traceback": false}
+  export_failure_rows_only: {"dsh_failures": {"reader_unavailable": 1}, "exit": 0, "tables": {}, "traceback": false}
+  merge_two_table_less_sets: {"exit": 0, "merged": true, "tables": {}, "traceback": false}
+  verify_dsh_no_agent: {"exit": 3, "failures": {"reader_unavailable": 1}}
+
+## Minor: omp manifests on host A (label source vs AgentsView polarity)
+  agent.manifest.json: {"label_source": null, "test_label_polarity": "failure_only"}
+  interactive.manifest.json: {"label_source": null, "test_label_polarity": "failure_only"}
+  legacy.manifest.json: {"label_source": "effective_tier", "test_label_polarity": null}
+  legacy.shadow.manifest.json: {"label_source": null, "test_label_polarity": null}
+
+## Minor: Codex cohort without session_kind (host G = real v0.39 schema, host H = v0.44 replay; same two sessions)
+  host_g_has_session_kind: False
+  host-g: {"cohorts": ["unknown", "unknown"], "label_join": {"joined": 2, "pending_index": 0, "unjoined": 0}}
+  host-h: {"cohorts": ["automated", "interactive"], "label_join": {"joined": 2, "pending_index": 0, "unjoined": 0}}
+  merge: {"cross_cohort_turn_keys": {"codex": 2}, "exit": 0, "tables": {"codex/automated": 1, "codex/interactive": 1, "codex/unknown": 2}}
+  host A x host B merged-1: turn keys in more than one training cohort = 0
+  => v0.39 never pools a Codex session into interactive; the merge keeps both rows and counts the disagreement.
+
+## Earlier rounds re-run unchanged in the same script (see e2e.report.json): hosts A/B verify x2 (idempotent), guards,
+## legacy imports, export/merge reproducible (identical_manifest_sha256 True), cross-version merge refused (exit 2), round 2 shapes.

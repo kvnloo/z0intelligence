@@ -1,0 +1,12 @@
+FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+FAILED tests/test_hook_adapter.py::test_prompt_handler_returns_under_5ms_p99_with_the_build_detached
+FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+FAILED tests/test_quota_budget.py::test_empty_authority_capacity
+FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily
+FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes

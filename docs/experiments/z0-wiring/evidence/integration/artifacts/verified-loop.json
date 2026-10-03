@@ -1,0 +1,95 @@
+{
+ "feature_schema_sha": "69d7eef44ba1707e",
+ "input": {
+  "analysis_rows": 0,
+  "excluded": {
+   "unverified_or_no_label": 4
+  },
+  "gate": {
+   "ACT": 2,
+   "ASK": 2
+  },
+  "rows": 4,
+  "states": {
+   "unverified": 4
+  }
+ },
+ "prereg": "docs/prereg/verified-loop-v0.md",
+ "primary": {
+  "decision": "INSUFFICIENT_DATA",
+  "descriptive_only": true,
+  "pooled": null,
+  "sufficiency": {
+   "checks": {
+    "groups>=10": false,
+    "k==5_and_every_test_fold_has_both_classes": false,
+    "not_success>=30": false,
+    "rows>=300": false
+   },
+   "observed": {
+    "groups": 0,
+    "k": null,
+    "not_success": 0,
+    "rows": 0,
+    "success": 0
+   },
+   "passed": false
+  }
+ },
+ "privacy": "metrics and counts only; no rows, ids or text",
+ "projection": {
+  "available": false,
+  "why": "no manifest.sweep (run z0int outcomes export --sweep-since 7d)"
+ },
+ "schema": "evolution_lab.verified_loop.result.v0",
+ "sensitivity_unverified_as_not_success": {
+  "decision_if_primary": "INSUFFICIENT_DATA",
+  "pooled": {
+   "G": {
+    "coverage": 0.5,
+    "selective_not_success": 1.0
+   },
+   "L_cov": {
+    "coverage": 0.5,
+    "selective_not_success": 1.0
+   },
+   "L_crc": {
+    "coverage": 0.0,
+    "selective_not_success": null
+   },
+   "L_crc_fallback": {
+    "ABSTAIN": 2,
+    "ASK": 2
+   },
+   "auroc_oof": null,
+   "brier_oof": 2.5779744097096864e-05,
+   "brier_prevalence": 0.0,
+   "crc_joint_risk": 0.0,
+   "delta_L_cov_minus_G": 0.0,
+   "delta_ci95": {
+    "B": 2000,
+    "hi": 0.0,
+    "lo": 0.0,
+    "skipped": 0
+   },
+   "folds_with_delta<0": 0,
+   "illegal_act_rows": 0
+  },
+  "rows": 4
+ },
+ "sources": {
+  "opportunities.jsonl": {
+   "rows": 4,
+   "sha256": "821310ad80adad87"
+  },
+  "outcomes.jsonl": {
+   "rows": 4,
+   "sha256": "fdb0a211a3b330af"
+  },
+  "outcomes_verified.jsonl": {
+   "rows": 4,
+   "sha256": "4c10b4a8fd9d4a77"
+  }
+ },
+ "table_version": "0.1.0"
+}

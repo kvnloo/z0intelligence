@@ -1,0 +1,19 @@
+# BUILD ROUND 2 RED (CLI polarity field) at test-only commit e537c14 on fix df247e5
+============================= test session starts ==============================
+platform linux -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0 -- /mnt/zer0models/z0-wt/venv-claude-code/bin/python
+rootdir: /mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 5 items
+
+tests/test_verify_harness.py::test_label_source_empty_names_the_resolved_dir_and_degrades_the_report PASSED [ 20%]
+tests/test_verify_harness.py::test_claude_code_rows_through_verify_harness_equal_verify PASSED [ 40%]
+tests/test_verify_harness.py::test_reader_rerun_is_idempotent_by_watermark PASSED [ 60%]
+tests/test_verify_harness.py::test_cli_verify_exits_nonzero_when_the_report_is_degraded PASSED [ 80%]
+tests/test_verify_harness.py::test_cli_verify_json_names_the_test_label_polarity FAILED [100%]
+
+=================================== FAILURES ===================================
+/mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers/tests/test_verify_harness.py:104: KeyError: 'test_label_polarity'
+=========================== short test summary info ============================
+FAILED tests/test_verify_harness.py::test_cli_verify_json_names_the_test_label_polarity
+========================= 1 failed, 4 passed in 0.43s ==========================

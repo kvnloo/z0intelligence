@@ -1,0 +1,150 @@
+{
+ "sha": "93e5478fb80b4421a77852422c622a03036a3a79",
+ "ok": false,
+ "passed": 9,
+ "total": 10,
+ "checks": [
+  {
+   "check": "join.claude-code.opportunity_record_memory_is_the_turns_receipt",
+   "ok": true,
+   "detail": {
+    "opportunities": 23,
+    "turns_with_seam_receipt": 22,
+    "joined": 16,
+    "missing": 0,
+    "foreign_or_mismatched": 0,
+    "valid": true
+   }
+  },
+  {
+   "check": "join.codex.opportunity_record_memory_is_the_turns_receipt",
+   "ok": true,
+   "detail": {
+    "opportunities": 2,
+    "turns_with_seam_receipt": 8,
+    "joined": 2,
+    "missing": 0,
+    "foreign_or_mismatched": 0,
+    "valid": true
+   }
+  },
+  {
+   "check": "join.grok.opportunity_record_memory_is_the_turns_receipt",
+   "ok": true,
+   "detail": {
+    "opportunities": 2,
+    "turns_with_seam_receipt": 8,
+    "joined": 2,
+    "missing": 0,
+    "foreign_or_mismatched": 0,
+    "valid": true
+   }
+  },
+  {
+   "check": "join.hermes.opportunity_record_memory_is_the_turns_receipt",
+   "ok": true,
+   "detail": {
+    "opportunities": 2,
+    "turns_with_seam_receipt": 23,
+    "joined": 2,
+    "missing": 0,
+    "foreign_or_mismatched": 0,
+    "valid": true
+   }
+  },
+  {
+   "check": "join.omp.opportunity_record_memory_is_the_turns_receipt",
+   "ok": false,
+   "detail": {
+    "opportunities": 20,
+    "turns_with_seam_receipt": 20,
+    "joined": 13,
+    "missing": 1,
+    "foreign_or_mismatched": 0,
+    "valid": true
+   }
+  },
+  {
+   "check": "join.omo.opportunity_record_memory_is_the_turns_receipt",
+   "ok": true,
+   "detail": {
+    "opportunities": 2,
+    "turns_with_seam_receipt": 8,
+    "joined": 2,
+    "missing": 0,
+    "foreign_or_mismatched": 0,
+    "valid": true
+   }
+  },
+  {
+   "check": "join.dsh.opportunity_record_memory_is_the_turns_receipt",
+   "ok": true,
+   "detail": {
+    "opportunities": 2,
+    "turns_with_seam_receipt": 19,
+    "joined": 2,
+    "missing": 0,
+    "foreign_or_mismatched": 0,
+    "valid": true
+   }
+  },
+  {
+   "check": "join.all_7_harnesses_carry_memory_in_opportunity_records",
+   "ok": true,
+   "detail": {
+    "claude-code": 16,
+    "codex": 2,
+    "grok": 2,
+    "hermes": 2,
+    "omp": 13,
+    "omo": 2,
+    "dsh": 2
+   }
+  },
+  {
+   "check": "kill_switch.cc_canary_with_Z0INT_CAPTURE_0_writes_no_seam_or_capture_row_and_injects_nothing",
+   "ok": true,
+   "detail": {
+    "rows_before": 41,
+    "rows_after": 41,
+    "killed_requests": 1
+   }
+  },
+  {
+   "check": "join.legs_exit_0",
+   "ok": true,
+   "detail": [
+    [
+     "join-hooks",
+     "codex",
+     0
+    ],
+    [
+     "join-hooks",
+     "grok",
+     0
+    ],
+    [
+     "join-hooks",
+     "codex",
+     0
+    ],
+    [
+     "join-hooks",
+     "grok",
+     0
+    ],
+    [
+     "omo-join",
+     null,
+     0
+    ],
+    [
+     "dsh-join",
+     null,
+     0
+    ]
+   ]
+  }
+ ]
+}

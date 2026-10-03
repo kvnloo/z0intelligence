@@ -1,0 +1,97 @@
+{
+ "corpus_sha256": "0e415e9ee987f96ef52b6e778e1c7aa689f7127581aefb04d4f55b387493fe0d",
+ "reference": {
+  "config": "B: BendGate adapter, gate_ref, --threads 1, persistent pipe",
+  "cases": 22079,
+  "kernel_routed": 10019,
+  "false_allow": 0,
+  "false_deny": 1,
+  "verdict_disagree": 1,
+  "verdict_disagree_unexplained": 0,
+  "codes_compared": 9519,
+  "codes_disagree": 0,
+  "allow_replies": 1812
+ },
+ "variants": {
+  "batch_ref_t1": {
+   "cmd": [
+    "/mnt/zer0models/z0-wt/wiring/bend-perf/bin/gate_ref",
+    "--threads",
+    "1"
+   ],
+   "replies": 10019,
+   "identical_to_reference": true,
+   "first_mismatch": null
+  },
+  "batch_ref_default_threads": {
+   "cmd": [
+    "/mnt/zer0models/z0-wt/wiring/bend-perf/bin/gate_ref"
+   ],
+   "replies": 10019,
+   "identical_to_reference": true,
+   "first_mismatch": null
+  },
+  "batch_ref_native_t1": {
+   "cmd": [
+    "/mnt/zer0models/z0-wt/wiring/bend-perf/bin/gate_ref_native",
+    "--threads",
+    "1"
+   ],
+   "replies": 10019,
+   "identical_to_reference": true,
+   "first_mismatch": null
+  },
+  "batch_par_t1": {
+   "cmd": [
+    "/mnt/zer0models/z0-wt/wiring/bend-perf/bin/gate_par",
+    "--threads",
+    "1"
+   ],
+   "replies": 10019,
+   "identical_to_reference": true,
+   "first_mismatch": null
+  },
+  "batch_par_t10": {
+   "cmd": [
+    "/mnt/zer0models/z0-wt/wiring/bend-perf/bin/gate_par",
+    "--threads",
+    "10"
+   ],
+   "replies": 10019,
+   "identical_to_reference": true,
+   "first_mismatch": null
+  },
+  "batch_par_default_threads": {
+   "cmd": [
+    "/mnt/zer0models/z0-wt/wiring/bend-perf/bin/gate_par"
+   ],
+   "replies": 10019,
+   "identical_to_reference": true,
+   "first_mismatch": null
+  },
+  "batch_js_run_mode": {
+   "cmd": [
+    "/mnt/zer0models/bend-stack/official/bend/bin/bend",
+    "main.bend"
+   ],
+   "replies": 10019,
+   "identical_to_reference": true,
+   "first_mismatch": null
+  },
+  "pipe_par_t1": {
+   "identical_to_reference": true,
+   "replies": 10019
+  },
+  "pipe_ref_native_t1": {
+   "identical_to_reference": true,
+   "replies": 10019
+  }
+ },
+ "binaries": {
+  "gate_par": "a222f767e0d422f49ed1dff0d762cbdee257cef3dcfc901fcd66ea484a7d05dd",
+  "gate_par.c": "ca866ad60ee4735c9463ffe4e9b11e738567bbf19a461ee246b063cb65fbd9cb",
+  "gate_ref": "3f8093a94cd66efb039581893e5954e65a0204eb99033968c95698f79286304f",
+  "gate_ref.c": "871894740f06632cfe76b2311ec6e0b9356c3ff173ec67d8d06956266ae77845",
+  "gate_ref_native": "88a1d397f99eb9235f5990be674cf5a442fabea8a4fb4b4a25d6b6ba8fe1298f"
+ }
+}

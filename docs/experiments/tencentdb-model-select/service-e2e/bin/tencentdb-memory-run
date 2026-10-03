@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# tencentdb-memory-run - run the TencentDB Agent Memory gateway (memory-core)
+# in the foreground for tencentdb-memory.service.
+#
+# Secret handling: the LLM API key is fetched from Bitwarden Secrets Manager at
+# start, kept in a non-exported shell variable, and handed to the container on
+# stdin. It never appears in argv, the docker client's environment, `docker
+# inspect`, a file, or a log. Only names/ids are ever printed.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+ENV_FILE="${TENCENTDB_ENV_FILE:-$HERE/tencentdb-memory.env}"
+if [[ -z "${TENCENTDB_IMAGE:-}" && -f "$ENV_FILE" ]]; then
+  set -a; . "$ENV_FILE"; set +a          # manual runs; systemd passes EnvironmentFile
+fi
+
+log() { printf 'tencentdb-memory-run: %s\n' "$*" >&2; }
+for v in TENCENTDB_CONTAINER TENCENTDB_IMAGE TENCENTDB_PORT TENCENTDB_VOLUME \
+         TENCENTDB_LLM_BASE_URL TENCENTDB_LLM_MODEL TENCENTDB_LLM_BWS_SECRET_ID \
+         TENCENTDB_LLM_BWS_SECRET_NAME TENCENTDB_BWS_BIN TENCENTDB_KEYRING_SERVICE \
+         TENCENTDB_KEYRING_KEY; do
+  [[ -n "${!v:-}" ]] || { log "missing setting $v"; exit 1; }
+done
+
+# 1) Docker daemon (a user unit cannot order itself after the system docker.service).
+for _ in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done
+docker info >/dev/null 2>&1 || { log "docker daemon unreachable"; exit 1; }
+
+# 2) BWS machine-account token from the login keyring. Locked keyring (e.g. at
+#    boot before graphical login, Linger=yes) -> exit; systemd retries every 30 s.
+token="$(secret-tool lookup service "$TENCENTDB_KEYRING_SERVICE" key "$TENCENTDB_KEYRING_KEY" 2>/dev/null || true)"
+if [[ -z "${token// /}" ]]; then
+  log "no BWS access token in keyring ($TENCENTDB_KEYRING_SERVICE/$TENCENTDB_KEYRING_KEY): keyring locked or not logged in; retrying later"
+  exit 1
+fi
+
+# 3) LLM key from BWS, held only in this shell variable.
+llm_key="$(BWS_ACCESS_TOKEN="$token" "$TENCENTDB_BWS_BIN" secret get "$TENCENTDB_LLM_BWS_SECRET_ID" \
+             -o json --color no 2>/dev/null | jq -r '.value // empty' 2>/dev/null || true)"
+unset token
+if [[ -z "$llm_key" ]]; then
+  log "could not read BWS secret $TENCENTDB_LLM_BWS_SECRET_NAME ($TENCENTDB_LLM_BWS_SECRET_ID)"
+  exit 1
+fi
+log "LLM key loaded from BWS secret $TENCENTDB_LLM_BWS_SECRET_NAME (len=${#llm_key}); model=$TENCENTDB_LLM_MODEL base=$TENCENTDB_LLM_BASE_URL"
+
+# 4) Clear an orphaned container left by an unclean stop (data lives in the volume).
+docker rm -f "$TENCENTDB_CONTAINER" >/dev/null 2>&1 || true
+
+# 5) Foreground container. --network host + TDAI_GATEWAY_HOST=127.0.0.1 => the
+#    gateway listens on host loopback only. Logs flow to the journal via this
+#    process; --log-driver none avoids a second copy under docker-data.
+exec docker run --rm -i --pull never \
+  --name "$TENCENTDB_CONTAINER" \
+  --network host \
+  --log-driver none \
+  --memory "${TENCENTDB_MEMORY_LIMIT:-2g}" --cpus "${TENCENTDB_CPUS:-2}" \
+  -e TDAI_GATEWAY_HOST=127.0.0.1 \
+  -e TDAI_GATEWAY_PORT="$TENCENTDB_PORT" \
+  -e TDAI_DATA_DIR=/data/tdai-memory \
+  -e TDAI_GATEWAY_CONFIG=/data/config/tdai-gateway.yaml \
+  -e TDAI_LLM_BASE_URL="$TENCENTDB_LLM_BASE_URL" \
+  -e TDAI_LLM_MODEL="$TENCENTDB_LLM_MODEL" \
+  -v "$TENCENTDB_VOLUME:/data/tdai-memory" \
+  -v "$HERE/tdai-gateway.yaml:/data/config/tdai-gateway.yaml:ro" \
+  --entrypoint /usr/bin/tini \
+  "$TENCENTDB_IMAGE" -- \
+  sh -c 'IFS= read -r TDAI_LLM_API_KEY && export TDAI_LLM_API_KEY && exec node --import tsx src/gateway/server.ts' \
+  < <(printf '%s\n' "$llm_key")

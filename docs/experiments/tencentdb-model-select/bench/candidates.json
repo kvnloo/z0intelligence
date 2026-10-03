@@ -1,0 +1,279 @@
+{
+ "_doc": "Candidate routes. Gateway side is identical for all: TDAI_LLM_BASE_URL -> loopback shim -> upstream. Prices USD per 1M tokens from live catalogs 2026-10-03 (scratch/vercel-models.json, openrouter-models.json). Keys are BWS secret NAMES only.",
+ "local_server": {
+  "binary": "/workspace/z0-farm/llama.cpp-b11270/build/bin/llama-server",
+  "host": "127.0.0.1",
+  "port": 11590,
+  "common_args": [
+   "--parallel",
+   "1",
+   "-ngl",
+   "99",
+   "-fa",
+   "on",
+   "-ctk",
+   "q8_0",
+   "-ctv",
+   "q8_0",
+   "--jinja",
+   "--no-webui",
+   "-t",
+   "4"
+  ],
+  "ctx_ladder": [
+   32768,
+   24576,
+   16384
+  ]
+ },
+ "candidates": [
+  {
+   "id": "nemotron-super-free",
+   "kind": "cloud-free",
+   "callable": true,
+   "endpoint": "https://openrouter.ai/api/v1",
+   "model": "nvidia/nemotron-3-super-120b-a12b:free",
+   "key_env": "OPENROUTER_API_KEY",
+   "inject": {},
+   "settings": "provider defaults (gateway sends no temperature/reasoning) - identical to production",
+   "price": {
+    "in": 0,
+    "out": 0
+   },
+   "paid": false,
+   "min_interval_s": 4.0,
+   "why_not": ""
+  },
+  {
+   "id": "grok-4.7-low",
+   "kind": "cloud-paid",
+   "callable": false,
+   "endpoint": "https://ai-gateway.vercel.sh/v1",
+   "model": "spacexai/grok-4.7",
+   "key_env": "AI_GATEWAY_API_KEY",
+   "inject": {
+    "reasoning_effort": "low"
+   },
+   "settings": "reasoning_effort=low injected by shim; otherwise provider defaults",
+   "price": {
+    "in": 2.0,
+    "out": 6.0,
+    "cache_read": 0.5
+   },
+   "paid": true,
+   "arm_cap_usd": 2.4,
+   "min_interval_s": 0,
+   "why_not": "Route blocked 2026-10-03: Vercel AI Gateway (BWS AI_GATEWAY_API_KEY, $4.9995 free-tier credit) answers 403 RestrictedModelsError 'Free tier users do not have access to this model' (probe runs/probes/grok-4.7-low/, $0 spent); OpenRouter key credit limit is $0; BWS OPENAI_API_KEY lacks model scope (403); no xAI API key. Subscription CLIs (grok CLI / codex) are not the gateway's OpenAI-protocol path. Unblock (owner action, no harness change): top up Vercel to paid credits, or raise the OpenRouter key limit to >= $5 and use alt_endpoint.",
+   "alt_endpoint": {
+    "endpoint": "https://openrouter.ai/api/v1",
+    "model": "x-ai/grok-4.7",
+    "key_env": "OPENROUTER_API_KEY"
+   }
+  },
+  {
+   "id": "luna-xhigh",
+   "kind": "cloud-paid",
+   "callable": false,
+   "endpoint": "https://ai-gateway.vercel.sh/v1",
+   "model": "openai/gpt-5.6-luna",
+   "key_env": "AI_GATEWAY_API_KEY",
+   "inject": {
+    "reasoning_effort": "xhigh"
+   },
+   "settings": "reasoning_effort=xhigh injected by shim; otherwise provider defaults",
+   "price": {
+    "in": 0.2,
+    "out": 1.2,
+    "cache_read": 0.02
+   },
+   "paid": true,
+   "arm_cap_usd": 2.1,
+   "min_interval_s": 0,
+   "why_not": "Route blocked 2026-10-03: Vercel AI Gateway (BWS AI_GATEWAY_API_KEY, $4.9995 free-tier credit) answers 403 RestrictedModelsError 'Free tier users do not have access to this model' (probe runs/probes/luna-xhigh/, $0 spent); OpenRouter key credit limit is $0; BWS OPENAI_API_KEY lacks model scope (403); no xAI API key. Subscription CLIs (grok CLI / codex) are not the gateway's OpenAI-protocol path. Unblock (owner action, no harness change): top up Vercel to paid credits, or raise the OpenRouter key limit to >= $5 and use alt_endpoint.",
+   "alt_endpoint": {
+    "endpoint": "https://openrouter.ai/api/v1",
+    "model": "openai/gpt-5.6-luna",
+    "key_env": "OPENROUTER_API_KEY"
+   }
+  },
+  {
+   "id": "grok-4.1-fast-non-reasoning",
+   "kind": "cloud-paid",
+   "callable": false,
+   "endpoint": "https://ai-gateway.vercel.sh/v1",
+   "model": "spacexai/grok-4.1-fast-non-reasoning",
+   "key_env": "AI_GATEWAY_API_KEY",
+   "inject": {},
+   "settings": "historical 2026-08-04 model",
+   "price": {
+    "in": 0.2,
+    "out": 0.5,
+    "cache_read": 0.05
+   },
+   "paid": true,
+   "why_not": "No free/credentialed route: original api.x.ai path used an xAI OAuth access token that expired (no xAI API key in BWS); only route is paid Vercel AI Gateway, and the task rules allow paid spend only for the owner-named grok-4.7-low and luna-xhigh. Owner approval would make it callable (est. <$0.30 for the full L1 corpus x3)."
+  },
+  {
+   "id": "qwen3-8b-q4km",
+   "kind": "local",
+   "callable": true,
+   "gguf": "/workspace/z0-farm/models/Qwen3-8B-Q4_K_M.gguf",
+   "server_args": [
+    "--reasoning",
+    "off",
+    "--temp",
+    "0.7",
+    "--top-p",
+    "0.8",
+    "--top-k",
+    "20",
+    "--min-p",
+    "0"
+   ],
+   "settings": "dedicated llama-server b11270, 32k ctx, q8_0 KV, reasoning off, Qwen3 non-thinking sampling as server default",
+   "why_not": ""
+  },
+  {
+   "id": "qwen3-8b-q6k",
+   "kind": "local",
+   "callable": true,
+   "gguf": "/workspace/z0-farm/models/Qwen3-8B-Q6_K.gguf",
+   "server_args": [
+    "--reasoning",
+    "off",
+    "--temp",
+    "0.7",
+    "--top-p",
+    "0.8",
+    "--top-k",
+    "20",
+    "--min-p",
+    "0"
+   ],
+   "settings": "as qwen3-8b-q4km, Q6_K weights",
+   "why_not": ""
+  },
+  {
+   "id": "qwen3-4b-q4km",
+   "kind": "local",
+   "callable": true,
+   "gguf": "/workspace/z0-farm/models/Qwen3-4B-Q4_K_M.gguf",
+   "server_args": [
+    "--reasoning",
+    "off",
+    "--temp",
+    "0.7",
+    "--top-p",
+    "0.8",
+    "--top-k",
+    "20",
+    "--min-p",
+    "0"
+   ],
+   "settings": "dedicated llama-server, 32k ctx, reasoning off",
+   "why_not": ""
+  },
+  {
+   "id": "qwen3-14b-q4km",
+   "kind": "local",
+   "callable": true,
+   "gguf": "/workspace/z0-farm/models/Qwen3-14B-Q4_K_M.gguf",
+   "server_args": [
+    "--reasoning",
+    "off",
+    "--temp",
+    "0.7",
+    "--top-p",
+    "0.8",
+    "--top-k",
+    "20",
+    "--min-p",
+    "0"
+   ],
+   "settings": "dedicated llama-server, largest ctx of the ladder that loads in 12 GB (expected 16-24k), q8_0 KV, reasoning off",
+   "why_not": ""
+  },
+  {
+   "id": "nemotron-orchestrator-8b-q4km",
+   "kind": "local",
+   "callable": true,
+   "gguf": "/workspace/z0-farm/models/nvidia_Orchestrator-8B-Q4_K_M.gguf",
+   "server_args": [
+    "--reasoning",
+    "off",
+    "--temp",
+    "0.7",
+    "--top-p",
+    "0.8",
+    "--top-k",
+    "20",
+    "--min-p",
+    "0"
+   ],
+   "settings": "dedicated llama-server, 32k ctx, reasoning off",
+   "why_not": ""
+  },
+  {
+   "id": "qwen2.5-coder-7b",
+   "kind": "local",
+   "callable": true,
+   "gguf": "/mnt/zer0models/zer0-models/ollama/blobs/sha256-60e05f2100071479f596b964f89f510f057ce397ea22f2833a0cfe029bfc2463",
+   "server_args": [
+    "--temp",
+    "0.7",
+    "--top-p",
+    "0.8",
+    "--top-k",
+    "20",
+    "--repeat-penalty",
+    "1.05"
+   ],
+   "settings": "Ollama's qwen2.5-coder:7b GGUF blob served by the dedicated llama-server (avoids Ollama num_ctx truncation), 32k ctx",
+   "why_not": ""
+  },
+  {
+   "id": "qwen2.5-3b",
+   "kind": "local",
+   "callable": true,
+   "gguf": "/mnt/zer0models/zer0-models/ollama/blobs/sha256-5ee4f07cdb9beadbbb293e85803c569b01bd37ed059d2715faa7bb405f31caa6",
+   "server_args": [
+    "--temp",
+    "0.7",
+    "--top-p",
+    "0.8",
+    "--top-k",
+    "20",
+    "--repeat-penalty",
+    "1.05"
+   ],
+   "settings": "Ollama's qwen2.5:3b GGUF blob on the dedicated llama-server, 32k ctx",
+   "why_not": ""
+  },
+  {
+   "id": "qwen3-1.7b-q4km",
+   "kind": "local",
+   "callable": true,
+   "gguf": "/workspace/z0-farm/models/Qwen3-1.7B-Q4_K_M.gguf",
+   "server_args": [],
+   "settings": "not run",
+   "why_not": "Excluded a priori (pre-registered): below the 3B floor; 2026-09-20 evidence had qwen2.5:3b at 0% schema compliance on these prompts, and the L1 system prompt alone is ~6-7k Chinese tokens. Route works; can be added if any 3-4B arm passes the gates."
+  },
+  {
+   "id": "qwen3-0.6b-q8",
+   "kind": "local",
+   "callable": true,
+   "gguf": "/workspace/z0-farm/models/Qwen3-0.6B-Q8_0.gguf",
+   "server_args": [],
+   "settings": "not run",
+   "why_not": "Excluded a priori (pre-registered): far below the 3B floor (see qwen3-1.7b)."
+  },
+  {
+   "id": "z0-farm-router-as-configured",
+   "kind": "local",
+   "callable": false,
+   "endpoint": "http://100.113.138.100:11530/v1",
+   "settings": "-c 8192 --parallel 2 (~4k tokens per slot), shared with mbp z0int",
+   "why_not": "The shared router's ~4k-token slots are smaller than the L1 system prompt plus a window, so every call would truncate or 400; changing its -c affects z0int (not ours to change). The same GGUFs are benchmarked on a dedicated llama-server instead."
+  }
+ ]
+}

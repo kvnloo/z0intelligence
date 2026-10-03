@@ -1,0 +1,26 @@
+# C7 fix round: full suite, head 8d619cf vs base 914dc99 (C1 head)
+# cmd: flock -s quiet-lane.lock scripts/suite.sh <tree> <tag>  (env -i isolated homes under homes/C7-memory-core/<tag>, socket guard, pytest -q tests); base in a temporary detached worktree wt/C7-memory-core-base, removed afterwards; runs were sequential (no overlap with e2e or each other)
+
+head: 11 failed, 1096 passed, 4 skipped in 328.28s (0:05:28)
+base: 12 failed, 1017 passed, 4 skipped in 321.10s (0:05:21)
+socket guard: head  0 violation(s), base  0 violation(s)
+
+## failures only in head (new failures):
+  (none if empty)
+## failures only in base:
+  FAILED tests/test_hook_adapter.py::test_prompt_handler_returns_under_5ms_p99_with_the_build_detached
+## common failures (pre-existing, environment: live provider/quota tests):
+  FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+  FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+  FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+  FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+  FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+  FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+  FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+  FAILED tests/test_quota_budget.py::test_empty_authority_capacity
+  FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily
+  FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+  FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+
+The base-only failure is the <5ms p99 timing test. Isolated reruns (flaky-rerun.txt): base 914dc99 2/3 pass, 1/3 fail; head 3/3 pass. It is a pre-existing timing flake on the untouched base, not a C7 change.
+Count check: head 1096 passed = previous head 1074 + 22 new fix-round tests; base 1017 passed + 1 flaky = 1018 as in the previous round.

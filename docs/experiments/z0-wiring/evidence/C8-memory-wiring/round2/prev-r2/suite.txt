@@ -1,0 +1,21 @@
+# C8 round 2 full suite: head vs base (shared quiet lock, env -i, isolated HOME/Z0INT_HOME/TMPDIR/AGENTSVIEW_DATA_DIR, socket guard)
+# runner: evidence/C8-memory-wiring/round2/scripts/suite.sh <tree> <tag>  (pytest tests/ ; node --test tests/test-dsh-*.mjs ; bun test omp-extensions/)
+base = 3028e0c (component base: C7 772ba7d + integrate/wiring-20261003 e02bcf5), temporary worktree wt/C8-memory-wiring-base (removed)
+head = 41aec0f (feat/wire-memory-harnesses-20261003; round-2 commits 55cbb4d test + 41aec0f fix on top of c875c6b)
+
+| tree | pytest | node (DSH) | bun (omp-extensions) |
+|---|---|---|---|
+| base 3028e0c | 11 failed, 1151 passed, 6 skipped | 1 file, 19 pass, rc 0 | 29 pass, 0 fail |
+| head 41aec0f | 12 failed, 1224 passed, 6 skipped, 1 xfailed | 2 files, 30 pass, rc 0 | 38 pass, 0 fail |
+
+FAILED diff (head minus base): one line
+  FAILED tests/test_hook_adapter.py::test_hook_subprocess_wall_time_is_within_bare_python_plus_40ms
+A C1 wall-clock test (hook subprocess within bare python + 40 ms) that this round does not touch (the only
+harness_capture change is an optional pool/pass_fds keyword; hook_entry imports nothing new). The head suite ran
+under load (297 s vs 183 s in round 1). Rerun in isolation 5x per tree (suite-timing-rerun.txt): head 3/3 completed
+runs pass, base 3/3 pass; the other runs aborted in run.sh's home cleanup (detached capture children of the previous
+run still writing), not in the test. Treated as a load flake, same class as round 1's agentweb_bridge overload flake.
+The remaining 11 are the identical known environment failures (live functions_verify x5, provider_saturation,
+quota_budget x5). xfailed: the strict Hermes host-persistence xfail (documented deviation). No socket-guard
+violation log on either tree.
+Raw: suite-r2-{head,base}{,-node,-bun}.raw.txt

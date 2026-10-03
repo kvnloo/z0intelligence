@@ -1,0 +1,9 @@
+--- FAIL: TestCodexCheckpointTruncationFallsBackToFullParse (0.11s)
+    checkpoint_test.go:147: 
+        	Error Trace:	/mnt/zer0models/z0-wt/wiring/agentsview-build/v0.44.0-pristine/internal/sync/checkpoint_test.go:147
+--- FAIL: TestCodexCheckpointTruncationFallsBackToFullParse (0.06s)
+    checkpoint_test.go:147: 
+        	Error Trace:	/mnt/zer0models/z0-wt/wiring/agentsview-build/v0.44.0-pristine/internal/sync/checkpoint_test.go:147
+FAIL
+FAIL	go.kenn.io/agentsview/internal/sync	0.177s
+FAIL

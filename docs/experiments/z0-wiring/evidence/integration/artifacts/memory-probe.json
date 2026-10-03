@@ -1,0 +1,69 @@
+{
+ "contract_present": {
+  "EventIdentity": true,
+  "MemoryScope": true,
+  "MemoryUseReceipt": true
+ },
+ "harness": {
+  "claude-code": {
+   "mcp_servers": [
+    "z0intelligence"
+   ],
+   "memory_read_possible": false,
+   "memory_seam_files": [],
+   "rows_with_memory_receipt": 0,
+   "z0_memory_server": false
+  },
+  "codex": {
+   "mcp_servers": [],
+   "memory_read_possible": false,
+   "memory_seam_files": [],
+   "rows_with_memory_receipt": 0,
+   "z0_memory_server": false
+  },
+  "dsh": {
+   "mcp_servers": [],
+   "memory_read_possible": false,
+   "memory_seam_files": [],
+   "rows_with_memory_receipt": 0,
+   "z0_memory_server": false
+  },
+  "grok": {
+   "mcp_servers": [],
+   "memory_read_possible": false,
+   "memory_seam_files": [],
+   "rows_with_memory_receipt": 0,
+   "z0_memory_server": false
+  },
+  "hermes": {
+   "mcp_servers": [],
+   "memory_read_possible": false,
+   "memory_seam_files": [],
+   "rows_with_memory_receipt": 0,
+   "z0_memory_server": false
+  },
+  "omo": {
+   "mcp_servers": [],
+   "memory_read_possible": false,
+   "memory_seam_files": [],
+   "rows_with_memory_receipt": 0,
+   "z0_memory_server": false
+  },
+  "omp": {
+   "mcp_servers": [],
+   "memory_read_possible": false,
+   "memory_seam_files": [],
+   "rows_with_memory_receipt": 0,
+   "z0_memory_server": false
+  }
+ },
+ "mcp_memory_tools": [],
+ "mcp_server": "z0intelligence",
+ "mcp_tools": [
+  "delegate_worker",
+  "list_models",
+  "route_worker"
+ ],
+ "memory_e2e": "BLOCKED",
+ "reason": "no harness seam reaches a z0 memory surface: C7-memory-core and C8-memory-wiring are not verified and not merged; the only z0 MCP server is the route_worker profile (no memory tools)"
+}

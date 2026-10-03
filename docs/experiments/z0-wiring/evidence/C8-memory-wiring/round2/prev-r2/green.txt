@@ -1,0 +1,36 @@
+# C8 round 2 GREEN: the same tests after the fix (worktree state before commit; committed unchanged, see NOTES.md)
+## pytest tests/test_memory_seam.py tests/test_hermes_memory.py tests/test_memory_acceptance.py (raw: green-pytest.raw.txt)
+....................................x...............................     [100%]
+=========================== short test summary info ============================
+XFAIL tests/test_hermes_memory.py::test_hermes_host_keeps_the_brief_out_of_the_session_store - Hermes core persists what it sends: agent/turn_context.py _stamp_api_content_sidecar stamps the user row with the sent bytes (pre_llm_call context included) in state.db messages.api_content and replays them on later turns. Spec C8 red test 2 ("not persisted to the session store") is UNMET for Hermes without a core change; owner decision pending (evidence/C8-memory-wiring/NOTES.md, deviations).
+67 passed, 1 xfailed in 13.21s
+## node --test tests/test-dsh-memory.mjs (raw: green-node.raw.txt)
+✔ shadow: the pre-step returns at once with the native decision and a receipt is written later (415.851484ms)
+✔ canary: the brief enters the next model request as one extra message; the native batch is untouched (170.204785ms)
+✔ canary past the 300 ms deadline gets the native decision and a counted timeout (520.496555ms)
+✔ fail-open: an unavailable z0int keeps the native decision and counts the failure (60.904595ms)
+✔ a cloud model endpoint is blocked unless dsh allows cloud injection (116.689931ms)
+✔ index.mjs registers exactly one memory pre-step (default shadow) and none when memory_inject is off (65.073057ms)
+✔ memory.mjs reaches only the z0 memory surface: no Hermes home or state.db path anywhere (1.531067ms)
+✔ the gate endpoint is the profile model_endpoint only: a generic env var never marks a cloud model loopback (113.692272ms)
+✔ a root agent without a session cwd gets no brief (fail closed) and a counted no_scope (113.782705ms)
+✔ persistence (recorded deviation): the DSH brief is a durable admitted message, marked for the recall echo guard (117.33406ms)
+✔ shadow children are bounded: past the cap a turn writes a counted queue_saturated row instead of spawning (110.064558ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+## bun test omp-extensions/z0-memory (raw: green-bun.raw.txt)
+(pass) OMP shadow: the context handler returns undefined at once and a receipt is written later [372.88ms]
+(pass) OMP canary: the brief is in the next model-visible request only; history is untouched; no double injection [168.69ms]
+(pass) OMP canary past the deadline is native with a counted timeout; fail-open; cloud blocked [563.47ms]
+(pass) OMO: the senpi shim loads, and with a context hook the brief reaches the next request [115.71ms]
+(pass) OMO without a context hook records B=UNSUPPORTED instead of passing [57.97ms]
+(pass) the installed senpi declares the context event (else UNSUPPORTED is recorded) [3.33ms]
+(pass) the omo entry is a one-line re-export activation can write [0.70ms]
+(pass) the gate endpoint is the active model's baseUrl only: a generic env var never marks a cloud model loopback [166.38ms]
+(pass) OMP turn key is the user message's own id: a new turn after compaction still gets its brief; replays are counted [226.17ms]
+ 9 pass
+ 0 fail

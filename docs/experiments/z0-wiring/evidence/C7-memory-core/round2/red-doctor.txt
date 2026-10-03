@@ -1,0 +1,27 @@
+# C7 round2 RED (doctor follow-up): a reachable real-shape gateway in memory doctor, run on head c067b57 before the doctor fix
+# (found while re-running e2e: doctor.run parsed 'rev:' revisions; 'unversioned' has no ':' -> IndexError)
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 8 items
+
+tests/test_memory_doctor.py::test_passes_on_a_fresh_fixture_and_reports_the_semantic_layer_honestly PASSED [ 12%]
+tests/test_memory_doctor.py::test_fails_on_a_stale_db PASSED             [ 25%]
+tests/test_memory_doctor.py::test_fails_without_a_deepseek_harness_agent PASSED [ 37%]
+tests/test_memory_doctor.py::test_fails_on_a_missing_claude_home PASSED  [ 50%]
+tests/test_memory_doctor.py::test_fails_on_a_user_version_data_version_mismatch PASSED [ 62%]
+tests/test_memory_doctor.py::test_reports_an_unreachable_gateway PASSED  [ 75%]
+tests/test_memory_doctor.py::test_reports_a_reachable_gateway_as_available_and_unversioned FAILED [ 87%]
+tests/test_memory_doctor.py::test_output_never_contains_config_secret_values PASSED [100%]
+
+=================================== FAILURES ===================================
+________ test_reports_a_reachable_gateway_as_available_and_unversioned _________
+tests/test_memory_doctor.py:85: in test_reports_a_reachable_gateway_as_available_and_unversioned
+    report = doctor.run(**{**env, 'config': gw.config(auth_env='Z0_FAKE_TDB_ENV')})
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/z0int/memory/doctor.py:106: in run
+    status = 'reachable' if rev.startswith('rev:') else rev.split(':', 1)[1]
+                                                        ^^^^^^^^^^^^^^^^^^^^
+E   IndexError: list index out of range
+=========================== short test summary info ============================
+FAILED tests/test_memory_doctor.py::test_reports_a_reachable_gateway_as_available_and_unversioned
+========================= 1 failed, 7 passed in 1.11s ==========================

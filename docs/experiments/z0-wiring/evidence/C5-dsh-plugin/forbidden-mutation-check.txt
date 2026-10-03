@@ -1,0 +1,2 @@
+index.js /\.omp\/\.env/ /(^|[\/'"`])\.env\b/m /hermes-home/ /openjev/ /\/home\/kvn/ /KEY_FILE/ /API_KEY/
+lineage.js (clean)

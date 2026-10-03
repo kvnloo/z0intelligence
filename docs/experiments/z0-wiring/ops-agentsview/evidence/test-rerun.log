@@ -1,0 +1,9 @@
+ok  	go.kenn.io/agentsview/internal/config	0.892s
+--- FAIL: TestCodexCheckpointTruncationFallsBackToFullParse (0.61s)
+--- FAIL: TestCodexCheckpointTruncationFallsBackToFullParse (0.17s)
+--- FAIL: TestCodexCheckpointTruncationFallsBackToFullParse (0.06s)
+--- FAIL: TestCodexCheckpointTruncationFallsBackToFullParse (0.06s)
+--- FAIL: TestCodexCheckpointTruncationFallsBackToFullParse (0.06s)
+FAIL
+FAIL	go.kenn.io/agentsview/internal/sync	0.986s
+FAIL

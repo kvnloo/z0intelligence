@@ -1,0 +1,1092 @@
+{
+ "join": [
+  {
+   "credit": {
+    "counterfactual_available": false,
+    "level": "observational",
+    "note": "observed action is not the optimal label; no counterfactual action was executed"
+   },
+   "gate_agrees_with_observed": null,
+   "gate_decision": null,
+   "join": {
+    "opportunity": false,
+    "verified": true
+   },
+   "observed": {
+    "action": "ACT",
+    "asked_user": false,
+    "asked_via_tool": false,
+    "assistant_messages": 2,
+    "label_kind": "observed_behaviour_not_optimal",
+    "tool_calls": 3
+   },
+   "opportunity": null,
+   "schema": "z0int.claude_code.credit_join.v0",
+   "session_id": "s-tests",
+   "trace_id": "p1",
+   "verified": {
+    "label_class": "unknown",
+    "label_confidence": null,
+    "measurement": {
+     "commits": {
+      "matched_by_time_window": 0,
+      "produced": 0,
+      "resolved": 0
+     },
+     "gh": "enabled",
+     "gh_calls_failed": 0,
+     "next_user_turn": true,
+     "subagents_inspected": 0,
+     "subagents_not_inspected": 0,
+     "subagents_spawned": 0,
+     "transcript": "found"
+    },
+    "oracles": [
+     "test_runner",
+     "user_cue"
+    ],
+    "state": "contested",
+    "verification_id": "c88588579aa51a5a7f12"
+   }
+  },
+  {
+   "credit": {
+    "counterfactual_available": false,
+    "level": "observational",
+    "note": "observed action is not the optimal label; no counterfactual action was executed"
+   },
+   "gate_agrees_with_observed": null,
+   "gate_decision": null,
+   "join": {
+    "opportunity": false,
+    "verified": true
+   },
+   "observed": {
+    "action": "ACT",
+    "asked_user": false,
+    "asked_via_tool": false,
+    "assistant_messages": 2,
+    "label_kind": "observed_behaviour_not_optimal",
+    "tool_calls": 3
+   },
+   "opportunity": null,
+   "schema": "z0int.claude_code.credit_join.v0",
+   "session_id": "s-tests",
+   "trace_id": "p2",
+   "verified": {
+    "label_class": "soft",
+    "label_confidence": "low",
+    "measurement": {
+     "commits": {
+      "matched_by_time_window": 0,
+      "produced": 0,
+      "resolved": 0
+     },
+     "gh": "enabled",
+     "gh_calls_failed": 0,
+     "next_user_turn": true,
+     "subagents_inspected": 0,
+     "subagents_not_inspected": 0,
+     "subagents_spawned": 0,
+     "transcript": "found"
+    },
+    "oracles": [
+     "test_runner",
+     "user_cue"
+    ],
+    "state": "unverified",
+    "verification_id": "07f99aae79d8e3222fba"
+   }
+  },
+  {
+   "credit": {
+    "counterfactual_available": false,
+    "level": "observational",
+    "note": "observed action is not the optimal label; no counterfactual action was executed"
+   },
+   "gate_agrees_with_observed": null,
+   "gate_decision": null,
+   "join": {
+    "opportunity": false,
+    "verified": true
+   },
+   "observed": {
+    "action": "ACT",
+    "asked_user": false,
+    "asked_via_tool": false,
+    "assistant_messages": 2,
+    "label_kind": "observed_behaviour_not_optimal",
+    "tool_calls": 3
+   },
+   "opportunity": null,
+   "schema": "z0int.claude_code.credit_join.v0",
+   "session_id": "s-tests",
+   "trace_id": "p3",
+   "verified": {
+    "label_class": "negative_gold",
+    "label_confidence": "medium",
+    "measurement": {
+     "commits": {
+      "matched_by_time_window": 0,
+      "produced": 0,
+      "resolved": 0
+     },
+     "gh": "enabled",
+     "gh_calls_failed": 0,
+     "next_user_turn": false,
+     "subagents_inspected": 0,
+     "subagents_not_inspected": 0,
+     "subagents_spawned": 0,
+     "transcript": "found"
+    },
+    "oracles": [
+     "test_runner",
+     "tool_runtime"
+    ],
+    "state": "verified_failure",
+    "verification_id": "6e0a32a1f5eac5f03cde"
+   }
+  },
+  {
+   "credit": {
+    "counterfactual_available": false,
+    "level": "observational",
+    "note": "observed action is not the optimal label; no counterfactual action was executed"
+   },
+   "gate_agrees_with_observed": null,
+   "gate_decision": null,
+   "join": {
+    "opportunity": false,
+    "verified": true
+   },
+   "observed": {
+    "action": "ACT",
+    "asked_user": false,
+    "asked_via_tool": false,
+    "assistant_messages": 2,
+    "label_kind": "observed_behaviour_not_optimal",
+    "tool_calls": 3
+   },
+   "opportunity": null,
+   "schema": "z0int.claude_code.credit_join.v0",
+   "session_id": "s-git",
+   "trace_id": "q1",
+   "verified": {
+    "label_class": "negative_gold",
+    "label_confidence": "high",
+    "measurement": {
+     "commits": {
+      "matched_by_time_window": 0,
+      "produced": 1,
+      "resolved": 1
+     },
+     "gh": "enabled",
+     "gh_calls_failed": 0,
+     "next_user_turn": true,
+     "subagents_inspected": 0,
+     "subagents_not_inspected": 0,
+     "subagents_spawned": 0,
+     "transcript": "found"
+    },
+    "oracles": [
+     "vcs_history"
+    ],
+    "state": "verified_failure",
+    "verification_id": "0c4f6c9508b4fe053b13"
+   }
+  },
+  {
+   "credit": {
+    "counterfactual_available": false,
+    "level": "observational",
+    "note": "observed action is not the optimal label; no counterfactual action was executed"
+   },
+   "gate_agrees_with_observed": null,
+   "gate_decision": null,
+   "join": {
+    "opportunity": false,
+    "verified": true
+   },
+   "observed": {
+    "action": "ACT",
+    "asked_user": false,
+    "asked_via_tool": false,
+    "assistant_messages": 2,
+    "label_kind": "observed_behaviour_not_optimal",
+    "tool_calls": 3
+   },
+   "opportunity": null,
+   "schema": "z0int.claude_code.credit_join.v0",
+   "session_id": "s-git",
+   "trace_id": "q2",
+   "verified": {
+    "label_class": "negative_gold",
+    "label_confidence": "high",
+    "measurement": {
+     "commits": {
+      "matched_by_time_window": 0,
+      "produced": 1,
+      "resolved": 1
+     },
+     "gh": "enabled",
+     "gh_calls_failed": 0,
+     "next_user_turn": true,
+     "subagents_inspected": 0,
+     "subagents_not_inspected": 0,
+     "subagents_spawned": 0,
+     "transcript": "found"
+    },
+    "oracles": [
+     "vcs_history"
+    ],
+    "state": "verified_failure",
+    "verification_id": "f972387177e23022744d"
+   }
+  },
+  {
+   "credit": {
+    "counterfactual_available": false,
+    "level": "observational",
+    "note": "observed action is not the optimal label; no counterfactual action was executed"
+   },
+   "gate_agrees_with_observed": null,
+   "gate_decision": null,
+   "join": {
+    "opportunity": false,
+    "verified": true
+   },
+   "observed": {
+    "action": "ACT",
+    "asked_user": false,
+    "asked_via_tool": false,
+    "assistant_messages": 2,
+    "label_kind": "observed_behaviour_not_optimal",
+    "tool_calls": 3
+   },
+   "opportunity": null,
+   "schema": "z0int.claude_code.credit_join.v0",
+   "session_id": "s-git",
+   "trace_id": "q3",
+   "verified": {
+    "label_class": "deterministic_gold",
+    "label_confidence": "medium",
+    "measurement": {
+     "commits": {
+      "matched_by_time_window": 0,
+      "produced": 0,
+      "resolved": 0
+     },
+     "gh": "enabled",
+     "gh_calls_failed": 0,
+     "next_user_turn": true,
+     "subagents_inspected": 0,
+     "subagents_not_inspected": 0,
+     "subagents_spawned": 0,
+     "transcript": "found"
+    },
+    "oracles": [
+     "pr_review"
+    ],
+    "state": "verified_success",
+    "verification_id": "6282a2b96bb1f3dd9ae5"
+   }
+  },
+  {
+   "credit": {
+    "counterfactual_available": false,
+    "level": "observational",
+    "note": "observed action is not the optimal label; no counterfactual action was executed"
+   },
+   "gate_agrees_with_observed": null,
+   "gate_decision": null,
+   "join": {
+    "opportunity": false,
+    "verified": true
+   },
+   "observed": {
+    "action": "ACT",
+    "asked_user": false,
+    "asked_via_tool": false,
+    "assistant_messages": 2,
+    "label_kind": "observed_behaviour_not_optimal",
+    "tool_calls": 3
+   },
+   "opportunity": null,
+   "schema": "z0int.claude_code.credit_join.v0",
+   "session_id": "s-git",
+   "trace_id": "q4",
+   "verified": {
+    "label_class": "negative_gold",
+    "label_confidence": "medium",
+    "measurement": {
+     "commits": {
+      "matched_by_time_window": 0,
+      "produced": 0,
+      "resolved": 0
+     },
+     "gh": "enabled",
+     "gh_calls_failed": 0,
+     "next_user_turn": true,
+     "subagents_inspected": 0,
+     "subagents_not_inspected": 0,
+     "subagents_spawned": 0,
+     "transcript": "found"
+    },
+    "oracles": [
+     "pr_review"
+    ],
+    "state": "verified_failure",
+    "verification_id": "ed0c81fcc07d2e8f9e84"
+   }
+  },
+  {
+   "credit": {
+    "counterfactual_available": false,
+    "level": "observational",
+    "note": "observed action is not the optimal label; no counterfactual action was executed"
+   },
+   "gate_agrees_with_observed": null,
+   "gate_decision": null,
+   "join": {
+    "opportunity": false,
+    "verified": true
+   },
+   "observed": {
+    "action": "ACT",
+    "asked_user": false,
+    "asked_via_tool": false,
+    "assistant_messages": 2,
+    "label_kind": "observed_behaviour_not_optimal",
+    "tool_calls": 3
+   },
+   "opportunity": null,
+   "schema": "z0int.claude_code.credit_join.v0",
+   "session_id": "s-git",
+   "trace_id": "q5",
+   "verified": {
+    "label_class": "execution_only",
+    "label_confidence": null,
+    "measurement": {
+     "commits": {
+      "matched_by_time_window": 0,
+      "produced": 0,
+      "resolved": 0
+     },
+     "gh": "enabled",
+     "gh_calls_failed": 0,
+     "next_user_turn": false,
+     "subagents_inspected": 0,
+     "subagents_not_inspected": 0,
+     "subagents_spawned": 0,
+     "transcript": "found"
+    },
+    "oracles": [
+     "pr_review"
+    ],
+    "state": "unverified",
+    "verification_id": "ee10a9454f8171a7e00c"
+   }
+  }
+ ],
+ "rows": [
+  {
+   "content_sha": "3fe95bb76662d7da",
+   "credit": {
+    "counterfactual_available": false,
+    "counterfactual_claimed": false,
+    "level": "observational"
+   },
+   "label_class": "negative_gold",
+   "label_confidence": "high",
+   "measurement": {
+    "commits": {
+     "matched_by_time_window": 0,
+     "produced": 1,
+     "resolved": 1
+    },
+    "gh": "enabled",
+    "gh_calls_failed": 0,
+    "next_user_turn": true,
+    "subagents_inspected": 0,
+    "subagents_not_inspected": 0,
+    "subagents_spawned": 0,
+    "transcript": "found"
+   },
+   "observed_ref": {
+    "label_kind": "observed_behaviour_not_optimal",
+    "present": true,
+    "row_sha": "a25edf3ed6c6c9a0",
+    "schema": "z0int.claude_code.turn_outcome.v0"
+   },
+   "privacy": "counts_ids_and_shas_only",
+   "schema": "z0int.claude_code.turn_outcome_verified.v0",
+   "session_id": "s-git",
+   "signals": [
+    {
+     "by": [
+      "b23bcc02277be085d992b299720a8f6827a242c8"
+     ],
+     "confidence": "high",
+     "files": 1,
+     "fix_days": 7,
+     "kind": "commit_szz_fixed",
+     "label_class": "negative_gold",
+     "on_remote": false,
+     "oracle": "vcs_history",
+     "polarity": -1,
+     "repo_id": "35e0c80b12",
+     "sha": "c0b508db32f34f59949a0c1e5c4ec15536e99efe"
+    }
+   ],
+   "trace_id": "q1",
+   "turn": {
+    "assistant_messages": 1,
+    "bash_calls": 1,
+    "bash_calls_via_subagents": 0,
+    "edits": 0,
+    "ended_at": "2026-05-28T20:43:30Z",
+    "harness_message": false,
+    "started_at": "2026-05-28T20:43:20Z",
+    "tool_calls": 1,
+    "type": "ops"
+   },
+   "verification_id": "0c4f6c9508b4fe053b13",
+   "verification_state": "verified_failure",
+   "verified_at": "2026-05-31T20:26:40Z",
+   "verifier": {
+    "id": "z0int.outcome_verifier",
+    "params": {
+     "density": true,
+     "fix_days": 7,
+     "re_ask_jaccard": 0.6
+    },
+    "version": "0.2.0"
+   }
+  },
+  {
+   "content_sha": "58da564b300dd127",
+   "credit": {
+    "counterfactual_available": false,
+    "counterfactual_claimed": false,
+    "level": "observational"
+   },
+   "label_class": "negative_gold",
+   "label_confidence": "high",
+   "measurement": {
+    "commits": {
+     "matched_by_time_window": 0,
+     "produced": 1,
+     "resolved": 1
+    },
+    "gh": "enabled",
+    "gh_calls_failed": 0,
+    "next_user_turn": true,
+    "subagents_inspected": 0,
+    "subagents_not_inspected": 0,
+    "subagents_spawned": 0,
+    "transcript": "found"
+   },
+   "observed_ref": {
+    "label_kind": "observed_behaviour_not_optimal",
+    "present": true,
+    "row_sha": "10ae1582ef3fafc9",
+    "schema": "z0int.claude_code.turn_outcome.v0"
+   },
+   "privacy": "counts_ids_and_shas_only",
+   "schema": "z0int.claude_code.turn_outcome_verified.v0",
+   "session_id": "s-git",
+   "signals": [
+    {
+     "by": "a1bedec185c5c2cc1b1b7c6f7d42443413d71221",
+     "confidence": "high",
+     "files": 1,
+     "kind": "commit_reverted",
+     "label_class": "negative_gold",
+     "on_remote": false,
+     "oracle": "vcs_history",
+     "polarity": -1,
+     "repo_id": "35e0c80b12",
+     "sha": "f2145aac57d389f76fc8a596ddd38a9d1f3fb85c"
+    }
+   ],
+   "trace_id": "q2",
+   "turn": {
+    "assistant_messages": 1,
+    "bash_calls": 1,
+    "bash_calls_via_subagents": 0,
+    "edits": 0,
+    "ended_at": "2026-05-28T20:45:10Z",
+    "harness_message": false,
+    "started_at": "2026-05-28T20:45:00Z",
+    "tool_calls": 1,
+    "type": "ops"
+   },
+   "verification_id": "f972387177e23022744d",
+   "verification_state": "verified_failure",
+   "verified_at": "2026-05-31T20:26:40Z",
+   "verifier": {
+    "id": "z0int.outcome_verifier",
+    "params": {
+     "density": true,
+     "fix_days": 7,
+     "re_ask_jaccard": 0.6
+    },
+    "version": "0.2.0"
+   }
+  },
+  {
+   "content_sha": "8fc3b18f43bcd02e",
+   "credit": {
+    "counterfactual_available": false,
+    "counterfactual_claimed": false,
+    "level": "observational"
+   },
+   "label_class": "deterministic_gold",
+   "label_confidence": "medium",
+   "measurement": {
+    "commits": {
+     "matched_by_time_window": 0,
+     "produced": 0,
+     "resolved": 0
+    },
+    "gh": "enabled",
+    "gh_calls_failed": 0,
+    "next_user_turn": true,
+    "subagents_inspected": 0,
+    "subagents_not_inspected": 0,
+    "subagents_spawned": 0,
+    "transcript": "found"
+   },
+   "observed_ref": {
+    "label_kind": "observed_behaviour_not_optimal",
+    "present": true,
+    "row_sha": "cf88738928d3acfe",
+    "schema": "z0int.claude_code.turn_outcome.v0"
+   },
+   "privacy": "counts_ids_and_shas_only",
+   "schema": "z0int.claude_code.turn_outcome_verified.v0",
+   "session_id": "s-git",
+   "signals": [
+    {
+     "confidence": "medium",
+     "kind": "pr_merged",
+     "label_class": "deterministic_gold",
+     "merged_by_agent": false,
+     "oracle": "pr_review",
+     "polarity": 1,
+     "pr": "o/r#7"
+    }
+   ],
+   "trace_id": "q3",
+   "turn": {
+    "assistant_messages": 1,
+    "bash_calls": 1,
+    "bash_calls_via_subagents": 0,
+    "edits": 0,
+    "ended_at": "2026-05-28T20:46:46Z",
+    "harness_message": false,
+    "started_at": "2026-05-28T20:46:40Z",
+    "tool_calls": 1,
+    "type": "ops"
+   },
+   "verification_id": "6282a2b96bb1f3dd9ae5",
+   "verification_state": "verified_success",
+   "verified_at": "2026-05-31T20:26:40Z",
+   "verifier": {
+    "id": "z0int.outcome_verifier",
+    "params": {
+     "density": true,
+     "fix_days": 7,
+     "re_ask_jaccard": 0.6
+    },
+    "version": "0.2.0"
+   }
+  },
+  {
+   "content_sha": "546bd34f5ab78584",
+   "credit": {
+    "counterfactual_available": false,
+    "counterfactual_claimed": false,
+    "level": "observational"
+   },
+   "label_class": "negative_gold",
+   "label_confidence": "medium",
+   "measurement": {
+    "commits": {
+     "matched_by_time_window": 0,
+     "produced": 0,
+     "resolved": 0
+    },
+    "gh": "enabled",
+    "gh_calls_failed": 0,
+    "next_user_turn": true,
+    "subagents_inspected": 0,
+    "subagents_not_inspected": 0,
+    "subagents_spawned": 0,
+    "transcript": "found"
+   },
+   "observed_ref": {
+    "label_kind": "observed_behaviour_not_optimal",
+    "present": true,
+    "row_sha": "b3e28f191da68a9d",
+    "schema": "z0int.claude_code.turn_outcome.v0"
+   },
+   "privacy": "counts_ids_and_shas_only",
+   "schema": "z0int.claude_code.turn_outcome_verified.v0",
+   "session_id": "s-git",
+   "signals": [
+    {
+     "confidence": "medium",
+     "kind": "pr_closed_unmerged",
+     "label_class": "negative_gold",
+     "oracle": "pr_review",
+     "polarity": -1,
+     "pr": "o/r#8"
+    }
+   ],
+   "trace_id": "q4",
+   "turn": {
+    "assistant_messages": 0,
+    "bash_calls": 0,
+    "bash_calls_via_subagents": 0,
+    "edits": 0,
+    "ended_at": "2026-05-28T20:48:20Z",
+    "harness_message": false,
+    "started_at": "2026-05-28T20:48:20Z",
+    "tool_calls": 0,
+    "type": "qa"
+   },
+   "verification_id": "ed0c81fcc07d2e8f9e84",
+   "verification_state": "verified_failure",
+   "verified_at": "2026-05-31T20:26:40Z",
+   "verifier": {
+    "id": "z0int.outcome_verifier",
+    "params": {
+     "density": true,
+     "fix_days": 7,
+     "re_ask_jaccard": 0.6
+    },
+    "version": "0.2.0"
+   }
+  },
+  {
+   "content_sha": "2aa2fe94a14d09e0",
+   "credit": {
+    "counterfactual_available": false,
+    "counterfactual_claimed": false,
+    "level": "observational"
+   },
+   "label_class": "execution_only",
+   "label_confidence": null,
+   "measurement": {
+    "commits": {
+     "matched_by_time_window": 0,
+     "produced": 0,
+     "resolved": 0
+    },
+    "gh": "enabled",
+    "gh_calls_failed": 0,
+    "next_user_turn": false,
+    "subagents_inspected": 0,
+    "subagents_not_inspected": 0,
+    "subagents_spawned": 0,
+    "transcript": "found"
+   },
+   "observed_ref": {
+    "label_kind": "observed_behaviour_not_optimal",
+    "present": true,
+    "row_sha": "f19aa4415c09b298",
+    "schema": "z0int.claude_code.turn_outcome.v0"
+   },
+   "privacy": "counts_ids_and_shas_only",
+   "schema": "z0int.claude_code.turn_outcome_verified.v0",
+   "session_id": "s-git",
+   "signals": [
+    {
+     "confidence": "low",
+     "kind": "pr_merged",
+     "label_class": "execution_only",
+     "merged_by_agent": true,
+     "oracle": "pr_review",
+     "polarity": 1,
+     "pr": "o/r#9"
+    }
+   ],
+   "trace_id": "q5",
+   "turn": {
+    "assistant_messages": 1,
+    "bash_calls": 1,
+    "bash_calls_via_subagents": 0,
+    "edits": 0,
+    "ended_at": "2026-05-28T20:50:11Z",
+    "harness_message": false,
+    "started_at": "2026-05-28T20:50:00Z",
+    "tool_calls": 1,
+    "type": "ops"
+   },
+   "verification_id": "ee10a9454f8171a7e00c",
+   "verification_state": "unverified",
+   "verified_at": "2026-05-31T20:26:40Z",
+   "verifier": {
+    "id": "z0int.outcome_verifier",
+    "params": {
+     "density": true,
+     "fix_days": 7,
+     "re_ask_jaccard": 0.6
+    },
+    "version": "0.2.0"
+   }
+  },
+  {
+   "content_sha": "6d1cc5d32eefbe55",
+   "credit": {
+    "counterfactual_available": false,
+    "counterfactual_claimed": false,
+    "level": "observational"
+   },
+   "label_class": "unknown",
+   "label_confidence": null,
+   "measurement": {
+    "commits": {
+     "matched_by_time_window": 0,
+     "produced": 0,
+     "resolved": 0
+    },
+    "gh": "enabled",
+    "gh_calls_failed": 0,
+    "next_user_turn": true,
+    "subagents_inspected": 0,
+    "subagents_not_inspected": 0,
+    "subagents_spawned": 0,
+    "transcript": "found"
+   },
+   "observed_ref": {
+    "label_kind": "observed_behaviour_not_optimal",
+    "present": true,
+    "row_sha": "5d0d7bbab82aee9d",
+    "schema": "z0int.claude_code.turn_outcome.v0"
+   },
+   "privacy": "counts_ids_and_shas_only",
+   "schema": "z0int.claude_code.turn_outcome_verified.v0",
+   "session_id": "s-tests",
+   "signals": [
+    {
+     "confidence": "medium",
+     "failed_runs": 1,
+     "kind": "tests_in_turn",
+     "label_class": "deterministic_gold",
+     "last_exit": 0,
+     "oracle": "test_runner",
+     "polarity": 1,
+     "runs": 2,
+     "runs_with_exit": 2,
+     "tests_edited_in_turn": false
+    },
+    {
+     "confidence": "medium",
+     "cue_count": 2,
+     "cues": [
+      "undo",
+      "thats_wrong"
+     ],
+     "kind": "user_correction",
+     "label_class": "soft",
+     "oracle": "user_cue",
+     "polarity": -1
+    },
+    {
+     "confidence": "low",
+     "cues": [
+      "wrong"
+     ],
+     "kind": "user_weak_correction",
+     "label_class": "soft",
+     "oracle": "user_cue",
+     "polarity": -1,
+     "re_ask": false
+    },
+    {
+     "confidence": "low",
+     "cues": [
+      "undo",
+      "thats_wrong"
+     ],
+     "kind": "user_correction_v2",
+     "label_class": "soft",
+     "oracle": "user_cue",
+     "polarity": -1,
+     "verifier_set": "density"
+    }
+   ],
+   "trace_id": "p1",
+   "turn": {
+    "assistant_messages": 3,
+    "bash_calls": 2,
+    "bash_calls_via_subagents": 0,
+    "edits": 0,
+    "ended_at": "2026-05-28T20:27:10Z",
+    "harness_message": false,
+    "started_at": "2026-05-28T20:26:40Z",
+    "tool_calls": 2,
+    "type": "ops"
+   },
+   "verification_id": "c88588579aa51a5a7f12",
+   "verification_state": "contested",
+   "verified_at": "2026-05-31T20:26:40Z",
+   "verifier": {
+    "id": "z0int.outcome_verifier",
+    "params": {
+     "density": true,
+     "fix_days": 7,
+     "re_ask_jaccard": 0.6
+    },
+    "version": "0.2.0"
+   }
+  },
+  {
+   "content_sha": "9f327777dc4776a4",
+   "credit": {
+    "counterfactual_available": false,
+    "counterfactual_claimed": false,
+    "level": "observational"
+   },
+   "label_class": "soft",
+   "label_confidence": "low",
+   "measurement": {
+    "commits": {
+     "matched_by_time_window": 0,
+     "produced": 0,
+     "resolved": 0
+    },
+    "gh": "enabled",
+    "gh_calls_failed": 0,
+    "next_user_turn": true,
+    "subagents_inspected": 0,
+    "subagents_not_inspected": 0,
+    "subagents_spawned": 0,
+    "transcript": "found"
+   },
+   "observed_ref": {
+    "label_kind": "observed_behaviour_not_optimal",
+    "present": true,
+    "row_sha": "dfc8f18db5029cb1",
+    "schema": "z0int.claude_code.turn_outcome.v0"
+   },
+   "privacy": "counts_ids_and_shas_only",
+   "schema": "z0int.claude_code.turn_outcome_verified.v0",
+   "session_id": "s-tests",
+   "signals": [
+    {
+     "confidence": "low",
+     "failed_runs": 0,
+     "kind": "tests_in_turn",
+     "label_class": "soft",
+     "last_exit": 0,
+     "oracle": "test_runner",
+     "polarity": 1,
+     "runs": 1,
+     "runs_with_exit": 1,
+     "tests_edited_in_turn": true
+    },
+    {
+     "confidence": "low",
+     "kind": "ask_answered",
+     "label_class": "soft",
+     "oracle": "user_cue",
+     "polarity": 0,
+     "via_tool": false
+    },
+    {
+     "check": "test",
+     "confidence": "low",
+     "exit_class": 0,
+     "kind": "checked_later",
+     "label_class": "soft",
+     "oracle": "test_runner",
+     "polarity": 1,
+     "same_turn": true,
+     "scope": "whole",
+     "self_judged": true,
+     "turns_later": 0,
+     "verifier_set": "density"
+    },
+    {
+     "after_question": true,
+     "confidence": "low",
+     "kind": "user_approval",
+     "label_class": "soft",
+     "oracle": "user_cue",
+     "polarity": 1,
+     "strength": "weak",
+     "verifier_set": "density"
+    }
+   ],
+   "trace_id": "p2",
+   "turn": {
+    "assistant_messages": 3,
+    "bash_calls": 1,
+    "bash_calls_via_subagents": 0,
+    "edits": 1,
+    "ended_at": "2026-05-28T20:28:30Z",
+    "harness_message": false,
+    "started_at": "2026-05-28T20:28:20Z",
+    "tool_calls": 2,
+    "type": "edit_tested"
+   },
+   "verification_id": "07f99aae79d8e3222fba",
+   "verification_state": "unverified",
+   "verified_at": "2026-05-31T20:26:40Z",
+   "verifier": {
+    "id": "z0int.outcome_verifier",
+    "params": {
+     "density": true,
+     "fix_days": 7,
+     "re_ask_jaccard": 0.6
+    },
+    "version": "0.2.0"
+   }
+  },
+  {
+   "content_sha": "5a6f77272cae70b6",
+   "credit": {
+    "counterfactual_available": false,
+    "counterfactual_claimed": false,
+    "level": "observational"
+   },
+   "label_class": "negative_gold",
+   "label_confidence": "medium",
+   "measurement": {
+    "commits": {
+     "matched_by_time_window": 0,
+     "produced": 0,
+     "resolved": 0
+    },
+    "gh": "enabled",
+    "gh_calls_failed": 0,
+    "next_user_turn": false,
+    "subagents_inspected": 0,
+    "subagents_not_inspected": 0,
+    "subagents_spawned": 0,
+    "transcript": "found"
+   },
+   "observed_ref": {
+    "label_kind": "observed_behaviour_not_optimal",
+    "present": true,
+    "row_sha": "0d93f9e0b36cfb9d",
+    "schema": "z0int.claude_code.turn_outcome.v0"
+   },
+   "privacy": "counts_ids_and_shas_only",
+   "schema": "z0int.claude_code.turn_outcome_verified.v0",
+   "session_id": "s-tests",
+   "signals": [
+    {
+     "confidence": "medium",
+     "failed_runs": 1,
+     "kind": "tests_in_turn",
+     "label_class": "negative_gold",
+     "last_exit": 1,
+     "oracle": "test_runner",
+     "polarity": -1,
+     "runs": 1,
+     "runs_with_exit": 1,
+     "tests_edited_in_turn": false
+    },
+    {
+     "confidence": "low",
+     "kind": "ask_answered",
+     "label_class": "soft",
+     "oracle": "user_cue",
+     "polarity": 0,
+     "via_tool": true
+    },
+    {
+     "confidence": "low",
+     "design_confidence": "medium",
+     "exit": 1,
+     "kind": "ended_on_error",
+     "label_class": "soft",
+     "oracle": "tool_runtime",
+     "polarity": -1,
+     "tool": "Bash",
+     "verifier_set": "density"
+    }
+   ],
+   "trace_id": "p3",
+   "turn": {
+    "assistant_messages": 2,
+    "bash_calls": 1,
+    "bash_calls_via_subagents": 0,
+    "edits": 0,
+    "ended_at": "2026-05-28T20:30:11Z",
+    "harness_message": false,
+    "started_at": "2026-05-28T20:30:00Z",
+    "tool_calls": 2,
+    "type": "ops"
+   },
+   "verification_id": "6e0a32a1f5eac5f03cde",
+   "verification_state": "verified_failure",
+   "verified_at": "2026-05-31T20:26:40Z",
+   "verifier": {
+    "id": "z0int.outcome_verifier",
+    "params": {
+     "density": true,
+     "fix_days": 7,
+     "re_ask_jaccard": 0.6
+    },
+    "version": "0.2.0"
+   }
+  }
+ ],
+ "summary": {
+  "join": {
+   "full_chain": 0,
+   "gate_x_state": {},
+   "observed_action_x_state": {
+    "ACT->contested": 1,
+    "ACT->unverified": 2,
+    "ACT->verified_failure": 4,
+    "ACT->verified_success": 1
+   },
+   "observed_rows": 8,
+   "with_opportunity": 0,
+   "with_verified": 8
+  },
+  "label_classes": {
+   "deterministic_gold": 1,
+   "execution_only": 1,
+   "negative_gold": 4,
+   "soft": 1,
+   "unknown": 1
+  },
+  "measurement": {
+   "commits_produced": 2,
+   "commits_resolved": 2,
+   "transcript_missing": 0,
+   "turns_with_unexamined_subagents": 0
+  },
+  "signals": {
+   "ask_answered[+0]": 2,
+   "checked_later[+1]": 1,
+   "commit_reverted[-1]": 1,
+   "commit_szz_fixed[-1]": 1,
+   "ended_on_error[-1]": 1,
+   "pr_closed_unmerged[-1]": 1,
+   "pr_merged[+1]": 2,
+   "tests_in_turn[+1]": 2,
+   "tests_in_turn[-1]": 1,
+   "user_approval[+1]": 1,
+   "user_correction[-1]": 1,
+   "user_correction_v2[-1]": 1,
+   "user_weak_correction[-1]": 1
+  },
+  "states": {
+   "contested": 1,
+   "unverified": 2,
+   "verified_failure": 4,
+   "verified_success": 1
+  },
+  "turns": 8,
+  "turns_with_any_signal": 8,
+  "with_observed_row": 8
+ }
+}

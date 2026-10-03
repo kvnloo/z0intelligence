@@ -1,0 +1,172 @@
+# C7 fix-round e2e on head 8d619cf
+# cmd: cd /mnt/zer0models/z0-wt/wiring/wt/C7-memory-core && flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock /mnt/zer0models/z0-wt/wiring/evidence/C7-memory-core/scripts/run.sh /mnt/zer0models/z0-wt/wiring/wt/C7-memory-core fix-e2e --guard -- <venv-claude-code>/bin/python /mnt/zer0models/z0-wt/wiring/evidence/C7-memory-core/scripts/e2e.py /mnt/zer0models/z0-wt/wiring/wt/C7-memory-core /mnt/zer0models/z0-wt/wiring/homes/C7-memory-core/fix-e2e/run 11545
+fixture: {'statements': 201, 'fts_shadow_tables_filtered': 12}
+CHECK PASS fixture: FTS5 shadow tables filtered from the schema copy
+CHECK PASS ledger: reference ingest is idempotent on event_uid
+fake TencentDB on http://127.0.0.1:11545
+CHECK PASS mcp: one response per request (notification silent)
+CHECK PASS mcp: serverInfo is z0-memory
+CHECK PASS mcp: tools/list is exactly the memory tools :: ['history', 'inspect', 'memory_search', 'orient', 'unknowns', 'verify']
+CHECK PASS search: cross-harness recall returns claude-code, codex and omp evidence for a hermes query :: ['-', 'claude-code', 'codex', 'dsh', 'hermes', 'omp']
+CHECK PASS search: sibling project rejected
+CHECK PASS provenance: every lexical hit has event_uid, agentsview:<sid>#<mid>, harness, session, timestamp :: 6 lexical hits
+CHECK PASS dedupe: no duplicate event_uid across layers
+CHECK PASS scope: semantic items (no canonical scope) are rejected before ranking under a project scope :: out_of_scope=2
+CHECK PASS semantic: layer ok through the bearer-checked stub
+CHECK PASS dedupe (unscoped): no duplicate event_uid across temporal, lexical and semantic
+CHECK PASS dedupe: the ingested reference and the TencentDB copy merge into the lexical hit :: ['lexical', 'semantic', 'temporal']
+CHECK PASS semantic: bearer came from the configured env var :: 7 POSTs
+CHECK PASS semantic: item without source_event_ids has provenance_ok=false (not canonical provenance)
+CHECK PASS scrub: memory_search over the secret-bearing message reports scrubbed spans :: scrubbed=5
+CHECK PASS brief: within token bound and not abstained :: tokens=172
+CHECK PASS supersession: brief shows the newer claim as current
+CHECK PASS supersession: history returns both versions :: ["relay-old", "relay-new"]
+CHECK PASS verify: USE when grounded, FALLBACK when not
+CHECK PASS inspect: reads the secret-bearing message scrubbed
+CHECK PASS unknowns: answerable with no gaps while every layer is up
+CHECK PASS scrub: no secret-shaped fixture string, bearer or config value in any MCP response
+CHECK PASS cache: first orient was a miss
+CHECK PASS cache: a second process with the same snapshot id hits the persistent cache
+CHECK PASS cache: a TencentDB revision change gives a new snapshot id and a fresh brief
+CHECK PASS ledger: events.jsonl unchanged by every read tool
+CHECK PASS scrub: MemoryUseReceipt rows carry no secret
+CHECK PASS offline: memory_search answers with the network disabled (unshare -rn) :: semantic=unreachable
+CHECK PASS fix scrub: env-dump/JSON/github_pat shapes never reach memory_search or inspect :: scrubbed=10
+CHECK PASS fix scrub: the AgentsView secret_findings span (byte offsets, after non-ASCII) is blanked
+CHECK PASS fix inspect: a credential straddling the chars bound never leaks (agentsview: and eventlog:) :: tail='x [redacted:cr' / 'y [redacted:cr'
+CHECK PASS fix mcp: every scoped tool documents that an omitted project spans all projects :: 5 tools
+hung fake TencentDB on http://127.0.0.1:11546 (sleeps 3 s on every endpoint)
+CHECK PASS fix deadline: search against a gateway hung on /health and search returns within deadline+50 ms :: 206 ms
+CHECK PASS fix deadline: memory_brief (snapshot probe + search) stays within deadline+50 ms :: 206 ms
+CHECK PASS fix deadline: over MCP the hung gateway is semantic=unavailable(timeout), lexical evidence still served :: search latency_ms=205.11
+CHECK PASS fix hook path: build_state_packet makes no gateway call (configured, hung gateway) :: 15 ms, gateway requests during build: 0
+CHECK PASS fix guard: allow_memory without a turn_key skips memory with an explicit double_inject_guard gap
+doctor fresh: {"agentsview_db": [true, "user_version 74"], "freshness": [true, "newest session 1.0 h old (limit 24 h)"], "deepseek_harness_agent": [true, "present"], "data_version": [true, "DB user_version 74, agentsview 0.39 dataVersion 74"], "recall_layer": [true, "0 recall entries"], "claude_home_indexed": [true, "present, indexed by agentsview config"], "require_auth": [true, "require_auth=True"], "tencentdb": [true, "semantic layer UNAVAILABLE (not_configured)"]}
+CHECK PASS doctor: passes on the fresh fixture (exit 0); TencentDB reported not_configured
+CHECK PASS doctor: output has no config secret value
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 23656)
+Traceback (most recent call last):
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/http/server.py", line 447, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/http/server.py", line 435, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/memory_fixture.py", line 167, in do_POST
+    self._send(200, {'code': 0, 'data': {'items': items[: int(body.get('limit') or 5)],
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                         'revision': stub.revision}})
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/memory_fixture.py", line 144, in _send
+    self.wfile.write(raw)
+    ~~~~~~~~~~~~~~~~^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 23658)
+Traceback (most recent call last):
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/http/server.py", line 447, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/http/server.py", line 435, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/memory_fixture.py", line 151, in do_GET
+    self._send(200, {'status': 'ok', 'revision': stub.revision})
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/memory_fixture.py", line 144, in _send
+    self.wfile.write(raw)
+    ~~~~~~~~~~~~~~~~^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 23668)
+Traceback (most recent call last):
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/http/server.py", line 447, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/http/server.py", line 435, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/memory_fixture.py", line 167, in do_POST
+    self._send(200, {'code': 0, 'data': {'items': items[: int(body.get('limit') or 5)],
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                         'revision': stub.revision}})
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/memory_fixture.py", line 144, in _send
+    self.wfile.write(raw)
+    ~~~~~~~~~~~~~~~~^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 23678)
+Traceback (most recent call last):
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/http/server.py", line 447, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/http/server.py", line 435, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/memory_fixture.py", line 151, in do_GET
+    self._send(200, {'status': 'ok', 'revision': stub.revision})
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/memory_fixture.py", line 144, in _send
+    self.wfile.write(raw)
+    ~~~~~~~~~~~~~~~~^^^^^
+  File "~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+CHECK PASS doctor: fails on the stale fixture (exit 1, freshness)
+CHECK PASS abstain: brief abstains with an explicit gap when AgentsView is removed
+CHECK PASS abstain: memory_search is isError (unavailable, missing), never an empty success
+RESULT PASS (0 failed: [])
+# exit: 0
+# socket guard log: 0 violation(s)

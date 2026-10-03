@@ -1,0 +1,36 @@
+# tree: /mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture @ 06454d590811da0ee3529fb511e94afa00c9dd1f (status: 0 changed paths)
+# cmd: (cd <tree> && flock -s quiet-lane.lock run.sh <tree> suite-head2 --guard -- python -m pytest -q -p no:cacheprovider -rfE --tb=no tests)
+........................................................................ [  6%]
+........................................................................ [ 13%]
+........................................................................ [ 20%]
+........................................................................ [ 27%]
+........................................................................ [ 34%]
+........................................................................ [ 41%]
+........................................................................ [ 48%]
+......FFFFF............................................................. [ 54%]
+........................................................................ [ 61%]
+......................................................................ss [ 68%]
+.........F.............................................................. [ 75%]
+................................F....F...F..FF.F........................ [ 82%]
+...............................s.s...................................... [ 89%]
+........................................................................ [ 96%]
+.........................................                                [100%]
+=========================== short test summary info ============================
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+FAILED tests/test_omp_capture.py::test_bridge_reply_latency_stays_within_its_bound_over_200_turns
+FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+FAILED tests/test_quota_budget.py::test_empty_authority_capacity - assert False
+FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily - KeyEr...
+FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+12 failed, 1033 passed, 4 skipped in 249.82s (0:04:09)
+# socket guard log: 0 violation(s)
+# cmd: (cd <tree> && flock -s quiet-lane.lock run.sh <tree> suite-head2-bun -- bun test omp-extensions/)
+ 23 pass
+ 0 fail
+Ran 23 tests across 3 files. [1298.00ms]

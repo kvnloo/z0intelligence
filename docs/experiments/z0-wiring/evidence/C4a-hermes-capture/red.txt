@@ -1,0 +1,66 @@
+# C4a red run (before implementation) on base 914dc99 + uncommitted red tests only; 2026-10-03T10:22:40Z
+# earlier attempts kept: red-attempt1-seam-errors.txt (helpers monkeypatched not-yet-existing seams), red-attempt2.txt (fixture raised ImportError at setup)
+# cmd: flock -s quiet-lane.lock scripts/run.sh <wt> red --guard -- env Z0INT_TEST_HERMES_PYTHON=<homes>/hermes-venv/bin/python python -m pytest -q -p no:cacheprovider -rfE --tb=line tests/test_hermes_capture.py tests/test_hermes_capture_host.py
+FFFFEEFFFFFFFFFFFFFFFFFFF                                                [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of test_p7_projection_uses_the_task_cwd_from_hook_context_never_the_process_cwd _
+E   ImportError: cannot import name 'hermes_capture' from 'z0int' (/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/src/z0int/__init__.py). Did you mean: 'harness_capture'?
+
+During handling of the above exception, another exception occurred:
+E   Failed: z0int.hermes_capture (the child that writes the Hermes capture rows) does not exist
+_ ERROR at setup of test_p9_state_packet_text_is_persisted_only_with_persist_packet_text _
+E   ImportError: cannot import name 'hermes_capture' from 'z0int' (/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/src/z0int/__init__.py). Did you mean: 'harness_capture'?
+
+During handling of the above exception, another exception occurred:
+E   Failed: z0int.hermes_capture (the child that writes the Hermes capture rows) does not exist
+=================================== FAILURES ===================================
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:160: AssertionError: assert ('mode' in {})
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:311: AssertionError: assert ({'pre_llm_cal...f4cc7cf0ea0>]} == {}
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:324: AssertionError: assert (None is None and {'pre_llm_cal...f4cc7cf1580>]} == {}
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:488: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:488: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:500: AssertionError: assert not True
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:543: AssertionError: assert ({'pre_llm_cal...f4cc7cf3240>]} == {}
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture.py:94: AssertionError: register() in mode shadow must return the capture instance
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture_host.py:39: AssertionError: assert {'pre_llm_call'} == {'api_request...lm_call', ...}
+/mnt/zer0models/z0-wt/wiring/wt/C4a-hermes-capture/tests/test_hermes_capture_host.py:49: AssertionError: assert (not True)
+=========================== short test summary info ============================
+FAILED tests/test_hermes_capture.py::test_p1_config_schema_has_no_service_host_or_port
+FAILED tests/test_hermes_capture.py::test_p1_no_hook_path_opens_a_socket_and_a_port_setting_is_ignored_with_a_counted_warning
+FAILED tests/test_hermes_capture.py::test_p2_close_with_a_full_queue_returns_within_2s_and_writes_nothing_after
+FAILED tests/test_hermes_capture.py::test_p3_drops_are_persisted_and_a_fresh_process_reports_the_same_count
+FAILED tests/test_hermes_capture.py::test_p10_mode_off_registers_no_hook_and_pre_tool_call_is_never_registered
+FAILED tests/test_hermes_capture.py::test_p11_config_error_fails_open_and_the_child_writes_no_pycache_into_the_installed_tree
+FAILED tests/test_hermes_capture.py::test_a1_rows_land_under_z0int_home_state_hermes_never_under_hermes_home
+FAILED tests/test_hermes_capture.py::test_a2_outcome_rows_carry_behaviour_and_session_end_fills_unfinished_turns
+FAILED tests/test_hermes_capture.py::test_a3_trace_and_turn_ids_are_canonical_and_match_the_c1_aliases
+FAILED tests/test_hermes_capture.py::test_a4_projection_pool_is_bounded_and_the_h3_flood_drops_no_events
+FAILED tests/test_hermes_capture.py::test_a4_every_projection_holds_one_of_max_children_slots
+FAILED tests/test_hermes_capture.py::test_double_capture_guard_emits_no_opportunities_and_writes_a_failure_row[profile0-z0int-decisions]
+FAILED tests/test_hermes_capture.py::test_double_capture_guard_emits_no_opportunities_and_writes_a_failure_row[profile1-bend]
+FAILED tests/test_hermes_capture.py::test_the_z0int_decisions_vehicle_is_retired
+FAILED tests/test_hermes_capture.py::test_inertness_every_capture_hook_returns_none_for_normal_and_hostile_payloads
+FAILED tests/test_hermes_capture.py::test_automatic_path_is_inert_and_spawns_nothing_while_automatic_json_has_hermes_off
+FAILED tests/test_hermes_capture.py::test_post_tool_call_stores_only_check_class_and_exit_status
+FAILED tests/test_hermes_capture.py::test_opportunity_and_outcome_rows_carry_model_id_and_the_plugin_policy_revision
+FAILED tests/test_hermes_capture.py::test_cron_kanban_and_cluster_sessions_are_cohort_automated_at_capture
+FAILED tests/test_hermes_capture.py::test_z0int_missing_or_broken_fails_open_and_is_counted[missing]
+FAILED tests/test_hermes_capture.py::test_z0int_missing_or_broken_fails_open_and_is_counted[broken]
+FAILED tests/test_hermes_capture_host.py::test_toolsets_shape_profile_loads_the_plugin_and_registers_its_capture_hooks
+FAILED tests/test_hermes_capture_host.py::test_mode_off_and_disabled_leave_dispatch_untouched
+ERROR tests/test_hermes_capture.py::test_p7_projection_uses_the_task_cwd_from_hook_context_never_the_process_cwd
+ERROR tests/test_hermes_capture.py::test_p9_state_packet_text_is_persisted_only_with_persist_packet_text
+23 failed, 2 errors in 2.09s

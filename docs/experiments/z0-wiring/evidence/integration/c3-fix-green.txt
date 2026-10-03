@@ -1,0 +1,8 @@
+
+ 28 pass
+ 1 skip
+ 0 fail
+ 138 expect() calls
+Ran 29 tests across 3 files. [1.71s]
+..........ss................................                             [100%]
+42 passed, 2 skipped in 7.79s

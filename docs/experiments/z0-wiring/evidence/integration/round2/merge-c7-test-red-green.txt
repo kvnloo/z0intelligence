@@ -1,0 +1,13 @@
+=== side e02bcf5 alone (tree = git archive e02bcf5 + merge test) ===
+>       assert row['memory'] == receipt.to_dict()  # validated and serialised, not the raw ctx object
+E       AssertionError: assert MemoryUseReceipt(snapshot_id='mem_merge', capability_ids=('agentsview',), query_ids=('q1',), included_claim_ids=(), ex...l_latency_ms=None, input_tokens=None, raw_source_reads=None, tainted_evidence=False, schema='z0int.memory_contract.v1') == {'capability_ids': ['agentsview'], 'evidence_event_uids': [], 'excluded_claim_ids': [], 'included_claim_ids': [], ...}
+E        +  where {'capability_ids': ['agentsview'], 'evidence_event_uids': [], 'excluded_claim_ids': [], 'included_claim_ids': [], ...} = to_dict()
+E        +    where to_dict = MemoryUseReceipt(snapshot_id='mem_merge', capability_ids=('agentsview',), query_ids=('q1',), included_claim_ids=(), ex...l_latency_ms=None, input_tokens=None, raw_source_reads=None, tainted_evidence=False, schema='z0int.memory_contract.v1').to_dict
+1 failed, 3 deselected in 0.17s
+=== side 772ba7d alone (tree = git archive 772ba7d + merge test) ===
+>       row = hc.opportunity_record('hermes', payload, ctx, packet_text='redacted')
+E       TypeError: opportunity_record() got an unexpected keyword argument 'packet_text'
+1 failed, 3 deselected in 0.05s
+=== merge (staged C7 merge tree) ===
+........                                                                 [100%]
+8 passed in 0.18s

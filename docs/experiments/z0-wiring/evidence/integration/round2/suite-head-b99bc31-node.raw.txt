@@ -1,0 +1,215 @@
+TAP version 13
+# Subtest: shadow: the pre-step returns at once with the native decision and a receipt is written later
+ok 1 - shadow: the pre-step returns at once with the native decision and a receipt is written later
+  ---
+  duration_ms: 232.852002
+  type: 'test'
+  ...
+# Subtest: canary: the brief enters the next model request as one extra message; the native batch is untouched
+ok 2 - canary: the brief enters the next model request as one extra message; the native batch is untouched
+  ---
+  duration_ms: 186.505864
+  type: 'test'
+  ...
+# Subtest: canary past the 300 ms deadline gets the native decision and a counted timeout
+ok 3 - canary past the 300 ms deadline gets the native decision and a counted timeout
+  ---
+  duration_ms: 520.283653
+  type: 'test'
+  ...
+# Subtest: fail-open: an unavailable z0int keeps the native decision and counts the failure
+ok 4 - fail-open: an unavailable z0int keeps the native decision and counts the failure
+  ---
+  duration_ms: 76.425216
+  type: 'test'
+  ...
+# Subtest: a cloud model endpoint is blocked unless dsh allows cloud injection
+ok 5 - a cloud model endpoint is blocked unless dsh allows cloud injection
+  ---
+  duration_ms: 115.694148
+  type: 'test'
+  ...
+# Subtest: index.mjs registers exactly one memory pre-step (default shadow) and none when memory_inject is off
+ok 6 - index.mjs registers exactly one memory pre-step (default shadow) and none when memory_inject is off
+  ---
+  duration_ms: 68.263366
+  type: 'test'
+  ...
+# Subtest: memory.mjs reaches only the z0 memory surface: no Hermes home or state.db path anywhere
+ok 7 - memory.mjs reaches only the z0 memory surface: no Hermes home or state.db path anywhere
+  ---
+  duration_ms: 1.12056
+  type: 'test'
+  ...
+# Subtest: the gate endpoint is the profile model_endpoint only: a generic env var never marks a cloud model loopback
+ok 8 - the gate endpoint is the profile model_endpoint only: a generic env var never marks a cloud model loopback
+  ---
+  duration_ms: 115.351797
+  type: 'test'
+  ...
+# Subtest: a root agent without a session cwd gets no brief (fail closed) and a counted no_scope
+ok 9 - a root agent without a session cwd gets no brief (fail closed) and a counted no_scope
+  ---
+  duration_ms: 119.402097
+  type: 'test'
+  ...
+# Subtest: persistence (recorded deviation): the DSH brief is a durable admitted message, marked for the recall echo guard
+ok 10 - persistence (recorded deviation): the DSH brief is a durable admitted message, marked for the recall echo guard
+  ---
+  duration_ms: 122.038513
+  type: 'test'
+  ...
+# Subtest: shadow children are bounded: past the cap a turn writes a counted queue_saturated row instead of spawning
+ok 11 - shadow children are bounded: past the cap a turn writes a counted queue_saturated row instead of spawning
+  ---
+  duration_ms: 115.658495
+  type: 'test'
+  ...
+# Subtest: 1 apply registers an observe-only agent/request middleware; next() comes back unchanged
+ok 12 - 1 apply registers an observe-only agent/request middleware; next() comes back unchanged
+  ---
+  duration_ms: 22.89605
+  type: 'test'
+  ...
+# Subtest: 1 the output stream is byte-identical with capture on or off
+ok 13 - 1 the output stream is byte-identical with capture on or off
+  ---
+  duration_ms: 0.724344
+  type: 'test'
+  ...
+# Subtest: 2 the llm/stream router registers only when config.router===true AND automatic.json dsh is enabled
+ok 14 - 2 the llm/stream router registers only when config.router===true AND automatic.json dsh is enabled
+  ---
+  duration_ms: 1.062275
+  type: 'test'
+  ...
+# Subtest: 3 a user turn sends one prompt and one stop event to hook_adapter --harness dsh, detached
+ok 15 - 3 a user turn sends one prompt and one stop event to hook_adapter --harness dsh, detached
+  ---
+  duration_ms: 0.635828
+  type: 'test'
+  ...
+# Subtest: 3 the JS turn_key matches a known harness_id.turn_key vector
+ok 16 - 3 the JS turn_key matches a known harness_id.turn_key vector
+  ---
+  duration_ms: 0.156583
+  type: 'test'
+  ...
+# Subtest: 3 a turn that errors before its stop boundary is closed with a counted failure row, not left open
+ok 17 - 3 a turn that errors before its stop boundary is closed with a counted failure row, not left open
+  ---
+  duration_ms: 71.165512
+  type: 'test'
+  ...
+# Subtest: 4 the plugin source and the env it gives the hook child never reference key files or private trees
+ok 18 - 4 the plugin source and the env it gives the hook child never reference key files or private trees
+  ---
+  duration_ms: 1.675157
+  type: 'test'
+  ...
+# Subtest: 5 default config: no network call, shadow_plane=off recorded once per process
+ok 19 - 5 default config: no network call, shadow_plane=off recorded once per process
+  ---
+  duration_ms: 236.401512
+  type: 'test'
+  ...
+# Subtest: 5 with a fake z0 service it samples deterministically at the configured rate and writes shadow_decision rows
+ok 20 - 5 with a fake z0 service it samples deterministically at the configured rate and writes shadow_decision rows
+  ---
+  duration_ms: 60.857538
+  type: 'test'
+  ...
+# Subtest: 5 the max-inflight cap holds: one call in flight, the rest recorded queue_saturated
+ok 21 - 5 the max-inflight cap holds: one call in flight, the rest recorded queue_saturated
+  ---
+  duration_ms: 323.414708
+  type: 'test'
+  ...
+# Subtest: 5 service down gives backend_unavailable, counted
+ok 22 - 5 service down gives backend_unavailable, counted
+  ---
+  duration_ms: 20.578822
+  type: 'test'
+  ...
+# Subtest: 5 port 11501 is refused unless allow_live_service
+ok 23 - 5 port 11501 is refused unless allow_live_service
+  ---
+  duration_ms: 149.960642
+  type: 'test'
+  ...
+# Subtest: 5 the shadow only ever calls the pure /v1/plan route: no config value can point it at an executing route
+ok 24 - 5 the shadow only ever calls the pure /v1/plan route: no config value can point it at an executing route
+  ---
+  duration_ms: 22.467838
+  type: 'test'
+  ...
+# Subtest: 5 a shadow response that claims it executed is counted as a contract violation, never recorded ok
+ok 25 - 5 a shadow response that claims it executed is counted as a contract violation, never recorded ok
+  ---
+  duration_ms: 20.684897
+  type: 'test'
+  ...
+# Subtest: 6 a missing python lets the turn proceed and leaves a counted drop row
+ok 26 - 6 a missing python lets the turn proceed and leaves a counted drop row
+  ---
+  duration_ms: 23.0689
+  type: 'test'
+  ...
+# Subtest: 6 a spawn that throws or errors is counted and never reaches the turn
+ok 27 - 6 a spawn that throws or errors is counted and never reaches the turn
+  ---
+  duration_ms: 42.067963
+  type: 'test'
+  ...
+# Subtest: 6 no unhandled rejection under --unhandled-rejections=strict on every failure path
+ok 28 - 6 no unhandled rejection under --unhandled-rejections=strict on every failure path
+  ---
+  duration_ms: 337.743854
+  type: 'test'
+  ...
+# Subtest: 7 lineage and shadow rows hold no prompt or response text
+ok 29 - 7 lineage and shadow rows hold no prompt or response text
+  ---
+  duration_ms: 20.825413
+  type: 'test'
+  ...
+# Subtest: 8 the plugin does not ship, export or load memory.js
+ok 30 - 8 the plugin does not ship, export or load memory.js
+  ---
+  duration_ms: 0.571865
+  type: 'test'
+  ...
+# Subtest: governed canary requires all three gates
+ok 31 - governed canary requires all three gates
+  ---
+  duration_ms: 1.109179
+  type: 'test'
+  ...
+# Subtest: non-governed calls preserve the original payload plus OMP identity
+ok 32 - non-governed calls preserve the original payload plus OMP identity
+  ---
+  duration_ms: 0.131111
+  type: 'test'
+  ...
+# Subtest: harness cannot smuggle provider model or AODL into governed body
+ok 33 - harness cannot smuggle provider model or AODL into governed body
+  ---
+  duration_ms: 0.153973
+  type: 'test'
+  ...
+# Subtest: rejects non-object arguments
+ok 34 - rejects non-object arguments
+  ---
+  duration_ms: 0.349465
+  type: 'test'
+  ...
+1..34
+# tests 34
+# suites 0
+# pass 34
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5543.539393
+node_rc=0

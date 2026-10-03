@@ -1,0 +1,51 @@
+# C2-loop-consumers isolated e2e (PASS). Full JSON report: e2e.raw.txt (run under flock -s quiet-lane.lock).
+# Driver: scripts/e2e.sh -> scripts/e2e_c2.py, isolated runner scripts/run.sh (env -i, socket guard on), python venv-claude-code.
+
+## Commands
+flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock scripts/e2e.sh
+  1. sqlite3 "file:/mnt/zer0models/sft-svlm/data/agentsview/sessions.db?mode=ro" .schema  > homes/C2-loop-consumers/e2e/sessions.schema.sql
+     (schema only; 1513 lines, 75 CREATE TABLE). Replayed into fresh scratch DBs with the 12 FTS5 shadow tables
+     (*_data/_idx/_docsize/_config/_content) filtered out: 201 statements, 0 failed; user_version 74 (av74) and 113 (av113),
+     plus a user_version 75 copy and a copy with the deepseek-harness sessions removed.
+  2. Two synthetic hosts (homes/.../e2e/host-a, host-b; HOME, Z0INT_HOME, CLAUDE_CONFIG_DIR, AGENTSVIEW_DATA_DIR all inside).
+     Capture through the C1 writer: `python -m z0int.hook_adapter --harness <h> prompt|stop` for hermes, codex, grok (GROK_SESSION_ID
+     env), omp, omo, dsh, claude-code (+ CC transcripts). Detached opportunity builds: host-a 34/34, host-b 37/37 rows.
+  3. Synthetic AgentsView sessions for every agent incl. deepseek-harness (plus claude/chatgpt/kimi noise): Hermes cli + cron,
+     Codex interactive + exec (session_kind non-interactive), Grok + an ambiguous Grok session (a second row with
+     source_session_id), OMP + an OMP subagent session, OMO (+ one never-indexed OMO session), DSH. A work repo with a commit
+     that is later reverted.
+  4. Synthetic legacy JSONL: OMP v1 decisions/outcomes (gold, negative, ambient-gold, execution, no-outcome), 300 cognition-shadow
+     receipts (3 served, 297 transport_error), DSH jev receipts (3 jev_decision + routed model_request).
+  5. CLI (Z0INT_HOME=<host>/z0): `z0int outcomes verify --harness X --agentsview-db <av113> --no-gh --json` for all seven, run twice;
+     guards with --dry-run on av74 / av75 / no-deepseek-harness DBs and `--harness claude-code --projects-dir <empty>`;
+     `z0int loop import {omp-v1,omp-cognition-shadow,dsh-jev}` twice each; `z0int loop export --root <z0> --host host-a|host-b
+     --out-dir tables-host-*`; `z0int loop merge --in A --in B --out merged-1` and `--in B --in A --out merged-2`; a merge with a
+     table_version changed in one input.
+
+## Observed
+- verify (host-a run 1): every harness status success; joined/unjoined/pending: hermes 6/0/0, codex 6/0/0, grok 3/3/0 (ambiguous
+  session -> unjoined + 3 failure rows), omp 6/0/0, omo 3/2/0 (never-indexed -> unjoined), dsh 3/0/0; claude-code 2 turns.
+  Per AgentsView session the same signal semantics as CC: turn 1 verified_failure (tests exit 1), turn 2 contested (tests pass vs
+  commit reverted), turn 3 unverified (its own next prompt is absent).
+- re-run: appended 0 for all seven harnesses (idempotent; failure rows not duplicated).
+- cohorts (tables): hermes/automated (cron) 3 + hermes/interactive 3; codex/automated (exec) 3 + codex/interactive 3; omp/agent
+  (subagent) 3 + omp/interactive 3; grok/unknown 3 (ambiguous) + grok/interactive 3; omo/unknown 2 + omo/interactive 3;
+  dsh/interactive 3; claude-code/interactive 2; omp/legacy 4 (imported). Shadow tables: omp/legacy 3, dsh/legacy 3.
+- guards: user_version 74 hermes -> joins (status success); user_version 75 omp -> degraded, reader_unavailable, 0 rows;
+  DB without deepseek-harness -> degraded, reader_unavailable (agent_missing), 0 rows; CC with an empty projects dir -> degraded,
+  label_source_empty.
+- export index: failure rows counted per harness (missing_verifier/partial_measurement from capture, unjoined from verify);
+  unsupported_schema {} for every harness (no foreign schema in this e2e; covered by the unit test).
+- imports: omp-v1 4 rows (gold 1, negative 1, execution 2 incl. the ambient-gold close, no_outcome 1), cognition-shadow 3 rows /
+  backend_unavailable 297, dsh-jev 3 rows; second runs add 0 rows with identical manifest_sha256.
+- merge: hosts [host-a, host-b]; codex/interactive 6 rows with provenance (host-a,host-b) for shared turns and (host-b) for the
+  host-b-only session; merging in the other order gives an identical manifest_sha256; the cross-version merge exits 2
+  ("refusing to merge codex/interactive: schema versions differ") and writes nothing.
+- privacy: no synthetic secret (prompt marker, repo dir name, tool input marker) in any exported, merged or imported table, or in
+  outcomes_verified rows.
+- socket guard violations: 0. Nothing outside homes/C2-loop-consumers/e2e was written; the real sessions.db was opened only by
+  the sqlite3 CLI in mode=ro for `.schema`.
+
+## Note
+e2e-unlocked-run.raw.txt is the first run of the same script, which I started without the flock -s wrapper by mistake; the
+locked rerun (e2e.raw.txt) produced an identical report (compared as parsed JSON).

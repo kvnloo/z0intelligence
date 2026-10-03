@@ -1,0 +1,132 @@
+{
+ "counts": {
+  "cohort": {
+   "agent": 4
+  },
+  "days": {
+   "2026-10-03": 2,
+   "none": 2
+  },
+  "gate": {
+   "ACT": 2,
+   "ASK": 2
+  },
+  "groups": 2,
+  "groups_with_resolved": 0,
+  "observed_action": {
+   "ACT": 4
+  },
+  "resolved": 0,
+  "rows": 4,
+  "states": {
+   "unverified": 4
+  },
+  "with_features": 4,
+  "with_label_row": 4
+ },
+ "feature_schema_sha": "69d7eef44ba1707e",
+ "features": [
+  "scope_mode=question",
+  "scope_mode=unscoped",
+  "scope_mode=repo",
+  "family.conv",
+  "family.docs.priority",
+  "family.gh",
+  "family.git.branch",
+  "family.git.branches_ahead",
+  "family.git.dirty",
+  "family.git.head",
+  "family.git.history",
+  "family.git.remote",
+  "family.git.stash",
+  "family.git.upstream",
+  "family.git.worktrees",
+  "n_families",
+  "n_claims",
+  "n_superseded",
+  "n_unknowns",
+  "n_unknowns_blocking",
+  "n_unknowns_status=unknown",
+  "n_unknowns_status=source_unavailable",
+  "n_unknowns_status=no_match",
+  "unknown_family.conv",
+  "unknown_family.docs.priority",
+  "unknown_family.gh",
+  "unknown_family.git.branch",
+  "unknown_family.git.branches_ahead",
+  "unknown_family.git.dirty",
+  "unknown_family.git.head",
+  "unknown_family.git.history",
+  "unknown_family.git.remote",
+  "unknown_family.git.stash",
+  "unknown_family.git.upstream",
+  "unknown_family.git.worktrees",
+  "n_contradictions",
+  "contradiction_family.conv",
+  "contradiction_family.docs.priority",
+  "contradiction_family.gh",
+  "contradiction_family.git.branch",
+  "contradiction_family.git.branches_ahead",
+  "contradiction_family.git.dirty",
+  "contradiction_family.git.head",
+  "contradiction_family.git.history",
+  "contradiction_family.git.remote",
+  "contradiction_family.git.stash",
+  "contradiction_family.git.upstream",
+  "contradiction_family.git.worktrees",
+  "effect.read",
+  "effect.write",
+  "effect.privileged",
+  "authority_source=aodl",
+  "authority_source=harness-default",
+  "grant.read",
+  "grant.write",
+  "grant.privileged",
+  "authority_fingerprinted",
+  "n_missing_authority",
+  "legal.ACT",
+  "legal.OBSERVE",
+  "legal.ASK",
+  "legal.ABSTAIN",
+  "legal.ESCALATE",
+  "gate=ACT",
+  "gate=OBSERVE",
+  "gate=ASK",
+  "gate=ABSTAIN",
+  "gate=ESCALATE",
+  "posture_factory=BURN",
+  "posture_factory=BALANCED",
+  "posture_factory=CONSERVE",
+  "posture_factory=other",
+  "posture_factory=absent",
+  "cohort=interactive",
+  "cohort=agent",
+  "cohort=harness",
+  "cohort=unknown"
+ ],
+ "generated_at": "2026-10-03T12:30:31Z",
+ "label": {
+  "y_success": "1 = verified_success; 0 = verified_failure or contested; null = unverified (missing, not negative)"
+ },
+ "post_decision_columns": [
+  "observed"
+ ],
+ "privacy": "no prompt/response/command/path/claim text; ids are sha256 prefixes",
+ "row_schema": "z0int.loop.training_row.v0",
+ "schema": "z0int.loop.training_table_manifest.v0",
+ "sources": {
+  "opportunities.jsonl": {
+   "rows": 4,
+   "sha256": "821310ad80adad87"
+  },
+  "outcomes.jsonl": {
+   "rows": 4,
+   "sha256": "fdb0a211a3b330af"
+  },
+  "outcomes_verified.jsonl": {
+   "rows": 4,
+   "sha256": "4c10b4a8fd9d4a77"
+  }
+ },
+ "table_version": "0.1.0"
+}

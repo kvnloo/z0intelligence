@@ -1,0 +1,46 @@
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/local-cognition/index.test.ts:
+(pass) tool_call handler returns undefined and never blocks [5.12ms]
+(pass) a rejected send does not throw into the tool_call handler [30.63ms]
+(pass) sends a cognition_shadow request through the bridge transport [30.34ms]
+(pass) payload actions contain only the available tool names [30.42ms]
+(pass) payload keeps read-only authority and the example shadow models by default [30.87ms]
+(pass) env kill-switch disables the lane [30.59ms]
+(pass) env kill-switch accepts off/false and explicit on [0.11ms]
+(pass) cognition.json setting gates the lane when env is unset [0.34ms]
+(pass) timeout comes from the env override [0.04ms]
+(pass) resolveAvailableTools prefers ctx.getTools and always includes the observed tool [0.07ms]
+(pass) buildShadowPayload is self-contained and schema-shaped [0.47ms]
+(pass) the shadow request gives the served-only local backend the bounded tool input and a structured actual_tool [30.49ms]
+(pass) registers z0int-cognition-status and the command never throws [0.90ms]
+
+omp-extensions/z0int-bridge/index.test.ts:
+(pass) the extension loads and registers with a missing interpreter [303.18ms]
+(pass) the default export is capture plus the bridge commands only: no routing handler, no route_worker tool [0.76ms]
+(pass) routing loaded from its own z0int-intelligence link registers exactly once next to the bridge [1.24ms]
+(pass) capture handlers return undefined and fail open, counted, when the worker cannot start [301.43ms]
+(pass) thrown errors inside a handler are caught: no throw, no unhandledRejection [302.67ms]
+(pass) the turn_open frame carries the task cwd, harness, subagent parent and model [0.22ms]
+(pass) the session id comes from ctx.sessionManager [0.05ms]
+(pass) interpreter resolution: Z0INT_PYTHON, then the checkout venv, then the z0int runtime, then python3 [0.04ms]
+(pass) frames reach the worker and a turn per session closes on its own agent_end [62.59ms]
+(pass) an unclosed turn whose agent_end never arrives stops blocking reload after the age bound [327.39ms]
+(pass) a new turn in a session whose last turn never closed is counted, not silently replaced [13.52ms]
+
+omp-extensions/z0int-bridge/omo.test.ts:
+(pass) the senpi re-export loads, registers capture only and stays inert [1.46ms]
+(pass) a diverged senpi API is recorded UNSUPPORTED, never a silent pass [0.18ms]
+(pass) a host whose on() accepts any event but never delivers agent_end is caught at run time [14.16ms]
+(skip) the installed senpi declares the events the shim needs [SKIPPED: senpi types.d.ts not found (set SENPI_TYPES); OMO API status UNVERIFIED]
+(pass) a host that exits when its event loop drains (senpi print mode) is never held open by the resident worker [138.96ms]
+
+1 tests skipped:
+(skip) the installed senpi declares the events the shim needs [SKIPPED: senpi types.d.ts not found (set SENPI_TYPES); OMO API status UNVERIFIED]
+
+ 28 pass
+ 1 skip
+ 0 fail
+ 138 expect() calls
+Ran 29 tests across 3 files. [1.79s]
+bun_rc=0

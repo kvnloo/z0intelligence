@@ -1,0 +1,27 @@
+To https://github.com/kvnloo/z0intelligence.git
+   e02bcf5..b99bc31  integrate/wiring-20261003 -> integrate/wiring-20261003
+remote: 
+remote: Create a pull request for 'feat/wire-memory-core-20261003' on GitHub by visiting:        
+remote:      https://github.com/kvnloo/z0intelligence/pull/new/feat/wire-memory-core-20261003        
+remote: 
+To https://github.com/kvnloo/z0intelligence.git
+ * [new branch]      feat/wire-memory-core-20261003 -> feat/wire-memory-core-20261003
+remote: 
+remote: Create a pull request for 'feat/wire-memory-harnesses-20261003' on GitHub by visiting:        
+remote:      https://github.com/kvnloo/z0intelligence/pull/new/feat/wire-memory-harnesses-20261003        
+remote: 
+To https://github.com/kvnloo/z0intelligence.git
+ * [new branch]      feat/wire-memory-harnesses-20261003 -> feat/wire-memory-harnesses-20261003
+To https://github.com/kvnloo/z0intelligence.git
+   352edf2..f20c2b7  feat/wire-loop-consumers-20261003 -> feat/wire-loop-consumers-20261003-unverified
+73fe3d7acc5feea91622cb0893a6424242d478a5	refs/heads/feat/wire-dsh-plugin-20261003
+ee7cae0d9b82d3fe24c8de9eb51c4eb6e5384034	refs/heads/feat/wire-hermes-capture-20261003
+f20c2b76880b89dde8297ee5513173358c7f327c	refs/heads/feat/wire-loop-consumers-20261003-unverified
+914dc9917bd41bb722d7eced4e7e5f1aa4002f66	refs/heads/feat/wire-loop-core-20261003
+772ba7d447a138659cda9683fcc34538539b013f	refs/heads/feat/wire-memory-core-20261003
+8d619cfb60b48f5310c9676b86ab8271720896ac	refs/heads/feat/wire-memory-core-20261003-unverified
+41aec0fa5795ba77054347813c7b1303ba0b6868	refs/heads/feat/wire-memory-harnesses-20261003
+3f6d139436e79e55435317d4b6541fabd566690d	refs/heads/feat/wire-omp-capture-20261003
+b99bc316e2d23e3f0d901b5fe7542d4ce1058060	refs/heads/integrate/wiring-20261003
+328ef7e1806a8fb568c0dc8aa2f9acbff08b90e3	refs/heads/lab/agentweb-bridge-wire-v1
+91aa4abec4a47a82f1c517f463f13fa8ebaf43e2	refs/heads/lab/agentweb-bridge-wire-v1-restack

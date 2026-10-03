@@ -1,0 +1,33 @@
+# C8 full suite: head vs base (shared quiet lock, env -i, isolated HOME/Z0INT_HOME/TMPDIR/AGENTSVIEW_DATA_DIR, socket guard)
+# runner: evidence/C8-memory-wiring/scripts/suite.sh <tree> <tag>  (pytest tests/ ; node --test tests/test-dsh-*.mjs ; bun test omp-extensions/)
+# interpreter: venv-integrate python 3.13.13 with <tree>/src first on PYTHONPATH
+base = 3028e0c (merge of C7 772ba7d + integrate/wiring-20261003 e02bcf5), temporary worktree wt/C8-memory-wiring-base (removed)
+head = c875c6b (feat/wire-memory-harnesses-20261003)
+
+| tree | pytest | node (DSH) | bun (omp-extensions) |
+|---|---|---|---|
+| base 3028e0c | 11 failed, 1151 passed, 6 skipped | 1 file, rc 0 | 29 pass, 0 fail |
+| head c875c6b | 11 failed, 1209 passed, 6 skipped | 2 files (+test-dsh-memory.mjs), 26 pass, rc 0 | 36 pass, 0 fail |
+
+FAILED set identical (diff of sorted FAILED lines is empty):
+  FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+  FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+  FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+  FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+  FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+  FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+  FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+  FAILED tests/test_quota_budget.py::test_empty_authority_capacity
+  FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily
+  FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+  FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+These are the known environment failures (live functions_verify, quota_budget, provider_saturation), the same set as
+the round-1 integration base. No socket-guard violation log was created on either tree.
+
+Intermediate head runs kept: suite-head-first.* (6c21ad2: 14 failed = the 11 + 3 C1 shim-contract tests that encoded
+"capture-only" shims; C8 extends those shims by plan, the tests now check the capture commands unchanged plus the memory
+seam as its own entry, commit ada3368; bun 5 fail from env sharing across bun test files, fixed in the same commit),
+suite-head-4b9a286.* (11 failed, identical), suite-head-c875c6b-run1.* (12 failed: the 11 +
+test_agentweb_bridge_overload::test_host_overload_is_503_before_handler_execution, a timing test this branch does not
+touch; it passed 5/5 in isolation and in the full rerun above).
+Raw: suite-{base,head}{,-node,-bun}.raw.txt

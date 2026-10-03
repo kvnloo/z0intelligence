@@ -1,0 +1,25 @@
+{
+ "rows": 4,
+ "with_features": 4,
+ "with_label_row": 4,
+ "resolved": 0,
+ "states": {
+  "unverified": 4
+ },
+ "groups": 2,
+ "groups_with_resolved": 0,
+ "gate": {
+  "ACT": 2,
+  "ASK": 2
+ },
+ "observed_action": {
+  "ACT": 4
+ },
+ "cohort": {
+  "agent": 4
+ },
+ "days": {
+  "2026-10-03": 2,
+  "none": 2
+ }
+}

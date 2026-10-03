@@ -1,0 +1,14 @@
+## codex plugin marketplace add
+Added marketplace `z0intelligence` from /mnt/zer0models/z0-wt/wiring/wt/C1-loop-core.
+Installed marketplace root: /mnt/zer0models/z0-wt/wiring/wt/C1-loop-core
+## codex plugin list
+Marketplace `z0intelligence`
+/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/.agents/plugins/marketplace.json
+
+PLUGIN                               STATUS         VERSION  PATH                                                                              
+codex-z0intelligence@z0intelligence  not installed           /mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/harness-adapters/codex-z0intelligence
+## codex plugin add
+Added plugin `codex-z0intelligence` from marketplace `z0intelligence`.
+Installed plugin root: /mnt/zer0models/z0-wt/wiring/homes/C1-loop-core/e2e-codex-fix/codex/plugins/cache/z0intelligence/codex-z0intelligence/0.1.0
+## codex exec
+codex exec exit=0

@@ -1,0 +1,97 @@
+# C8 round 2 RED: new/changed tests on head c875c6be257793096da14e1f906e0fd1905f4f86 (round-1 code) before any implementation change
+## pytest
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_hermes_memory.py:244: AttributeError: module 'hz0_under_test_f95ae128bb6648ce89af99fd76c77b21_memory' has no attribute 'MAX_SHADOW_CHILDREN'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:59: TypeError: run() got an unexpected keyword argument 'cwd'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:59: TypeError: run() got an unexpected keyword argument 'cwd'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:59: TypeError: run() got an unexpected keyword argument 'cwd'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:59: TypeError: run() got an unexpected keyword argument 'cwd'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:67: TypeError: run() got an unexpected keyword argument 'cwd'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:83: TypeError: run() got an unexpected keyword argument 'cwd'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:91: TypeError: run() got an unexpected keyword argument 'cwd'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:91: TypeError: run() got an unexpected keyword argument 'cwd'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:91: TypeError: run() got an unexpected keyword argument 'cwd'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:102: TypeError: run() got an unexpected keyword argument 'cwd'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:107: TypeError: run() got an unexpected keyword argument 'cwd'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:117: AssertionError: usage: z0int memory [-h] {doctor,bench,eval,rules} ...
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_acceptance.py:164: Failed: DID NOT RAISE <class 'FileExistsError'>
+=========================== short test summary info ============================
+FAILED tests/test_memory_seam.py::test_a_generic_endpoint_env_never_turns_a_cloud_harness_into_loopback[claude-code-ANTHROPIC_BASE_URL-https://api.anthropic.com]
+FAILED tests/test_memory_seam.py::test_a_generic_endpoint_env_never_turns_a_cloud_harness_into_loopback[codex-OPENAI_BASE_URL-https://api.openai.com/v1]
+FAILED tests/test_memory_seam.py::test_a_turn_without_a_task_project_injects_nothing_and_never_surfaces_another_project[None]
+FAILED tests/test_memory_seam.py::test_a_turn_without_a_task_project_injects_nothing_and_never_surfaces_another_project[]
+FAILED tests/test_memory_seam.py::test_the_project_is_named_the_way_agentsview_names_it
+FAILED tests/test_memory_seam.py::test_a_full_shadow_pool_is_a_counted_queue_saturated_row_and_no_spawn
+FAILED tests/test_memory_seam.py::test_turn_markers_are_pruned_after_the_ttl
+FAILED tests/test_memory_seam.py::test_the_hook_counts_the_deadline_from_process_start
+FAILED tests/test_memory_seam.py::test_a_persisted_z0_brief_is_never_recalled_as_evidence
+FAILED tests/test_hermes_memory.py::test_a_turn_without_a_workspace_root_gets_no_brief_and_a_counted_no_scope
+FAILED tests/test_hermes_memory.py::test_non_user_platforms_and_subagent_turns_run_no_memory_seam[kw0]
+FAILED tests/test_hermes_memory.py::test_non_user_platforms_and_subagent_turns_run_no_memory_seam[kw1]
+FAILED tests/test_hermes_memory.py::test_non_user_platforms_and_subagent_turns_run_no_memory_seam[kw2]
+FAILED tests/test_hermes_memory.py::test_non_user_platforms_and_subagent_turns_run_no_memory_seam[kw3]
+FAILED tests/test_hermes_memory.py::test_shadow_children_are_bounded_and_a_full_pool_is_a_counted_queue_saturated_row
+FAILED tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[dsh]
+FAILED tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[hermes]
+FAILED tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[omo]
+FAILED tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[omp]
+FAILED tests/test_memory_acceptance.py::test_cohort_cases_on_the_synthetic_fixture
+FAILED tests/test_memory_acceptance.py::test_an_observed_model_request_upgrades_b
+FAILED tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[claude-code]
+FAILED tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[codex]
+FAILED tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[grok]
+FAILED tests/test_memory_acceptance.py::test_grok_case_b_is_unsupported_pull_only
+FAILED tests/test_memory_acceptance.py::test_omo_case_b_is_unsupported_when_the_senpi_api_lacks_a_context_hook
+FAILED tests/test_memory_acceptance.py::test_eval_cli_writes_validated_rows_under_the_given_out
+FAILED tests/test_memory_acceptance.py::test_seeding_refuses_an_existing_db_and_needs_an_explicit_ledger
+XFAIL tests/test_hermes_memory.py::test_hermes_host_keeps_the_brief_out_of_the_session_store - Hermes core persists what it sends: agent/turn_context.py _stamp_api_content_sidecar stamps the user row with the sent bytes (pre_llm_call context included) in state.db messages.api_content and replays them on later turns. Spec C8 red test 2 ("not persisted to the session store") is UNMET for Hermes without a core change; owner decision pending (evidence/C8-memory-wiring/NOTES.md, deviations).
+28 failed, 39 passed, 1 xfailed in 9.45s
+## node --test tests/test-dsh-memory.mjs (raw: round2/red-node.raw.txt)
+✔ shadow: the pre-step returns at once with the native decision and a receipt is written later (182.929622ms)
+✔ canary: the brief enters the next model request as one extra message; the native batch is untouched (208.239142ms)
+✔ canary past the 300 ms deadline gets the native decision and a counted timeout (524.002995ms)
+✔ fail-open: an unavailable z0int keeps the native decision and counts the failure (179.749781ms)
+✔ a cloud model endpoint is blocked unless dsh allows cloud injection (2211.457391ms)
+✔ index.mjs registers exactly one memory pre-step (default shadow) and none when memory_inject is off (72.207554ms)
+✔ memory.mjs reaches only the z0 memory surface: no Hermes home or state.db path anywhere (1.860646ms)
+✖ the gate endpoint is the profile model_endpoint only: a generic env var never marks a cloud model loopback (138.943408ms)
+✖ a root agent without a session cwd gets no brief (fail closed) and a counted no_scope (136.015268ms)
+✔ persistence (recorded deviation): the DSH brief is a durable admitted message, marked for the recall echo guard (1209.044999ms)
+✖ shadow children are bounded: past the cap a turn writes a counted queue_saturated row instead of spawning (166.896483ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 8
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5512.574626
+
+## bun test omp-extensions/z0-memory
+(pass) OMP shadow: the context handler returns undefined at once and a receipt is written later [381.20ms]
+(pass) OMP canary: the brief is in the next model-visible request only; history is untouched; no double injection [172.19ms]
+(pass) OMP canary past the deadline is native with a counted timeout; fail-open; cloud blocked [566.97ms]
+(pass) OMO: the senpi shim loads, and with a context hook the brief reaches the next request [119.69ms]
+(pass) OMO without a context hook records B=UNSUPPORTED instead of passing [62.32ms]
+(pass) the installed senpi declares the context event (else UNSUPPORTED is recorded) [0.08ms]
+(pass) the omo entry is a one-line re-export activation can write [1.02ms]
+error: expect(received).toBeUndefined()
+Received: {
+(fail) the gate endpoint is the active model's baseUrl only: a generic env var never marks a cloud model loopback [171.72ms]
+error: expect(received).toBe(expected)
+Expected: 2
+Received: undefined
+(fail) OMP turn key is the user message's own id: a new turn after compaction still gets its brief; replays are counted [175.83ms]
+ 7 pass
+ 2 fail
+
+## Reading
+Every failure is the intended missing behaviour: Z0INT_MEMORY_ENDPOINT still overrides the harness endpoint (CC,
+Codex, DSH, OMP); a turn without a task cwd is not no_scope; seam.project_of / SLOT_POOL / hook.process_started_at /
+surface.BRIEF_MARKER / memory.MAX_SHADOW_CHILDREN / memory-client MAX_SHADOW_CHILDREN do not exist yet; seam turn
+markers are never pruned; Hermes runs the seam on cron/subagent/kanban and child-session turns; acceptance.run has
+no task cwd and seed_cohort writes into an existing DB / the default ledger; the OMP turn key repeats after
+compaction. "persistence (recorded deviation)" (DSH) passes on round-1 code: it documents host behaviour, not a fix.
+The strict xfail documents the Hermes host api_content persistence (owner decision pending).
+Test edits that are not new red tests: existing seam/Hermes/acceptance tests now pass a task cwd ('/w/z0'), because
+a turn without one is fail-closed after the fix; the two TencentDB-exclusion tests now assert the semantic layer is
+queried / not queried (receipt capability_ids), since unscoped TencentDB items never enter a project-scoped brief.

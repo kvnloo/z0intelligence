@@ -1,0 +1,58 @@
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/local-cognition/index.test.ts:
+(pass) tool_call handler returns undefined and never blocks [10.65ms]
+(pass) a rejected send does not throw into the tool_call handler [30.64ms]
+(pass) sends a cognition_shadow request through the bridge transport [30.65ms]
+(pass) payload actions contain only the available tool names [30.67ms]
+(pass) payload keeps read-only authority and the example shadow models by default [30.63ms]
+(pass) env kill-switch disables the lane [30.44ms]
+(pass) env kill-switch accepts off/false and explicit on [0.16ms]
+(pass) cognition.json setting gates the lane when env is unset [0.63ms]
+(pass) timeout comes from the env override [0.05ms]
+(pass) resolveAvailableTools prefers ctx.getTools and always includes the observed tool [0.10ms]
+(pass) buildShadowPayload is self-contained and schema-shaped [0.08ms]
+(pass) the shadow request gives the served-only local backend the bounded tool input and a structured actual_tool [30.40ms]
+(pass) registers z0int-cognition-status and the command never throws [0.60ms]
+
+omp-extensions/z0int-bridge/index.test.ts:
+(pass) the extension loads and registers with a missing interpreter [303.26ms]
+(pass) the default export is capture plus the bridge commands only: no routing handler, no route_worker tool [0.77ms]
+(pass) routing loaded from its own z0int-intelligence link registers exactly once next to the bridge [1.38ms]
+(pass) capture handlers return undefined and fail open, counted, when the worker cannot start [302.94ms]
+(pass) thrown errors inside a handler are caught: no throw, no unhandledRejection [302.82ms]
+(pass) the turn_open frame carries the task cwd, harness, subagent parent and model [0.27ms]
+(pass) the session id comes from ctx.sessionManager [0.06ms]
+(pass) interpreter resolution: Z0INT_PYTHON, then the checkout venv, then the z0int runtime, then python3 [0.04ms]
+(pass) frames reach the worker and a turn per session closes on its own agent_end [63.04ms]
+(pass) an unclosed turn whose agent_end never arrives stops blocking reload after the age bound [327.55ms]
+(pass) a new turn in a session whose last turn never closed is counted, not silently replaced [14.11ms]
+
+omp-extensions/z0int-bridge/omo.test.ts:
+(pass) the senpi re-export loads, registers capture only and stays inert [1.61ms]
+(pass) a diverged senpi API is recorded UNSUPPORTED, never a silent pass [0.19ms]
+(pass) a host whose on() accepts any event but never delivers agent_end is caught at run time [13.78ms]
+(skip) the installed senpi declares the events the shim needs [SKIPPED: senpi types.d.ts not found (set SENPI_TYPES); OMO API status UNVERIFIED]
+(pass) a host that exits when its event loop drains (senpi print mode) is never held open by the resident worker [140.04ms]
+
+omp-extensions/z0-memory/index.test.ts:
+(pass) OMP shadow: the context handler returns undefined at once and a receipt is written later [383.64ms]
+(pass) OMP canary: the brief is in the next model-visible request only; history is untouched; no double injection [168.25ms]
+(pass) OMP canary past the deadline is native with a counted timeout; fail-open; cloud blocked [559.59ms]
+(pass) OMO: the senpi shim loads, and with a context hook the brief reaches the next request [117.71ms]
+(pass) OMO without a context hook records B=UNSUPPORTED instead of passing [65.98ms]
+SKIP: SENPI_TYPES not given; the installed senpi API is unchecked
+(pass) the installed senpi declares the context event (else UNSUPPORTED is recorded) [0.09ms]
+(pass) the omo entry is a one-line re-export activation can write [0.84ms]
+(pass) the gate endpoint is the active model's baseUrl only: a generic env var never marks a cloud model loopback [168.42ms]
+(pass) OMP turn key is the user message's own id: a new turn after compaction still gets its brief; replays are counted [241.96ms]
+
+1 tests skipped:
+(skip) the installed senpi declares the events the shim needs [SKIPPED: senpi types.d.ts not found (set SENPI_TYPES); OMO API status UNVERIFIED]
+
+ 37 pass
+ 1 skip
+ 0 fail
+ 179 expect() calls
+Ran 38 tests across 4 files. [3.68s]
+bun_rc=0

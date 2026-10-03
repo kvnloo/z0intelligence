@@ -1,0 +1,32 @@
+tree=/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-base head=3028e0cbdbf736f8aa8578eee926f3150b74b037 start=2026-10-03T16:05:32Z
+........................................................................ [  6%]
+........................................................................ [ 12%]
+........................................................................ [ 18%]
+........................................................................ [ 24%]
+........................................................................ [ 30%]
+........................................................................ [ 36%]
+........................................................................ [ 43%]
+...........FFFFF........................................................ [ 49%]
+..........ss............................................................ [ 55%]
+........................................................................ [ 61%]
+........................................................................ [ 67%]
+...........................................ss........................... [ 73%]
+........................................................................ [ 80%]
+......F....F...F..FF.F.................................................. [ 86%]
+......s.s............................................................... [ 92%]
+........................................................................ [ 98%]
+................                                                         [100%]
+=========================== short test summary info ============================
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+FAILED tests/test_quota_budget.py::test_empty_authority_capacity - assert False
+FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily - KeyEr...
+FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+11 failed, 1151 passed, 6 skipped in 243.51s (0:04:03)
+pytest_rc=1 end=2026-10-03T16:09:40Z

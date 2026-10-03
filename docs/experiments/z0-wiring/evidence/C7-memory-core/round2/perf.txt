@@ -1,0 +1,33 @@
+# C7 round 2 cost probe (minor finding: O(ledger) ingest / temporal scan). 20k synthetic references, isolated homes, quiet-lane lock.
+## r1 tree @ 8d619cf
+ledger events before: 20000
+50 ingest_reference calls (one process): 18661 ms total, 373.2 ms each
+duplicate ingest_reference: 568.5 ms
+temporal search: 1034 ms
+## r2 tree @ 772ba7d
+ledger events before: 20000
+50 ingest_reference calls (one process): 936 ms total, 18.7 ms each
+duplicate ingest_reference: 0.4 ms
+temporal search: 4625 ms
+## rerun (ledgers reused, +50 events each), sequential, to check the temporal timing:  08:21:25 up 3 days, 21:54,  1 user,  load average: 22.46, 17.72, 10.84
+## r1 run 1
+ledger events before: 20050
+50 ingest_reference calls (one process): 20015 ms total, 400.3 ms each
+duplicate ingest_reference: 608.2 ms
+temporal search: 1167 ms
+## r2 run 1
+ledger events before: 20050
+50 ingest_reference calls (one process): 776 ms total, 15.5 ms each
+duplicate ingest_reference: 0.4 ms
+temporal search: 1544 ms
+## r1 run 2
+ledger events before: 20100
+50 ingest_reference calls (one process): 16115 ms total, 322.3 ms each
+duplicate ingest_reference: 800.8 ms
+temporal search: 1093 ms
+## r2 run 2
+ledger events before: 20100
+50 ingest_reference calls (one process): 950 ms total, 19.0 ms each
+duplicate ingest_reference: 0.3 ms
+temporal search: 1025 ms
+## reading: ingest 322-400 ms/call -> 15-19 ms/call; duplicate 570-800 ms -> 0.3-0.4 ms. Temporal search is the same code path in both trees (1.0-1.5 s here; the first r2 4.6 s sample ran at host load ~22, reruns 1.5 s / 1.0 s): NOT fixed, open minor.

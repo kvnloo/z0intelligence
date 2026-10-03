@@ -1,0 +1,89 @@
+# C1-loop-core fix round: RED run at HEAD c624a54 + new/adjusted tests only, no implementation (2026-10-03T09:39:51Z)
+# cmd: flock -s quiet-lane.lock run.sh <wt> fix-red --guard -- python -m pytest -v -p no:cacheprovider -rfE --tb=short <tests> (cwd=<wt>)
+# tests: tests/test_hook_adapter.py::test_claude_code_stop_measures_its_own_prompt_and_closes_a_lagging_turn_explicitly tests/test_hook_adapter.py::test_claude_code_stop_measurement_errors_are_failure_rows_not_silent tests/test_hook_adapter.py::test_subagent_turns_are_agent_cohort_and_join_on_turn_key tests/test_harness_capture.py::test_append_and_the_stale_check_read_no_record_history tests/test_harness_capture.py::test_spool_put_racing_close_is_written_or_counted_never_lost tests/test_loop_export.py::test_legacy_rows_without_capture_flags_are_never_user_rows tests/test_cc_export_regression.py
+============================= test session starts ==============================
+platform linux -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0 -- /mnt/zer0models/z0-wt/venv-claude-code/bin/python
+rootdir: /mnt/zer0models/z0-wt/wiring/wt/C1-loop-core
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 8 items
+
+tests/test_hook_adapter.py::test_claude_code_stop_measures_its_own_prompt_and_closes_a_lagging_turn_explicitly FAILED [ 12%]
+tests/test_hook_adapter.py::test_claude_code_stop_measurement_errors_are_failure_rows_not_silent FAILED [ 25%]
+tests/test_hook_adapter.py::test_subagent_turns_are_agent_cohort_and_join_on_turn_key PASSED [ 37%]
+tests/test_harness_capture.py::test_append_and_the_stale_check_read_no_record_history FAILED [ 50%]
+tests/test_harness_capture.py::test_spool_put_racing_close_is_written_or_counted_never_lost FAILED [ 62%]
+tests/test_loop_export.py::test_legacy_rows_without_capture_flags_are_never_user_rows FAILED [ 75%]
+tests/test_cc_export_regression.py::test_claude_code_export_equals_the_6fee859_export PASSED [ 87%]
+tests/test_cc_export_regression.py::test_legacy_rows_never_export_as_user_rows_and_the_backfill_restores_the_6fee859_export FAILED [100%]
+
+=================================== FAILURES ===================================
+_ test_claude_code_stop_measures_its_own_prompt_and_closes_a_lagging_turn_explicitly _
+tests/test_hook_adapter.py:423: in test_claude_code_stop_measures_its_own_prompt_and_closes_a_lagging_turn_explicitly
+    assert set(outs) == {'p1', 'p2'}
+E   AssertionError: assert {'p2'} == {'p1', 'p2'}
+E     
+E     Extra items in the right set:
+E     'p1'
+E     
+E     Full diff:
+E       {
+E     -     'p1',
+E           'p2',
+E       }
+_____ test_claude_code_stop_measurement_errors_are_failure_rows_not_silent _____
+tests/test_hook_adapter.py:453: in test_claude_code_stop_measurement_errors_are_failure_rows_not_silent
+    (out,) = rows(home, 'claude-code', 'outcomes.jsonl')
+    ^^^^^^
+E   ValueError: not enough values to unpack (expected 1, got 0)
+____________ test_append_and_the_stale_check_read_no_record_history ____________
+tests/test_harness_capture.py:373: in test_append_and_the_stale_check_read_no_record_history
+    assert reads == []
+E   AssertionError: assert [('outcomes.j...jsonl', 'a+')] == []
+E     
+E     Left contains 4 more items, first extra item: ('outcomes.jsonl', 'a+')
+E     
+E     Full diff:
+E     - []
+E     + [
+E     +     (...
+E     
+E     ...Full output truncated (16 lines hidden), use '-vv' to show
+_________ test_spool_put_racing_close_is_written_or_counted_never_lost _________
+tests/test_harness_capture.py:394: in test_spool_put_racing_close_is_written_or_counted_never_lost
+    assert len(written) + spool.dropped == 1
+E   assert (0 + 0) == 1
+E    +  where 0 = len([])
+E    +  and   0 = <z0int.harness_capture.Spool object at 0x7f984ebc3e00>.dropped
+__________ test_legacy_rows_without_capture_flags_are_never_user_rows __________
+tests/test_loop_export.py:111: in test_legacy_rows_without_capture_flags_are_never_user_rows
+    assert by_trace['t1']['cohort'] == by_trace['t2']['cohort'] == 'unknown'
+E   AssertionError: assert 'interactive' == 'unknown'
+E     
+E     - unknown
+E     + interactive
+_ test_legacy_rows_never_export_as_user_rows_and_the_backfill_restores_the_6fee859_export _
+tests/test_cc_export_regression.py:90: in test_legacy_rows_never_export_as_user_rows_and_the_backfill_restores_the_6fee859_export
+    assert len(before) == 2 and all(r['cohort'] not in ('interactive', 'agent') for r in before)
+E   AssertionError: assert (2 == 2 and False)
+E    +  where 2 = len([{'cohort': 'interactive', 'day': '2026-09-30', 'feature_schema_sha': '69d7eef44ba1707e', 'features': {'authority_fingerprinted': 0, 'authority_source=aodl': 0, 'authority_source=harness-default': 1, 'cohort=agent': 0, ...}, ...}, {'cohort': 'interactive', 'day': '2026-09-30', 'feature_schema_sha': '69d7eef44ba1707e', 'features': {'authority_fingerprinted': 0, 'authority_source=aodl': 0, 'authority_source=harness-default': 1, 'cohort=agent': 0, ...}, ...}])
+E    +  and   False = all(<generator object test_legacy_rows_never_export_as_user_rows_and_the_backfill_restores_the_6fee859_export.<locals>.<genexpr> at 0x7f984ed7f9f0>)
+=========================== short test summary info ============================
+FAILED tests/test_hook_adapter.py::test_claude_code_stop_measures_its_own_prompt_and_closes_a_lagging_turn_explicitly
+FAILED tests/test_hook_adapter.py::test_claude_code_stop_measurement_errors_are_failure_rows_not_silent
+FAILED tests/test_harness_capture.py::test_append_and_the_stale_check_read_no_record_history
+FAILED tests/test_harness_capture.py::test_spool_put_racing_close_is_written_or_counted_never_lost
+FAILED tests/test_loop_export.py::test_legacy_rows_without_capture_flags_are_never_user_rows
+FAILED tests/test_cc_export_regression.py::test_legacy_rows_never_export_as_user_rows_and_the_backfill_restores_the_6fee859_export
+========================= 6 failed, 2 passed in 0.53s ==========================
+# socket guard log: 0 violation(s)
+
+# Intended failure reasons (all assertion failures in the new/adjusted tests, no import/collection errors):
+#  - CC lagging Stop: p1 has no outcome at all (only p2) -> verifier major #1
+#  - CC measurement error: no outcome and no failure row (bare except) -> major #1 (d)
+#  - append/stale check opened outcomes.jsonl/opportunities.jsonl in a+/r mode -> minor (O(1))
+#  - Spool put racing close: written 0 + dropped 0 (item lost) -> minor (Spool race)
+#  - legacy unflagged rows exported as 'interactive' -> major #2 (both loop_export and CC regression legacy case)
+#  - PASSED before the fix (test correction, not a red test): the fallback subagent test now uses real PostToolUse/SubagentStop
+#    shapes; the join already worked when PostToolUse closes the fallback -> minor #4 fixed in docs/docstring + the test.
+# Previous build-round red run: red-build-round.txt

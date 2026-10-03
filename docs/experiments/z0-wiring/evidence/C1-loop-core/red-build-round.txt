@@ -1,0 +1,210 @@
+# RED run 2026-10-03T08:17:00Z worktree=/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core head=6fee859 (tests only; no implementation yet)
+# cmd: flock -s quiet-lane.lock run.sh <wt> red --guard -- python -m pytest -q -p no:cacheprovider -rfE <red files>
+FFFF.F.......                                                            [100%]
+==================================== ERRORS ====================================
+___________________ ERROR collecting tests/test_turn_key.py ____________________
+ImportError while importing test module '/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/tests/test_turn_key.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_turn_key.py:10: in <module>
+    from z0int.harness_id import detect_hook_harness, turn_key, turn_key_from_alias
+E   ImportError: cannot import name 'detect_hook_harness' from 'z0int.harness_id' (/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/src/z0int/harness_id.py)
+________________ ERROR collecting tests/test_harness_capture.py ________________
+ImportError while importing test module '/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/tests/test_harness_capture.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_harness_capture.py:15: in <module>
+    from z0int import harness_capture as hc
+E   ImportError: cannot import name 'harness_capture' from 'z0int' (/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/src/z0int/__init__.py)
+_________________ ERROR collecting tests/test_hook_adapter.py __________________
+ImportError while importing test module '/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/tests/test_hook_adapter.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_hook_adapter.py:17: in <module>
+    from z0int import harness_capture as hc
+E   ImportError: cannot import name 'harness_capture' from 'z0int' (/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/src/z0int/__init__.py)
+__________________ ERROR collecting tests/test_check_class.py __________________
+ImportError while importing test module '/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/tests/test_check_class.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_check_class.py:4: in <module>
+    from z0int import check_class as cc
+E   ImportError: cannot import name 'check_class' from 'z0int' (/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/src/z0int/__init__.py)
+_________________ ERROR collecting tests/test_agentsview_ro.py _________________
+ImportError while importing test module '/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/tests/test_agentsview_ro.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_agentsview_ro.py:8: in <module>
+    from z0int import agentsview_ro as av
+E   ImportError: cannot import name 'agentsview_ro' from 'z0int' (/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/src/z0int/__init__.py)
+_____________ ERROR collecting tests/test_cc_export_regression.py ______________
+ImportError while importing test module '/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/tests/test_cc_export_regression.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_cc_export_regression.py:11: in <module>
+    from z0int import harness_capture as hc
+E   ImportError: cannot import name 'harness_capture' from 'z0int' (/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/src/z0int/__init__.py)
+=================================== FAILURES ===================================
+_ test_claude_code_plugin_routes_every_hook_through_the_adapter_and_adds_subagents _
+
+    def test_claude_code_plugin_routes_every_hook_through_the_adapter_and_adds_subagents():
+>       got = commands(json.loads(CC_HOOKS.read_text()))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_capture_shims.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+hooks_doc = {'hooks': {'SessionEnd': [{'hooks': [{'command': '"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.claude_code stop..."${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.claude_code prompt || true', 'timeout': 30, 'type': 'command'}]}]}}
+
+    def commands(hooks_doc):
+        """{event: [adapter argv tail]} for every command hook in a Claude-compatible hooks document."""
+        out = {}
+        for event, groups in hooks_doc['hooks'].items():
+            for group in groups:
+                for h in group['hooks']:
+                    assert h['type'] == 'command'
+                    m = re.search(r'-m z0int\.hook_adapter (.*?) \|\| true$', h['command'])
+>                   assert m, h['command']
+E                   AssertionError: "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.claude_code prompt || true
+E                   assert None
+
+tests/test_capture_shims.py:24: AssertionError
+________________________ test_codex_shim_is_hooks_only _________________________
+
+    def test_codex_shim_is_hooks_only():
+>       manifest = json.loads((CODEX / '.codex-plugin' / 'plugin.json').read_text())
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_capture_shims.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_abc.py:632: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/harness-adapters/codex-z0intelligence/.codex-plugin/plugin.json')
+mode = 'r', buffering = -1, encoding = 'locale', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/harness-adapters/codex-z0intelligence/.codex-plugin/plugin.json'
+
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_local.py:537: FileNotFoundError
+____________ test_codex_local_marketplace_lists_only_the_hooks_shim ____________
+
+    def test_codex_local_marketplace_lists_only_the_hooks_shim():
+>       market = json.loads((ROOT / '.agents' / 'plugins' / 'marketplace.json').read_text())
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_capture_shims.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_abc.py:632: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/.agents/plugins/marketplace.json')
+mode = 'r', buffering = -1, encoding = 'locale', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/.agents/plugins/marketplace.json'
+
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_local.py:537: FileNotFoundError
+__________ test_grok_hooks_file_is_capture_only_and_names_its_harness __________
+
+    def test_grok_hooks_file_is_capture_only_and_names_its_harness():
+>       doc = json.loads(GROK_HOOKS.read_text())
+                         ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_capture_shims.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_abc.py:632: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/harness-adapters/grok-z0intelligence/hooks/z0-capture.json')
+mode = 'r', buffering = -1, encoding = 'locale', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/mnt/zer0models/z0-wt/wiring/wt/C1-loop-core/harness-adapters/grok-z0intelligence/hooks/z0-capture.json'
+
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_local.py:537: FileNotFoundError
+_ test_join_keeps_harness_messages_in_their_own_cohort_and_latest_verified_row_wins _
+
+state = PosixPath('/mnt/zer0models/z0-wt/wiring/homes/C1-loop-core/red/tmp/pytest-of-kvn/pytest-0/test_join_keeps_harness_messag0/state')
+
+    def test_join_keeps_harness_messages_in_their_own_cohort_and_latest_verified_row_wins(state):
+        rows = {r['turn_key']: r for r in table(state)}
+        assert len(rows) == 4
+>       (harness,) = [r for r in rows.values() if r['cohort'] == 'harness']  # t3: flagged at capture, not dropped
+        ^^^^^^^^^^
+E       ValueError: not enough values to unpack (expected 1, got 0)
+
+tests/test_loop_export.py:85: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_capture_shims.py::test_claude_code_plugin_routes_every_hook_through_the_adapter_and_adds_subagents
+FAILED tests/test_capture_shims.py::test_codex_shim_is_hooks_only - FileNotFo...
+FAILED tests/test_capture_shims.py::test_codex_local_marketplace_lists_only_the_hooks_shim
+FAILED tests/test_capture_shims.py::test_grok_hooks_file_is_capture_only_and_names_its_harness
+FAILED tests/test_loop_export.py::test_join_keeps_harness_messages_in_their_own_cohort_and_latest_verified_row_wins
+ERROR tests/test_turn_key.py
+ERROR tests/test_harness_capture.py
+ERROR tests/test_hook_adapter.py
+ERROR tests/test_check_class.py
+ERROR tests/test_agentsview_ro.py
+ERROR tests/test_cc_export_regression.py
+5 failed, 8 passed, 6 errors in 0.44s

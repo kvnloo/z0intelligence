@@ -1,0 +1,21 @@
+# C1-loop-core fix round: GREEN at committed HEAD 914dc99 (clean tree), 2026-10-03T09:53:01Z
+# cmd: flock -s quiet-lane.lock run.sh <wt> fix-green-head --guard -- python -m pytest -v -p no:cacheprovider -rfE --tb=short <tests> (cwd=<wt>)
+# tests: tests/test_hook_adapter.py::test_claude_code_stop_measures_its_own_prompt_and_closes_a_lagging_turn_explicitly tests/test_hook_adapter.py::test_claude_code_stop_measurement_errors_are_failure_rows_not_silent tests/test_hook_adapter.py::test_subagent_turns_are_agent_cohort_and_join_on_turn_key tests/test_harness_capture.py::test_append_and_the_stale_check_read_no_record_history tests/test_harness_capture.py::test_spool_put_racing_close_is_written_or_counted_never_lost tests/test_loop_export.py::test_legacy_rows_without_capture_flags_are_never_user_rows tests/test_cc_export_regression.py
+============================= test session starts ==============================
+platform linux -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0 -- /mnt/zer0models/z0-wt/venv-claude-code/bin/python
+rootdir: /mnt/zer0models/z0-wt/wiring/wt/C1-loop-core
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 8 items
+
+tests/test_hook_adapter.py::test_claude_code_stop_measures_its_own_prompt_and_closes_a_lagging_turn_explicitly PASSED [ 12%]
+tests/test_hook_adapter.py::test_claude_code_stop_measurement_errors_are_failure_rows_not_silent PASSED [ 25%]
+tests/test_hook_adapter.py::test_subagent_turns_are_agent_cohort_and_join_on_turn_key PASSED [ 37%]
+tests/test_harness_capture.py::test_append_and_the_stale_check_read_no_record_history PASSED [ 50%]
+tests/test_harness_capture.py::test_spool_put_racing_close_is_written_or_counted_never_lost PASSED [ 62%]
+tests/test_loop_export.py::test_legacy_rows_without_capture_flags_are_never_user_rows PASSED [ 75%]
+tests/test_cc_export_regression.py::test_claude_code_export_equals_the_6fee859_export PASSED [ 87%]
+tests/test_cc_export_regression.py::test_legacy_rows_never_export_as_user_rows_and_the_backfill_restores_the_6fee859_export PASSED [100%]
+
+============================== 8 passed in 1.02s ===============================
+# socket guard log: 0 violation(s)

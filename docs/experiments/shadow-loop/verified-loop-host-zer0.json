@@ -1,0 +1,60 @@
+{
+ "feature_schema_sha": "69d7eef44ba1707e",
+ "input": {
+  "analysis_rows": 0,
+  "excluded": {
+   "no_opportunity": 9
+  },
+  "gate": {},
+  "rows": 9,
+  "states": {
+   "unverified": 9
+  }
+ },
+ "prereg": "docs/prereg/verified-loop-v0.md",
+ "primary": {
+  "decision": "INSUFFICIENT_DATA",
+  "descriptive_only": true,
+  "pooled": null,
+  "sufficiency": {
+   "checks": {
+    "groups>=10": false,
+    "k==5_and_every_test_fold_has_both_classes": false,
+    "not_success>=30": false,
+    "rows>=300": false
+   },
+   "observed": {
+    "groups": 0,
+    "k": null,
+    "not_success": 0,
+    "rows": 0,
+    "success": 0
+   },
+   "passed": false
+  }
+ },
+ "privacy": "metrics and counts only; no rows, ids or text",
+ "projection": {
+  "available": false,
+  "why": "no manifest.sweep (run z0int outcomes export --sweep-since 7d)"
+ },
+ "schema": "evolution_lab.verified_loop.result.v0",
+ "sensitivity_unverified_as_not_success": {
+  "rows": 0
+ },
+ "sources": {
+  "opportunities.jsonl": {
+   "rows": 0,
+   "sha256": null
+  },
+  "outcomes.jsonl": {
+   "rows": 9,
+   "sha256": "2e4af67d34756b40"
+  },
+  "outcomes_verified.jsonl": {
+   "rows": 9,
+   "sha256": "7212317afa9d8d1b"
+  }
+ },
+ "table_version": "0.1.0"
+}

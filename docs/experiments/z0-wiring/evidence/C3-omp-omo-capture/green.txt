@@ -1,0 +1,89 @@
+# GREEN at committed head fe077db8f46b3427995c0302352a22268fce1df4 (clean tree): the full C3 red/green set incl. the REVISE-round tests
+# python: flock -s quiet-lane.lock run.sh <wt> revise-green2-py --guard -- python -m pytest -v -p no:cacheprovider -rfE --tb=short tests/test_omp_capture.py tests/test_cognition_shadow.py::test_no_models_served_still_returns_the_compiled_legal_set (cwd=<wt>)
+============================= test session starts ==============================
+platform linux -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0 -- /mnt/zer0models/z0-wt/venv-claude-code/bin/python
+rootdir: /mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 18 items
+
+tests/test_omp_capture.py::test_turn_open_with_cwd_writes_an_omp_opportunity_through_the_detached_core PASSED [  5%]
+tests/test_omp_capture.py::test_bridge_reply_latency_stays_within_its_bound_over_200_turns PASSED [ 11%]
+tests/test_omp_capture.py::test_turn_close_writes_an_outcome_joined_by_turn_key_and_never_claims_verification PASSED [ 16%]
+tests/test_omp_capture.py::test_outcome_model_id_matches_the_opportunity_model_id PASSED [ 22%]
+tests/test_omp_capture.py::test_omo_turns_land_in_their_own_record_family PASSED [ 27%]
+tests/test_omp_capture.py::test_a_subagent_turn_is_agent_cohort_at_capture PASSED [ 33%]
+tests/test_omp_capture.py::test_missing_cwd_gives_unknown_facts_and_the_gate_never_acts PASSED [ 38%]
+tests/test_omp_capture.py::test_bridge_jsonl_rows_contain_no_prompt_text PASSED [ 44%]
+tests/test_omp_capture.py::test_dead_backend_writes_no_shadow_row_and_counts_backend_unavailable PASSED [ 50%]
+tests/test_omp_capture.py::test_served_backend_writes_a_row_with_a_structured_actual_tool_and_no_tool_input PASSED [ 55%]
+tests/test_omp_capture.py::test_protocol_parity_with_the_canonical_a9cbbed_worker PASSED [ 61%]
+tests/test_omp_capture.py::test_bridge_current_json_is_readable_across_both_trees PASSED [ 66%]
+tests/test_omp_capture.py::test_install_dry_run_lists_only_the_bridge_and_local_cognition_retargets PASSED [ 72%]
+tests/test_omp_capture.py::test_install_writes_the_links_backup_first_and_is_idempotent PASSED [ 77%]
+tests/test_omp_capture.py::test_install_refuses_a_dirty_target_checkout PASSED [ 83%]
+tests/test_omp_capture.py::test_install_touches_z0int_intelligence_only_with_include_routing PASSED [ 88%]
+tests/test_omp_capture.py::test_install_refuses_when_no_z0int_intelligence_link_would_carry_routing PASSED [ 94%]
+tests/test_cognition_shadow.py::test_no_models_served_still_returns_the_compiled_legal_set PASSED [100%]
+
+============================= 18 passed in 21.41s ==============================
+# socket guard log: 0 violation(s)
+# bun: flock -s quiet-lane.lock run.sh <wt> revise-green2-bun -- env SENPI_TYPES=<installed senpi types.d.ts> bun test omp-extensions/z0int-bridge/index.test.ts (cwd=<wt>)
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/z0int-bridge/index.test.ts:
+(pass) the extension loads and registers with a missing interpreter [306.30ms]
+(pass) the default export is capture plus the bridge commands only: no routing handler, no route_worker tool [1.60ms]
+(pass) routing loaded from its own z0int-intelligence link registers exactly once next to the bridge [1.88ms]
+(pass) capture handlers return undefined and fail open, counted, when the worker cannot start [303.07ms]
+(pass) thrown errors inside a handler are caught: no throw, no unhandledRejection [302.70ms]
+(pass) the turn_open frame carries the task cwd, harness, subagent parent and model [0.23ms]
+(pass) the session id comes from ctx.sessionManager [0.06ms]
+(pass) interpreter resolution: Z0INT_PYTHON, then the checkout venv, then the z0int runtime, then python3 [0.04ms]
+(pass) frames reach the worker and a turn per session closes on its own agent_end [63.58ms]
+(pass) an unclosed turn whose agent_end never arrives stops blocking reload after the age bound [328.56ms]
+(pass) a new turn in a session whose last turn never closed is counted, not silently replaced [14.27ms]
+
+ 11 pass
+ 0 fail
+ 69 expect() calls
+Ran 11 tests across 1 file. [1346.00ms]
+# exit: 0
+# bun: flock -s quiet-lane.lock run.sh <wt> revise-green2-bun -- env SENPI_TYPES=<installed senpi types.d.ts> bun test omp-extensions/z0int-bridge/omo.test.ts (cwd=<wt>)
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/z0int-bridge/omo.test.ts:
+(pass) the senpi re-export loads, registers capture only and stays inert [4.78ms]
+(pass) a diverged senpi API is recorded UNSUPPORTED, never a silent pass [0.19ms]
+(pass) a host whose on() accepts any event but never delivers agent_end is caught at run time [15.38ms]
+OMO senpi API (~/.bun/install/global/node_modules/@code-yeongyu/senpi/dist/core/extensions/types.d.ts): SUPPORTED
+(pass) the installed senpi declares the events the shim needs [0.89ms]
+
+ 4 pass
+ 0 fail
+ 18 expect() calls
+Ran 4 tests across 1 file. [47.00ms]
+# exit: 0
+# bun: flock -s quiet-lane.lock run.sh <wt> revise-green2-bun -- env SENPI_TYPES=<installed senpi types.d.ts> bun test omp-extensions/local-cognition/index.test.ts (cwd=<wt>)
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/local-cognition/index.test.ts:
+(pass) tool_call handler returns undefined and never blocks [1.65ms]
+(pass) a rejected send does not throw into the tool_call handler [30.61ms]
+(pass) sends a cognition_shadow request through the bridge transport [30.51ms]
+(pass) payload actions contain only the available tool names [30.82ms]
+(pass) payload keeps read-only authority and the example shadow models by default [30.70ms]
+(pass) env kill-switch disables the lane [30.43ms]
+(pass) env kill-switch accepts off/false and explicit on [0.19ms]
+(pass) cognition.json setting gates the lane when env is unset [0.43ms]
+(pass) timeout comes from the env override [0.05ms]
+(pass) resolveAvailableTools prefers ctx.getTools and always includes the observed tool [0.10ms]
+(pass) buildShadowPayload is self-contained and schema-shaped [0.08ms]
+(pass) the shadow request gives the served-only local backend the bounded tool input and a structured actual_tool [30.77ms]
+(pass) registers z0int-cognition-status and the command never throws [0.69ms]
+
+ 13 pass
+ 0 fail
+ 51 expect() calls
+Ran 13 tests across 1 file. [204.00ms]
+# exit: 0

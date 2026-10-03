@@ -1,0 +1,8 @@
+server: {'name': 'agentsview', 'title': 'agentsview session history', 'version': 'v0.44.0-3-g987293f4'}
+tools: ['get_messages', 'get_session_overview', 'get_usage_summary', 'list_sessions', 'query_recall', 'search_content', 'search_sessions']
+isError: None error: None
+result keys: ['matches', 'next_cursor'] hits: 3
+  hit: {'session_id': 'omo:01a0e1b4-9757-737b-836d-aa8642c9d9ee', 'agent': 'omo', 'ordinal': 715}
+  hit: {'session_id': 'omo:01a0e1b4-9757-737b-836d-aa8642c9d9ee', 'agent': 'omo', 'ordinal': 715}
+  hit: {'session_id': 'omo:01a0e1b4-9757-737b-836d-aa8642c9d9ee', 'agent': 'omo', 'ordinal': 715}
+elapsed: 26.4s

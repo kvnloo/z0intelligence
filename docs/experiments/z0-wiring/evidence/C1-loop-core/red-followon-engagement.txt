@@ -1,0 +1,16 @@
+# RED (follow-on) 2026-10-03T08:57:46Z: engagement instrument must recognise the new SessionStart hook command; hooks.json contract test updated for C1 SubagentStart (before the engagement fix)
+        old = '"$Z0INT_PYTHON" -m z0int.claude_code session-start || true'
+        new = '"$Z0INT_PYTHON" -m z0int.hook_adapter --harness claude-code session-start || true'
+        capture = '"$Z0INT_PYTHON" -m z0int.hook_adapter --harness claude-code subagent-start || true'
+        for rows, expected in (([hook_row('SessionStart', old)], True), ([hook_row('SessionStart', new)], True),
+                               ([hook_row('SubagentStart', capture)], False)):
+            path = tmp_path / f'{len(list(tmp_path.iterdir()))}.jsonl'
+            path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+>           assert eng.scan(path)['z0_session_start'] is expected, rows
+E           AssertionError: [{'attachment': {'command': '"$Z0INT_PYTHON" -m z0int.hook_adapter --harness claude-code session-start || true', 'hookEvent': 'SessionStart', 'type': 'hook_success'}, 'type': 'attachment'}]
+E           assert False is True
+
+tests/test_claude_code_engagement.py:152: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_claude_code_engagement.py::test_scan_recognises_the_z0_session_start_hook_by_either_command
+1 failed, 11 passed in 0.14s

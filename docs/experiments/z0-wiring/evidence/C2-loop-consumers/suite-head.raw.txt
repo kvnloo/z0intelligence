@@ -1,0 +1,32 @@
+...............................F........................................ [  6%]
+........................................................................ [ 13%]
+........................................................................ [ 19%]
+........................................................................ [ 26%]
+........................................................................ [ 32%]
+........................................................................ [ 39%]
+........................................................................ [ 45%]
+......FFFFF............................................................. [ 52%]
+..............................F......................................... [ 58%]
+........................................................................ [ 65%]
+........................ss.............................................. [ 71%]
+..........................................F....F...F..FF.F.............. [ 78%]
+.........................................s.s............................ [ 85%]
+........................................................................ [ 91%]
+........................................................................ [ 98%]
+.....................                                                    [100%]
+=========================== short test summary info ============================
+FAILED tests/test_agentweb_bridge_overload.py::test_host_overload_is_503_before_handler_execution
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+FAILED tests/test_intelligence_service.py::test_health_and_bounded_admission
+FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+FAILED tests/test_quota_budget.py::test_empty_authority_capacity - assert False
+FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily - KeyEr...
+FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+13 failed, 1084 passed, 4 skipped in 204.59s (0:03:24)
+exit=1

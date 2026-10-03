@@ -1,0 +1,185 @@
+{
+ "bare_python_ms": {
+  "median": 9.4,
+  "p95": 9.8
+ },
+ "commands": {
+  "claude-code": {
+   "SessionEnd": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code stop || true"
+   ],
+   "SessionStart": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code session-start || true"
+   ],
+   "Stop": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code stop || true"
+   ],
+   "SubagentStart": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code subagent-start || true"
+   ],
+   "SubagentStop": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code subagent-stop || true"
+   ],
+   "UserPromptSubmit": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness claude-code prompt || true"
+   ]
+  },
+  "codex": {
+   "Stop": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness codex stop || true"
+   ],
+   "SubagentStart": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness codex subagent-start || true"
+   ],
+   "SubagentStop": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness codex subagent-stop || true"
+   ],
+   "UserPromptSubmit": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness codex prompt || true"
+   ]
+  },
+  "grok": {
+   "Stop": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok stop || true"
+   ],
+   "StopCancelled": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok stop || true"
+   ],
+   "StopFailure": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok stop || true"
+   ],
+   "SubagentStart": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok subagent-start || true"
+   ],
+   "SubagentStop": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok subagent-stop || true"
+   ],
+   "UserPromptSubmit": [
+    "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok prompt || true"
+   ]
+  }
+ },
+ "harness": {
+  "claude-code": {
+   "drops": 0,
+   "failures": {},
+   "joined": 6,
+   "joined_by_cohort": {
+    "agent": 3,
+    "interactive": 3
+   },
+   "model_ids": [
+    "claude-fixture"
+   ],
+   "ok": true,
+   "opportunities": 6,
+   "outcomes": 6,
+   "prompt_wall_ms": {
+    "median": 38.6,
+    "p95": 38.6
+   },
+   "schemas": [
+    "z0int.claude_code.opportunity_record.v0",
+    "z0int.claude_code.turn_outcome.v0"
+   ],
+   "stdout_nonempty": [],
+   "work_items": {
+    "p1": [
+     "b0be8a374ab9070c2089",
+     0
+    ],
+    "p2": [
+     "63e8fb95847ec688e829",
+     0
+    ],
+    "p3": [
+     "7230e5f39658af781e88",
+     0
+    ]
+   }
+  },
+  "codex": {
+   "drops": 0,
+   "failures": {
+    "missing_verifier": 6,
+    "partial_measurement": 6
+   },
+   "joined": 6,
+   "joined_by_cohort": {
+    "agent": 3,
+    "interactive": 3
+   },
+   "model_ids": [
+    "gpt-fixture"
+   ],
+   "ok": true,
+   "opportunities": 6,
+   "outcomes": 6,
+   "prompt_wall_ms": {
+    "median": 37.7,
+    "p95": 37.7
+   },
+   "schemas": [
+    "z0int.codex.opportunity_record.v0",
+    "z0int.codex.turn_outcome.v0"
+   ],
+   "stdout_nonempty": [],
+   "work_items": {
+    "t1": [
+     "6e102024ff8e7ba6e811",
+     0
+    ],
+    "t2": [
+     "082af5372ddc7d60cc74",
+     0
+    ],
+    "t3": [
+     "abeee13fde8196ac8190",
+     0
+    ]
+   }
+  },
+  "grok": {
+   "drops": 0,
+   "failures": {
+    "missing_verifier": 6,
+    "partial_measurement": 6
+   },
+   "joined": 6,
+   "joined_by_cohort": {
+    "agent": 3,
+    "interactive": 3
+   },
+   "model_ids": [
+    "grok-fixture"
+   ],
+   "ok": true,
+   "opportunities": 6,
+   "outcomes": 6,
+   "prompt_wall_ms": {
+    "median": 37.6,
+    "p95": 37.6
+   },
+   "schemas": [
+    "z0int.grok.opportunity_record.v0",
+    "z0int.grok.turn_outcome.v0"
+   ],
+   "stdout_nonempty": [],
+   "work_items": {
+    "09ddc50a348cb91fe40b91c4c212bff6f783f5580c7badca1bceea0421560413": [
+     "74f9578a4274093d1d5d",
+     0
+    ],
+    "572379e5437fe40b0a5cb653e662aae32fd5eb9aee5f3037ff4409acf3995667": [
+     "ebc547ee1209ee94c6c2",
+     0
+    ],
+    "7420157ee44aef588d0922653913fab06580c49ae6c73511a89f5efcdeacc9d4": [
+     "cb7865c6c2ddb65be53c",
+     0
+    ]
+   }
+  }
+ },
+ "ok": true
+}

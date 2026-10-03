@@ -1,0 +1,470 @@
+diff --git a/scripts/omp_bridge_install.py b/scripts/omp_bridge_install.py
+new file mode 100644
+index 0000000..5f4a644
+--- /dev/null
++++ b/scripts/omp_bridge_install.py
+@@ -0,0 +1,133 @@
++"""Point the OMP agent's capture extensions at one pinned z0intelligence checkout (activation step A2).
++
++    python scripts/omp_bridge_install.py --target /mnt/zer0models/z0-wt/pinned/z0intelligence [--dry-run]
++        [--agent-dir DIR] [--include-routing] [--backup PATH]
++
++Each extension stays ONE symlink ``<agent-dir>/extensions/<name> -> <target>/omp-extensions/<name>`` (a link,
++never a copy: the shim imports its siblings and finds ``src/z0int`` through its real path). Salvaged from
++feat/omp-bridge-ready@815c680 and narrowed to the wiring plan:
++
++- only ``z0int-bridge`` and ``local-cognition`` move; ``z0int-intelligence`` (live routing) moves only with
++  ``--include-routing``, and no other entry under ``extensions/`` is ever touched;
++- the target must be a clean git checkout that carries each extension it will point at (a dirty tree is
++  refused, in a dry run too) and an entry that is not a symlink is refused, never replaced;
++- before the first change the full listing of ``extensions/`` (name -> link target) is saved to
++  ``<agent-dir>/extensions.links.bak-z0wiring-<date>``; an existing backup is kept, it is the rollback point;
++- a second run with the same target changes nothing; ``--dry-run`` prints the plan and writes nothing.
++
++Prints the plan as JSON. Rollback: ``ln -sfn <target from the backup> <agent-dir>/extensions/<name>``.
++The agent dir defaults to ``$PI_CODING_AGENT_DIR`` or ``~/.omp/agent``. Restart OMP after a change.
++"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import os
++import subprocess
++import sys
++import time
++from pathlib import Path
++
++CAPTURE = ("z0int-bridge", "local-cognition")
++ROUTING = ("z0int-intelligence",)
++REQUIRED = ("src/z0int/bridge/worker.py",)
++
++
++def default_agent_dir() -> Path:
++    env = os.environ.get("PI_CODING_AGENT_DIR")
++    return Path(env).expanduser() if env else Path.home() / ".omp" / "agent"
++
++
++def default_backup(agent_dir: Path) -> Path:
++    return agent_dir / f"extensions.links.bak-z0wiring-{time.strftime('%Y%m%d')}"
++
++
++def refuse(message: str) -> None:
++    raise SystemExit(f"refusing: {message}")
++
++
++def check_target(target: Path, names: tuple[str, ...]) -> None:
++    proc = subprocess.run(["git", "-C", str(target), "status", "--porcelain"], capture_output=True, text=True)
++    if proc.returncode != 0:
++        refuse(f"{target} is not a git checkout")
++    if proc.stdout.strip():
++        refuse(f"{target} is a dirty checkout; pin a clean tree:\n{proc.stdout}")
++    missing = [rel for rel in (*REQUIRED, *(f"omp-extensions/{n}/index.ts" for n in names))
++               if not (target / rel).is_file()]
++    if missing:
++        refuse(f"{target} is missing {missing}")
++
++
++def listing(ext_dir: Path) -> dict:
++    links, other = {}, {}
++    for entry in sorted(ext_dir.iterdir()) if ext_dir.is_dir() else []:
++        if entry.is_symlink():
++            links[entry.name] = {"target": os.readlink(entry)}
++        else:
++            other[entry.name] = "dir" if entry.is_dir() else "file"
++    return {"links": links, "other": other}
++
++
++def plan(agent_dir: Path, target: Path, names: tuple[str, ...]) -> list[dict]:
++    actions = []
++    for name in names:
++        link, want = agent_dir / "extensions" / name, (target / "omp-extensions" / name).resolve()
++        if link.is_symlink():
++            current = os.readlink(link)
++            if (link.parent / current).resolve() == want:
++                actions.append({"name": name, "action": "unchanged", "to": str(want)})
++            else:
++                actions.append({"name": name, "action": "retarget", "from": current, "to": str(want)})
++        elif link.exists():
++            refuse(f"{link} exists and is not a symlink; leaving it alone")
++        else:
++            actions.append({"name": name, "action": "create", "to": str(want)})
++    return actions
++
++
++def apply(agent_dir: Path, actions: list[dict], backup: Path) -> bool:
++    """Save the listing (once), then swap each link atomically. Returns whether a backup was written."""
++    if not any(a["action"] != "unchanged" for a in actions):
++        return False
++    ext = agent_dir / "extensions"
++    ext.mkdir(parents=True, exist_ok=True)
++    wrote = False
++    if not backup.exists():
++        backup.write_text(json.dumps({"schema": "z0int.omp_extension_links.v0", "agent_dir": str(agent_dir),
++                                      "saved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
++                                      **listing(ext)}, indent=2) + "\n")
++        wrote = True
++    for action in actions:
++        if action["action"] == "unchanged":
++            continue
++        tmp = ext / f".{action['name']}.z0wiring-tmp"
++        if tmp.is_symlink():
++            tmp.unlink()
++        tmp.symlink_to(action["to"], target_is_directory=True)
++        os.replace(tmp, ext / action["name"])
++    return wrote
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
++    ap.add_argument("--target", type=Path, required=True, help="pinned z0intelligence checkout (clean)")
++    ap.add_argument("--agent-dir", type=Path, default=None)
++    ap.add_argument("--include-routing", action="store_true", help="also move z0int-intelligence (live routing)")
++    ap.add_argument("--backup", type=Path, default=None, help="links backup path (default: dated, in agent dir)")
++    ap.add_argument("--dry-run", action="store_true")
++    args = ap.parse_args(argv)
++    agent_dir = (args.agent_dir or default_agent_dir()).expanduser()
++    target = args.target.expanduser().resolve()
++    names = CAPTURE + (ROUTING if args.include_routing else ())
++    check_target(target, names)
++    actions = plan(agent_dir, target, names)
++    backup = (args.backup or default_backup(agent_dir)).expanduser()
++    wrote = False if args.dry_run else apply(agent_dir, actions, backup)
++    print(json.dumps({"agent_dir": str(agent_dir), "target": str(target), "dry_run": args.dry_run,
++                      "backup": str(backup), "backup_written": wrote, "actions": actions}, indent=2))
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/src/z0int/bridge/runtime.py b/src/z0int/bridge/runtime.py
+index 53eb0ca..5db7a72 100644
+--- a/src/z0int/bridge/runtime.py
++++ b/src/z0int/bridge/runtime.py
+@@ -2,6 +2,13 @@
+ 
+ Production preflight is owned by z0intelligence (no Evolution Lab on live path).
+ Kerdoios remains optional residual planner via subprocess when configured.
++
++Capture (oh-my-pi#109, z0int#62): every OMP/OMO user turn also lands in the shared record family
++``$Z0INT_HOME/state/<harness>/``: turn_open queues a ``z0int.<harness>.opportunity_record.v0`` (built in a
++detached child, from the task cwd the shim sends) and turn_close a ``turn_outcome.v0`` on the same turn key.
++As in the hook adapter, the reply pays only the hand-off (a session-file update and one detached spawn, or
++the outcome rows); no capture thread runs in this resident process, so none competes with the reply for the
++GIL. Nothing a capture row holds reaches the host.
+ """
+ 
+ from __future__ import annotations
+@@ -15,6 +22,7 @@ import uuid
+ from pathlib import Path
+ from typing import Any
+ 
++from z0int import harness_capture as hc
+ from z0int import paths
+ from z0int.bridge import generation as gen
+ from z0int.bridge.decision_cache import ResidentDecisionCache
+@@ -224,6 +232,7 @@ class BridgeRuntime:
+         generation: int,
+         instance_id: str | None = None,
+         build_id: str | None = None,
++        capture_spawn: Any = None,
+     ) -> None:
+         self.generation = int(generation)
+         self.instance_id = instance_id or uuid.uuid4().hex[:12]
+@@ -233,6 +242,26 @@ class BridgeRuntime:
+         self.draining = False
+         # Per-generation resident DecisionBackend instances (not shared across reloads).
+         self._decision_backends = ResidentDecisionCache()
++        # Capture: the detached opportunity build (tests may pass a stand-in for the spawn).
++        self._capture_spawn = capture_spawn or hc.spawn_detached
++
++    # --- capture (shadow: nothing here reaches the host) ---------------------
++    def _capture(self, harness: str, kind: str, job: dict[str, Any]) -> None:
++        """Write one capture event (the hook adapter's pattern); never raises into the reply. An unsupported
++        harness leaves an explicit failure row (begin_turn / outcome_context return None)."""
++        try:
++            if not hc.enabled():
++                return
++            if kind == "opportunity_record":
++                ctx = hc.begin_turn(harness, job)
++                if ctx:
++                    self._capture_spawn(hc.child_argv(harness), {"payload": job, "ctx": ctx})
++            else:
++                ctx = hc.outcome_context(harness, job["turn"])
++                if ctx and ctx.get("trace_id") is not None:
++                    hc.record_outcome(harness, ctx, job["behaviour"], ended=job["ended"], extra=job["extra"])
++        except Exception:  # noqa: BLE001 - capture is shadow-only
++            pass
+ 
+     def identity(self) -> dict[str, Any]:
+         return {
+@@ -335,6 +364,11 @@ class BridgeRuntime:
+         prompt: str,
+         omp_pid: int | None = None,
+         writer_generation: int | None = None,
++        cwd: str | None = None,
++        harness: str = "omp",
++        parent_id: str | None = None,
++        agent_kind: str | None = None,
++        model: str | None = None,
+     ) -> dict[str, Any]:
+         if self.draining:
+             return {"ok": False, "error": "draining"}
+@@ -352,6 +386,10 @@ class BridgeRuntime:
+             row = {"op": "turn_open", "error": "generation_mismatch", **stamp, "writer_generation": writer_generation}
+             gen.quarantine(row, reason="open_generation_mismatch")
+             return {"ok": False, "error": "generation_mismatch", **stamp}
++        # The user turn happened whatever the bridge's own bookkeeping decides below: capture it first.
++        self._capture(harness, "opportunity_record", {
++            "session_id": session_id, "turn_id": trace_id, "prompt": prompt, "cwd": cwd, "model": model,
++            "parent_id": parent_id, "agent_kind": agent_kind})
+ 
+         pf = preflight(prompt)
+         capability_id = pf.get("capability_id") if isinstance(pf.get("capability_id"), str) else "coding.next_action"
+@@ -415,7 +453,7 @@ class BridgeRuntime:
+         row = {
+             "schema": SCHEMA_EVENT,
+             "ts": receipt["ts"],
+-            "prompt": prompt[:400],
++            "capture": hc.capture_flags(prompt),  # content-free; the prompt itself is never stored here
+             "preflight": pf,
+             "kerdoios_plan": plan,
+             "latency_ms": latency_ms,
+@@ -480,6 +518,7 @@ class BridgeRuntime:
+         measurement_state: str | None = None,
+         state_reason: str | None = None,
+         writer_generation: int | None = None,
++        harness: str = "omp",
+     ) -> dict[str, Any]:
+         stamp = _meta_stamp(
+             generation=self.generation,
+@@ -499,6 +538,17 @@ class BridgeRuntime:
+         if trace_id in self.closing:
+             return {"ok": True, "already_closed": True, "trace_id": trace_id, **stamp}
+         self.closing.add(trace_id)
++        # Observed behaviour only: execution_completed is what the host saw; verified_success stays null in the
++        # capture row until a verifier labels the turn (an operator claim lives in the heart row below).
++        self._capture(harness, "turn_outcome", {
++            # model_id as the shim names it at open (provider/id); the close frame carries the two apart
++            "turn": {"session_id": session_id, "turn_id": trace_id,
++                     "model": f"{provider}/{model}" if provider and model else model},
++            "behaviour": {"asked_user": None, "tool_calls": None, "assistant_messages": None},
++            "ended": "completed" if execution_completed else "interrupted",
++            "extra": {"execution_completed": bool(execution_completed), "verified_success": None,
++                      "measurement_state": measurement_state, "input_tokens": input_tokens,
++                      "output_tokens": output_tokens}})
+ 
+         # Close may carry a different generation than open — record both.
+         open_gen = open_row.get("bridge_generation") if open_row else None
+diff --git a/src/z0int/bridge/worker.py b/src/z0int/bridge/worker.py
+index 1323fca..899fc2b 100644
+--- a/src/z0int/bridge/worker.py
++++ b/src/z0int/bridge/worker.py
+@@ -1,7 +1,9 @@
+ """Resident JSONL bridge worker: python -u -m z0int.bridge.worker
+ 
+ Protocol: one JSON object per line on stdin; one JSON response per line on stdout.
+-Request ids are required for concurrent ops.
++Request ids are required for concurrent ops. turn_open/turn_close payloads may carry the capture fields
++``harness`` (omp|omo), ``cwd``, ``parent_id``, ``agent_kind`` and ``model``; a frame without them (the a9cbbed
++shim) is still served, and captured with unknown task facts.
+ """
+ 
+ from __future__ import annotations
+@@ -18,6 +20,11 @@ from z0int.bridge.protocol import BRIDGE_PROTOCOL, OPS, compute_build_id
+ from z0int.bridge.runtime import BridgeRuntime
+ 
+ 
++def _text(payload: dict[str, Any], key: str) -> str | None:
++    value = payload.get(key)
++    return value if isinstance(value, str) and value else None
++
++
+ def _respond(req_id: str | None, body: dict[str, Any]) -> None:
+     out = {"id": req_id, **body}
+     sys.stdout.write(json.dumps(out, ensure_ascii=False, separators=(",", ":")) + "\n")
+@@ -102,6 +109,11 @@ def serve(generation: int | None = None) -> int:
+                     writer_generation=req.get("bridge_generation")
+                     if isinstance(req.get("bridge_generation"), int)
+                     else rt.generation,
++                    cwd=_text(payload, "cwd"),
++                    harness=_text(payload, "harness") or "omp",
++                    parent_id=_text(payload, "parent_id"),
++                    agent_kind=_text(payload, "agent_kind"),
++                    model=_text(payload, "model"),
+                 )
+                 _respond(req_id, result)
+                 continue
+@@ -125,6 +137,7 @@ def serve(generation: int | None = None) -> int:
+                     writer_generation=req.get("bridge_generation")
+                     if isinstance(req.get("bridge_generation"), int)
+                     else rt.generation,
++                    harness=_text(payload, "harness") or "omp",
+                 )
+                 _respond(req_id, result)
+                 continue
+diff --git a/src/z0int/cognition/shadow.py b/src/z0int/cognition/shadow.py
+index 53a05cc..905043f 100644
+--- a/src/z0int/cognition/shadow.py
++++ b/src/z0int/cognition/shadow.py
+@@ -10,7 +10,11 @@ The bridge op ``cognition_shadow`` is a *safety boundary*, not a controller:
+   disagreement between "what the compiler allows" and "what a local model
+   wanted" is visible without ever being acted on;
+ * it fails open. A bad payload, a missing model or a dead server produces a
+-  result dict — never an exception into the host.
++  result dict — never an exception into the host;
++* it records answers only (oh-my-pi#109): a backend that is not served, raised,
++  timed out or could not be reached gives no receipt row, only a persisted
++  ``backend_unavailable`` count; a receipt names the observed tool as a
++  structured ``actual_tool`` and never stores the state text or any tool input.
+ 
+ The pure part is :func:`build_shadow_plan`; :func:`run_shadow` is the small
+ effectful shell the bridge worker calls. Both are unit-testable with fake
+@@ -20,8 +24,10 @@ backends and no model server.
+ from __future__ import annotations
+ 
+ from dataclasses import dataclass
++import fcntl
+ import json
+ import os
++import re
+ import threading
+ import time
+ from pathlib import Path
+@@ -36,6 +42,8 @@ from ..receipt import new_trace_id
+ SCHEMA = "z0int.cognition.shadow.v1"
+ RECEIPT_SCHEMA = "z0int.cognition.shadow.receipt.v1"
+ RECEIPT_NAME = "cognition-shadow.jsonl"
++COUNTERS_NAME = "cognition-shadow-counters.json"
++_TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
+ 
+ _ALLOWED_KINDS = ("tool", "model", "control")
+ _ALLOWED_RISKS = ("read", "write", "destructive", "publish", "credential", "payment")
+@@ -418,6 +426,44 @@ def shadow_receipt_path() -> Path:
+     return paths.home() / "shadow" / RECEIPT_NAME
+ 
+ 
++def _unavailable(row: Mapping[str, Any]) -> bool:
++    """No answer from the backend: unresolved, raised, timed out (no decision) or a transport error."""
++    return row.get("backend") is None or str(row.get("parse_error") or "").startswith("transport_error")
++
++
++def _actual_tool(payload: Mapping[str, Any]) -> dict[str, str] | None:
++    """The tool OMP actually ran, as a name + risk class only (never its input)."""
++    raw = payload.get("actual_tool")
++    if not isinstance(raw, Mapping):
++        facts = payload.get("facts")
++        raw = {"name": facts.get("tool_name")} if isinstance(facts, Mapping) else {}
++    name, risk = raw.get("name"), raw.get("risk_class")
++    if not isinstance(name, str) or not _TOOL_NAME_RE.match(name):
++        return None
++    out = {"name": name}
++    if risk in _ALLOWED_RISKS:
++        out["risk_class"] = risk
++    return out
++
++
++def count_backend_unavailable(n: int) -> int:
++    """Add ``n`` to the persisted ``backend_unavailable`` counter (under ``Z0INT_HOME``); returns the total."""
++    path = shadow_receipt_path().with_name(COUNTERS_NAME)
++    path.parent.mkdir(parents=True, exist_ok=True)
++    with path.open("a+", encoding="utf-8") as fh:
++        fcntl.flock(fh, fcntl.LOCK_EX)
++        fh.seek(0)
++        try:
++            counters = json.loads(fh.read() or "{}")
++        except ValueError:
++            counters = {}
++        counters["backend_unavailable"] = int(counters.get("backend_unavailable") or 0) + n
++        fh.seek(0)
++        fh.truncate()
++        fh.write(json.dumps(counters))
++    return counters["backend_unavailable"]
++
++
+ def append_shadow_receipt(row: Mapping[str, Any]) -> Path:
+     path = shadow_receipt_path()
+     path.parent.mkdir(parents=True, exist_ok=True)
+@@ -473,7 +519,8 @@ def run_shadow(
+ 
+     legal_ids = frozenset(legal.ids())
+     shadow_rows: list[dict[str, Any]] = []
+-    if specs and not legal.is_empty:
++    asked = bool(specs) and not legal.is_empty
++    if asked:
+         request = ToolDecisionRequest(
+             state=context.state,
+             legal=legal,
+@@ -503,14 +550,21 @@ def run_shadow(
+         "selected_action": None,
+         "executed_action": None,
+     }
++    answered = [row for row in shadow_rows if not _unavailable(row)]
++    result["backend_unavailable"] = len(specs) - len(answered) if asked else 0
+ 
+-    if write:
++    if write and result["backend_unavailable"]:
++        try:
++            count_backend_unavailable(result["backend_unavailable"])
++        except Exception:  # noqa: BLE001 - a lost count must not fail the op
++            pass
++    if write and answered:
+         receipt = {
+             "schema": RECEIPT_SCHEMA,
+             "ts": time.time(),
+             "trace_id": trace_id,
+             "session_id": session_id,
+-            "state": context.state[:400],
++            "actual_tool": _actual_tool(payload),
+             "graph_digest": legal.graph_digest,
+             "candidate_action_count": legal.candidate_count,
+             "legal_ids": list(legal.ids()),
+@@ -520,7 +574,7 @@ def run_shadow(
+             "authority": list(legal.authority),
+             "budget_units": legal.budget_units,
+             "spent_units": legal.spent_units,
+-            "shadow": shadow_rows,
++            "shadow": answered,
+             # Nothing in this lane is ever executed; keep both facts explicit.
+             "selected_action": None,
+             "executed_action": None,
+@@ -538,10 +592,12 @@ __all__ = [
+     "RECEIPT_NAME",
+     "RECEIPT_SCHEMA",
+     "SCHEMA",
++    "COUNTERS_NAME",
+     "ShadowPayloadError",
+     "ShadowSpec",
+     "append_shadow_receipt",
+     "build_shadow_plan",
++    "count_backend_unavailable",
+     "run_shadow",
+     "shadow_receipt_path",
+ ]
+diff --git a/src/z0int/harness_capture.py b/src/z0int/harness_capture.py
+index 6955050..abb9ccc 100644
+--- a/src/z0int/harness_capture.py
++++ b/src/z0int/harness_capture.py
+@@ -264,8 +264,9 @@ def begin_turn(harness: str, payload: Mapping[str, Any], *, env: Mapping[str, st
+ 
+     A user message opens the session's next work item (an ordinal persisted per session, so every hook
+     process agrees); a payload ``retry: true`` keeps the work item and counts one more attempt. A
+-    harness-injected prompt gets cohort ``harness`` and a work item of its own. A repeated hook for the same
+-    turn changes nothing here; its duplicate row is caught when it is appended.
++    harness-injected prompt gets cohort ``harness`` and a work item of its own. A prompt in a subagent's own
++    session (a bridge payload naming ``parent_id`` or ``agent_kind: sub``) is cohort ``agent``. A repeated hook
++    for the same turn changes nothing here; its duplicate row is caught when it is appended.
+     """
+     if not supported(harness, root):
+         return None
+@@ -281,8 +282,9 @@ def begin_turn(harness: str, payload: Mapping[str, Any], *, env: Mapping[str, st
+             if not (payload.get('retry') is True and st.get('ordinal')):
+                 st['ordinal'], st['attempt'] = st.get('ordinal', 0) + 1, -1
+             st['attempt'] = st.get('attempt', -1) + 1
++            subagent = payload.get('parent_id') not in (None, '') or payload.get('agent_kind') == 'sub'
+             wi, attempt, cohort = _h({'harness': harness, 'session': session, 'ordinal': st['ordinal']}), \
+-                st['attempt'], 'interactive'
++                st['attempt'], 'agent' if subagent else 'interactive'
+         turn = {'work_item_id': wi, 'attempt_id': attempt, 'cohort': cohort}
+         return dict(st, turn_id=tid, **turn, turns=_keep(st.get('turns') or {}, {tid: turn}))
+ 

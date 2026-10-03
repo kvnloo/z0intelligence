@@ -1,0 +1,211 @@
+{
+ "counts": {
+  "cohort": {},
+  "days": {},
+  "gate": {},
+  "groups": 0,
+  "groups_with_resolved": 0,
+  "observed_action": {},
+  "resolved": 0,
+  "rows": 9,
+  "states": {},
+  "with_features": 0,
+  "with_label_row": 0
+ },
+ "feature_schema_sha": "69d7eef44ba1707e",
+ "features": [
+  "scope_mode=question",
+  "scope_mode=unscoped",
+  "scope_mode=repo",
+  "family.conv",
+  "family.docs.priority",
+  "family.gh",
+  "family.git.branch",
+  "family.git.branches_ahead",
+  "family.git.dirty",
+  "family.git.head",
+  "family.git.history",
+  "family.git.remote",
+  "family.git.stash",
+  "family.git.upstream",
+  "family.git.worktrees",
+  "n_families",
+  "n_claims",
+  "n_superseded",
+  "n_unknowns",
+  "n_unknowns_blocking",
+  "n_unknowns_status=unknown",
+  "n_unknowns_status=source_unavailable",
+  "n_unknowns_status=no_match",
+  "unknown_family.conv",
+  "unknown_family.docs.priority",
+  "unknown_family.gh",
+  "unknown_family.git.branch",
+  "unknown_family.git.branches_ahead",
+  "unknown_family.git.dirty",
+  "unknown_family.git.head",
+  "unknown_family.git.history",
+  "unknown_family.git.remote",
+  "unknown_family.git.stash",
+  "unknown_family.git.upstream",
+  "unknown_family.git.worktrees",
+  "n_contradictions",
+  "contradiction_family.conv",
+  "contradiction_family.docs.priority",
+  "contradiction_family.gh",
+  "contradiction_family.git.branch",
+  "contradiction_family.git.branches_ahead",
+  "contradiction_family.git.dirty",
+  "contradiction_family.git.head",
+  "contradiction_family.git.history",
+  "contradiction_family.git.remote",
+  "contradiction_family.git.stash",
+  "contradiction_family.git.upstream",
+  "contradiction_family.git.worktrees",
+  "effect.read",
+  "effect.write",
+  "effect.privileged",
+  "authority_source=aodl",
+  "authority_source=harness-default",
+  "grant.read",
+  "grant.write",
+  "grant.privileged",
+  "authority_fingerprinted",
+  "n_missing_authority",
+  "legal.ACT",
+  "legal.OBSERVE",
+  "legal.ASK",
+  "legal.ABSTAIN",
+  "legal.ESCALATE",
+  "gate=ACT",
+  "gate=OBSERVE",
+  "gate=ASK",
+  "gate=ABSTAIN",
+  "gate=ESCALATE",
+  "posture_factory=BURN",
+  "posture_factory=BALANCED",
+  "posture_factory=CONSERVE",
+  "posture_factory=other",
+  "posture_factory=absent",
+  "cohort=interactive",
+  "cohort=agent",
+  "cohort=harness",
+  "cohort=unknown"
+ ],
+ "generated_at": "2026-10-03T04:07:58Z",
+ "label": {
+  "y_success": "1 = verified_success; 0 = verified_failure or contested; null = unverified (missing, not negative)"
+ },
+ "post_decision_columns": [
+  "observed"
+ ],
+ "privacy": "no prompt/response/command/path/claim text; ids are sha256 prefixes",
+ "row_schema": "z0int.loop.training_row.v0",
+ "schema": "z0int.loop.training_table_manifest.v0",
+ "sources": {
+  "opportunities.jsonl": {
+   "rows": 0,
+   "sha256": null
+  },
+  "outcomes.jsonl": {
+   "rows": 9,
+   "sha256": "2e4af67d34756b40"
+  },
+  "outcomes_verified.jsonl": {
+   "rows": 9,
+   "sha256": "7212317afa9d8d1b"
+  }
+ },
+ "sweep": {
+  "by_cohort": {
+   "agent": {
+    "turns": 4,
+    "turns_after_first_opportunity": 0,
+    "unverified": 4,
+    "with_observed": 0,
+    "with_opportunity": 0,
+    "with_opportunity_after_first_opportunity": 0,
+    "with_opportunity_and_resolved": 0
+   },
+   "interactive": {
+    "contested": 5,
+    "turns": 145,
+    "turns_after_first_opportunity": 0,
+    "unverified": 130,
+    "verified_failure": 5,
+    "verified_success": 5,
+    "with_observed": 7,
+    "with_opportunity": 0,
+    "with_opportunity_after_first_opportunity": 0,
+    "with_opportunity_and_resolved": 0
+   }
+  },
+  "by_day": {
+   "2026-09-30": {
+    "contested": 5,
+    "turns": 70,
+    "turns_after_first_opportunity": 0,
+    "unverified": 58,
+    "verified_failure": 3,
+    "verified_success": 4,
+    "with_observed": 0,
+    "with_opportunity": 0,
+    "with_opportunity_after_first_opportunity": 0,
+    "with_opportunity_and_resolved": 0
+   },
+   "2026-10-01": {
+    "turns": 55,
+    "turns_after_first_opportunity": 0,
+    "unverified": 52,
+    "verified_failure": 2,
+    "verified_success": 1,
+    "with_observed": 0,
+    "with_opportunity": 0,
+    "with_opportunity_after_first_opportunity": 0,
+    "with_opportunity_and_resolved": 0
+   },
+   "2026-10-02": {
+    "turns": 8,
+    "turns_after_first_opportunity": 0,
+    "unverified": 8,
+    "with_observed": 0,
+    "with_opportunity": 0,
+    "with_opportunity_after_first_opportunity": 0,
+    "with_opportunity_and_resolved": 0
+   },
+   "2026-10-03": {
+    "turns": 16,
+    "turns_after_first_opportunity": 0,
+    "unverified": 16,
+    "with_observed": 7,
+    "with_opportunity": 0,
+    "with_opportunity_after_first_opportunity": 0,
+    "with_opportunity_and_resolved": 0
+   }
+  },
+  "first_opportunity_at": null,
+  "first_turn_at": "2026-09-30T02:03:48Z",
+  "last_turn_at": "2026-10-03T03:45:18Z",
+  "measured_at": "2026-10-03T04:07:58Z",
+  "privacy": "counts only",
+  "sessions": 8,
+  "sessions_by_cohort": {
+   "agent": 4,
+   "interactive": 4
+  },
+  "since": "7d",
+  "total": {
+   "contested": 5,
+   "turns": 149,
+   "turns_after_first_opportunity": 0,
+   "unverified": 134,
+   "verified_failure": 5,
+   "verified_success": 5,
+   "with_observed": 7,
+   "with_opportunity": 0,
+   "with_opportunity_after_first_opportunity": 0,
+   "with_opportunity_and_resolved": 0
+  }
+ },
+ "table_version": "0.1.0"
+}

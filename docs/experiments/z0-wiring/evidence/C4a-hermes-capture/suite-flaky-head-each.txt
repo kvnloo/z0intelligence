@@ -1,0 +1,3 @@
+head: tests/test_agentweb_bridge_overload.py::test_host_overload_is_503_before_handler_execution failed 2/10
+head: tests/test_hook_adapter.py::test_prompt_handler_returns_under_5ms_p99_with_the_build_detached failed 1/10
+ 06:00:43 up 3 days, 19:33,  1 user,  load average: 4.36, 4.39, 4.68

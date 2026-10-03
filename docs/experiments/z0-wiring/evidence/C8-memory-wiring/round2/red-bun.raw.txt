@@ -1,0 +1,48 @@
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/z0-memory/index.test.ts:
+235 | 			const opened = readFileSync(log, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l))
+236 | 				.find(f => f.op === "turn_open");
+237 | 			expect(opened?.session_id).toBe("sess-1");
+238 | 			const want = spawnSync(PY, ["-c", "import sys; sys.path[:0] = [sys.argv[1]]; from z0int.harness_id import turn_key; print(turn_key(*sys.argv[2:]))",
+239 | 				join(ROOT, "src"), harness, "sess-1", opened.trace_id], { encoding: "utf8" }).stdout.trim();
+240 | 			expect(seamRows(h, harness).map(r => r.turn_key)).toEqual([want]);
+                                                           ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "fe8484654c34361bc066c36ce7d9c805",
++   "2bebd13fc0f6fd851eec6eebc4f810c4",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/omp-extensions/z0-memory/index.test.ts:240:54)
+(fail) omp: with the capture bridge loaded, the memory seam keys the turn the bridge opened (one canonical turn_key) [226.28ms]
+235 | 			const opened = readFileSync(log, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l))
+236 | 				.find(f => f.op === "turn_open");
+237 | 			expect(opened?.session_id).toBe("sess-1");
+238 | 			const want = spawnSync(PY, ["-c", "import sys; sys.path[:0] = [sys.argv[1]]; from z0int.harness_id import turn_key; print(turn_key(*sys.argv[2:]))",
+239 | 				join(ROOT, "src"), harness, "sess-1", opened.trace_id], { encoding: "utf8" }).stdout.trim();
+240 | 			expect(seamRows(h, harness).map(r => r.turn_key)).toEqual([want]);
+                                                           ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "2dbf2e0eb1e165281758788035ccd0a7",
++   "02fbe5a6f5da98ca81ae35365c566990",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/omp-extensions/z0-memory/index.test.ts:240:54)
+(fail) omo: with the capture bridge loaded, the memory seam keys the turn the bridge opened (one canonical turn_key) [158.85ms]
+
+ 0 pass
+ 9 filtered out
+ 2 fail
+ 8 expect() calls
+Ran 2 tests across 1 file. [519.00ms]
+bun_rc=1

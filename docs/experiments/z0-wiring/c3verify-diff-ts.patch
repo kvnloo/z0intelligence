@@ -1,0 +1,1100 @@
+diff --git a/omp-extensions/local-cognition/README.md b/omp-extensions/local-cognition/README.md
+index aab99ba..d5c5cd9 100644
+--- a/omp-extensions/local-cognition/README.md
++++ b/omp-extensions/local-cognition/README.md
+@@ -21,6 +21,13 @@ compiler's verdict and the local cognition portfolio.
+   legal set to models, records an out-of-set answer as `invalid_call` with
+   `selected_action: null`, and always writes `selected_action: null` /
+   `executed_action: null` in its receipt.
++- The tool input never leaves the host: the request carries the tool name and
++  the legal set, and the receipt names the observed tool as a structured
++  `actual_tool` (`{name, risk_class}`) with no state text. A receipt row is
++  written only when at least one backend answered; a backend that is not
++  served, raised, timed out or could not be reached only increments
++  `backend_unavailable` in `~/.z0int/shadow/cognition-shadow-counters.json`
++  (oh-my-pi#109).
+ 
+ ## Install
+ 
+diff --git a/omp-extensions/local-cognition/index.test.ts b/omp-extensions/local-cognition/index.test.ts
+index 9ac0613..8545ec0 100644
+--- a/omp-extensions/local-cognition/index.test.ts
++++ b/omp-extensions/local-cognition/index.test.ts
+@@ -245,6 +245,17 @@ test("buildShadowPayload is self-contained and schema-shaped", () => {
+ 	expect(payload.objective).toBeNull();
+ });
+ 
++test("the shadow request names the actual tool as a structure and carries no tool input", async () => {
++	process.env.OMP_Z0INT_COGNITION_TOOLS = "bash,read";
++	const { handler } = installed();
++	handler(toolCall("bash", { command: "cat SECRET_TOOL_INPUT_MARKER_7" }), fakeCtx());
++	await flush();
++	expect(sent).toHaveLength(1);
++	expect(sent[0].actual_tool).toEqual({ name: "bash", risk_class: "write" });
++	expect(JSON.stringify(sent[0])).not.toContain("SECRET_TOOL_INPUT_MARKER_7");
++	expect(String(sent[0].state)).not.toContain("input");
++});
++
+ test("registers z0int-cognition-status and the command never throws", async () => {
+ 	const home = mkdtempSync(join(tmpdir(), "local-cognition-status-"));
+ 	process.env.Z0INT_HOME = home;
+diff --git a/omp-extensions/local-cognition/index.ts b/omp-extensions/local-cognition/index.ts
+index 43acea3..44bf641 100644
+--- a/omp-extensions/local-cognition/index.ts
++++ b/omp-extensions/local-cognition/index.ts
+@@ -30,7 +30,6 @@ const DEFAULT_TIMEOUT_MS = 4000;
+ const DEFAULT_MODELS = ["nemotron_orchestrator_8b", "functiongemma_270m"];
+ const DEFAULT_AUTHORITY = ["read"];
+ const DEFAULT_TOOL_NAMES = ["bash", "read", "write", "edit", "grep", "glob"];
+-const MAX_STATE_CHARS = 2000;
+ const STATUS_RING = 100;
+ 
+ /** Tool names whose call has real filesystem/process side effects. */
+@@ -197,14 +196,6 @@ export function authorityList(): string[] {
+ 
+ // --- payload ------------------------------------------------------------
+ 
+-function safeJson(value: unknown): string {
+-	try {
+-		return JSON.stringify(value) ?? "";
+-	} catch {
+-		return String(value);
+-	}
+-}
+-
+ function riskFor(toolName: string): string {
+ 	return WRITE_TOOLS.has(toolName) ? "write" : "read";
+ }
+@@ -294,12 +285,13 @@ function buildActions(toolNames: string[]): Jsonish[] {
+ 
+ export function buildShadowPayload(event: ToolCallLike, toolNames: string[]): Jsonish {
+ 	const toolName = typeof event?.toolName === "string" ? event.toolName : "";
+-	const input = event?.input && typeof event.input === "object" ? event.input : {};
+ 	return {
+ 		op: "cognition_shadow",
+ 		trace_id: randomUUID().replaceAll("-", ""),
+ 		session_id: process.env.OMP_SESSION_ID ?? null,
+-		state: `OMP tool_call: ${toolName}\ninput: ${safeJson(input).slice(0, MAX_STATE_CHARS)}`,
++		// The tool input never leaves the host: the shadow sees the tool name and the legal set only.
++		state: `OMP tool_call: ${toolName}`,
++		actual_tool: { name: toolName, risk_class: riskFor(toolName) },
+ 		actions: buildActions(toolNames),
+ 		granted_capabilities: toolNames,
+ 		authority: authorityList(),
+diff --git a/omp-extensions/z0int-bridge/index.test.ts b/omp-extensions/z0int-bridge/index.test.ts
+new file mode 100644
+index 0000000..d21d552
+--- /dev/null
++++ b/omp-extensions/z0int-bridge/index.test.ts
+@@ -0,0 +1,215 @@
++/**
++ * `bun test` for the z0int-bridge capture handlers (oh-my-pi#109).
++ *
++ * A fake ExtensionAPI and, for the worker, either an interpreter that does not exist (fail-open) or a tiny
++ * fake JSONL worker. No OMP runtime, no z0int Python, no model server, no network.
++ */
++import { afterAll, beforeAll, expect, test } from "bun:test";
++import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++
++const home = mkdtempSync(join(process.env.TMPDIR || tmpdir(), "z0int-bridge-test-"));
++process.env.Z0INT_HOME = home;
++process.env.Z0INT_PYTHON = join(home, "no-such-python");
++process.env.OMP_SESSION_ID = "";
++
++const m = await import("./index.ts");
++
++type AnyFn = (...args: unknown[]) => unknown;
++
++function fakePi() {
++	const handlers = new Map<string, AnyFn[]>();
++	return {
++		handlers,
++		events: {},
++		on: (event: string, handler: AnyFn) => {
++			handlers.set(event, [...(handlers.get(event) ?? []), handler]);
++		},
++		setLabel: () => undefined,
++		registerCommand: () => undefined,
++		registerTool: () => undefined,
++	};
++}
++
++function ctx(over: Record<string, unknown> = {}) {
++	return {
++		cwd: "/work/repo",
++		sessionManager: { getSessionId: () => "sess-1" },
++		agent: { kind: "main", id: "Main", name: "main", depth: 0 },
++		model: { provider: "stub", id: "model-a" },
++		ui: { notify: () => undefined },
++		...over,
++	};
++}
++
++const rejections: unknown[] = [];
++const onRejection = (reason: unknown) => rejections.push(reason);
++const errors: unknown[] = [];
++const onError = (error: unknown) => errors.push(error);
++
++beforeAll(() => {
++	process.on("unhandledRejection", onRejection);
++	process.on("uncaughtException", onError);
++});
++
++afterAll(() => {
++	process.off("unhandledRejection", onRejection);
++	process.off("uncaughtException", onError);
++	rmSync(home, { recursive: true, force: true });
++});
++
++function settle(ms = 300): Promise<void> {
++	return new Promise(resolve => setTimeout(resolve, ms));
++}
++
++function drops(harness: string): Array<Record<string, unknown>> {
++	const path = join(home, "state", harness, "drops.jsonl");
++	if (!existsSync(path)) return [];
++	return readFileSync(path, "utf8")
++		.split("\n")
++		.filter(Boolean)
++		.map(line => JSON.parse(line));
++}
++
++test("the extension loads and registers with a missing interpreter", async () => {
++	const pi = fakePi();
++	expect(() => m.default(pi as never)).not.toThrow();
++	for (const event of ["input", "before_agent_start", "turn_end", "agent_end"]) {
++		expect(pi.handlers.get(event)?.length).toBeGreaterThan(0);
++	}
++	await settle();
++	expect(rejections).toEqual([]);
++	expect(errors).toEqual([]);
++});
++
++test("capture handlers return undefined and fail open, counted, when the worker cannot start", async () => {
++	const pi = fakePi();
++	expect(m.registerBridgeCapture(pi as never, { harness: "omp" }).status).toBe("SUPPORTED");
++	const before = m.captureStatus().counters.worker_unavailable ?? 0;
++	const [open] = pi.handlers.get("before_agent_start")!;
++	const [turnEnd] = pi.handlers.get("turn_end")!;
++	const [agentEnd] = pi.handlers.get("agent_end")!;
++	expect(await open({ type: "before_agent_start", prompt: "fix the parser" }, ctx())).toBeUndefined();
++	expect(await turnEnd({ type: "turn_end", message: { role: "assistant" } }, ctx())).toBeUndefined();
++	expect(await agentEnd({ type: "agent_end", messages: [] }, ctx())).toBeUndefined();
++	await settle();
++	expect(m.captureStatus().counters.worker_unavailable).toBe(before + 1);
++	const rows = drops("omp").filter(r => r.reason === "worker_unavailable");
++	expect(rows.length).toBe(before + 1);
++	expect(rows[0].schema).toBe("z0int.omp.drop.v0");
++	expect(JSON.stringify(rows)).not.toContain("fix the parser");
++	expect(rejections).toEqual([]);
++	expect(errors).toEqual([]);
++});
++
++test("thrown errors inside a handler are caught: no throw, no unhandledRejection", async () => {
++	const pi = fakePi();
++	m.registerBridgeCapture(pi as never, { harness: "omp" });
++	const hostile = {
++		get cwd(): string {
++			throw new Error("cwd exploded");
++		},
++		sessionManager: {
++			getSessionId: () => {
++				throw new Error("session exploded");
++			},
++		},
++	};
++	for (const [event, payload] of [
++		["input", { type: "input", text: "/reload-plugins" }],
++		["before_agent_start", { type: "before_agent_start", prompt: "hello" }],
++		["turn_end", null],
++		["agent_end", { type: "agent_end", messages: null }],
++	] as const) {
++		for (const handler of pi.handlers.get(event)!) {
++			expect(await handler(payload, hostile)).toBeUndefined();
++			expect(await handler(payload, undefined)).toBeUndefined();
++		}
++	}
++	await settle();
++	expect(rejections).toEqual([]);
++	expect(errors).toEqual([]);
++});
++
++test("the turn_open frame carries the task cwd, harness, subagent parent and model", () => {
++	const info = m.turnContext(ctx({ agent: { kind: "sub", id: "0-Task", name: "task", depth: 1, parentId: "Main" } }));
++	expect(info).toEqual({ cwd: "/work/repo", agentKind: "sub", parentId: "Main", model: "stub/model-a" });
++	const frame = m.turnOpenFrame({ traceId: "t1", sessionId: "sess-1", pid: 9 }, "fix it", info, "omp");
++	expect(frame.op).toBe("turn_open");
++	expect(frame.payload).toMatchObject({ cwd: "/work/repo", harness: "omp", parent_id: "Main", agent_kind: "sub" });
++	const close = m.turnCloseFrame({ traceId: "t1", sessionId: "sess-1", pid: 9 }, "agent_end", { execution_completed: false }, "omo");
++	expect(close).toMatchObject({ op: "agent_end", trace_id: "t1", payload: { harness: "omo", execution_completed: false } });
++	expect(m.turnContext(undefined)).toEqual({ cwd: null, agentKind: null, parentId: null, model: null });
++});
++
++test("the session id comes from ctx.sessionManager", () => {
++	expect(m.resolveSessionId({ sessionManager: { getSessionId: () => "sess-123" } })).toBe("sess-123");
++	expect(String(m.resolveSessionId({}))).toStartWith("omp-");
++});
++
++test("interpreter resolution: Z0INT_PYTHON, then the checkout venv, then the z0int runtime, then python3", () => {
++	expect(m.resolvePython({ Z0INT_PYTHON: "/x/py" }, "/r", "/z")).toBe("/x/py");
++	expect(m.resolvePython({}, "/nonexistent-root", "/nonexistent-z0")).toBe("python3");
++});
++
++// --- a fake JSONL worker: the frames reach it, one turn per session ------------------------------------
++
++test("frames reach the worker and a turn per session closes on its own agent_end", async () => {
++	const log = join(home, "worker-frames.jsonl");
++	const worker = join(home, "fake-worker.py");
++	writeFileSync(
++		worker,
++		[
++			"#!/usr/bin/env python3",
++			"import json, sys",
++			`log = open(${JSON.stringify(log)}, "a")`,
++			"for line in sys.stdin:",
++			"    req = json.loads(line)",
++			"    log.write(line); log.flush()",
++			"    out = {'id': req.get('id'), 'ok': True, 'protocol': 'z0int.bridge.v2', 'generation': 1,",
++			"           'instance_id': 'fake', 'build_id': 'fake'}",
++			"    sys.stdout.write(json.dumps(out) + '\\n'); sys.stdout.flush()",
++			"    if req.get('op') == 'shutdown':",
++			"        break",
++		].join("\n"),
++	);
++	chmodSync(worker, 0o755);
++	process.env.Z0INT_PYTHON = worker;
++	try {
++		const pi = fakePi();
++		m.registerBridgeCapture(pi as never, { harness: "omp" });
++		const [open] = pi.handlers.get("before_agent_start")!;
++		const [agentEnd] = pi.handlers.get("agent_end")!;
++		const main = ctx();
++		const sub = ctx({
++			sessionManager: { getSessionId: () => "sub-1" },
++			agent: { kind: "sub", id: "0-Task", name: "task", depth: 1, parentId: "Main" },
++		});
++		expect(await open({ prompt: "main prompt" }, main)).toBeUndefined();
++		expect(await open({ prompt: "sub prompt" }, sub)).toBeUndefined();
++		expect(await agentEnd({ messages: [], willRetry: true }, sub)).toBeUndefined(); // not the end yet
++		expect(await agentEnd({ messages: [], aborted: true }, sub)).toBeUndefined();
++		expect(await agentEnd({ messages: [] }, main)).toBeUndefined();
++		const frames = readFileSync(log, "utf8")
++			.split("\n")
++			.filter(Boolean)
++			.map(line => JSON.parse(line));
++		const opens = frames.filter(f => f.op === "turn_open");
++		const closes = frames.filter(f => f.op === "agent_end");
++		expect(opens.map(f => f.session_id).sort()).toEqual(["sess-1", "sub-1"]);
++		expect(closes.map(f => f.session_id)).toEqual(["sub-1", "sess-1"]);
++		const subOpen = opens.find(f => f.session_id === "sub-1");
++		expect(subOpen.payload).toMatchObject({ cwd: "/work/repo", parent_id: "Main", agent_kind: "sub", harness: "omp" });
++		const byTrace = Object.fromEntries(opens.map(f => [f.session_id, f.trace_id]));
++		expect(closes[0].trace_id).toBe(byTrace["sub-1"]);
++		expect(closes[0].payload.execution_completed).toBe(false);
++		expect(closes[1].trace_id).toBe(byTrace["sess-1"]);
++		expect(closes[1].payload.execution_completed).toBe(true);
++		await m.stopWorker();
++	} finally {
++		process.env.Z0INT_PYTHON = join(home, "no-such-python");
++	}
++	expect(rejections).toEqual([]);
++	expect(errors).toEqual([]);
++});
+diff --git a/omp-extensions/z0int-bridge/index.ts b/omp-extensions/z0int-bridge/index.ts
+index c16ecc0..875c8fa 100644
+--- a/omp-extensions/z0int-bridge/index.ts
++++ b/omp-extensions/z0int-bridge/index.ts
+@@ -11,31 +11,43 @@
+  * Python edits take effect via /reload-plugins (transactional generation swap).
+  *
+  * execution remains log_only until host consume is authorized.
++ *
++ * Capture (oh-my-pi#109): turn_open carries the task cwd, the harness, the subagent parent and the model so
++ * the worker can write the z0int#62 record family; every capture handler returns undefined and fails open
++ * (a worker that cannot start is a counted drop in $Z0INT_HOME/state/<harness>/drops.jsonl).
++ * `registerBridgeCapture` is the capture alone (the OMO/senpi entry `omo.ts` uses only that); the default
++ * export adds the canonical z0int-intelligence routing and the bridge commands for OMP.
+  */
+ import registerIntelligence from "../z0int-intelligence/index.ts";
+ import { fileURLToPath } from "node:url";
+ import { randomUUID } from "node:crypto";
+ import { spawn, type ChildProcess } from "node:child_process";
+ import { createInterface, type Interface } from "node:readline";
+-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
++import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+ import { homedir } from "node:os";
+ import { dirname, join } from "node:path";
+ import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+ 
+ const BRIDGE_PROTOCOL = "z0int.bridge.v2";
+-const Z0 = process.env.Z0INT_HOME || join(homedir(), ".z0int");
+-const RUNTIME = join(Z0, "runtime");
+-const CURRENT = join(RUNTIME, "bridge-current.json");
+-
+-const Z0_PY =
+-	process.env.Z0INT_PYTHON ||
+-	"python3";
++// Read per use, not at import, so the host env at spawn time decides (and tests can point it elsewhere).
++function z0Home(env: NodeJS.ProcessEnv = process.env): string {
++	return env.Z0INT_HOME || join(homedir(), ".z0int");
++}
+ const Z0_ROOT =
+ 	process.env.Z0INT_ROOT ||
+ 	// Prefer the tree that owns this extension when possible.
+ 	process.env.Z0INT_BRIDGE_ROOT ||
+ 	fileURLToPath(new URL("../../", import.meta.url));
+ 
++/** Z0INT_PYTHON, else the owning checkout's .venv, else the z0int runtime, else python3 (salvaged, 815c680). */
++export function resolvePython(env: NodeJS.ProcessEnv = process.env, root = Z0_ROOT, z0 = z0Home(env)): string {
++	if (env.Z0INT_PYTHON) return env.Z0INT_PYTHON;
++	for (const candidate of [join(root, ".venv", "bin", "python"), join(z0, "bin", "python")]) {
++		if (existsSync(candidate)) return candidate;
++	}
++	return "python3";
++}
++
+ const WORKER_TIMEOUT_MS = Number(process.env.Z0INT_BRIDGE_TIMEOUT_MS || 45_000);
+ const HANDSHAKE_TIMEOUT_MS = 20_000;
+ 
+@@ -60,6 +72,7 @@ type Pending = {
+ type ActiveTurn = {
+ 	traceId: string;
+ 	sessionId: string;
++	harness: string;
+ 	openedGeneration: number;
+ 	turnsSeen: number;
+ 	turnsWithProviderUsage: number;
+@@ -79,16 +92,48 @@ type WorkerHandle = {
+ };
+ 
+ let current: WorkerHandle | null = null;
++let starting: Promise<WorkerHandle> | null = null;
+ let generation = 0;
+ let reloadPromise: Promise<Jsonish> | null = null;
+-let activeTurn: ActiveTurn | null = null;
++// One open turn per session: an in-process subagent's turn never closes (or replaces) its parent's.
++const activeTurns = new Map<string, ActiveTurn>();
++
++// --- capture accounting (content-free) -----------------------------------------------------------------
++const CAPTURE_EVENTS = ["input", "before_agent_start", "turn_end", "agent_end"] as const;
++const counters: Record<string, number> = {};
++const harnessStatus: Record<string, { status: "SUPPORTED" | "UNSUPPORTED"; missing: string[] }> = {};
++
++export function captureStatus(): { counters: Record<string, number>; harnesses: typeof harnessStatus } {
++	return { counters: { ...counters }, harnesses: { ...harnessStatus } };
++}
++
++/** Count a lost capture and persist it in the shared drop file (same row shape as harness_capture). */
++function recordDrop(harness: string, reason: string): void {
++	counters[reason] = (counters[reason] ?? 0) + 1;
++	try {
++		const dir = join(z0Home(), "state", harness);
++		mkdirSync(dir, { recursive: true });
++		const row = {
++			schema: `z0int.${harness.replaceAll("-", "_")}.drop.v0`,
++			harness,
++			kind: "opportunity_record",
++			reason,
++			count: 1,
++			recorded_at: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
++		};
++		appendFileSync(join(dir, "drops.jsonl"), JSON.stringify(row) + "\n", "utf8");
++	} catch {
++		/* a lost drop marker never affects the host */
++	}
++}
+ 
+ function ensureDir(path: string): void {
+ 	mkdirSync(path, { recursive: true });
+ }
+ 
+-function publishCurrent(h: WorkerHandle): void {
+-	ensureDir(RUNTIME);
++export function publishCurrent(h: Pick<WorkerHandle, "generation" | "instanceId" | "buildId">): void {
++	const runtime = join(z0Home(), "runtime");
++	ensureDir(runtime);
+ 	const blob = {
+ 		protocol: BRIDGE_PROTOCOL,
+ 		generation: h.generation,
+@@ -97,7 +142,7 @@ function publishCurrent(h: WorkerHandle): void {
+ 		activated_at: Date.now() / 1000,
+ 		omp_pid: process.pid,
+ 	};
+-	writeFileSync(CURRENT, JSON.stringify(blob, null, 2) + "\n", "utf8");
++	writeFileSync(join(runtime, "bridge-current.json"), JSON.stringify(blob, null, 2) + "\n", "utf8");
+ }
+ 
+ function failAll(h: WorkerHandle, err: Error): void {
+@@ -116,10 +161,20 @@ function spawnWorker(nextGen: number): Promise<WorkerHandle> {
+ 			PYTHONPATH: join(Z0_ROOT, "src") + (process.env.PYTHONPATH ? `:${process.env.PYTHONPATH}` : ""),
+ 			Z0INT_BRIDGE_GENERATION: String(nextGen),
+ 		};
+-		const child = spawn(Z0_PY, ["-u", "-m", "z0int.bridge.worker", "--generation", String(nextGen)], {
+-			cwd: Z0_ROOT,
+-			env,
+-			stdio: ["pipe", "pipe", "pipe"],
++		let child: ChildProcess;
++		try {
++			child = spawn(resolvePython(), ["-u", "-m", "z0int.bridge.worker", "--generation", String(nextGen)], {
++				cwd: Z0_ROOT,
++				env,
++				stdio: ["pipe", "pipe", "pipe"],
++			});
++		} catch (e) {
++			reject(e instanceof Error ? e : new Error(String(e)));
++			return;
++		}
++		// A worker that never started (missing interpreter) or died must not raise into the host.
++		child.stdin?.on("error", () => {
++			/* fail-open: the pending requests are failed by exit/error below */
+ 		});
+ 		const pending = new Map<string, Pending>();
+ 		const lines = createInterface({ input: child.stdout! });
+@@ -258,25 +313,40 @@ async function drainAndStop(h: WorkerHandle): Promise<void> {
+ 
+ async function ensureWorker(): Promise<WorkerHandle> {
+ 	if (current && current.child.exitCode === null) return current;
+-	const nextGen = generation + 1 || 1;
+-	const h = await spawnWorker(nextGen);
+-	const check = await selfCheck(h);
+-	if (check.ok !== true) {
+-		await drainAndStop(h);
+-		throw new Error(`self_check failed: ${JSON.stringify(check.errors || check.error)}`);
+-	}
+-	current = h;
+-	generation = h.generation;
+-	publishCurrent(h);
+-	publishShadowTransport(h);
+-	maybePrewarmDecider(h);
+-	return h;
++	// One start at a time: the eager start and a first turn must not spawn two workers.
++	if (starting) return starting;
++	starting = (async () => {
++		const nextGen = generation + 1 || 1;
++		const h = await spawnWorker(nextGen);
++		const check = await selfCheck(h);
++		if (check.ok !== true) {
++			await drainAndStop(h);
++			throw new Error(`self_check failed: ${JSON.stringify(check.errors || check.error)}`);
++		}
++		current = h;
++		generation = h.generation;
++		publishCurrent(h);
++		publishShadowTransport(h);
++		maybePrewarmDecider(h);
++		return h;
++	})().finally(() => {
++		starting = null;
++	});
++	return starting;
++}
++
++/** Stop the resident worker (tests, and hosts that unload the extension). */
++async function stopWorker(): Promise<void> {
++	const h = current;
++	current = null;
++	publishShadowTransport(null);
++	if (h) await drainAndStop(h);
+ }
+ 
+ async function reload(reason: string): Promise<Jsonish> {
+ 	if (reloadPromise) return reloadPromise;
+ 	reloadPromise = (async () => {
+-		if (activeTurn) {
++		if (activeTurns.size) {
+ 			return {
+ 				ok: false,
+ 				error: "turn_in_flight",
+@@ -328,14 +398,77 @@ async function reload(reason: string): Promise<Jsonish> {
+ 	return reloadPromise;
+ }
+ 
+-function resolveSessionId(ctx: unknown): string {
+-	if (ctx && typeof ctx === "object" && "sessionId" in ctx) {
+-		const s = (ctx as { sessionId?: unknown }).sessionId;
+-		if (typeof s === "string" && s) return s;
++/** The host session id: OMP and senpi expose it through ctx.sessionManager.getSessionId() (salvaged, 815c680). */
++export function resolveSessionId(ctx: unknown): string {
++	try {
++		if (ctx && typeof ctx === "object") {
++			const sm = (ctx as { sessionManager?: { getSessionId?: () => unknown } }).sessionManager;
++			const id = typeof sm?.getSessionId === "function" ? sm.getSessionId() : undefined;
++			if (typeof id === "string" && id) return id;
++			const s = (ctx as { sessionId?: unknown }).sessionId;
++			if (typeof s === "string" && s) return s;
++		}
++	} catch {
++		/* fall through */
+ 	}
+ 	return process.env.OMP_SESSION_ID || `omp-${process.pid}`;
+ }
+ 
++export type TurnInfo = { cwd: string | null; agentKind: string | null; parentId: string | null; model: string | null };
++
++/** What the capture needs from the handler ctx: the task cwd, the agent identity and the model. Never throws. */
++export function turnContext(ctx: unknown): TurnInfo {
++	const c = (ctx && typeof ctx === "object" ? ctx : {}) as Record<string, unknown>;
++	const read = (key: string): unknown => {
++		try {
++			return c[key];
++		} catch {
++			return undefined;
++		}
++	};
++	const text = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
++	const agent = (read("agent") ?? {}) as { kind?: unknown; parentId?: unknown };
++	const model = (read("model") ?? {}) as { provider?: unknown; id?: unknown };
++	const id = text(model?.id);
++	return {
++		cwd: text(read("cwd")),
++		agentKind: text(agent?.kind),
++		parentId: text(agent?.parentId),
++		model: id && text(model?.provider) ? `${model.provider}/${id}` : id,
++	};
++}
++
++type FrameTurn = { traceId: string; sessionId: string; pid: number };
++
++export function turnOpenFrame(turn: FrameTurn, prompt: string, info: Partial<TurnInfo>, harness: string): Jsonish {
++	return {
++		op: "turn_open",
++		trace_id: turn.traceId,
++		session_id: turn.sessionId,
++		omp_pid: turn.pid,
++		payload: {
++			prompt,
++			session_id: turn.sessionId,
++			omp_pid: turn.pid,
++			harness,
++			cwd: info.cwd ?? null,
++			parent_id: info.parentId ?? null,
++			agent_kind: info.agentKind ?? null,
++			model: info.model ?? null,
++		},
++	};
++}
++
++export function turnCloseFrame(turn: FrameTurn, op: string, fields: Jsonish, harness: string): Jsonish {
++	return {
++		op,
++		trace_id: turn.traceId,
++		session_id: turn.sessionId,
++		omp_pid: turn.pid,
++		payload: { trace_id: turn.traceId, session_id: turn.sessionId, omp_pid: turn.pid, harness, ...fields },
++	};
++}
++
+ function estimateMeasuredFromMessages(messages: unknown[]): {
+ 	input_tokens: number;
+ 	output_tokens: number;
+@@ -513,119 +646,54 @@ function maybePrewarmDecider(h: WorkerHandle): void {
+ 	});
+ }
+ 
+-export default function z0intBridge(pi: ExtensionAPI) {
+-	registerIntelligence(pi);
+-	pi.setLabel("z0int bridge v2 + canonical intelligence");
++function eventField(event: unknown, key: string): unknown {
++	return event && typeof event === "object" && key in event ? (event as Record<string, unknown>)[key] : undefined;
++}
+ 
+-	// Eager start so first turn is warm.
+-	void ensureWorker().catch(() => {
+-		/* fail-open; next turn retries */
+-	});
++async function closeActive(sessionId: string, messages: unknown[], source: string, completed: boolean): Promise<void> {
++	const turn = activeTurns.get(sessionId);
++	if (!turn) return;
++	activeTurns.delete(sessionId);
+ 
+-	// /reload-plugins interception: hot-swap worker, then let OMP continue.
+-	pi.on("input", async (event, ctx) => {
+-		const text =
+-			event && typeof event === "object" && "text" in event
+-				? String((event as { text?: unknown }).text ?? "").trim()
+-				: "";
+-		if (text !== "/reload-plugins") return;
+-		// Do NOT return { handled: true } — OMP must still run builtin reload.
+-		try {
+-			const result = await reload("omp_reload_plugins");
+-			const ok = result.ok === true;
+-			const gen = result.generation;
+-			const build = result.build_id;
+-			ctx.ui?.notify?.(
+-				ok
+-					? `z0int bridge → generation ${gen} build=${build}`
+-					: `z0int bridge reload failed (${result.error}); keeping generation ${generation}`,
+-				ok ? "info" : "warning",
+-			);
+-		} catch (e) {
+-			ctx.ui?.notify?.(`z0int bridge reload error: ${e}`, "warning");
+-		}
+-	});
++	let inputTokens = turn.inputTokens;
++	let outputTokens = turn.outputTokens;
++	let provider = turn.provider;
++	let model = turn.model;
++	let measurementState: "complete" | "partial";
++	let stateReason: string;
+ 
+-	pi.on("before_agent_start", async (event, ctx) => {
+-		const prompt =
+-			event && typeof event === "object" && "prompt" in event
+-				? String((event as { prompt?: unknown }).prompt ?? "").trim()
+-				: "";
+-		const sessionId = resolveSessionId(ctx);
+-		if (!prompt || prompt.startsWith("/")) return;
++	if (turn.turnsSeen > 0) {
++		measurementState =
++			turn.turnsWithProviderUsage === turn.turnsSeen ? "complete" : "partial";
++		stateReason =
++			measurementState === "complete"
++				? "all_turns_provider_usage"
++				: "missing_turn_provider_usage";
++	} else {
++		const fallback = estimateMeasuredFromMessages(messages);
++		inputTokens = fallback.input_tokens;
++		outputTokens = fallback.output_tokens;
++		provider = fallback.provider;
++		model = fallback.model;
++		measurementState = "partial";
++		stateReason =
++			fallback.usage_source === "provider_usage"
++				? "agent_end_last_message_provider_usage"
++				: "agent_end_char_count_proxy";
++	}
+ 
+-		try {
+-			const h = await ensureWorker();
+-			const turn: ActiveTurn = {
+-				traceId: randomUUID().replaceAll("-", ""),
+-				sessionId,
+-				openedGeneration: h.generation,
+-				turnsSeen: 0,
+-				turnsWithProviderUsage: 0,
+-				inputTokens: 0,
+-				outputTokens: 0,
+-				provider: null,
+-				model: null,
+-			};
+-			activeTurn = turn;
+-			await request(h, {
+-				op: "turn_open",
+-				trace_id: turn.traceId,
+-				session_id: turn.sessionId,
+-				omp_pid: process.pid,
+-				payload: { prompt, session_id: turn.sessionId, omp_pid: process.pid },
+-			});
+-		} catch {
+-			activeTurn = null;
+-		}
+-	});
+-
+-	async function closeActive(messages: unknown[], source: string): Promise<void> {
+-		const turn = activeTurn;
+-		if (!turn) return;
+-
+-		let inputTokens = turn.inputTokens;
+-		let outputTokens = turn.outputTokens;
+-		let provider = turn.provider;
+-		let model = turn.model;
+-		let measurementState: "complete" | "partial";
+-		let stateReason: string;
+-
+-		if (turn.turnsSeen > 0) {
+-			measurementState =
+-				turn.turnsWithProviderUsage === turn.turnsSeen ? "complete" : "partial";
+-			stateReason =
+-				measurementState === "complete"
+-					? "all_turns_provider_usage"
+-					: "missing_turn_provider_usage";
+-		} else {
+-			const fallback = estimateMeasuredFromMessages(messages);
+-			inputTokens = fallback.input_tokens;
+-			outputTokens = fallback.output_tokens;
+-			provider = fallback.provider;
+-			model = fallback.model;
+-			measurementState = "partial";
+-			stateReason =
+-				fallback.usage_source === "provider_usage"
+-					? "agent_end_last_message_provider_usage"
+-					: "agent_end_char_count_proxy";
+-		}
+-
+-		try {
+-			const h = await ensureWorker();
+-			await request(h, {
+-				op: source === "bridge_agent_end" ? "agent_end" : "turn_close",
+-				trace_id: turn.traceId,
+-				session_id: turn.sessionId,
+-				omp_pid: process.pid,
+-				payload: {
+-					trace_id: turn.traceId,
+-					session_id: turn.sessionId,
+-					omp_pid: process.pid,
++	try {
++		const h = await ensureWorker();
++		await request(
++			h,
++			turnCloseFrame(
++				{ traceId: turn.traceId, sessionId: turn.sessionId, pid: process.pid },
++				source === "bridge_agent_end" ? "agent_end" : "turn_close",
++				{
+ 					measured: inputTokens + outputTokens,
+ 					input_tokens: inputTokens,
+ 					output_tokens: outputTokens,
+-					execution_completed: true,
++					execution_completed: completed,
+ 					// verified_success stays null until async join
+ 					source,
+ 					provider,
+@@ -637,47 +705,139 @@ export default function z0intBridge(pi: ExtensionAPI) {
+ 					opened_generation: turn.openedGeneration,
+ 					close_generation: h.generation,
+ 				},
+-			});
++				turn.harness,
++			),
++		);
++	} catch {
++		/* fail-open */
++	}
++}
++
++/**
++ * The capture handlers alone, for any pi-family host (OMP, OMO/senpi). Every handler returns undefined and
++ * never throws. A host whose API lacks a needed event is recorded UNSUPPORTED (status + a counted drop row)
++ * instead of half-capturing.
++ */
++export function registerBridgeCapture(
++	pi: ExtensionAPI,
++	opts: { harness?: string } = {},
++): { status: "SUPPORTED" | "UNSUPPORTED"; missing: string[] } {
++	const harness = opts.harness || "omp";
++	const handlers: Record<(typeof CAPTURE_EVENTS)[number], (event: unknown, ctx: unknown) => Promise<undefined>> = {
++		// /reload-plugins interception: hot-swap worker, then let the host continue.
++		input: async (event, ctx) => {
++			try {
++				const text = String(eventField(event, "text") ?? "").trim();
++				if (text !== "/reload-plugins") return undefined;
++				// Do NOT return { handled: true } — OMP must still run builtin reload.
++				const notify = (ctx as { ui?: { notify?: (m: string, l?: string) => void } } | undefined)?.ui?.notify;
++				try {
++					const result = await reload("omp_reload_plugins");
++					const ok = result.ok === true;
++					notify?.(
++						ok
++							? `z0int bridge → generation ${result.generation} build=${result.build_id}`
++							: `z0int bridge reload failed (${result.error}); keeping generation ${generation}`,
++						ok ? "info" : "warning",
++					);
++				} catch (e) {
++					notify?.(`z0int bridge reload error: ${e}`, "warning");
++				}
++			} catch {
++				counters.handler_errors = (counters.handler_errors ?? 0) + 1;
++			}
++			return undefined;
++		},
++		before_agent_start: async (event, ctx) => {
++			try {
++				const prompt = String(eventField(event, "prompt") ?? "").trim();
++				if (!prompt || prompt.startsWith("/")) return undefined;
++				const sessionId = resolveSessionId(ctx);
++				const info = turnContext(ctx);
++				let h: WorkerHandle;
++				try {
++					h = await ensureWorker();
++				} catch {
++					recordDrop(harness, "worker_unavailable");
++					return undefined;
++				}
++				const turn: ActiveTurn = {
++					traceId: randomUUID().replaceAll("-", ""),
++					sessionId,
++					harness,
++					openedGeneration: h.generation,
++					turnsSeen: 0,
++					turnsWithProviderUsage: 0,
++					inputTokens: 0,
++					outputTokens: 0,
++					provider: null,
++					model: null,
++				};
++				activeTurns.set(sessionId, turn);
++				try {
++					await request(h, turnOpenFrame({ traceId: turn.traceId, sessionId, pid: process.pid }, prompt, info, harness));
++				} catch {
++					if (activeTurns.get(sessionId)?.traceId === turn.traceId) activeTurns.delete(sessionId);
++					recordDrop(harness, "worker_unavailable");
++				}
++			} catch {
++				counters.handler_errors = (counters.handler_errors ?? 0) + 1;
++			}
++			return undefined;
++		},
++		turn_end: async (event, ctx) => {
++			try {
++				const turn = activeTurns.get(resolveSessionId(ctx));
++				if (turn) accumulateTurnUsage(turn, eventField(event, "message") ?? null);
++			} catch {
++				counters.handler_errors = (counters.handler_errors ?? 0) + 1;
++			}
++			return undefined;
++		},
++		agent_end: async (event, ctx) => {
++			try {
++				// OMP says willContinue, senpi says willRetry: either way the turn is not over yet.
++				if (eventField(event, "willContinue") === true || eventField(event, "willRetry") === true) return undefined;
++				const messages = eventField(event, "messages");
++				await closeActive(
++					resolveSessionId(ctx),
++					Array.isArray(messages) ? messages : [],
++					"bridge_agent_end",
++					eventField(event, "aborted") !== true,
++				);
++			} catch {
++				counters.handler_errors = (counters.handler_errors ?? 0) + 1;
++			}
++			return undefined;
++		},
++	};
++	const missing: string[] = [];
++	const on = (pi as { on?: unknown } | undefined)?.on;
++	for (const [event, handler] of Object.entries(handlers)) {
++		try {
++			if (typeof on !== "function") throw new Error("no on()");
++			(on as (e: string, h: unknown) => void).call(pi, event, handler);
+ 		} catch {
+-			/* fail-open */
+-		} finally {
+-			if (activeTurn?.traceId === turn.traceId) activeTurn = null;
++			missing.push(event);
+ 		}
+ 	}
++	const status = missing.length ? "UNSUPPORTED" : "SUPPORTED";
++	harnessStatus[harness] = { status, missing };
++	if (status === "UNSUPPORTED") {
++		recordDrop(harness, "unsupported_api");
++	} else {
++		// Eager start so the first turn is warm.
++		void ensureWorker().catch(() => {
++			/* fail-open; next turn retries */
++		});
++	}
++	return harnessStatus[harness];
++}
+ 
+-	pi.on("turn_end", async event => {
+-		try {
+-			const turn = activeTurn;
+-			if (!turn) return;
+-			const msg =
+-				event && typeof event === "object" && "message" in event
+-					? (event as { message?: unknown }).message
+-					: null;
+-			accumulateTurnUsage(turn, msg);
+-		} catch {
+-			/* */
+-		}
+-	});
+-
+-	pi.on("agent_end", async event => {
+-		try {
+-			if (
+-				event &&
+-				typeof event === "object" &&
+-				"willContinue" in event &&
+-				(event as { willContinue?: boolean }).willContinue
+-			) {
+-				return;
+-			}
+-			const messages =
+-				event && typeof event === "object" && "messages" in event
+-					? ((event as { messages?: unknown[] }).messages || [])
+-					: [];
+-			await closeActive(messages, "bridge_agent_end");
+-		} catch {
+-			/* */
+-		}
+-	});
++export default function z0intBridge(pi: ExtensionAPI) {
++	registerIntelligence(pi);
++	pi.setLabel("z0int bridge v2 + canonical intelligence");
++	registerBridgeCapture(pi, { harness: "omp" });
+ 
+ 	pi.registerCommand("z0int-bridge-status", {
+ 		description: "Show resident z0int bridge worker generation/build",
+@@ -711,7 +871,7 @@ export default function z0intBridge(pi: ExtensionAPI) {
+ 	pi.registerCommand("z0int-close", {
+ 		description: "Close active z0int turn with optional --verified",
+ 		async handler(args, ctx) {
+-			const turn = activeTurn;
++			const turn = activeTurns.get(resolveSessionId(ctx));
+ 			if (!turn) {
+ 				ctx.ui.notify("z0int close: no active turn in this session", "warning");
+ 				return;
+@@ -725,20 +885,22 @@ export default function z0intBridge(pi: ExtensionAPI) {
+ 			}
+ 			try {
+ 				const h = await ensureWorker();
+-				const closed = await request(h, {
+-					op: "turn_close",
+-					trace_id: turn.traceId,
+-					session_id: turn.sessionId,
+-					omp_pid: process.pid,
+-					payload: {
+-						measured: measured ?? null,
+-						execution_completed: true,
+-						verified_success: verified ? true : null,
+-						source: verified ? "bridge_verified" : "z0int-close-cmd",
+-						verification_source: verified ? "operator" : null,
+-					},
+-				});
+-				if (activeTurn?.traceId === turn.traceId) activeTurn = null;
++				const closed = await request(
++					h,
++					turnCloseFrame(
++						{ traceId: turn.traceId, sessionId: turn.sessionId, pid: process.pid },
++						"turn_close",
++						{
++							measured: measured ?? null,
++							execution_completed: true,
++							verified_success: verified ? true : null,
++							source: verified ? "bridge_verified" : "z0int-close-cmd",
++							verification_source: verified ? "operator" : null,
++						},
++						turn.harness,
++					),
++				);
++				if (activeTurns.get(turn.sessionId)?.traceId === turn.traceId) activeTurns.delete(turn.sessionId);
+ 				ctx.ui.notify(
+ 					`z0int close: ${JSON.stringify({ ok: closed.ok !== false, trace: turn.traceId, gen: h.generation })}`,
+ 					closed.ok === false ? "error" : "info",
+@@ -750,4 +912,4 @@ export default function z0intBridge(pi: ExtensionAPI) {
+ 	});
+ }
+ 
+-export { reload, ensureWorker, request, BRIDGE_PROTOCOL, publishShadowTransport };
++export { reload, ensureWorker, stopWorker, request, BRIDGE_PROTOCOL, publishShadowTransport };
+diff --git a/omp-extensions/z0int-bridge/omo.test.ts b/omp-extensions/z0int-bridge/omo.test.ts
+new file mode 100644
+index 0000000..e7a0569
+--- /dev/null
++++ b/omp-extensions/z0int-bridge/omo.test.ts
+@@ -0,0 +1,90 @@
++/**
++ * `bun test` for the OMO (senpi) capture shim: the one-line re-export that activation writes to
++ * ~/.omo/agent/extensions/z0-capture.js, loaded against a fake senpi API.
++ *
++ * The capture needs four senpi events: input, before_agent_start, turn_end and agent_end. When the API
++ * diverges the shim records UNSUPPORTED (status + a counted drop row) instead of pretending to capture.
++ */
++import { afterAll, expect, test } from "bun:test";
++import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { pathToFileURL } from "node:url";
++
++const home = mkdtempSync(join(process.env.TMPDIR || tmpdir(), "z0int-omo-test-"));
++process.env.Z0INT_HOME = home;
++process.env.Z0INT_PYTHON = join(home, "no-such-python");
++
++// Exactly the file activation writes (README "OMO"): a one-line re-export of the pinned checkout's entry.
++const shim = join(home, "z0-capture.js");
++writeFileSync(shim, `export { default } from ${JSON.stringify(pathToFileURL(join(import.meta.dir, "omo.ts")).href)};\n`);
++const omoCapture = (await import(shim)).default as (pi: unknown) => { status: string; missing: string[] };
++const bridge = await import("./index.ts");
++
++const SENPI_EVENTS = ["session_start", "input", "before_agent_start", "agent_start", "agent_end", "turn_start", "turn_end",
++	"tool_call", "tool_result", "message_end", "session_shutdown"];
++
++afterAll(() => rmSync(home, { recursive: true, force: true }));
++
++/** A fake senpi ExtensionAPI: `on` accepts only the events senpi declares, like a host that validates names. */
++function fakeSenpi(events: string[]) {
++	const handlers = new Map<string, Array<(...args: unknown[]) => unknown>>();
++	return {
++		handlers,
++		on(event: string, handler: (...args: unknown[]) => unknown) {
++			if (!events.includes(event)) throw new Error(`unknown event ${event}`);
++			handlers.set(event, [...(handlers.get(event) ?? []), handler]);
++		},
++	};
++}
++
++function dropReasons(): string[] {
++	const path = join(home, "state", "omo", "drops.jsonl");
++	return existsSync(path) ? readFileSync(path, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l).reason) : [];
++}
++
++test("the senpi re-export loads, registers capture only and stays inert", async () => {
++	const pi = fakeSenpi(SENPI_EVENTS);
++	const out = omoCapture(pi);
++	expect(out.status).toBe("SUPPORTED");
++	expect([...pi.handlers.keys()].sort()).toEqual(["agent_end", "before_agent_start", "input", "turn_end"]);
++	// no routing: the OMO shim never registers the z0int-intelligence route_worker tool (G-#95)
++	expect("registerTool" in pi).toBe(false);
++	for (const [event, handlers] of pi.handlers) {
++		for (const handler of handlers) {
++			expect(await handler({ type: event, prompt: "hi", text: "hi", messages: [] }, { cwd: "/w" })).toBeUndefined();
++		}
++	}
++	expect(bridge.captureStatus().harnesses.omo).toEqual({ status: "SUPPORTED", missing: [] });
++	expect(dropReasons()).toContain("worker_unavailable"); // fail-open, counted under omo
++});
++
++test("a diverged senpi API is recorded UNSUPPORTED, never a silent pass", () => {
++	const pi = fakeSenpi(SENPI_EVENTS.filter(e => e !== "before_agent_start" && e !== "agent_end"));
++	const out = omoCapture(pi);
++	expect(out.status).toBe("UNSUPPORTED");
++	expect(out.missing.sort()).toEqual(["agent_end", "before_agent_start"]);
++	expect(dropReasons()).toContain("unsupported_api");
++	expect(omoCapture({}).status).toBe("UNSUPPORTED"); // no `on` at all
++});
++
++test("the installed senpi declares the events the shim needs (else UNSUPPORTED is recorded)", () => {
++	const candidates = [
++		process.env.SENPI_TYPES,
++		"/mnt/zer0models/home-offload/kvn/bun/install/global/node_modules/@code-yeongyu/senpi/dist/core/extensions/types.d.ts",
++	].filter((p): p is string => Boolean(p));
++	const types = candidates.find(p => existsSync(p));
++	if (!types) {
++		console.log("OMO senpi API: UNSUPPORTED-UNVERIFIED (senpi types.d.ts not found on this host)");
++		return;
++	}
++	const text = readFileSync(types, "utf8");
++	const missing = ["input", "before_agent_start", "turn_end", "agent_end"].filter(
++		e => !text.includes(`on(event: "${e}"`),
++	);
++	const status = missing.length ? "UNSUPPORTED" : "SUPPORTED";
++	console.log(`OMO senpi API (${types}): ${status}${missing.length ? ` missing=${missing.join(",")}` : ""}`);
++	expect(text).toContain("cwd: string;");
++	expect(text).toContain("sessionManager: ReadonlySessionManager;");
++	expect(status).toBe("SUPPORTED");
++});
+diff --git a/omp-extensions/z0int-bridge/omo.ts b/omp-extensions/z0int-bridge/omo.ts
+new file mode 100644
+index 0000000..004e74e
+--- /dev/null
++++ b/omp-extensions/z0int-bridge/omo.ts
+@@ -0,0 +1,17 @@
++/**
++ * OMO (omo-ai / senpi) capture entry: the z0int-bridge capture handlers only, recorded as harness `omo`.
++ *
++ * No z0int-intelligence routing and no route_worker tool are registered here (new route_worker exposure
++ * stays gated by z0intelligence#95). Activation writes a one-line re-export of this file:
++ *
++ *   ~/.omo/agent/extensions/z0-capture.js:
++ *     export { default } from "file:///<pinned checkout>/omp-extensions/z0int-bridge/omo.ts";
++ *
++ * Senpi has no agent identity on the handler ctx, so OMO turns are never marked subagent here.
++ */
++import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
++import { registerBridgeCapture } from "./index.ts";
++
++export default function omoCapture(pi: ExtensionAPI) {
++	return registerBridgeCapture(pi, { harness: "omo" });
++}

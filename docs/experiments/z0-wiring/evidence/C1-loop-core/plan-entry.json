@@ -1,0 +1,82 @@
+{
+  "id": "C1-loop-core",
+  "title": "One cross-harness capture record, shared capture core, lean hook adapter, and the Claude Code / Codex / Grok capture shims",
+  "owner_repo": "kvnloo/z0intelligence",
+  "repo_path": "/mnt/zer0models/z0-wt/z0intelligence",
+  "base_ref": "origin/feat/shadow-loop-v0 (6fee859 = origin/master 0159808 + 1)",
+  "branch": "feat/wire-loop-core-20261003",
+  "harnesses": [
+    "claude-code",
+    "codex",
+    "grok",
+    "shared-core (used by hermes, omp, omo, dsh)"
+  ],
+  "purpose": "z0int#62: one semantic record for every harness. Adds harness_id.turn_key() with an alias table for the six trace-id conventions; harness_capture.py (record family z0int.<harness>.{opportunity_record,turn_outcome,failure}.v0 carrying harness, turn_key, work_item_id, attempt_id, recorded_at, model_id, policy_revision, privacy_class and content-free capture-time flags; bounded spool; persisted drops; bounded close; explicit F-case failure rows incl. stale_evidence); src/z0int/agentsview_ro.py (one shared read-only connection helper for C2 and C7: sqlite mode=ro, user_version guard for 74 and 113, staleness); check_class.py EXTRACTED from the outcome_verifier regexes (outcome_verifier then imports it); a lean entry module z0int.hook_entry (stdlib + harness_capture only at import; everything else lazy, in a detached child) behind `python -m z0int.hook_adapter --harness <id> {prompt,stop,subagent-start,subagent-stop,session-start}`, harness from payload/env, never from the hook file location. Only claude-code keeps the automatic.* calls; every other harness is capture-only. claude_code.py becomes a thin wrapper; the CC plugin adds SubagentStart and SubagentStop (PreToolUse on Agent|Task as the fallback opportunity source, payload INFERRED). New shims: harness-adapters/codex-z0intelligence (hooks only; no route_worker, no credential plumbing; the existing non-git z0intelligence@personal route_worker plugin is left untouched as a recorded legacy exception, see A9) and harness-adapters/grok-z0intelligence/hooks/z0-capture.json. Regression guards (must stay green, not red tests): on the CC fixture set the EXPORTED training rows and cohorts equal the 6fee859 export (raw opportunity rows may differ because request text becomes opt-in); tests/test_claude_code_adapter.py and tests/test_hermes_decisions.py stay green; current CC hook stdout inertness.",
+  "reuse": [
+    "src/z0int/decision_opportunity.py build_decision_opportunity + deterministic_gate + with_authority_grant (master)",
+    "src/z0int/claude_code.py on_opportunity / emit_opportunity_async / stop / session-start packet (feat/shadow-loop-v0 6fee859)",
+    "src/z0int/outcome_verifier.py _TEST_RE, CHECK_EXTRA, CI_CMD, COMMIT_CMD, PR_MERGE, PIPE_FILTER, effective_exit (lines 56-91, 218-243): moved into check_class.py, not re-written",
+    "src/z0int/loop_export.py is_harness_message (line 213) and the other export-time text features: computed at capture time instead, as booleans/buckets",
+    "src/z0int/hermes_decisions.py + harness-adapters/hermes-z0int-decisions/__init__.py: _outcome, session-end gap filling, MAX_CHILDREN fan-out cap",
+    "src/z0int/harness_id.py HarnessIdentity / detect_harness_id (extend; no new identity module)",
+    "src/z0int/cognition/mutation_outcome.py (uncertain-execution semantics for the F3 failure row)",
+    "src/z0int/tokenomics_emit.py emit_provider_usage",
+    "harness-adapters/claude-code-z0intelligence/{hooks/hooks.json,.mcp.json,bin/z0int-mcp} (template for the Codex shim)",
+    "tests/test_claude_code_adapter.py fake-stdin pattern; tests/test_hermes_decisions.py (<5 ms hook, fail-open, trace parity)"
+  ],
+  "red_tests": [
+    "turn_key: the same (harness, session_id, turn_id) gives the same key across processes and replays; different harnesses give different keys; ledger order is not part of the key",
+    "turn_key aliases: CC prompt_id, Hermes raw \"session:turn\", bend-native sha256(session\\0turn), automatic sha256(parent\\0turn), DSH lineage turn_key and an OMP bridge turn trace each map to the canonical key; the two Hermes conventions give the same key for one turn",
+    "record family: an opportunity written for each of claude-code/codex/grok/hermes/omp/omo/dsh has schema z0int.<harness>.opportunity_record.v0 with harness, turn_key, work_item_id, attempt_id, a non-null recorded_at, and model_id + policy_revision fields present (value or explicit \"unknown\"), including non-repo turns where built_at is null",
+    "work item / attempt: re-submitting the same work item (same session, same user-message ordinal, retry flag) keeps work_item_id and increments attempt_id; two different turns get different work_item_ids",
+    "an unknown harness or schema version writes an explicit failure row (unsupported_harness / unsupported_schema) and is never silently dropped",
+    "failure rows exist for stale_evidence (a source revision in the opportunity differs from the one seen at outcome time), missing_verifier, partial_measurement, uncertain_execution (mutation_outcome semantics), duplicate_event and misattribution; a duplicate append of the same turn_key+kind is a counted no-op",
+    "spool (P-3 contract): when the bounded queue is full, drops are counted and persisted to state/<harness>/drops.jsonl, and a fresh process reports the same drop count",
+    "spool (P-2 contract): close() with a full queue returns within the configured bound (2 s) and nothing is written after close",
+    "hot path: the in-process prompt handler returns in < 5 ms p99 over 200 fixture payloads with the opportunity build detached; importing z0int.hook_entry loads no module outside stdlib + z0int.harness_capture/harness_id (asserted import set); the subprocess wall time p95 is within bare-python baseline + 40 ms, with the baseline measured in the same test run",
+    "inertness: hook stdout is byte-identical with capture on vs off, apart from the existing opt-in SessionStart packet",
+    "harness detection: a payload with GROK_HOOK_EVENT set is attributed to grok even when fired from ~/.claude/settings.json; a Codex payload with turn_id goes to codex; a CC payload with prompt_id goes to claude-code; explicit --harness wins; a conflict writes a misattribution failure row",
+    "P-7 contract in the core: the opportunity uses the payload cwd (task repo), never the process cwd; when every git fact is unknown the gate never returns ACT",
+    "capture-time flags: with the default privacy_class (no request text stored) a harness-injected prompt still carries is_harness_message=true and lands in cohort \"harness\" at export; no export-time code path reads intent.request",
+    "subagents: a SubagentStart payload (fallback PreToolUse with tool Agent|Task) writes an opportunity with cohort \"agent\" keyed by the subagent id; the SubagentStop outcome joins to it on turn_key; neither is ever cohort \"interactive\"",
+    "#62 A1: Claude Code, Codex and Grok fixtures for the same synthetic turn round-trip to the same semantic record, differing only in harness and ids",
+    "#62 freeze: one reader builds a z0evals-style frozen bundle (rows + manifest hash) from synthetic fixtures of all seven harnesses; the reader has no harness-specific branch (assert by fixture: adding an eighth harness id with the same fields needs no reader change); rebuilding gives the same hash",
+    "#62 authority: an opportunity whose payload or backend reports confidence 0.99/1.0 never receives ACT unless deterministic_gate grants it; with_authority_grant ignores every confidence field",
+    "privacy: outcome and failure rows hold no prompt, response, command or path text; opportunity request text is stored only when privacy_class=request_opt_in",
+    "check_class: a shared command corpus classifies identically through check_class.classify and through outcome_verifier (which now imports it) into {test, check, ci, git-commit, git-revert, pr-merge, build, other} plus effective exit status; the command string is never persisted",
+    "agentsview_ro.connect opens with mode=ro (a write raises), returns unavailable(schema) for a user_version other than 74/113 and unavailable(locked/missing) instead of raising into callers",
+    "capture-only seam: for every harness other than claude-code, hook_adapter never calls automatic.handle_event or automatic.post (mock + socket guard)",
+    "Codex shim: plugin manifest declares hooks only; no route_worker, no credential env, no HERMES_HOME, no path into .work or ~/plugins; z0intelligence@personal files are not modified"
+  ],
+  "acceptance_refs": [
+    "z0int#62 R1-R10/F1-F7/A1 + acceptance (freeze, no authority from confidence)",
+    "z0int#54",
+    "z0int#56 M0/M1 (subagent/eval cohort)",
+    "G-CAP",
+    "G0",
+    "R1 G0",
+    "R3 finding 1-2",
+    "owner 10-03 plugin layout"
+  ],
+  "depends_on": [],
+  "isolated_e2e": "Homes under /mnt/zer0models/z0-wt/wiring/homes/C1-loop-core/ (HOME, Z0INT_HOME, CLAUDE_CONFIG_DIR, CODEX_HOME, GROK_HOME). (1) Replay recorded synthetic hook payloads through the exact command strings in each shim hooks.json (claude-code, codex, grok); assert joined opp+outcome rows, drops=0 and the latency bounds. (2) Claude Code, no subscription and no network: run `claude -p` with CLAUDE_CONFIG_DIR=<home>/claude, ANTHROPIC_BASE_URL=http://127.0.0.1:<port in 11540-11559> (an Anthropic-Messages-compatible stub that records requests and can script one Task tool_use) and a dummy key, plus `--plugin-dir <wt>/harness-adapters/claude-code-z0intelligence`; assert an interactive opportunity+outcome and an agent-cohort subagent opportunity+outcome. (3) Codex: `CODEX_HOME=<home>/codex codex exec` against an OpenAI-compatible stub configured as a custom model provider on a private port (INFERRED config keys); if the binary refuses, record UNVERIFIED and keep the fixture. (4) Grok: fixtures only (the real CLI is paid). (5) Full suite under `flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock` with the socket guard on (any connect to 11501 or a non-loopback address fails the run).",
+  "activation": {
+    "steps": [
+      "Prerequisite A0: pinned checkout /mnt/zer0models/z0-wt/pinned/z0intelligence at the pushed integrate/wiring-20261003 SHA and venv /mnt/zer0models/z0-wt/venv-wiring built from it",
+      "A1 Claude Code: back up ~/.claude-home/settings.json to .bak-z0wiring-20261003; register /mnt/zer0models/z0-wt/pinned/z0intelligence as a local-directory marketplace (or, if the owner merges integrate to master, update the kvnloo/z0intelligence marketplace) and reinstall z0intelligence from it; set env Z0INT_PYTHON=/mnt/zer0models/z0-wt/venv-wiring/bin/python; owner runs one real turn and one subagent turn; check state/claude-code rows; record the plugin SHA in ACTIVATE.md",
+      "A5 Codex: back up ~/.codex/config.toml; add /mnt/zer0models/z0-wt/pinned/z0intelligence as a local marketplace and install codex-z0intelligence (hooks only); leave z0intelligence@personal enabled and unchanged (legacy exception, A9); trust the hooks; owner runs one real turn; check state/codex",
+      "A5 Grok: write ~/.grok/hooks/z0-capture.json (new file); owner runs one real turn; check state/grok"
+    ],
+    "touches_live": [
+      "~/.claude-home/settings.json",
+      "Claude plugin cache + known marketplaces",
+      "~/.codex/config.toml",
+      "~/.grok/hooks/z0-capture.json"
+    ],
+    "rollback": "Restore settings.json and config.toml from the .bak-z0wiring-20261003 copies (or set enabledPlugins z0intelligence false / disable codex-z0intelligence), remove the local marketplace entry, rm ~/.grok/hooks/z0-capture.json",
+    "risk": "low-medium: a hook on every turn (bounded by the in-process and subprocess latency tests); Codex hook trust prompts; Grok compat scanning of ~/.claude/settings.json (handled by env-based detection)",
+    "needs_owner_approval": true
+  },
+  "gated_by": "none for build; activation needs A0 pinned ref + owner approval",
+  "build_now": true
+}

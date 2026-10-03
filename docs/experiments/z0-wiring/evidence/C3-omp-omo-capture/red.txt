@@ -1,0 +1,269 @@
+# C3 RED run (before implementation) at 914dc99 + uncommitted red tests
+# python: flock -s quiet-lane.lock run.sh <wt> red-py --guard -- python -m pytest -v -p no:cacheprovider -rfE --tb=short tests/test_omp_capture.py tests/test_cognition_shadow.py::test_no_models_served_still_returns_the_compiled_legal_set (cwd=<wt>)
+============================= test session starts ==============================
+platform linux -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0 -- /mnt/zer0models/z0-wt/venv-claude-code/bin/python
+rootdir: /mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 16 items
+
+tests/test_omp_capture.py::test_turn_open_with_cwd_writes_an_omp_opportunity_through_the_detached_core FAILED [  6%]
+tests/test_omp_capture.py::test_bridge_reply_latency_stays_within_its_bound_over_200_turns FAILED [ 12%]
+tests/test_omp_capture.py::test_turn_close_writes_an_outcome_joined_by_turn_key_and_never_claims_verification FAILED [ 18%]
+tests/test_omp_capture.py::test_omo_turns_land_in_their_own_record_family FAILED [ 25%]
+tests/test_omp_capture.py::test_a_subagent_turn_is_agent_cohort_at_capture FAILED [ 31%]
+tests/test_omp_capture.py::test_missing_cwd_gives_unknown_facts_and_the_gate_never_acts FAILED [ 37%]
+tests/test_omp_capture.py::test_bridge_jsonl_rows_contain_no_prompt_text FAILED [ 43%]
+tests/test_omp_capture.py::test_dead_backend_writes_no_shadow_row_and_counts_backend_unavailable FAILED [ 50%]
+tests/test_omp_capture.py::test_served_backend_writes_a_row_with_a_structured_actual_tool_and_no_tool_input FAILED [ 56%]
+tests/test_omp_capture.py::test_protocol_parity_with_the_canonical_a9cbbed_worker FAILED [ 62%]
+tests/test_omp_capture.py::test_bridge_current_json_is_readable_across_both_trees FAILED [ 68%]
+tests/test_omp_capture.py::test_install_dry_run_lists_only_the_bridge_and_local_cognition_retargets FAILED [ 75%]
+tests/test_omp_capture.py::test_install_writes_the_links_backup_first_and_is_idempotent FAILED [ 81%]
+tests/test_omp_capture.py::test_install_refuses_a_dirty_target_checkout FAILED [ 87%]
+tests/test_omp_capture.py::test_install_touches_z0int_intelligence_only_with_include_routing FAILED [ 93%]
+tests/test_cognition_shadow.py::test_no_models_served_still_returns_the_compiled_legal_set FAILED [100%]
+
+=================================== FAILURES ===================================
+_ test_turn_open_with_cwd_writes_an_omp_opportunity_through_the_detached_core __
+tests/test_omp_capture.py:117: in test_turn_open_with_cwd_writes_an_omp_opportunity_through_the_detached_core
+    opened = rt.turn_open(trace_id="trace-open-1", session_id="omp-sess-1", prompt=PROMPT, omp_pid=4242,
+E   TypeError: BridgeRuntime.turn_open() got an unexpected keyword argument 'cwd'
+_______ test_bridge_reply_latency_stays_within_its_bound_over_200_turns ________
+tests/test_omp_capture.py:154: in test_bridge_reply_latency_stays_within_its_bound_over_200_turns
+    off = run(BridgeRuntime(generation=1, instance_id="off", build_id="b", capture_spawn=slow_spawn), "off")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: BridgeRuntime.__init__() got an unexpected keyword argument 'capture_spawn'
+_ test_turn_close_writes_an_outcome_joined_by_turn_key_and_never_claims_verification _
+tests/test_omp_capture.py:166: in test_turn_close_writes_an_outcome_joined_by_turn_key_and_never_claims_verification
+    rt = BridgeRuntime(generation=1, instance_id="t", build_id="b", capture_spawn=inline_spawn)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: BridgeRuntime.__init__() got an unexpected keyword argument 'capture_spawn'
+________________ test_omo_turns_land_in_their_own_record_family ________________
+tests/test_omp_capture.py:189: in test_omo_turns_land_in_their_own_record_family
+    rt = BridgeRuntime(generation=1, instance_id="t", build_id="b", capture_spawn=inline_spawn)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: BridgeRuntime.__init__() got an unexpected keyword argument 'capture_spawn'
+_______________ test_a_subagent_turn_is_agent_cohort_at_capture ________________
+tests/test_omp_capture.py:201: in test_a_subagent_turn_is_agent_cohort_at_capture
+    rt = BridgeRuntime(generation=1, instance_id="t", build_id="b", capture_spawn=inline_spawn)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: BridgeRuntime.__init__() got an unexpected keyword argument 'capture_spawn'
+_________ test_missing_cwd_gives_unknown_facts_and_the_gate_never_acts _________
+tests/test_omp_capture.py:215: in test_missing_cwd_gives_unknown_facts_and_the_gate_never_acts
+    rt = BridgeRuntime(generation=1, instance_id="t", build_id="b", capture_spawn=inline_spawn)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: BridgeRuntime.__init__() got an unexpected keyword argument 'capture_spawn'
+________________ test_bridge_jsonl_rows_contain_no_prompt_text _________________
+tests/test_omp_capture.py:228: in test_bridge_jsonl_rows_contain_no_prompt_text
+    rt = BridgeRuntime(generation=1, instance_id="t", build_id="b", capture_spawn=inline_spawn)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: BridgeRuntime.__init__() got an unexpected keyword argument 'capture_spawn'
+____ test_dead_backend_writes_no_shadow_row_and_counts_backend_unavailable _____
+tests/test_omp_capture.py:298: in test_dead_backend_writes_no_shadow_row_and_counts_backend_unavailable
+    assert result["receipts_path"] is None
+E   AssertionError: assert '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_dead_backend_writes_no_sh0/z0/shadow/cognition-shadow.jsonl' is None
+_ test_served_backend_writes_a_row_with_a_structured_actual_tool_and_no_tool_input _
+tests/test_omp_capture.py:307: in test_served_backend_writes_a_row_with_a_structured_actual_tool_and_no_tool_input
+    assert result["ok"] is True and result["backend_unavailable"] == 0
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'backend_unavailable'
+____________ test_protocol_parity_with_the_canonical_a9cbbed_worker ____________
+tests/test_omp_capture.py:394: in test_protocol_parity_with_the_canonical_a9cbbed_worker
+    new_open = _bun(f"m.turnOpenFrame({{traceId:'new-trace', sessionId:'new-sess', pid: 88}}, 'new prompt', "
+tests/test_omp_capture.py:321: in _bun
+    proc = subprocess.run(["bun", "-e", script], capture_output=True, text=True, timeout=60, check=True,
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: in run
+    raise CalledProcessError(retcode, process.args,
+E   subprocess.CalledProcessError: Command '['bun', '-e', 'const m = await import("/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/omp-extensions/z0int-bridge/index.ts"); console.log(JSON.stringify(await (m.turnOpenFrame({traceId:\'new-trace\', sessionId:\'new-sess\', pid: 88}, \'new prompt\', {"sessionId": "new-sess", "cwd": "/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_protocol_parity_with_the_0", "parentId": null, "agentKind": "main", "model": "stub/model-a"}, \'omp\'))));']' returned non-zero exit status 1.
+____________ test_bridge_current_json_is_readable_across_both_trees ____________
+tests/test_omp_capture.py:445: in test_bridge_current_json_is_readable_across_both_trees
+    write(z0)
+tests/test_omp_capture.py:441: in <lambda>
+    "new-shim": lambda z0: _bun("m.publishCurrent({generation: 3, instanceId: 'i', buildId: 'b'})", z0)}
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_omp_capture.py:321: in _bun
+    proc = subprocess.run(["bun", "-e", script], capture_output=True, text=True, timeout=60, check=True,
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: in run
+    raise CalledProcessError(retcode, process.args,
+E   subprocess.CalledProcessError: Command '['bun', '-e', 'const m = await import("/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/omp-extensions/z0int-bridge/index.ts"); console.log(JSON.stringify(await (m.publishCurrent({generation: 3, instanceId: \'i\', buildId: \'b\'}))));']' returned non-zero exit status 1.
+___ test_install_dry_run_lists_only_the_bridge_and_local_cognition_retargets ___
+tests/test_omp_capture.py:494: in test_install_dry_run_lists_only_the_bridge_and_local_cognition_retargets
+    assert proc.returncode == 0, proc.stderr
+E   AssertionError: /mnt/zer0models/z0-wt/venv-claude-code/bin/python: can't open file '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py': [Errno 2] No such file or directory
+E     
+E   assert 2 == 0
+E    +  where 2 = CompletedProcess(args=['/mnt/zer0models/z0-wt/venv-claude-code/bin/python', '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py', '--target', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_dry_run_lists_onl0/pinned', '--agent-dir', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_dry_run_lists_onl0/agent', '--dry-run'], returncode=2, stdout='', stderr="/mnt/zer0models/z0-wt/venv-claude-code/bin/python: can't open file '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py': [Errno 2] No such file or directory\n").returncode
+_________ test_install_writes_the_links_backup_first_and_is_idempotent _________
+tests/test_omp_capture.py:508: in test_install_writes_the_links_backup_first_and_is_idempotent
+    assert proc.returncode == 0, proc.stderr
+E   AssertionError: /mnt/zer0models/z0-wt/venv-claude-code/bin/python: can't open file '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py': [Errno 2] No such file or directory
+E     
+E   assert 2 == 0
+E    +  where 2 = CompletedProcess(args=['/mnt/zer0models/z0-wt/venv-claude-code/bin/python', '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py', '--target', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_writes_the_links_0/pinned', '--agent-dir', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_writes_the_links_0/agent'], returncode=2, stdout='', stderr="/mnt/zer0models/z0-wt/venv-claude-code/bin/python: can't open file '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py': [Errno 2] No such file or directory\n").returncode
+_________________ test_install_refuses_a_dirty_target_checkout _________________
+tests/test_omp_capture.py:530: in test_install_refuses_a_dirty_target_checkout
+    assert proc.returncode != 0 and "dirty" in (proc.stderr + proc.stdout)
+E   assert (2 != 0 and 'dirty' in ("/mnt/zer0models/z0-wt/venv-claude-code/bin/python: can't open file '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py': [Errno 2] No such file or directory\n" + ''))
+E    +  where 2 = CompletedProcess(args=['/mnt/zer0models/z0-wt/venv-claude-code/bin/python', '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py', '--target', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_refuses_a_dirty_t0/pinned', '--agent-dir', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_refuses_a_dirty_t0/agent'], returncode=2, stdout='', stderr="/mnt/zer0models/z0-wt/venv-claude-code/bin/python: can't open file '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py': [Errno 2] No such file or directory\n").returncode
+E    +  and   "/mnt/zer0models/z0-wt/venv-claude-code/bin/python: can't open file '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py': [Errno 2] No such file or directory\n" = CompletedProcess(args=['/mnt/zer0models/z0-wt/venv-claude-code/bin/python', '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py', '--target', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_refuses_a_dirty_t0/pinned', '--agent-dir', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_refuses_a_dirty_t0/agent'], returncode=2, stdout='', stderr="/mnt/zer0models/z0-wt/venv-claude-code/bin/python: can't open file '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py': [Errno 2] No such file or directory\n").stderr
+E    +  and   '' = CompletedProcess(args=['/mnt/zer0models/z0-wt/venv-claude-code/bin/python', '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py', '--target', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_refuses_a_dirty_t0/pinned', '--agent-dir', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_refuses_a_dirty_t0/agent'], returncode=2, stdout='', stderr="/mnt/zer0models/z0-wt/venv-claude-code/bin/python: can't open file '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py': [Errno 2] No such file or directory\n").stdout
+______ test_install_touches_z0int_intelligence_only_with_include_routing _______
+tests/test_omp_capture.py:538: in test_install_touches_z0int_intelligence_only_with_include_routing
+    assert proc.returncode == 0, proc.stderr
+E   AssertionError: /mnt/zer0models/z0-wt/venv-claude-code/bin/python: can't open file '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py': [Errno 2] No such file or directory
+E     
+E   assert 2 == 0
+E    +  where 2 = CompletedProcess(args=['/mnt/zer0models/z0-wt/venv-claude-code/bin/python', '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py', '--target', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_touches_z0int_int0/pinned', '--agent-dir', '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_install_touches_z0int_int0/agent', '--include-routing', '--dry-run'], returncode=2, stdout='', stderr="/mnt/zer0models/z0-wt/venv-claude-code/bin/python: can't open file '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/scripts/omp_bridge_install.py': [Errno 2] No such file or directory\n").returncode
+__________ test_no_models_served_still_returns_the_compiled_legal_set __________
+tests/test_cognition_shadow.py:302: in test_no_models_served_still_returns_the_compiled_legal_set
+    assert result["receipts_path"] is None and result["backend_unavailable"] == 1
+E   AssertionError: assert ('/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-py/tmp/pytest-of-kvn/pytest-0/test_no_models_served_still_re0/shadow/cognition-shadow.jsonl' is None)
+=========================== short test summary info ============================
+FAILED tests/test_omp_capture.py::test_turn_open_with_cwd_writes_an_omp_opportunity_through_the_detached_core
+FAILED tests/test_omp_capture.py::test_bridge_reply_latency_stays_within_its_bound_over_200_turns
+FAILED tests/test_omp_capture.py::test_turn_close_writes_an_outcome_joined_by_turn_key_and_never_claims_verification
+FAILED tests/test_omp_capture.py::test_omo_turns_land_in_their_own_record_family
+FAILED tests/test_omp_capture.py::test_a_subagent_turn_is_agent_cohort_at_capture
+FAILED tests/test_omp_capture.py::test_missing_cwd_gives_unknown_facts_and_the_gate_never_acts
+FAILED tests/test_omp_capture.py::test_bridge_jsonl_rows_contain_no_prompt_text
+FAILED tests/test_omp_capture.py::test_dead_backend_writes_no_shadow_row_and_counts_backend_unavailable
+FAILED tests/test_omp_capture.py::test_served_backend_writes_a_row_with_a_structured_actual_tool_and_no_tool_input
+FAILED tests/test_omp_capture.py::test_protocol_parity_with_the_canonical_a9cbbed_worker
+FAILED tests/test_omp_capture.py::test_bridge_current_json_is_readable_across_both_trees
+FAILED tests/test_omp_capture.py::test_install_dry_run_lists_only_the_bridge_and_local_cognition_retargets
+FAILED tests/test_omp_capture.py::test_install_writes_the_links_backup_first_and_is_idempotent
+FAILED tests/test_omp_capture.py::test_install_refuses_a_dirty_target_checkout
+FAILED tests/test_omp_capture.py::test_install_touches_z0int_intelligence_only_with_include_routing
+FAILED tests/test_cognition_shadow.py::test_no_models_served_still_returns_the_compiled_legal_set
+============================== 16 failed in 1.16s ==============================
+# socket guard log: 0 violation(s)
+# bun: flock -s quiet-lane.lock run.sh <wt> red-bun -- bun test omp-extensions/z0int-bridge/index.test.ts (cwd=<wt>)
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/z0int-bridge/index.test.ts:
+(pass) the extension loads and registers with a missing interpreter [307.23ms]
+83 | 	expect(errors).toEqual([]);
+84 | });
+85 | 
+86 | test("capture handlers return undefined and fail open, counted, when the worker cannot start", async () => {
+87 | 	const pi = fakePi();
+88 | 	expect(m.registerBridgeCapture(pi as never, { harness: "omp" }).status).toBe("SUPPORTED");
+               ^
+TypeError: m.registerBridgeCapture is not a function. (In 'm.registerBridgeCapture(pi, { harness: "omp" })', 'm.registerBridgeCapture' is undefined)
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/omp-extensions/z0int-bridge/index.test.ts:88:11)
+(fail) capture handlers return undefined and fail open, counted, when the worker cannot start [0.35ms]
+103 | 	expect(errors).toEqual([]);
+104 | });
+105 | 
+106 | test("thrown errors inside a handler are caught: no throw, no unhandledRejection", async () => {
+107 | 	const pi = fakePi();
+108 | 	m.registerBridgeCapture(pi as never, { harness: "omp" });
+         ^
+TypeError: m.registerBridgeCapture is not a function. (In 'm.registerBridgeCapture(pi, { harness: "omp" })', 'm.registerBridgeCapture' is undefined)
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/omp-extensions/z0int-bridge/index.test.ts:108:4)
+(fail) thrown errors inside a handler are caught: no throw, no unhandledRejection [0.26ms]
+131 | 	expect(rejections).toEqual([]);
+132 | 	expect(errors).toEqual([]);
+133 | });
+134 | 
+135 | test("the turn_open frame carries the task cwd, harness, subagent parent and model", () => {
+136 | 	const info = m.turnContext(ctx({ agent: { kind: "sub", id: "0-Task", name: "task", depth: 1, parentId: "Main" } }));
+                      ^
+TypeError: m.turnContext is not a function. (In 'm.turnContext(ctx({ agent: { kind: "sub", id: "0-Task", name: "task", depth: 1, parentId: "Main" } }))', 'm.turnContext' is undefined)
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/omp-extensions/z0int-bridge/index.test.ts:136:17)
+(fail) the turn_open frame carries the task cwd, harness, subagent parent and model [0.11ms]
+142 | 	expect(close).toMatchObject({ op: "agent_end", trace_id: "t1", payload: { harness: "omo", execution_completed: false } });
+143 | 	expect(m.turnContext(undefined)).toEqual({ cwd: null, agentKind: null, parentId: null, model: null });
+144 | });
+145 | 
+146 | test("the session id comes from ctx.sessionManager", () => {
+147 | 	expect(m.resolveSessionId({ sessionManager: { getSessionId: () => "sess-123" } })).toBe("sess-123");
+                ^
+TypeError: m.resolveSessionId is not a function. (In 'm.resolveSessionId({ sessionManager: { getSessionId: () => "sess-123" } })', 'm.resolveSessionId' is undefined)
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/omp-extensions/z0int-bridge/index.test.ts:147:11)
+(fail) the session id comes from ctx.sessionManager [0.04ms]
+147 | 	expect(m.resolveSessionId({ sessionManager: { getSessionId: () => "sess-123" } })).toBe("sess-123");
+148 | 	expect(String(m.resolveSessionId({}))).toStartWith("omp-");
+149 | });
+150 | 
+151 | test("interpreter resolution: Z0INT_PYTHON, then the checkout venv, then the z0int runtime, then python3", () => {
+152 | 	expect(m.resolvePython({ Z0INT_PYTHON: "/x/py" }, "/r", "/z")).toBe("/x/py");
+                ^
+TypeError: m.resolvePython is not a function. (In 'm.resolvePython({ Z0INT_PYTHON: "/x/py" }, "/r", "/z")', 'm.resolvePython' is undefined)
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/omp-extensions/z0int-bridge/index.test.ts:152:11)
+(fail) interpreter resolution: Z0INT_PYTHON, then the checkout venv, then the z0int runtime, then python3 [0.04ms]
+176 | 	);
+177 | 	chmodSync(worker, 0o755);
+178 | 	process.env.Z0INT_PYTHON = worker;
+179 | 	try {
+180 | 		const pi = fakePi();
+181 | 		m.registerBridgeCapture(pi as never, { harness: "omp" });
+          ^
+TypeError: m.registerBridgeCapture is not a function. (In 'm.registerBridgeCapture(pi, { harness: "omp" })', 'm.registerBridgeCapture' is undefined)
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/omp-extensions/z0int-bridge/index.test.ts:181:5)
+(fail) frames reach the worker and a turn per session closes on its own agent_end [0.48ms]
+
+ 1 pass
+ 6 fail
+ 7 expect() calls
+Ran 7 tests across 1 file. [428.00ms]
+# exit: 1
+# bun: flock -s quiet-lane.lock run.sh <wt> red-bun -- bun test omp-extensions/z0int-bridge/omo.test.ts (cwd=<wt>)
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/z0int-bridge/omo.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module '/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/omp-extensions/z0int-bridge/omo.ts' from '/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/red-bun/tmp/z0int-omo-test-z44TQB/z0-capture.js'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [18.00ms]
+# exit: 1
+# bun: flock -s quiet-lane.lock run.sh <wt> red-bun -- bun test omp-extensions/local-cognition/index.test.ts (cwd=<wt>)
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/local-cognition/index.test.ts:
+(pass) tool_call handler returns undefined and never blocks [2.73ms]
+(pass) a rejected send does not throw into the tool_call handler [30.71ms]
+(pass) sends a cognition_shadow request through the bridge transport [30.83ms]
+(pass) payload actions contain only the available tool names [30.78ms]
+(pass) payload keeps read-only authority and the example shadow models by default [30.88ms]
+(pass) env kill-switch disables the lane [30.58ms]
+(pass) env kill-switch accepts off/false and explicit on [0.18ms]
+(pass) cognition.json setting gates the lane when env is unset [0.43ms]
+(pass) timeout comes from the env override [0.05ms]
+(pass) resolveAvailableTools prefers ctx.getTools and always includes the observed tool [0.09ms]
+(pass) buildShadowPayload is self-contained and schema-shaped [0.08ms]
+249 | 	process.env.OMP_Z0INT_COGNITION_TOOLS = "bash,read";
+250 | 	const { handler } = installed();
+251 | 	handler(toolCall("bash", { command: "cat SECRET_TOOL_INPUT_MARKER_7" }), fakeCtx());
+252 | 	await flush();
+253 | 	expect(sent).toHaveLength(1);
+254 | 	expect(sent[0].actual_tool).toEqual({ name: "bash", risk_class: "write" });
+                                   ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "name": "bash",
+-   "risk_class": "write",
+- }
++ undefined
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/omp-extensions/local-cognition/index.test.ts:254:30)
+(fail) the shadow request names the actual tool as a structure and carries no tool input [34.09ms]
+(pass) registers z0int-cognition-status and the command never throws [0.69ms]
+
+ 12 pass
+ 1 fail
+ 48 expect() calls
+Ran 13 tests across 1 file. [210.00ms]
+# exit: 1

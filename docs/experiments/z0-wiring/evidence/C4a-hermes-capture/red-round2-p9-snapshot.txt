@@ -1,0 +1,14 @@
+# C4a red (round 2, found by the isolated e2e): P-9 State Packet snapshot files; on f29ec04 + the extended test; 2026-10-03T10:39:04Z
+# e2e-trial showed c4a-e2e-open-item in z0home/state/state_packet/<id>/latest.json (build_state_packet store=True default)
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____ test_p9_state_packet_text_is_persisted_only_with_persist_packet_text _____
+tests/test_hermes_capture.py:284: in test_p9_state_packet_text_is_persisted_only_with_persist_packet_text
+    assert not (env.z0 / 'state' / 'state_packet').exists()
+E   AssertionError: assert not True
+E    +  where True = exists()
+E    +    where exists = ((PosixPath('/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/red2/tmp/pytest-of-kvn/pytest-0/test_p9_state_packet_text_is_p0/z0') / 'state') / 'state_packet').exists
+E    +      where PosixPath('/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/red2/tmp/pytest-of-kvn/pytest-0/test_p9_state_packet_text_is_p0/z0') = namespace(z0=PosixPath('/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/red2/tmp/pytest-of-kvn/pytest-0/test_p9_...mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/red2/tmp/pytest-of-kvn/pytest-0/test_p9_state_packet_text_is_p0')).z0
+=========================== short test summary info ============================
+FAILED tests/test_hermes_capture.py::test_p9_state_packet_text_is_persisted_only_with_persist_packet_text
+1 failed, 23 deselected in 0.38s

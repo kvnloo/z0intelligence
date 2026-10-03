@@ -1,0 +1,9 @@
+# C3 e2e parity at 7d64bd9: tests/test_omp_capture.py parity tests. canonical tree = ~/tmp/z0int-canonical a9cbbed src/ (*.py, *.json) exported file by file with 'git show a9cbbed:<path>' into the isolated TMPDIR (never the dirty checkout, never the running process); the a9cbbed worker runs with KERDOIOS_ROOT/KERDOIOS_PYTHON pointed at nonexistent scratch paths and its own Z0INT_HOME
+# cmd: flock -s quiet-lane.lock run.sh <wt> e2e-parity2 --guard -- python -m pytest -v -p no:cacheprovider --tb=short tests/test_omp_capture.py -k 'parity or bridge_current'
+
+tests/test_omp_capture.py::test_protocol_parity_with_the_canonical_a9cbbed_worker PASSED [ 50%]
+tests/test_omp_capture.py::test_bridge_current_json_is_readable_across_both_trees PASSED [100%]
+
+======================= 2 passed, 14 deselected in 1.56s =======================
+# socket guard log: 0 violation(s)
+# exported a9cbbed files: 148

@@ -1,0 +1,181 @@
+# C7 red run: tests written, skeleton modules empty (no implementation)
+# cmd: flock -s quiet-lane.lock run.sh <wt> red --guard -- python -m pytest -v -p no:cacheprovider -rfE --tb=line <tests> (cwd=<wt>)
+# tree: /mnt/zer0models/z0-wt/wiring/wt/C7-memory-core @ 914dc99 (+ working tree changes: 13 paths)
+============================= test session starts ==============================
+platform linux -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0 -- /mnt/zer0models/z0-wt/venv-claude-code/bin/python
+rootdir: /mnt/zer0models/z0-wt/wiring/wt/C7-memory-core
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 56 items
+
+tests/test_memory_event_identity.py::test_same_identity_twice_is_a_noop_and_bytes_are_never_rewritten FAILED [  1%]
+tests/test_memory_event_identity.py::test_ledger_seq_differs_while_event_uid_is_stable FAILED [  3%]
+tests/test_memory_event_identity.py::test_same_uid_with_a_different_payload_hash_is_a_conflict FAILED [  5%]
+tests/test_memory_event_identity.py::test_identity_survives_reopen FAILED [  7%]
+tests/test_memory_event_identity.py::test_harness_transcript_sources_take_references_only[content] FAILED [  8%]
+tests/test_memory_event_identity.py::test_harness_transcript_sources_take_references_only[body] FAILED [ 10%]
+tests/test_memory_event_identity.py::test_harness_transcript_sources_take_references_only[text] FAILED [ 12%]
+tests/test_memory_event_identity.py::test_harness_transcript_sources_take_references_only[prompt] FAILED [ 14%]
+tests/test_memory_event_identity.py::test_harness_transcript_sources_take_references_only[response] FAILED [ 16%]
+tests/test_memory_event_identity.py::test_source_ingest_is_off_until_the_owner_confirms FAILED [ 17%]
+tests/test_memory_event_identity.py::test_worker_facing_ledger_cannot_write FAILED [ 19%]
+tests/test_memory_event_identity.py::test_held_out_facts_recoverable_after_a_1024_event_nap_cascade FAILED [ 21%]
+tests/test_memory_surface.py::test_agentsview_hit_carries_evidence_ref_and_event_identity FAILED [ 23%]
+tests/test_memory_surface.py::test_fts_hits_carry_the_canonical_event_uid_the_ledger_assigns FAILED [ 25%]
+tests/test_memory_surface.py::test_sibling_scope_is_rejected_before_ranking FAILED [ 26%]
+tests/test_memory_surface.py::test_sibling_repo_and_task_claims_are_rejected_before_ranking FAILED [ 28%]
+tests/test_memory_surface.py::test_missing_db_is_unavailable_with_a_reason FAILED [ 30%]
+tests/test_memory_surface.py::test_schema_mismatch_is_unavailable FAILED [ 32%]
+tests/test_memory_surface.py::test_locked_db_is_unavailable FAILED       [ 33%]
+tests/test_memory_surface.py::test_semantic_layer_is_unavailable_when_not_configured FAILED [ 35%]
+tests/test_memory_surface.py::test_slow_gateway_returns_unavailable_within_the_deadline FAILED [ 37%]
+tests/test_memory_surface.py::test_bearer_comes_from_the_configured_env_var_and_is_never_logged FAILED [ 39%]
+tests/test_memory_surface.py::test_items_without_source_event_ids_are_not_canonical_provenance FAILED [ 41%]
+tests/test_memory_surface.py::test_semantic_duplicates_of_agentsview_hits_are_removed FAILED [ 42%]
+tests/test_memory_surface.py::test_hermes_query_with_cross_harness_policy_recalls_claude_codex_and_omp FAILED [ 44%]
+tests/test_memory_surface.py::test_one_query_resolves_temporal_lexical_and_semantic_without_duplicates FAILED [ 46%]
+tests/test_memory_surface.py::test_memory_snapshot_id_tracks_every_source_revision FAILED [ 48%]
+tests/test_memory_surface.py::test_state_packet_and_decision_opportunity_carry_the_snapshot_id FAILED [ 50%]
+tests/test_memory_surface.py::test_brief_stays_within_its_token_bound FAILED [ 51%]
+tests/test_memory_surface.py::test_brief_abstains_with_an_explicit_gap_when_a_required_source_is_removed FAILED [ 53%]
+tests/test_memory_surface.py::test_supersession_shows_the_newer_claim_while_history_returns_both FAILED [ 55%]
+tests/test_memory_surface.py::test_second_process_with_the_same_snapshot_hits_the_persistent_cache FAILED [ 57%]
+tests/test_memory_scrub.py::test_scrub_text_removes_each_secret_shape_and_counts_it FAILED [ 58%]
+tests/test_memory_scrub.py::test_scrub_obj_walks_nested_values FAILED    [ 60%]
+tests/test_memory_scrub.py::test_no_secret_reaches_search_brief_mcp_receipts_or_eventlog FAILED [ 62%]
+tests/test_memory_receipt_binding.py::test_round_trip_through_decision_receipt_extra_without_a_schema_change FAILED [ 64%]
+tests/test_memory_receipt_binding.py::test_opportunity_record_carries_the_memory_use FAILED [ 66%]
+tests/test_memory_receipt_binding.py::test_instruction_capability_is_rejected FAILED [ 67%]
+tests/test_context_resolve_memory.py::test_memory_stays_off_without_allow_memory FAILED [ 69%]
+tests/test_context_resolve_memory.py::test_memory_resolves_with_allow_memory_and_no_other_injector FAILED [ 71%]
+tests/test_context_resolve_memory.py::test_memory_does_not_resolve_when_another_injector_owns_the_turn FAILED [ 73%]
+tests/test_memory_mcp_profile.py::test_tools_list_is_exactly_the_memory_tools FAILED [ 75%]
+tests/test_memory_mcp_profile.py::test_default_profile_is_unchanged PASSED [ 76%]
+tests/test_memory_mcp_profile.py::test_tools_answer_from_the_fixture FAILED [ 78%]
+tests/test_memory_mcp_profile.py::test_tool_errors_are_is_error_never_empty_results FAILED [ 80%]
+tests/test_memory_mcp_profile.py::test_works_with_the_network_disabled FAILED [ 82%]
+tests/test_memory_mcp_profile.py::test_stdio_server_speaks_the_memory_profile FAILED [ 83%]
+tests/test_memory_doctor.py::test_passes_on_a_fresh_fixture_and_reports_the_semantic_layer_honestly FAILED [ 85%]
+tests/test_memory_doctor.py::test_fails_on_a_stale_db FAILED             [ 87%]
+tests/test_memory_doctor.py::test_fails_without_a_deepseek_harness_agent FAILED [ 89%]
+tests/test_memory_doctor.py::test_fails_on_a_missing_claude_home FAILED  [ 91%]
+tests/test_memory_doctor.py::test_fails_on_a_user_version_data_version_mismatch FAILED [ 92%]
+tests/test_memory_doctor.py::test_reports_an_unreachable_gateway FAILED  [ 94%]
+tests/test_memory_doctor.py::test_output_never_contains_config_secret_values FAILED [ 96%]
+tests/test_memory_bench.py::test_bench_reports_per_query_measurements FAILED [ 98%]
+tests/test_memory_bench.py::test_bench_cli_reads_a_query_file FAILED     [100%]
+
+=================================== FAILURES ===================================
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:25: TypeError: EventLog.append() got an unexpected keyword argument 'identity'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:39: TypeError: EventLog.append() got an unexpected keyword argument 'identity'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:48: TypeError: EventLog.append() got an unexpected keyword argument 'identity'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:57: TypeError: EventLog.append() got an unexpected keyword argument 'identity'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:67: TypeError: EventLog.append() got an unexpected keyword argument 'identity'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:67: TypeError: EventLog.append() got an unexpected keyword argument 'identity'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:67: TypeError: EventLog.append() got an unexpected keyword argument 'identity'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:67: TypeError: EventLog.append() got an unexpected keyword argument 'identity'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:67: TypeError: EventLog.append() got an unexpected keyword argument 'identity'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:76: AttributeError: module 'z0int.memory.event_log' has no attribute 'SourceIngestDisabled'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:83: AttributeError: module 'z0int.memory.surface' has no attribute 'worker_ledger'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_event_identity.py:108: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:46: AttributeError: module 'z0int.memory.surface' has no attribute 'ScopePolicy'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:38: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:76: AttributeError: module 'z0int.memory.surface' has no attribute 'ScopePolicy'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:88: AttributeError: module 'z0int.memory.surface' has no attribute 'record_claim'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:38: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:38: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:38: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:132: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:140: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:151: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:164: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:38: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:184: AttributeError: module 'z0int.memory.surface' has no attribute 'ScopePolicy'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:38: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:229: AttributeError: module 'z0int.memory.surface' has no attribute 'memory_snapshot_id'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:252: KeyError: 'memory_snapshot_id'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:262: AttributeError: module 'z0int.memory.surface' has no attribute 'memory_brief'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:270: AttributeError: module 'z0int.memory.surface' has no attribute 'memory_brief'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:281: AttributeError: module 'z0int.memory.surface' has no attribute 'record_claim'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_surface.py:293: AttributeError: module 'z0int.memory.surface' has no attribute 'memory_brief'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_scrub.py:32: AttributeError: module 'z0int.memory.scrub' has no attribute 'scrub_text'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_scrub.py:38: AttributeError: module 'z0int.memory.scrub' has no attribute 'scrub_obj'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_scrub.py:44: AttributeError: module 'z0int.memory.surface' has no attribute 'search'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_receipt_binding.py:21: AttributeError: type object 'MemoryUseReceipt' has no attribute 'from_dict'. Did you mean: 'to_dict'?
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_receipt_binding.py:27: AssertionError: assert MemoryUseReceipt(snapshot_id='mem_abc', capability_ids=('agentsview', 'eventlog'), query_ids=('q1',), included_claim_ids=(), excluded_claim_ids=(), evidence_event_uids=('evt_1', 'evt_2'), retrieval_latency_ms=12.5, input_tokens=90, raw_source_reads=4, tainted_evidence=False, schema='z0int.memory_contract.v1') == {'capability_ids': ['agentsview', 'eventlog'], 'evidence_event_uids': ['evt_1', 'evt_2'], 'excluded_claim_ids': [], 'included_claim_ids': [], ...}
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_receipt_binding.py:34: TypeError: MemoryUseReceipt.__init__() got an unexpected keyword argument 'instruction_capability'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_context_resolve_memory.py:22: TypeError: resolve_context() got an unexpected keyword argument 'turn_key'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_context_resolve_memory.py:22: TypeError: resolve_context() got an unexpected keyword argument 'turn_key'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_context_resolve_memory.py:41: AttributeError: module 'z0int.memory.surface' has no attribute 'claim_injection'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_mcp_profile.py:33: TypeError: handle() got an unexpected keyword argument 'profile'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_mcp_profile.py:26: TypeError: handle() got an unexpected keyword argument 'profile'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_mcp_profile.py:26: TypeError: handle() got an unexpected keyword argument 'profile'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_mcp_profile.py:26: TypeError: handle() got an unexpected keyword argument 'profile'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_mcp_profile.py:93: AssertionError: assert {'delegate_wo...route_worker'} == {'history', '...ns', 'verify'}
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_doctor.py:42: AttributeError: module 'z0int.memory.doctor' has no attribute 'run'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_doctor.py:53: AttributeError: module 'z0int.memory.doctor' has no attribute 'run'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_doctor.py:61: AttributeError: module 'z0int.memory.doctor' has no attribute 'run'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_doctor.py:66: AttributeError: module 'z0int.memory.doctor' has no attribute 'run'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_doctor.py:71: AttributeError: module 'z0int.memory.doctor' has no attribute 'run'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_doctor.py:79: AttributeError: module 'z0int.memory.doctor' has no attribute 'run'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_doctor.py:85: AttributeError: module 'z0int.memory.doctor' has no attribute 'run'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_bench.py:26: AttributeError: module 'z0int.memory.surface' has no attribute 'bench'
+/mnt/zer0models/z0-wt/wiring/wt/C7-memory-core/tests/test_memory_bench.py:39: AttributeError: module 'z0int.memory.cli' has no attribute 'main'
+=========================== short test summary info ============================
+FAILED tests/test_memory_event_identity.py::test_same_identity_twice_is_a_noop_and_bytes_are_never_rewritten
+FAILED tests/test_memory_event_identity.py::test_ledger_seq_differs_while_event_uid_is_stable
+FAILED tests/test_memory_event_identity.py::test_same_uid_with_a_different_payload_hash_is_a_conflict
+FAILED tests/test_memory_event_identity.py::test_identity_survives_reopen - T...
+FAILED tests/test_memory_event_identity.py::test_harness_transcript_sources_take_references_only[content]
+FAILED tests/test_memory_event_identity.py::test_harness_transcript_sources_take_references_only[body]
+FAILED tests/test_memory_event_identity.py::test_harness_transcript_sources_take_references_only[text]
+FAILED tests/test_memory_event_identity.py::test_harness_transcript_sources_take_references_only[prompt]
+FAILED tests/test_memory_event_identity.py::test_harness_transcript_sources_take_references_only[response]
+FAILED tests/test_memory_event_identity.py::test_source_ingest_is_off_until_the_owner_confirms
+FAILED tests/test_memory_event_identity.py::test_worker_facing_ledger_cannot_write
+FAILED tests/test_memory_event_identity.py::test_held_out_facts_recoverable_after_a_1024_event_nap_cascade
+FAILED tests/test_memory_surface.py::test_agentsview_hit_carries_evidence_ref_and_event_identity
+FAILED tests/test_memory_surface.py::test_fts_hits_carry_the_canonical_event_uid_the_ledger_assigns
+FAILED tests/test_memory_surface.py::test_sibling_scope_is_rejected_before_ranking
+FAILED tests/test_memory_surface.py::test_sibling_repo_and_task_claims_are_rejected_before_ranking
+FAILED tests/test_memory_surface.py::test_missing_db_is_unavailable_with_a_reason
+FAILED tests/test_memory_surface.py::test_schema_mismatch_is_unavailable - At...
+FAILED tests/test_memory_surface.py::test_locked_db_is_unavailable - Attribut...
+FAILED tests/test_memory_surface.py::test_semantic_layer_is_unavailable_when_not_configured
+FAILED tests/test_memory_surface.py::test_slow_gateway_returns_unavailable_within_the_deadline
+FAILED tests/test_memory_surface.py::test_bearer_comes_from_the_configured_env_var_and_is_never_logged
+FAILED tests/test_memory_surface.py::test_items_without_source_event_ids_are_not_canonical_provenance
+FAILED tests/test_memory_surface.py::test_semantic_duplicates_of_agentsview_hits_are_removed
+FAILED tests/test_memory_surface.py::test_hermes_query_with_cross_harness_policy_recalls_claude_codex_and_omp
+FAILED tests/test_memory_surface.py::test_one_query_resolves_temporal_lexical_and_semantic_without_duplicates
+FAILED tests/test_memory_surface.py::test_memory_snapshot_id_tracks_every_source_revision
+FAILED tests/test_memory_surface.py::test_state_packet_and_decision_opportunity_carry_the_snapshot_id
+FAILED tests/test_memory_surface.py::test_brief_stays_within_its_token_bound
+FAILED tests/test_memory_surface.py::test_brief_abstains_with_an_explicit_gap_when_a_required_source_is_removed
+FAILED tests/test_memory_surface.py::test_supersession_shows_the_newer_claim_while_history_returns_both
+FAILED tests/test_memory_surface.py::test_second_process_with_the_same_snapshot_hits_the_persistent_cache
+FAILED tests/test_memory_scrub.py::test_scrub_text_removes_each_secret_shape_and_counts_it
+FAILED tests/test_memory_scrub.py::test_scrub_obj_walks_nested_values - Attri...
+FAILED tests/test_memory_scrub.py::test_no_secret_reaches_search_brief_mcp_receipts_or_eventlog
+FAILED tests/test_memory_receipt_binding.py::test_round_trip_through_decision_receipt_extra_without_a_schema_change
+FAILED tests/test_memory_receipt_binding.py::test_opportunity_record_carries_the_memory_use
+FAILED tests/test_memory_receipt_binding.py::test_instruction_capability_is_rejected
+FAILED tests/test_context_resolve_memory.py::test_memory_stays_off_without_allow_memory
+FAILED tests/test_context_resolve_memory.py::test_memory_resolves_with_allow_memory_and_no_other_injector
+FAILED tests/test_context_resolve_memory.py::test_memory_does_not_resolve_when_another_injector_owns_the_turn
+FAILED tests/test_memory_mcp_profile.py::test_tools_list_is_exactly_the_memory_tools
+FAILED tests/test_memory_mcp_profile.py::test_tools_answer_from_the_fixture
+FAILED tests/test_memory_mcp_profile.py::test_tool_errors_are_is_error_never_empty_results
+FAILED tests/test_memory_mcp_profile.py::test_works_with_the_network_disabled
+FAILED tests/test_memory_mcp_profile.py::test_stdio_server_speaks_the_memory_profile
+FAILED tests/test_memory_doctor.py::test_passes_on_a_fresh_fixture_and_reports_the_semantic_layer_honestly
+FAILED tests/test_memory_doctor.py::test_fails_on_a_stale_db - AttributeError...
+FAILED tests/test_memory_doctor.py::test_fails_without_a_deepseek_harness_agent
+FAILED tests/test_memory_doctor.py::test_fails_on_a_missing_claude_home - Att...
+FAILED tests/test_memory_doctor.py::test_fails_on_a_user_version_data_version_mismatch
+FAILED tests/test_memory_doctor.py::test_reports_an_unreachable_gateway - Att...
+FAILED tests/test_memory_doctor.py::test_output_never_contains_config_secret_values
+FAILED tests/test_memory_bench.py::test_bench_reports_per_query_measurements
+FAILED tests/test_memory_bench.py::test_bench_cli_reads_a_query_file - Attrib...
+======================== 55 failed, 1 passed in 12.50s =========================
+# socket guard log: 0 violation(s)

@@ -1,0 +1,19 @@
+# C2 full suite, build round 2 (isolated runner, socket guard, flock -s quiet-lane.lock)
+#   python -m pytest -q -p no:cacheprovider -rfE --tb=no tests   (scripts/suite.sh; raw: suite-base.raw.txt, suite-head.raw.txt)
+base 914dc99 (C1 head = component base; temporary worktree wt/C2-loop-consumers-base, removed after the run):
+     11 failed, 1018 passed, 4 skipped
+head df247e5 (first run, main fix): 11 failed, 1128 passed, 4 skipped -- failure set identical to base
+head f20c2b7 (final HEAD; suite-head.raw.txt): 12 failed, 1128 passed, 4 skipped
+
+Base failure set (11): test_functions_verify live x5, test_provider_saturation x1, test_quota_budget x5 (same set as
+C1 and every earlier C2 round).
+Final head = the same 11 + 1:
+  tests/test_hook_adapter.py::test_prompt_handler_returns_under_5ms_p99_with_the_build_detached
+A 5 ms p99 timing test in a module C2 does not touch (git diff 914dc99..HEAD is empty for hook_adapter). It passed in
+the df247e5 head run. Isolated rerun 3x each under the lock (suite-isolated.raw.txt): 3/3 passed on head f20c2b7 and
+3/3 on base 914dc99.
+=> No new deterministic failures; the persistent failure set is identical (11) on base and head.
+
+Regression guard: cc-verify-head.json (f20c2b7, scratch homes/C2-loop-consumers/golden/s) sha256
+fc8b94c220a0cc926b4faf398199cdc2095f158f4405b4931daa6a217898e655 == ../cc-verify-6fee859.json (byte-identical).
+Socket guard: 0 violations in every run (r3-red, r3-red2, r3-green, r3-suite-head, r3-suite-base, r3-iso-*, golden).

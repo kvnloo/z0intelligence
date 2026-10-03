@@ -1,0 +1,12 @@
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/z0-memory/index.test.ts:
+(pass) omp: with the capture bridge loaded, the memory seam keys the turn the bridge opened (one canonical turn_key) [399.25ms]
+(pass) omo: with the capture bridge loaded, the memory seam keys the turn the bridge opened (one canonical turn_key) [203.52ms]
+
+ 2 pass
+ 9 filtered out
+ 0 fail
+ 8 expect() calls
+Ran 2 tests across 1 file. [624.00ms]
+bun_rc=0

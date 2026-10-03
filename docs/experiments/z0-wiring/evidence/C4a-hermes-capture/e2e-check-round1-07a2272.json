@@ -1,0 +1,294 @@
+{
+ "verdict": "PASS",
+ "failed": [],
+ "checks": {
+  "every_run_exit_0": {
+   "ok": true,
+   "detail": [
+    [
+     "off",
+     1,
+     0
+    ],
+    [
+     "shadow",
+     1,
+     0
+    ],
+    [
+     "shadow",
+     2,
+     0
+    ],
+    [
+     "off",
+     2,
+     0
+    ],
+    [
+     "off",
+     3,
+     0
+    ],
+    [
+     "shadow",
+     3,
+     0
+    ],
+    [
+     "shadow",
+     4,
+     0
+    ],
+    [
+     "off",
+     4,
+     0
+    ],
+    [
+     "off",
+     5,
+     0
+    ],
+    [
+     "shadow",
+     5,
+     0
+    ],
+    [
+     "shadow",
+     6,
+     0
+    ],
+    [
+     "off",
+     6,
+     0
+    ],
+    [
+     "off",
+     7,
+     0
+    ],
+    [
+     "shadow",
+     7,
+     0
+    ],
+    [
+     "shadow",
+     8,
+     0
+    ],
+    [
+     "off",
+     8,
+     0
+    ],
+    [
+     "off",
+     9,
+     0
+    ],
+    [
+     "shadow",
+     9,
+     0
+    ],
+    [
+     "shadow",
+     10,
+     0
+    ],
+    [
+     "off",
+     10,
+     0
+    ],
+    [
+     "unavailable",
+     1,
+     0
+    ]
+   ]
+  },
+  "every_run_has_a_session_id": {
+   "ok": true
+  },
+  "h1_off_vs_shadow_identical_requests": {
+   "ok": true,
+   "detail": {
+    "pairs": 10,
+    "identical": 10,
+    "requests_per_run": 4
+   }
+  },
+  "h1_all_runs_identical_to_first_off_run": {
+   "ok": true,
+   "detail": {
+    "runs": 20
+   }
+  },
+  "h1_no_plugin_context_in_requests": {
+   "ok": true
+  },
+  "shadow_runs_have_joined_opportunity_and_outcome": {
+   "ok": true,
+   "detail": [
+    {
+     "idx": 1,
+     "opp": 1,
+     "out": 1,
+     "same_turn_key": true,
+     "events": 8
+    },
+    {
+     "idx": 2,
+     "opp": 1,
+     "out": 1,
+     "same_turn_key": true,
+     "events": 8
+    },
+    {
+     "idx": 3,
+     "opp": 1,
+     "out": 1,
+     "same_turn_key": true,
+     "events": 8
+    },
+    {
+     "idx": 4,
+     "opp": 1,
+     "out": 1,
+     "same_turn_key": true,
+     "events": 8
+    },
+    {
+     "idx": 5,
+     "opp": 1,
+     "out": 1,
+     "same_turn_key": true,
+     "events": 8
+    },
+    {
+     "idx": 6,
+     "opp": 1,
+     "out": 1,
+     "same_turn_key": true,
+     "events": 8
+    },
+    {
+     "idx": 7,
+     "opp": 1,
+     "out": 1,
+     "same_turn_key": true,
+     "events": 8
+    },
+    {
+     "idx": 8,
+     "opp": 1,
+     "out": 1,
+     "same_turn_key": true,
+     "events": 8
+    },
+    {
+     "idx": 9,
+     "opp": 1,
+     "out": 1,
+     "same_turn_key": true,
+     "events": 8
+    },
+    {
+     "idx": 10,
+     "opp": 1,
+     "out": 1,
+     "same_turn_key": true,
+     "events": 8
+    }
+   ]
+  },
+  "projection_uses_the_hermes_task_cwd": {
+   "ok": true,
+   "detail": [
+    "/mnt/zer0models/z0-wt/wiring/homes/C4a-hermes-capture/e2e/task-repo"
+   ]
+  },
+  "cohort_interactive_model_and_policy_on_rows": {
+   "ok": true,
+   "detail": {
+    "model": [
+     "c4a-stub"
+    ],
+    "policy": [
+     "hermes-z0intelligence@0.2.0"
+    ]
+   }
+  },
+  "packet_text_redacted_by_default": {
+   "ok": true
+  },
+  "h6_mode_off_runs_leave_no_rows": {
+   "ok": true,
+   "detail": 0
+  },
+  "unavailable_arm_completes_and_is_counted": {
+   "ok": true,
+   "detail": {
+    "z0int_unavailable_rows": 7,
+    "jobs": 8
+   }
+  },
+  "drops_persisted_and_fresh_process_reports_them": {
+   "ok": true,
+   "detail": {
+    "persisted": 8,
+    "fresh_process_rows_dropped": 8,
+    "by_reason": {
+     "z0int_unavailable": 8
+    }
+   }
+  },
+  "unavailable_session_wrote_no_capture_rows": {
+   "ok": true
+  },
+  "no_prompt_or_packet_text_in_rows": {
+   "ok": true
+  },
+  "exit_drain_bounded_shadow_minus_off_median_under_2s": {
+   "ok": true,
+   "detail": {
+    "off_ms": [
+     8878,
+     3171,
+     3367,
+     3324,
+     3434,
+     3049,
+     3056,
+     2984,
+     3183,
+     3030
+    ],
+    "shadow_ms": [
+     4466,
+     3293,
+     3682,
+     3420,
+     3281,
+     3232,
+     3071,
+     3120,
+     3148,
+     3155
+    ],
+    "unavailable_ms": [
+     3086
+    ],
+    "median_delta_ms": 79.5
+   }
+  },
+  "no_socket_or_live_writes": {
+   "ok": true
+  }
+ }
+}

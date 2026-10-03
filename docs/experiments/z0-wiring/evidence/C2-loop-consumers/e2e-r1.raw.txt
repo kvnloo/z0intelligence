@@ -1,0 +1,565 @@
+# cmd: flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock /mnt/zer0models/z0-wt/wiring/evidence/C2-loop-consumers/scripts/e2e.sh (2026-10-03T10:30:52Z, HEAD 6f5855f)
+# 1. schema only, read-only: sqlite3 "file:/mnt/zer0models/sft-svlm/data/agentsview/sessions.db?mode=ro" .schema
+#    1513 schema lines, 75 CREATE TABLE statements
+# 2-5. cd /mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers && run.sh /mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers e2e --guard -- python e2e_c2.py /mnt/zer0models/z0-wt/wiring/wt/C2-loop-consumers /mnt/zer0models/z0-wt/wiring/homes/C2-loop-consumers/e2e python /mnt/zer0models/z0-wt/wiring/homes/C2-loop-consumers/e2e/sessions.schema.sql
+{
+ "export_host_a": {
+  "failures": {
+   "claude-code": {
+    "partial_measurement": 2
+   },
+   "codex": {
+    "missing_verifier": 6,
+    "partial_measurement": 6
+   },
+   "dsh": {
+    "missing_verifier": 3,
+    "partial_measurement": 3
+   },
+   "grok": {
+    "missing_verifier": 6,
+    "partial_measurement": 6,
+    "unjoined": 3
+   },
+   "hermes": {
+    "missing_verifier": 6,
+    "partial_measurement": 6
+   },
+   "omo": {
+    "missing_verifier": 5,
+    "partial_measurement": 5,
+    "unjoined": 2
+   },
+   "omp": {
+    "missing_verifier": 6,
+    "partial_measurement": 6
+   }
+  },
+  "shadow_tables": {
+   "dsh/legacy": 3,
+   "omp/legacy": 3
+  },
+  "tables": {
+   "claude-code/interactive": 2,
+   "codex/automated": 3,
+   "codex/interactive": 3,
+   "dsh/interactive": 3,
+   "grok/interactive": 3,
+   "grok/unknown": 3,
+   "hermes/automated": 3,
+   "hermes/interactive": 3,
+   "omo/interactive": 3,
+   "omo/unknown": 2,
+   "omp/agent": 3,
+   "omp/interactive": 3,
+   "omp/legacy": 4
+  },
+  "unsupported_schema": {
+   "claude-code": {},
+   "codex": {},
+   "dsh": {},
+   "grok": {},
+   "hermes": {},
+   "omo": {},
+   "omp": {}
+  }
+ },
+ "guards": {
+  "cc_wrong_projects_dir": {
+   "failures": {
+    "label_source_empty": 1
+   },
+   "status": "degraded",
+   "turns": 2
+  },
+  "no_dsh_agent": {
+   "failures": {
+    "reader_unavailable": 1
+   },
+   "label_join": {
+    "joined": 0,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {},
+   "status": "degraded",
+   "turns": 0
+  },
+  "v74_hermes": {
+   "failures": {
+    "unjoined": 3
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 3
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 4,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "v75_omp": {
+   "failures": {
+    "reader_unavailable": 1
+   },
+   "label_join": {
+    "joined": 0,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {},
+   "status": "degraded",
+   "turns": 0
+  }
+ },
+ "host_a_build": {
+  "expected_turns": 34,
+  "opportunity_rows": 34,
+  "schema113": {
+   "failed": 0,
+   "failures": [],
+   "fts5_shadow_tables_filtered": 12,
+   "statements": 201
+  },
+  "schema74": {
+   "failed": 0,
+   "failures": [],
+   "fts5_shadow_tables_filtered": 12,
+   "statements": 201
+  }
+ },
+ "host_b_build": {
+  "expected_turns": 37,
+  "opportunity_rows": 37,
+  "schema113": {
+   "failed": 0,
+   "failures": [],
+   "fts5_shadow_tables_filtered": 12,
+   "statements": 201
+  },
+  "schema74": {
+   "failed": 0,
+   "failures": [],
+   "fts5_shadow_tables_filtered": 12,
+   "statements": 201
+  }
+ },
+ "imports": {
+  "dsh-jev": {
+   "counts": {
+    "model_request_only": 0
+   },
+   "run1_rows_added": 3,
+   "run2_rows_added": 0,
+   "same_manifest_sha256": true
+  },
+  "omp-cognition-shadow": {
+   "counts": {
+    "backend_unavailable": 297,
+    "served": 3
+   },
+   "run1_rows_added": 3,
+   "run2_rows_added": 0,
+   "same_manifest_sha256": true
+  },
+  "omp-v1": {
+   "counts": {
+    "no_outcome": 1,
+    "tier_execution": 2,
+    "tier_gold": 1,
+    "tier_negative": 1
+   },
+   "run1_rows_added": 4,
+   "run2_rows_added": 0,
+   "same_manifest_sha256": true
+  }
+ },
+ "merge": {
+  "codex_interactive_hosts": [
+   [
+    "host-a",
+    "host-b"
+   ],
+   [
+    "host-b"
+   ]
+  ],
+  "hosts": [
+   "host-a",
+   "host-b"
+  ],
+  "identical_manifest_sha256": true,
+  "tables": {
+   "claude-code/interactive": 2,
+   "codex/automated": 3,
+   "codex/interactive": 6,
+   "dsh/interactive": 3,
+   "grok/interactive": 3,
+   "grok/unknown": 3,
+   "hermes/automated": 3,
+   "hermes/interactive": 3,
+   "omo/interactive": 3,
+   "omo/unknown": 2,
+   "omp/agent": 3,
+   "omp/interactive": 3,
+   "omp/legacy": 4
+  }
+ },
+ "merge_refused": {
+  "exit": 2,
+  "stdout_head": "refused: refusing to merge codex/interactive: schema versions differ [\"('0.1.0', '69d7eef44ba1707e', 'z0int.loop.trainin",
+  "wrote_nothing": true
+ },
+ "privacy_leaks": {},
+ "verify_host_a_run1": {
+  "claude-code": {
+   "appended": 2,
+   "failures": {},
+   "states": {
+    "verified_failure": 1,
+    "verified_success": 1
+   },
+   "status": "success",
+   "turns": 2
+  },
+  "codex": {
+   "appended": 6,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "dsh": {
+   "appended": 3,
+   "failures": {},
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 1,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 3
+  },
+  "grok": {
+   "appended": 6,
+   "failures": {
+    "unjoined": 3
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 3
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 4,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "hermes": {
+   "appended": 6,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "omo": {
+   "appended": 5,
+   "failures": {
+    "unjoined": 2
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 2
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 3,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 5
+  },
+  "omp": {
+   "appended": 6,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  }
+ },
+ "verify_host_a_run2": {
+  "claude-code": {
+   "appended": 0,
+   "failures": {},
+   "states": {
+    "verified_failure": 1,
+    "verified_success": 1
+   },
+   "status": "success",
+   "turns": 2
+  },
+  "codex": {
+   "appended": 0,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "dsh": {
+   "appended": 0,
+   "failures": {},
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 1,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 3
+  },
+  "grok": {
+   "appended": 0,
+   "failures": {
+    "unjoined": 3
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 3
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 4,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "hermes": {
+   "appended": 0,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "omo": {
+   "appended": 0,
+   "failures": {
+    "unjoined": 2
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 2
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 3,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 5
+  },
+  "omp": {
+   "appended": 0,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  }
+ },
+ "verify_host_b": {
+  "claude-code": {
+   "appended": 2,
+   "failures": {},
+   "states": {
+    "verified_failure": 1,
+    "verified_success": 1
+   },
+   "status": "success",
+   "turns": 2
+  },
+  "codex": {
+   "appended": 9,
+   "failures": {},
+   "label_join": {
+    "joined": 9,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 3,
+    "unverified": 3,
+    "verified_failure": 3
+   },
+   "status": "success",
+   "turns": 9
+  },
+  "dsh": {
+   "appended": 3,
+   "failures": {},
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 1,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 3
+  },
+  "grok": {
+   "appended": 6,
+   "failures": {
+    "unjoined": 3
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 3
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 4,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "hermes": {
+   "appended": 6,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "omo": {
+   "appended": 5,
+   "failures": {
+    "unjoined": 2
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 2
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 3,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 5
+  },
+  "omp": {
+   "appended": 6,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  }
+ },
+ "verify_rerun_appended": {
+  "claude-code": 0,
+  "codex": 0,
+  "dsh": 0,
+  "grok": 0,
+  "hermes": 0,
+  "omo": 0,
+  "omp": 0
+ }
+}
+# socket guard violations: 0
+exit=0

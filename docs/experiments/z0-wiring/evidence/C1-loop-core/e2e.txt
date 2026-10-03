@@ -1,0 +1,77 @@
+# C1-loop-core isolated e2e, FIX ROUND (verifier REVISE), 2026-10-03, head 914dc99. Homes under
+# /mnt/zer0models/z0-wt/wiring/homes/C1-loop-core/<leg>/ (HOME, Z0INT_HOME, CLAUDE_CONFIG_DIR, CODEX_HOME, GROK_HOME).
+# Every leg ran under flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock. Live-binary legs ran under hostless +
+# "unshare -rn" (private user+net namespace, loopback only: neither the live z0 service nor any network reachable),
+# stubs on private ports 11541/11542, dummy keys. Scripts: evidence/C1-loop-core/scripts/. Raw outputs: e2e-fix/.
+# Build-round e2e: e2e-build-round.txt.
+
+## (1) Replay synthetic hook payloads through the EXACT command strings in each shim hooks file
+cmd: flock -s quiet-lane.lock scripts/run.sh <wt> e2e-replay-runner --guard -- <venv-python> scripts/e2e_replay.py <wt> homes/C1-loop-core/e2e-replay-fix <venv-python>
+(unchanged driver; 3 turns x (prompt, SubagentStart, SubagentStop, Stop) per harness, sh -c <command> per event)
+result per run: ok, bare-python ms, {harness: (ok, joined, joined_by_cohort, drops, prompt-hook p95 ms, failure kinds)}
+  run 1: (False, {'median': 12.4, 'p95': 22.0}, {'claude-code': (True, 6, {'agent': 3, 'interactive': 3}, 0, 38.6, {}), 'codex': (False, 6, {'agent': 3, 'interactive': 3}, 0, 82.8, {'missing_verifier': 6, 'partial_measurement': 6}), 'grok': (False, 6, {'agent': 3, 'interactive': 3}, 0, 90.0, {'missing_verifier': 6, 'partial_measurement': 6})})
+  run 2: (True, {'median': 9.9, 'p95': 10.7}, {'claude-code': (True, 6, {'agent': 3, 'interactive': 3}, 0, 42.1, {}), 'codex': (True, 6, {'agent': 3, 'interactive': 3}, 0, 41.3, {'missing_verifier': 6, 'partial_measurement': 6}), 'grok': (True, 6, {'agent': 3, 'interactive': 3}, 0, 39.1, {'missing_verifier': 6, 'partial_measurement': 6})})
+  run 3: (True, {'median': 9.4, 'p95': 9.8}, {'claude-code': (True, 6, {'agent': 3, 'interactive': 3}, 0, 38.6, {}), 'codex': (True, 6, {'agent': 3, 'interactive': 3}, 0, 37.7, {'missing_verifier': 6, 'partial_measurement': 6}), 'grok': (True, 6, {'agent': 3, 'interactive': 3}, 0, 37.6, {'missing_verifier': 6, 'partial_measurement': 6})})
+  run 1 FAILED only the latency bound for codex/grok (82.8 / 90.0 ms vs bound bare p95 22.0 + 40 ms) on a noisy host
+  (bare-python p95 22.0 ms vs a 12.4 ms median in the same run); joins, cohorts, drops=0 and stdout passed. Runs 2 and 3,
+  back to back with nothing changed, PASS fully (37.6-42.1 ms against a bare p95 of 9.8-10.7 ms), the same as the build
+  round (38-43 ms). The in-process <5 ms p99 test and the subprocess test (best of 3 rounds, each with its own baseline)
+  stay green in the suite.
+RESULT (1): PASS (2 of 3 consecutive runs fully green; the failed run failed only the latency bound under load, details above)
+
+## (2) Claude Code 2.1.288, no subscription and no network, REPEATED 8 TIMES (verifier: assert the join over >=5 runs)
+cmd: scripts/e2e_claude_runs.sh 8 3  ->  per run: env -i PATH=... HOME=homes/C1-loop-core/e2e-claude-outer flock -s quiet-lane.lock
+     scripts/e2e_claude.sh <wt> homes/C1-loop-core/e2e-claude-fix-r<i> <venv-python> 11541 <background> < /dev/null; then
+     python3 scripts/e2e_claude_check.py <home>
+  inside: hostless unshare -rn bash inner.sh -> anthropic_stub.py 11541 &; env -i HOME=<h>/home CLAUDE_CONFIG_DIR=<h>/claude
+     ANTHROPIC_BASE_URL=http://127.0.0.1:11541 ANTHROPIC_API_KEY=<dummy> ... claude -p "MAIN-MARKER-c1: ..." --plugin-dir
+     <wt>/harness-adapters/claude-code-z0intelligence --output-format json --max-turns 6 --allowedTools Agent Task; sleep 4
+  runs 1-3: the stub's Agent tool_use sets run_in_background=false (foreground subagent)
+  runs 4-8: C1_STUB_BACKGROUND=1 leaves it unset, so CC runs the subagent in the background and hands its result back as a
+     <task-notification> prompt: the shape in which the verifier saw 2 of 5 runs lose the root outcome
+  check (stricter than the build round): claude success; interactive opp+outcome joined on turn_key; agent opp+outcome joined;
+     EVERY opportunity has its outcome; EVERY UserPromptSubmit prompt_id has an outcome; an outcome without an opportunity
+     is only ever cohort harness; no outcome is cohort unknown; no misattribution/unsupported_* row; drops=0
+  run 1 background=0: PASS {"claude_result": {"type": "result", "subtype": "success", "is_error": false, "num_turns": 2}, "prompts": [["user", "176a1752-dce"]], "joined_on_turn_key": [["interactive", "176a1752-dce", "interactive"], ["agent", "agent:af7dcd", "agent"]], "outcome_cohorts": ["agent", "interactive"], "late_rows": [], "failures": [["duplicate_event", {"record": "turn_outcome"}]], "drops": 0}
+  run 2 background=0: PASS {"claude_result": {"type": "result", "subtype": "success", "is_error": false, "num_turns": 2}, "prompts": [["user", "58bd599a-652"]], "joined_on_turn_key": [["interactive", "58bd599a-652", "interactive"], ["agent", "agent:a73dfc", "agent"]], "outcome_cohorts": ["agent", "interactive"], "late_rows": [], "failures": [["duplicate_event", {"record": "turn_outcome"}]], "drops": 0}
+  run 3 background=0: PASS {"claude_result": {"type": "result", "subtype": "success", "is_error": false, "num_turns": 2}, "prompts": [["user", "11b9a253-d4b"]], "joined_on_turn_key": [["interactive", "11b9a253-d4b", "interactive"], ["agent", "agent:a33c53", "agent"]], "outcome_cohorts": ["agent", "interactive"], "late_rows": [], "failures": [["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["duplicate_event", {"record": "turn_outcome"}]], "drops": 0}
+  run 4 background=1: PASS {"claude_result": {"type": "result", "subtype": "success", "is_error": false, "num_turns": 1}, "prompts": [["user", "db827c54-ef1"], ["harness", "e3411307-1a7"]], "joined_on_turn_key": [["interactive", "db827c54-ef1", "interactive"], ["agent", "agent:a4cce8", "agent"]], "outcome_cohorts": ["agent", "harness", "interactive"], "late_rows": [], "failures": [["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["duplicate_event", {"record": "turn_outcome"}]], "drops": 0}
+  run 5 background=1: PASS {"claude_result": {"type": "result", "subtype": "success", "is_error": false, "num_turns": 1}, "prompts": [["user", "b3fa0e37-f79"], ["harness", "0102e9f5-608"]], "joined_on_turn_key": [["interactive", "b3fa0e37-f79", "interactive"], ["agent", "agent:aeacfa", "agent"]], "outcome_cohorts": ["agent", "harness", "interactive"], "late_rows": [{"record": "turn_outcome", "late_messages": 2}], "failures": [["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["partial_measurement", {"record": "turn_outcome", "late_messages": 2}], ["duplicate_event", {"record": "turn_outcome"}]], "drops": 0}
+  run 6 background=1: PASS {"claude_result": {"type": "result", "subtype": "success", "is_error": false, "num_turns": 1}, "prompts": [["user", "9104f004-bf0"], ["harness", "252185d7-7d8"]], "joined_on_turn_key": [["interactive", "9104f004-bf0", "interactive"], ["agent", "agent:aabac8", "agent"]], "outcome_cohorts": ["agent", "harness", "interactive"], "late_rows": [{"record": "turn_outcome", "late_messages": 2}], "failures": [["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["partial_measurement", {"record": "turn_outcome", "late_messages": 2}], ["duplicate_event", {"record": "turn_outcome"}]], "drops": 0}
+  run 7 background=1: PASS {"claude_result": {"type": "result", "subtype": "success", "is_error": false, "num_turns": 1}, "prompts": [["user", "b1c69ef7-dc2"], ["harness", "78a4330d-13c"]], "joined_on_turn_key": [["interactive", "b1c69ef7-dc2", "interactive"], ["agent", "agent:adb118", "agent"]], "outcome_cohorts": ["agent", "harness", "interactive"], "late_rows": [], "failures": [["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["duplicate_event", {"record": "turn_outcome"}]], "drops": 0}
+  run 8 background=1: PASS {"claude_result": {"type": "result", "subtype": "success", "is_error": false, "num_turns": 1}, "prompts": [["user", "4c1a2f79-c8e"], ["harness", "62884cc3-132"]], "joined_on_turn_key": [["interactive", "4c1a2f79-c8e", "interactive"], ["agent", "agent:a68628", "agent"]], "outcome_cohorts": ["agent", "harness", "interactive"], "late_rows": [], "failures": [["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["partial_measurement", {"missing": ["assistant_messages", "tool_calls"]}], ["duplicate_event", {"record": "turn_outcome"}]], "drops": 0}
+  PASSED 8/8
+  runs 5 and 6 reproduced the verifier's race: the Stop for the user prompt fired before its reply was flushed. The
+  outcome came from the payload plus a partial_measurement row, and the next (task-notification) Stop closed the earlier
+  prompt with partial_measurement {late_messages: 2} instead of absorbing its messages. The task-notification turn is
+  cohort harness with its own work item. The duplicate_event row in each run is the SessionEnd re-close of the last
+  turn (counted no-op).
+RESULT (2): PASS 8/8 (the build round's e2e (2) was intermittent: 3/5 in the verifier's runs)
+
+## (3) Codex 0.153.4 against an OpenAI-Responses stub (custom model provider), same driver as the build round
+cmd: env -i PATH=... HOME=homes/C1-loop-core/e2e-codex-outer flock -s quiet-lane.lock scripts/e2e_codex.sh <wt> homes/C1-loop-core/e2e-codex-fix <venv-python> 11542 < /dev/null
+  codex plugin marketplace add <wt>; codex plugin add codex-z0intelligence@z0intelligence;
+  codex exec --skip-git-repo-check -s read-only --dangerously-bypass-hook-trust "Tidy the changelog please" (isolated run only)
+  observed: stderr 'hook: UserPromptSubmit Completed', 'hook: Stop'; stdout 'Which file should I tidy?'
+  rows: opportunities [('interactive', 'z0int.codex.opportunity_record.v0', 'gpt-stub', joined=True)];
+        outcomes [('interactive', asked_user=True, 'completed', 'gpt-stub', work_item_id present)];
+        failures [missing_verifier, partial_measurement {missing: [assistant_messages, tool_calls]}]; drops 0;
+        per-session state file 414 bytes (the O(1) duplicate/stale state)
+RESULT (3): PASS - VERIFIED with the real codex binary
+
+## (4) Grok: fixtures only (the real CLI is paid)
+  covered by (1) (the exact z0-capture.json command strings with GROK_HOOK_EVENT / GROK_SESSION_ID env) and the unit tests.
+RESULT (4): PASS on fixtures; a live Grok turn remains an owner-run activation step (A5).
+
+## (5) Full suite under flock -s quiet-lane.lock with the socket guard on
+  see suite.txt: base 6fee859 = 11 failed / 964 passed / 4 skipped; head 914dc99 = 11 failed / 1018 passed / 4 skipped;
+  identical failure sets; no socket-guard violations. RESULT (5): PASS
+
+## extra: `z0int outcomes backfill-capture` CLI smoke (isolated Z0INT_HOME=homes/C1-loop-core/backfill-cli/z0, synthetic
+## legacy rows from tests/fixtures/cc_export_6fee859.json)
+  --dry-run -> {"flagged": 2, "redacted": 2, "rows": 2} (file unchanged); run -> same counts; second run ->
+  {"flagged": 0, "redacted": 0, "rows": 2} (idempotent); afterwards no request text in the file; capture flags
+  [{is_harness_message: false, request_chars: 1-49}, {is_harness_message: true, request_chars: 50-199}].
+
+Nothing live was touched: no reads/writes of ~/.claude-home, ~/.codex, ~/.grok, ~/.z0int or ~/.hermes; no HTTP to
+:11501; no systemd; no DSH wrapper; no paid API call (dummy keys against local stubs in a private network namespace).

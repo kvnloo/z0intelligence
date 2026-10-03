@@ -1,0 +1,60 @@
+# REVISE round (current): isolated e2e at fe077db (committed, clean tree). Same harness as below (homes/C3-omp-omo-capture/e2e,
+# flock -s quiet-lane.lock, hostless + unshare -rn, stub :11548, dead backend :11549, dummy key), with one addition: Z0INT_PYTHON
+# is a logging wrapper ($H/pywrap.sh -> venv-claude-code python) that records the module of every z0 interpreter spawn
+# (first 3 args only, never a payload) in $H/python-argv.log.
+# (1) e2e/omp-run.txt: 3 bridged + 3 baseline real `omp -p` runs, all exit 0 (bridged 1.93/1.57/1.57 s, baseline 1.51/1.53/1.51 s).
+#     e2e_check.py ok=true, 18/18: the 16 previous checks plus
+#       bridge_worker_spawned=true and no_routing_spawn_from_bridge=true (spawns: only "-u -m z0int.bridge.worker"; no z0int.automatic).
+#     The stub saw 11 tools on every bridged request, the same as baseline; at 7d64bd9 bridged requests carried 12
+#     (z0int_route_worker came in through the bridge's sibling import; e2e/omp-run-7d64bd9.txt).
+#     No prompt or tool-input marker anywhere under z0home, although the local shadow request now carries the bounded input again
+#     (the dead backend gives backend_unavailable=3 and no receipt; receipts never store state/input, tests/test_omp_capture.py).
+# (2) e2e/parity.txt: parity with the a9cbbed git-show export, frames and bridge-current.json both ways: 2 passed, 0 guard violations.
+# (3) OMO: still fixtures only (bun fake senpi). The installed senpi types (via SENPI_TYPES) declare input/before_agent_start/
+#     turn_end/agent_end: SUPPORTED. Real senpi on() accepts any event name, so a diverged runtime is caught by unclosed_turn drops.
+# No processes left over (pgrep for z0int.bridge.worker / openai_chat_stub empty after the run).
+
+# ---- previous round (7d64bd9), kept for history ----
+# C3-omp-omo-capture isolated e2e (head 7d64bd9, committed clean tree). Everything under
+# homes/C3-omp-omo-capture/, under flock -s quiet-lane.lock, hostless + unshare -rn (private user+net namespace,
+# loopback only), stub on 127.0.0.1:11548, dead "model backend" port 127.0.0.1:11549 (nothing listens), dummy key.
+
+## (1) real omp -p with the worktree extensions (scripts/e2e_omp.sh, check scripts/e2e_check.py) -> e2e/omp-run.txt
+Command (per run, cwd = a synthetic git task repo /mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/e2e/work):
+  env -i ... HOME=/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/e2e/home PI_CODING_AGENT_DIR=/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/e2e/omp-agent Z0INT_HOME=/mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/e2e/z0home \
+    Z0INT_PYTHON=/mnt/zer0models/z0-wt/venv-claude-code/bin/python KERDOIOS_ROOT=<nonexistent> Z0INT_SERVICE_URL=http://127.0.0.1:9 \
+    OMP_Z0INT_COGNITION_MODELS=functiongemma_270m \
+    omp -p --no-session --no-extensions -e <wt>/omp-extensions/z0int-bridge -e <wt>/omp-extensions/local-cognition \
+        --mode json --model sandbox/bridge-fake "E2E_PROMPT_MARKER_C3 run N: read the readme and summarise it" < /dev/null
+  omp-agent/extensions/{z0int-bridge,local-cognition} are symlinks into the worktree; models.yml points provider
+  "sandbox" at the stub (openai-completions); z0home/config/serving.json serves functiongemma_270m at the dead port.
+  The stub asks for one read tool call (arguments carry E2E_TOOL_INPUT_MARKER_C3), then answers text.
+Observed: omp omp/18.4.2, 3 bridged runs exit 0, 3 baseline runs (no extensions) exit 0.
+  wall s bridged: 2.5888 1.65012 1.65468 
+  wall s baseline: 1.55818 1.65734 1.74891 
+  e2e_check.py: ok=true, all 16 checks true:
+    3 z0int.omp.opportunity_record.v0 + 3 z0int.omp.turn_outcome.v0, every pair joined on turn_key with the same
+    work_item_id, cohort (interactive) and model_id (sandbox/bridge-fake); repo = the task cwd; request text null
+    (content_free); execution_completed true, verified_success null; session ids from ctx.sessionManager (no
+    omp-<pid> fallback); 0 drops; 3 bridge.jsonl rows with no prompt field; ZERO occurrences of the prompt marker or
+    the tool-input marker in any file under z0home; shadow/cognition-shadow-counters.json backend_unavailable = 3
+    (one per tool call, dead backend -> URLError -> transport_error) and no cognition-shadow.jsonl answer rows.
+  failure rows (explicit, by design): missing_verifier x3 (OMP has no capture-time verifier), partial_measurement x3
+    (asked_user/tool_calls/assistant_messages are not exposed by the bridge close frame).
+  gates recorded: ACT x3 (shadow record of the deterministic gate for a clean repo; nothing acts on it).
+  Leftover processes after the run: none.
+
+## (2) protocol parity against the git-show export of a9cbbed -> e2e/parity.txt
+  test_protocol_parity_with_the_canonical_a9cbbed_worker: the new shim's turn_open/agent_end frames (built by bun from
+  index.ts turnOpenFrame/turnCloseFrame, with cwd/harness/parent_id) are served ok by the a9cbbed worker; the a9cbbed
+  shim's frames are served ok by the new worker, which also captures that turn (joined rows, unknown cwd, gate != ACT).
+  test_bridge_current_json_is_readable_across_both_trees: bridge-current.json written by new python, a9cbbed python and
+  the new TS shim is read (protocol, generation, is_stale) identically by both trees. PASS, 148 exported files.
+
+## (3) OMO: fixtures only (bun test omo.test.ts, in green.txt). The one-line re-export shim loads against a fake senpi
+  API and registers capture only (no route_worker tool); a diverged API is recorded UNSUPPORTED with a drop row; the
+  installed senpi 2026.9.27 types.d.ts declares input/before_agent_start/turn_end/agent_end, cwd and sessionManager:
+  SUPPORTED. No real omo binary was run (no isolated-dir env verified for OMO; live proof is activation step A2.4).
+
+## Earlier e2e at 06454d5 (before the capture-thread removal): e2e/omp-run-06454d5.txt, same 16/16 checks true.
+## The first e2e attempt (1c35e8a) found the model_id mismatch fixed in 06454d5 (red-followup.txt).

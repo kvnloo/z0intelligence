@@ -1,0 +1,30 @@
+{
+ "bundle_sha256": "b55033eeb70c26354b11874e9d4dfca8a3d617b555c73d1d825b12107b1a70c6",
+ "by_schema": {
+  "z0int.claude_code.failure.v0": 2,
+  "z0int.claude_code.opportunity_record.v0": 4,
+  "z0int.claude_code.turn_outcome.v0": 4,
+  "z0int.codex.failure.v0": 4,
+  "z0int.codex.opportunity_record.v0": 2,
+  "z0int.codex.turn_outcome.v0": 2,
+  "z0int.dsh.failure.v0": 6,
+  "z0int.dsh.opportunity_record.v0": 3,
+  "z0int.dsh.turn_outcome.v0": 3,
+  "z0int.grok.failure.v0": 12,
+  "z0int.grok.opportunity_record.v0": 6,
+  "z0int.grok.turn_outcome.v0": 6,
+  "z0int.hermes.failure.v0": 10,
+  "z0int.hermes.opportunity_record.v0": 3,
+  "z0int.hermes.turn_outcome.v0": 3,
+  "z0int.omo.failure.v0": 4,
+  "z0int.omo.opportunity_record.v0": 2,
+  "z0int.omo.turn_outcome.v0": 2,
+  "z0int.omp.failure.v0": 4,
+  "z0int.omp.opportunity_record.v0": 2,
+  "z0int.omp.turn_outcome.v0": 2
+ },
+ "rows": 86,
+ "rows_sha256": "9a2faab086342710d09b4547de29a49327915a44d1afcbee835b748470348deb",
+ "schema": "z0int.capture.frozen_bundle.v0",
+ "unsupported_schemas": {}
+}

@@ -1,0 +1,125 @@
+TAP version 13
+# Subtest: 1 apply registers an observe-only agent/request middleware; next() comes back unchanged
+ok 1 - 1 apply registers an observe-only agent/request middleware; next() comes back unchanged
+  ---
+  duration_ms: 14.896331
+  type: 'test'
+  ...
+# Subtest: 1 the output stream is byte-identical with capture on or off
+ok 2 - 1 the output stream is byte-identical with capture on or off
+  ---
+  duration_ms: 0.881911
+  type: 'test'
+  ...
+# Subtest: 2 the llm/stream router registers only when config.router===true AND automatic.json dsh is enabled
+ok 3 - 2 the llm/stream router registers only when config.router===true AND automatic.json dsh is enabled
+  ---
+  duration_ms: 1.226223
+  type: 'test'
+  ...
+# Subtest: 3 a user turn sends one prompt and one stop event to hook_adapter --harness dsh, detached
+ok 4 - 3 a user turn sends one prompt and one stop event to hook_adapter --harness dsh, detached
+  ---
+  duration_ms: 0.670011
+  type: 'test'
+  ...
+# Subtest: 3 the JS turn_key matches a known harness_id.turn_key vector
+ok 5 - 3 the JS turn_key matches a known harness_id.turn_key vector
+  ---
+  duration_ms: 0.169651
+  type: 'test'
+  ...
+# Subtest: 3 a turn that errors before its stop boundary is closed with a counted failure row, not left open
+ok 6 - 3 a turn that errors before its stop boundary is closed with a counted failure row, not left open
+  ---
+  duration_ms: 71.028796
+  type: 'test'
+  ...
+# Subtest: 4 the plugin source and the env it gives the hook child never reference key files or private trees
+ok 7 - 4 the plugin source and the env it gives the hook child never reference key files or private trees
+  ---
+  duration_ms: 1.81557
+  type: 'test'
+  ...
+# Subtest: 5 default config: no network call, shadow_plane=off recorded once per process
+ok 8 - 5 default config: no network call, shadow_plane=off recorded once per process
+  ---
+  duration_ms: 236.086948
+  type: 'test'
+  ...
+# Subtest: 5 with a fake z0 service it samples deterministically at the configured rate and writes shadow_decision rows
+ok 9 - 5 with a fake z0 service it samples deterministically at the configured rate and writes shadow_decision rows
+  ---
+  duration_ms: 60.540058
+  type: 'test'
+  ...
+# Subtest: 5 the max-inflight cap holds: one call in flight, the rest recorded queue_saturated
+ok 10 - 5 the max-inflight cap holds: one call in flight, the rest recorded queue_saturated
+  ---
+  duration_ms: 326.612029
+  type: 'test'
+  ...
+# Subtest: 5 service down gives backend_unavailable, counted
+ok 11 - 5 service down gives backend_unavailable, counted
+  ---
+  duration_ms: 20.747646
+  type: 'test'
+  ...
+# Subtest: 5 port 11501 is refused unless allow_live_service
+ok 12 - 5 port 11501 is refused unless allow_live_service
+  ---
+  duration_ms: 150.593842
+  type: 'test'
+  ...
+# Subtest: 5 the shadow only ever calls the pure /v1/plan route: no config value can point it at an executing route
+ok 13 - 5 the shadow only ever calls the pure /v1/plan route: no config value can point it at an executing route
+  ---
+  duration_ms: 22.216934
+  type: 'test'
+  ...
+# Subtest: 5 a shadow response that claims it executed is counted as a contract violation, never recorded ok
+ok 14 - 5 a shadow response that claims it executed is counted as a contract violation, never recorded ok
+  ---
+  duration_ms: 20.660631
+  type: 'test'
+  ...
+# Subtest: 6 a missing python lets the turn proceed and leaves a counted drop row
+ok 15 - 6 a missing python lets the turn proceed and leaves a counted drop row
+  ---
+  duration_ms: 23.600558
+  type: 'test'
+  ...
+# Subtest: 6 a spawn that throws or errors is counted and never reaches the turn
+ok 16 - 6 a spawn that throws or errors is counted and never reaches the turn
+  ---
+  duration_ms: 41.609974
+  type: 'test'
+  ...
+# Subtest: 6 no unhandled rejection under --unhandled-rejections=strict on every failure path
+ok 17 - 6 no unhandled rejection under --unhandled-rejections=strict on every failure path
+  ---
+  duration_ms: 334.72912
+  type: 'test'
+  ...
+# Subtest: 7 lineage and shadow rows hold no prompt or response text
+ok 18 - 7 lineage and shadow rows hold no prompt or response text
+  ---
+  duration_ms: 21.008368
+  type: 'test'
+  ...
+# Subtest: 8 the plugin does not ship, export or load memory.js
+ok 19 - 8 the plugin does not ship, export or load memory.js
+  ---
+  duration_ms: 0.507641
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1415.24098
+node_rc=0

@@ -1,0 +1,53 @@
+# C5 isolated e2e (unit-level + unmocked hook spawn), head 157e1a5, 2026-10-03T05:17:51-05:00
+# on : flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock run.sh <wt> e2e-on --guard -- env Z0INT_HOME=/mnt/zer0models/z0-wt/wiring/homes/C5-dsh-plugin/e2e-on/z0home C5_PLUGIN=<index.mjs> C5_PORT=11551 node --unhandled-rejections=strict e2e_dsh.mjs on
+# off: same with e2e-off home and 'off'; check: run.sh <wt> e2e-on --guard -- python e2e_check.py <z0home> on.json off.json
+on exit=0
+off exit=0
+{
+ "counts": {
+  "opportunities": 3,
+  "outcomes": 3,
+  "failures_by_kind": {
+   "missing_verifier": 3,
+   "partial_measurement": 3
+  },
+  "shadow": 3,
+  "lineage": 7,
+  "drops": 0
+ }
+}
+PASS alias == canonical
+PASS plugin keys == python keys
+PASS 3 opportunity rows, schema
+PASS 3 outcome rows, schema
+PASS joined on turn_key
+PASS cohort interactive, model
+PASS work items: s1 two items, s2 one
+PASS drops == 0
+PASS no misattribution/unsupported failures
+PASS shadow: 3 ok rows, decision kind only
+PASS shadow requests == 3 to /v1/plan
+PASS lineage rows: 7 (6 root + 1 child)
+PASS no synthetic text in any dsh row
+PASS counters clean
+PASS replay transcript identical (capture on vs off)
+PASS capture off: no shadow requests
+check exit=0
+## state/dsh files (e2e-on):
+total 24
+-rw-r--r-- 1 kvn kvn 2620 Oct  3 05:17 failures.jsonl
+-rw-r--r-- 1 kvn kvn 3733 Oct  3 05:17 lineage.jsonl
+-rw-r--r-- 1 kvn kvn 6075 Oct  3 05:17 opportunities.jsonl
+-rw-r--r-- 1 kvn kvn 1523 Oct  3 05:17 outcomes.jsonl
+drwxr-xr-x 1 kvn kvn   84 Oct  3 05:17 sessions
+-rw-r--r-- 1 kvn kvn 1185 Oct  3 05:17 shadow_decisions.jsonl
+## e2e-off state: none
+## socket guard logs:
+(none)
+## failure rows (expected F-cases from the C1 core, not plugin errors):
+      3 missing_verifier {"record": "turn_outcome"}            (no outcome verifier for dsh today; VERIFIERS = claude-code only)
+      3 partial_measurement {"missing": ["asked_user", "assistant_messages", "tool_calls"]}  (the DSH stop event carries ids only)
+
+## DSH-source e2e (headless profile + packages/test-support/llm-replay in a scratch deepseek-harness copy): NOT RUN.
+The spec requires owner approval for it. DSH G-CAP is therefore recorded as "unit-proven only".
+Nothing here ran the dsh binary, the /usr/bin/dsh wrapper or ~/.dsh/bin/*.

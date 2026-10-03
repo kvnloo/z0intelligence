@@ -1,0 +1,77 @@
+# C4a-hermes-capture isolated e2e, fix round after the verifier REVISE (2026-10-03)
+
+Plugin under test: harness-adapters/hermes-z0intelligence at ee7cae0 (installed tree = `git archive ee7cae0`).
+Round 1 (07a2272) is kept as e2e-round1-07a2272.txt / e2e-run-round1-07a2272.log / e2e-check-round1-07a2272.json.
+Hermes: fork /mnt/zer0models/hermes-wt/bend-integration @ ad31bbf079f0ee559ce1b61c5f85178c4c3d9396, exported with
+`git -C /mnt/zer0models/hermes-wt/bend-integration archive HEAD | tar -x -C homes/C4a-hermes-capture/hermes-src`
+(never built in the read-only worktree; the export and venv from round 1 were reused unchanged).
+`hermes --version` in the export: "Hermes Agent vunknown (2026.9.24)".
+Venv homes/C4a-hermes-capture/hermes-venv (python 3.14.7): the export on sys.path plus a private reflink copy of the
+third-party site-packages of the lane setup venv (same uv.lock). See NOTES.md "Deviations".
+z0int: this worktree's src via homes/C4a-hermes-capture/e2e-fix/z0int-python (venv-claude-code python 3.13, PYTHONPATH=<wt>/src).
+
+## Commands
+  flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock \
+    evidence/C4a-hermes-capture/scripts/e2e_hermes.sh <wt> e2e-fix 10 11545    # log: e2e-run.log
+  venv-claude-code/bin/python evidence/C4a-hermes-capture/scripts/e2e_check.py homes/C4a-hermes-capture/e2e-fix \
+    homes/C4a-hermes-capture/e2e-fix/z0int-python                                # verdict: e2e-check.json
+
+Isolation: hostless + `bwrap --dev-bind / / --tmpfs /workspace/hermes-home --tmpfs ~/.z0int --unshare-net`.
+The masks are fixed paths now: this round the script runs no stat, readlink or ls on any live path (round 1's
+before/after `stat` of live paths was removed, as the verifier asked). Inside the sandbox both masks are empty
+tmpfs ("hermes-home entries=0 z0int entries=0", checked by e2e_check.py). Private net namespace with loopback only,
+so no connection to 127.0.0.1:11501 or any other host is possible; HOME, HERMES_HOME, Z0INT_HOME, TMPDIR and the
+pyc cache under homes/C4a-hermes-capture/e2e-fix; recording chat-completions stub (scripts/chat_stub.py) on
+127.0.0.1:11545 with a dummy key; proxies pointed at 127.0.0.1:9.
+
+Install step (unchanged finding, confirmed by the verifier): `hermes plugins install file://<wt>#harness-adapters/
+hermes-z0intelligence --ref ee7cae0... --enable --no-deps` clones and scans the plugin, then fails at Hermes PM's
+runtime sync (network). A plain path argument, as in the spec, is parsed as GitHub owner/repo shorthand. The e2e
+lays out `git archive <sha>` of the plugin dir in $HERMES_HOME/plugins/hermes-z0intelligence and enables it in
+config.yaml; this fallback is now documented in the plugin README and ACTIVATE.md (the GitHub-URL install of
+activation step 3 remains unverified).
+
+Profile config per arm (scripts/e2e_config.py): model {provider: custom, base_url: stub, api_key: dummy},
+toolsets [kanban, memory, session_search, clarify, no_mcp] (live shape), plugins.enabled [hermes-z0intelligence],
+settings {mode: off|shadow, opportunities: true, z0int_python: <wrapper>}.
+Arms, alternating order per round: off x10, shadow x10 (`hermes chat -Q -q "c4a-e2e-canary-7f3a: what is the status
+of the release checklist?"`), then one fail-open arm (mode shadow, z0int_python pointing at a missing file).
+
+## Observed (e2e-check.json: verdict PASS, 17/17 checks)
+- every `hermes chat -q` run exited 0 (21 runs), each with its own session id.
+- H1 off vs shadow: the stub recorded 4 requests per run; all 10 off/shadow pairs byte-identical (canonical JSON),
+  all 20 runs identical to the first off run (A/A); no z0int / DecisionOpportunity text in any request.
+- Shadow sessions: 10/10 have exactly one opportunity_record.v0 and one turn_outcome.v0 joined on the same
+  turn_key; cohort interactive; model_id c4a-stub; policy_revision hermes-z0intelligence@0.2.0; projection repo =
+  the Hermes task cwd (the task repo); packet_text redacted; 8 event rows per session.
+  failures.jsonl: missing_verifier x10 (by design) + z0int_unavailable x7 (fail-open arm); nothing else.
+- P-2 in the real host: `hermes chat -q` exits right after its turn, so close() runs at interpreter exit while the
+  turn's projection is running. close() now waits for it within its budget: every shadow session still has its
+  opportunity, drops.jsonl has 0 `closed` drops, and every Hermes process removed its gate
+  (z0home/runtime/hermes-gates is empty; check every_hermes_process_closed_its_capture_gate).
+- H6: the 10 mode-off sessions left no row of any kind.
+- Fail-open arm: Hermes completed the turn (rc 0, 2.9 s, same as off); 7 z0int_unavailable rows covering 8 jobs;
+  drops.jsonl holds 8 dropped jobs (z0int_unavailable); a fresh `z0int hermes decisions` reports rows_dropped 8.
+- Privacy: none of the prompt canary, the README open item, the commit subject or the branch name appears
+  anywhere under the z0 home.
+- Close bounded: wall time median shadow - off = 89.5 ms (off 2874-7271 ms, first run cold; shadow 2964-3075 ms).
+
+## The verifier's P-2 reproduction against the fix (p2-probe.txt; scripts/p2_probe.py is its probe.py, copied)
+3 user turns, flush(), close(): close returned in 0.041-0.046 s with 3 opportunity rows, and 8 s later there were
+still 3 (round 1: 2 at close, 3 after 8 s). The unit test test_p2_a_projection_in_flight_at_close_writes_nothing_after_close
+forces the cut-off case (close budget 0.05 s, projections still running): state/hermes is byte-identical after
+every projection child has exited, and opportunities written + `closed` drops == turns (10/10 stress runs,
+green-fix-stress.txt).
+
+## bend-native exp/contract-20261002 checks against the new plugin
+- H1 (shadow cannot change behaviour): above, 10 pairs + A/A, REAL Hermes + stub (no model).
+- H2 (hooks return None; prompts, tools, provider unchanged): unit test_inertness_* (normal + hostile payloads,
+  every capture hook returns None) and host test through Hermes's PluginManager (invoke_hook -> [] for every event);
+  identical requests above.
+- H3 (bounded queue, nothing blocks, unload within 2 s): unit tests test_p2_* (close asserted <= 2.0 s with a stuck
+  child, nothing written after; and with a real projection in flight at close), test_a4_* (the H3 flood 8x400+200 through the plugin callbacks: 3,400/3,400
+  events written, 0 event drops, 800 projections refused as fanout_cap and counted).
+- H6 (disabled leaves zero footprint): host test test_mode_off_and_disabled_leave_dispatch_untouched (mode off and
+  disabled: 0 callbacks on all 13 events, has_hook False, no z0 home created) and the off arm above.
+- H4 (profile isolation) and H5 (canaries) are covered by A1 (rows only under Z0INT_HOME, nothing under
+  HERMES_HOME) and the privacy checks; the Bend-proof parts of H4 are out of scope (bend keeps them, C9).

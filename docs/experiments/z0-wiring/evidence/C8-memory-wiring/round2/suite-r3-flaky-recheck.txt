@@ -1,0 +1,6 @@
+C8-memory-wiring run1: 1 passed in 0.73s
+C8-memory-wiring run2: 1 passed in 0.08s
+C8-memory-wiring run3: 1 passed in 0.08s
+C8-memory-wiring-base run1: 1 passed in 0.67s
+C8-memory-wiring-base run2: 1 passed in 0.58s
+C8-memory-wiring-base run3: 1 passed in 0.08s

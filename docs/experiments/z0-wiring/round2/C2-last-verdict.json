@@ -1,0 +1,30 @@
+{
+ "verdict": "REVISE",
+ "issues": [
+  {
+   "severity": "blocker",
+   "file": "src/z0int/turn_readers.py",
+   "problem": "exit_code() runs EXIT_RE.search over the whole tool result and takes the first match. The OMP/OMO notice 'Command exited with code N' comes at the END of the result, after the command's own output. So any exit-like text in the output body wins: a line starting 'Exit code 0', a '\"exit_code\": 0', or 'Process/Command exited with code 0'. I reproduced it with tests/agentsview_fixture.py: an OMP failing run with result_content 'FAILED ... assert {\"exit_code\": 0, \"ok\": true} == {\"exit_code\": 1}\\n1 failed, 4 passed\\n\\nCommand exited with code 1' and no tool_result_events row. exit_code() returned 0 and verify_harness('omp') gave verified_success / deterministic_gold with tests_in_turn +1. That is the same failure class as the prior blocker (a failing test run minted as gold), now through the output body. The function ignores the harness, so the same happens on: OMO; DSH; Grok, which breaks its declared test_label_polarity 'none'; and Hermes, where the unanchored 'Process/Command exited with code' alternatives match inside the JSON 'output' string before the top-level exit_code. Codex is safe only because its header comes first. JSON-printing assertion diffs are common in the owner's repos.",
+   "fix": "Parse exit evidence from each harness's own frame, never from the output body. OMP/OMO: only a trailing 'Command exited with code N' line (anchored to the end of the result). Codex: only the 'Process exited with code N' header before 'Output:'. Hermes and DSH: json.loads the result and read only the top-level exit_code. Grok: always None. Add red tests per harness where the output body contains 'Exit code 0', '\"exit_code\": 0' and 'Process exited with code 0' but the real frame says failure (or has no code). Each must give verified_failure or unknown, never verified_success."
+  },
+  {
+   "severity": "major",
+   "file": "src/z0int/loop_export.py",
+   "problem": "_write_tables() creates out_dir/<harness>/ only per table and then writes out_dir/'manifest.json'. When no table is built, out_dir is never created and both `z0int loop export` and `z0int loop merge` crash with a FileNotFoundError traceback. The counts index is lost: per-harness accepted, unsupported_schema and failure-row counts. This happens on a fresh host, or on a host whose only state is failure rows (e.g. a dsh reader_unavailable). Repro: hc.record_failure('dsh','reader_unavailable',...) into an empty home, then le.export_tables(<new dir>) raises FileNotFoundError. In my e2e, `z0int loop export --out-dir X` on an empty Z0INT_HOME exited 1 with a traceback, and merge of two table-less sets raised the same error. C6 consumes this CLI from a timer, so a host with no captures would fail every run, against the spec's 'nothing is dropped silently'.",
+   "fix": "Path(out_dir).mkdir(parents=True, exist_ok=True) at the top of _write_tables. Add red tests: export on a home with only failure rows writes manifest.json with records.failures counted and zero tables, and merge of empty sets writes an empty index."
+  },
+  {
+   "severity": "minor",
+   "file": "src/z0int/loop_export.py",
+   "problem": "_table_manifest stamps test_label_polarity on every training table of an AgentsView harness, including omp/legacy. In my e2e host-A omp/legacy.manifest.json says 'failure_only', but legacy rows are labelled by effective_tier from the OMP v1 spine, not by AgentsView shell exits. The polarity record is meant to stop a one-sided class balance from being misread, and here it says the wrong thing.",
+   "fix": "Stamp test_label_polarity only on tables whose labels come from the AgentsView verifier (cohort != 'legacy'), or record label_source='effective_tier' for legacy tables. Extend test_report_and_table_manifests_record_the_test_label_polarity to cover a legacy table."
+  },
+  {
+   "severity": "minor",
+   "file": "src/z0int/turn_readers.py",
+   "problem": "On v0.39 (user_version 74, no sessions.session_kind) a Codex exec session cannot be told apart and classify_cohort returns 'interactive'. In my e2e the same synthetic codex exec turn went to codex/automated on host A (v113) and codex/interactive on host B (real v0.39 schema). `loop merge` then kept that turn_key in both cohort tables. The spec says Codex exec runs are never pooled into interactive. The live DB is now 113, so the current impact is limited to other hosts on v0.39.",
+   "fix": "Either document this as a known v0.39 limitation in the codex JoinRule doc and the verify report (e.g. a 'cohort_basis: no_session_kind' count), or classify codex sessions as 'unknown' when the schema has no session_kind and is_automated is 0. Optionally have merge count turn_keys that appear in more than one cohort."
+  }
+ ],
+ "hard_rule_breach": "none"
+}

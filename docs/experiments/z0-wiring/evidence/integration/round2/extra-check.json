@@ -1,0 +1,266 @@
+{
+ "passed": 13,
+ "total": 17,
+ "failed": [
+  "memory.opportunity_record_memory_joined (DoD D3 \"MemoryUseReceipt in opportunity records\")",
+  "learn.harness_generic_export_nonzero_rows_all_7",
+  "learn.harness_generic_verify_all_7",
+  "learn.tick_entry_point_runs_once"
+ ],
+ "checks": [
+  {
+   "check": "memory.codex_push_seam_shadow_default",
+   "ok": true,
+   "detail": {
+    "rc": 0,
+    "stdout": "",
+    "rows": [
+     [
+      "shadow",
+      true
+     ]
+    ]
+   }
+  },
+  {
+   "check": "memory.cloud_injection_default_off",
+   "ok": true,
+   "detail": {
+    "claude-code": {
+     "default_mode": "shadow",
+     "default_stdout": "",
+     "default_rows": [
+      "shadow"
+     ],
+     "canary_stdout": "",
+     "canary_rows": [
+      [
+       "cloud_injection_blocked",
+       false
+      ]
+     ]
+    },
+    "codex": {
+     "default_mode": "shadow",
+     "default_stdout": "",
+     "default_rows": [
+      "shadow"
+     ],
+     "canary_stdout": "",
+     "canary_rows": [
+      [
+       "cloud_injection_blocked",
+       false
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "check": "memory.no_injection_into_a_non_loopback_endpoint_anywhere",
+   "ok": true,
+   "detail": []
+  },
+  {
+   "check": "memory.same_substrate_every_mcp_seam_same_evidence",
+   "ok": true,
+   "detail": {
+    "claude-code": 4,
+    "codex": 4,
+    "grok": 4,
+    "omp": 4,
+    "omo": 4,
+    "dsh": 4
+   }
+  },
+  {
+   "check": "memory.same_substrate_push_receipts_share_evidence",
+   "ok": true,
+   "detail": {
+    "claude-code": 8,
+    "hermes": 8,
+    "omp": 7,
+    "codex": 7,
+    "dsh": 7,
+    "distinct_uids": 9
+   }
+  },
+  {
+   "check": "memory.provenance_canonical_locators_and_event_uids",
+   "ok": true,
+   "detail": {
+    "bad_refs": [],
+    "receipts_without_uids": [],
+    "sample_ref": [
+     "eventlog:1"
+    ]
+   }
+  },
+  {
+   "check": "memory.scope_no_sibling_project_in_receipts",
+   "ok": true,
+   "detail": []
+  },
+  {
+   "check": "memory.secret_scrub_planted_fake_keys_never_leave",
+   "ok": true,
+   "detail": {
+    "planted": [
+     "api_key",
+     "aws",
+     "bearer",
+     "bws",
+     "pem"
+    ],
+    "hits": []
+   }
+  },
+  {
+   "check": "memory.secret_probe_was_planted_in_the_substrate",
+   "ok": true,
+   "detail": {
+    "planted_found_in_av_db": 5
+   }
+  },
+  {
+   "check": "memory.memory_use_receipt_rows_present_push_seams",
+   "ok": true,
+   "detail": {
+    "claude-code": {
+     "seam_rows_with_receipt": 21,
+     "valid": 21,
+     "acceptance_rows": 6
+    },
+    "codex": {
+     "seam_rows_with_receipt": 8,
+     "valid": 8,
+     "acceptance_rows": 6
+    },
+    "grok": {
+     "seam_rows_with_receipt": 6,
+     "valid": 6,
+     "acceptance_rows": 6
+    },
+    "hermes": {
+     "seam_rows_with_receipt": 29,
+     "valid": 29,
+     "acceptance_rows": 6
+    },
+    "omp": {
+     "seam_rows_with_receipt": 20,
+     "valid": 20,
+     "acceptance_rows": 6
+    },
+    "omo": {
+     "seam_rows_with_receipt": 6,
+     "valid": 6,
+     "acceptance_rows": 6
+    },
+    "dsh": {
+     "seam_rows_with_receipt": 17,
+     "valid": 17,
+     "acceptance_rows": 6
+    }
+   }
+  },
+  {
+   "check": "memory.acceptance_rows_every_harness",
+   "ok": true,
+   "detail": {
+    "claude-code": 6,
+    "codex": 6,
+    "grok": 6,
+    "hermes": 6,
+    "omp": 6,
+    "omo": 6,
+    "dsh": 6
+   }
+  },
+  {
+   "check": "memory.opportunity_record_memory_joined (DoD D3 \"MemoryUseReceipt in opportunity records\")",
+   "ok": false,
+   "detail": {
+    "claude-code": {
+     "opportunities": 4,
+     "with_memory": 0
+    },
+    "codex": {
+     "opportunities": 2,
+     "with_memory": 0
+    },
+    "grok": {
+     "opportunities": 6,
+     "with_memory": 0
+    },
+    "hermes": {
+     "opportunities": 3,
+     "with_memory": 0
+    },
+    "omp": {
+     "opportunities": 2,
+     "with_memory": 0
+    },
+    "omo": {
+     "opportunities": 2,
+     "with_memory": 0
+    },
+    "dsh": {
+     "opportunities": 3,
+     "with_memory": 0
+    }
+   }
+  },
+  {
+   "check": "learn.harness_generic_export_nonzero_rows_all_7",
+   "ok": false,
+   "detail": {
+    "export_rows": {
+     "claude-code": 4,
+     "codex": 0,
+     "grok": 0,
+     "hermes": 0,
+     "omp": 0,
+     "omo": 0,
+     "dsh": 0
+    }
+   }
+  },
+  {
+   "check": "learn.harness_generic_verify_all_7",
+   "ok": false,
+   "detail": {
+    "verify --harness codex": [
+     "z0int outcomes: error: unrecognized arguments: --harness codex"
+    ]
+   }
+  },
+  {
+   "check": "learn.frozen_capture_rows_nonzero_all_7 (unlabelled; not an export)",
+   "ok": true,
+   "detail": {
+    "claude-code": 11,
+    "codex": 8,
+    "dsh": 12,
+    "grok": 24,
+    "hermes": 16,
+    "omo": 8,
+    "omp": 8
+   }
+  },
+  {
+   "check": "learn.tick_entry_point_runs_once",
+   "ok": false,
+   "detail": {
+    "rc": 0,
+    "stderr_tail": null
+   }
+  },
+  {
+   "check": "learn.learner_once_reports_sufficiency_honestly_never_promotes",
+   "ok": true,
+   "detail": {
+    "decision": "INSUFFICIENT_DATA"
+   }
+  }
+ ]
+}

@@ -1,0 +1,17 @@
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/z0-memory/index.test.ts:
+(pass) OMP shadow: the context handler returns undefined at once and a receipt is written later [372.88ms]
+(pass) OMP canary: the brief is in the next model-visible request only; history is untouched; no double injection [168.69ms]
+(pass) OMP canary past the deadline is native with a counted timeout; fail-open; cloud blocked [563.47ms]
+(pass) OMO: the senpi shim loads, and with a context hook the brief reaches the next request [115.71ms]
+(pass) OMO without a context hook records B=UNSUPPORTED instead of passing [57.97ms]
+(pass) the installed senpi declares the context event (else UNSUPPORTED is recorded) [3.33ms]
+(pass) the omo entry is a one-line re-export activation can write [0.70ms]
+(pass) the gate endpoint is the active model's baseUrl only: a generic env var never marks a cloud model loopback [166.38ms]
+(pass) OMP turn key is the user message's own id: a new turn after compaction still gets its brief; replays are counted [226.17ms]
+
+ 9 pass
+ 0 fail
+ 42 expect() calls
+Ran 9 tests across 1 file. [1.80s]

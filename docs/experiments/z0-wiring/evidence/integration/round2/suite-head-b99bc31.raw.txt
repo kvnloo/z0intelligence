@@ -1,0 +1,33 @@
+tree=/mnt/zer0models/z0-wt/wiring/wt/integrate head=b99bc316e2d23e3f0d901b5fe7542d4ce1058060 start=2026-10-03T16:43:26Z
+........................................................................ [  5%]
+........................................................................ [ 11%]
+........................................................................ [ 17%]
+........................................................................ [ 23%]
+........................................................................ [ 28%]
+........................................................................ [ 34%]
+........................................................................ [ 40%]
+...........FFFFF........................................................ [ 46%]
+..........ss...........................x................................ [ 52%]
+........................................................................ [ 57%]
+........................................................................ [ 63%]
+........................................................................ [ 69%]
+...............................................ss..................ss... [ 75%]
+........................................................................ [ 81%]
+..........F....F...F..FF.F.............................................. [ 86%]
+..........s.s........................................................... [ 92%]
+........................................................................ [ 98%]
+....................                                                     [100%]
+=========================== short test summary info ============================
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+FAILED tests/test_quota_budget.py::test_empty_authority_capacity - assert False
+FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily - KeyEr...
+FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+11 failed, 1224 passed, 8 skipped, 1 xfailed in 196.69s (0:03:16)
+pytest_rc=1 end=2026-10-03T16:46:46Z

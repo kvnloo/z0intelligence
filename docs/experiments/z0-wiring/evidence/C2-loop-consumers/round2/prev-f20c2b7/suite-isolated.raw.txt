@@ -1,0 +1,12 @@
+## C2-loop-consumers (f20c2b7) run 1
+1 passed in 0.30s
+## C2-loop-consumers (f20c2b7) run 2
+1 passed in 0.26s
+## C2-loop-consumers (f20c2b7) run 3
+1 passed in 0.27s
+## C2-loop-consumers-base (914dc99) run 1
+1 passed in 0.28s
+## C2-loop-consumers-base (914dc99) run 2
+1 passed in 0.24s
+## C2-loop-consumers-base (914dc99) run 3
+1 passed in 0.28s

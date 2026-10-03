@@ -1,0 +1,343 @@
+# C5 red run @ 914dc99 + uncommitted red tests only (no implementation), 2026-10-03T05:14:01-05:00
+# cmd: flock -s quiet-lane.lock scripts/run.sh <wt> red --guard -- node --test tests/test-dsh-plugin.mjs ; same runner -- python -m pytest -q tests/test_dsh_capture.py
+✖ 1 apply registers an observe-only agent/request middleware; next() comes back unchanged (1.526653ms)
+✖ 1 the output stream is byte-identical with capture on or off (86.762935ms)
+✖ 2 the llm/stream router registers only when config.router===true AND automatic.json dsh is enabled (0.343633ms)
+✖ 3 a user turn sends one prompt and one stop event to hook_adapter --harness dsh, detached (1.171713ms)
+✖ 3 the canonical turn_key is computed the same way as harness_id.turn_key (0.124414ms)
+✖ 4 the plugin source and the env it gives the hook child never reference key files or private trees (0.393897ms)
+✖ 5 default config: no network call, shadow_plane=off recorded once per process (28.311057ms)
+✖ 5 with a fake z0 service it samples deterministically at the configured rate and writes shadow_decision rows (3015.889689ms)
+✖ 5 the max-inflight cap holds: one call in flight, the rest recorded queue_saturated (3013.804746ms)
+✖ 5 service down gives backend_unavailable, counted (0.852609ms)
+✖ 5 port 11501 is refused unless allow_live_service (150.138059ms)
+✖ 6 a missing python lets the turn proceed and leaves a counted drop row (0.442847ms)
+✖ 6 a spawn that throws or errors is counted and never reaches the turn (0.200605ms)
+✖ 6 no unhandled rejection under --unhandled-rejections=strict on every failure path (31.808504ms)
+✖ 7 lineage and shadow rows hold no prompt or response text (6017.587968ms)
+✖ 8 the plugin does not ship, export or load memory.js (3.578662ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 0
+ℹ fail 16
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12421.999793
+
+✖ failing tests:
+
+test at tests/test-dsh-plugin.mjs:118:1
+✖ 1 apply registers an observe-only agent/request middleware; next() comes back unchanged (1.526653ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  undefined !== 1
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:122:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-plugin.mjs:130:1
+✖ 1 the output stream is byte-identical with capture on or off (86.762935ms)
+  AssertionError [ERR_ASSERTION]: capture on registers the observer
+  
+  undefined !== 1
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:145:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-plugin.mjs:150:1
+✖ 2 the llm/stream router registers only when config.router===true AND automatic.json dsh is enabled (0.343633ms)
+  AssertionError [ERR_ASSERTION]: default config: router off
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:164:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-plugin.mjs:174:1
+✖ 3 a user turn sends one prompt and one stop event to hook_adapter --harness dsh, detached (1.171713ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   'prompt',
+  -   'stop'
+  - ]
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:182:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'prompt', 'stop' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-plugin.mjs:198:1
+✖ 3 the canonical turn_key is computed the same way as harness_id.turn_key (0.124414ms)
+  TypeError: plugin.canonicalTurnKey is not a function
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:200:23)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests/test-dsh-plugin.mjs:213:1
+✖ 4 the plugin source and the env it gives the hook child never reference key files or private trees (0.393897ms)
+  AssertionError [ERR_ASSERTION]: capture/shadow/lineage modules exist
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:215:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-plugin.mjs:234:1
+✖ 5 default config: no network call, shadow_plane=off recorded once per process (28.311057ms)
+  AssertionError [ERR_ASSERTION]: file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/[eval1]:11
+          await hs['agent/request'][0]({agent: {id: 'session-d' + i, parentId: null, session: {header: {id: 'd' + i}},
+                                   ^
+  
+  TypeError: Cannot read properties of undefined (reading '0')
+      at file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/[eval1]:11:34
+  
+  Node.js v26.7.0
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:252:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-plugin.mjs:261:1
+✖ 5 with a fake z0 service it samples deterministically at the configured rate and writes shadow_decision rows (3015.889689ms)
+  TypeError: plugin.sampleHash is not a function
+      at file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:274:50
+      at Array.filter (<anonymous>)
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:274:27)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests/test-dsh-plugin.mjs:294:1
+✖ 5 the max-inflight cap holds: one call in flight, the rest recorded queue_saturated (3013.804746ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:304:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-plugin.mjs:310:1
+✖ 5 service down gives backend_unavailable, counted (0.852609ms)
+  TypeError: Cannot read properties of undefined (reading 'backend_unavailable')
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:315:34)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests/test-dsh-plugin.mjs:325:1
+✖ 5 port 11501 is refused unless allow_live_service (150.138059ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   'http://127.0.0.1:11501/v1/plan'
+  - ]
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:343:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'http://127.0.0.1:11501/v1/plan' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-plugin.mjs:347:1
+✖ 6 a missing python lets the turn proceed and leaves a counted drop row (0.442847ms)
+  TypeError: Cannot read properties of undefined (reading 'hook_spawn_failed')
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:349:34)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests/test-dsh-plugin.mjs:359:1
+✖ 6 a spawn that throws or errors is counted and never reaches the turn (0.200605ms)
+  TypeError: Cannot read properties of undefined (reading 'hook_spawn_failed')
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:362:36)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at tests/test-dsh-plugin.mjs:372:1
+✖ 6 no unhandled rejection under --unhandled-rejections=strict on every failure path (31.808504ms)
+  AssertionError [ERR_ASSERTION]: file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/[eval1]:9
+      const got = await hs['agent/request'][0]({agent, turn: 1, step: 1}, async () => cfg)
+                                           ^
+  
+  TypeError: Cannot read properties of undefined (reading '0')
+      at file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/[eval1]:9:42
+  
+  Node.js v26.7.0
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:394:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-plugin.mjs:402:1
+✖ 7 lineage and shadow rows hold no prompt or response text (6017.587968ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:412:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test-dsh-plugin.mjs:427:1
+✖ 8 the plugin does not ship, export or load memory.js (3.578662ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'apply',
+  -   'canonicalTurnKey',
+  -   'counters',
+      'name',
+  -   'sampleHash'
+    ]
+  
+      at TestContext.<anonymous> (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/tests/test-dsh-plugin.mjs:436:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'apply', 'name' ],
+    expected: [ 'apply', 'canonicalTurnKey', 'counters', 'name', 'sampleHash' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+## pytest
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_a_user_turn_gives_one_joined_opportunity_and_outcome ___________
+tests/test_dsh_capture.py:81: in test_a_user_turn_gives_one_joined_opportunity_and_outcome
+    driven = drive(home)
+             ^^^^^^^^^^^
+tests/test_dsh_capture.py:76: in drive
+    assert proc.returncode == 0, proc.stderr[-600:]
+E   AssertionError: file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/[eval1]:12
+E     const req = (agent, turn, step) => hs['agent/request'][0]({agent, turn, step}, async () => ({provider: 'deepseek-official', model: 'deepseek-flash'}))
+E                                                           ^
+E     
+E     TypeError: Cannot read properties of undefined (reading '0')
+E         at req (file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/[eval1]:12:55)
+E         at file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/[eval1]:18:7
+E     
+E     Node.js v26.7.0
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '--unhandled-rejections=strict', '--input-type=module', '-e', '\nconst p = awa...-plugin/[eval1]:12:55)\n    at file:///mnt/zer0models/z0-wt/wiring/wt/C5-dsh-plugin/[eval1]:18:7\n\nNode.js v26.7.0\n").returncode
+=========================== short test summary info ============================
+FAILED tests/test_dsh_capture.py::test_a_user_turn_gives_one_joined_opportunity_and_outcome
+1 failed in 0.07s

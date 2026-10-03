@@ -1,0 +1,28 @@
+{
+ "verdict": "REVISE",
+ "red_reproduced_on_base": true,
+ "green_reproduced_on_head": true,
+ "suite_no_new_failures": true,
+ "e2e_reproduced": true,
+ "issues": [
+  {
+   "severity": "major",
+   "file": "src/z0int/memory/surface.py",
+   "problem": "The TencentDB revision in memory_snapshot_id is not a data revision. The real MemoryCore gateway (oss/TencentDB-Agent-Memory@0aff21a, gateway/types.ts HealthResponse and v2-router.ts handleAtomicSearch) returns only the software `version` from GET /health, and `/v3/atomic/search` returns `data.items` with no `revision`. TencentDBClient.revision() falls back to `version`, so the snapshot keys on the gateway build ('rev:0.9.1'), not on its contents. I confirmed this with a gateway stub that has the real response shape (scratch/C7-verify/e2e/probe_semrev.py): memory_brief('wombat lantern') misses, I add a new L1 item to the gateway, then the same brief returns cache='hit' with the same snapshot id and without the new item (STALE). Red tests 11 and 13 (snapshot changes when the TencentDB rev changes; the persistent cache is keyed by snapshot) pass only because tests/memory_fixture.FakeTencentDB invents a `revision` field in both /health and the search response that the real gateway does not emit. The fake mirrors the implementation's assumption, not the reference contract. This becomes live once G-SEM/A8-sem is activated.",
+   "fix": "Treat a gateway with no data revision as unversioned. revision() should return something like 'unversioned' rather than the software version. Do not persist-cache a brief that includes semantic evidence while the TencentDB revision is unversioned, or derive the revision from the per-item id/version/updated_at the search response actually returns and re-check it before serving the cache. Change FakeTencentDB to the real response shape (/health -> {status, version, uptime, stores}; search -> data.items with id/version/updated_at, no revision). Add a red test: the gateway content changes while AgentsView, ledger and repo stay unchanged, and the brief must not serve the stale cached semantic evidence."
+  },
+  {
+   "severity": "minor",
+   "file": "src/z0int/memory/event_log.py",
+   "problem": "Ingesting through the canonical #23 path and the temporal layer both cost O(ledger) per call. Each ingest_reference builds a new EventLog, and its first identity append re-reads events.jsonl from offset 0 to build the uid map. A duplicate also triggers a full _scan_locked in _event_at_locked. _temporal_candidates reads and JSON-dumps every event on every query, and OptMem is only consulted for its manifest hash. Measured on a 20k-event ledger: 50 ingest_reference calls take 11.1 s (about 220 ms each, so bulk ingestion is quadratic), and one temporal search takes 522 ms, which already exceeds C8's 300 ms canary/on deadline.",
+   "fix": "Keep the uid map persistent, for example as a derived uid -> event_id index next to events.index.jsonl that is rebuilt on repair, or reuse one EventLog per process. Return the duplicate through the existing offset index rather than a scan. Bound the temporal scan by using the OptMem tree or index, or scan only the raw tail plus claims, and add a latency assertion on a larger fixture ledger."
+  },
+  {
+   "severity": "minor",
+   "file": "tests/test_memory_receipt_binding.py",
+   "problem": "build_state_packet now always computes memory_snapshot_id. That reads $Z0INT_HOME/config/memory.json and memory/events.state.json, and opens the default AgentsView DB (~/.agentsview/sessions.db, mode=ro) whenever it exists. The new receipt-binding test sets neither Z0INT_HOME nor AGENTSVIEW_DATA_DIR. Run plainly on a dev box, it and the pre-existing test_decision_opportunity/test_loop_export tests reach the developer's live AgentsView DB and z0 config. An audit hook confirmed the reads land on the default paths. The access is read-only and other ~/.z0int reads already happen on base, but C7 adds a new live read to the suite.",
+   "fix": "Give the new test file an autouse fixture that points Z0INT_HOME and AGENTSVIEW_DATA_DIR at tmp_path. Better, add a tests/conftest.py autouse fixture that sets AGENTSVIEW_DATA_DIR to a tmp dir for the whole suite, so no test can reach the real sessions.db."
+  }
+ ],
+ "hard_rule_breach": "none"
+}

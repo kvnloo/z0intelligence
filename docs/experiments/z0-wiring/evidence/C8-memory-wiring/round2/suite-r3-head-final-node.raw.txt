@@ -1,0 +1,40 @@
+✔ shadow: the pre-step returns at once with the native decision and a receipt is written later (512.735954ms)
+✔ canary: the brief enters the next model request as one extra message; the native batch is untouched (189.131555ms)
+✔ canary past the 300 ms deadline gets the native decision and a counted timeout (516.087364ms)
+✔ fail-open: an unavailable z0int keeps the native decision and counts the failure (92.929607ms)
+✔ a cloud model endpoint is blocked unless dsh allows cloud injection (141.37937ms)
+✔ index.mjs registers exactly one memory pre-step (default shadow) and none when memory_inject is off (74.004583ms)
+✔ memory.mjs reaches only the z0 memory surface: no Hermes home or state.db path anywhere (1.48611ms)
+✔ the gate endpoint is the profile model_endpoint only: a generic env var never marks a cloud model loopback (129.04705ms)
+✔ a root agent without a session cwd gets no brief (fail closed) and a counted no_scope (167.095756ms)
+✔ persistence (recorded deviation): the DSH brief is a durable admitted message, marked for the recall echo guard (179.040549ms)
+✔ shadow children are bounded: past the cap a turn writes a counted queue_saturated row instead of spawning (204.796219ms)
+✔ one root turn: the capture prompt and the memory job name the same session and turn (one canonical turn_key) (1.588361ms)
+✔ 1 apply registers an observe-only agent/request middleware; next() comes back unchanged (16.032058ms)
+✔ 1 the output stream is byte-identical with capture on or off (0.774933ms)
+✔ 2 the llm/stream router registers only when config.router===true AND automatic.json dsh is enabled (1.122891ms)
+✔ 3 a user turn sends one prompt and one stop event to hook_adapter --harness dsh, detached (1.132279ms)
+✔ 3 the JS turn_key matches a known harness_id.turn_key vector (0.164993ms)
+✔ 3 a turn that errors before its stop boundary is closed with a counted failure row, not left open (71.853118ms)
+✔ 4 the plugin source and the env it gives the hook child never reference key files or private trees (3.494173ms)
+✔ 5 default config: no network call, shadow_plane=off recorded once per process (242.206985ms)
+✔ 5 with a fake z0 service it samples deterministically at the configured rate and writes shadow_decision rows (57.835825ms)
+✔ 5 the max-inflight cap holds: one call in flight, the rest recorded queue_saturated (326.765046ms)
+✔ 5 service down gives backend_unavailable, counted (21.432027ms)
+✔ 5 port 11501 is refused unless allow_live_service (153.059724ms)
+✔ 5 the shadow only ever calls the pure /v1/plan route: no config value can point it at an executing route (23.63787ms)
+✔ 5 a shadow response that claims it executed is counted as a contract violation, never recorded ok (21.125439ms)
+✔ 6 a missing python lets the turn proceed and leaves a counted drop row (23.829273ms)
+✔ 6 a spawn that throws or errors is counted and never reaches the turn (42.045048ms)
+✔ 6 no unhandled rejection under --unhandled-rejections=strict on every failure path (340.7953ms)
+✔ 7 lineage and shadow rows hold no prompt or response text (21.677693ms)
+✔ 8 the plugin does not ship, export or load memory.js (0.973719ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5844.363097
+node_rc=0 files=tests/test-dsh-memory.mjs tests/test-dsh-plugin.mjs 

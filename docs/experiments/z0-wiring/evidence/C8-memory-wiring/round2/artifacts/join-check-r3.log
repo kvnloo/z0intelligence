@@ -1,0 +1,64 @@
+{
+ "ok": true,
+ "passed": 10,
+ "total": 10,
+ "failed": [],
+ "per_harness": {
+  "claude-code": {
+   "opportunities": 23,
+   "turns_with_seam_receipt": 22,
+   "joined": 16,
+   "missing": 0,
+   "foreign_or_mismatched": 0,
+   "valid": true
+  },
+  "codex": {
+   "opportunities": 2,
+   "turns_with_seam_receipt": 8,
+   "joined": 2,
+   "missing": 0,
+   "foreign_or_mismatched": 0,
+   "valid": true
+  },
+  "grok": {
+   "opportunities": 2,
+   "turns_with_seam_receipt": 8,
+   "joined": 2,
+   "missing": 0,
+   "foreign_or_mismatched": 0,
+   "valid": true
+  },
+  "hermes": {
+   "opportunities": 2,
+   "turns_with_seam_receipt": 23,
+   "joined": 2,
+   "missing": 0,
+   "foreign_or_mismatched": 0,
+   "valid": true
+  },
+  "omp": {
+   "opportunities": 20,
+   "turns_with_seam_receipt": 20,
+   "joined": 14,
+   "missing": 0,
+   "foreign_or_mismatched": 0,
+   "valid": true
+  },
+  "omo": {
+   "opportunities": 2,
+   "turns_with_seam_receipt": 8,
+   "joined": 2,
+   "missing": 0,
+   "foreign_or_mismatched": 0,
+   "valid": true
+  },
+  "dsh": {
+   "opportunities": 2,
+   "turns_with_seam_receipt": 19,
+   "joined": 2,
+   "missing": 0,
+   "foreign_or_mismatched": 0,
+   "valid": true
+  }
+ }
+}

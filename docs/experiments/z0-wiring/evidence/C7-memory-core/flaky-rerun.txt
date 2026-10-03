@@ -1,0 +1,13 @@
+# isolated reruns of the timing test that failed only in the base full-suite run (3x base 914dc99, 3x head 8d619cf)
+## C7-memory-core-base run 1
+1 passed in 0.34s
+## C7-memory-core-base run 2
+1 failed in 0.32s
+## C7-memory-core-base run 3
+1 passed in 0.30s
+## C7-memory-core run 1
+1 passed in 0.42s
+## C7-memory-core run 2
+1 passed in 0.30s
+## C7-memory-core run 3
+1 passed in 0.29s

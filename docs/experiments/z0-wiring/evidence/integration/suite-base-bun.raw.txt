@@ -1,0 +1,21 @@
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/local-cognition/index.test.ts:
+(pass) tool_call handler returns undefined and never blocks [2.90ms]
+(pass) a rejected send does not throw into the tool_call handler [30.73ms]
+(pass) sends a cognition_shadow request through the bridge transport [30.82ms]
+(pass) payload actions contain only the available tool names [30.80ms]
+(pass) payload keeps read-only authority and the example shadow models by default [30.63ms]
+(pass) env kill-switch disables the lane [30.57ms]
+(pass) env kill-switch accepts off/false and explicit on [0.13ms]
+(pass) cognition.json setting gates the lane when env is unset [0.39ms]
+(pass) timeout comes from the env override [0.05ms]
+(pass) resolveAvailableTools prefers ctx.getTools and always includes the observed tool [0.08ms]
+(pass) buildShadowPayload is self-contained and schema-shaped [0.08ms]
+(pass) registers z0int-cognition-status and the command never throws [0.72ms]
+
+ 12 pass
+ 0 fail
+ 46 expect() calls
+Ran 12 tests across 1 file. [189.00ms]
+bun_rc=0

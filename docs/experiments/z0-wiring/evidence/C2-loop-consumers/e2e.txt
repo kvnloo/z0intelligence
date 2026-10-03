@@ -1,0 +1,46 @@
+# C2-loop-consumers isolated e2e, round 2 (HEAD 352edf2)
+# cmd: flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock /mnt/zer0models/github/cua-lanes/bin/hostless scripts/e2e.sh
+#      (driver scripts/e2e_c2.py; round 1 driver kept as scripts/e2e_c2.r1.py). Full JSON: e2e.raw.txt. exit=0.
+# Homes: /mnt/zer0models/z0-wt/wiring/homes/C2-loop-consumers/e2e (HOME, Z0INT_HOME, TMPDIR); socket guard on: 0 violations.
+# Real data: only `sqlite3 "file:/mnt/zer0models/sft-svlm/data/agentsview/sessions.db?mode=ro" .schema` (schema text).
+
+1. Schema replay: the real .schema (1513 lines, 75 CREATE TABLE) with FTS5 shadow tables filtered out, replayed into
+   scratch DBs at user_version 74 and 113. Synthetic sessions for every agent incl. deepseek-harness.
+2. Two synthetic hosts captured turns through the C1 writer for all seven harnesses.
+
+3. `z0int outcomes verify --harness X --agentsview-db <v113> --no-gh --json` (host A, exit 0 for every harness):
+     harness      status   joined/unjoined/pending  appended
+     hermes       success  6/0/0                    6
+     codex        success  6/0/0                    6
+     grok         success  3/3/0 (ambiguous session) 6
+     omp          success  6/0/0                    6
+     omo          success  3/2/0 (never indexed)    5
+     dsh          success  3/0/0                    3
+     claude-code  success  (transcripts)            2
+   Re-run: 0 rows appended for every harness. Identical to round 1.
+
+4. Guards (CLI, --dry-run), now with the exit code:
+     v74 hermes                 success, joined 3 / unjoined 3, exit 0
+     v75 omp                    degraded, reader_unavailable, exit 3
+     no deepseek-harness agent  degraded, reader_unavailable (agent_missing), exit 3
+     CC empty projects dir      degraded, label_source_empty, exit 3        (round 1: exit 0 -- fixed)
+     grok --since 2099-01-01    0 turns, join 0/0/0, no failure rows        (new: the window covers every captured turn)
+
+5. Legacy imports (`z0int loop import`, twice each):
+     omp-v1                rows 4 then 0, same manifest hash; tiers gold 1 / negative 1 / execution 2; no_outcome 1
+     omp-cognition-shadow  rows 3 then 0, same manifest hash; backend_unavailable 297
+     dsh-jev               rows 4 then 0, same manifest hash; no_lineage 1   (new: an orphan jev_decision from a
+                           crashed agent is FIRST in the file; round 1 code would have imported 0 rows behind it)
+     scrub correction      a downgraded outcome_join.v1 for the gold turn: +1 stored row (5 stored, 4 turn_keys)
+     symlink -> /workspace/hermes-home/...   exit 1, "refusing to read" (refused before any open)
+
+6. `z0int loop export` per host + `z0int loop merge` (A,B) and (B,A):
+     omp/legacy exported rows 4 for 4 turn_keys; y_success [0, 0, None, None] (the scrubbed gold is now 0; one row)
+     shadow tables dsh/legacy 4, omp/legacy 3
+     merge: hosts [host-a, host-b]; identical manifest hash in both orders; codex/interactive provenance
+            {[host-a, host-b], [host-b]}; per harness x cohort tables only
+     cross-version merge: exit 2, nothing written
+     privacy: no synthetic secret in any exported, merged or imported table
+
+Differences against round 1 (scripted diff of the JSON reports): only the intended ones above (dsh-jev orphan row,
+exit codes, since guard, scrub row, symlink refusal, export_omp_legacy). All other keys are identical.

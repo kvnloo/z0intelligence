@@ -1,0 +1,34 @@
+TAP version 13
+# Subtest: governed canary requires all three gates
+ok 1 - governed canary requires all three gates
+  ---
+  duration_ms: 1.109627
+  type: 'test'
+  ...
+# Subtest: non-governed calls preserve the original payload plus OMP identity
+ok 2 - non-governed calls preserve the original payload plus OMP identity
+  ---
+  duration_ms: 0.553417
+  type: 'test'
+  ...
+# Subtest: harness cannot smuggle provider model or AODL into governed body
+ok 3 - harness cannot smuggle provider model or AODL into governed body
+  ---
+  duration_ms: 0.163337
+  type: 'test'
+  ...
+# Subtest: rejects non-object arguments
+ok 4 - rejects non-object arguments
+  ---
+  duration_ms: 0.327468
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 50.59305

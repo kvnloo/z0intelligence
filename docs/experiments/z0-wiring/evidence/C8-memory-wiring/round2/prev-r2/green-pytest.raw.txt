@@ -1,0 +1,4 @@
+....................................x...............................     [100%]
+=========================== short test summary info ============================
+XFAIL tests/test_hermes_memory.py::test_hermes_host_keeps_the_brief_out_of_the_session_store - Hermes core persists what it sends: agent/turn_context.py _stamp_api_content_sidecar stamps the user row with the sent bytes (pre_llm_call context included) in state.db messages.api_content and replays them on later turns. Spec C8 red test 2 ("not persisted to the session store") is UNMET for Hermes without a core change; owner decision pending (evidence/C8-memory-wiring/NOTES.md, deviations).
+67 passed, 1 xfailed in 13.21s

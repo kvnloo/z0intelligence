@@ -1,0 +1,15 @@
+178 | 	expect(exited).toBe(true);
+                      ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/omp-extensions/z0int-bridge/omo.test.ts:178:17)
+(fail) a host that exits when its event loop drains (senpi print mode) is never held open by the resident worker [8004.40ms]
+
+ 3 pass
+ 1 skip
+ 1 fail
+ 17 expect() calls
+Ran 5 tests across 1 file. [8.07s]

@@ -1,0 +1,4 @@
+tree=/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring head=ab8962d150c4393ba41103a8a662774276b63afc dirty=10
+...........................                                              [100%]
+27 passed in 5.74s
+pytest_rc=0

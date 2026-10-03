@@ -1,0 +1,218 @@
+go run ./internal/pricing/cmd/litellm-snapshot -restore
+Restored internal/pricing/snapshot/litellm_snapshot.json.gz
+cd frontend && npm ci && npm run build
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'agentsview-frontend@0.1.0',
+npm warn EBADENGINE   required: { node: '>=24.11.0' },
+npm warn EBADENGINE   current: { node: 'v22.23.2', npm: '10.9.8' }
+npm warn EBADENGINE }
+npm warn skipping integrity check for git dependency ssh://git@github.com/kenn-io/kit-ui.git
+
+added 459 packages, and audited 460 packages in 19s
+
+101 packages are looking for funding
+  run `npm fund` for details
+
+15 vulnerabilities (1 low, 14 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues possible, run:
+  npm audit fix --force
+
+Some issues need review, and may require choosing
+a different dependency.
+
+Run `npm audit` for details.
+
+> agentsview-frontend@0.1.0 build
+> vp build
+
+[32m✔[39m [1m[32m[paraglide-js] [39m[22mCompilation complete (message-modules)
+transforming...
+[32m✓[0m 8039 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[0m[32mindex.html                                       [0m[1;2m    3.81 kB[0m[2m │ gzip:   0.94 kB[0m
+[2mdist/[0m[2massets/[0m[35mTransformContext-CImm17dX.css             [0m[1;2m    0.07 kB[0m[2m │ gzip:   0.09 kB[0m
+[2mdist/[0m[2massets/[0m[35mVoronoi-ce7atosu.css                      [0m[1;2m    0.09 kB[0m[2m │ gzip:   0.09 kB[0m
+[2mdist/[0m[2massets/[0m[35mRect-CtRaGMmQ.css                         [0m[1;2m    0.49 kB[0m[2m │ gzip:   0.21 kB[0m
+[2mdist/[0m[2massets/[0m[35mChartAnnotations-Bw8CGteN.css             [0m[1;2m    0.52 kB[0m[2m │ gzip:   0.18 kB[0m
+[2mdist/[0m[2massets/[0m[35mLabels-sEaJtb97.css                       [0m[1;2m    0.60 kB[0m[2m │ gzip:   0.24 kB[0m
+[2mdist/[0m[2massets/[0m[35mBrushContext-C249R7Ej.css                 [0m[1;2m    0.79 kB[0m[2m │ gzip:   0.28 kB[0m
+[2mdist/[0m[2massets/[0m[35mPath-MiPiAzgz.css                         [0m[1;2m    1.07 kB[0m[2m │ gzip:   0.34 kB[0m
+[2mdist/[0m[2massets/[0m[35mDefaultTooltip-B5CAhh2Q.css               [0m[1;2m    1.65 kB[0m[2m │ gzip:   0.54 kB[0m
+[2mdist/[0m[2massets/[0m[35mLegend-DeowBKKb.css                       [0m[1;2m    2.09 kB[0m[2m │ gzip:   0.55 kB[0m
+[2mdist/[0m[2massets/[0m[35mindex-CIM8L2ae.css                        [0m[1;2m  345.65 kB[0m[2m │ gzip:  49.88 kB[0m
+[2mdist/[0m[2massets/[0m[36mcss-CdtkT07m.js                           [0m[1;2m    0.05 kB[0m[2m │ gzip:   0.07 kB[0m
+[2mdist/[0m[2massets/[0m[36mdisclose-version-xihTtKlq.js              [0m[1;2m    0.06 kB[0m[2m │ gzip:   0.08 kB[0m
+[2mdist/[0m[2massets/[0m[36mjavascript-Yelw-5ZN.js                    [0m[1;2m    0.06 kB[0m[2m │ gzip:   0.08 kB[0m
+[2mdist/[0m[2massets/[0m[36mascending-T0YRA00y.js                     [0m[1;2m    0.08 kB[0m[2m │ gzip:   0.09 kB[0m
+[2mdist/[0m[2massets/[0m[36mchannel-9GpTXcQM.js                       [0m[1;2m    0.11 kB[0m[2m │ gzip:   0.12 kB[0m
+[2mdist/[0m[2massets/[0m[36marray-B5KRA4hC.js                         [0m[1;2m    0.11 kB[0m[2m │ gzip:   0.12 kB[0m
+[2mdist/[0m[2massets/[0m[36mpie-WAS4IAKB-CFNR1zlq.js                  [0m[1;2m    0.12 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36minfo-A6RAGUB7-w064w4zi.js                 [0m[1;2m    0.12 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36mradar-RG4KPBEZ-DS4n89kX.js                [0m[1;2m    0.12 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36mpacket-AYTQ26CC-IuxipoU1.js               [0m[1;2m    0.12 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36mcynefin-OW5HDTMX-CgacDur8.js              [0m[1;2m    0.12 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36mtreemap-WGGIJYW6-DkKzoFXf.js              [0m[1;2m    0.12 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36mwardley-WFR3VGLG-CXQgsMt3.js              [0m[1;2m    0.12 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36mgitGraph-4MIJSDKK-BZa6kHw0.js             [0m[1;2m    0.12 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36mrailroad-74A4TZTK-i6FbI8gE.js             [0m[1;2m    0.12 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36mtreeView-Q6P3EWNA-B_ZCXS3f.js             [0m[1;2m    0.12 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36mrailroad-peg-WCYAUIDC-CuymJtvP.js         [0m[1;2m    0.13 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36marchitecture-7GRP2DOG-BrtvDH9a.js         [0m[1;2m    0.13 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36mrailroad-abnf-HS5TGJTU-Dqspe2Dz.js        [0m[1;2m    0.13 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36mrailroad-ebnf-LZEXJU2U-CLhOTQnr.js        [0m[1;2m    0.13 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36meventmodeling-NTZA5JFV-DQWAw0PY.js        [0m[1;2m    0.13 kB[0m[2m │ gzip:   0.13 kB[0m
+[2mdist/[0m[2massets/[0m[36minit-C-OQMol4.js                          [0m[1;2m    0.14 kB[0m[2m │ gzip:   0.12 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-Y2CYZVJY-DsF7k-Jl.js                [0m[1;2m    0.15 kB[0m[2m │ gzip:   0.14 kB[0m
+[2mdist/[0m[2massets/[0m[36mrange-EplFIxc7.js                         [0m[1;2m    0.17 kB[0m[2m │ gzip:   0.16 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-2Q5K7J3B-C1jixKkw.js                [0m[1;2m    0.19 kB[0m[2m │ gzip:   0.16 kB[0m
+[2mdist/[0m[2massets/[0m[36mmax-Db0q5_zr.js                           [0m[1;2m    0.19 kB[0m[2m │ gzip:   0.14 kB[0m
+[2mdist/[0m[2massets/[0m[36mmin-CCch3uox.js                           [0m[1;2m    0.19 kB[0m[2m │ gzip:   0.14 kB[0m
+[2mdist/[0m[2massets/[0m[36mattributes-DQ89ZbyK.js                    [0m[1;2m    0.20 kB[0m[2m │ gzip:   0.16 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-JWPE2WC7-DVXcaiue.js                [0m[1;2m    0.22 kB[0m[2m │ gzip:   0.17 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-XXDRQBXY-CX1k1KUB.js                [0m[1;2m    0.26 kB[0m[2m │ gzip:   0.22 kB[0m
+[2mdist/[0m[2massets/[0m[36mpath-CBgyysAW.js                          [0m[1;2m    0.30 kB[0m[2m │ gzip:   0.22 kB[0m
+[2mdist/[0m[2massets/[0m[36mmath-Bi_r_ZWc.js                          [0m[1;2m    0.31 kB[0m[2m │ gzip:   0.20 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-5VM5RSS4-ZNzvKenW.js                [0m[1;2m    0.36 kB[0m[2m │ gzip:   0.27 kB[0m
+[2mdist/[0m[2massets/[0m[36mrotate-ccw-D6-td0qY.js                    [0m[1;2m    0.39 kB[0m[2m │ gzip:   0.31 kB[0m
+[2mdist/[0m[2massets/[0m[36mArc-Iwq_97bq.js                           [0m[1;2m    0.45 kB[0m[2m │ gzip:   0.33 kB[0m
+[2mdist/[0m[2massets/[0m[36mmath-RobXhXPM.js                          [0m[1;2m    0.48 kB[0m[2m │ gzip:   0.30 kB[0m
+[2mdist/[0m[2massets/[0m[36mlinear-CNEal4Ob.js                        [0m[1;2m    0.50 kB[0m[2m │ gzip:   0.25 kB[0m
+[2mdist/[0m[2massets/[0m[36mPoints-C17FT5Vg.js                        [0m[1;2m    0.50 kB[0m[2m │ gzip:   0.34 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-WEXAMYUT-B-C8dzwz.js                [0m[1;2m    0.57 kB[0m[2m │ gzip:   0.40 kB[0m
+[2mdist/[0m[2massets/[0m[36mflowDiagram-KWPJA3E3-DhFdn6Ld.js          [0m[1;2m    0.57 kB[0m[2m │ gzip:   0.31 kB[0m
+[2mdist/[0m[2massets/[0m[36mtransition-DxJPU7MM.js                    [0m[1;2m    0.59 kB[0m[2m │ gzip:   0.37 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-J5ZVWO5B-oDCd-gWO.js                [0m[1;2m    0.63 kB[0m[2m │ gzip:   0.43 kB[0m
+[2mdist/[0m[2massets/[0m[36minfoDiagram-VRGFBTTK-CstyNjnL.js          [0m[1;2m    0.65 kB[0m[2m │ gzip:   0.41 kB[0m
+[2mdist/[0m[2massets/[0m[36mswimlanesDiagram-TC7HE7FX-CKidf_jD.js     [0m[1;2m    0.83 kB[0m[2m │ gzip:   0.48 kB[0m
+[2mdist/[0m[2massets/[0m[36msizeCapture-INFHLROL-B0uUizjq.js          [0m[1;2m    0.87 kB[0m[2m │ gzip:   0.51 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-DUW6YSOI-Dgx8z5s3.js                [0m[1;2m    0.89 kB[0m[2m │ gzip:   0.46 kB[0m
+[2mdist/[0m[2massets/[0m[36mline-DuTBPHTZ.js                          [0m[1;2m    0.94 kB[0m[2m │ gzip:   0.46 kB[0m
+[2mdist/[0m[2massets/[0m[36mrolldown-runtime-Dd_uD5pT.js              [0m[1;2m    1.10 kB[0m[2m │ gzip:   0.62 kB[0m
+[2mdist/[0m[2massets/[0m[36mband-DAAWTjgR.js                          [0m[1;2m    1.41 kB[0m[2m │ gzip:   0.59 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-5DYCD2WN-CTcsweWs.js                [0m[1;2m    1.41 kB[0m[2m │ gzip:   0.78 kB[0m
+[2mdist/[0m[2massets/[0m[36mordinal-fvhoxA7s.js                       [0m[1;2m    1.45 kB[0m[2m │ gzip:   0.59 kB[0m
+[2mdist/[0m[2massets/[0m[36mrailroadDiagram-XR7U4H2S-DkCXge0Z.js      [0m[1;2m    1.66 kB[0m[2m │ gzip:   0.77 kB[0m
+[2mdist/[0m[2massets/[0m[36mscales.svelte-Bvdrwh5d.js                 [0m[1;2m    1.79 kB[0m[2m │ gzip:   0.82 kB[0m
+[2mdist/[0m[2massets/[0m[36mabnfDiagram-O67JEVCF-CG_d3pM1.js          [0m[1;2m    1.85 kB[0m[2m │ gzip:   0.90 kB[0m
+[2mdist/[0m[2massets/[0m[36mdist-BRuBKNNy.js                          [0m[1;2m    1.87 kB[0m[2m │ gzip:   0.83 kB[0m
+[2mdist/[0m[2massets/[0m[36mtime-BGqk84Iu.js                          [0m[1;2m    1.94 kB[0m[2m │ gzip:   1.02 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-7PRAP22T-Bon19PoR.js                [0m[1;2m    1.95 kB[0m[2m │ gzip:   0.95 kB[0m
+[2mdist/[0m[2massets/[0m[36mstep-kmeQPQxc.js                          [0m[1;2m    1.96 kB[0m[2m │ gzip:   0.62 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-GWA4HPMP-DrkOvXl_.js                [0m[1;2m    1.97 kB[0m[2m │ gzip:   0.88 kB[0m
+[2mdist/[0m[2massets/[0m[36mpegDiagram-GJSIUBJH-CkVmxZRW.js           [0m[1;2m    2.01 kB[0m[2m │ gzip:   0.94 kB[0m
+[2mdist/[0m[2massets/[0m[36mebnfDiagram-ZINNZB2B-CiLLfy_p.js          [0m[1;2m    2.06 kB[0m[2m │ gzip:   0.89 kB[0m
+[2mdist/[0m[2massets/[0m[36mpath-C_SyPjZC.js                          [0m[1;2m    2.07 kB[0m[2m │ gzip:   0.91 kB[0m
+[2mdist/[0m[2massets/[0m[36mrect.svelte-FzjMonm1.js                   [0m[1;2m    2.56 kB[0m[2m │ gzip:   1.03 kB[0m
+[2mdist/[0m[2massets/[0m[36mmotion.svelte-CSgUoAEw.js                 [0m[1;2m    2.61 kB[0m[2m │ gzip:   1.00 kB[0m
+[2mdist/[0m[2massets/[0m[36mjson-qhed-kSA.js                          [0m[1;2m    2.81 kB[0m[2m │ gzip:   0.77 kB[0m
+[2mdist/[0m[2massets/[0m[36mIcon-C7gQKXJS.js                          [0m[1;2m    2.95 kB[0m[2m │ gzip:   1.47 kB[0m
+[2mdist/[0m[2massets/[0m[36marc-D-vY3gAg.js                           [0m[1;2m    3.47 kB[0m[2m │ gzip:   1.46 kB[0m
+[2mdist/[0m[2massets/[0m[36mmotion-BjBVrAm6.js                        [0m[1;2m    3.75 kB[0m[2m │ gzip:   1.57 kB[0m
+[2mdist/[0m[2massets/[0m[36mpackage-D8d_148E.js                       [0m[1;2m    4.27 kB[0m[2m │ gzip:   1.78 kB[0m
+[2mdist/[0m[2massets/[0m[36mdiagram-MLGK6HIB-CzJtai_4.js              [0m[1;2m    4.27 kB[0m[2m │ gzip:   1.84 kB[0m
+[2mdist/[0m[2massets/[0m[36mPoints.html-CSmh98rr.js                   [0m[1;2m    4.44 kB[0m[2m │ gzip:   1.72 kB[0m
+[2mdist/[0m[2massets/[0m[36mdefaultLocale-BFoDCU3G.js                 [0m[1;2m    4.63 kB[0m[2m │ gzip:   2.12 kB[0m
+[2mdist/[0m[2massets/[0m[36msrc-CXv7gojb.js                           [0m[1;2m    4.97 kB[0m[2m │ gzip:   2.00 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-NETBCI7D-CYUOSVyt.js                [0m[1;2m    5.43 kB[0m[2m │ gzip:   2.50 kB[0m
+[2mdist/[0m[2massets/[0m[36mlinear-BaL3Nfgg.js                        [0m[1;2m    5.68 kB[0m[2m │ gzip:   2.34 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-742MDFTN-CCUAtld-.js                [0m[1;2m    5.83 kB[0m[2m │ gzip:   2.68 kB[0m
+[2mdist/[0m[2massets/[0m[36mpath-Y5urAfNy.js                          [0m[1;2m    6.01 kB[0m[2m │ gzip:   2.27 kB[0m
+[2mdist/[0m[2massets/[0m[36mdiagram-MPIPVDR6-BBip-LR4.js              [0m[1;2m    6.06 kB[0m[2m │ gzip:   2.56 kB[0m
+[2mdist/[0m[2massets/[0m[36mBrushContext-BHxFNS6h.js                  [0m[1;2m    6.09 kB[0m[2m │ gzip:   2.28 kB[0m
+[2mdist/[0m[2massets/[0m[36mpieDiagram-5QR66LMP-BihDpw3y.js           [0m[1;2m    6.21 kB[0m[2m │ gzip:   2.59 kB[0m
+[2mdist/[0m[2massets/[0m[36mLabels-DeVSdrQT.js                        [0m[1;2m    8.14 kB[0m[2m │ gzip:   3.04 kB[0m
+[2mdist/[0m[2massets/[0m[36mdiagram-CDSNMT55-Dhk3pS3U.js              [0m[1;2m    8.19 kB[0m[2m │ gzip:   3.64 kB[0m
+[2mdist/[0m[2massets/[0m[36mstring-CjztbJiz.js                        [0m[1;2m    8.41 kB[0m[2m │ gzip:   3.61 kB[0m
+[2mdist/[0m[2massets/[0m[36mDefaultTooltip-DAY-XSpC.js                [0m[1;2m    8.87 kB[0m[2m │ gzip:   2.84 kB[0m
+[2mdist/[0m[2massets/[0m[36mLegend-CkyIQiJR.js                        [0m[1;2m    9.54 kB[0m[2m │ gzip:   3.91 kB[0m
+[2mdist/[0m[2massets/[0m[36mcynefinDiagram-VND7K2PF-rKfp-sH3.js       [0m[1;2m    9.93 kB[0m[2m │ gzip:   3.51 kB[0m
+[2mdist/[0m[2massets/[0m[36mArc.canvas-HaJMeYcb.js                    [0m[1;2m   10.45 kB[0m[2m │ gzip:   3.31 kB[0m
+[2mdist/[0m[2massets/[0m[36myaml-rwi0_p6S.js                          [0m[1;2m   10.49 kB[0m[2m │ gzip:   2.26 kB[0m
+[2mdist/[0m[2massets/[0m[36mdiagram-ATOU4E4O-DlkTLfRz.js              [0m[1;2m   10.65 kB[0m[2m │ gzip:   4.12 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-3FUC2YCW-D2BeITiT.js                [0m[1;2m   10.72 kB[0m[2m │ gzip:   4.32 kB[0m
+[2mdist/[0m[2massets/[0m[36mLink.canvas-DMj-pGwm.js                   [0m[1;2m   10.88 kB[0m[2m │ gzip:   4.04 kB[0m
+[2mdist/[0m[2massets/[0m[36mdiagram-3UASUU5V-Blp1Tr-q.js              [0m[1;2m   11.05 kB[0m[2m │ gzip:   3.84 kB[0m
+[2mdist/[0m[2massets/[0m[36mkey.svelte-UDz6tL_r.js                    [0m[1;2m   11.12 kB[0m[2m │ gzip:   4.37 kB[0m
+[2mdist/[0m[2massets/[0m[36mRect.html-DqNCUkLH.js                     [0m[1;2m   11.75 kB[0m[2m │ gzip:   3.59 kB[0m
+[2mdist/[0m[2massets/[0m[36mdefaultLocale-Dc_zD0ki.js                 [0m[1;2m   12.87 kB[0m[2m │ gzip:   3.90 kB[0m
+[2mdist/[0m[2massets/[0m[36mTransformContext-DVKQeYaS.js              [0m[1;2m   13.22 kB[0m[2m │ gzip:   3.95 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-UA2S7LBM-Cj0fpxhY.js                [0m[1;2m   14.82 kB[0m[2m │ gzip:   4.22 kB[0m
+[2mdist/[0m[2massets/[0m[36mrust-Cfkwpbl8.js                          [0m[1;2m   15.06 kB[0m[2m │ gzip:   2.71 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-GTNCS2PH-CMTEjH__.js                [0m[1;2m   15.64 kB[0m[2m │ gzip:   4.36 kB[0m
+[2mdist/[0m[2massets/[0m[36mmermaid-parser.core-DnO6wWmF.js           [0m[1;2m   16.58 kB[0m[2m │ gzip:   3.92 kB[0m
+[2mdist/[0m[2massets/[0m[36mishikawaDiagram-OU5B5YK6-Bi1_acEA.js      [0m[1;2m   17.30 kB[0m[2m │ gzip:   6.53 kB[0m
+[2mdist/[0m[2massets/[0m[36mPath.canvas-CV8dcnij.js                   [0m[1;2m   18.51 kB[0m[2m │ gzip:   6.60 kB[0m
+[2mdist/[0m[2massets/[0m[36mChartAnnotations-CwrSwLc9.js              [0m[1;2m   18.75 kB[0m[2m │ gzip:   6.01 kB[0m
+[2mdist/[0m[2massets/[0m[36mcentroid-yCfI4PCa.js                      [0m[1;2m   19.45 kB[0m[2m │ gzip:   7.06 kB[0m
+[2mdist/[0m[2massets/[0m[36mkanban-definition-PNTS6WVX-B0zZhnsF.js    [0m[1;2m   20.26 kB[0m[2m │ gzip:   7.15 kB[0m
+[2mdist/[0m[2massets/[0m[36msankeyDiagram-IPEJSGJF-BIe-1n_e.js        [0m[1;2m   22.78 kB[0m[2m │ gzip:   8.25 kB[0m
+[2mdist/[0m[2massets/[0m[36mjourneyDiagram-ZHPQQLJL-BhdGtVQN.js       [0m[1;2m   23.14 kB[0m[2m │ gzip:   8.15 kB[0m
+[2mdist/[0m[2massets/[0m[36msql-BsFa4tDR.js                           [0m[1;2m   23.42 kB[0m[2m │ gzip:   7.45 kB[0m
+[2mdist/[0m[2massets/[0m[36mmindmap-definition-NLK3R4M7-7oAUghbe.js   [0m[1;2m   23.44 kB[0m[2m │ gzip:   7.99 kB[0m
+[2mdist/[0m[2massets/[0m[36mgraphlib-DS17s2tU.js                      [0m[1;2m   23.90 kB[0m[2m │ gzip:   8.31 kB[0m
+[2mdist/[0m[2massets/[0m[36mwardleyDiagram-VNRHLVJA-C2Fhe3Ef.js       [0m[1;2m   25.20 kB[0m[2m │ gzip:   6.55 kB[0m
+[2mdist/[0m[2massets/[0m[36mchart-CoqHiKTJ.js                         [0m[1;2m   26.86 kB[0m[2m │ gzip:   9.20 kB[0m
+[2mdist/[0m[2massets/[0m[36mrough.esm-Dy-Kn_BL.js                     [0m[1;2m   27.10 kB[0m[2m │ gzip:   8.85 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-ZIGJFQKS-CYuD5_wM.js                [0m[1;2m   28.53 kB[0m[2m │ gzip:   8.28 kB[0m
+[2mdist/[0m[2massets/[0m[36mgitGraphDiagram-X574FWY7-DJrlVoGA.js      [0m[1;2m   29.00 kB[0m[2m │ gzip:   8.56 kB[0m
+[2mdist/[0m[2massets/[0m[36mdist-D4MOZF22.js                          [0m[1;2m   29.11 kB[0m[2m │ gzip:   9.38 kB[0m
+[2mdist/[0m[2massets/[0m[36mtimeline-definition-EJHVYXUP-z7KSU2Ya.js  [0m[1;2m   30.46 kB[0m[2m │ gzip:  10.01 kB[0m
+[2mdist/[0m[2massets/[0m[36merDiagram-OPXOYQCR-CErdTOIe.js            [0m[1;2m   30.65 kB[0m[2m │ gzip:  10.56 kB[0m
+[2mdist/[0m[2massets/[0m[36mVoronoi-CO4srvWL.js                       [0m[1;2m   31.00 kB[0m[2m │ gzip:  11.68 kB[0m
+[2mdist/[0m[2massets/[0m[36mrequirementDiagram-PLB6GJNP-DQoCwU10.js   [0m[1;2m   31.07 kB[0m[2m │ gzip:   9.83 kB[0m
+[2mdist/[0m[2massets/[0m[36mquadrantDiagram-O4NWA36T-D0eP3Jed.js      [0m[1;2m   33.51 kB[0m[2m │ gzip:   9.74 kB[0m
+[2mdist/[0m[2massets/[0m[36msrc-J-Nw5TUa.js                           [0m[1;2m   37.18 kB[0m[2m │ gzip:  12.42 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-Z7XXMR3K-B4-6_JF-.js                [0m[1;2m   37.46 kB[0m[2m │ gzip:   8.09 kB[0m
+[2mdist/[0m[2massets/[0m[36mvennDiagram-UO4OBE2U-3rQusLFo.js          [0m[1;2m   41.17 kB[0m[2m │ gzip:  15.11 kB[0m
+[2mdist/[0m[2massets/[0m[36mbash-CLZ0U2zV.js                          [0m[1;2m   41.47 kB[0m[2m │ gzip:   6.07 kB[0m
+[2mdist/[0m[2massets/[0m[36mstateDiagram-v2-GCMORJYK-Bju7ZNDI.js      [0m[1;2m   41.57 kB[0m[2m │ gzip:  13.91 kB[0m
+[2mdist/[0m[2massets/[0m[36mblockDiagram-BEXU5L5S-vjnuyCZp.js         [0m[1;2m   42.47 kB[0m[2m │ gzip:  13.87 kB[0m
+[2mdist/[0m[2massets/[0m[36mxychartDiagram-PMCCYNJV-D9p1AVn3.js       [0m[1;2m   42.85 kB[0m[2m │ gzip:  11.75 kB[0m
+[2mdist/[0m[2massets/[0m[36mgo-rLFTqkRN.js                            [0m[1;2m   46.81 kB[0m[2m │ gzip:   5.14 kB[0m
+[2mdist/[0m[2massets/[0m[36mdagre-6A5THRUB-CWpQsch9.js                [0m[1;2m   47.83 kB[0m[2m │ gzip:  17.11 kB[0m
+[2mdist/[0m[2massets/[0m[36mcss-LbU1hoFO.js                           [0m[1;2m   49.02 kB[0m[2m │ gzip:  11.90 kB[0m
+[2mdist/[0m[2massets/[0m[36mclassDiagram-v2-NBCMYWYE-zI9Ek04S.js      [0m[1;2m   49.73 kB[0m[2m │ gzip:  16.18 kB[0m
+[2mdist/[0m[2massets/[0m[36mcatppuccin-mocha-DjuaAJKi.js              [0m[1;2m   50.84 kB[0m[2m │ gzip:   8.47 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-MBY4JIJT-bcOkVtXT.js                [0m[1;2m   51.86 kB[0m[2m │ gzip:  16.63 kB[0m
+[2mdist/[0m[2massets/[0m[36mganttDiagram-FUAMR5RP-C7zc5acz.js         [0m[1;2m   54.76 kB[0m[2m │ gzip:  18.38 kB[0m
+[2mdist/[0m[2massets/[0m[36mhtml-DhZ_c8hx.js                          [0m[1;2m   57.24 kB[0m[2m │ gzip:  11.74 kB[0m
+[2mdist/[0m[2massets/[0m[36mengine-javascript-DQIjgwkj.js             [0m[1;2m   57.63 kB[0m[2m │ gzip:  20.18 kB[0m
+[2mdist/[0m[2massets/[0m[36mmarkdown-BYOwaDjH.js                      [0m[1;2m   59.32 kB[0m[2m │ gzip:   5.66 kB[0m
+[2mdist/[0m[2massets/[0m[36mindex-client-dTBGG5a8.js                  [0m[1;2m   60.18 kB[0m[2m │ gzip:  22.95 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-7M6MHVWA-SQFeu0Il.js                [0m[1;2m   62.75 kB[0m[2m │ gzip:  20.38 kB[0m
+[2mdist/[0m[2massets/[0m[36mc4Diagram-YGBWAQC7-URUXr-Ti.js            [0m[1;2m   65.08 kB[0m[2m │ gzip:  18.61 kB[0m
+[2mdist/[0m[2massets/[0m[36mpython-gzcpVVnB.js                        [0m[1;2m   69.94 kB[0m[2m │ gzip:   9.09 kB[0m
+[2mdist/[0m[2massets/[0m[36mdiagram-22UHCM2B-B7ID1V3X.js              [0m[1;2m   80.52 kB[0m[2m │ gzip:  25.20 kB[0m
+[2mdist/[0m[2massets/[0m[36mcose-bilkent-JH36ORCC-DE9136-0.js         [0m[1;2m   81.25 kB[0m[2m │ gzip:  21.53 kB[0m
+[2mdist/[0m[2massets/[0m[36mmermaid.core-C77fM8KQ.js                  [0m[1;2m   89.43 kB[0m[2m │ gzip:  29.82 kB[0m
+[2mdist/[0m[2massets/[0m[36mswimlanes-2SLR337P-BxX1PVUJ.js            [0m[1;2m  106.24 kB[0m[2m │ gzip:  36.12 kB[0m
+[2mdist/[0m[2massets/[0m[36mcore-C37KF-j0.js                          [0m[1;2m  111.88 kB[0m[2m │ gzip:  35.79 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-7INBJB4K-BMAriUIL.js                [0m[1;2m  115.48 kB[0m[2m │ gzip:  29.20 kB[0m
+[2mdist/[0m[2massets/[0m[36msequenceDiagram-PO4LG4MO-B8Dyc1Up.js      [0m[1;2m  117.31 kB[0m[2m │ gzip:  31.26 kB[0m
+[2mdist/[0m[2massets/[0m[36marchitectureDiagram-NJMV4G6O-BD87a9fY.js  [0m[1;2m  148.90 kB[0m[2m │ gzip:  41.14 kB[0m
+[2mdist/[0m[2massets/[0m[36mjavascript-BzbQS41l.js                    [0m[1;2m  174.81 kB[0m[2m │ gzip:  16.62 kB[0m
+[2mdist/[0m[2massets/[0m[36mtypescript-bsJCZSQ-.js                    [0m[1;2m  181.07 kB[0m[2m │ gzip:  16.23 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-O7XYJQB3-AxaPShTF.js                [0m[1;2m  211.24 kB[0m[2m │ gzip:  28.47 kB[0m
+[2mdist/[0m[2massets/[0m[36musecaseDiagram-POWQR4AR-BRKIbAdE.js       [0m[1;2m  231.08 kB[0m[2m │ gzip:  61.84 kB[0m
+[2mdist/[0m[2massets/[0m[36mkatex-ZlcWpGUi.js                         [0m[1;2m  258.68 kB[0m[2m │ gzip:  77.43 kB[0m
+[2mdist/[0m[2massets/[0m[36mcytoscape.esm-BsO9fSUN.js                 [0m[1;2m  434.70 kB[0m[2m │ gzip: 137.74 kB[0m
+[2mdist/[0m[2massets/[0m[36mchunk-FOHPRMQF-CoA4358r.js                [0m[1;2m  662.09 kB[0m[2m │ gzip: 143.16 kB[0m
+[2mdist/[0m[2massets/[0m[36melk-276RUBZZ-VmKIUxfQ.js                  [0m[33;1m1,456.44 kB[0m[2m │ gzip: 453.24 kB[0m
+[2mdist/[0m[2massets/[0m[36mindex-Ck_kk5YP.js                         [0m[33;1m1,946.65 kB[0m[2m │ gzip: 552.57 kB[0m
+
+[32m✓ built in 13.44s[39m
+[33m[plugin builtin:vite-reporter] [33;1m
+(!) Some chunks are larger than 1200 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[0m[39m
+rm -rf internal/web/dist
+cp -r frontend/dist internal/web/dist
+printf '%s\n' \
+	'keep embed dir for generated frontend assets' \
+	> internal/web/dist/.keep

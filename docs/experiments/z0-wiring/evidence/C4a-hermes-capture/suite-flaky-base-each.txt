@@ -1,0 +1,2 @@
+base: tests/test_agentweb_bridge_overload.py::test_host_overload_is_503_before_handler_execution failed 1/10
+base: tests/test_hook_adapter.py::test_prompt_handler_returns_under_5ms_p99_with_the_build_detached failed 3/10

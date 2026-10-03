@@ -1,0 +1,57 @@
+# C3 isolated e2e at 06454d590811da0ee3529fb511e94afa00c9dd1f (committed, clean tree: 0 changed paths)
+# omp omp/18.4.2; cmd: flock -s quiet-lane.lock scripts/e2e_omp.sh <wt> /mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/e2e <venv python> 11548 11549 3
+## omp run 1
+omp exit=0 wall_s=2.47024
+## omp run 2
+omp exit=0 wall_s=1.99652
+## omp run 3
+omp exit=0 wall_s=2.16265
+## baseline omp run 1 (no extensions)
+omp exit=0 wall_s=2.31335
+## baseline omp run 2 (no extensions)
+omp exit=0 wall_s=2.12796
+## baseline omp run 3 (no extensions)
+omp exit=0 wall_s=1.99028
+# check: e2e_check.py /mnt/zer0models/z0-wt/wiring/homes/C3-omp-omo-capture/e2e 3
+{
+  "ok": true,
+  "checks": {
+    "one_opportunity_per_run": true,
+    "one_outcome_per_run": true,
+    "all_joined_on_turn_key": true,
+    "join_fields_agree": true,
+    "schemas": true,
+    "cohort_interactive": true,
+    "task_cwd_repo": true,
+    "request_text_not_stored": true,
+    "execution_completed_true_verified_null": true,
+    "session_id_from_omp_session_manager": true,
+    "no_drops": true,
+    "bridge_jsonl_rows": true,
+    "bridge_jsonl_no_prompt_field": true,
+    "no_marker_text_anywhere_in_z0home": true,
+    "backend_unavailable_counted": true,
+    "no_shadow_answer_rows_for_dead_backend": true
+  },
+  "counts": {
+    "opportunities": 3,
+    "outcomes": 3,
+    "failure_kinds": [
+      "missing_verifier",
+      "partial_measurement"
+    ],
+    "failures": 6,
+    "drops": 0,
+    "bridge_rows": 3,
+    "counters": {
+      "backend_unavailable": 3
+    }
+  },
+  "gates": [
+    "ACT",
+    "ACT",
+    "ACT"
+  ],
+  "marker_leaks": {}
+}
+check exit=0

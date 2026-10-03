@@ -1,0 +1,35 @@
+# C2-loop-consumers isolated e2e, build round 2 (HEAD f20c2b7)
+# cmd: flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock /mnt/zer0models/github/cua-lanes/bin/hostless scripts/e2e.sh
+#      driver scripts/e2e_c2.py (the previous driver is kept as scripts/e2e_c2.r2.py). exit=0.
+#      Full output: e2e.raw.txt (stderr: e2e.stderr.txt, empty); JSON report alone: e2e.report.json.
+# Homes: /mnt/zer0models/z0-wt/wiring/homes/C2-loop-consumers/e2e (HOME, Z0INT_HOME, TMPDIR, CLAUDE_CONFIG_DIR,
+#        AGENTSVIEW_DATA_DIR); socket guard on: 0 violations.
+# Real data: only `sqlite3 "file:/mnt/zer0models/sft-svlm/data/agentsview/sessions.db?mode=ro" .schema` (schema text,
+#        live DB is v0.44 / user_version 113). No rows, no TencentDB, no z0 service, no ~/.z0int / ~/.dsh read.
+# Contrast run: the same driver against the pre-fix commit 0a73899 (temporary detached worktree, removed),
+#        home homes/C2-loop-consumers/e2e-pre -> e2e-prefix.raw.txt (exit 0).
+
+A. Spec e2e (hosts A and B: verify for all seven harnesses at 74 and 113, export, merge x2, refusals, legacy
+   imports, privacy). Every check still holds; 38 keys differ from the previous round's report, all of one kind:
+   hosts A/B write every harness's shell results in the Claude Code shape (pass = status 'completed', no exit line;
+   fail = 'Exit code N'). A passing run there is now unknown instead of exit 0, so the turn with "tests pass + a
+   correction cue" moves from contested to verified_failure on every harness (e.g. verify_host_b.omp.states
+   {contested: 2, verified_failure: 2} -> {verified_failure: 4}). Joins, failures, exits, merge hashes, refusals,
+   legacy counts and privacy are unchanged. Privacy: no synthetic secret in any table or verified row.
+
+B. Host C (harness result shapes, v113 replay and the v0.39 fixture at 74), via the CLI `z0int outcomes verify
+   --harness X --agentsview-db ... --no-gh --json`:
+   1. OMP / DSH / Hermes: identical to the previous round (omp {verified_failure: 2, unverified: 1}, dsh
+      {unverified: 1}, hermes {verified_failure: 1}), at 113 and 74; reports now carry test_label_polarity
+      (failure_only / sparse / both).
+   2. NEW Grok, real shape (run_terminal_command, ACP status 'completed', no exit-code line):
+        turn 1 'pytest -q' -> '..F..\n1 failed, 4 passed'        : unverified / execution_only, tests_in_turn [0]
+        turn 2 'pytest -q' -> Python traceback                    : unverified / execution_only, tests_in_turn [0]
+        turn 3 'git commit' -> '[main <sha>] ...' (later reverted): verified_failure / negative_gold, commit_reverted
+      states {unverified: 2, verified_failure: 1}, test_label_polarity none, at 113 and at 74.
+      Pre-fix (0a73899, e2e-prefix.raw.txt): turns 1 and 2 were verified_success / deterministic_gold with
+      tests_in_turn [+1] -- the reported blocker, reproduced through the CLI and gone at HEAD.
+   3. Unreadable schema (dropped table): exit 3, degraded, reader_unavailable: 1, no traceback (unchanged).
+   4. Export of host C: every table manifest names its polarity: dsh sparse, grok none, hermes both,
+      omp failure_only. omp export turn keys: 3/3 rows on a verified turn key (unchanged).
+   5. Privacy: no synthetic secret in host C's tables or in the omp/grok verified rows.

@@ -1,0 +1,20 @@
+== wt/C8-memory-wiring run 1
+1 passed in 3.01s
+== wt/C8-memory-wiring run 2
+rm: cannot remove '/mnt/zer0models/z0-wt/wiring/homes/C8-memory-wiring/r2-timing/tmp/pytest-of-kvn/pytest-0/test_hook_subprocess_wall_time0/z0/state': Directory not empty
+== wt/C8-memory-wiring run 3
+1 passed in 3.06s
+== wt/C8-memory-wiring run 4
+1 passed in 9.46s
+== wt/C8-memory-wiring run 5
+rm: cannot remove '/mnt/zer0models/z0-wt/wiring/homes/C8-memory-wiring/r2-timing/tmp/pytest-of-kvn/pytest-2/test_hook_subprocess_wall_time0/z0/runtime/capture-slots': Directory not empty
+== wt/C8-memory-wiring-base run 1
+1 passed in 6.39s
+== wt/C8-memory-wiring-base run 2
+rm: cannot remove '/mnt/zer0models/z0-wt/wiring/homes/C8-memory-wiring/r2-timing/tmp/pytest-of-kvn/pytest-3/test_hook_subprocess_wall_time0/z0': Directory not empty
+== wt/C8-memory-wiring-base run 3
+rm: cannot remove '/mnt/zer0models/z0-wt/wiring/homes/C8-memory-wiring/r2-timing/tmp/pytest-of-kvn/pytest-3/test_hook_subprocess_wall_time0/z0/runtime/capture-slots': Directory not empty
+== wt/C8-memory-wiring-base run 4
+1 passed in 3.23s
+== wt/C8-memory-wiring-base run 5
+1 passed in 6.81s

@@ -1,0 +1,17 @@
+# C2 full suite, build round 2 (isolated runner, socket guard, flock -s quiet-lane.lock)
+#   python -m pytest -q -p no:cacheprovider -rfE --tb=no tests   (scripts/suite.sh; raw: suite-base.raw.txt, suite-head.raw.txt)
+base 914dc99 (C1 head = component base; temporary worktree wt/C2-loop-consumers-base, removed after the run):
+     11 failed, 1018 passed, 4 skipped
+head 0a73899: 12 failed, 1115 passed, 4 skipped
+
+Base failure set (11): test_functions_verify live x5, test_provider_saturation x1, test_quota_budget x5 (same set as
+C1 and as C2's earlier rounds).
+Head = the same 11 + 1:
+  tests/test_agentweb_bridge_overload.py::test_host_overload_is_503_before_handler_execution
+A load/timing-sensitive service test in a module C2 does not touch (it also showed up in C2's previous round).
+Isolated rerun, 3x each under the lock (suite-isolated.raw.txt): 3/3 passed on head 0a73899 and 3/3 passed on base 914dc99.
+=> No new deterministic failures; the persistent failure set is identical (11) on base and head.
+
+Regression guard: cc-verify-head.json (0a73899, scratch homes/C2-loop-consumers/golden/s, the same path as before)
+sha256 fc8b94c220a0cc926b4faf398199cdc2095f158f4405b4931daa6a217898e655 == ../cc-verify-6fee859.json (byte-identical).
+test_cc_export_regression is green in the head suite (the claude-code turn_key derivation is unchanged).

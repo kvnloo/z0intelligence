@@ -1,0 +1,411 @@
+{
+ "sha": "ada336841983a3aadb6b7c600d0f3199883c3665",
+ "ok": false,
+ "passed": 38,
+ "total": 40,
+ "checks": [
+  {
+   "check": "runs.every_leg_exit_0",
+   "ok": true,
+   "detail": 61
+  },
+  {
+   "check": "isolation.masks_empty_inside",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "claude-code.shadow_requests_identical_to_off",
+   "ok": true,
+   "detail": {
+    "differ": []
+   }
+  },
+  {
+   "check": "claude-code.canary_brief_in_next_model_request",
+   "ok": true,
+   "detail": {
+    "exact-identifier": true,
+    "supersession": true,
+    "cross-harness": true,
+    "contradiction": true,
+    "missing-evidence": true,
+    "minimal-context": true
+   }
+  },
+  {
+   "check": "claude-code.off_requests_carry_no_brief",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "claude-code.secret_probe_brief_is_scrubbed",
+   "ok": true,
+   "detail": {
+    "requests": 1,
+    "brief": true
+   }
+  },
+  {
+   "check": "claude-code.shadow_rows_would_inject_with_snapshot",
+   "ok": true,
+   "detail": {
+    "shadow_rows": 6,
+    "would_inject": 6
+   }
+  },
+  {
+   "check": "claude-code.no_secret_in_seam_rows",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "hermes.shadow_requests_identical_to_off",
+   "ok": true,
+   "detail": {
+    "differ": []
+   }
+  },
+  {
+   "check": "hermes.canary_brief_in_next_model_request",
+   "ok": true,
+   "detail": {
+    "exact-identifier": true,
+    "supersession": true,
+    "cross-harness": true,
+    "contradiction": true,
+    "missing-evidence": true,
+    "minimal-context": true
+   }
+  },
+  {
+   "check": "hermes.off_requests_carry_no_brief",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "hermes.secret_probe_brief_is_scrubbed",
+   "ok": true,
+   "detail": {
+    "requests": 4,
+    "brief": true
+   }
+  },
+  {
+   "check": "hermes.shadow_rows_would_inject_with_snapshot",
+   "ok": true,
+   "detail": {
+    "shadow_rows": 6,
+    "would_inject": 6
+   }
+  },
+  {
+   "check": "hermes.no_secret_in_seam_rows",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "omp.shadow_requests_identical_to_off",
+   "ok": true,
+   "detail": {
+    "differ": []
+   }
+  },
+  {
+   "check": "omp.canary_brief_in_next_model_request",
+   "ok": true,
+   "detail": {
+    "exact-identifier": true,
+    "supersession": true,
+    "cross-harness": true,
+    "contradiction": true,
+    "missing-evidence": true,
+    "minimal-context": true
+   }
+  },
+  {
+   "check": "omp.off_requests_carry_no_brief",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "omp.secret_probe_brief_is_scrubbed",
+   "ok": true,
+   "detail": {
+    "requests": 1,
+    "brief": true
+   }
+  },
+  {
+   "check": "omp.shadow_rows_would_inject_with_snapshot",
+   "ok": true,
+   "detail": {
+    "shadow_rows": 6,
+    "would_inject": 6
+   }
+  },
+  {
+   "check": "omp.no_secret_in_seam_rows",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "claude-code.cloud_endpoint_blocked_request_identical_to_off",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "check": "default.allow_cloud_injection_false_for_every_harness",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "hermes.brief_never_persisted_to_hermes_home_or_session_db",
+   "ok": false,
+   "detail": [
+    "hermes/hermes-home/state.db",
+    "hermes/hermes-home/state.db-wal"
+   ]
+  },
+  {
+   "check": "omp.brief_never_persisted_to_the_session_files",
+   "ok": true,
+   "detail": []
+  },
+  {
+   "check": "claude-code.transcript_holds_hook_context (observation, not a gate)",
+   "ok": true,
+   "detail": {
+    "files_with_brief": [
+     "cc/claude/projects/-mnt-zer0models-z0-wt-wiring-homes-C8-memory-wiring-e2e-cc-z0/26db4aad-1f39-423f-8948-01115db5c6f6.jsonl",
+     "cc/claude/projects/-mnt-zer0models-z0-wt-wiring-homes-C8-memory-wiring-e2e-cc-z0/a70e4941-9fa5-429c-9e4e-b035629be37e.jsonl",
+     "cc/claude/projects/-mnt-zer0models-z0-wt-wiring-homes-C8-memory-wiring-e2e-cc-z0/620523f6-4762-418a-b7e3-03b39469c8b0.jsonl",
+     "cc/claude/projects/-mnt-zer0models-z0-wt-wiring-homes-C8-memory-wiring-e2e-cc-z0/0eb29284-bd19-45a4-be5a-a7eb7755b64f.jsonl",
+     "cc/claude/projects/-mnt-zer0models-z0-wt-wiring-homes-C8-memory-wiring-e2e-cc-z0/420b04d0-8ff7-45a8-8173-f5b555570ff6.jsonl",
+     "cc/claude/projects/-mnt-zer0models-z0-wt-wiring-homes-C8-memory-wiring-e2e-cc-z0/f67ba56a-b767-4bd8-9efc-664c2bbc16ff.jsonl",
+     "cc/claude/projects/-mnt-zer0models-z0-wt-wiring-homes-C8-memory-wiring-e2e-cc-z0/4152b37a-52bb-490a-94cb-7a911064d6d2.jsonl"
+    ],
+    "note": "Claude Code records hook additionalContext in its own transcript; the seam writes none"
+   }
+  },
+  {
+   "check": "dsh.off_and_shadow_admit_the_native_batch",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "dsh.canary_admits_one_z0_memory_message",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "dsh.memory_node_tests_pass",
+   "ok": true,
+   "detail": [
+    "\u2139 tests 7",
+    "\u2139 suites 0",
+    "\u2139 pass 7",
+    "\u2139 fail 0",
+    "\u2139 cancelled 0",
+    "\u2139 skipped 0",
+    "\u2139 todo 0",
+    "\u2139 duration_ms 5492.285846"
+   ]
+  },
+  {
+   "check": "mcp.every_harness_has_z0_memory",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "mcp.memory_tools_only_no_route_worker",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "mcp.orient_returns_cohort_evidence",
+   "ok": true,
+   "detail": {
+    "claude-code": 4,
+    "codex": 4,
+    "grok": 4,
+    "omp": 4,
+    "omo": 4,
+    "dsh": 4
+   }
+  },
+  {
+   "check": "mcp.no_secret_in_responses",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "rows.dsh.written_and_valid_against_fb14919_schema",
+   "ok": true,
+   "detail": {
+    "rc": 0,
+    "stderr": "",
+    "errors": []
+   }
+  },
+  {
+   "check": "rows.hermes.written_and_valid_against_fb14919_schema",
+   "ok": true,
+   "detail": {
+    "rc": 0,
+    "stderr": "",
+    "errors": []
+   }
+  },
+  {
+   "check": "rows.omo.written_and_valid_against_fb14919_schema",
+   "ok": true,
+   "detail": {
+    "rc": 0,
+    "stderr": "",
+    "errors": []
+   }
+  },
+  {
+   "check": "rows.omp.written_and_valid_against_fb14919_schema",
+   "ok": true,
+   "detail": {
+    "rc": 0,
+    "stderr": "",
+    "errors": []
+   }
+  },
+  {
+   "check": "rows.claude-code.written_and_labelled_z0_memory_acceptance",
+   "ok": true,
+   "detail": {
+    "rc": 0,
+    "stderr": "",
+    "errors": []
+   }
+  },
+  {
+   "check": "rows.codex.written_and_labelled_z0_memory_acceptance",
+   "ok": true,
+   "detail": {
+    "rc": 0,
+    "stderr": "",
+    "errors": []
+   }
+  },
+  {
+   "check": "rows.grok.written_and_labelled_z0_memory_acceptance",
+   "ok": true,
+   "detail": {
+    "rc": 0,
+    "stderr": "",
+    "errors": []
+   }
+  },
+  {
+   "check": "rows.refuse_study_label_for_claude_code_codex_grok",
+   "ok": true,
+   "detail": null
+  }
+ ],
+ "acceptance_summary": {
+  "dsh": {
+   "schema": "z0eval.unified_memory_receipt.v0",
+   "A_retrieval_ok": 6,
+   "B": [
+    "B=VERIFIED"
+   ],
+   "B_injected": 6,
+   "C_answer_supported": 6,
+   "C_verified": 6,
+   "D_missing_evidence_abstained": true,
+   "E_duplicate_injection": 0,
+   "F_superseded_answer": true,
+   "rows": 6
+  },
+  "hermes": {
+   "schema": "z0eval.unified_memory_receipt.v0",
+   "A_retrieval_ok": 6,
+   "B": [
+    "B=VERIFIED"
+   ],
+   "B_injected": 6,
+   "C_answer_supported": 6,
+   "C_verified": 6,
+   "D_missing_evidence_abstained": true,
+   "E_duplicate_injection": 0,
+   "F_superseded_answer": true,
+   "rows": 6
+  },
+  "omo": {
+   "schema": "z0eval.unified_memory_receipt.v0",
+   "A_retrieval_ok": 6,
+   "B": [
+    "B=UNVERIFIED"
+   ],
+   "B_injected": 6,
+   "C_answer_supported": 6,
+   "C_verified": 6,
+   "D_missing_evidence_abstained": true,
+   "E_duplicate_injection": 0,
+   "F_superseded_answer": true,
+   "rows": 6
+  },
+  "omp": {
+   "schema": "z0eval.unified_memory_receipt.v0",
+   "A_retrieval_ok": 6,
+   "B": [
+    "B=VERIFIED"
+   ],
+   "B_injected": 6,
+   "C_answer_supported": 6,
+   "C_verified": 6,
+   "D_missing_evidence_abstained": true,
+   "E_duplicate_injection": 0,
+   "F_superseded_answer": true,
+   "rows": 6
+  },
+  "claude-code": {
+   "schema": "z0int.memory_acceptance.v0",
+   "A_retrieval_ok": 6,
+   "B": [
+    "B=VERIFIED"
+   ],
+   "B_injected": 6,
+   "C_answer_supported": 6,
+   "C_verified": 6,
+   "D_missing_evidence_abstained": true,
+   "E_duplicate_injection": 0,
+   "F_superseded_answer": true,
+   "rows": 6
+  },
+  "codex": {
+   "schema": "z0int.memory_acceptance.v0",
+   "A_retrieval_ok": 6,
+   "B": [
+    "B=UNVERIFIED"
+   ],
+   "B_injected": 6,
+   "C_answer_supported": 6,
+   "C_verified": 6,
+   "D_missing_evidence_abstained": true,
+   "E_duplicate_injection": 0,
+   "F_superseded_answer": true,
+   "rows": 6
+  },
+  "grok": {
+   "schema": "z0int.memory_acceptance.v0",
+   "A_retrieval_ok": 6,
+   "B": [
+    "B=UNSUPPORTED"
+   ],
+   "B_injected": 0,
+   "C_answer_supported": 6,
+   "C_verified": 6,
+   "D_missing_evidence_abstained": true,
+   "E_duplicate_injection": 0,
+   "F_superseded_answer": true,
+   "rows": 6
+  }
+ }
+}

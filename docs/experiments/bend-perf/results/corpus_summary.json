@@ -1,0 +1,22 @@
+{
+ "cases": 22079,
+ "kinds": {
+  "fixture": 32,
+  "z0int": 1,
+  "mut": 2046,
+  "fuzz": 20000
+ },
+ "routes": {
+  "kernel": 10019,
+  "host-shape": 12059,
+  "unsupported": 1
+ },
+ "corpus_sha256": "0e415e9ee987f96ef52b6e778e1c7aa689f7127581aefb04d4f55b387493fe0d",
+ "python_accept": 1813,
+ "python_exceptions": 1158,
+ "kernel_lines_bytes": 9613378,
+ "tokens_per_line": {
+  "mean": 319.7,
+  "max": 2644
+ }
+}

@@ -1,0 +1,6 @@
+== head 352edf2: flock -s quiet-lane.lock run.sh <tree> suite-iso-head --guard -- python -m pytest -q tests/test_agentweb_bridge_overload.py::test_host_overload_is_503_before_handler_execution tests/test_intelligence_service.py::test_health_and_bounded_admission tests/test_hook_adapter.py::test_prompt_handler_returns_under_5ms_p99_with_the_build_detached
+...                                                                      [100%]
+3 passed in 1.22s
+== base 914dc99: flock -s quiet-lane.lock run.sh <tree> suite-iso-base --guard -- python -m pytest -q tests/test_agentweb_bridge_overload.py::test_host_overload_is_503_before_handler_execution tests/test_intelligence_service.py::test_health_and_bounded_admission tests/test_hook_adapter.py::test_prompt_handler_returns_under_5ms_p99_with_the_build_detached
+...                                                                      [100%]
+3 passed in 1.78s

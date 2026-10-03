@@ -1,0 +1,15 @@
+# C8 round 3 full suite (scripts/suite.sh: pytest tests/ + node tests/test-dsh-*.mjs + bun omp-extensions/), isolated homes, socket guard, flock -s
+base 41aec0f (round-2 head; temp worktree wt/C8-memory-wiring-base, removed): pytest 11 failed / 1225 passed / 6 skipped / 1 xfailed; node 30/0; bun 38/0
+  (suite-r3-base*.raw.txt)
+FINAL head 73ff88e: pytest 11 failed / 1255 passed / 6 skipped / 1 xfailed; node 31/0; bun 40/0  (suite-r3-head-73ff88e*.raw.txt)
+Failure set: IDENTICAL to base (the 11 pre-existing failures, e.g. test_functions_verify live_laya x3).
+
+Intermediate head runs (kept for the record):
+- 057091c (suite-r3-head*): +1 test_capture_shims::test_grok_hooks_file_is_capture_only_and_names_its_harness (adapter file inventory);
+  fixed in a1863fe (z0-capture.json still asserted capture-only; z0-memory.json admitted).
+- a1863fe (suite-r3-head-final*): +1 test_agentweb_bridge_overload::test_host_overload_is_503_before_handler_execution, a timing flake
+  (also failed in the round-1 head run; passes 3/3 on head and base in isolation: suite-r3-flaky-recheck.txt).
+- 9655bca (suite-r3-head-9655bca*): identical to base.
+- 5e69533 (suite-r3-head-final2*): +1 test_hermes_decisions::test_opportunity_record_for_repo_and_non_repo, a real regression
+  (Hermes marked its seam installed at plugin load, so capture-only turns waited the grace past the test's drain bound);
+  fixed TDD-style in 8b5061b/73ff88e (marker on the seam's first turn). Final head identical to base.

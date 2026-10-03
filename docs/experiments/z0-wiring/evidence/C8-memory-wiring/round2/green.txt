@@ -1,0 +1,9 @@
+# C8 round 3 GREEN
+- 057091c (main implementation): pytest tests/test_memory_capture_join.py 27 passed (green-pytest.raw.txt); bun 'with the capture bridge
+  loaded' 2 pass / 0 fail (green-bun.raw.txt); node 'one root turn' 1 pass (green-node.raw.txt).
+- a1863fe: test_capture_shims + test_memory_mcp_entries + test_memory_seam (changed Grok contract) + test_hermes_memory +
+  test_memory_capture_join: 88 passed, 1 xfailed (suite-r3-head-recheck.raw.txt).
+- 9655bca (3 s grace): test_memory_capture_join 28 passed (green-late.raw.txt).
+- 5e69533 (installed marker): 80 passed, 1 xfailed (green-installed.raw.txt).
+- 73ff88e FINAL: test_memory_capture_join + test_hermes_memory + test_hermes_decisions + test_hermes_capture: 98 passed, 1 xfailed
+  (green-hermes-firstturn.raw.txt); full suite on 73ff88e: suite.txt (failure set identical to base).

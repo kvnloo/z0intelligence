@@ -1,0 +1,29 @@
+# C2-loop-consumers isolated e2e, build round 2 (HEAD 0a73899)
+# cmd: flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock /mnt/zer0models/github/cua-lanes/bin/hostless scripts/e2e.sh
+#      driver scripts/e2e_c2.py (previous round's driver kept as scripts/e2e_c2.prev.py). exit=0.
+#      Full output: e2e.raw.txt (stderr: e2e.stderr.txt); JSON report alone: e2e.report.json.
+# Homes: /mnt/zer0models/z0-wt/wiring/homes/C2-loop-consumers/e2e (HOME, Z0INT_HOME, TMPDIR, CLAUDE_CONFIG_DIR,
+#        AGENTSVIEW_DATA_DIR); socket guard on: 0 violations.
+# Real data: only `sqlite3 "file:/mnt/zer0models/sft-svlm/data/agentsview/sessions.db?mode=ro" .schema` (schema text;
+#        the live DB is now user_version 113 / v0.44: 1513 schema lines, 75 CREATE TABLE). No rows, no TencentDB, no z0
+#        service, no ~/.z0int / ~/.dsh read.
+
+A. Spec e2e (hosts A and B; the steps of PLAN isolated_e2e): the report is IDENTICAL, key for key, to the previous
+   round's (../e2e.raw.txt, 34/34 checks): verify for all seven harnesses on the replayed schema at 74 and 113, the 75
+   and no-deepseek-harness guards, label_source_empty for claude-code, --since, legacy imports x2 (idempotent, scrub
+   correction, symlink refusal), per-harness x cohort export, merge x2 (identical manifest sha), cross-version merge
+   refused, privacy (no synthetic secret in any table).
+
+B. Round-2 checks (host C, report key "round2"):
+ 1. Shell results stored without a tool_result_events row, in each harness's own shape (v113 replayed schema):
+    - omp: 'Command exited with code 1' (pytest) and '... 101' (cargo test) -> verified_failure x2; a run with neither
+      a status nor an exit code ('5 passed') -> unverified. No verified_success.         states {verified_failure: 2, unverified: 1}
+    - dsh: '1 failed, 4 passed', no status, no code -> unverified (was verified_success).  states {unverified: 1}
+    - hermes: terminal JSON with "exit_code": 1 -> verified_failure.                      states {verified_failure: 1}
+ 2. The real v0.39 schema (tests/fixtures/agentsview_core_schema_v039.sql, copied from agentsview v0.39.0
+    internal/db/schema.sql; sessions has no session_kind) at user_version 74: the same three harnesses give the same
+    states and joins, status success, exit 0, no traceback (round 1: OperationalError 'no such column: session_kind').
+ 3. An unreadable schema (tool_result_events dropped): `outcomes verify --harness omp` -> status degraded, exit 3,
+    failures {reader_unavailable: 1}, 0 turns, no traceback.
+ 4. One turn key: every row of the exported omp tables carries a turn_key that is on a verified omp row (3/3).
+ 5. Privacy: no synthetic secret in host C's tables or verified rows.

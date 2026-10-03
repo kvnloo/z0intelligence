@@ -1,0 +1,26 @@
+# C7 round 2: full suite, head 772ba7d vs base 914dc99 (C1 head; same base as round 1)
+# cmd: flock -s quiet-lane.lock evidence/C7-memory-core/scripts/suite.sh <tree> <tag> (env -i isolated homes under homes/C7-memory-core/<tag>, socket guard, pytest -q tests); base in a temporary detached worktree wt/C7-memory-core-base, removed afterwards; runs sequential
+
+head: 11 failed, 1102 passed, 4 skipped in 157.03s (0:02:37)
+base: 11 failed, 1018 passed, 4 skipped in 202.86s (0:03:22)
+socket guard: head 0 violation, base 0 violation
+
+## failures only in head (new failures):
+  (none if empty)
+## failures only in base:
+  (none if empty)
+## common failures (pre-existing, environment: live provider/quota tests):
+  FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+  FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+  FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+  FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+  FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+  FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+  FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+  FAILED tests/test_quota_budget.py::test_empty_authority_capacity - assert False
+  FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily - KeyEr...
+  FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+  FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+
+Identical failure set (11 = 11). Round 1's base-only 5 ms p99 timing flake did not fire in this base run.
+Count check: head 1102 passed = round-1 head 1096 + 6 round-2 tests (5 in 7c68f4b incl. the conftest-isolation test, 1 doctor test in f8f2e09); base 1018 passed as in round 1.

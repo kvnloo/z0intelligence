@@ -1,0 +1,40 @@
+# C1-loop-core full suite, fix round (verifier REVISE), base vs head. Isolated runner scripts/run.sh: env -i, HOME/Z0INT_HOME/TMPDIR
+# under homes/C1-loop-core/fix-suite-{base,head}, PYTHONPATH=<tree>/src, socket guard on (any connect to :11501 or a non-loopback
+# address is refused and logged); both runs under flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock; python = venv-claude-code 3.13, read-only.
+# cmd: (cd <tree> && flock -s quiet-lane.lock scripts/run.sh <tree> fix-suite-<tag> --guard -- python -m pytest -q -p no:cacheprovider -rfE --tb=no tests)
+base: 6fee8594e67dcd63684f50f6ec0c5445c5a98bed (temp worktree /mnt/zer0models/z0-wt/wiring/wt/C1-loop-core-base, removed after)
+  11 failed, 964 passed, 4 skipped in 162.14s (0:02:42)
+head: feat/wire-loop-core-20261003 @ 914dc99 (committed, clean tree)
+  11 failed, 1018 passed, 4 skipped in 231.95s (0:03:51)
+socket-guard violations: base none, head none (no violation log created)
+failure sets: IDENTICAL (diff of sorted FAILED ids is empty)
+pass-count note: the base count is 964 here and 968 in the build round on the same 6fee859 tree, so 4 environment-dependent
+  tests vary between runs; the head is +54 over the base in this run (build round +48, plus 6 fix-round tests).
+
+## base failure set
+FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+FAILED tests/test_quota_budget.py::test_empty_authority_capacity
+FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily
+FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+
+## head failure set
+FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+FAILED tests/test_quota_budget.py::test_empty_authority_capacity
+FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily
+FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+
+Raw logs: suite-base-fix.raw.txt, suite-head-fix.raw.txt. Build-round suite: suite-build-round.txt.

@@ -1,0 +1,40 @@
+=== integrate/wiring-20261003 (since origin/integrate/wiring-20261003)
+lesseradmin <veeman961@gmail.com> lesseradmin <veeman961@gmail.com>
+commits: 14
+ 61 files changed, 5587 insertions(+), 51 deletions(-)
+home paths: 0
+secret-like: 0
+emails:       5 +@pytest.fixture;      7 +@pytest.mark.parametrize;      1 +@pytest.mark.xfail;
+binaries/large:
+=== feat/wire-memory-core-20261003 (since origin/feat/wire-memory-core-20261003-unverified)
+lesseradmin <veeman961@gmail.com> lesseradmin <veeman961@gmail.com>
+commits: 4
+ 9 files changed, 182 insertions(+), 57 deletions(-)
+home paths: 0
+secret-like: 0
+emails:       2 +@pytest.fixture;
+binaries/large:
+=== feat/wire-memory-harnesses-20261003 (since origin/integrate/wiring-20261003)
+lesseradmin <veeman961@gmail.com> lesseradmin <veeman961@gmail.com>
+commits: 12
+ 60 files changed, 5554 insertions(+), 51 deletions(-)
+home paths: 0
+secret-like: 0
+emails:       5 +@pytest.fixture;      7 +@pytest.mark.parametrize;      1 +@pytest.mark.xfail;
+binaries/large:
+=== feat/wire-loop-consumers-20261003 (since origin/feat/wire-loop-consumers-20261003-unverified)
+lesseradmin <veeman961@gmail.com> lesseradmin <veeman961@gmail.com>
+commits: 10
+ 7 files changed, 483 insertions(+), 46 deletions(-)
+home paths: 0
+secret-like: 0
+emails:      10 +@pytest.mark.parametrize;
+binaries/large:
+== integrate/wiring-20261003
+2001:+      "locator": "kvnloo/z0intelligence:src/z0int/context_resolve.py:SCHEMA",
+2010:+      "locator": "kvnloo/oh-my-pi#77:packages/coding-agent/src/rlm/store.ts:RLM_DEFAULT_SPILL_BYTES",
+2019:+      "locator": "kvnloo/z0evals#56:harness-matrix",
+2654:+# git blob ids of studies/unified-memory-v0/{receipt.schema,cohort}.json at kvnloo/z0evals fb14919
+tencent tenant/token: 0
+== feat/wire-loop-consumers-20261003
+tencent tenant/token: 0

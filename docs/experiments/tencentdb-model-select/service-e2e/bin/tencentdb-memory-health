@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# tencentdb-memory-health [--wait SECONDS] [--quiet]
+# Exit 0 when GET http://127.0.0.1:$TENCENTDB_PORT/health answers status ok|degraded
+# (the same test Hermes' memory_tencentdb provider uses in is_available()).
+set -uo pipefail
+port="${TENCENTDB_PORT:-8420}"
+wait_s=0; quiet=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --wait) wait_s="${2:-0}"; shift 2 ;;
+    --quiet) quiet=1; shift ;;
+    *) echo "usage: $0 [--wait SECONDS] [--quiet]" >&2; exit 2 ;;
+  esac
+done
+deadline=$(( $(date +%s) + wait_s ))
+while :; do
+  body="$(curl -fsS -m 3 "http://127.0.0.1:${port}/health" 2>/dev/null)" || body=""
+  status="$(jq -r '.status // empty' <<<"$body" 2>/dev/null)"
+  if [[ "$status" == "ok" || "$status" == "degraded" ]]; then
+    [[ $quiet == 1 ]] || jq -c '{status, version, uptime, vectorStore: .stores.vectorStore,
+      embeddingService: .stores.embeddingService, stateBackend: .services.stateBackend}' <<<"$body"
+    exit 0
+  fi
+  if (( $(date +%s) >= deadline )); then
+    [[ $quiet == 1 ]] || echo "tencentdb-memory-health: 127.0.0.1:${port}/health not ok (status='${status:-unreachable}')" >&2
+    exit 1
+  fi
+  sleep 2
+done

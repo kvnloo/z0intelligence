@@ -1,0 +1,8 @@
+tree=/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red head=767382961c496ccd2a4d87db5d8827553e8034af
+F                                                                        [100%]
+=================================== FAILURES ===================================
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_seam.py:317: assert ([])
+=========================== short test summary info ============================
+FAILED tests/test_memory_seam.py::test_grok_has_no_push_seam - assert ([])
+1 failed in 15.32s
+pytest_rc=1

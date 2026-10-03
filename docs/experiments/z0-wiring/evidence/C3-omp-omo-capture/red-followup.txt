@@ -1,0 +1,17 @@
+# C3 red (follow-up found by the e2e): outcome model_id vs opportunity model_id, before the fix, at 1c35e8a + uncommitted test
+# cmd: flock -s quiet-lane.lock run.sh <wt> red2-py --guard -- python -m pytest -v -p no:cacheprovider --tb=short tests/test_omp_capture.py::test_outcome_model_id_matches_the_opportunity_model_id
+collecting ... collected 1 item
+
+tests/test_omp_capture.py::test_outcome_model_id_matches_the_opportunity_model_id FAILED [100%]
+
+=================================== FAILURES ===================================
+____________ test_outcome_model_id_matches_the_opportunity_model_id ____________
+tests/test_omp_capture.py:201: in test_outcome_model_id_matches_the_opportunity_model_id
+    assert opp["model_id"] == out["model_id"] == "sandbox/bridge-fake"
+E   AssertionError: assert 'sandbox/bridge-fake' == 'bridge-fake'
+E     
+E     - bridge-fake
+E     + sandbox/bridge-fake
+=========================== short test summary info ============================
+FAILED tests/test_omp_capture.py::test_outcome_model_id_matches_the_opportunity_model_id
+============================== 1 failed in 0.31s ===============================

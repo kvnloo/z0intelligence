@@ -1,0 +1,5 @@
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring/tests/test_memory_capture_join.py:305: AssertionError: the first late shadow turn of the Hermes seam was not joined
+=========================== short test summary info ============================
+FAILED tests/test_memory_capture_join.py::test_a_js_shim_marks_its_seam_installed_so_the_first_late_turn_still_joins
+FAILED tests/test_memory_capture_join.py::test_the_hermes_memory_seam_marks_itself_installed
+2 failed, 28 deselected in 3.30s

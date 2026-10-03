@@ -1,0 +1,32 @@
+{
+ "turns": 4,
+ "with_observed_row": 4,
+ "states": {
+  "unverified": 4
+ },
+ "label_classes": {
+  "unknown": 4
+ },
+ "signals": {},
+ "turns_with_any_signal": 0,
+ "measurement": {
+  "transcript_missing": 2,
+  "commits_produced": 0,
+  "commits_resolved": 0,
+  "turns_with_unexamined_subagents": 0
+ },
+ "join": {
+  "observed_rows": 4,
+  "with_opportunity": 4,
+  "with_verified": 4,
+  "full_chain": 4,
+  "gate_x_state": {
+   "ACT->unverified": 2,
+   "ASK->unverified": 2
+  },
+  "observed_action_x_state": {
+   "ACT->unverified": 4
+  }
+ },
+ "appended": 4
+}

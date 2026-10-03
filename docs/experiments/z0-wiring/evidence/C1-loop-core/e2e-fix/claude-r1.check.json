@@ -1,0 +1,103 @@
+{
+ "claude_result": {
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "num_turns": 2
+ },
+ "stub_requests": [
+  "delegate",
+  "subagent",
+  "final"
+ ],
+ "opportunities": [
+  [
+   "interactive",
+   "z0int.claude_code.opportunity_record.v0",
+   "ASK",
+   "unknown"
+  ],
+  [
+   "agent",
+   "z0int.claude_code.opportunity_record.v0",
+   "ACT",
+   "unknown"
+  ]
+ ],
+ "outcomes": [
+  [
+   "agent",
+   false,
+   0,
+   1,
+   "claude-opus-5-5"
+  ],
+  [
+   "interactive",
+   false,
+   1,
+   1,
+   "claude-opus-5-5"
+  ]
+ ],
+ "joined_on_turn_key": [
+  [
+   "interactive",
+   "176a1752-dce",
+   "interactive"
+  ],
+  [
+   "agent",
+   "agent:af7dcd",
+   "agent"
+  ]
+ ],
+ "failures": [
+  [
+   "duplicate_event",
+   {
+    "record": "turn_outcome"
+   }
+  ]
+ ],
+ "drops": 0,
+ "real_payload_keys": {
+  "SubagentStart": [
+   "agent_id",
+   "agent_type",
+   "cwd",
+   "hook_event_name",
+   "prompt_id",
+   "session_id",
+   "transcript_path"
+  ],
+  "SubagentStop": [
+   "agent_id",
+   "agent_transcript_path",
+   "agent_type",
+   "background_tasks",
+   "cwd",
+   "effort",
+   "hook_event_name",
+   "last_assistant_message",
+   "permission_mode",
+   "prompt_id",
+   "session_crons",
+   "session_id",
+   "stop_hook_active",
+   "transcript_path"
+  ]
+ },
+ "prompts": [
+  [
+   "user",
+   "176a1752-dce"
+  ]
+ ],
+ "outcome_cohorts": [
+  "agent",
+  "interactive"
+ ],
+ "late_rows": [],
+ "ok": true
+}

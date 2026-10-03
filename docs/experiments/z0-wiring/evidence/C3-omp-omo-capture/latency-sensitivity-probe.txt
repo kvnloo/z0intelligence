@@ -1,0 +1,7 @@
+# sensitivity probe (scratch test /mnt/zer0models/z0-wt/wiring/scratch/C3-omp-omo-capture/probe/test_latency_probe.py, not committed): the committed latency test (task cwd = a git repo) with the opportunity build moved onto the reply path; expected FAIL, 3 runs
+/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/tests/test_omp_capture.py:162: AssertionError: (9.018483018735424, 31.772539514349774, 22.201590501936153)
+1 failed in 12.25s
+/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/tests/test_omp_capture.py:162: AssertionError: (8.039018022827804, 30.600557511206716, 21.903332031797618)
+1 failed in 10.87s
+/mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture/tests/test_omp_capture.py:162: AssertionError: (8.238102978793904, 30.39831150090322, 21.606948983389884)
+1 failed in 10.79s

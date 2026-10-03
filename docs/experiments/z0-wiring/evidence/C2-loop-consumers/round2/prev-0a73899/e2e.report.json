@@ -1,0 +1,714 @@
+{
+ "export_host_a": {
+  "failures": {
+   "claude-code": {
+    "partial_measurement": 2
+   },
+   "codex": {
+    "missing_verifier": 6,
+    "partial_measurement": 6
+   },
+   "dsh": {
+    "missing_verifier": 3,
+    "partial_measurement": 3
+   },
+   "grok": {
+    "missing_verifier": 6,
+    "partial_measurement": 6,
+    "unjoined": 3
+   },
+   "hermes": {
+    "missing_verifier": 6,
+    "partial_measurement": 6
+   },
+   "omo": {
+    "missing_verifier": 5,
+    "partial_measurement": 5,
+    "unjoined": 2
+   },
+   "omp": {
+    "missing_verifier": 6,
+    "partial_measurement": 6
+   }
+  },
+  "shadow_tables": {
+   "dsh/legacy": 4,
+   "omp/legacy": 3
+  },
+  "tables": {
+   "claude-code/interactive": 2,
+   "codex/automated": 3,
+   "codex/interactive": 3,
+   "dsh/interactive": 3,
+   "grok/interactive": 3,
+   "grok/unknown": 3,
+   "hermes/automated": 3,
+   "hermes/interactive": 3,
+   "omo/interactive": 3,
+   "omo/unknown": 2,
+   "omp/agent": 3,
+   "omp/interactive": 3,
+   "omp/legacy": 4
+  },
+  "unsupported_schema": {
+   "claude-code": {},
+   "codex": {},
+   "dsh": {},
+   "grok": {},
+   "hermes": {},
+   "omo": {},
+   "omp": {}
+  }
+ },
+ "export_omp_legacy": {
+  "rows": 4,
+  "turn_keys": 4,
+  "y_success": [
+   "0",
+   "0",
+   "None",
+   "None"
+  ]
+ },
+ "guards": {
+  "cc_wrong_projects_dir": {
+   "exit": 3,
+   "failures": {
+    "label_source_empty": 1
+   },
+   "status": "degraded",
+   "turns": 2
+  },
+  "grok_since_future": {
+   "failures": {},
+   "label_join": {
+    "joined": 0,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "status": "success",
+   "turns": 0
+  },
+  "no_dsh_agent": {
+   "exit": 3,
+   "failures": {
+    "reader_unavailable": 1
+   },
+   "label_join": {
+    "joined": 0,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {},
+   "status": "degraded",
+   "turns": 0
+  },
+  "v74_hermes": {
+   "exit": 0,
+   "failures": {
+    "unjoined": 3
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 3
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 4,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "v75_omp": {
+   "exit": 3,
+   "failures": {
+    "reader_unavailable": 1
+   },
+   "label_join": {
+    "joined": 0,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {},
+   "status": "degraded",
+   "turns": 0
+  }
+ },
+ "host_a_build": {
+  "expected_turns": 34,
+  "opportunity_rows": 34,
+  "schema113": {
+   "failed": 0,
+   "failures": [],
+   "fts5_shadow_tables_filtered": 12,
+   "statements": 201
+  },
+  "schema74": {
+   "failed": 0,
+   "failures": [],
+   "fts5_shadow_tables_filtered": 12,
+   "statements": 201
+  }
+ },
+ "host_b_build": {
+  "expected_turns": 37,
+  "opportunity_rows": 37,
+  "schema113": {
+   "failed": 0,
+   "failures": [],
+   "fts5_shadow_tables_filtered": 12,
+   "statements": 201
+  },
+  "schema74": {
+   "failed": 0,
+   "failures": [],
+   "fts5_shadow_tables_filtered": 12,
+   "statements": 201
+  }
+ },
+ "imports": {
+  "dsh-jev": {
+   "counts": {
+    "model_request_only": 0,
+    "no_lineage": 1
+   },
+   "run1_rows_added": 4,
+   "run2_rows_added": 0,
+   "same_manifest_sha256": true
+  },
+  "dsh-jev_symlink_into_hermes_home": {
+   "exit": 1,
+   "refused": true
+  },
+  "omp-cognition-shadow": {
+   "counts": {
+    "backend_unavailable": 297,
+    "served": 3
+   },
+   "run1_rows_added": 3,
+   "run2_rows_added": 0,
+   "same_manifest_sha256": true
+  },
+  "omp-v1": {
+   "counts": {
+    "no_outcome": 1,
+    "tier_execution": 2,
+    "tier_gold": 1,
+    "tier_negative": 1
+   },
+   "run1_rows_added": 4,
+   "run2_rows_added": 0,
+   "same_manifest_sha256": true
+  },
+  "omp-v1_scrub": {
+   "rows_added": 1,
+   "stored_rows": 5,
+   "stored_turn_keys": 4
+  }
+ },
+ "merge": {
+  "codex_interactive_hosts": [
+   [
+    "host-a",
+    "host-b"
+   ],
+   [
+    "host-b"
+   ]
+  ],
+  "hosts": [
+   "host-a",
+   "host-b"
+  ],
+  "identical_manifest_sha256": true,
+  "tables": {
+   "claude-code/interactive": 2,
+   "codex/automated": 3,
+   "codex/interactive": 6,
+   "dsh/interactive": 3,
+   "grok/interactive": 3,
+   "grok/unknown": 3,
+   "hermes/automated": 3,
+   "hermes/interactive": 3,
+   "omo/interactive": 3,
+   "omo/unknown": 2,
+   "omp/agent": 3,
+   "omp/interactive": 3,
+   "omp/legacy": 4
+  }
+ },
+ "merge_refused": {
+  "exit": 2,
+  "stdout_head": "refused: refusing to merge codex/interactive: schema versions differ [\"('0.1.0', '69d7eef44ba1707e', 'z0int.loop.trainin",
+  "wrote_nothing": true
+ },
+ "privacy_leaks": {},
+ "round2": {
+  "omp_export_turn_keys": {
+   "all_rows_carry_a_verified_turn_key": true,
+   "rows": 3,
+   "verified_turn_keys": 3
+  },
+  "opportunity_rows": 5,
+  "privacy_leaks": [],
+  "shapes_v039_user_version_74": {
+   "dsh": {
+    "exit": 0,
+    "failures": {},
+    "label_join": {
+     "joined": 1,
+     "pending_index": 0,
+     "unjoined": 0
+    },
+    "states": {
+     "unverified": 1
+    },
+    "status": "success",
+    "traceback": false,
+    "turns": 1
+   },
+   "hermes": {
+    "exit": 0,
+    "failures": {},
+    "label_join": {
+     "joined": 1,
+     "pending_index": 0,
+     "unjoined": 0
+    },
+    "states": {
+     "verified_failure": 1
+    },
+    "status": "success",
+    "traceback": false,
+    "turns": 1
+   },
+   "omp": {
+    "exit": 0,
+    "failures": {},
+    "label_join": {
+     "joined": 3,
+     "pending_index": 0,
+     "unjoined": 0
+    },
+    "states": {
+     "unverified": 1,
+     "verified_failure": 2
+    },
+    "status": "success",
+    "traceback": false,
+    "turns": 3
+   }
+  },
+  "shapes_v113": {
+   "dsh": {
+    "exit": 0,
+    "failures": {},
+    "label_join": {
+     "joined": 1,
+     "pending_index": 0,
+     "unjoined": 0
+    },
+    "states": {
+     "unverified": 1
+    },
+    "status": "success",
+    "traceback": false,
+    "turns": 1
+   },
+   "hermes": {
+    "exit": 0,
+    "failures": {},
+    "label_join": {
+     "joined": 1,
+     "pending_index": 0,
+     "unjoined": 0
+    },
+    "states": {
+     "verified_failure": 1
+    },
+    "status": "success",
+    "traceback": false,
+    "turns": 1
+   },
+   "omp": {
+    "exit": 0,
+    "failures": {},
+    "label_join": {
+     "joined": 3,
+     "pending_index": 0,
+     "unjoined": 0
+    },
+    "states": {
+     "unverified": 1,
+     "verified_failure": 2
+    },
+    "status": "success",
+    "traceback": false,
+    "turns": 3
+   }
+  },
+  "unreadable_schema_omp": {
+   "exit": 3,
+   "failures": {
+    "reader_unavailable": 1
+   },
+   "label_join": {
+    "joined": 0,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {},
+   "status": "degraded",
+   "traceback": false,
+   "turns": 0
+  },
+  "v039_has_session_kind": false
+ },
+ "verify_host_a_run1": {
+  "claude-code": {
+   "appended": 2,
+   "failures": {},
+   "states": {
+    "verified_failure": 1,
+    "verified_success": 1
+   },
+   "status": "success",
+   "turns": 2
+  },
+  "codex": {
+   "appended": 6,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "dsh": {
+   "appended": 3,
+   "failures": {},
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 1,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 3
+  },
+  "grok": {
+   "appended": 6,
+   "failures": {
+    "unjoined": 3
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 3
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 4,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "hermes": {
+   "appended": 6,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "omo": {
+   "appended": 5,
+   "failures": {
+    "unjoined": 2
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 2
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 3,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 5
+  },
+  "omp": {
+   "appended": 6,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  }
+ },
+ "verify_host_a_run2": {
+  "claude-code": {
+   "appended": 0,
+   "failures": {},
+   "states": {
+    "verified_failure": 1,
+    "verified_success": 1
+   },
+   "status": "success",
+   "turns": 2
+  },
+  "codex": {
+   "appended": 0,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "dsh": {
+   "appended": 0,
+   "failures": {},
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 1,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 3
+  },
+  "grok": {
+   "appended": 0,
+   "failures": {
+    "unjoined": 3
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 3
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 4,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "hermes": {
+   "appended": 0,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "omo": {
+   "appended": 0,
+   "failures": {
+    "unjoined": 2
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 2
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 3,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 5
+  },
+  "omp": {
+   "appended": 0,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  }
+ },
+ "verify_host_b": {
+  "claude-code": {
+   "appended": 2,
+   "failures": {},
+   "states": {
+    "verified_failure": 1,
+    "verified_success": 1
+   },
+   "status": "success",
+   "turns": 2
+  },
+  "codex": {
+   "appended": 9,
+   "failures": {},
+   "label_join": {
+    "joined": 9,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 3,
+    "unverified": 3,
+    "verified_failure": 3
+   },
+   "status": "success",
+   "turns": 9
+  },
+  "dsh": {
+   "appended": 3,
+   "failures": {},
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 1,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 3
+  },
+  "grok": {
+   "appended": 6,
+   "failures": {
+    "unjoined": 3
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 3
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 4,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "hermes": {
+   "appended": 6,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  },
+  "omo": {
+   "appended": 5,
+   "failures": {
+    "unjoined": 2
+   },
+   "label_join": {
+    "joined": 3,
+    "pending_index": 0,
+    "unjoined": 2
+   },
+   "states": {
+    "contested": 1,
+    "unverified": 3,
+    "verified_failure": 1
+   },
+   "status": "success",
+   "turns": 5
+  },
+  "omp": {
+   "appended": 6,
+   "failures": {},
+   "label_join": {
+    "joined": 6,
+    "pending_index": 0,
+    "unjoined": 0
+   },
+   "states": {
+    "contested": 2,
+    "unverified": 2,
+    "verified_failure": 2
+   },
+   "status": "success",
+   "turns": 6
+  }
+ },
+ "verify_rerun_appended": {
+  "claude-code": 0,
+  "codex": 0,
+  "dsh": 0,
+  "grok": 0,
+  "hermes": 0,
+  "omo": 0,
+  "omp": 0
+ }
+}

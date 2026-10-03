@@ -1,0 +1,10 @@
+# verifier P-2 probe on the fixed tree (uncommitted fix on 07a2272); 2026-10-03T11:27:48Z
+close_s 0.041
+opp rows at close 3 after 8s 3
+closed opportunity drops 0
+close_s 0.042
+opp rows at close 3 after 8s 3
+closed opportunity drops 0
+close_s 0.046
+opp rows at close 3 after 8s 3
+closed opportunity drops 0

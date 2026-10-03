@@ -1,0 +1,32 @@
+# C5 green run (implementation in the worktree, uncommitted), 2026-10-03T05:16:39-05:00
+# cmd: flock -s quiet-lane.lock scripts/run.sh <wt> green --guard -- node --test tests/test-dsh-plugin.mjs ; same runner -- python -m pytest -q tests/test_dsh_capture.py
+# red-test correction after red: test 4 dotenv regex /\.env/ -> /(^|[\/'"`])\.env/m (it matched the JS spread ...env; behaviour unchanged)
+✔ 1 apply registers an observe-only agent/request middleware; next() comes back unchanged (11.612562ms)
+✔ 1 the output stream is byte-identical with capture on or off (1.761647ms)
+✔ 2 the llm/stream router registers only when config.router===true AND automatic.json dsh is enabled (1.144695ms)
+✔ 3 a user turn sends one prompt and one stop event to hook_adapter --harness dsh, detached (0.71554ms)
+✔ 3 the canonical turn_key is computed the same way as harness_id.turn_key (0.797476ms)
+✔ 4 the plugin source and the env it gives the hook child never reference key files or private trees (1.736701ms)
+✔ 5 default config: no network call, shadow_plane=off recorded once per process (239.209866ms)
+✔ 5 with a fake z0 service it samples deterministically at the configured rate and writes shadow_decision rows (107.08029ms)
+✔ 5 the max-inflight cap holds: one call in flight, the rest recorded queue_saturated (342.398593ms)
+✔ 5 service down gives backend_unavailable, counted (31.18701ms)
+✔ 5 port 11501 is refused unless allow_live_service (157.03562ms)
+✔ 6 a missing python lets the turn proceed and leaves a counted drop row (24.161517ms)
+✔ 6 a spawn that throws or errors is counted and never reaches the turn (50.755699ms)
+✔ 6 no unhandled rejection under --unhandled-rejections=strict on every failure path (523.294389ms)
+✔ 7 lineage and shadow rows hold no prompt or response text (121.3569ms)
+✔ 8 the plugin does not ship, export or load memory.js (12.758751ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1913.864711
+## pytest
+.                                                                        [100%]
+1 passed in 0.13s
+## socket guard log:
+(none)

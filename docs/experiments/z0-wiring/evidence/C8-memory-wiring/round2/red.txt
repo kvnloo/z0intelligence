@@ -1,0 +1,36 @@
+# C8 round 3 RED (D3: MemoryUseReceipt in opportunity_record.memory; kill switch)
+Tree: temporary worktree wt/C8-memory-wiring-r3red at 7673829 (round-3 test commits 49e3478, ab8962d, 7673829 on top of
+the round-2 head 41aec0f; NO implementation). Runner: scripts/redfinal-r3.sh -> scripts/redgreen-r3.sh (isolated homes, socket guard, flock -s).
+(A first red pass at 49e3478 gave the identical 23 failures; 7673829 only corrects the receipt field name on line 75, which red never reaches.)
+
+## pytest tests/test_memory_capture_join.py  (red-pytest.raw.txt): 23 failed, 4 passed
+Failures, all from missing behaviour:
+- 7x test_the_opportunity_record_carries_the_receipt_the_memory_seam_wrote_for_that_turn[<all 7 harnesses>]: KeyError 'memory' (no join)
+- test_the_opportunity_build_waits_for_a_detached_shadow_brief_still_running: "the receipt of the detached shadow brief was not attached"
+- test_a_pending_receipt_that_never_settles_is_bounded: seam has no RECEIPT_WAIT_S (no pending/wait mechanism)
+- test_a_late_second_injector_never_replaces_the_turns_receipt: KeyError 'memory'
+- 3x test_hook_processes_join_the_capture_opportunity_and_the_memory_receipt[claude-code|codex|grok]: "opportunity row has no memory receipt"
+- test_grok_memory_hook_is_shadow_only_and_never_prints: no grok seam row ([] == ['shadow'])
+- test_grok_memory_hook_is_its_own_hooks_file_and_capture_stays_capture_only: hooks/z0-memory.json missing
+- 4x test_the_capture_kill_switch_keeps_the_memory_seam_native[shadow|on x env|config]: outcome shadow/injected, not off
+- test_the_kill_switch_silences_the_hook_in_on_mode: the hook printed additionalContext with Z0INT_CAPTURE=0
+- test_the_js_memory_client_reads_the_same_kill_switch: ['on','on','shadow'] != ['off','on','off']
+- 2x test_the_hermes_memory_seam_reads_the_capture_kill_switch[env|config]: Memory created despite the switch
+Passing on red (regression guards, by design): a receipt from another turn is never attached; no seam -> no field, no wait;
+a no_scope turn adds no field; Hermes memory job and capture derive the same turn_key.
+
+## pytest tests/test_memory_seam.py::test_grok_has_no_push_seam (changed contract, ab8962d)  (red-grok-contract.raw.txt): 1 failed (no shadow row: [])
+
+## bun test omp-extensions/z0-memory -t 'with the capture bridge loaded'  (red-bun.raw.txt): 0 pass, 2 fail
+omp and omo: the seam row's turn_key (user@<ts>) differs from turn_key(<h>, session, bridge trace_id).
+
+## node --test tests/test-dsh-memory.mjs 'one root turn'  (red-node.raw.txt): 1 pass (guard: DSH capture and memory already share session/turn)
+
+## Follow-up cycles found by the round-3 e2e (each: red test commit, then fix)
+1. a821ab2 test_a_seam_child_that_starts_late_still_joins: red (1 failed, red-late.raw.txt; 1 s grace) -> 9655bca 3 s grace -> green (28 passed, green-late.raw.txt).
+2. 085a4d1 test_a_js_shim_marks_its_seam_installed_so_the_first_late_turn_still_joins + test_the_hermes_memory_seam_marks_itself_installed:
+   red (2 failed, red-installed.raw.txt: first OMP shadow turn on a fresh home had no grace) -> 5e69533 seam/<h>.active marker
+   -> green (80 passed, 1 xfailed with test_hermes_memory.py + test_memory_seam.py, green-installed.raw.txt).
+3. 8b5061b test_the_hermes_memory_seam_marks_itself_installed_on_its_first_turn: red (1 failed, red-hermes-firstturn.raw.txt:
+   the marker was written at plugin load, which made test_hermes_decisions capture-only turns wait the grace) -> 73ff88e marker on the
+   seam's first pre_llm_call -> green (98 passed, 1 xfailed incl. test_hermes_decisions/test_hermes_capture, green-hermes-firstturn.raw.txt).

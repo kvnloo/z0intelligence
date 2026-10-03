@@ -1,0 +1,190 @@
+# C8 green run on head c875c6b: the red tests (+ the two fix-round tests, fix-rounds.txt) after the implementation
+# cmd: flock -s quiet-lane.lock run.sh <wt> green --guard -- python -m pytest -v -p no:cacheprovider -rfE --tb=line tests/test_memory_seam.py tests/test_memory_acceptance.py tests/test_memory_mcp_entries.py tests/test_hermes_memory.py tests/test_capture_shims.py tests/test_hermes_capture.py
+============================= test session starts ==============================
+platform linux -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0 -- /mnt/zer0models/z0-wt/wiring/venv-integrate/bin/python
+rootdir: /mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 89 items
+
+tests/test_memory_seam.py::test_shadow_returns_without_waiting_and_writes_the_receipt_asynchronously PASSED [  1%]
+tests/test_memory_seam.py::test_off_is_inert_and_writes_nothing PASSED   [  2%]
+tests/test_memory_seam.py::test_default_mode_is_shadow_and_cloud_injection_is_off_for_every_harness PASSED [  3%]
+tests/test_memory_seam.py::test_canary_and_on_return_the_brief_for_the_next_request PASSED [  4%]
+tests/test_memory_seam.py::test_deadline_exceeded_gives_native_context_and_a_counted_timeout PASSED [  5%]
+tests/test_memory_seam.py::test_the_deadline_counts_from_the_job_start_the_shim_stamped PASSED [  6%]
+tests/test_memory_seam.py::test_a_second_process_serves_the_brief_from_the_snapshot_cache_until_a_source_changes PASSED [  7%]
+tests/test_memory_seam.py::test_replaying_a_turn_key_never_injects_twice_and_has_no_side_effect PASSED [  8%]
+tests/test_memory_seam.py::test_replaying_a_shadow_turn_spawns_nothing PASSED [ 10%]
+tests/test_memory_seam.py::test_a_second_injector_for_the_same_turn_refuses_and_writes_double_inject_guard PASSED [ 11%]
+tests/test_memory_seam.py::test_context_resolve_owning_the_turn_blocks_the_seam PASSED [ 12%]
+tests/test_memory_seam.py::test_tencentdb_items_are_excluded_when_the_host_already_has_the_tencentdb_provider PASSED [ 13%]
+tests/test_memory_seam.py::test_a_resolver_exception_gives_native_context_and_a_counted_failure PASSED [ 14%]
+tests/test_memory_seam.py::test_with_the_required_source_removed_the_brief_states_the_gap_and_invents_nothing PASSED [ 15%]
+tests/test_memory_seam.py::test_supersession_shows_the_newer_fact_as_current_and_history_shows_both PASSED [ 16%]
+tests/test_memory_seam.py::test_fixture_secrets_never_reach_the_request_the_receipt_or_the_mcp_response PASSED [ 17%]
+tests/test_memory_seam.py::test_canary_on_refuse_a_non_loopback_endpoint_unless_that_harness_allows_cloud_injection PASSED [ 19%]
+tests/test_memory_seam.py::test_claude_code_hook_shadow_prints_nothing_and_returns_fast PASSED [ 20%]
+tests/test_memory_seam.py::test_claude_compatible_hook_injects_additional_context_in_on_mode[claude-code-ANTHROPIC_BASE_URL] PASSED [ 21%]
+tests/test_memory_seam.py::test_claude_compatible_hook_injects_additional_context_in_on_mode[codex-OPENAI_BASE_URL] PASSED [ 22%]
+tests/test_memory_seam.py::test_claude_code_hook_with_the_default_cloud_endpoint_injects_nothing PASSED [ 23%]
+tests/test_memory_seam.py::test_the_hook_fails_open_on_garbage_input PASSED [ 24%]
+tests/test_memory_seam.py::test_grok_has_no_push_seam PASSED             [ 25%]
+tests/test_memory_seam.py::test_a_shadow_spawn_failure_is_a_counted_error_not_an_exception PASSED [ 26%]
+tests/test_memory_acceptance.py::test_the_vendored_study_files_are_the_pinned_fb14919_blobs PASSED [ 28%]
+tests/test_memory_acceptance.py::test_the_pinned_study_enum_is_exactly_dsh_hermes_omo_omp PASSED [ 29%]
+tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[dsh] PASSED [ 30%]
+tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[hermes] PASSED [ 31%]
+tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[omo] PASSED [ 32%]
+tests/test_memory_acceptance.py::test_study_harness_rows_validate_against_the_pinned_receipt_schema[omp] PASSED [ 33%]
+tests/test_memory_acceptance.py::test_cohort_cases_on_the_synthetic_fixture PASSED [ 34%]
+tests/test_memory_acceptance.py::test_an_observed_model_request_upgrades_b PASSED [ 35%]
+tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[claude-code] PASSED [ 37%]
+tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[codex] PASSED [ 38%]
+tests/test_memory_acceptance.py::test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label[grok] PASSED [ 39%]
+tests/test_memory_acceptance.py::test_grok_case_b_is_unsupported_pull_only PASSED [ 40%]
+tests/test_memory_acceptance.py::test_omo_case_b_is_unsupported_when_the_senpi_api_lacks_a_context_hook PASSED [ 41%]
+tests/test_memory_acceptance.py::test_eval_cli_writes_validated_rows_under_the_given_out PASSED [ 42%]
+tests/test_memory_acceptance.py::test_grok_rules_need_project_scope_and_owner_approval_and_write_only_scrubbed_project_content PASSED [ 43%]
+tests/test_memory_acceptance.py::test_a_grok_turn_never_writes_a_rules_file PASSED [ 44%]
+tests/test_memory_mcp_entries.py::test_every_harness_has_exactly_one_z0_memory_server_on_the_memory_profile PASSED [ 46%]
+tests/test_memory_mcp_entries.py::test_claude_code_keeps_its_route_worker_server_unchanged PASSED [ 47%]
+tests/test_memory_mcp_entries.py::test_codex_plugin_manifest_points_at_its_mcp_file PASSED [ 48%]
+tests/test_memory_mcp_entries.py::test_each_entry_serves_the_memory_tools_only_over_stdio PASSED [ 49%]
+tests/test_memory_mcp_entries.py::test_memory_push_seam_is_its_own_user_prompt_submit_entry[claude-code] PASSED [ 50%]
+tests/test_memory_mcp_entries.py::test_memory_push_seam_is_its_own_user_prompt_submit_entry[codex] PASSED [ 51%]
+tests/test_memory_mcp_entries.py::test_grok_registers_no_memory_push_hook PASSED [ 52%]
+tests/test_hermes_memory.py::test_shadow_hook_returns_without_waiting_and_the_request_is_identical_to_off PASSED [ 53%]
+tests/test_hermes_memory.py::test_shadow_writes_a_would_inject_receipt_asynchronously PASSED [ 55%]
+tests/test_hermes_memory.py::test_canary_brief_reaches_the_next_request_and_never_the_session_store PASSED [ 56%]
+tests/test_hermes_memory.py::test_canary_deadline_gives_native_context_and_a_counted_timeout PASSED [ 57%]
+tests/test_hermes_memory.py::test_fail_open_when_z0int_is_unavailable PASSED [ 58%]
+tests/test_hermes_memory.py::test_replaying_the_turn_never_injects_twice PASSED [ 59%]
+tests/test_hermes_memory.py::test_a_cloud_model_is_blocked_unless_hermes_allows_cloud_injection PASSED [ 60%]
+tests/test_hermes_memory.py::test_automatic_capture_and_memory_share_one_pre_llm_call PASSED [ 61%]
+tests/test_hermes_memory.py::test_memory_follows_the_capture_mode_when_unset PASSED [ 62%]
+tests/test_hermes_memory.py::test_tencentdb_items_are_excluded_when_hermes_uses_the_tencentdb_memory_provider PASSED [ 64%]
+tests/test_hermes_memory.py::test_post_llm_call_writes_the_memory_use_receipt_of_the_injected_turn PASSED [ 65%]
+tests/test_capture_shims.py::test_claude_code_plugin_routes_every_hook_through_the_adapter_and_adds_subagents PASSED [ 66%]
+tests/test_capture_shims.py::test_codex_shim_is_hooks_only PASSED        [ 67%]
+tests/test_capture_shims.py::test_codex_local_marketplace_lists_only_the_hooks_shim PASSED [ 68%]
+tests/test_capture_shims.py::test_grok_hooks_file_is_capture_only_and_names_its_harness PASSED [ 69%]
+tests/test_hermes_capture.py::test_p1_config_schema_has_no_service_host_or_port PASSED [ 70%]
+tests/test_hermes_capture.py::test_p1_no_hook_path_opens_a_socket_and_a_port_setting_is_ignored_with_a_counted_warning PASSED [ 71%]
+tests/test_hermes_capture.py::test_p1_the_child_socket_guard_logs_every_connect_including_loopback_and_unix PASSED [ 73%]
+tests/test_hermes_capture.py::test_p2_close_with_a_full_queue_returns_within_2s_and_writes_nothing_after PASSED [ 74%]
+tests/test_hermes_capture.py::test_p2_a_projection_in_flight_at_close_writes_nothing_after_close PASSED [ 75%]
+tests/test_hermes_capture.py::test_p3_drops_are_persisted_and_a_fresh_process_reports_the_same_count PASSED [ 76%]
+tests/test_hermes_capture.py::test_p7_projection_uses_the_task_cwd_from_hook_context_never_the_process_cwd PASSED [ 77%]
+tests/test_hermes_capture.py::test_p9_state_packet_text_is_persisted_only_with_persist_packet_text PASSED [ 78%]
+tests/test_hermes_capture.py::test_p10_mode_off_registers_no_hook_and_pre_tool_call_is_never_registered PASSED [ 79%]
+tests/test_hermes_capture.py::test_p11_config_error_fails_open_and_the_child_writes_no_pycache_into_the_installed_tree PASSED [ 80%]
+tests/test_hermes_capture.py::test_a1_rows_land_under_z0int_home_state_hermes_never_under_hermes_home PASSED [ 82%]
+tests/test_hermes_capture.py::test_a2_outcome_rows_carry_behaviour_and_session_end_fills_unfinished_turns PASSED [ 83%]
+tests/test_hermes_capture.py::test_a3_trace_and_turn_ids_are_canonical_and_match_the_c1_aliases PASSED [ 84%]
+tests/test_hermes_capture.py::test_a4_projection_pool_is_bounded_and_the_h3_flood_drops_no_events PASSED [ 85%]
+tests/test_hermes_capture.py::test_a4_every_projection_holds_one_of_max_children_slots PASSED [ 86%]
+tests/test_hermes_capture.py::test_double_capture_guard_emits_no_opportunities_and_writes_a_failure_row[profile0-z0int-decisions] PASSED [ 87%]
+tests/test_hermes_capture.py::test_double_capture_guard_emits_no_opportunities_and_writes_a_failure_row[profile1-bend] PASSED [ 88%]
+tests/test_hermes_capture.py::test_the_z0int_decisions_vehicle_is_retired PASSED [ 89%]
+tests/test_hermes_capture.py::test_inertness_every_capture_hook_returns_none_for_normal_and_hostile_payloads PASSED [ 91%]
+tests/test_hermes_capture.py::test_automatic_path_is_inert_and_spawns_nothing_while_automatic_json_has_hermes_off PASSED [ 92%]
+tests/test_hermes_capture.py::test_automatic_invoke_runs_the_configured_z0int_with_the_same_home_as_its_gate PASSED [ 93%]
+tests/test_hermes_capture.py::test_post_tool_call_stores_only_check_class_and_exit_status PASSED [ 94%]
+tests/test_hermes_capture.py::test_opportunity_and_outcome_rows_carry_model_id_and_the_plugin_policy_revision PASSED [ 95%]
+tests/test_hermes_capture.py::test_cron_kanban_and_cluster_sessions_are_cohort_automated_at_capture PASSED [ 96%]
+tests/test_hermes_capture.py::test_z0int_missing_or_broken_fails_open_and_is_counted[missing] PASSED [ 97%]
+tests/test_hermes_capture.py::test_z0int_missing_or_broken_fails_open_and_is_counted[broken] PASSED [ 98%]
+tests/test_hermes_capture.py::test_an_interpreter_exit_right_after_the_turn_still_drains_the_queue PASSED [100%]
+
+============================= 89 passed in 27.48s ==============================
+pytest_rc=0
+# cmd: run.sh <wt> green-node -- node --test tests/test-dsh-memory.mjs tests/test-dsh-plugin.mjs
+✔ shadow: the pre-step returns at once with the native decision and a receipt is written later (171.819303ms)
+✔ canary: the brief enters the next model request as one extra message; the native batch is untouched (182.903489ms)
+✔ canary past the 300 ms deadline gets the native decision and a counted timeout (519.918479ms)
+✔ fail-open: an unavailable z0int keeps the native decision and counts the failure (64.624082ms)
+✔ a cloud model endpoint is blocked unless dsh allows cloud injection (127.650028ms)
+✔ index.mjs registers exactly one memory pre-step (default shadow) and none when memory_inject is off (95.228584ms)
+✔ memory.mjs reaches only the z0 memory surface: no Hermes home or state.db path anywhere (4.137774ms)
+✔ 1 apply registers an observe-only agent/request middleware; next() comes back unchanged (3.617659ms)
+✔ 1 the output stream is byte-identical with capture on or off (0.640887ms)
+✔ 2 the llm/stream router registers only when config.router===true AND automatic.json dsh is enabled (0.938554ms)
+✔ 3 a user turn sends one prompt and one stop event to hook_adapter --harness dsh, detached (0.587445ms)
+✔ 3 the JS turn_key matches a known harness_id.turn_key vector (0.150564ms)
+✔ 3 a turn that errors before its stop boundary is closed with a counted failure row, not left open (71.515695ms)
+✔ 4 the plugin source and the env it gives the hook child never reference key files or private trees (1.203985ms)
+✔ 5 default config: no network call, shadow_plane=off recorded once per process (234.979142ms)
+✔ 5 with a fake z0 service it samples deterministically at the configured rate and writes shadow_decision rows (55.741439ms)
+✔ 5 the max-inflight cap holds: one call in flight, the rest recorded queue_saturated (325.875284ms)
+✔ 5 service down gives backend_unavailable, counted (20.566828ms)
+✔ 5 port 11501 is refused unless allow_live_service (151.447387ms)
+✔ 5 the shadow only ever calls the pure /v1/plan route: no config value can point it at an executing route (23.145804ms)
+✔ 5 a shadow response that claims it executed is counted as a contract violation, never recorded ok (20.977093ms)
+✔ 6 a missing python lets the turn proceed and leaves a counted drop row (23.109058ms)
+✔ 6 a spawn that throws or errors is counted and never reaches the turn (40.972279ms)
+✔ 6 no unhandled rejection under --unhandled-rejections=strict on every failure path (338.607516ms)
+✔ 7 lineage and shadow rows hold no prompt or response text (20.638498ms)
+✔ 8 the plugin does not ship, export or load memory.js (0.488095ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5474.321639
+node_rc=0
+# cmd: run.sh <wt> green-bun -- env SENPI_TYPES=<installed senpi types.d.ts> bun test omp-extensions/
+bun test v1.3.14 (0d9b296a)
+
+omp-extensions/local-cognition/index.test.ts:
+(pass) tool_call handler returns undefined and never blocks [1.60ms]
+(pass) a rejected send does not throw into the tool_call handler [30.44ms]
+(pass) sends a cognition_shadow request through the bridge transport [30.55ms]
+(pass) payload actions contain only the available tool names [31.44ms]
+(pass) payload keeps read-only authority and the example shadow models by default [30.81ms]
+(pass) env kill-switch disables the lane [30.42ms]
+(pass) env kill-switch accepts off/false and explicit on [0.20ms]
+(pass) cognition.json setting gates the lane when env is unset [0.35ms]
+(pass) timeout comes from the env override [0.04ms]
+(pass) resolveAvailableTools prefers ctx.getTools and always includes the observed tool [0.08ms]
+(pass) buildShadowPayload is self-contained and schema-shaped [0.06ms]
+(pass) the shadow request gives the served-only local backend the bounded tool input and a structured actual_tool [30.51ms]
+(pass) registers z0int-cognition-status and the command never throws [0.65ms]
+
+omp-extensions/z0int-bridge/index.test.ts:
+(pass) the extension loads and registers with a missing interpreter [303.09ms]
+(pass) the default export is capture plus the bridge commands only: no routing handler, no route_worker tool [0.75ms]
+(pass) routing loaded from its own z0int-intelligence link registers exactly once next to the bridge [1.41ms]
+(pass) capture handlers return undefined and fail open, counted, when the worker cannot start [301.49ms]
+(pass) thrown errors inside a handler are caught: no throw, no unhandledRejection [302.64ms]
+(pass) the turn_open frame carries the task cwd, harness, subagent parent and model [0.23ms]
+(pass) the session id comes from ctx.sessionManager [0.06ms]
+(pass) interpreter resolution: Z0INT_PYTHON, then the checkout venv, then the z0int runtime, then python3 [0.04ms]
+(pass) frames reach the worker and a turn per session closes on its own agent_end [23.64ms]
+(pass) an unclosed turn whose agent_end never arrives stops blocking reload after the age bound [326.91ms]
+(pass) a new turn in a session whose last turn never closed is counted, not silently replaced [13.44ms]
+
+omp-extensions/z0int-bridge/omo.test.ts:
+(pass) the senpi re-export loads, registers capture only and stays inert [1.24ms]
+(pass) a diverged senpi API is recorded UNSUPPORTED, never a silent pass [0.18ms]
+(pass) a host whose on() accepts any event but never delivers agent_end is caught at run time [13.54ms]
+OMO senpi API (/mnt/zer0models/home-offload/kvn/bun/install/global/node_modules/@code-yeongyu/senpi/dist/core/extensions/types.d.ts): SUPPORTED
+(pass) the installed senpi declares the events the shim needs [0.33ms]
+(pass) a host that exits when its event loop drains (senpi print mode) is never held open by the resident worker [137.99ms]
+
+omp-extensions/z0-memory/index.test.ts:
+(pass) OMP shadow: the context handler returns undefined at once and a receipt is written later [167.60ms]
+(pass) OMP canary: the brief is in the next model-visible request only; history is untouched; no double injection [167.67ms]
+(pass) OMP canary past the deadline is native with a counted timeout; fail-open; cloud blocked [562.22ms]
+(pass) OMO: the senpi shim loads, and with a context hook the brief reaches the next request [122.68ms]
+(pass) OMO without a context hook records B=UNSUPPORTED instead of passing [60.59ms]
+(pass) the installed senpi declares the context event (else UNSUPPORTED is recorded) [0.15ms]
+(pass) the omo entry is a one-line re-export activation can write [0.74ms]
+
+ 36 pass
+ 0 fail
+ 173 expect() calls
+Ran 36 tests across 4 files. [2.75s]
+bun_rc=0

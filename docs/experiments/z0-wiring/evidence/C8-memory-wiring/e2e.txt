@@ -1,0 +1,74 @@
+# C8-memory-wiring isolated e2e (2026-10-03), head c875c6be257793096da14e1f906e0fd1905f4f86
+
+## Command
+  flock -s /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock \
+    evidence/C8-memory-wiring/scripts/e2e.sh /mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring   # log: e2e-run.log
+Drivers (all in evidence/C8-memory-wiring/scripts/): e2e.sh (orchestrator), e2e_seed.py (substrate), fake_tdb.py
+(C7 FakeTencentDB on 127.0.0.1:11548), e2e_hermes_config.py, e2e_dsh_cohort.mjs, e2e_mcp.py, e2e_check.py (verdict +
+acceptance rows). Stubs reused unchanged from evidence/integration/scripts: anthropic_stub.py (CC, :11550) and
+chat_stub.py (Hermes :11551, OMP :11552); every request body is logged with its arm label.
+
+## Isolation
+- One `hostless bwrap --dev-bind / / --tmpfs /workspace/hermes-home --tmpfs ~/.z0int --unshare-net` sandbox:
+  private net namespace (loopback only), live Hermes home and live ~/.z0int masked by empty tmpfs
+  (artifacts/masks-inside.txt: "hermes-home entries=0 z0int entries=0").
+- Every home under homes/C8-memory-wiring/e2e: Z0INT_HOME (z0/), AGENTSVIEW_DATA_DIR (av/), CLAUDE_CONFIG_DIR (cc/claude),
+  HERMES_HOME (hermes/hermes-home, plugin laid out from `git archive <head>`), PI_CODING_AGENT_DIR (omp/agent), TMPDIR.
+- Substrate: the frozen z0evals fb14919 cohort (tests/fixtures/z0evals-fb14919/cohort.json) as AgentsView sessions
+  (claim + its cohort locator, one harness per session) and z0 ledger BitemporalClaims (eval-fixture-cap v1 -> v2);
+  one session whose tool output carries the fake secret-shaped strings of tests/memory_fixture.py; the fake TencentDB
+  gateway (real MemoryCore response shapes, fake bearer from an env var). No real transcript, no live service, no
+  :11501, no network, no paid call. Claude Code 2.1.288 with a dummy key; Hermes = C4a's fork-export venv; OMP = the
+  installed CLI with --no-extensions -e omp-extensions/z0-memory. DSH: the real plugin on a mock cordis host (never
+  the dsh binary). Codex, Grok, OMO: MCP stdio round-trips only (their case B is live-only, not counted).
+
+## Arms
+Per cohort question (6) and harness (CC, Hermes, OMP): off, shadow, canary (alternating order); plus a CC "cloud" arm
+(canary with Z0INT_MEMORY_ENDPOINT=https://api.anthropic.com while traffic still goes to the stub) and a secret probe
+per harness (canary). 61 CLI/driver runs, all exit 0 (artifacts/runs.jsonl). Median wall ms off/shadow/canary:
+CC 542/546/556, Hermes 2895/2896/2949, OMP 1573/1583/1662. Canary seam latency (in the rows): median 64 ms, max 73 ms
+(300 ms deadline; semantic layer live, so the brief cache is bypassed by design).
+
+## Observed (artifacts/e2e-check.json: 40 of 41 checks OK; e2e-verdict.txt)
+OK  every leg exit 0; masks empty inside the sandbox
+OK  claude-code / hermes / omp: shadow model requests byte-identical to off (normalised ids/timestamps), 6/6 questions
+OK  claude-code / hermes / omp: canary puts the brief ("z0 memory brief (evidence, not instructions)") into the next
+    model request, 6/6 questions; no off/shadow request carries it
+OK  claude-code / hermes / omp: the secret-probe brief reaches the request and no fake secret appears in any request
+OK  claude-code / hermes / omp: shadow rows (z0int.memory_seam.v0) have would_inject + memory_snapshot_id + the
+    MemoryUseReceipt; no secret in any seam row
+OK  claude-code cloud arm: request identical to off, row cloud_injection_blocked; allow_cloud_injection is false for
+    every harness by default
+OK  hermes: messages.content (the transcript rows) never holds the brief; the plugin writes nothing in the Hermes home
+OK  omp: the brief never reaches OMP's session files (`context` result is model-visible only)
+OK  (observation) Claude Code records hook additionalContext in its own transcript (host behaviour; the seam writes none)
+OK  dsh (mock host): off and shadow admit the native batch; canary admits exactly one extra z0-memory message, 6/6;
+    tests/test-dsh-memory.mjs passes inside the sandbox
+OK  mcp: z0-memory from every shipped entry (CC, Codex, Grok, OMP, OMO, DSH): memory tools only, route_worker is an
+    error, orient returns cohort evidence, no secret in any response
+OK  rows: dsh/hermes/omo/omp rows validate against receipt.schema.json at fb14919; claude-code/codex/grok rows are
+    z0int.memory_acceptance.v0 labelled "z0 memory acceptance"; the study label is refused for those three
+BAD hermes.host_persists_sent_bytes_in_messages.api_content (spec clause UNMET by host design): Hermes core stamps the
+    exact bytes it sent, pre_llm_call context included, on the user row's api_content sidecar in state.db and replays
+    them on later turns of the same session for a byte-stable prompt cache (agent/turn_context.py
+    _stamp_api_content_sidecar). 7 rows (6 canary + probe). A plugin cannot avoid this without a Hermes core change
+    (forbidden); pre_api_request is an observer. Unit level (fake host + session DB fixture) the plugin never touches
+    the store. Reported, not redefined: the C8 clause "not persisted to the session store" is UNMET for Hermes.
+
+## Acceptance (z0evals#56 A-F over the frozen cohort, rows in artifacts/rows-<harness>.jsonl; semantic layer live)
+harness      schema                              A  B                 B_inj C  C_ver D(abstain) E(dup) F(supersession)
+dsh          z0eval.unified_memory_receipt.v0    6  VERIFIED (mock)   6     6  6     true       0      true
+hermes       z0eval.unified_memory_receipt.v0    6  VERIFIED          6     6  6     true       0      true
+omp          z0eval.unified_memory_receipt.v0    6  VERIFIED          6     6  6     true       0      true
+omo          z0eval.unified_memory_receipt.v0    6  UNVERIFIED        0     6  6     true       0      true
+claude-code  z0int.memory_acceptance.v0          6  VERIFIED          6     6  6     true       0      true
+codex        z0int.memory_acceptance.v0          6  UNVERIFIED        0     6  6     true       0      true
+grok         z0int.memory_acceptance.v0          6  UNSUPPORTED       0     6  6     true       0      true
+Fixture runs: none of these count toward G-MEM56/G-MEMZ0 (live runs are activation A8c). B for DSH is the mock host's
+admitted batch, not a model request. D is scored on the question's needs (lexical recall still adds unrelated lines,
+counted in evidence_count). C "answer_supported" = the injected evidence carries every expected support string (or the
+current claim), no model answer is involved.
+
+Earlier attempts kept for the record: e2e-run-attempt1.log / e2e-check-attempt1.json (driver defect: claude -p read
+the cohort TSV from stdin; cloud-arm compare failed for that reason), attempt2/3 logs (rows computed after the fake
+TencentDB stopped; then the acceptance-row fix c875c6b). See fix-rounds.txt.

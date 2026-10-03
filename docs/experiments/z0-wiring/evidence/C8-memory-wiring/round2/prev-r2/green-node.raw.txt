@@ -1,0 +1,19 @@
+✔ shadow: the pre-step returns at once with the native decision and a receipt is written later (415.851484ms)
+✔ canary: the brief enters the next model request as one extra message; the native batch is untouched (170.204785ms)
+✔ canary past the 300 ms deadline gets the native decision and a counted timeout (520.496555ms)
+✔ fail-open: an unavailable z0int keeps the native decision and counts the failure (60.904595ms)
+✔ a cloud model endpoint is blocked unless dsh allows cloud injection (116.689931ms)
+✔ index.mjs registers exactly one memory pre-step (default shadow) and none when memory_inject is off (65.073057ms)
+✔ memory.mjs reaches only the z0 memory surface: no Hermes home or state.db path anywhere (1.531067ms)
+✔ the gate endpoint is the profile model_endpoint only: a generic env var never marks a cloud model loopback (113.692272ms)
+✔ a root agent without a session cwd gets no brief (fail closed) and a counted no_scope (113.782705ms)
+✔ persistence (recorded deviation): the DSH brief is a durable admitted message, marked for the recall echo guard (117.33406ms)
+✔ shadow children are bounded: past the cap a turn writes a counted queue_saturated row instead of spawning (110.064558ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5718.827787

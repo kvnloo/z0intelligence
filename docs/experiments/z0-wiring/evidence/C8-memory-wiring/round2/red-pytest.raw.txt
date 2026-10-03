@@ -1,0 +1,52 @@
+tree=/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red head=767382961c496ccd2a4d87db5d8827553e8034af dirty=0
+FFFFFFF.FF.F.FFFFFFFFFFF.FF                                              [100%]
+=================================== FAILURES ===================================
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:74: KeyError: 'memory'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:74: KeyError: 'memory'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:74: KeyError: 'memory'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:74: KeyError: 'memory'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:74: KeyError: 'memory'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:74: KeyError: 'memory'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:74: KeyError: 'memory'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:94: AssertionError: the receipt of the detached shadow brief was not attached
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:104: AttributeError: <module 'z0int.memory.seam' from '/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/src/z0int/memory/seam.py'> has no attribute 'RECEIPT_WAIT_S'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:129: KeyError: 'memory'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:157: AssertionError: claude-code: opportunity row has no memory receipt
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:157: AssertionError: codex: opportunity row has no memory receipt
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:157: AssertionError: grok: opportunity row has no memory receipt
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:170: AssertionError: assert ([] == ['shadow']
+~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/lib/python3.13/pathlib/_local.py:537: FileNotFoundError: [Errno 2] No such file or directory: '/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/harness-adapters/grok-z0intelligence/hooks/z0-memory.json'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:194: AssertionError: assert ('shadow' == 'off'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:194: AssertionError: assert ('shadow' == 'off'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:194: AssertionError: assert ('injected' == 'off'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:194: AssertionError: assert ('injected' == 'off'
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:206: assert '{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "z0 memory brief (evidence, not ins...y (agentsview:c1#3)\\n- [codex 2026-10-03T16:16:05Z] quokka bench numbers were recorded for codex (agentsview:x1#5)"}}' is None
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:220: AssertionError: assert ['on', 'on', 'shadow'] == ['off', 'on', 'off']
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:252: AssertionError: assert <hz_memory_ks.Memory object at 0x7f3f74410190> is None
+/mnt/zer0models/z0-wt/wiring/wt/C8-memory-wiring-r3red/tests/test_memory_capture_join.py:252: AssertionError: assert <hz_memory_ks.Memory object at 0x7f3f74410550> is None
+=========================== short test summary info ============================
+FAILED tests/test_memory_capture_join.py::test_the_opportunity_record_carries_the_receipt_the_memory_seam_wrote_for_that_turn[claude-code]
+FAILED tests/test_memory_capture_join.py::test_the_opportunity_record_carries_the_receipt_the_memory_seam_wrote_for_that_turn[codex]
+FAILED tests/test_memory_capture_join.py::test_the_opportunity_record_carries_the_receipt_the_memory_seam_wrote_for_that_turn[grok]
+FAILED tests/test_memory_capture_join.py::test_the_opportunity_record_carries_the_receipt_the_memory_seam_wrote_for_that_turn[hermes]
+FAILED tests/test_memory_capture_join.py::test_the_opportunity_record_carries_the_receipt_the_memory_seam_wrote_for_that_turn[omp]
+FAILED tests/test_memory_capture_join.py::test_the_opportunity_record_carries_the_receipt_the_memory_seam_wrote_for_that_turn[omo]
+FAILED tests/test_memory_capture_join.py::test_the_opportunity_record_carries_the_receipt_the_memory_seam_wrote_for_that_turn[dsh]
+FAILED tests/test_memory_capture_join.py::test_the_opportunity_build_waits_for_a_detached_shadow_brief_still_running
+FAILED tests/test_memory_capture_join.py::test_a_pending_receipt_that_never_settles_is_bounded
+FAILED tests/test_memory_capture_join.py::test_a_late_second_injector_never_replaces_the_turns_receipt
+FAILED tests/test_memory_capture_join.py::test_hook_processes_join_the_capture_opportunity_and_the_memory_receipt[claude-code]
+FAILED tests/test_memory_capture_join.py::test_hook_processes_join_the_capture_opportunity_and_the_memory_receipt[codex]
+FAILED tests/test_memory_capture_join.py::test_hook_processes_join_the_capture_opportunity_and_the_memory_receipt[grok]
+FAILED tests/test_memory_capture_join.py::test_grok_memory_hook_is_shadow_only_and_never_prints
+FAILED tests/test_memory_capture_join.py::test_grok_memory_hook_is_its_own_hooks_file_and_capture_stays_capture_only
+FAILED tests/test_memory_capture_join.py::test_the_capture_kill_switch_keeps_the_memory_seam_native[shadow-env]
+FAILED tests/test_memory_capture_join.py::test_the_capture_kill_switch_keeps_the_memory_seam_native[shadow-config]
+FAILED tests/test_memory_capture_join.py::test_the_capture_kill_switch_keeps_the_memory_seam_native[on-env]
+FAILED tests/test_memory_capture_join.py::test_the_capture_kill_switch_keeps_the_memory_seam_native[on-config]
+FAILED tests/test_memory_capture_join.py::test_the_kill_switch_silences_the_hook_in_on_mode
+FAILED tests/test_memory_capture_join.py::test_the_js_memory_client_reads_the_same_kill_switch
+FAILED tests/test_memory_capture_join.py::test_the_hermes_memory_seam_reads_the_capture_kill_switch[env]
+FAILED tests/test_memory_capture_join.py::test_the_hermes_memory_seam_reads_the_capture_kill_switch[config]
+23 failed, 4 passed in 21.89s
+pytest_rc=1

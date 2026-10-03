@@ -1,0 +1,35 @@
+# tree: /mnt/zer0models/z0-wt/wiring/wt/C3-omp-omo-capture-base @ 914dc9917bd41bb722d7eced4e7e5f1aa4002f66 (status: 0 changed paths)
+# cmd: (cd <tree> && flock -s quiet-lane.lock run.sh <tree> suite-base-rerun --guard -- python -m pytest -q -p no:cacheprovider -rfE --tb=no tests)
+........................................................................ [  6%]
+........................................................................ [ 13%]
+........................................................................ [ 20%]
+........................................................................ [ 27%]
+........................................................................ [ 34%]
+........................................................................ [ 41%]
+........................................................................ [ 48%]
+......FFFFF............................................................. [ 55%]
+........................................................................ [ 62%]
+......................................................................ss [ 69%]
+........................................................................ [ 76%]
+................F....F...F..FF.F........................................ [ 83%]
+...............s.s...................................................... [ 90%]
+........................................................................ [ 97%]
+.........................                                                [100%]
+=========================== short test summary info ============================
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[0]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[1]
+FAILED tests/test_functions_verify.py::test_live_laya_orders_the_three_packets[2]
+FAILED tests/test_functions_verify.py::test_live_jev_reports_the_validated_revision
+FAILED tests/test_functions_verify.py::test_live_escalation_records_both_physical_calls
+FAILED tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only
+FAILED tests/test_quota_budget.py::test_empty_authority_capacity - assert False
+FAILED tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute
+FAILED tests/test_quota_budget.py::test_latest_physical_row_not_double_counted
+FAILED tests/test_quota_budget.py::test_groq_requests_header_is_daily - KeyEr...
+FAILED tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes
+11 failed, 1018 passed, 4 skipped in 144.98s (0:02:24)
+# socket guard log: 0 violation(s)
+# cmd: (cd <tree> && flock -s quiet-lane.lock run.sh <tree> suite-base-rerun-bun -- env SENPI_TYPES=<installed senpi types.d.ts> bun test omp-extensions/)
+ 12 pass
+ 0 fail
+Ran 12 tests across 1 file. [230.00ms]
