@@ -139,4 +139,10 @@ def create(settings, home, python, profile):
     mode = mode_of(settings)
     if mode == 'off' or killed(home):
         return None
+    try:  # seam/hermes.active: capture's opportunity build waits briefly for a turn this seam has not marked yet
+        marker = Path(home) / 'state' / 'memory' / 'seam' / f'{HARNESS}.active'
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch()
+    except OSError:
+        pass
     return Memory(home=home, python=python, mode=mode, profile=profile, injector=settings.get('memory_injector'))

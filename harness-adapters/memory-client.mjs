@@ -50,6 +50,15 @@ async function row(env, harness, mode, fields) {
   } catch { /* a read-only home only loses the row */ }
 }
 
+/** seam/<harness>.active: the capture side's opportunity build then waits briefly for a turn this seam has not
+ * marked yet (a cold shadow child), even before the seam's first row. Never throws. */
+function markInstalled(env, harness) {
+  try {
+    mkdirSync(seamDir(env), {recursive: true})
+    writeFileSync(join(seamDir(env), `${harness}.active`), '')
+  } catch { /* a read-only home only loses the grace */ }
+}
+
 /** Whether the host has a model-visible push seam (recorded for the acceptance eval: B=UNSUPPORTED otherwise). */
 export function recordPushStatus(env, harness, status) {
   try {
@@ -64,6 +73,7 @@ export function recordPushStatus(env, harness, status) {
 export function createMemoryClient({harness, mode, env = process.env, spawn = nodeSpawn, injector,
                                     deadlineMs = DEADLINE_MS} = {}) {
   mode = memoryMode(mode, env)
+  if (mode !== 'off') markInstalled(env, harness)
   // Read per call: a long-lived host may change its environment after the extension loaded.
   const python = () => env.Z0INT_PYTHON || 'python3'
   const childEnv = () => ({...env, PYTHONPATH: SRC + (env.PYTHONPATH ? ':' + env.PYTHONPATH : '')})

@@ -139,13 +139,13 @@ def _settle(harness: str, turn_key: str, receipt: Any) -> None:
 def receipt_for(harness: str, turn_key: Any) -> dict[str, Any] | None:
     """The MemoryUseReceipt the seam settled for this turn, or None. Called from the detached opportunity build:
     a pending turn is waited for up to RECEIPT_WAIT_S; an unmarked turn of a harness whose seam has run here before
-    gets RECEIPT_GRACE_S (the two hooks of one turn start together); otherwise it returns at once. Never raises."""
+    (or whose shim marked it installed: ``seam/<harness>.active``) gets RECEIPT_GRACE_S (the two hooks of one turn start together); otherwise it returns at once. Never raises."""
     try:
         if not turn_key:
             return None
         final, pending = _receipt_path(harness, turn_key, 'json'), _receipt_path(harness, turn_key, 'pending')
         t0 = time.monotonic()
-        seen = (_seam_dir() / f'{harness}.jsonl').exists()
+        seen = any((_seam_dir() / f'{harness}.{ext}').exists() for ext in ('jsonl', 'active'))  # ran / installed
         while True:
             if final.exists():
                 return json.loads(final.read_text(encoding='utf-8')).get('memory')
