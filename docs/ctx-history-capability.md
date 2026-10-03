@@ -66,6 +66,12 @@ It validates ctx search schema v2, requires the response to confirm
 `freshness.mode == "off"`, retains the Core `generation_id`, and projects each
 hit onto the existing `EvidenceRef` type.
 
+Every ctx command runs with `CTX_LOCAL_USAGE_ENABLED=false` and
+`CTX_ANALYTICS_ENABLED=false`. Without them, a plain `search --refresh off` on
+ctx 2.2.7 upserts `<data-root>/usage.sqlite` (observed on real local history),
+so a z0 read would still write ctx state. The rest of the caller's environment,
+including `CTX_DATA_ROOT`, is passed through.
+
 A hit is treated as conversation evidence. Its search score/rank is diagnostic
 only; it does not upgrade the evidence into a verified claim.
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import time
@@ -21,6 +22,9 @@ from z0int.memory_contract import EventIdentity
 CAPABILITY_ID = "ctx.history.v1"
 SEARCH_SCHEMA_VERSION = 2
 _ALLOWED_BACKENDS = {"lexical", "semantic", "hybrid"}
+# ctx read commands otherwise upsert <data-root>/usage.sqlite and may emit the
+# first-party analytics marker; z0 evidence reads must leave ctx state untouched.
+_READ_ONLY_ENV = {"CTX_LOCAL_USAGE_ENABLED": "false", "CTX_ANALYTICS_ENABLED": "false"}
 
 
 class CtxHistoryError(RuntimeError):
@@ -115,6 +119,7 @@ class CtxHistoryCapability:
                 text=True,
                 timeout=timeout_s,
                 check=False,
+                env={**os.environ, **_READ_ONLY_ENV},
             )
         except subprocess.TimeoutExpired as exc:
             raise CtxCommandError(f"ctx command timed out after {timeout_s:g}s") from exc

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from dataclasses import dataclass
 from typing import Any
+from unittest import mock
 
 from z0int.capabilities.ctx_history import (
     CtxCommandError,
@@ -72,7 +74,136 @@ EVENT = {
 }
 
 
+# Sanitized fixtures shaped like real ctx 2.2.7 output on local history
+# (default session-scoped lexical search; `show event` event_window). IDs and
+# text are synthetic; only the key layout mirrors the observed payloads.
+REAL_SHAPED_SEARCH = {
+    "schema_version": 2,
+    "payload_type": "search_results",
+    "query": "unified memory",
+    "filters": {"content_scope": "all"},
+    "freshness": {"mode": "off", "status": "existing_generation"},
+    "retrieval": {
+        "requested_mode": "lexical",
+        "effective_mode": "lexical",
+        "generation_id": "f" * 64,
+        "semantic_status": "skipped",
+        "semantic_weight": 0.0,
+        "index": "core",
+    },
+    "generated_at": "2026-10-03T22:10:00Z",
+    "diversification": {"status": "applied", "top_n": 2},
+    "truncation": {"candidate_pool_truncated": True},
+    "results": [
+        {
+            "item_id": "00000000-0000-8000-8000-0000000000a1",
+            "ctx_session_id": "00000000-0000-8000-8000-0000000000a1",
+            "session_id": "00000000-0000-8000-8000-0000000000a1",
+            "ctx_event_id": "00000000-0000-8000-8000-0000000000e1",
+            "event_id": "00000000-0000-8000-8000-0000000000e1",
+            "event_seq": 65536,
+            "provider": "claude",
+            "provider_session_id": "synthetic-provider-session",
+            "result_type": "session_result",
+            "result_scope": "session",
+            "agent_scope": "subagent",
+            "session_relationship": "workflow_child",
+            "rank": 1,
+            "retrieval_score": 12.5,
+            "snippet": "synthetic snippet about unified memory",
+            "snippet_truncated": True,
+            "visibility": "local",
+            "citations": [{"kind": "event"}],
+        },
+        {
+            "item_id": "00000000-0000-8000-8000-0000000000a2",
+            "ctx_session_id": "00000000-0000-8000-8000-0000000000a2",
+            "ctx_event_id": "00000000-0000-8000-8000-0000000000e2",
+            "provider": "hermes",
+            "result_type": "session_result",
+            "result_scope": "session",
+            "rank": 2,
+            "snippet": "another synthetic snippet",
+            "visibility": "local",
+        },
+    ],
+    "result_window": {"limit": 2, "returned": 2, "more_available": True},
+}
+
+REAL_SHAPED_EVENT = {
+    "schema_version": 1,
+    "target": "event",
+    "payload_type": "event_window",
+    "format": "json",
+    "ctx_event_id": "00000000-0000-8000-8000-0000000000e1",
+    "ctx_session_id": "00000000-0000-8000-8000-0000000000a1",
+    "event": {
+        "item_id": "00000000-0000-8000-8000-0000000000e1",
+        "ctx_event_id": "00000000-0000-8000-8000-0000000000e1",
+        "ctx_session_id": "00000000-0000-8000-8000-0000000000a1",
+        "record_type": "event",
+        "provider": "claude",
+        "provider_session_id": "synthetic-provider-session",
+        "source_format": "claude_projects_jsonl_tree",
+        "sequence": 65536,
+        "event_type": "message",
+        "role": "user",
+        "occurred_at": "2026-10-01T04:57:52.192Z",
+        "content": {"complete": True, "policy_status": "selected"},
+        "text": "synthetic event text",
+    },
+    "events": [
+        {
+            "ctx_event_id": "00000000-0000-8000-8000-0000000000e1",
+            "ctx_session_id": "00000000-0000-8000-8000-0000000000a1",
+        }
+    ],
+    "copied_lineage": {"schema_version": 2, "returned": 0, "occurrences": []},
+}
+
+
 class CtxHistoryCapabilityTests(unittest.TestCase):
+    def test_real_shaped_session_search_and_event_hydration(self):
+        runner = _Runner([REAL_SHAPED_SEARCH, REAL_SHAPED_EVENT])
+        cap = CtxHistoryCapability(binary="ctx", runner=runner)
+
+        out = cap.search("unified memory", limit=2)
+        self.assertEqual(out.generation_id, "f" * 64)
+        self.assertEqual(
+            [e.locator for e in out.evidence],
+            [
+                "ctx:event:00000000-0000-8000-8000-0000000000e1",
+                "ctx:event:00000000-0000-8000-8000-0000000000e2",
+            ],
+        )
+        self.assertTrue(all(e.source_version == "ctx-core:" + "f" * 64 for e in out.evidence))
+        self.assertTrue(out.more_available)
+
+        hydrated = cap.show_event(out.evidence[0].locator.removeprefix("ctx:event:"), window=3)
+        self.assertEqual(hydrated.identity.source_system, "ctx:claude")
+        self.assertEqual(hydrated.identity.source_session, "00000000-0000-8000-8000-0000000000a1")
+        self.assertIsNone(hydrated.identity.ledger_seq)
+        self.assertEqual(len(hydrated.window_events), 1)
+
+    def test_ctx_reads_disable_ctx_side_effect_writes(self):
+        # Observed on real ctx 2.2.7: a plain `search --refresh off` upserts
+        # <data-root>/usage.sqlite unless CTX_LOCAL_USAGE_ENABLED=false.
+        runner = _Runner([REAL_SHAPED_SEARCH, REAL_SHAPED_EVENT])
+        cap = CtxHistoryCapability(binary="ctx", runner=runner)
+        with mock.patch.dict(
+            os.environ,
+            {"CTX_DATA_ROOT": "/history/ctx", "CTX_LOCAL_USAGE_ENABLED": "true"},
+        ):
+            cap.search("unified memory", limit=2)
+            cap.show_event("00000000-0000-8000-8000-0000000000e1")
+
+        for _argv, kwargs in runner.calls:
+            env = kwargs.get("env")
+            self.assertIsNotNone(env, "ctx must run with an explicit read-only env")
+            self.assertEqual(env["CTX_LOCAL_USAGE_ENABLED"], "false")
+            self.assertEqual(env["CTX_ANALYTICS_ENABLED"], "false")
+            self.assertEqual(env["CTX_DATA_ROOT"], "/history/ctx")
+
     def test_missing_binary_is_explicit(self):
         cap = CtxHistoryCapability(binary="", runner=_Runner([]))
         with self.assertRaisesRegex(CtxUnavailable, "not found"):
