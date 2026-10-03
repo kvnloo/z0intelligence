@@ -169,24 +169,6 @@ def _base_rates(root: str | Path | None) -> dict[str, float | None]:
     return out
 
 
-def _cohort_fn(root: str | Path | None, harness: str, projects: Path | None) -> Callable[[Mapping[str, Any]], str]:
-    """The cohort the turn's training row gets (loop_export.build_table): the capture-time cohort when it is not the
-    session's, else the verified row's (the turn's, then its session's), else the transcript's (Claude Code)."""
-    by_turn, by_session = {}, {}
-    for r in hc._read_jsonl(hc.state_dir(harness, root) / 'outcomes_verified.jsonl'):
-        if r.get('cohort') in le.TABLE_COHORTS:
-            by_turn[(r.get('session_id'), r.get('trace_id'))] = by_session[r.get('session_id')] = r['cohort']
-    sessions: dict[Any, str] = {}
-
-    def cohort(rec: Mapping[str, Any]) -> str:
-        sid = rec.get('session_id')
-        tid = ((rec.get('opportunity') or {}).get('trace') or {}).get('trace_id')
-        if harness == le.HARNESS and sid not in by_session and sid not in sessions:
-            sessions[sid] = le.transcript_cohort(sid, projects)
-        return le.capture_cohort(rec) or by_turn.get((sid, tid)) or by_session.get(sid) or sessions.get(sid, 'unknown')
-    return cohort
-
-
 def replay(root: str | Path | None = None, registry: Mapping[str, Any] | None = None, *,
            backend_factory: Callable[[str], Any] | None = None, deadline: float | None = None,
            projects: Path | None = None) -> dict[str, Any]:
@@ -238,7 +220,7 @@ def replay(root: str | Path | None = None, registry: Mapping[str, Any] | None = 
         if not records:
             continue
         done = {r.get('decision_id') for r in hc._read_jsonl(out_path)}
-        cohort_of = _cohort_fn(root, h, projects)
+        cohort_of = le.turn_cohort_fn(h, le.latest_verified(hc.state_dir(h, root), h), projects=projects)
         rows = []
         for rec in records:
             if deadline is not None and time.monotonic() >= deadline:
@@ -247,11 +229,14 @@ def replay(root: str | Path | None = None, registry: Mapping[str, Any] | None = 
             opp = rec['opportunity']
             trace = opp.get('trace') or {}
             sid, tid = rec.get('session_id'), trace.get('trace_id')
-            cohort = cohort_of(rec)
+            cohort = cohort_of(sid, tid, rec)
+            turn_key = le.row_turn_key(h, sid, tid)
             ctx = {'base_rate': rates[h], 'routines': routines, 'features': le.opportunity_features(rec, cohort)}
             rec = dict(rec, harness=h)
             for c, fn in deciders:
-                decision_id = le._sha({'opportunity': trace.get('opportunity_id'), 'challenger': c['sha256']}, 20)
+                # the turn's key too: an opportunity_id alone can collide across sessions (grok's C1 turn id)
+                decision_id = le._sha({'opportunity': trace.get('opportunity_id'), 'turn_key': turn_key,
+                                       'challenger': c['sha256']}, 20)
                 if decision_id in done:
                     continue
                 t0 = time.perf_counter()
@@ -263,7 +248,7 @@ def replay(root: str | Path | None = None, registry: Mapping[str, Any] | None = 
                 rows.append({'schema': hc.schema(h, 'shadow_decision'), 'harness': h, 'cohort': cohort,
                              'source': 'shadow_slot', 'decision_id': decision_id,
                              'opportunity_id': trace.get('opportunity_id'),
-                             'turn_key': le.row_turn_key(h, sid, tid),  # joins the turn's training row
+                             'turn_key': turn_key,  # joins the turn's training row
                              'group': le._sha({'session': sid}, 12), 'day': (rec.get('recorded_at') or '')[:10] or None,
                              'challenger': {'id': c['id'], 'kind': c['kind'], 'sha256': c['sha256']},
                              'decision': action, 'distribution': dist,
