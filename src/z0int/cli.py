@@ -472,6 +472,9 @@ def build_parser() -> argparse.ArgumentParser:
     cxp.add_argument("--hook", choices=["session-start"], default=None,
                      help="Emit Claude Code hook JSON (reads hook stdin for cwd); fail-open")
 
+    cxb = cx_sub.add_parser("gstack-bill", help="Normalize gstack-context-bill JSON for shadow experiments")
+    cxb.add_argument("--input", required=True, help="Path to gstack-context-bill --json output")
+
 
     osc = sub.add_parser(
         "os-context",
@@ -822,6 +825,17 @@ def _cmd_context(args: argparse.Namespace) -> int:
 
     if args.context_cmd == "packet":
         return _cmd_context_packet(args)
+    if args.context_cmd == "gstack-bill":
+        from pathlib import Path
+
+        from z0int.gstack_context import normalize_context_bill
+
+        raw = json.loads(Path(args.input).expanduser().read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            print("gstack context bill must be a JSON object", file=sys.stderr)
+            return 2
+        print(json.dumps(normalize_context_bill(raw), indent=2, ensure_ascii=False))
+        return 0
     if args.context_cmd != "resolve":
         print(f"unknown context command: {args.context_cmd}", file=sys.stderr)
         return 2
