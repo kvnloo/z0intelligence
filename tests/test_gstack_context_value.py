@@ -17,6 +17,14 @@ def _runner():
     return module
 
 
+def test_root_cli_exposes_gstack_bill_shadow_command() -> None:
+    from z0int.cli import build_parser
+
+    args = build_parser().parse_args(["context", "gstack-bill", "--input", "bill.json"])
+    assert args.context_cmd == "gstack-bill"
+    assert args.input == "bill.json"
+
+
 def test_gstack_context_value_fixture_suite() -> None:
     result = _runner().run_cases()
     assert result["passed"] == result["total"]
