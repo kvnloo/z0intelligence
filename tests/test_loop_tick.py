@@ -369,6 +369,88 @@ def test_an_exhausted_budget_stops_releases_the_lock_and_is_partial(world, learn
     assert summary_file(world.home)['status'] == 'partial_measurement'
 
 
+def test_the_verify_step_stops_between_harnesses_at_the_deadline(world, learner, monkeypatch):
+    """verify is bounded too: a slow label source holds the lock for at most one harness past the budget."""
+    from z0int import outcome_verifier as ov
+    for h in ('codex', 'hermes', 'omp'):
+        turns(world.home, h, [(f'{h}-s', 't1', None, '2026-09-30')])
+    real, seen = ov.verify_harness, []
+
+    def slow(h, **k):
+        seen.append(h)
+        time.sleep(1.5)
+        return real(h, **k)
+    monkeypatch.setattr(ov, 'verify_harness', slow)
+    rep = tick(world, budget_s=1.0)
+    status = {s['name']: s['status'] for s in rep['steps']}
+    assert status['verify'] == 'partial' and len(seen) == 1
+    assert [status[n] for n in STEPS[1:]] == ['skipped_budget'] * 6
+    assert rep['status'] == 'partial_measurement' and rep['tokenomics']['lock_held_s'] < 1.0 + 1.5 + 1.0
+    assert lock_is_free(world.lock)
+
+
+def test_the_import_step_stops_between_legacy_sources_at_the_deadline(world, learner, monkeypatch):
+    from z0int import legacy_import as li
+    omp_v1_legacy(world.home)
+    (world.home / 'shadow').mkdir(exist_ok=True)
+    (world.home / 'shadow' / 'cognition-shadow.jsonl').write_text('')
+    real, seen = li.import_omp_v1, []
+
+    def slow(*a, **k):
+        seen.append('omp-v1')
+        time.sleep(1.5)
+        return real(*a, **k)
+    monkeypatch.setattr(li, 'import_omp_v1', slow)
+    monkeypatch.setattr(li, 'import_cognition_shadow', lambda *a, **k: seen.append('cognition') or {})
+    rep = tick(world, budget_s=1.0)
+    status = {s['name']: s['status'] for s in rep['steps']}
+    assert status['import'] == 'partial' and seen == ['omp-v1']
+    assert rep['status'] == 'partial_measurement'
+
+
+# ----------------------------------------------------------------------------- sufficiency thresholds: the learner's
+def repin_learner(world, learner, consts):
+    """Commit a learner version that declares its own sufficiency constants and pin the tick to it."""
+    path = learner.dir / 'evolution_lab' / 'verified_loop.py'
+    path.write_text(consts + '\n' + FAKE_LEARNER)
+    env = dict(os.environ, **GIT_ENV)
+    for args in (['add', '-A'], ['commit', '-qm', 'learner constants']):
+        subprocess.run(['git', '-C', str(learner.dir), *args], check=True, env=env, capture_output=True)
+    sha = subprocess.run(['git', '-C', str(learner.dir), 'rev-parse', 'HEAD'], check=True, capture_output=True,
+                         text=True).stdout.strip()
+    set_config(world.home, learner_sha=sha)
+
+
+def test_sufficiency_uses_the_pinned_learners_thresholds_and_flags_a_mismatch(world, learner):
+    repin_learner(world, learner, 'MIN_ROWS = 2\nMIN_NEG = 1\nMIN_GROUPS = 2\nK = 2')
+    cc_opportunities(world.home)
+    turns(world.home, 'hermes', [('hs-1', 't1', 'verified_success', '2026-09-30')])
+    rep = tick(world)
+    assert rep['learner']['status'] == 'ok'
+    assert rep['learner']['thresholds'] == {'MIN_ROWS': 2, 'MIN_NEG': 1, 'MIN_GROUPS': 2, 'K': 2}
+    assert rep['learner']['threshold_mismatch'] == {'MIN_ROWS': [300, 2], 'MIN_NEG': [30, 1], 'MIN_GROUPS': [10, 2],
+                                                    'K': [5, 2]}
+    for s in rep['strata'].values():
+        assert s['sufficiency']['thresholds'] == rep['learner']['thresholds']
+        assert s['sufficiency']['thresholds_source'] == 'learner'
+
+
+def test_a_learner_with_the_preregistered_thresholds_reports_no_mismatch(world, learner):
+    repin_learner(world, learner, 'MIN_ROWS = 300\nMIN_NEG = 30\nMIN_GROUPS = 10\nK = 5')
+    cc_opportunities(world.home)
+    rep = tick(world)
+    assert rep['learner']['thresholds'] == {'MIN_ROWS': 300, 'MIN_NEG': 30, 'MIN_GROUPS': 10, 'K': 5}
+    assert rep['learner']['threshold_mismatch'] == {}
+    assert rep['strata']['claude-code/unknown']['sufficiency']['thresholds_source'] == 'learner'
+
+
+def test_cli_help_lists_the_tick_under_loop():
+    from z0int import cli
+    sub = next(a for a in cli.build_parser()._actions if a.dest == 'cmd')
+    (loop,) = [c for c in sub._choices_actions if c.dest == 'loop']
+    assert 'tick' in loop.help and 'merge' in loop.help
+
+
 # ----------------------------------------------------------------------------- 11. report
 def test_report_counts_per_harness_discrimination_vs_base_rate_and_the_cost_event(world, learner):
     turns(world.home, 'hermes', [('hs-1', 't1', 'verified_success', '2026-09-30'),
@@ -492,8 +574,14 @@ def test_agentsview_sync_unit_is_a_bounded_shared_lock_oneshot_not_a_daemon():
     assert start.startswith('/usr/bin/flock -s -w 60 -E 0 /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock ')
     assert start.endswith('agentsview sync') and 'serve' not in start and 'daemon' not in start
     assert svc['Type'] == ['oneshot'] and svc['Nice'] == ['19'] and svc['IOSchedulingClass'] == ['idle']
-    assert 'AGENTSVIEW_DATA_DIR' in dict(e.split('=', 1) for e in svc['Environment'])
-    assert unit('agentsview-sync.timer')['OnCalendar']
+    env = dict(e.split('=', 1) for e in svc['Environment'])
+    assert 'AGENTSVIEW_DATA_DIR' in env
+    # v0.44: plain `agentsview sync` leaves a background serve daemon running unless this is set (ops README: Required)
+    assert env.get('AGENTSVIEW_NO_DAEMON') == '1'
+    assert svc['TimeoutStartSec'] == ['50min']  # the owner-approved ops unit's bound on one sync
+    assert 'v74 -> v113' not in (UNITS / 'agentsview-sync.service').read_text()  # the resync is done (v0.44 live)
+    timer = unit('agentsview-sync.timer')
+    assert timer['OnCalendar'] and timer['RandomizedDelaySec'] == ['2min']
 
 
 @pytest.mark.skipif(not shutil.which('systemd-analyze'), reason='systemd-analyze not installed')

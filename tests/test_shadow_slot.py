@@ -94,6 +94,47 @@ def test_shadow_rows_take_the_cohort_of_their_training_rows(tmp_path):
     assert shadow == train
 
 
+def test_two_sessions_whose_opportunity_ids_collide_each_get_their_decisions(tmp_path):
+    """Grok's C1 turn id hashes a payload session the CLI never sends: equal prompt + time collide across sessions."""
+    home = tmp_path / 'z0'
+    recs = [opp('grok', sid, 'same-turn') for sid in ('grok-a', 'grok-b')]
+    for r in recs:
+        r['opportunity']['trace']['opportunity_id'] = 'collided-opportunity'
+    put(home, 'grok', 'opportunities.jsonl', recs)
+    put(home, 'grok', 'outcomes_verified.jsonl', [
+        dict(verified(sid, 'same-turn', 'verified_success'), schema=hc.schema('grok', 'turn_outcome_verified'),
+             harness='grok', cohort='interactive') for sid in ('grok-a', 'grok-b')])
+    rep = slot().replay(home)
+    n = len(slot().default_registry()['challengers'])
+    assert rep['decisions_added'] == 2 * n
+    train = {k: sorted(r['turn_key'] for r in t.rows) for k, t in le.build_tables(home).items()}
+    shadow = {k: sorted({r['turn_key'] for r in t.rows}) for k, t in le.shadow_tables(home).items()}
+    assert shadow == train and len(train[('grok', 'interactive')]) == 2
+    assert all(len(t.rows) == 2 * n for t in le.shadow_tables(home).values())
+    assert slot().replay(home)['decisions_added'] == 0  # still idempotent
+
+
+def test_shadow_cohorts_follow_build_table_in_its_edge_cases(tmp_path):
+    """One cohort rule for both tables: a claude-code turn with no verified row of its own takes the transcript's
+    cohort (not another turn's), and a re-verified turn takes its latest verified row's cohort."""
+    home, projects = tmp_path / 'z0', tmp_path / 'projects'
+    projects.mkdir()
+    cc = lambda s, t: dict(opp('claude-code', s, t), schema='z0int.claude_code.opportunity_record.v0')  # noqa: E731
+    put(home, 'claude-code', 'opportunities.jsonl', [cc('cc-1', 'p1'), cc('cc-1', 'p2')])
+    put(home, 'claude-code', 'outcomes_verified.jsonl', [  # p1 only; p2 has no verified row yet
+        dict(verified('cc-1', 'p1', 'verified_success'), schema='z0int.claude_code.turn_outcome_verified.v0',
+             cohort='agent')])
+    put(home, 'hermes', 'opportunities.jsonl', [opp('hermes', 'hs-1', 't1'), opp('hermes', 'hs-1', 't2')])
+    vr = lambda t, **kw: dict(verified('hs-1', t, 'verified_success'),  # noqa: E731
+                              schema=hc.schema('hermes', 'turn_outcome_verified'), harness='hermes', **kw)
+    put(home, 'hermes', 'outcomes_verified.jsonl', [vr('t1', cohort='automated'), vr('t2', cohort='interactive'),
+                                                    vr('t1')])  # t1 re-verified by a row without a cohort
+    slot().replay(home, projects=projects)
+    train = {k: sorted(r['turn_key'] for r in t.rows) for k, t in le.build_tables(home, projects=projects).items()}
+    shadow = {k: sorted({r['turn_key'] for r in t.rows}) for k, t in le.shadow_tables(home).items()}
+    assert shadow == train
+
+
 # ----------------------------------------------------------------------------- 7. fail-open, no retry storm
 class FakeBackend:
     def __init__(self, calls, ready):
