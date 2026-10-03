@@ -1,0 +1,310 @@
+"""The z0 memory surface over AgentsView (lexical), the EventLog (temporal) and TencentDB (semantic).
+
+Synthetic fixtures only; the TencentDB gateway is a loopback stub with a fake bearer value.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import sqlite3
+import subprocess
+import sys
+import time
+
+import pytest
+
+from memory_fixture import SECRETS, FakeTencentDB, add_message, build_av_db, message_id
+from z0int import agentsview_ro
+from z0int.memory import surface as ms
+from z0int.memory.event_log import EventLog
+from z0int.memory_contract import BitemporalClaim, EventIdentity, MemoryScope, derive_event_uid
+
+Z0 = MemoryScope(user='local', project='z0')
+TOKEN = 'fake-tdb-bearer-value-123'
+
+
+@pytest.fixture
+def env(tmp_path, monkeypatch):
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path / 'z0'))
+    monkeypatch.setenv('AGENTSVIEW_DATA_DIR', str(tmp_path / 'av'))
+    monkeypatch.setenv('Z0INT_MEMORY_SOURCE_INGEST', 'references')
+    monkeypatch.setenv('Z0_TEST_TDB_TOKEN', TOKEN)
+    build_av_db(tmp_path / 'av' / 'sessions.db')
+    return tmp_path
+
+
+def lexical(query, policy=None, **kw):
+    return ms.search(query, policy, layers=('lexical',), config={}, **kw)
+
+
+# ----------------------------------------------------------------------------- 2. AgentsView capability
+def test_agentsview_hit_carries_evidence_ref_and_event_identity(env, monkeypatch):
+    mids = {o: message_id(env / 'av' / 'sessions.db', 'h1', o) for o in (0, 1)}
+    uris = []
+    real = agentsview_ro.sqlite3.connect
+    monkeypatch.setattr(agentsview_ro.sqlite3, 'connect', lambda target, *a, **k: uris.append(target) or real(target, *a, **k))
+    res = lexical('quokka gateway', ms.ScopePolicy(scope=Z0, requester='hermes', cross_harness=False))
+    assert res['ok'] and res['layers']['lexical']['status'] == 'ok'
+    hit = res['evidence'][0]
+    mid = mids[hit['ordinal']]
+    assert hit['locator'] == hit['evidence_ref']['source_id'] == f'agentsview:h1#{mid}'
+    assert hit['evidence_ref']['trust_class'] == 'conversation'
+    ident = hit['identity']
+    assert (ident['source_system'], ident['source_session'], ident['source_event_id']) == ('hermes', 'h1', str(mid))
+    assert hit['event_uid'] == ident['event_uid']
+    replay = lexical('quokka gateway', ms.ScopePolicy(scope=Z0, requester='hermes', cross_harness=False))
+    assert [e['event_uid'] for e in replay['evidence']] == [e['event_uid'] for e in res['evidence']]
+    assert uris and all('mode=ro' in u for u in uris)
+
+
+def test_fts_hits_carry_the_canonical_event_uid_the_ledger_assigns(env):
+    hit = next(e for e in lexical('quokka bench')['evidence'] if e['session_id'] == 'x1')
+    assert hit['event_uid'] == derive_event_uid(source_system='codex', source_session='x1',
+                                                source_event_id=hit['message_id'])
+    event = ms.ingest_reference(EventIdentity(**{k: v for k, v in hit['identity'].items()}), hit['locator'])
+    assert event.event_identity().event_uid == hit['event_uid']
+
+
+# ----------------------------------------------------------------------------- 3. scope before ranking
+def test_sibling_scope_is_rejected_before_ranking(env):
+    seen = []
+
+    def ranker(items):
+        seen.extend(items)
+        return items
+
+    res = lexical('quokka', ms.ScopePolicy(scope=Z0, requester='hermes', cross_harness=True), ranker=ranker)
+    assert seen and all(i['scope']['project'] == 'z0' for i in seen)
+    assert 'sib' not in {e['session_id'] for e in res['evidence']}
+
+
+def test_sibling_repo_and_task_claims_are_rejected_before_ranking(env):
+    def claim(cid, scope, value):
+        return BitemporalClaim(claim_id=cid, scope=scope, subject='quokka', predicate='port', value=value,
+                               status='observed', observed_at='2026-10-01T00:00:00Z',
+                               recorded_at='2026-10-01T00:00:00Z')
+
+    repo_a = MemoryScope(user='local', project='z0', repo='a')
+    ms.record_claim(claim('c-a', repo_a, 1))
+    ms.record_claim(claim('c-b', MemoryScope(user='local', project='z0', repo='b'), 2))
+    ms.record_claim(claim('c-t', MemoryScope(user='local', project='z0', repo='a', task='t2'), 3))
+    seen = []
+    res = ms.search('quokka port', ms.ScopePolicy(scope=MemoryScope(user='local', project='z0', repo='a', task='t1')),
+                    layers=('temporal',), config={}, ranker=lambda items: seen.extend(items) or items)
+    assert {i['claim_id'] for i in seen if i.get('claim_id')} == {'c-a'}
+    assert {e.get('claim_id') for e in res['evidence']} == {'c-a'}
+
+
+# ----------------------------------------------------------------------------- 4. unavailable, never empty success
+def test_missing_db_is_unavailable_with_a_reason(env):
+    (env / 'av' / 'sessions.db').unlink()
+    res = lexical('quokka')
+    assert res['layers']['lexical'] == {**res['layers']['lexical'], 'status': 'unavailable', 'reason': 'missing'}
+    assert res['ok'] is False and res['evidence'] == []
+
+
+def test_schema_mismatch_is_unavailable(env, tmp_path):
+    build_av_db(tmp_path / 'v75' / 'sessions.db', user_version=75)
+    res = lexical('quokka', av_db=tmp_path / 'v75' / 'sessions.db')
+    assert (res['ok'], res['layers']['lexical']['status'], res['layers']['lexical']['reason']) == (False, 'unavailable', 'schema')
+    build_av_db(tmp_path / 'nofts' / 'sessions.db', fts=False)
+    res = lexical('quokka', av_db=tmp_path / 'nofts' / 'sessions.db')
+    assert (res['ok'], res['layers']['lexical']['reason']) == (False, 'schema')
+
+
+def test_locked_db_is_unavailable(env):
+    holder = sqlite3.connect(env / 'av' / 'sessions.db', isolation_level=None)
+    holder.execute('begin exclusive')
+    try:
+        res = lexical('quokka', av_timeout=0.1)
+    finally:
+        holder.execute('rollback')
+        holder.close()
+    assert (res['ok'], res['layers']['lexical']['status'], res['layers']['lexical']['reason']) == (False, 'unavailable', 'locked')
+
+
+# ----------------------------------------------------------------------------- 5. TencentDB
+def test_semantic_layer_is_unavailable_when_not_configured(env, monkeypatch):
+    def no_network(*a, **k):
+        raise AssertionError('no gateway configured: nothing may connect')
+
+    monkeypatch.setattr('socket.socket.connect', no_network)
+    res = ms.search('quokka', layers=('semantic',), config={})
+    assert res['layers']['semantic']['status'] == 'unavailable'
+    assert res['layers']['semantic']['reason'] == 'not_configured'
+
+
+def test_slow_gateway_returns_unavailable_within_the_deadline(env):
+    with FakeTencentDB(token=TOKEN, items=[{'id': 'm', 'content': 'quokka'}], sleep_s=1.5) as gw:
+        t0 = time.monotonic()
+        res = ms.search('quokka', layers=('semantic',), config=gw.config(deadline_ms=200))
+        elapsed = time.monotonic() - t0
+    assert res['layers']['semantic']['status'] == 'unavailable'
+    assert res['layers']['semantic']['reason'] == 'timeout'
+    assert elapsed < 0.2 + 0.05
+
+
+def test_bearer_comes_from_the_configured_env_var_and_is_never_logged(env, caplog, capsys):
+    caplog.set_level(logging.DEBUG)
+    items = [{'id': 'm1', 'content': 'quokka semantic memory without provenance'}]
+    with FakeTencentDB(token=TOKEN, items=items) as gw:
+        res = ms.search('quokka', layers=('semantic',), config=gw.config())
+    assert gw.auth_headers == [f'Bearer {TOKEN}']
+    assert res['layers']['semantic']['status'] == 'ok'
+    out = capsys.readouterr()
+    for blob in (json.dumps(res), caplog.text, out.out, out.err, repr(ms.TencentDBClient(gw.config()))):
+        assert TOKEN not in blob
+
+
+def test_items_without_source_event_ids_are_not_canonical_provenance(env):
+    uid = derive_event_uid(source_system='hermes', source_session='s9', source_event_id='9')
+    items = [{'id': 'm1', 'content': 'quokka loose memory'},
+             {'id': 'm2', 'content': 'quokka grounded memory', 'source_event_ids': [uid]}]
+    with FakeTencentDB(token=TOKEN, items=items) as gw:
+        res = ms.search('quokka', layers=('semantic',), config=gw.config())
+    by_id = {e['semantic_id']: e for e in res['evidence']}
+    assert by_id['m1']['provenance_ok'] is False and by_id['m2']['provenance_ok'] is True
+    assert by_id['m2']['event_uid'] == uid
+    assert res['layers']['semantic']['canonical_provenance'] == 1
+
+
+def test_semantic_duplicates_of_agentsview_hits_are_removed(env):
+    hit = next(e for e in lexical('quokka bench')['evidence'] if e['session_id'] == 'x1')
+    items = [{'id': 'dup', 'content': 'quokka bench copy', 'source_event_ids': [hit['event_uid']]}]
+    with FakeTencentDB(token=TOKEN, items=items) as gw:
+        res = ms.search('quokka bench', layers=('lexical', 'semantic'), config=gw.config())
+    uids = [e['event_uid'] for e in res['evidence']]
+    assert len(uids) == len(set(uids))
+    assert 'dup' not in {e.get('semantic_id') for e in res['evidence']}
+    assert res['duplicates_removed'] >= 1
+
+
+# ----------------------------------------------------------------------------- 7. cross-product recall
+def test_hermes_query_with_cross_harness_policy_recalls_claude_codex_and_omp(env):
+    policy = ms.ScopePolicy(scope=Z0, requester='hermes', cross_harness=True)
+    res = lexical('quokka', policy, limit=20)
+    harnesses = {e['harness'] for e in res['evidence']}
+    assert {'claude-code', 'codex', 'omp'} <= harnesses
+    for e in res['evidence']:
+        assert e['source_system'] and e['harness'] and e['session_id'] and e['timestamp'] and e['locator']
+    again = lexical('quokka', policy, limit=20)
+    assert sorted(e['locator'] for e in again['evidence']) == sorted(e['locator'] for e in res['evidence'])
+    own = lexical('quokka', ms.ScopePolicy(scope=Z0, requester='hermes', cross_harness=False), limit=20)
+    assert {e['harness'] for e in own['evidence']} == {'hermes'}
+
+
+# ----------------------------------------------------------------------------- 9. one query across all layers
+def test_one_query_resolves_temporal_lexical_and_semantic_without_duplicates(env):
+    lex = next(e for e in lexical('quokka cache')['evidence'] if e['session_id'] == 'c1')
+    ms.ingest_reference(EventIdentity(**lex['identity']), lex['locator'])
+    EventLog().append('memory.note', {'text': 'quokka cache was moved last week'}, source='z0')
+    items = [{'id': 'dup', 'content': 'quokka cache', 'source_event_ids': [lex['event_uid']]},
+             {'id': 'own', 'content': 'quokka cache semantic summary',
+              'source_event_ids': [derive_event_uid(source_system='omp', source_session='o9', source_event_id='1')]}]
+    with FakeTencentDB(token=TOKEN, items=items) as gw:
+        res = ms.search('quokka cache', config=gw.config(), limit=20)
+    uids = [e['event_uid'] for e in res['evidence']]
+    assert len(uids) == len(set(uids))
+    layers = {layer for e in res['evidence'] for layer in e['layers']}
+    assert layers == {'temporal', 'lexical', 'semantic'}
+    merged = next(e for e in res['evidence'] if e['event_uid'] == lex['event_uid'])
+    assert {'lexical', 'temporal'} <= set(merged['layers'])
+    assert res['duplicates_removed'] >= 1
+
+
+# ----------------------------------------------------------------------------- 11. memory_snapshot_id
+def _git(repo, *args):
+    subprocess.run(['git', '-C', str(repo), *args], check=True, capture_output=True,
+                   env={**os.environ, 'GIT_AUTHOR_NAME': 't', 'GIT_AUTHOR_EMAIL': 't@t', 'GIT_COMMITTER_NAME': 't',
+                        'GIT_COMMITTER_EMAIL': 't@t'})
+
+
+def test_memory_snapshot_id_tracks_every_source_revision(env, tmp_path):
+    repo = tmp_path / 'repo'
+    repo.mkdir()
+    _git(repo, 'init', '-q')
+    _git(repo, 'commit', '-q', '--allow-empty', '-m', 'one')
+    with FakeTencentDB(token=TOKEN, revision='r1') as gw:
+        cfg = gw.config()
+        first = ms.memory_snapshot_id(repo=repo, config=cfg)
+        assert ms.memory_snapshot_id(repo=repo, config=cfg) == first
+        add_message(env / 'av' / 'sessions.db', 'h1', 'a new quokka message')
+        second = ms.memory_snapshot_id(repo=repo, config=cfg)
+        assert second != first
+        gw.revision = 'r2'
+        third = ms.memory_snapshot_id(repo=repo, config=cfg)
+        assert third != second
+        _git(repo, 'commit', '-q', '--allow-empty', '-m', 'two')
+        fourth = ms.memory_snapshot_id(repo=repo, config=cfg)
+        assert fourth != third
+        assert ms.memory_snapshot_id(repo=repo, config=cfg) == fourth
+
+
+def test_state_packet_and_decision_opportunity_carry_the_snapshot_id(env, tmp_path):
+    from z0int.decision_opportunity import build_decision_opportunity
+    from z0int.state_packet import build_state_packet
+
+    repo = tmp_path / 'repo'
+    repo.mkdir()
+    _git(repo, 'init', '-q')
+    _git(repo, 'commit', '-q', '--allow-empty', '-m', 'one')
+    packet = build_state_packet(repo, use_cache=False, store=False, adapters=('git',), projects_root=tmp_path / 'none')
+    assert packet['memory_snapshot_id'] == ms.memory_snapshot_id(repo=repo)
+    opp = build_decision_opportunity(repo, 'where is the quokka cache', packet=packet)
+    assert opp['memory_snapshot_id'] == packet['memory_snapshot_id']
+    add_message(env / 'av' / 'sessions.db', 'h1', 'another quokka message')
+    again = build_state_packet(repo, use_cache=False, store=False, adapters=('git',), projects_root=tmp_path / 'none')
+    assert again['memory_snapshot_id'] != packet['memory_snapshot_id']
+
+
+# ----------------------------------------------------------------------------- 13. memory_brief
+def test_brief_stays_within_its_token_bound(env):
+    brief = ms.memory_brief('quokka', ms.ScopePolicy(scope=Z0), max_tokens=80, config={})
+    assert brief['abstained'] is False and brief['tokens'] <= 80
+    assert ms.estimate_tokens(brief['text']) <= 80
+    assert brief['receipt']['snapshot_id'] == brief['memory_snapshot_id']
+
+
+def test_brief_abstains_with_an_explicit_gap_when_a_required_source_is_removed(env):
+    (env / 'av' / 'sessions.db').unlink()
+    brief = ms.memory_brief('quokka gateway', ms.ScopePolicy(scope=Z0), required=('lexical',), config={})
+    assert brief['abstained'] is True
+    assert any('lexical' in g and 'missing' in g for g in brief['gaps'])
+    assert 'systemd' not in brief['text'] and brief['receipt']['evidence_event_uids'] == []
+
+
+def test_supersession_shows_the_newer_claim_while_history_returns_both(env):
+    def claim(cid, value, at):
+        return BitemporalClaim(claim_id=cid, scope=Z0, subject='quokka gateway', predicate='port', value=value,
+                               status='observed', observed_at=at, recorded_at=at)
+
+    ms.record_claim(claim('old', 8420, '2026-09-01T00:00:00Z'))
+    ms.record_claim(claim('new', 8421, '2026-10-01T00:00:00Z'))
+    brief = ms.memory_brief('quokka gateway port', ms.ScopePolicy(scope=Z0), config={})
+    current = [c for c in brief['current_claims'] if c['subject'] == 'quokka gateway']
+    assert [c['value'] for c in current] == [8421]
+    assert '8421' in brief['text'] and '8420' not in brief['text']
+    hist = ms.claim_history('quokka gateway', 'port', ms.ScopePolicy(scope=Z0))
+    assert [h['claim_id'] for h in hist] == ['old', 'new']
+    assert hist[0]['superseded_by'] == 'new' and hist[1]['current'] is True
+
+
+def test_second_process_with_the_same_snapshot_hits_the_persistent_cache(env):
+    first = ms.memory_brief('quokka routing', ms.ScopePolicy(scope=Z0), config={})
+    assert first['cache'] == 'miss' and first['abstained'] is False
+    code = (
+        'import json\n'
+        'from z0int.memory import surface as ms\n'
+        'from z0int.memory_contract import MemoryScope\n'
+        'def boom(*a, **k):\n'
+        '    raise AssertionError("resolver called")\n'
+        'ms.search = boom\n'
+        'b = ms.memory_brief("quokka routing", ms.ScopePolicy(scope=MemoryScope(user="local", project="z0")), config={})\n'
+        'print(json.dumps({"cache": b["cache"], "text": b["text"], "sid": b["memory_snapshot_id"]}))\n'
+    )
+    proc = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, timeout=60,
+                          env={**os.environ, 'PYTHONPATH': os.pathsep.join(p for p in sys.path if p)})
+    assert proc.returncode == 0, proc.stderr
+    out = json.loads(proc.stdout)
+    assert out == {'cache': 'hit', 'text': first['text'], 'sid': first['memory_snapshot_id']}
