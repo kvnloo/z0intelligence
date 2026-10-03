@@ -249,16 +249,18 @@ def test_memory_snapshot_id_tracks_every_source_revision(env, tmp_path):
     repo.mkdir()
     _git(repo, 'init', '-q')
     _git(repo, 'commit', '-q', '--allow-empty', '-m', 'one')
-    with FakeTencentDB(token=TOKEN, revision='r1') as gw:
+    with FakeTencentDB(token=TOKEN) as gw:
         cfg = gw.config()
         first = ms.memory_snapshot_id(repo=repo, config=cfg)
         assert ms.memory_snapshot_id(repo=repo, config=cfg) == first
         add_message(env / 'av' / 'sessions.db', 'h1', 'a new quokka message')
         second = ms.memory_snapshot_id(repo=repo, config=cfg)
         assert second != first
-        gw.revision = 'r2'
+        EventLog().append('memory.note', {'text': 'quokka ledger note'}, source='z0')
         third = ms.memory_snapshot_id(repo=repo, config=cfg)
         assert third != second
+        gw.version = '0.9.2'  # a gateway build is not a data revision: the snapshot must not key on it
+        assert ms.memory_snapshot_id(repo=repo, config=cfg) == third
         _git(repo, 'commit', '-q', '--allow-empty', '-m', 'two')
         fourth = ms.memory_snapshot_id(repo=repo, config=cfg)
         assert fourth != third
@@ -296,19 +298,43 @@ def test_state_packet_memory_probe_never_calls_the_gateway_on_the_hook_path(env,
         return build_state_packet(repo, use_cache=False, store=False, adapters=('git',),
                                   projects_root=tmp_path / 'none')['memory_snapshot_id']
 
-    with FakeTencentDB(token=TOKEN, revision='r1') as gw:
+    with FakeTencentDB(token=TOKEN) as gw:
         (env / 'z0' / 'config').mkdir(parents=True, exist_ok=True)
         (env / 'z0' / 'config' / 'memory.json').write_text(json.dumps(gw.config()))
         unprobed = packet_snapshot()
         assert gw.requests == []
-        ms.search('quokka', layers=('semantic',))  # a real query observes revision r1
+        ms.search('quokka', layers=('semantic',))  # a real query observes the gateway (unversioned)
         seen = len(gw.requests)
-        r1 = packet_snapshot()
-        assert r1 != unprobed and packet_snapshot() == r1
+        probed = packet_snapshot()
+        assert probed != unprobed and packet_snapshot() == probed
         assert len(gw.requests) == seen
-        gw.revision = 'r2'
-        ms.search('quokka', layers=('semantic',))
-        assert packet_snapshot() != r1
+
+
+def test_a_gateway_without_a_data_revision_is_unversioned_not_its_software_version(env):
+    """The real gateway reports only its software version on /health and no revision on search."""
+    with FakeTencentDB(token=TOKEN, version='0.9.1') as gw:
+        revs = ms.source_revisions(config=gw.config())
+        client = ms.TencentDBClient(gw.config())
+        status, _, _ = client.search('quokka')
+    assert revs['tencentdb'] == 'unversioned'
+    assert '0.9.1' not in json.dumps(revs) and '0.9.1' not in json.dumps(status)
+
+
+def test_brief_never_serves_stale_semantic_evidence_when_only_the_gateway_content_changes(env):
+    """AgentsView, the ledger and the repo stay unchanged; a new gateway item must reach the next brief."""
+    with FakeTencentDB(token=TOKEN) as gw:
+        cfg = gw.config()
+        first = ms.memory_brief('quokka wombat lantern', ms.ScopePolicy(scope=Z0), config=cfg)
+        assert first['abstained'] is False and first['evidence']
+        assert not any(e.startswith('tencentdb:') for e in first['evidence'])
+        gw.items.append({'id': 'w1', 'content': 'wombat lantern semantic memory', 'version': 2, 'score': 100.0,
+                         'updated_at': '2026-10-03T00:00:00.000Z'})
+        second = ms.memory_brief('quokka wombat lantern', ms.ScopePolicy(scope=Z0), config=cfg)
+        res = ms.search('quokka wombat lantern', ms.ScopePolicy(scope=Z0), config=cfg)
+    assert second['cache'] != 'hit'
+    assert 'tencentdb:w1' in second['evidence']
+    ref = next(e['evidence_ref'] for e in res['evidence'] if e['locator'] == 'tencentdb:w1')
+    assert ref['source_version'] == 'v2@2026-10-03T00:00:00.000Z'  # the item's own version, not the gateway's
 
 
 def test_injection_markers_are_pruned_by_age(env):
@@ -371,3 +397,25 @@ def test_second_process_with_the_same_snapshot_hits_the_persistent_cache(env):
     assert proc.returncode == 0, proc.stderr
     out = json.loads(proc.stdout)
     assert out == {'cache': 'hit', 'text': first['text'], 'sid': first['memory_snapshot_id']}
+
+
+# ----------------------------------------------------------------------------- canonical ingest cost (#23)
+def test_bulk_reference_ingest_reads_each_ledger_line_once_and_duplicates_need_no_scan(env, monkeypatch):
+    """One process ingesting n references decodes O(n) ledger lines, not O(n^2); a duplicate is returned from
+    the offset it was recorded at, without a full ledger scan."""
+    decoded = []
+    real = EventLog._decode_committed_line
+    monkeypatch.setattr(EventLog, '_decode_committed_line',
+                        lambda self, raw, **kw: decoded.append(1) or real(self, raw, **kw))
+    idents = [EventIdentity.from_source(source_system='codex', source_session='bulk', source_event_id=str(i),
+                                        payload_hash=f'sha256:{i:064x}') for i in range(60)]
+    for i, ident in enumerate(idents):
+        ms.ingest_reference(ident, f'agentsview:bulk#{i}')
+    assert len(decoded) < 3 * len(idents), len(decoded)
+
+    def no_scan(*a, **k):
+        raise AssertionError('duplicate ingest scanned the whole ledger')
+
+    monkeypatch.setattr(EventLog, '_scan_locked', no_scan)
+    again = ms.ingest_reference(idents[7], 'agentsview:bulk#7')
+    assert again.event_identity().event_uid == idents[7].event_uid and again.payload['locator'] == 'agentsview:bulk#7'

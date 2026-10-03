@@ -37,3 +37,10 @@ def test_instruction_capability_is_rejected():
     with pytest.raises(ValueError, match='instruction'):
         harness_capture.opportunity_record('claude-code', {'prompt': 'x'},
                                            {'turn_key': 'k', 'memory': {**R.to_dict(), 'instruction_capability': True}})
+
+
+def test_receipt_binding_runs_in_an_isolated_z0_home(tmp_path):
+    """build_state_packet reads $Z0INT_HOME and AgentsView for memory_snapshot_id: never the developer's."""
+    from z0int import agentsview_ro, paths
+    assert paths.home().is_relative_to(tmp_path.resolve())
+    assert agentsview_ro.db_path().is_relative_to(tmp_path)

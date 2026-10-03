@@ -118,15 +118,20 @@ def add_secret_finding(path: str | Path, session: str, ordinal: int, start: int,
 
 
 class FakeTencentDB:
-    """Loopback stand-in for the TencentDB gateway: bearer check, /v3/atomic/search and GET /health."""
+    """Loopback stand-in for the TencentDB gateway: bearer check, /v3/atomic/search and GET /health.
 
-    def __init__(self, *, token: str = 'fake-tdb-bearer-value-123', items=None, revision: str = 'r1',
+    The response shapes are the real MemoryCore gateway's (oss/TencentDB-Agent-Memory@0aff21a,
+    gateway/types.ts HealthResponse and v2-router.ts handleAtomicSearch): /health reports the software
+    ``version`` only, and a search hit carries its own id/version/updated_at. Neither has a data revision.
+    """
+
+    def __init__(self, *, token: str = 'fake-tdb-bearer-value-123', items=None, version: str = '0.9.1',
                  sleep_s: float = 0.0, port: int = 0):
         import json
         import threading
         from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-        self.token, self.items, self.revision, self.sleep_s = token, list(items or []), revision, sleep_s
+        self.token, self.items, self.version, self.sleep_s = token, list(items or []), version, sleep_s
         self.auth_headers: list[str | None] = []
         self.requests: list[str] = []  # 'METHOD /path' for every request, /health included
         stub = self
@@ -148,7 +153,8 @@ class FakeTencentDB:
                 if stub.sleep_s:
                     time.sleep(stub.sleep_s)  # a hung gateway hangs on every endpoint, /health included
                 if self.path == '/health':
-                    self._send(200, {'status': 'ok', 'revision': stub.revision})
+                    self._send(200, {'status': 'ok', 'version': stub.version, 'uptime': 1.0,
+                                     'stores': {'vectorStore': True, 'embeddingService': False}})
                 else:
                     self._send(404, {})
 
@@ -164,8 +170,10 @@ class FakeTencentDB:
                     return
                 q = str(body.get('query') or '').lower().split()
                 items = [i for i in stub.items if any(w in str(i.get('content', '')).lower() for w in q)]
-                self._send(200, {'code': 0, 'data': {'items': items[: int(body.get('limit') or 5)],
-                                                     'revision': stub.revision}})
+                hits = [{'type': 'l1', 'version': 0, 'created_at': '2026-10-01T00:00:00.000Z',
+                         'updated_at': '2026-10-01T00:00:00.000Z', 'score': 1.0, **i}
+                        for i in items[: int(body.get('limit') or 5)]]
+                self._send(200, {'code': 0, 'message': 'ok', 'request_id': 'req-fake', 'data': {'items': hits}})
 
         self.server = ThreadingHTTPServer(('127.0.0.1', port), Handler)
         self.server.daemon_threads = True
