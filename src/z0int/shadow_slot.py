@@ -169,15 +169,27 @@ def _base_rates(root: str | Path | None) -> dict[str, float | None]:
     return out
 
 
-def _cohorts(root: str | Path | None, harness: str) -> dict[Any, str]:
-    """The cohort the verifier's classifier gave each session (what the training rows of the turn carry)."""
-    return {r.get('session_id'): r['cohort'] for r in hc._read_jsonl(hc.state_dir(harness, root) /
-                                                                     'outcomes_verified.jsonl')
-            if r.get('cohort') in le.TABLE_COHORTS}
+def _cohort_fn(root: str | Path | None, harness: str, projects: Path | None) -> Callable[[Mapping[str, Any]], str]:
+    """The cohort the turn's training row gets (loop_export.build_table): the capture-time cohort when it is not the
+    session's, else the verified row's (the turn's, then its session's), else the transcript's (Claude Code)."""
+    by_turn, by_session = {}, {}
+    for r in hc._read_jsonl(hc.state_dir(harness, root) / 'outcomes_verified.jsonl'):
+        if r.get('cohort') in le.TABLE_COHORTS:
+            by_turn[(r.get('session_id'), r.get('trace_id'))] = by_session[r.get('session_id')] = r['cohort']
+    sessions: dict[Any, str] = {}
+
+    def cohort(rec: Mapping[str, Any]) -> str:
+        sid = rec.get('session_id')
+        tid = ((rec.get('opportunity') or {}).get('trace') or {}).get('trace_id')
+        if harness == le.HARNESS and sid not in by_session and sid not in sessions:
+            sessions[sid] = le.transcript_cohort(sid, projects)
+        return le.capture_cohort(rec) or by_turn.get((sid, tid)) or by_session.get(sid) or sessions.get(sid, 'unknown')
+    return cohort
 
 
 def replay(root: str | Path | None = None, registry: Mapping[str, Any] | None = None, *,
-           backend_factory: Callable[[str], Any] | None = None, deadline: float | None = None) -> dict[str, Any]:
+           backend_factory: Callable[[str], Any] | None = None, deadline: float | None = None,
+           projects: Path | None = None) -> dict[str, Any]:
     """Decide every registered challenger on every recorded opportunity it has not decided yet.
 
     ``deadline`` (time.monotonic) stops the replay between opportunities; the rest is decided on the next tick.
@@ -226,7 +238,7 @@ def replay(root: str | Path | None = None, registry: Mapping[str, Any] | None = 
         if not records:
             continue
         done = {r.get('decision_id') for r in hc._read_jsonl(out_path)}
-        cohorts = _cohorts(root, h)
+        cohort_of = _cohort_fn(root, h, projects)
         rows = []
         for rec in records:
             if deadline is not None and time.monotonic() >= deadline:
@@ -235,8 +247,7 @@ def replay(root: str | Path | None = None, registry: Mapping[str, Any] | None = 
             opp = rec['opportunity']
             trace = opp.get('trace') or {}
             sid, tid = rec.get('session_id'), trace.get('trace_id')
-            cohort = le.capture_cohort(rec) or rec.get('cohort') or cohorts.get(sid) or 'unknown'
-            cohort = cohort if cohort in le.TABLE_COHORTS else 'unknown'
+            cohort = cohort_of(rec)
             ctx = {'base_rate': rates[h], 'routines': routines, 'features': le.opportunity_features(rec, cohort)}
             rec = dict(rec, harness=h)
             for c, fn in deciders:

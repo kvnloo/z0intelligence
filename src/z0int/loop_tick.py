@@ -332,8 +332,8 @@ def _import(home: Path, out: Path, cfg: Mapping, st: dict, **_: Any) -> None:
         st['imports']['dsh-jev'] = li.import_dsh_jev(src['dsh-jev'], root=home)
 
 
-def _shadow(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, **_: Any) -> None:
-    st['shadow'] = shadow_slot.replay(home, deadline=deadline)
+def _shadow(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, projects: Any, **_: Any) -> None:
+    st['shadow'] = shadow_slot.replay(home, deadline=deadline, projects=Path(projects) if projects else None)
     st['shadow_partial'] = st['shadow'].get('partial')
 
 
