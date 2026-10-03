@@ -35,9 +35,11 @@ shadow candidate
 existing z0int receipts / experiment harness
 ```
 
-The bridge deliberately exposes only `entity`, `recall`, `context_pack`, and
-`delta`. It rejects `remember`, `forget`, `synthesize`, and
-`include_private=true`.
+The first bridge deliberately exposes only `context_pack` and `delta`. Both are
+world-only by default in GBrain. It rejects `recall` on the trusted-local CLI
+because local recall can return unredacted stored values; a later remote/scoped
+transport can add explicit recall safely. It also rejects writes, `synthesize`,
+and `include_private=true`.
 
 ## AODL binding
 
@@ -51,7 +53,7 @@ AodlBindingConfig(
     memory_binding={
         "runtime": "gbrain",
         "protocol": "MEMORY_VERBS_v1",
-        "readVerbs": ["entity", "recall", "context_pack", "delta"],
+        "readVerbs": ["context_pack", "delta"],
         "worldOnlyDefault": True,
     },
 )
