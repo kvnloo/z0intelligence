@@ -199,10 +199,16 @@ def label_of(verified: Mapping[str, Any] | None) -> dict[str, Any]:
 
 
 def capture_cohort(record: Mapping[str, Any] | None) -> str | None:
-    """The cohort fixed at capture when it is not the session's (harness-injected prompt, subagent turn)."""
+    """The cohort fixed at capture when it is not the session's (harness-injected prompt, subagent turn).
+
+    A row without capture flags predates them (its request text is the only clue, and the export never reads
+    it): cohort unknown, never a user row, until ``z0int outcomes backfill-capture`` flags it.
+    """
     if not record:
         return None
-    if (record.get('capture') or {}).get('is_harness_message'):
+    if not isinstance(record.get('capture'), Mapping):
+        return 'unknown'
+    if record['capture'].get('is_harness_message'):
         return 'harness'
     return record.get('cohort') if record.get('cohort') in ('agent', 'harness') else None
 

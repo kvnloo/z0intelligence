@@ -31,13 +31,6 @@ def _ended(payload, env):
                      'completed')
 
 
-def _behaviour(payload):
-    """Content-free behaviour from the hook payload alone: whether the last reply asked the user."""
-    text = payload.get('last_assistant_message') or payload.get('lastAssistantMessage')
-    return {'asked_user': text.rstrip().endswith('?') if isinstance(text, str) else None,
-            'tool_calls': None, 'assistant_messages': None}
-
-
 def _subagent_outcome(harness, payload, ctx):
     """(ctx, behaviour) for a finished subagent; Claude Code agent transcripts give the measured behaviour
     and model (the transcript may lag the hook: then only the payload is used)."""
@@ -49,7 +42,7 @@ def _subagent_outcome(harness, payload, ctx):
         if measured['assistant_messages']:
             models = sorted({m.get('model') for m in fresh.values() if m.get('model')})
             return (dict(ctx, model_id=','.join(models)) if models else ctx), measured
-    return ctx, _behaviour(payload)
+    return ctx, hc.payload_behaviour(payload)
 
 
 def _claude_code(event, raw, payload, capture, env):
@@ -116,7 +109,7 @@ def handle(event, raw, harness=None, *, env=None):
         ctx = hc.outcome_context(harness, payload, env=env)
         if ctx['trace_id'] is not None:
             cwd = payload.get('cwd') or payload.get('workspaceRoot')
-            hc.record_outcome(harness, ctx, _behaviour(payload), ended=_ended(payload, env),
+            hc.record_outcome(harness, ctx, hc.payload_behaviour(payload), ended=_ended(payload, env),
                               seen_revisions=hc.observed_revisions(cwd) if cwd else None)
     elif event == 'session-start':
         hc.note_session(harness, payload, env=env)

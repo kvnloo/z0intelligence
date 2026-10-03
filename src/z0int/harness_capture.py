@@ -52,6 +52,7 @@ SUBAGENT_TOOLS = ('Agent', 'Task')
 IDENTITY = ('harness', 'session_id', 'trace_id', 'turn_key', 'work_item_id', 'attempt_id', 'cohort', 'model_id',
             'policy_revision', 'privacy_class')
 MAX_CHILDREN = 4  # detached builds at once, across all hook processes (a subagent burst must not fork-bomb)
+KEEP = 32  # per-session memory (recent turns, appended markers, source revisions): small, read on every hook
 SLOT_WAIT_S = 60.0
 _SCHEMA_RE = re.compile(r'^z0int\.([a-z0-9_]+)\.([a-z_]+)\.(v\d+)$')
 GIT_UNKNOWN = {'key': 'git', 'source_status': 'source_unavailable'}
@@ -213,6 +214,13 @@ def _read_session(harness: str, session: Any, root: str | Path | None) -> dict[s
         return {}
 
 
+def _keep(entries: Mapping[str, Any] | list, add: Any = None) -> Any:
+    """Bound one per-session collection to its newest KEEP entries (dicts keep insertion order)."""
+    if isinstance(entries, list):
+        return [*entries, add][-KEEP:]
+    return dict(list({**entries, **(add or {})}.items())[-KEEP:])
+
+
 def _update_session(harness: str, session: Any, root: str | Path | None,
                     step: Callable[[dict[str, Any]], dict[str, Any]]) -> dict[str, Any]:
     path = _session_path(harness, session, root)
@@ -275,7 +283,8 @@ def begin_turn(harness: str, payload: Mapping[str, Any], *, env: Mapping[str, st
             st['attempt'] = st.get('attempt', -1) + 1
             wi, attempt, cohort = _h({'harness': harness, 'session': session, 'ordinal': st['ordinal']}), \
                 st['attempt'], 'interactive'
-        return dict(st, turn_id=tid, work_item_id=wi, attempt_id=attempt, cohort=cohort)
+        turn = {'work_item_id': wi, 'attempt_id': attempt, 'cohort': cohort}
+        return dict(st, turn_id=tid, **turn, turns=_keep(st.get('turns') or {}, {tid: turn}))
 
     st = _update_session(harness, session, root, step)
     return _ctx(harness, session, tid, work_item_id=st['work_item_id'], attempt_id=st['attempt_id'],
@@ -285,8 +294,9 @@ def begin_turn(harness: str, payload: Mapping[str, Any], *, env: Mapping[str, st
 
 def subagent_turn(harness: str, payload: Mapping[str, Any], *, env: Mapping[str, str] | None = None,
                   root: str | Path | None = None) -> dict[str, Any] | None:
-    """SubagentStart/SubagentStop, or the PreToolUse Agent|Task fallback: cohort ``agent``, keyed by the
-    subagent id (the tool_use id for the fallback, where no agent id exists yet). Other tools: None."""
+    """SubagentStart/SubagentStop, or the fallback pair PreToolUse/PostToolUse on Agent|Task: cohort ``agent``,
+    keyed by the subagent id. The fallback pair is keyed by the tool_use id on both sides (a real SubagentStop
+    names only the agent id, so it never closes a fallback opportunity). Other tools: None."""
     if not supported(harness, root):
         return None
     if payload.get('tool_name') is not None:
@@ -307,23 +317,35 @@ def subagent_turn(harness: str, payload: Mapping[str, Any], *, env: Mapping[str,
 def outcome_context(harness: str, payload: Mapping[str, Any], *, env: Mapping[str, str] | None = None,
                     root: str | Path | None = None) -> dict[str, Any] | None:
     """Stop time: the turn this outcome closes. A Stop without its own turn id (Grok) closes the session's
-    latest prompt; work item, attempt and cohort come from that prompt when the turn ids agree."""
+    latest prompt; work item, attempt and cohort come from the prompt with that turn id (the session's recent
+    turns are remembered, so a Stop that arrives after the next prompt still finds its own)."""
     if not supported(harness, root):
         return None
     session = session_id_of(payload, env)
     st = _read_session(harness, session, root)
     tid = _first(payload, 'prompt_id', 'turn_id')
     tid = str(tid) if tid is not None else st.get('turn_id')
-    same = tid is not None and tid == st.get('turn_id')
-    return _ctx(harness, session, tid, work_item_id=st.get('work_item_id') if same else None,
-                attempt_id=st.get('attempt_id') if same else None, cohort=st.get('cohort', UNKNOWN) if same else UNKNOWN,
-                model=_model_of(payload) or st.get('model'), payload=payload, env=env, root=root)
+    turn = (st.get('turns') or {}).get(tid) or (st if tid is not None and tid == st.get('turn_id') else {})
+    return _ctx(harness, session, tid, work_item_id=turn.get('work_item_id'), attempt_id=turn.get('attempt_id'),
+                cohort=turn.get('cohort', UNKNOWN), model=_model_of(payload) or st.get('model'), payload=payload,
+                env=env, root=root)
+
+
+def payload_behaviour(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Content-free behaviour from the hook payload alone: whether the last reply asked the user."""
+    text = payload.get('last_assistant_message') or payload.get('lastAssistantMessage')
+    return {'asked_user': text.rstrip().endswith('?') if isinstance(text, str) else None,
+            'tool_calls': None, 'assistant_messages': None}
 
 
 # ----------------------------------------------------------------------------- writers
 def append(harness: str, kind: str, row: Mapping[str, Any], *, root: str | Path | None = None) -> dict | None:
     """Append one record; None when it was refused (unsupported harness/schema) or is a duplicate of the same
-    turn_key + kind. Every refusal leaves a failure row: nothing is dropped silently."""
+    turn_key + kind. Every refusal leaves a failure row: nothing is dropped silently.
+
+    The duplicate check reads the session's small state file (the turn_key + kind markers it has appended),
+    never the record file, so its cost does not grow with the number of turns ever captured.
+    """
     if not supported(harness, root):
         return None
     parsed = parse_schema(row.get('schema'))
@@ -332,17 +354,17 @@ def append(harness: str, kind: str, row: Mapping[str, Any], *, root: str | Path 
                        detail={'record': kind, 'schema_version': parsed[2] if parsed else None})
         return None
     row = dict(row, recorded_at=row.get('recorded_at') or _now())
-    path = state_dir(harness, root) / RECORD_FILES[kind]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    key, duplicate = row.get('turn_key'), False
-    with open(path, 'a+', encoding='utf-8') as fh:
-        fcntl.flock(fh, fcntl.LOCK_EX)
-        if key and kind != 'failure':
-            fh.seek(0)
-            needle = f'"turn_key": "{key}"'
-            duplicate = any(needle in line for line in fh)
-        if not duplicate:
-            fh.write(json.dumps(row, ensure_ascii=False, default=str) + '\n')
+    duplicate = False
+    if row.get('turn_key') and kind != 'failure':
+        mark = f"{kind}:{row['turn_key']}"
+
+        def step(st: dict[str, Any]) -> dict[str, Any]:
+            nonlocal duplicate
+            duplicate = mark in (st.get('appended') or [])
+            return st if duplicate else dict(st, appended=_keep(st.get('appended') or [], mark))
+        _update_session(harness, row.get('session_id'), root, step)
+    if not duplicate:
+        _write_line(state_dir(harness, root) / RECORD_FILES[kind], row)
     if duplicate:
         record_failure(harness, 'duplicate_event', ctx=row, root=root, detail={'record': kind})
         return None
@@ -419,7 +441,12 @@ def record_opportunity(harness: str, payload: Mapping[str, Any], ctx: Mapping[st
                        root: str | Path | None = None) -> dict[str, Any] | None:
     if not supported(harness, root):
         return None
-    return append(harness, 'opportunity_record', opportunity_record(harness, payload, ctx), root=root)
+    row = append(harness, 'opportunity_record', opportunity_record(harness, payload, ctx), root=root)
+    revisions = (((row or {}).get('opportunity') or {}).get('invalidation') or {}).get('source_revisions')
+    if revisions:  # what the stale-evidence check compares with at Stop time, without reading this file
+        _update_session(harness, row.get('session_id'), root, lambda st: dict(
+            st, revisions=_keep(st.get('revisions') or {}, {row['turn_key']: revisions})))
+    return row
 
 
 def observed_revisions(cwd: Any) -> dict[str, Any]:
@@ -432,17 +459,9 @@ def observed_revisions(cwd: Any) -> dict[str, Any]:
     return {'git': {'head': proc.stdout.strip()}} if proc.returncode == 0 and proc.stdout.strip() else {}
 
 
-def _stale_sources(harness: str, key: str, seen: Mapping[str, Any], root: str | Path | None) -> list[str]:
-    needle = f'"turn_key": "{key}"'
-    revisions: dict[str, Any] = {}
-    try:
-        with open(state_dir(harness, root) / RECORD_FILES['opportunity_record'], encoding='utf-8') as fh:
-            for line in fh:
-                if needle in line:
-                    opp = json.loads(line).get('opportunity') or {}
-                    revisions = (opp.get('invalidation') or {}).get('source_revisions') or {}
-    except (OSError, ValueError):
-        return []
+def _stale_sources(harness: str, session: Any, key: str, seen: Mapping[str, Any],
+                   root: str | Path | None) -> list[str]:
+    revisions = (_read_session(harness, session, root).get('revisions') or {}).get(key) or {}
     changed = []
     for source, now in seen.items():
         then = revisions.get(source)
@@ -477,10 +496,52 @@ def record_outcome(harness: str, ctx: Mapping[str, Any], behaviour: Mapping[str,
     if ended != 'completed':
         record_failure(harness, 'uncertain_execution', ctx=ctx, root=root,
                        detail={'ended': ended, 'mutation_outcome': _uncertain_execution(ctx)})
-    stale = _stale_sources(harness, row['turn_key'], seen_revisions, root) if seen_revisions else []
+    stale = _stale_sources(harness, row.get('session_id'), row['turn_key'], seen_revisions, root) \
+        if seen_revisions else []
     if stale:
         record_failure(harness, 'stale_evidence', ctx=ctx, root=root, detail={'sources': stale})
     return row
+
+
+def backfill_capture(harness: str, *, root: str | Path | None = None, env: Mapping[str, str] | None = None,
+                     dry_run: bool = False) -> dict[str, int]:
+    """One-shot and idempotent, for opportunity rows written before capture flags existed (request text kept,
+    no ``capture``): compute their content-free flags here, on the capture side, and drop the stored request
+    text unless privacy_class is request_opt_in. Until then the export puts such rows in cohort unknown.
+    The file is rewritten in place under the writers' lock, so concurrent appends wait instead of being lost.
+    """
+    counts = {'rows': 0, 'flagged': 0, 'redacted': 0}
+    keep = privacy_class(env, root) == 'request_opt_in'
+    try:
+        fh = open(state_dir(harness, root) / RECORD_FILES['opportunity_record'], 'r+', encoding='utf-8')
+    except OSError:
+        return counts
+    with fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        out = []
+        for line in fh:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                row = None
+            if not isinstance(row, dict):
+                out.append(line if line.endswith('\n') else line + '\n')
+                continue
+            counts['rows'] += 1
+            intent = (row.get('opportunity') or {}).get('intent')
+            request = intent.get('request') if isinstance(intent, dict) else None
+            if 'capture' not in row:
+                row['capture'] = capture_flags(request)
+                counts['flagged'] += 1
+            if request is not None and not keep:
+                intent['request'] = None
+                counts['redacted'] += 1
+            out.append(json.dumps(row, ensure_ascii=False, default=str) + '\n')
+        if not dry_run and (counts['flagged'] or counts['redacted']):
+            fh.seek(0)
+            fh.truncate()
+            fh.write(''.join(out))
+    return counts
 
 
 # ----------------------------------------------------------------------------- detached build
@@ -541,19 +602,22 @@ class Spool:
         self._write = write or (lambda kind, row: append(harness, kind, row, root=root))
         self._queue: queue.Queue = queue.Queue(maxsize=maxsize)
         self._lock = threading.Lock()
-        self._stopping = self._closed = False
+        self._put_lock = threading.Lock()  # put's closed-check + enqueue vs close's seal: nothing slips between
+        self._stopping = self._closed = self._sealed = False
         self._late: list[tuple[str, Any]] = []
         self._worker = threading.Thread(target=self._run, name=f'z0int-capture-{harness}', daemon=True)
         self._worker.start()
 
     def put(self, kind: str, row: Mapping[str, Any]) -> bool:
-        if not self._closed:
-            try:
-                self._queue.put_nowait((kind, row))
-                return True
-            except queue.Full:
-                pass
-        self._drop(kind, 1, 'closed' if self._closed else 'queue_full')
+        with self._put_lock:
+            reason = 'closed'
+            if not self._sealed:
+                try:
+                    self._queue.put_nowait((kind, row))
+                    return True
+                except queue.Full:
+                    reason = 'queue_full'
+        self._drop(kind, 1, reason)
         return False
 
     def _drop(self, kind: str, count: int, reason: str) -> None:
@@ -587,6 +651,8 @@ class Spool:
     def close(self) -> None:
         deadline = time.monotonic() + self.close_timeout
         reserve = min(0.5, self.close_timeout / 4)
+        with self._put_lock:  # from here every put is a counted 'closed' drop; everything queued is drained below
+            self._sealed = True
         while self._queue.unfinished_tasks and time.monotonic() < deadline - reserve:
             time.sleep(0.01)
         self._stopping = True

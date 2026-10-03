@@ -14,6 +14,19 @@ used by the Codex and Grok shims); `z0int.claude_code` keeps only what is Claude
 | `SessionStart` | `session-start` → opt-in State Packet (`Z0INT_CLAUDE_CODE_PACKET=1`) | off |
 | MCP `route_worker` | `z0int.intelligence_mcp` with `Z0INT_HARNESS=claude-code` | on |
 
+A turn's outcome is measured from the transcript messages of its own prompt (`promptId`). When Claude Code
+fires `Stop` before the reply is flushed, the outcome comes from the payload with a `partial_measurement`
+row, and the late messages close that turn with a `partial_measurement` row (`late_messages`) instead of
+being credited to the next prompt. Harness-injected prompts (`<task-notification>` etc.) get no
+opportunity; their outcome is cohort `harness`.
+
+For a Claude Code build without `SubagentStart`/`SubagentStop`, register `PreToolUse` and `PostToolUse` with
+matcher `Agent|Task` to `subagent-start` / `subagent-stop` instead (both keyed by `tool_use_id`). Never
+register both pairs: each subagent would be captured twice.
+
+Opportunity rows written before capture flags existed export as cohort `unknown` until
+`z0int outcomes backfill-capture` flags them and drops their stored request text (one-shot, idempotent).
+
 Capture records live under `$Z0INT_HOME/state/claude-code/`; `Z0INT_CAPTURE=0` turns capture off, and
 request text is stored only with `Z0INT_CAPTURE_PRIVACY=request_opt_in`.
 

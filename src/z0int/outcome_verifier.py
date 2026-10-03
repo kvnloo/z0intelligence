@@ -1093,6 +1093,10 @@ def _main(argv: list[str] | None = None) -> int:
                    help='counts-only diagnosis: why turns are unverified, by cohort x turn type (-> verification_density)')
     sub.add_parser('export', add_help=False,
                    help='privacy-safe training table for the verified loop (-> z0int.loop_export; see --help)')
+    b = sub.add_parser('backfill-capture', help='one-shot: content-free capture flags for opportunity rows '
+                       'written before them, and drop their stored request text (-> harness_capture.backfill_capture)')
+    b.add_argument('--harness', default='claude-code')
+    b.add_argument('--dry-run', action='store_true', help='count only; do not rewrite')
     j = sub.add_parser('join', help='credit-ready join: opportunity -> gate -> observed -> verified')
     j.add_argument('--out', type=Path, default=None, help='write join rows as JSONL (default: print summary only)')
     j.add_argument('--json', action='store_true')
@@ -1106,6 +1110,10 @@ def _main(argv: list[str] | None = None) -> int:
         from .loop_export import _main as export_main
         return export_main(list(argv[1:]))
     args = ap.parse_args(argv)
+    if args.cmd == 'backfill-capture':
+        from .harness_capture import backfill_capture
+        print(json.dumps(backfill_capture(args.harness, dry_run=args.dry_run), sort_keys=True))
+        return 0
     if args.cmd == 'verify':
         now = time.time()
         gh = GitHub(not args.no_gh, cache_path=None if args.no_gh_cache else default_gh_cache())
