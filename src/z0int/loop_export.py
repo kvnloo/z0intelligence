@@ -224,6 +224,43 @@ def capture_cohort(record: Mapping[str, Any] | None) -> str | None:
     return record.get('cohort') if record.get('cohort') in ('agent', 'harness', 'automated', 'eval') else None
 
 
+def row_turn_key(harness: str, session: Any, trace: Any) -> str:
+    """The turn_key of a table row: claude-code keeps its 6fee859 key (byte-identical tables); every other harness the
+    canonical one, the key its verified, imported and failure rows carry."""
+    return _sha({'session': session, 'trace': trace}) if harness == HARNESS else hc.turn_key(harness, session, trace)
+
+
+def latest_verified(state: Path, harness: str = HARNESS) -> dict[tuple, dict[str, Any]]:
+    """(session, trace) -> the turn's latest verified row (the file is append-only: the latest row wins)."""
+    verified: dict[tuple, dict[str, Any]] = {}
+    for r in _read_jsonl(state / 'outcomes_verified.jsonl'):
+        if r.get('schema') == hc.schema(harness, 'turn_outcome_verified'):
+            verified[(r.get('session_id'), r.get('trace_id'))] = r
+    return verified
+
+
+def turn_cohort_fn(harness: str, verified: Mapping[tuple, Mapping[str, Any]], *, projects: Path | None = None,
+                   cohort_fn=None) -> Callable[[Any, Any, Mapping[str, Any] | None], str]:
+    """The cohort rule of a table row, as ``cohort(session, trace, opportunity_record)``; the shadow slot uses the same
+    one, so a turn's shadow rows land in the cohort table of its training row.
+
+    The capture-time cohort when it is not the session's, else the turn's latest verified row's, else the session's:
+    Claude Code from its transcript, other harnesses from the cohort the verifier's classifier put on their verified
+    rows (``turn_readers.classify_cohort``), else unknown."""
+    if cohort_fn is None and harness == HARNESS:
+        cohort_fn = lambda sid: transcript_cohort(sid, projects)  # noqa: E731
+    elif cohort_fn is None:
+        by_session = {k[0]: r['cohort'] for k, r in verified.items() if r.get('cohort') in TABLE_COHORTS}
+        cohort_fn = lambda sid: by_session.get(sid, 'unknown')  # noqa: E731
+    sessions: dict[Any, str] = {}
+
+    def cohort(sid: Any, tid: Any, rec: Mapping[str, Any] | None) -> str:
+        if sid not in sessions:
+            sessions[sid] = cohort_fn(sid)
+        return capture_cohort(rec) or (verified.get((sid, tid)) or {}).get('cohort') or sessions[sid]
+    return cohort
+
+
 def build_table(state: Path, *, projects: Path | None = None, include_unjoined: bool = False,
                 cohort_fn=None, harness: str = HARNESS) -> list[dict[str, Any]]:
     """One row per turn that has an opportunity record (or, with include_unjoined, any verified turn).
@@ -238,33 +275,21 @@ def build_table(state: Path, *, projects: Path | None = None, include_unjoined: 
         opps[(r.get('session_id'), (opp.get('trace') or {}).get('trace_id'))] = r  # latest wins
     observed = {(r.get('session_id'), r.get('trace_id')): r for r in _read_jsonl(state / 'outcomes.jsonl')
                 if r.get('schema') == hc.schema(harness, 'turn_outcome')}
-    verified: dict[tuple, dict[str, Any]] = {}
-    for r in _read_jsonl(state / 'outcomes_verified.jsonl'):
-        if r.get('schema') == hc.schema(harness, 'turn_outcome_verified'):
-            verified[(r.get('session_id'), r.get('trace_id'))] = r  # append-only: latest row wins
-    if cohort_fn is None and harness == HARNESS:
-        cohort_fn = lambda sid: transcript_cohort(sid, projects)  # noqa: E731
-    elif cohort_fn is None:
-        by_session = {k[0]: r['cohort'] for k, r in verified.items() if r.get('cohort') in TABLE_COHORTS}
-        cohort_fn = lambda sid: by_session.get(sid, 'unknown')  # noqa: E731
+    verified = latest_verified(state, harness)
+    cohort_of = turn_cohort_fn(harness, verified, projects=projects, cohort_fn=cohort_fn)
     keys = list(opps)
     if include_unjoined:
         keys += [k for k in verified if k not in opps]
-    cohorts: dict[str, str] = {}
     rows = []
     for key in keys:
         sid, tid = key
-        if sid not in cohorts:
-            cohorts[sid] = cohort_fn(sid)
         rec, obs, ver = opps.get(key), observed.get(key), verified.get(key)
-        cohort = capture_cohort(rec) or (ver or {}).get('cohort') or cohorts[sid]
+        cohort = cohort_of(sid, tid, rec)
         opp = (rec or {}).get('opportunity') or {}
         started = ((ver or {}).get('turn') or {}).get('started_at') or (opp.get('provenance') or {}).get('built_at')
         rows.append({
             'schema': SCHEMA, 'table_version': TABLE_VERSION, 'feature_schema_sha': FEATURE_SCHEMA_SHA,
-            # claude-code keeps its 6fee859 key (byte-identical tables); every other harness the canonical one,
-            # the key its verified, imported and failure rows carry
-            'turn_key': _sha({'session': sid, 'trace': tid}) if harness == HARNESS else hc.turn_key(harness, sid, tid),
+            'turn_key': row_turn_key(harness, sid, tid),
             'group': _sha({'session': sid}, 12),
             'day': started[:10] if isinstance(started, str) else None,
             'harness': harness,
@@ -681,6 +706,9 @@ def _main(argv: list[str] | None = None) -> int:
     if argv[:1] == ['import']:
         from .legacy_import import _main as import_main
         return import_main(argv[1:])
+    if argv[:1] == ['tick']:
+        from .loop_tick import _main as tick_main
+        return tick_main(argv[1:])
     ap = argparse.ArgumentParser(prog='z0int outcomes export', description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--out', type=Path, required=True, help='training table JSONL (manifest written beside it)')

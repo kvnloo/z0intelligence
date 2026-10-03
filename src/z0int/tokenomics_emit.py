@@ -25,9 +25,11 @@ def _append_jsonl(path: Path, row: dict[str, Any]) -> None:
         fh.write("\n")
 
 
-def emit_raw(row: dict[str, Any], *, root: Path | None = None) -> Path:
-    """Append a pre-shaped provider/session row (OMP/Hermes adapters consume this)."""
-    p = events_path(root)
+def emit_raw(row: dict[str, Any], *, root: Path | None = None, path: Path | None = None) -> Path:
+    """Append a pre-shaped provider/session row (OMP/Hermes adapters consume this).
+
+    ``path``: an explicit events file instead of the layout's (the loop tick writes only under its out root)."""
+    p = path or events_path(root)
     _append_jsonl(p, row)
     return p
 
