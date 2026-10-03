@@ -96,7 +96,6 @@ def serve(generation: int | None = None) -> int:
                 _respond(req_id, rt.cognition_shadow(payload))
                 continue
             if op == "shutdown":
-                rt.close_capture()
                 _respond(req_id, {"ok": True, "shutdown": True, **rt.identity()})
                 return 0
             if op == "turn_open":
@@ -145,7 +144,6 @@ def serve(generation: int | None = None) -> int:
             _respond(req_id, {"ok": False, "error": f"unhandled_op:{op}"})
         except Exception as exc:  # noqa: BLE001
             _respond(req_id if isinstance(req_id, str) else None, {"ok": False, "error": str(exc)})
-    rt.close_capture()  # stdin closed (host exit): bounded drain of the capture spools
     return 0
 
 

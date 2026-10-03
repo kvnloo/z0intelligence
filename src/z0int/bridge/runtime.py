@@ -6,8 +6,9 @@ Kerdoios remains optional residual planner via subprocess when configured.
 Capture (oh-my-pi#109, z0int#62): every OMP/OMO user turn also lands in the shared record family
 ``$Z0INT_HOME/state/<harness>/``: turn_open queues a ``z0int.<harness>.opportunity_record.v0`` (built in a
 detached child, from the task cwd the shim sends) and turn_close a ``turn_outcome.v0`` on the same turn key.
-Both go through one bounded spool per harness, so the reply never waits for capture; nothing a capture row
-holds reaches the host.
+As in the hook adapter, the reply pays only the hand-off (a session-file update and one detached spawn, or
+the outcome rows); no capture thread runs in this resident process, so none competes with the reply for the
+GIL. Nothing a capture row holds reaches the host.
 """
 
 from __future__ import annotations
@@ -16,7 +17,6 @@ import json
 import os
 import sys
 import subprocess
-import threading
 import time
 import uuid
 from pathlib import Path
@@ -242,30 +242,16 @@ class BridgeRuntime:
         self.draining = False
         # Per-generation resident DecisionBackend instances (not shared across reloads).
         self._decision_backends = ResidentDecisionCache()
-        # Capture: the detached opportunity build (tests pass an in-process stand-in) and one spool per harness.
+        # Capture: the detached opportunity build (tests may pass a stand-in for the spawn).
         self._capture_spawn = capture_spawn or hc.spawn_detached
-        self._spools: dict[str, hc.Spool] = {}
-        self._spool_lock = threading.Lock()
 
     # --- capture (shadow: nothing here reaches the host) ---------------------
     def _capture(self, harness: str, kind: str, job: dict[str, Any]) -> None:
-        """Queue one capture job; never raises and never waits (a full queue is a persisted drop)."""
+        """Write one capture event (the hook adapter's pattern); never raises into the reply. An unsupported
+        harness leaves an explicit failure row (begin_turn / outcome_context return None)."""
         try:
-            if harness not in hc.HARNESSES:
-                hc.supported(harness)  # an explicit unsupported_harness failure row
-                return
             if not hc.enabled():
                 return
-            with self._spool_lock:
-                spool = self._spools.get(harness)
-                if spool is None:
-                    spool = self._spools[harness] = hc.Spool(harness, write=self._capture_write(harness))
-            spool.put(kind, job)
-        except Exception:  # noqa: BLE001 - capture is shadow-only
-            pass
-
-    def _capture_write(self, harness: str):
-        def write(kind: str, job: dict[str, Any]) -> None:
             if kind == "opportunity_record":
                 ctx = hc.begin_turn(harness, job)
                 if ctx:
@@ -274,14 +260,8 @@ class BridgeRuntime:
                 ctx = hc.outcome_context(harness, job["turn"])
                 if ctx and ctx.get("trace_id") is not None:
                     hc.record_outcome(harness, ctx, job["behaviour"], ended=job["ended"], extra=job["extra"])
-        return write
-
-    def close_capture(self) -> None:
-        """Drain and stop every capture spool (bounded: ``Spool.close`` returns within its close timeout)."""
-        with self._spool_lock:
-            spools, self._spools = list(self._spools.values()), {}
-        for spool in spools:
-            spool.close()
+        except Exception:  # noqa: BLE001 - capture is shadow-only
+            pass
 
     def identity(self) -> dict[str, Any]:
         return {
