@@ -1,0 +1,121 @@
+{
+  "schema": "z0int.gstack_context_value_eval.v1",
+  "cases": [
+    {
+      "id": "declared-order",
+      "bill": {
+        "root": "/skills",
+        "tokenSource": "estimate: calibrated bytes/token per content class",
+        "tokenEstimateErrorPct": 40,
+        "skills": [
+          {
+            "name": "alpha",
+            "eagerTokens": 100,
+            "estimatedTokenSaving": 1000,
+            "avgExecutionTime": "10s"
+          },
+          {
+            "name": "beta",
+            "eagerTokens": 200,
+            "estimatedTokenSaving": 600
+          },
+          {
+            "name": "gamma",
+            "eagerTokens": 50
+          }
+        ]
+      },
+      "expected_order": [
+        "alpha",
+        "beta",
+        "gamma"
+      ],
+      "expected_density": {
+        "alpha": 10,
+        "beta": 3,
+        "gamma": null
+      }
+    },
+    {
+      "id": "measured-cost",
+      "bill": {
+        "root": "/skills",
+        "tokenSource": "count_tokens (claude-opus-4-5)",
+        "tokenEstimateErrorPct": 0,
+        "skills": [
+          {
+            "name": "measured",
+            "eagerTokens": 80,
+            "estimatedTokenSaving": 160
+          }
+        ]
+      },
+      "expected_order": [
+        "measured"
+      ],
+      "expected_cost_state": "measured"
+    },
+    {
+      "id": "invalid-benefit",
+      "bill": {
+        "root": "/skills",
+        "tokenSource": "estimate",
+        "tokenEstimateErrorPct": 40,
+        "skills": [
+          {
+            "name": "bad",
+            "eagerTokens": 100,
+            "estimatedTokenSaving": "not-a-number"
+          }
+        ]
+      },
+      "expected_order": [
+        "bad"
+      ],
+      "expected_reason": "benefit_invalid"
+    },
+    {
+      "id": "zero-cost",
+      "bill": {
+        "root": "/skills",
+        "tokenSource": "estimate",
+        "tokenEstimateErrorPct": 40,
+        "skills": [
+          {
+            "name": "free-ish",
+            "eagerTokens": 0,
+            "estimatedTokenSaving": 100
+          }
+        ]
+      },
+      "expected_order": [
+        "free-ish"
+      ],
+      "expected_reason": "zero_cost_no_density"
+    },
+    {
+      "id": "stable-tie",
+      "bill": {
+        "root": "/skills",
+        "tokenSource": "estimate",
+        "tokenEstimateErrorPct": 40,
+        "skills": [
+          {
+            "name": "zeta",
+            "eagerTokens": 100,
+            "estimatedTokenSaving": 200
+          },
+          {
+            "name": "eta",
+            "eagerTokens": 50,
+            "estimatedTokenSaving": 100
+          }
+        ]
+      },
+      "expected_order": [
+        "eta",
+        "zeta"
+      ]
+    }
+  ]
+}
