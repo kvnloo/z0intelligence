@@ -145,7 +145,6 @@ def test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview(t
 
     assert report['status'] == 'success' and len(rows) == 7
     polarity = TEST_LABEL_POLARITY[harness]
-    assert report['test_label_polarity'] == polarity
     tests = lambda r: [s for s in signals(r) if s[0] == 'tests_in_turn']
     for i in range(1, 8):
         av, ref = rows[f't{i}'], cc[f'p{i}']
@@ -165,6 +164,7 @@ def test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview(t
         assert rows['t1']['verification_state'] == 'verified_failure'
     else:
         assert rows['t1']['verification_state'] != 'verified_success'
+    assert report['test_label_polarity'] == polarity
     assert any(s['kind'] == 'commit_reverted' for s in rows['t2']['signals'])
     assert rows['t3']['verification_state'] == 'verified_success'
     assert next(s for s in rows['t4']['signals'] if s['kind'] == 'pr_merged')['merged_by_agent']
