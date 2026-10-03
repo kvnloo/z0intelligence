@@ -291,12 +291,23 @@ def build_shadow_candidate(
         len(response.get(k) or []) for k in ("pages", "facts", "cards")
         if isinstance(response.get(k) or [], list)
     )
+    incomplete = bool(
+        response.get("degraded_reason")
+        or response.get("has_more")
+        or int(response.get("dropped_count") or 0) > 0
+    )
     if thread_count:
         attention_action = "PREPARE"
         reason_codes = ["open_thread"]
     elif change_count or packet.evidence:
         attention_action = "OBSERVE"
         reason_codes = ["memory_change"]
+    elif incomplete:
+        # Partial delivery is not evidence of "nothing changed". Preserve the
+        # uncertainty in shadow state so a learned policy cannot train on a
+        # false negative created by budget/degradation.
+        attention_action = "OBSERVE"
+        reason_codes = ["incomplete_memory"]
     else:
         attention_action = "IGNORE"
         reason_codes = ["no_change"]
