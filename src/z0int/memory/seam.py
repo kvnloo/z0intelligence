@@ -190,10 +190,12 @@ def turn(harness: str, *, turn_key: str, query: str, mode: str | None = None, en
     job = {'harness': harness, 'turn_key': turn_key, 'query': str(query)[:MAX_QUERY_CHARS], 'cwd': cwd,
            'injector': injector, 'exclude_layers': list(exclude_layers), 'max_tokens': cfg['max_tokens']}
     if cfg['mode'] == 'shadow':
-        if detach:
-            _spawn_shadow(job)
-        else:
-            run_shadow(job)
+        try:
+            _spawn_shadow(job) if detach else run_shadow(job)
+        except Exception as exc:  # noqa: BLE001 - fail open: counted, never raised into the turn
+            _write(harness, {'mode': 'shadow', 'turn_key': turn_key, 'injector': injector, 'outcome': 'error',
+                             'injected': False, 'would_inject': False, 'error': type(exc).__name__})
+            return {**out, 'outcome': 'error'}
         return out
     base = {'mode': cfg['mode'], 'turn_key': turn_key, 'injector': injector, 'endpoint_loopback': is_loopback(endpoint)}
     if not base['endpoint_loopback'] and not cfg['allow_cloud_injection']:

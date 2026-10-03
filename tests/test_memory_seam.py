@@ -306,3 +306,13 @@ def test_grok_has_no_push_seam(env, monkeypatch):
     monkeypatch.setenv('Z0INT_MEMORY_ENDPOINT', 'http://127.0.0.1:9')
     assert hook('prompt', PAYLOAD, 'grok') is None
     assert rows('grok') == []
+
+
+def test_a_shadow_spawn_failure_is_a_counted_error_not_an_exception(env, monkeypatch):
+    def broken(job):
+        raise OSError('fork failed')
+
+    monkeypatch.setattr(seam, '_spawn_shadow', broken)
+    out = seam.turn('claude-code', turn_key='sp1', query=QUERY, mode='shadow', endpoint=LOOPBACK)
+    assert out['context'] is None and out['outcome'] == 'error'
+    assert seam.counts('claude-code')['error'] == 1
