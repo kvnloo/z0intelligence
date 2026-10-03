@@ -148,13 +148,9 @@ def _excerpt(value: Any, limit: int = 320) -> str:
 
 
 def _item_locator(source: str, kind: str, item: Mapping[str, Any]) -> str:
-    ident = (
-        item.get("fact_id")
-        or item.get("loop_id")
-        or item.get("slug")
-        or item.get("id")
-        or item.get("entity", {}).get("slug") if isinstance(item.get("entity"), Mapping) else None
-    )
+    entity = item.get("entity")
+    entity_slug = entity.get("slug") if isinstance(entity, Mapping) else None
+    ident = item.get("fact_id") or item.get("loop_id") or item.get("slug") or item.get("id") or entity_slug
     if not ident:
         ident = _hash(item)
     return f"gbrain://{source}/{kind}/{ident}"
