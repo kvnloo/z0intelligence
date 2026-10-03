@@ -13,7 +13,7 @@ from pathlib import Path
 SECRETS = {
     'api_key': 'sk-' + 'proj-' + 'FAKE' * 6,
     'bearer': 'fakebearer' + 'x' * 20,
-    'bws': '0.' + '48b4774c-68fa-4d1c-a1e0-b0a3013e8e6a' + '.' + 'FAKEbwsClientSecret0123' + ':' + 'RkFLRWJ3c0tleUZBS0U9PQ==',
+    'bws': '0.' + '00000000-0000-4000-8000-000000000001' + '.' + 'FAKEbwsClientSecret0123' + ':' + 'RkFLRWJ3c0tleUZBS0U9PQ==',
     'aws': 'AKIA' + 'FAKEFAKEFAKEFAKE',
     'pem': 'MIIEfake' + 'fakefakefake',
 }
@@ -96,6 +96,27 @@ def add_message(path: str | Path, session: str, content: str) -> None:
     conn.close()
 
 
+SECRET_FINDINGS_SCHEMA = """
+create table if not exists secret_findings (id integer primary key, session_id text not null references sessions(id)
+  on delete cascade, rule_name text not null, confidence text not null, location_kind text not null,
+  message_ordinal integer not null, call_index integer, event_index integer, match_start integer not null,
+  match_end integer not null, match_index integer not null, redacted_match text not null, rules_version text not null,
+  created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')));
+"""
+
+
+def add_secret_finding(path: str | Path, session: str, ordinal: int, start: int, end: int, *,
+                       kind: str = 'message') -> None:
+    """Record a finding the way AgentsView's scanner does (UTF-8 byte offsets into the located text)."""
+    conn = sqlite3.connect(path)
+    conn.executescript(SECRET_FINDINGS_SCHEMA)
+    conn.execute('insert into secret_findings (session_id, rule_name, confidence, location_kind, message_ordinal, '
+                 'match_start, match_end, match_index, redacted_match, rules_version) values (?,?,?,?,?,?,?,?,?,?)',
+                 (session, 'generic', 'definite', kind, ordinal, start, end, 0, '****', 'test'))
+    conn.commit()
+    conn.close()
+
+
 class FakeTencentDB:
     """Loopback stand-in for the TencentDB gateway: bearer check, /v3/atomic/search and GET /health."""
 
@@ -107,6 +128,7 @@ class FakeTencentDB:
 
         self.token, self.items, self.revision, self.sleep_s = token, list(items or []), revision, sleep_s
         self.auth_headers: list[str | None] = []
+        self.requests: list[str] = []  # 'METHOD /path' for every request, /health included
         stub = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -122,6 +144,9 @@ class FakeTencentDB:
                 self.wfile.write(raw)
 
             def do_GET(self):
+                stub.requests.append(f'GET {self.path}')
+                if stub.sleep_s:
+                    time.sleep(stub.sleep_s)  # a hung gateway hangs on every endpoint, /health included
                 if self.path == '/health':
                     self._send(200, {'status': 'ok', 'revision': stub.revision})
                 else:
@@ -130,6 +155,7 @@ class FakeTencentDB:
             def do_POST(self):
                 length = int(self.headers.get('Content-Length') or 0)
                 body = json.loads(self.rfile.read(length) or b'{}')
+                stub.requests.append(f'POST {self.path}')
                 stub.auth_headers.append(self.headers.get('Authorization'))
                 if stub.sleep_s:
                     time.sleep(stub.sleep_s)

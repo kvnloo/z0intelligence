@@ -92,3 +92,17 @@ def test_stdio_server_speaks_the_memory_profile(env):
     assert [o['id'] for o in out] == [1, 2, 3]
     assert {t['name'] for t in out[1]['result']['tools']} == MEMORY_TOOLS
     assert out[2]['result']['isError'] is False
+
+
+def test_an_unscoped_call_spans_every_project_and_says_so(env):
+    """Pinned: without "project" a memory tool is unscoped (all projects); the tool schema says so, so the
+    caller (the per-harness shim) knows to pass its project."""
+    listed = mcp.handle({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/list'}, profile='memory')
+    for tool in listed['result']['tools']:
+        project = tool['inputSchema']['properties'].get('project')
+        if project is not None:
+            assert 'all projects' in project.get('description', ''), tool['name']
+    _, out = call('memory_search', {'query': 'quokka sibling', 'limit': 20})
+    assert 'sib' in {e['session_id'] for e in out['evidence']}
+    _, out = call('memory_search', {'query': 'quokka sibling', 'limit': 20, 'project': 'z0'})
+    assert 'sib' not in {e['session_id'] for e in out['evidence']}

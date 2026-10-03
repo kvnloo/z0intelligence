@@ -44,3 +44,10 @@ def test_memory_does_not_resolve_when_another_injector_owns_the_turn(env):
     assert any('double_inject_guard' in g for g in packet.unresolved_gaps)
     assert ms.claim_injection('t2', 'tencentdb_proxy') is True
     assert ms.claim_injection('t2', 'context_resolve') is False
+
+
+def test_memory_without_a_turn_key_is_skipped_because_the_guard_cannot_run(env):
+    packet = resolve(allow_memory=True)
+    assert not packet.evidence
+    assert any('double_inject_guard' in g and 'turn_key' in g for g in packet.unresolved_gaps)
+    assert not any(op.get('op') == 'memory_resolve' for op in packet.recipe.operations)

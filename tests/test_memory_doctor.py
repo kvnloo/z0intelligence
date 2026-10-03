@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import stat
 
 import pytest
@@ -80,16 +79,13 @@ def test_reports_an_unreachable_gateway(env):
     assert checks(report)['tencentdb']['status'] == 'unreachable'
 
 
-def test_output_never_contains_config_secret_values(env, capsys):
+def test_output_never_contains_config_secret_values(env, capsys, monkeypatch):
     cfg = {'tencentdb': {'url': 'http://127.0.0.1:9', 'auth_env': 'Z0_FAKE_TDB_ENV', 'deadline_ms': 200}}
     report = doctor.run(**{**env, 'config': cfg})
     from z0int.memory import cli
-    os.environ['AGENTSVIEW_DATA_DIR'] = str(env['av_dir'])
-    try:
-        rc = cli.main(['doctor', '--json', '--agentsview-bin', str(env['agentsview_bin']),
+    monkeypatch.setenv('AGENTSVIEW_DATA_DIR', str(env['av_dir']))
+    rc = cli.main(['doctor', '--json', '--agentsview-bin', str(env['agentsview_bin']),
                    '--claude-home', str(env['claude_home'])])
-    finally:
-        os.environ.pop('AGENTSVIEW_DATA_DIR', None)
     out = capsys.readouterr()
     assert rc == 0
     for blob in (json.dumps(report), out.out, out.err):

@@ -145,6 +145,30 @@ def test_slow_gateway_returns_unavailable_within_the_deadline(env):
     assert elapsed < 0.2 + 0.05
 
 
+def test_hung_gateway_bounds_search_and_brief_end_to_end(env):
+    """One deadline budget per query: a gateway hung on /health and on search costs at most the deadline,
+    however many semantic round-trips (revision probe + search) the call needs."""
+    with FakeTencentDB(token=TOKEN, items=[{'id': 'm', 'content': 'quokka'}], sleep_s=1.5) as gw:
+        cfg = gw.config(deadline_ms=200)
+        t0 = time.monotonic()
+        res = ms.search('quokka gateway', ms.ScopePolicy(scope=Z0), config=cfg)
+        searched = time.monotonic() - t0
+        t0 = time.monotonic()
+        brief = ms.memory_brief('quokka gateway', ms.ScopePolicy(scope=Z0), config=cfg)
+        briefed = time.monotonic() - t0
+    assert (res['layers']['semantic']['status'], res['layers']['semantic']['reason']) == ('unavailable', 'timeout')
+    assert res['layers']['lexical']['status'] == 'ok' and res['evidence']
+    assert searched < 0.2 + 0.05, searched
+    assert brief['abstained'] is False and any(g.startswith('semantic: unavailable') for g in brief['gaps'])
+    assert briefed < 0.2 + 0.05, briefed
+
+
+def test_a_query_without_the_semantic_layer_never_calls_the_gateway(env):
+    with FakeTencentDB(token=TOKEN) as gw:
+        res = ms.search('quokka', ms.ScopePolicy(scope=Z0), layers=('lexical', 'temporal'), config=gw.config())
+    assert res['ok'] and gw.requests == []
+
+
 def test_bearer_comes_from_the_configured_env_var_and_is_never_logged(env, caplog, capsys):
     caplog.set_level(logging.DEBUG)
     items = [{'id': 'm1', 'content': 'quokka semantic memory without provenance'}]
@@ -256,6 +280,45 @@ def test_state_packet_and_decision_opportunity_carry_the_snapshot_id(env, tmp_pa
     add_message(env / 'av' / 'sessions.db', 'h1', 'another quokka message')
     again = build_state_packet(repo, use_cache=False, store=False, adapters=('git',), projects_root=tmp_path / 'none')
     assert again['memory_snapshot_id'] != packet['memory_snapshot_id']
+
+
+def test_state_packet_memory_probe_never_calls_the_gateway_on_the_hook_path(env, tmp_path):
+    """build_state_packet runs inside synchronous harness hooks: its memory_snapshot_id uses the gateway
+    revision last observed by a real query, never a fresh network call."""
+    from z0int.state_packet import build_state_packet
+
+    repo = tmp_path / 'repo'
+    repo.mkdir()
+    _git(repo, 'init', '-q')
+    _git(repo, 'commit', '-q', '--allow-empty', '-m', 'one')
+
+    def packet_snapshot():
+        return build_state_packet(repo, use_cache=False, store=False, adapters=('git',),
+                                  projects_root=tmp_path / 'none')['memory_snapshot_id']
+
+    with FakeTencentDB(token=TOKEN, revision='r1') as gw:
+        (env / 'z0' / 'config').mkdir(parents=True, exist_ok=True)
+        (env / 'z0' / 'config' / 'memory.json').write_text(json.dumps(gw.config()))
+        unprobed = packet_snapshot()
+        assert gw.requests == []
+        ms.search('quokka', layers=('semantic',))  # a real query observes revision r1
+        seen = len(gw.requests)
+        r1 = packet_snapshot()
+        assert r1 != unprobed and packet_snapshot() == r1
+        assert len(gw.requests) == seen
+        gw.revision = 'r2'
+        ms.search('quokka', layers=('semantic',))
+        assert packet_snapshot() != r1
+
+
+def test_injection_markers_are_pruned_by_age(env):
+    d = env / 'z0' / 'state' / 'memory' / 'injectors'
+    assert ms.claim_injection('turn-old', 'a') is True
+    old = next(d.glob('*.json'))
+    stale = time.time() - 3 * 86400
+    os.utime(old, (stale, stale))
+    assert ms.claim_injection('turn-new', 'a') is True
+    assert not old.exists() and len(list(d.glob('*.json'))) == 1
 
 
 # ----------------------------------------------------------------------------- 13. memory_brief

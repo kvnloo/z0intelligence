@@ -90,7 +90,9 @@ def test_worker_facing_ledger_cannot_write(tmp_path, refs_on):
     assert (tmp_path / 'm' / 'events.jsonl').read_bytes() == before
 
 
-def test_held_out_facts_recoverable_after_a_1024_event_nap_cascade(tmp_path):
+def test_held_out_facts_recoverable_after_a_1024_event_nap_cascade(tmp_path, monkeypatch):
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path / 'z0'))  # hermetic: no dev-box config, DB or gateway
+    monkeypatch.setenv('AGENTSVIEW_DATA_DIR', str(tmp_path / 'av'))
     log = EventLog(tmp_path / 'm', blob_threshold=4096)
     tree = OptMemTree(log, raw_tail_events=8)
     held = {3: 'heldfact0003', 500: 'heldfact0500', 1000: 'heldfact1000'}
@@ -105,7 +107,7 @@ def test_held_out_facts_recoverable_after_a_1024_event_nap_cascade(tmp_path):
     manifest = tree.nap()
     assert manifest['event_count'] == 1024 and manifest['coarse_end'] == 1016
     for event_id, token in held.items():
-        found = ms.search(token, layers=('temporal',), ledger_root=tmp_path / 'm')
+        found = ms.search(token, layers=('temporal',), ledger_root=tmp_path / 'm', config={})
         hits = [e for e in found['evidence'] if e['locator'] == f'eventlog:{event_id}']
         assert hits, f'{token} not recovered'
         assert tree.zoom(event_id, event_id + 1)['events'][0]['payload'] == originals[event_id]
