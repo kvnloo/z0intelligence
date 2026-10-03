@@ -296,10 +296,14 @@ def test_a_js_shim_marks_its_seam_installed_so_the_first_late_turn_still_joins(e
     assert not (env / 'z0' / 'state' / 'memory' / 'seam' / 'dsh.active').exists()  # off: nothing marked
 
 
-def test_the_hermes_memory_seam_marks_itself_installed(env):
+def test_the_hermes_memory_seam_marks_itself_installed_on_its_first_turn(env):
     import importlib.util
     spec = importlib.util.spec_from_file_location('hz_memory_active', HA / 'hermes-z0intelligence' / 'memory.py')
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    assert mod.create({'memory_inject': 'shadow'}, env / 'z0', sys.executable, {}) is not None
+    mem = mod.create({'memory_inject': 'shadow'}, env / 'z0', sys.executable, {})
+    marker = env / 'z0' / 'state' / 'memory' / 'seam' / 'hermes.active'
+    assert not marker.exists()  # created but never called (e.g. a profile whose turns skip it): no grace for capture
+    mem.pre_llm_call(session_id='s0', turn_id='0', user_message=QUERY, cwd=str(env / 'z0'))
+    assert marker.exists()  # synchronously, before its cold shadow child could write anything
     assert _late_turn_joins(env, 'hermes'), 'the first late shadow turn of the Hermes seam was not joined'
