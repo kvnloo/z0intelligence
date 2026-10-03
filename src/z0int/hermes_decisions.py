@@ -1,9 +1,8 @@
 """Hermes decision layer (shadow): DecisionOpportunity records + observed turn outcomes.
 
-Mirrors the Claude Code integration (``z0int.claude_code``): the Hermes plugin in
-``harness-adapters/hermes-z0int-decisions`` classifies each turn on the hot path (string checks
-only), hands user turns to ``python -m z0int.hermes_decisions opportunity`` in a detached child,
-and appends turn outcomes itself. Nothing is injected, routed or sent anywhere.
+The records are written by the Hermes plugin ``harness-adapters/hermes-z0intelligence`` through its child
+``z0int.hermes_capture`` (the shared #62 capture core). This module classifies turns the same way the plugin
+does and reports the gate against observed behaviour. Nothing is injected, routed or sent anywhere.
 
   z0int hermes decisions        # gate vs observed behaviour, joined by trace_id
   z0int hermes paths            # where the records live
@@ -106,6 +105,7 @@ def decisions_report(root=None):
         elif r.get('trace_id') and r['trace_id'] not in outcomes:
             outcomes[r['trace_id']] = r
     table, unlinked, examples, tools, overhead = {}, 0, [], 0, []
+    dropped = sum(int(r.get('count') or 0) for r in _rows(base / 'drops.jsonl'))
     for rec in _rows(base / 'opportunities.jsonl'):
         opp = rec['opportunity']
         out = outcomes.get(opp['trace'].get('trace_id'))
@@ -121,9 +121,9 @@ def decisions_report(root=None):
         if GATE_EXPECTS.get(rec['gate']) != obs and len(examples) < 10:
             examples.append({'gate': rec['gate'], 'observed': obs, 'scope': opp['scope'].get('mode'),
                              'families': opp['scope'].get('families'), 'platform': rec.get('platform'),
-                             'request': opp['intent']['request'][:80]})
+                             'request': (opp['intent'].get('request') or '')[:80] or None})
     overhead.sort()
-    return {'harness': HARNESS, 'linked': sum(table.values()), 'unlinked': unlinked,
+    return {'harness': HARNESS, 'linked': sum(table.values()), 'unlinked': unlinked, 'rows_dropped': dropped,
             'non_user_turns_excluded': excluded, 'tool_calls_on_linked_turns': tools,
             'hook_ms_p50': overhead[len(overhead) // 2] if overhead else None,
             'hook_ms_max': overhead[-1] if overhead else None,
@@ -142,8 +142,8 @@ def _main(argv=None):
         print(json.dumps(decisions_report(), indent=1, ensure_ascii=False))
     elif args.cmd == 'paths':
         base = state_dir()
-        print(json.dumps({'opportunities': str(base / 'opportunities.jsonl'),
-                          'outcomes': str(base / 'outcomes.jsonl')}, indent=1))
+        print(json.dumps({name: str(base / f'{name}.jsonl')
+                          for name in ('opportunities', 'outcomes', 'events', 'failures', 'drops')}, indent=1))
     else:
         try:
             on_opportunity(json.load(sys.stdin))

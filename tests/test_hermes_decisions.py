@@ -1,15 +1,20 @@
 import importlib.util
 import json
+import os
 import statistics
 import subprocess
+import sys
 import time
 from pathlib import Path
 
 import pytest
 
+from z0int import harness_capture as hc
+from z0int import hermes_capture as hcap
 from z0int import hermes_decisions as H
 
-PLUGIN_DIR = Path(__file__).resolve().parents[1] / 'harness-adapters' / 'hermes-z0int-decisions'
+# The z0int-decisions capture moved into the one Hermes plugin (C4a); these behaviours guard the move.
+PLUGIN_DIR = Path(__file__).resolve().parents[1] / 'harness-adapters' / 'hermes-z0intelligence'
 
 CASES = [
     ('fix the failing test in auth.py', 'cli', None),
@@ -26,18 +31,40 @@ CASES = [
 ]
 
 
+class Ctx:
+    def __init__(self, settings):
+        self.settings, self.hooks = settings, {}
+
+    def get_config(self, key, default=None):
+        return self.settings.get(key, default)
+
+    def register_hook(self, name, callback):
+        self.hooks[name] = callback
+
+    def on_unload(self, callback):
+        pass
+
+
 @pytest.fixture
 def plugin(monkeypatch, tmp_path):
+    """The plugin in mode shadow; its batch child runs in-process and projections are recorded, not built."""
     monkeypatch.setenv('Z0INT_HOME', str(tmp_path / 'z0'))
     spec = importlib.util.spec_from_file_location('z0int_decisions_plugin_under_test', PLUGIN_DIR / '__init__.py')
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    monkeypatch.setattr(mod, '_hermes_workspace_root', lambda task_id: None)
+    monkeypatch.setattr(mod, '_profile_config', lambda: {})
     spawned = []
-    monkeypatch.setattr(mod, '_spawn', lambda argv, payload: spawned.append((argv, payload)))
-    monkeypatch.setattr(mod, 'child_argv', lambda: ['z0int', 'hermes', 'opportunity'])
+    monkeypatch.setattr(hcap, '_spawn_project', lambda job, slot: spawned.append(job))
+    cap = mod.register(Ctx({'mode': 'shadow', 'z0int_python': sys.executable}))
+    monkeypatch.setattr(cap, '_deliver', lambda jobs: [hcap.process(j) for j in jobs] and len(jobs))
+    for name in ('on_pre_llm_call', 'on_post_llm_call', 'on_session_end', 'on_approval_request'):
+        setattr(mod, name, getattr(cap, name))
+    mod.drain = cap.flush
     mod.spawned = spawned
     yield mod
-    mod.drain(timeout=30)  # the worker must not write into the next test's Z0INT_HOME
+    cap.flush(timeout=30)  # the worker must not write into the next test's Z0INT_HOME
+    cap.close()
 
 
 def rows(tmp_path, name):
@@ -64,12 +91,12 @@ def test_user_turn_emits_opportunity_off_the_hot_path_and_never_injects(plugin):
     assert plugin.on_pre_llm_call(session_id='s1', turn_id='t2', user_message='digest', platform='cron') is None
     plugin.drain()
     assert len(plugin.spawned) == 1
-    argv, payload = plugin.spawned[0]
-    assert argv[-1] == 'opportunity' and payload['trace_id'] == 's1:t1' and payload['user_message'] == 'fix the build'
+    job = plugin.spawned[0]
+    assert job['ctx']['trace_id'] == 's1:t1' and job['payload']['user_message'] == 'fix the build'
 
 
 def test_hook_stays_under_5ms_even_when_the_child_is_slow(plugin, monkeypatch):
-    monkeypatch.setattr(plugin, '_spawn', lambda argv, payload: time.sleep(0.05))
+    monkeypatch.setattr(hcap, '_spawn_project', lambda job, slot: time.sleep(0.05))
     history = [{'role': 'user', 'content': 'x'}] + [{'role': 'assistant', 'content': 'y'}] * 200
     samples = []
     for i in range(50):
@@ -180,20 +207,17 @@ def test_trace_key_is_stable_between_hooks_and_not_double_prefixed(plugin):
 
 def test_child_fanout_is_bounded(monkeypatch, tmp_path):
     monkeypatch.setenv('Z0INT_HOME', str(tmp_path / 'z0'))
-    spec = importlib.util.spec_from_file_location('z0int_decisions_plugin_bound', PLUGIN_DIR / '__init__.py')
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    started = []
+    started, held = [], []
 
-    class Slow:
-        def __init__(self, argv, **kw):
-            started.append(argv)
-            self.stdin = open(tmp_path / f'stdin{len(started)}', 'wb')
+    def slow(job, slot):  # a build that is still running keeps its slot
+        started.append(job)
+        held.append(os.dup(slot.fileno()))
 
-        def poll(self):
-            return None  # still running
-
-    monkeypatch.setattr(mod.subprocess, 'Popen', Slow)
+    monkeypatch.setattr(hcap, '_spawn_project', slow)
     for i in range(10):
-        mod._spawn(['x'], {'i': i})
-    assert len(started) == mod.MAX_CHILDREN
+        hcap.process({'kind': 'turn', 'session_id': 's', 'turn_id': str(i), 'text': f'job {i}', 'cohort': 'interactive',
+                      'opportunity': True})
+    for fd in held:
+        os.close(fd)
+    assert len(started) == hc.MAX_CHILDREN
+    assert hc.drop_count('hermes') == 10 - hc.MAX_CHILDREN
