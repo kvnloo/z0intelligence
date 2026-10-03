@@ -294,13 +294,25 @@ def build_shadow_candidate(
         attention_action = "IGNORE"
         reason_codes = ["no_change"]
 
+    aodl_ref = _aodl_ref(aodl_doc)
+    candidate_id = "gb:" + _hash(
+        {
+            "source": source,
+            "verb": verb,
+            "context_packet_id": packet.task_id,
+            "aodl": aodl_ref,
+            "attention_action": attention_action,
+        },
+        20,
+    )
     return {
         "schema": SCHEMA,
+        "candidate_id": candidate_id,
         "traffic_eligible": False,
         "shadow_only": True,
         "source": {"kind": "gbrain", "source_id": source, "verb": verb},
         "context_packet": packet.to_dict(),
-        "aodl": _aodl_ref(aodl_doc),
+        "aodl": aodl_ref,
         "attention": {
             "action": attention_action,
             "reason_codes": reason_codes,
@@ -311,4 +323,32 @@ def build_shadow_candidate(
             "granted": [],
             "note": "memory evidence never grants execution or interruption authority",
         },
+        "receipt_extra": {
+            "gbrain_candidate_id": candidate_id,
+            "gbrain_shadow_action": attention_action,
+            "gbrain_context_packet_id": packet.task_id,
+            "gbrain_verb": verb,
+        },
     }
+
+
+def attach_shadow_candidate(
+    receipt: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Join a GBrain shadow candidate to an existing z0int receipt.
+
+    The candidate remains counterfactual evidence. This helper only adds opaque
+    correlation fields under extra; it never changes the receipt's chosen
+    action, authority, success, or verifier result.
+    """
+    if candidate.get("schema") != SCHEMA or not candidate.get("shadow_only"):
+        raise ValueError("expected a z0int GBrain shadow candidate")
+    fields = candidate.get("receipt_extra")
+    if not isinstance(fields, Mapping) or not fields.get("gbrain_candidate_id"):
+        raise ValueError("shadow candidate has no receipt correlation fields")
+    out = dict(receipt)
+    extra = dict(out.get("extra") or {})
+    extra.update({str(k): v for k, v in fields.items()})
+    out["extra"] = extra
+    return out
