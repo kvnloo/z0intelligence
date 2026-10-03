@@ -24,6 +24,14 @@ def opp_record(session, trace, request=SECRET, **pkt):
     return {'schema': le.OPP_SCHEMA, 'session_id': session, 'gate': deterministic_gate(opp), 'opportunity': opp}
 
 
+def harness_record(session, trace, request):
+    """A harness-injected prompt as the capture core writes it: flagged at capture, request text not stored."""
+    rec = opp_record(session, trace, request=request)
+    rec['opportunity']['intent']['request'] = None
+    rec['capture'] = {'is_harness_message': True}
+    return rec
+
+
 def verified(session, trace, state, oracle='test_runner'):
     sig = [] if state == 'unverified' else [{'kind': 'tests_in_turn', 'polarity': 1 if state == 'verified_success' else -1,
                                              'confidence': 'medium', 'label_class': 'deterministic_gold', 'oracle': oracle}]
@@ -44,7 +52,7 @@ def state(tmp_path):
         opp_record('s1', 't1'),
         opp_record('s1', 't2', request='which branch is checked out?',
                    contradictions=[{'key': 'priority', 'contests': 'git.branch'}]),
-        opp_record('s2', 't3', request='<task-notification>done</task-notification>'),
+        harness_record('s2', 't3', request='<task-notification>done</task-notification>'),
         opp_record('s2', 't4', request='is the CI status green on the pull request?'),
     ])
     write(s / 'outcomes.jsonl', [
@@ -71,10 +79,12 @@ def test_feature_vocabulary_is_stable_and_versioned():
     assert list(f) == list(le.FEATURES) and all(isinstance(v, int) for v in f.values())
 
 
-def test_join_drops_harness_messages_and_latest_verified_row_wins(state):
+def test_join_keeps_harness_messages_in_their_own_cohort_and_latest_verified_row_wins(state):
     rows = {r['turn_key']: r for r in table(state)}
-    assert len(rows) == 3  # t3 is a harness message
-    by = {(r['observed'] or {}).get('action'): r for r in rows.values()}
+    assert len(rows) == 4
+    (harness,) = [r for r in rows.values() if r['cohort'] == 'harness']  # t3: flagged at capture, not dropped
+    assert harness['features']['cohort=harness'] == 1 and harness['label']['present'] is False
+    by = {(r['observed'] or {}).get('action'): r for r in rows.values() if r['cohort'] != 'harness'}
     assert by['ACT']['label']['state'] == 'verified_success' and by['ACT']['label']['y_success'] == 1
     assert by['ASK']['label']['y_success'] == 0 and by['ASK']['observed']['post_decision'] is True
     unlabeled = by[None]
@@ -111,7 +121,7 @@ def test_no_private_text_reaches_the_table(state, tmp_path):
     blob = (tmp_path / 'out' / 't.jsonl').read_text() + (tmp_path / 'out' / 't.manifest.json').read_text()
     for needle in ('payments', 'secret', 'branch is checked', 'task-notification', 's1', 't1', '/home/'):
         assert needle not in blob, needle
-    assert man['counts']['with_features'] == 3 and man['counts']['resolved'] == 2
+    assert man['counts']['with_features'] == 4 and man['counts']['resolved'] == 2
     assert man['feature_schema_sha'] == le.FEATURE_SCHEMA_SHA and man['features'] == list(le.FEATURES)
 
 

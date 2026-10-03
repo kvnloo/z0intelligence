@@ -127,10 +127,26 @@ def test_cohorts_and_report_count_only(tmp_path):
     assert 'secret' not in json.dumps(rep)
 
 
-def test_hooks_json_does_not_register_subagent_start_by_default():
-    # subagent_packet is off by default; a registered hook would still spawn Python per subagent.
+def test_subagent_start_hook_is_capture_only():
+    # C1 (z0int#56 M1) registers SubagentStart for capture: the adapter records an agent-cohort opportunity and
+    # prints nothing; the subagent packet (subagent_packet, off by default) is never served from this hook.
     from pathlib import Path
     hooks = json.loads((Path(__file__).resolve().parents[1] / 'harness-adapters' / 'claude-code-z0intelligence'
                         / 'hooks' / 'hooks.json').read_text())['hooks']
-    assert 'SubagentStart' not in hooks
+    (command,) = [h['command'] for group in hooks['SubagentStart'] for h in group['hooks']]
+    assert '-m z0int.hook_adapter --harness claude-code subagent-start' in command
+    assert 'engagement' not in command and 'session-start' not in command
     assert 'session-start' in hooks['SessionStart'][0]['hooks'][0]['command']
+
+
+def test_scan_recognises_the_z0_session_start_hook_by_either_command(tmp_path):
+    def hook_row(event, command):
+        return {'type': 'attachment', 'attachment': {'type': 'hook_success', 'hookEvent': event, 'command': command}}
+    old = '"$Z0INT_PYTHON" -m z0int.claude_code session-start || true'
+    new = '"$Z0INT_PYTHON" -m z0int.hook_adapter --harness claude-code session-start || true'
+    capture = '"$Z0INT_PYTHON" -m z0int.hook_adapter --harness claude-code subagent-start || true'
+    for rows, expected in (([hook_row('SessionStart', old)], True), ([hook_row('SessionStart', new)], True),
+                           ([hook_row('SubagentStart', capture)], False)):
+        path = tmp_path / f'{len(list(tmp_path.iterdir()))}.jsonl'
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+        assert eng.scan(path)['z0_session_start'] is expected, rows
