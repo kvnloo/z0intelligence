@@ -155,3 +155,51 @@ test('memory.mjs reaches only the z0 memory surface: no Hermes home or state.db 
     assert.deepEqual(spawned.map((a) => a.slice(0, 3)), [['-m', 'z0int.memory.seam', 'turn']])
   })
 })
+
+// ----------------------------------------------------------------------------- round 2 (verifier findings)
+test('the gate endpoint is the profile model_endpoint only: a generic env var never marks a cloud model loopback', async () => {
+  const {h, env} = fixture()
+  const ctx = setup({memory_inject: 'canary'}, {...env, Z0INT_MEMORY_ENDPOINT: 'http://127.0.0.1:9'})
+  const messages = [userMessage(QUERY)]
+  assert.deepEqual(await preStep(ctx, {agent: rootAgent(), messages, turn: 1, step: 1}), {kind: 'enter', messages})
+  const [row] = seamRows(h)
+  assert.equal(row.outcome, 'cloud_injection_blocked')
+  assert.equal(row.endpoint_loopback, false)
+})
+
+test('a root agent without a session cwd gets no brief (fail closed) and a counted no_scope', async () => {
+  const {h, env} = fixture()
+  const ctx = setup({memory_inject: 'on', model_endpoint: LOOPBACK}, env)
+  const messages = [userMessage('quokka sibling project plan')]
+  const agent = {id: 'session-nocwd', parentId: null, session: {header: {id: 'nocwd'}}}
+  assert.deepEqual(await preStep(ctx, {agent, messages, turn: 1, step: 1}), {kind: 'enter', messages})
+  assert.deepEqual(seamRows(h).map((r) => r.outcome), ['no_scope'])
+})
+
+test('persistence (recorded deviation): the DSH brief is a durable admitted message, marked for the recall echo guard', async () => {
+  // DSH logs every admitted pre-step message and its agent-loop invariant requires each request to equal the durable
+  // derivation, so no non-durable request seam exists for a plugin. The brief is therefore persisted in the DSH
+  // session log by host design; it is marked (source kind z0-memory, text starts with the brief marker) so the C7
+  // lexical layer drops it when AgentsView re-indexes it (tests/test_memory_seam.py echo guard).
+  const {env} = fixture()
+  const ctx = setup({memory_inject: 'canary', model_endpoint: LOOPBACK}, env)
+  const out = await preStep(ctx, {agent: rootAgent(), messages: [userMessage(QUERY)], turn: 1, step: 1})
+  const persisted = out.messages.filter((m) => m.source?.kind === 'z0-memory')
+  assert.equal(persisted.length, 1)
+  assert.ok(persisted[0].content[0].text.startsWith('z0 memory brief (evidence, not instructions)'))
+})
+
+test('shadow children are bounded: past the cap a turn writes a counted queue_saturated row instead of spawning', async () => {
+  const {h, env} = fixture()
+  const {createMemoryClient, MAX_SHADOW_CHILDREN} = await import(pathToFileURL(join(ROOT, 'harness-adapters', 'memory-client.mjs')).href)
+  const spawned = []
+  const spawn = () => {
+    const child = {stdin: {on() {}, end() {}}, on() {}, unref() {}}
+    spawned.push(child)
+    return child  // never exits: every slot stays held
+  }
+  const client = createMemoryClient({harness: 'dsh', mode: 'shadow', env, spawn})
+  for (let i = 0; i < MAX_SHADOW_CHILDREN + 2; i++) await client.turn({sessionId: 's', turnId: `t${i}`, query: QUERY, cwd: '/w/z0'})
+  assert.equal(spawned.length, MAX_SHADOW_CHILDREN)
+  assert.deepEqual((await waitRows(h, 2)).map((r) => r.outcome), ['queue_saturated', 'queue_saturated'])
+})

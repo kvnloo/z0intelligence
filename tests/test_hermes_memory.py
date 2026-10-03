@@ -54,18 +54,19 @@ def slow_python(tmp_path, seconds=5):
     return str(path)
 
 
-def start(mod, settings, monkeypatch, profile=LOOPBACK):
+def start(mod, settings, monkeypatch, profile=LOOPBACK, workspace='/w/z0'):
     monkeypatch.setattr(mod, '_profile_config', lambda: profile, raising=False)
-    monkeypatch.setattr(mod, '_hermes_workspace_root', lambda task_id: None, raising=False)
+    monkeypatch.setattr(mod, '_hermes_workspace_root', lambda task_id: workspace, raising=False)
     ctx = Ctx(settings)
     mod.register(ctx)
     return ctx
 
 
-def request(ctx, turn='t1', session='s1', text=QUERY):
+def request(ctx, turn='t1', session='s1', text=QUERY, **kw):
     """The user message Hermes sends for this turn: the original text plus every pre_llm_call context."""
+    kw.setdefault('platform', 'cli')
     results = ctx.call('pre_llm_call', session_id=session, turn_id=turn, task_id='task-1', user_message=text,
-                       conversation_history=[], model='stub-model', platform='cli')
+                       conversation_history=[], model='stub-model', **kw)
     parts = [r['context'] if isinstance(r, dict) else r for r in results if r]
     return '\n\n'.join([text, *parts])
 
@@ -107,7 +108,10 @@ def test_shadow_writes_a_would_inject_receipt_asynchronously(env, monkeypatch):
     assert row['turn_key'] == turn_key('hermes', 's1', 't1')
 
 
-def test_canary_brief_reaches_the_next_request_and_never_the_session_store(env, monkeypatch):
+def test_canary_brief_reaches_the_next_request_and_the_plugin_never_writes_the_session_store(env, monkeypatch):
+    """What the plugin controls: it returns the brief as pre_llm_call context and never opens the session store or
+    any other file under HERMES_HOME. (No Hermes host runs here, so this says nothing about what Hermes persists;
+    see the strict xfail below.)"""
     mod = load_plugin()
     before = digest(env / 'hermes-home' / 'state.db')
     ctx = start(mod, {'memory_inject': 'canary', 'z0int_python': sys.executable}, monkeypatch)
@@ -116,6 +120,25 @@ def test_canary_brief_reaches_the_next_request_and_never_the_session_store(env, 
     assert digest(env / 'hermes-home' / 'state.db') == before
     assert not any('quokka' in p.read_text(errors='ignore') for p in (env / 'hermes-home').rglob('*') if p.is_file()
                    and p.name != 'state.db')
+
+
+@pytest.mark.xfail(strict=True, reason='Hermes core persists what it sends: agent/turn_context.py '
+                   '_stamp_api_content_sidecar stamps the user row with the sent bytes (pre_llm_call context included) '
+                   'in state.db messages.api_content and replays them on later turns. Spec C8 red test 2 ("not '
+                   'persisted to the session store") is UNMET for Hermes without a core change; owner decision pending '
+                   '(evidence/C8-memory-wiring/NOTES.md, deviations).')
+def test_hermes_host_keeps_the_brief_out_of_the_session_store(env, monkeypatch):
+    mod = load_plugin()
+    ctx = start(mod, {'memory_inject': 'canary', 'z0int_python': sys.executable}, monkeypatch)
+    sent = request(ctx, turn='host-1')
+    conn = sqlite3.connect(env / 'hermes-home' / 'state.db')
+    conn.execute('alter table messages add column api_content text')
+    # the host side, as Hermes does it: "persist what you send" (durable content clean, api_content = sent bytes)
+    conn.execute("insert into messages values ('s1', 'user', ?, ?)", (QUERY, sent if sent != QUERY else None))
+    conn.commit()
+    stored = conn.execute("select count(*) from messages where api_content like '%z0 memory brief%'").fetchone()[0]
+    conn.close()
+    assert stored == 0
 
 
 def test_canary_deadline_gives_native_context_and_a_counted_timeout(env, monkeypatch):
@@ -180,8 +203,9 @@ def test_tencentdb_items_are_excluded_when_hermes_uses_the_tencentdb_memory_prov
                              profile=profile), turn='p1')
         plain = request(start(mod, {'memory_inject': 'on', 'z0int_python': sys.executable}, monkeypatch),
                         turn='p2')
-    assert 'agentsview:h1#' in sent and 'tencentdb:' not in sent
-    assert 'tencentdb:sem-9' in plain
+    assert 'agentsview:h1#' in sent and 'tencentdb:' not in sent and 'tencentdb:' not in plain
+    caps = {r['turn_key']: r['memory']['capability_ids'] for r in seam_rows(env / 'z0') if r.get('memory')}
+    assert 'semantic' not in caps[turn_key('hermes', 's1', 'p1')] and 'semantic' in caps[turn_key('hermes', 's1', 'p2')]
 
 
 def test_post_llm_call_writes_the_memory_use_receipt_of_the_injected_turn(env, monkeypatch):
@@ -193,3 +217,31 @@ def test_post_llm_call_writes_the_memory_use_receipt_of_the_injected_turn(env, m
     used = [r for r in seam_rows(env / 'z0') if r.get('event') == 'post_llm_call']
     assert len(used) == 1 and used[0]['turn_key'] == turn_key('hermes', 's1', 'u1') and used[0]['injected'] is True
     assert used[0]['memory']['snapshot_id'] == used[0]['memory_snapshot_id']
+
+
+# ----------------------------------------------------------------------------- round 2 (verifier findings)
+def test_a_turn_without_a_workspace_root_gets_no_brief_and_a_counted_no_scope(env, monkeypatch):
+    mod = load_plugin()
+    ctx = start(mod, {'memory_inject': 'on', 'z0int_python': sys.executable}, monkeypatch, workspace=None)
+    assert request(ctx, turn='ns1', text='quokka sibling project plan') == 'quokka sibling project plan'
+    assert [r['outcome'] for r in seam_rows(env / 'z0')] == ['no_scope']
+
+
+@pytest.mark.parametrize('kw', [{'platform': 'cron'}, {'platform': 'subagent'}, {'platform': 'kanban'},
+                                {'platform': 'cli', 'parent_session_id': 'parent-1'}])
+def test_non_user_platforms_and_subagent_turns_run_no_memory_seam(env, monkeypatch, kw):
+    mod = load_plugin()
+    for mode in ('shadow', 'on'):
+        ctx = start(mod, {'memory_inject': mode, 'z0int_python': sys.executable}, monkeypatch)
+        assert request(ctx, turn=f'np-{mode}', **kw) == QUERY
+    time.sleep(0.5)
+    assert seam_rows(env / 'z0') == []
+
+
+def test_shadow_children_are_bounded_and_a_full_pool_is_a_counted_queue_saturated_row(env, monkeypatch):
+    mod = load_plugin()
+    ctx = start(mod, {'memory_inject': 'shadow', 'z0int_python': slow_python(env)}, monkeypatch)
+    n = mod._memory_module().MAX_SHADOW_CHILDREN
+    for i in range(n + 2):
+        assert request(ctx, turn=f'b{i}') == QUERY
+    assert [r['outcome'] for r in seam_rows(env / 'z0')] == ['queue_saturated'] * 2

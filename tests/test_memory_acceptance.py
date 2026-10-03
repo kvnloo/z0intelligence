@@ -26,6 +26,7 @@ BLOBS = {'receipt.schema.json': 'b43eaf3eba88e31142d5f0f2af01b0729eb221ba',
          'cohort.json': '284c3e8cef695d0be7a90f782627f9fdaa65e3b4'}
 SCHEMA = json.loads((PINNED / 'receipt.schema.json').read_text())
 COHORT = json.loads((PINNED / 'cohort.json').read_text())
+CWD = '/w/z0'  # the eval's task cwd: the seeded cohort is project z0
 
 
 @pytest.fixture
@@ -35,7 +36,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv('PYTHONPATH', os.pathsep.join(p for p in (str(ROOT / 'src'), os.environ.get('PYTHONPATH', ''))
                                                      if p))
     monkeypatch.delenv('Z0INT_MEMORY_INJECT', raising=False)
-    acceptance.seed_cohort(COHORT, av_db=tmp_path / 'av' / 'sessions.db')
+    acceptance.seed_cohort(COHORT, av_db=tmp_path / 'av' / 'sessions.db', ledger_root=tmp_path / 'z0' / 'memory')
     return tmp_path
 
 
@@ -55,7 +56,7 @@ def test_the_pinned_study_enum_is_exactly_dsh_hermes_omo_omp():
 
 @pytest.mark.parametrize('harness', ['dsh', 'hermes', 'omo', 'omp'])
 def test_study_harness_rows_validate_against_the_pinned_receipt_schema(env, harness):
-    rows = acceptance.run(harness, COHORT, revision='0123abcd')
+    rows = acceptance.run(harness, COHORT, revision='0123abcd', cwd=CWD)
     assert [r['question_id'] for r in rows] == [q['id'] for q in COHORT['questions']]
     for row in rows:
         assert row['schema'] == 'z0eval.unified_memory_receipt.v0'
@@ -63,7 +64,7 @@ def test_study_harness_rows_validate_against_the_pinned_receipt_schema(env, harn
 
 
 def test_cohort_cases_on_the_synthetic_fixture(env):
-    rows = {r['question_id']: r for r in acceptance.run('hermes', COHORT, revision='0123abcd')}
+    rows = {r['question_id']: r for r in acceptance.run('hermes', COHORT, revision='0123abcd', cwd=CWD)}
     for qid in ('exact-identifier', 'cross-harness', 'minimal-context', 'supersession', 'contradiction'):
         r = rows[qid]
         assert r['retrieval_ok'] and r['answer_supported'] and r['verified'], r  # A, C
@@ -79,31 +80,31 @@ def test_cohort_cases_on_the_synthetic_fixture(env):
 
 def test_an_observed_model_request_upgrades_b(env):
     observed = {q['id']: True for q in COHORT['questions']}
-    rows = acceptance.run('omp', COHORT, revision='0123abcd', observed=observed)
+    rows = acceptance.run('omp', COHORT, revision='0123abcd', cwd=CWD, observed=observed)
     assert all('B=VERIFIED' in ' '.join(r['notes']) and r['injected'] is True for r in rows)
-    missed = acceptance.run('omp', COHORT, revision='0123abcd', observed={}, session_id='missed')
+    missed = acceptance.run('omp', COHORT, revision='0123abcd', cwd=CWD, observed={}, session_id='missed')
     assert all('B=FAILED' in ' '.join(r['notes']) and r['injected'] is False for r in missed)
 
 
 @pytest.mark.parametrize('harness', ['claude-code', 'codex', 'grok'])
 def test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label(env, harness):
-    rows = acceptance.run(harness, COHORT, revision='0123abcd')
+    rows = acceptance.run(harness, COHORT, revision='0123abcd', cwd=CWD)
     assert {r['schema'] for r in rows} == {acceptance.ACCEPTANCE_SCHEMA} == {'z0int.memory_acceptance.v0'}
     assert all(r['label'] == 'z0 memory acceptance' and r['harness'] == harness for r in rows)
     with pytest.raises(ValueError, match='not in the z0evals fb14919 harness enum'):
-        acceptance.run(harness, COHORT, revision='0123abcd', schema='z0eval.unified_memory_receipt.v0')
+        acceptance.run(harness, COHORT, revision='0123abcd', cwd=CWD, schema='z0eval.unified_memory_receipt.v0')
     study = dict(rows[0], schema='z0eval.unified_memory_receipt.v0')
     study.pop('label')
     assert any('harness' in e for e in acceptance.validate(study, SCHEMA))
 
 
 def test_grok_case_b_is_unsupported_pull_only(env):
-    rows = acceptance.run('grok', COHORT, revision='0123abcd', observed={q['id']: True for q in COHORT['questions']})
+    rows = acceptance.run('grok', COHORT, revision='0123abcd', cwd=CWD, observed={q['id']: True for q in COHORT['questions']})
     assert all(r['injected'] is False and 'B=UNSUPPORTED' in ' '.join(r['notes']) for r in rows)
 
 
 def test_omo_case_b_is_unsupported_when_the_senpi_api_lacks_a_context_hook(env):
-    rows = acceptance.run('omo', COHORT, revision='0123abcd', push_supported=False)
+    rows = acceptance.run('omo', COHORT, revision='0123abcd', cwd=CWD, push_supported=False)
     assert all(r['injected'] is False and 'B=UNSUPPORTED' in ' '.join(r['notes']) for r in rows)
     assert all(acceptance.validate(r, SCHEMA) == [] for r in rows)
 
@@ -111,7 +112,7 @@ def test_omo_case_b_is_unsupported_when_the_senpi_api_lacks_a_context_hook(env):
 def test_eval_cli_writes_validated_rows_under_the_given_out(env):
     out = env / 'rows.jsonl'
     proc = subprocess.run([sys.executable, '-m', 'z0int.memory.cli', 'eval', '--harness', 'dsh', '--cohort',
-                           str(PINNED / 'cohort.json'), '--revision', '0123abcd', '--out', str(out)],
+                           str(PINNED / 'cohort.json'), '--revision', '0123abcd', '--out', str(out), '--cwd', CWD],
                           capture_output=True, text=True, timeout=120)
     assert proc.returncode == 0, proc.stderr
     rows = [json.loads(line) for line in out.read_text().splitlines()]
@@ -152,3 +153,24 @@ def test_a_grok_turn_never_writes_a_rules_file(env, monkeypatch):
     monkeypatch.setenv('Z0INT_MEMORY_INJECT', 'on')
     seam.turn('grok', turn_key='g1', query='quokka gateway', mode='on', endpoint='http://127.0.0.1:9')
     assert not list(env.rglob('.grok'))
+
+
+# ----------------------------------------------------------------------------- round 2: seeding never touches live data
+def test_seeding_refuses_an_existing_db_and_needs_an_explicit_ledger(tmp_path, monkeypatch):
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path / 'z0'))
+    live = tmp_path / 'live' / 'sessions.db'
+    build_av_db(live)
+    before = live.read_bytes()
+    with pytest.raises(FileExistsError):
+        acceptance.seed_cohort(COHORT, av_db=live, ledger_root=tmp_path / 'ledger')
+    assert live.read_bytes() == before and not (tmp_path / 'ledger').exists()
+    with pytest.raises(TypeError):
+        acceptance.seed_cohort(COHORT, av_db=tmp_path / 'fresh' / 'sessions.db')  # no default ledger (Z0INT_HOME)
+    assert not (tmp_path / 'z0').exists() and not (tmp_path / 'fresh' / 'sessions.db').exists()
+    proc = subprocess.run([sys.executable, '-m', 'z0int.memory.cli', 'eval', '--harness', 'dsh', '--cohort',
+                           str(PINNED / 'cohort.json'), '--revision', 'x', '--out', str(tmp_path / 'rows.jsonl'),
+                           '--seed-av-db', str(live), '--seed-ledger', str(tmp_path / 'ledger2')],
+                          capture_output=True, text=True, timeout=120,
+                          env=dict(os.environ, PYTHONPATH=os.pathsep.join([str(ROOT / 'src'), os.environ.get('PYTHONPATH', '')])))
+    assert proc.returncode != 0 and live.read_bytes() == before and not (tmp_path / 'ledger2').exists()
+    assert not (tmp_path / 'rows.jsonl').exists()

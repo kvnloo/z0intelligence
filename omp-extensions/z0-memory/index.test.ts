@@ -16,7 +16,7 @@ const ROOT = join(import.meta.dir, "..", "..");
 // bun runs every test file in one process: another file may already have pointed Z0INT_PYTHON at a missing
 // interpreter, so take it only when it exists, and put back every variable these tests change.
 const PY = [process.env.Z0INT_PYTHON].find(p => p && existsSync(p)) ?? "python3";
-const KEYS = ["Z0INT_HOME", "AGENTSVIEW_DATA_DIR", "Z0INT_PYTHON", "Z0INT_MEMORY_INJECT"] as const;
+const KEYS = ["Z0INT_HOME", "AGENTSVIEW_DATA_DIR", "Z0INT_PYTHON", "Z0INT_MEMORY_INJECT", "Z0INT_MEMORY_ENDPOINT"] as const;
 const saved = Object.fromEntries(KEYS.map(k => [k, process.env[k]]));
 afterEach(() => {
 	for (const k of KEYS) {
@@ -168,3 +168,33 @@ test("the omo entry is a one-line re-export activation can write", async () => {
 	writeFileSync(shim, `export { default } from ${JSON.stringify(pathToFileURL(join(import.meta.dir, "omo.ts")).href)};\n`);
 	expect((await import(shim)).default).toBe(omo);
 });
+
+// ----------------------------------------------------------------------------- round 2 (verifier findings)
+test("the gate endpoint is the active model's baseUrl only: a generic env var never marks a cloud model loopback", async () => {
+	const h = fixture("canary");
+	process.env.Z0INT_MEMORY_ENDPOINT = "http://127.0.0.1:9";
+	const pi = fakePi();
+	omp(pi);
+	const cloud = { provider: "anthropic", id: "x", baseUrl: "https://api.anthropic.com" };
+	expect(await context(pi, [user(QUERY)], hctx(cloud, "sess-e1"))).toBeUndefined();
+	const noModel = { cwd: "/w/z0", sessionManager: { getSessionId: () => "sess-e2" } };
+	expect(await context(pi, [user(QUERY)], noModel)).toBeUndefined();
+	const got = seamRows(h, "omp").map(r => [r.outcome, r.endpoint_loopback]);
+	expect(got).toEqual([["cloud_injection_blocked", false], ["cloud_injection_blocked", false]]);
+}, 30000);
+
+test("OMP turn key is the user message's own id: a new turn after compaction still gets its brief; replays are counted", async () => {
+	const h = fixture("canary");
+	const { counters } = await import("../../harness-adapters/memory-client.mjs");
+	const pi = fakePi();
+	omp(pi);
+	const first = [user(QUERY, 1000)];
+	expect((await context(pi, first))?.messages?.length).toBe(2);
+	// compaction: the history shrinks back to one user message, a different turn with the same user count
+	const after = [user("how do we deploy the quokka gateway now", 2000)];
+	expect((await context(pi, after))?.messages?.length).toBe(2);
+	const before = counters.replay;
+	expect(await context(pi, after)).toBeUndefined();  // a re-sent request of the same turn: replay, counted
+	expect(counters.replay).toBe(before + 1);
+	expect(seamRows(h, "omp").map(r => r.outcome)).toEqual(["injected", "injected"]);
+}, 30000);

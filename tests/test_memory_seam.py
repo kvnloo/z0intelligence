@@ -24,6 +24,7 @@ from z0int.memory_contract import BitemporalClaim, MemoryScope
 
 ROOT = Path(__file__).resolve().parents[1]
 LOOPBACK = 'http://127.0.0.1:9/v1'
+CWD = '/w/z0'  # the task cwd: project z0 (no git root on this path, so its own name, as AgentsView names it)
 QUERY = 'how do we deploy the quokka gateway'
 
 
@@ -55,6 +56,7 @@ def wait_rows(harness, n=1, timeout=15.0):
 
 def on(harness='claude-code', key='t1', query=QUERY, **kw):
     kw.setdefault('endpoint', LOOPBACK)
+    kw.setdefault('cwd', CWD)
     return seam.turn(harness, turn_key=key, query=query, mode=kw.pop('mode', 'on'), **kw)
 
 
@@ -68,7 +70,7 @@ def test_shadow_returns_without_waiting_and_writes_the_receipt_asynchronously(en
 
     monkeypatch.setattr(seam, 'resolve', slow)
     t0 = time.perf_counter()
-    out = seam.turn('claude-code', turn_key='s1', query=QUERY, mode='shadow', endpoint=LOOPBACK)
+    out = seam.turn('claude-code', turn_key='s1', query=QUERY, mode='shadow', endpoint=LOOPBACK, cwd=CWD)
     elapsed = time.perf_counter() - t0
     assert elapsed < 0.02, f'shadow hook waited {elapsed * 1000:.1f} ms'
     assert out['context'] is None and calls == []  # nothing model-visible, the hook never ran the resolver
@@ -127,7 +129,8 @@ from z0int.memory import seam, surface
 calls = []
 real = surface.search
 surface.search = lambda *a, **k: calls.append(1) or real(*a, **k)
-out = seam.turn('claude-code', turn_key=sys.argv[1], query=sys.argv[2], mode='on', endpoint='http://127.0.0.1:9/v1')
+out = seam.turn('claude-code', turn_key=sys.argv[1], query=sys.argv[2], mode='on', endpoint='http://127.0.0.1:9/v1',
+                cwd='/w/z0')
 print(json.dumps({'context': out['context'], 'searches': len(calls), 'cache': out.get('cache')}))
 """
 
@@ -161,9 +164,9 @@ def test_replaying_a_turn_key_never_injects_twice_and_has_no_side_effect(env):
 
 
 def test_replaying_a_shadow_turn_spawns_nothing(env):
-    seam.turn('claude-code', turn_key='r2', query=QUERY, mode='shadow', endpoint=LOOPBACK)
+    seam.turn('claude-code', turn_key='r2', query=QUERY, mode='shadow', endpoint=LOOPBACK, cwd=CWD)
     wait_rows('claude-code')
-    out = seam.turn('claude-code', turn_key='r2', query=QUERY, mode='shadow', endpoint=LOOPBACK)
+    out = seam.turn('claude-code', turn_key='r2', query=QUERY, mode='shadow', endpoint=LOOPBACK, cwd=CWD)
     time.sleep(1.0)
     assert out['outcome'] == 'replay' and len(rows()) == 1
 
@@ -191,8 +194,11 @@ def test_tencentdb_items_are_excluded_when_the_host_already_has_the_tencentdb_pr
         cfg.write_text(json.dumps(gw.config()))
         both = on('hermes', key='x1')
         only_z0 = on('hermes', key='x2', exclude_layers=('semantic',))
-    assert 'tencentdb:sem-1' in both['context']
-    assert 'tencentdb:' not in only_z0['context'] and 'agentsview:h1#' in only_z0['context']
+    # the semantic layer is queried unless the host already injects it; its items carry no project provenance (#63),
+    # so a project-scoped brief never shows them either way
+    assert 'semantic' in both['memory']['capability_ids'] and 'semantic' not in only_z0['memory']['capability_ids']
+    assert 'tencentdb:' not in both['context'] and 'tencentdb:' not in only_z0['context']
+    assert 'agentsview:h1#' in only_z0['context']
 
 
 # ----------------------------------------------------------------------------- 6. fail-open
@@ -234,7 +240,8 @@ def test_supersession_shows_the_newer_fact_as_current_and_history_shows_both(env
 def test_fixture_secrets_never_reach_the_request_the_receipt_or_the_mcp_response(env):
     out = on(key='k1', query='quokka deploy notes tool output')
     assert out['outcome'] == 'injected' and 'agentsview:c1#' in out['context']
-    seam.turn('claude-code', turn_key='k2', query='quokka deploy notes tool output', mode='shadow', endpoint=LOOPBACK)
+    seam.turn('claude-code', turn_key='k2', query='quokka deploy notes tool output', mode='shadow', endpoint=LOOPBACK,
+              cwd=CWD)
     wait_rows('claude-code', 2)
     mcp = intelligence_mcp.handle({'jsonrpc': '2.0', 'id': 2, 'method': 'tools/call',
                                    'params': {'name': 'orient', 'arguments': {'query': 'quokka deploy notes'}}}, 'memory')
@@ -309,10 +316,115 @@ def test_grok_has_no_push_seam(env, monkeypatch):
 
 
 def test_a_shadow_spawn_failure_is_a_counted_error_not_an_exception(env, monkeypatch):
-    def broken(job):
+    def broken(job, slot=None):
         raise OSError('fork failed')
 
     monkeypatch.setattr(seam, '_spawn_shadow', broken)
-    out = seam.turn('claude-code', turn_key='sp1', query=QUERY, mode='shadow', endpoint=LOOPBACK)
+    out = seam.turn('claude-code', turn_key='sp1', query=QUERY, mode='shadow', endpoint=LOOPBACK, cwd=CWD)
     assert out['context'] is None and out['outcome'] == 'error'
     assert seam.counts('claude-code')['error'] == 1
+
+
+# ----------------------------------------------------------------------------- round 2 (verifier findings)
+# The gate's endpoint is the harness's own model setting only: a generic env var never marks a cloud harness loopback.
+@pytest.mark.parametrize('harness,var,cloud', [('claude-code', 'ANTHROPIC_BASE_URL', 'https://api.anthropic.com'),
+                                               ('codex', 'OPENAI_BASE_URL', 'https://api.openai.com/v1')])
+def test_a_generic_endpoint_env_never_turns_a_cloud_harness_into_loopback(env, monkeypatch, harness, var, cloud):
+    monkeypatch.setenv('Z0INT_MEMORY_INJECT', 'canary')
+    monkeypatch.setenv('Z0INT_MEMORY_ENDPOINT', 'http://127.0.0.1:9')
+    monkeypatch.setenv(var, cloud)
+    assert hook('prompt', dict(PAYLOAD, prompt_id='e-set'), harness) is None
+    monkeypatch.delenv(var)  # unset: the public API default, still cloud
+    assert hook('prompt', dict(PAYLOAD, prompt_id='e-unset'), harness) is None
+    assert [(r['outcome'], r['endpoint_loopback']) for r in rows(harness)] == [('cloud_injection_blocked', False)] * 2
+
+
+# A turn without a resolvable task project injects nothing (fail closed) and never surfaces another project.
+SIBLING = 'quokka sibling project plan'
+
+
+@pytest.mark.parametrize('cwd', [None, ''])
+def test_a_turn_without_a_task_project_injects_nothing_and_never_surfaces_another_project(env, cwd):
+    outs = [on(key=f'n-{mode}-{cwd!r}', query=SIBLING, mode=mode, cwd=cwd) for mode in ('canary', 'on')]
+    assert all(o['context'] is None and o['outcome'] == 'no_scope' for o in outs), outs
+    shadow = seam.turn('claude-code', turn_key=f'n-shadow-{cwd!r}', query=SIBLING, mode='shadow', endpoint=LOOPBACK,
+                       cwd=cwd)
+    assert shadow['outcome'] == 'no_scope'
+    time.sleep(0.5)  # no detached child may write a brief row for it either
+    found = rows()
+    assert [r['outcome'] for r in found] == ['no_scope'] * 3 and seam.counts('claude-code')['no_scope'] == 3
+    assert not any(r.get('would_inject') or r.get('memory_snapshot_id') for r in found)
+    assert 'agentsview:sib#' not in json.dumps(found)
+    scoped = on(key='n-scoped', query=SIBLING)  # the same query with the task cwd: project z0 only
+    assert scoped['outcome'] == 'injected' and 'agentsview:sib#' not in scoped['context']
+
+
+def test_the_project_is_named_the_way_agentsview_names_it(tmp_path):
+    repo = tmp_path / 'my-repo'
+    (repo / '.git').mkdir(parents=True)
+    (repo / 'src' / 'pkg').mkdir(parents=True)
+    assert seam.project_of(repo / 'src' / 'pkg') == 'my_repo'  # the repo root, not the subdirectory; '-' -> '_'
+    linked = tmp_path / 'wt' / 'feature-x'
+    linked.mkdir(parents=True)
+    (repo / '.git' / 'worktrees' / 'feature-x').mkdir(parents=True)
+    (linked / '.git').write_text(f"gitdir: {repo / '.git' / 'worktrees' / 'feature-x'}\n")
+    assert seam.project_of(linked) == 'my_repo'  # a linked worktree belongs to its main checkout
+    assert seam.project_of('/w/z0') == 'z0'  # no repo: the directory's own name
+    assert seam.project_of(None) is None and seam.project_of('') is None and seam.project_of('/') is None
+
+
+# Shadow children are bounded like C1 capture children: a full pool is a counted row, never another spawn.
+def test_a_full_shadow_pool_is_a_counted_queue_saturated_row_and_no_spawn(env, monkeypatch):
+    from z0int import harness_capture as hc
+    spawned = []
+    monkeypatch.setattr(seam, '_spawn_shadow', lambda job, slot=None: spawned.append(job))
+    held = [hc.try_slot(pool=seam.SLOT_POOL) for _ in range(hc.MAX_CHILDREN)]
+    try:
+        assert all(held)
+        out = seam.turn('claude-code', turn_key='q1', query=QUERY, mode='shadow', endpoint=LOOPBACK, cwd=CWD)
+    finally:
+        for fh in held:
+            fh.close()
+    assert out['outcome'] == 'queue_saturated' and spawned == []
+    assert seam.counts('claude-code')['queue_saturated'] == 1
+    seam.turn('claude-code', turn_key='q2', query=QUERY, mode='shadow', endpoint=LOOPBACK, cwd=CWD)
+    assert len(spawned) == 1  # a free slot spawns again
+
+
+def test_turn_markers_are_pruned_after_the_ttl(env):
+    on(key='m1')
+    turns = Path(os.environ['Z0INT_HOME']) / 'state' / 'memory' / 'seam' / 'turns'
+    [old] = list(turns.iterdir())
+    stale = time.time() - ms.INJECTOR_MARKER_TTL_S - 60
+    os.utime(old, (stale, stale))
+    on(key='m2')
+    assert old not in list(turns.iterdir()) and len(list(turns.iterdir())) == 1
+
+
+# The Claude-compatible hook counts the 300 ms budget from process start, like the JS and Hermes shims.
+def test_the_hook_counts_the_deadline_from_process_start(env, monkeypatch):
+    from z0int.memory import hook as mhook
+    started = mhook.process_started_at()
+    assert started <= mhook.IMPORTED_AT <= time.time()
+    monkeypatch.setenv('Z0INT_MEMORY_INJECT', 'on')
+    monkeypatch.setenv('ANTHROPIC_BASE_URL', 'http://127.0.0.1:11541')
+    monkeypatch.setattr(seam, 'resolve', lambda job: time.sleep(0.15) or {'text': 'late', 'evidence': ['x']})
+    late = mhook.handle('prompt', json.dumps(dict(PAYLOAD, prompt_id='dl-1')), 'claude-code', started_at=time.time() - 0.2)
+    assert late is None and rows()[-1]['outcome'] == 'timeout'
+
+
+# Echo guard: a z0 brief a host persisted (DSH admitted message, Hermes api_content, a Claude transcript) and
+# AgentsView re-indexed is never evidence for a later brief.
+def test_a_persisted_z0_brief_is_never_recalled_as_evidence(env):
+    from memory_fixture import SESSIONS
+    marker = ms.BRIEF_MARKER
+    echo = [('echo', 'deepseek-harness', 'z0', '/w/z0', [('user', f'{marker}\n- [hermes] zebracorn rollout note (agentsview:h1#9)')]),
+            ('tail', 'hermes', 'z0', '/w/z0', [('user', f'what about the zebracorn rollout?\n\n{marker}\n- zebracorn echo line')]),
+            ('real', 'claude', 'z0', '/w/z0', [('assistant', 'zebracorn rollout finished on tuesday')])]
+    db = env / 'av' / 'sessions.db'
+    db.unlink()
+    build_av_db(db, sessions=[*SESSIONS, *echo])
+    out = on(key='echo1', query='zebracorn rollout')
+    assert out['outcome'] == 'injected' and 'agentsview:real#' in out['context']
+    assert 'agentsview:echo#' not in out['context'] and 'zebracorn echo line' not in out['context']
+    assert out['context'].count(marker) == 1
