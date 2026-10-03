@@ -103,8 +103,8 @@ def run(*, av_dir: str | Path | None = None, agentsview_bin: str | Path | None =
                          'config unreadable' if cfg is None else f"require_auth={cfg.get('require_auth') is True}"))
     gateway = TencentDBClient(load_config() if config is None else config)
     rev = gateway.revision()
-    status = 'reachable' if rev.startswith('rev:') else rev.split(':', 1)[1]
-    checks.append(_check('tencentdb', True, 'semantic layer ' + ('available' if status == 'reachable' else
+    status = rev.split(':', 1)[1] if rev.startswith('unavailable:') else 'reachable'
+    checks.append(_check('tencentdb', True, 'semantic layer ' + (f'available ({rev})' if status == 'reachable' else
                                                                   f'UNAVAILABLE ({status})'), status=status))
     report = {'schema': SCHEMA, 'ok': all(c['ok'] for c in checks), 'checks': checks,
               'agentsview_dir': str(av_dir), 'claude_home': str(claude_home)}
