@@ -426,7 +426,7 @@ def _digest_values(entry: Any) -> Any:
 
 
 def opportunity_record(harness: str, payload: Mapping[str, Any], ctx: Mapping[str, Any], *,
-                       packet_text: str | None = None) -> dict[str, Any]:
+                       packet_text: str | None = None, packet_args: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Build one opportunity record (1-3 s; runs in the detached child).
 
     P-7: state comes from the payload's task cwd, never the process cwd. Outside any repository the turn is
@@ -446,7 +446,7 @@ def opportunity_record(harness: str, payload: Mapping[str, Any], ctx: Mapping[st
         if _git_marker(Path(cwd).resolve()):
             packet, scoped = _git_unreadable_packet('git cannot read the repository at the task cwd'), False
     else:
-        packet = sp.build_state_packet(repo)
+        packet = sp.build_state_packet(repo, **(packet_args or {}))
         if not any(str(c.get('key', '')).startswith('git.') for c in packet.get('current_claims') or []):
             packet = dict(packet, blocking_unknowns=[*(packet.get('blocking_unknowns') or []),
                                                      dict(GIT_UNKNOWN, reason='no git fact could be read')])
@@ -467,11 +467,12 @@ def opportunity_record(harness: str, payload: Mapping[str, Any], ctx: Mapping[st
 
 
 def record_opportunity(harness: str, payload: Mapping[str, Any], ctx: Mapping[str, Any], *,
-                       root: str | Path | None = None, packet_text: str | None = None) -> dict[str, Any] | None:
+                       root: str | Path | None = None, packet_text: str | None = None,
+                       packet_args: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
     if not supported(harness, root):
         return None
-    row = append(harness, 'opportunity_record', opportunity_record(harness, payload, ctx, packet_text=packet_text),
-                 root=root)
+    row = append(harness, 'opportunity_record', opportunity_record(harness, payload, ctx, packet_text=packet_text,
+                                                                   packet_args=packet_args), root=root)
     revisions = (((row or {}).get('opportunity') or {}).get('invalidation') or {}).get('source_revisions')
     if revisions:  # what the stale-evidence check compares with at Stop time, without reading this file
         _update_session(harness, row.get('session_id'), root, lambda st: dict(

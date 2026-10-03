@@ -42,7 +42,9 @@ example bend's `stack_service_port`) is ignored and written down as a counted `c
 - Request text: kept in an opportunity only with `Z0INT_CAPTURE_PRIVACY=request_opt_in` (default `content_free`).
 - State Packet text (`packet_text` on each opportunity row): `redacted` by default, which replaces every claim
   value (branch names, commit subjects, README open items) with its sha256 digest; `opt_in` with
-  `persist_packet_text: true` keeps the text. Training/export tables never carry either.
+  `persist_packet_text: true` keeps the text. Without the opt-in the State Packet also keeps no snapshot of its
+  own (`state/state_packet/<repo>/latest.json`, `history.jsonl`). A Hermes projection reads the task repo's git
+  and docs only, never another harness's transcript store. Training/export tables never carry either text.
 - Tool args and output, assistant replies and conversation history are never written.
 
 ## Runtime shape

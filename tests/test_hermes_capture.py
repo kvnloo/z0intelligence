@@ -276,7 +276,13 @@ def test_p9_state_packet_text_is_persisted_only_with_persist_packet_text(env, mo
     repo = git_repo(tmp_path / 'repo', branch=secret['branch'], subject=secret['subject'],
                     readme=f'# Repo\n\n## P0\n- [ ] {secret["item"]}\n')
     monkeypatch.setattr(hcap, '_spawn_project', lambda job, slot: hcap.project(job))
+    from z0int import state_packet
+    transcripts = []  # a Hermes turn never reads the Claude Code transcript store
+    monkeypatch.setattr(state_packet, 'adapter_claude_code', lambda *a: transcripts.append(a) or 1 / 0)
     for i, opt_in in enumerate((False, True)):
+        if opt_in:  # nothing from the plain turn may be on disk outside its record
+            assert not [p for p in (env.z0 / 'state').rglob('*') if p.name in ('latest.json', 'history.jsonl')]
+            assert not [v for v in secret.values() if v in tree_text(env.z0)]
         mod = load_plugin()
         jobs = []
         ctx, cap = start(mod, shadow(persist_packet_text=opt_in), monkeypatch, str(repo))
@@ -288,6 +294,10 @@ def test_p9_state_packet_text_is_persisted_only_with_persist_packet_text(env, mo
             hcap.process(job)
     plain, opted = rows(env.z0, 'opportunities.jsonl')
     assert plain['packet_text'] == 'redacted' and opted['packet_text'] == 'opt_in'
+    # the State Packet's own snapshot (state/state_packet/<repo>/latest.json, history.jsonl) is the other place
+    # bend leaked this text: it is written only for the opt-in turn
+    snapshots = list((env.z0 / 'state' / 'state_packet').rglob('*.json*'))
+    assert len([p for p in snapshots if p.name == 'latest.json']) == 1 and transcripts == []
     assert not [v for v in secret.values() if v in json.dumps(plain)]
     assert all(v in json.dumps(opted) for v in secret.values())
     assert plain['gate'] == opted['gate']

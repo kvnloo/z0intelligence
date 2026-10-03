@@ -27,6 +27,7 @@ from .harness_id import _hermes_turn
 
 HARNESS = 'hermes'
 EVENT_SCHEMA = hc.schema(HARNESS, 'event')
+PACKET_ADAPTERS = ('git', 'docs')  # as bend #385: the task repo only
 
 
 def _trace(job):
@@ -61,8 +62,14 @@ def _spawn_project(job, slot):
 
 
 def project(job, root=None):
+    """One opportunity build. The State Packet reads the task repo's git and docs only (never another harness's
+    transcript store) and keeps its own snapshot (latest.json, history.jsonl) only with persist_packet_text (P-9)."""
+    keep = bool(job.get('persist_packet_text'))
+    no_transcripts = hc.state_dir(HARNESS, root) / 'no-transcripts'  # never created: the revision probe scans nothing
     return hc.record_opportunity(HARNESS, job['payload'], job['ctx'], root=root,
-                                 packet_text='opt_in' if job.get('persist_packet_text') else 'redacted')
+                                 packet_text='opt_in' if keep else 'redacted',
+                                 packet_args={'adapters': PACKET_ADAPTERS, 'projects_root': no_transcripts,
+                                              'use_cache': keep, 'store': keep})
 
 
 def _turn(job, root):
