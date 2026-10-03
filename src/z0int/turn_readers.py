@@ -45,12 +45,22 @@ _ORDINAL = ('the n-th captured prompt turn of the session (capture order; subage
             'ordinal_misaligned).')
 
 
+# Which test-run labels a harness's shell results can give (exit evidence is the text's exit-code line only):
+#   both          every run carries its code (Codex 'Process exited with code N', Hermes terminal JSON exit_code)
+#   failure_only  only a failing run does (oh-my-pi prints 'Command exited with code N' on failure only): OMP, OMO
+#   sparse        almost no run does (DSH: exit_code JSON on a handful of results)
+#   none          no run does (Grok: the ACP status says the call finished, not how the command exited)
+# Recorded in the verify report and every exported table manifest so a one-sided class balance is not read as real.
+TEST_LABEL_POLARITIES = ('both', 'failure_only', 'sparse', 'none')
+
+
 @dataclass(frozen=True)
 class JoinRule:
     harness: str
     agent: str  # AgentsView sessions.agent
     name: str
     doc: str
+    test_labels: str  # one of TEST_LABEL_POLARITIES
 
     def av_id(self, session: Any) -> str:
         return f'{self.agent}:{session}'
@@ -58,20 +68,21 @@ class JoinRule:
 
 JOIN_RULES = {
     'hermes': JoinRule('hermes', 'hermes', 'hermes.session_user_ordinal.v0',
-                       'Hermes session id -> AgentsView hermes:<sid> (hermes.go: "hermes:" + state.db id); ' + _ORDINAL),
+                       'Hermes session id -> AgentsView hermes:<sid> (hermes.go: "hermes:" + state.db id); ' + _ORDINAL,
+                       'both'),
     'codex': JoinRule('codex', 'codex', 'codex.session_user_ordinal.v0',
                       'hook session_id is the Codex thread (rollout) id -> codex:<thread>; the captured turns are '
                       'ordered by capture time (recorded_at), not by turn_id. The id mapping is INFERRED from the AgentsView codex parser and pinned by '
-                      'tests/test_turn_readers.py; ' + _ORDINAL),
+                      'tests/test_turn_readers.py; ' + _ORDINAL, 'both'),
     'grok': JoinRule('grok', 'grok', 'grok.session_user_ordinal.v0',
-                     'GROK_SESSION_ID (the hook env) -> grok:<id>; ' + _ORDINAL),
+                     'GROK_SESSION_ID (the hook env) -> grok:<id>; ' + _ORDINAL, 'none'),
     'omp': JoinRule('omp', 'omp', 'omp.session_user_ordinal.v0',
-                    'the z0int-bridge session id (OMP_SESSION_ID) -> omp:<sid>; ' + _ORDINAL),
+                    'the z0int-bridge session id (OMP_SESSION_ID) -> omp:<sid>; ' + _ORDINAL, 'failure_only'),
     'omo': JoinRule('omo', 'omo', 'omo.session_user_ordinal.v0',
-                    'the z0int-bridge session id of the OMO process -> omo:<sid>; ' + _ORDINAL),
+                    'the z0int-bridge session id of the OMO process -> omo:<sid>; ' + _ORDINAL, 'failure_only'),
     'dsh': JoinRule('dsh', 'deepseek-harness', 'dsh.session_user_ordinal.v0',
                     'the lineage session_id the DSH capture records (its trace is the lineage turn_key) -> '
-                    'deepseek-harness:<sid>; ' + _ORDINAL),
+                    'deepseek-harness:<sid>; ' + _ORDINAL, 'sparse'),
 }
 
 
@@ -139,17 +150,14 @@ def captured_turns(harness: str, root: str | Path | None = None) -> dict[Any, li
 
 # ----------------------------------------------------------------------------- AgentsView (read-only)
 def exit_code(text: str, status: str | None) -> int | None:
-    """N from a shell tool result's exit-code line; else 0 only on an explicit ``completed`` status.
+    """N from a shell tool result's exit-code line, else None (unknown).
 
-    None (unknown) otherwise: errored without a code, cancelled, backgrounded, or no status at all, which is what
-    the pi (OMP/OMO), Hermes and deepseek-harness parsers record. Execution completing is never a pass.
+    ``status`` is never exit evidence: no AgentsView parser maps a non-zero exit to ``errored`` (Grok's ACP
+    ``completed`` and Codex's default ``completed`` only say the call finished), and the pi (OMP/OMO), Hermes and
+    deepseek-harness parsers record none. Execution completing is never a pass.
     """
     m = EXIT_RE.search(text)
-    if m:
-        return int(next(g for g in m.groups() if g is not None))
-    if status == 'completed' and 'running in background' not in text[:200].lower():
-        return 0
-    return None
+    return int(next(g for g in m.groups() if g is not None)) if m else None
 
 
 def _command(inp: Mapping[str, Any]) -> str | None:
@@ -260,6 +268,8 @@ class AgentsViewReader:
             for m in ov.PR_MERGE.finditer(cmd):
                 cur['pr_merged_by_agent'].append({'number': int(m.group(1)) if m.group(1) else None, 'repo': m.group(2)})
             ov.bash_result(call, text, exit_code(text, status))
+            if call['exit'] is None and call.get('commits'):
+                call['committed'] = True  # git printed '[branch sha] subject', which it does only once committed
         elif kind in ('Edit', 'Write'):
             paths = [p for p in (inp.get('file_path') or inp.get('path') or inp.get('notebook_path'),) if isinstance(p, str)]
             paths += PATCH_FILE.findall(inp.get('input') or inp.get('patch') or '') if not paths else []

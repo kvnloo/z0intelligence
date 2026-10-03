@@ -780,7 +780,8 @@ def verify_turn(turn: Mapping[str, Any], next_prompt: str | None, *, index: Repo
         elif last != 8:  # gh pr checks exits 8 while checks are pending
             signals.append(signal('ci_watch_in_turn', -1, 'medium', 'negative_gold', 'ci', runs=len(ci), last_exit=last))
     # 2) commits produced by the turn: revert / SZZ fix / survival / CI on the pushed commit
-    commit_calls = [c for c in turn['bash'] if c.get('exit') == 0 and COMMIT_CMD.search(c.get('command', ''))]
+    commit_calls = [c for c in turn['bash'] if (c.get('exit') == 0 or c.get('committed'))
+                    and COMMIT_CMD.search(c.get('command', ''))]
     for c in commit_calls:
         if not c.get('commits') and c.get('t0') and c.get('t1'):
             hit = index.committed_between(command_paths(c['command'], c.get('cwd')) + [c.get('cwd')], c['t0'], c['t1'])
@@ -1133,8 +1134,11 @@ def verify_harness(harness: str, *, root: Path | None = None, agentsview: str | 
             files[name] = None
     manifest = {'harness': harness, 'verifier': VERIFIER['version'], 'files': files}
     manifest['manifest_sha256'] = _sha(manifest, 64)
-    return {'harness': harness, 'status': 'degraded' if any(f['kind'] in DEGRADING for f in failures) else 'success',
-            'rows': rows, 'failures': failures, 'join': dict(join), 'appended': appended, 'manifest': manifest}
+    report = {'harness': harness, 'status': 'degraded' if any(f['kind'] in DEGRADING for f in failures) else 'success',
+              'rows': rows, 'failures': failures, 'join': dict(join), 'appended': appended, 'manifest': manifest}
+    if harness in tr.JOIN_RULES:
+        report['test_label_polarity'] = tr.JOIN_RULES[harness].test_labels
+    return report
 
 
 # ----------------------------------------------------------------------------- credit-ready join

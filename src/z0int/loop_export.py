@@ -502,6 +502,9 @@ def _table_manifest(t: Table, body: str, *, generated_at: float, **extra: Any) -
     man.pop('sources', None)
     man.update(harness=t.harness, cohort=t.cohort, kind=t.kind,
                rows_sha256=hashlib.sha256(body.encode()).hexdigest(), **extra)
+    from .turn_readers import JOIN_RULES
+    if t.kind == 'training' and t.harness in JOIN_RULES:  # one-sided test labels must not read as class balance
+        man['test_label_polarity'] = JOIN_RULES[t.harness].test_labels
     return _stamp(man)
 
 
