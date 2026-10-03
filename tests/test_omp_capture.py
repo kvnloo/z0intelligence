@@ -137,7 +137,7 @@ def test_bridge_reply_latency_stays_within_its_bound_over_200_turns(home, tmp_pa
     one detached spawn on open, the outcome rows on close). Over 200 open+close turns in a real task repo, with
     off and on turns alternating (each runtime in its own fresh home, so host load hits both sides alike):
     the median per-turn cost of capture is < 4 ms (measured ~1.2-1.6 ms; the build on the reply path measured
-    ~7.5-8.2 ms) and the p95 stays within the capture-off p95 + 25 ms. The spawn is the real detached spawn; its
+    ~7.5-8.2 ms) and the p95 stays within the capture-off p95 + 40 ms (C1's hook bound). The spawn is the real detached spawn; its
     child is `cat` (it reads the job and exits), so 200 real builds do not load the host during the burst."""
     stand_in = ["cat"]
     spawned, repo = [], git_repo(tmp_path / "task-repo")  # a real task repo: the build would read its git state
@@ -160,7 +160,7 @@ def test_bridge_reply_latency_stays_within_its_bound_over_200_turns(home, tmp_pa
     p95 = lambda xs: statistics.quantiles(xs, n=20)[18]  # noqa: E731
     cost = statistics.median(on - off for on, off in zip(lat["on"], lat["off"]))
     assert cost < 4.0, (cost, statistics.median(lat["on"]), statistics.median(lat["off"]))
-    assert p95(lat["on"]) <= p95(lat["off"]) + 25.0, (p95(lat["on"]), p95(lat["off"]))
+    assert p95(lat["on"]) <= p95(lat["off"]) + 40.0, (p95(lat["on"]), p95(lat["off"]))
     assert len(spawned) == 200 and len(rows(sides["on"][0], "omp", "outcomes.jsonl")) == 200
     assert not (sides["off"][0] / "state" / "omp").exists()  # capture off: no record family at all
 
