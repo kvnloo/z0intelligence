@@ -503,7 +503,9 @@ def _table_manifest(t: Table, body: str, *, generated_at: float, **extra: Any) -
     man.update(harness=t.harness, cohort=t.cohort, kind=t.kind,
                rows_sha256=hashlib.sha256(body.encode()).hexdigest(), **extra)
     from .turn_readers import JOIN_RULES
-    if t.kind == 'training' and t.harness in JOIN_RULES:  # one-sided test labels must not read as class balance
+    if t.kind == 'training' and t.cohort == 'legacy':  # imported labels: the OMP v1 effective tier, no shell exits
+        man['label_source'] = 'effective_tier'
+    elif t.kind == 'training' and t.harness in JOIN_RULES:  # one-sided test labels must not read as class balance
         man['test_label_polarity'] = JOIN_RULES[t.harness].test_labels
     return _stamp(man)
 
@@ -514,6 +516,7 @@ def _write_tables(out_dir: Path, tables: Iterable[Table], *, generated_at: float
     tables = list(tables)
     for t in tables:
         assert_private(t.rows)
+    out_dir.mkdir(parents=True, exist_ok=True)  # no table at all still writes the counts index
     for t in tables:
         name = t.cohort if t.kind == 'training' else f'{t.cohort}.shadow'
         body = _body(t.rows)
