@@ -95,6 +95,23 @@ def test_the_opportunity_build_waits_for_a_detached_shadow_brief_still_running(e
     assert record['memory'] == wait_for(lambda: seam.rows('claude-code'))[0]['memory']
 
 
+def test_a_seam_child_that_starts_late_still_joins(env):
+    """A JS/Hermes shadow child is a cold interpreter: it can mark the turn well after the opportunity build has
+    started (seen in the round-3 OMP e2e under load). A seam that has run here before gets a grace for that."""
+    task = env / 'z0'
+    seam.turn('omp', turn_key='earlier', query=QUERY, mode='shadow', cwd=str(task), detach=False)  # the seam has run
+    p = payload('omp', task=task)
+    ctx = hc.begin_turn('omp', p)
+    late = threading.Timer(1.5, lambda: seam.turn('omp', turn_key=ctx['turn_key'], query=QUERY, mode='shadow',
+                                                   cwd=str(task), detach=False))
+    late.start()
+    try:
+        record = hc.opportunity_record('omp', p, ctx)
+    finally:
+        late.join()
+    assert record.get('memory'), 'a seam child that marked the turn 1.5 s late was not joined'
+
+
 def test_a_pending_receipt_that_never_settles_is_bounded(env, monkeypatch):
     task = env / 'z0'
     p = payload('omp', task=task)
