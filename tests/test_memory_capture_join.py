@@ -72,7 +72,7 @@ def test_the_opportunity_record_carries_the_receipt_the_memory_seam_wrote_for_th
     assert row['memory'], row
     record = hc.opportunity_record(harness, p, ctx)
     assert record['memory'] == MemoryUseReceipt.from_dict(row['memory']).to_dict()
-    assert record['memory']['memory_snapshot_id'] == row['memory_snapshot_id']
+    assert record['memory']['snapshot_id'] == row['memory_snapshot_id']
 
 
 def test_a_receipt_from_another_turn_is_never_attached(env):
