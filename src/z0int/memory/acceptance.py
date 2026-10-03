@@ -8,8 +8,8 @@ dsh, hermes, omo and omp emit ``z0eval.unified_memory_receipt.v0`` rows (the har
 receipt.schema.json is exactly those four). claude-code, codex and grok emit ``z0int.memory_acceptance.v0``
 ("z0 memory acceptance", the same fields) and are refused the study label until the study is amended (C12).
 
-B is honest about what was observed: the seam result alone is ``B=UNVERIFIED`` (no model request seen); a
-recorded model request carrying the brief (``observed``) makes it ``B=VERIFIED``; a harness without a push seam
+B is honest about what was observed: the seam result alone is ``B=UNVERIFIED`` and ``injected`` stays false (no
+model request seen); a recorded model request carrying the brief (``observed``) makes it ``B=VERIFIED``; a harness without a push seam
 (Grok, OMO without a senpi ``context`` hook) is ``B=UNSUPPORTED`` and never counts as injected.
 """
 
@@ -103,8 +103,8 @@ def _b_note(harness: str, push_supported: bool | None, observed: bool | None, in
         return False, f'B=UNSUPPORTED: {PULL_ONLY[harness]}'
     if push_supported is False:
         return False, 'B=UNSUPPORTED: the host API has no model-visible context hook (stop condition)'
-    if observed is None:
-        return injected, 'B=UNVERIFIED: seam result only, no model request observed (fixture run, not counted)'
+    if observed is None:  # the seam returned a brief, but no model request was seen: not claimed as injected
+        return False, 'B=UNVERIFIED: seam result only, no model request observed (fixture run, not counted)'
     if observed and injected:
         return True, 'B=VERIFIED: the brief was in the recorded model request'
     return False, 'B=FAILED: the brief was not in the recorded model request'

@@ -66,19 +66,23 @@ def test_cohort_cases_on_the_synthetic_fixture(env):
     rows = {r['question_id']: r for r in acceptance.run('hermes', COHORT, revision='0123abcd')}
     for qid in ('exact-identifier', 'cross-harness', 'minimal-context', 'supersession', 'contradiction'):
         r = rows[qid]
-        assert r['retrieval_ok'] and r['injected'] and r['answer_supported'] and r['verified'], r  # A, B, C
+        assert r['retrieval_ok'] and r['answer_supported'] and r['verified'], r  # A, C
         assert r['evidence_refs'] and all(ref['source_id'] for ref in r['evidence_refs'])
     assert rows['supersession']['superseded_answer'] is True  # F: the newer cap is current
     miss = rows['missing-evidence']
     assert miss['abstained'] is True and miss['answer_supported'] is True  # D: abstains, nothing forbidden
     assert all(r['duplicate_injection'] is False for r in rows.values())  # E: a replay never injects twice
-    assert all('B=UNVERIFIED' in ' '.join(r['notes']) for r in rows.values())  # seam-level only, no model request
+    # B: a seam result alone is not an injection into a model request: unverified rows never claim injected
+    assert all('B=UNVERIFIED' in ' '.join(r['notes']) and r['injected'] is False for r in rows.values())
+    assert all('seam outcome injected' in r['notes'] for r in rows.values())
 
 
 def test_an_observed_model_request_upgrades_b(env):
     observed = {q['id']: True for q in COHORT['questions']}
     rows = acceptance.run('omp', COHORT, revision='0123abcd', observed=observed)
-    assert all('B=VERIFIED' in ' '.join(r['notes']) for r in rows if r['injected'])
+    assert all('B=VERIFIED' in ' '.join(r['notes']) and r['injected'] is True for r in rows)
+    missed = acceptance.run('omp', COHORT, revision='0123abcd', observed={}, session_id='missed')
+    assert all('B=FAILED' in ' '.join(r['notes']) and r['injected'] is False for r in missed)
 
 
 @pytest.mark.parametrize('harness', ['claude-code', 'codex', 'grok'])
