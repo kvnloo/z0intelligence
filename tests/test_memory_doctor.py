@@ -6,7 +6,7 @@ import stat
 
 import pytest
 
-from memory_fixture import build_av_db
+from memory_fixture import FakeTencentDB, build_av_db
 from z0int.memory import doctor
 
 AUTH_VALUE = 'FAKE-AGENTSVIEW-AUTH-VALUE-0001'
@@ -77,6 +77,15 @@ def test_reports_an_unreachable_gateway(env):
     cfg = {'tencentdb': {'url': 'http://127.0.0.1:9', 'auth_env': 'Z0_FAKE_TDB_ENV', 'deadline_ms': 200}}
     report = doctor.run(**{**env, 'config': cfg})
     assert checks(report)['tencentdb']['status'] == 'unreachable'
+
+
+def test_reports_a_reachable_gateway_as_available_and_unversioned(env):
+    """The real gateway's /health carries only its software version: reachable, with no content revision."""
+    with FakeTencentDB(version='0.9.1') as gw:
+        report = doctor.run(**{**env, 'config': gw.config(auth_env='Z0_FAKE_TDB_ENV')})
+    c = checks(report)['tencentdb']
+    assert (c['status'], c['ok']) == ('reachable', True)
+    assert 'available' in c['detail'] and 'UNAVAILABLE' not in c['detail'] and 'unversioned' in c['detail']
 
 
 def test_output_never_contains_config_secret_values(env, capsys, monkeypatch):
