@@ -161,6 +161,20 @@ Track verified correctness, provenance completeness, irrelevant injected tokens,
 bytes opened, cold/warm latency, update cost and abstention. A future router may
 select ctx only after this evidence exists.
 
+The harness is `benchmarks/ctx_history/run.py`. First local results (2026-10-03,
+26 real-history questions) are in `benchmarks/ctx_history/results/`. **Do not
+promote ctx into any default path.**
+
+- **Lexical search, as wired:** 0 of 26 answers. Natural-language question text
+  goes to the CLI, which returns 5 root-diverse session snippets.
+- **The existing AgentsView/qmd control:** 6 of 26.
+- **Exact hydration:** 3 of 26, including 3 answers the control missed. It costs
+  about 3× the injected tokens and 2× the latency of the control.
+- **Caller dependence:** direct CLI search drops the calling agent's own session
+  tree, so results depend on which session calls the adapter. Pass
+  `--include-current-session` (or an explicit `--exclude-session`) before any
+  replayable use.
+
 ## Credit / provenance
 
 The normalized agent-history, stable identity, search/citation and Blame
