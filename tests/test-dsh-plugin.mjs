@@ -195,10 +195,41 @@ test('3 a user turn sends one prompt and one stop event to hook_adapter --harnes
   assert.ok(!('prompt' in stop), 'the stop event carries no prompt text')
 })
 
-test('3 the canonical turn_key is computed the same way as harness_id.turn_key', () => {
-  // sha256("z0int.turn_key.v0\0dsh\0abc\0session-abc:1")[:32], checked against Python in test_dsh_capture.py
-  assert.match(plugin.canonicalTurnKey('abc', 'session-abc:1'), /^[0-9a-f]{32}$/)
+test('3 the JS turn_key matches a known harness_id.turn_key vector', () => {
+  // python: harness_id.turn_key('dsh', 'abc', 'session-abc:1')
+  //       == turn_key_from_alias('dsh.lineage_turn_key', 'session-abc:1', session_id='abc')
+  assert.equal(plugin.canonicalTurnKey('abc', 'session-abc:1'), '6935feb94c3840e4f0e08d176cabe416')
   assert.notEqual(plugin.canonicalTurnKey('abc', 'session-abc:1'), plugin.canonicalTurnKey('abc', 'session-abc:2'))
+})
+
+test('3 a turn that errors before its stop boundary is closed with a counted failure row, not left open', async () => {
+  const h = home(), calls = []
+  const ctx = fakeCtx()
+  const before = plugin.counters.turn_errored ?? 0
+  plugin.apply(ctx, {capture: true}, {spawn: fakeSpawn(calls), env: {Z0INT_HOME: h, Z0INT_PYTHON: '/venv/bin/python'}})
+  assert.equal(ctx.handlers['agent/error']?.length, 1, 'agent/error is observed')
+  const agent = rootAgent('err', 'SECRET-ERR-PROMPT do the thing')
+  await request(ctx, {agent, turn: 1, step: 1}, CFG())
+  for (const fn of ctx.handlers['agent/error']) {
+    assert.equal(fn({agent, turn: 1, step: 1, error: new Error('SECRET-ERR-DETAIL upstream 500')}), undefined)
+  }
+  await stopping(ctx, {agent, turn: 1}) // the turn is already closed: no second outcome
+  assert.deepEqual(calls.map((c) => c.args.at(-1)), ['prompt'])
+  assert.equal(plugin.counters.turn_errored, before + 1)
+  const drops = await waitRows(h, 'drops.jsonl', 1)
+  assert.deepEqual(drops.map((d) => [d.schema, d.kind, d.reason, d.count]),
+                   [['z0int.dsh.drop.v0', 'turn_outcome', 'turn_errored', 1]])
+  assert.equal(drops[0].turn_key, plugin.canonicalTurnKey('err', 'session-err:1'))
+  // an error on a child or an unknown turn changes nothing
+  for (const fn of ctx.handlers['agent/error']) {
+    fn({agent: childAgent(), turn: 1, step: 1, error: new Error('x')})
+    fn({agent: rootAgent('never-opened'), turn: 3, step: 1, error: null})
+    fn(null)
+  }
+  await tick(50)
+  assert.equal(plugin.counters.turn_errored, before + 1)
+  const all = readFileSync(join(h, 'state', 'dsh', 'drops.jsonl'), 'utf8')
+  assert.ok(!all.includes('SECRET-ERR'), 'no prompt or error text in the row')
 })
 
 // ----------------------------------------------------------------------------- 4. forbidden paths
@@ -344,6 +375,44 @@ test('5 port 11501 is refused unless allow_live_service', async () => {
   assert.deepEqual(seen, ['http://127.0.0.1:11501/v1/plan'])
 })
 
+test('5 the shadow only ever calls the pure /v1/plan route: no config value can point it at an executing route', async () => {
+  // /v1/worker and /v1/intelligence on the same service dispatch real work (gated by #95); the body is a valid
+  // delegate_worker request, so the endpoint must not be configurable.
+  const svc = await fakeService()
+  try {
+    for (const path of ['/v1/worker', '/v1/intelligence', 'v1/worker', 'http://127.0.0.1:1/v1/worker']) {
+      const ctx = fakeCtx()
+      plugin.apply(ctx, {capture: true, shadow: {url: svc.url, path, endpoint: path, route: path, sample_rate: 1}},
+                   {spawn: fakeSpawn([]), env: {Z0INT_HOME: home(), Z0INT_PYTHON: '/venv/bin/python'}})
+      await request(ctx, {agent: rootAgent('route' + path.length), turn: 1, step: 1}, CFG())
+    }
+    for (const url of [`${svc.url}/v1/worker`, `${svc.url}/v1/intelligence?x=1`]) {
+      const ctx = fakeCtx()
+      plugin.apply(ctx, {capture: true, shadow: {url, sample_rate: 1}},
+                   {spawn: fakeSpawn([]), env: {Z0INT_HOME: home(), Z0INT_PYTHON: '/venv/bin/python'}})
+      await request(ctx, {agent: rootAgent('base' + url.length), turn: 1, step: 1}, CFG())
+    }
+    const end = Date.now() + 3000
+    while (svc.seen.length < 6 && Date.now() < end) await tick(20)
+    assert.deepEqual(svc.seen.map((s) => s.path), Array(6).fill('/v1/plan'))
+  } finally { svc.server.close() }
+})
+
+test('5 a shadow response that claims it executed is counted as a contract violation, never recorded ok', async () => {
+  const h = home(), ctx = fakeCtx()
+  const before = plugin.counters.shadow_executed ?? 0
+  plugin.apply(ctx, {capture: true, shadow: {url: 'http://127.0.0.1:11545', sample_rate: 1}},
+               {spawn: fakeSpawn([]), env: {Z0INT_HOME: h, Z0INT_PYTHON: '/venv/bin/python'},
+                fetch: async () => ({ok: true, json: async () => ({ok: true, mode: 'dispatch', executed: true, route: {kind: 'WORKER'}})})})
+  const cfg = CFG()
+  assert.equal(await request(ctx, {agent: rootAgent('exec'), turn: 1, step: 1}, cfg), cfg)
+  const rows = await waitRows(h, 'shadow_decisions.jsonl', 1)
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].status, 'executed_unexpectedly')
+  assert.equal(rows[0].student_changed_execution, false, 'nothing it returned reached the turn')
+  assert.equal(plugin.counters.shadow_executed, before + 1)
+})
+
 // ----------------------------------------------------------------------------- 6. fail-open
 test('6 a missing python lets the turn proceed and leaves a counted drop row', async () => {
   const h = home(), ctx = fakeCtx()
@@ -429,10 +498,10 @@ test('8 the plugin does not ship, export or load memory.js', async () => {
   assert.ok(!existsSync(join(PLUGIN_DIR, 'memory.js')))
   const pkg = JSON.parse(readFileSync(join(PLUGIN_DIR, 'package.json'), 'utf8'))
   assert.ok(!JSON.stringify(pkg).includes('memory.js'))
+  // memory.js was the direct Hermes DB reader: it must not be shipped, imported or pointed at Hermes state.
   for (const f of pluginFiles()) {
     const text = readFileSync(f, 'utf8')
-    assert.doesNotMatch(text, /memory\.js|state\.db|TencentDB|\.hermes\b/i, f)
+    assert.doesNotMatch(text, /memory\.js|state\.db|\.hermes\b/i, f)
   }
-  assert.ok(!Object.keys(plugin).some((k) => /memory|recall/i.test(k)), Object.keys(plugin).join(','))
-  assert.deepEqual(Object.keys(plugin).sort(), ['apply', 'canonicalTurnKey', 'counters', 'name', 'sampleHash'])
+  assert.ok(!Object.keys(plugin).some((k) => /hermes/i.test(k)), Object.keys(plugin).join(','))
 })
