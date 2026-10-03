@@ -14,7 +14,7 @@ import time
 
 import pytest
 
-from memory_fixture import SECRETS, FakeTencentDB, add_message, build_av_db, message_id
+from memory_fixture import FakeTencentDB, add_message, build_av_db, message_id
 from z0int import agentsview_ro
 from z0int.memory import surface as ms
 from z0int.memory.event_log import EventLog
