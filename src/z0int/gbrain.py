@@ -232,6 +232,8 @@ def response_to_context_packet(
         "budget_used": response.get("budget_used"),
         "dropped_count": response.get("dropped_count"),
         "has_more": response.get("has_more"),
+        "since": response.get("since"),
+        "next_cursor": response.get("next_cursor"),
         "degraded_reason": response.get("degraded_reason"),
     }
     packet = ContextPacket(
