@@ -224,6 +224,12 @@ def capture_cohort(record: Mapping[str, Any] | None) -> str | None:
     return record.get('cohort') if record.get('cohort') in ('agent', 'harness', 'automated', 'eval') else None
 
 
+def row_turn_key(harness: str, session: Any, trace: Any) -> str:
+    """The turn_key of a table row: claude-code keeps its 6fee859 key (byte-identical tables); every other harness the
+    canonical one, the key its verified, imported and failure rows carry."""
+    return _sha({'session': session, 'trace': trace}) if harness == HARNESS else hc.turn_key(harness, session, trace)
+
+
 def build_table(state: Path, *, projects: Path | None = None, include_unjoined: bool = False,
                 cohort_fn=None, harness: str = HARNESS) -> list[dict[str, Any]]:
     """One row per turn that has an opportunity record (or, with include_unjoined, any verified turn).
@@ -262,9 +268,7 @@ def build_table(state: Path, *, projects: Path | None = None, include_unjoined: 
         started = ((ver or {}).get('turn') or {}).get('started_at') or (opp.get('provenance') or {}).get('built_at')
         rows.append({
             'schema': SCHEMA, 'table_version': TABLE_VERSION, 'feature_schema_sha': FEATURE_SCHEMA_SHA,
-            # claude-code keeps its 6fee859 key (byte-identical tables); every other harness the canonical one,
-            # the key its verified, imported and failure rows carry
-            'turn_key': _sha({'session': sid, 'trace': tid}) if harness == HARNESS else hc.turn_key(harness, sid, tid),
+            'turn_key': row_turn_key(harness, sid, tid),
             'group': _sha({'session': sid}, 12),
             'day': started[:10] if isinstance(started, str) else None,
             'harness': harness,

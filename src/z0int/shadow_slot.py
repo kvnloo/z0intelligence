@@ -263,7 +263,7 @@ def replay(root: str | Path | None = None, registry: Mapping[str, Any] | None = 
                 rows.append({'schema': hc.schema(h, 'shadow_decision'), 'harness': h, 'cohort': cohort,
                              'source': 'shadow_slot', 'decision_id': decision_id,
                              'opportunity_id': trace.get('opportunity_id'),
-                             'turn_key': rec.get('turn_key') or hc.turn_key(h, sid, tid),
+                             'turn_key': le.row_turn_key(h, sid, tid),  # joins the turn's training row
                              'group': le._sha({'session': sid}, 12), 'day': (rec.get('recorded_at') or '')[:10] or None,
                              'challenger': {'id': c['id'], 'kind': c['kind'], 'sha256': c['sha256']},
                              'decision': action, 'distribution': dist,
