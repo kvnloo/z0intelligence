@@ -145,14 +145,15 @@ def test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview(t
 
     assert report['status'] == 'success' and len(rows) == 7
     polarity = TEST_LABEL_POLARITY[harness]
-    tests = lambda r: [s for s in signals(r) if s[0] == 'tests_in_turn']
+    exit_derived = ('tests_in_turn', 'ended_on_error')  # the signals only an exit code can give
+    tests = lambda r: [s for s in signals(r) if s[0] in exit_derived]
     for i in range(1, 8):
         av, ref = rows[f't{i}'], cc[f'p{i}']
         assert av['schema'] == f'z0int.{harness.replace("-", "_")}.turn_outcome_verified.v0'
         assert av['harness'] == harness and av['join']['state'] == 'joined' and av['join']['ordinal'] == i
         # commit/revert, PR merge (self-merge downgrade) and correction cues: always the CC semantics
-        assert [s for s in signals(av) if s[0] != 'tests_in_turn'] == \
-            [s for s in signals(ref) if s[0] != 'tests_in_turn'], f't{i}'
+        assert [s for s in signals(av) if s[0] not in exit_derived] == \
+            [s for s in signals(ref) if s[0] not in exit_derived], f't{i}'
         if polarity == 'both':  # exit evidence on every run: identical to CC, test labels included
             assert (signals(av), av['verification_state'], av['label_class']) == \
                 (signals(ref), ref['verification_state'], ref['label_class']), f't{i}'
