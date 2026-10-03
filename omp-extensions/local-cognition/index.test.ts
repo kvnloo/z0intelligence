@@ -245,6 +245,17 @@ test("buildShadowPayload is self-contained and schema-shaped", () => {
 	expect(payload.objective).toBeNull();
 });
 
+test("the shadow request names the actual tool as a structure and carries no tool input", async () => {
+	process.env.OMP_Z0INT_COGNITION_TOOLS = "bash,read";
+	const { handler } = installed();
+	handler(toolCall("bash", { command: "cat SECRET_TOOL_INPUT_MARKER_7" }), fakeCtx());
+	await flush();
+	expect(sent).toHaveLength(1);
+	expect(sent[0].actual_tool).toEqual({ name: "bash", risk_class: "write" });
+	expect(JSON.stringify(sent[0])).not.toContain("SECRET_TOOL_INPUT_MARKER_7");
+	expect(String(sent[0].state)).not.toContain("input");
+});
+
 test("registers z0int-cognition-status and the command never throws", async () => {
 	const home = mkdtempSync(join(tmpdir(), "local-cognition-status-"));
 	process.env.Z0INT_HOME = home;
