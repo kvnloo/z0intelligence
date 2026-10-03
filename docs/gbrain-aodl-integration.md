@@ -50,7 +50,10 @@ z0int context gbrain-delta --session-id demo
 
 Both commands print a shadow candidate plus its provenance-preserving context
 packet. Pass `--aodl contract.json` to correlate the candidate with a compiled
-AODL contract. Neither command executes an action or surfaces an interruption.
+AODL contract. Each candidate carries a deterministic `candidate_id` and
+`receipt_extra`; `attach_shadow_candidate()` joins those opaque fields to an
+existing z0int receipt without changing action, authority, success, or verifier
+state. Neither command executes an action or surfaces an interruption.
 
 ## AODL binding
 
@@ -89,7 +92,8 @@ latency, privacy, and token budgets.
 
 ## Next slices
 
-1. Join GBrain candidate IDs to z0int decision/outcome receipts.
+1. Feed joined GBrain candidate/decision/outcome receipts into the existing
+   counterfactual evaluator.
 2. Run the attention policy in AB/shadow evaluation.
 3. Add Ripple as a surface only after `SURFACE` has a measured precision floor.
 4. Add write-back only for verified durable facts, with explicit provenance and
