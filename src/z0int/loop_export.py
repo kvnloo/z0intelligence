@@ -452,11 +452,20 @@ def build_tables(root: str | Path | None = None, *, projects: Path | None = None
     return _split(rows, 'training')
 
 
+SHADOW_DROP = FORBIDDEN_KEYS + ('lineage_turn_key',)
+
+
 def shadow_tables(root: str | Path | None = None) -> dict[tuple[str, str], Table]:
     """Shadow-decision tables (counterfactual answers, label null) keyed (harness, cohort)."""
-    rows = [r for h in hc.HARNESSES for r in _latest(
-        (r for r in _read_jsonl(hc.state_dir(h, root) / 'shadow_decisions.jsonl')
-         if r.get('schema') == hc.schema(h, 'shadow_decision')), 'decision_id')]
+    rows = []
+    for h in hc.HARNESSES:
+        own = [r for r in _read_jsonl(hc.state_dir(h, root) / 'shadow_decisions.jsonl')
+               if r.get('schema') == hc.schema(h, 'shadow_decision')]
+        # the DSH live shadow plane writes no decision_id (each row is its own decision), no cohort (unknown: never
+        # pooled into a known cohort) and its raw session/lineage ids (dropped: tables carry hashed ids only)
+        rows += [{k: v for k, v in dict(r, cohort=r.get('cohort') or 'unknown').items() if k not in SHADOW_DROP}
+                 for r in _latest([r for r in own if r.get('decision_id')], 'decision_id')
+                 + [r for r in own if not r.get('decision_id')]]
     return _split(rows, 'shadow')
 
 
