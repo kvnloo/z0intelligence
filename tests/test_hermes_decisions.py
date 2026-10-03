@@ -158,20 +158,40 @@ def _git_repo(path):
     return path
 
 
-def test_opportunity_record_for_repo_and_non_repo(tmp_path):
+def test_opportunity_record_for_repo_and_non_repo(plugin, tmp_path, monkeypatch):
+    monkeypatch.setattr(hcap, '_spawn_project', lambda job, slot: hcap.project(job))
     repo = _git_repo(tmp_path / 'repo')
-    rec = H.on_opportunity({'session_id': 's', 'trace_id': 's:1', 'user_message': 'what branch am I on?',
-                            'platform': 'cli', 'cwd': str(repo)}, root=tmp_path / 'home')
-    assert rec['opportunity']['trace']['harness'] == 'hermes' and rec['repo'] == str(repo.resolve())
-    assert rec['opportunity']['trace']['trace_id'] == 's:1' and rec['gate'] in ('ACT', 'ASK', 'ESCALATE', 'OBSERVE', 'ABSTAIN')
     outside = tmp_path / 'plain'
     outside.mkdir()
-    rec2 = H.on_opportunity({'trace_id': 's:2', 'user_message': 'draft an email', 'cwd': str(outside)},
-                            root=tmp_path / 'home')
+    plugin.on_pre_llm_call(session_id='s', turn_id='1', user_message='what branch am I on?', platform='cli',
+                           cwd=str(repo))
+    plugin.on_pre_llm_call(session_id='s', turn_id='2', user_message='draft an email', platform='cli',
+                           cwd=str(outside))
+    plugin.on_pre_llm_call(session_id='s', turn_id='3', user_message='x', platform='cron', cwd=str(repo))
+    plugin.drain()
+    rec, rec2 = rows(tmp_path, 'opportunities.jsonl')  # the cron turn has no opportunity
+    assert rec['opportunity']['trace']['harness'] == 'hermes' and rec['repo'] == str(repo.resolve())
+    assert rec['opportunity']['trace']['trace_id'] == 's:1' and rec['gate'] in ('ACT', 'ASK', 'ESCALATE', 'OBSERVE', 'ABSTAIN')
     assert rec2['repo'] is None
-    assert H.on_opportunity({'trace_id': 's:3', 'user_message': 'x', 'platform': 'cron'}, root=tmp_path / 'home') is None
-    lines = (tmp_path / 'home' / 'state' / 'hermes' / 'opportunities.jsonl').read_text().splitlines()
-    assert len(lines) == 2
+
+
+def test_the_retired_opportunity_command_writes_no_opportunity(tmp_path):
+    """`z0int hermes opportunity` (the retired z0int-decisions child) records nothing but a retired_vehicle row:
+    a stale z0int-decisions install cannot write a second, unredacted opportunity stream."""
+    repo = _git_repo(tmp_path / 'repo')
+    canary = 'c4a-retired-canary-5d6e'
+    payload = json.dumps({'session_id': 's', 'trace_id': 's:1', 'user_message': f'what branch am I on? {canary}',
+                          'platform': 'cli', 'cwd': str(repo)})
+    env = dict(os.environ, Z0INT_HOME=str(tmp_path / 'z0'))
+    for argv in (['-m', 'z0int.hermes_decisions', 'opportunity'], ['-m', 'z0int.cli', 'hermes', 'opportunity']):
+        done = subprocess.run([sys.executable, *argv], input=payload, text=True, capture_output=True, env=env,
+                              timeout=60)
+        assert done.returncode == 0, done.stderr
+    assert rows(tmp_path, 'opportunities.jsonl') == []
+    retired = [r for r in rows(tmp_path, 'failures.jsonl') if r['kind'] == 'retired_vehicle']
+    assert len(retired) == 2 and all(r['detail'] == {'vehicle': 'z0int-decisions'} for r in retired)
+    assert canary not in ''.join(p.read_text() for p in (tmp_path / 'z0').rglob('*') if p.is_file())
+    assert not hasattr(H, 'on_opportunity')
 
 
 def test_decisions_report_joins_by_trace_and_counts_exclusions(tmp_path):

@@ -1,43 +1,26 @@
-"""Test socket guard (sitecustomize for child processes): refuse and log any connect to port 11501 or a non-loopback address."""
-import ipaddress
+"""Test socket guard (sitecustomize for child processes): the capture children need no socket at all, so every
+connect / connect_ex (any family: AF_INET/AF_INET6 on any address and port, loopback included, and AF_UNIX) is
+refused and logged to $Z0INT_SOCKET_GUARD_LOG. The test asserts the log stays empty."""
 import os
 import socket
 
 _LOG = os.environ.get('Z0INT_SOCKET_GUARD_LOG')
-_orig_connect = socket.socket.connect
-_orig_connect_ex = socket.socket.connect_ex
 
 
-def _blocked(sock, address):
-    if sock.family not in (socket.AF_INET, socket.AF_INET6) or not isinstance(address, tuple):
-        return False
-    host, port = address[0], address[1]
-    if port == 11501:
-        return True
-    try:
-        return not ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return host not in ('localhost',)
-
-
-def _record(address):
+def _record(sock, address):
     if _LOG:
         with open(_LOG, 'a') as fh:
-            fh.write(f'{os.getpid()} {address!r}\n')
+            fh.write(f'{os.getpid()} {sock.family!r} {address!r}\n')
 
 
 def connect(self, address):
-    if _blocked(self, address):
-        _record(address)
-        raise ConnectionRefusedError(111, 'socket guard: blocked connect')
-    return _orig_connect(self, address)
+    _record(self, address)
+    raise ConnectionRefusedError(111, 'socket guard: blocked connect')
 
 
 def connect_ex(self, address):
-    if _blocked(self, address):
-        _record(address)
-        return 111
-    return _orig_connect_ex(self, address)
+    _record(self, address)
+    return 111
 
 
 socket.socket.connect = connect

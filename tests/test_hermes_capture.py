@@ -189,6 +189,25 @@ def test_p1_no_hook_path_opens_a_socket_and_a_port_setting_is_ignored_with_a_cou
     assert cap.stats()['config_warnings'] == 2
 
 
+def test_p1_the_child_socket_guard_logs_every_connect_including_loopback_and_unix(tmp_path):
+    """The guard the P-1 children run under sees any socket at all (they need none), not only port 11501."""
+    guard_dir = tmp_path / 'guard'
+    guard_dir.mkdir()
+    (guard_dir / 'sitecustomize.py').write_text((ROOT / 'tests' / 'fixtures' / 'socket_guard_sitecustomize.py')
+                                                .read_text())
+    log = tmp_path / 'sockets.log'
+    code = ('import socket\n'
+            "for fam, addr in ((socket.AF_INET, ('127.0.0.1', 9)), (socket.AF_UNIX, '/nonexistent/z0.sock')):\n"
+            '    s = socket.socket(fam)\n'
+            '    try:\n        s.connect(addr)\n    except OSError:\n        pass\n'
+            '    try:\n        s.connect_ex(addr)\n    except OSError:\n        pass\n'
+            '    s.close()\n')
+    subprocess.run([sys.executable, '-c', code], check=True, timeout=30,
+                   env={'PATH': os.environ.get('PATH', ''), 'PYTHONPATH': str(guard_dir),
+                        'Z0INT_SOCKET_GUARD_LOG': str(log)})
+    assert log.exists() and len(log.read_text().splitlines()) == 4
+
+
 # ----------------------------------------------------------------------------- P-2 / P-3
 def slow_python(tmp_path):
     script = tmp_path / 'slow-python'
@@ -226,6 +245,47 @@ def test_p2_close_with_a_full_queue_returns_within_2s_and_writes_nothing_after(e
     assert child is None or not Path(f'/proc/{child}').exists()
 
 
+def slots_free(z0):
+    """True when no process holds a capture build slot (every projection child has exited)."""
+    held = []
+    try:
+        for i in range(hc.MAX_CHILDREN):
+            fh = open(hc.slot_path(i, z0), 'a')
+            held.append(fh)
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+    finally:
+        for fh in held:
+            fh.close()
+
+
+def test_p2_a_projection_in_flight_at_close_writes_nothing_after_close(env, monkeypatch, tmp_path):
+    """A build started before close() is tied to the plugin's lifetime: once close() returns it writes nothing,
+    and close() has counted it as dropped instead (built + dropped == turns)."""
+    repo = git_repo(tmp_path / 'repo')
+    mod = load_plugin()
+    monkeypatch.setattr(mod, 'CLOSE_TIMEOUT', 0.05, raising=False)  # a real build outlives this close budget
+    ctx, cap = start(mod, shadow(), monkeypatch, str(repo))
+    turns = hc.MAX_CHILDREN - 1
+    for i in range(turns):
+        ctx.call('pre_llm_call', session_id='s', turn_id=f't{i}', task_id='task', user_message=f'what is open {i}?',
+                 platform='cli', model='m')
+    assert cap.flush(30)  # every turn job is processed: its projection child is running now
+    t0 = time.monotonic()
+    cap.close()
+    assert time.monotonic() - t0 <= 2.0
+    at_close = state_snapshot(env.z0)
+    built = len(rows(env.z0, 'opportunities.jsonl'))
+    assert wait_for(lambda: slots_free(env.z0), 60)  # every projection child has exited
+    assert state_snapshot(env.z0) == at_close
+    closed = sum(r['count'] for r in rows(env.z0, 'drops.jsonl')
+                 if r['kind'] == 'opportunity_record' and r['reason'] == 'closed')
+    assert closed >= 1 and built + closed == turns
+    assert not list((env.z0 / 'runtime').rglob('*.gate'))  # close leaves no per-instance state behind
+
+
 def test_p3_drops_are_persisted_and_a_fresh_process_reports_the_same_count(env, monkeypatch, tmp_path):
     mod = load_plugin()
     monkeypatch.setattr(mod, 'MAX_QUEUE', 10, raising=False)
@@ -256,13 +316,13 @@ def test_p7_projection_uses_the_task_cwd_from_hook_context_never_the_process_cwd
     ctx.call('pre_llm_call', session_id='s', turn_id='t2', task_id='task-1', user_message='what branch am I on?',
              platform='cli', model='m')
     assert cap.flush(10)
-    cap.close()
     turns = [j for j in jobs if j['kind'] == 'turn']
     assert [j['cwd'] for j in turns] == [str(task_repo), None]
-    # with every git fact unknown, the gate never returns ACT
+    # with every git fact unknown, the gate never returns ACT (built while the plugin is loaded)
     monkeypatch.setattr(hcap, '_spawn_project', lambda job, slot: hcap.project(job))
     for job in turns:
         hcap.process(job)
+    cap.close()
     recs = rows(env.z0, 'opportunities.jsonl')
     assert [r['repo'] for r in recs] == [str(task_repo.resolve()), None]
     assert recs[1]['gate'] != 'ACT'
@@ -289,9 +349,9 @@ def test_p9_state_packet_text_is_persisted_only_with_persist_packet_text(env, mo
         monkeypatch.setattr(cap, '_deliver', lambda batch: jobs.extend(batch) or len(batch))
         ctx.call('pre_llm_call', session_id=f's{i}', turn_id='t', user_message='what is open?', platform='cli')
         assert cap.flush(10)
-        cap.close()
-        for job in jobs:
+        for job in jobs:  # built while the plugin is loaded (after close() a build writes nothing)
             hcap.process(job)
+        cap.close()
     plain, opted = rows(env.z0, 'opportunities.jsonl')
     assert plain['packet_text'] == 'redacted' and opted['packet_text'] == 'opt_in'
     # the State Packet's own snapshot (state/state_packet/<repo>/latest.json, history.jsonl) is the other place
@@ -562,11 +622,34 @@ def test_automatic_path_is_inert_and_spawns_nothing_while_automatic_json_has_her
     (env.z0 / 'config' / 'automatic.json').write_text(json.dumps({'hermes': {'enabled': True}}))
     mod = load_plugin()
     calls = []
-    monkeypatch.setattr(mod, 'invoke', lambda op, value: calls.append(op) or {'action': 'context', 'context': 'c'})
+    monkeypatch.setattr(mod, 'invoke', lambda op, value, *a: calls.append(op) or {'action': 'context', 'context': 'c'})
     ctx, cap = start(mod, {}, monkeypatch)
     assert list(ctx.hooks) == ['pre_llm_call'] and cap is None
     assert ctx.call('pre_llm_call', session_id='s', turn_id='t', user_message='hello') == [{'context': 'c'}]
     assert calls == ['event']
+
+
+def test_automatic_invoke_runs_the_configured_z0int_with_the_same_home_as_its_gate(env, monkeypatch, tmp_path):
+    """The automatic call uses the interpreter capture uses (z0int_python) and the z0 home its gate read; it never
+    points PYTHONPATH at a source tree beside the plugin (an installed plugin has none)."""
+    monkeypatch.delenv('PYTHONPATH', raising=False)
+    home = tmp_path / 'auto-home'
+    (home / 'config').mkdir(parents=True)
+    (home / 'config' / 'automatic.json').write_text(json.dumps({'hermes': {'enabled': True}}))
+    mod = load_plugin()
+    seen = []
+
+    def run(argv, **kw):
+        seen.append((list(argv), kw.get('env') or {}))
+        return SimpleNamespace(stdout=json.dumps({'action': 'context', 'context': 'c'}))
+    monkeypatch.setattr(mod.subprocess, 'run', run)
+    ctx, cap = start(mod, {'z0int_python': '/opt/z0int/bin/python', 'z0int_home': str(home)}, monkeypatch)
+    assert cap is None and list(ctx.hooks) == ['pre_llm_call']
+    assert ctx.call('pre_llm_call', session_id='s', turn_id='t', user_message='hello') == [{'context': 'c'}]
+    ((argv, child_env),) = seen
+    assert argv == ['/opt/z0int/bin/python', '-m', 'z0int.automatic', 'event']
+    assert child_env.get('Z0INT_HOME') == str(home)
+    assert str(PLUGIN_DIR.parents[1] / 'src') not in child_env.get('PYTHONPATH', '')
 
 
 # ----------------------------------------------------------------------------- tool, model/policy, cohort
