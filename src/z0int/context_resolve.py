@@ -300,7 +300,8 @@ def resolve_context(
     Memory recall is off by default. With ``allow_memory=True`` a ``kind="memory"``
     need resolves through the z0 memory surface, but only when no other injector
     (e.g. the TencentDB proxy) already owns memory for ``turn_key``: the single
-    owner is claimed first, so two injectors can never both inject one turn.
+    owner is claimed first, so two injectors can never both inject one turn. Without
+    a ``turn_key`` the guard cannot run and memory stays out (an explicit gap).
     QMD is lexical-only here; no embedding/rerank on the critical path unless
     later tiers are explicitly enabled.
     """
@@ -398,7 +399,12 @@ def resolve_context(
                 continue
             from .memory import surface as memory_surface
 
-            if turn_key is not None and not memory_surface.claim_injection(turn_key, "context_resolve"):
+            if turn_key is None:  # without a turn the single-injector guard cannot run, so memory stays out
+                ops.append({"op": "memory_skipped", "need": need.id, "reason": "double_inject_guard: no turn_key"})
+                if need.required:
+                    gaps.append(f"{need.id}: double_inject_guard: no turn_key, cannot claim the turn's injection")
+                continue
+            if not memory_surface.claim_injection(turn_key, "context_resolve"):
                 ops.append({"op": "memory_skipped", "need": need.id, "reason": "double_inject_guard"})
                 if need.required:
                     gaps.append(f"{need.id}: double_inject_guard: another injector owns memory for this turn")

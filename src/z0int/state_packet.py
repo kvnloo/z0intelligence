@@ -1145,12 +1145,15 @@ def source_revisions(repo: Path, projects_root: Path | None = None, reader: Read
 def _memory_snapshot_id(revisions: dict[str, Any]) -> str | None:
     """The memory view this packet was built against (AgentsView generation, TencentDB rev, ledger tail, HEAD).
 
-    Recomputed on a cache hit too: the packet's own sources may be unchanged while memory moved on.
+    Recomputed on a cache hit too: the packet's own sources may be unchanged while memory moved on. This runs
+    inside synchronous harness hooks, so it is local only: a short AgentsView busy timeout and the gateway
+    revision last observed by a real memory query, never a network call.
     """
     try:
         from .memory.surface import memory_snapshot_id
 
-        return memory_snapshot_id(repo_sha=((revisions.get("git") or {}).get("head")) or "unreadable")
+        return memory_snapshot_id(repo_sha=((revisions.get("git") or {}).get("head")) or "unreadable",
+                                  av_timeout=0.02, probe_gateway=False)
     except Exception:  # noqa: BLE001 - memory is an optional source; its absence is not a packet failure
         return None
 

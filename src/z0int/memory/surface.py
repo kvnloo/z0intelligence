@@ -39,7 +39,7 @@ from ..context_resolve import EvidenceRef
 from ..memory_contract import (BitemporalClaim, EventIdentity, MemoryScope, MemorySnapshot, MemoryUseReceipt,
                                derive_event_uid)
 from .event_log import EventLog, MemoryEvent
-from .scrub import scrub_obj, scrub_text
+from .scrub import redact_spans, scrub_obj, scrub_text
 
 SCHEMA = 'z0int.memory.search.v0'
 BRIEF_SCHEMA = 'z0int.memory.brief.v0'
@@ -121,6 +121,29 @@ def _unavailable_reason(exc: sqlite3.Error) -> str:
     return 'schema' if 'no such' in msg else 'error'
 
 
+def _finding_spans(conn: sqlite3.Connection, sessions: Iterable[str]) -> dict[tuple[str, int], list[tuple[int, int]]]:
+    """AgentsView's own scanner findings on message text, keyed by (session, ordinal) (kernel
+    ``_redact_secrets``). A DB without the ``secret_findings`` table has none; the regex backstop still runs."""
+    sessions, out = sorted(set(sessions)), {}
+    for i in range(0, len(sessions), 500):
+        chunk = sessions[i:i + 500]
+        try:
+            rows = conn.execute('select session_id, message_ordinal, match_start, match_end from secret_findings '
+                                f"where location_kind = 'message' and session_id in ({','.join('?' * len(chunk))})",
+                                chunk).fetchall()
+        except sqlite3.Error:
+            return out
+        for sid, ordinal, a, b in rows:
+            out.setdefault((sid, ordinal), []).append((a, b))
+    return out
+
+
+def _clean_message(content: str | None, spans: Iterable[tuple[int, int]]) -> tuple[str, int]:
+    text, n = redact_spans(content or '', spans)
+    text, k = scrub_text(text)
+    return text, n + k
+
+
 def agentsview_generation(conn: sqlite3.Connection) -> str:
     uv = conn.execute('pragma user_version').fetchone()[0]
     return f"uv{uv}:m{conn.execute('select max(id) from messages').fetchone()[0] or 0}"
@@ -142,13 +165,14 @@ def _agentsview_candidates(query: str, policy: ScopePolicy, *, limit: int, db: s
             sql = _FTS_SQL.format(project='and s.project = ?' if project is not None else '')
             args = (_fts_match(query), *((project,) if project is not None else ()), max(limit * 10, CANDIDATE_CAP))
             rows = conn.execute(sql, args).fetchall()
+        findings = _finding_spans(conn, (r[1] for r in rows))
     except sqlite3.Error as exc:
         return _layer('unavailable', _unavailable_reason(exc), detail=type(exc).__name__), [], 0
     finally:
         conn.close()
     for mid, sid, ordinal, role, ts, content, agent, proj, score in rows:
         agent = agent or 'unknown'
-        clean, n = scrub_text(content or '')
+        clean, n = _clean_message(content, findings.get((sid, ordinal), ()))
         scrubbed += n
         payload_hash = 'sha256:' + _sha(content or '')
         ident = EventIdentity.from_source(source_system=agent, source_session=sid, source_event_id=str(mid),
@@ -170,7 +194,13 @@ def _agentsview_candidates(query: str, policy: ScopePolicy, *, limit: int, db: s
 # ----------------------------------------------------------------------------- semantic: TencentDB gateway
 class TencentDBClient:
     """Read client for the TencentDB gateway. The bearer value is read from the env var the config names, at
-    call time, and is never stored, logged or returned."""
+    call time, and is never stored, logged or returned.
+
+    One client serves one query and carries one deadline budget: every round-trip it makes (revision probe,
+    search) shares ``deadline_ms`` from the first call, and a timed-out or unreachable gateway is not asked
+    again. The revision is taken from the search response when there is one, and the last revision a real
+    call observed is kept under ``$Z0INT_HOME`` so hook-path snapshots (``last_revision``) need no network.
+    """
 
     def __init__(self, config: Mapping[str, Any] | None):
         t = dict((config or {}).get('tencentdb') or {})
@@ -178,6 +208,9 @@ class TencentDBClient:
         self.auth_env = t.get('auth_env')
         self.deadline_s = float(t.get('deadline_ms', 300)) / 1000.0
         self.ids = {k: str(t.get(k) or 'default') for k in ('team_id', 'agent_id', 'user_id')}
+        self._deadline_at: float | None = None
+        self._down: str | None = None
+        self._rev: str | None = None
 
     def __repr__(self) -> str:
         return f'TencentDBClient(url={self.url!r}, auth_env={self.auth_env!r}, deadline_s={self.deadline_s})'
@@ -186,52 +219,100 @@ class TencentDBClient:
     def configured(self) -> bool:
         return bool(self.url)
 
-    def _call(self, method: str, path: str, body: Mapping[str, Any] | None = None) -> Any:
+    def _call(self, method: str, path: str, body: Mapping[str, Any] | None = None, timeout: float = 0.0) -> Any:
         headers = {'Content-Type': 'application/json'}
         token = os.environ.get(str(self.auth_env)) if self.auth_env else None
         if token:
             headers['Authorization'] = 'Bearer ' + token
         data = None if body is None else json.dumps({**self.ids, **body}).encode()
         req = urllib.request.Request(self.url + path, data=data, headers=headers, method=method)
-        with urllib.request.urlopen(req, timeout=self.deadline_s) as resp:  # noqa: S310 - configured loopback gateway
+        with urllib.request.urlopen(req, timeout=timeout or self.deadline_s) as resp:  # noqa: S310 - configured loopback gateway
             return json.load(resp)
 
-    def _bounded(self, fn: Callable[[], Any]) -> tuple[Any, str | None]:
-        """Hard deadline: the caller gets an answer or ``timeout`` by deadline, however the socket behaves."""
+    def _bounded(self, method: str, path: str, body: Mapping[str, Any] | None = None) -> tuple[Any, str | None]:
+        """Hard deadline: the caller gets an answer or ``timeout`` by the client's deadline, however the socket
+        behaves and however many calls the query makes."""
+        if self._down:
+            return None, self._down
+        now = time.monotonic()
+        if self._deadline_at is None:
+            self._deadline_at = now + self.deadline_s
+        remaining = self._deadline_at - now
+        if remaining <= 0:
+            self._down = 'timeout'
+            return None, 'timeout'
         box: dict[str, Any] = {}
 
         def run() -> None:
             try:
-                box['value'] = fn()
+                box['value'] = self._call(method, path, body, timeout=remaining)
             except Exception as exc:  # noqa: BLE001 - classified below, never re-raised into the caller
                 box['error'] = exc
 
         th = threading.Thread(target=run, daemon=True)
         th.start()
-        th.join(self.deadline_s)
-        if th.is_alive():
-            return None, 'timeout'
+        th.join(remaining)
         exc = box.get('error')
+        if th.is_alive() or isinstance(exc, TimeoutError) or 'timed out' in str(getattr(exc, 'reason', '')):
+            self._down = 'timeout'
+            return None, 'timeout'
         if exc is None:
             return box.get('value'), None
         if isinstance(exc, urllib.error.HTTPError):
             return None, 'unauthorized' if exc.code in (401, 403) else 'http_error'
-        if isinstance(exc, TimeoutError) or 'timed out' in str(getattr(exc, 'reason', '')):
-            return None, 'timeout'
-        return None, 'unreachable' if isinstance(exc, (urllib.error.URLError, OSError)) else 'bad_response'
+        if isinstance(exc, (urllib.error.URLError, OSError)):
+            self._down = 'unreachable'
+            return None, 'unreachable'
+        return None, 'bad_response'
+
+    def _rev_path(self) -> Path:
+        return paths.home() / 'state' / 'memory' / 'tencentdb_revision.json'
+
+    def _observe(self, rev: str) -> str:
+        """Remember the revision a real call saw (in-process and, when it changed, on disk)."""
+        self._rev = rev
+        key, path = _sha(self.url, 16), self._rev_path()
+        try:
+            seen = json.loads(path.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            seen = {}
+        if not isinstance(seen, dict) or seen.get(key) != rev:
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                tmp = path.with_suffix(f'.{os.getpid()}.tmp')
+                tmp.write_text(json.dumps({**(seen if isinstance(seen, dict) else {}), key: rev}), encoding='utf-8')
+                os.replace(tmp, path)
+            except OSError:
+                pass  # a read-only home only loses the hook-path hint
+        return rev
 
     def revision(self) -> str:
+        """The gateway revision: from this client's earlier call when it has one, else a bounded /health."""
         if not self.configured:
             return 'unavailable:not_configured'
-        body, reason = self._bounded(lambda: self._call('GET', '/health'))
+        if self._rev is not None:
+            return self._rev
+        body, reason = self._bounded('GET', '/health')
         if reason:
             return f'unavailable:{reason}'
-        return 'rev:' + str((body or {}).get('revision') or (body or {}).get('version') or 'unknown')
+        return self._observe('rev:' + str((body or {}).get('revision') or (body or {}).get('version') or 'unknown'))
+
+    def last_revision(self) -> str:
+        """No network: the revision last observed by a real call (any process), or ``unprobed``."""
+        if not self.configured:
+            return 'unavailable:not_configured'
+        if self._rev is not None:
+            return self._rev
+        try:
+            seen = json.loads(self._rev_path().read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            seen = {}
+        return str(seen.get(_sha(self.url, 16)) or 'unprobed') if isinstance(seen, dict) else 'unprobed'
 
     def search(self, query: str, *, limit: int = 8) -> tuple[dict[str, Any], list[dict[str, Any]], int]:
         if not self.configured:
             return _layer('unavailable', 'not_configured'), [], 0
-        body, reason = self._bounded(lambda: self._call('POST', '/v3/atomic/search', {'query': query, 'limit': limit}))
+        body, reason = self._bounded('POST', '/v3/atomic/search', {'query': query, 'limit': limit})
         if reason:
             return _layer('unavailable', reason), [], 0
         data = (body or {}).get('data') or {}
@@ -239,6 +320,8 @@ class TencentDBClient:
         if not isinstance(items, list):
             return _layer('unavailable', 'bad_response'), [], 0
         rev, terms, out, scrubbed = str(data.get('revision') or 'unknown'), _terms(query), [], 0
+        if data.get('revision'):
+            self._observe('rev:' + rev)
         for item in items:
             if not isinstance(item, dict):
                 continue
@@ -356,9 +439,13 @@ def _repo_sha(repo: str | Path) -> str:
 
 def source_revisions(*, repo: str | Path | None = None, repo_sha: str | None = None, av_db: str | Path | None = None,
                      config: Mapping[str, Any] | None = None, ledger_root: str | Path | None = None,
-                     av_timeout: float = 0.2) -> dict[str, str]:
-    """Cheap revision probe of every memory source (one ro query, one bounded /health, one state-file read)."""
+                     av_timeout: float = 0.2, gateway: TencentDBClient | None = None,
+                     probe_gateway: bool = True) -> dict[str, str]:
+    """Cheap revision probe of every memory source: one ro query, one state-file read and the gateway revision
+    (a bounded /health on ``gateway``'s budget, or with ``probe_gateway=False`` the last observed one, no
+    network: the hook path)."""
     cfg = load_config() if config is None else config
+    gateway = gateway or TencentDBClient(cfg)
     conn = agentsview_ro.connect(av_db, timeout=av_timeout)
     if conn:
         try:
@@ -375,7 +462,8 @@ def source_revisions(*, repo: str | Path | None = None, repo_sha: str | None = N
     except (OSError, ValueError):
         ledger = 'empty'
     sha = repo_sha or (_repo_sha(repo) if repo is not None else 'none')
-    return {'agentsview': av, 'tencentdb': TencentDBClient(cfg).revision(), 'eventlog': ledger, 'repo': sha}
+    tdb = gateway.revision() if probe_gateway else gateway.last_revision()
+    return {'agentsview': av, 'tencentdb': tdb, 'eventlog': ledger, 'repo': sha}
 
 
 def memory_snapshot_id(scope: MemoryScope | None = None, **kw: Any) -> str:
@@ -393,14 +481,18 @@ def search(query: str, policy: ScopePolicy | None = None, *, layers: Iterable[st
            ranker: Callable[[list[dict[str, Any]]], list[dict[str, Any]]] | None = None,
            required: Iterable[str] = ('lexical',), av_db: str | Path | None = None, av_timeout: float = 0.5,
            ledger_root: str | Path | None = None, config: Mapping[str, Any] | None = None,
-           snapshot_id: str | None = None) -> dict[str, Any]:
-    """Resolve one query across the requested layers. Scope first, then ranking, then the limit."""
+           snapshot_id: str | None = None, gateway: TencentDBClient | None = None) -> dict[str, Any]:
+    """Resolve one query across the requested layers. Scope first, then ranking, then the limit.
+
+    The gateway is only called when the semantic layer is requested, within one deadline for the whole query.
+    """
     if not str(query or '').strip():
         raise ValueError('query is required')
     t0 = time.perf_counter()
     policy = policy or ScopePolicy()
     cfg = load_config() if config is None else config
     layers = tuple(layer for layer in LAYERS if layer in set(layers))
+    gateway = gateway or TencentDBClient(cfg)
     status: dict[str, dict[str, Any]] = {}
     candidates: list[dict[str, Any]] = []
     scrubbed = 0
@@ -409,7 +501,7 @@ def search(query: str, policy: ScopePolicy | None = None, *, layers: Iterable[st
         candidates += found
         scrubbed += n
     if 'semantic' in layers:
-        status['semantic'], found, n = TencentDBClient(cfg).search(query, limit=limit)
+        status['semantic'], found, n = gateway.search(query, limit=limit)
         candidates += found
         scrubbed += n
     if 'temporal' in layers:
@@ -444,7 +536,8 @@ def search(query: str, policy: ScopePolicy | None = None, *, layers: Iterable[st
         st['hits'] = sum(1 for e in ranked if layer in e['layers'])
     req = [r for r in required if r in layers]
     ok = any(s['status'] == 'ok' for s in status.values()) and all(status[r]['status'] == 'ok' for r in req)
-    snap = snapshot_id or memory_snapshot_id(policy.scope, av_db=av_db, config=cfg, ledger_root=ledger_root)
+    snap = snapshot_id or memory_snapshot_id(policy.scope, av_db=av_db, config=cfg, ledger_root=ledger_root,
+                                             gateway=gateway, probe_gateway='semantic' in layers)
     result = {
         'schema': SCHEMA, 'ok': ok, 'query': query, 'evidence': ranked, 'layers': status,
         'duplicates_removed': duplicates, 'out_of_scope': out_of_scope, 'memory_snapshot_id': snap,
@@ -488,8 +581,12 @@ def claim_history(subject: str, predicate: str | None = None, policy: ScopePolic
                                    'recorded_at', 'scope', 'superseded_by', 'current', 'event_id')} for c in rows]
 
 
+INJECTOR_MARKER_TTL_S = 86400.0
+
+
 def claim_injection(turn_key: str, owner: str) -> bool:
-    """Single injection owner per turn (cross-process): the first owner to claim a turn keeps it."""
+    """Single injection owner per turn (cross-process): the first owner to claim a turn keeps it. Markers older
+    than a day (long after any turn ends) are pruned whenever a new turn is claimed."""
     d = paths.home() / 'state' / 'memory' / 'injectors'
     d.mkdir(parents=True, exist_ok=True)
     path = d / f'{_sha(str(turn_key))}.json'
@@ -500,6 +597,13 @@ def claim_injection(turn_key: str, owner: str) -> bool:
             return json.loads(path.read_text(encoding='utf-8')).get('owner') == owner
         except (OSError, ValueError):
             return False
+    cutoff = time.time() - INJECTOR_MARKER_TTL_S
+    for old in d.glob('*.json'):
+        try:
+            if old != path and old.stat().st_mtime < cutoff:
+                old.unlink()
+        except OSError:
+            pass
     with os.fdopen(fd, 'w', encoding='utf-8') as fh:
         fh.write(json.dumps({'owner': owner, 'at': time.time()}) + '\n')
     return True
@@ -523,7 +627,8 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
     policy = policy or ScopePolicy()
     cfg = load_config() if config is None else config
     required = tuple(required)
-    snap = memory_snapshot_id(policy.scope, av_db=av_db, config=cfg, ledger_root=ledger_root)
+    gateway = TencentDBClient(cfg)  # one deadline budget for the snapshot probe and the search
+    snap = memory_snapshot_id(policy.scope, av_db=av_db, config=cfg, ledger_root=ledger_root, gateway=gateway)
     key = _sha('\x1f'.join((POLICY_VERSION, policy.key(), _normalize(query), str(max_tokens), ','.join(required), snap)))
     if use_cache:
         try:
@@ -533,7 +638,7 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
         if isinstance(cached, dict) and cached.get('memory_snapshot_id') == snap:
             return {**cached, 'cache': 'hit'}
     res = search(query, policy, limit=limit, required=required, av_db=av_db, config=cfg, ledger_root=ledger_root,
-                 snapshot_id=snap)
+                 snapshot_id=snap, gateway=gateway)
     gaps = [f"{layer}: unavailable ({st.get('reason')})" for layer, st in res['layers'].items()
             if st['status'] != 'ok']
     abstained = any(res['layers'].get(r, {}).get('status') != 'ok' for r in required)
@@ -596,16 +701,19 @@ def inspect(locator: str, *, chars: int = 400, context: int = 1, av_db: str | Pa
             rows = [] if row is None else conn.execute(
                 'select ordinal, role, timestamp, content from messages where session_id = ? and ordinal between ? '
                 'and ? order by ordinal', (row[0], row[1] - context, row[1] + context)).fetchall()
+            findings = _finding_spans(conn, [row[0]]) if rows else {}
         except sqlite3.Error as exc:
             return {'ok': False, 'error': f'agentsview unavailable ({_unavailable_reason(exc)})'}
         finally:
             conn.close()
         if row is None:
             return {'ok': False, 'error': f'no such message {locator}'}
+        # Scrub the whole message, then bound it: a credential cut by the bound would no longer match a pattern.
         out = {'ok': True, 'locator': locator, 'session_id': row[0], 'source_system': row[2],
                'harness': HARNESS_OF_AGENT.get(row[2], row[2]),
                'messages': [{'ordinal': o, 'role': r, 'timestamp': ts, 'target': o == row[1],
-                             'text': (content or '')[:chars]} for o, r, ts, content in rows]}
+                             'text': _clean_message(content, findings.get((row[0], o), ()))[0][:chars]}
+                            for o, r, ts, content in rows]}
         return scrub_obj(out)[0]
     m = re.fullmatch(r'eventlog:(\d+)', locator or '')
     if m:
@@ -616,7 +724,7 @@ def inspect(locator: str, *, chars: int = 400, context: int = 1, av_db: str | Pa
             return {'ok': False, 'error': f'no such event {locator}'}
         return scrub_obj({'ok': True, 'locator': locator, 'event_type': event.event_type, 'source': event.source,
                           'identity': event.identity,
-                          'payload': json.dumps(event.payload, ensure_ascii=False)[:chars]})[0]
+                          'payload': scrub_text(json.dumps(event.payload, ensure_ascii=False))[0][:chars]})[0]
     return {'ok': False, 'error': f'unsupported locator {locator!r}: expected agentsview:<sid>#<mid> or eventlog:<id>'}
 
 
