@@ -47,11 +47,28 @@ def by_trace(report):
     return {r['trace_id']: r for r in report['rows']}
 
 
+# Each harness's shell result as its AgentsView parser stores it: (tool name, result_content, tool_result_events
+# status; None = no row). Only an exit-code line in the text is exit evidence: Grok's ACP 'completed' only says the
+# tool call finished (grok.go maps nothing but 'failed' to 'errored'), oh-my-pi prints its notice only on failure and
+# DSH results carry no code at all.
+SHELL_SHAPE = {
+    'codex': lambda exit, out: ('exec_command', f'Process exited with code {exit}\nOutput:\n{out}', ''),
+    'hermes': lambda exit, out: ('terminal', json.dumps({'output': out, 'exit_code': exit, 'error': None}), None),
+    'omp': lambda exit, out: ('bash', f'{out}\n\nCommand exited with code {exit}' if exit else out, None),
+    'omo': lambda exit, out: ('bash', f'{out}\n\nCommand exited with code {exit}' if exit else out, None),
+    'dsh': lambda exit, out: ('bash', out, None),
+    'grok': lambda exit, out: ('run_terminal_command', out, 'completed'),
+}
+# Which test-run polarities each harness's shell results can carry (recorded in the report and table manifests).
+TEST_LABEL_POLARITY = {'codex': 'both', 'hermes': 'both', 'omp': 'failure_only', 'omo': 'failure_only',
+                       'dsh': 'sparse', 'grok': 'none'}
+
+
 class AVWriter:
     """The Transcript builder's interface over one AgentsView session (same scenario, other label source)."""
 
-    def __init__(self, fx, sid):
-        self.fx, self.sid = fx, sid
+    def __init__(self, fx, sid, harness=None):
+        self.fx, self.sid, self.harness = fx, sid, harness
 
     def prompt(self, pid, text, t):
         self.fx.user(self.sid, text, t)
@@ -60,7 +77,10 @@ class AVWriter:
         self.fx.say(self.sid, text, t)
 
     def bash(self, command, t, exit=0, out=''):
-        self.fx.bash(self.sid, command, t, exit=exit, out=out)
+        if self.harness is None:
+            return self.fx.bash(self.sid, command, t, exit=exit, out=out)
+        name, result, status = SHELL_SHAPE[self.harness](exit, out)
+        self.fx.tool(self.sid, name, 'Bash', {'command': command}, result, t, status=status)
 
 
 def scenario(w, repo):
@@ -117,20 +137,34 @@ def test_verify_harness_gives_the_claude_code_signal_semantics_from_agentsview(t
 
     fx = AVFixture(tmp_path / 'sessions.db', user_version=version)
     sid = fx.session(AGENT[harness], 'S1', started=T0, cwd=str(repo))
-    scenario(AVWriter(fx, sid), {'sha': sha})
+    scenario(AVWriter(fx, sid, harness), {'sha': sha})  # each harness's own shell result shape
     db = fx.close()
     capture(home, harness, 'S1', [f't{i}' for i in range(1, 8)])
     report = verify(harness, home, db, now=now, gh=ov.GitHub(True, fake_gh()))
     rows = by_trace(report)
 
     assert report['status'] == 'success' and len(rows) == 7
+    polarity = TEST_LABEL_POLARITY[harness]
+    assert report['test_label_polarity'] == polarity
+    tests = lambda r: [s for s in signals(r) if s[0] == 'tests_in_turn']
     for i in range(1, 8):
         av, ref = rows[f't{i}'], cc[f'p{i}']
         assert av['schema'] == f'z0int.{harness.replace("-", "_")}.turn_outcome_verified.v0'
         assert av['harness'] == harness and av['join']['state'] == 'joined' and av['join']['ordinal'] == i
-        assert (signals(av), av['verification_state'], av['label_class']) == \
-            (signals(ref), ref['verification_state'], ref['label_class']), f't{i}'
-    assert rows['t1']['verification_state'] == 'verified_failure'
+        # commit/revert, PR merge (self-merge downgrade) and correction cues: always the CC semantics
+        assert [s for s in signals(av) if s[0] != 'tests_in_turn'] == \
+            [s for s in signals(ref) if s[0] != 'tests_in_turn'], f't{i}'
+        if polarity == 'both':  # exit evidence on every run: identical to CC, test labels included
+            assert (signals(av), av['verification_state'], av['label_class']) == \
+                (signals(ref), ref['verification_state'], ref['label_class']), f't{i}'
+        elif polarity == 'failure_only':  # a failing run is labelled, a passing one is unknown
+            assert all(s[1] == -1 for s in tests(av)), f't{i}'
+        else:  # no exit evidence: a test run is never a label
+            assert tests(av) == [], f't{i}'
+    if polarity in ('both', 'failure_only'):
+        assert rows['t1']['verification_state'] == 'verified_failure'
+    else:
+        assert rows['t1']['verification_state'] != 'verified_success'
     assert any(s['kind'] == 'commit_reverted' for s in rows['t2']['signals'])
     assert rows['t3']['verification_state'] == 'verified_success'
     assert next(s for s in rows['t4']['signals'] if s['kind'] == 'pr_merged')['merged_by_agent']
@@ -421,14 +455,14 @@ def test_since_windows_every_captured_turn_and_the_join_counts(tmp_path, home, m
 # The pi (OMP/OMO), Hermes and deepseek-harness parsers write no tool_result_events row: the only evidence is
 # tool_calls.result_content in each harness's own shape. A run without a status and without an exit code is
 # unknown, never a pass.
-SHELL_TOOL = {'omp': 'bash', 'omo': 'bash', 'hermes': 'terminal', 'dsh': 'bash'}
+SHELL_TOOL = {'omp': 'bash', 'omo': 'bash', 'hermes': 'terminal', 'dsh': 'bash', 'grok': 'run_terminal_command'}
 
 
-def one_command_turn(tmp_path, home, harness, command, result):
+def one_command_turn(tmp_path, home, harness, command, result, status=None):
     fx = AVFixture(tmp_path / 'sessions.db')
     sid = fx.session(AGENT[harness], 'S1', started=T0, cwd=str(tmp_path))
     fx.user(sid, 'run the tests', T0)
-    fx.tool(sid, SHELL_TOOL[harness], 'Bash', {'command': command}, result, T0 + 5, status=None)
+    fx.tool(sid, SHELL_TOOL[harness], 'Bash', {'command': command}, result, T0 + 5, status=status)
     fx.say(sid, 'Done.', T0 + 30)
     db = fx.close()
     capture(home, harness, 'S1', ['t1'])
@@ -456,7 +490,9 @@ def test_exit_code_reads_the_omp_notice_and_is_unknown_without_status_or_code():
     assert tr.exit_code('1 failed\n\nCommand exited with code 1', None) == 1
     assert tr.exit_code('oops\nCommand exited with code 101', 'completed') == 101
     assert tr.exit_code('5 passed', None) is None  # no status, no code: unknown, never a pass
-    assert tr.exit_code('5 passed', 'completed') == 0  # an explicit completed status is a pass
+    # a 'completed' status is not exit evidence: Grok/Codex record it for a call that finished, whatever its exit
+    assert tr.exit_code('5 passed', 'completed') is None
+    assert tr.exit_code('..F..\n1 failed, 4 passed', 'completed') is None
     assert tr.exit_code('{"output": "1 failed", "exit_code": 1, "error": null}', None) == 1
 
 
@@ -472,6 +508,58 @@ def test_shell_result_without_status_or_exit_code_is_never_verified_success(tmp_
     row = one_command_turn(tmp_path, home, harness, command, result)
     assert row['verification_state'] != 'verified_success', row['signals']
     assert not [s for s in row['signals'] if s['kind'] == 'tests_in_turn' and s['polarity'] == 1]
+
+
+GROK_COMPLETED = [  # Grok's real shape: run_terminal_command, ACP status 'completed', no exit-code line
+    ('pytest -q', '..F..\n1 failed, 4 passed in 0.12s'),
+    ('pytest -q', 'Traceback (most recent call last):\n  File "x.py", line 1\nImportError: no module y'),
+    ('git push', 'fatal: not a git repository (or any of the parent directories): .git'),
+    ('cargo test', 'test result: FAILED. 3 passed; 1 failed; 0 ignored'),
+    ('pytest -q', '.....\n5 passed in 0.10s'),  # even a passing run: the exit is unknown
+]
+
+
+@pytest.mark.parametrize('command,result', GROK_COMPLETED, ids=['pytest-failed', 'traceback', 'fatal', 'cargo-failed',
+                                                                 'pytest-passed'])
+def test_grok_completed_tool_call_without_exit_line_is_never_a_pass(tmp_path, home, command, result):
+    row = one_command_turn(tmp_path, home, 'grok', command, result, status='completed')
+    assert row['verification_state'] != 'verified_success', row['signals']
+    assert row['label_class'] != 'deterministic_gold', row['signals']
+    assert not [s for s in row['signals'] if s['kind'] == 'tests_in_turn' and s['polarity'] == 1]
+
+
+def test_codex_completed_status_is_not_exit_evidence_but_its_exit_line_is(tmp_path, home):
+    # codex custom_tool_call_output gets 'completed' by default (codex.go); only the text's code counts
+    fx = AVFixture(tmp_path / 'sessions.db')
+    sid = fx.session('codex', 'S1', started=T0, cwd=str(tmp_path))
+    fx.user(sid, 'run the tests', T0)
+    fx.tool(sid, 'shell', 'Bash', {'command': 'pytest -q'}, '1 failed, 4 passed', T0 + 5, status='completed')
+    fx.say(sid, 'Done.', T0 + 30)
+    fx.user(sid, 'again', T0 + 100)
+    fx.tool(sid, 'exec_command', 'Bash', {'command': 'pytest -q'}, 'Process exited with code 0\nOutput:\n5 passed',
+            T0 + 105, status='')
+    fx.say(sid, 'Done.', T0 + 130)
+    db = fx.close()
+    capture(home, 'codex', 'S1', ['t1', 't2'])
+    rows = by_trace(verify('codex', home, db))
+    assert rows['t1']['verification_state'] != 'verified_success'
+    assert not [s for s in rows['t1']['signals'] if s['kind'] == 'tests_in_turn' and s['polarity'] == 1]
+    assert [s['polarity'] for s in rows['t2']['signals'] if s['kind'] == 'tests_in_turn'] == [1]
+
+
+@pytest.mark.parametrize('harness', AV_HARNESSES)
+def test_report_and_table_manifests_record_the_test_label_polarity(tmp_path, home, harness):
+    # one-sided test labels (OMP/OMO failures only, DSH rare, Grok none) are recorded, so A0/G-SUFF do not read
+    # their class balance as real
+    fx = AVFixture(tmp_path / 'sessions.db')
+    two_turn_session(fx, harness, 'k1')
+    db = fx.close()
+    capture(home, harness, 'k1', ['k1:x', 'k1:y'])
+    report = verify(harness, home, db, write=True)
+    assert report['test_label_polarity'] == TEST_LABEL_POLARITY[harness]
+    le.export_tables(tmp_path / 'out', root=home, host='h', include_unjoined=True)
+    mans = [json.loads(p.read_text()) for p in (tmp_path / 'out' / harness).glob('*.manifest.json')]
+    assert mans and all(m['test_label_polarity'] == TEST_LABEL_POLARITY[harness] for m in mans)
 
 
 def test_hermes_terminal_json_exit_code_gives_the_label(tmp_path, home):
