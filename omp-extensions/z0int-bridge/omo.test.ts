@@ -134,3 +134,59 @@ test.skipIf(!TYPES)(
 		expect(status).toBe("SUPPORTED");
 	},
 );
+
+test("a host that exits when its event loop drains (senpi print mode) is never held open by the resident worker", async () => {
+	// Found by the integration e2e: `omo -p` with this shim loaded finished its turn and then hung until killed,
+	// because the resident worker's child process and stdio pipes kept the host's event loop alive. OMP exits
+	// explicitly, senpi waits for the loop to drain. The worker must never keep a host alive, and must still
+	// exit itself once the host is gone (stdin EOF).
+	const dir = mkdtempSync(join(home, "drain-"));
+	const pidFile = join(dir, "worker.pid");
+	const fake = join(dir, "resident-worker.py");
+	writeFileSync(fake, [
+		"#!/usr/bin/env python3",
+		"import json, os, sys",
+		`open(${JSON.stringify(pidFile)}, "w").write(str(os.getpid()))`,
+		"for line in sys.stdin:",
+		"    req = json.loads(line)",
+		"    sys.stdout.write(json.dumps({'id': req.get('id'), 'ok': True, 'protocol': 'z0int.bridge.v2',",
+		"                                 'generation': 1, 'instance_id': 'f', 'build_id': 'f'}) + '\\n')",
+		"    sys.stdout.flush()",
+	].join("\n"));
+	chmodSync(fake, 0o755);
+	const host = join(dir, "host.ts");
+	writeFileSync(host, [
+		`const omoCapture = (await import(${JSON.stringify(join(import.meta.dir, "omo.ts"))})).default;`,
+		"const handlers = new Map();",
+		"const pi = { on: (e, h) => handlers.set(e, [...(handlers.get(e) ?? []), h]) };",
+		"if (omoCapture(pi).status !== 'SUPPORTED') throw new Error('unsupported');",
+		"const c = { cwd: '/w', sessionManager: { getSessionId: () => 'omo-drain' } };",
+		"await handlers.get('before_agent_start')[0]({ prompt: 'one' }, c);",
+		"await handlers.get('agent_end')[0]({ messages: [] }, c);",
+		"console.log('turn-done');",
+		"// no stopWorker, no process.exit: the host simply lets its event loop drain",
+	].join("\n"));
+	const proc = Bun.spawn([process.execPath, host], {
+		env: { ...process.env, Z0INT_PYTHON: fake, Z0INT_HOME: dir },
+		stdout: "pipe",
+		stderr: "pipe",
+	});
+	const exited = await Promise.race([proc.exited.then(() => true), Bun.sleep(8000).then(() => false)]);
+	if (!exited) proc.kill("SIGKILL");
+	const out = await new Response(proc.stdout).text();
+	expect(out).toContain("turn-done");
+	expect(exited).toBe(true);
+	// the worker follows its host out (stdin EOF) instead of lingering
+	const pid = Number(readFileSync(pidFile, "utf8"));
+	let alive = true;
+	for (let i = 0; i < 50 && alive; i++) {
+		try {
+			process.kill(pid, 0);
+			await Bun.sleep(100);
+		} catch {
+			alive = false;
+		}
+	}
+	if (alive) process.kill(pid, "SIGKILL");
+	expect(alive).toBe(false);
+}, 20000);
