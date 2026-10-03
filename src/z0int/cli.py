@@ -472,6 +472,24 @@ def build_parser() -> argparse.ArgumentParser:
     cxp.add_argument("--hook", choices=["session-start"], default=None,
                      help="Emit Claude Code hook JSON (reads hook stdin for cwd); fail-open")
 
+    cxg = cx_sub.add_parser("gbrain-pack", help="GBrain context_pack -> shadow context candidate")
+    cxg.add_argument("--entity", action="append", required=True, help="Standing entity (repeatable)")
+    cxg.add_argument("--source", default="default", help="GBrain source id")
+    cxg.add_argument("--session-id", default=None)
+    cxg.add_argument("--budget-tokens", type=int, default=1200)
+    cxg.add_argument("--binary", default=None, help="Override gbrain executable")
+    cxg.add_argument("--aodl", default=None, help="Optional compiled AODL JSON for correlation")
+
+    cxd = cx_sub.add_parser("gbrain-delta", help="GBrain delta -> shadow context candidate")
+    cxd.add_argument("--entity", action="append", default=[], help="Standing entity filter (repeatable)")
+    cxd.add_argument("--source", default="default", help="GBrain source id")
+    cursor = cxd.add_mutually_exclusive_group(required=True)
+    cursor.add_argument("--session-id", default=None)
+    cursor.add_argument("--since", default=None, help="ISO-8601 cursor for stateless wake")
+    cxd.add_argument("--budget-tokens", type=int, default=1200)
+    cxd.add_argument("--binary", default=None, help="Override gbrain executable")
+    cxd.add_argument("--aodl", default=None, help="Optional compiled AODL JSON for correlation")
+
 
     osc = sub.add_parser(
         "os-context",
@@ -822,6 +840,42 @@ def _cmd_context(args: argparse.Namespace) -> int:
 
     if args.context_cmd == "packet":
         return _cmd_context_packet(args)
+    if args.context_cmd in {"gbrain-pack", "gbrain-delta"}:
+        from pathlib import Path
+
+        from z0int.gbrain import GBrainClient, GBrainProtocolError, build_shadow_candidate
+
+        aodl_doc = None
+        if getattr(args, "aodl", None):
+            aodl_doc = json.loads(Path(args.aodl).expanduser().read_text(encoding="utf-8"))
+        client = GBrainClient(binary=getattr(args, "binary", None), source=args.source)
+        try:
+            if args.context_cmd == "gbrain-pack":
+                response = client.context_pack(
+                    args.entity,
+                    budget_tokens=args.budget_tokens,
+                    session_id=args.session_id,
+                )
+                verb = "context_pack"
+            else:
+                response = client.delta(
+                    session_id=args.session_id,
+                    since=args.since,
+                    entities=args.entity or None,
+                    budget_tokens=args.budget_tokens,
+                )
+                verb = "delta"
+        except GBrainProtocolError as exc:
+            print(json.dumps({"ok": False, "error": "gbrain_unavailable", "detail": str(exc)}), file=sys.stderr)
+            return 2
+        payload = build_shadow_candidate(
+            response,
+            verb=verb,
+            source=args.source,
+            aodl_doc=aodl_doc,
+        )
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return 0
     if args.context_cmd != "resolve":
         print(f"unknown context command: {args.context_cmd}", file=sys.stderr)
         return 2
