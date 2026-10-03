@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -32,7 +33,9 @@ AUTOMATED_KINDS = ('non-interactive', 'roborev')  # AgentsView session_kind valu
 HERMES_AUTOMATED_SOURCES = ('cron', 'kanban', 'cluster')  # Hermes session source -> AgentsView project hermes-<src>
 ASK_TOOLS = (ov.ASK_TOOL, 'ask_question', 'ask_followup_question', 'clarify')
 EDIT_CATEGORIES = {'Edit': 'Edit', 'Write': 'Write'}
-EXIT_RE = re.compile(r'^\s*Exit code (\d+)|"exit_code"\s*:\s*(-?\d+)|Process exited with code (-?\d+)', re.M)
+# Claude/Codex "Exit code N", Hermes terminal JSON, Codex "Process exited", OMP/OMO "Command exited" (oh-my-pi bash.ts)
+EXIT_RE = re.compile(r'^\s*Exit code (\d+)|"exit_code"\s*:\s*(-?\d+)|(?:Process|Command) exited with code (-?\d+)',
+                     re.M)
 PATCH_FILE = re.compile(r'^\*\*\* (?:Update|Add) File: (\S+)', re.M)
 
 _ORDINAL = ('the n-th captured prompt turn of the session (capture order; subagent turns excluded) is the n-th '
@@ -136,13 +139,17 @@ def captured_turns(harness: str, root: str | Path | None = None) -> dict[Any, li
 
 # ----------------------------------------------------------------------------- AgentsView (read-only)
 def exit_code(text: str, status: str | None) -> int | None:
-    """0 / N from a shell tool result; None when unknown (errored without a code, cancelled, backgrounded)."""
+    """N from a shell tool result's exit-code line; else 0 only on an explicit ``completed`` status.
+
+    None (unknown) otherwise: errored without a code, cancelled, backgrounded, or no status at all, which is what
+    the pi (OMP/OMO), Hermes and deepseek-harness parsers record. Execution completing is never a pass.
+    """
     m = EXIT_RE.search(text)
     if m:
         return int(next(g for g in m.groups() if g is not None))
-    if status in ('errored', 'cancelled', 'running') or 'running in background' in text[:200].lower():
-        return None
-    return 0
+    if status == 'completed' and 'running in background' not in text[:200].lower():
+        return 0
+    return None
 
 
 def _command(inp: Mapping[str, Any]) -> str | None:
@@ -152,14 +159,23 @@ def _command(inp: Mapping[str, Any]) -> str | None:
     return cmd if isinstance(cmd, str) else None
 
 
+SESSION_COLUMNS = ('id', 'project', 'agent', 'session_kind', 'is_automated', 'relationship_type', 'parent_session_id',
+                   'cwd')
+
+
 class AgentsViewReader:
-    """One read-only AgentsView connection; ``unavailable`` says why there is none (never an exception)."""
+    """One read-only AgentsView connection; ``unavailable`` says why there is none.
+
+    The queries raise ``sqlite3.Error`` on a schema they cannot read; the verifier turns that into a
+    ``reader_unavailable`` failure row (``reader_error``), never an exception into its caller.
+    """
 
     def __init__(self, path: str | Path | None = None, *, now: float | None = None):
         got = av.connect(path)
         self.conn = None if isinstance(got, av.Unavailable) else got
         self.unavailable = got if isinstance(got, av.Unavailable) else None
         self.staleness = av.staleness_hours(self.conn, now) if self.conn is not None else None
+        self._session_columns: str | None = None
 
     @property
     def available(self) -> bool:
@@ -174,9 +190,12 @@ class AgentsViewReader:
 
     def candidates(self, rule: JoinRule, session: Any) -> list[dict[str, Any]]:
         """Session rows that claim this captured session: its own id, or a copy naming it as source."""
+        if self._session_columns is None:  # session_kind only where present (v0.44; v0.39 has none)
+            have = {r[1] for r in self.conn.execute('pragma table_info(sessions)')}
+            self._session_columns = ', '.join(c for c in SESSION_COLUMNS if c in have or c != 'session_kind')
         cur = self.conn.execute(
-            'select id, project, agent, session_kind, is_automated, relationship_type, parent_session_id, cwd'
-            ' from sessions where agent = ? and deleted_at is null and (id = ? or source_session_id = ?)',
+            f'select {self._session_columns} from sessions'
+            ' where agent = ? and deleted_at is null and (id = ? or source_session_id = ?)',
             (rule.agent, rule.av_id(session), str(session)))
         cols = [c[0] for c in cur.description]
         return [dict(zip(cols, row)) for row in cur.fetchall()]
@@ -258,6 +277,12 @@ class AgentsViewReader:
             cur['ask_tool'].append(call)
         elif cat == 'Task':
             cur['agents_spawned'] += 1
+
+
+def reader_error(exc: sqlite3.Error) -> dict[str, str]:
+    """A query the schema cannot answer -> the ``reader_unavailable`` detail (exception type only, no SQL text)."""
+    missing = isinstance(exc, sqlite3.OperationalError) and str(exc).startswith('no such')
+    return {'reason': 'schema' if missing else 'error', 'error': type(exc).__name__}
 
 
 # ----------------------------------------------------------------------------- join

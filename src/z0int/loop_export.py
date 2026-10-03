@@ -262,7 +262,9 @@ def build_table(state: Path, *, projects: Path | None = None, include_unjoined: 
         started = ((ver or {}).get('turn') or {}).get('started_at') or (opp.get('provenance') or {}).get('built_at')
         rows.append({
             'schema': SCHEMA, 'table_version': TABLE_VERSION, 'feature_schema_sha': FEATURE_SCHEMA_SHA,
-            'turn_key': _sha({'session': sid, 'trace': tid}),
+            # claude-code keeps its 6fee859 key (byte-identical tables); every other harness the canonical one,
+            # the key its verified, imported and failure rows carry
+            'turn_key': _sha({'session': sid, 'trace': tid}) if harness == HARNESS else hc.turn_key(harness, sid, tid),
             'group': _sha({'session': sid}, 12),
             'day': started[:10] if isinstance(started, str) else None,
             'harness': harness,

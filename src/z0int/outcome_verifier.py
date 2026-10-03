@@ -31,6 +31,7 @@ import hashlib
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import time
@@ -1040,6 +1041,8 @@ def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Pat
     rule = tr.JOIN_RULES[harness]
     reader = tr.AgentsViewReader(agentsview, now=now)
     rows: list[dict[str, Any]] = []
+    fails: list[dict[str, Any]] = []  # this run's rows and failures land only when every query succeeded
+    counts: Counter = Counter()
     try:
         if not reader.available:
             failures.append(_failure(harness, 'reader_unavailable', {'reason': reader.unavailable.reason}))
@@ -1061,7 +1064,7 @@ def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Pat
                     started = core['_started']
                 if (started or 0) < since:
                     continue
-                join[j['state']] += 1
+                counts[j['state']] += 1
                 if core is None:
                     core = {'signals': [], 'label_class': 'unknown', 'label_confidence': None, 'turn': None,
                             'verification_state': 'pending_index' if j['state'] == 'pending_index' else 'unverified',
@@ -1070,12 +1073,17 @@ def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Pat
                     core['measurement'] = {**core['measurement'], 'label_source': 'agentsview'}
                 core.pop('_started', None)
                 if j['state'] == 'unjoined':
-                    failures.append(_failure(harness, 'unjoined', {'reason': j['reason'], 'rule': rule.name,
-                                                                   'candidates': j['candidates']}, dict(turn, cohort=cohort)))
+                    fails.append(_failure(harness, 'unjoined', {'reason': j['reason'], 'rule': rule.name,
+                                                                'candidates': j['candidates']}, dict(turn, cohort=cohort)))
                 rows.append(_harness_row(harness, turn, core, cohort, j, fix_days=fix_days, gh=gh, now=now,
                                          density=density))
+    except sqlite3.Error as exc:  # a schema the reader cannot read: a counted failure, never an exception
+        failures.append(_failure(harness, 'reader_unavailable', tr.reader_error(exc)))
+        return []
     finally:
         reader.close()
+    failures.extend(fails)
+    join.update(counts)
     return rows
 
 
