@@ -13,6 +13,12 @@ R = MemoryUseReceipt(snapshot_id='mem_abc', capability_ids=('agentsview', 'event
                      raw_source_reads=4)
 
 
+@pytest.fixture(autouse=True)
+def _hermetic(tmp_path, monkeypatch):
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path / 'z0'))
+    monkeypatch.setenv('AGENTSVIEW_DATA_DIR', str(tmp_path / 'av'))
+
+
 def test_round_trip_through_decision_receipt_extra_without_a_schema_change():
     d = receipt.DecisionReceipt(trace_id='t1', extra=R.to_decision_extra())
     row = json.loads(json.dumps(d.to_dict()))

@@ -321,16 +321,17 @@ def test_a_gateway_without_a_data_revision_is_unversioned_not_its_software_versi
 
 
 def test_brief_never_serves_stale_semantic_evidence_when_only_the_gateway_content_changes(env):
-    """AgentsView, the ledger and the repo stay unchanged; a new gateway item must reach the next brief."""
+    """AgentsView, the ledger and the repo stay unchanged; a new gateway item must reach the next brief.
+    (Unscoped: gateway items carry no scope, so a scoped policy never admits them.)"""
     with FakeTencentDB(token=TOKEN) as gw:
         cfg = gw.config()
-        first = ms.memory_brief('quokka wombat lantern', ms.ScopePolicy(scope=Z0), config=cfg)
+        first = ms.memory_brief('quokka wombat lantern', ms.ScopePolicy(), config=cfg)
         assert first['abstained'] is False and first['evidence']
         assert not any(e.startswith('tencentdb:') for e in first['evidence'])
         gw.items.append({'id': 'w1', 'content': 'wombat lantern semantic memory', 'version': 2, 'score': 100.0,
                          'updated_at': '2026-10-03T00:00:00.000Z'})
-        second = ms.memory_brief('quokka wombat lantern', ms.ScopePolicy(scope=Z0), config=cfg)
-        res = ms.search('quokka wombat lantern', ms.ScopePolicy(scope=Z0), config=cfg)
+        second = ms.memory_brief('quokka wombat lantern', ms.ScopePolicy(), config=cfg)
+        res = ms.search('quokka wombat lantern', ms.ScopePolicy(), config=cfg)
     assert second['cache'] != 'hit'
     assert 'tencentdb:w1' in second['evidence']
     ref = next(e['evidence_ref'] for e in res['evidence'] if e['locator'] == 'tencentdb:w1')

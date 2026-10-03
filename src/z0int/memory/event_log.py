@@ -202,8 +202,9 @@ class EventLog:
         self.blobs_dir = base / "blobs"
         self.blob_threshold = max(1, int(blob_threshold))
         self.read_only = bool(read_only)
-        self._uids: dict[str, tuple[int, str]] = {}  # event_uid -> (event_id, payload_hash), in-process
-        self._uids_end = 0  # events.jsonl offset the uid map reflects
+        # event_uid -> (event_id, payload_hash, offset, length), in-process; reuse one EventLog to keep it warm
+        self._uids: dict[str, tuple[int, str, int, int]] = {}
+        self._uids_at = (None, 0)  # (events.jsonl inode, offset) the uid map reflects
         if not self.read_only:
             self._ensure_layout()
 
@@ -211,18 +212,20 @@ class EventLog:
         if self.read_only:
             raise PermissionError("read-only view of the canonical ledger: workers cannot write it")
 
-    def _identity_index_locked(self, events, committed_end: int) -> dict[str, tuple[int, str]]:
+    def _identity_index_locked(self, events, committed_end: int) -> dict[str, tuple[int, str, int, int]]:
         """Bring the uid map up to ``committed_end`` by reading only the bytes appended since last time."""
-        if self._uids_end > committed_end:
-            self._uids, self._uids_end = {}, 0
-        events.seek(self._uids_end)
-        while events.tell() < committed_end:
+        inode = os.fstat(events.fileno()).st_ino
+        if self._uids_at[0] != inode or self._uids_at[1] > committed_end:
+            self._uids, self._uids_at = {}, (inode, 0)
+        events.seek(self._uids_at[1])
+        while (offset := events.tell()) < committed_end:
             raw = events.readline()
             row = self._decode_committed_line(raw)
             ident = row.get("identity")
             if ident:
-                self._uids.setdefault(ident["event_uid"], (row["event_id"], str(ident.get("payload_hash"))))
-        self._uids_end = committed_end
+                self._uids.setdefault(ident["event_uid"],
+                                      (row["event_id"], str(ident.get("payload_hash")), offset, len(raw)))
+        self._uids_at = (inode, committed_end)
         return self._uids
 
     def _ensure_layout(self) -> None:
@@ -470,8 +473,9 @@ class EventLog:
                 if seen is not None:
                     if seen[1] != ident_row["payload_hash"]:
                         raise EventIdentityConflict(f"{ident_row['event_uid']} already ingested with another payload_hash")
-                    events.seek(0)
-                    return self._event_at_locked(events, seen[0])
+                    events.seek(seen[2])  # the offset it was recorded at: no ledger scan
+                    raw = events.read(seen[3])
+                    return MemoryEvent.from_dict(self._decode_committed_line(raw, expected_id=seen[0]))
             parents = tuple(int(x) for x in parent_event_ids)
             if any(x < 0 or x >= event_id for x in parents):
                 raise ValueError("parent_event_ids must reference earlier events")
@@ -526,16 +530,10 @@ class EventLog:
                 last_offset=offset,
                 last_length=len(line),
             )
-            if ident_row is not None and self._uids_end == offset:
-                self._uids[ident_row["event_uid"]] = (event_id, ident_row["payload_hash"])
-                self._uids_end = offset + len(line)
+            if ident_row is not None and self._uids_at[1] == offset:
+                self._uids[ident_row["event_uid"]] = (event_id, ident_row["payload_hash"], offset, len(line))
+                self._uids_at = (self._uids_at[0], offset + len(line))
             return MemoryEvent.from_dict(base)
-
-    def _event_at_locked(self, events, event_id: int) -> MemoryEvent:
-        for row, _offset, _length in self._scan_locked(events):
-            if row["event_id"] == event_id:
-                return MemoryEvent.from_dict(row)
-        raise KeyError(event_id)
 
     def _append_index_row(self, row: dict[str, Any]) -> None:
         self.index_path.touch(mode=0o600, exist_ok=True)

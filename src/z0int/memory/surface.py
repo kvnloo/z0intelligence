@@ -49,6 +49,9 @@ HARNESS_OF_AGENT = {'claude': 'claude-code', 'deepseek-harness': 'dsh'}
 DEFAULT_USER = 'local'
 EXCERPT_CHARS = 300
 CANDIDATE_CAP = 200
+# The TencentDB gateway has no data revision (/health reports its software version only, a search hit only its own
+# id/version/updated_at), so its content cannot be keyed: a brief with the gateway reachable is never cached.
+UNVERSIONED = 'unversioned'
 
 _FTS_SQL = """
 select m.id, m.session_id, m.ordinal, m.role, m.timestamp, m.content, s.agent, s.project, bm25(messages_fts)
@@ -198,8 +201,9 @@ class TencentDBClient:
 
     One client serves one query and carries one deadline budget: every round-trip it makes (revision probe,
     search) shares ``deadline_ms`` from the first call, and a timed-out or unreachable gateway is not asked
-    again. The revision is taken from the search response when there is one, and the last revision a real
-    call observed is kept under ``$Z0INT_HOME`` so hook-path snapshots (``last_revision``) need no network.
+    again. A reachable gateway's revision is ``unversioned`` (it exposes no data revision; its software
+    version is not one), and the last revision a real call observed is kept under ``$Z0INT_HOME`` so hook-path
+    snapshots (``last_revision``) need no network.
     """
 
     def __init__(self, config: Mapping[str, Any] | None):
@@ -287,7 +291,7 @@ class TencentDBClient:
         return rev
 
     def revision(self) -> str:
-        """The gateway revision: from this client's earlier call when it has one, else a bounded /health."""
+        """``unversioned`` when the gateway answers a bounded /health, else ``unavailable:<reason>``."""
         if not self.configured:
             return 'unavailable:not_configured'
         if self._rev is not None:
@@ -295,7 +299,7 @@ class TencentDBClient:
         body, reason = self._bounded('GET', '/health')
         if reason:
             return f'unavailable:{reason}'
-        return self._observe('rev:' + str((body or {}).get('revision') or (body or {}).get('version') or 'unknown'))
+        return self._observe(UNVERSIONED)
 
     def last_revision(self) -> str:
         """No network: the revision last observed by a real call (any process), or ``unprobed``."""
@@ -319,9 +323,7 @@ class TencentDBClient:
         items = data.get('items') if isinstance(data, dict) else None
         if not isinstance(items, list):
             return _layer('unavailable', 'bad_response'), [], 0
-        rev, terms, out, scrubbed = str(data.get('revision') or 'unknown'), _terms(query), [], 0
-        if data.get('revision'):
-            self._observe('rev:' + rev)
+        terms, out, scrubbed = _terms(query), [], 0
         for item in items:
             if not isinstance(item, dict):
                 continue
@@ -333,17 +335,18 @@ class TencentDBClient:
             sem_id = str(item.get('id') or _sha(content, 16))
             locator = f'tencentdb:{sem_id}'
             excerpt = _excerpt(clean, terms)
+            version = f"v{item.get('version') or 0}@{item.get('updated_at') or ''}"  # the item's own revision
             out.append({
                 'event_uid': ids[0] if ids else 'sem_' + _sha(sem_id), 'layers': ['semantic'], 'semantic_id': sem_id,
                 'source_event_ids': ids, 'provenance_ok': bool(ids), 'source_system': 'tencentdb', 'harness': None,
                 'session_id': item.get('session_id'), 'timestamp': item.get('updated_at') or item.get('created_at'),
                 'locator': locator, 'scope': None, 'excerpt': excerpt, 'payload_hash': 'sha256:' + _sha(content),
                 'score': float(item.get('score') or 0),
-                'evidence_ref': EvidenceRef(source_id=locator, source_version=rev, locator=locator,
+                'evidence_ref': EvidenceRef(source_id=locator, source_version=version, locator=locator,
                                             trust_class='derived_memory', observed_at=str(item.get('updated_at') or ''),
                                             excerpt=excerpt).to_dict(),
             })
-        return _layer('ok', revision=rev, reads=len(items),
+        return _layer('ok', revision=UNVERSIONED, reads=len(items),
                       canonical_provenance=sum(1 for e in out if e['provenance_ok'])), out, scrubbed
 
 
@@ -466,10 +469,15 @@ def source_revisions(*, repo: str | Path | None = None, repo_sha: str | None = N
     return {'agentsview': av, 'tencentdb': tdb, 'eventlog': ledger, 'repo': sha}
 
 
-def memory_snapshot_id(scope: MemoryScope | None = None, **kw: Any) -> str:
-    """Content-addressed id of the memory view: changes iff a source revision (or the policy version) changes."""
+def _snapshot_of(scope: MemoryScope | None, revisions: Mapping[str, str]) -> str:
     return MemorySnapshot.build(scope=scope or MemoryScope(), state_revision=POLICY_VERSION,
-                                source_revisions=source_revisions(**kw)).snapshot_id
+                                source_revisions=dict(revisions)).snapshot_id
+
+
+def memory_snapshot_id(scope: MemoryScope | None = None, **kw: Any) -> str:
+    """Content-addressed id of the memory view: changes iff a source revision (or the policy version) changes.
+    An ``unversioned`` TencentDB gateway contributes no content revision (see ``UNVERSIONED``)."""
+    return _snapshot_of(scope, source_revisions(**kw))
 
 
 # ----------------------------------------------------------------------------- search
@@ -555,17 +563,32 @@ def worker_ledger(root: str | Path | None = None) -> EventLog:
     return EventLog(root, read_only=True)
 
 
+_WRITERS: dict[Path, EventLog] = {}
+
+
+def _writer(root: str | Path | None) -> EventLog:
+    """One writable EventLog per ledger per process, so its uid map stays warm: bulk ingest reads each ledger
+    line once instead of re-reading the ledger on every call."""
+    path = (Path(root) if root is not None else paths.home() / 'memory').resolve()
+    log = _WRITERS.get(path)
+    if log is None:
+        log = _WRITERS[path] = EventLog(path)
+    else:
+        log._ensure_layout()
+    return log
+
+
 def ingest_reference(identity: EventIdentity, locator: str, *, scope: MemoryScope | None = None,
                      ledger_root: str | Path | None = None) -> MemoryEvent:
     """Record a source event in the ledger as a reference (EventIdentity + locator; never a body)."""
     payload = {'locator': locator, **({'scope': scope.to_dict()} if scope else {})}
     source = locator.split(':', 1)[0] if ':' in locator else identity.source_system
-    return EventLog(ledger_root).append('source.reference', payload, source=source, identity=identity)
+    return _writer(ledger_root).append('source.reference', payload, source=source, identity=identity)
 
 
 def record_claim(claim: BitemporalClaim, *, ledger_root: str | Path | None = None) -> MemoryEvent:
     payload, _ = scrub_obj(claim.to_dict())
-    return EventLog(ledger_root).append('memory.claim', payload, source='z0-memory')
+    return _writer(ledger_root).append('memory.claim', payload, source='z0-memory')
 
 
 def claim_history(subject: str, predicate: str | None = None, policy: ScopePolicy | None = None, *,
@@ -622,15 +645,18 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
                  required: Iterable[str] = ('lexical',), use_cache: bool = True, limit: int = 8,
                  config: Mapping[str, Any] | None = None, av_db: str | Path | None = None,
                  ledger_root: str | Path | None = None) -> dict[str, Any]:
-    """A bounded, scrubbed, provenance-carrying brief. ``use_cache=False`` skips the lookup but still stores."""
+    """A bounded, scrubbed, provenance-carrying brief. ``use_cache=False`` skips the lookup but still stores.
+    With the TencentDB gateway reachable (``unversioned``) the cache is bypassed: no lookup, no store."""
     t0 = time.perf_counter()
     policy = policy or ScopePolicy()
     cfg = load_config() if config is None else config
     required = tuple(required)
     gateway = TencentDBClient(cfg)  # one deadline budget for the snapshot probe and the search
-    snap = memory_snapshot_id(policy.scope, av_db=av_db, config=cfg, ledger_root=ledger_root, gateway=gateway)
+    revisions = source_revisions(av_db=av_db, config=cfg, ledger_root=ledger_root, gateway=gateway)
+    snap = _snapshot_of(policy.scope, revisions)
+    cacheable = revisions['tencentdb'] != UNVERSIONED
     key = _sha('\x1f'.join((POLICY_VERSION, policy.key(), _normalize(query), str(max_tokens), ','.join(required), snap)))
-    if use_cache:
+    if use_cache and cacheable:
         try:
             cached = json.loads(_cache_path(key).read_text(encoding='utf-8'))
         except (OSError, ValueError):
@@ -671,12 +697,13 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
         raw_source_reads=res['raw_reads'])
     brief = {
         'schema': BRIEF_SCHEMA, 'query': query, 'text': text, 'tokens': estimate_tokens(text), 'max_tokens': max_tokens,
-        'abstained': abstained, 'gaps': gaps, 'memory_snapshot_id': snap, 'cache': 'miss',
+        'abstained': abstained, 'gaps': gaps, 'memory_snapshot_id': snap,
+        'cache': 'miss' if cacheable else 'bypass:tencentdb_unversioned',
         'current_claims': [{k: c.get(k) for k in ('claim_id', 'subject', 'predicate', 'value')} for c in used
                            if c.get('claim_id')],
         'evidence': [e['locator'] for e in used], 'scrubbed': res['scrubbed'], 'receipt': receipt.to_dict(),
     }
-    if used and not abstained:  # an empty or abstained brief is never cached: an outage must not persist
+    if used and not abstained and cacheable:  # an empty or abstained brief is never cached: an outage must not persist
         path = _cache_path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(f'.{os.getpid()}.tmp')
