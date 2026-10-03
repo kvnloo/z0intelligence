@@ -74,11 +74,11 @@ def on_opportunity(hook, root=None):
     from .decision_opportunity import build_decision_opportunity, deterministic_gate
     from .state_packet import repo_root
     repo = repo_root(hook.get('cwd') or os.getcwd())
-    if repo is None:
-        return None
-    opp = build_decision_opportunity(repo, hook['prompt'], harness=HARNESS, trace_id=turn_id(hook))
+    # Sessions often run outside a repo; record them with empty state rather than dropping them (as Hermes does).
+    opp = build_decision_opportunity(repo or '.', hook['prompt'], harness=HARNESS, trace_id=turn_id(hook),
+                                     packet=None if repo else {})
     record = {'schema': 'z0int.claude_code.opportunity_record.v0', 'session_id': hook.get('session_id'),
-              'gate': deterministic_gate(opp), 'opportunity': opp}
+              'repo': str(repo) if repo else None, 'gate': deterministic_gate(opp), 'opportunity': opp}
     path = opportunities_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('a', encoding='utf-8') as fh:
