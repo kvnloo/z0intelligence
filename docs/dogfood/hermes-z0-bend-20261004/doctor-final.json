@@ -1,0 +1,40 @@
+{
+ "rows": [
+  {
+   "name": "Jev",
+   "state": "GREEN",
+   "detail": "v0.18.0 211ms routing=on"
+  },
+  {
+   "name": "Bend",
+   "state": "GREEN",
+   "detail": "bend 2.0.34 scope=bend-emitted-book attested=false"
+  },
+  {
+   "name": "Bend GPU",
+   "state": "GREEN",
+   "detail": "cpu==gpu==1048576, build 735ms, gpu run 111ms, cubin present (compute evidence only, no authority)"
+  },
+  {
+   "name": "z0",
+   "state": "GREEN",
+   "detail": "127.0.0.1:11501 healthz/readyz/providers/metrics 200, authority_protocol=3"
+  },
+  {
+   "name": "AODL",
+   "state": "GREEN",
+   "detail": "aodl_admission_ready=true aodl-canon-1"
+  },
+  {
+   "name": "Hermes<->z0",
+   "state": "GREEN",
+   "detail": "stack_mode=shadow runtime reachable, 10 providers"
+  },
+  {
+   "name": "receipts",
+   "state": "GREEN",
+   "detail": "last receipt verdict=fail scope=bend-emitted-book (run --full for PASS/FAIL/replay)"
+  }
+ ],
+ "ts": 1791094139.9381275
+}

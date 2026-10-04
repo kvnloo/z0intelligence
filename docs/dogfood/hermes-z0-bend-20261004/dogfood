@@ -1,0 +1,273 @@
+#!/usr/bin/env python3
+"""Daily surface for the Hermes + Jev + Bend + z0intelligence dogfood stack.
+
+Thin wrapper over existing CLIs (jev, hermes bend, hermes z0, systemd, curl-equivalent
+HTTP, the Bend binary). It adds no scheduler, router, receipt ledger or authority.
+
+  dogfood doctor [--full] [--json]   status board; exit 1 if anything is RED
+  dogfood up                         (re)start the user-scoped z0 service, then doctor
+  dogfood hermes [args...]           launch hermes with the toolchain env this stack needs
+
+Rows are GREEN (checked and good), RED (checked and bad) or SKIP (could not be checked
+safely, e.g. GPU busy). SKIP is never shown as GREEN. --full also runs a real Bend
+PASS + deliberate FAIL + replay (about 1 minute).
+"""
+import json, os, shutil, subprocess, sys, tempfile, time, urllib.request
+
+HOME = os.path.expanduser("~")
+PROFILE = os.environ.get("HERMES_HOME") or f"{HOME}/.hermes/profiles/clean"
+BEND = os.environ.get("DOGFOOD_BEND", f"{HOME}/.bend/bin/bend")
+LEAN_BIN = os.environ.get("DOGFOOD_LEAN_BIN", "/mnt/zer0models/bend-stack/lean-4.34.0-linux/bin")
+Z0_PORT = int(os.environ.get("DOGFOOD_Z0_PORT", "11501"))
+Z0_UNIT = "z0intelligence.service"
+EVIDENCE = os.environ.get("DOGFOOD_EVIDENCE", "/tmp/hermes-z0-bend-dogfood")
+JEV_BASELINE = os.environ.get("DOGFOOD_JEV_BASELINE", f"{EVIDENCE}/jev/state.before.json")
+MIN_FREE_MIB = 2000
+
+
+def env(extra_lean=True):
+    e = dict(os.environ)
+    # Lean goes LAST: its bundled clang lacks stdbool.h and must not shadow the system clang
+    # that Bend's native/GPU build needs.
+    parts = [p for p in e.get("PATH", "").split(os.pathsep) if p and p != LEAN_BIN]
+    if extra_lean:
+        parts.append(LEAN_BIN)
+    e["PATH"] = os.pathsep.join(parts)
+    e.setdefault("CUDA_HOME", "/opt/cuda")
+    e["BEND_NO_TELEMETRY"] = "1"
+    return e
+
+
+def run(cmd, timeout=120, cwd=None):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env(), cwd=cwd)
+        return r.returncode, r.stdout, r.stderr
+    except subprocess.TimeoutExpired:
+        return 124, "", "timeout"
+    except FileNotFoundError as exc:
+        return 127, "", str(exc)
+
+
+def json_from(text):
+    """hermes prints a banner before JSON; parse from the first '{'."""
+    i = text.find("{")
+    if i < 0:
+        return None
+    try:
+        return json.loads(text[i:])
+    except ValueError:
+        try:
+            return json.JSONDecoder().raw_decode(text[i:])[0]
+        except ValueError:
+            return None
+
+
+def http(path, timeout=6):
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{Z0_PORT}{path}", timeout=timeout) as r:
+            return r.status, r.read().decode()
+    except Exception as exc:  # explicit degrade: report, never fake
+        return 0, f"{type(exc).__name__}: {exc}"
+
+
+def row(name, state, detail):
+    return {"name": name, "state": state, "detail": detail}
+
+
+def check_jev():
+    rc, out, err = run(["jev", "doctor"], 60)
+    d = json_from(out) or {}
+    if rc != 0 or not d:
+        return row("Jev", "RED", f"jev doctor rc={rc} {err[:120]}")
+    if not d.get("jev", {}).get("reachable"):
+        return row("Jev", "RED", "jev unreachable (hermes keeps its own model; nothing fabricated)")
+    st = {}
+    try:
+        st = json.load(open(f"{PROFILE}/jev/state.json"))
+    except Exception:
+        pass
+    note = f"v{d.get('version')} {d['jev'].get('latency_ms')}ms routing={st.get('routing', '?')}"
+    try:
+        before = json.load(open(JEV_BASELINE))
+        if before != st:
+            return row("Jev", "RED", f"routing state changed vs baseline: {before} -> {st}")
+    except FileNotFoundError:
+        note += " (no baseline to compare)"
+    return row("Jev", "GREEN", note)
+
+
+def check_bend():
+    rc, out, _ = run(["hermes", "bend", "doctor"], 90)
+    d = json_from(out) or {}
+    if not d.get("available"):
+        return row("Bend", "RED", d.get("error") or f"hermes bend doctor rc={rc}")
+    if d.get("verification_scope") != "bend-emitted-book" or d.get("source_semantics_attested") is not False:
+        return row("Bend", "RED", "scope contract violated (expected bend-emitted-book / attested=false)")
+    return row("Bend", "GREEN", f"bend {d.get('bend_version')} scope=bend-emitted-book attested=false")
+
+
+def free_mib():
+    rc, out, _ = run(["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"], 15)
+    try:
+        return int(out.strip().splitlines()[0])
+    except Exception:
+        return None
+
+
+GPU_SRC = """import Base
+
+law pow2:
+  for +d: Nat
+  U32
+
+def pow2(d):
+  match d:
+    case 0n:
+      1
+    case 1n+p:
+      a b = pow2(p) pow2(p)
+      U32.add(a, b)
+
+law main:
+  IO(Unit)
+
+def main():
+  IO.print(U32.show(pow2!(20n)))
+"""
+
+
+def check_gpu():
+    free = free_mib()
+    if free is None:
+        return row("Bend GPU", "SKIP", "nvidia-smi unavailable; GPU not checked")
+    if free < MIN_FREE_MIB:
+        return row("Bend GPU", "SKIP", f"only {free} MiB free (<{MIN_FREE_MIB}); shared card, not run")
+    work = tempfile.mkdtemp(prefix="dogfood-gpu-", dir=os.environ.get("TMPDIR"))
+    try:
+        open(f"{work}/pow2.bend", "w").write(GPU_SRC)
+        t0 = time.time()
+        rc, out, err = run([BEND, "pow2.bend", "-o", "pow2"], 120, cwd=work)
+        build_ms = int((time.time() - t0) * 1000)
+        if rc != 0:
+            return row("Bend GPU", "RED", f"build failed: {err.strip().splitlines()[-1:]}")
+        if not os.path.exists(f"{work}/pow2.gpu"):
+            return row("Bend GPU", "RED", "no pow2.gpu cubin: CUDA lane not built (CUDA_HOME / nvrtc?)")
+        t0 = time.time()
+        rg, og, eg = run(["./pow2", "--gpu", "1GB"], 60, cwd=work)  # explicit size = fail loudly, no fallback
+        gpu_ms = int((time.time() - t0) * 1000)
+        rcpu, ocpu, _ = run(["./pow2", "--gpu", "off"], 60, cwd=work)
+        if rg != 0:
+            return row("Bend GPU", "RED", f"--gpu 1GB failed rc={rg}: {eg.strip()[:120]}")
+        if og.strip() != "1048576" or ocpu.strip() != "1048576":
+            return row("Bend GPU", "RED", f"result mismatch gpu={og.strip()!r} cpu={ocpu.strip()!r}")
+        return row("Bend GPU", "GREEN", f"cpu==gpu==1048576, build {build_ms}ms, gpu run {gpu_ms}ms, "
+                                         f"cubin present (compute evidence only, no authority)")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def check_z0():
+    s, body = http("/healthz")
+    if s != 200:
+        return row("z0", "RED", f"/healthz {s}: {body[:100]}"), None
+    s2, body2 = http("/readyz")
+    if s2 != 200:
+        return row("z0", "RED", f"/readyz {s2}: {body2[:100]}"), None
+    d = json.loads(body2)
+    sp, _ = http("/v1/providers")
+    sm, _ = http("/metrics")
+    if sp != 200 or sm != 200:
+        return row("z0", "RED", f"/v1/providers={sp} /metrics={sm}"), d
+    return row("z0", "GREEN", f"127.0.0.1:{Z0_PORT} healthz/readyz/providers/metrics 200, "
+                              f"authority_protocol={d.get('authority_protocol_version')}"), d
+
+
+def check_aodl(ready):
+    if ready is None:
+        return row("AODL", "RED", "z0 not ready; admission unknown")
+    if ready.get("aodl_admission_ready") is True:
+        return row("AODL", "GREEN", f"aodl_admission_ready=true {ready.get('aodl_canon_version')}")
+    return row("AODL", "RED", f"aodl_admission_ready={ready.get('aodl_admission_ready')}")
+
+
+def check_bridge():
+    rc, out, _ = run(["hermes", "z0", "status"], 60)
+    d = json_from(out) or {}
+    mode = d.get("mode")
+    if rc != 0 or mode is None:
+        return row("Hermes<->z0", "RED", f"hermes z0 status rc={rc}")
+    rc2, out2, _ = run(["hermes", "z0", "runtime", "providers"], 60)
+    p = json_from(out2) or {}
+    if rc2 != 0 or "providers" not in p:
+        return row("Hermes<->z0", "RED", f"stack_mode={mode} but runtime unreachable (degraded, nothing faked)")
+    if mode != "shadow":
+        return row("Hermes<->z0", "RED", f"stack_mode={mode}; expected shadow for dogfooding")
+    return row("Hermes<->z0", "GREEN", f"stack_mode=shadow runtime reachable, {len(p['providers'])} providers")
+
+
+def check_receipts(full):
+    rc, out, _ = run(["hermes", "bend", "last-receipt"], 60)
+    d = json_from(out) or {}
+    last = d.get("receipt") or d
+    detail = f"last receipt verdict={last.get('verdict')} scope={last.get('verification_scope')}" if last.get("verdict") else "no saved receipt yet"
+    if not full:
+        return row("receipts", "GREEN" if last.get("verdict") else "SKIP", detail + " (run --full for PASS/FAIL/replay)")
+    work = tempfile.mkdtemp(prefix="dogfood-bend-", dir=os.environ.get("TMPDIR"))
+    try:
+        ex = f"{PROFILE}/plugins/bend/examples/basic"
+        shutil.copytree(ex, f"{work}/pass"); shutil.copytree(ex, f"{work}/fail")
+        open(f"{work}/fail/LAWS.bend", "w").write("import Base\n\nlaw identity:\n  {0n == 1n : Nat}\n")
+        r1 = run(["hermes", "bend", "verify", f"{work}/pass", "--receipt", f"{work}/pass.json"], 240)
+        r2 = run(["hermes", "bend", "verify", f"{work}/fail", "--receipt", f"{work}/fail.json"], 240)
+        r3 = run(["hermes", "bend", "replay", f"{work}/pass.json", "--project", f"{work}/pass", "--receipt", f"{work}/replay.json"], 240)
+        with open(f"{work}/pass/PROOF.bend", "a") as fh:
+            fh.write("-- changed\n")
+        r4 = run(["hermes", "bend", "replay", f"{work}/pass.json", "--project", f"{work}/pass", "--receipt", f"{work}/stale.json"], 240)
+        stale = json_from(r4[1]) or {}
+        ok = (r1[0] == 0 and r2[0] == 1 and r3[0] == 0 and r4[0] == 2 and stale.get("code") == "receipt_stale")
+        got = f"pass rc={r1[0]} fail rc={r2[0]} replay rc={r3[0]} stale rc={r4[0]} code={stale.get('code')}"
+        return row("receipts", "GREEN" if ok else "RED", got + (" fail-closed confirmed" if ok else " UNEXPECTED"))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def doctor(full=False, as_json=False):
+    rows = [check_jev(), check_bend(), check_gpu()]
+    z0row, ready = check_z0()
+    rows += [z0row, check_aodl(ready), check_bridge(), check_receipts(full)]
+    if as_json:
+        print(json.dumps({"rows": rows, "ts": time.time()}, indent=1))
+    else:
+        for r in rows:
+            print(f"{r['name']:<12} {r['state']:<6} {r['detail']}")
+    return 1 if any(r["state"] == "RED" for r in rows) else 0
+
+
+def up():
+    rc, _, err = run(["systemctl", "--user", "restart", Z0_UNIT], 60)
+    if rc != 0:
+        print(f"z0 restart failed: {err.strip()}", file=sys.stderr)
+        return 2
+    for _ in range(30):
+        if http("/readyz")[0] == 200:
+            break
+        time.sleep(1)
+    return doctor()
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__); return 0
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "doctor":
+        return doctor("--full" in rest, "--json" in rest)
+    if cmd == "up":
+        return up()
+    if cmd == "hermes":
+        os.execvpe("hermes", ["hermes", *rest], env())
+    print(f"unknown command {cmd!r}\n{__doc__}", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

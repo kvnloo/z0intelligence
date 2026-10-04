@@ -1,0 +1,49 @@
+{
+ "schema": "dogfood.bend_gpu_smoke.v1",
+ "date": "2026-10-04T00:51:37-0500",
+ "program": "pow2!(20n)",
+ "expected": "1048576",
+ "bend": "2.0.34 $HOME/.bend/bin/bend",
+ "bend_sha256": "7fafb749dd33df446a0cb5839c5694df237312a8e8048d2e9420480164ff5934",
+ "env": {
+  "CUDA_HOME": "/opt/cuda",
+  "clang": "/usr/bin/clang 22.1.8",
+  "gpu": "RTX 3080 Ti sm_86 driver 610.57.04",
+  "heap_cap": "--gpu 1GB"
+ },
+ "cpu_ms": [
+  6.2,
+  6.0,
+  6.7,
+  6.2,
+  5.6,
+  5.9,
+  6.0
+ ],
+ "gpu_ms": [
+  116.1,
+  118.3,
+  106.3,
+  111.2,
+  103.9,
+  105.3,
+  107.2
+ ],
+ "cpu_median_ms": 6.0,
+ "gpu_median_ms": 107.2,
+ "cpu_outputs": [
+  "1048576"
+ ],
+ "gpu_outputs": [
+  "1048576"
+ ],
+ "build_ms_with_cuda": 1211,
+ "gpu_backend_proof": [
+  "pow2.gpu cubin emitted only when CUDA_HOME set",
+  "pow2 appeared in nvidia-smi compute-apps (20 MiB) during --gpu 1GB runs",
+  "CPU-only binary + --gpu 1GB exits rc=1 \"no usable GPU\" (no silent fallback)"
+ ],
+ "stable": true,
+ "authority": "none - compute evidence only, not proof verification",
+ "pow2.gpu_sha256": "450b8091ba681a7a52e718f7d8beec0ecd9e30eab14c387338bdf67b89f8cf52"
+}
