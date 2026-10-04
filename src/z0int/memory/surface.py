@@ -44,7 +44,9 @@ from .scrub import redact_spans, scrub_obj, scrub_text
 SCHEMA = 'z0int.memory.search.v0'
 BRIEF_SCHEMA = 'z0int.memory.brief.v0'
 POLICY_VERSION = 'z0-memory-1'  # part of every cache key and snapshot: bump when a brief's meaning changes
-LAYERS = ('temporal', 'lexical', 'semantic')
+LAYERS = ('temporal', 'lexical', 'semantic')  # latency-sensitive/default path: unchanged
+PULL_LAYERS = (*LAYERS, 'ctx')                 # explicit read/MCP path
+ALL_LAYERS = PULL_LAYERS
 HARNESS_OF_AGENT = {'claude': 'claude-code', 'deepseek-harness': 'dsh'}
 DEFAULT_USER = 'local'
 EXCERPT_CHARS = 300
@@ -117,6 +119,143 @@ class ScopePolicy:
 
 def _layer(status: str, reason: str | None = None, **kw: Any) -> dict[str, Any]:
     return {'status': status, **({'reason': reason} if reason else {}), 'hits': 0, 'reads': 0, **kw}
+
+
+_CTX_STOPWORDS = {
+    'the', 'and', 'for', 'with', 'from', 'this', 'that', 'what', 'when', 'where', 'which',
+    'into', 'about', 'have', 'does', 'did', 'was', 'were', 'why', 'how', 'our', 'last', 'latest',
+}
+
+
+def _ctx_capability() -> Any:
+    from ..capabilities.ctx_history import CtxHistoryCapability
+    return CtxHistoryCapability()
+
+
+def _ctx_terms(query: str, limit: int = 8) -> tuple[str, ...]:
+    """Keyword alternatives for ctx lexical retrieval; the original query is still preserved."""
+    out: list[str] = []
+    for token in _terms(query):
+        if token in _CTX_STOPWORDS or token in out:
+            continue
+        out.append(token)
+        if len(out) >= limit:
+            break
+    return tuple(out)
+
+
+def _project_from_cwd(cwd: str | None) -> str | None:
+    """Best-effort project identity matching the existing task-cwd rule; absence stays absence."""
+    if not cwd:
+        return None
+    p = Path(cwd).expanduser()
+    if not p.is_absolute():
+        return None
+    root = p
+    for d in (p, *p.parents):
+        git = d / '.git'
+        if git.is_dir():
+            root = d
+            break
+        if git.is_file():
+            root = d
+            try:
+                target = git.read_text(encoding='utf-8').strip()
+            except OSError:
+                break
+            gitdir = Path(target[len('gitdir:'):].strip()) if target.startswith('gitdir:') else None
+            if gitdir is not None:
+                gitdir = gitdir if gitdir.is_absolute() else d / gitdir
+                if gitdir.parent.name == 'worktrees' and gitdir.parent.parent.name == '.git':
+                    root = gitdir.parent.parent.parent
+            break
+    return root.name.replace('-', '_') or None
+
+
+def _ctx_candidates(
+    query: str,
+    policy: ScopePolicy,
+    *,
+    limit: int,
+    config: Mapping[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]], int]:
+    """Read ctx as evidence only. Missing/slow/malformed ctx is an explicit unavailable layer."""
+    own = dict(config.get('ctx') or {})
+    if own.get('enabled') is False:
+        return _layer('unavailable', 'disabled'), [], 0
+    cap = _ctx_capability()
+    if not cap.available:
+        return _layer('unavailable', 'not_installed'), [], 0
+    backend = str(own.get('backend') or 'lexical')
+    allow_semantic = own.get('allow_semantic') is True
+    if backend not in {'lexical', 'hybrid', 'semantic'}:
+        return _layer('unavailable', 'bad_backend'), [], 0
+    if backend != 'lexical' and not allow_semantic:
+        return _layer('unavailable', 'semantic_not_opted_in'), [], 0
+    timeout_s = max(0.05, min(float(own.get('timeout_ms') or 1500) / 1000.0, 8.0))
+    try:
+        result = cap.search(
+            query,
+            limit=max(1, min(int(limit), 100)),
+            backend=backend,
+            terms=_ctx_terms(query),
+            include_current_session=True,
+            allow_semantic=allow_semantic,
+            timeout_s=timeout_s,
+        )
+    except Exception as exc:
+        from ..capabilities.ctx_history import CtxCommandError, CtxHistoryError, CtxProtocolError, CtxUnavailable
+        if isinstance(exc, CtxUnavailable):
+            reason = 'not_installed'
+        elif isinstance(exc, CtxCommandError):
+            reason = 'timeout' if 'timed out' in str(exc).lower() else 'command_error'
+        elif isinstance(exc, CtxProtocolError):
+            reason = 'protocol_error'
+        elif isinstance(exc, CtxHistoryError):
+            reason = 'ctx_error'
+        else:
+            reason = 'error'
+        return _layer('unavailable', reason, detail=type(exc).__name__), [], 0
+
+    out: list[dict[str, Any]] = []
+    for index, hit in enumerate(result.hits):
+        ref = hit.evidence
+        session_id = hit.session_id or f'unknown:{hit.provider}'
+        source_event_id = hit.event_id or ref.locator
+        event_uid = derive_event_uid(
+            source_system=f'ctx:{hit.provider}',
+            source_session=session_id,
+            source_event_id=source_event_id,
+        )
+        project = _project_from_cwd(hit.cwd)
+        scope = MemoryScope(user=DEFAULT_USER, project=project) if project else MemoryScope(user=DEFAULT_USER)
+        out.append({
+            'event_uid': event_uid,
+            'layers': ['ctx'],
+            'source_system': f'ctx:{hit.provider}',
+            'harness': HARNESS_OF_AGENT.get(hit.provider, hit.provider),
+            'session_id': hit.session_id,
+            'message_id': hit.event_id,
+            'timestamp': hit.timestamp,
+            'locator': ref.locator,
+            'scope': scope.to_dict(),
+            'cwd': hit.cwd,
+            'excerpt': ref.excerpt,
+            'score': 1.0 / max(1, hit.rank or index + 1),
+            'ctx_generation': result.generation_id,
+            'source_event_ids': [source_event_id],
+            'provenance_ok': bool(hit.event_id and hit.session_id),
+            'evidence_ref': ref.to_dict(),
+        })
+    return _layer(
+        'ok',
+        revision=result.generation_id,
+        requested_mode=result.requested_mode,
+        effective_mode=result.effective_mode,
+        more_available=result.more_available,
+        latency_ms=round(result.latency_ms, 2),
+        reads=1,
+    ), out, 0
 
 
 # ----------------------------------------------------------------------------- lexical: AgentsView
@@ -511,7 +650,7 @@ def search(query: str, policy: ScopePolicy | None = None, *, layers: Iterable[st
     t0 = time.perf_counter()
     policy = policy or ScopePolicy()
     cfg = load_config() if config is None else config
-    layers = tuple(layer for layer in LAYERS if layer in set(layers))
+    layers = tuple(layer for layer in ALL_LAYERS if layer in set(layers))
     gateway = gateway or TencentDBClient(cfg)
     status: dict[str, dict[str, Any]] = {}
     candidates: list[dict[str, Any]] = []
@@ -527,6 +666,10 @@ def search(query: str, policy: ScopePolicy | None = None, *, layers: Iterable[st
     if 'temporal' in layers:
         status['temporal'], found, n = _temporal_candidates(
             query, ledger_root=ledger_root, join_uids={c['event_uid'] for c in candidates})
+        candidates += found
+        scrubbed += n
+    if 'ctx' in layers:
+        status['ctx'], found, n = _ctx_candidates(query, policy, limit=limit, config=cfg)
         candidates += found
         scrubbed += n
     admitted, out_of_scope = [], 0
@@ -556,8 +699,16 @@ def search(query: str, policy: ScopePolicy | None = None, *, layers: Iterable[st
         st['hits'] = sum(1 for e in ranked if layer in e['layers'])
     req = [r for r in required if r in layers]
     ok = any(s['status'] == 'ok' for s in status.values()) and all(status[r]['status'] == 'ok' for r in req)
-    snap = snapshot_id or memory_snapshot_id(policy.scope, av_db=av_db, config=cfg, ledger_root=ledger_root,
-                                             gateway=gateway, probe_gateway='semantic' in layers)
+    if snapshot_id is not None:
+        snap = snapshot_id
+    else:
+        revisions = source_revisions(av_db=av_db, config=cfg, ledger_root=ledger_root, gateway=gateway,
+                                     probe_gateway='semantic' in layers)
+        if 'ctx' in layers:
+            ctx_status = status.get('ctx') or {}
+            revisions['ctx'] = str(ctx_status.get('revision')
+                                   or f"unavailable:{ctx_status.get('reason') or ctx_status.get('status') or 'unknown'}")
+        snap = _snapshot_of(policy.scope, revisions)
     result = {
         'schema': SCHEMA, 'ok': ok, 'query': query, 'evidence': ranked, 'layers': status,
         'duplicates_removed': duplicates, 'out_of_scope': out_of_scope, 'memory_snapshot_id': snap,
@@ -669,14 +820,15 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
     policy = policy or ScopePolicy()
     cfg = load_config() if config is None else config
     required = tuple(required)
-    layers = tuple(layer for layer in LAYERS if layer in set(layers))
+    layers = tuple(layer for layer in ALL_LAYERS if layer in set(layers))
     gateway = TencentDBClient(cfg)  # one deadline budget for the snapshot probe and the search
     revisions = source_revisions(av_db=av_db, config=cfg, ledger_root=ledger_root, gateway=gateway,
                                  probe_gateway='semantic' in layers)
-    snap = _snapshot_of(policy.scope, revisions)
-    cacheable = 'semantic' not in layers or revisions['tencentdb'] != UNVERSIONED
+    ctx_requested = 'ctx' in layers
+    snap = None if ctx_requested else _snapshot_of(policy.scope, revisions)
+    cacheable = (not ctx_requested) and ('semantic' not in layers or revisions['tencentdb'] != UNVERSIONED)
     key = _sha('\x1f'.join((POLICY_VERSION, policy.key(), _normalize(query), str(max_tokens), ','.join(required),
-                            ','.join(layers), snap)))
+                            ','.join(layers), str(snap or 'ctx-dynamic'))))
     if use_cache and cacheable:
         try:
             cached = json.loads(_cache_path(key).read_text(encoding='utf-8'))
@@ -686,6 +838,7 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
             return {**cached, 'cache': 'hit'}
     res = search(query, policy, layers=layers, limit=limit, required=required, av_db=av_db, config=cfg,
                  ledger_root=ledger_root, snapshot_id=snap, gateway=gateway)
+    snap = res['memory_snapshot_id']
     gaps = [f"{layer}: unavailable ({st.get('reason')})" for layer, st in res['layers'].items()
             if st['status'] != 'ok']
     abstained = any(res['layers'].get(r, {}).get('status') != 'ok' for r in required)
@@ -719,7 +872,8 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
     brief = {
         'schema': BRIEF_SCHEMA, 'query': query, 'text': text, 'tokens': estimate_tokens(text), 'max_tokens': max_tokens,
         'abstained': abstained, 'gaps': gaps, 'memory_snapshot_id': snap,
-        'cache': 'miss' if cacheable else 'bypass:tencentdb_unversioned',
+        'cache': ('miss' if cacheable
+                  else ('bypass:ctx_generation' if ctx_requested else 'bypass:tencentdb_unversioned')),
         'current_claims': [{k: c.get(k) for k in ('claim_id', 'subject', 'predicate', 'value')} for c in used
                            if c.get('claim_id')],
         'evidence': [e['locator'] for e in used], 'evidence_refs': [e['evidence_ref'] for e in used],
@@ -764,6 +918,36 @@ def inspect(locator: str, *, chars: int = 400, context: int = 1, av_db: str | Pa
                              'text': _clean_message(content, findings.get((row[0], o), ()))[0][:chars]}
                             for o, r, ts, content in rows]}
         return scrub_obj(out)[0]
+    m = re.fullmatch(r'ctx:event:(.+)', locator or '')
+    if m:
+        cap = _ctx_capability()
+        if not cap.available:
+            return {'ok': False, 'error': 'ctx unavailable (not_installed)'}
+        own = dict(load_config().get('ctx') or {})
+        timeout_s = max(0.05, min(float(own.get('inspect_timeout_ms') or own.get('timeout_ms') or 2000) / 1000.0, 8.0))
+        try:
+            hydrated = cap.show_event(m.group(1), window=max(0, min(int(context), 20)), timeout_s=timeout_s)
+        except Exception as exc:
+            return {'ok': False, 'error': f'ctx unavailable ({type(exc).__name__})'}
+
+        def bounded_event(raw: Mapping[str, Any]) -> dict[str, Any]:
+            out = {k: raw.get(k) for k in (
+                'ctx_event_id', 'ctx_session_id', 'provider', 'provider_session_id', 'event_seq',
+                'sequence', 'event_type', 'role', 'occurred_at', 'timestamp', 'cwd',
+            ) if raw.get(k) is not None}
+            if raw.get('text') is not None:
+                clean, _ = scrub_text(str(raw['text']))
+                out['text'] = clean[:chars]
+            return out
+
+        return scrub_obj({
+            'ok': True,
+            'locator': locator,
+            'identity': hydrated.identity.to_dict(),
+            'event': bounded_event(hydrated.event),
+            'events': [bounded_event(event) for event in hydrated.window_events],
+            'latency_ms': round(hydrated.latency_ms, 2),
+        })[0]
     m = re.fullmatch(r'eventlog:(\d+)', locator or '')
     if m:
         log = worker_ledger(ledger_root)
@@ -774,7 +958,9 @@ def inspect(locator: str, *, chars: int = 400, context: int = 1, av_db: str | Pa
         return scrub_obj({'ok': True, 'locator': locator, 'event_type': event.event_type, 'source': event.source,
                           'identity': event.identity,
                           'payload': scrub_text(json.dumps(event.payload, ensure_ascii=False))[0][:chars]})[0]
-    return {'ok': False, 'error': f'unsupported locator {locator!r}: expected agentsview:<sid>#<mid> or eventlog:<id>'}
+    return {'ok': False, 'error': (
+        f'unsupported locator {locator!r}: expected agentsview:<sid>#<mid>, ctx:event:<id> or eventlog:<id>'
+    )}
 
 
 def unknowns(query: str, policy: ScopePolicy | None = None, **kw: Any) -> dict[str, Any]:
