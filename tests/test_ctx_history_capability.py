@@ -230,6 +230,15 @@ class CtxHistoryCapabilityTests(unittest.TestCase):
         self.assertNotIn("import", argv)
         self.assertNotIn("index", argv)
 
+    def test_search_can_explicitly_include_callers_current_session(self):
+        runner = _Runner([SEARCH])
+        cap = CtxHistoryCapability(binary="/usr/bin/ctx", runner=runner)
+        cap.search("why retry", include_current_session=True)
+
+        argv = runner.calls[0][0]
+        self.assertIn("--include-current-session", argv)
+        self.assertLess(argv.index("--include-current-session"), argv.index("--"))
+
     def test_search_rejects_wrong_schema_and_non_read_only_freshness(self):
         wrong_schema = dict(SEARCH)
         wrong_schema["schema_version"] = 3
