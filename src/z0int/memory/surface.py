@@ -240,11 +240,9 @@ def _ctx_candidates(
             'timestamp': hit.timestamp,
             'locator': ref.locator,
             'scope': scope,
-            'cwd': hit.cwd,
             'excerpt': ref.excerpt,
             'score': 1.0 / max(1, hit.rank or index + 1),
             'ctx_generation': result.generation_id,
-            'source_event_ids': [source_event_id],
             'provenance_ok': bool(hit.event_id and hit.session_id),
             'evidence_ref': ref.to_dict(),
         })
