@@ -19,6 +19,25 @@ The turn id is the DSH lineage turn_key `<agent id>:<turn>` (alias `dsh.lineage_
 only. No row holds prompt or response text; the prompt reaches the hook child on stdin and, when configured,
 the z0 shadow service.
 
+## Run it in DSH
+
+From the z0intelligence checkout, load capture + the safe shadow push seam + the read-only memory MCP in one overlay:
+
+```sh
+export Z0INT_PYTHON="${Z0INT_PYTHON:-$HOME/.z0int/bin/python}"
+dsh web --patch "$PWD/harness-adapters/dsh-z0intelligence/z0-dsh.cordis.yml"
+```
+
+For another DSH surface, pass the same `--patch` file. To persist it, merge its rows into
+`$DSH_HOME/profiles/<name>/cordis.patch.yml` (or the machine-wide `$DSH_HOME/cordis.patch.yml`);
+do not overwrite an existing user patch.
+
+The MCP pull path includes ctx as a fourth, read-only source. It searches ctx with
+`--refresh off` and `--include-current-session`, keeps the Core generation in the memory snapshot,
+and lets `inspect` hydrate an exact `ctx:event:<id>`. The automatic `agent/pre-step` push path
+still uses only the existing temporal/AgentsView/TencentDB layers: ctx remains out of the 300 ms push
+budget until its bakeoff clears latency and precision gates.
+
 Profile config (all optional):
 
 ```yaml
