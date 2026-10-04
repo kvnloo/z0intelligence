@@ -150,10 +150,10 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404,{'error':'not_found'})
 
     def do_POST(self):
-        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence', '/v1/worker', '/v1/automatic', '/v1/automatic/consumed', '/v1/integrations/agent-orchestrator/spawn-decision', '/v1/integrations/agent-orchestrator/outcome', '/v1/plan', '/v1/experimental/choice', '/v1/experimental/noul', '/v1/observe/reliability', '/v1/observe/outcome', '/v1/observe/outcome/expectation', '/v1/observe/outcome/assignment', '/v1/observe/event-batch', '/v1/context/pack', '/v1/governed-worker', '/v1/agentweb', '/v1/agentweb/observation'):return self.reply(404,{'error':'not_found'})
+        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence', '/v1/worker', '/v1/automatic', '/v1/automatic/consumed', '/v1/integrations/agent-orchestrator/spawn-decision', '/v1/integrations/agent-orchestrator/outcome', '/v1/plan', '/v1/experimental/choice', '/v1/experimental/noul', '/v1/observe/reliability', '/v1/observe/outcome', '/v1/observe/outcome/expectation', '/v1/observe/outcome/assignment', '/v1/observe/event-batch', '/v1/context/pack', '/v1/governed-worker', '/v1/agentweb', '/v1/agentweb/observation', '/v1/o8', '/v1/o8/observation'):return self.reply(404,{'error':'not_found'})
         try:
             size=int(self.headers.get('Content-Length','0'))
-            max_size = 262144 if self.path.startswith('/v1/authority/') else (48000 if self.path=='/v1/agentweb' else (8000 if self.path=='/v1/agentweb/observation' else 40000))
+            max_size = 262144 if self.path.startswith('/v1/authority/') else (48000 if self.path in ('/v1/agentweb','/v1/o8') else (8000 if self.path in ('/v1/agentweb/observation','/v1/o8/observation') else 40000))
             if not 0<size<=max_size:return self.reply(413,{'error':'request_size'})
             args=json.loads(self.rfile.read(size))
             bridge_envelope=None
@@ -180,6 +180,12 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=='/v1/agentweb/observation':
                 from .agentweb_bridge import join_agentweb_observation
                 return self.reply(200,join_agentweb_observation(args))
+            if self.path=='/v1/o8':
+                from .o8_bridge import handle_bridge_request as handle_o8_bridge_request
+                return self.reply(200,handle_o8_bridge_request(args))
+            if self.path=='/v1/o8/observation':
+                from .o8_bridge import join_o8_observation
+                return self.reply(200,join_o8_observation(args))
             if self.path=='/v1/automatic/consumed':return self.reply(200,consume(args))
             if self.path=='/v1/observe/reliability':return self.reply(200,ingest_observation(args))
             if self.path=='/v1/observe/outcome':return self.reply(200,ingest_outcome_observation(args))
