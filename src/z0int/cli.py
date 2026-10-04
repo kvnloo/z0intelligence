@@ -473,6 +473,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Explicitly allow ctx hybrid/semantic retrieval",
     )
+    cxr.add_argument(
+        "--ctx-hydrate-top",
+        type=int,
+        default=0,
+        help="Hydrate the top N ctx event hits with exact event windows (0 disables)",
+    )
+    cxr.add_argument(
+        "--ctx-hydrate-chars",
+        type=int,
+        default=2000,
+        help="Maximum characters retained per hydrated ctx event window",
+    )
     cxr.add_argument("--input", default=None, help="JSON file with needs[]")
     cxp = cx_sub.add_parser("packet", help="State Packet v0 — current-work state from git + docs + Claude Code history")
     cxp.add_argument("--repo", default=None, help="Target repository (default: cwd)")
@@ -859,6 +871,8 @@ def _cmd_context(args: argparse.Namespace) -> int:
         allow_ctx_semantic=bool(getattr(args, "allow_ctx_semantic", False)),
         ctx_include_current_session=bool(getattr(args, "ctx_include_current_session", False)),
         ctx_backend=str(getattr(args, "ctx_backend", "lexical")),
+        ctx_hydrate_top=int(getattr(args, "ctx_hydrate_top", 0)),
+        ctx_hydrate_chars=int(getattr(args, "ctx_hydrate_chars", 2000)),
     )
     payload = packet.to_dict()
     if args.json or True:
