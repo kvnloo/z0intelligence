@@ -456,6 +456,23 @@ def build_parser() -> argparse.ArgumentParser:
     cxr.add_argument("--project-root", default=None)
     cxr.add_argument("--no-qmd", action="store_true")
     cxr.add_argument("--allow-memory", action="store_true")
+    cxr.add_argument("--allow-ctx", action="store_true", help="Opt into read-only ctx history evidence")
+    cxr.add_argument(
+        "--ctx-include-current-session",
+        action="store_true",
+        help="Do not hide ctx's caller session tree (caller-neutral harness integration)",
+    )
+    cxr.add_argument(
+        "--ctx-backend",
+        choices=("lexical", "hybrid", "semantic"),
+        default="lexical",
+        help="ctx retrieval backend; hybrid/semantic also require --allow-ctx-semantic",
+    )
+    cxr.add_argument(
+        "--allow-ctx-semantic",
+        action="store_true",
+        help="Explicitly allow ctx hybrid/semantic retrieval",
+    )
     cxr.add_argument("--input", default=None, help="JSON file with needs[]")
     cxp = cx_sub.add_parser("packet", help="State Packet v0 — current-work state from git + docs + Claude Code history")
     cxp.add_argument("--repo", default=None, help="Target repository (default: cwd)")
@@ -838,6 +855,10 @@ def _cmd_context(args: argparse.Namespace) -> int:
         project_root=getattr(args, "project_root", None),
         allow_qmd=not bool(getattr(args, "no_qmd", False)),
         allow_memory=bool(getattr(args, "allow_memory", False)),
+        allow_ctx=bool(getattr(args, "allow_ctx", False)),
+        allow_ctx_semantic=bool(getattr(args, "allow_ctx_semantic", False)),
+        ctx_include_current_session=bool(getattr(args, "ctx_include_current_session", False)),
+        ctx_backend=str(getattr(args, "ctx_backend", "lexical")),
     )
     payload = packet.to_dict()
     if args.json or True:
