@@ -147,6 +147,7 @@ class CtxHistoryCapability:
         provider: str | None = None,
         workspace: str | None = None,
         file: str | None = None,
+        include_current_session: bool = False,
         allow_semantic: bool = False,
         timeout_s: float = 8.0,
     ) -> CtxSearchEvidence:
@@ -178,6 +179,8 @@ class CtxHistoryCapability:
             args.extend(["--workspace", str(workspace)])
         if file:
             args.extend(["--file", str(file)])
+        if include_current_session:
+            args.append("--include-current-session")
         args.extend(["--", query])
 
         payload, latency_ms = self._run_json(args, timeout_s=timeout_s)
