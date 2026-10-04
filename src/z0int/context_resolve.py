@@ -306,6 +306,8 @@ def resolve_context(
     allow_ctx_semantic: bool = False,
     ctx_include_current_session: bool = False,
     ctx_backend: str = "lexical",
+    ctx_hydrate_top: int = 0,
+    ctx_hydrate_chars: int = 2000,
 ) -> ContextPacket:
     """Resolve information needs into a provenance-preserving packet.
 
@@ -326,6 +328,10 @@ def resolve_context(
             raise ValueError(f"unsupported ctx backend: {ctx_backend}")
         if ctx_backend != "lexical" and not allow_ctx_semantic:
             raise ValueError("ctx semantic/hybrid retrieval requires allow_ctx_semantic=True")
+        if not 0 <= int(ctx_hydrate_top) <= 10:
+            raise ValueError("ctx_hydrate_top must be between 0 and 10")
+        if not 1 <= int(ctx_hydrate_chars) <= 10000:
+            raise ValueError("ctx_hydrate_chars must be between 1 and 10000")
     t0 = time.perf_counter()
     root = Path(project_root).expanduser().resolve() if project_root else None
     need_list: list[InformationNeed] = list(needs or [])
@@ -376,9 +382,13 @@ def resolve_context(
             "allow_ctx_semantic": allow_ctx_semantic,
             "ctx_include_current_session": ctx_include_current_session,
             "ctx_backend": ctx_backend,
+            "ctx_hydrate_top": int(ctx_hydrate_top),
+            "ctx_hydrate_chars": int(ctx_hydrate_chars),
             "ctx_status": "ready" if ctx.available else "absent",
             "ctx_results": 0,
             "ctx_latency_ms": 0.0,
+            "ctx_hydration_latency_ms": 0.0,
+            "ctx_hydrated_events": 0,
             "ctx_effective_modes": [],
         }
 
@@ -408,14 +418,63 @@ def resolve_context(
             op.update(status="error", error=f"{type(exc).__name__}: {str(exc)[:200]}")
             ctx_meas["ctx_status"] = "error"
             return False
+        hydrated: dict[str, str] = {}
+        hydration_errors: list[str] = []
+        for ref in res.evidence[: int(ctx_hydrate_top)]:
+            if not ref.locator.startswith("ctx:event:"):
+                continue
+            event_id = ref.locator.removeprefix("ctx:event:")
+            try:
+                item = ctx.show_event(event_id, window=3)
+            except CtxHistoryError as exc:
+                hydration_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
+                continue
+            ctx_meas["ctx_hydration_latency_ms"] += item.latency_ms
+            rows = [item.event, *item.window_events]
+            target = next(
+                (i for i, row in enumerate(rows) if row.get("ctx_event_id") == event_id),
+                0,
+            )
+            order = [target] + [
+                j
+                for distance in range(1, len(rows))
+                for j in (target - distance, target + distance)
+                if 0 <= j < len(rows)
+            ]
+            text = ""
+            for j in order:
+                value = rows[j].get("text")
+                if not isinstance(value, str) or not value:
+                    continue
+                piece = value if not text else "\n" + value
+                room = int(ctx_hydrate_chars) - len(text)
+                if room <= 0:
+                    break
+                text += piece[:room]
+            if text:
+                hydrated[ref.locator] = text
+                ctx_meas["ctx_hydrated_events"] += 1
+
         seen = {(e.source_id, e.source_version, e.locator) for e in evidence}
         added = 0
         for ref in res.evidence:
             key = (ref.source_id, ref.source_version, ref.locator)
-            if key not in seen:
-                seen.add(key)
-                evidence.append(ref)
-                added += 1
+            if key in seen:
+                continue
+            seen.add(key)
+            excerpt = hydrated.get(ref.locator)
+            if excerpt is not None:
+                ref = EvidenceRef(
+                    source_id=ref.source_id,
+                    source_version=ref.source_version,
+                    locator=ref.locator,
+                    trust_class=ref.trust_class,
+                    observed_at=ref.observed_at,
+                    excerpt=excerpt,
+                    note=((ref.note + "; ") if ref.note else "") + "hydration=exact",
+                )
+            evidence.append(ref)
+            added += 1
         prev = epochs.setdefault("ctx_generation", res.generation_id)
         if prev != res.generation_id:
             contradictions.append(f"ctx generation changed during resolve: {prev} -> {res.generation_id}")
@@ -427,6 +486,8 @@ def resolve_context(
             added=added,
             more_available=res.more_available,
             latency_ms=round(res.latency_ms, 1),
+            hydrated=len(hydrated),
+            hydration_errors=hydration_errors,
         )
         ctx_meas["ctx_results"] += res.returned
         ctx_meas["ctx_latency_ms"] += res.latency_ms
