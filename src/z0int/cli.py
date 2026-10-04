@@ -623,6 +623,12 @@ def build_parser() -> argparse.ArgumentParser:
     po.add_argument("--log", action="store_true", help="Append a snapshot to ~/.z0int/state/posture/history.jsonl")
     _json_flag(po)
 
+    ut = sub.add_parser("utilization", help="North-star z0 utilization per harness and cohort (count-only)")
+    ut.add_argument("--range", default="7d", help="window, e.g. 7d or 24h")
+    ut.add_argument("--projects-dir", default=None, help="Claude Code projects dir (default ~/.claude/projects)")
+    ut.add_argument("--no-external", action="store_true", help="skip Hermes/OMP/Codex volume counts")
+    _json_flag(ut)
+
     pf = sub.add_parser("preflight", help="z0intelligence production preflight (no Evolution Lab)")
     pf.add_argument("prompt")
     pf.add_argument("--capability-id", default=None)
@@ -1172,6 +1178,13 @@ def main(argv: list[str] | None = None) -> int:
         out = preflight_dict(args.prompt, capability_id=getattr(args, "capability_id", None))
         _print(out, as_json=as_json)
         return 0
+
+    if args.cmd == "utilization":
+        rest = ["--range", args.range] + (["--json"] if as_json else [])
+        rest += ["--projects-dir", args.projects_dir] if args.projects_dir else []
+        rest += ["--no-external"] if args.no_external else []
+        from .utilization import run as _util_run
+        return int(_util_run(rest))
 
     if args.cmd in ("routine", "cascade", "aodl", "repair", "abab", "claude-code", "hermes", "outcomes", "loop",
                     "memory"):
