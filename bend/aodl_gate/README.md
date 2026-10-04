@@ -99,11 +99,7 @@ nothing.
 
 ## Findings
 
-1. **No latency benefit is possible at this boundary.** The host must walk
-   the JSON to shape-check and intern it. That costs about as much as the
-   canonical validator itself. The Bend runtime then spends ~1 µs per token on
-   linked-list and closure-heavy code, and IPC adds a floor of ~70 µs. The
-   #48 promotion condition 2 ("material latency benefit") fails.
+1. **The CPU-only latency paragraph is not a verdict.** Those numbers are Intel i7-4870HQ, `--threads 1`, persistent pipe. This file's own limit says the GPU was unused (below). Do not cite them as "Bend is slower" or as promotion condition 2 failed. A GPU-path measurement of this gate has not been published. On that CPU path, the host JSON walk already costs about as much as the canonical validator, and the Bend runtime then adds ~1 µs per token plus an IPC floor of ~70 µs. That does not decide the GPU path.
 2. **The runtime Nat is capped at 2^48−1 and aborts past it**, while the
    proofs model an unbounded Nat. The fuzzer found it:
    `bend: a Nat past the largest immediate 2^48-1`. The adapter denies on the
