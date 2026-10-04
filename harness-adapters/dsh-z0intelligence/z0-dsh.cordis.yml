@@ -1,0 +1,23 @@
+# z0intelligence × DSH: capture + safe shadow push + read-only unified-memory MCP.
+# Pass with:
+#   dsh web --patch /path/to/z0intelligence/harness-adapters/dsh-z0intelligence/z0-dsh.cordis.yml
+#
+# ctx is available through the MCP pull surface when installed, but is intentionally excluded
+# from the latency-sensitive automatic pre-step push path until its bakeoff clears promotion.
+
+- insert:
+    - id: automatic-z0intelligence
+      name: ./index.mjs
+      config:
+        capture: true
+        router: false
+        memory_inject: shadow
+
+    - id: memory-z0
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: z0-memory
+        transport: stdio
+        command: sh
+        args: ['-c', 'exec "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.intelligence_mcp --profile memory']
+        cwd: !!js process.cwd()
