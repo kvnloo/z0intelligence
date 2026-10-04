@@ -9,6 +9,7 @@ files are never echoed: ``require_auth`` is reported as a boolean only.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -53,6 +54,35 @@ def _binary_data_version(binary: str | Path | None) -> tuple[int | None, str]:
     release = (int(m.group(1)), int(m.group(2)))
     version = KNOWN_DATA_VERSIONS.get(release)
     return version, f'agentsview {release[0]}.{release[1]}' + ('' if version else ' (dataVersion unknown)')
+
+def _ctx_lexical(command: str | None = None) -> dict[str, Any]:
+    """Read-only. A missing binary or a failed status is an explicit unavailable, never an omitted check."""
+    cmd = command if command is not None else shutil.which('ctx')
+    if not cmd:
+        return _check('ctx_lexical', True, 'unavailable (ctx not on PATH)', status='unavailable')
+    try:
+        proc = subprocess.run([cmd, 'status', '--format', 'json', '--quiet'], capture_output=True, text=True,
+                              timeout=8, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return _check('ctx_lexical', True, f'unavailable ({type(exc).__name__})', status='unavailable')
+    try:
+        payload = json.loads(proc.stdout)
+    except (json.JSONDecodeError, TypeError):
+        detail = (proc.stderr or proc.stdout or 'status not json').strip().splitlines()
+        return _check('ctx_lexical', True, 'unavailable (' + (detail[-1] if detail else 'no status') + ')',
+                      status='unavailable')
+    lexical = payload.get('lexical') if isinstance(payload, dict) else None
+    epoch = payload.get('history_epoch') if isinstance(payload, dict) else None
+    lexical_status = lexical.get('status') if isinstance(lexical, dict) else None
+    reason = lexical.get('reason') if isinstance(lexical, dict) else None
+    generation = epoch.get('generation_path') if isinstance(epoch, dict) else None
+    if lexical_status == 'ready':
+        return _check('ctx_lexical', True, f'ready generation {generation or "unnamed"}', status='ready',
+                      generation=generation)
+    return _check('ctx_lexical', True,
+                  f'unavailable ({lexical_status or "missing"}{": " + reason if reason else ""})',
+                  status='unavailable', generation=generation)
+
 
 
 def run(*, av_dir: str | Path | None = None, agentsview_bin: str | Path | None = None,
@@ -106,6 +136,7 @@ def run(*, av_dir: str | Path | None = None, agentsview_bin: str | Path | None =
     status = rev.split(':', 1)[1] if rev.startswith('unavailable:') else 'reachable'
     checks.append(_check('tencentdb', True, 'semantic layer ' + (f'available ({rev})' if status == 'reachable' else
                                                                   f'UNAVAILABLE ({status})'), status=status))
+    checks.append(_ctx_lexical())
     report = {'schema': SCHEMA, 'ok': all(c['ok'] for c in checks), 'checks': checks,
               'agentsview_dir': str(av_dir), 'claude_home': str(claude_home)}
     return scrub_obj(report)[0]
