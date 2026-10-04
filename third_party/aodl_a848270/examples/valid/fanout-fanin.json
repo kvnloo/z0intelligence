@@ -1,0 +1,220 @@
+{
+  "specVersion": "0.2",
+  "graphId": "fanout-fanin",
+  "revision": 0,
+  "intentGraph": {
+    "nodes": [
+      {
+        "id": "source",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "workerA",
+        "kind": "executor",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "workerB",
+        "kind": "executor",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "synth",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-src-a",
+        "relation": "dependency",
+        "from": "source",
+        "to": "workerA",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      },
+      {
+        "id": "e-src-b",
+        "relation": "dependency",
+        "from": "source",
+        "to": "workerB",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      },
+      {
+        "id": "e-a-synth",
+        "relation": "dependency",
+        "from": "workerA",
+        "to": "synth",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      },
+      {
+        "id": "e-b-synth",
+        "relation": "dependency",
+        "from": "workerB",
+        "to": "synth",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      }
+    ]
+  },
+  "policies": {
+    "kinds": [
+      "fanout",
+      "reducer"
+    ],
+    "fanIn": "reducer",
+    "reducer": "synth",
+    "dynamic": {
+      "allowed": false,
+      "maxChildren": 0,
+      "maxDepth": 0
+    }
+  },
+  "constraints": {
+    "budgets": {
+      "tokens": 0
+    },
+    "termination": {
+      "on": "verifier.succeeded"
+    }
+  },
+  "provenance": {
+    "source": "example",
+    "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+  }
+}

@@ -1,0 +1,244 @@
+{
+  "specVersion": "0.2",
+  "graphId": "hermes-dry-run",
+  "revision": 0,
+  "intentGraph": {
+    "nodes": [
+      {
+        "id": "intent",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "agent",
+        "kind": "executor",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared",
+        "harness": "hermes"
+      },
+      {
+        "id": "tool",
+        "kind": "tool",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "verify",
+        "kind": "verifier",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-intent-agent",
+        "relation": "dependency",
+        "from": "intent",
+        "to": "agent",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      },
+      {
+        "id": "e-agent-tool",
+        "relation": "dependency",
+        "from": "agent",
+        "to": "tool",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      },
+      {
+        "id": "e-tool-verify",
+        "relation": "verification",
+        "from": "tool",
+        "to": "verify",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      }
+    ]
+  },
+  "policies": {
+    "kinds": [
+      "sequence",
+      "retry"
+    ],
+    "fanIn": "all",
+    "dynamic": {
+      "allowed": false,
+      "maxChildren": 0,
+      "maxDepth": 0
+    }
+  },
+  "constraints": {
+    "budgets": {
+      "tokens": 0
+    },
+    "termination": {
+      "on": "verifier.succeeded"
+    }
+  },
+  "provenance": {
+    "source": "profiles/hermes.md",
+    "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+  },
+  "plan": {
+    "compiler": "hermes",
+    "profile": "hermes",
+    "status": "dry-run",
+    "specVersion": "0.2",
+    "graphId": "hermes-dry-run",
+    "revision": 0,
+    "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531",
+    "idempotencyKey": "c3203a6cbd8902bd102031206fcd16189ed532e7c6bdaaa9bb06cd3f3529383f",
+    "tasks": [
+      {
+        "id": "t_a82c71af",
+        "node": "agent",
+        "kind": "executor",
+        "harness": "hermes",
+        "parents": [
+          "t_ac8bdecd"
+        ],
+        "reviewChildren": []
+      },
+      {
+        "id": "t_ac8bdecd",
+        "node": "intent",
+        "kind": "task",
+        "parents": [],
+        "reviewChildren": []
+      },
+      {
+        "id": "t_d78338c1",
+        "node": "tool",
+        "kind": "tool",
+        "parents": [
+          "t_a82c71af"
+        ],
+        "reviewChildren": [
+          "t_f542aa96"
+        ]
+      },
+      {
+        "id": "t_f542aa96",
+        "node": "verify",
+        "kind": "verifier",
+        "parents": [],
+        "reviewChildren": []
+      }
+    ]
+  }
+}

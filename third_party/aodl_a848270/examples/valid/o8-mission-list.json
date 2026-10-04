@@ -1,0 +1,589 @@
+{
+  "specVersion": "0.2",
+  "graphId": "o8-mission-list",
+  "revision": 0,
+  "intentGraph": {
+    "nodes": [
+      {
+        "id": "packetA",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "workerA",
+        "kind": "executor",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared",
+        "harness": "codex"
+      },
+      {
+        "id": "packetB",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "workerB",
+        "kind": "executor",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared",
+        "harness": "hermes"
+      },
+      {
+        "id": "review",
+        "kind": "verifier",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "captain",
+        "kind": "humanGate",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-a-alloc",
+        "relation": "allocation",
+        "from": "packetA",
+        "to": "workerA",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+        }
+      },
+      {
+        "id": "e-b-alloc",
+        "relation": "allocation",
+        "from": "packetB",
+        "to": "workerB",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+        }
+      },
+      {
+        "id": "e-a-verify",
+        "relation": "verification",
+        "from": "workerA",
+        "to": "review",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+        }
+      },
+      {
+        "id": "e-b-verify",
+        "relation": "verification",
+        "from": "workerB",
+        "to": "review",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+        }
+      },
+      {
+        "id": "e-approve",
+        "relation": "control",
+        "from": "review",
+        "to": "captain",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+        }
+      }
+    ]
+  },
+  "policies": {
+    "kinds": [
+      "sequence",
+      "human_gate"
+    ],
+    "fanIn": "all",
+    "dynamic": {
+      "allowed": false,
+      "maxChildren": 0,
+      "maxDepth": 0
+    },
+    "protocol": "o8-list"
+  },
+  "constraints": {
+    "budgets": {
+      "tokens": 0
+    },
+    "termination": {
+      "on": "humanGate.approved"
+    }
+  },
+  "provenance": {
+    "source": "example",
+    "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+  },
+  "observedGraph": {
+    "nodes": [
+      {
+        "id": "packetA",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "ready"
+      },
+      {
+        "id": "workerA",
+        "kind": "executor",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "running",
+        "harness": "codex"
+      },
+      {
+        "id": "packetB",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "ready"
+      },
+      {
+        "id": "workerB",
+        "kind": "executor",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "running",
+        "harness": "hermes"
+      },
+      {
+        "id": "review",
+        "kind": "verifier",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "ready"
+      },
+      {
+        "id": "captain",
+        "kind": "humanGate",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-a-alloc",
+        "relation": "allocation",
+        "from": "packetA",
+        "to": "workerA",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+        }
+      },
+      {
+        "id": "e-b-alloc",
+        "relation": "allocation",
+        "from": "packetB",
+        "to": "workerB",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+        }
+      },
+      {
+        "id": "e-a-verify",
+        "relation": "verification",
+        "from": "workerA",
+        "to": "review",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+        }
+      },
+      {
+        "id": "e-b-verify",
+        "relation": "verification",
+        "from": "workerB",
+        "to": "review",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+        }
+      },
+      {
+        "id": "e-approve",
+        "relation": "control",
+        "from": "review",
+        "to": "captain",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6"
+        }
+      }
+    ]
+  },
+  "eventLog": [
+    {
+      "eventId": "laneA-0",
+      "type": "spawn",
+      "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6",
+      "revision": 0,
+      "causalParents": [],
+      "payload": {
+        "lane": "packetA",
+        "node": "workerA"
+      }
+    },
+    {
+      "eventId": "laneA-1",
+      "type": "stateUpdate",
+      "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6",
+      "revision": 1,
+      "causalParents": [
+        "laneA-0"
+      ],
+      "payload": {
+        "verb": "comment",
+        "lane": "packetA"
+      }
+    },
+    {
+      "eventId": "laneB-0",
+      "type": "spawn",
+      "sourceHash": "128e121350c06bed5e8cb28c48d377b2d13b0962b132bc441a25f1291353dae6",
+      "revision": 0,
+      "causalParents": [],
+      "payload": {
+        "lane": "packetB",
+        "node": "workerB"
+      }
+    }
+  ]
+}
