@@ -194,6 +194,22 @@ class CtxSeamOnTests(unittest.TestCase):
         # ctx satisfies the memory need; the unsupported symbol need stays a gap.
         self.assertEqual(packet.unresolved_gaps, ["s: unsupported kind exact_symbol"])
 
+    def test_caller_neutral_flag_reaches_ctx_and_receipt(self):
+        runner = _Runner([_search(("evt-1", "ses-1", "x"))])
+        with _patch_ctx(runner):
+            packet = resolve_context(
+                query="q",
+                allow_qmd=False,
+                allow_ctx=True,
+                ctx_include_current_session=True,
+                use_cache=False,
+            )
+        argv = runner.calls[0]
+        self.assertIn("--include-current-session", argv)
+        (op,) = _ctx_ops(packet)
+        self.assertTrue(op["include_current_session"])
+        self.assertTrue(packet.measurements["ctx_include_current_session"])
+
     def test_semantic_or_hybrid_requires_both_flags(self):
         runner = _Runner([])
         with _patch_ctx(runner):
