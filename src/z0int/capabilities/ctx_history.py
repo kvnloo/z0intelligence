@@ -44,9 +44,36 @@ class CtxProtocolError(CtxHistoryError):
 
 
 @dataclass(frozen=True)
+class CtxSearchHit:
+    """One typed ctx hit plus the metadata z0 needs for scope/provenance."""
+
+    evidence: EvidenceRef
+    event_id: str | None
+    session_id: str | None
+    provider: str
+    timestamp: str
+    cwd: str | None = None
+    rank: int | None = None
+    retrieval_score: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "event_id": self.event_id,
+            "session_id": self.session_id,
+            "provider": self.provider,
+            "timestamp": self.timestamp,
+            "cwd": self.cwd,
+            "rank": self.rank,
+            "retrieval_score": self.retrieval_score,
+            "evidence": self.evidence.to_dict(),
+        }
+
+
+@dataclass(frozen=True)
 class CtxSearchEvidence:
     query: str
     evidence: tuple[EvidenceRef, ...]
+    hits: tuple[CtxSearchHit, ...]
     generation_id: str
     requested_mode: str
     effective_mode: str
@@ -66,6 +93,7 @@ class CtxSearchEvidence:
             "more_available": self.more_available,
             "latency_ms": self.latency_ms,
             "evidence": [e.to_dict() for e in self.evidence],
+            "hits": [h.to_dict() for h in self.hits],
         }
 
 
@@ -147,6 +175,8 @@ class CtxHistoryCapability:
         provider: str | None = None,
         workspace: str | None = None,
         file: str | None = None,
+        terms: tuple[str, ...] = (),
+        include_current_session: bool = False,
         allow_semantic: bool = False,
         timeout_s: float = 8.0,
     ) -> CtxSearchEvidence:
@@ -178,6 +208,12 @@ class CtxHistoryCapability:
             args.extend(["--workspace", str(workspace)])
         if file:
             args.extend(["--file", str(file)])
+        if include_current_session:
+            args.append("--include-current-session")
+        for term in terms:
+            normalized = str(term).strip()
+            if normalized and normalized != query:
+                args.extend(["--term", normalized])
         args.extend(["--", query])
 
         payload, latency_ms = self._run_json(args, timeout_s=timeout_s)
@@ -213,6 +249,7 @@ class CtxHistoryCapability:
             raise CtxProtocolError("ctx search response missing results[]")
 
         evidence: list[EvidenceRef] = []
+        hits: list[CtxSearchHit] = []
         for hit in raw_results:
             if not isinstance(hit, dict):
                 raise CtxProtocolError("ctx search result must be an object")
@@ -224,7 +261,12 @@ class CtxHistoryCapability:
             source_id = f"ctx:event:{event_id}" if event_id else f"ctx:session:{session_id}"
             provider_name = str(hit.get("provider") or "unknown")
             result_scope = str(hit.get("result_scope") or "unknown")
-            rank = hit.get("rank")
+            rank_raw = hit.get("rank")
+            rank = rank_raw if type(rank_raw) is int else None
+            score_raw = hit.get("retrieval_score")
+            retrieval_score = float(score_raw) if isinstance(score_raw, (int, float)) and not isinstance(score_raw, bool) else None
+            timestamp = str(hit.get("timestamp") or generated_at)
+            cwd = str(hit.get("cwd") or "").strip() or None
             note_parts = [
                 f"provider={provider_name}",
                 f"scope={result_scope}",
@@ -234,15 +276,26 @@ class CtxHistoryCapability:
                 note_parts.append(f"session={session_id}")
             if rank is not None:
                 note_parts.append(f"rank={rank}")
-            evidence.append(
-                EvidenceRef(
-                    source_id=source_id,
-                    source_version=f"ctx-core:{generation_id}",
-                    locator=locator,
-                    trust_class="conversation",
-                    observed_at=generated_at,
-                    excerpt=str(hit.get("snippet") or "")[:400] or None,
-                    note="; ".join(note_parts),
+            ref = EvidenceRef(
+                source_id=source_id,
+                source_version=f"ctx-core:{generation_id}",
+                locator=locator,
+                trust_class="conversation",
+                observed_at=timestamp,
+                excerpt=str(hit.get("snippet") or "")[:400] or None,
+                note="; ".join(note_parts),
+            )
+            evidence.append(ref)
+            hits.append(
+                CtxSearchHit(
+                    evidence=ref,
+                    event_id=event_id or None,
+                    session_id=session_id or None,
+                    provider=provider_name,
+                    timestamp=timestamp,
+                    cwd=cwd,
+                    rank=rank,
+                    retrieval_score=retrieval_score,
                 )
             )
 
@@ -260,6 +313,7 @@ class CtxHistoryCapability:
         return CtxSearchEvidence(
             query=str(payload.get("query") or query),
             evidence=tuple(evidence),
+            hits=tuple(hits),
             generation_id=generation_id,
             requested_mode=requested_mode,
             effective_mode=effective_mode,
