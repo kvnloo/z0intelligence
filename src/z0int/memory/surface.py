@@ -224,6 +224,7 @@ class TencentDBClient:
         self.auth_env = t.get('auth_env')
         self.deadline_s = float(t.get('deadline_ms', 300)) / 1000.0
         self.ids = {k: str(t.get(k) or 'default') for k in ('team_id', 'agent_id', 'user_id')}
+        self.service_id = str(t.get('service_id') or 'default')
         self._deadline_at: float | None = None
         self._down: str | None = None
         self._rev: str | None = None
@@ -236,7 +237,7 @@ class TencentDBClient:
         return bool(self.url)
 
     def _call(self, method: str, path: str, body: Mapping[str, Any] | None = None, timeout: float = 0.0) -> Any:
-        headers = {'Content-Type': 'application/json'}
+        headers = {'Content-Type': 'application/json', 'x-tdai-service-id': self.service_id}
         token = os.environ.get(str(self.auth_env)) if self.auth_env else None
         if token:
             headers['Authorization'] = 'Bearer ' + token
