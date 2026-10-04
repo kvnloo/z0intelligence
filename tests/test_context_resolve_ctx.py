@@ -210,6 +210,55 @@ class CtxSeamOnTests(unittest.TestCase):
         self.assertTrue(op["include_current_session"])
         self.assertTrue(packet.measurements["ctx_include_current_session"])
 
+    def test_exact_hydration_replaces_snippet_with_bounded_event_text(self):
+        event = {
+            "schema_version": 1,
+            "target": "event",
+            "payload_type": "event_window",
+            "ctx_event_id": "evt-1",
+            "ctx_session_id": "ses-1",
+            "event": {
+                "ctx_event_id": "evt-1",
+                "ctx_session_id": "ses-1",
+                "provider": "claude",
+                "event_type": "message",
+                "role": "assistant",
+                "text": "exact answer from the source event",
+            },
+            "events": [
+                {
+                    "ctx_event_id": "evt-1",
+                    "ctx_session_id": "ses-1",
+                    "provider": "claude",
+                    "text": "exact answer from the source event",
+                },
+                {
+                    "ctx_event_id": "evt-2",
+                    "ctx_session_id": "ses-1",
+                    "provider": "claude",
+                    "text": "nearby context",
+                },
+            ],
+        }
+        runner = _Runner([_search(("evt-1", "ses-1", "weak snippet")), event])
+        with _patch_ctx(runner):
+            packet = resolve_context(
+                query="q",
+                allow_qmd=False,
+                allow_ctx=True,
+                ctx_hydrate_top=1,
+                ctx_hydrate_chars=64,
+                use_cache=False,
+            )
+
+        self.assertEqual(len(runner.calls), 2)
+        self.assertEqual(runner.calls[1][1:3], ["show", "event"])
+        self.assertIn("exact answer from the source event", packet.evidence[0].excerpt or "")
+        self.assertIn("hydration=exact", packet.evidence[0].note or "")
+        (op,) = _ctx_ops(packet)
+        self.assertEqual(op["hydrated"], 1)
+        self.assertEqual(packet.measurements["ctx_hydrated_events"], 1)
+
     def test_semantic_or_hybrid_requires_both_flags(self):
         runner = _Runner([])
         with _patch_ctx(runner):
