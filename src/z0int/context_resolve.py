@@ -430,11 +430,11 @@ def resolve_context(
                 hydration_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
                 continue
             ctx_meas["ctx_hydration_latency_ms"] += item.latency_ms
-            rows = [item.event, *item.window_events]
-            target = next(
-                (i for i, row in enumerate(rows) if row.get("ctx_event_id") == event_id),
-                0,
-            )
+            rows = [
+                item.event,
+                *(row for row in item.window_events if row.get("ctx_event_id") != event_id),
+            ]
+            target = 0
             order = [target] + [
                 j
                 for distance in range(1, len(rows))
