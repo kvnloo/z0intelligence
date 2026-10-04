@@ -304,6 +304,7 @@ def resolve_context(
     allow_memory: bool = False,
     allow_ctx: bool = False,
     allow_ctx_semantic: bool = False,
+    ctx_include_current_session: bool = False,
     ctx_backend: str = "lexical",
 ) -> ContextPacket:
     """Resolve information needs into a provenance-preserving packet.
@@ -373,6 +374,7 @@ def resolve_context(
         ctx_meas = {
             "allow_ctx": True,
             "allow_ctx_semantic": allow_ctx_semantic,
+            "ctx_include_current_session": ctx_include_current_session,
             "ctx_backend": ctx_backend,
             "ctx_status": "ready" if ctx.available else "absent",
             "ctx_results": 0,
@@ -384,14 +386,23 @@ def resolve_context(
         """Read-only ctx search for one need; True when it returned evidence."""
         from .capabilities.ctx_history import CtxHistoryError
 
-        op: dict[str, Any] = {"op": "ctx_search", "need": need.id, "backend": ctx_backend}
+        op: dict[str, Any] = {
+            "op": "ctx_search",
+            "need": need.id,
+            "backend": ctx_backend,
+            "include_current_session": ctx_include_current_session,
+        }
         ops.append(op)
         if not ctx.available:
             op["status"] = "unavailable"
             return False
         try:
             res = ctx.search(
-                need.description, limit=5, backend=ctx_backend, allow_semantic=allow_ctx_semantic
+                need.description,
+                limit=5,
+                backend=ctx_backend,
+                include_current_session=ctx_include_current_session,
+                allow_semantic=allow_ctx_semantic,
             )
         except (CtxHistoryError, ValueError) as exc:
             op.update(status="error", error=f"{type(exc).__name__}: {str(exc)[:200]}")
