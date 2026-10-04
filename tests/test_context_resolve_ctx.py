@@ -194,6 +194,48 @@ class CtxSeamOnTests(unittest.TestCase):
         # ctx satisfies the memory need; the unsupported symbol need stays a gap.
         self.assertEqual(packet.unresolved_gaps, ["s: unsupported kind exact_symbol"])
 
+    def test_exact_hydration_replaces_search_snippet_with_bounded_event_text(self):
+        event = {
+            "target": "event",
+            "event": {
+                "ctx_event_id": "evt-1",
+                "ctx_session_id": "ses-1",
+                "provider": "claude",
+                "text": "exact answer from the event",
+            },
+            "events": [
+                {
+                    "ctx_event_id": "evt-1",
+                    "ctx_session_id": "ses-1",
+                    "provider": "claude",
+                    "text": "exact answer from the event",
+                },
+                {
+                    "ctx_event_id": "evt-2",
+                    "ctx_session_id": "ses-1",
+                    "provider": "claude",
+                    "text": "nearby context",
+                },
+            ],
+        }
+        runner = _Runner([_search(("evt-1", "ses-1", "weak snippet")), event])
+        with _patch_ctx(runner):
+            packet = resolve_context(
+                query="q",
+                allow_qmd=False,
+                allow_ctx=True,
+                ctx_hydrate_top=1,
+                ctx_hydrate_chars=64,
+                use_cache=False,
+            )
+        self.assertEqual(len(runner.calls), 2)
+        self.assertEqual(runner.calls[1][1:3], ["show", "event"])
+        self.assertIn("exact answer from the event", packet.evidence[0].excerpt or "")
+        self.assertIn("hydration=exact", packet.evidence[0].note or "")
+        (op,) = _ctx_ops(packet)
+        self.assertEqual(op["hydrated"], 1)
+        self.assertEqual(packet.measurements["ctx_hydrated_events"], 1)
+
     def test_caller_neutral_flag_reaches_ctx_and_receipt(self):
         runner = _Runner([_search(("evt-1", "ses-1", "x"))])
         with _patch_ctx(runner):
