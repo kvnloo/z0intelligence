@@ -47,7 +47,7 @@ POLICY_VERSION = 'z0-memory-1'  # part of every cache key and snapshot: bump whe
 LAYERS = ('temporal', 'lexical', 'semantic')  # latency-sensitive/default path: unchanged
 PULL_LAYERS = (*LAYERS, 'ctx')                 # explicit read/MCP path
 ALL_LAYERS = PULL_LAYERS
-HARNESS_OF_AGENT = {'claude': 'claude-code', 'deepseek-harness': 'dsh'}
+HARNESS_OF_AGENT = {'claude': 'claude-code', 'deepseek-harness': 'dsh', 'deepseek_harness': 'dsh'}
 DEFAULT_USER = 'local'
 EXCERPT_CHARS = 300
 CANDIDATE_CAP = 200
@@ -228,7 +228,8 @@ def _ctx_candidates(
             source_event_id=source_event_id,
         )
         project = _project_from_cwd(hit.cwd)
-        scope = MemoryScope(user=DEFAULT_USER, project=project) if project else MemoryScope(user=DEFAULT_USER)
+        # Unknown ctx scope is not user-global. A project-scoped request must reject it.
+        scope = MemoryScope(user=DEFAULT_USER, project=project).to_dict() if project else None
         out.append({
             'event_uid': event_uid,
             'layers': ['ctx'],
@@ -238,7 +239,7 @@ def _ctx_candidates(
             'message_id': hit.event_id,
             'timestamp': hit.timestamp,
             'locator': ref.locator,
-            'scope': scope.to_dict(),
+            'scope': scope,
             'cwd': hit.cwd,
             'excerpt': ref.excerpt,
             'score': 1.0 / max(1, hit.rank or index + 1),
