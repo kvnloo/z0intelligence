@@ -204,6 +204,14 @@ def _qmd_search(query: str, *, limit: int = 5, timeout_s: float = 8.0) -> list[d
     return []
 
 
+_CTX_BACKENDS = ("lexical", "hybrid", "semantic")
+
+
+def _ctx_capability() -> Any:
+    from .capabilities.ctx_history import CtxHistoryCapability
+    return CtxHistoryCapability()
+
+
 def _fetch_exact_path(path_str: str, project_root: Path | None) -> EvidenceRef | None:
     p = Path(path_str).expanduser()
     if not p.is_absolute() and project_root is not None:
@@ -292,6 +300,9 @@ def resolve_context(
     use_cache: bool = True,
     allow_qmd: bool = True,
     allow_memory: bool = False,
+    allow_ctx: bool = False,
+    allow_ctx_semantic: bool = False,
+    ctx_backend: str = "lexical",
     turn_key: str | None = None,
     memory_policy: Any = None,
 ) -> ContextPacket:
@@ -306,6 +317,11 @@ def resolve_context(
     later tiers are explicitly enabled.
     """
     t0 = time.perf_counter()
+    if allow_ctx:
+        if ctx_backend not in _CTX_BACKENDS:
+            raise ValueError(f"unsupported ctx backend: {ctx_backend}")
+        if ctx_backend != "lexical" and not allow_ctx_semantic:
+            raise ValueError("ctx semantic/hybrid retrieval requires allow_ctx_semantic=True")
     root = Path(project_root).expanduser().resolve() if project_root else None
     need_list: list[InformationNeed] = list(needs or [])
     if query and not need_list:
@@ -323,6 +339,68 @@ def resolve_context(
     contradictions: list[str] = []
     epochs: dict[str, str] = {"policy": policy_revision}
     measurements_extra: dict[str, Any] = {}
+    ctx_statuses: list[str] = []
+    ctx_results = 0
+    ctx_latency_ms = 0.0
+    ctx_effective_modes: set[str] = set()
+    ctx_generation: str | None = None
+
+    def ctx_search(need: InformationNeed) -> tuple[bool, str]:
+        nonlocal ctx_results, ctx_latency_ms, ctx_generation
+        from .capabilities.ctx_history import CtxHistoryError, CtxUnavailable
+
+        try:
+            cap = _ctx_capability()
+            if not cap.available:
+                raise CtxUnavailable("ctx CLI not found on PATH")
+            result = cap.search(
+                need.description,
+                limit=5,
+                backend=ctx_backend,
+                include_current_session=True,
+                allow_semantic=allow_ctx_semantic,
+            )
+        except CtxUnavailable:
+            status = "absent"
+            ctx_statuses.append(status)
+            ops.append({"op": "ctx_search", "need": need.id, "status": "unavailable", "hits": 0, "added": 0})
+            return False, status
+        except CtxHistoryError as exc:
+            status = "error"
+            ctx_statuses.append(status)
+            ops.append({
+                "op": "ctx_search", "need": need.id, "status": "error", "hits": 0, "added": 0,
+                "error": f"{type(exc).__name__}: {str(exc)[:160]}",
+            })
+            return False, status
+
+        status = "ready"
+        ctx_statuses.append(status)
+        ctx_results += result.returned
+        ctx_latency_ms += result.latency_ms
+        ctx_effective_modes.add(result.effective_mode)
+        if ctx_generation is None:
+            ctx_generation = result.generation_id
+            epochs["ctx_generation"] = result.generation_id
+        elif ctx_generation != result.generation_id:
+            contradictions.append(
+                f"ctx generation changed during resolve: {ctx_generation} -> {result.generation_id}"
+            )
+        seen = {(e.source_id, e.source_version, e.locator) for e in evidence}
+        added = 0
+        for ref in result.evidence:
+            key = (ref.source_id, ref.source_version, ref.locator)
+            if key in seen:
+                continue
+            seen.add(key)
+            evidence.append(ref)
+            added += 1
+        ops.append({
+            "op": "ctx_search", "need": need.id, "status": "ok", "hits": result.returned, "added": added,
+            "generation_id": result.generation_id, "effective_mode": result.effective_mode,
+            "latency_ms": result.latency_ms,
+        })
+        return bool(result.evidence), status
 
     if use_cache:
         cached = load_recipe_cache(sig)
@@ -349,6 +427,7 @@ def resolve_context(
 
     for need in need_list:
         satisfied = False
+        ctx_need_status: str | None = None
         if need.kind == "exact_path" or need.path:
             path_s = need.path or need.description
             ref = _fetch_exact_path(path_s, root)
@@ -386,20 +465,32 @@ def resolve_context(
                         )
                     )
                     satisfied = True
+            if allow_ctx:
+                ctx_hit, ctx_need_status = ctx_search(need)
+                satisfied = satisfied or ctx_hit
             if not satisfied and need.required:
-                # empty index is a gap, not a license to invent requirements
-                gaps.append(
-                    f"{need.id}: no lexical hits for {need.description!r} (qmd={qmd_status})"
-                )
+                details = f"qmd={qmd_status}"
+                if allow_ctx:
+                    details += f", ctx={ctx_need_status or 'absent'}"
+                gaps.append(f"{need.id}: no lexical hits for {need.description!r} ({details})")
         elif need.kind == "memory":
             if not allow_memory:
-                ops.append({"op": "memory_skipped", "need": need.id, "reason": "allow_memory=False by default"})
-                if need.required:
-                    gaps.append(f"{need.id}: memory recall disabled (avoid double-inject)")
+                if allow_ctx:
+                    ctx_hit, ctx_need_status = ctx_search(need)
+                    satisfied = ctx_hit
+                    if need.required and not satisfied:
+                        gaps.append(
+                            f"{need.id}: no memory evidence for {need.description!r} "
+                            f"(ctx={ctx_need_status or 'absent'})"
+                        )
+                else:
+                    ops.append({"op": "memory_skipped", "need": need.id, "reason": "allow_memory=False by default"})
+                    if need.required:
+                        gaps.append(f"{need.id}: memory recall disabled (avoid double-inject)")
                 continue
-            from .memory import surface as memory_surface
 
-            if turn_key is None:  # without a turn the single-injector guard cannot run, so memory stays out
+            from .memory import surface as memory_surface
+            if turn_key is None:
                 ops.append({"op": "memory_skipped", "need": need.id, "reason": "double_inject_guard: no turn_key"})
                 if need.required:
                     gaps.append(f"{need.id}: double_inject_guard: no turn_key, cannot claim the turn's injection")
@@ -413,13 +504,37 @@ def resolve_context(
             ops.append({"op": "memory_resolve", "need": need.id, "hits": len(res["evidence"]),
                         "layers": {k: v["status"] for k, v in res["layers"].items()}})
             measurements_extra["memory_snapshot_id"] = res["memory_snapshot_id"]
-            evidence.extend(EvidenceRef(**e["evidence_ref"]) for e in res["evidence"])
-            if need.required and not res["evidence"]:
+            existing = {(e.source_id, e.source_version, e.locator) for e in evidence}
+            for raw_ref in (e["evidence_ref"] for e in res["evidence"]):
+                ref = EvidenceRef(**raw_ref)
+                key = (ref.source_id, ref.source_version, ref.locator)
+                if key not in existing:
+                    evidence.append(ref)
+                    existing.add(key)
+            satisfied = bool(res["evidence"])
+            if allow_ctx:
+                ctx_hit, ctx_need_status = ctx_search(need)
+                satisfied = satisfied or ctx_hit
+            if need.required and not satisfied:
                 down = [f"{k}={v.get('reason')}" for k, v in res["layers"].items() if v["status"] != "ok"]
+                if allow_ctx and ctx_need_status != "ready":
+                    down.append(f"ctx={ctx_need_status or 'absent'}")
                 gaps.append(f"{need.id}: no memory evidence for {need.description!r}"
                             + (f" (unavailable: {', '.join(down)})" if down else ""))
         else:
             gaps.append(f"{need.id}: unsupported kind {need.kind}")
+
+    if allow_ctx:
+        rank = {"ready": 0, "absent": 1, "error": 2}
+        worst = max(ctx_statuses or ["absent"], key=lambda x: rank[x])
+        measurements_extra.update({
+            "allow_ctx": True,
+            "allow_ctx_semantic": allow_ctx_semantic,
+            "ctx_status": worst,
+            "ctx_results": ctx_results,
+            "ctx_latency_ms": float(ctx_latency_ms),
+            "ctx_effective_modes": sorted(ctx_effective_modes),
+        })
 
     recipe = ResolutionRecipe(
         capability_id="context_resolve",
