@@ -62,6 +62,25 @@ memory is rejected **before** semantic ranking.
 This is a visibility contract, not an authorization system. Privacy and tool
 authority still live in their existing policy boundaries.
 
+## Retrieval projections
+
+Retrieval systems are rebuildable evidence projections, not canonical truth.
+
+- **AgentsView / FTS5** remains the local lexical control/fallback.
+- **ctx Core** is an optional normalized cross-harness history projection. z0 reads it only with
+  `--refresh off`, disables ctx usage/analytics writes, preserves the Core `generation_id`, and
+  keeps exact `ctx:event:<id>` / session provenance.
+- **TencentDB** remains the semantic claim/memory backend when configured.
+- **EventLog + OptMem** remains the admitted episodic/temporal ledger and projection.
+
+ctx hits enter as conversation evidence. Search score/rank never makes a hit a claim, verified fact,
+instruction, action, or AODL authority. Unknown ctx project scope fails closed for project-scoped
+requests. Semantic/hybrid ctx retrieval requires explicit opt-in.
+
+The latency-sensitive harness push path does not include ctx by default. DSH and other harnesses can
+pull ctx through the read-only unified-memory MCP, then hydrate exact events only when needed. Default
+promotion remains evidence-driven by the real-history bakeoff.
+
 ## Bitemporal claims
 
 `BitemporalClaim` preserves two distinct timelines:
