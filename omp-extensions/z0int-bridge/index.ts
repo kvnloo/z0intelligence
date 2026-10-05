@@ -81,6 +81,10 @@ type WorkerHandle = {
 let current: WorkerHandle | null = null;
 let generation = 0;
 let reloadPromise: Promise<Jsonish> | null = null;
+let pendingReload: {
+	reason: string;
+	notify?: (message: string, level: "info" | "warning" | "error") => void;
+} | null = null;
 let activeTurn: ActiveTurn | null = null;
 
 function ensureDir(path: string): void {
@@ -328,6 +332,23 @@ async function reload(reason: string): Promise<Jsonish> {
 	return reloadPromise;
 }
 
+async function flushPendingReload(): Promise<void> {
+	if (!pendingReload || activeTurn) return;
+	const pending = pendingReload;
+	pendingReload = null;
+	const result = await reload(pending.reason);
+	if (result.deferred === true) {
+		pendingReload = pending;
+		return;
+	}
+	pending.notify?.(
+		result.ok === true
+			? `z0int bridge → generation ${result.generation} build=${result.build_id}`
+			: `z0int bridge reload failed (${result.error}); keeping generation ${generation}`,
+		result.ok === true ? "info" : "warning",
+	);
+}
+
 function resolveSessionId(ctx: unknown): string {
 	if (ctx && typeof ctx === "object" && "sessionId" in ctx) {
 		const s = (ctx as { sessionId?: unknown }).sessionId;
@@ -532,12 +553,21 @@ export default function z0intBridge(pi: ExtensionAPI) {
 		// Do NOT return { handled: true } — OMP must still run builtin reload.
 		try {
 			const result = await reload("omp_reload_plugins");
+			if (result.deferred === true) {
+				pendingReload = {
+					reason: "omp_reload_plugins",
+					notify: (message, level) => ctx.ui?.notify?.(message, level),
+				};
+				ctx.ui?.notify?.(
+					`z0int bridge reload deferred until this turn ends; keeping generation ${generation}`,
+					"info",
+				);
+				return;
+			}
 			const ok = result.ok === true;
-			const gen = result.generation;
-			const build = result.build_id;
 			ctx.ui?.notify?.(
 				ok
-					? `z0int bridge → generation ${gen} build=${build}`
+					? `z0int bridge → generation ${result.generation} build=${result.build_id}`
 					: `z0int bridge reload failed (${result.error}); keeping generation ${generation}`,
 				ok ? "info" : "warning",
 			);
@@ -674,6 +704,7 @@ export default function z0intBridge(pi: ExtensionAPI) {
 					? ((event as { messages?: unknown[] }).messages || [])
 					: [];
 			await closeActive(messages, "bridge_agent_end");
+			await flushPendingReload();
 		} catch {
 			/* */
 		}
@@ -699,6 +730,17 @@ export default function z0intBridge(pi: ExtensionAPI) {
 		description: "Hot-reload resident z0int bridge worker (same as /reload-plugins intercept)",
 		async handler(_args, ctx) {
 			const result = await reload("z0int-bridge-reload-cmd");
+			if (result.deferred === true) {
+				pendingReload = {
+					reason: "z0int-bridge-reload-cmd",
+					notify: (message, level) => ctx.ui.notify(message, level),
+				};
+				ctx.ui.notify(
+					`reload deferred until this turn ends; keeping generation ${generation}`,
+					"info",
+				);
+				return;
+			}
 			ctx.ui.notify(
 				result.ok
 					? `z0int bridge → generation ${result.generation} build=${result.build_id}`
@@ -739,6 +781,7 @@ export default function z0intBridge(pi: ExtensionAPI) {
 					},
 				});
 				if (activeTurn?.traceId === turn.traceId) activeTurn = null;
+				await flushPendingReload();
 				ctx.ui.notify(
 					`z0int close: ${JSON.stringify({ ok: closed.ok !== false, trace: turn.traceId, gen: h.generation })}`,
 					closed.ok === false ? "error" : "info",
