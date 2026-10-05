@@ -4,7 +4,9 @@ manifest_version: 1
 kind: standalone
 description: "z0intelligence for Hermes: shadow capture, the evidence-gated automatic call, the z0 memory seam, and optional harness-local OptChat context (off by default)."
 license: MIT
-provides_tools: []
+provides_tools:
+  - optchat_zoom
+  - optchat_date
 provides_hooks:
   - on_session_start
   - pre_llm_call
