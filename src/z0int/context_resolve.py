@@ -204,6 +204,16 @@ def _qmd_search(query: str, *, limit: int = 5, timeout_s: float = 8.0) -> list[d
     return []
 
 
+_CTX_BACKENDS = ("lexical", "hybrid", "semantic")
+
+
+def _ctx_capability() -> Any:
+    # Lazy: ctx_history imports EvidenceRef from this module.
+    from .capabilities.ctx_history import CtxHistoryCapability
+
+    return CtxHistoryCapability()
+
+
 def _fetch_exact_path(path_str: str, project_root: Path | None) -> EvidenceRef | None:
     p = Path(path_str).expanduser()
     if not p.is_absolute() and project_root is not None:
@@ -292,13 +302,36 @@ def resolve_context(
     use_cache: bool = True,
     allow_qmd: bool = True,
     allow_memory: bool = False,
+    allow_ctx: bool = False,
+    allow_ctx_semantic: bool = False,
+    ctx_include_current_session: bool = False,
+    ctx_backend: str = "lexical",
+    ctx_hydrate_top: int = 0,
+    ctx_hydrate_chars: int = 2000,
 ) -> ContextPacket:
     """Resolve information needs into a provenance-preserving packet.
 
     Memory recall is off by default (avoid double-inject with TencentDB proxy).
     QMD is lexical-only here; no embedding/rerank on the critical path unless
     later tiers are explicitly enabled.
+
+    ``allow_ctx`` opts ``natural_language``/``memory`` needs into read-only ctx
+    history search (#116). Lexical is the default; ``ctx_backend`` of
+    ``hybrid``/``semantic`` also needs ``allow_ctx_semantic``. Hits stay
+    conversation evidence; a missing or failing ctx is a recorded miss.
+    ``measurements["ctx_status"]`` is the worst status across needs; per-need
+    outcomes are the ``ctx_search`` operations.
     """
+    if allow_ctx:
+        # Fail fast, before qmd or ctx subprocesses run.
+        if ctx_backend not in _CTX_BACKENDS:
+            raise ValueError(f"unsupported ctx backend: {ctx_backend}")
+        if ctx_backend != "lexical" and not allow_ctx_semantic:
+            raise ValueError("ctx semantic/hybrid retrieval requires allow_ctx_semantic=True")
+        if not 0 <= int(ctx_hydrate_top) <= 10:
+            raise ValueError("ctx_hydrate_top must be between 0 and 10")
+        if not 1 <= int(ctx_hydrate_chars) <= 10000:
+            raise ValueError("ctx_hydrate_chars must be between 1 and 10000")
     t0 = time.perf_counter()
     root = Path(project_root).expanduser().resolve() if project_root else None
     need_list: list[InformationNeed] = list(needs or [])
@@ -340,6 +373,131 @@ def resolve_context(
         except (OSError, subprocess.TimeoutExpired):
             qmd_status = "error"
 
+    ctx = None
+    ctx_meas: dict[str, Any] = {}
+    if allow_ctx:
+        ctx = _ctx_capability()
+        ctx_meas = {
+            "allow_ctx": True,
+            "allow_ctx_semantic": allow_ctx_semantic,
+            "ctx_include_current_session": ctx_include_current_session,
+            "ctx_backend": ctx_backend,
+            "ctx_hydrate_top": int(ctx_hydrate_top),
+            "ctx_hydrate_chars": int(ctx_hydrate_chars),
+            "ctx_status": "ready" if ctx.available else "absent",
+            "ctx_results": 0,
+            "ctx_latency_ms": 0.0,
+            "ctx_hydration_latency_ms": 0.0,
+            "ctx_hydrated_events": 0,
+            "ctx_effective_modes": [],
+        }
+
+    def ctx_need(need: InformationNeed) -> bool:
+        """Read-only ctx search for one need; True when it returned evidence."""
+        from .capabilities.ctx_history import CtxHistoryError
+
+        op: dict[str, Any] = {
+            "op": "ctx_search",
+            "need": need.id,
+            "backend": ctx_backend,
+            "include_current_session": ctx_include_current_session,
+        }
+        ops.append(op)
+        if not ctx.available:
+            op["status"] = "unavailable"
+            return False
+        try:
+            res = ctx.search(
+                need.description,
+                limit=5,
+                backend=ctx_backend,
+                include_current_session=ctx_include_current_session,
+                allow_semantic=allow_ctx_semantic,
+            )
+        except (CtxHistoryError, ValueError) as exc:
+            op.update(status="error", error=f"{type(exc).__name__}: {str(exc)[:200]}")
+            ctx_meas["ctx_status"] = "error"
+            return False
+        hydrated: dict[str, str] = {}
+        hydration_errors: list[str] = []
+        for ref in res.evidence[: int(ctx_hydrate_top)]:
+            if not ref.locator.startswith("ctx:event:"):
+                continue
+            event_id = ref.locator.removeprefix("ctx:event:")
+            try:
+                item = ctx.show_event(event_id, window=3)
+            except CtxHistoryError as exc:
+                hydration_errors.append(f"{type(exc).__name__}: {str(exc)[:160]}")
+                continue
+            ctx_meas["ctx_hydration_latency_ms"] += item.latency_ms
+            rows = [
+                item.event,
+                *(row for row in item.window_events if row.get("ctx_event_id") != event_id),
+            ]
+            target = 0
+            order = [target] + [
+                j
+                for distance in range(1, len(rows))
+                for j in (target - distance, target + distance)
+                if 0 <= j < len(rows)
+            ]
+            text = ""
+            for j in order:
+                value = rows[j].get("text")
+                if not isinstance(value, str) or not value:
+                    continue
+                piece = value if not text else "\n" + value
+                room = int(ctx_hydrate_chars) - len(text)
+                if room <= 0:
+                    break
+                text += piece[:room]
+            if text:
+                hydrated[ref.locator] = text
+                ctx_meas["ctx_hydrated_events"] += 1
+
+        seen = {(e.source_id, e.source_version, e.locator) for e in evidence}
+        added = 0
+        for ref in res.evidence:
+            key = (ref.source_id, ref.source_version, ref.locator)
+            if key in seen:
+                continue
+            seen.add(key)
+            excerpt = hydrated.get(ref.locator)
+            if excerpt is not None:
+                ref = EvidenceRef(
+                    source_id=ref.source_id,
+                    source_version=ref.source_version,
+                    locator=ref.locator,
+                    trust_class=ref.trust_class,
+                    observed_at=ref.observed_at,
+                    excerpt=excerpt,
+                    note=((ref.note + "; ") if ref.note else "") + "hydration=exact",
+                )
+            evidence.append(ref)
+            added += 1
+        prev = epochs.setdefault("ctx_generation", res.generation_id)
+        if prev != res.generation_id:
+            contradictions.append(f"ctx generation changed during resolve: {prev} -> {res.generation_id}")
+        op.update(
+            status="ok",
+            generation_id=res.generation_id,
+            effective_mode=res.effective_mode,
+            hits=res.returned,
+            added=added,
+            more_available=res.more_available,
+            latency_ms=round(res.latency_ms, 1),
+            hydrated=len(hydrated),
+            hydration_errors=hydration_errors,
+        )
+        ctx_meas["ctx_results"] += res.returned
+        ctx_meas["ctx_latency_ms"] += res.latency_ms
+        if res.effective_mode not in ctx_meas["ctx_effective_modes"]:
+            ctx_meas["ctx_effective_modes"].append(res.effective_mode)
+        return bool(res.evidence)
+
+    def ctx_gap() -> str:
+        return f", ctx={ctx_meas['ctx_status']}" if ctx is not None else ""
+
     for need in need_list:
         satisfied = False
         if need.kind == "exact_path" or need.path:
@@ -379,15 +537,19 @@ def resolve_context(
                         )
                     )
                     satisfied = True
+            if ctx is not None and ctx_need(need):
+                satisfied = True
             if not satisfied and need.required:
                 # empty index is a gap, not a license to invent requirements
                 gaps.append(
-                    f"{need.id}: no lexical hits for {need.description!r} (qmd={qmd_status})"
+                    f"{need.id}: no lexical hits for {need.description!r} (qmd={qmd_status}{ctx_gap()})"
                 )
         elif need.kind == "memory":
             ops.append({"op": "memory_skipped", "need": need.id, "reason": "allow_memory=False by default"})
-            if need.required and not allow_memory:
-                gaps.append(f"{need.id}: memory recall disabled (avoid double-inject)")
+            if ctx is not None:
+                satisfied = ctx_need(need)
+            if need.required and not allow_memory and not satisfied:
+                gaps.append(f"{need.id}: memory recall disabled (avoid double-inject{ctx_gap()})")
         else:
             gaps.append(f"{need.id}: unsupported kind {need.kind}")
 
@@ -423,6 +585,7 @@ def resolve_context(
             "allow_memory": allow_memory,
             "gpu_loaded": False,
             "network_model_calls": 0,
+            **ctx_meas,
         },
     )
     packet.aodl_projection = project_to_aodl_fields(packet)
