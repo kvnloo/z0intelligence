@@ -13,6 +13,9 @@ has ``hermes.enabled: true`` at load; otherwise it is not called and nothing is 
 
 Memory (C8, ``memory.py``): the z0 memory seam shares the same one ``pre_llm_call`` (``memory_inject``; unset it
 follows ``mode``). Capture, automatic and memory are one callback; their contexts are joined.
+
+OptChat (#120, ``optchat.py``): optional ``off|shadow|on``. It reuses ``z0int.optchat`` but keeps a
+Hermes-local log root; shared cross-harness memory stays in the z0 memory plane.
 """
 import atexit
 import fcntl
@@ -30,7 +33,7 @@ import uuid
 from pathlib import Path
 
 PLUGIN = 'hermes-z0intelligence'
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 POLICY_REVISION = f'{PLUGIN}@{VERSION}'
 HARNESS = 'hermes'
 INSTANCE_ID = uuid.uuid4().hex
@@ -44,7 +47,7 @@ OBSERVED = ('pre_api_request', 'post_api_request', 'api_request_error', 'pre_aux
 CAPTURE_HOOKS = ('on_session_start', 'pre_llm_call', 'post_llm_call', 'on_session_end', 'pre_approval_request',
                  'post_tool_call', *OBSERVED, 'subagent_stop')
 SETTINGS = ('mode', 'opportunities', 'z0int_python', 'z0int_home', 'persist_packet_text', 'memory_inject',
-            'memory_injector')
+            'memory_injector', 'optchat_mode')
 SERVICE_KEYS = ('stack_service_port', 'service_port', 'service_host', 'service_url', 'host', 'port', 'url')
 # Keep in sync with z0int.hermes_decisions (tests/test_hermes_decisions.py checks parity).
 NON_USER_PLATFORMS = frozenset({'cron', 'subagent', 'curator', 'kanban', 'batch', 'raft'})
@@ -670,6 +673,14 @@ def _memory_module():
     return mod
 
 
+def _optchat_module():
+    """optchat.py next to this file, loaded by path like the memory seam."""
+    spec = importlib.util.spec_from_file_location(f'{__name__}_optchat', Path(__file__).with_name('optchat.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def _non_user_turn(kw):
     """Cron/subagent/batch/... platforms and child sessions get no memory seam (as capture and the DSH shim)."""
     return (kw.get('platform') or '').lower() in NON_USER_PLATFORMS or bool(kw.get('parent_session_id'))
@@ -712,33 +723,51 @@ def register(ctx):
         memory = _memory_module().create(settings, home, python, _profile_config())
     except Exception:
         log.warning('%s: memory seam unavailable; turns keep native context', PLUGIN)
+    optchat = None
+    try:
+        optchat = _optchat_module().create(settings, home, python)
+    except Exception:
+        log.warning('%s: OptChat unavailable; turns keep native context', PLUGIN)
     if capture is not None:
         for event in CAPTURE_HOOKS:
             if event not in ('pre_llm_call', 'post_llm_call'):
                 ctx.register_hook(event, capture.hook(event))
         ctx.on_unload(capture.close)
         atexit.register(capture.close)  # `hermes chat -q` exits right after its turn: drain, bounded, then stop
-    if capture is not None or memory is not None:
+    if optchat is not None:
+        ctx.on_unload(optchat.close)
+        atexit.register(optchat.close)
+        optchat.register_tools(ctx)
+        ctx.register_hook('post_tool_call', optchat.post_tool_call)
+    if capture is not None or memory is not None or optchat is not None:
         captured = capture.hook('post_llm_call') if capture is not None else None
 
-        def post_llm_call(**kw):  # one post_llm_call too: capture's outcome, then memory's use receipt
+        def post_llm_call(**kw):  # one post_llm_call: capture outcome, memory receipt, then OptChat transcript event
             if captured is not None:
                 captured(**kw)
             if memory is not None:
                 memory.post_llm_call(**kw)
+            if optchat is not None:
+                optchat.post_llm_call(**kw)
             return None
         ctx.register_hook('post_llm_call', post_llm_call)
-    if capture is not None or automatic or memory is not None:
-        def pre_llm_call(**kw):  # the one pre_llm_call: capture, automatic and memory (single owner of this hook)
+    if capture is not None or automatic or memory is not None or optchat is not None:
+        def pre_llm_call(**kw):  # capture, automatic, memory and OptChat share one pre_llm_call
             if capture is not None:
                 capture.on_pre_llm_call(**kw)
             auto = before_turn(python, home, **kw) if automatic else None
-            mem = None
-            if memory is not None and not _non_user_turn(kw):
-                try:
-                    mem = memory.pre_llm_call(cwd=_hermes_workspace_root(kw.get('task_id')), **kw)
-                except Exception:
-                    mem = None
-            return _joined(auto, mem)
+            mem = chat = None
+            if not _non_user_turn(kw):
+                if memory is not None:
+                    try:
+                        mem = memory.pre_llm_call(cwd=_hermes_workspace_root(kw.get('task_id')), **kw)
+                    except Exception:
+                        mem = None
+                if optchat is not None:
+                    try:
+                        chat = optchat.pre_llm_call(**kw)
+                    except Exception:
+                        chat = None
+            return _joined(auto, mem, chat)
         ctx.register_hook('pre_llm_call', pre_llm_call)
     return capture

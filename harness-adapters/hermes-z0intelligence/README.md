@@ -34,6 +34,7 @@ injected system turns. `z0int hermes decisions` reports gate vs observed behavio
 | `persist_packet_text` | `false` | see privacy below |
 | `memory_inject` | (empty) | z0 memory seam: `off`, `shadow`, `canary`, `on`; empty follows `mode` (see Memory) |
 | `memory_injector` | (empty) | owner id for the single-injector guard (default `z0-memory:hermes`) |
+| `optchat_mode` | `off` | `off`, `shadow` (record only), or `on` (inject prior bounded view + OptChat tools) |
 
 There is no service host or port: capture writes files only and opens no socket. A host/port/url setting (for
 example bend's `stack_service_port`) is ignored and written down as a counted `config_warning`. Kill switch:
@@ -103,6 +104,17 @@ tools for the model are the `z0-memory` MCP server (Hermes toolsets carry `no_mc
 profiles). Activation target profile: `clean` only (owner decision; chiefstaff is retired and never targeted).
 Activation also sets clean's `memory.provider: memory_tencentdb` (owner-deferred; runbook only, not activated here),
 so z0 briefs there leave TencentDB items to that provider.
+
+## OptChat (#120)
+
+OptChat is optional and remains off by default. It is a harness-local conversation UX over the existing
+`z0int.optchat` engine; it does not replace the z0 memory seam, State Packet, TencentDB, or Hermes's native
+transcript.
+
+- `shadow`: root user turns, tool calls/results and assistant replies are appended, but no context or tool reaches the model.
+- `on`: before each root user turn the prior bounded view is returned through the existing `pre_llm_call` context seam. The plugin also registers `optchat_zoom` and `optchat_date`.
+- Hermes writes to `$Z0INT_HOME/optchat/hermes/chat`. OMP keeps its existing default OptChat root, avoiding two resident writers racing over one `ChatLog`.
+- Tool/result/assistant appends use one bounded worker queue; only the pre-turn `prepare` request waits for the local child. Failures leave native Hermes context intact.
 
 ## Install (activation step A3; owner-approved, after backups)
 
