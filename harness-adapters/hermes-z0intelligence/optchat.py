@@ -145,6 +145,7 @@ class OptChat:
                     try:
                         row = self._raw_call(op, extra)
                     except Exception as exc:
+                        self._stop_proc()
                         row = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
                     if reply is not None:
                         try:
