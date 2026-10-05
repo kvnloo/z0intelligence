@@ -11,6 +11,16 @@
 3. Do not bypass privacy/secret checks. Do not invent unimplemented steps.
 4. Thin skill: `skills/z0int-onboard/SKILL.md` (calls CLI only).
 
+## Shared memory (read before changing it)
+
+- Canonical continuity plan and acceptance: [#22](https://github.com/kvnloo/z0intelligence/issues/22).
+- Pinned implementation/evidence index: **[`docs/memory-status.md`](docs/memory-status.md)**.
+- Distinguish merged source, branch-only wiring, dated host setup and verified model use. A configured backend, branch name or closed setup issue is not proof of integration.
+- Reuse existing `EventLog`, `OptMemTree`, State Packet, memory-contract and harness-adapter work. No second memory database, router, scheduler or receipt system.
+- Native source archives remain original evidence; z0's ledger owns admitted events/references. Memory and summaries never grant execution authority.
+- #116/#121 own the read-only `ctx` pull integration; #120 is an optional semantic/fresh-turn OptChat experiment, not a mandatory master-chat migration.
+- Every memory-related change should name its exact source revision, narrow owning issue and activation/verification effect. Do not implement superseded issue prose as if it were current code.
+
 ## Verified OSS Loop
 
 This repo follows the [Verified OSS Loop](https://github.com/kvnloo/verified-oss-loop). See **`docs/verified-oss-loop.md`**.
