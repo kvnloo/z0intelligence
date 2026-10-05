@@ -73,6 +73,12 @@ def serve() -> int:
                     msg = chat.append(str(req.get("kind")), str(req.get("text") or ""))
                     body = {"ok": True, "i": msg.i, "size": msg.size}
                     start_pump = True
+                elif op == "prepare":
+                    view = chat.render()
+                    before = len(chat.messages)
+                    msg = chat.append(str(req.get("kind") or "user"), str(req.get("text") or ""))
+                    body = {"ok": True, "view": view, "messages": before, "i": msg.i, "size": msg.size}
+                    start_pump = True
                 elif op == "view":
                     body = {"ok": True, "view": chat.render(), "messages": len(chat.messages)}
                 elif op == "zoom":

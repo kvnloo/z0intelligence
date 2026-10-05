@@ -240,7 +240,9 @@ class ChatLog:
 
 def load_chat(root: Path | None = None) -> ChatLog:
     home = Path(os.environ.get("Z0INT_HOME", Path.home() / ".z0int"))
-    chat = ChatLog(root or home / "optchat" / "chat")
+    configured = os.environ.get("Z0INT_OPTCHAT_ROOT")
+    target = root if root is not None else (Path(configured).expanduser() if configured else home / "optchat" / "chat")
+    chat = ChatLog(target)
     chat.load()
     return chat
 

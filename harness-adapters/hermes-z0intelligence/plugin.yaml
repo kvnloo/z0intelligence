@@ -1,10 +1,12 @@
 name: hermes-z0intelligence
-version: 0.2.0
+version: 0.3.0
 manifest_version: 1
 kind: standalone
-description: "z0intelligence for Hermes: shadow capture of DecisionOpportunities, turn outcomes and content-free hook events into $Z0INT_HOME/state/hermes (never alters a turn), the evidence-gated automatic call (inert unless automatic.json enables hermes), and the z0 memory seam (shadow unless memory_inject is canary/on)."
+description: "z0intelligence for Hermes: shadow capture, the evidence-gated automatic call, the z0 memory seam, and optional harness-local OptChat context (off by default)."
 license: MIT
-provides_tools: []
+provides_tools:
+  - optchat_zoom
+  - optchat_date
 provides_hooks:
   - on_session_start
   - pre_llm_call
@@ -54,3 +56,8 @@ config_schema:
     default: ""
     label: z0 memory injector id
     description: Owner id for the single-injector guard (default z0-memory:hermes).
+  optchat_mode:
+    type: str
+    default: "off"
+    label: OptChat mode
+    description: off, shadow (record only), or on (inject the prior bounded view and expose optchat_zoom/optchat_date). Uses $Z0INT_HOME/optchat/hermes/chat so it never races an OMP OptChat writer.
