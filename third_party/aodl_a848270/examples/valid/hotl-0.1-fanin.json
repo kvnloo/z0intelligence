@@ -1,0 +1,34 @@
+{
+  "specVersion": "0.1",
+  "graphId": "research-fanin",
+  "nodes": [
+    {
+      "id": "r1",
+      "role": "worker"
+    },
+    {
+      "id": "synth",
+      "role": "orchestrator"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e",
+      "from": "r1",
+      "to": "synth",
+      "kind": "dependency"
+    }
+  ],
+  "policies": {
+    "fanIn": "all",
+    "coordination": "ledger",
+    "dynamicFanOut": {
+      "allowed": false,
+      "maxChildren": 0
+    }
+  },
+  "provenance": {
+    "source": "example",
+    "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+  }
+}

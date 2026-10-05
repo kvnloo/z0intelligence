@@ -1,0 +1,313 @@
+{
+  "specVersion": "0.2",
+  "graphId": "langchain-stategraph",
+  "revision": 0,
+  "intentGraph": {
+    "nodes": [
+      {
+        "id": "prompt",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "chat",
+        "kind": "model",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "weather",
+        "kind": "tool",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "checkpoint",
+        "kind": "stateStore",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "store"
+        ],
+        "authorityCeiling": [
+          "execute",
+          "store"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "review",
+        "kind": "verifier",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "gate",
+        "kind": "humanGate",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "approve"
+        ],
+        "authorityCeiling": [
+          "execute",
+          "approve"
+        ],
+        "lifecycle": "declared"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-prompt-chat",
+        "relation": "dependency",
+        "from": "prompt",
+        "to": "chat",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      },
+      {
+        "id": "e-chat-weather",
+        "relation": "dependency",
+        "from": "chat",
+        "to": "weather",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      },
+      {
+        "id": "e-weather-review",
+        "relation": "verification",
+        "from": "weather",
+        "to": "review",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      },
+      {
+        "id": "e-review-gate",
+        "relation": "control",
+        "from": "review",
+        "to": "gate",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      },
+      {
+        "id": "e-chat-checkpoint",
+        "relation": "data",
+        "from": "chat",
+        "to": "checkpoint",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      },
+      {
+        "id": "e-weather-checkpoint",
+        "relation": "data",
+        "from": "weather",
+        "to": "checkpoint",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+        }
+      }
+    ]
+  },
+  "policies": {
+    "kinds": [
+      "sequence",
+      "human_gate"
+    ],
+    "fanIn": "all",
+    "dynamic": {
+      "allowed": false,
+      "maxChildren": 0,
+      "maxDepth": 0
+    }
+  },
+  "constraints": {
+    "budgets": {
+      "tokens": 0
+    },
+    "termination": {
+      "on": "humanGate.approved"
+    }
+  },
+  "provenance": {
+    "source": "example",
+    "sourceHash": "0a98a13e7c5b87ffc21be62dff3d051fc94ba369ce8528b248a639f072195531"
+  }
+}

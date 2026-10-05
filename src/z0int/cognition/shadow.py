@@ -10,7 +10,11 @@ The bridge op ``cognition_shadow`` is a *safety boundary*, not a controller:
   disagreement between "what the compiler allows" and "what a local model
   wanted" is visible without ever being acted on;
 * it fails open. A bad payload, a missing model or a dead server produces a
-  result dict — never an exception into the host.
+  result dict — never an exception into the host;
+* it records answers only (oh-my-pi#109): a backend that is not served, raised,
+  timed out or could not be reached gives no receipt row, only a persisted
+  ``backend_unavailable`` count; a receipt names the observed tool as a
+  structured ``actual_tool`` and never stores the state text or any tool input.
 
 The pure part is :func:`build_shadow_plan`; :func:`run_shadow` is the small
 effectful shell the bridge worker calls. Both are unit-testable with fake
@@ -20,8 +24,10 @@ backends and no model server.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import fcntl
 import json
 import os
+import re
 import threading
 import time
 from pathlib import Path
@@ -36,6 +42,8 @@ from ..receipt import new_trace_id
 SCHEMA = "z0int.cognition.shadow.v1"
 RECEIPT_SCHEMA = "z0int.cognition.shadow.receipt.v1"
 RECEIPT_NAME = "cognition-shadow.jsonl"
+COUNTERS_NAME = "cognition-shadow-counters.json"
+_TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
 
 _ALLOWED_KINDS = ("tool", "model", "control")
 _ALLOWED_RISKS = ("read", "write", "destructive", "publish", "credential", "payment")
@@ -418,6 +426,44 @@ def shadow_receipt_path() -> Path:
     return paths.home() / "shadow" / RECEIPT_NAME
 
 
+def _unavailable(row: Mapping[str, Any]) -> bool:
+    """No answer from the backend: unresolved, raised, timed out (no decision) or a transport error."""
+    return row.get("backend") is None or str(row.get("parse_error") or "").startswith("transport_error")
+
+
+def _actual_tool(payload: Mapping[str, Any]) -> dict[str, str] | None:
+    """The tool OMP actually ran, as a name + risk class only (never its input)."""
+    raw = payload.get("actual_tool")
+    if not isinstance(raw, Mapping):
+        facts = payload.get("facts")
+        raw = {"name": facts.get("tool_name")} if isinstance(facts, Mapping) else {}
+    name, risk = raw.get("name"), raw.get("risk_class")
+    if not isinstance(name, str) or not _TOOL_NAME_RE.match(name):
+        return None
+    out = {"name": name}
+    if risk in _ALLOWED_RISKS:
+        out["risk_class"] = risk
+    return out
+
+
+def count_backend_unavailable(n: int) -> int:
+    """Add ``n`` to the persisted ``backend_unavailable`` counter (under ``Z0INT_HOME``); returns the total."""
+    path = shadow_receipt_path().with_name(COUNTERS_NAME)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+", encoding="utf-8") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        fh.seek(0)
+        try:
+            counters = json.loads(fh.read() or "{}")
+        except ValueError:
+            counters = {}
+        counters["backend_unavailable"] = int(counters.get("backend_unavailable") or 0) + n
+        fh.seek(0)
+        fh.truncate()
+        fh.write(json.dumps(counters))
+    return counters["backend_unavailable"]
+
+
 def append_shadow_receipt(row: Mapping[str, Any]) -> Path:
     path = shadow_receipt_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -473,7 +519,8 @@ def run_shadow(
 
     legal_ids = frozenset(legal.ids())
     shadow_rows: list[dict[str, Any]] = []
-    if specs and not legal.is_empty:
+    asked = bool(specs) and not legal.is_empty
+    if asked:
         request = ToolDecisionRequest(
             state=context.state,
             legal=legal,
@@ -503,14 +550,21 @@ def run_shadow(
         "selected_action": None,
         "executed_action": None,
     }
+    answered = [row for row in shadow_rows if not _unavailable(row)]
+    result["backend_unavailable"] = len(specs) - len(answered) if asked else 0
 
-    if write:
+    if write and result["backend_unavailable"]:
+        try:
+            count_backend_unavailable(result["backend_unavailable"])
+        except Exception:  # noqa: BLE001 - a lost count must not fail the op
+            pass
+    if write and answered:
         receipt = {
             "schema": RECEIPT_SCHEMA,
             "ts": time.time(),
             "trace_id": trace_id,
             "session_id": session_id,
-            "state": context.state[:400],
+            "actual_tool": _actual_tool(payload),
             "graph_digest": legal.graph_digest,
             "candidate_action_count": legal.candidate_count,
             "legal_ids": list(legal.ids()),
@@ -520,7 +574,7 @@ def run_shadow(
             "authority": list(legal.authority),
             "budget_units": legal.budget_units,
             "spent_units": legal.spent_units,
-            "shadow": shadow_rows,
+            "shadow": answered,
             # Nothing in this lane is ever executed; keep both facts explicit.
             "selected_action": None,
             "executed_action": None,
@@ -538,10 +592,12 @@ __all__ = [
     "RECEIPT_NAME",
     "RECEIPT_SCHEMA",
     "SCHEMA",
+    "COUNTERS_NAME",
     "ShadowPayloadError",
     "ShadowSpec",
     "append_shadow_receipt",
     "build_shadow_plan",
+    "count_backend_unavailable",
     "run_shadow",
     "shadow_receipt_path",
 ]

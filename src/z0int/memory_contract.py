@@ -365,11 +365,14 @@ class MemoryUseReceipt:
     input_tokens: int | None = None
     raw_source_reads: int | None = None
     tainted_evidence: bool = False
+    instruction_capability: bool = False
     schema: str = SCHEMA
 
     def __post_init__(self) -> None:
         if not self.snapshot_id.strip():
             raise ValueError("snapshot_id is required")
+        if self.instruction_capability:
+            raise ValueError("memory use is evidence and cannot carry instruction authority")
         if self.retrieval_latency_ms is not None and self.retrieval_latency_ms < 0:
             raise ValueError("retrieval_latency_ms must be >= 0")
         if self.input_tokens is not None and self.input_tokens < 0:
@@ -399,3 +402,10 @@ class MemoryUseReceipt:
     def to_decision_extra(self) -> dict[str, Any]:
         """Projection for DecisionReceipt.extra; no second receipt schema."""
         return {"memory": self.to_dict()}
+
+    @classmethod
+    def from_dict(cls, row: dict[str, Any]) -> "MemoryUseReceipt":
+        """Inverse of ``to_dict`` (DecisionReceipt.extra.memory, opportunity_record.memory); validates on the way in."""
+        tuples = ("capability_ids", "query_ids", "included_claim_ids", "excluded_claim_ids", "evidence_event_uids")
+        known = {f for f in cls.__dataclass_fields__ if f != "schema"}
+        return cls(**{k: tuple(v) if k in tuples else v for k, v in row.items() if k in known})

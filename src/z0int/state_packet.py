@@ -1142,6 +1142,22 @@ def source_revisions(repo: Path, projects_root: Path | None = None, reader: Read
             **({"resource": _posture_revision()} if resource else {}), **out_gh}
 
 
+def _memory_snapshot_id(revisions: dict[str, Any]) -> str | None:
+    """The memory view this packet was built against (AgentsView generation, TencentDB rev, ledger tail, HEAD).
+
+    Recomputed on a cache hit too: the packet's own sources may be unchanged while memory moved on. This runs
+    inside synchronous harness hooks, so it is local only: a short AgentsView busy timeout and the gateway
+    revision last observed by a real memory query, never a network call.
+    """
+    try:
+        from .memory.surface import memory_snapshot_id
+
+        return memory_snapshot_id(repo_sha=((revisions.get("git") or {}).get("head")) or "unreadable",
+                                  av_timeout=0.02, probe_gateway=False)
+    except Exception:  # noqa: BLE001 - memory is an optional source; its absence is not a packet failure
+        return None
+
+
 def build_state_packet(
     repo: str | Path,
     *,
@@ -1169,8 +1185,9 @@ def build_state_packet(
     revisions = source_revisions(root, proj, probe, github=bool(github), resource="resource" in adapters)
     key = _cache_key(intent, required, root, revisions)
     prior = _load_prior(root) if (use_cache or store) else None
+    memory_snapshot_id = _memory_snapshot_id(revisions)
     if use_cache and prior and prior.get("packet_id") == key:
-        out = dict(prior)
+        out = dict(prior, memory_snapshot_id=memory_snapshot_id)
         m = dict(out.get("measurements") or {})
         m.update({"cache_hit": True, "wall_ms": round((time.perf_counter() - t0) * 1000, 2),
                   "raw_source_reads": probe.reads, "bytes_read": probe.bytes,
@@ -1214,6 +1231,7 @@ def build_state_packet(
         "current_claims": current,
         **reduced,
         "source_revisions": revisions,
+        "memory_snapshot_id": memory_snapshot_id,
         "policy_revision": POLICY_REVISION,
         "coverage": {b.facet: b.coverage for b in bundles},
         "freshness": {"github_probe_ttl_s": float(os.environ.get("Z0INT_PACKET_GH_TTL", "300"))} if github else {},

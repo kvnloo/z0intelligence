@@ -456,6 +456,7 @@ def build_parser() -> argparse.ArgumentParser:
     cxr.add_argument("--project-root", default=None)
     cxr.add_argument("--no-qmd", action="store_true")
     cxr.add_argument("--allow-memory", action="store_true")
+    cxr.add_argument("--turn-key", help="turn id for the single memory injector guard (required with --allow-memory)")
     cxr.add_argument("--input", default=None, help="JSON file with needs[]")
     cxp = cx_sub.add_parser("packet", help="State Packet v0 — current-work state from git + docs + Claude Code history")
     cxp.add_argument("--repo", default=None, help="Target repository (default: cwd)")
@@ -622,6 +623,12 @@ def build_parser() -> argparse.ArgumentParser:
     po.add_argument("--log", action="store_true", help="Append a snapshot to ~/.z0int/state/posture/history.jsonl")
     _json_flag(po)
 
+    ut = sub.add_parser("utilization", help="North-star z0 utilization per harness and cohort (count-only)")
+    ut.add_argument("--range", default="7d", help="window, e.g. 7d or 24h")
+    ut.add_argument("--projects-dir", default=None, help="Claude Code projects dir (default ~/.claude/projects)")
+    ut.add_argument("--no-external", action="store_true", help="skip Hermes/OMP/Codex volume counts")
+    _json_flag(ut)
+
     pf = sub.add_parser("preflight", help="z0intelligence production preflight (no Evolution Lab)")
     pf.add_argument("prompt")
     pf.add_argument("--capability-id", default=None)
@@ -635,6 +642,9 @@ def build_parser() -> argparse.ArgumentParser:
         ("abab", "ABAB experiment archive helpers (→ z0int.abab)"),
         ("claude-code", "Claude Code launch profiles + prefix-cache residency (→ z0int.claude_code_launch)"),
         ("hermes", "Hermes shadow DecisionOpportunity records + turn outcomes (→ z0int.hermes_decisions)"),
+        ("outcomes", "Verified turn outcomes + credit join (→ z0int.outcome_verifier)"),
+        ("loop", "Verified learning loop: export tables, merge hosts, scheduled tick (→ z0int.loop_export)"),
+        ("memory", "z0 memory surface: doctor, bench, eval, rules (→ z0int.memory.cli)"),
     ):
         sp = sub.add_parser(name, help=help_txt)
         sp.add_argument(
@@ -838,6 +848,7 @@ def _cmd_context(args: argparse.Namespace) -> int:
         project_root=getattr(args, "project_root", None),
         allow_qmd=not bool(getattr(args, "no_qmd", False)),
         allow_memory=bool(getattr(args, "allow_memory", False)),
+        turn_key=getattr(args, "turn_key", None),
     )
     payload = packet.to_dict()
     if args.json or True:
@@ -1168,7 +1179,15 @@ def main(argv: list[str] | None = None) -> int:
         _print(out, as_json=as_json)
         return 0
 
-    if args.cmd in ("routine", "cascade", "aodl", "repair", "abab", "claude-code", "hermes"):
+    if args.cmd == "utilization":
+        rest = ["--range", args.range] + (["--json"] if as_json else [])
+        rest += ["--projects-dir", args.projects_dir] if args.projects_dir else []
+        rest += ["--no-external"] if args.no_external else []
+        from .utilization import run as _util_run
+        return int(_util_run(rest))
+
+    if args.cmd in ("routine", "cascade", "aodl", "repair", "abab", "claude-code", "hermes", "outcomes", "loop",
+                    "memory"):
         rest = list(getattr(args, "module_argv", None) or [])
         # argparse REMAINDER keeps a leading "--" when users write: z0int routine -- compile ...
         if rest and rest[0] == "--":
@@ -1188,6 +1207,12 @@ def main(argv: list[str] | None = None) -> int:
             from .claude_code_launch import _main as _mod_main
         elif args.cmd == "hermes":
             from .hermes_decisions import _main as _mod_main
+        elif args.cmd == "outcomes":
+            from .outcome_verifier import _main as _mod_main
+        elif args.cmd == "loop":
+            from .loop_export import _main as _mod_main
+        elif args.cmd == "memory":
+            from .memory.cli import main as _mod_main
         else:
             from .abab import _main as _mod_main
         return int(_mod_main(rest))

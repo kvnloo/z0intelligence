@@ -245,6 +245,19 @@ test("buildShadowPayload is self-contained and schema-shaped", () => {
 	expect(payload.objective).toBeNull();
 });
 
+test("the shadow request gives the served-only local backend the bounded tool input and a structured actual_tool", async () => {
+	// The input goes to the local shadow model only; the Python receipt persists actual_tool, never state/input.
+	process.env.OMP_Z0INT_COGNITION_TOOLS = "bash,read";
+	const { handler } = installed();
+	handler(toolCall("bash", { command: "cat SECRET_TOOL_INPUT_MARKER_7", pad: "x".repeat(5000) }), fakeCtx());
+	await flush();
+	expect(sent).toHaveLength(1);
+	expect(sent[0].actual_tool).toEqual({ name: "bash", risk_class: "write" });
+	expect(String(sent[0].state)).toStartWith("OMP tool_call: bash\ninput: ");
+	expect(String(sent[0].state)).toContain("SECRET_TOOL_INPUT_MARKER_7");
+	expect(String(sent[0].state).length).toBeLessThanOrEqual("OMP tool_call: bash\ninput: ".length + 2000);
+});
+
 test("registers z0int-cognition-status and the command never throws", async () => {
 	const home = mkdtempSync(join(tmpdir(), "local-cognition-status-"));
 	process.env.Z0INT_HOME = home;

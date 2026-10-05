@@ -121,6 +121,9 @@ def run_abab_job(job: dict[str, Any]) -> dict[str, Any]:
         )
         rec = record_arm(job["id"], name, rr.treatment_hash, status="done", result=rr.to_dict())
         row = rr.to_dict()
+        # Synthetic cost is test machinery. It is not a measurement and cannot promote.
+        row["measurement_source"] = "simulation"
+        row["promotion_credit"] = False
         row["arm_record"] = rec
         row["trace_id"] = job.get("trace_id")
         store.append_result(row)
@@ -157,6 +160,8 @@ def run_abab_job(job: dict[str, Any]) -> dict[str, Any]:
         "job_id": job["id"],
         "trace_id": job["trace_id"],
         "decision": decision,
+        "promotion_credit": False,
+        "measurement_source": "simulation",
         "champion_hash": champ.get("treatment_hash"),
         "challenger_hash": primary.get("treatment_hash"),
         "arms": results,

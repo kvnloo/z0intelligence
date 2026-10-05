@@ -1,5 +1,56 @@
 name: hermes-z0intelligence
-version: 0.1.0
-description: Canonical evidence-gated automatic intelligence decisions.
+version: 0.2.0
+manifest_version: 1
+kind: standalone
+description: "z0intelligence for Hermes: shadow capture of DecisionOpportunities, turn outcomes and content-free hook events into $Z0INT_HOME/state/hermes (never alters a turn), the evidence-gated automatic call (inert unless automatic.json enables hermes), and the z0 memory seam (shadow unless memory_inject is canary/on)."
+license: MIT
+provides_tools: []
 provides_hooks:
+  - on_session_start
   - pre_llm_call
+  - post_llm_call
+  - on_session_end
+  - pre_approval_request
+  - post_tool_call
+  - pre_api_request
+  - post_api_request
+  - api_request_error
+  - pre_auxiliary_call
+  - post_auxiliary_call
+  - subagent_stop
+config_schema:
+  mode:
+    type: str
+    default: "off"
+    label: Capture mode
+    description: off (no capture hook is registered) or shadow (records metadata; every hook returns None).
+  opportunities:
+    type: bool
+    default: true
+    label: Shadow DecisionOpportunities
+    description: Build a DecisionOpportunity for each user turn in a detached z0int child (bounded pool).
+  z0int_python:
+    type: str
+    default: ""
+    label: z0int interpreter
+    description: Python of the installed z0int (else Z0INT_PYTHON, else $Z0INT_HOME/config/hermes.json python).
+  z0int_home:
+    type: str
+    default: ""
+    label: z0int home
+    description: Where rows are written (state/hermes). Empty uses Z0INT_HOME or ~/.z0int.
+  persist_packet_text:
+    type: bool
+    default: false
+    label: Keep State Packet text
+    description: Privacy class packet_text opt_in. Off digests README open items, commit subjects and branch names.
+  memory_inject:
+    type: str
+    default: ""
+    label: z0 memory injection
+    description: off, shadow (brief computed detached, never injected), canary or on (brief joins the user message within 300 ms; a non-loopback model also needs allow_cloud_injection for hermes in $Z0INT_HOME/config/memory.json). Empty follows mode.
+  memory_injector:
+    type: str
+    default: ""
+    label: z0 memory injector id
+    description: Owner id for the single-injector guard (default z0-memory:hermes).

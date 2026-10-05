@@ -1,0 +1,57 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness codex prompt || true",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.memory.hook --harness codex prompt || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness codex stop || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness codex subagent-start || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness codex subagent-stop || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,524 @@
+{
+  "specVersion": "0.2",
+  "graphId": "craid-autonomous-pm",
+  "revision": 0,
+  "intentGraph": {
+    "nodes": [
+      {
+        "id": "product",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "research",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "scoutA",
+        "kind": "executor",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "scoutB",
+        "kind": "executor",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "analysis",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "critic",
+        "kind": "verifier",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "integrate",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "memory",
+        "kind": "memory",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "store"
+        ],
+        "authorityCeiling": [
+          "execute",
+          "store"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "deploy",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "captain",
+        "kind": "humanGate",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-product-research",
+        "relation": "dependency",
+        "from": "product",
+        "to": "research",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+        }
+      },
+      {
+        "id": "e-research-scoutA",
+        "relation": "dependency",
+        "from": "research",
+        "to": "scoutA",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+        }
+      },
+      {
+        "id": "e-research-scoutB",
+        "relation": "dependency",
+        "from": "research",
+        "to": "scoutB",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+        }
+      },
+      {
+        "id": "e-scoutA-analysis",
+        "relation": "dependency",
+        "from": "scoutA",
+        "to": "analysis",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+        }
+      },
+      {
+        "id": "e-scoutB-analysis",
+        "relation": "dependency",
+        "from": "scoutB",
+        "to": "analysis",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+        }
+      },
+      {
+        "id": "e-analysis-critic",
+        "relation": "verification",
+        "from": "analysis",
+        "to": "critic",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+        }
+      },
+      {
+        "id": "e-critic-integrate",
+        "relation": "dependency",
+        "from": "critic",
+        "to": "integrate",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+        }
+      },
+      {
+        "id": "e-integrate-memory",
+        "relation": "data",
+        "from": "integrate",
+        "to": "memory",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+        }
+      },
+      {
+        "id": "e-integrate-deploy",
+        "relation": "dependency",
+        "from": "integrate",
+        "to": "deploy",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+        }
+      },
+      {
+        "id": "e-deploy-captain",
+        "relation": "control",
+        "from": "deploy",
+        "to": "captain",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+        }
+      },
+      {
+        "id": "e-captain-research",
+        "relation": "observation",
+        "from": "captain",
+        "to": "research",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+        }
+      }
+    ]
+  },
+  "policies": {
+    "kinds": [
+      "sequence",
+      "retry",
+      "fanout",
+      "reducer",
+      "human_gate"
+    ],
+    "fanIn": "reducer",
+    "reducer": "analysis",
+    "dynamic": {
+      "allowed": false,
+      "maxChildren": 0,
+      "maxDepth": 0
+    },
+    "protocol": "craid"
+  },
+  "constraints": {
+    "budgets": {
+      "tokens": 0
+    },
+    "termination": {
+      "on": "humanGate.approved"
+    }
+  },
+  "provenance": {
+    "source": "blueprint-craid",
+    "sourceHash": "89b168f0c83867c1f77da71857c53f79f86f933b85b50ae6ec7ee3a8d0a69839"
+  }
+}

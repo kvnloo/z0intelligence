@@ -1,0 +1,70 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok prompt || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok stop || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok stop || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "StopCancelled": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok stop || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok subagent-start || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.hook_adapter --harness grok subagent-stop || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
