@@ -3,6 +3,14 @@
 **Canonical source.** Harness adapters (`AGENTS.md`, `CLAUDE.md`, …) point here.
 Do **not** reproduce install steps from memory — run the CLI.
 
+## Memory setup is not memory continuity
+
+Before installing or changing a memory adapter, read the [pinned memory status](memory-status.md) and [canonical plan #22](https://github.com/kvnloo/z0intelligence/issues/22).
+
+Package installation, history indexing, a reachable gateway, and a populated cache are separate from evidence reaching the answering model and being used correctly. The status page distinguishes audited `master` capabilities, branch-only wiring, dated host reports and unverified work. Do not copy branch-only commands into default-install guidance or rebuild an adapter from a superseded issue.
+
+The immediate acceptance target is one source-backed decision/correction handoff between two supported clients without a manual recap. No new memory database or mandatory OptChat master is required. Raw private history stays local; memory never grants action authority. Installing this package does not activate hosted/private-history export, semantic model downloads or a new routing policy.
+
 ## Principle
 
 > The LLM decides intent and handles genuinely semantic steps.
