@@ -197,8 +197,10 @@ def _normalize_host(host: Mapping[str, Any], *, now: float) -> dict[str, Any] | 
     raw_id = host.get("host_id") or host.get("id") or host.get("name") or host.get("label") or host.get("slot")
     if raw_id is None:
         return None
+    explicit_host_id = host.get("host_id")
+    normalized_host_id = str(explicit_host_id) if explicit_host_id is not None else f"tern:{raw_id}"
     return {
-        "host_id": str(host.get("host_id") or _stable_id("host", raw_id)),
+        "host_id": normalized_host_id,
         "label": host.get("label") or host.get("name"),
         "mode": host.get("mode") if host.get("mode") in {"direct", "kubernetes", "remote"} else "remote",
         "status": host.get("status") or host.get("state") or "unknown",
@@ -213,6 +215,10 @@ def _normalize_session(session: Mapping[str, Any], *, now: float) -> dict[str, A
     if raw_id is None:
         return None
     host_id = session.get("host_id") or session.get("host")
+    if host_id is not None:
+        host_id = str(host_id)
+        if not host_id.startswith("tern:"):
+            host_id = f"tern:{host_id}"
     status = session.get("status") or session.get("state")
     if status is None:
         if session.get("current") is True and session.get("locked") is True:
@@ -226,7 +232,7 @@ def _normalize_session(session: Mapping[str, Any], *, now: float) -> dict[str, A
     return {
         "session_id": str(raw_id),
         "name": session.get("name"),
-        "host_id": str(host_id) if host_id is not None else None,
+        "host_id": host_id,
         "runtime": session.get("runtime") or session.get("program"),
         "status": status,
         "current": session.get("current"),
