@@ -134,6 +134,42 @@ class ContextResolveTests(unittest.TestCase):
             self.assertFalse(packet.unresolved_gaps)
             self.assertIn("fff:", next(k for k in packet.recipe.source_epochs if k.startswith("fff:")))
 
+    def test_fff_hit_does_not_spawn_qmd_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "README.md"
+            target.write_text("resident index evidence\n", encoding="utf-8")
+            found = {
+                "status": "ready",
+                "package_version": "0.11.0",
+                "index_epoch": 1,
+                "reused": True,
+                "wall_ms": 0.5,
+                "path_hits": [{"path": "README.md"}],
+                "content_hits": [],
+            }
+            with (
+                mock.patch(
+                    "z0int.context_resolve._fff_search_repository",
+                    return_value=found,
+                ),
+                mock.patch(
+                    "z0int.context_resolve._qmd_bin",
+                    return_value="/usr/bin/qmd",
+                ),
+                mock.patch("z0int.context_resolve.subprocess.run") as run,
+            ):
+                packet = resolve_context(
+                    query="README",
+                    project_root=root,
+                    allow_fff=True,
+                    allow_qmd=True,
+                    use_cache=False,
+                )
+            run.assert_not_called()
+            self.assertEqual(packet.measurements["qmd_status"], "idle")
+            self.assertEqual(packet.measurements["fff_hits"], 1)
+
     def test_context_packet_can_be_recorded_in_event_log_without_granting_success(self):
         with tempfile.TemporaryDirectory() as tmp, z0home(tmp):
             root = Path(tmp) / "proj"
