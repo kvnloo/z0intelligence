@@ -325,7 +325,7 @@ def _normalize_kerdoios(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], 
                 "observed_at": entry.get("updated_at") or entry.get("observed_at") or now,
             }
         )
-    observed_at = raw.get("saved_at") or raw.get("observed_at") or now
+    observed_at = raw.get("generated_at") or raw.get("saved_at") or raw.get("observed_at") or now
     return offers, _source(
         "ok" if offers else "degraded",
         observed_at=observed_at,
