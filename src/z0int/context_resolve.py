@@ -401,13 +401,22 @@ def resolve_context(
     fff_hits = 0
     fff_wall_ms = 0.0
 
-    qmd_status = "absent"
-    if allow_qmd and _qmd_bin():
+    # Do not even spawn qmd status on a successful FFF fast path. QMD is a
+    # later tier and should pay its process/model costs only when it is needed.
+    qmd_status = "disabled" if not allow_qmd else "idle"
+
+    def ensure_qmd_status() -> str:
+        nonlocal qmd_status
+        if qmd_status != "idle":
+            return qmd_status
+        bin_path = _qmd_bin()
+        if not bin_path:
+            qmd_status = "absent"
+            return qmd_status
         qmd_status = "installed"
-        # index freshness — status only
         try:
             st = subprocess.run(
-                [_qmd_bin() or "qmd", "status"],
+                [bin_path, "status"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -418,6 +427,7 @@ def resolve_context(
                 epochs["qmd_status_sha"] = _sha16(st.stdout[:2000])
         except (OSError, subprocess.TimeoutExpired):
             qmd_status = "error"
+        return qmd_status
 
     for need in need_list:
         satisfied = False
@@ -498,6 +508,8 @@ def resolve_context(
 
             # QMD is complementary rather than competing: use it after the
             # repository fast path misses (or when no repository root exists).
+            if not satisfied and allow_qmd:
+                ensure_qmd_status()
             if not satisfied and allow_qmd and qmd_status in {"ready", "installed"}:
                 hits = _qmd_search(need.description, limit=5)
                 ops.append(
