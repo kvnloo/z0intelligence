@@ -4,6 +4,7 @@ import json
 import stat
 
 from z0int.capacity_snapshot import SCHEMA, build_snapshot, write_snapshot
+from z0int.cli import main as cli_main
 
 
 def test_tern_sessions_are_sticky_and_not_implicitly_migratable():
@@ -86,3 +87,26 @@ def test_atomic_private_write(tmp_path):
     assert json.loads(path.read_text())["schema"] == SCHEMA
     mode = stat.S_IMODE(path.stat().st_mode)
     assert mode & 0o077 == 0
+
+
+def test_root_cli_emits_snapshot(tmp_path, monkeypatch, capsys):
+    for name in (
+        "Z0INT_TERN_CAPACITY_SNAPSHOT",
+        "Z0INT_KERDOIOS_CAPACITY_SNAPSHOT",
+        "Z0INT_PLACEMENT_LEASES_SNAPSHOT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    path = tmp_path / "cli-capacity.json"
+    rc = cli_main([
+        "capacity",
+        "snapshot",
+        "--no-local",
+        "--output",
+        str(path),
+        "--json",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema"] == SCHEMA
+    assert payload["path"] == str(path)
+    assert json.loads(path.read_text())["schema"] == SCHEMA
