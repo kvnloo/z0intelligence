@@ -132,7 +132,8 @@ def test_native_tern_session_shape_is_normalized():
     session = snap["sessions"][0]
     assert host["label"] == "groot"
     assert session["name"] == "omp-work"
-    assert session["host_id"] == "groot"
+    assert host["host_id"] == "tern:groot"
+    assert session["host_id"] == "tern:groot"
     assert session["status"] == "current"
     assert session["tab_count"] == 3
     assert session["migration_allowed"] is False
