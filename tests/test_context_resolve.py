@@ -9,6 +9,7 @@ from unittest import mock
 
 from z0int.context_resolve import (
     InformationNeed,
+    append_context_packet_event,
     project_to_aodl_fields,
     resolve_context,
 )
@@ -80,6 +81,81 @@ class ContextResolveTests(unittest.TestCase):
             use_cache=False,
         )
         self.assertTrue(any("memory recall disabled" in g for g in packet.unresolved_gaps))
+
+    def test_exact_symbol_prefers_fff_and_emits_index_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "src").mkdir()
+            target = root / "src" / "main.py"
+            target.write_text("def resolve_context():\n    pass\n", encoding="utf-8")
+            found = {
+                "status": "ready",
+                "package_version": "0.11.0",
+                "index_epoch": 4,
+                "reused": True,
+                "wall_ms": 1.25,
+                "path_hits": [],
+                "content_hits": [
+                    {
+                        "path": "src/main.py",
+                        "line": 1,
+                        "col": 1,
+                        "text": "def resolve_context():",
+                        "context_before": [],
+                        "context_after": ["    pass"],
+                        "is_definition": True,
+                    }
+                ],
+            }
+            with mock.patch(
+                "z0int.context_resolve._fff_search_repository",
+                return_value=found,
+            ) as search:
+                packet = resolve_context(
+                    needs=[
+                        InformationNeed(
+                            id="s1",
+                            description="resolve_context",
+                            kind="exact_symbol",
+                            symbol="resolve_context",
+                        )
+                    ],
+                    project_root=root,
+                    allow_fff=True,
+                    allow_qmd=False,
+                    use_cache=False,
+                )
+            search.assert_called_once()
+            self.assertEqual(len(packet.evidence), 1)
+            self.assertEqual(packet.evidence[0].trust_class, "index_hit")
+            self.assertIn("src/main.py:1", packet.evidence[0].locator)
+            self.assertEqual(packet.measurements["fff_status"], "ready")
+            self.assertEqual(packet.measurements["fff_hits"], 1)
+            self.assertFalse(packet.unresolved_gaps)
+            self.assertIn("fff:", next(k for k in packet.recipe.source_epochs if k.startswith("fff:")))
+
+    def test_context_packet_can_be_recorded_in_event_log_without_granting_success(self):
+        with tempfile.TemporaryDirectory() as tmp, z0home(tmp):
+            root = Path(tmp) / "proj"
+            root.mkdir()
+            (root / "a.py").write_text("x=1\n", encoding="utf-8")
+            packet = resolve_context(
+                needs=[InformationNeed(id="e", description="a", kind="exact_path", path="a.py")],
+                project_root=root,
+                allow_fff=False,
+                allow_qmd=False,
+                use_cache=False,
+            )
+            event = append_context_packet_event(
+                packet,
+                source="test:harness",
+                project=str(root),
+                session_id="s1",
+            )
+            self.assertEqual(event.event_type, "context.resolve")
+            self.assertFalse(event.payload["execution_completed"])
+            self.assertIsNone(event.payload["verified_success"])
+            self.assertEqual(event.session_id, "s1")
 
     def test_recipe_cache_roundtrip(self):
         with tempfile.TemporaryDirectory() as tmp, z0home(tmp):
