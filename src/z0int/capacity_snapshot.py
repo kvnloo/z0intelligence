@@ -194,7 +194,7 @@ def _safe_resources(value: Any) -> dict[str, Any]:
 
 
 def _normalize_host(host: Mapping[str, Any], *, now: float) -> dict[str, Any] | None:
-    raw_id = host.get("host_id") or host.get("id") or host.get("name") or host.get("label")
+    raw_id = host.get("host_id") or host.get("id") or host.get("name") or host.get("label") or host.get("slot")
     if raw_id is None:
         return None
     return {
@@ -212,12 +212,26 @@ def _normalize_session(session: Mapping[str, Any], *, now: float) -> dict[str, A
     raw_id = session.get("session_id") or session.get("id")
     if raw_id is None:
         return None
-    host_id = session.get("host_id")
+    host_id = session.get("host_id") or session.get("host")
+    status = session.get("status") or session.get("state")
+    if status is None:
+        if session.get("current") is True and session.get("locked") is True:
+            status = "current_locked"
+        elif session.get("current") is True:
+            status = "current"
+        elif session.get("locked") is True:
+            status = "locked"
+        else:
+            status = "available"
     return {
         "session_id": str(raw_id),
+        "name": session.get("name"),
         "host_id": str(host_id) if host_id is not None else None,
         "runtime": session.get("runtime") or session.get("program"),
-        "status": session.get("status") or session.get("state") or "unknown",
+        "status": status,
+        "current": session.get("current"),
+        "locked": session.get("locked"),
+        "tab_count": session.get("tab_count") or session.get("tabs"),
         "rtt_ms": session.get("rtt_ms"),
         "pane_id": session.get("pane_id"),
         "session_sticky": True,
@@ -440,6 +454,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     tern_path = _path_arg(args.tern, "Z0INT_TERN_CAPACITY_SNAPSHOT")
+    if tern_path is None:
+        tern_path = paths.home() / "state" / "tern_capacity.json"
     kerdoios_path = _path_arg(args.kerdoios, "Z0INT_KERDOIOS_CAPACITY_SNAPSHOT")
     leases_path = _path_arg(args.leases, "Z0INT_PLACEMENT_LEASES_SNAPSHOT")
 
