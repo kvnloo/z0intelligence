@@ -246,14 +246,16 @@ def _safe_quota(quota: Any) -> dict[str, Any]:
     src = quota if isinstance(quota, Mapping) else {}
     out: dict[str, Any] = {}
     dimensions: dict[str, Any] = {}
-    for name, dimension in (src.get("dimensions") or {}).items():
-        if not isinstance(name, str) or not isinstance(dimension, Mapping):
-            continue
-        dimensions[name] = {
-            key: dimension.get(key)
-            for key in _SAFE_QUOTA_DIMENSION_KEYS
-            if key in dimension
-        }
+    raw_dimensions = src.get("dimensions")
+    if isinstance(raw_dimensions, Mapping):
+        for name, dimension in raw_dimensions.items():
+            if not isinstance(name, str) or not isinstance(dimension, Mapping):
+                continue
+            dimensions[name] = {
+                key: dimension.get(key)
+                for key in _SAFE_QUOTA_DIMENSION_KEYS
+                if key in dimension
+            }
     if dimensions:
         out["dimensions"] = dimensions
     for key in (
