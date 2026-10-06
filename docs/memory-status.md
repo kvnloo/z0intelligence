@@ -25,6 +25,7 @@ These states are not interchangeable. An issue can be closed for a bounded setup
 | Host-related fixes | `feat/salvage-stack-metrics` at `d9a3615487ec54a2ca613ac6819809725328fa17` | Published branch, not an unpushed local branch. Contains more than memory work; no blanket merge authorization. |
 | Host setup acceptance | [#122 close receipt](https://github.com/kvnloo/z0intelligence/issues/122#issuecomment-5983241590), reporting earlier branch revision `5578792` | Setup/cache/tunnel/import checks, not a scored cross-client memory study. |
 | Fresh-turn OptChat | #120; `feat/optchat-harness-v0` compared identical to audited `master` | Proposed experiment. A branch name does not establish a semantic compactor or chat harness. |
+| Post-audit default branch | [PR #128](https://github.com/kvnloo/z0intelligence/pull/128), squash `43b796aa8752e703fdb119b8660a0d28c1de0a44` on `master` | Merged after this audit: opt-in OptChat fresh-view turns (`src/z0int/optchat/`, `omp-extensions/z0-optchat/`) with a model-written summary tree. Merged source only; not re-audited here and not verified use. #120 acceptance remains open. |
 
 The historical [October 2 integration audit](https://github.com/kvnloo/z0intelligence/blob/0159808f64a8e8d7f7ae36a5a9a238b1cd2d03d6/docs/pr-reconciliation-2026-10-02.md) remains evidence for its own revision and tests. Its test totals were not re-run during this documentation pass.
 
@@ -106,4 +107,4 @@ Private raw history stays local. Sanitized receipts can be published; summaries 
 
 A memory-related PR should link #22 and its narrow owning issue, name the exact implementation/source revisions, and state whether it changes merged capability, activation, host coverage or verified-use status. Update this evidence index when those facts change; do not silently convert a branch plan into a default-install instruction. Record new measurements separately from historical cohorts.
 
-This documentation branch targets `preview` under the repository's day-pass convention. The audited default branch and implementation branches above are separate source pins; this doc does not claim `preview` contains their runtime code. No runtime branch was merged and no local/private host tests were run by this audit.
+This documentation was originally prepared against `preview` and is re-applied on `master` at `43b796aa8752e703fdb119b8660a0d28c1de0a44`. The audited revision and implementation branches above are separate source pins; this doc does not claim the target branch contains their runtime code. No runtime branch was merged and no local/private host tests were run by this audit.
