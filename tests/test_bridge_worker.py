@@ -115,6 +115,33 @@ class BridgeRuntimeTests(unittest.TestCase):
             self.assertIn("abc123def456", heart)
             self.assertIn('"measurement_state": "partial"', heart)
 
+    def test_file_search_records_context_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, z0home(tmp):
+            root = Path(tmp) / "repo"
+            root.mkdir()
+            (root / "README.md").write_text("bridge evidence\n", encoding="utf-8")
+            rt = BridgeRuntime(generation=1, instance_id="t", build_id="b")
+            out = rt.file_search(
+                {
+                    "query": "README.md",
+                    "kind": "exact_path",
+                    "project_root": str(root),
+                    "session_id": "s1",
+                    "trace_id": "trace1",
+                    "allow_qmd": False,
+                }
+            )
+            self.assertTrue(out["ok"])
+            self.assertEqual(out["harness_id"], "omp")
+            self.assertEqual(len(out["packet"]["evidence"]), 1)
+            self.assertIsInstance(out["event_id"], int)
+            from z0int.memory.event_log import EventLog
+
+            event = EventLog().get(out["event_id"])
+            self.assertEqual(event.event_type, "context.resolve")
+            self.assertEqual(event.source, "harness:omp")
+            self.assertIsNone(event.payload["verified_success"])
+
     def test_stale_generation_open_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp, z0home(tmp):
             import z0int.bridge.runtime as rtmod
@@ -168,7 +195,23 @@ class BridgeWorkerProcessTests(unittest.TestCase):
             self.assertFalse(bad["ok"])
             st = rpc({"id": "4", "op": "status"})
             self.assertTrue(st["ok"])
-            rpc({"id": "5", "op": "shutdown"})
+            search = rpc(
+                {
+                    "id": "5",
+                    "op": "file_search",
+                    "payload": {
+                        "query": "README.md",
+                        "kind": "exact_path",
+                        "project_root": str(root),
+                        "allow_qmd": False,
+                        "record": False,
+                    },
+                }
+            )
+            self.assertTrue(search["ok"])
+            self.assertEqual(search["harness_id"], "omp")
+            self.assertTrue(search["packet"]["evidence"])
+            rpc({"id": "6", "op": "shutdown"})
             proc.wait(timeout=5)
             self.assertEqual(proc.returncode, 0)
 
