@@ -40,18 +40,26 @@ local function host_id(h: any): string
     return "tern:" .. tostring(raw)
 end
 
-local function session_host_id(s: any): string?
+local function session_host_id(s: any, lookup: { [string]: string }): string?
     local raw = present(s.host)
     if raw == nil then
         return nil
     end
-    return "tern:" .. tostring(raw)
+    return lookup[tostring(raw)] or ("tern:" .. tostring(raw))
 end
 
 local function snapshot(cx: any): any
     local hosts = tern.json.array()
+    local host_lookup: { [string]: string } = {}
     for _, raw in cx.hosts:list() do
         local h: any = raw
+        local id = host_id(h)
+        for _, candidate in { h.name, h.id, h.slot } do
+            local value = present(candidate)
+            if value ~= nil then
+                host_lookup[tostring(value)] = id
+            end
+        end
         local state = present(h.state) or present(h.status)
         if state == nil then
             if h.connected == true then
@@ -64,9 +72,9 @@ local function snapshot(cx: any): any
         end
 
         table.insert(hosts, {
-            host_id = host_id(h),
+            host_id = id,
             label = present(h.name) or present(h.label) or tostring(present(h.slot) or "local"),
-            mode = if h.local == true then "direct" else "remote",
+            mode = if h.local == true or id == "tern:local" then "direct" else "remote",
             status = state,
             rtt_ms = present(h.rtt_ms),
         })
@@ -86,7 +94,7 @@ local function snapshot(cx: any): any
         table.insert(sessions, {
             session_id = tostring(s.id),
             name = present(s.name),
-            host_id = session_host_id(s),
+            host_id = session_host_id(s, host_lookup),
             status = state,
             current = s.current == true,
             locked = s.locked == true,
