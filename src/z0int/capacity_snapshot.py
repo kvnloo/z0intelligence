@@ -321,6 +321,7 @@ def _normalize_kerdoios(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], 
                 "burn_rate": entry.get("burn_rate"),
                 "time_to_exhaustion": entry.get("time_to_exhaustion"),
                 "time_to_reset": entry.get("time_to_reset"),
+                "reset_at": entry.get("reset_at"),
                 "observed_at": entry.get("updated_at") or entry.get("observed_at") or now,
             }
         )
@@ -463,6 +464,8 @@ def main(argv: list[str] | None = None) -> int:
     if tern_path is None:
         tern_path = paths.home() / "state" / "tern_capacity.json"
     kerdoios_path = _path_arg(args.kerdoios, "Z0INT_KERDOIOS_CAPACITY_SNAPSHOT")
+    if kerdoios_path is None:
+        kerdoios_path = Path.home() / ".cache" / "kerdoios" / "capacity.json"
     leases_path = _path_arg(args.leases, "Z0INT_PLACEMENT_LEASES_SNAPSHOT")
 
     snapshot = build_snapshot(
