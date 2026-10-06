@@ -102,7 +102,7 @@ local function snapshot(cx: any): any
     }
 end
 
-local function export(cx: any, toast: boolean?)
+local function emit_snapshot(cx: any, toast: boolean?)
     if writing then
         return
     end
@@ -125,7 +125,7 @@ local function export(cx: any, toast: boolean?)
 end
 
 local function tick(cx: any)
-    export(cx, false)
+    emit_snapshot(cx, false)
     tern.timer(5000, tick)
 end
 
@@ -134,11 +134,11 @@ tern.command({
     title = "Export z0 capacity snapshot",
     icon = "terminal",
     run = function(cx)
-        export(cx, true)
+        emit_snapshot(cx, true)
     end,
 })
 
 tern.on("window_start", function(cx)
-    export(cx, false)
+    emit_snapshot(cx, false)
     tern.timer(5000, tick)
 end)
