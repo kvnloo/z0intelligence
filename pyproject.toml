@@ -35,8 +35,8 @@ z0int-compile = "z0int.compile:main"
 z0int-train-next-action = "z0int.train:main"
 z0int-image-decide = "z0int.image_decision_cli:main"
 [project.optional-dependencies]
-test = ["pytest==8.4.2", "PyYAML==6.0.3", "agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@2ae90511a900fdb3dcc576c9634cd8d9ee1c8d6a"]
-analytics = ["agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@2ae90511a900fdb3dcc576c9634cd8d9ee1c8d6a"]
+test = ["pytest==8.4.2", "PyYAML==6.0.3", "agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@65e8f2dd9d6c5784a2a1c67f5236d69a5ae94021"]
+analytics = ["agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@65e8f2dd9d6c5784a2a1c67f5236d69a5ae94021"]
 image = ["pillow>=11", "torchvision"]
 games = [
   "chess>=1.11",
