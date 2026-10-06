@@ -18,6 +18,9 @@ import hashlib
 import json
 import os
 import shutil
+import re
+import sys
+from contextlib import contextmanager
 import subprocess
 import time
 import uuid
@@ -26,18 +29,10 @@ from pathlib import Path
 from typing import Any, Literal
 
 from . import paths
-from .aodl import (
-    AodlBindingConfig,
-    AodlBudgets,
-    assert_basic_aodl_invariants,
-    compile_aodl,
-)
-from .cascade import CascadePolicy, StagePolicy
-from .context_resolve import (
-    ContextPacket,
-    InformationNeed,
-    attach_context_to_aodl,
-    resolve_context,
+from .continuation import (
+    SCHEMA as CONTINUATION_SCHEMA, ContinuationCheckpoint, ContinuationContext,
+    InvalidCheckpoint, PendingOperation, StaleCheckpoint, canonical_json,
+    plan_restore, read_json, record_checkpoint, write_atomic,
 )
 
 FAMILY_ID = "coding.bounded_worktree_patch"
@@ -105,22 +100,99 @@ class TaskCheckpoint:
     last_error: str | None = None
     measurements: dict[str, Any] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
+    pending_patch: dict[str, str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "TaskCheckpoint":
-        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
-        # dataclass fields
-        fields = {k: d[k] for k in d if k in {
-            "schema", "task_id", "family_id", "status", "authorized_at", "updated_at",
-            "base_repo", "base_ref", "worktree_path", "branch", "requirement_paths",
-            "patch", "context_packet_path", "aodl_path", "aodl_source_hash",
-            "verifier_kind", "execution_completed", "verified_success", "last_error",
-            "measurements", "notes",
-        }}
-        return cls(**fields)  # type: ignore[arg-type]
+        if type(d) is not dict or set(d) - set(cls.__dataclass_fields__):
+            raise InvalidCheckpoint("unknown task checkpoint fields")
+        cp = cls(**d)
+        _validate_task(cp)
+        return cp
+
+
+_NEXT = {
+    "authorized": "resolve", "resolved": "worktree", "worktree_ready": "apply_patch",
+    "patched": "verify", "execution_completed": "verify", "verified": "stop",
+    "failed": "stop", "abandoned": "stop",
+}
+_TERMINAL = {"verified", "failed", "abandoned"}
+
+
+def _validate_task(cp: TaskCheckpoint) -> None:
+    if (cp.schema != CHECKPOINT_SCHEMA or cp.family_id != FAMILY_ID
+            or type(cp.status) is not str or cp.status not in _NEXT):
+        raise InvalidCheckpoint("unsupported task schema, family or status")
+    if type(cp.task_id) is not str or not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", cp.task_id):
+        raise InvalidCheckpoint("task_id must be a safe filename component")
+    for flag in (cp.execution_completed, cp.verified_success):
+        if flag is not None and type(flag) is not bool:
+            raise InvalidCheckpoint("task outcome must be boolean or null")
+    if cp.pending_patch is not None:
+        op = cp.pending_patch
+        if (type(op) is not dict or set(op) != {"status", "before", "after"}
+                or type(op["status"]) is not str
+                or op["status"] not in {"started", "unknown", "completed"}
+                or any(type(op[k]) is not str or not re.fullmatch(r"[0-9a-f]{64}", op[k])
+                       for k in ("before", "after"))):
+            raise InvalidCheckpoint("invalid pending patch")
+    canonical_json(cp.to_dict())
+
+
+def _source_revisions(cp: TaskCheckpoint) -> dict[str, str]:
+    revisions = {}
+    for name in ("aodl_path", "context_packet_path"):
+        value = getattr(cp, name)
+        if value is not None:
+            try:
+                revisions[name] = hashlib.sha256(Path(value).read_bytes()).hexdigest()
+            except OSError as exc:
+                raise StaleCheckpoint(f"required task source unavailable: {name}") from exc
+    return revisions
+
+
+def _context(cp: TaskCheckpoint) -> ContinuationContext:
+    return ContinuationContext(
+        runtime="z0int.task_loop", runtime_revision=f"python:{sys.version_info.major}.{sys.version_info.minor}",
+        code_revision=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        policy_revision=cp.aodl_source_hash or CHECKPOINT_SCHEMA,
+        authority_ref=cp.aodl_path or f"task:{cp.task_id}", scope=cp.base_repo or "local:task",
+        trace_id=cp.task_id, work_item_id=cp.task_id, attempt_lineage_id=cp.task_id,
+    )
+
+
+def task_continuation(cp: TaskCheckpoint) -> ContinuationCheckpoint:
+    """Export the existing task state, not a new scheduler or authorization."""
+    _validate_task(cp)
+    pending = ()
+    if cp.pending_patch:
+        op = cp.pending_patch
+        pending = (PendingOperation(
+            f"{cp.task_id}:patch", "bounded_file_patch", op["status"], "readback",
+            durable_ref=cp.worktree_path,
+            result_ref=f"sha256:{op['after']}" if op["status"] == "completed" else None,
+        ),)
+    verifier_ref = cp.measurements.get("verifier_ref")
+    return ContinuationCheckpoint.build(
+        continuation_id=cp.task_id, context=_context(cp), phase=cp.status,
+        resume_entrypoint=_NEXT[cp.status], state=cp.to_dict(),
+        source_revisions=_source_revisions(cp),
+        durable_refs={k: v for k in ("base_repo", "base_ref", "worktree_path", "aodl_path")
+                      if (v := getattr(cp, k)) is not None},
+        pending=pending, terminal=cp.status in _TERMINAL,
+        execution_completed=cp.execution_completed,
+        # Legacy true flags without verifier evidence remain unverified in the new contract.
+        verified_success=cp.verified_success if cp.verified_success is not True or verifier_ref else None,
+        verifier_ref=verifier_ref,
+    )
+
+
+def record_task_checkpoint(task_id: str, log: Any) -> Any:
+    """Opt-in admission into the existing EventLog; never changes task scheduling."""
+    return record_checkpoint(log, task_continuation(load_checkpoint(task_id)))
 
 
 def _tasks_dir() -> Path:
@@ -130,29 +202,57 @@ def _tasks_dir() -> Path:
 
 
 def checkpoint_path(task_id: str) -> Path:
+    _validate_task(TaskCheckpoint(task_id=task_id))
     return _tasks_dir() / f"{task_id}.json"
 
 
 def save_checkpoint(cp: TaskCheckpoint) -> Path:
     cp.updated_at = time.time()
+    continuation = task_continuation(cp)
+    # Keep legacy top-level fields readable without duplicating the task state.
+    metadata = continuation.body
+    metadata.pop("state")
+    row = cp.to_dict()
+    row["_continuation"] = {
+        "schema": CONTINUATION_SCHEMA, "checkpoint_id": continuation.checkpoint_id,
+        "metadata": metadata,
+    }
     path = checkpoint_path(cp.task_id)
-    path.write_text(json.dumps(cp.to_dict(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    write_atomic(path, row)
     return path
 
 
 def load_checkpoint(task_id: str) -> TaskCheckpoint:
     path = checkpoint_path(task_id)
-    if not path.is_file():
-        raise FileNotFoundError(f"no checkpoint for task_id={task_id}")
-    return TaskCheckpoint.from_dict(json.loads(path.read_text(encoding="utf-8")))
+    row = read_json(path)
+    if type(row) is not dict:
+        raise InvalidCheckpoint("task checkpoint must be an object")
+    sealed = row.pop("_continuation", None)
+    cp = TaskCheckpoint.from_dict(row)
+    if cp.task_id != task_id:
+        raise InvalidCheckpoint("task identity mismatch")
+    if sealed is not None:
+        if (type(sealed) is not dict or set(sealed) != {"schema", "checkpoint_id", "metadata"}
+                or type(sealed["metadata"]) is not dict or "state" in sealed["metadata"]):
+            raise InvalidCheckpoint("invalid task continuation metadata")
+        generic = ContinuationCheckpoint.from_dict({
+            "schema": sealed["schema"], "checkpoint_id": sealed["checkpoint_id"],
+            "payload": canonical_json({**sealed["metadata"], "state": row}),
+        })
+        plan_restore(generic, context=_context(cp), source_revisions=_source_revisions(cp),
+                     allowed_entrypoints=set(_NEXT.values()))
+        if generic.checkpoint_id != task_continuation(cp).checkpoint_id:
+            raise InvalidCheckpoint("task state and continuation metadata disagree")
+    # Unsealed v1 files remain readable; next save migrates them. They have no integrity proof.
+    return cp
 
 
 def list_checkpoints() -> list[dict[str, Any]]:
     out = []
     for p in sorted(_tasks_dir().glob("*.json")):
         try:
-            d = json.loads(p.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+            d = load_checkpoint(p.stem).to_dict()
+        except (OSError, ValueError):
             continue
         out.append({
             "task_id": d.get("task_id"),
@@ -175,7 +275,9 @@ def _run_git(args: list[str], *, cwd: Path | None = None, check: bool = True) ->
     )
 
 
-def _family_cascade() -> CascadePolicy:
+def _family_cascade() -> Any:
+    from .cascade import CascadePolicy, StagePolicy
+
     # Shadow-capable cascade for the reference family (not a live bridge flip).
     return CascadePolicy(
         capability_id=CAPABILITY_ID,
@@ -193,6 +295,8 @@ def _family_cascade() -> CascadePolicy:
 
 
 def compile_family_aodl() -> dict[str, Any]:
+    from .aodl import AodlBindingConfig, AodlBudgets, compile_aodl
+
     return compile_aodl(
         capability_id=CAPABILITY_ID,
         cascade=_family_cascade(),
@@ -226,11 +330,10 @@ def authorize_task(
             raise ValueError(f"base_repo is not a git repo: {repo}")
     tid = task_id or f"twp-{uuid.uuid4().hex[:12]}"
     ref = base_ref
-    if ref is None:
-        try:
-            ref = _run_git(["rev-parse", "HEAD"], cwd=repo).stdout.strip()
-        except subprocess.CalledProcessError as exc:
-            raise ValueError(f"cannot resolve HEAD in {repo}: {exc.stderr}") from exc
+    try:
+        ref = _run_git(["rev-parse", "--verify", f"{base_ref or 'HEAD'}^{{commit}}"], cwd=repo).stdout.strip()
+    except subprocess.CalledProcessError as exc:
+        raise ValueError(f"cannot resolve base ref in {repo}: {exc.stderr}") from exc
     cp = TaskCheckpoint(
         task_id=tid,
         family_id=FAMILY_ID,
@@ -248,6 +351,9 @@ def authorize_task(
 
 
 def step_resolve(cp: TaskCheckpoint, *, allow_qmd: bool = False) -> TaskCheckpoint:
+    from .aodl import assert_basic_aodl_invariants
+    from .context_resolve import InformationNeed, attach_context_to_aodl, resolve_context
+
     if cp.status not in {"authorized", "resolved", "failed"}:
         # allow re-resolve from authorized/resolved
         if cp.status not in {"authorized", "resolved"}:
@@ -344,6 +450,51 @@ def step_worktree(cp: TaskCheckpoint, *, worktrees_root: Path | str | None = Non
     return cp
 
 
+def _patch_target(cp: TaskCheckpoint) -> Path:
+    if not cp.worktree_path or not cp.patch or not cp.base_repo:
+        raise InvalidCheckpoint("missing isolated worktree or patch")
+    wt = Path(cp.worktree_path).resolve()
+    relative = Path(cp.patch["relative_path"])
+    target = (wt / relative).resolve()
+    if (relative.is_absolute() or ".." in relative.parts or not relative.parts
+            or wt == Path(cp.base_repo).resolve() or not target.is_relative_to(wt)):
+        raise InvalidCheckpoint("patch target escapes the isolated worktree")
+    return target
+
+
+def _reconcile_patch(cp: TaskCheckpoint) -> bool:
+    """Under the task owner's lock, reconcile this ONE bounded file edit.
+
+    Never infer arbitrary tool success from a transcript or retry an unknown
+    write. Only exact before/after byte hashes permit this local recovery.
+    Returns true when the after-image is already present.
+    """
+    if not cp.pending_patch:
+        return False
+    op = cp.pending_patch
+    target = _patch_target(cp)
+    if op["status"] == "started":
+        op["status"] = "unknown"
+        save_checkpoint(cp)
+    try:
+        actual = hashlib.sha256(target.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise InvalidCheckpoint("pending patch requires readback reconciliation") from exc
+    if actual == op["after"]:
+        op["status"] = "completed"
+        cp.status = "patched"
+        cp.execution_completed = True
+        cp.verified_success = None
+        cp.notes.append("after-image reconciled; no patch replay; git commit not inferred")
+        save_checkpoint(cp)
+        return True
+    if actual == op["before"] and op["status"] != "completed":
+        cp.pending_patch = None
+        save_checkpoint(cp)
+        return False
+    raise InvalidCheckpoint("ambiguous patch outcome; manual reconciliation required")
+
+
 def step_apply_patch(cp: TaskCheckpoint) -> TaskCheckpoint:
     if cp.status not in {"worktree_ready", "patched", "execution_completed"}:
         raise ValueError(f"need worktree_ready before patch; got {cp.status}")
@@ -351,14 +502,17 @@ def step_apply_patch(cp: TaskCheckpoint) -> TaskCheckpoint:
         raise ValueError("missing worktree or patch")
     wt = Path(cp.worktree_path)
     spec = PatchSpec.from_dict(cp.patch)
-    target = wt / spec.relative_path
+    target = _patch_target(cp)
+    if _reconcile_patch(cp):
+        return cp
     if not target.is_file():
         cp.status = "failed"
         cp.last_error = f"target missing: {target}"
         cp.execution_completed = False
         save_checkpoint(cp)
         raise FileNotFoundError(cp.last_error)
-    text = target.read_text(encoding="utf-8")
+    before_bytes = target.read_bytes()
+    text = before_bytes.decode("utf-8")
     if spec.find not in text:
         cp.status = "failed"
         cp.last_error = "patch find-string not present (not applied)"
@@ -372,7 +526,12 @@ def step_apply_patch(cp: TaskCheckpoint) -> TaskCheckpoint:
         save_checkpoint(cp)
         raise ValueError(cp.last_error)
     new_text = text.replace(spec.find, spec.replace, 1)
-    target.write_text(new_text, encoding="utf-8")
+    cp.pending_patch = {
+        "status": "started", "before": hashlib.sha256(before_bytes).hexdigest(),
+        "after": hashlib.sha256(new_text.encode("utf-8")).hexdigest(),
+    }
+    save_checkpoint(cp)  # Intent MUST be durable before touching the target.
+    target.write_bytes(new_text.encode("utf-8"))
     # commit inside worktree for durability (still no merge)
     try:
         _run_git(["add", "--", spec.relative_path], cwd=wt)
@@ -387,6 +546,7 @@ def step_apply_patch(cp: TaskCheckpoint) -> TaskCheckpoint:
     cp.status = "patched"
     cp.execution_completed = True  # worker finished applying; NOT verified
     cp.verified_success = None
+    cp.pending_patch["status"] = "completed"
     cp.notes.append("patch applied; execution_completed=true; verified_success=null")
     save_checkpoint(cp)
     return cp
@@ -402,7 +562,7 @@ def step_verify(cp: TaskCheckpoint) -> TaskCheckpoint:
             raise ValueError(f"cannot verify from status={cp.status}")
     wt = Path(cp.worktree_path)
     spec = PatchSpec.from_dict(cp.patch)
-    target = wt / spec.relative_path
+    target = _patch_target(cp)
     ok = False
     detail = ""
     try:
@@ -429,6 +589,11 @@ def step_verify(cp: TaskCheckpoint) -> TaskCheckpoint:
     cp.verified_success = bool(ok and base_ok)
     cp.status = "verified" if cp.verified_success else "failed"
     cp.measurements["verify_detail"] = detail
+    cp.measurements.pop("verifier_ref", None)
+    if ok and base_ok:
+        cp.measurements["verifier_ref"] = "content_predicate:sha256:" + hashlib.sha256(
+            target.read_bytes()
+        ).hexdigest()
     cp.notes.append(f"verify {cp.verified_success}: {detail}")
     if not cp.verified_success:
         cp.last_error = detail
@@ -436,7 +601,7 @@ def step_verify(cp: TaskCheckpoint) -> TaskCheckpoint:
     return cp
 
 
-def run_until(
+def _run_until(
     cp: TaskCheckpoint,
     *,
     until: TaskStatus = "verified",
@@ -475,9 +640,36 @@ def run_until(
         return cp
 
 
+@contextmanager
+def _task_owner(task_id: str):
+    # This is the existing local task runtime's ownership, not an OMP scheduler.
+    if os.name != "posix":
+        raise RuntimeError("task resume ownership currently requires POSIX flock")
+    import fcntl
+
+    lock_path = checkpoint_path(task_id).with_suffix(".lock")
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    with os.fdopen(fd, "a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
+def run_until(
+    cp: TaskCheckpoint, *, until: TaskStatus = "verified", allow_qmd: bool = False,
+    worktrees_root: Path | str | None = None,
+) -> TaskCheckpoint:
+    """Serialize local task owners and reject stale caller state before effects."""
+    with _task_owner(cp.task_id):
+        current = load_checkpoint(cp.task_id)
+        if current.to_dict() != cp.to_dict():
+            raise StaleCheckpoint("task changed; reload before continuing")
+        return _run_until(cp, until=until, allow_qmd=allow_qmd, worktrees_root=worktrees_root)
+
+
 def resume_task(task_id: str, **kwargs: Any) -> TaskCheckpoint:
-    cp = load_checkpoint(task_id)
-    return run_until(cp, **kwargs)
+    with _task_owner(task_id):
+        cp = load_checkpoint(task_id)
+        return _run_until(cp, **kwargs)
 
 
 def make_fixture_repo(root: Path) -> tuple[Path, PatchSpec]:
