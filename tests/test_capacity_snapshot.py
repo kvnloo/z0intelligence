@@ -110,3 +110,29 @@ def test_root_cli_emits_snapshot(tmp_path, monkeypatch, capsys):
     assert payload["schema"] == SCHEMA
     assert payload["path"] == str(path)
     assert json.loads(path.read_text())["schema"] == SCHEMA
+
+
+def test_native_tern_session_shape_is_normalized():
+    snap = build_snapshot(
+        include_local=False,
+        now=30.0,
+        tern={
+            "hosts": [{"name": "groot", "state": "connected", "rtt_ms": 3.5}],
+            "sessions": [{
+                "id": 42,
+                "name": "omp-work",
+                "host": "groot",
+                "current": True,
+                "locked": False,
+                "tabs": 3,
+            }],
+        },
+    )
+    host = snap["hosts"][0]
+    session = snap["sessions"][0]
+    assert host["label"] == "groot"
+    assert session["name"] == "omp-work"
+    assert session["host_id"] == "groot"
+    assert session["status"] == "current"
+    assert session["tab_count"] == 3
+    assert session["migration_allowed"] is False
