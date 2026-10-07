@@ -233,6 +233,7 @@ class BridgeRuntime:
         self.draining = False
         # Per-generation resident DecisionBackend instances (not shared across reloads).
         self._decision_backends = ResidentDecisionCache()
+        self._reuse_packets: dict[str, Any] = {}
 
     def identity(self) -> dict[str, Any]:
         return {
@@ -321,6 +322,56 @@ class BridgeRuntime:
         out.update(self.identity())
         return out
 
+    def reuse_resolve(self, payload: dict[str, Any]) -> dict[str, Any]:
+        from z0int.bridge.reuse import prepare
+
+        if self.draining:
+            return {"ok": False, "error": "draining", **self.identity()}
+        try:
+            record = prepare(payload)
+            # Only current-generation transient turn state. Restarts require
+            # fresh evidence and injection; old readiness is never restored.
+            while len(self._reuse_packets) >= 128:
+                self._reuse_packets.pop(next(iter(self._reuse_packets)))
+            self._reuse_packets[record.packet_id] = record
+            return {
+                "ok": True, "trace_id": record.request["trace_id"],
+                "packet_id": record.packet_id, "packet": record.packet.to_dict(),
+                "context_text": record.context_text, "decision": record.packet.decision,
+                "source_revisions": record.packet.source_revisions,
+                "snapshot_id": record.snapshot.snapshot_id, "event_id": record.event_id,
+                **self.identity(),
+            }
+        except (OSError, ValueError, TypeError, RuntimeError) as exc:
+            return {"ok": False, "error": str(exc), **self.identity()}
+
+    def _reuse_operation(self, operation: str, payload: dict[str, Any]) -> dict[str, Any]:
+        from z0int.bridge.reuse import check, injected, model_input
+
+        if self.draining:
+            error = "draining"
+        else:
+            try:
+                handler = {"check": check, "injected": injected, "model_input": model_input}[operation]
+                result = handler(self._reuse_packets, payload)
+                return {**result, **self.identity()}
+            except (OSError, ValueError, TypeError, RuntimeError) as exc:
+                error = str(exc)
+        return {
+            "ok": False, "valid": False, "status": "unavailable", "error": error,
+            "decision": {"mode": "OBSERVE", "implementation_allowed": False, "authorizes_action": False, "verified_success": None, "reason": error},
+            **self.identity(),
+        }
+
+    def reuse_check(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._reuse_operation("check", payload)
+
+    def reuse_injected(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._reuse_operation("injected", payload)
+
+    def reuse_model_input(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._reuse_operation("model_input", payload)
+
     def file_search(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Resolve codebase evidence through the shared resident FFF path.
 
@@ -340,7 +391,9 @@ class BridgeRuntime:
         if not query:
             return {"ok": False, "error": "query required", **self.identity()}
 
-        root_raw = payload.get("project_root") or payload.get("cwd") or str(repo_root())
+        root_raw = payload.get("project_root") or payload.get("cwd")
+        if not isinstance(root_raw, str) or not root_raw.strip():
+            return {"ok": False, "error": "explicit task project_root required", **self.identity()}
         try:
             root = Path(str(root_raw)).expanduser().resolve()
         except OSError as exc:

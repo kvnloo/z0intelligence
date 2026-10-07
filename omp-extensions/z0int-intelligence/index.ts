@@ -7,6 +7,10 @@ import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
 const registration = Symbol.for("z0intelligence.omp.registration");
 
+function isJsonSchemaObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export default function(pi: ExtensionAPI) {
   if (Reflect.get(pi.events, registration) === true) return;
   Reflect.set(pi.events, registration, true);
@@ -21,7 +25,7 @@ export default function(pi: ExtensionAPI) {
     return undefined;
   });
   const schema: unknown = JSON.parse(readFileSync(new URL("./schema.json", import.meta.url), "utf8"));
-  if (typeof schema !== "object" || schema === null || Array.isArray(schema)) throw new Error("Invalid canonical tool schema");
+  if (!isJsonSchemaObject(schema)) throw new Error("Invalid canonical tool schema");
   pi.registerTool({
     name: "z0int_route_worker", label: "z0intelligence", loadMode: "essential",
     description: "Use the shared capability router for bounded delegation and typed decisions. With function=cheap_bounded_worker, allow_remote=true, and operator-enabled governed remote mode, the host attaches AODL authority before off-host execution. Tiny tasks otherwise return PARENT_ONLY. Stable trace_id permits safe replay; consume and verify returned output.",

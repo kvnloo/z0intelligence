@@ -21,6 +21,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { registerReuseAdapter, reuseConfigFromEnv } from "./reuse.ts";
 
 const BRIDGE_PROTOCOL = "z0int.bridge.v2";
 const Z0 = process.env.Z0INT_HOME || join(homedir(), ".z0int");
@@ -544,25 +545,22 @@ export default function z0intBridge(pi: ExtensionAPI) {
 	});
 
 	const z = pi.zod;
+	const fileSearchParameters = z.object({
+		query: z.string().describe("Filename, symbol, or content to find"),
+		kind: z.string().optional().describe("natural_language (default), exact_symbol, or exact_path"),
+		allowQmd: z.boolean().optional().describe("Allow QMD docs/notes fallback after FFF misses (default true)"),
+	});
 	pi.registerTool({
 		name: "z0_file_search",
 		label: "z0 file search",
 		loadMode: "essential",
+		approval: "read",
 		description:
 			"Fast repository path/content search through z0's resident FFF index. Returns source-backed evidence only; it does not authorize actions.",
-		parameters: z.object({
-			query: z.string().describe("Filename, symbol, or content to find"),
-			kind: z
-				.string()
-				.optional()
-				.describe("natural_language (default), exact_symbol, or exact_path"),
-			allowQmd: z
-				.boolean()
-				.optional()
-				.describe("Allow QMD docs/notes fallback after FFF misses (default true)"),
-		}),
-		async execute(_toolCallId, params, _onUpdate, ctx, _signal) {
+		parameters: fileSearchParameters,
+		async execute(_toolCallId, rawParams, _signal, _onUpdate, ctx) {
 			try {
+				const params = fileSearchParameters.parse(rawParams);
 				const h = await ensureWorker();
 				const sessionId = resolveSessionId(ctx);
 				const result = await request(
@@ -663,6 +661,15 @@ export default function z0intBridge(pi: ExtensionAPI) {
 		} catch {
 			activeTurn = null;
 		}
+	});
+
+	registerReuseAdapter(pi, {
+		config: reuseConfigFromEnv(),
+		getTraceId: () => activeTurn?.traceId ?? null,
+		request: async (body, timeoutMs) => {
+			const h = await ensureWorker();
+			return request(h, body, timeoutMs);
+		},
 	});
 
 	async function closeActive(messages: unknown[], source: string): Promise<void> {

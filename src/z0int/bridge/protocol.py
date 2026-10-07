@@ -27,6 +27,10 @@ OPS = frozenset(
         "decision_warm",
         "cognition_shadow",
         "file_search",
+        "reuse_resolve",
+        "reuse_check",
+        "reuse_injected",
+        "reuse_model_input",
     }
 )
 
@@ -90,10 +94,21 @@ def compute_build_id(root: Path | None = None) -> str:
         "src/z0int/bridge/decision_cache.py",
         "src/z0int/bridge/protocol.py",
         "src/z0int/bridge/runtime.py",
+        "src/z0int/bridge/reuse.py",
+        "src/z0int/context_resolve.py",
+        "src/z0int/state_packet.py",
+        "src/z0int/file_search.py",
+        "src/z0int/reuse_packet.py",
+        "src/z0int/receipt.py",
+        "src/z0int/memory/event_log.py",
+        "src/z0int/memory/claims.py",
+        "src/z0int/memory/native_preferences.py",
+        "src/z0int/memory_contract.py",
         "src/z0int/bridge/worker.py",
         "src/z0int/bridge/generation.py",
         "src/z0int/cognition/shadow.py",
         "omp-extensions/z0int-bridge/index.ts",
+        "omp-extensions/z0int-bridge/reuse.ts",
     ):
         fp = root / rel
         if fp.is_file():

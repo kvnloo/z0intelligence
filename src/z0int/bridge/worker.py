@@ -76,13 +76,16 @@ def serve(generation: int | None = None) -> int:
                     ),
                 )
                 continue
-            if op == "file_search":
+            if op in {"file_search", "reuse_resolve", "reuse_check", "reuse_injected", "reuse_model_input"}:
                 payload = req.get("payload") if isinstance(req.get("payload"), dict) else {}
                 if isinstance(req.get("trace_id"), str) and "trace_id" not in payload:
                     payload["trace_id"] = req["trace_id"]
                 if isinstance(req.get("session_id"), str) and "session_id" not in payload:
                     payload["session_id"] = req["session_id"]
-                _respond(req_id, rt.file_search(payload))
+                handler = {"file_search": rt.file_search, "reuse_resolve": rt.reuse_resolve,
+                           "reuse_check": rt.reuse_check, "reuse_injected": rt.reuse_injected,
+                           "reuse_model_input": rt.reuse_model_input}[op]
+                _respond(req_id, handler(payload))
                 continue
             if op == "drain":
                 rt.mark_drain()

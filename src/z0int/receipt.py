@@ -443,14 +443,18 @@ def _iter_jsonl(path: Path):
 
 
 def find_receipt(trace_id: str, *, root: Path | None = None) -> dict[str, Any] | None:
-    """Last matching receipt for trace_id (scan receipts + bridge stream)."""
+    """Latest canonical receipt, falling back to legacy streams in the same root."""
     hits: list[dict[str, Any]] = []
+    primary = receipts_path(root)
+    state_root = paths.home() if root is None else root
     for path in (
-        receipts_path(root),
-        paths.home() / "stream" / "bridge.jsonl",
-        paths.home() / "stream" / "raw.jsonl",
+        primary,
+        state_root / "stream" / "bridge.jsonl",
+        state_root / "stream" / "raw.jsonl",
     ):
         for row in _iter_jsonl(path) or []:
+            if not isinstance(row, dict):
+                continue
             if row.get("trace_id") == trace_id:
                 # bridge nests receipt
                 if "receipt" in row and isinstance(row["receipt"], dict):
@@ -461,6 +465,8 @@ def find_receipt(trace_id: str, *, root: Path | None = None) -> dict[str, Any] |
                     hits.append(merged)
                 else:
                     hits.append(row)
+        if path == primary and hits:
+            return hits[-1]
     return hits[-1] if hits else None
 
 
@@ -470,23 +476,28 @@ def find_receipt_by_extra(
     *,
     root: Path | None = None,
 ) -> dict[str, Any] | None:
-    """Last receipt whose extra mapping contains an exact opaque correlation value."""
+    """Latest canonical correlation match, with same-root legacy fallback."""
     if not isinstance(key, str) or not key or value is None:
         return None
     hits: list[dict[str, Any]] = []
     paths_home = paths.home() if root is None else root
+    primary = receipts_path(root)
     for path in (
-        receipts_path(root),
+        primary,
         paths_home / "stream" / "bridge.jsonl",
         paths_home / "stream" / "raw.jsonl",
     ):
         for row in _iter_jsonl(path) or []:
+            if not isinstance(row, dict):
+                continue
             rec = row.get("receipt") if isinstance(row.get("receipt"), dict) else row
             if not isinstance(rec, dict):
                 continue
             extra = rec.get("extra")
             if isinstance(extra, dict) and extra.get(key) == value:
                 hits.append(rec)
+        if path == primary and hits:
+            return hits[-1]
     return hits[-1] if hits else None
 
 
@@ -829,4 +840,3 @@ def scrub_contaminated_outcomes(
             for c in corrections
         ],
     }
-
