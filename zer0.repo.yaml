@@ -15,7 +15,9 @@ architecture:
       memory database or treating retrieval as belief.
     paths:
     - src/z0int/context_resolve.py
+    - src/z0int/file_search.py
     - tests/test_context_resolve.py
+    - tests/test_file_search.py
     depends_on: []
   - id: capability-router
     name: Evidence-gated capability router
@@ -260,6 +262,7 @@ architecture:
   provides_interfaces:
   - z0int.decision_receipt.v1
   - z0int.context_resolve.v1
+  - z0int.file_search.v1
   - agentweb.z0.bridge.v1
   consumes_interfaces:
   - tokenomics.report.v1
@@ -300,6 +303,7 @@ architecture:
     - README.md
     - ROADMAP.md
     - docs/intelligence-layer.md
+    - docs/file-search.md
     - docs/local-cognition-portfolio.md
     - docs/aodl-integration.md
     - docs/evolution-lab.md
