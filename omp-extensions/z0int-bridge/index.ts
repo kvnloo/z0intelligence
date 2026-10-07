@@ -543,6 +543,61 @@ export default function z0intBridge(pi: ExtensionAPI) {
 		/* fail-open; next turn retries */
 	});
 
+	const z = pi.zod;
+	pi.registerTool({
+		name: "z0_file_search",
+		label: "z0 file search",
+		loadMode: "essential",
+		description:
+			"Fast repository path/content search through z0's resident FFF index. Returns source-backed evidence only; it does not authorize actions.",
+		parameters: z.object({
+			query: z.string().describe("Filename, symbol, or content to find"),
+			kind: z
+				.string()
+				.optional()
+				.describe("natural_language (default), exact_symbol, or exact_path"),
+			allowQmd: z
+				.boolean()
+				.optional()
+				.describe("Allow QMD docs/notes fallback after FFF misses (default true)"),
+		}),
+		async execute(_toolCallId, params, _onUpdate, ctx, _signal) {
+			try {
+				const h = await ensureWorker();
+				const sessionId = resolveSessionId(ctx);
+				const result = await request(
+					h,
+					{
+						op: "file_search",
+						trace_id: activeTurn?.traceId,
+						session_id: sessionId,
+						payload: {
+							query: params.query,
+							kind: params.kind || "natural_language",
+							project_root: ctx.cwd,
+							session_id: sessionId,
+							trace_id: activeTurn?.traceId,
+							allow_qmd: params.allowQmd ?? true,
+							record: true,
+						},
+					},
+					10_000,
+				);
+				return {
+					content: [{ type: "text", text: JSON.stringify(result.packet ?? result) }],
+					details: result,
+					isError: result.ok !== true,
+				};
+			} catch (error) {
+				return {
+					content: [{ type: "text", text: String(error) }],
+					details: { ok: false, error: String(error) },
+					isError: true,
+				};
+			}
+		},
+	});
+
 	// /reload-plugins interception: hot-swap worker, then let OMP continue.
 	pi.on("input", async (event, ctx) => {
 		const text =

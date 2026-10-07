@@ -124,3 +124,47 @@ def join_outcome(
         "joined_at": time.time(),
     }
     return out
+
+
+
+def resolve_repository_context(
+    envelope: dict[str, Any],
+    *,
+    project_root: str | os.PathLike[str],
+    query: str | None = None,
+    needs: list[Any] | None = None,
+    allow_qmd: bool = True,
+    event_log: Any | None = None,
+) -> dict[str, Any]:
+    """Resolve repository evidence through z0's shared FFF/QMD ContextPacket path.
+
+    Hermes remains a transport adapter: this records what was retrieved but
+    does not authorize tools, claim completion, or promote retrieved text.
+    """
+    from z0int.context_resolve import append_context_packet_event, resolve_context
+
+    identity = envelope.get("identity") or {}
+    text = str(query if query is not None else envelope.get("text") or "").strip()
+    packet = resolve_context(
+        needs=needs,
+        query=text if not needs else None,
+        task_id=str(identity.get("trace_id") or identity.get("turn_id") or "") or None,
+        project_root=project_root,
+        allow_fff=True,
+        allow_qmd=allow_qmd,
+        allow_memory=False,
+        use_cache=False,
+    )
+    event = append_context_packet_event(
+        packet,
+        source="harness:hermes",
+        project=str(project_root),
+        session_id=str(identity.get("session_id") or "") or None,
+        event_log=event_log,
+    )
+    return {
+        "schema": "z0int.harness_context.v1",
+        "harness_id": "hermes",
+        "event_id": event.event_id,
+        "packet": packet.to_dict(),
+    }

@@ -76,6 +76,14 @@ def serve(generation: int | None = None) -> int:
                     ),
                 )
                 continue
+            if op == "file_search":
+                payload = req.get("payload") if isinstance(req.get("payload"), dict) else {}
+                if isinstance(req.get("trace_id"), str) and "trace_id" not in payload:
+                    payload["trace_id"] = req["trace_id"]
+                if isinstance(req.get("session_id"), str) and "session_id" not in payload:
+                    payload["session_id"] = req["session_id"]
+                _respond(req_id, rt.file_search(payload))
+                continue
             if op == "drain":
                 rt.mark_drain()
                 _respond(req_id, {"ok": True, "draining": True, **rt.identity()})

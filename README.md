@@ -14,7 +14,7 @@ The current repository is much more than the original OpenJev prototype.
 
 | Surface | Current role |
 | --- | --- |
-| Provenance-backed context and state | ContextPacket resolver plus source-backed State Packets, question-scoped DecisionOpportunities and explicit invalidation; retrieval is not authority |
+| Provenance-backed context and state | ContextPacket resolver with resident FFF codebase search + QMD docs fallback, source-backed State Packets, question-scoped DecisionOpportunities and explicit invalidation; retrieval is not authority |
 | Capability router | `z0int.intelligence.route(request, snapshot)` chooses only from evidence-backed eligible capabilities; missing evidence returns `PARENT_ONLY` |
 | Dispatch authority | Owns execution identity, replay/conflict protection, canonical receipts, and “do not execute twice when prior execution is uncertain” semantics |
 | Local cognition | Deterministic legal-action compiler + provider-neutral candidate model + risk/quality gates + escalation + shadow cascade |
@@ -391,6 +391,7 @@ They are compatibility/research surfaces, not the product identity.
 | `src/z0int/intelligence.py` | pure capability selection |
 | `src/z0int/dispatch_authority.py` | canonical execution/replay authority |
 | `src/z0int/context_resolve.py` | provenance-backed context resolution |
+| `src/z0int/file_search.py` | resident FFF path/content index + watcher; bounded retrieval only |
 | `src/z0int/cognition/` | deterministic legal-action compiler, candidate model, cascade, serving, shadow path |
 | `src/z0int/backends/` | typed decision backends + benchmark harness |
 | `src/z0int/functions/` | named function-level verification implementations |

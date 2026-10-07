@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from . import paths
+from .file_search import search_repository as _fff_search_repository
 
 SCHEMA = "z0int.context_resolve.v1"
 RECIPE_SCHEMA = "z0int.resolution_recipe.v1"
@@ -204,6 +205,78 @@ def _qmd_search(query: str, *, limit: int = 5, timeout_s: float = 8.0) -> list[d
     return []
 
 
+def _fff_evidence_refs(
+    result: dict[str, Any],
+    project_root: Path,
+    *,
+    limit: int = 5,
+) -> list[EvidenceRef]:
+    """Normalize FFF index hits into bounded, non-authoritative EvidenceRefs."""
+    refs: list[EvidenceRef] = []
+    seen: set[str] = set()
+    version = str(result.get("package_version") or "unknown")
+    epoch = int(result.get("index_epoch") or 0)
+
+    def safe_path(raw: Any) -> Path | None:
+        if not isinstance(raw, str) or not raw:
+            return None
+        try:
+            path = (project_root / raw).resolve()
+            path.relative_to(project_root)
+            return path
+        except (OSError, ValueError):
+            return None
+
+    for hit in list(result.get("content_hits") or [])[:limit]:
+        if not isinstance(hit, dict):
+            continue
+        path = safe_path(hit.get("path"))
+        if path is None:
+            continue
+        line = int(hit.get("line") or 0)
+        locator = f"{path}:{line}" if line > 0 else str(path)
+        if locator in seen:
+            continue
+        seen.add(locator)
+        before = [str(x) for x in (hit.get("context_before") or [])]
+        after = [str(x) for x in (hit.get("context_after") or [])]
+        body = [*before[-1:], str(hit.get("text") or ""), *after[:1]]
+        excerpt = "\\n".join(x for x in body if x)[:400] or None
+        refs.append(
+            EvidenceRef(
+                source_id=f"file:{path}",
+                source_version=f"{_file_version(path)};fff={version};epoch={epoch}",
+                locator=locator,
+                trust_class="index_hit",
+                observed_at=_now_iso(),
+                excerpt=excerpt,
+                note="resident FFF index hit; retrieval is evidence, not execution authority",
+            )
+        )
+
+    for hit in list(result.get("path_hits") or [])[:limit]:
+        if len(refs) >= limit or not isinstance(hit, dict):
+            break
+        path = safe_path(hit.get("path"))
+        if path is None:
+            continue
+        locator = str(path)
+        if locator in seen:
+            continue
+        seen.add(locator)
+        refs.append(
+            EvidenceRef(
+                source_id=f"file:{path}",
+                source_version=f"{_file_version(path)};fff={version};epoch={epoch}",
+                locator=locator,
+                trust_class="index_hit",
+                observed_at=_now_iso(),
+                note="resident FFF filename hit; retrieval is evidence, not execution authority",
+            )
+        )
+    return refs
+
+
 def _fetch_exact_path(path_str: str, project_root: Path | None) -> EvidenceRef | None:
     p = Path(path_str).expanduser()
     if not p.is_absolute() and project_root is not None:
@@ -290,14 +363,16 @@ def resolve_context(
     collections: tuple[str, ...] = (),
     policy_revision: str = "v0",
     use_cache: bool = True,
+    allow_fff: bool = True,
     allow_qmd: bool = True,
     allow_memory: bool = False,
 ) -> ContextPacket:
     """Resolve information needs into a provenance-preserving packet.
 
     Memory recall is off by default (avoid double-inject with TencentDB proxy).
-    QMD is lexical-only here; no embedding/rerank on the critical path unless
-    later tiers are explicitly enabled.
+    Repository-scoped FFF is the first discovery tier: its process-resident Rust
+    index + watcher amortizes repeated codebase searches. QMD remains the later
+    lexical/docs tier. Neither retrieval layer grants action authority.
     """
     t0 = time.perf_counter()
     root = Path(project_root).expanduser().resolve() if project_root else None
@@ -322,13 +397,26 @@ def resolve_context(
         if cached and cached.get("recipe", {}).get("scope_fingerprint") == scope_fp:
             ops.append({"op": "recipe_cache_hit", "signature": sig})
 
-    qmd_status = "absent"
-    if allow_qmd and _qmd_bin():
+    fff_status = "disabled" if not allow_fff else ("no_project_root" if root is None else "idle")
+    fff_hits = 0
+    fff_wall_ms = 0.0
+
+    # Do not even spawn qmd status on a successful FFF fast path. QMD is a
+    # later tier and should pay its process/model costs only when it is needed.
+    qmd_status = "disabled" if not allow_qmd else "idle"
+
+    def ensure_qmd_status() -> str:
+        nonlocal qmd_status
+        if qmd_status != "idle":
+            return qmd_status
+        bin_path = _qmd_bin()
+        if not bin_path:
+            qmd_status = "absent"
+            return qmd_status
         qmd_status = "installed"
-        # index freshness — status only
         try:
             st = subprocess.run(
-                [_qmd_bin() or "qmd", "status"],
+                [bin_path, "status"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -339,6 +427,7 @@ def resolve_context(
                 epochs["qmd_status_sha"] = _sha16(st.stdout[:2000])
         except (OSError, subprocess.TimeoutExpired):
             qmd_status = "error"
+        return qmd_status
 
     for need in need_list:
         satisfied = False
@@ -351,8 +440,77 @@ def resolve_context(
                 satisfied = True
             elif need.required:
                 gaps.append(f"{need.id}: missing path {path_s}")
+        elif need.kind == "exact_symbol" or need.symbol:
+            symbol = need.symbol or need.description
+            if allow_fff and root is not None:
+                found = _fff_search_repository(root, symbol, kind="exact_symbol", limit=5)
+                fff_status = str(found.get("status") or "unknown")
+                refs = _fff_evidence_refs(found, root, limit=5)
+                fff_hits += len(refs)
+                fff_wall_ms += float(found.get("wall_ms") or 0.0)
+                if found.get("package_version") is not None:
+                    epochs[f"fff:{root}"] = (
+                        f"{found.get('package_version')}:epoch={int(found.get('index_epoch') or 0)}"
+                    )
+                ops.append(
+                    {
+                        "op": "fff_symbol",
+                        "need": need.id,
+                        "symbol": symbol,
+                        "hits": len(refs),
+                        "status": fff_status,
+                        "reused": bool(found.get("reused")),
+                    }
+                )
+                if refs:
+                    evidence.extend(refs)
+                    satisfied = True
+            else:
+                ops.append(
+                    {
+                        "op": "fff_symbol_skipped",
+                        "need": need.id,
+                        "reason": "disabled" if not allow_fff else "no_project_root",
+                    }
+                )
+            if not satisfied and need.required:
+                gaps.append(
+                    f"{need.id}: no repository symbol hits for {symbol!r} (fff={fff_status})"
+                )
         elif need.kind == "natural_language":
-            if allow_qmd and qmd_status in {"ready", "installed"}:
+            if allow_fff and root is not None:
+                found = _fff_search_repository(
+                    root,
+                    need.description,
+                    kind="natural_language",
+                    limit=5,
+                )
+                fff_status = str(found.get("status") or "unknown")
+                refs = _fff_evidence_refs(found, root, limit=5)
+                fff_hits += len(refs)
+                fff_wall_ms += float(found.get("wall_ms") or 0.0)
+                if found.get("package_version") is not None:
+                    epochs[f"fff:{root}"] = (
+                        f"{found.get('package_version')}:epoch={int(found.get('index_epoch') or 0)}"
+                    )
+                ops.append(
+                    {
+                        "op": "fff_search",
+                        "need": need.id,
+                        "hits": len(refs),
+                        "status": fff_status,
+                        "reused": bool(found.get("reused")),
+                    }
+                )
+                if refs:
+                    evidence.extend(refs)
+                    satisfied = True
+
+            # QMD is complementary rather than competing: use it after the
+            # repository fast path misses (or when no repository root exists).
+            if not satisfied and allow_qmd:
+                ensure_qmd_status()
+            if not satisfied and allow_qmd and qmd_status in {"ready", "installed"}:
                 hits = _qmd_search(need.description, limit=5)
                 ops.append(
                     {
@@ -376,13 +534,14 @@ def resolve_context(
                             observed_at=_now_iso(),
                             excerpt=str(hit.get("snippet") or hit.get("text") or hit.get("raw_preview") or "")[:400]
                             or None,
+                            note="QMD lexical/docs retrieval; evidence is not execution authority",
                         )
                     )
                     satisfied = True
             if not satisfied and need.required:
-                # empty index is a gap, not a license to invent requirements
                 gaps.append(
-                    f"{need.id}: no lexical hits for {need.description!r} (qmd={qmd_status})"
+                    f"{need.id}: no retrieval hits for {need.description!r} "
+                    f"(fff={fff_status}, qmd={qmd_status})"
                 )
         elif need.kind == "memory":
             ops.append({"op": "memory_skipped", "need": need.id, "reason": "allow_memory=False by default"})
@@ -417,6 +576,10 @@ def resolve_context(
         recipe=recipe,
         measurements={
             "wall_ms": (time.perf_counter() - t0) * 1000.0,
+            "fff_status": fff_status,
+            "fff_hits": fff_hits,
+            "fff_wall_ms": fff_wall_ms,
+            "allow_fff": allow_fff,
             "qmd_status": qmd_status,
             "qmd_bin": bool(_qmd_bin()),
             "allow_qmd": allow_qmd,
@@ -455,7 +618,12 @@ def needs_from_mapping(raw: dict[str, Any] | list[Any]) -> list[InformationNeed]
             InformationNeed(
                 id=str(item.get("id") or f"n{i}"),
                 description=str(item.get("description") or item.get("query") or ""),
-                kind=item.get("kind") or ("exact_path" if item.get("path") else "natural_language"),  # type: ignore[arg-type]
+                kind=item.get("kind")
+                or (
+                    "exact_path"
+                    if item.get("path")
+                    else ("exact_symbol" if item.get("symbol") else "natural_language")
+                ),  # type: ignore[arg-type]
                 path=item.get("path"),
                 symbol=item.get("symbol"),
                 required=bool(item.get("required", True)),
@@ -507,6 +675,42 @@ def context_observation_event(
     }
 
 
+def append_context_packet_event(
+    packet: ContextPacket,
+    *,
+    source: str,
+    project: str | None = None,
+    session_id: str | None = None,
+    event_log: Any | None = None,
+) -> Any:
+    """Persist one bounded retrieval observation in the canonical EventLog.
+
+    This records what evidence was surfaced. It deliberately does not claim
+    task completion, correctness, or action authority.
+    """
+    from .memory.event_log import EventLog
+
+    log = event_log if event_log is not None else EventLog()
+    payload = {
+        "schema": SCHEMA,
+        "task_id": packet.task_id,
+        "recipe": packet.recipe.to_dict() if packet.recipe else None,
+        "evidence": [ref.to_dict() for ref in packet.evidence],
+        "unresolved_gaps": list(packet.unresolved_gaps),
+        "contradictions": list(packet.contradictions),
+        "measurements": dict(packet.measurements),
+        "execution_completed": False,
+        "verified_success": None,
+    }
+    return log.append(
+        "context.resolve",
+        payload,
+        source=source,
+        project=project,
+        session_id=session_id,
+    )
+
+
 def attach_context_to_aodl(
     doc: dict[str, Any],
     packet: ContextPacket,
@@ -552,6 +756,7 @@ def attach_context_to_aodl(
         "runtime": "z0int.context_resolve",
         "schema": SCHEMA,
         "implementationStage": "context_resolve",
+        "allow_fff": bool(packet.measurements.get("allow_fff")),
         "allow_memory": bool(packet.measurements.get("allow_memory")),
         "gpu_loaded": False,
     }
