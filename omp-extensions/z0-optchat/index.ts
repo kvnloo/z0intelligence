@@ -103,13 +103,16 @@ export default function optchat(pi: {
 }): void {
 	if (pi.events && Reflect.get(pi.events, registration) === true) return;
 	if (pi.events) Reflect.set(pi.events, registration, true);
-	pi.setLabel?.("OptChat");
+	if (enabled()) pi.setLabel?.("OptChat");
 
 	pi.registerCommand?.("optchat", {
 		description: "Turn the OptChat view on or off: /optchat on|off|status",
 		async handler(args: string, ctx: { ui?: { notify?: (text: string, level?: string) => void; setWidget?: (key: string, content: unknown, options?: { placement?: "aboveEditor" }) => void } }) {
 			const cmd = String(args || "status").trim().split(/\s+/)[0] || "status";
-			if (cmd === "on" || cmd === "off") setEnabled(cmd === "on");
+			if (cmd === "on" || cmd === "off") {
+				setEnabled(cmd === "on");
+				if (cmd === "on") pi.setLabel?.("OptChat");
+			}
 			else if (cmd !== "status") {
 				ctx.ui?.notify?.("usage: /optchat on|off|status", "warning");
 				return;
@@ -152,38 +155,39 @@ export default function optchat(pi: {
 		return { handled: true };
 	});
 
-	pi.registerTool?.({
-		name: "optchat_zoom",
-		label: "OptChat zoom",
-		loadMode: "essential",
-		description: "Open the line id+n of the view into the two lines of n/2 under it; n = 1 gives the message whole.",
-		parameters: {
-			type: "object",
-			properties: {
-				id: { type: "integer", minimum: 0 },
-				n: { type: "integer", minimum: 1 },
+	if (enabled()) {
+		pi.registerTool?.({
+			name: "optchat_zoom",
+			label: "OptChat zoom",
+			description: "Open the line id+n of the view into the two lines of n/2 under it; n = 1 gives the message whole.",
+			parameters: {
+				type: "object",
+				properties: {
+					id: { type: "integer", minimum: 0 },
+					n: { type: "integer", minimum: 1 },
+				},
+				required: ["id", "n"],
 			},
-			required: ["id", "n"],
-		},
-		async execute(_id: string, args: { id?: number; n?: number }) {
-			const row = await call("zoom", { msg_id: args?.id ?? 0, n: args?.n ?? 1 });
-			return { content: [{ type: "text", text: String(row.text ?? row.error ?? "") }], isError: row.ok === false };
-		},
-	});
-
-	pi.registerTool?.({
-		name: "optchat_date",
-		label: "OptChat date",
-		loadMode: "essential",
-		description: "The date and time of message id.",
-		parameters: {
-			type: "object",
-			properties: { id: { type: "integer", minimum: 0 } },
-			required: ["id"],
-		},
-		async execute(_id: string, args: { id?: number }) {
-			const row = await call("date", { msg_id: args?.id ?? 0 });
-			return { content: [{ type: "text", text: String(row.text ?? row.error ?? "") }], isError: row.ok === false };
-		},
-	});
+			async execute(_id: string, args: { id?: number; n?: number }) {
+				if (!enabled()) return { content: [{ type: "text", text: "OptChat is off." }], isError: true };
+				const row = await call("zoom", { msg_id: args?.id ?? 0, n: args?.n ?? 1 });
+				return { content: [{ type: "text", text: String(row.text ?? row.error ?? "") }], isError: row.ok === false };
+			},
+		});
+		pi.registerTool?.({
+			name: "optchat_date",
+			label: "OptChat date",
+			description: "The date and time of message id.",
+			parameters: {
+				type: "object",
+				properties: { id: { type: "integer", minimum: 0 } },
+				required: ["id"],
+			},
+			async execute(_id: string, args: { id?: number }) {
+				if (!enabled()) return { content: [{ type: "text", text: "OptChat is off." }], isError: true };
+				const row = await call("date", { msg_id: args?.id ?? 0 });
+				return { content: [{ type: "text", text: String(row.text ?? row.error ?? "") }], isError: row.ok === false };
+			},
+		});
+	}
 }

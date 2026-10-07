@@ -101,6 +101,20 @@ class LogTests(unittest.TestCase):
             self.assertNotIn("+1|", joined)
             self.assertEqual(len(SCALE.encode()), 512)
 
+    def test_huge_message_fits_the_compactor_budget(self) -> None:
+        from z0int.optchat.compact import CONTEXT_BYTES, SOURCE_BYTES, compactor_messages, fit_bytes
+
+        with TemporaryDirectory() as tmp:
+            chat = ChatLog(Path(tmp))
+            chat.append("user", "keep this")
+            chat.append("echo", "z" * 40_000)
+            messages = compactor_messages(chat, 0, 1)
+            user = messages[1]["content"]
+            self.assertLessEqual(len(user[0]["text"].encode()), CONTEXT_BYTES + 32)
+            self.assertLessEqual(len(user[1]["text"].encode()), SOURCE_BYTES + 700)
+            self.assertIn("... cut ...", user[1]["text"])
+            self.assertEqual(fit_bytes("short", 100), "short")
+
     def test_switch_defaults_off(self) -> None:
         from z0int.optchat.switch import enabled, set_enabled
         with TemporaryDirectory() as tmp:
@@ -278,6 +292,47 @@ class GistRemainderTests(unittest.TestCase):
         from z0int.optchat.turn import subagent_text
 
         self.assertEqual(subagent_text("7", "done"), "[7] done")
+
+    def test_begin_returns_while_the_compactor_call_is_still_running(self) -> None:
+        import threading
+        from z0int.optchat.compact import commit_line, enforce, snapshot_due
+        from z0int.optchat.turn import begin
+
+        with TemporaryDirectory() as tmp:
+            chat = ChatLog(Path(tmp))
+            chat.append("user", "short")
+            chat.append("echo", "y" * (NODE + 40))
+            lock = threading.Lock()
+            started = threading.Event()
+            release = threading.Event()
+
+            def slow(_messages: list) -> str:
+                started.set()
+                release.wait(2)
+                return "echo: a long tool result"
+
+            def run() -> None:
+                with lock:
+                    job = snapshot_due(chat)
+                assert job is not None
+                level, index, messages = job
+                line = enforce(messages, slow)
+                with lock:
+                    commit_line(chat, level, index, line)
+
+            worker = threading.Thread(target=run)
+            worker.start()
+            self.assertTrue(started.wait(1))
+            with lock:
+                chat._store_node(0, 1, "echo: already built for the view")
+                chat.fit()
+                opened = begin(chat, ["next"], "")
+            release.set()
+            worker.join(2)
+            self.assertTrue(opened["ready"])
+            self.assertEqual(chat.messages[-1].text, "next")
+            self.assertIn("next", chat.messages[-1].text)
+
 
 
 

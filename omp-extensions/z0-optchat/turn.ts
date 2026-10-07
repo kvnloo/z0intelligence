@@ -275,7 +275,11 @@ async function drain(call: Call, ctx: TurnCtx, pi: TurnPi): Promise<void> {
 			}
 			if (settled.ready !== true) {
 				await call("abort", { texts }, 5000);
-				ctx.ui?.notify?.("OptChat left the message in the log, unanswered. The view is still compacting.", "warning");
+				const why = settled.error ? ` Compactor: ${String(settled.error)}` : "";
+				ctx.ui?.notify?.(
+					`OptChat left the message in the log, unanswered. The view is still compacting.${why}`,
+					"warning",
+				);
 				continue;
 			}
 			const opened = await call("begin", { texts, agents: agentsText(ctx.cwd) }, 10_000);

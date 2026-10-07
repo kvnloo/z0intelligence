@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
 import urllib.request
-from typing import Callable
+from typing import Any, Callable
 
 from .log import NODE, PLACEHOLDER, ChatLog, one_line, utf8_len
 
@@ -14,6 +15,12 @@ JOBS = 8
 RETRY_S = 10
 MODEL = os.environ.get("Z0INT_OPTCHAT_MODEL", "qwen3-14b-q4km")
 HOST = os.environ.get("Z0INT_OPTCHAT_HOST", "http://100.113.138.100:11530")
+CTX = int(os.environ.get("Z0INT_OPTCHAT_CTX", "4096"))
+# qwen3-14b-q4km on the groot router is 4096. A 27KB tool echo plus the
+# prior view was 8589 tokens and every compact of that node 400'd, so the
+# view never became ready.
+CONTEXT_BYTES = 800
+SOURCE_BYTES = 2400
 
 COMPACT = """You write the memory of OptChat, an AI agent that works for one user in one
 endless chat, through tools and subagents. Each message has a kind: user
@@ -139,14 +146,18 @@ def context_block(chat: ChatLog, level: int, index: int) -> str:
         if text == PLACEHOLDER:
             continue
         lines.append(one_line(text))
-    return "<chat>\n" + "\n".join(lines) + "\n</chat>"
+    block = "<chat>\n" + "\n".join(lines) + "\n</chat>"
+    if utf8_len(block) <= CONTEXT_BYTES:
+        return block
+    return "<chat>\n" + fit_bytes("\n".join(lines), CONTEXT_BYTES - len("<chat>\n\n</chat>")) + "\n</chat>"
 
 
 def step_block(chat: ChatLog, level: int, index: int) -> str:
     head = f"For scale, this line is exactly {NODE} bytes:\n{SCALE}\n\n"
     if level == 0:
         msg = chat.messages[index]
-        return head + f"Compress this message into one line, in at most {NODE} bytes:\n{msg.kind}: {msg.text}"
+        source = fit_bytes(f"{msg.kind}: {msg.text}", SOURCE_BYTES)
+        return head + f"Compress this message into one line, in at most {NODE} bytes:\n{source}"
     left = one_line(chat.nodes[(level - 1, index * 2)])
     right = one_line(chat.nodes[(level - 1, index * 2 + 1)])
     return head + f"Merge these two lines into one, in at most {NODE} bytes:\n{left}\n{right}"
@@ -169,6 +180,22 @@ def cut_utf8(text: str, limit: int = NODE) -> str:
     """Cut at a byte offset without splitting a character or keeping U+FFFD."""
     cut = text.encode("utf-8")[:limit].decode("utf-8", "replace")
     return cut.removesuffix("\ufffd")
+
+
+def fit_bytes(text: str, limit: int) -> str:
+    """Keep the head and tail when a compactor input cannot fit the router ctx."""
+    raw = text.encode("utf-8")
+    if len(raw) <= limit:
+        return text
+    mark = b"\n... cut ...\n"
+    room = limit - len(mark)
+    if room < 32:
+        return cut_utf8(text, max(0, limit))
+    head_n = room // 2
+    tail_n = room - head_n
+    head = raw[:head_n].decode("utf-8", "ignore")
+    tail = raw[-tail_n:].decode("utf-8", "ignore")
+    return head + mark.decode() + tail
 
 
 reported: set[tuple[int, int]] = set()
@@ -207,22 +234,51 @@ def enforce(messages: list[dict[str, object]], complete: Callable[[list[dict[str
     return min(tries, key=utf8_len)
 
 
-def ollama_complete(messages: list[dict[str, str]]) -> str:
+def _shrink_user(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    shrunk: list[dict[str, Any]] = []
+    for msg in messages:
+        content = msg.get("content")
+        if msg.get("role") == "system" or not isinstance(content, list):
+            shrunk.append(msg)
+            continue
+        parts = []
+        for part in content:
+            text = part.get("text") if isinstance(part, dict) else None
+            if not isinstance(text, str):
+                parts.append(part)
+                continue
+            parts.append({**part, "text": fit_bytes(text, max(256, utf8_len(text) // 2))})
+        shrunk.append({**msg, "content": parts})
+    return shrunk
+
+
+def ollama_complete(messages: list[dict[str, Any]]) -> str:
     """Call the groot CUDA router. A dense 35B does not fit this 12GB card."""
-    body = json.dumps({
-        "model": MODEL,
-        "messages": messages,
-        "max_tokens": 220,
-        "temperature": 0,
-    }).encode()
-    req = urllib.request.Request(
-        HOST.rstrip("/") + "/v1/chat/completions",
-        data=body,
-        headers={"Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        data = json.loads(resp.read().decode())
-    return str(((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "")
+    payload = messages
+    last = ""
+    for _ in range(4):
+        body = json.dumps({
+            "model": MODEL,
+            "messages": payload,
+            "max_tokens": 220,
+            "temperature": 0,
+        }).encode()
+        req = urllib.request.Request(
+            HOST.rstrip("/") + "/v1/chat/completions",
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode())
+        except urllib.error.HTTPError as exc:
+            last = exc.read().decode(errors="replace")
+            if exc.code != 400 or "context size" not in last:
+                raise RuntimeError(f"compactor HTTP {exc.code}: {last[:300]}") from exc
+            payload = _shrink_user(payload)
+            continue
+        return str(((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "")
+    raise RuntimeError(f"compactor prompt exceeds {CTX} ctx: {last[:300]}")
 
 
 def pump(chat: ChatLog, complete: Callable[[list[dict[str, str]]], str] | None = None, *, limit: int = 8) -> int:
@@ -265,3 +321,18 @@ def pump(chat: ChatLog, complete: Callable[[list[dict[str, str]]], str] | None =
         chat.fit()
         built += 1
     return built
+
+
+def snapshot_due(chat: ChatLog) -> tuple[int, int, list[dict[str, object]]] | None:
+    """Copy the next compactor call so the model request can run without the writer lock."""
+    pending = due(chat)
+    if not pending:
+        return None
+    level, index = pending[0]
+    return level, index, compactor_messages(chat, level, index)
+
+
+def commit_line(chat: ChatLog, level: int, index: int, line: str) -> None:
+    chat._store_node(level, index, line)
+    chat.fit()
+

@@ -13,7 +13,7 @@ import threading
 import time
 
 from .browse import write_html
-from .compact import JOBS, RETRY_S, pump
+from .compact import JOBS, RETRY_S, commit_line, enforce, note_failure, ollama_complete, pump, reports, snapshot_due
 from .log import PLACEHOLDER, load_chat
 from .persist import persist
 from .switch import enabled, set_enabled
@@ -26,10 +26,23 @@ _queue = Queue()
 
 def _pump_forever(chat) -> None:
     while True:
-        if enabled():
-            with _lock:
-                pump(chat, limit=JOBS)
-        time.sleep(RETRY_S)
+        if not enabled():
+            time.sleep(RETRY_S)
+            continue
+        with _lock:
+            job = snapshot_due(chat)
+        if job is None:
+            time.sleep(RETRY_S)
+            continue
+        level, index, messages = job
+        try:
+            line = enforce(messages, ollama_complete)
+        except Exception as exc:
+            note_failure(level, index, exc)
+            time.sleep(RETRY_S)
+            continue
+        with _lock:
+            commit_line(chat, level, index, line)
 
 
 def take_lock(path) -> socket.socket:
@@ -57,8 +70,7 @@ def serve() -> int:
     chat = load_chat()
     _holder = take_lock(chat.root / "lock")
     threading.Thread(target=_pump_forever, args=(chat,), daemon=True, name="optchat-pump").start()
-    if enabled():
-        pump(chat, limit=JOBS)
+
     for raw in sys.stdin:
         line = raw.strip()
         if not line:
@@ -87,7 +99,6 @@ def serve() -> int:
                 with _lock:
                     msg = chat.append(str(req.get("kind")), str(req.get("text") or ""))
                 body = {"ok": True, "i": msg.i, "size": msg.size}
-                pump(chat, limit=JOBS)
             elif op == "begin":
                 texts = req.get("texts")
                 if isinstance(texts, str):
@@ -98,14 +109,10 @@ def serve() -> int:
                     with _lock:
                         opened = begin(chat, texts, str(req.get("agents") or ""))
                     body = {"ok": True, **opened}
-                    if opened.get("ready"):
-                        pump(chat, limit=JOBS)
             elif op == "record":
                 with _lock:
                     saved = record(chat, str(req.get("kind") or ""), str(req.get("text") or ""))
                 body = {"ok": True, **saved}
-                if saved.get("logged"):
-                    pump(chat, limit=JOBS)
             elif op == "settle":
                 deadline = time.time() + float(req.get("timeout") or 20)
                 while time.time() < deadline and PLACEHOLDER in chat.render():
@@ -113,6 +120,8 @@ def serve() -> int:
                         break
                 ready = PLACEHOLDER not in chat.render()
                 body = {"ok": True, "ready": ready, "view": chat.render()}
+                if not ready and reports:
+                    body["error"] = reports[-1]
             elif op == "view":
                 body = {"ok": True, "view": chat.render(), "messages": len(chat.messages)}
             elif op == "zoom":
