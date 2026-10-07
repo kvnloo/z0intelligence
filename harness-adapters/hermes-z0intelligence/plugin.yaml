@@ -1,5 +1,18 @@
 name: hermes-z0intelligence
 version: 0.1.0
-description: Canonical evidence-gated automatic intelligence decisions.
+description: Canonical evidence-gated automatic decisions with opt-in scoped memory continuity.
 provides_hooks:
   - pre_llm_call
+  - provider_request_body
+  - post_llm_call
+  - on_session_end
+config_schema:
+  context_memory_scope:
+    type: object
+    description: Explicit MemoryScope object; absent means scoped memory is disabled.
+  context_memory_subject:
+    type: string
+    description: Optional exact memory claim subject filter.
+  context_memory_predicate:
+    type: string
+    description: Optional exact memory claim predicate filter.
