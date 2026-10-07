@@ -55,9 +55,11 @@ class _ResidentFinder:
     finder: Any
     package_version: str
     ready: bool
+    generation_id: int = field(default_factory=time.time_ns)
     created_at: float = field(default_factory=time.time)
     last_used: float = field(default_factory=time.time)
     epoch: int = 0
+    epoch_error: str | None = None
     subscription: Any | None = None
     lock: threading.RLock = field(default_factory=threading.RLock)
 
@@ -113,6 +115,8 @@ def _resident(root: Path) -> tuple[_ResidentFinder | None, str, bool, str | None
         if mod is None:
             return None, "absent", False, None
 
+        finder = None
+        resident: _ResidentFinder | None = None
         try:
             finder = mod.FileFinder(
                 root,
@@ -138,14 +142,25 @@ def _resident(root: Path) -> tuple[_ResidentFinder | None, str, bool, str | None
             )
             try:
                 resident.subscription = finder.watch(None, resident.on_change)
-            except Exception:
+                if resident.subscription is None:
+                    resident.epoch_error = "watch returned no subscription handle"
+            except Exception as exc:
                 # watch=True still lets FFF maintain its own index. The
-                # subscription is only for our source-epoch counter.
+                # subscription is needed to track our source epoch, so queries
+                # remain partial if it cannot be registered.
                 resident.subscription = None
+                resident.epoch_error = f"{type(exc).__name__}: {exc}"
             _POOL[key] = resident
             _evict_if_needed()
             return resident, ("ready" if ready else "warming"), False, None
         except Exception as exc:
+            if resident is not None:
+                resident.close()
+            elif finder is not None:
+                try:
+                    finder.close()
+                except Exception:
+                    pass
             return None, "error", False, f"{type(exc).__name__}: {exc}"
 
 
@@ -199,6 +214,67 @@ def _content_hits(result: Any, limit: int) -> list[dict[str, Any]]:
     return out
 
 
+def _result_coverage(
+    *,
+    status: str,
+    warmup_complete: bool,
+    path_result: Any,
+    content_result: Any,
+    generation_error: str | None = None,
+) -> tuple[str, dict[str, Any], str | None]:
+    path_total = int(getattr(path_result, "total_matched", 0) or 0)
+    content_total = int(getattr(content_result, "total_matched", 0) or 0)
+    searched_value = getattr(content_result, "total_files_searched", None)
+    total_files_value = getattr(content_result, "total_files", None)
+    files_searched = int(searched_value or 0)
+    total_files = int(total_files_value or 0)
+    # FFF 0.11 defines this as the number of files eligible after filtering,
+    # not the count excluded from the query.
+    eligible_value = getattr(content_result, "filtered_file_count", None)
+    eligible_files = total_files if eligible_value is None else int(eligible_value or 0)
+    scan_scope_known = searched_value is not None and (
+        eligible_value is not None or total_files_value is not None
+    )
+    has_more = bool(getattr(content_result, "has_more", False))
+    next_file_offset = int(getattr(content_result, "next_file_offset", 0) or 0)
+    regex_error = getattr(content_result, "regex_fallback_error", None)
+    partial_reasons: list[str] = []
+    if status != "ready" or not warmup_complete:
+        partial_reasons.append("index_warming")
+    if has_more:
+        partial_reasons.append("content_results_have_more")
+    if path_total > len(getattr(path_result, "items", []) or []):
+        partial_reasons.append("path_results_truncated")
+    if content_total > len(getattr(content_result, "items", []) or []):
+        partial_reasons.append("content_results_truncated")
+    if not scan_scope_known:
+        partial_reasons.append("content_scan_counts_unavailable")
+    if eligible_files > files_searched:
+        partial_reasons.append("content_scan_incomplete")
+    if next_file_offset:
+        partial_reasons.append("content_scan_has_next_page")
+    if regex_error:
+        partial_reasons.append("regex_fallback_error")
+    if generation_error:
+        partial_reasons.append("generation_unreliable")
+    coverage = "partial" if partial_reasons else "complete"
+    errors = [str(value) for value in (regex_error, generation_error) if value]
+    error = "; ".join(errors) if errors else None
+    detail = {
+        "path_total_matched": path_total,
+        "content_total_matched": content_total,
+        "files_searched": files_searched,
+        "total_files": total_files,
+        "eligible_files": eligible_files,
+        "has_more": has_more,
+        "next_file_offset": next_file_offset,
+        "regex_fallback_error": str(regex_error) if regex_error else None,
+        "generation_error": generation_error,
+        "partial_reasons": partial_reasons,
+    }
+    return coverage, detail, error
+
+
 def search_repository(
     project_root: str | Path,
     query: str,
@@ -218,6 +294,13 @@ def search_repository(
         return {
             "schema": SCHEMA,
             "status": "error",
+            "coverage": "unavailable",
+            "scanning": False,
+            "watcher_ready": False,
+            "warmup_complete": False,
+            "generation": None,
+            "generation_status": "unavailable",
+            "generation_reliable": False,
             "error": "empty query",
             "path_hits": [],
             "content_hits": [],
@@ -230,6 +313,13 @@ def search_repository(
         return {
             "schema": SCHEMA,
             "status": "error",
+            "coverage": "unavailable",
+            "scanning": False,
+            "watcher_ready": False,
+            "warmup_complete": False,
+            "generation": None,
+            "generation_status": "unavailable",
+            "generation_reliable": False,
             "error": str(exc),
             "path_hits": [],
             "content_hits": [],
@@ -239,6 +329,13 @@ def search_repository(
         return {
             "schema": SCHEMA,
             "status": "missing_root",
+            "coverage": "unavailable",
+            "scanning": False,
+            "watcher_ready": False,
+            "warmup_complete": False,
+            "generation": None,
+            "generation_status": "unavailable",
+            "generation_reliable": False,
             "root": str(root),
             "path_hits": [],
             "content_hits": [],
@@ -252,6 +349,13 @@ def search_repository(
         return {
             "schema": SCHEMA,
             "status": status,
+            "coverage": "unavailable",
+            "scanning": False,
+            "watcher_ready": False,
+            "warmup_complete": False,
+            "generation": None,
+            "generation_status": "unavailable",
+            "generation_reliable": False,
             "root": str(root),
             "error": error,
             "path_hits": [],
@@ -300,9 +404,19 @@ def search_repository(
                 content_hits = _content_hits(content_result, bounded_limit)
             path_hits = _path_hits(path_result, bounded_limit)
         except Exception as exc:
+            generation = (
+                f"{resident.package_version}:resident={resident.generation_id}:epoch={resident.epoch}"
+            )
             return {
                 "schema": SCHEMA,
                 "status": "error",
+                "coverage": "unavailable",
+                "scanning": bool(getattr(getattr(resident.finder, "scan_progress", None), "is_scanning", False)),
+                "watcher_ready": bool(getattr(getattr(resident.finder, "scan_progress", None), "is_watcher_ready", False)),
+                "warmup_complete": bool(getattr(getattr(resident.finder, "scan_progress", None), "is_warmup_complete", False)),
+                "generation": generation,
+                "generation_status": "unreliable" if resident.epoch_error else "tracked",
+                "generation_reliable": resident.epoch_error is None,
                 "root": str(root),
                 "error": f"{type(exc).__name__}: {exc}",
                 "path_hits": [],
@@ -315,21 +429,45 @@ def search_repository(
 
         progress = getattr(resident.finder, "scan_progress", None)
         scanning = bool(getattr(progress, "is_scanning", False)) if progress is not None else not resident.ready
-        if not scanning:
+        watcher_ready = bool(getattr(progress, "is_watcher_ready", not scanning)) if progress is not None else not scanning
+        warmup_complete = bool(getattr(progress, "is_warmup_complete", resident.ready)) if progress is not None else resident.ready
+        if not scanning and warmup_complete:
             resident.ready = True
             status = "ready"
+        else:
+            resident.ready = False
+            status = "warming"
+
+        coverage, content_scan, error = _result_coverage(
+            status=status,
+            warmup_complete=warmup_complete and watcher_ready,
+            path_result=path_result,
+            content_result=content_result,
+            generation_error=resident.epoch_error,
+        )
+        generation = (
+            f"{resident.package_version}:resident={resident.generation_id}:epoch={resident.epoch}"
+        )
 
         return {
             "schema": SCHEMA,
             "status": status,
+            "coverage": coverage,
             "root": str(root),
             "query": q,
             "kind": kind,
             "grep_mode": mode,
             "package_version": resident.package_version,
             "index_epoch": resident.epoch,
+            "generation": generation,
+            "generation_status": "unreliable" if resident.epoch_error else "tracked",
+            "generation_reliable": resident.epoch_error is None,
             "reused": reused,
             "scanning": scanning,
+            "watcher_ready": watcher_ready,
+            "warmup_complete": warmup_complete,
+            "error": error,
+            "content_scan": content_scan,
             "path_hits": path_hits,
             "content_hits": content_hits,
             "wall_ms": (time.perf_counter() - t0) * 1000.0,

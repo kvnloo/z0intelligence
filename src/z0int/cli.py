@@ -454,8 +454,29 @@ def build_parser() -> argparse.ArgumentParser:
     cxr.add_argument("--path", action="append", default=[], help="Exact file path need (repeatable)")
     cxr.add_argument("--task-id", default=None)
     cxr.add_argument("--project-root", default=None)
+    cxr.add_argument("--canonical-repo", default=None, help="Canonical repository identity from the registry")
+    cxr.add_argument("--registry-path", default=None, help="Repository orientation registry path")
+    cxr.add_argument(
+        "--candidate-root",
+        action="append",
+        default=[],
+        help="Checkout candidate root (repeatable)",
+    )
+    cxr.add_argument(
+        "--registry-format",
+        choices=("canonical", "generated"),
+        default="canonical",
+        help="Registry schema to read",
+    )
     cxr.add_argument("--no-qmd", action="store_true")
     cxr.add_argument("--allow-memory", action="store_true")
+    cxr.add_argument(
+        "--memory-scope",
+        default=None,
+        help="Explicit MemoryScope JSON file (used only with --allow-memory)",
+    )
+    cxr.add_argument("--memory-subject", default=None, help="Exact normalized memory claim subject")
+    cxr.add_argument("--memory-predicate", default=None, help="Exact normalized memory claim predicate")
     cxr.add_argument("--input", default=None, help="JSON file with needs[]")
     cxp = cx_sub.add_parser("packet", help="State Packet v0 — current-work state from git + docs + Claude Code history")
     cxp.add_argument("--repo", default=None, help="Target repository (default: cwd)")
@@ -814,6 +835,8 @@ def _cmd_context_packet(args: argparse.Namespace) -> int:
 
 
 def _cmd_context(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
     from z0int.context_resolve import (
         InformationNeed,
         needs_from_mapping,
@@ -831,13 +854,67 @@ def _cmd_context(args: argparse.Namespace) -> int:
         needs.extend(needs_from_mapping(raw if isinstance(raw, dict) else {"needs": raw}))
     for i, path in enumerate(getattr(args, "path", None) or []):
         needs.append(InformationNeed(id=f"p{i}", description=path, kind="exact_path", path=path))
+    allow_memory = bool(getattr(args, "allow_memory", False))
+    memory_scope = None
+    if allow_memory and getattr(args, "memory_scope", None):
+        try:
+            from z0int.memory_contract import MemoryScope
+
+            raw_scope = json.loads(Path(args.memory_scope).expanduser().read_text(encoding="utf-8"))
+            if not isinstance(raw_scope, dict):
+                raise ValueError("scope file must contain a JSON object")
+            allowed_fields = {"user", "project", "repo", "task", "level"}
+            extra_fields = set(raw_scope) - allowed_fields
+            if extra_fields:
+                raise ValueError(f"unknown scope fields: {', '.join(sorted(extra_fields))}")
+            scope_fields = {
+                key: raw_scope[key]
+                for key in ("user", "project", "repo", "task")
+                if key in raw_scope
+            }
+            if any(value is not None and not isinstance(value, str) for value in scope_fields.values()):
+                raise ValueError("scope segments must be strings or null")
+            memory_scope = MemoryScope(**scope_fields)
+            declared_level = raw_scope.get("level")
+            if declared_level is not None and declared_level != memory_scope.level:
+                raise ValueError("scope level does not match its hierarchy")
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            print(f"invalid --memory-scope: {exc}", file=sys.stderr)
+            return 2
+    if allow_memory and getattr(args, "query", None) and not any(
+        need.kind == "natural_language" and need.description == args.query for need in needs
+    ):
+        needs.append(
+            InformationNeed(
+                id="memory_query",
+                description=args.query,
+                kind="natural_language",
+                required=True,
+            )
+        )
+    if allow_memory and not any(need.kind == "memory" for need in needs):
+        needs.append(
+            InformationNeed(
+                id="memory",
+                description="scope-visible memory claims",
+                kind="memory",
+                required=True,
+            )
+        )
     packet = resolve_context(
         needs=needs or None,
         query=getattr(args, "query", None),
         task_id=getattr(args, "task_id", None),
         project_root=getattr(args, "project_root", None),
+        canonical_repo=getattr(args, "canonical_repo", None),
+        registry_path=getattr(args, "registry_path", None),
+        candidate_roots=getattr(args, "candidate_root", None),
+        registry_format=getattr(args, "registry_format", "canonical"),
         allow_qmd=not bool(getattr(args, "no_qmd", False)),
-        allow_memory=bool(getattr(args, "allow_memory", False)),
+        allow_memory=allow_memory,
+        memory_scope=memory_scope,
+        memory_subject=getattr(args, "memory_subject", None) if allow_memory else None,
+        memory_predicate=getattr(args, "memory_predicate", None) if allow_memory else None,
     )
     payload = packet.to_dict()
     if args.json or True:

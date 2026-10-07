@@ -1,4 +1,4 @@
-"""Revision-bound architecture reuse packet (#138).
+"""Revision-bound architecture reuse packet (#137; memory parent #22).
 
 This module deliberately does not perform repository search. It compiles already
 resolved, provenance-carrying evidence into a pre-implementation gate so coding
@@ -101,12 +101,10 @@ class NoveltyReceipt:
 
     @property
     def evidence_backed(self) -> bool:
-        return bool(
-            self.new_abstraction_necessary
-            and self.searched
-            and self.candidates_rejected
-            and all(rejected.evidence for rejected in self.candidates_rejected)
-        )
+        # This schema records search labels and evidence about rejected
+        # candidates, but no revision-bound proof that the search scope was
+        # complete. Those fields alone cannot qualify NOVEL.
+        return False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -201,39 +199,144 @@ def _source_revisions(
 
 
 def _input_fingerprint(
-    *,
-    task_id: str | None,
-    source_revisions: Mapping[str, str],
-    candidates: Sequence[ReuseCandidate],
-    novelty_receipt: NoveltyReceipt | None,
+    packet: ArchitectureReusePacket,
 ) -> str:
-    blob = {
-        "schema": SCHEMA,
-        "task_id": task_id,
-        "source_revisions": dict(sorted(source_revisions.items())),
-        "candidates": [
-            {
-                "candidate_id": candidate.candidate_id,
-                "strategy": candidate.strategy,
-                "owner": candidate.owner,
-                "symbol": candidate.symbol,
-            }
-            for candidate in candidates
-        ],
-        "novelty_receipt": novelty_receipt.to_dict() if novelty_receipt else None,
-    }
+    # Hash the full derived packet state. The fingerprint is an integrity check,
+    # not authentication: source observations still belong to the caller.
+    blob = packet.to_dict()
+    blob.pop("input_fingerprint", None)
     return hashlib.sha256(
-        json.dumps(blob, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        json.dumps(
+            blob,
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
     ).hexdigest()
+
+
+def _has_revision(ref: EvidenceRef) -> bool:
+    return bool(
+        ref.source_id.strip()
+        and ref.locator.strip()
+        and ref.source_version.strip()
+        and ref.source_version.strip().lower() not in {"unknown", "missing", "none", "null"}
+    )
+
+
+def _is_implementation_ref(ref: EvidenceRef) -> bool:
+    return ref.trust_class == "code" and _has_revision(ref)
+
+
+def _is_test_or_verifier_ref(ref: EvidenceRef) -> bool:
+    if not _is_implementation_ref(ref):
+        return False
+    identity = f"{ref.source_id}/{ref.locator}".lower().replace("\\", "/")
+    parts = {part for part in identity.replace(".", "/").replace("-", "/").split("/") if part}
+    return any(
+        part in {"test", "tests", "verify", "verifier", "verification"}
+        or part.startswith(("test_", "verify_"))
+        for part in parts
+    )
+
+
+def _candidate_is_adequate(candidate: ReuseCandidate) -> bool:
+    owner = (candidate.owner or "").strip()
+    implementations = [ref for ref in candidate.evidence if _is_implementation_ref(ref)]
+    tests = [ref for ref in candidate.related_tests if _is_test_or_verifier_ref(ref)]
+    return bool(
+        owner
+        and implementations
+        and any(
+            (test.source_id, test.locator) != (implementation.source_id, implementation.locator)
+            for test in tests
+            for implementation in implementations
+        )
+    )
+
+
+_INCOMPLETE_OPERATION_STATES = {
+    "building",
+    "error",
+    "failed",
+    "incomplete",
+    "missing",
+    "not_ready",
+    "partial",
+    "pending",
+    "scanning",
+    "stale",
+    "timeout",
+    "timed_out",
+    "unreliable",
+    "unknown",
+    "unavailable",
+    "warming",
+}
+
+_COMPLETED_OPERATION_STATES = {"complete", "ready", "ready_empty"}
+
+
+def _flag_is_set(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "0", "false", "no", "off", "none"}
+    return bool(value)
+
+
+def _required_coverage_is_complete(context: ContextPacket) -> bool:
+    if context.measurements.get("coverage") != "complete":
+        return False
+
+    recipe = context.recipe
+    if recipe is None:
+        return False
+    required_needs = set(recipe.required_evidence_fields)
+    completed_needs: set[str] = set()
+    for operation in recipe.operations:
+        need = operation.get("need")
+        explicitly_optional = operation.get("required") is False
+        required = operation.get("required") is True or (
+            not explicitly_optional and need in required_needs
+        )
+        if not required:
+            continue
+
+        if operation.get("coverage") != "complete":
+            return False
+        state = operation.get("status")
+        if not isinstance(state, str) or state.strip().lower() not in _COMPLETED_OPERATION_STATES:
+            return False
+        if _flag_is_set(operation.get("error")):
+            return False
+        if _flag_is_set(operation.get("scanning")):
+            return False
+        for field_name in ("status", "index_status", "generation_status"):
+            state = operation.get(field_name)
+            if isinstance(state, str) and state.strip().lower() in _INCOMPLETE_OPERATION_STATES:
+                return False
+        if need in required_needs:
+            completed_needs.add(need)
+    if not required_needs.issubset(completed_needs):
+        return False
+    return True
 
 
 def _decision(
     *,
+    context: ContextPacket,
     candidates: Sequence[ReuseCandidate],
-    novelty_receipt: NoveltyReceipt | None,
     unresolved_gaps: Sequence[str],
 ) -> dict[str, Any]:
-    if unresolved_gaps:
+    if any(str(item).strip() for item in context.contradictions):
+        return {
+            "mode": "OBSERVE",
+            "implementation_allowed": False,
+            "authorizes_action": False,
+            "verified_success": None,
+            "reason": "context contains unresolved contradictions",
+        }
+
+    if unresolved_gaps or context.unresolved_gaps:
         return {
             "mode": "OBSERVE",
             "implementation_allowed": False,
@@ -242,9 +345,21 @@ def _decision(
             "reason": "required architecture archaeology is incomplete",
         }
 
-    if candidates:
+    if not _required_coverage_is_complete(context):
+        return {
+            "mode": "OBSERVE",
+            "implementation_allowed": False,
+            "authorizes_action": False,
+            "verified_success": None,
+            "reason": "required context coverage is incomplete or unavailable",
+        }
+
+    adequate_candidates = [candidate for candidate in candidates if _candidate_is_adequate(candidate)]
+    if adequate_candidates:
         mode: ReuseMode = (
-            "REUSE" if any(candidate.strategy == "reuse" for candidate in candidates) else "EXTEND"
+            "REUSE"
+            if any(candidate.strategy == "reuse" for candidate in adequate_candidates)
+            else "EXTEND"
         )
         return {
             "mode": mode,
@@ -254,21 +369,14 @@ def _decision(
             "reason": "revision-bound existing implementation evidence is available",
         }
 
-    if novelty_receipt is not None and novelty_receipt.evidence_backed:
-        return {
-            "mode": "NOVEL",
-            "implementation_allowed": True,
-            "authorizes_action": False,
-            "verified_success": None,
-            "reason": "existing candidates were searched and rejected with evidence",
-        }
-
     return {
         "mode": "OBSERVE",
         "implementation_allowed": False,
         "authorizes_action": False,
         "verified_success": None,
-        "reason": "no reusable candidate and no evidence-backed NoveltyReceipt",
+        "reason": (
+            "no adequately sourced reusable candidate; NOVEL requires structured complete-search evidence"
+        ),
     }
 
 
@@ -294,14 +402,8 @@ def build_reuse_packet(
     test_refs = tuple(related_tests)
     gaps = list(dict.fromkeys([*context.unresolved_gaps, *unresolved_gaps]))
     revisions = _source_revisions(context, candidate_list, test_refs, novelty_receipt)
-    fingerprint = _input_fingerprint(
-        task_id=context.task_id,
-        source_revisions=revisions,
-        candidates=candidate_list,
-        novelty_receipt=novelty_receipt,
-    )
 
-    return ArchitectureReusePacket(
+    packet = ArchitectureReusePacket(
         task_id=context.task_id,
         context=context,
         reuse_candidates=candidate_list,
@@ -312,14 +414,15 @@ def build_reuse_packet(
         superseded_or_rejected_paths=tuple(superseded_or_rejected_paths),
         unresolved_gaps=gaps,
         source_revisions=revisions,
-        input_fingerprint=fingerprint,
         decision=_decision(
+            context=context,
             candidates=candidate_list,
-            novelty_receipt=novelty_receipt,
             unresolved_gaps=gaps,
         ),
         measurements=dict(measurements or {}),
     )
+    packet.input_fingerprint = _input_fingerprint(packet)
+    return packet
 
 
 def check_reuse_packet(
@@ -333,26 +436,76 @@ def check_reuse_packet(
     silently being treated as current.
     """
 
-    changed = [
+    integrity_errors: list[str] = []
+    try:
+        recomputed_revisions = _source_revisions(
+            packet.context,
+            packet.reuse_candidates,
+            packet.related_tests,
+            packet.novelty_receipt,
+        )
+        recomputed_fingerprint = _input_fingerprint(packet)
+        recomputed_decision = _decision(
+            context=packet.context,
+            candidates=packet.reuse_candidates,
+            unresolved_gaps=packet.unresolved_gaps,
+        )
+    except (AttributeError, TypeError, ValueError) as exc:
+        recomputed_revisions = {}
+        recomputed_fingerprint = ""
+        recomputed_decision = {
+            "mode": "OBSERVE",
+            "implementation_allowed": False,
+            "authorizes_action": False,
+            "verified_success": None,
+            "reason": "reuse packet contents are malformed",
+        }
+        integrity_errors.append(f"malformed_packet:{type(exc).__name__}")
+
+    if packet.source_revisions != recomputed_revisions:
+        integrity_errors.append("source_revisions_mismatch")
+    if packet.input_fingerprint != recomputed_fingerprint:
+        integrity_errors.append("input_fingerprint_mismatch")
+    if packet.decision != recomputed_decision:
+        integrity_errors.append("decision_mismatch")
+
+    dependencies = set(recomputed_revisions) | set(current_source_revisions)
+    changed = sorted(
         key
-        for key, expected in packet.source_revisions.items()
-        if current_source_revisions.get(key) != expected
-    ]
-    valid = not changed
+        for key in dependencies
+        if recomputed_revisions.get(key) != current_source_revisions.get(key)
+    )
+    changed.extend(
+        key
+        for key in set(packet.source_revisions) | set(recomputed_revisions)
+        if packet.source_revisions.get(key) != recomputed_revisions.get(key) and key not in changed
+    )
+    changed.sort()
+    valid = not changed and not integrity_errors
     if valid:
-        decision = dict(packet.decision)
+        decision = recomputed_decision
+        status = "current"
+        reason = None
     else:
         decision = {
             "mode": "OBSERVE",
             "implementation_allowed": False,
             "authorizes_action": False,
             "verified_success": None,
-            "reason": "reuse packet is stale; source revisions changed or are unavailable",
+            "reason": (
+                "reuse packet contents or derived decision changed"
+                if integrity_errors
+                else "reuse packet is stale; source revisions changed or are unavailable"
+            ),
         }
+        status = "tampered" if integrity_errors else "stale"
+        reason = decision["reason"]
     return {
         "valid": valid,
-        "status": "current" if valid else "stale",
+        "status": status,
         "input_fingerprint": packet.input_fingerprint,
         "changed_sources": changed,
+        "integrity_errors": integrity_errors,
+        "reason": reason,
         "decision": decision,
     }

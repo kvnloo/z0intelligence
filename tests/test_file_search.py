@@ -40,10 +40,17 @@ class _Result:
         self.items = items
         self.scores = scores or []
         self.total_matched = len(items)
+        self.total_files_searched = 4
+        self.total_files = 4
+        self.filtered_file_count = 0
+        self.has_more = False
+        self.regex_fallback_error = None
 
 
 class _Progress:
     is_scanning = False
+    is_watcher_ready = True
+    is_warmup_complete = True
 
 
 class _Sub:
@@ -122,6 +129,113 @@ class FileSearchTests(unittest.TestCase):
             self.assertEqual(out["content_hits"][0]["line"], 7)
             self.assertTrue(out["content_hits"][0]["is_definition"])
             self.assertEqual(out["grep_mode"], "plain")
+            self.assertEqual(out["coverage"], "complete")
+            self.assertFalse(out["scanning"])
+            self.assertTrue(out["warmup_complete"])
+            self.assertRegex(out["generation"], r"^0\.test:resident=\d+:epoch=0$")
+            self.assertEqual(out["content_scan"]["files_searched"], 4)
+
+    def test_filtered_file_count_is_eligible_scope_not_an_omission_count(self):
+        class EligibleFinder(_Finder):
+            def grep(self, query, **kwargs):
+                result = _Result([_Match()])
+                result.total_files = 3
+                result.filtered_file_count = 2
+                result.total_files_searched = 2
+                return result
+
+        class EligibleFFF:
+            __version__ = "0.11.0"
+            FileFinder = EligibleFinder
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "z0int.file_search._load_fff", return_value=EligibleFFF
+        ):
+            complete = file_search.search_repository(tmp, "find_context", kind="exact_symbol")
+            self.assertEqual(complete["coverage"], "complete")
+            self.assertEqual(complete["content_scan"]["eligible_files"], 2)
+            self.assertEqual(complete["content_scan"]["total_files"], 3)
+
+        class IncompleteFinder(EligibleFinder):
+            def grep(self, query, **kwargs):
+                result = super().grep(query, **kwargs)
+                result.total_files_searched = 1
+                return result
+
+        class IncompleteFFF:
+            __version__ = "0.11.0"
+            FileFinder = IncompleteFinder
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "z0int.file_search._load_fff", return_value=IncompleteFFF
+        ):
+            incomplete = file_search.search_repository(tmp, "find_context", kind="exact_symbol")
+            self.assertEqual(incomplete["coverage"], "partial")
+            self.assertIn("content_scan_incomplete", incomplete["content_scan"]["partial_reasons"])
+
+    def test_missing_scan_scope_counts_cannot_qualify_complete_coverage(self):
+        class UncountedFinder(_Finder):
+            def grep(self, query, **kwargs):
+                result = _Result([_Match()])
+                del result.total_files_searched
+                del result.total_files
+                del result.filtered_file_count
+                return result
+
+        class UncountedFFF:
+            __version__ = "unknown"
+            FileFinder = UncountedFinder
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "z0int.file_search._load_fff", return_value=UncountedFFF
+        ):
+            out = file_search.search_repository(tmp, "find_context", kind="exact_symbol")
+
+            self.assertEqual(out["coverage"], "partial")
+            self.assertIn("content_scan_counts_unavailable", out["content_scan"]["partial_reasons"])
+
+    def test_partial_warming_search_exposes_scan_state_and_keeps_hits(self):
+        class WarmingFinder(_Finder):
+            def __init__(self, root, **kwargs):
+                super().__init__(root, **kwargs)
+                self.scan_progress.is_scanning = True
+                self.scan_progress.is_watcher_ready = False
+                self.scan_progress.is_warmup_complete = False
+
+            def wait_for_scan_blocking(self, timeout_ms=5000):
+                return False
+
+        class WarmingFFF:
+            __version__ = "0.11.0"
+            FileFinder = WarmingFinder
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "z0int.file_search._load_fff", return_value=WarmingFFF
+        ):
+            out = file_search.search_repository(tmp, "find_context", kind="exact_symbol")
+            self.assertEqual(out["status"], "warming")
+            self.assertEqual(out["coverage"], "partial")
+            self.assertTrue(out["scanning"])
+            self.assertFalse(out["warmup_complete"])
+            self.assertEqual(len(out["content_hits"]), 1)
+
+    def test_query_error_retains_generation_and_is_unavailable(self):
+        class BrokenFinder(_Finder):
+            def grep(self, query, **kwargs):
+                raise RuntimeError("grep transport failed")
+
+        class BrokenFFF:
+            __version__ = "0.11.0"
+            FileFinder = BrokenFinder
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "z0int.file_search._load_fff", return_value=BrokenFFF
+        ):
+            out = file_search.search_repository(tmp, "find_context", kind="exact_symbol")
+            self.assertEqual(out["status"], "error")
+            self.assertEqual(out["coverage"], "unavailable")
+            self.assertIn("grep transport failed", out["error"])
+            self.assertRegex(out["generation"], r"^0\.11\.0:resident=\d+:epoch=0$")
 
     def test_watcher_bumps_source_epoch(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch(
@@ -133,6 +247,47 @@ class FileSearchTests(unittest.TestCase):
             finder.callback([object()])
             second = file_search.search_repository(tmp, "context")
             self.assertEqual(second["index_epoch"], first["index_epoch"] + 1)
+
+    def test_failed_epoch_subscription_makes_search_coverage_partial(self):
+        class UnsubscribedFinder(_Finder):
+            def watch(self, pattern, callback):
+                raise RuntimeError("watch callback unavailable")
+
+        class UnsubscribedFFF:
+            __version__ = "0.11.0"
+            FileFinder = UnsubscribedFinder
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "z0int.file_search._load_fff", return_value=UnsubscribedFFF
+        ):
+            out = file_search.search_repository(tmp, "find_context", kind="exact_symbol")
+            self.assertEqual(out["coverage"], "partial")
+            self.assertFalse(out["generation_reliable"])
+            self.assertEqual(out["generation_status"], "unreliable")
+            self.assertIn("watch callback unavailable", out["error"])
+            self.assertIn("generation_unreliable", out["content_scan"]["partial_reasons"])
+            self.assertIn("watch callback unavailable", out["content_scan"]["generation_error"])
+            self.assertIsNone(out["content_scan"]["regex_fallback_error"])
+
+    def test_missing_epoch_subscription_handle_is_unreliable(self):
+        class NoHandleFinder(_Finder):
+            def watch(self, pattern, callback):
+                self.callback = callback
+                return None
+
+        class NoHandleFFF:
+            __version__ = "0.11.0"
+            FileFinder = NoHandleFinder
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "z0int.file_search._load_fff", return_value=NoHandleFFF
+        ):
+            out = file_search.search_repository(tmp, "find_context", kind="exact_symbol")
+
+            self.assertEqual(out["generation_status"], "unreliable")
+            self.assertFalse(out["generation_reliable"])
+            self.assertEqual(out["coverage"], "partial")
+            self.assertIn("subscription handle", out["error"])
 
     def test_missing_binding_fails_open(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch(

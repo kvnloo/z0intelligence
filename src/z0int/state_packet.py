@@ -38,6 +38,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 from . import paths
 from .context_resolve import ContextPacket, EvidenceRef, InformationNeed
@@ -504,7 +505,26 @@ _P0_LINE = re.compile(r"\*\*(P0\b[^*]{0,160})\*\*")
 
 def _gh_slug(repo: Path, reader: Reader) -> str | None:
     url = (reader.git(repo, "remote", "get-url", "origin") or "").strip()
-    m = re.search(r"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?$", url)
+    if "://" in url:
+        try:
+            parsed = urlsplit(url)
+            port = parsed.port
+        except ValueError:
+            return None
+        if (
+            parsed.scheme not in {"https", "http", "ssh", "git", "git+ssh", "ssh+git"}
+            or parsed.hostname not in {"github.com", "ssh.github.com"}
+            or parsed.query or parsed.fragment
+            or (port is not None and port == 0)
+        ):
+            return None
+        path = parsed.path.removeprefix("/")
+    else:
+        scp = re.fullmatch(r"(?:[^@:/\s]+@)?(?:github\.com|ssh\.github\.com):(.+)", url)
+        if scp is None:
+            return None
+        path = scp.group(1)
+    m = re.fullmatch(r"([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?", path)
     return f"{m.group(1)}/{m.group(2)}" if m else None
 
 
