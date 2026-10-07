@@ -12,7 +12,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
@@ -77,6 +77,7 @@ function isHighInfo(row: {
 }
 
 async function shadow(prompt: string, sessionId: string | undefined): Promise<void> {
+	if (PY.includes("/") && !existsSync(PY)) return;
 	const t0 = Date.now();
 	const [decideRaw, jevRaw] = await Promise.all([
 		runPy(["-m", "evolution_lab", "next-action-decide", prompt], 8000),

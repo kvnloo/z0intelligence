@@ -1,6 +1,6 @@
 {
   "schema": "z0int.worker_routing.v1",
-  "policy_revision": "validated-free-only-dsh-v1",
+  "policy_revision": "validated-free-only-sidestep-v1",
   "baseline": {
     "model": "codex-parent",
     "method": "ceil_utf8_bytes_div_4_v1",
@@ -285,6 +285,15 @@
   "free_only": true,
   "free_provider_order": [
     "openrouter"
+  ],
+  "sidestep_http": [402, 429],
+  "sidestep_blocked_providers": ["cursor", "paid-api", "openai-codex", "xai", "xai-oauth"],
+  "sidestep_order": [
+    {"provider": "nous", "model": "inclusionai/ling-3.0-flash-sante:free"},
+    {"provider": "vercel", "model": "openai/gpt-oss-20b"},
+    {"provider": "openrouter", "model": "nvidia/nemotron-3-super-120b-a12b:free"},
+    {"provider": "groq", "model": "openai/gpt-oss-20b"},
+    {"provider": "nvidia", "model": "openai/gpt-oss-20b"}
   ],
   "validated_free_routes": [
     {
