@@ -84,6 +84,17 @@ class EventLogTests(unittest.TestCase):
         with self.assertRaisesRegex(EventLogCorruption, "incomplete trailing"):
             self.log.append("test.event", {"value": 2}, source="test")
 
+    def test_verify_rejects_truncated_committed_suffix_while_recovery_read_keeps_prefix(self):
+        self.log.append("test.event", {"value": 1}, source="test")
+        self.log.append("test.event", {"value": 2}, source="test")
+        committed_rows = self.log.events_path.read_bytes().splitlines(keepends=True)
+        self.log.events_path.write_bytes(committed_rows[0])
+
+        # Recovery reads keep their historical valid-prefix behavior.
+        self.assertEqual(len(list(self.log.iter_events())), 1)
+        with self.assertRaisesRegex(EventLogCorruption, "event state"):
+            self.log.verify()
+
     def test_committed_malformed_line_fails_closed(self):
         self.log.append("test.event", {"value": 1}, source="test")
         with self.log.events_path.open("ab") as out:
