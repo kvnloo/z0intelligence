@@ -41,6 +41,8 @@ class PreparedReuse:
     verifier_binding: dict[str, Any] | None = None
     decision_receipt: dict[str, Any] | None = None
     decision_extra: dict[str, Any] | None = None
+    packet_metadata: dict[str, Any] = field(default_factory=dict)
+    packet_metadata_sha256: str | None = None
     scoped_memory_use: Any = None
     injected: bool = False
     injection_id: int | None = None
@@ -410,9 +412,459 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
     return build_reuse_packet(context, candidates=candidates, ownership=(owner,), related_tests=related_tests, unresolved_gaps=gaps), root
 
 
+_PACKET_METADATA_SCHEMA = "z0int.bridge.reuse_packet_metadata.v1"
+_METADATA_OPERATIONS = {"repo_orientation", "recipe_cache_hit", "fff_symbol", "fff_search", "fff_search_skipped", "fff_symbol_skipped", "qmd_search", "exact_path", "memory_skipped", "memory_claims", "unsupported"}
+_METADATA_NEEDS = {"reuse-discovery", "test-discovery", "scoped-memory", "reuse-architecture-manifest"}
+_METADATA_STATUSES = {"ready", "partial", "error", "blocked_by_orientation", "missing", "disabled", "no_project_root", "warming", "unavailable", "absent", "ready_empty", "blocked", "unknown", "not_ready", "failed", "incomplete", "building", "pending", "stale", "timeout", "timed_out", "unreliable", "missing_root", "tracked", "untracked"}
+_METADATA_COVERAGE = {"complete", "partial", "unavailable", "disabled"}
+_METADATA_TRUST = {"authoritative_task", "project_constraint", "code", "conversation", "derived_memory", "index_hit", "unknown"}
+_METADATA_HEX = re.compile(r"^[0-9a-f]{16,64}$")
+_METADATA_FILE_VERSION = re.compile(
+    r"^mtime_ns=\d+:size=\d+:sha256=[0-9a-f]{64}"
+    r"(?:;fff=[A-Za-z0-9][A-Za-z0-9._+-]{0,63}(?::resident=\d{1,20})?(?::epoch=\d{1,20})?;epoch=\d{1,20})?$"
+)
+_METADATA_SHA256_VERSION = re.compile(r"^(?:sha256:)?[0-9a-f]{64}$")
+_METADATA_FFF_GENERATION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}:(?:resident=\d{1,20}:)?epoch=\d{1,20}$")
+_METADATA_QMD_VERSION = re.compile(r"^(?:unknown|[0-9]+(?:\.[0-9]+)?|v[0-9][A-Za-z0-9._+-]{0,63}|sha256:[0-9a-f]{64}|[0-9a-f]{16,64})$")
+_METADATA_SECRET_OR_URL = re.compile(r"(?i)(?:://|[?&](?:token|key|secret|password)=|\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\s*[:=]|\bsk-[A-Za-z0-9_-]{12,}\b|\bgh[pousr]_[A-Za-z0-9]{20,}\b|\bxox[baprs]-[A-Za-z0-9-]{12,}\b)")
+
+
+def _metadata_sha256(value: Any) -> str:
+    material = value if isinstance(value, str) else type(value).__name__
+    return hashlib.sha256(material.encode("utf-8", errors="replace")).hexdigest()
+
+
+def _safe_metadata_text(value: Any, *, limit: int = 4096) -> bool:
+    return bool(
+        isinstance(value, str) and value and len(value) <= limit
+        and not any(ord(char) < 32 for char in value)
+        and not _METADATA_SECRET_OR_URL.search(value)
+    )
+
+
+def _metadata_absolute_path(value: Any) -> bool:
+    return bool(
+        _safe_metadata_text(value)
+        and isinstance(value, str)
+        and Path(value).is_absolute()
+    )
+
+
+def _metadata_qmd_locator(value: Any) -> bool:
+    if not _safe_metadata_text(value, limit=2048):
+        return False
+    if Path(value).is_absolute():
+        return True
+    return bool(re.fullmatch(r"hit:\d+", value))
+
+
+def _metadata_branch(value: Any) -> bool:
+    if not _safe_metadata_text(value, limit=255) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,254}", value):
+        return False
+    return not (
+        value.endswith(("/", "."))
+        or ".." in value
+        or "//" in value
+        or "@{" in value
+    )
+
+
+def _metadata_epoch_key(key: str) -> bool:
+    if key in {"policy", "qmd_status_sha", "eventlog.memory_snapshot", "eventlog.scoped_claims"}:
+        return True
+    prefix, separator, identity = key.partition(":")
+    if not separator:
+        return False
+    if prefix == "orientation":
+        return bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", identity)) and ".." not in identity
+    if prefix in {"registry", "candidate", "repo", "head", "branch", "worktree", "fff", "file"}:
+        return _metadata_absolute_path(identity)
+    if prefix == "qmd":
+        return _metadata_qmd_locator(identity)
+    return False
+
+
+def _metadata_epoch_value(key: str, value: Any) -> bool:
+    if not _safe_metadata_text(value, limit=512):
+        return False
+    if key == "policy":
+        return bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}", value))
+    if key == "qmd_status_sha":
+        return bool(re.fullmatch(r"[0-9a-f]{16,64}", value))
+    if key == "eventlog.memory_snapshot":
+        return bool(re.fullmatch(r"mem_[0-9a-f]{32}", value))
+    if key == "eventlog.scoped_claims":
+        return bool(re.fullmatch(r"sha256:[0-9a-f]{64}", value))
+    prefix = key.partition(":")[0]
+    if prefix in {"file", "registry"}:
+        return bool(_METADATA_FILE_VERSION.fullmatch(value) or _METADATA_SHA256_VERSION.fullmatch(value))
+    if prefix == "orientation":
+        return bool(_METADATA_SHA256_VERSION.fullmatch(value) or re.fullmatch(r"[0-9a-f]{16}", value))
+    if prefix == "candidate":
+        return bool(re.fullmatch(r"[0-9a-f]{16,64}", value))
+    if prefix == "repo":
+        return bool(re.fullmatch(r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}", value))
+    if prefix == "head":
+        return bool(re.fullmatch(r"[0-9a-f]{40}", value))
+    if prefix == "branch":
+        return _metadata_branch(value)
+    if prefix == "worktree":
+        return bool(_METADATA_SHA256_VERSION.fullmatch(value) or re.fullmatch(r"[0-9a-f]{16,64}", value))
+    if prefix == "fff":
+        return bool(_METADATA_FFF_GENERATION.fullmatch(value))
+    if prefix == "qmd":
+        return bool(_METADATA_QMD_VERSION.fullmatch(value))
+    return False
+
+
+def _metadata_reference_identity(source_id: Any) -> tuple[str, bool]:
+    if not isinstance(source_id, str) or not _safe_metadata_text(source_id):
+        return "", False
+    source_kind, separator, identity = source_id.partition(":")
+    if not separator:
+        return source_kind, False
+    if source_kind == "file":
+        return source_kind, _metadata_absolute_path(identity)
+    if source_kind == "qmd":
+        return source_kind, _metadata_qmd_locator(identity)
+    if source_kind == "agentsview":
+        return source_kind, bool(re.fullmatch(r"[A-Za-z0-9_.-]{1,256}#[A-Za-z0-9_.:-]{1,256}", identity))
+    if source_kind == "eventlog":
+        return source_kind, bool(re.fullmatch(r"[A-Za-z0-9_.:-]{1,256}", identity))
+    return source_kind, False
+
+
+def _metadata_reference_version(source_kind: str, version: Any) -> bool:
+    if not _safe_metadata_text(version, limit=512):
+        return False
+    if source_kind == "file":
+        return bool(_METADATA_FILE_VERSION.fullmatch(version))
+    if source_kind == "qmd":
+        return bool(_METADATA_QMD_VERSION.fullmatch(version))
+    if source_kind == "agentsview":
+        return bool(_METADATA_SHA256_VERSION.fullmatch(version))
+    if source_kind == "eventlog":
+        return bool(_METADATA_SHA256_VERSION.fullmatch(version))
+    return False
+
+
+def _metadata_gaps(values: Any) -> list[dict[str, str]]:
+    if not isinstance(values, list):
+        return []
+    rows = []
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        lower = value.lower()
+        category = next((name for fragments, name in (
+            (("repository search incomplete", "qmd retrieval incomplete"), "provider_coverage_incomplete"),
+            (("no repository symbol hits",), "symbol_evidence_missing"),
+            (("no retrieval hits",), "retrieval_evidence_missing"),
+            (("missing path",), "exact_path_missing"),
+            (("test path", "owning test"), "owning_test_evidence_missing"),
+            (("manifest",), "repository_manifest_incomplete"),
+            (("memory", "claim"), "scoped_memory_incomplete"),
+            (("orientation", "repository root"), "repository_orientation_incomplete"),
+            (("candidate", "implementation"), "reuse_candidate_missing"),
+        ) if any(fragment in lower for fragment in fragments)), "unclassified_gap")
+        rows.append({"category": category, "sha256": _metadata_sha256(value)})
+    return rows
+
+
+def _metadata_error_fields(operation: dict[str, Any]) -> dict[str, Any]:
+    if "error" not in operation:
+        return {}
+    error = operation["error"]
+    if error is None or error == "":
+        return {"error_present": False}
+    return {"error_present": True, "error_sha256": _metadata_sha256(error)}
+
+
+def _metadata_operation(operation: dict[str, Any], gaps: list[str]) -> dict[str, Any]:
+    row: dict[str, Any] = {}
+    op = operation.get("op")
+    if isinstance(op, str) and op in _METADATA_OPERATIONS:
+        row["op"] = op
+    else:
+        gaps.append("operation_name_unavailable")
+    need = operation.get("need")
+    if need is not None:
+        if isinstance(need, str) and (need in _METADATA_NEEDS or re.fullmatch(r"reuse-file-\d+", need)):
+            row["need"] = need
+        else:
+            gaps.append("operation_need_unavailable")
+    for key, allowed, gap in (
+        ("status", _METADATA_STATUSES, "operation_status_unavailable"),
+        ("coverage", _METADATA_COVERAGE, "operation_coverage_unavailable"),
+    ):
+        value = operation.get(key)
+        if isinstance(value, str) and value in allowed:
+            row[key] = value
+        else:
+            gaps.append(gap)
+    for key in ("required", "scanning", "generation_reliable", "watcher_ready", "warmup_complete", "content_scan", "reused"):
+        if isinstance(operation.get(key), bool):
+            row[key] = operation[key]
+    for key in ("hits", "selected_claim_count"):
+        value = operation.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 1_000_000:
+            row[key] = value
+    for key in ("index_status", "generation_status", "qmd_status"):
+        value = operation.get(key)
+        if isinstance(value, str) and value in _METADATA_STATUSES:
+            row[key] = value
+    if operation.get("authority") == "untrusted_evidence_only":
+        row["authority"] = operation["authority"]
+    row.update(_metadata_error_fields(operation))
+    return row
+
+
+def _metadata_source_epochs(raw: Any, gaps: list[str]) -> dict[str, str] | None:
+    if not isinstance(raw, dict):
+        gaps.append("source_epochs_unavailable")
+        return None
+    result: dict[str, str] = {}
+    for raw_key, raw_value in sorted(raw.items(), key=lambda item: str(item[0])):
+        key = raw_key if isinstance(raw_key, str) else ""
+        if _metadata_epoch_key(key) and _metadata_epoch_value(key, raw_value):
+            result[key] = raw_value
+        else:
+            if _metadata_epoch_key(key):
+                gaps.append("source_epoch_value_hashed")
+                safe_key = key
+            else:
+                gaps.append("unclassified_source_epoch_hashed")
+                safe_key = f"sha256:{_metadata_sha256(key)}"
+            result[safe_key] = f"sha256:{_metadata_sha256(raw_value)}"
+    if not result:
+        gaps.append("source_epochs_unavailable")
+    return result
+
+
+def _metadata_recipe(packet: ArchitectureReusePacket, gaps: list[str]) -> dict[str, Any] | None:
+    recipe = packet.context.recipe
+    if recipe is None:
+        gaps.append("context_recipe_unavailable")
+        return None
+    signature = recipe.request_signature
+    if not isinstance(signature, str) or not _METADATA_HEX.fullmatch(signature):
+        gaps.append("context_recipe_signature_unavailable")
+        signature = None
+    scope_fingerprint = recipe.scope_fingerprint
+    if not isinstance(scope_fingerprint, str) or not _METADATA_HEX.fullmatch(scope_fingerprint):
+        gaps.append("context_recipe_scope_fingerprint_unavailable")
+        scope_fingerprint = None
+    policy = recipe.policy_revision
+    if not _safe_metadata_text(policy, limit=128) or not re.fullmatch(r"[A-Za-z0-9._:-]+", policy):
+        gaps.append("context_recipe_policy_revision_unavailable")
+        policy = None
+    source_epochs = _metadata_source_epochs(recipe.source_epochs, gaps)
+    required = []
+    for need in recipe.required_evidence_fields:
+        if isinstance(need, str) and (need in _METADATA_NEEDS or re.fullmatch(r"reuse-file-\d+", need)):
+            required.append(need)
+        else:
+            gaps.append("required_evidence_field_unavailable")
+    schema = recipe.to_dict().get("schema")
+    if schema != "z0int.resolution_recipe.v1":
+        gaps.append("context_recipe_schema_unavailable")
+        schema = None
+    return {
+        "schema": schema,
+        "capability_id": recipe.capability_id if recipe.capability_id == "context_resolve" else None,
+        "request_signature": signature,
+        "scope_fingerprint": scope_fingerprint,
+        "policy_revision": policy,
+        "source_epochs": source_epochs,
+        "operations": [_metadata_operation(operation, gaps) for operation in recipe.operations],
+        "required_evidence_fields": required,
+        "verifier_revision": recipe.verifier_revision if recipe.verifier_revision == "none" else None,
+    }
+
+
+def _metadata_reference(ref: Any, role: str, gaps: list[str], *, candidate_id: str | None = None) -> dict[str, Any]:
+    source_id = ref.source_id
+    source_kind, source_known = _metadata_reference_identity(source_id)
+    locator = ref.locator
+    if source_kind == "file" and isinstance(source_id, str):
+        locator_known = isinstance(locator, str) and (locator == source_id[5:] or bool(re.fullmatch(re.escape(source_id[5:]) + r":\d+", locator)))
+    elif source_kind == "qmd" and isinstance(source_id, str):
+        locator_known = _metadata_qmd_locator(locator) and source_id == f"qmd:{locator}"
+    elif source_kind == "agentsview" and isinstance(source_id, str):
+        locator_known = locator == source_id
+    elif source_kind == "eventlog" and isinstance(source_id, str):
+        locator_known = locator == source_id
+    else:
+        locator_known = False
+    version = ref.source_version
+    version_known = _metadata_reference_version(source_kind, version)
+    row: dict[str, Any] = {"role": role}
+    for key, value, known in (("source_id", source_id, source_known), ("locator", locator, locator_known), ("source_version", version, version_known)):
+        if known and _safe_metadata_text(value):
+            row[key] = value
+        else:
+            gaps.append(f"evidence_{key}_unavailable")
+            row[f"{key}_sha256"] = _metadata_sha256(value)
+    if ref.trust_class in _METADATA_TRUST:
+        row["trust_class"] = ref.trust_class
+    else:
+        gaps.append("evidence_trust_class_unavailable")
+    if candidate_id is not None:
+        candidate_path = candidate_id[5:] if isinstance(candidate_id, str) and candidate_id.startswith("file:") else ""
+        if (
+            _safe_metadata_text(candidate_id)
+            and candidate_path
+            and not Path(candidate_path).is_absolute()
+            and ".." not in Path(candidate_path).parts
+            and "\\" not in candidate_path
+        ):
+            row["candidate_id"] = candidate_id
+        else:
+            gaps.append("candidate_reference_unavailable")
+            row["candidate_id_sha256"] = _metadata_sha256(candidate_id)
+    return row
+
+
+def _metadata_safe_source_revisions(
+    packet: ArchitectureReusePacket,
+    metadata: dict[str, Any],
+) -> tuple[dict[str, str], list[str]]:
+    """Keep revision joins while excluding unvalidated provider values from durable payloads."""
+    safe_epochs = (metadata.get("context_recipe") or {}).get("source_epochs") or {}
+    safe_evidence_versions = set()
+    for ref in metadata.get("context_evidence", []):
+        if "source_version" in ref:
+            safe_evidence_versions.add(ref["source_version"])
+        elif "source_version_sha256" in ref:
+            safe_evidence_versions.add(f"sha256:{ref['source_version_sha256']}")
+
+    result: dict[str, str] = {}
+    gaps: list[str] = []
+    for raw_key, raw_value in sorted(packet.source_revisions.items()):
+        if raw_key.startswith("epoch:"):
+            epoch_key = raw_key[len("epoch:"):]
+            safe_epoch_key = epoch_key if _metadata_epoch_key(epoch_key) else f"sha256:{_metadata_sha256(epoch_key)}"
+            safe_value = safe_epochs.get(safe_epoch_key)
+            if safe_value is None:
+                gaps.append("source_revision_projection_incomplete")
+                result[f"epoch:{safe_epoch_key}"] = f"sha256:{_metadata_sha256(raw_value)}"
+            else:
+                result[f"epoch:{safe_epoch_key}"] = safe_value
+                if safe_value != raw_value:
+                    gaps.append("source_revision_value_hashed")
+        elif raw_key.startswith("evidence:") and raw_value in safe_evidence_versions:
+            result[raw_key] = raw_value
+        elif raw_key.startswith("evidence:"):
+            result[raw_key] = f"sha256:{_metadata_sha256(raw_value)}"
+            gaps.append("source_revision_value_hashed")
+        else:
+            result[f"sha256:{_metadata_sha256(raw_key)}"] = f"sha256:{_metadata_sha256(raw_value)}"
+            gaps.append("source_revision_key_hashed")
+    return dict(sorted(result.items())), list(dict.fromkeys(gaps))
+
+
+def _packet_metadata(packet: ArchitectureReusePacket) -> dict[str, Any]:
+    context = packet.context
+    gaps: list[str] = []
+    recipe = _metadata_recipe(packet, gaps)
+    refs = [_metadata_reference(ref, "context", gaps) for ref in context.evidence]
+    for candidate in packet.reuse_candidates:
+        refs.extend(_metadata_reference(ref, "reuse_candidate", gaps, candidate_id=candidate.candidate_id) for ref in candidate.evidence)
+        refs.extend(_metadata_reference(ref, "reuse_candidate_test", gaps, candidate_id=candidate.candidate_id) for ref in candidate.related_tests)
+    refs.extend(_metadata_reference(ref, "related_test", gaps) for ref in packet.related_tests)
+    if packet.novelty_receipt is not None:
+        for rejected in packet.novelty_receipt.candidates_rejected:
+            refs.extend(_metadata_reference(ref, "rejected_candidate", gaps, candidate_id=rejected.candidate_id) for ref in rejected.evidence)
+
+    measurements: dict[str, Any] = {}
+    for key in ("coverage", "fff_coverage"):
+        value = context.measurements.get(key)
+        if isinstance(value, str) and value in _METADATA_COVERAGE:
+            measurements[key] = value
+        else:
+            gaps.append(f"context_{key}_unavailable")
+    raw_ops = context.measurements.get("coverage_operations")
+    if isinstance(raw_ops, list):
+        measurements["coverage_operations"] = [_metadata_operation(operation, gaps) for operation in raw_ops if isinstance(operation, dict)]
+        if len(measurements["coverage_operations"]) != len(raw_ops):
+            gaps.append("context_coverage_operation_unstructured")
+    else:
+        gaps.append("context_coverage_operations_unavailable")
+
+    provider_errors = []
+    operations = recipe.get("operations", []) if recipe is not None else []
+    for operation in operations:
+        if operation.get("error_present") is True:
+            provider_errors.append({key: operation[key] for key in ("op", "need", "status", "coverage", "error_present", "error_sha256") if key in operation})
+    required = set(recipe.get("required_evidence_fields") or ()) if recipe is not None else set()
+    represented = {operation.get("need") for operation in operations}
+    if required and not required.issubset(represented):
+        gaps.append("required_operation_metadata_missing")
+    if any(operation.get("need") in required and ("status" not in operation or "coverage" not in operation) for operation in operations):
+        gaps.append("required_operation_coverage_unavailable")
+    if not refs:
+        gaps.append("context_evidence_references_unavailable")
+    gaps = list(dict.fromkeys(gaps))
+    context_gaps = _metadata_gaps(context.unresolved_gaps)
+    reuse_gaps = _metadata_gaps(packet.unresolved_gaps)
+    return {
+        "schema": _PACKET_METADATA_SCHEMA,
+        "context_recipe": recipe,
+        "context_evidence": refs,
+        "context_measurements": measurements,
+        "context_unresolved_gaps": context_gaps,
+        "context_unresolved_gap_count": len(context_gaps),
+        "reuse_unresolved_gaps": reuse_gaps,
+        "reuse_unresolved_gap_count": len(reuse_gaps),
+        "provider_errors": provider_errors,
+        "metadata_gaps": gaps,
+    }
+
+
+def _canonical_sha256(value: dict[str, Any]) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
 def prepare(payload: dict[str, Any]) -> PreparedReuse:
     request = normalize_request(payload)
     packet, root = resolve_packet(request)
+    packet_metadata = _packet_metadata(packet)
+    packet_metadata["context_input_sha256"] = hashlib.sha256(request["query"].encode("utf-8")).hexdigest()
+    safe_source_revisions, revision_gaps = _metadata_safe_source_revisions(packet, packet_metadata)
+    packet.source_revisions = safe_source_revisions
+    packet_metadata["metadata_gaps"] = list(dict.fromkeys([
+        *packet_metadata["metadata_gaps"],
+        *revision_gaps,
+    ]))
+    if packet_metadata["metadata_gaps"]:
+        packet.unresolved_gaps = list(dict.fromkeys([
+            *packet.unresolved_gaps,
+            *packet_metadata["metadata_gaps"],
+        ]))
+        packet.decision = {
+            "mode": "OBSERVE",
+            "implementation_allowed": False,
+            "authorizes_action": False,
+            "verified_success": None,
+            "reason": "reuse packet provenance metadata is incomplete",
+        }
+        packet.input_fingerprint = hashlib.sha256(
+            json.dumps(
+                {key: value for key, value in packet.to_dict().items() if key != "input_fingerprint"},
+                sort_keys=True,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        packet_metadata = _packet_metadata(packet)
+        packet_metadata["context_input_sha256"] = hashlib.sha256(request["query"].encode("utf-8")).hexdigest()
+        packet_metadata["metadata_gaps"] = list(dict.fromkeys([
+            *packet_metadata["metadata_gaps"],
+            *revision_gaps,
+        ]))
+    packet_metadata_sha256 = _canonical_sha256(packet_metadata)
     verifier_binding = _bind_verifier_to_packet(packet, root, request.get("verifier_binding"))
     request["verifier_binding"] = verifier_binding
     binding_fingerprint = json.dumps(verifier_binding, sort_keys=True, ensure_ascii=False, separators=(",", ":")) if verifier_binding is not None else ""
@@ -427,6 +879,7 @@ def prepare(payload: dict[str, Any]) -> PreparedReuse:
         "trace_id": request["trace_id"], "packet_id": packet_id,
         "input_fingerprint": packet.input_fingerprint, "decision": packet.decision,
         "source_revisions": packet.source_revisions, "scope": scope.to_dict(),
+        "packet_metadata": packet_metadata, "packet_metadata_sha256": packet_metadata_sha256,
         "verifier_binding": verifier_binding,
         "verifier_binding_sha256": hashlib.sha256(binding_fingerprint.encode()).hexdigest() if verifier_binding is not None else None,
         "execution_completed": False, "verified_success": None,
@@ -457,6 +910,8 @@ def prepare(payload: dict[str, Any]) -> PreparedReuse:
         request, packet, packet_id, root, text, snapshot, event.event_id,
         verifier_binding=verifier_binding, decision_receipt=receipt, decision_extra=decision_extra,
         scoped_memory_use=scoped_use,
+        packet_metadata=packet_metadata,
+        packet_metadata_sha256=packet_metadata_sha256,
     )
     _append_reuse_receipt(record)
     return record
@@ -471,6 +926,8 @@ def _reuse_receipt_payload(record: PreparedReuse) -> dict[str, Any]:
         "execution_completed": False,
         "verified_success": None,
         "preparation_event_id": record.event_id,
+        "packet_metadata": record.packet_metadata,
+        "packet_metadata_sha256": record.packet_metadata_sha256,
         "injection_event_id": record.injection_id,
         "model_input_event_id": record.model_input_event_id,
         "mutation_event_id": record.mutation_event_id,
