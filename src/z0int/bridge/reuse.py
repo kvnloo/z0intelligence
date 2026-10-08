@@ -15,11 +15,14 @@ from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any
 
-from z0int.context_resolve import InformationNeed, resolve_context
+from z0int.context_resolve import InformationNeed, _orient_repository, resolve_context, resolve_owning_repository
 from z0int.memory.event_log import EventLog
 from z0int.memory_contract import MemoryScope, MemorySnapshot, MemoryUseReceipt
 from z0int.receipt import DecisionReceipt, append_receipt, build_receipt, find_receipt
 from z0int.reuse_packet import ArchitectureReusePacket, ReuseCandidate, build_reuse_packet, check_reuse_packet
+
+
+_UNRESOLVED_OWNERSHIP = "unresolved-ownership"
 
 
 def context_block(text: str) -> str:
@@ -149,8 +152,11 @@ def _bind_verifier_to_packet(
 
 def normalize_request(payload: dict[str, Any]) -> dict[str, Any]:
     request = {key: _string(payload, key) for key in (
-        "canonical_repo", "registry_path", "project_root", "query", "task_id", "trace_id", "session_id",
+        "registry_path", "project_root", "query", "task_id", "trace_id", "session_id",
     )}
+    # Without an operator-selected repository the task itself is resolved
+    # against registry ownership when the packet is built.
+    request["canonical_repo"] = _string(payload, "canonical_repo") if "canonical_repo" in payload else None
     roots = payload.get("candidate_roots", [])
     if not isinstance(roots, list) or any(not isinstance(root, str) or not root.strip() for root in roots):
         raise ValueError("candidate_roots must be a list of checkout paths")
@@ -296,12 +302,32 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
     A lexical candidate is a reuse hypothesis, not a semantic verification.
     Owning tests remain evidence until an independent verifier runs them.
     """
+    ownership_gaps: list[str] = []
+    if request["canonical_repo"] is None:
+        ownership = resolve_owning_repository(request["query"], request["registry_path"])
+        request["ownership"] = {key: ownership[key] for key in (
+            "status", "component_id", "canonical_repo", "matched_terms", "registry_source_version",
+        )}
+        if ownership["status"] == "resolved":
+            request["canonical_repo"] = ownership["canonical_repo"]
+            oriented = _orient_repository(
+                ownership["canonical_repo"], registry_path=request["registry_path"],
+                candidate_roots=request["candidate_roots"], project_root=None, registry_format="canonical",
+            )
+            # The session may start anywhere; the installed checkout that the
+            # registry owner maps to becomes the root, or orientation reports why not.
+            request["project_root"] = oriented["root"] if oriented.get("status") in {"ready", "partial"} else None
+        else:
+            request["canonical_repo"] = _UNRESOLVED_OWNERSHIP
+            request["project_root"] = None
+    if request["canonical_repo"] == _UNRESOLVED_OWNERSHIP:
+        ownership_gaps = ["repository ownership is unresolved for this task; observe only"]
     symbol = request.get("symbol")
     needs = [InformationNeed(
         id="reuse-discovery", description=request["query"],
         kind="exact_symbol" if symbol else "natural_language", symbol=symbol, required=True,
     )]
-    if request.get("test_query"):
+    if request.get("test_query") and request["project_root"] is not None:
         test_query = request["test_query"]
         test_path = Path(test_query)
         search_root = Path(request["project_root"]).resolve()
@@ -328,6 +354,7 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
     discovery = resolve_context(needs=needs, **args)
     orientation = discovery.measurements.get("repo_orientation") or {}
     if orientation.get("status") != "ready":
+        discovery.unresolved_gaps.extend(ownership_gaps)
         return build_reuse_packet(discovery), None
     root = Path(orientation["root"]).resolve()
     if memory_scope is not None and memory_scope.repo != orientation["repo_slug"]:
@@ -1072,8 +1099,9 @@ def model_input(cache: dict[str, PreparedReuse], payload: dict[str, Any]) -> dic
 def _mutation_scope(record: PreparedReuse, payload: dict[str, Any]) -> None:
     if record.root is None:
         raise ValueError("no validated repository root")
-    if Path(_string(payload, "target_cwd")).resolve() != record.root:
-        raise ValueError("mutation working directory does not match prepared root")
+    # The session may run from any directory. What matters is where each
+    # target lands once the tool resolves it against that directory.
+    working_directory = Path(_string(payload, "target_cwd")).resolve()
     if payload.get("tool_name") not in {"write", "edit"} or payload.get("scope_status") == "unresolved":
         raise ValueError("unsupported or unresolved mutation scope")
     targets = payload.get("target_paths")
@@ -1082,7 +1110,7 @@ def _mutation_scope(record: PreparedReuse, payload: dict[str, Any]) -> None:
     for raw in targets:
         if not isinstance(raw, str) or not raw.strip():
             raise ValueError("invalid mutation path")
-        path = (record.root / raw).resolve()
+        path = (working_directory / raw).resolve()
         if not path.is_relative_to(record.root) or path == record.root or ".git" in path.relative_to(record.root).parts:
             raise ValueError("mutation path escapes repository source scope")
 

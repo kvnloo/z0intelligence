@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { registerReuseAdapter, reuseConfigFromEnv } from "./reuse.ts";
+import { registerReuseAdapter, reuseConfigFromEnv, type ReuseAdapter } from "./reuse.ts";
 
 const BRIDGE_PROTOCOL = "z0int.bridge.v2";
 const Z0 = process.env.Z0INT_HOME || join(homedir(), ".z0int");
@@ -545,6 +545,7 @@ export default function z0intBridge(pi: ExtensionAPI) {
 	});
 
 	const z = pi.zod;
+	let reuseAdapter: ReuseAdapter | null = null;
 	const fileSearchParameters = z.object({
 		query: z.string().describe("Filename, symbol, or content to find"),
 		kind: z.string().optional().describe("natural_language (default), exact_symbol, or exact_path"),
@@ -572,7 +573,7 @@ export default function z0intBridge(pi: ExtensionAPI) {
 						payload: {
 							query: params.query,
 							kind: params.kind || "natural_language",
-							project_root: ctx.cwd,
+							project_root: reuseAdapter?.resolvedRoot() ?? ctx.cwd,
 							session_id: sessionId,
 							trace_id: activeTurn?.traceId,
 							allow_qmd: params.allowQmd ?? true,
@@ -663,7 +664,7 @@ export default function z0intBridge(pi: ExtensionAPI) {
 		}
 	});
 
-	registerReuseAdapter(pi, {
+	reuseAdapter = registerReuseAdapter(pi, {
 		config: reuseConfigFromEnv(),
 		getTraceId: () => activeTurn?.traceId ?? null,
 		request: async (body, timeoutMs) => {

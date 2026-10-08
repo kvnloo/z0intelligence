@@ -791,3 +791,28 @@ test("enforce does not advise symbol-search recovery for a tool whose scope can 
 	expect(alias?.reason).toContain("repository-relative");
 	expect(h.sent.filter(item => item.body.op === "reuse_check")).toHaveLength(0);
 });
+
+test("without a configured repository the task is sent for ownership resolution and the resolved root is exposed", async () => {
+	const sent: SentRequest[] = [];
+	const adapter = createReuseAdapter({
+		config: { ...config("enforce"), canonicalRepo: null },
+		getTraceId: () => "trace-1",
+		timeoutMs: 50,
+		request: async (body, timeoutMs) => {
+			sent.push({ body, timeoutMs });
+			return body.op === "reuse_resolve"
+				? { ...(resolveResponse() as Record<string, unknown>), root: "/installed/known-library" }
+				: { ok: true };
+		},
+	});
+	await adapter.beforeAgentStart({ prompt: "Reuse the row normalization" }, CONTEXT);
+
+	const payload = sent.find(item => item.body.op === "reuse_resolve")?.body.payload as Record<string, unknown>;
+	expect(payload).toBeDefined();
+	expect("canonical_repo" in payload).toBe(false);
+	expect(payload.query).toBe("Reuse the row normalization");
+	expect(adapter.resolvedRoot()).toBe("/installed/known-library");
+
+	adapter.reset();
+	expect(adapter.resolvedRoot()).toBeNull();
+});

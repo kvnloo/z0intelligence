@@ -218,13 +218,16 @@ def _canonical_slug(value: Any) -> str | None:
     return None
 
 
-def _load_component_registry(
-    canonical_repo: str,
+def _read_component_registry(
+    requested: str,
     registry_path: Path | str | None,
     registry_format: str,
-) -> dict[str, Any]:
-    """Read one explicitly selected z0 registry representation and resolve identity."""
-    requested = canonical_repo.strip()
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """Read one explicitly selected z0 registry representation.
+
+    Returns the orientation base and the components mapping, or ``None`` with
+    the reason recorded in ``base["gaps"]``.
+    """
     base: dict[str, Any] = {
         "status": "unavailable",
         "requested": requested,
@@ -243,10 +246,10 @@ def _load_component_registry(
     }
     if registry_format not in {"canonical", "generated"}:
         base["gaps"].append(f"unsupported registry format {registry_format!r}")
-        return base
+        return base, None
     if registry_path is None:
         base["gaps"].append("canonical registry path is required for repository orientation")
-        return base
+        return base, None
     unresolved_path = Path(registry_path).expanduser()
     try:
         path = unresolved_path.resolve()
@@ -255,13 +258,13 @@ def _load_component_registry(
         base["gaps"].append(
             f"registry path unavailable at {unresolved_path}: {type(exc).__name__}: {exc}"
         )
-        return base
+        return base, None
     base["registry_path"] = str(path)
     try:
         raw = path.read_bytes()
     except OSError as exc:
         base["gaps"].append(f"registry unavailable at {path}: {type(exc).__name__}: {exc}")
-        return base
+        return base, None
     digest = hashlib.sha256(raw).hexdigest()
     base["registry_source_version"] = f"sha256:{digest}"
     try:
@@ -270,21 +273,21 @@ def _load_component_registry(
         document = yaml.safe_load(raw) or {}
     except Exception as exc:
         base["gaps"].append(f"registry parse failed: {type(exc).__name__}: {exc}")
-        return base
+        return base, None
     if not isinstance(document, dict):
         base["gaps"].append("registry root must be a mapping")
-        return base
+        return base, None
 
     if registry_format == "canonical":
         schema = document.get("schema")
         if schema not in (None, "z0.registry.component.v1"):
             base["gaps"].append(f"unsupported canonical registry schema {schema!r}")
-            return base
+            return base, None
         if schema is None and ("version" in document or "generated_from" in document):
             base["gaps"].append(
                 "generated registry requires registry_format='generated' and explicit provenance"
             )
-            return base
+            return base, None
         components = document.get("components")
         base["registry_schema"] = str(schema or "components_mapping_without_schema")
         base["registry_representation"] = (
@@ -295,19 +298,32 @@ def _load_component_registry(
         # representation. Preserve both its own version and source declaration.
         if document.get("version") != 2 or document.get("ecosystem") != "zer0":
             base["gaps"].append("generated registry must declare version 2 and ecosystem zer0")
-            return base
+            return base, None
         base["registry_schema"] = f"generated:v{document.get('version')}"
         base["registry_representation"] = "generated_flattened_v2"
         base["registry_canonical_repo"] = document.get("canonical_repo")
         base["registry_generated_from"] = document.get("generated_from")
         if not isinstance(document.get("generated_from"), list) or not document.get("generated_from"):
             base["gaps"].append("generated registry provenance is missing generated_from")
-            return base
+            return base, None
         components = document.get("components")
     if registry_format == "canonical":
         base["registry_canonical_repo"] = document.get("canonical_repo")
     if not isinstance(components, dict):
         base["gaps"].append("registry components must be a mapping keyed by component ID")
+        return base, None
+    return base, components
+
+
+def _load_component_registry(
+    canonical_repo: str,
+    registry_path: Path | str | None,
+    registry_format: str,
+) -> dict[str, Any]:
+    """Read one explicitly selected z0 registry representation and resolve identity."""
+    requested = canonical_repo.strip()
+    base, components = _read_component_registry(requested, registry_path, registry_format)
+    if components is None:
         return base
 
     requested_slug = _canonical_slug(requested)
@@ -343,6 +359,103 @@ def _load_component_registry(
         }
     )
     return base
+
+
+_OWNERSHIP_STOPWORDS = frozenset(
+    "about above after again against also another around because before being below between both cannot "
+    "could does doing done down during each either every existing from have having into itself just "
+    "make makes more most must only other over print prints same should small some such than that "
+    "their them then there these they this those through under until very were what when where which "
+    "while will with within without would your add adds added using used uses use new one two".split()
+)
+
+
+def _ownership_stems(text: Any) -> set[str]:
+    """Deterministic vocabulary key: lowercase words, stopwords dropped, six-letter prefix."""
+    if not isinstance(text, str):
+        return set()
+    return {
+        word[:6]
+        for word in re.findall(r"[a-z][a-z0-9]{3,}", text.lower())
+        if word not in _OWNERSHIP_STOPWORDS
+    }
+
+
+def resolve_owning_repository(
+    task_text: str,
+    registry_path: Path | str | None,
+    registry_format: str = "canonical",
+) -> dict[str, Any]:
+    """Map a natural-language task to the one registry component that owns it.
+
+    The registry is the only input: a component's declared ``owns`` phrases and
+    provided interfaces count double, its name and summary once, and anything it
+    lists under ``not_here`` never counts for it. A component is selected only
+    when it is the sole clear leader; otherwise the caller must observe.
+    """
+    base, components = _read_component_registry("", registry_path, registry_format)
+    result: dict[str, Any] = {
+        "status": "unavailable",
+        "canonical_repo": None,
+        "component_id": None,
+        "matched_terms": [],
+        "candidates": [],
+        "gaps": list(base["gaps"]),
+        "registry_path": base["registry_path"],
+        "registry_source_version": base["registry_source_version"],
+    }
+    if components is None:
+        return result
+    task_stems = _ownership_stems(task_text)
+    scored: list[dict[str, Any]] = []
+    for component_id, metadata in components.items():
+        if not isinstance(metadata, dict):
+            continue
+        repo_slug = _canonical_slug(metadata.get("repo"))
+        if repo_slug is None:
+            continue
+        boundaries = metadata.get("boundaries") if isinstance(metadata.get("boundaries"), dict) else {}
+        owns = boundaries.get("owns", metadata.get("owns")) or []
+        not_here = boundaries.get("not_here", metadata.get("not_here")) or []
+        provides = metadata.get("provides") or []
+        strong: set[str] = set()
+        for phrase in [*owns, *provides] if isinstance(owns, list) and isinstance(provides, list) else []:
+            strong |= _ownership_stems(phrase)
+        weak = _ownership_stems(metadata.get("summary")) | _ownership_stems(metadata.get("name"))
+        weak |= _ownership_stems(str(component_id))
+        disclaimed: set[str] = set()
+        for phrase in not_here if isinstance(not_here, list) else []:
+            disclaimed |= _ownership_stems(phrase)
+        strong_hits = (task_stems & strong) - disclaimed
+        weak_hits = (task_stems & weak) - strong_hits - disclaimed
+        scored.append(
+            {
+                "component_id": str(component_id),
+                "canonical_repo": repo_slug,
+                "score": 2 * len(strong_hits) + len(weak_hits),
+                "matched_terms": sorted(strong_hits | weak_hits),
+            }
+        )
+    scored.sort(key=lambda item: (-item["score"], item["component_id"]))
+    result["candidates"] = scored[:5]
+    leader = scored[0] if scored else None
+    runner_up = scored[1]["score"] if len(scored) > 1 else 0
+    if leader is None or leader["score"] < 2:
+        result["status"] = "unresolved"
+        result["gaps"].append("task names no capability that a registry component declares as owned")
+        return result
+    if leader["score"] < 2 * runner_up or leader["score"] - runner_up < 2:
+        result["status"] = "ambiguous"
+        contenders = ", ".join(item["component_id"] for item in scored[:2])
+        result["gaps"].append(f"repository ownership is ambiguous between {contenders}")
+        return result
+    result.update(
+        status="resolved",
+        canonical_repo=leader["canonical_repo"],
+        component_id=leader["component_id"],
+        matched_terms=leader["matched_terms"],
+    )
+    return result
 
 
 def _nested_repository_fingerprint(
