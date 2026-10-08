@@ -743,3 +743,21 @@ for (const mode of ["shadow", "enforce"] as const) {
 		expect(blocked(await adapter.toolCall(toolCall("write", { path: "src/a.py" }), CONTEXT))).toBe(mode === "enforce");
 	});
 }
+
+test("enforce does not advise symbol-search recovery for a tool whose scope can never resolve", async () => {
+	const h = harness();
+	await h.adapter.beforeAgentStart({ prompt: "Write a file" }, CONTEXT);
+
+	// Searching cannot change which tool is being called, so the hint only
+	// produces retries. Path-shaped rejections stay recoverable.
+	for (const toolName of ["z0int_route_worker", "bash"]) {
+		const result = await h.adapter.toolCall(toolCall(toolName, { task: "run smoke tests" }), CONTEXT);
+		expect(blocked(result)).toBe(true);
+		expect(result?.reason).not.toContain("Recover with z0_file_search");
+		expect(result?.reason).toContain("Do not retry");
+	}
+	const alias = await h.adapter.toolCall(toolCall("write", { path: "~/outside.py", content: "x" }), CONTEXT);
+	expect(alias?.reason).not.toContain("Recover with z0_file_search");
+	expect(alias?.reason).toContain("repository-relative");
+	expect(h.sent.filter(item => item.body.op === "reuse_check")).toHaveLength(0);
+});

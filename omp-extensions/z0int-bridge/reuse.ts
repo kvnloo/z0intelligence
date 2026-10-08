@@ -480,7 +480,7 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 		if (!activeMode(mode) || isRecoveryTool(event.toolName)) return;
 		const scope = mutationScope(event);
 		if (scope.kind === "unresolved" && mode === "enforce") {
-			return block(scope.reason);
+			return blockUnresolvedScope(scope.reason);
 		}
 		const state = prepared;
 		const identity = contextIdentity(context);
@@ -676,6 +676,15 @@ function block(reason: string): ToolCallEventResult {
 	return {
 		block: true,
 		reason: `z0int reuse gate: ${reason}. Recover with z0_file_search: kind exact_symbol, query one declared symbol name found in the existing source (not a descriptive phrase). Then retry after the packet is injected.`,
+	};
+}
+
+// A packet cannot make an unscoped call acceptable, so advising a search here
+// only sends the model into a retry loop against the same rejection.
+function blockUnresolvedScope(reason: string): ToolCallEventResult {
+	return {
+		block: true,
+		reason: `z0int reuse gate: ${reason}. Do not retry this call; searching will not unblock it. Mutations are limited to write or edit with explicit repository-relative paths.`,
 	};
 }
 
