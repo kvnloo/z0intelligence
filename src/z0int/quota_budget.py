@@ -66,7 +66,7 @@ def project(provider,model,config,needed,events=None,now=None):
         used=sum(1 if dim.startswith('r') else t for _,t in recent)
         required=1 if dim.startswith('r') else needed
         reset=min((ts+window for ts,_ in recent),default=now)
-        dims[dim]={'remaining':max(0,limit-used)}
+        dims[dim]={'limit':limit,'remaining':max(0,limit-used),'reset_at':reset,'source':'locally_reconstructed'}
         if limit-used<required:next_times.append(reset)
     if headers and parser is not None:
         observed,raw=max(headers,key=lambda pair:pair[0])
@@ -81,10 +81,13 @@ def project(provider,model,config,needed,events=None,now=None):
             after=[(ts,t) for ts,t in calls if ts>observed]
             remaining=max(0,d.remaining-sum(1 if dim.startswith('r') else t for _,t in after))
             if dim in dims and remaining<dims[dim]['remaining']:
-                dims[dim]={'remaining':remaining}
+                dims[dim]={'limit':d.limit,'remaining':remaining,'reset_at':expiry,'source':'provider_header'}
             if remaining<(1 if dim.startswith('r') else needed):next_times.append(expiry)
+    # Preserve the previously published QuotaState.to_dict() wire shape even
+    # when kerdoios.quota is unavailable; receipts still own the measurements.
+    quota_state={'provider':provider,'model':model,'observed_at':now,'dimensions':dims}
     return {'allowed':not next_times,'reason':'quota_available' if not next_times else 'quota_boundary',
-        'quota_bucket':provider+'/'+model,'quota_source':'local_receipts' if parser is None else 'local_plus_headers',
+        'quota_bucket':provider+'/'+model,'quota':quota_state,'quota_source':'local_receipts' if parser is None else 'local_plus_headers',
         'request_count_24h':sum(ts>now-86400 for ts,_ in calls),
         'tokens_24h':sum(t for ts,t in calls if ts>now-86400),'reserved_tokens':needed,
         'next_eligible_at':max(next_times) if next_times else None,'reset_rule':'rolling conservative windows plus provider header reset; never midnight refill',
