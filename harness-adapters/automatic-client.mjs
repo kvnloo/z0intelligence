@@ -1,5 +1,6 @@
 import {spawn} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import {appendFile, mkdir} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
@@ -50,6 +51,21 @@ export async function delivered(harness, result) {
     await call('consume', {harness, instance_id: instanceId, receipt_id: result.receipt_id});
   } catch {
     /* Native behavior survives service failure; readiness does not turn green. */
+  }
+}
+
+/** Preserve the original model-visible result path for explicitly enabled OMP
+ * automatic specialization. Default-disabled turns can use the spawn-free path.
+ * The enablement source is the same operator-owned file read by automatic.py.
+ */
+export function ompAutomaticContextEnabled() {
+  if (process.env.Z0INT_AUTO_OMP === '0') return false;
+  const config = join(process.env.Z0INT_HOME || join(homedir(), '.z0int'), 'config', 'automatic.json');
+  try {
+    const settings = JSON.parse(readFileSync(config, 'utf8'));
+    return settings?.omp?.enabled === true;
+  } catch {
+    return false;
   }
 }
 
