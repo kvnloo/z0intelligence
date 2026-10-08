@@ -675,7 +675,7 @@ function mutationScope(event: Pick<ToolCallEvent, "toolName" | "input">): Mutati
 function block(reason: string): ToolCallEventResult {
 	return {
 		block: true,
-		reason: `z0int reuse gate: ${reason}. Read/search tools remain available for recovery.`,
+		reason: `z0int reuse gate: ${reason}. Recover with z0_file_search: kind exact_symbol, query one declared symbol name found in the existing source (not a descriptive phrase). Then retry after the packet is injected.`,
 	};
 }
 
