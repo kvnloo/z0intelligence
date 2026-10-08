@@ -383,7 +383,7 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 		event: Pick<ToolResultEvent, "toolName" | "input" | "isError">,
 		context: ReuseHookContext,
 	): Promise<void> {
-		if (prepared.kind !== "unavailable" || !taskPrompt || event.isError ||
+		if (prepared.kind === "off" || (prepared.kind === "ready" && isPositiveDecision(prepared.decision)) || !taskPrompt || event.isError ||
 			event.toolName !== "z0_file_search" || event.input.kind !== "exact_symbol" ||
 			!matchesTurn(prepared, contextIdentity(context), dependencies.getTraceId())) return;
 		const symbol = nonEmptyString(event.input.query);

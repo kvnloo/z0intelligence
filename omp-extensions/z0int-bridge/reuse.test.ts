@@ -130,6 +130,15 @@ test("failed or advisor searches cannot recover the primary packet", async () =>
 	expect(h.sent.filter(row => row.body.op === "reuse_resolve")).toHaveLength(1);
 });
 
+test("agent symbol search refreshes an incomplete OBSERVE packet", async () => {
+	const h = harness({ resolveResponses: [resolveResponse("trace-1", "incomplete", {
+		mode: "OBSERVE", implementation_allowed: false, authorizes_action: false,
+	}), resolveResponse()] });
+	await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
+	await h.adapter.toolResult({ toolName: "z0_file_search", input: { kind: "exact_symbol", query: "helper" }, isError: false }, CONTEXT);
+	expect(h.sent.filter(row => row.body.op === "reuse_resolve")).toHaveLength(2);
+});
+
 function userMessageText(message: AgentMessage | undefined): string | null {
 	if (!message || !("role" in message) || message.role !== "user") return null;
 	if (typeof message.content === "string") return message.content;
