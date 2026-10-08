@@ -1,0 +1,56 @@
+{
+  "catalog_total_estimate_20000in_4096out_usd": 0.0018192,
+  "created_at": "2026-10-02T17:22:06.549695+00:00",
+  "frozen_task": "r2-03-evidence-reconciliation",
+  "holdouts": "This is inspected development evidence, never a protected holdout.",
+  "max_physical_posts_per_route": 1,
+  "max_physical_posts_total": 3,
+  "model_fallbacks": 0,
+  "output_tokens_per_route": 4096,
+  "protocol_price_scope": "Nous catalog estimates are not server-enforced billing caps. OpenRouter max_price=0 enforced via supported routing fields. Unknown response cost stays unknown.",
+  "purpose": "Provider requalification and one verified native Hermes factual task; test named OpenRouter route availability independently of prior router429. No context-selection or resource-cap causal comparison.",
+  "request_bytes_per_route": 20000,
+  "request_tools": [],
+  "retries": 0,
+  "routes": [
+    {
+      "catalog_context_length": 262144,
+      "catalog_path": "/home/agent/.z0int/state/provider-inventory/20261002-nous/catalog.json",
+      "catalog_sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+      "catalog_text_price_estimate_20000in_4096out_usd": 0.0,
+      "has_text_output": true,
+      "id": "nous-free-stepfun",
+      "model": "stepfun/step-3.7-flash:free",
+      "provider": "nous",
+      "route_path": "/workspace/hermes-factory/reviews/nous-provider-next/routes/nous-free-stepfun.json"
+    },
+    {
+      "catalog_context_length": 262144,
+      "catalog_path": "/home/agent/.z0int/state/provider-inventory/20261002-openrouter/catalog.json",
+      "catalog_sha256": "b977932ba24fbe28009345b51a26be01fa8c308b3b1e5f11635363f48265eb60",
+      "catalog_text_price_estimate_20000in_4096out_usd": 0.0,
+      "has_text_output": true,
+      "id": "openrouter-free-qwen",
+      "model": "qwen/qwen3.8-27b:free",
+      "provider": "openrouter",
+      "route_path": "/workspace/hermes-factory/reviews/nous-provider-next/routes/openrouter-free-qwen.json"
+    },
+    {
+      "catalog_context_length": 524288,
+      "catalog_path": "/home/agent/.z0int/state/provider-inventory/20261002-nous/catalog.json",
+      "catalog_sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+      "catalog_text_price_estimate_20000in_4096out_usd": 0.0018192,
+      "has_text_output": true,
+      "id": "nous-cheap-solar",
+      "model": "upstage/solar-mini4",
+      "provider": "nous",
+      "route_path": "/workspace/hermes-factory/reviews/nous-provider-next/routes/nous-cheap-solar.json"
+    }
+  ],
+  "status": "PREREGISTERED_NO_INFERENCE_YET",
+  "stop": "One actual request each; no retry, prompt repair, schema relaxation, judge modification or claim from a failed or incomplete attempt. Preserve transport/auth/quota distinctions.",
+  "unchanged_checker_sha256": "8a1a37449c1f33a0028866b49316f6815aaa74881b35b08768748faf1698343d",
+  "unchanged_context_sha256": "e3a286f8d6ea0c3a2091f8495c9ca3b6b2a56da9c3bc5de122782aa91d271472",
+  "unchanged_prompt_sha256": "d6ac8bcb93d8157f5396f81b9c54a038fc38952382b7c92fb1db6bd6eadc72f6",
+  "wall_seconds_per_route": 120
+}

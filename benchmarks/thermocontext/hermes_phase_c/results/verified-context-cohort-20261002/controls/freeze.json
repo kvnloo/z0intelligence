@@ -1,0 +1,66 @@
+{
+  "cases": {
+    "complete": {
+      "context_bytes": 14340,
+      "context_sha256": "e3a286f8d6ea0c3a2091f8495c9ca3b6b2a56da9c3bc5de122782aa91d271472",
+      "pool_sha256": "b168345bedba35d61e62eb9bdb9a33c01e59d79d8abf3065d3ffb625a3d962f4"
+    },
+    "contradictory_source_identity": {
+      "context_bytes": 16096,
+      "context_sha256": "de1b5af801b10a3d79b9d8551bd709284dadc87520b3ecb484e317b60bb2612f",
+      "pool_sha256": "ec625d95c52e95ddc73c5769da32c1a20b94293d2c234fdce26fc0f0846e0afc"
+    },
+    "missing_source_identity": {
+      "context_bytes": 12590,
+      "context_sha256": "549603e9f834952bb46e9da80aaef0f434fa2f44b3947dab484b34ab4127dcc8",
+      "pool_sha256": "659ce8fd3de0254b6213a30a34165ce590f9543fddff0ab6136ef352d8201808"
+    }
+  },
+  "checker_visible_to_model": false,
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "files": {
+    "context_resolve.py": "04d3da59e850c6488613a5b23ee2e8312cb19d00c49a9d0fcde7696e04ac7c1c",
+    "discriminator.py": "72b585e5ebe59e4a4d26f091ec32479c469f2d886aac3e5a0e7792657c9ec9c4",
+    "frozen_check.py": "7c646ba5040a0a5c3090c8f9132aefcf4b7a9f93d243271b35cbc45428fcfdb5",
+    "hook_output_spill.py": "3e2ab6e5f088920065c22549f34d072526aa793246096cef8656d8810f6012a0",
+    "selection_boundary.py": "4bdffce967ed17ffc2b082c91a38e294a41959d179a4bb4a4499e435fd364790",
+    "shared_driver.py": "c0cdd0c1dc87d79caa180987f20db3808d58ad48cc2fb2367384660e43b25137",
+    "turn_context.py": "b838c191eb44e8fd99a768bb782438b2b8751c775df67599dbc4b5892ea344ce"
+  },
+  "fixed_pair_requirements": [
+    "identical prompt",
+    "identical actual served model and provider",
+    "same authority and output limits",
+    "independent unchanged checker",
+    "all physical attempts and actual consumed usage retained"
+  ],
+  "fresh_isolated_session_per_arm": true,
+  "hermes_revision": "3536d56cf45b5d19c19675e2e576637edc267946",
+  "host_policy": {
+    "optional_policy": "include every available ref; no semantic selector",
+    "pinned_ids": [
+      "limits"
+    ]
+  },
+  "max_output_tokens": 1024,
+  "max_paid_cost_usd": 0,
+  "max_physical_posts_per_arm": 1,
+  "max_serialized_request_bytes": 20000,
+  "max_wall_seconds_per_arm": 120,
+  "native_transport_admission_requirement": "Before forwarding an actual POST, require one exact context occurrence and <=20000 serialized request bytes. Offline admission is not this transport check.",
+  "next_live_pair": [
+    "complete",
+    "missing_source_identity"
+  ],
+  "pool_sha256": "5780cabab15705f67a25268b96612b61015d9906d4815c98f29dd06a57f5fa8b",
+  "preexisting_live_baseline_comparable": false,
+  "prompt_sha256": "05f7af0dbd3d0e9f0aa4cee760587c78cc9baca0530e50a0c2a8cccb798c69ba",
+  "provider_calls": 0,
+  "reason_prior_baseline_separate": "New explicit abstention output contract and host policy; previous outcome cannot be reused as paired baseline.",
+  "requested_model": "openrouter/free",
+  "required_study_profile_policy": "Reuse frozen live_baseline.study_spill_config(context): max(10000,len(context)); probe and actual profile share this policy. The 20000 wire-byte cap remains common to both arms.",
+  "schema": "hermes.context_causal_discriminator.v1",
+  "sources_sha256": "7334619674af88cef91aed96361a72b33d0534be76147a39b446887b1cff72ed",
+  "stop": "No RLM or thermal integration claim if same-ref deterministic comparator ties. No causal inference without a valid same-model pair.",
+  "synthetic_control_case": "contradictory_source_identity"
+}

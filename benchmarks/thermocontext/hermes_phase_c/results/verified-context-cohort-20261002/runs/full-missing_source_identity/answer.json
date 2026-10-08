@@ -1,0 +1,15 @@
+{
+  "citations": [
+    "limits",
+    "gates",
+    "baseline",
+    "guarded",
+    "task_verified_ms",
+    "input_tokens",
+    "output_tokens"
+  ],
+  "hermes_speedup_established": null,
+  "reason": "missing_evidence",
+  "status": "ABSTAIN",
+  "tested_source": null
+}

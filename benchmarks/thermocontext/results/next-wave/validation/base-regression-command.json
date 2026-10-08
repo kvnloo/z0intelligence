@@ -1,0 +1,42 @@
+{
+  "base_revision": "456ff17a734206bb5558d0b063cde5cd74f1a6ae",
+  "base_worktree": "/workspace/hermes-factory/experiments/thermocontext-next/base-regression",
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/workspace/hermes-factory/venvs/z0int/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_bridge_worker.py::BridgeWorkerProcessTests::test_worker_hello_self_check_reload_fail_closed",
+    "tests/test_intelligence.py::test_jev_requires_explicit_remote_and_exact_state",
+    "tests/test_julia_backend.py::JuliaBackendOfflineTests::test_unavailable_without_checkout",
+    "tests/test_provider_saturation.py::test_health_429_ttl_403_operator_only",
+    "tests/test_quota_budget.py::test_empty_authority_capacity",
+    "tests/test_quota_budget.py::test_daily_tokens_bind_even_with_empty_minute",
+    "tests/test_quota_budget.py::test_latest_physical_row_not_double_counted",
+    "tests/test_quota_budget.py::test_groq_requests_header_is_daily",
+    "tests/test_quota_budget.py::test_unknown_usage_reserved_until_window_passes"
+  ],
+  "cpu_affinity": [
+    2
+  ],
+  "timeout_seconds": 120,
+  "elapsed_seconds": 0.5653622709942283,
+  "exit_code": 1,
+  "environment_keys": [
+    "HF_HUB_OFFLINE",
+    "HOME",
+    "LANG",
+    "MKL_NUM_THREADS",
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "PATH",
+    "PYTHONPATH",
+    "TRANSFORMERS_OFFLINE",
+    "USER"
+  ],
+  "provider_credentials_supplied": false,
+  "offline_model_flags": true
+}

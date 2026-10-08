@@ -1,0 +1,95 @@
+{
+  "schema": "thermocontext.independent-audit.v1",
+  "frozen_prototype_sha256": "69e1b4537858c06f87968093c41f11118af8d842c95edd49cd71897767044a00",
+  "rows_audited": 636,
+  "exact_tasks_independently_enumerated": 0,
+  "all_row_checks_pass": true,
+  "complete_present_arm_grids": true,
+  "failures": [],
+  "grids": [
+    {
+      "N": 32,
+      "arm": "adaptive",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 32,
+      "arm": "champion",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 32,
+      "arm": "component_dp",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 32,
+      "arm": "greedy",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 32,
+      "arm": "pair_greedy",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 32,
+      "arm": "prototype",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 32,
+      "arm": "prototype_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 32,
+      "arm": "random_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 32,
+      "arm": "thrml_projected",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 32,
+      "arm": "thrml_static",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "N": 32,
+      "arm": "topk",
+      "complete": true,
+      "missing": [],
+      "extra": []
+    }
+  ],
+  "limits": [
+    "Grid checks cover arms present in data; compare missing whole arms/stages against protocol separately.",
+    "Output arithmetic and retained trajectories do not establish transition-kernel correctness or prove absence of oracle leakage in implementation.",
+    "This is synthetic-cohort replay, not independently observed real Hermes task success."
+  ],
+  "results_sha256": "b532d09de967dffd2313839599a6fc6b46a8d993f3ad600be4932cbd496a0b19",
+  "auditor_sha256": "eea9b38893011a9be711295396e798cd8c7ebff2fa89dd5adc659ad239fdc3c4"
+}

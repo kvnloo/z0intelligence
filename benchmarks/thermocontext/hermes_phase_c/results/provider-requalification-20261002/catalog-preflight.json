@@ -1,0 +1,47 @@
+{
+  "provider_calls": 0,
+  "routes": [
+    {
+      "catalog_completion_usd_per_million": 0.2,
+      "catalog_model": "upstage/solar-mini4",
+      "catalog_prompt_usd_per_million": 0.05,
+      "catalog_row_sha256": "5f0129325f15b8b27a1358d10ce9d66b40fc8e3650d206081ebb883511002a2d",
+      "catalog_sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+      "cost_control": "fixed_model_catalog_estimate_only",
+      "endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+      "estimate_is_billing_cap": false,
+      "estimated_cost_at_token_caps_usd": 0.0018192,
+      "model": "upstage/solar-mini4",
+      "provider": "nous",
+      "route_sha256": "9637b2389150128ce3e40901aa8296193d5f309ca09104b4f506ec562a7e6b20"
+    },
+    {
+      "catalog_completion_usd_per_million": 0.0,
+      "catalog_model": "stepfun/step-3.7-flash:free",
+      "catalog_prompt_usd_per_million": 0.0,
+      "catalog_row_sha256": "197273b3a03a3483bf71e18c142671364106ac2af7a31f541402b69e69ad98ff",
+      "catalog_sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+      "cost_control": "fixed_model_catalog_estimate_only",
+      "endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+      "estimate_is_billing_cap": false,
+      "estimated_cost_at_token_caps_usd": 0.0,
+      "model": "stepfun/step-3.7-flash:free",
+      "provider": "nous",
+      "route_sha256": "d0bd74a49240cf6a68ee9648a64632f0134bd22c2682b1c174ddec049b6e3645"
+    },
+    {
+      "catalog_completion_usd_per_million": 0.0,
+      "catalog_model": "qwen/qwen3.8-27b:free",
+      "catalog_prompt_usd_per_million": 0.0,
+      "catalog_row_sha256": "51eea05e730bfcfee580732e2268c714527866765f13d2a4fb8b06e50e1a38c9",
+      "catalog_sha256": "b977932ba24fbe28009345b51a26be01fa8c308b3b1e5f11635363f48265eb60",
+      "cost_control": "openrouter_max_price_zero",
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "estimate_is_billing_cap": false,
+      "estimated_cost_at_token_caps_usd": 0.0,
+      "model": "qwen/qwen3.8-27b:free",
+      "provider": "openrouter",
+      "route_sha256": "2bcaf3bed175afcf350f29416a61b309ef88946249cfde019cab88f22456d8cc"
+    }
+  ]
+}

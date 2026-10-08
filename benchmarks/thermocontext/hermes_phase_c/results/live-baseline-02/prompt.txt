@@ -1,0 +1,10 @@
+Reconcile the claim that R2-03 guarded completion improved work: identify the tested source, verified outcomes and consumed provider-call change; state whether this establishes a Hermes speedup. Preserve scope and unknowns.
+
+Return exactly one JSON object with these fields:
+tested_source (full source revision string), baseline_verified (integer),
+baseline_attempted (integer), guarded_verified (integer), guarded_attempted (integer),
+baseline_provider_requests_per_task (integer), guarded_provider_requests_per_task (integer),
+hermes_speedup_established (boolean), scope (one of single_fixture_python_typesafe,
+general_hermes_production, unknown), citations (list of evidence source_id strings).
+Use only the supplied evidence. Do not equate publication revision with tested
+source, or completed execution with independent verification.

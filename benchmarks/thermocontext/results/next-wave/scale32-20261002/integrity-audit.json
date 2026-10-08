@@ -1,0 +1,70 @@
+{
+  "schema": "thermocontext.run-integrity-audit.v1",
+  "source_revision": "74af422e51ffab78d8a5521186cf50c9b8f2c042",
+  "source_files_checked": [
+    {
+      "path": "benchmarks/thermocontext/adaptive_budget.py",
+      "manifest_sha256": "0c9a815b39039cc01a941d6c7289d8cb41a42c3d56748b589cd94720aa560f98",
+      "current_matches_manifest": true,
+      "frozen_commit_matches_manifest": true
+    },
+    {
+      "path": "benchmarks/thermocontext/audit_next_wave.py",
+      "manifest_sha256": "eea9b38893011a9be711295396e798cd8c7ebff2fa89dd5adc659ad239fdc3c4",
+      "current_matches_manifest": true,
+      "frozen_commit_matches_manifest": true
+    },
+    {
+      "path": "benchmarks/thermocontext/constrained_budget.py",
+      "manifest_sha256": "a51ab7810ea47b2db64ec49bdfe9dc3fe74da76ceaf163ef3fcfe917f44dfa49",
+      "current_matches_manifest": true,
+      "frozen_commit_matches_manifest": true
+    },
+    {
+      "path": "benchmarks/thermocontext/next_wave.py",
+      "manifest_sha256": "dcdddfe377d61b98812be01007cfcfcfd705a3b4e3bccf7a9d5723b3c05fc74c",
+      "current_matches_manifest": true,
+      "frozen_commit_matches_manifest": true
+    },
+    {
+      "path": "benchmarks/thermocontext/pair_greedy.py",
+      "manifest_sha256": "1a2935e9e253f43eb5989a072ce687e9a80734cb7601b41cac5f25995b58c979",
+      "current_matches_manifest": true,
+      "frozen_commit_matches_manifest": true
+    },
+    {
+      "path": "benchmarks/thermocontext/phase_a_prototype.py",
+      "manifest_sha256": "69e1b4537858c06f87968093c41f11118af8d842c95edd49cd71897767044a00",
+      "current_matches_manifest": true,
+      "frozen_commit_matches_manifest": true
+    },
+    {
+      "path": "benchmarks/thermocontext/reproduce.py",
+      "manifest_sha256": "7fe7779b13c86bd9ee73800677033c69c262d76e16db8ed4e6eb2c8ee1f13a2f",
+      "current_matches_manifest": true,
+      "frozen_commit_matches_manifest": true
+    },
+    {
+      "path": "benchmarks/thermocontext/slack_budget.py",
+      "manifest_sha256": "9a3197970782351a44b60e6c35ce4823837f5a838a13d98e81fd18cecb048b82",
+      "current_matches_manifest": true,
+      "frozen_commit_matches_manifest": true
+    },
+    {
+      "path": "benchmarks/thermocontext/thrml_backend.py",
+      "manifest_sha256": "b8b9f54ee53f01a2c65cb9191c4f3c3c8dc3be3c0a76140bbba6c6cdd2b23e47",
+      "current_matches_manifest": true,
+      "frozen_commit_matches_manifest": true
+    }
+  ],
+  "protocol_sha256": "235c25f2a94196170aae67bde7716aa47622b8a7471f5f709cbc8756d96638b1",
+  "arm_config_sha256": "bf1d29f3ba06f345b78ed20f37c46a8a0eb0345480a18f5bbf9815b24580f5ff",
+  "rows_sha256": "b532d09de967dffd2313839599a6fc6b46a8d993f3ad600be4932cbd496a0b19",
+  "declared_artifacts_checked": 580,
+  "failures": [],
+  "pass": true,
+  "limits": [
+    "Only run-declared files are checked; post-run independent audit files are separate.",
+    "Manifest/source integrity alone is not scientific validation; see independent row/trace audit and MILP reference audit."
+  ]
+}

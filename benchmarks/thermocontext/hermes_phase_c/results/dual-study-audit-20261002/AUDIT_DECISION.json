@@ -1,0 +1,68 @@
+{
+  "attribution_limits": [
+    "Configured fixed model and identical system/context wire; response backend provider is null",
+    "One attempt per development case, executed in separate periods; no population or backend causal claim",
+    "Do not pool the two task contracts or reinterpret v1 failures"
+  ],
+  "audit_status": "PASS unchanged independent checker replay; no answer repaired or regraded under a new policy",
+  "decision": "STOP_AFTER_TWO_SEPARATE_FROZEN_STUDIES_NO_MORE_CALLS",
+  "efficiency": {
+    "cost_limit": "v1 minimal-missing reports832 cached prompt tokens; v2 reports0. Do not equate observed cost differences with a pure token-only causal effect.",
+    "matched_prompt_token_reductions": {
+      "complete": 5436,
+      "missing_source_identity": 5436
+    },
+    "reason": "The v2 complete pair loses verified quality in the minimal arm; both missing-source arms fail the scope field. Fewer input tokens alone is not a verified-task improvement.",
+    "verified_savings_established": false
+  },
+  "evidence_sha256": {
+    "audit_saved_studies.py": "8b6b3537325a67215babbe74f8732979ed4a2d3d5f93cc12a93896cfb3288c6b",
+    "independent-audit.json": "ee8970dc8e847ad77d8b9e28d23841185fa339f8511fe983b77937c2a352286b",
+    "scope-evidence-inventory.json": "b771ae89920451777e1bde2575c0e9a536dc27d4c7092d30cc47f595ab666fa5"
+  },
+  "exact_request_control": {
+    "all_198_predecessor_artifacts_hash_unchanged": true,
+    "all_contexts_selections_and_full_system_bytes_unchanged": true,
+    "cases_checked": 5,
+    "native_and_forwarded_raw_bytes_differ_only_by_prompt": true
+  },
+  "new_runtime_or_posthoc_repair": false,
+  "no_further_calls": true,
+  "precise_observed_v2_failure": {
+    "failed_cases": [
+      "full-missing_source_identity",
+      "minimal-complete",
+      "minimal-contradictory_source_identity",
+      "minimal-missing_source_identity"
+    ],
+    "interpretation": "Residual failure to apply the frozen scope false-versus-null rule. Source extraction, missing-source abstention and contradiction reason are correct under the clarified contract. This does not establish general Solar incapability or an internal failure mechanism.",
+    "observed_failed_value": null,
+    "only_failed_field": "hermes_speedup_established",
+    "passing_case": "full-complete",
+    "status_tested_source_reason_and_citations_correct_in_all_five": true,
+    "unchanged_checker_required_value": false
+  },
+  "schema": "hermes.dual_study_diagnosis.v1",
+  "scope_representation": {
+    "deterministic_option_boundary": "A fixed source-reporting lookup for these published bounds could be specified prospectively, or producers could supply typed scope metadata. Neither policy is implemented or used to repair/rescore these outcomes.",
+    "machine_fields_limit": "Provider/model/host strings and CUA source locators alone are not a complete logical certificate about a possible Hermes performance claim.",
+    "prose_limits": "One fixture/Python/Driver/TypeSafe Jev scope; results do not transfer to other tasks, providers, platforms or untested heads.",
+    "scope_field": "No typed hermes_speedup_established or equivalent complete-scope boolean is provided. The fixed false judgment requires interpreting the retained limits prose and the explicit textual gap.",
+    "shared_explicit_gap": "No real Hermes provider or end-to-end task result exists for this pool.",
+    "source_identity": "tested_source is directly present in decoded provenance JSON; unique declarations, absence and conflicting values can be inventoried deterministically"
+  },
+  "v1": {
+    "physical_posts": 5,
+    "reported_completion_tokens": 305,
+    "reported_cost_usd_decimal": "0.00107041",
+    "reported_prompt_tokens": 20937,
+    "verified_successes": 0
+  },
+  "v2": {
+    "physical_posts": 5,
+    "reported_completion_tokens": 404,
+    "reported_cost_usd_decimal": "0.00114690",
+    "reported_prompt_tokens": 21322,
+    "verified_successes": 1
+  }
+}

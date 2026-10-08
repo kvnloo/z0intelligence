@@ -1,0 +1,14 @@
+{
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "max_estimated_cost_usd": 0,
+  "model": "qwen/qwen3.8-27b:free",
+  "pricing": {
+    "catalog_sha256": "b977932ba24fbe28009345b51a26be01fa8c308b3b1e5f11635363f48265eb60",
+    "completion_usd_per_million": 0.0,
+    "prompt_usd_per_million": 0.0,
+    "retrieved_at": "2026-10-02T17:18:18.611041+00:00",
+    "source_url": "https://openrouter.ai/api/v1/models"
+  },
+  "provider": "openrouter",
+  "schema_version": 1
+}

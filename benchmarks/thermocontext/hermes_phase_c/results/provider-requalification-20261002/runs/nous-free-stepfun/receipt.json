@@ -1,0 +1,54 @@
+{
+  "answer_parsed": false,
+  "classification": "REAL_PROVIDER_ATTEMPT",
+  "configured_max_output_tokens": 4096,
+  "error_type": null,
+  "estimated_cost_at_token_caps_usd": 0.0,
+  "exact_selected_context_in_forwarded_request": true,
+  "execution_window_wall_ns": 21133989942,
+  "freeze_sha256": "ac1079667742f2f4dc360974e6e52161f3046b3f534d0d32efee01741f13ee00",
+  "local_metadata_calls": 2,
+  "outcome": {
+    "problems": [
+      "answer_not_object"
+    ],
+    "verified_success": false
+  },
+  "preparation_wall_ns": 1157068041,
+  "provider_calls": 1,
+  "provider_identity_source": "configured_endpoint_only",
+  "reported_cost": 0,
+  "reported_zero_cost": true,
+  "requested_model": "stepfun/step-3.7-flash:free",
+  "requested_provider": "nous",
+  "resource_comparison_eligible": true,
+  "returncode": 0,
+  "route_sha256": "d0bd74a49240cf6a68ee9648a64632f0134bd22c2682b1c174ddec049b6e3645",
+  "sampler_enabled": false,
+  "served_model": "stepfun/step-3.7-flash:free",
+  "served_provider": null,
+  "speedup_or_noninferiority_claim": false,
+  "total_wall_ns": 22393175066,
+  "usage": {
+    "completion_tokens": 2951,
+    "completion_tokens_details": {
+      "audio_tokens": 0,
+      "image_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "cost": 0,
+    "cost_details": {
+      "floor_applied": false,
+      "rate_source": "nas_model_override",
+      "source": "nas_model_override"
+    },
+    "prompt_tokens": 6323,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    },
+    "total_tokens": 9274
+  }
+}

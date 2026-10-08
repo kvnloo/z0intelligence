@@ -1,0 +1,24 @@
+{
+  "admission": "Default hook spill loss detected; actual shared study-only spill policy preserves exact context in offline native hook/serialization probe. Actual POST guard remains mandatory.",
+  "classification": "BLOCKED_PROVIDER_RATE_LIMIT",
+  "current_pair_freeze": "results/causal-pair-01/pair-freeze.json",
+  "current_pair_freeze_sha256": "cbe9c965515f5209bea338e295fc21c529b06465ca36ab57def6793c8dabf097",
+  "decision": "NOT_RUN_RESOURCE_BLOCK",
+  "first_remaining_uncertainty": "Whether model behavior follows full versus withheld source-identity evidence under one fixed actual served model/provider.",
+  "issue": "https://github.com/kvnloo/hermes-agent/issues/320",
+  "model_semantic_use": null,
+  "native_conformance": "PASS_OFFLINE_ONLY",
+  "new_task": "Explicit abstention task and policy; previous baseline output cannot be reused as paired baseline.",
+  "no_network_replay_identical": true,
+  "prior_negative_evidence_preserved": "Generic StatePacket donor remains rejected for prior three inspected questions; no donor adapter reinstated.",
+  "provider_calls": 0,
+  "runtime_activation": false,
+  "same_ref_comparator": "Current ContextPacket rendering and generic deterministic bundle produce identical bytes across complete/missing/synthetic-contradiction cases. No extra RLM architecture is justified by this representation.",
+  "source_429_receipt": "/workspace/hermes-factory/reviews/thermocontext-next/hermes/live-baseline-03-resource4096/receipt.json",
+  "speedup_claim": false,
+  "tests": {
+    "command": "PYTHONPATH=<z0intelligence>/src <hermes-python> -m unittest -q test_discriminator test_pair",
+    "failures": 0,
+    "run": 16
+  }
+}

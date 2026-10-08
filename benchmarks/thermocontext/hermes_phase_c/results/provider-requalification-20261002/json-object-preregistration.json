@@ -1,0 +1,31 @@
+{
+  "acceptance": "One real native Hermes invocation; exactly one physical POST; exact old prompt/context/checker; actual native request carries response_format json_object; final response directly parses and frozen checker passes; replay reconstructs all evidence.",
+  "axis": "native AIAgent request_overrides.response_format = {type:json_object}; default remains absent",
+  "baseline_receipt_sha256": "afd03bec0f4ce8c959d3da674c47ca3c84b250692e2396c6a355d60342e0fc54",
+  "baseline_result": "FAILED_STRICT_JSON_PARSE; preserve original receipt; do not strip Markdown or change checker",
+  "baseline_run": "runs/nous-cheap-solar",
+  "catalog_cost_estimate_at_token_caps_usd": 0.0018191999999999998,
+  "catalog_estimate_is_billing_cap": false,
+  "checker_sha256": "8a1a37449c1f33a0028866b49316f6815aaa74881b35b08768748faf1698343d",
+  "client_model_fallbacks": 0,
+  "context_sha256": "e3a286f8d6ea0c3a2091f8495c9ca3b6b2a56da9c3bc5de122782aa91d271472",
+  "created_at": "2026-10-02T17:41:31.906164+00:00",
+  "endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+  "falsifier": "Non-200, non-JSON response, changed/missing context, wrong facts/citations/scope, or independent checker rejection.",
+  "hypothesis": "Requesting JSON mode through the existing Hermes native transport yields a directly parseable answer that passes the unchanged independent factual verifier.",
+  "interpretation_limit": "Single inspected development task, not a protected holdout or population-level causal/performance claim.",
+  "max_output_tokens": 4096,
+  "max_physical_posts_total": 1,
+  "max_request_bytes": 20000,
+  "max_wall_seconds": 120,
+  "model": "upstage/solar-mini4",
+  "new_driver_requirement": "Freeze exact final driver source and pass native route/format regression tests before execution. Deadline accounting correction changes producer bookkeeping only; transport successful responses prove all three historical requests actually occurred.",
+  "prompt_sha256": "d6ac8bcb93d8157f5396f81b9c54a038fc38952382b7c92fb1db6bd6eadc72f6",
+  "response_format_requested": {
+    "type": "json_object"
+  },
+  "retries": 0,
+  "route_sha256": "9637b2389150128ce3e40901aa8296193d5f309ca09104b4f506ec562a7e6b20",
+  "status": "PREREGISTERED_BEFORE_NEW_REQUEST",
+  "stop": "One fresh call then stop; preserve a failure. No output repair, cap increase, judge edit, extra sampling or activation."
+}

@@ -1,0 +1,28 @@
+{
+  "answer_parsed": false,
+  "classification": "REAL_PROVIDER_ATTEMPT",
+  "configured_max_output_tokens": 4096,
+  "error_type": null,
+  "exact_selected_context_in_forwarded_request": true,
+  "execution_window_wall_ns": 4644508766,
+  "freeze_sha256": "9d2f6eb65d75335983d0b06bd54cf7aaebe546c6d5e2d1d4f03d4544eaa74e61",
+  "local_metadata_calls": 1,
+  "outcome": {
+    "problems": [
+      "answer_not_object"
+    ],
+    "verified_success": false
+  },
+  "preparation_wall_ns": 1260591062,
+  "provider_calls": 1,
+  "reported_cost": null,
+  "reported_zero_cost": null,
+  "resource_comparison_eligible": false,
+  "returncode": 0,
+  "sampler_enabled": false,
+  "served_model": null,
+  "served_provider": null,
+  "speedup_or_noninferiority_claim": false,
+  "total_wall_ns": 5973017953,
+  "usage": null
+}

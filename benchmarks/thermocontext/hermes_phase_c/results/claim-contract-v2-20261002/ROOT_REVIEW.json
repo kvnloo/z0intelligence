@@ -1,0 +1,7 @@
+{
+  "protocol_review": "new source-grounded reporting contract; same contexts/checker/nativewire except prompt; prior failures retained",
+  "cohort_freeze_sha256": "a316a317b97818cb9b9bfb276f031001f9b3c77f85b8d22ae7b25abf6ce01d4d",
+  "prompt_study_freeze_sha256": "0a218cc61455e6e26e706c8020a42d82c982ecd780a86aaa3ba3c06de9cbe6c8",
+  "max_posts": 5,
+  "retries": false
+}

@@ -1,0 +1,85 @@
+{
+  "decision": "REPRODUCIBILITY_CONFIRMED_RETAIN_N32_STOP",
+  "evidence_sha256": {
+    "audit_saved_waves.py": "8aac7c8570f550ad57eaa50dd2e24d3971217a229570898fb0ae6207a808907f",
+    "compare_trace_artifacts.py": "22f525d64c31b1a43b15cb47900b439e0259f00b925057dd59faf4315cdcf273",
+    "remote-wave-independent-audit.json": "7a6db2e04fff8f52358d15419bb7639c2e0b38fd013be61766141f9be082909b",
+    "reproduction-independent-audit.json": "95b742a8fc268473260b424fcd35fb4ca40716f7cf1b0aac32b33c43b0d92728",
+    "small-full-independent-audit.json": "cc79e8e4b082bdc26d63d3a488837c9e55f72e3e0cafaf6f9e8b6e573e9f1235",
+    "small-full-trace-comparison.json": "0c2f1c7ecc6f05219ff82271f57c9cb79355bbc32f218101d81965e23bbaba64"
+  },
+  "independent_remote_wave": {
+    "N32_component_oracle_tasks": 10,
+    "adaptive_N32": {
+      "THRML_success": 48,
+      "prototype_JAX_success": 47,
+      "runs_per_backend": 80,
+      "stop_preserved": true,
+      "task_ids": "0..9 only"
+    },
+    "all_selected_arithmetic_checks_pass": true,
+    "archive_files_hash_verified": 34,
+    "archive_sha256": "51db439561f75c4a1a5355e42c419b88f27f3ebd742c8442536be958cdb29e2a",
+    "distinct_wave": "Different adaptive schedule, auxiliary formulations, gates and N32 cohort completeness; do not pool with next-wave.",
+    "executed_source_bindings_checked": 7,
+    "final_manifest_only_documentation_differences": [
+      "benchmarks/thermocontext/README.md",
+      "benchmarks/thermocontext/REPRODUCE.md"
+    ],
+    "fixed_adapter_snapshot_matches": true,
+    "original432_matches_prior": true,
+    "retained_trajectory_limit": "UNAVAILABLE: archive preserves selected rows, not retained masks. First-valid ordinals and sample-count claims cannot be independently replayed from this archive.",
+    "selected_rows_independently_checked": 2060,
+    "small_N_exact_tasks": 36,
+    "source_revision": "46d93b02881d73bfab581a7f17c8d0dbc6feb249"
+  },
+  "limits": [
+    "Synthetic evidence task and token weights; no consumed Hermes tokens or real task outcomes",
+    "Independent remote archive supports selected-output checks, not retained trajectory claims",
+    "CPU timing observations are not reproducibility targets, isolated benchmarks, or hardware energy claims",
+    "Shared tasks/seeds across reproductions do not increase the independent sample size"
+  ],
+  "no_new_sampling": true,
+  "no_provider_calls": true,
+  "original_reproduction": {
+    "artifact_hashes_checked": 3,
+    "exact_masks_ids_energy_count_tokens_success_and_first_valid_match_prior": true,
+    "independent_selected_checks": "PASS",
+    "rows": 432
+  },
+  "schema": "thermocontext.independent_reverification_decision.v1",
+  "scientific_disposition": "KILL the current engineered-cohort case for adding sampling to Hermes; no population or hardware conclusion",
+  "small_full_reproduction": {
+    "complete_arm_grids": true,
+    "declared_artifact_hashes_checked": 2632,
+    "independent_exact_tasks": 36,
+    "interpretation": "Repeated same-task/same-seed reproduction; not an independent enlarged cohort",
+    "retained_trace_and_auxiliary_graph_hashes_identical": 2628,
+    "rows": 2520,
+    "selected_arithmetic_and_retained_trace_audit": "PASS",
+    "selected_non_timing_fields_exactly_match_prior": true,
+    "source_comparison": {
+      "added_sources": [
+        "benchmarks/thermocontext/audit_reference_milp.py",
+        "benchmarks/thermocontext/diagnose_adaptive.py",
+        "benchmarks/thermocontext/gate_analysis.py"
+      ],
+      "all_common_sources_unchanged": true,
+      "arm_config_sha256_equal": true,
+      "changed_common_sources": {},
+      "note": "Strict source-map equality in the raw audit is false only because three diagnostic/audit helpers were newly inventoried; all shared source bytes are unchanged.",
+      "prior_sampling_revision": "74af422e51ffab78d8a5521186cf50c9b8f2c042",
+      "protocol_sha256_equal": true,
+      "removed_sources": [],
+      "rerun_sampling_revision": "c6003984f8d44bc6fa549cf11dd3e30ca061222f"
+    },
+    "timing_equality_claim": false
+  },
+  "stop": {
+    "N32_resampled_by_this_audit": false,
+    "N64_N128_authorized_or_sampled_by_this_audit": false,
+    "no_further_sampling": true,
+    "prior_local_wave_N32_adaptive_success": "57/96",
+    "remote_wave_N32_adaptive_success": "48/80 THRML, different schedule and partial tasks"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "frozen_at": "2026-10-02T17:35:59.559714+00:00",
+  "protocol_sha256": "4a5d35850f5ae9383f7e29afee611b7dad4e5eb206c314457eca08eb66bed808",
+  "source_sha256": {
+    "baseline_check.py": "8a1a37449c1f33a0028866b49316f6815aaa74881b35b08768748faf1698343d",
+    "live_baseline.py": "1344a3bb4418a0b1b580d3456fa068b2898b890f8cc757c2312bc5705a24ff3e",
+    "replay_bridge.py": "3b066231185ba34d5346d4def8f9a4b7311c45996b80aa29113743689005bd71",
+    "selection_boundary.py": "4bdffce967ed17ffc2b082c91a38e294a41959d179a4bb4a4499e435fd364790"
+  }
+}

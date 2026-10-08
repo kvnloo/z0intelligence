@@ -1,0 +1,70 @@
+{
+  "compile_positive_rows": {
+    "adaptive": 22,
+    "prototype_projected": 0,
+    "slack": 36,
+    "thrml_projected": 0,
+    "thrml_static": 22
+  },
+  "hardware_claim": false,
+  "implementation_changed": false,
+  "protocol_sha256": "235c25f2a94196170aae67bde7716aa47622b8a7471f5f709cbc8756d96638b1",
+  "scale_sampling_performed_by_review": false,
+  "schema": "thermocontext.sparsity-review.v1",
+  "scope": "Independent read-only row comparisons, source review, and static construction analysis. Not a new sampling experiment or a substitute for full trajectory audit.",
+  "slack_recorded_results": {
+    "8": {
+      "minimum_constraint_valid_sample_fraction": 0.9998046875,
+      "rows": 96,
+      "rows_with_retained_item_motion": 0,
+      "same_initial_final_masks": 96,
+      "verified": 81
+    },
+    "12": {
+      "minimum_constraint_valid_sample_fraction": 0.9990234375,
+      "rows": 96,
+      "rows_with_retained_item_motion": 0,
+      "same_initial_final_masks": 96,
+      "verified": 59
+    },
+    "16": {
+      "minimum_constraint_valid_sample_fraction": 0.998828125,
+      "rows": 96,
+      "rows_with_retained_item_motion": 1,
+      "same_initial_final_masks": 96,
+      "verified": 27
+    }
+  },
+  "source_revision": "74af422e51ffab78d8a5521186cf50c9b8f2c042",
+  "source_rows_sha256": "a8b36054ee1d9725bdffd52fa520c744719766f24d3c34a154342652b6dd78cf",
+  "static_construction_only": [
+    {
+      "N": 32,
+      "auxiliary_nodes": 550,
+      "coefficient_dynamic_range": 744.2026764105657,
+      "edges": 1773,
+      "max_degree": 9,
+      "nodes": 582,
+      "task_seed": 0
+    },
+    {
+      "N": 64,
+      "auxiliary_nodes": 1080,
+      "coefficient_dynamic_range": 1092.4240100801783,
+      "edges": 3495,
+      "max_degree": 9,
+      "nodes": 1144,
+      "task_seed": 0
+    },
+    {
+      "N": 128,
+      "auxiliary_nodes": 2184,
+      "coefficient_dynamic_range": 2159.8104753981406,
+      "edges": 7157,
+      "max_degree": 9,
+      "nodes": 2312,
+      "task_seed": 0
+    }
+  ],
+  "thresholds_changed": false
+}

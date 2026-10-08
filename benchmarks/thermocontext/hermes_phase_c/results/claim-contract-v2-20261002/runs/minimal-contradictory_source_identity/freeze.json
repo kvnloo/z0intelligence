@@ -1,0 +1,55 @@
+{
+  "case_metadata": {
+    "case_id": "minimal-contradictory_source_identity",
+    "cohort_freeze_sha256": "a316a317b97818cb9b9bfb276f031001f9b3c77f85b8d22ae7b25abf6ce01d4d"
+  },
+  "catalog_estimate_is_billing_cap": false,
+  "checker_sha256": "5cd620aee008c42f2691c63f97a4e129533899509fe0de063885f940772fa255",
+  "cohort": "host_prepared_case",
+  "context_sha256": "67a3b51645da0e6c4961764b3155e7c4519c4865925c1af21083fda0fdb29209",
+  "cost_control": "fixed_model_catalog_estimate_only",
+  "driver_sha256": "c0cdd0c1dc87d79caa180987f20db3808d58ad48cc2fb2367384660e43b25137",
+  "endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+  "estimated_cost_at_token_caps_usd": 0.0018191999999999998,
+  "exact_context_required_before_forwarding": true,
+  "execute_requested": true,
+  "hook_output_spill": {
+    "enabled": true,
+    "max_chars": 10000,
+    "preview_head": 500,
+    "preview_tail": 500
+  },
+  "input_token_cap": {
+    "enforcement": "post-response eligibility; no preflight tokenizer guarantee",
+    "value": 20000
+  },
+  "max_output_tokens": 4096,
+  "max_paid_cost_usd": null,
+  "max_physical_inference_attempts": 1,
+  "max_serialized_request_bytes": 20000,
+  "max_wall_seconds": 120,
+  "model": "upstage/solar-mini4",
+  "native_recorder_sha256": "4f80efb3f43bf56af97eb1d305b3a680a992d31f08921ce96ad2c624530fbe62",
+  "prompt_sha256": "9a60718e0985c774421f9a72a6b61ab7e8f999bc14e3aaed06a91598ad64f1dd",
+  "protected_checker_visible_to_worker_model": false,
+  "provider_calls": 0,
+  "response_format_requested": {
+    "type": "json_object"
+  },
+  "route_sha256": "9637b2389150128ce3e40901aa8296193d5f309ca09104b4f506ec562a7e6b20",
+  "route_spec": {
+    "endpoint": "https://inference-api.nousresearch.com/v1/chat/completions",
+    "max_estimated_cost_usd": 0.02,
+    "model": "upstage/solar-mini4",
+    "pricing": {
+      "catalog_sha256": "fe83a478f571525c964d68cfb1fc8711920106772c3e2c304ea3512008be45a2",
+      "completion_usd_per_million": 0.19999999999999998,
+      "prompt_usd_per_million": 0.049999999999999996,
+      "retrieved_at": "2026-10-02T17:17:15.046581+00:00",
+      "source_url": "https://inference-api.nousresearch.com/v1/models"
+    },
+    "provider": "nous",
+    "schema_version": 1
+  },
+  "sampler_enabled": false
+}

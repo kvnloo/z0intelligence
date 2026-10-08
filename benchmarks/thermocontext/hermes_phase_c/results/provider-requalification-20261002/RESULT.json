@@ -1,0 +1,112 @@
+{
+  "all_four_independent_replays_match": true,
+  "created_at": "2026-10-02T17:48:24.987515+00:00",
+  "final_auditor_sha256": "559b1a23069b76a06143c7cd75afae90bcaa285204ae58b8d0ff306e1dfb2a22",
+  "final_independent_replay_sha256": "59c2fcf1c415e3d215a27eab745ebe69a7cf08c9c46d2d7f213bb6f71606d22d",
+  "frozen_checker_unchanged": true,
+  "incidental_system_prompt_difference": "Fresh profile directory appears twice in native system boilerplate; after exact path normalization the only changed body field between Solar attempts is response_format. No perfectly controlled full-prompt causal claim.",
+  "interpretation": "Actual Hermes AIAgent + existing z0int ContextPacket -> model-visible evidence -> one bounded JSON answer -> unchanged independent verifier -> exact receipt -> offline replay. This closes one inspected development task.",
+  "inventory": {
+    "availability_scope": "Catalog discovery and observed single calls; remaining routes UNTESTED.",
+    "catalog_zero_chat_candidates": {
+      "nous": 9,
+      "openrouter": 20
+    },
+    "distinct_model_ids": 512,
+    "existing_tools": "z0int doctor/backends doctor + Kerdoios ResourceOffer/cache/CLI round-trip; no new control plane or automatic router activation.",
+    "nous_catalog_rows": 425,
+    "openrouter_catalog_rows": 465,
+    "provider_model_rows": 890
+  },
+  "known_consumed_tokens": 24917,
+  "known_reported_cost_usd": 0.000836,
+  "missing_usage_runs": [
+    "openrouter-free-qwen"
+  ],
+  "next_smallest_experiment": "Freeze a small cohort with exact stable model-visible runtime boilerplate and complete/missing/contradictory evidence, using the working low-cost JSON route; keep model, output cap, judge and acquisition fixed. Backend provider remains unknown unless Nous exposes it.",
+  "not_established": [
+    "population noninferiority",
+    "context or model necessity",
+    "token or latency savings",
+    "backend-provider-stable causal pair",
+    "THRML benefit",
+    "production integration",
+    "learned adaptation"
+  ],
+  "physical_inference_posts": 4,
+  "price_estimates_are_not_billing_caps": true,
+  "runs": [
+    {
+      "actual_backend_provider": null,
+      "completion_tokens": 2951,
+      "execution_window_seconds": 21.133989942,
+      "http_status": 200,
+      "prompt_tokens": 6323,
+      "receipt_sha256": "d7f691941e18a4aa1de9a0a936398fcda1835a70714a464072859a43837d5652",
+      "reported_cost_usd": 0,
+      "requested_model": "stepfun/step-3.7-flash:free",
+      "requested_provider": "nous",
+      "run": "nous-free-stepfun",
+      "strict_output_failure_preserved": true,
+      "total_wall_seconds": 22.393175066,
+      "verified_success": false
+    },
+    {
+      "actual_backend_provider": null,
+      "completion_tokens": null,
+      "execution_window_seconds": 4.006049071,
+      "http_status": 429,
+      "prompt_tokens": null,
+      "receipt_sha256": "7aba8f584ecb8e8846e857e4cc46aea893e5ce2fd148f88a49ac90d81075d972",
+      "reported_cost_usd": null,
+      "requested_model": "qwen/qwen3.8-27b:free",
+      "requested_provider": "openrouter",
+      "run": "openrouter-free-qwen",
+      "strict_output_failure_preserved": true,
+      "total_wall_seconds": 5.230086065,
+      "verified_success": false
+    },
+    {
+      "actual_backend_provider": null,
+      "completion_tokens": 176,
+      "execution_window_seconds": 5.706691372,
+      "http_status": 200,
+      "prompt_tokens": 7639,
+      "receipt_sha256": "afd03bec0f4ce8c959d3da674c47ca3c84b250692e2396c6a355d60342e0fc54",
+      "reported_cost_usd": 0.00041715,
+      "requested_model": "upstage/solar-mini4",
+      "requested_provider": "nous",
+      "run": "nous-cheap-solar",
+      "strict_output_failure_preserved": true,
+      "total_wall_seconds": 7.0325132,
+      "verified_success": false
+    },
+    {
+      "actual_backend_provider": null,
+      "completion_tokens": 183,
+      "execution_window_seconds": 6.18771876,
+      "http_status": 200,
+      "prompt_tokens": 7645,
+      "receipt_sha256": "c0d27b59a4a1fe89f0ef4ed83c12018171b608181b83aceb20dd1677420e4186",
+      "reported_cost_usd": 0.00041885,
+      "requested_model": "upstage/solar-mini4",
+      "requested_provider": "nous",
+      "run": "nous-cheap-solar-json-object",
+      "strict_output_failure_preserved": false,
+      "total_wall_seconds": 7.470554564,
+      "verified_success": true
+    }
+  ],
+  "schema": "hermes.nous_provider_qualification.v1",
+  "status": "ONE_VERIFIED_DEVELOPMENT_TASK_DEFAULT_OFF",
+  "stop": "Bounded round complete; no additional provider calls or background experiments scheduled.",
+  "successful_provider_responses": 3,
+  "task_and_selected_context_unchanged": true,
+  "unknown_failed_request_usage_is_not_zero": true,
+  "validation": {
+    "causal_tests_passed": 16,
+    "native_provider_audit_tests_passed": 57,
+    "provider_calls_during_tests": 0
+  },
+  "verified_tasks": 1
+}

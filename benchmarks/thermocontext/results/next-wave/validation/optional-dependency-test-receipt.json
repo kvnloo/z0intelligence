@@ -1,0 +1,45 @@
+{
+  "schema": "thermocontext.optional-dependency-tests.v1",
+  "change_scope": "Only pytest dependency guards in ThermoContext tests; no sampler, frozen prototype, protocol, or auditor implementation changed.",
+  "missing_dependency_behavior": "Guard optional JAX/THRML/SciPy imports before dependent imports; pure NumPy structural and controller tests remain active. Catch ModuleNotFoundError only.",
+  "base_environment": {
+    "python": "/workspace/hermes-factory/venvs/z0int/bin/python",
+    "optional_modules_absent": [
+      "jax",
+      "jaxlib",
+      "thrml",
+      "scipy"
+    ],
+    "numpy_present": true,
+    "command": "OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 taskset -c 2 /workspace/hermes-factory/venvs/z0int/bin/python -m pytest -q tests/test_thermocontext_*.py",
+    "passed": 45,
+    "skipped": 8,
+    "exit_code": 0,
+    "seconds": 0.31,
+    "log_sha256": "dad768c1db2403e81b875b24fd72bb9b3cdd17ddb110e4c5cf4cf680e6587365"
+  },
+  "full_environment": {
+    "python": "/workspace/hermes-factory/venvs/thermocontext/bin/python",
+    "requirements": "benchmarks/thermocontext/requirements-next-wave.txt",
+    "command": "OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 taskset -c 2 /workspace/hermes-factory/venvs/thermocontext/bin/python -m pytest -q tests/test_thermocontext_*.py",
+    "passed": 81,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 11.85,
+    "log_sha256": "f177abb38e05ccc38a1f798affce21ca53e2c271e5a9f46636cba2d675e8ae73"
+  },
+  "test_sha256": {
+    "tests/test_thermocontext_adaptive_budget.py": "aca5e8d8026517fc28cba280446087e821e690567c9cea0372f2943b03c276ed",
+    "tests/test_thermocontext_audit.py": "6c6193e8c539610196de2b9b88f8370dc6298e708b1ae4835007257445ae3210",
+    "tests/test_thermocontext_constrained_budget.py": "09901d278cd85c645d6879cd2caf617648d9f865ae9ff93fd94833a7760ff248",
+    "tests/test_thermocontext_milp_audit.py": "8d4565b93af3b37bcf4849fd4776ebb80dd24c90d7c1d1fcdbda47c0944361a4",
+    "tests/test_thermocontext_next_wave.py": "fc893e31464339dc0330512b0d1c29b0d07a1a5aa5f83e6bba03b029e0769faa",
+    "tests/test_thermocontext_pair_greedy.py": "9ff9f209fccdcf66e3eea96e6717f70abaabfb5a7bd3abbf005d036138337b69",
+    "tests/test_thermocontext_slack_budget.py": "86a249461f525a1c3217d783225ee2dfb9d82c14c7d7011f06b25b6f516b8d64",
+    "tests/test_thermocontext_thrml_backend.py": "74e517cc41f0c28385a68d646f473b07a82a2105b0cfb09021830af96d70ddf9"
+  },
+  "limits": [
+    "A module-level optional-dependency skip represents the module, not one count for every contained test.",
+    "Unrelated existing repository failures are documented separately."
+  ]
+}

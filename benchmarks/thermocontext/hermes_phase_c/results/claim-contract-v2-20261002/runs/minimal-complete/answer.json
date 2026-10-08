@@ -1,0 +1,10 @@
+{
+  "citations": [
+    "limits",
+    "source-identity"
+  ],
+  "hermes_speedup_established": null,
+  "reason": "supported",
+  "status": "SUPPORTED",
+  "tested_source": "a0bca744067d04f05904319d3d919be30c336556"
+}
