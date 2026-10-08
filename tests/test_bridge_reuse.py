@@ -552,6 +552,30 @@ class BridgeRepoReuseTests(unittest.TestCase):
             self.assertEqual(out["decision"]["mode"], "OBSERVE", out)
             self.assertFalse(out["decision"]["implementation_allowed"])
 
+    def test_packet_with_no_candidate_yet_is_still_delivered_when_a_verifier_is_configured(self):
+        payload, neutral = self.neutral_payload("Reuse the row normalization for records.")
+        del payload["symbol"]
+        payload["verifier_binding"] = {
+            "verifier_id": "pytest:records-owning-test",
+            "candidate_id": "file:upstream/records.py",
+            "argv": [sys.executable, "-m", "pytest", "-q", "tests/test_records.py"],
+            "test_paths": ["tests/test_records.py"],
+        }
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits()):
+            out = self.rt.reuse_resolve(payload)
+        # The agent must learn where the owning checkout is before it can name a candidate.
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["decision"]["mode"], "OBSERVE")
+        self.assertEqual(Path(out["root"]), self.repo.resolve())
+        self.assertTrue(self.injected(out)["ok"])
+        self.assertTrue(self.model_input(out)["ok"])
+        # An unbound observe-only packet can never admit a write.
+        inside = str(self.repo / "consumer.py")
+        self.assertFalse(self.check(out, target_cwd=str(neutral), target_paths=[inside])["valid"])
+        self.assertFalse(self.check(
+            out, target_cwd=str(neutral), target_paths=[inside], verifier_binding=payload["verifier_binding"],
+        )["valid"])
+
     def test_verifier_binding_accepts_pytest_node_for_exact_owning_file(self):
         from z0int.bridge.reuse import _normalize_verifier_binding
 

@@ -905,7 +905,14 @@ def prepare(payload: dict[str, Any]) -> PreparedReuse:
             *revision_gaps,
         ]))
     packet_metadata_sha256 = _canonical_sha256(packet_metadata)
-    verifier_binding = _bind_verifier_to_packet(packet, root, request.get("verifier_binding"))
+    if packet.decision.get("implementation_allowed") is True:
+        verifier_binding = _bind_verifier_to_packet(packet, root, request.get("verifier_binding"))
+    else:
+        # Nothing can be implemented from this packet, so there is no candidate
+        # to bind yet. Deliver the orientation anyway; an unbound record can
+        # never admit a write, and the binding is required again once a
+        # candidate is prepared.
+        verifier_binding = None
     request["verifier_binding"] = verifier_binding
     binding_fingerprint = json.dumps(verifier_binding, sort_keys=True, ensure_ascii=False, separators=(",", ":")) if verifier_binding is not None else ""
     packet_material = f"{request['trace_id']}|{request['session_id']}|{packet.input_fingerprint}"
