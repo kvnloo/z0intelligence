@@ -92,7 +92,7 @@ def _normalize_verifier_binding(raw: Any) -> dict[str, Any]:
         normalized_paths.append(raw_path)
     if len(set(normalized_paths)) != len(normalized_paths):
         raise ValueError("verifier_binding test paths must be unique")
-    if any(path not in argv for path in normalized_paths):
+    if any(not any(arg.partition("::")[0] == path for arg in argv) for path in normalized_paths):
         raise ValueError("verifier_binding.argv must contain every exact test path")
     return {
         "verifier_id": verifier_id.strip(),
@@ -361,6 +361,7 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
     manifest_ref = next((
         ref for ref in context.evidence
         if manifest_path is not None and ref.source_id == f"file:{manifest_path}"
+        and ref.trust_class == "project_constraint"
     ), None)
     subsystem_paths = None
     if manifest_path is not None:

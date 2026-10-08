@@ -289,6 +289,29 @@ class FileSearchTests(unittest.TestCase):
             self.assertEqual(out["coverage"], "partial")
             self.assertIn("subscription handle", out["error"])
 
+    def test_epoch_subscription_recovers_after_watcher_startup(self):
+        class StartingFinder(_Finder):
+            attempts = 0
+
+            def watch(self, pattern, callback):
+                self.attempts += 1
+                if self.attempts == 1:
+                    raise RuntimeError("File system watcher is not ready")
+                return super().watch(pattern, callback)
+
+        class StartingFFF:
+            __version__ = "0.11.0"
+            FileFinder = StartingFinder
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "z0int.file_search._load_fff", return_value=StartingFFF
+        ):
+            first = file_search.search_repository(tmp, "find_context", kind="exact_symbol")
+            self.assertFalse(first["generation_reliable"])
+            second = file_search.search_repository(tmp, "find_context", kind="exact_symbol")
+            self.assertTrue(second["generation_reliable"])
+            self.assertEqual(second["coverage"], "complete")
+
     def test_missing_binding_fails_open(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch(
             "z0int.file_search._load_fff", return_value=None

@@ -422,6 +422,13 @@ class BridgeRepoReuseTests(unittest.TestCase):
         manifest = str((self.repo / "zer0.repo.yaml").resolve())
         self.assertIn(f"file:{manifest}", out["packet"]["context"]["recipe"]["source_epochs"])
 
+    def test_manifest_index_hit_does_not_shadow_hydrated_manifest(self):
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits(
+            "zer0.repo.yaml", "upstream/records.py", "tests/test_records.py",
+        )):
+            out = self.prepare()
+        self.assertEqual(out["decision"]["mode"], "REUSE", out["packet"]["unresolved_gaps"])
+
     def test_manifest_identity_mismatch_fails_closed(self):
         (self.repo / "zer0.repo.yaml").write_text(
             "version: 1\nrepo: example/other-library\narchitecture:\n"
@@ -496,6 +503,19 @@ class BridgeRepoReuseTests(unittest.TestCase):
         self.assertTrue(self.check(out)["valid"])
         self.assertFalse(self.check(out, session_id="another-session")["valid"])
         self.assertFalse(self.check(out, target_cwd=str(self.base))["valid"])
+
+    def test_verifier_binding_accepts_pytest_node_for_exact_owning_file(self):
+        from z0int.bridge.reuse import _normalize_verifier_binding
+
+        binding = {
+            "verifier_id": "pytest:owning-node",
+            "candidate_id": "file:upstream/records.py",
+            "argv": ["python", "-m", "pytest", "tests/test_records.py::RecordsTests::test_existing"],
+            "test_paths": ["tests/test_records.py"],
+        }
+        self.assertEqual(_normalize_verifier_binding(binding)["argv"], binding["argv"])
+        with self.assertRaises(ValueError):
+            _normalize_verifier_binding({**binding, "argv": ["pytest", "other/tests/test_records.py::test_existing"]})
 
     def test_verifier_binding_is_prepared_before_mutation_and_cannot_be_swapped(self):
         request = self.payload()

@@ -108,6 +108,13 @@ def _resident(root: Path) -> tuple[_ResidentFinder | None, str, bool, str | None
         if existing is not None:
             existing.last_used = time.time()
             _POOL.move_to_end(key)
+            with existing.lock:
+                if existing.subscription is None:
+                    try:
+                        existing.subscription = existing.finder.watch(None, existing.on_change)
+                        existing.epoch_error = None if existing.subscription is not None else "watch returned no subscription handle"
+                    except Exception as exc:
+                        existing.epoch_error = f"{type(exc).__name__}: {exc}"
             status = "ready" if existing.ready else "warming"
             return existing, status, True, None
 
