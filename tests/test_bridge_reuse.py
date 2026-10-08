@@ -429,6 +429,15 @@ class BridgeRepoReuseTests(unittest.TestCase):
             out = self.prepare()
         self.assertEqual(out["decision"]["mode"], "REUSE", out["packet"]["unresolved_gaps"])
 
+    def test_known_owning_test_path_is_hydrated_without_fuzzy_search(self):
+        request = self.payload()
+        request["test_query"] = "tests/test_records.py"
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits(
+            "upstream/records.py",
+        )):
+            out = self.rt.reuse_resolve(request)
+        self.assertEqual(out["decision"]["mode"], "REUSE", out["packet"]["unresolved_gaps"])
+
     def test_manifest_identity_mismatch_fails_closed(self):
         (self.repo / "zer0.repo.yaml").write_text(
             "version: 1\nrepo: example/other-library\narchitecture:\n"

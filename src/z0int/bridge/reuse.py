@@ -302,7 +302,19 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
         kind="exact_symbol" if symbol else "natural_language", symbol=symbol, required=True,
     )]
     if request.get("test_query"):
-        needs.append(InformationNeed(id="test-discovery", description=request["test_query"], kind="natural_language", required=True))
+        test_query = request["test_query"]
+        test_path = Path(test_query)
+        search_root = Path(request["project_root"]).resolve()
+        exact_test = (
+            not test_path.is_absolute()
+            and _relative_to_root(search_root, search_root / test_path) is not None
+            and (search_root / test_path).is_file()
+        )
+        needs.append(InformationNeed(
+            id="test-discovery", description=test_query,
+            kind="exact_path" if exact_test else "natural_language",
+            path=test_query if exact_test else None, required=True,
+        ))
     memory_scope = MemoryScope(**request["memory_scope"]) if request.get("memory_scope") else None
     if memory_scope is not None:
         needs.append(InformationNeed(id="scoped-memory", description="Admitted decisions for this workstream", kind="memory", required=True))
