@@ -513,6 +513,45 @@ class BridgeRepoReuseTests(unittest.TestCase):
         self.assertFalse(self.check(out, session_id="another-session")["valid"])
         self.assertFalse(self.check(out, target_cwd=str(self.base))["valid"])
 
+    def neutral_payload(self, query="Reuse the row normalization that keeps the first occurrence."):
+        neutral = self.base / "neutral"
+        neutral.mkdir(exist_ok=True)
+        payload = self.payload()
+        del payload["canonical_repo"]
+        payload.update(project_root=str(neutral), query=query)
+        return payload, neutral
+
+    def test_task_without_repository_resolves_owner_and_checkout_from_registry(self):
+        payload, neutral = self.neutral_payload()
+        out = self.rt.reuse_resolve(payload)
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["decision"]["mode"], "REUSE", out["decision"])
+        orientation = json.loads(out["context_text"])["context"]["measurements"]["repo_orientation"]
+        self.assertEqual(orientation["repo_slug"], "example/known-library")
+        self.assertEqual(Path(orientation["root"]), self.repo.resolve())
+
+        self.assertTrue(self.injected(out)["ok"])
+        self.assertTrue(self.model_input(out)["ok"])
+        inside = str(self.repo / "consumer.py")
+        # Scope follows the resolved repository, not the directory the session started in.
+        self.assertTrue(self.check(out, target_cwd=str(neutral), target_paths=[inside])["valid"])
+        self.assertFalse(self.check(out, target_cwd=str(neutral), target_paths=["consumer.py"])["valid"])
+        self.assertFalse(self.check(out, target_cwd=str(neutral), target_paths=[str(self.base / "elsewhere.py")])["valid"])
+        self.assertFalse(self.check(out, target_cwd=str(neutral), target_paths=[str(self.repo / ".git" / "config")])["valid"])
+        self.assertFalse(self.check(out, target_cwd=str(self.repo), target_paths=["../neutral/escape.py"])["valid"])
+
+    def test_ambiguous_or_unowned_task_only_observes(self):
+        self.registry.write_text(
+            self.registry.read_text()
+            + "  rows:\n    repo: example/other-library\n    boundaries:\n      owns: [row normalization]\n"
+        )
+        for query in ("Reuse the row normalization that keeps the first occurrence.", "Make the button blue."):
+            payload, neutral = self.neutral_payload(query)
+            payload["trace_id"] = "trace-" + hashlib.sha256(query.encode()).hexdigest()[:8]
+            out = self.rt.reuse_resolve(payload)
+            self.assertEqual(out["decision"]["mode"], "OBSERVE", out)
+            self.assertFalse(out["decision"]["implementation_allowed"])
+
     def test_verifier_binding_accepts_pytest_node_for_exact_owning_file(self):
         from z0int.bridge.reuse import _normalize_verifier_binding
 

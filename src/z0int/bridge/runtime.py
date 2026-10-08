@@ -340,6 +340,7 @@ class BridgeRuntime:
                 "context_text": record.context_text, "decision": record.packet.decision,
                 "source_revisions": record.packet.source_revisions,
                 "snapshot_id": record.snapshot.snapshot_id, "event_id": record.event_id,
+                "root": str(record.root) if record.root is not None else None,
                 **self.identity(),
             }
         except (OSError, ValueError, TypeError, RuntimeError) as exc:

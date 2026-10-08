@@ -74,6 +74,7 @@ type PreparedTurn =
 			contextBlock: string;
 			decision: ReuseDecision;
 			injectionId: number | null;
+			root: string | null;
 	  };
 
 type TurnIdentity = { traceId: string; sessionId: string; cwd: string; agentId: string };
@@ -194,6 +195,7 @@ function resolveResponse(value: unknown, expectedTraceId: string): {
 	packet: JsonObject;
 	contextText: string;
 	decision: ReuseDecision;
+	root: string | null;
 } | null {
 	if (!isObject(value) || value.ok !== true || value.trace_id !== expectedTraceId) return null;
 	const packetId = nonEmptyString(value.packet_id);
@@ -205,7 +207,7 @@ function resolveResponse(value: unknown, expectedTraceId: string): {
 		? value.context_text
 		: JSON.stringify(packet);
 	if (typeof contextText !== "string") return null;
-	return { packetId, packet, contextText, decision };
+	return { packetId, packet, contextText, decision, root: nonEmptyString(value.root) };
 }
 
 function checkResponse(value: unknown): { valid: boolean; status: string; decision: ReuseDecision | null } | null {
@@ -283,6 +285,8 @@ export interface ReuseAdapter {
 		event: Pick<ProviderPayloadFinalizedEvent, "serializedBody">,
 		context: ReuseHookContext,
 	) => Promise<void>;
+	/** Checkout the current turn's packet resolved to, when the session started elsewhere. */
+	resolvedRoot: () => string | null;
 	reset: () => void;
 }
 
@@ -320,7 +324,9 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 			return;
 		}
 		const { canonicalRepo, registryPath, candidateRoots } = dependencies.config;
-		if (!canonicalRepo || !registryPath || candidateRoots.length === 0) {
+		// The repository itself may be left to registry ownership; the registry
+		// and the installed checkouts it can map to are still operator inputs.
+		if (!registryPath || candidateRoots.length === 0) {
 			prepared = unavailable(mode, identity, traceId, "canonical repository orientation is not configured");
 			return;
 		}
@@ -337,7 +343,7 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 					trace_id: traceId,
 					session_id: identity.sessionId,
 					payload: {
-						canonical_repo: canonicalRepo,
+						...(canonicalRepo ? { canonical_repo: canonicalRepo } : {}),
 						registry_path: registryPath,
 						candidate_roots: [...candidateRoots],
 						project_root: identity.cwd,
@@ -371,6 +377,7 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 				contextBlock: makeContextBlock(resolved.contextText),
 				decision: resolved.decision,
 				injectionId: null,
+				root: resolved.root,
 			};
 		} catch (error) {
 			if (generation !== currentGeneration ||
@@ -560,6 +567,7 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 		toolCall: beforeToolCall,
 		toolResult: afterToolResult,
 		providerPayloadFinalized,
+		resolvedRoot: () => (prepared.kind === "ready" ? prepared.root : null),
 		reset: () => {
 			generation += 1;
 			prepared = { kind: "off" };
