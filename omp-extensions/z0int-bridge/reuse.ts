@@ -8,6 +8,7 @@ import type {
 	ExtensionContext,
 	ToolCallEvent,
 	ToolCallEventResult,
+	ToolResultEvent,
 	ProviderPayloadFinalizedEvent,
 } from "@oh-my-pi/pi-coding-agent";
 
@@ -277,6 +278,7 @@ export interface ReuseAdapter {
 		event: Pick<ToolCallEvent, "toolName" | "input">,
 		context: ReuseHookContext,
 	) => Promise<ToolCallEventResult | void>;
+	toolResult: (event: Pick<ToolResultEvent, "toolName" | "input" | "isError">, context: ReuseHookContext) => Promise<void>;
 	providerPayloadFinalized: (
 		event: Pick<ProviderPayloadFinalizedEvent, "serializedBody">,
 		context: ReuseHookContext,
@@ -290,14 +292,17 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 	// wrappers for advisors share the runner but report their own context.agent.id.
 	let primaryAgentId: string | null = null;
 	let generation = 0;
+	let taskPrompt: string | null = null;
 	const timeoutMs = dependencies.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
 	async function beforeAgentStart(
 		event: Pick<BeforeAgentStartEvent, "prompt">,
 		context: ReuseHookContext,
+		discovery?: { symbol: string; test_query?: string },
 	): Promise<void> {
 		if (primaryAgentId === null) primaryAgentId = context.agent.id;
 		if (context.agent.id !== primaryAgentId) return;
+		taskPrompt = event.prompt;
 		const currentGeneration = ++generation;
 		prepared = { kind: "off" };
 		const mode = dependencies.config.mode;
@@ -337,6 +342,7 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 						candidate_roots: [...candidateRoots],
 						project_root: identity.cwd,
 						query,
+						...discovery,
 						task_id: dependencies.config.taskId ?? nonEmptyString(dependencies.config.memoryScope?.task) ?? traceId,
 						...(dependencies.config.memoryScope ? { memory_scope: dependencies.config.memoryScope } : {}),
 						...(dependencies.config.verifierBinding ? { verifier_binding: dependencies.config.verifierBinding } : {}),
@@ -371,6 +377,22 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 				!matchesTurn(prepared, contextIdentity(context), dependencies.getTraceId())) return;
 			prepared = unavailable(mode, identity, traceId, `reuse resolver failed: ${errorMessage(error)}`);
 		}
+	}
+
+	async function afterToolResult(
+		event: Pick<ToolResultEvent, "toolName" | "input" | "isError">,
+		context: ReuseHookContext,
+	): Promise<void> {
+		if (prepared.kind !== "unavailable" || !taskPrompt || event.isError ||
+			event.toolName !== "z0_file_search" || event.input.kind !== "exact_symbol" ||
+			!matchesTurn(prepared, contextIdentity(context), dependencies.getTraceId())) return;
+		const symbol = nonEmptyString(event.input.query);
+		if (!symbol || !/^[A-Za-z_][A-Za-z0-9_.$:]*$/.test(symbol)) return;
+		const paths = dependencies.config.verifierBinding?.test_paths;
+		const testQuery = Array.isArray(paths) ? paths.filter((path): path is string => typeof path === "string").join(" ") : "";
+		await beforeAgentStart({ prompt: taskPrompt }, context, {
+			symbol, ...(testQuery ? { test_query: testQuery } : {}),
+		});
 	}
 
 	async function injectContext(
@@ -536,10 +558,12 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 		beforeAgentStart,
 		context: injectContext,
 		toolCall: beforeToolCall,
+		toolResult: afterToolResult,
 		providerPayloadFinalized,
 		reset: () => {
 			generation += 1;
 			prepared = { kind: "off" };
+			taskPrompt = null;
 		},
 	};
 }
@@ -549,6 +573,7 @@ export function registerReuseAdapter(pi: ExtensionAPI, dependencies: ReuseDepend
 	pi.on("before_agent_start", (event, context) => adapter.beforeAgentStart(event, context));
 	pi.on("context", (event, context) => adapter.context(event, context));
 	pi.on("tool_call", (event, context) => adapter.toolCall(event, context));
+	pi.on("tool_result", (event, context) => adapter.toolResult(event, context));
 	pi.on("provider_payload_finalized", (event, context) => adapter.providerPayloadFinalized(event, context));
 	pi.on("session_switch", () => adapter.reset());
 	pi.on("session_branch", () => adapter.reset());

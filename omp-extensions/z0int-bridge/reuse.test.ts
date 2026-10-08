@@ -112,6 +112,24 @@ function blocked(value: unknown): boolean {
 	return value !== null && typeof value === "object" && "block" in value && value.block === true;
 }
 
+test("agent symbol search recovers an unavailable packet without replacing the task input", async () => {
+	const h = harness({ resolveResponses: [{ ok: false }, resolveResponse()] });
+	await h.adapter.beforeAgentStart({ prompt: "Add a bounded path evidence CLI" }, CONTEXT);
+	await h.adapter.toolResult({ toolName: "z0_file_search", input: { kind: "exact_symbol", query: "existing_helper" }, isError: false }, CONTEXT);
+	const resolves = h.sent.filter(row => row.body.op === "reuse_resolve");
+	expect(resolves).toHaveLength(2);
+	expect(resolves[1].body.payload).toMatchObject({ query: "Add a bounded path evidence CLI", symbol: "existing_helper" });
+	expect(await h.adapter.context({ messages: [] }, CONTEXT)).toBeDefined();
+});
+
+test("failed or advisor searches cannot recover the primary packet", async () => {
+	const h = harness({ resolve: { ok: false } });
+	await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
+	await h.adapter.toolResult({ toolName: "z0_file_search", input: { kind: "exact_symbol", query: "helper" }, isError: true }, CONTEXT);
+	await h.adapter.toolResult({ toolName: "z0_file_search", input: { kind: "exact_symbol", query: "helper" }, isError: false }, ADVISOR_CONTEXT);
+	expect(h.sent.filter(row => row.body.op === "reuse_resolve")).toHaveLength(1);
+});
+
 function userMessageText(message: AgentMessage | undefined): string | null {
 	if (!message || !("role" in message) || message.role !== "user") return null;
 	if (typeof message.content === "string") return message.content;
