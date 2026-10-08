@@ -14,6 +14,7 @@ export type Call = ((op: string, extra?: Json, timeoutMs?: number) => Promise<Js
 	onNotice?: (handler: NoticeHandler) => () => void;
 };
 type TextBlock = { type: "text"; text: string };
+type Effort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 type ToolCall = { type: "toolCall"; name: string; id: string; arguments: Json };
 type NativeBlock = { type: string; text?: string; thinking?: string };
 // These are the consumed SDK fields, not a reconstruction of its native history.
@@ -29,7 +30,7 @@ type StreamEvent =
 	| { type: "error"; error: Assistant }
 	| { type: "start" | "text_start" | "text_delta" | "thinking_start" | "thinking_delta" | "toolcall_start" | "toolcall_delta" | "image_end" };
 type ModelPolicy = { api?: string; compat?: { supportsPromptCacheBreakpoints?: boolean; supportsAllTurnsReasoningContext?: boolean } };
-type StreamOptions = { apiKey: unknown; cacheRetention: "short"; signal: AbortSignal; storeResponses: false; statefulResponses: false; onPayload: (payload: unknown, model?: ModelPolicy) => unknown };
+type StreamOptions = { apiKey: unknown; reasoning?: Effort; forceReasoningOff: boolean; promptCacheKey: string; cacheRetention: "short"; signal: AbortSignal; storeResponses: false; statefulResponses: false; onPayload: (payload: unknown, model?: ModelPolicy) => unknown };
 type StreamSimple = (model: unknown, context: { systemPrompt: string[]; messages: Message[]; tools: typeof TOOLS }, options: StreamOptions) => AsyncIterable<StreamEvent>;
 
 export type TurnCtx = {
@@ -44,6 +45,7 @@ export type TurnCtx = {
 	};
 };
 export type TurnPi = {
+	getThinkingLevel: () => "off" | Effort | undefined;
 	sendMessage?: (message: { customType: string; content: string; display: boolean }, options?: { triggerTurn?: boolean }) => void;
 };
 type TurnOwner = {
@@ -273,6 +275,7 @@ async function freshCall(owner: TurnOwner, opened: Json): Promise<void> {
 	const model = owner.ctx.model;
 	if (!model) throw new Error("no active model");
 	const apiKey = await owner.ctx.modelRegistry?.getApiKey?.(model);
+	const thinking = owner.pi.getThinkingLevel();
 	const pieces = Array.isArray(opened.pieces) ? opened.pieces.map(String) : [String(opened.view ?? "")];
 	const blocks = Array.isArray(opened.blocks) ? opened.blocks.map(String) : [];
 	const userText = blocks[1] ?? "";
@@ -284,6 +287,9 @@ async function freshCall(owner: TurnOwner, opened: Json): Promise<void> {
 		const calls: ToolCall[] = [];
 		const stream = streamSimple(model, { systemPrompt: [String(opened.system ?? "")], messages, tools: TOOLS }, {
 			apiKey,
+			reasoning: thinking === "off" ? undefined : thinking,
+			forceReasoningOff: thinking === "off",
+			promptCacheKey: "z0int-optchat",
 			cacheRetention: "short",
 			storeResponses: false,
 			statefulResponses: false,

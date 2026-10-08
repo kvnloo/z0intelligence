@@ -373,6 +373,11 @@ It does not send the OMP session history. **All OMP sessions share one permanent
 OptChat log** under `$Z0INT_HOME/optchat`, or `~/.z0int/optchat`. A new OMP session
 does not reset that log.
 
+The main turn uses the active OMP model and selected thinking effort, including
+`max` when supported. OpenAI-family requests keep a stable prompt-cache routing
+key for the shared log, without retaining a server conversation. A stable key
+does not prove a cache hit; verify the real provider's token-usage report.
+
 The related [OptMem repository](https://github.com/VictorTaelin/OptMem) is the tree
 memory predecessor. Its `wake` tiling is not OptChat's append-and-merge view.
 The creator's [AI-scripts Anthropic adapter](https://github.com/VictorTaelin/AI-scripts/blob/906c4feb8e3345dfab8675c3961182ab8b647637/askai/Vendors/Anthropic.ts)

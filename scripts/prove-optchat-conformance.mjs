@@ -183,13 +183,14 @@ const model = buildModel({
   id: scenario === "reasoning" ? "gpt-5.6" : "audit-local-model", name: "Audit Local", provider: scenario === "reasoning" ? "openai" : "audit-local",
   api: scenario === "reasoning" ? "openai-responses" : "anthropic-messages", baseUrl: origin + "/v1",
   reasoning: scenario === "reasoning", input: ["text"], contextWindow: 200000, maxTokens: 1024,
+  thinking: scenario === "reasoning" ? { mode: "effort", efforts: ["low", "medium", "high", "xhigh", "max"] } : undefined,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 });
 const ctx = { cwd: fixture, model, modelRegistry: { getApiKey: async () => "dummy-local-not-a-secret" }, ui: {
   notify: (message, level) => notifications.push({ message, level }),
   onTerminalInput: handler => { terminalHandlers.add(handler); return () => terminalHandlers.delete(handler); },
 } };
-const pi = { sendMessage: message => shown.push(message) };
+const pi = { getThinkingLevel: () => scenario === "reasoning" ? "max" : "off", sendMessage: message => shown.push(message) };
 const checks = [];
 function check(name, verify) { verify(); checks.push(name); }
 function logRows() {
@@ -263,6 +264,13 @@ try {
     if (scenario !== "rpc-error") check("stopped response starts no later request", () => assert.equal(requests.length, 1));
   }
   if (scenario === "reasoning") {
+    check("selected max effort reaches every native Responses request", () => {
+      for (const request of requests) assert.equal(request.reasoning?.effort, "max");
+    });
+    check("fresh requests retain one cache identity without server history", () => {
+      assert.equal(typeof requests[0].prompt_cache_key, "string");
+      assert.equal(requests[0].prompt_cache_key, requests[1].prompt_cache_key);
+    });
     check("native encrypted reasoning survives injected user input", () => {
       assert.equal(requests.length, 2);
       const input = requests[1].input;
