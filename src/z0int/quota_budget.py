@@ -31,11 +31,12 @@ def project(provider,model,config,needed,events=None,now=None):
     root=os.environ.get('Z0INT_KERDOIOS_ROOT',rule.get('kerdoios_root'))
     added=bool(root and root not in sys.path)
     if added:sys.path.append(root)
+    parser=None
     try:
-        from kerdoios.quota.model import QuotaState,QuotaDimension
         from kerdoios.quota.parse import quota_state_from_headers
+        parser=quota_state_from_headers
     except ImportError:
-        return {'allowed':False,'reason':'quota_backend_unavailable','next_eligible_at':None}
+        parser=None
     finally:
         if added:sys.path.remove(root)
     now=time.time() if now is None else now
@@ -65,26 +66,29 @@ def project(provider,model,config,needed,events=None,now=None):
         used=sum(1 if dim.startswith('r') else t for _,t in recent)
         required=1 if dim.startswith('r') else needed
         reset=min((ts+window for ts,_ in recent),default=now)
-        dims[dim]=QuotaDimension(limit=limit,remaining=max(0,limit-used),reset_at=reset,source='locally_reconstructed')
+        dims[dim]={'limit':limit,'remaining':max(0,limit-used),'reset_at':reset,'source':'locally_reconstructed'}
         if limit-used<required:next_times.append(reset)
-    if headers:
+    if headers and parser is not None:
         observed,raw=max(headers,key=lambda pair:pair[0])
         # KERD's legacy generic parser maps unsuffixed requests to RPM. Groq
         # documents these as RPD; normalize the input, retaining raw receipts.
         normalized={k.replace('-requests','-requests-day') if provider=='groq' and k.endswith('-requests') else k:v for k,v in raw.items()}
-        reported=quota_state_from_headers(normalized,provider=provider,model=model,now=observed)
+        reported=parser(normalized,provider=provider,model=model,now=observed)
         for dim,d in reported.dimensions.items():
             if d.remaining is None:continue
             expiry=d.reset_at or observed+WINDOWS.get(dim,86400)
             if now>=expiry:continue
             after=[(ts,t) for ts,t in calls if ts>observed]
             remaining=max(0,d.remaining-sum(1 if dim.startswith('r') else t for _,t in after))
-            if dim in dims and remaining<dims[dim].remaining:
-                dims[dim]=QuotaDimension(limit=d.limit,remaining=remaining,reset_at=expiry,source='provider_header')
+            if dim in dims and remaining<dims[dim]['remaining']:
+                dims[dim]={'limit':d.limit,'remaining':remaining,'reset_at':expiry,'source':'provider_header'}
             if remaining<(1 if dim.startswith('r') else needed):next_times.append(expiry)
-    state=QuotaState(provider=provider,model=model,dimensions=dims,observed_at=now)
-    return {'allowed':not next_times and state.has_free_capacity(),'reason':'quota_available' if not next_times else 'quota_boundary',
-        'quota_bucket':provider+'/'+model,'quota':state.to_dict(),'request_count_24h':sum(ts>now-86400 for ts,_ in calls),
+    # Preserve the previously published QuotaState.to_dict() wire shape even
+    # when kerdoios.quota is unavailable; receipts still own the measurements.
+    quota_state={'provider':provider,'model':model,'observed_at':now,'dimensions':dims}
+    return {'allowed':not next_times,'reason':'quota_available' if not next_times else 'quota_boundary',
+        'quota_bucket':provider+'/'+model,'quota':quota_state,'quota_source':'local_receipts' if parser is None else 'local_plus_headers',
+        'request_count_24h':sum(ts>now-86400 for ts,_ in calls),
         'tokens_24h':sum(t for ts,t in calls if ts>now-86400),'reserved_tokens':needed,
         'next_eligible_at':max(next_times) if next_times else None,'reset_rule':'rolling conservative windows plus provider header reset; never midnight refill',
         'reset_cohort_date':time.strftime('%Y-%m-%d',time.gmtime(now)),'no_paid_spill':True}

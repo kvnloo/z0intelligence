@@ -65,6 +65,11 @@ class BridgeRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, z0home(tmp):
             import z0int.bridge.runtime as rtmod
 
+            # The bridge runs in-process in the complete pytest suite; never
+            # leak per-test runtime stubs into later hot-path tests.
+            for attr in ("preflight", "kerdoios_plan", "kerdoios_record"):
+                self.addCleanup(setattr, rtmod, attr, getattr(rtmod, attr))
+
             rtmod.preflight = lambda prompt: {  # type: ignore[assignment]
                 "capability_id": "coding.next_action",
                 "route": "local",
@@ -146,6 +151,7 @@ class BridgeRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, z0home(tmp):
             import z0int.bridge.runtime as rtmod
 
+            self.addCleanup(setattr, rtmod, "preflight", rtmod.preflight)
             rtmod.preflight = lambda prompt: {"route": "local", "capability_id": "x"}  # type: ignore
             rt = BridgeRuntime(generation=5, instance_id="t", build_id="b")
             out = rt.turn_open(

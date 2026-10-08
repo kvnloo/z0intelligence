@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
 import time
 import uuid
 from typing import Any
@@ -16,6 +17,29 @@ from typing import Any
 from z0int.bridge.generation import publish_current
 from z0int.bridge.protocol import BRIDGE_PROTOCOL, OPS, compute_build_id
 from z0int.bridge.runtime import BridgeRuntime
+
+def _defer_automatic(payload: dict[str, Any]) -> dict[str, Any]:
+    """Receipt work stays off the stdin loop and off the OMP turn hook."""
+
+    def run() -> None:
+        try:
+            from z0int.automatic import consume, handle_event
+
+            result = handle_event(payload)
+            receipt_id = result.get("receipt_id") if isinstance(result, dict) else None
+            if receipt_id:
+                consume(
+                    {
+                        "harness": payload.get("harness"),
+                        "instance_id": payload.get("instance_id"),
+                        "receipt_id": receipt_id,
+                    }
+                )
+        except Exception:
+            return
+
+    threading.Thread(target=run, name="z0int-automatic", daemon=True).start()
+    return {"ok": True, "deferred": True, "spawn": False}
 
 
 def _respond(req_id: str | None, body: dict[str, Any]) -> None:
@@ -95,6 +119,10 @@ def serve(generation: int | None = None) -> int:
                 if isinstance(req.get("payload"), dict):
                     payload.update(req["payload"])
                 _respond(req_id, rt.cognition_shadow(payload))
+                continue
+            if op == "automatic_event":
+                payload = req.get("payload") if isinstance(req.get("payload"), dict) else {}
+                _respond(req_id, _defer_automatic(payload))
                 continue
             if op == "shutdown":
                 _respond(req_id, {"ok": True, "shutdown": True, **rt.identity()})
