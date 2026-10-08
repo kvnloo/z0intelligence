@@ -49,6 +49,9 @@ games = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"z0int.optchat" = ["*.mjs"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests", "webgpu-demo"]
 markers = ["live: requires configured external or local model services"]
