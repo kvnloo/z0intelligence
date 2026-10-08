@@ -1,27 +1,23 @@
 # AODL compatibility target
 
-z0int's future Routine/Cascade compiler targets the **AODL intent-contract
-semantics**, not `aodl/main` as of 2026-09-18.
+z0int's Routine/Cascade compiler targets the **AODL intent-contract semantics**
+at the exact `aodl-contract` commit pinned in `pyproject.toml`. Main and the
+rolling channels are references, not implicit runtime upgrades.
 
 ## Relevant upstream refs checked
 
-- `kvnloo/aodl@main` — `8e41ef024262339d28a968d71113fc52819d4bd4`
-  (Sep 10; **does not contain the intent-contract profile**).
-- `cursor/aodl-intent-contract-e30f` — contains the intent-and-participation
-  contract (`profiles/intent-contract.md`, `intent-loop.json`, executor harness
-  binding). This branch is 12 commits ahead of main.
-- `nightly` — `9e8d61673b1fca39ffe453609d763996dce94cbb`.
-  Contains the intent-contract work plus the stricter current formal contract:
-  `observedGraph`, fail-closed harness catalog validation, control-room rejection,
-  verifier-vs-humanGate authority separation, closed event types, and Hermes
-  dry-run compiler semantics.
-- `preview` — `ed73b7ee2e600cf1f575a57afd435e548665404d`.
-  Contains the intent/Hermes work plus Mesh Registry and Jev catalog additions.
-  It diverges from nightly; the registry additions are catalog-only and do not
-  replace the nightly intent/authority semantics used here.
-- `feat/validator-importable-api-12` — exposes an importable validator, but is
-  based directly on the old main head. Do not use it as the semantic authority
-  until rebased onto the current formal contract.
+- `kvnloo/aodl@main` — `416736c80a727757202bdeedb02579c3c820f7f6`
+  (Sep 30). Main now contains `profiles/intent-contract.md`, the importable
+  validator, `observedGraph`, fail-closed harness validation, closed event
+  types, and the intent/plan/observed separation. The older note that main
+  lacked the intent-contract profile is obsolete.
+- z0int's package dependency is pinned to
+  `68231658f0ec0338464c0916a2329b9587444312` (Oct 1), which is the current
+  runtime semantic authority for this repo. It adds `aodl-canon-1` canonical
+  semantic fingerprints on top of the Sep 30 main head.
+- AODL `nightly` / `preview` can move ahead of that pin. Treat newer channel
+  work as research until the z0int dependency pin is intentionally advanced and
+  its contract tests pass.
 
 ## z0int mapping
 
