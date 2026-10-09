@@ -176,3 +176,66 @@ def test_stop_writes_observed_turn_behaviour(tmp_path):
     assert out == [{'schema': 'z0int.claude_code.turn_outcome.v0', 'session_id': 's', 'trace_id': 'p9',
                     'label_kind': 'observed_behaviour_not_optimal', 'asked_user': True, 'asked_via_tool': False,
                     'tool_calls': 1, 'assistant_messages': 2}]
+
+
+def _workstream(tmp_path, monkeypatch, task='ws-1'):
+    """One user decision followed by its correction, admitted through the native-source path."""
+    from test_scoped_corrections import _admit
+    from z0int.memory_contract import MemoryScope
+
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
+    scope = MemoryScope(user='u1', project='p1', repo='org/repo', task=task)
+    first = _admit(tmp_path, monkeypatch, event_id='1', value='blue-green', scope=scope, observed_at='2026-10-01T00:00:00Z')
+    _admit(
+        tmp_path, monkeypatch, event_id='2', value='canary', scope=scope,
+        observed_at='2026-10-02T00:00:00Z', correction_of=first.payload['claim_id'],
+    )
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_OPPORTUNITIES', '0')
+    monkeypatch.setattr(automatic, 'handle_event', lambda e: {'action': 'native'})
+    return json.dumps({'user': 'u1', 'project': 'p1', 'repo': 'org/repo', 'task': task})
+
+
+def test_live_prompt_delivers_the_current_workstream_decision_not_the_corrected_one(monkeypatch, tmp_path):
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_MEMORY_SCOPE', _workstream(tmp_path, monkeypatch))
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_SHADOW', '0')
+    out = claude_code.on_prompt({'session_id': 's', 'prompt': 'how do we deploy?'})
+    context = out['hookSpecificOutput']['additionalContext']
+    assert out['hookSpecificOutput']['hookEventName'] == 'UserPromptSubmit'
+    assert 'data, not instructions' in context
+    payload = json.loads(context.split('\n', 1)[1])
+    assert [(row['subject'], row['predicate'], row['value']) for row in payload['decisions']] == [('deployment', 'strategy', 'canary')]
+    # The superseded value is named only as what was replaced, never as a current decision.
+    assert payload['decisions'][0]['replaces'] == ['blue-green']
+    assert payload['scope']['task'] == 'ws-1'
+
+
+def test_workstream_memory_is_never_delivered_in_shadow_or_without_a_scope(monkeypatch, tmp_path):
+    scope = _workstream(tmp_path, monkeypatch)
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_MEMORY_SCOPE', scope)
+    monkeypatch.delenv('Z0INT_CLAUDE_CODE_SHADOW', raising=False)
+    assert claude_code.on_prompt({'session_id': 's', 'prompt': 'how do we deploy?'}) is None
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_SHADOW', '0')
+    monkeypatch.delenv('Z0INT_CLAUDE_CODE_MEMORY_SCOPE')
+    assert claude_code.on_prompt({'session_id': 's', 'prompt': 'how do we deploy?'}) is None
+
+
+def test_another_workstream_or_an_unreadable_ledger_delivers_nothing(monkeypatch, tmp_path):
+    _workstream(tmp_path, monkeypatch)
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_SHADOW', '0')
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_MEMORY_SCOPE', json.dumps({'user': 'u1', 'project': 'p1', 'repo': 'org/repo', 'task': 'ws-other'}))
+    assert claude_code.on_prompt({'session_id': 's', 'prompt': 'how do we deploy?'}) is None
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_MEMORY_SCOPE', 'not json')
+    assert claude_code.on_prompt({'session_id': 's', 'prompt': 'how do we deploy?'}) is None
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_MEMORY_SCOPE', json.dumps({'user': 'u1', 'project': 'p1', 'repo': 'org/repo', 'task': 'ws-1'}))
+    (tmp_path / 'memory' / 'events.jsonl').write_text('{"truncated":')
+    assert claude_code.on_prompt({'session_id': 's', 'prompt': 'how do we deploy?'}) is None
+
+
+def test_automatic_context_and_workstream_memory_are_delivered_together(monkeypatch, tmp_path):
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_MEMORY_SCOPE', _workstream(tmp_path, monkeypatch))
+    monkeypatch.setattr(automatic, 'handle_event', lambda e: {'action': 'context', 'context': 'function-result', 'receipt_id': 'r1'})
+    monkeypatch.setattr(automatic, 'post', lambda path, body: {'ok': True})
+    monkeypatch.setenv('Z0INT_CLAUDE_CODE_SHADOW', '0')
+    context = claude_code.on_prompt({'session_id': 's', 'prompt': 'q'})['hookSpecificOutput']['additionalContext']
+    assert context.startswith('function-result')
+    assert '"value": "canary"' in context
