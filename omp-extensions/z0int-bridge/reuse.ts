@@ -478,6 +478,44 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 	): Promise<ToolCallEventResult | void> {
 		const mode = dependencies.config.mode;
 		if (!activeMode(mode) || isRecoveryTool(event.toolName)) return;
+		const binding = dependencies.config.verifierBinding;
+		const argv = binding?.argv;
+		if (event.toolName === "bash" && Array.isArray(argv) && argv.length > 0 &&
+			argv.every((arg): arg is string => typeof arg === "string" && /^[A-Za-z0-9_/.:+=-]+$/.test(arg)) &&
+			event.input.command === argv.join(" ") && !event.input.async && !event.input.service &&
+			(event.input.cwd === undefined || event.input.cwd === "." || event.input.cwd === context.cwd)) {
+			const state = prepared;
+			if (state.kind !== "ready" || context.agent.id !== primaryAgentId ||
+				!matchesTurn(state, contextIdentity(context), dependencies.getTraceId()))
+				return mode === "enforce" ? block("no current primary repository scope for the owning verifier") : undefined;
+			const paths = binding?.test_paths;
+			const refs = state.packet.related_tests;
+			if (!Array.isArray(paths) || paths.length === 0 || !Array.isArray(refs))
+				return mode === "enforce" ? block("owning verifier has no bound test sources") : undefined;
+			try {
+				for (const path of paths) {
+					const ref = refs.find(item => isObject(item) && item.source_id === `file:${context.cwd}/${path}` && item.trust_class === "code");
+					if (typeof path !== "string" || !isObject(ref) || typeof ref.source_version !== "string" || !ref.source_version)
+						throw new Error("owning test source is not bound");
+					const response = await dependencies.request({
+						op: "file_search", trace_id: state.traceId, session_id: state.sessionId,
+						payload: { query: path, kind: "exact_path", project_root: state.cwd, trace_id: state.traceId,
+							session_id: state.sessionId, allow_qmd: false, record: true },
+					}, timeoutMs);
+					const packet = isObject(response) && response.ok === true && isObject(response.packet) ? response.packet : null;
+					if (!packet || !isObject(packet.measurements) || packet.measurements.coverage !== "complete" ||
+						!Array.isArray(packet.unresolved_gaps) || packet.unresolved_gaps.length > 0 ||
+						!Array.isArray(packet.evidence) || !packet.evidence.some(item => isObject(item) &&
+							item.source_id === ref.source_id && item.source_version === ref.source_version && item.trust_class === "code"))
+						throw new Error("owning test source changed or could not be validated");
+				}
+				if (prepared !== state || !matchesTurn(state, contextIdentity(context), dependencies.getTraceId()))
+					throw new Error("owning verifier task scope changed during validation");
+				return;
+			} catch (error) {
+				return mode === "enforce" ? block(`owning verifier unavailable: ${errorMessage(error)}`) : undefined;
+			}
+		}
 		const scope = mutationScope(event);
 		if (scope.kind === "unresolved" && mode === "enforce") {
 			return block(scope.reason);
@@ -545,9 +583,11 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 			const admissible = checked !== null && checked.valid && checked.status === "current" &&
 				isPositiveDecision(state.decision) && isPositiveDecision(checked.decision);
 			if (!admissible && mode === "enforce") {
-				return block(checked === null
+				const reason = checked === null
 					? "reuse check returned an invalid response"
-					: `reuse check did not allow implementation (${checked.status}/${checked.decision?.mode ?? "unknown"})`);
+					: `reuse check did not allow implementation (${checked.status}/${checked.decision?.mode ?? "unknown"})`;
+				prepared = unavailable(mode, identity, state.traceId, reason);
+				return block(reason);
 			}
 		} catch (error) {
 			if (mode === "enforce") return block(`reuse check failed: ${errorMessage(error)}`);

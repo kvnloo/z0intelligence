@@ -72,12 +72,14 @@ function harness(options: {
 	resolveError?: Error;
 	checkError?: Error;
 	resolveResponses?: unknown[];
+	verifierBinding?: Record<string, unknown>;
+	fileSearch?: unknown;
 	} = {}) {
 	const sent: SentRequest[] = [];
 	let traceId: string | null = "trace-1";
 	let resolveIndex = 0;
 	const dependencies: ReuseDependencies = {
-		config: config(options.mode),
+		config: { ...config(options.mode), verifierBinding: options.verifierBinding },
 		getTraceId: () => traceId,
 		timeoutMs: 50,
 		request: async (body, timeoutMs) => {
@@ -92,6 +94,7 @@ function harness(options: {
 				if (options.checkError) throw options.checkError;
 				return options.check ?? checkResponse();
 			}
+			if (body.op === "file_search") return options.fileSearch ?? { ok: false };
 			if (body.op === "reuse_injected") {
 				const payload = body.payload as Record<string, unknown>;
 				return { ok: true, trace_id: body.trace_id, packet_id: payload.packet_id, event_id: 7 };
@@ -137,6 +140,33 @@ test("agent symbol search refreshes an incomplete OBSERVE packet", async () => {
 	await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
 	await h.adapter.toolResult({ toolName: "z0_file_search", input: { kind: "exact_symbol", query: "helper" }, isError: false }, CONTEXT);
 	expect(h.sent.filter(row => row.body.op === "reuse_resolve")).toHaveLength(2);
+});
+
+test("a stale mutation check permits recovery instead of retaining positive readiness", async () => {
+	const h = harness({ check: checkResponse(false, "stale") });
+	await h.adapter.beforeAgentStart({ prompt: "Extend the existing implementation" }, CONTEXT);
+	expect(blocked(await h.adapter.toolCall(toolCall("write", { path: "src/a.py", content: "change" }), CONTEXT))).toBe(true);
+	await h.adapter.toolResult({ toolName: "z0_file_search", input: { kind: "exact_symbol", query: "existing_helper" }, isError: false }, CONTEXT);
+	expect(h.sent.filter(row => row.body.op === "reuse_resolve")).toHaveLength(2);
+});
+
+test("the exact owning verifier can execute after fresh source hydration", async () => {
+	const ref = { source_id: "file:/work/task/tests/test_records.py", source_version: "content-version", trust_class: "code" };
+	const fresh = { ok: true, packet: { evidence: [ref], unresolved_gaps: [], measurements: { coverage: "complete" } } };
+	const h = harness({
+		verifierBinding: { argv: ["python", "-m", "pytest", "-q", "tests/test_records.py"], test_paths: ["tests/test_records.py"] },
+		resolve: { ...resolveResponse(), packet: { ...resolveResponse().packet, related_tests: [ref] } },
+		fileSearch: fresh,
+	});
+	await h.adapter.beforeAgentStart({ prompt: "Repair the existing implementation and run its owning tests" }, CONTEXT);
+	expect(await h.adapter.toolCall(toolCall("bash", { command: "python -m pytest -q tests/test_records.py" }), CONTEXT)).toBeUndefined();
+	expect(h.sent.filter(row => row.body.op === "file_search")).toHaveLength(1);
+	for (const command of ["python -m pytest -q tests/test_records.py; touch duplicate.py", "python -m pytest -q tests/test_records.py > tests/test_records.py", "python -m pytest -q other.py"])
+		expect(blocked(await h.adapter.toolCall(toolCall("bash", { command }), CONTEXT))).toBe(true);
+	expect(blocked(await h.adapter.toolCall(toolCall("bash", { command: "python -m pytest -q tests/test_records.py", cwd: "/other" }), CONTEXT))).toBe(true);
+	expect(blocked(await h.adapter.toolCall(toolCall("bash", { command: "python -m pytest -q tests/test_records.py" }), ADVISOR_CONTEXT))).toBe(true);
+	fresh.packet.evidence = [{ ...ref, source_version: "different-content" }];
+	expect(blocked(await h.adapter.toolCall(toolCall("bash", { command: "python -m pytest -q tests/test_records.py" }), CONTEXT))).toBe(true);
 });
 
 function userMessageText(message: AgentMessage | undefined): string | null {
