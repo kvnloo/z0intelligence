@@ -86,7 +86,7 @@ def _probe(python: str) -> tuple[bool, str]:
         "print(transformers.__version__)"
     )
     try:
-        p = subprocess.run([python, "-c", code], capture_output=True, text=True, timeout=120)
+        p = subprocess.run([python, "-E", "-c", code], capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, f"probe failed: {exc}"
     if p.returncode != 0:
@@ -302,7 +302,7 @@ class JuliaBackend:
     # ------------------------------------------------------------------- worker
     def _worker_cmd(self, python: str) -> list[str]:
         cmd = [
-            python, str(WORKER),
+            python, "-E", str(WORKER),
             "--model-dir", str(self._model_path()),
             "--device", self.device,
             "--max-length", str(self.max_length),

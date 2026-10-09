@@ -186,6 +186,19 @@ class JuliaCapabilityTests(unittest.TestCase):
 
 
 class JuliaBackendOfflineTests(unittest.TestCase):
+    @unittest.skipUnless(_interpreter_present(), "requires the existing pinned Julia interpreter")
+    def test_pinned_interpreter_ignores_caller_pythonpath(self):
+        import tempfile
+        from z0int.backends.julia import _probe
+
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "transformers.py").write_text("__version__ = '5.17.0'\n")
+            (Path(tmp) / "torch.py").write_text("")
+            with mock.patch.dict(os.environ, {"PYTHONPATH": tmp}):
+                ready, detail = _probe(JULIA_PYTHON)
+            self.assertTrue(ready, detail)
+            self.assertIn("transformers 5.0", detail)
+
     def test_unavailable_without_checkout(self):
         backend = JuliaBackend(hf="SupersonicLabs/Julia-1", revision=REVISION,
                                model_dir=Path("/nonexistent/julia"))
