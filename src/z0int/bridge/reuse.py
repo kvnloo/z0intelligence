@@ -541,7 +541,7 @@ def _metadata_reference_identity(source_id: Any) -> tuple[str, bool]:
     if source_kind == "qmd":
         return source_kind, _metadata_qmd_locator(identity)
     if source_kind == "agentsview":
-        return source_kind, bool(re.fullmatch(r"[A-Za-z0-9_.-]{1,256}#[A-Za-z0-9_.:-]{1,256}", identity))
+        return source_kind, bool(re.fullmatch(r"[A-Za-z0-9_.:-]{1,256}#[A-Za-z0-9_.:-]{1,256}", identity))
     if source_kind == "eventlog":
         return source_kind, bool(re.fullmatch(r"[A-Za-z0-9_.:-]{1,256}", identity))
     return source_kind, False

@@ -308,7 +308,7 @@ class BridgeRepoReuseTests(unittest.TestCase):
         self.assertIn("locator_sha256", reference)
         self.assertIn("source_version_sha256", reference)
 
-        agentsview_id = "agentsview:session-1#7"
+        agentsview_id = "agentsview:codex:session-1#7"
         prior_reference_gap_count = len(reference_gaps)
         canonical_reference = _metadata_reference(
             SimpleNamespace(
@@ -776,6 +776,30 @@ class BridgeRepoReuseTests(unittest.TestCase):
         out = self.rt.reuse_resolve(request)
         self.assertEqual(out["decision"]["mode"], "OBSERVE")
         self.assertTrue(any("admitted" in gap for gap in out["packet"]["unresolved_gaps"]))
+
+    def test_native_user_memory_reference_preserves_reuse_readiness(self):
+        from z0int.memory.native_preferences import NativeWorkstreamBinding, admit_delegated_agent_config
+        from z0int.memory_contract import MemoryScope
+        from z0int.memory.event_log import EventLog
+
+        scope = MemoryScope(user="u", project="p", repo="example/known-library", task="work-one")
+        session_id = "codex:native-session"
+        binding = NativeWorkstreamBinding(scope=scope, session_id=session_id)
+        with patch.dict(os.environ, {"Z0INT_MEMORY_SOURCE_INGEST": "references"}):
+            admit_delegated_agent_config(session_id, 7, binding, native_reader=lambda session, ordinal: {
+                "session_id": session, "ordinal": ordinal, "role": "user",
+                "content": "use 10 luna subagents", "timestamp": "2026-10-07T00:00:00Z",
+            })
+        request = self.payload()
+        request["memory_scope"] = {key: value for key, value in scope.to_dict().items() if key != "level"}
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits("upstream/records.py", "tests/test_records.py")):
+            out = self.rt.reuse_resolve(request)
+        self.assertEqual(out["decision"]["mode"], "REUSE", out["packet"]["unresolved_gaps"])
+        metadata = EventLog().get(out["event_id"]).payload["packet_metadata"]
+        self.assertFalse(metadata["metadata_gaps"])
+        refs = metadata["context_evidence"]
+        self.assertTrue(any(ref.get("source_id") == f"agentsview:{session_id}#7" for ref in refs))
+        self.assertFalse(out["decision"]["authorizes_action"])
 
 
 if __name__ == "__main__":
