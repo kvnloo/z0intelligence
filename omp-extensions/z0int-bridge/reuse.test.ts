@@ -879,3 +879,23 @@ test("shadow and off leave the advertised tools alone", async () => {
 		expect(fake.active()).toEqual(["read", "write", "bash"]);
 	}
 });
+
+test("compact presentation is requested only when configured", async () => {
+	for (const [presentation, expected] of [["compact", "compact"], [undefined, undefined]] as const) {
+		const sent: SentRequest[] = [];
+		const adapter = createReuseAdapter({
+			config: { ...config("enforce"), presentation },
+			getTraceId: () => "trace-1",
+			timeoutMs: 50,
+			request: async (body, timeoutMs) => {
+				sent.push({ body, timeoutMs });
+				return body.op === "reuse_resolve" ? resolveResponse() : { ok: true };
+			},
+		});
+		await adapter.beforeAgentStart({ prompt: "Write a file" }, CONTEXT);
+		const payload = sent.find(item => item.body.op === "reuse_resolve")?.body.payload as Record<string, unknown>;
+		expect(payload.presentation).toBe(expected);
+	}
+	expect(reuseConfigFromEnv({ OMP_Z0INT_REUSE_MODE: "enforce", OMP_Z0INT_REUSE_PRESENTATION: "compact" }).presentation).toBe("compact");
+	expect(reuseConfigFromEnv({ OMP_Z0INT_REUSE_MODE: "enforce" }).presentation).toBe("full");
+});
