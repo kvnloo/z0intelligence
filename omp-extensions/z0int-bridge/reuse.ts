@@ -618,7 +618,25 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 
 export function registerReuseAdapter(pi: ExtensionAPI, dependencies: ReuseDependencies): ReuseAdapter {
 	const adapter = createReuseAdapter(dependencies);
-	pi.on("before_agent_start", (event, context) => adapter.beforeAgentStart(event, context));
+	pi.on("before_agent_start", async (event, context) => {
+		await adapter.beforeAgentStart(event, context);
+		if (dependencies.config.mode !== "enforce") return;
+		// Enforce denies every call to a tool whose target it cannot scope. Left
+		// advertised, such a tool is retried again and again; withholding it
+		// changes what the model sees, not what it is allowed to do.
+		const active = pi.getActiveTools();
+		const admitted = active.filter(isGateAdmissibleTool);
+		if (admitted.length === active.length) return;
+		const withheld = active.filter(name => !isGateAdmissibleTool(name));
+		await pi.setActiveTools(admitted);
+		return {
+			message: {
+				customType: "z0int-reuse-tools",
+				content: `z0int reuse gate: this session admits write and edit with explicit paths, and read-only search. Withheld because every call would be denied: ${withheld.join(", ")}. Code cannot be executed in this session. Do not look for another way to run it: finish the change, state the exact command that would verify it, and stop.`,
+				display: true,
+			},
+		};
+	});
 	pi.on("context", (event, context) => adapter.context(event, context));
 	pi.on("tool_call", (event, context) => adapter.toolCall(event, context));
 	pi.on("tool_result", (event, context) => adapter.toolResult(event, context));
@@ -636,6 +654,11 @@ function containsContext(value: unknown, block: string): boolean {
 
 function isRecoveryTool(toolName: string): boolean {
 	return RECOVERY_TOOLS.has(toolName.toLowerCase());
+}
+
+function isGateAdmissibleTool(toolName: string): boolean {
+	const name = toolName.toLowerCase();
+	return name === "write" || name === "edit" || isRecoveryTool(name);
 }
 
 type MutationScope =
