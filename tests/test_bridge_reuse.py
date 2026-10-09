@@ -720,6 +720,80 @@ class BridgeRepoReuseTests(unittest.TestCase):
         self.assertTrue(out["context_text"].endswith("}}"))
         self.assertNotEqual(again["packet_id"], out["packet_id"])
 
+    def admit_workstream_requirement(self, task="ws-records"):
+        """A user decision and its correction, admitted for the fixture repository's workstream."""
+        import pytest
+        from test_scoped_corrections import _admit
+        from z0int.memory_contract import MemoryScope
+
+        patcher = pytest.MonkeyPatch()
+        self.addCleanup(patcher.undo)
+        scope = MemoryScope(user="u1", project="p1", repo="example/known-library", task=task)
+        first = _admit(
+            self.base / "state", patcher, event_id="1", scope=scope, observed_at="2026-10-01T00:00:00Z",
+            value="Write new standalone code for removing duplicates.",
+        )
+        _admit(
+            self.base / "state", patcher, event_id="2", scope=scope, observed_at="2026-10-02T00:00:00Z",
+            value="Correction: reuse the existing row normalization of the records; add no standalone code.",
+            correction_of=first.payload["claim_id"],
+        )
+        return {key: value for key, value in scope.to_dict().items() if key != "level"}
+
+    def workstream_turn(self, scope, **extra):
+        payload, neutral = self.neutral_payload("Implement the helper as currently decided for this workstream.")
+        del payload["symbol"]
+        payload.update(memory_scope=scope, task_id=scope["task"], **extra)
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits()):
+            return self.rt.reuse_resolve(payload), neutral
+
+    def test_requirement_held_in_workstream_memory_selects_owner_and_subsystem(self):
+        self.declare_subsystems()
+        scope = self.admit_workstream_requirement()
+        # The task names neither the repository nor the capability; both come from the workstream.
+        out, _neutral = self.workstream_turn(scope)
+        self.assertTrue(out["ok"], out)
+        brief = json.loads(out["context_text"])
+        self.assertEqual(brief["owner"], "example/known-library")
+        self.assertEqual(Path(brief["root"]), self.repo.resolve())
+        self.assertEqual(brief["subsystem"], "records")
+        self.assertEqual(out["decision"]["mode"], "EXTEND", brief["gaps"])
+        self.assertEqual([item["id"] for item in brief["candidates"]], ["file:upstream/records.py"])
+        decision = brief["current_user_decisions"][0]
+        self.assertIn("reuse the existing row normalization", decision["value"])
+        self.assertEqual(decision["replaces"], ["Write new standalone code for removing duplicates."])
+
+    def test_a_superseded_decision_never_shapes_discovery(self):
+        self.declare_subsystems()
+        import pytest
+        from test_scoped_corrections import _admit
+        from z0int.memory_contract import MemoryScope
+
+        patcher = pytest.MonkeyPatch()
+        self.addCleanup(patcher.undo)
+        scope = MemoryScope(user="u1", project="p1", repo="example/known-library", task="ws-flip")
+        first = _admit(
+            self.base / "state", patcher, event_id="1", scope=scope, observed_at="2026-10-01T00:00:00Z",
+            value="Use the row normalization of the records.",
+        )
+        _admit(
+            self.base / "state", patcher, event_id="2", scope=scope, observed_at="2026-10-02T00:00:00Z",
+            value="Correction: do something else entirely.", correction_of=first.payload["claim_id"],
+        )
+        out, _neutral = self.workstream_turn({key: value for key, value in scope.to_dict().items() if key != "level"})
+        brief = json.loads(out["context_text"])
+        # Only the current decision counts; the replaced one named the subsystem and must not select it.
+        self.assertNotIn("subsystem", brief)
+        self.assertEqual(out["decision"]["mode"], "OBSERVE")
+
+    def test_workstream_bound_to_a_repository_without_a_checkout_only_observes(self):
+        self.declare_subsystems()
+        scope = self.admit_workstream_requirement()
+        out, _neutral = self.workstream_turn(scope, candidate_roots=[str(self.base)])
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["decision"]["mode"], "OBSERVE")
+        self.assertIsNone(json.loads(out["context_text"])["root"])
+
     def test_verifier_binding_accepts_pytest_node_for_exact_owning_file(self):
         from z0int.bridge.reuse import _normalize_verifier_binding
 

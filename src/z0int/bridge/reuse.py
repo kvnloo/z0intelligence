@@ -306,6 +306,29 @@ def _path_is_declared(relative_path: Path, declaration: tuple[Path, bool]) -> bo
 _MAX_COMPILED_DISCOVERY_PATHS = 6
 
 
+def _current_decision_text(scope_fields: dict[str, Any]) -> list[str]:
+    """Text of the workstream's current explicit user decisions, for discovery only.
+
+    Superseded decisions are excluded by the same reducer that selects what is
+    delivered, and an incomplete ledger contributes nothing. This shapes where
+    to look; it is never evidence, and the decisions still reach the packet
+    through the scoped-memory need.
+    """
+    try:
+        from z0int.memory.claims import project_claims
+
+        projection = project_claims(MemoryScope(**scope_fields))
+    except Exception:
+        return []
+    if projection.unresolved_gaps or projection.measurements.get("coverage") != "complete":
+        return []
+    return [
+        claim["value"] if isinstance(claim.get("value"), str) else json.dumps(claim.get("value"), ensure_ascii=False)
+        for claim in projection.measurements.get("selected_claims") or []
+        if claim.get("origin_trust") == "explicit_user"
+    ]
+
+
 def _compile_subsystem_discovery(task_text: str, project_root: Any) -> dict[str, Any] | None:
     """Turn a task sentence into the declared files of the one subsystem it names.
 
@@ -383,8 +406,23 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
     Owning tests remain evidence until an independent verifier runs them.
     """
     ownership_gaps: list[str] = []
+    # What is being asked for is the task plus whatever the workstream has
+    # already decided. A task may say only "as currently decided".
+    discovery_text = request["query"]
+    scope_fields = request.get("memory_scope")
+    if scope_fields and not request.get("symbol"):
+        discovery_text = "\n".join([discovery_text, *_current_decision_text(scope_fields)])
+    if request["canonical_repo"] is None and scope_fields and scope_fields.get("repo"):
+        # The workstream is already bound to a repository; that binding is the owner.
+        request["canonical_repo"] = scope_fields["repo"]
+        request["ownership"] = {"status": "workstream_scope", "canonical_repo": scope_fields["repo"]}
+        oriented = _orient_repository(
+            scope_fields["repo"], registry_path=request["registry_path"],
+            candidate_roots=request["candidate_roots"], project_root=None, registry_format="canonical",
+        )
+        request["project_root"] = oriented["root"] if oriented.get("status") in {"ready", "partial"} else None
     if request["canonical_repo"] is None:
-        ownership = resolve_owning_repository(request["query"], request["registry_path"])
+        ownership = resolve_owning_repository(discovery_text, request["registry_path"])
         request["ownership"] = {key: ownership[key] for key in (
             "status", "component_id", "canonical_repo", "matched_terms", "registry_source_version",
         )}
@@ -403,7 +441,7 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
     if request["canonical_repo"] == _UNRESOLVED_OWNERSHIP:
         ownership_gaps = ["repository ownership is unresolved for this task; observe only"]
     symbol = request.get("symbol")
-    compiled = None if symbol else _compile_subsystem_discovery(request["query"], request["project_root"])
+    compiled = None if symbol else _compile_subsystem_discovery(discovery_text, request["project_root"])
     request["compiled_discovery"] = compiled
     compiled_paths: list[str] = []
     if compiled is not None:
