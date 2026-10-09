@@ -1299,7 +1299,7 @@ def resolve_context(
 
     for need in need_list:
         satisfied = False
-        if need.kind == "exact_path" or need.path:
+        if need.kind == "exact_path" or (need.kind == "natural_language" and need.path):
             path_s = need.path or need.description
             orientation_blocked = canonical_repo is not None and root is None
             ref = None if orientation_blocked else _fetch_exact_path(path_s, root)
@@ -1321,7 +1321,7 @@ def resolve_context(
             elif need.required:
                 reason = "repository orientation unresolved" if orientation_blocked else f"missing path {path_s}"
                 gaps.append(f"{need.id}: {reason}")
-        elif need.kind == "exact_symbol" or need.symbol:
+        elif need.kind == "exact_symbol" or (need.kind == "natural_language" and need.symbol):
             symbol = need.symbol or need.description
             if allow_fff and root is not None:
                 fff_status, satisfied = search_fff(need, symbol, "exact_symbol", "fff_symbol")

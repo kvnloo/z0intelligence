@@ -31,6 +31,53 @@ def z0home(tmp: str):
 
 
 class ContextResolveTests(unittest.TestCase):
+    def test_memory_need_cannot_be_satisfied_by_a_code_path_hint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "helper.py").write_text("def helper(): return 1\n")
+            packet = resolve_context(
+                needs=[InformationNeed(id="decision", description="User decision behind the helper", kind="memory", path="helper.py")],
+                project_root=root, allow_memory=False, allow_fff=False, allow_qmd=False, use_cache=False,
+            )
+            self.assertTrue(any("memory recall disabled" in gap for gap in packet.unresolved_gaps))
+            self.assertEqual(packet.evidence, [])
+            self.assertNotEqual(packet.measurements["coverage"], "complete")
+
+    def test_memory_need_cannot_be_rerouted_by_a_symbol_hint(self):
+        packet = resolve_context(
+            needs=[InformationNeed(id="decision", description="User decision behind the helper", kind="memory", symbol="helper")],
+            allow_memory=False, allow_fff=False, allow_qmd=False, use_cache=False,
+        )
+        self.assertTrue(any("memory recall disabled" in gap for gap in packet.unresolved_gaps))
+        self.assertEqual(packet.recipe.operations[-1]["op"], "memory_skipped")
+
+    def test_required_memory_blocks_reuse_but_optional_memory_preserves_fast_path(self):
+        from z0int.reuse_packet import ReuseCandidate, build_reuse_packet
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "helper.py").write_text("def helper(): return 1\n")
+            (root / "test_helper.py").write_text("from helper import helper\ndef test_helper(): assert helper() == 1\n")
+            for required in (True, False):
+                with self.subTest(required=required), mock.patch("z0int.context_resolve._qmd_search") as qmd:
+                    context = resolve_context(
+                        needs=[
+                            InformationNeed(id="code", description="existing code", path="helper.py"),
+                            InformationNeed(id="tests", description="owning tests", path="test_helper.py"),
+                            InformationNeed(id="decision", description="User decision", kind="memory", path="helper.py", required=required),
+                        ],
+                        project_root=root, allow_memory=False, allow_fff=False, use_cache=False,
+                    )
+                    code, test = context.evidence[:2]
+                    packet = build_reuse_packet(context, candidates=[ReuseCandidate(
+                        candidate_id="helper", summary="Existing helper", strategy="reuse",
+                        evidence=(code,), owner="fixture", related_tests=(test,),
+                    )])
+                    self.assertEqual(packet.decision["mode"], "OBSERVE" if required else "REUSE")
+                    self.assertEqual(packet.decision["implementation_allowed"], not required)
+                    self.assertEqual(context.measurements["network_model_calls"], 0)
+                    qmd.assert_not_called()
+
     def test_exact_path_hit(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
