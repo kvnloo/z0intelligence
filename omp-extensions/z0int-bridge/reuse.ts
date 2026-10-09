@@ -20,6 +20,8 @@ type JsonObject = Record<string, unknown>;
 export interface ReuseConfig {
 	mode: ReuseMode;
 	canonicalRepo: string | null;
+	/** How the packet is shown to the model; the packet and the gate are the same either way. */
+	presentation?: "full" | "compact";
 	registryPath: string | null;
 	candidateRoots: string[];
 	taskId?: string | null;
@@ -156,6 +158,7 @@ export function reuseConfigFromEnv(env: Record<string, string | undefined> = pro
 	return {
 		mode,
 		canonicalRepo: nonEmptyString(env.OMP_Z0INT_REUSE_CANONICAL_REPO),
+		presentation: env.OMP_Z0INT_REUSE_PRESENTATION === "compact" ? "compact" : "full",
 		registryPath: nonEmptyString(env.OMP_Z0INT_REUSE_REGISTRY_PATH),
 		candidateRoots: readCandidateRoots(env.OMP_Z0INT_REUSE_CANDIDATE_ROOTS),
 		taskId: nonEmptyString(env.OMP_Z0INT_REUSE_TASK_ID),
@@ -344,6 +347,7 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 					session_id: identity.sessionId,
 					payload: {
 						...(canonicalRepo ? { canonical_repo: canonicalRepo } : {}),
+						...(dependencies.config.presentation === "compact" ? { presentation: "compact" } : {}),
 						registry_path: registryPath,
 						candidate_roots: [...candidateRoots],
 						project_root: identity.cwd,

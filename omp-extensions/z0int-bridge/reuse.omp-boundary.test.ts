@@ -626,3 +626,42 @@ test("an auto-learn capture tool cannot reuse the primary packet to write", asyn
 		await rm(tempRoot, { recursive: true, force: true });
 	}
 });
+
+test("each serialized request carries the context block exactly once, unchanged, as its final message", async () => {
+	const tempRoot = await mkdtemp(join(tmpdir(), "z0int-omp-reuse-context-once-"));
+	const cwd = join(tempRoot, "project");
+	await mkdir(cwd, { recursive: true });
+	const target = join(cwd, "target.txt");
+	await writeFile(target, "original content", "utf8");
+	const requests: JsonObject[] = [];
+	const providerPayloads: unknown[] = [];
+	const model = scriptedProviderModel(
+		[
+			{ content: [{ type: "toolCall", name: "read", arguments: { path: target } }] },
+			{ content: [{ type: "toolCall", name: "write", arguments: { path: target, content: MOCK_WRITE } }] },
+			{ content: ["scripted response after the write dispatch"] },
+		],
+		providerPayloads,
+		payload => recordFinalPayloadWitness(requests, payload),
+	);
+	const { session, manager } = await newSession(cwd, model, [reuseExtension(requests)]);
+	try {
+		await session.prompt("Replace the target file using the existing implementation.");
+
+		expect(providerPayloads.length).toBe(3);
+		const open = "<z0int-reuse-context>";
+		const blocks = providerPayloads.map(payload => {
+			const text = providerPayloadText(payload);
+			// It is re-appended to each request, never accumulated across them.
+			expect(text.split(open).length - 1).toBe(1);
+			const messages = (payload as { messages: unknown[] }).messages;
+			expect(JSON.stringify(messages[messages.length - 1])).toContain(open);
+			return text.slice(text.indexOf(open), text.indexOf("</z0int-reuse-context>"));
+		});
+		expect(new Set(blocks).size).toBe(1);
+	} finally {
+		await session.dispose();
+		await manager.close();
+		await rm(tempRoot, { recursive: true, force: true });
+	}
+});

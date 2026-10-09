@@ -518,7 +518,7 @@ class BridgeRepoReuseTests(unittest.TestCase):
         neutral.mkdir(exist_ok=True)
         payload = self.payload()
         del payload["canonical_repo"]
-        payload.update(project_root=str(neutral), query=query)
+        payload.update(project_root=str(neutral), query=query, presentation="compact")
         return payload, neutral
 
     def test_task_without_repository_resolves_owner_and_checkout_from_registry(self):
@@ -526,9 +526,12 @@ class BridgeRepoReuseTests(unittest.TestCase):
         out = self.rt.reuse_resolve(payload)
         self.assertTrue(out["ok"], out)
         self.assertEqual(out["decision"]["mode"], "REUSE", out["decision"])
-        orientation = json.loads(out["context_text"])["context"]["measurements"]["repo_orientation"]
+        brief = json.loads(out["context_text"])
+        self.assertEqual(brief["owner"], "example/known-library")
+        self.assertEqual(Path(brief["root"]), self.repo.resolve())
+        # The authoritative packet is unchanged and still returned beside the brief.
+        orientation = out["packet"]["context"]["measurements"]["repo_orientation"]
         self.assertEqual(orientation["repo_slug"], "example/known-library")
-        self.assertEqual(Path(orientation["root"]), self.repo.resolve())
 
         self.assertTrue(self.injected(out)["ok"])
         self.assertTrue(self.model_input(out)["ok"])
@@ -595,7 +598,7 @@ class BridgeRepoReuseTests(unittest.TestCase):
     def first_turn(self, query, **extra):
         payload = self.payload()
         del payload["symbol"]
-        payload.update(query=query, **extra)
+        payload.update(query=query, **{"presentation": "compact", **extra})
         # The index finds nothing for a task sentence; only compiled discovery can.
         with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits()) as search:
             out = self.rt.reuse_resolve(payload)
@@ -605,7 +608,9 @@ class BridgeRepoReuseTests(unittest.TestCase):
         self.declare_subsystems()
         out, search = self.first_turn("Add a helper that removes duplicate rows after normalization of the records.")
         self.assertTrue(out["ok"], out)
-        self.assertEqual(out["decision"]["mode"], "REUSE", out["packet"]["unresolved_gaps"])
+        # Located by the manifest: the source is known, its fit for the task is not.
+        self.assertEqual(out["decision"]["mode"], "EXTEND", out["packet"]["unresolved_gaps"])
+        self.assertTrue(out["decision"]["implementation_allowed"])
         candidates = {item["candidate_id"]: item for item in out["packet"]["reuse_candidates"]}
         self.assertEqual(set(candidates), {"file:upstream/records.py"})
         tests = [ref["locator"] for ref in candidates["file:upstream/records.py"]["related_tests"]]
@@ -638,7 +643,7 @@ class BridgeRepoReuseTests(unittest.TestCase):
     def test_first_turn_packet_is_invalidated_by_same_size_same_mtime_content_replacement(self):
         self.declare_subsystems()
         out, _search = self.first_turn("Add a helper that removes duplicate rows after normalization of the records.")
-        self.assertEqual(out["decision"]["mode"], "REUSE")
+        self.assertEqual(out["decision"]["mode"], "EXTEND")
         self.injected(out)
         self.assertTrue(self.model_input(out)["ok"])
         before = self.code.stat()
@@ -648,6 +653,72 @@ class BridgeRepoReuseTests(unittest.TestCase):
         self.assertEqual(self.code.stat().st_size, before.st_size)
         with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits()):
             self.assertFalse(self.check(out)["valid"])
+
+    def test_right_subsystem_but_unsupported_behavior_is_located_not_declared_reusable(self):
+        self.declare_subsystems()
+        # Names the records subsystem, asks for something its code does not do.
+        out, _search = self.first_turn("Make row normalization of the records run across a distributed cluster.")
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["decision"]["mode"], "EXTEND")
+        brief = json.loads(out["context_text"])
+        self.assertEqual([item["strategy"] for item in brief["candidates"]], ["extend"])
+        self.assertIn("not checked against the requested behavior", brief["candidates"][0]["why"])
+        self.assertNotIn("REUSE", out["context_text"])
+        # An agent-identified symbol is still the only route to REUSE.
+        symbol = self.prepare()
+        self.assertEqual(symbol["decision"]["mode"], "REUSE")
+
+    def test_full_presentation_is_the_default_and_carries_the_same_packet(self):
+        self.declare_subsystems()
+        compact, _search = self.first_turn("Add a helper that removes duplicate rows after normalization of the records.")
+        full, _search = self.first_turn(
+            "Add a helper that removes duplicate rows after normalization of the records.",
+            trace_id="trace-full", presentation="full",
+        )
+        default = self.prepare()
+        self.assertIn('"recipe"', full["context_text"])
+        self.assertIn('"recipe"', default["context_text"])
+        self.assertNotIn('"recipe"', compact["context_text"])
+        # Presentation changes what the model reads, never what the gate decides on.
+        self.assertEqual(full["decision"], compact["decision"])
+        self.assertEqual(
+            [item["candidate_id"] for item in full["packet"]["reuse_candidates"]],
+            [item["candidate_id"] for item in compact["packet"]["reuse_candidates"]],
+        )
+        bad = self.payload()
+        bad["presentation"] = "summary"
+        self.assertFalse(self.rt.reuse_resolve(bad)["ok"])
+
+    def test_model_brief_is_bounded_stable_and_keeps_the_evidence_needed_to_choose(self):
+        self.declare_subsystems()
+        out, _search = self.first_turn("Add a helper that removes duplicate rows after normalization of the records.")
+        brief = json.loads(out["context_text"])
+        self.assertEqual(brief["schema"], "z0int.reuse_brief.v1")
+        candidate = brief["candidates"][0]
+        self.assertEqual(candidate["source"], "upstream/records.py")
+        self.assertIn("def normalize_rows", candidate["excerpt"])
+        self.assertTrue(candidate["source_version"].startswith("mtime_ns="))
+        self.assertEqual(candidate["tests"], ["tests/test_records.py"])
+        self.assertEqual(brief["packet"]["packet_id"], out["packet_id"])
+        self.assertEqual(brief["packet"]["input_fingerprint"], out["packet"]["input_fingerprint"])
+        self.assertTrue(brief["omitted"]["resolver_bookkeeping"])
+        # Far smaller than the packet it projects, which is still complete.
+        full = json.dumps(out["packet"], sort_keys=True, separators=(",", ":"))
+        self.assertLess(len(out["context_text"]), len(full) // 4)
+        self.assertIn("recipe", out["packet"]["context"])
+        # A later preparation over unchanged sources differs only in its trailing identity.
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits()):
+            payload = self.payload()
+            del payload["symbol"]
+            payload.update(
+                query="Add a helper that removes duplicate rows after normalization of the records.",
+                trace_id="trace-two", presentation="compact",
+            )
+            again = self.rt.reuse_resolve(payload)
+        marker = ',"packet":{'
+        self.assertEqual(again["context_text"].split(marker)[0], out["context_text"].split(marker)[0])
+        self.assertTrue(out["context_text"].endswith("}}"))
+        self.assertNotEqual(again["packet_id"], out["packet_id"])
 
     def test_verifier_binding_accepts_pytest_node_for_exact_owning_file(self):
         from z0int.bridge.reuse import _normalize_verifier_binding

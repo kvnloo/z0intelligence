@@ -159,6 +159,11 @@ def normalize_request(payload: dict[str, Any]) -> dict[str, Any]:
     # Without an operator-selected repository the task itself is resolved
     # against registry ownership when the packet is built.
     request["canonical_repo"] = _string(payload, "canonical_repo") if "canonical_repo" in payload else None
+    # How the packet is shown to the model. The packet itself is the same either way.
+    presentation = payload.get("presentation", "full")
+    if presentation not in ("full", "compact"):
+        raise ValueError("presentation must be full or compact")
+    request["presentation"] = presentation
     roots = payload.get("candidate_roots", [])
     if not isinstance(roots, list) or any(not isinstance(root, str) or not root.strip() for root in roots):
         raise ValueError("candidate_roots must be a list of checkout paths")
@@ -542,10 +547,19 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
         )
         for test_ref in related_tests:
             all_related_tests[(test_ref.source_id, test_ref.locator, test_ref.source_version)] = test_ref
+        if compiled is not None:
+            # The manifest says where this capability lives. It says nothing
+            # about whether that code already does what the task asks.
+            summary = (
+                f"Declared source of subsystem {compiled['subsystem_id']} in {relative.as_posix()}; located by the "
+                "manifest, not checked against the requested behavior"
+            )
+        else:
+            summary = f"Discovered existing implementation in {relative.as_posix()}; verify task fit with owning tests"
         candidates.append(ReuseCandidate(
-            candidate_id="file:" + relative.as_posix(),
-            summary=f"Discovered existing implementation in {relative.as_posix()}; verify task fit with owning tests",
-            strategy="reuse", evidence=(ref,), owner=owner, symbol=symbol, related_tests=related_tests,
+            candidate_id="file:" + relative.as_posix(), summary=summary,
+            strategy="extend" if compiled is not None else "reuse",
+            evidence=(ref,), owner=owner, symbol=symbol, related_tests=related_tests,
         ))
     related_tests = tuple(all_related_tests[key] for key in sorted(all_related_tests))
     gaps: list[str] = []
@@ -973,6 +987,111 @@ def _canonical_sha256(value: dict[str, Any]) -> str:
     ).hexdigest()
 
 
+_BRIEF_SCHEMA = "z0int.reuse_brief.v1"
+_BRIEF_CANDIDATES = 4
+_BRIEF_TESTS = 4
+_BRIEF_GAPS = 6
+_BRIEF_DECISIONS = 8
+_BRIEF_TEXT = 240
+
+
+def _clip(value: Any, limit: int = _BRIEF_TEXT) -> str:
+    text = " ".join(str(value).split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _model_brief(
+    packet: ArchitectureReusePacket, request: dict[str, Any], root: Path | None, packet_id: str,
+) -> str:
+    """Render what a model needs to act on the packet, and nothing else.
+
+    The packet stays authoritative and complete: it is returned to the
+    harness, hashed into the prepared event and re-resolved before any write.
+    This is only its model-facing projection. Resolver bookkeeping, repeated
+    evidence and history are left out; every omission is counted so the reader
+    knows the brief is partial and where the rest is. Content depends only on
+    the packet, so it is identical on every request of a turn.
+    """
+    measurements = packet.context.measurements
+    orientation = measurements.get("repo_orientation") or {}
+    relative = (
+        lambda locator: _clip(str(locator).replace(str(root) + "/", ""), 200) if root is not None else _clip(locator, 200)
+    )
+    seen: set[str] = set()
+    candidates: list[dict[str, Any]] = []
+    for candidate in packet.reuse_candidates:
+        if candidate.candidate_id in seen:
+            continue  # the same file reached by two retrieval steps is one candidate
+        seen.add(candidate.candidate_id)
+        if len(candidates) >= _BRIEF_CANDIDATES:
+            continue
+        evidence = candidate.evidence[0]
+        row: dict[str, Any] = {
+            "id": candidate.candidate_id,
+            "strategy": candidate.strategy,
+            "why": _clip(candidate.summary),
+            "source": relative(evidence.locator),
+            "source_version": evidence.source_version,
+            "excerpt": evidence.excerpt or "",
+            "tests": [relative(ref.locator) for ref in candidate.related_tests[:_BRIEF_TESTS]],
+        }
+        if candidate.symbol:
+            row["symbol"] = candidate.symbol
+        if candidate.invariants:
+            row["invariants"] = [_clip(item) for item in candidate.invariants]
+        candidates.append(row)
+    selected = [
+        claim for claim in measurements.get("selected_claims") or [] if claim.get("origin_trust") == "explicit_user"
+    ]
+    replaced: dict[str, list[Any]] = {}
+    for claim in measurements.get("claim_history") or []:
+        if claim.get("superseded_by"):
+            replaced.setdefault(claim["superseded_by"], []).append(claim.get("value"))
+    decisions = [
+        {
+            "subject": claim.get("subject"), "predicate": claim.get("predicate"), "value": claim.get("value"),
+            "replaces": replaced.get(claim.get("claim_id"), []),
+        }
+        for claim in selected[:_BRIEF_DECISIONS]
+    ]
+    compiled = request.get("compiled_discovery") or {}
+    gaps = list(dict.fromkeys(packet.unresolved_gaps))
+    brief: dict[str, Any] = {
+        "schema": _BRIEF_SCHEMA,
+        "workstream": packet.task_id,
+        "owner": orientation.get("repo_slug"),
+        "root": str(root) if root is not None else None,
+        "decision": {
+            "mode": packet.decision.get("mode"),
+            "implementation_allowed": packet.decision.get("implementation_allowed"),
+            "reason": packet.decision.get("reason"),
+        },
+        "current_user_decisions": decisions,
+        "candidates": candidates,
+        "invariants": [_clip(item) for item in packet.relevant_invariants],
+        "gaps": [_clip(item) for item in gaps[:_BRIEF_GAPS]],
+        "omitted": {
+            "candidates": max(0, len(seen) - len(candidates)),
+            "gaps": max(0, len(gaps) - _BRIEF_GAPS),
+            "user_decisions": max(0, len(selected) - _BRIEF_DECISIONS),
+            "entry_points": "not extracted; read the candidate source",
+            "resolver_bookkeeping": True,
+        },
+    }
+    if compiled:
+        brief["subsystem"] = compiled.get("subsystem_id")
+    # Identity goes last. It changes with every preparation even when the
+    # sources have not, so everything before it stays byte-identical for as
+    # long as the evidence does.
+    brief["packet"] = {
+        "drill_down": "read the listed source and test files; the full packet and its receipts are held by the runtime under packet_id",
+        "memory_snapshot_id": measurements.get("memory_snapshot_id"),
+        "input_fingerprint": packet.input_fingerprint,
+        "packet_id": packet_id,
+    }
+    return json.dumps(brief, ensure_ascii=False, separators=(",", ":"))
+
+
 def prepare(payload: dict[str, Any]) -> PreparedReuse:
     request = normalize_request(payload)
     packet, root = resolve_packet(request)
@@ -1025,8 +1144,11 @@ def prepare(payload: dict[str, Any]) -> PreparedReuse:
     if verifier_binding is not None:
         packet_material += f"|{binding_fingerprint}"
     packet_id = "reuse_" + hashlib.sha256(packet_material.encode()).hexdigest()
-    text = json.dumps(packet.to_dict(), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     orientation = packet.context.measurements.get("repo_orientation") or {}
+    if request["presentation"] == "compact":
+        text = _model_brief(packet, request, root, packet_id)
+    else:
+        text = json.dumps(packet.to_dict(), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     scope = MemoryScope(**request["memory_scope"]) if request.get("memory_scope") else MemoryScope(user="local", project="z0", repo=orientation.get("repo_slug") or request["canonical_repo"], task=request["task_id"])
     event = EventLog().append("reuse.prepared", {
         "trace_id": request["trace_id"], "packet_id": packet_id,
