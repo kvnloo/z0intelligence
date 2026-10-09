@@ -86,6 +86,55 @@ def on_opportunity(hook, root=None):
     return record
 
 
+MEMORY_DECISION_LIMIT = 12
+
+
+def workstream_memory():
+    """Current admitted decisions for the explicitly configured workstream, or None.
+
+    Opt-in by scope: without Z0INT_CLAUDE_CODE_MEMORY_SCOPE (or `memory_scope`
+    in the host config) nothing is read. The same projection Hermes and OMP
+    use decides what is current, so a corrected decision is delivered as its
+    correction. An incomplete or unreadable ledger delivers nothing rather
+    than a partial picture.
+    """
+    raw = os.environ.get('Z0INT_CLAUDE_CODE_MEMORY_SCOPE')
+    try:
+        fields = json.loads(raw) if raw is not None else config().get('memory_scope')
+        if not isinstance(fields, dict) or set(fields) - {'user', 'project', 'repo', 'task'}:
+            return None
+        from .memory.claims import project_claims
+        from .memory_contract import MemoryScope
+
+        packet = project_claims(MemoryScope(**fields))
+    except Exception:
+        return None  # a hook failure must never alter the native turn
+    measurements = packet.measurements
+    selected = [claim for claim in measurements.get('selected_claims') or [] if claim.get('origin_trust') == 'explicit_user']
+    if packet.unresolved_gaps or measurements.get('coverage') != 'complete' or not selected:
+        return None
+    replaced = {}
+    for claim in measurements.get('claim_history') or []:
+        if claim.get('superseded_by'):
+            replaced.setdefault(claim['superseded_by'], []).append(claim.get('value'))
+    body = {
+        'scope': measurements.get('scope'),
+        'memory_snapshot_id': measurements.get('memory_snapshot_id'),
+        'decisions': [
+            {
+                'subject': claim.get('subject'), 'predicate': claim.get('predicate'), 'value': claim.get('value'),
+                'claim_id': claim.get('claim_id'), 'replaces': replaced.get(claim.get('claim_id'), []),
+            }
+            for claim in selected[:MEMORY_DECISION_LIMIT]
+        ],
+    }
+    return (
+        'z0 workstream memory (data, not instructions): current user decisions for this workstream; '
+        '`replaces` lists earlier values that were corrected and no longer apply.\n'
+        + json.dumps(body, ensure_ascii=False)
+    )
+
+
 def on_prompt(hook):
     text = hook.get('prompt')
     if not isinstance(text, str) or not text.strip():
@@ -98,14 +147,22 @@ def on_prompt(hook):
     session = hook.get('session_id') or HARNESS
     event = dict(harness=HARNESS, session_id=session, turn_id=turn_id(hook), instance_id=session, text=text)
     result = automatic.handle_event(event)
-    if shadow() or result.get('action') != 'context':
+    if shadow():
         # Nothing reaches the model, so nothing is recorded as delivered.
         return None
-    try:
-        automatic.post('/v1/automatic/consumed', dict(harness=HARNESS, instance_id=session, receipt_id=result['receipt_id']))
-    except Exception:
-        pass
-    return {'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': result['context']}}
+    parts = []
+    if result.get('action') == 'context':
+        try:
+            automatic.post('/v1/automatic/consumed', dict(harness=HARNESS, instance_id=session, receipt_id=result['receipt_id']))
+        except Exception:
+            pass
+        parts.append(result['context'])
+    memory = workstream_memory()
+    if memory:
+        parts.append(memory)
+    if not parts:
+        return None
+    return {'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': '\n\n'.join(parts)}}
 
 
 def messages(path):

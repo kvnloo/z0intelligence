@@ -15,7 +15,14 @@ environment). Every hook fails open.
 ```bash
 claude --plugin-dir harness-adapters/claude-code-z0intelligence
 Z0INT_CLAUDE_CODE_SHADOW=0   # allow delivered context (requires automatic.json enabled for claude-code)
+Z0INT_CLAUDE_CODE_MEMORY_SCOPE='{"user":"…","project":"…","repo":"owner/repo","task":"<workstream>"}'
+                             # with shadow off, also deliver that workstream's current user decisions
 ```
+
+Workstream memory is read only when a scope is set and is delivered only with
+shadow off. It carries the current admitted decisions for exactly that scope;
+a decision that was corrected is delivered as its correction, with the earlier
+value listed under `replaces`. An incomplete ledger delivers nothing.
 
 Usage receipts dedupe transcript messages by id, split `root` and `subagent`
 roles, and keep cache reads/writes separate from uncached input. They measure
