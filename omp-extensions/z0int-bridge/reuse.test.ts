@@ -4,6 +4,7 @@ import type { ToolCallEvent } from "@oh-my-pi/pi-coding-agent";
 import {
 	appendUntrustedReuseContext,
 	createReuseAdapter,
+	registerReuseAdapter,
 	reuseConfigFromEnv,
 	sha256Utf8,
 	type ReuseConfig,
@@ -815,4 +816,66 @@ test("without a configured repository the task is sent for ownership resolution 
 
 	adapter.reset();
 	expect(adapter.resolvedRoot()).toBeNull();
+});
+
+function fakePi(activeTools: string[]) {
+	const handlers = new Map<string, Array<(event: unknown, context: unknown) => unknown>>();
+	let active = [...activeTools];
+	const setCalls: string[][] = [];
+	const pi = {
+		on: (name: string, handler: (event: unknown, context: unknown) => unknown) => {
+			handlers.set(name, [...(handlers.get(name) ?? []), handler]);
+		},
+		getActiveTools: () => [...active],
+		setActiveTools: async (names: string[]) => {
+			setCalls.push([...names]);
+			active = [...names];
+		},
+	};
+	const start = async () => {
+		const results: unknown[] = [];
+		for (const handler of handlers.get("before_agent_start") ?? []) {
+			results.push(await handler({ prompt: "Write a file" }, CONTEXT));
+		}
+		return results;
+	};
+	return { pi, start, setCalls, active: () => [...active] };
+}
+
+function registerWith(mode: ReuseConfig["mode"], activeTools: string[]) {
+	const fake = fakePi(activeTools);
+	registerReuseAdapter(fake.pi as never, {
+		config: config(mode),
+		getTraceId: () => "trace-1",
+		timeoutMs: 50,
+		request: async body => (body.op === "reuse_resolve" ? resolveResponse() : { ok: true }),
+	});
+	return fake;
+}
+
+test("enforce withholds every tool the gate would always deny and says code cannot be run", async () => {
+	const fake = registerWith("enforce", ["read", "grep", "glob", "write", "edit", "bash", "z0_file_search", "z0int_route_worker"]);
+
+	const [first] = await fake.start();
+	// Advertising a tool whose every call is denied only invites retries.
+	expect(fake.active()).toEqual(["read", "grep", "glob", "write", "edit", "z0_file_search"]);
+	const notice = (first as { message?: { customType: string; content: string } }).message;
+	expect(notice?.customType).toBe("z0int-reuse-tools");
+	expect(notice?.content).toContain("bash, z0int_route_worker");
+	expect(notice?.content).toContain("cannot be executed");
+
+	// Nothing left to withhold on later turns, so the notice is not repeated.
+	const [second] = await fake.start();
+	expect(second).toBeUndefined();
+	expect(fake.setCalls).toHaveLength(1);
+});
+
+test("shadow and off leave the advertised tools alone", async () => {
+	for (const mode of ["shadow", "off"] as const) {
+		const fake = registerWith(mode, ["read", "write", "bash"]);
+		const [result] = await fake.start();
+		expect(result).toBeUndefined();
+		expect(fake.setCalls).toHaveLength(0);
+		expect(fake.active()).toEqual(["read", "write", "bash"]);
+	}
 });
