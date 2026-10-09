@@ -15,7 +15,9 @@ from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any
 
-from z0int.context_resolve import InformationNeed, _orient_repository, resolve_context, resolve_owning_repository
+from z0int.context_resolve import (
+    InformationNeed, _orient_repository, _ownership_stems, resolve_context, resolve_owning_repository,
+)
 from z0int.memory.event_log import EventLog
 from z0int.memory_contract import MemoryScope, MemorySnapshot, MemoryUseReceipt
 from z0int.receipt import DecisionReceipt, append_receipt, build_receipt, find_receipt
@@ -296,6 +298,79 @@ def _path_is_declared(relative_path: Path, declaration: tuple[Path, bool]) -> bo
     return relative_path == declared or (is_directory and declared in relative_path.parents)
 
 
+_MAX_COMPILED_DISCOVERY_PATHS = 6
+
+
+def _compile_subsystem_discovery(task_text: str, project_root: Any) -> dict[str, Any] | None:
+    """Turn a task sentence into the declared files of the one subsystem it names.
+
+    A task sentence is not a search query. The owning repository's manifest
+    already states what each subsystem is for and which source and test files
+    belong to it, so the task is matched against those declared purposes and
+    the result is a short list of exact paths. Nothing is selected unless one
+    subsystem is the sole clear match; the caller then falls back to observing.
+    The manifest read here is only a selection hint: identity, freshness and
+    path ownership are still checked from the hydrated manifest afterwards.
+    """
+    if project_root is None:
+        return None
+    root = Path(project_root)
+    try:
+        import yaml
+
+        document = yaml.safe_load((root / "zer0.repo.yaml").read_bytes()) or {}
+    except Exception:
+        return None
+    architecture = document.get("architecture") if isinstance(document, dict) else None
+    subsystems = architecture.get("subsystems") if isinstance(architecture, dict) else None
+    if not isinstance(subsystems, list):
+        return None
+    task_stems = _ownership_stems(task_text)
+    scored: list[tuple[int, int, str, list[str], list[str]]] = []
+    for subsystem in subsystems:
+        if not isinstance(subsystem, dict) or not isinstance(subsystem.get("id"), str):
+            continue
+        declared = subsystem.get("paths")
+        if not isinstance(declared, list):
+            continue
+        # The id and name are the declared capability and count double, as
+        # `owns` does for repository ownership. Summary prose shares incidental
+        # vocabulary with many tasks, so it only supports a named match.
+        named = task_stems & (
+            _ownership_stems(subsystem["id"].replace("-", " ")) | _ownership_stems(subsystem.get("name"))
+        )
+        described = (task_stems & _ownership_stems(subsystem.get("summary"))) - named
+        scored.append((
+            2 * len(named) + len(described), len(named), subsystem["id"], sorted(named | described),
+            [item for item in declared if isinstance(item, str)],
+        ))
+    scored.sort(key=lambda item: (-item[0], item[2]))
+    if not scored or scored[0][1] < 2:
+        return None  # the task does not name this subsystem's capability
+    runner_up = scored[1][0] if len(scored) > 1 else 0
+    if scored[0][0] < 2 * runner_up or scored[0][0] - runner_up < 2:
+        return None
+    _score, _named, subsystem_id, matched, declared = scored[0]
+    implementations: list[str] = []
+    tests: list[str] = []
+    for item in declared:
+        resolved = _manifest_path(root, item)
+        if resolved is None or resolved[1] or not (root / resolved[0]).is_file():
+            continue  # directories are ownership scope, not a bounded read
+        (tests if _is_test(root / resolved[0], root) else implementations).append(resolved[0].as_posix())
+    if not implementations or not tests:
+        return None
+    selected = (implementations + tests)[:_MAX_COMPILED_DISCOVERY_PATHS]
+    if not any(path in tests for path in selected):
+        selected[-1] = tests[0]
+    return {
+        "subsystem_id": subsystem_id,
+        "matched_terms": matched,
+        "implementation": [path for path in selected if path in implementations],
+        "tests": [path for path in selected if path in tests],
+    }
+
+
 def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Path | None]:
     """Discover candidates, then hydrate actual files through context_resolve.
 
@@ -323,11 +398,31 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
     if request["canonical_repo"] == _UNRESOLVED_OWNERSHIP:
         ownership_gaps = ["repository ownership is unresolved for this task; observe only"]
     symbol = request.get("symbol")
-    needs = [InformationNeed(
-        id="reuse-discovery", description=request["query"],
-        kind="exact_symbol" if symbol else "natural_language", symbol=symbol, required=True,
-    )]
-    if request.get("test_query") and request["project_root"] is not None:
+    compiled = None if symbol else _compile_subsystem_discovery(request["query"], request["project_root"])
+    request["compiled_discovery"] = compiled
+    compiled_paths: list[str] = []
+    if compiled is not None:
+        # Code location only: declared source and owning tests, read exactly.
+        first_source, first_test = compiled["implementation"][0], compiled["tests"][0]
+        needs = [
+            InformationNeed(
+                id="reuse-discovery", description=f"declared source of subsystem {compiled['subsystem_id']}",
+                kind="exact_path", path=first_source, required=True,
+            ),
+            InformationNeed(
+                id="test-discovery", description=f"owning test of subsystem {compiled['subsystem_id']}",
+                kind="exact_path", path=first_test, required=True,
+            ),
+        ]
+        compiled_paths = [
+            path for path in (*compiled["implementation"], *compiled["tests"]) if path not in (first_source, first_test)
+        ]
+    else:
+        needs = [InformationNeed(
+            id="reuse-discovery", description=request["query"],
+            kind="exact_symbol" if symbol else "natural_language", symbol=symbol, required=True,
+        )]
+    if compiled is None and request.get("test_query") and request["project_root"] is not None:
         test_query = request["test_query"]
         test_path = Path(test_query)
         search_root = Path(request["project_root"]).resolve()
@@ -370,6 +465,17 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
                 paths.add(path)
         except (OSError, RuntimeError, ValueError):
             continue
+    if compiled is not None:
+        # The two discovery needs are already exact reads of their files;
+        # hydrating them again would list each candidate twice.
+        paths = set()
+        for relative in compiled_paths:
+            try:
+                path = (root / relative).resolve(strict=True)
+                if path.is_relative_to(root) and path.is_file():
+                    paths.add(path)
+            except (OSError, RuntimeError, ValueError):
+                continue
     manifest_path: Path | None = None
     manifest_error: str | None = None
     try:

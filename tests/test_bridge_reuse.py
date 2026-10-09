@@ -576,6 +576,79 @@ class BridgeRepoReuseTests(unittest.TestCase):
             out, target_cwd=str(neutral), target_paths=[inside], verifier_binding=payload["verifier_binding"],
         )["valid"])
 
+    def declare_subsystems(self, extra=""):
+        """Give the fixture manifest the purpose text a real manifest carries."""
+        (self.repo / "upstream" / "ledger.py").write_text("def total(rows):\n    return sum(rows)\n")
+        (self.repo / "tests" / "test_ledger.py").write_text("def test_total():\n    assert True\n")
+        (self.repo / "zer0.repo.yaml").write_text(
+            "version: 1\nrepo: example/known-library\narchitecture:\n  subsystems:\n"
+            "  - id: records\n    name: Row normalization\n"
+            "    summary: Normalizes tabular rows and removes duplicate records, keeping the first occurrence.\n"
+            "    paths: [upstream/records.py, tests/test_records.py]\n"
+            "  - id: ledger\n    name: Cost ledger\n"
+            "    summary: Totals provider cost and token accounting.\n"
+            "    paths: [upstream/ledger.py, tests/test_ledger.py]\n" + extra
+        )
+        self.git("add", ".")
+        self.git("commit", "-qm", "declare subsystem purposes")
+
+    def first_turn(self, query, **extra):
+        payload = self.payload()
+        del payload["symbol"]
+        payload.update(query=query, **extra)
+        # The index finds nothing for a task sentence; only compiled discovery can.
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits()) as search:
+            out = self.rt.reuse_resolve(payload)
+        return out, search
+
+    def test_first_turn_packet_carries_the_owning_subsystem_source_and_tests(self):
+        self.declare_subsystems()
+        out, search = self.first_turn("Add a helper that removes duplicate rows after normalization of the records.")
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["decision"]["mode"], "REUSE", out["packet"]["unresolved_gaps"])
+        candidates = {item["candidate_id"]: item for item in out["packet"]["reuse_candidates"]}
+        self.assertEqual(set(candidates), {"file:upstream/records.py"})
+        tests = [ref["locator"] for ref in candidates["file:upstream/records.py"]["related_tests"]]
+        self.assertTrue(any(locator.endswith("tests/test_records.py") for locator in tests), tests)
+        # Code location comes from declared paths; the whole task is never sent to the index.
+        search.assert_not_called()
+        self.assertTrue(self.injected(out)["ok"])
+        self.assertTrue(self.model_input(out)["ok"])
+        self.assertTrue(self.check(out)["valid"])
+
+    def test_first_turn_stays_observe_when_no_single_subsystem_owns_the_task(self):
+        self.declare_subsystems()
+        for query in (
+            "Total the cost of duplicate rows in the records ledger after normalization and token accounting.",
+            "Add a websocket heartbeat with exponential backoff.",
+        ):
+            out, _search = self.first_turn(query, trace_id="trace-" + hashlib.sha256(query.encode()).hexdigest()[:8])
+            self.assertTrue(out["ok"], out)
+            self.assertEqual(out["decision"]["mode"], "OBSERVE", query)
+            # A novel or ambiguous task is not given an invented candidate.
+            self.assertEqual(out["packet"]["reuse_candidates"], [], query)
+
+    def test_first_turn_stays_observe_when_a_declared_source_is_missing(self):
+        self.declare_subsystems()
+        (self.repo / "tests" / "test_records.py").unlink()
+        out, _search = self.first_turn("Add a helper that removes duplicate rows after normalization of the records.")
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["decision"]["mode"], "OBSERVE")
+
+    def test_first_turn_packet_is_invalidated_by_same_size_same_mtime_content_replacement(self):
+        self.declare_subsystems()
+        out, _search = self.first_turn("Add a helper that removes duplicate rows after normalization of the records.")
+        self.assertEqual(out["decision"]["mode"], "REUSE")
+        self.injected(out)
+        self.assertTrue(self.model_input(out)["ok"])
+        before = self.code.stat()
+        original = self.code.read_text()
+        self.code.write_text(original.replace("fromkeys", "FROMKEYS"))
+        os.utime(self.code, ns=(before.st_atime_ns, before.st_mtime_ns))
+        self.assertEqual(self.code.stat().st_size, before.st_size)
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits()):
+            self.assertFalse(self.check(out)["valid"])
+
     def test_verifier_binding_accepts_pytest_node_for_exact_owning_file(self):
         from z0int.bridge.reuse import _normalize_verifier_binding
 
