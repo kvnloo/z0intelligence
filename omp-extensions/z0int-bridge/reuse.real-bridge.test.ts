@@ -21,7 +21,7 @@ import {
 } from "@oh-my-pi/pi-coding-agent";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { registerReuseAdapter, sha256Utf8, type ReuseConfig } from "./reuse.ts";
+import { createReuseAdapter, registerReuseAdapter, sha256Utf8, type ReuseConfig } from "./reuse.ts";
 
 const Z0_ROOT = join(import.meta.dir, "../..");
 const PYTHON = join(Z0_ROOT, ".venv/bin/python");
@@ -266,6 +266,69 @@ function openAiModel(): Model<"openai-completions"> {
 	const bundled = getBundledModel<"openai-completions">("openai", "gpt-4o-mini");
 	if (!bundled) throw new Error("Expected bundled OpenAI Completions fixture model");
 	return { ...bundled, api: "openai-completions" };
+}
+
+for (const stripUpdatedContext of [false, true]) {
+	test(`post-edit source refresh requires a new final payload witness (stripped=${stripUpdatedContext})`, async () => {
+		const tempRoot = await mkdtemp(join(tmpdir(), "z0int-reuse-post-edit-"));
+		const repoRoot = join(tempRoot, "repository");
+		let worker: JsonlBridgeWorker | null = null;
+		try {
+			await mkdir(join(repoRoot, "upstream"), { recursive: true });
+			await mkdir(join(repoRoot, "tests"), { recursive: true });
+			await writeFile(join(repoRoot, "upstream/records.py"), "def normalize_rows(rows):\n    return list(dict.fromkeys(rows))\n");
+			await writeFile(join(repoRoot, "tests/test_records.py"),
+				"import runpy\nfrom upstream.records import normalize_rows\n"
+				+ "def test_normalize_rows():\n    assert normalize_rows([1, 1, 2]) == [1, 2]\n"
+				+ "    assert runpy.run_path('result.py')['rows'] == [1, 2]\n");
+			await writeFile(join(repoRoot, "zer0.repo.yaml"),
+				"version: 1\nrepo: example/known-library\narchitecture:\n  subsystems:\n"
+				+ "  - id: records\n    paths: [upstream/records.py, tests/test_records.py]\n");
+			const registryPath = join(tempRoot, "components.yaml");
+			await writeFile(registryPath, "components:\n  records:\n    repo: example/known-library\n    owner: Library\n");
+			await writeFile(join(repoRoot, "result.py"), "raise RuntimeError('second write has not executed')\n");
+			initFixtureRepository(repoRoot);
+			const wrapperPath = join(tempRoot, "worker-fixture.py");
+			await writeFile(wrapperPath, fixtureSearchWorkerSource(true));
+			worker = await JsonlBridgeWorker.start(join(tempRoot, "z0int-home"), repoRoot, wrapperPath);
+			const exchanges: BridgeExchange[] = [];
+			const adapter = createReuseAdapter({
+				config: { mode: "enforce", canonicalRepo: "records", registryPath, candidateRoots: [repoRoot], verifierBinding },
+				getTraceId: () => "trace-multi-edit",
+				request: async (body, timeoutMs) => {
+					if (!worker) throw new Error("worker unavailable");
+					const response = await worker.request(body, timeoutMs);
+					exchanges.push({ request: body, response });
+					return response;
+				},
+			});
+			const context = { cwd: repoRoot, agent: { id: "primary" }, sessionManager: { getSessionId: () => "multi-edit" } };
+			await adapter.beforeAgentStart({ prompt: "normalize_rows" }, context);
+			const first = await adapter.context({ messages: [] }, context);
+			await adapter.providerPayloadFinalized({ serializedBody: JSON.stringify({ messages: first?.messages }) }, context);
+			expect(await adapter.toolCall({ toolName: "write", input: { path: "upstream/records.py" } }, context)).toBeUndefined();
+			await writeFile(join(repoRoot, "upstream/records.py"), "def normalize_rows(rows):\n    # changed after the first witnessed request\n    return list(dict.fromkeys(rows))\n");
+			await adapter.toolResult({ toolName: "write", input: { path: "upstream/records.py" }, isError: false }, context);
+			const second = await adapter.context({ messages: [] }, context);
+			await adapter.providerPayloadFinalized({ serializedBody: JSON.stringify({ messages: stripUpdatedContext ? [] : second?.messages }) }, context);
+			const admission = await adapter.toolCall({ toolName: "write", input: { path: "result.py" } }, context);
+			if (stripUpdatedContext) {
+				expect(admission?.block).toBe(true);
+				expect(await readFile(join(repoRoot, "result.py"), "utf8")).toContain("second write has not executed");
+			} else {
+				expect(admission).toBeUndefined();
+				expect(exchanges.filter(row => row.request.op === "reuse_resolve")).toHaveLength(2);
+				await writeFile(join(repoRoot, "result.py"), WRITE_CONTENT);
+				expect(runOwningVerifier(repoRoot).status).toBe(0);
+				const checks = exchanges.filter(row => row.request.op === "reuse_check");
+				expect(checks).toHaveLength(2);
+				expect((checks[0].request.payload as JsonObject).packet_id).not.toBe((checks[1].request.payload as JsonObject).packet_id);
+			}
+		} finally {
+			if (worker) await worker.close();
+			await rm(tempRoot, { recursive: true, force: true });
+		}
+	}, 30_000);
 }
 
 const runtimeScenarios = [

@@ -16,6 +16,7 @@ export type ReuseMode = "off" | "shadow" | "enforce";
 type ActiveReuseMode = Exclude<ReuseMode, "off">;
 type DecisionMode = "REUSE" | "EXTEND" | "NOVEL" | "OBSERVE";
 type JsonObject = Record<string, unknown>;
+type ReuseDiscovery = { symbol: string; test_query?: string };
 
 export interface ReuseConfig {
 	mode: ReuseMode;
@@ -79,6 +80,7 @@ type PreparedTurn =
 			decision: ReuseDecision;
 			injectionId: number | null;
 			root: string | null;
+			discovery?: ReuseDiscovery;
 	  };
 
 type TurnIdentity = { traceId: string; sessionId: string; cwd: string; agentId: string };
@@ -309,7 +311,7 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 	async function beforeAgentStart(
 		event: Pick<BeforeAgentStartEvent, "prompt">,
 		context: ReuseHookContext,
-		discovery?: { symbol: string; test_query?: string },
+		discovery?: ReuseDiscovery,
 	): Promise<void> {
 		if (primaryAgentId === null) primaryAgentId = context.agent.id;
 		if (context.agent.id !== primaryAgentId) return;
@@ -388,6 +390,7 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 				decision: resolved.decision,
 				injectionId: null,
 				root: resolved.root,
+				discovery,
 			};
 		} catch (error) {
 			if (generation !== currentGeneration ||
@@ -400,6 +403,13 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 		event: Pick<ToolResultEvent, "toolName" | "input" | "isError">,
 		context: ReuseHookContext,
 	): Promise<void> {
+		const state = prepared;
+		if (state.kind === "ready" && state.mode === "enforce" && isPositiveDecision(state.decision) &&
+			taskPrompt && !event.isError && (event.toolName === "edit" || event.toolName === "write") &&
+			matchesTurn(state, contextIdentity(context), dependencies.getTraceId())) {
+			await beforeAgentStart({ prompt: taskPrompt }, context, state.discovery);
+			return;
+		}
 		if (prepared.kind === "off" || (prepared.kind === "ready" && isPositiveDecision(prepared.decision)) || !taskPrompt || event.isError ||
 			event.toolName !== "z0_file_search" || event.input.kind !== "exact_symbol" ||
 			!matchesTurn(prepared, contextIdentity(context), dependencies.getTraceId())) return;

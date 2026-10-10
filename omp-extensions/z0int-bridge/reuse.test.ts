@@ -143,6 +143,62 @@ test("agent symbol search refreshes an incomplete OBSERVE packet", async () => {
 	expect(h.sent.filter(row => row.body.op === "reuse_resolve")).toHaveLength(2);
 });
 
+test("successful primary edits refresh recovered discovery before the next model input", async () => {
+	const refreshed = { ...resolveResponse("trace-1", "after-edit"), context_text: "updated source evidence" };
+	const h = harness({ resolveResponses: [{ ok: false }, resolveResponse(), refreshed] });
+	await h.adapter.beforeAgentStart({ prompt: "Repair the existing receipt" }, CONTEXT);
+	await h.adapter.toolResult({ toolName: "z0_file_search", input: { kind: "exact_symbol", query: "normalize_outcome" }, isError: false }, CONTEXT);
+	const before = await h.adapter.context({ messages: [] }, CONTEXT);
+	await h.adapter.providerPayloadFinalized({ serializedBody: JSON.stringify({ messages: before?.messages }) }, CONTEXT);
+	await h.adapter.toolCall(toolCall("edit", { path: "src/receipt.py", old_string: "old", new_string: "new" }), CONTEXT);
+	await h.adapter.toolResult({ toolName: "edit", input: { path: "src/receipt.py" }, isError: false }, CONTEXT);
+	const resolves = h.sent.filter(row => row.body.op === "reuse_resolve");
+	expect(resolves).toHaveLength(3);
+	expect(resolves[2].body.payload).toMatchObject({ query: "Repair the existing receipt", symbol: "normalize_outcome" });
+	expect(h.sent.filter(row => row.body.op === "reuse_model_input")).toHaveLength(1);
+	const injected = await h.adapter.context({ messages: [] }, CONTEXT);
+	expect(JSON.stringify(injected)).toContain("updated source evidence");
+	expect(h.sent.filter(row => row.body.op === "reuse_injected").at(-1)?.body.payload).toMatchObject({ packet_id: "after-edit" });
+	await h.adapter.providerPayloadFinalized({ serializedBody: JSON.stringify({ messages: injected?.messages }) }, CONTEXT);
+	expect(h.sent.filter(row => row.body.op === "reuse_model_input").at(-1)?.body.payload).toMatchObject({ packet_id: "after-edit" });
+});
+
+test("failed post-edit resolution revokes the previous positive packet", async () => {
+	const h = harness({ resolveResponses: [resolveResponse(), { ok: false }] });
+	await h.adapter.beforeAgentStart({ prompt: "Repair existing code" }, CONTEXT);
+	await h.adapter.toolResult({ toolName: "edit", input: { path: "src/a.py" }, isError: false }, CONTEXT);
+	expect(await h.adapter.context({ messages: [] }, CONTEXT)).toBeUndefined();
+	expect(blocked(await h.adapter.toolCall(toolCall("write", { path: "src/b.py", content: "x" }), CONTEXT))).toBe(true);
+	expect(h.sent.filter(row => row.body.op === "reuse_check")).toHaveLength(0);
+});
+
+test("a late post-edit refresh cannot replace a newer primary task", async () => {
+	let completeRefresh!: (value: unknown) => void;
+	const pendingRefresh = new Promise(resolve => { completeRefresh = resolve; });
+	const h = harness({ resolveResponses: [resolveResponse(), pendingRefresh, resolveResponse("trace-new", "packet-new")] });
+	await h.adapter.beforeAgentStart({ prompt: "Original task" }, CONTEXT);
+	const refresh = h.adapter.toolResult({ toolName: "edit", input: { path: "src/a.py" }, isError: false }, CONTEXT);
+	h.setTraceId("trace-new");
+	await h.adapter.beforeAgentStart({ prompt: "New task" }, CONTEXT);
+	completeRefresh(resolveResponse("trace-1", "old-refresh"));
+	await refresh;
+	await h.adapter.context({ messages: [] }, CONTEXT);
+	expect(h.sent.filter(row => row.body.op === "reuse_injected").at(-1)?.body.payload).toMatchObject({ packet_id: "packet-new", trace_id: "trace-new" });
+});
+
+test("failed edits, advisor edits, reads and shadow writes do not refresh mutation context", async () => {
+	const h = harness();
+	await h.adapter.beforeAgentStart({ prompt: "Repair existing code" }, CONTEXT);
+	await h.adapter.toolResult({ toolName: "edit", input: { path: "src/a.py" }, isError: true }, CONTEXT);
+	await h.adapter.toolResult({ toolName: "edit", input: { path: "src/a.py" }, isError: false }, ADVISOR_CONTEXT);
+	await h.adapter.toolResult({ toolName: "read", input: { path: "src/a.py" }, isError: false }, CONTEXT);
+	expect(h.sent.filter(row => row.body.op === "reuse_resolve")).toHaveLength(1);
+	const shadow = harness({ mode: "shadow" });
+	await shadow.adapter.beforeAgentStart({ prompt: "Repair existing code" }, CONTEXT);
+	await shadow.adapter.toolResult({ toolName: "write", input: { path: "src/a.py" }, isError: false }, CONTEXT);
+	expect(shadow.sent.filter(row => row.body.op === "reuse_resolve")).toHaveLength(1);
+});
+
 test("a stale mutation check permits recovery instead of retaining positive readiness", async () => {
 	const h = harness({ check: checkResponse(false, "stale") });
 	await h.adapter.beforeAgentStart({ prompt: "Extend the existing implementation" }, CONTEXT);
