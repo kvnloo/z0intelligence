@@ -435,3 +435,58 @@ test("a result that arrives after the session changed is not written into the ne
 	expect(entries.map(entry => [entry.data.session_id, entry.data.tool_call_id])).toEqual([["session-b", "on-time"]]);
 	expect(statusRing.at(-1)?.recorded).toBe("session_entry");
 });
+
+// --- one time budget for the extension and the worker ---------------------
+
+/** A stand-in for the worker: it waits for the model unless told a shorter budget, as run_shadow does. */
+function workerWithSlowModel(modelMs: number, workerDefaultMs: number) {
+	const finished: Array<{ status: string; atMs: number }> = [];
+	const started = Date.now();
+	globalHolder.__omp_z0int_bridge_transport__ = {
+		kind: "z0int-bridge",
+		generation: 1,
+		buildId: "b",
+		request: async (body: Record<string, unknown>) => {
+			sent.push(body);
+			const budget = typeof body.timeout_ms === "number" ? body.timeout_ms : workerDefaultMs;
+			const ran = modelMs <= budget;
+			await new Promise(resolve => setTimeout(resolve, Math.min(modelMs, budget)));
+			finished.push({ status: ran ? "selected" : "timeout", atMs: Date.now() - started });
+			return ran
+				? { ok: true, legal_ids: ["read"], shadow: [{ label: "m", backend: "llama", model: "m", selected_action: "read", abstained: false, latency_ms: modelMs }] }
+				: { ok: true, legal_ids: ["read"], shadow: [{ label: "m", backend: null, model: "m", abstained: true, error: "shadow_timeout" }] };
+		},
+	};
+	return finished;
+}
+
+test("the worker is given the extension's budget, so both records of a slow model agree", async () => {
+	process.env.OMP_Z0INT_COGNITION_TIMEOUT_MS = "100";
+	const { pi, entries } = observingPi();
+	// The model needs 250 ms (a cold load); the worker's own default would wait for it.
+	const finished = workerWithSlowModel(250, 30_000);
+	localCognition(pi as never);
+	pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "cold", toolName: "read", input: {} }, sessionCtx());
+	await flush(400);
+
+	expect(typeof sent[0].timeout_ms).toBe("number");
+	expect(sent[0].timeout_ms as number).toBeLessThan(100);
+	expect(sent[0].timeout_ms as number).toBeGreaterThan(0);
+	// The session entry and what the worker concluded say the same thing, and name the model.
+	expect(finished).toHaveLength(1);
+	expect(finished[0].status).toBe("timeout");
+	expect(entries[0].data.outcome).toBe("timeout");
+	expect((entries[0].data.models as Array<Record<string, unknown>>).map(model => model.status)).toEqual(["timeout"]);
+	// The worker stopped inside the budget instead of working on for an answer nobody is waiting for.
+	expect(finished[0].atMs).toBeLessThan(200);
+});
+
+test("a model that answers inside the budget is unaffected", async () => {
+	process.env.OMP_Z0INT_COGNITION_TIMEOUT_MS = "400";
+	const { pi, entries } = observingPi();
+	workerWithSlowModel(30, 30_000);
+	localCognition(pi as never);
+	pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "warm", toolName: "read", input: {} }, sessionCtx());
+	await flush(150);
+	expect(entries[0].data.outcome).toBe("slm_executed");
+});
