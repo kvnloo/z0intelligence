@@ -80,3 +80,29 @@ bun test
 
 The tests use a fake `ExtensionAPI` and a fake bridge transport; they need no
 OMP runtime, no Python and no model server.
+
+## What an observation records
+
+Every observed tool call settles into exactly one outcome:
+
+| Outcome | Meaning |
+| --- | --- |
+| `slm_executed` | at least one requested model answered |
+| `compiler_only` | the worker compiled the legal action set; no model was served |
+| `unavailable` | models were requested and none could be reached |
+| `timeout` | every requested model, or the worker itself, ran out of time |
+| `error` | the worker answered with a failure, or the send failed |
+| `no_transport` | no bridge worker was reachable |
+
+Per model the status is `selected`, `abstained`, `invalid_call`, `unavailable` or
+`timeout`. A model has abstained only if its backend answered; the worker's
+receipt marks unreached models `abstained` as well, and this lane does not
+repeat that.
+
+Each observation is also appended to the OMP session as a
+`z0int-cognition-shadow` entry (`pi.appendEntry`), carrying the live session id,
+the tool-call id, the trace id sent to the worker, the outcome, the per-model
+statuses and the worker generation. Session entries are records, not messages:
+nothing is added to what the model reads. Tool input is not copied into the
+entry. `/z0int-cognition-status` reports coverage (tool calls seen against
+observations settled, by outcome) alongside the recent rows.
