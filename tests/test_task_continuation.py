@@ -642,9 +642,10 @@ class GitDerivedBlobTests(unittest.TestCase):
         return subprocess.run(['git', *args], cwd=cwd, check=check, capture_output=True).stdout
 
     def task(self, name, *, config=(), attributes=None, content=ORDINARY, find='STATUS = "BROKEN"',
-             replace='STATUS = "READY"', configure_after_commit=False, rel='app.py'):
-        repo = self.root / name
-        repo.mkdir()
+             replace='STATUS = "READY"', configure_after_commit=False, rel='app.py', directory=None,
+             tracked=None, after_commit=None):
+        repo = self.root / (directory or name)
+        repo.mkdir(parents=True)
         self.git(repo, 'init')
 
         def configure():
@@ -655,18 +656,21 @@ class GitDerivedBlobTests(unittest.TestCase):
 
         if not configure_after_commit:
             configure()
-        (repo / rel).write_bytes(content)
+        (repo / (tracked or rel)).parent.mkdir(parents=True, exist_ok=True)
+        (repo / (tracked or rel)).write_bytes(content)
         self.git(repo, 'add', '-A')
         self.git(repo, '-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-m', 'fixture')
         if configure_after_commit:
             configure()
+        if after_commit:
+            after_commit(repo)
         cp = authorize_task(base_repo=repo, task_id=name, patch=PatchSpec(
             relative_path=rel, find=find, replace=replace, description='git-derived blob'))
         cp.status = 'resolved'
         save_checkpoint(cp)
         cp = step_worktree(cp, worktrees_root=self.root / 'wts')
         self.wt = Path(cp.worktree_path)
-        self.target = self.wt / rel
+        self.target = self.wt / (tracked or rel)
         return cp
 
     def normalising_task(self, name, **kwargs):
@@ -1002,6 +1006,360 @@ class GitDerivedBlobTests(unittest.TestCase):
         done = resume_task(cp.task_id)
         self.assertIsNone(done.verified_success)
         self.assertNotEqual(done.status, 'verified')
+
+
+    # --- the repository path: no character of it is a separator ---
+
+    AWKWARD_DIRECTORIES = {
+        'colon': 're:po', 'colon-in-parent': 'a:b/repo', 'space': 'sp ace', 'double-quote': 'q"uo"te',
+        'backslash': 'back\\slash', 'newline': 'new\nline', 'non-ascii': 'ünï-日本', 'leading-dash': '-dash',
+        'leading-hash': '#hash', 'tab': 'ta\tb', 'all-of-them': '-a:b "c"\\d\ne ü#',
+    }
+
+    def base_repository_path_verifies(self, name):
+        cp = self.task(name, config=(('core.autocrlf', 'true'),), directory=self.AWKWARD_DIRECTORIES[name])
+        self.assertIn(self.AWKWARD_DIRECTORIES[name], cp.base_repo)
+        index = Path(self.git(self.wt, 'rev-parse', '--path-format=absolute', '--git-path', 'index').strip().decode())
+        self.kill(cp, 'before_add')
+        before = index.read_bytes()
+        loose = self.git(self.wt, 'count-objects', '-v')
+        derived = task_loop._git_derived_oid(self.wt, cp.branch, 'app.py')
+        self.assertEqual(index.read_bytes(), before, 'deriving touched the worktree index')
+        self.assertEqual(self.git(self.wt, 'count-objects', '-v'), loose, 'deriving wrote to the object store')
+        self.assert_derived_oid_is_what_git_add_stores(cp)
+        self.assertEqual(self.git(self.wt, 'rev-parse', f'{cp.branch}:app.py').strip().decode(), derived)
+
+    def test_base_repository_path_with_a_colon_verifies(self):
+        self.base_repository_path_verifies('colon')
+
+    def test_base_repository_path_with_a_colon_in_a_parent_directory_verifies(self):
+        self.base_repository_path_verifies('colon-in-parent')
+
+    def test_base_repository_path_with_a_space_verifies(self):
+        self.base_repository_path_verifies('space')
+
+    def test_base_repository_path_with_a_double_quote_verifies(self):
+        self.base_repository_path_verifies('double-quote')
+
+    def test_base_repository_path_with_a_backslash_verifies(self):
+        self.base_repository_path_verifies('backslash')
+
+    def test_base_repository_path_with_a_newline_verifies(self):
+        self.base_repository_path_verifies('newline')
+
+    def test_base_repository_path_with_non_ascii_characters_verifies(self):
+        self.base_repository_path_verifies('non-ascii')
+
+    def test_base_repository_path_with_a_leading_dash_verifies(self):
+        self.base_repository_path_verifies('leading-dash')
+
+    def test_base_repository_path_with_a_leading_hash_verifies(self):
+        self.base_repository_path_verifies('leading-hash')
+
+    def test_base_repository_path_with_a_tab_verifies(self):
+        self.base_repository_path_verifies('tab')
+
+    def test_base_repository_path_with_every_awkward_character_at_once_verifies(self):
+        self.base_repository_path_verifies('all-of-them')
+
+    def test_colon_in_the_path_survives_a_kill_at_every_git_step(self):
+        for points in (('before_add',), ('after_add',), ('after_commit',)):
+            with self.subTest(points=points):
+                cp = self.task('colon', config=(('core.autocrlf', 'true'),), directory='a:b/re:po')
+                self.kill(cp, *points)
+                self.assert_verified_with_one_clean_commit(cp)
+                shutil.rmtree(self.root)
+                self.root.mkdir()
+
+    def test_scratch_directory_path_with_awkward_characters_verifies(self):
+        scratch_root = self.root / 'tm:p "dir"\\\nü'
+        scratch_root.mkdir()
+        cp = self.task('plain', config=(('core.autocrlf', 'true'),))
+        with patch.object(tempfile, 'tempdir', str(scratch_root)):
+            self.assert_verified_with_one_clean_commit(cp)
+        self.assertEqual(list(scratch_root.iterdir()), [])
+
+    def test_alternates_entry_is_c_quoted_so_no_byte_of_the_path_is_a_separator(self):
+        self.assertEqual(task_loop._c_quoted('/plain/objects'), b'"/plain/objects"')
+        self.assertEqual(task_loop._c_quoted('/a:b c/#d'), b'"/a:b c/#d"')
+        self.assertEqual(task_loop._c_quoted('/q"uo\\te'), b'"/q\\"uo\\\\te"')
+        self.assertEqual(task_loop._c_quoted('/new\nline\ttab'), b'"/new\\012line\\011tab"')
+        self.assertEqual(task_loop._c_quoted('/\u00fc'), b'"/\\303\\274"')
+        self.assertEqual(task_loop._c_quoted(os.fsdecode(b'/\xff')), b'"/\\377"')
+        for path in self.AWKWARD_DIRECTORIES.values():
+            self.assertNotIn(b'\n', task_loop._c_quoted(path))
+
+    def test_inherited_alternate_object_directories_still_reach_the_scratch_index(self):
+        # Every object of the repository is reachable only through the inherited variable,
+        # whose one entry is itself quoted because its path holds the list separator.
+        alternate = self.root / 'in:herited objects'
+
+        def move_objects_out(repo):
+            shutil.move(repo / '.git' / 'objects', alternate)
+            (repo / '.git' / 'objects' / 'info').mkdir(parents=True)
+            (repo / '.git' / 'objects' / 'pack').mkdir()
+            self.assertNotEqual(subprocess.run(['git', 'rev-parse', '--verify', 'HEAD^{tree}'], cwd=repo,
+                                               capture_output=True).returncode, 0)
+            inherited = patch.dict(os.environ, {'GIT_ALTERNATE_OBJECT_DIRECTORIES': f'"{alternate}"'})
+            inherited.start(); self.addCleanup(inherited.stop)
+
+        cp = self.task('inherited', config=(('core.autocrlf', 'true'),), after_commit=move_objects_out)
+        self.assert_derived_oid_is_what_git_add_stores(cp)
+        self.assertEqual(os.environ['GIT_ALTERNATE_OBJECT_DIRECTORIES'], f'"{alternate}"')
+
+    # --- the target path: compared in git's own spelling of it ---
+
+    SPELLINGS = (('./app.py', 'app.py'), ('./sub/a.py', 'sub/a.py'), ('sub//a.py', 'sub/a.py'),
+                 ('sub/./a.py', 'sub/a.py'), ('.//sub/.//a.py', 'sub/a.py'))
+
+    def spelled_task(self, index, rel, canonical, **kwargs):
+        return self.task(f'spelled-{index}', rel=rel, tracked=canonical, **kwargs)
+
+    def spelling_verifies(self, index):
+        rel, canonical = self.SPELLINGS[index]
+        cp = self.spelled_task(index, rel, canonical)
+        self.assertEqual(cp.patch['relative_path'], rel)
+        done = self.assert_verified_with_one_clean_commit(cp, canonical)
+        self.assertEqual(done.patch['relative_path'], rel)
+        self.assertEqual(self.blob(cp, canonical), ORDINARY.replace(b'BROKEN', b'READY'))
+
+    def test_dot_slash_target_path_verifies_with_one_commit(self):
+        self.spelling_verifies(0)
+
+    def test_dot_slash_nested_target_path_verifies_with_one_commit(self):
+        self.spelling_verifies(1)
+
+    def test_doubled_slash_target_path_verifies_with_one_commit(self):
+        self.spelling_verifies(2)
+
+    def test_dot_component_target_path_verifies_with_one_commit(self):
+        self.spelling_verifies(3)
+
+    def test_mixed_redundant_components_target_path_verifies_with_one_commit(self):
+        self.spelling_verifies(4)
+
+    def test_non_canonical_target_path_survives_a_kill_at_every_git_step(self):
+        for index, (rel, canonical) in enumerate(self.SPELLINGS[:4]):
+            for points in (('before_add',), ('after_add',), ('after_commit',)):
+                with self.subTest(rel=rel, points=points):
+                    cp = self.spelled_task(index, rel, canonical, config=(('core.autocrlf', 'true'),))
+                    self.kill(cp, *points)
+                    self.assert_verified_with_one_clean_commit(cp, canonical)
+                    shutil.rmtree(self.root)
+                    self.root.mkdir()
+
+    def test_canonical_path_is_the_name_git_prints(self):
+        for index, (rel, canonical) in enumerate(self.SPELLINGS):
+            with self.subTest(rel=rel):
+                self.spelled_task(index, rel, canonical)
+                index_file = Path(self.git(self.wt, 'rev-parse', '--path-format=absolute', '--git-path',
+                                           'index').strip().decode())
+                before = index_file.read_bytes()
+                printed = self.git(self.wt, 'ls-files', '--full-name', '--', rel).decode().splitlines()
+                self.assertEqual(printed, [canonical])
+                self.assertEqual(task_loop._canonical_path(self.wt, rel), canonical)
+                self.assertEqual(task_loop._canonical_path(self.wt, canonical), canonical)
+                self.assertEqual(self.git(self.wt, 'ls-tree', '--name-only', '--full-tree', '-r', 'HEAD').decode()
+                                 .splitlines(), [canonical])
+                self.assertEqual(index_file.read_bytes(), before)
+        # untracked, removed from the index, and odd names are spelled by git too
+        (self.wt / 'new dir').mkdir()
+        (self.wt / 'new dir' / 'a*.py').write_text('X = 1\n')
+        self.assertEqual(task_loop._canonical_path(self.wt, './new dir//a*.py'), 'new dir/a*.py')
+        (self.wt / 'ab.py').write_text('X = 1\n')
+        (self.wt / 'a*.py').write_text('X = 1\n')
+        self.assertEqual(task_loop._canonical_path(self.wt, 'a*.py'), 'a*.py')
+        self.git(self.wt, 'rm', '-q', '--cached', '--', 'sub/a.py')
+        self.assertEqual(task_loop._canonical_path(self.wt, 'sub/./a.py'), 'sub/a.py')
+        # no canonical form: nothing there, a directory, a file named as a directory
+        self.assertIsNone(task_loop._canonical_path(self.wt, 'missing.py'))
+        self.assertIsNone(task_loop._canonical_path(self.wt, 'sub'))
+        self.assertIsNone(task_loop._canonical_path(self.wt, 'sub/'))
+        self.assertIsNone(task_loop._canonical_path(self.wt, 'sub/a.py/'))
+        self.assertIsNone(task_loop._canonical_path(self.wt, 'sub/a.py/.'))
+
+    def test_target_path_that_escapes_the_worktree_is_still_refused(self):
+        outside = self.root / 'outside.py'
+        for index, rel in enumerate(('../outside.py', 'sub/../../outside.py', str(outside))):
+            with self.subTest(rel=rel):
+                cp = self.task(f'escape-{index}', rel='sub/a.py')
+                outside.write_bytes(ORDINARY)
+                cp.patch['relative_path'] = rel
+                save_checkpoint(cp)
+                with self.assertRaisesRegex(InvalidCheckpoint, 'patch target escapes the isolated worktree'):
+                    resume_task(cp.task_id)
+                self.assertEqual(outside.read_bytes(), ORDINARY)
+                cp.pending_patch = {'status': 'completed', 'before': '0' * 64, 'after': '1' * 64}
+                self.assertEqual(task_loop._commit_patch(cp),
+                                 'patch not committed: commit failed: patch target escapes the isolated worktree')
+                self.assertEqual(self.commits(cp), 0)
+                self.assertEqual(self.git(self.wt, 'status', '--porcelain'), b'')
+
+    def test_trailing_slash_on_the_target_path_is_withheld_with_nothing_committed(self):
+        # git matches a name with a trailing slash against directories only: nothing is staged.
+        cp = self.task('trailing', rel='sub/a.py/', tracked='sub/a.py')
+        for _ in range(2):
+            self.assert_withheld_with_nothing_committed(cp, 'patch not committed: ')
+        self.assertEqual(self.git(self.wt, 'status', '--porcelain'), b' M sub/a.py\n')
+        self.assertEqual(self.git(self.wt, 'diff', '--cached', '--name-only'), b'')
+
+    def test_target_path_git_has_no_single_name_for_is_refused_before_git_derives_anything(self):
+        cp = self.task('trailing', rel='sub/a.py/', tracked='sub/a.py')
+
+        def never(*args):
+            raise AssertionError('git was asked to derive a blob for a name it matches no file for')
+
+        with patch.object(task_loop, '_git_derived_oid', never):
+            self.assert_withheld_with_nothing_committed(cp, 'git would not store the target as a regular file')
+
+    def test_line_ending_only_patch_under_a_non_canonical_path_leaves_a_clean_status(self):
+        # Nothing to commit, but the index entry is still refreshed under git's name for the file.
+        cp = self.task('spelled-eol', config=(('core.autocrlf', 'true'),), content=b'KEY = 1\r\n', find='\r\n',
+                       replace='\n', rel='./app.py', tracked='app.py')
+        self.assert_nothing_to_commit_matches_the_baseline(cp)
+        self.assertEqual(self.target.read_bytes(), b'KEY = 1\n')
+
+    # --- a commit found necessary stays necessary ---
+
+    def attributes_file(self):
+        common = self.git(self.wt, 'rev-parse', '--path-format=absolute', '--git-common-dir').strip().decode()
+        (Path(common) / 'info').mkdir(exist_ok=True)
+        return Path(common) / 'info' / 'attributes'
+
+    def add_clean_filter(self, command):
+        self.git(self.wt, 'config', 'filter.late.clean', command)
+        self.attributes_file().write_text('*.py filter=late\n')
+
+    def filter_appears_before(self, verb, command):
+        real = task_loop._run_git
+
+        def run_git(args, **kwargs):
+            if args[0] == verb or (verb == 'commit' and 'commit' in args):
+                self.add_clean_filter(command)
+            return real(args, **kwargs)
+
+        return patch.object(task_loop, '_run_git', run_git)
+
+    def assert_withheld_until_the_reverting_filter_is_gone(self, cp):
+        for _ in range(3):
+            done = self.assert_withheld_with_nothing_committed(cp, 'a commit of the recorded patch was needed')
+            self.assertIsNone(done.measurements.get('verifier_ref'))
+        self.attributes_file().unlink()
+        self.assert_verified_with_one_clean_commit(cp)
+        self.assertEqual(self.blob(cp), ORDINARY.replace(b'BROKEN', b'READY'))
+
+    def test_filter_that_undoes_the_patch_between_add_and_commit_is_not_verified_without_a_commit(self):
+        cp = self.task('plain')
+        with self.filter_appears_before('commit', 'sed s/READY/BROKEN/'):
+            first = resume_task(cp.task_id)
+        self.assertIsNone(first.verified_success)
+        self.assertEqual(self.commits(cp), 0)
+        self.assert_withheld_until_the_reverting_filter_is_gone(cp)
+
+    def test_filter_that_undoes_the_patch_after_a_kill_following_the_add_is_not_verified_without_a_commit(self):
+        cp = self.task('plain')
+        self.kill(cp, 'after_add')
+        self.assertEqual(self.git(self.wt, 'diff', '--cached', '--name-only'), b'app.py\n')
+        self.add_clean_filter('sed s/READY/BROKEN/')
+        self.assert_withheld_until_the_reverting_filter_is_gone(cp)
+
+    def test_filter_that_undoes_the_patch_under_autocrlf_is_not_verified_without_a_commit(self):
+        cp = self.normalising_task('autocrlf-true')
+        with self.filter_appears_before('commit', 'sed s/READY/BROKEN/'):
+            resume_task(cp.task_id)
+        for _ in range(2):
+            self.assert_withheld_with_nothing_committed(cp, 'a commit of the recorded patch was needed')
+
+    def test_filter_that_undoes_the_patch_before_any_commit_was_needed_has_nothing_to_commit(self):
+        # Present before the commit step first runs: exactly as if it had always been configured.
+        cp = self.task('plain')
+        self.kill(cp, 'before_--literal-pathspecs')  # patch written; the commit step asked git nothing yet
+        self.add_clean_filter('sed s/READY/BROKEN/')
+        self.assert_nothing_to_commit_matches_the_baseline(cp)
+
+    def test_filter_that_changes_the_blob_between_add_and_commit_still_ends_in_one_commit(self):
+        cp = self.task('plain')
+        with self.filter_appears_before('commit', 'tr a-z A-Z'):
+            first = resume_task(cp.task_id, until='patched')
+        self.assertIn('does not carry the recorded patch', first.last_error)
+        self.assert_verified_with_one_clean_commit(cp)
+        self.assertEqual(self.blob(cp), ORDINARY.replace(b'BROKEN', b'READY').upper())
+
+    # --- conditions no earlier test distinguished ---
+
+    def test_target_swapped_for_a_symlink_while_git_derives_the_blob_is_never_staged(self):
+        cp = self.normalising_task('autocrlf-true')
+        real, real_git, asked = task_loop._git_derived_oid, task_loop._run_git, []
+
+        def swapped_after_deriving(wt, branch, rel):
+            oid = real(wt, branch, rel)
+            self.target.rename(self.wt / 'real.py')  # same bytes when read through the link
+            self.target.symlink_to('real.py')
+            return oid
+
+        def recording(args, **kwargs):
+            asked.append(list(args))
+            return real_git(args, **kwargs)
+
+        with patch.object(task_loop, '_git_derived_oid', swapped_after_deriving), \
+                patch.object(task_loop, '_run_git', recording):
+            done = resume_task(cp.task_id, until='patched')
+        self.assertIn('the worktree content does not match the recorded patch', done.last_error)
+        self.assertEqual([args for args in asked if 'add' in args or 'reset' in args or 'commit' in args], [])
+        self.assertEqual(self.commits(cp), 0)
+        self.assertEqual(self.git(self.wt, 'diff', '--cached', '--name-only'), b'')
+        self.assert_withheld_with_nothing_committed(cp, 'symlink')
+
+    def test_nothing_to_commit_leaves_a_different_staged_version_of_the_target_alone(self):
+        cp = self.normalising_task('autocrlf-true')
+        resume_task(cp.task_id, until='patched')
+        self.assertEqual(self.commits(cp), 1)
+        patched = self.target.read_bytes()
+        self.target.write_bytes(b'USER VERSION\r\n')
+        self.git(self.wt, 'add', '--', 'app.py')
+        staged_by_the_user = self.staged_oid()
+        self.target.write_bytes(patched)
+        done = resume_task(cp.task_id)
+        self.assertTrue(done.verified_success, done.last_error)
+        self.assertEqual(self.commits(cp), 1)
+        self.assertEqual(self.staged_oid(), staged_by_the_user)
+        self.assertEqual(self.git(self.wt, 'cat-file', 'blob', staged_by_the_user), b'USER VERSION\n')
+
+    def test_staged_blob_that_is_not_the_derived_one_is_unstaged_again(self):
+        cp = self.task('plain')
+        with self.filter_appears_before('add', 'tr a-z A-Z'):  # after deriving, before the real add
+            done = resume_task(cp.task_id, until='patched')
+        self.assertIn('what git staged for the target is not what it derives', done.last_error)
+        self.assertEqual(self.commits(cp), 0)
+        self.assertEqual(self.git(self.wt, 'diff', '--cached', '--name-only'), b'')
+        self.assertEqual(self.staged_oid(), self.git(self.wt, 'rev-parse', f'{cp.branch}:app.py').strip().decode())
+        self.assert_verified_with_one_clean_commit(cp)
+        self.assertEqual(self.blob(cp), ORDINARY.replace(b'BROKEN', b'READY').upper())
+
+    def test_scratch_index_that_cannot_be_read_from_the_task_branch_derives_nothing(self):
+        cp = self.task('crlf-blob-then-autocrlf', config=(('core.autocrlf', 'true'),),
+                       content=ORDINARY.replace(b'\n', b'\r\n'), configure_after_commit=True)
+        self.kill(cp, 'before_add')
+        with self.assertRaises(subprocess.CalledProcessError) as raised:
+            task_loop._git_derived_oid(self.wt, 'no-such-branch', 'app.py')
+        self.assertIn('read-tree', raised.exception.cmd)
+
+    def test_target_git_add_refuses_in_the_scratch_index_is_withheld(self):
+        # A required clean filter that fails: git add stores nothing. The scratch index
+        # still holds the task branch's entry, which must not be taken for the derived blob.
+        cp = self.task('plain')
+        self.git(self.wt, 'config', 'filter.late.clean', "sh -c 'cat >/dev/null; exit 1'")
+        self.git(self.wt, 'config', 'filter.late.required', 'true')
+        self.attributes_file().write_text('*.py filter=late\n')
+        for _ in range(2):
+            done = self.assert_withheld_with_nothing_committed(cp, 'commit failed')
+            self.assertIn('clean filter', done.last_error)
+        self.assertEqual(self.git(self.wt, 'diff', '--cached', '--name-only'), b'')
+        with self.assertRaises(subprocess.CalledProcessError) as raised:
+            task_loop._git_derived_oid(self.wt, cp.branch, 'app.py')
+        self.assertIn('add', raised.exception.cmd)
+        self.attributes_file().unlink()
+        self.assert_verified_with_one_clean_commit(cp)
 
 
 if __name__ == '__main__':

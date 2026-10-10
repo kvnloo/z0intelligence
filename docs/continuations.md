@@ -140,7 +140,13 @@ file on the way in. The expected blob id is taken from a real `git add` of the
 target into a scratch index read from the task branch, with a scratch object
 directory, so the worktree's index and the object store are not touched; the
 staged entry and the task branch entry must both be that id, as a regular
-file. (`git hash-object` is not used: it does not load the index, so it
+file. The scratch object directory reaches the repository's objects through
+its own `info/alternates` file holding one C-style quoted entry, so no
+character of the repository path (a colon, a newline, a quote) is a list
+separator, and an inherited `GIT_ALTERNATE_OBJECT_DIRECTORIES` is passed on
+unchanged. Entries are compared under the name Git itself prints for the
+target, so `./sub//a.py` is `sub/a.py`; a path Git matches no single file for
+(a directory, or a file named with a trailing slash) is withheld. (`git hash-object` is not used: it does not load the index, so it
 converts a path whose stored blob already holds CRLF where `git add` does
 not.) A filter that appears after the write is therefore applied, exactly as
 if it had always been configured. A target that is a symlink in the worktree
@@ -150,6 +156,12 @@ under `ident`), there is nothing to commit and the content predicate decides.
 Another process that rewrites the target while the commit step runs is not
 excluded; the worktree hash is re-checked after the blob id is derived, and
 the task-branch check after the commit then withholds verification.
+Once a commit has been found necessary, the entry the task branch held at that
+moment is recorded in the checkpoint (`measurements.patch_commit_needed_over`)
+before anything is staged. While the branch still holds that entry the patch
+is not committed, whatever Git derives later: a clean filter that appears
+after the add and undoes the patch does not turn "nothing was committed" into
+"nothing to commit". Removing such a filter lets the next resume commit.
 Verification otherwise remains the existing content predicate, not a claim that
 arbitrary tests ran or all project requirements were satisfied.
 Atomic checkpoint writes flush the temporary file and POSIX parent directory;

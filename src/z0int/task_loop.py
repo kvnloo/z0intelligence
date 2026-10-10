@@ -26,7 +26,7 @@ import tempfile
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 from . import paths
@@ -506,6 +506,43 @@ def _staged_blob_oid(wt: Path, rel: str, env: dict[str, str] | None = None) -> s
     return None
 
 
+def _canonical_path(wt: Path, rel: str) -> str | None:
+    """The target's name as git itself spells it (``./sub//a.py`` is ``sub/a.py``), or None.
+
+    Git prints, and stores, one spelling of a path; ``ls-files`` and ``ls-tree`` output
+    is compared with that spelling, never with the recorded one. Git is asked rather
+    than imitated, and its answer must name the same path component by component, so
+    a directory (which git answers with the files inside it) or a name git matches
+    nothing for (a trailing slash on a file) has no canonical form here. Read-only.
+    """
+    out = _run_git(["--literal-pathspecs", "ls-files", "-z", "--full-name", "--cached", "--others", "--", rel],
+                   cwd=wt, check=False)
+    names = {name for name in out.stdout.split("\0") if name} if out.returncode == 0 else set()
+    if len(names) == 1 and PurePosixPath(*names) == PurePosixPath(rel):
+        return names.pop()
+    return None
+
+
+def _c_quoted(path: str) -> bytes:
+    """``path`` as one C-style quoted entry of a git alternates list.
+
+    An unquoted entry cannot hold the list separator (a newline in
+    ``objects/info/alternates``, ``:`` in ``GIT_ALTERNATE_OBJECT_DIRECTORIES``) and
+    is a comment when it starts with ``#``. An entry that starts with a double quote
+    is unquoted by git, so every byte that is not printable ASCII is written as a
+    three-digit octal escape and no path is unrepresentable.
+    """
+    out = bytearray(b'"')
+    for byte in os.fsencode(path):
+        if byte in b'"\\':
+            out += b"\\" + bytes((byte,))
+        elif 0x20 <= byte < 0x7F:
+            out.append(byte)
+        else:
+            out += b"\\%03o" % byte
+    return bytes(out) + b'"'
+
+
 def _git_derived_oid(wt: Path, branch: str, rel: str) -> str | None:
     """Blob id that ``git add`` itself stores for the worktree target on the task branch.
 
@@ -516,17 +553,28 @@ def _git_derived_oid(wt: Path, branch: str, rel: str) -> str | None:
     taken from a real ``git add`` into a scratch index read from the task branch,
     writing to a scratch object directory: the worktree's own index and the
     repository's object store gain nothing. None when git stores no regular file.
+
+    The scratch object directory reaches the repository's objects through its own
+    ``info/alternates`` file, one quoted entry. No list of paths is assembled, so no
+    character of the repository path can act as a separator, and an inherited
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` is passed on exactly as it was received.
     """
-    objects = _run_git(["rev-parse", "--path-format=absolute", "--git-path", "objects"], cwd=wt).stdout.strip()
+    objects = _run_git(["rev-parse", "--path-format=absolute", "--git-path", "objects"],
+                       cwd=wt).stdout.removesuffix("\n")
     with tempfile.TemporaryDirectory(prefix="z0int-derive-") as scratch:
-        (Path(scratch) / "objects").mkdir()
-        alternates = [objects, os.environ.get("GIT_ALTERNATE_OBJECT_DIRECTORIES", "")]
+        info = Path(scratch) / "objects" / "info"
+        info.mkdir(parents=True)
+        (info / "alternates").write_bytes(_c_quoted(objects) + b"\n")
         env = dict(os.environ, GIT_INDEX_FILE=str(Path(scratch) / "index"),
-                   GIT_OBJECT_DIRECTORY=str(Path(scratch) / "objects"),
-                   GIT_ALTERNATE_OBJECT_DIRECTORIES=os.pathsep.join(a for a in alternates if a))
+                   GIT_OBJECT_DIRECTORY=str(Path(scratch) / "objects"))
         for args in (["read-tree", f"refs/heads/{branch}"], ["add", "--", f":(literal){rel}"]):
             subprocess.run(["git", *args], cwd=str(wt), capture_output=True, text=True, check=True, env=env)
         return _staged_blob_oid(wt, rel, env)
+
+
+# measurements key: the task-branch blob id of the target ("" when the branch has no such
+# regular file) at the moment a commit of the recorded patch was found to be needed.
+_COMMIT_NEEDED_OVER = "patch_commit_needed_over"
 
 
 def _commit_patch(cp: TaskCheckpoint) -> str | None:
@@ -538,6 +586,10 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
     from the after-image under this repository's attributes and config, so a
     repeat (or a resume after a kill between write and commit) is a no-op.
     Never checks anything out or moves a branch.
+
+    Once a commit has been found necessary, that is durable: the entry the branch
+    held then is recorded before anything is staged, and while the branch still
+    holds that entry the patch is not committed, whatever git derives later.
     """
     wt = Path(cp.worktree_path or "")
     rel = str((cp.patch or {}).get("relative_path"))
@@ -556,23 +608,38 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
         if head.returncode != 0 or head.stdout.strip() != f"refs/heads/{branch}":
             return (_NOT_COMMITTED + f"the worktree HEAD is detached or on another branch, "
                     f"not the task branch {branch}; nothing was checked out or moved")
-        expected = _git_derived_oid(wt, branch, rel)
+        not_regular = _NOT_COMMITTED + "git would not store the target as a regular file"
+        name = _canonical_path(wt, rel)  # every later comparison and pathspec uses git's spelling
+        if name is None:
+            return not_regular
+        expected = _git_derived_oid(wt, branch, name)
         if expected is None:
-            return _NOT_COMMITTED + "git would not store the target as a regular file"
+            return not_regular
         # The id was derived from the file as it was read just now: it stands for
         # the recorded patch only if the bytes are still the after-image.
         if (wt / rel).is_symlink() or hashlib.sha256(target.read_bytes()).hexdigest() != after:
             return mismatch
-        literal = f":(literal){rel}"  # the name is a file, never a pattern: a*.py must not also match ab.py
-        if _branch_blob_oid(wt, branch, rel) == expected:
+        literal = f":(literal){name}"  # the name is a file, never a pattern: a*.py must not also match ab.py
+        carried = _branch_blob_oid(wt, branch, name)
+        if carried == expected:
+            if cp.measurements.get(_COMMIT_NEEDED_OVER) == carried:
+                # An earlier call derived a different blob and set out to commit it; the
+                # branch entry has not moved since. Git deriving that same old entry now
+                # (a clean filter that appeared after the add and undoes the patch) is
+                # not evidence that the patch was committed.
+                return (_NOT_COMMITTED + f"a commit of the recorded patch was needed and the task branch "
+                        f"{branch} still holds the entry it had then")
             # Nothing to commit. When the index entry is that blob too, re-adding it only
             # refreshes its stat data, which is what stops ``git status`` reporting a
             # rewritten file whose stored form did not change (CRLF to LF under autocrlf).
-            if _staged_blob_oid(wt, rel) == expected:
+            if _staged_blob_oid(wt, name) == expected:
                 _run_git(["add", "--", literal], cwd=wt, check=False)
         else:
+            if cp.measurements.get(_COMMIT_NEEDED_OVER) != (carried or ""):
+                cp.measurements[_COMMIT_NEEDED_OVER] = carried or ""
+                save_checkpoint(cp)  # durable before the index is touched: a kill after the add keeps it
             _run_git(["add", "--", literal], cwd=wt)
-            if _staged_blob_oid(wt, rel) != expected:
+            if _staged_blob_oid(wt, name) != expected:
                 _run_git(["reset", "-q", "--", literal], cwd=wt, check=False)
                 return _NOT_COMMITTED + "what git staged for the target is not what it derives from the recorded patch"
             _run_git(
@@ -580,7 +647,7 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
                  "commit", "-m", f"z0int task {cp.task_id}: bounded patch", "--only", "--", literal],
                 cwd=wt,
             )
-        if _branch_blob_oid(wt, branch, rel) != expected:
+        if _branch_blob_oid(wt, branch, name) != expected:
             return _NOT_COMMITTED + f"the task branch {branch} does not carry the recorded patch"
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         return _NOT_COMMITTED + f"commit failed: {(getattr(exc, 'stderr', None) or str(exc))[:300]}"
