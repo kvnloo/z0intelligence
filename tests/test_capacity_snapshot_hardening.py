@@ -380,7 +380,10 @@ def test_canaries_as_mapping_keys_do_not_reach_the_snapshot():
     kerdoios["entries"] = {f"{MARK}entrykey": kerdoios["entries"][0]}
     snap = _build(kerdoios=kerdoios)
     assert MARK not in json.dumps(snap)
-    assert set(snap["offers"][0]["quota"]["dimensions"]) == {"rpd"}
+    dimensions = snap["offers"][0]["quota"]["dimensions"]
+    assert len(dimensions) == 1 + sum(isinstance(value, str) for value in _shapes("key").values())
+    for name, row in dimensions.items():
+        assert name == "rpd" or (name.startswith("redacted-") and row["id_redacted"]), name
 
 
 def test_all_positions_planted_at_once_do_not_leak():
