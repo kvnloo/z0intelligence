@@ -922,16 +922,40 @@ function fakePi(activeTools: string[]) {
 	return { pi, start, setCalls, active: () => [...active] };
 }
 
-function registerWith(mode: ReuseConfig["mode"], activeTools: string[]) {
+function registerWith(mode: ReuseConfig["mode"], activeTools: string[], verifierBinding?: Record<string, unknown>) {
 	const fake = fakePi(activeTools);
 	registerReuseAdapter(fake.pi as never, {
-		config: config(mode),
+		config: { ...config(mode), verifierBinding },
 		getTraceId: () => "trace-1",
 		timeoutMs: 50,
 		request: async body => (body.op === "reuse_resolve" ? resolveResponse() : { ok: true }),
 	});
 	return fake;
 }
+
+test("enforce advertises the configured owning verifier and its exact command on every turn", async () => {
+	const command = "env PYTHONPATH=src python -m pytest -q tests/test_records.py";
+	const fake = registerWith("enforce", ["read", "edit", "bash"], {
+		argv: command.split(" "), test_paths: ["tests/test_records.py"],
+	});
+	for (let turn = 0; turn < 2; turn++) {
+		const [result] = await fake.start();
+		expect(fake.active()).toEqual(["read", "edit", "bash"]);
+		const content = (result as { message?: { content: string } }).message?.content;
+		expect(content).toContain(command);
+		expect(content).toContain("z0_file_search");
+		expect(content).not.toContain("cannot be executed");
+	}
+	expect(fake.setCalls).toHaveLength(0);
+});
+
+test("enforce still withholds bash for malformed or shell-composed verifier argv", async () => {
+	for (const argv of [[], ["python", "-m", "pytest", 1], ["python", "-m", "pytest;touch"], ["python", "-m", "pytest > out"]]) {
+		const fake = registerWith("enforce", ["read", "bash"], { argv, test_paths: ["tests/test_records.py"] });
+		await fake.start();
+		expect(fake.active()).toEqual(["read"]);
+	}
+});
 
 test("enforce withholds every tool the gate would always deny and says code cannot be run", async () => {
 	const fake = registerWith("enforce", ["read", "grep", "glob", "write", "edit", "bash", "z0_file_search", "z0int_route_worker"]);

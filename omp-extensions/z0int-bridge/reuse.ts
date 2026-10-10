@@ -506,10 +506,9 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 		const mode = dependencies.config.mode;
 		if (!activeMode(mode) || isRecoveryTool(event.toolName)) return;
 		const binding = dependencies.config.verifierBinding;
-		const argv = binding?.argv;
-		if (event.toolName === "bash" && Array.isArray(argv) && argv.length > 0 &&
-			argv.every((arg): arg is string => typeof arg === "string" && /^[A-Za-z0-9_/.:+=-]+$/.test(arg)) &&
-			event.input.command === argv.join(" ") && !event.input.async && !event.input.service &&
+		const verifierCommand = configuredVerifierCommand(binding);
+		if (event.toolName === "bash" && verifierCommand !== null &&
+			event.input.command === verifierCommand && !event.input.async && !event.input.service &&
 			(event.input.cwd === undefined || event.input.cwd === "." || event.input.cwd === context.cwd)) {
 			const state = prepared;
 			if (state.kind !== "ready" || context.agent.id !== primaryAgentId ||
@@ -645,14 +644,19 @@ export function registerReuseAdapter(pi: ExtensionAPI, dependencies: ReuseDepend
 		// advertised, such a tool is retried again and again; withholding it
 		// changes what the model sees, not what it is allowed to do.
 		const active = pi.getActiveTools();
-		const admitted = active.filter(isGateAdmissibleTool);
-		if (admitted.length === active.length) return;
-		const withheld = active.filter(name => !isGateAdmissibleTool(name));
-		await pi.setActiveTools(admitted);
+		const verifierCommand = configuredVerifierCommand(dependencies.config.verifierBinding);
+		const admissible = (name: string) => isGateAdmissibleTool(name) || (name === "bash" && verifierCommand !== null);
+		const admitted = active.filter(admissible);
+		const withheld = active.filter(name => !admissible(name));
+		if (withheld.length === 0 && verifierCommand === null) return;
+		if (withheld.length > 0) await pi.setActiveTools(admitted);
+		const verification = verifierCommand !== null && admitted.includes("bash")
+			? `Run the owning verifier with bash using exactly: ${verifierCommand}. The gate validates its bound test sources; normal tool permissions still apply. Other shell commands are denied.`
+			: "Code cannot be executed in this session. Finish the change, state the exact command that would verify it, and stop.";
 		return {
 			message: {
 				customType: "z0int-reuse-tools",
-				content: `z0int reuse gate: this session admits write and edit with explicit paths, and read-only search. Withheld because every call would be denied: ${withheld.join(", ")}. If the packet is OBSERVE or lacks implementation/test evidence, recover before writing with z0_file_search: kind exact_symbol, query one declared symbol found in the existing source, then wait for the updated packet. A descriptive phrase is not a symbol. Code cannot be executed in this session. Do not look for another way to run it: finish the change, state the exact command that would verify it, and stop.`,
+				content: `z0int reuse gate: this session admits write and edit with explicit paths, and read-only search.${withheld.length > 0 ? ` Withheld because every call would be denied: ${withheld.join(", ")}.` : ""} If the packet is OBSERVE or lacks implementation/test evidence, recover before writing with z0_file_search: kind exact_symbol, query one declared symbol found in the existing source, then wait for the updated packet. A descriptive phrase is not a symbol. ${verification}`,
 				display: true,
 			},
 		};
@@ -679,6 +683,13 @@ function isRecoveryTool(toolName: string): boolean {
 function isGateAdmissibleTool(toolName: string): boolean {
 	const name = toolName.toLowerCase();
 	return name === "write" || name === "edit" || isRecoveryTool(name);
+}
+
+function configuredVerifierCommand(binding: JsonObject | null | undefined): string | null {
+	const argv = binding?.argv;
+	return Array.isArray(argv) && argv.length > 0 &&
+		argv.every((arg): arg is string => typeof arg === "string" && /^[A-Za-z0-9_/.:+=-]+$/.test(arg))
+		? argv.join(" ") : null;
 }
 
 type MutationScope =
