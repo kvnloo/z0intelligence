@@ -590,6 +590,32 @@ class ReceiptRevisionTruth(unittest.TestCase):
                 summary = summarize_tokenomics(root=home)
                 self.assertEqual(summary["actual_tokens_saved_authoritative"], 0)
 
+    def test_raw_stream_is_only_a_fallback_for_canonical_trace_lookup(self):
+        from z0int.receipt import append_receipt, build_receipt, effective_tier, find_receipt, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            row = append_receipt(build_receipt(), root=home)
+            append_receipt({**row, "outcome": {"ci_failed": True}, "outcome_ts": 20}, root=home)
+            raw = home / "stream/raw.jsonl"
+            raw.write_text(json.dumps({"trace_id": row["trace_id"], "outcome_ts": 30,
+                                       "outcome": {"test_pass": True, "source": "ci"}}) + "\n")
+            self.assertEqual(effective_tier(find_receipt(row["trace_id"], root=home)["outcome"]), "negative")
+            self.assertEqual(summarize_tokenomics(root=home)["by_tier"], {"negative": 1})
+
+    def test_raw_only_receipt_remains_available_in_the_requested_root(self):
+        from z0int.receipt import effective_tier, find_receipt
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            raw = home / "stream/raw.jsonl"
+            raw.parent.mkdir(parents=True)
+            raw.write_text(json.dumps({"trace_id": "raw-only", "outcome": {"ci_failed": True},
+                                       "extra": {"origin": "retained"}}) + "\n")
+            found = find_receipt("raw-only", root=home)
+            self.assertEqual(effective_tier(found["outcome"]), "negative")
+            self.assertEqual(found["extra"], {"origin": "retained"})
+
 
 class ReceiptCli(unittest.TestCase):
     def test_cli_emit_join_summary(self):

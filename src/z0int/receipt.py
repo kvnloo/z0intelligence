@@ -504,18 +504,20 @@ def _merge_receipt_revisions(revisions: list[dict[str, Any]], decision_rows: lis
     return merged
 
 
-def _receipt_views(*, root: Path | None, limit: int | None = None, include_raw: bool = False) -> list[dict[str, Any]]:
+def _receipt_views(*, root: Path | None, limit: int | None = None, include_raw: bool = False,
+                   trace_id: str | None = None) -> list[dict[str, Any]]:
     state_root = paths.home() if root is None else root
     primary = receipts_path(root)
-    candidates = ([state_root / "stream" / "raw.jsonl"] if include_raw else []) + [
-        state_root / "stream" / "bridge.jsonl", primary,
-    ]
+    raw = state_root / "stream" / "raw.jsonl"
+    candidates = [primary, state_root / "stream" / "bridge.jsonl"] + ([raw] if include_raw else [])
     traces: dict[str, list[dict[str, Any]]] = {}
     canonical: dict[str, list[dict[str, Any]]] = {}
     unidentified: list[dict[str, Any]] = []
     for path in candidates:
-        history = list(_iter_jsonl(path) or [])
-        for row in history if limit is None else history[-limit:]:
+        if path == raw and trace_id in canonical:
+            continue
+        history = _iter_jsonl(path) or []
+        for row in history if limit is None else list(history)[-limit:]:
             if not isinstance(row, dict):
                 continue
             nested = row.get("receipt")
@@ -525,6 +527,8 @@ def _receipt_views(*, root: Path | None, limit: int | None = None, include_raw: 
                 rec["outcome_tier"] = row.get("outcome_tier")
                 rec["outcome_ts"] = row.get("outcome_ts", row.get("ts"))
             trace = row.get("trace_id") or rec.get("trace_id")
+            if trace_id is not None and trace != trace_id:
+                continue
             if isinstance(trace, str) and trace:
                 rec["trace_id"] = trace
                 traces.setdefault(trace, []).append(rec)
@@ -538,7 +542,7 @@ def _receipt_views(*, root: Path | None, limit: int | None = None, include_raw: 
 
 def find_receipt(trace_id: str, *, root: Path | None = None) -> dict[str, Any] | None:
     """Canonical decision fields joined to retained same-root outcome and usage evidence."""
-    return next((row for row in _receipt_views(root=root, include_raw=True)
+    return next((row for row in _receipt_views(root=root, include_raw=True, trace_id=trace_id)
                  if row.get("trace_id") == trace_id), None)
 
 
