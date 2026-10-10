@@ -564,6 +564,32 @@ class ReceiptRevisionTruth(unittest.TestCase):
             }}) + "\n")
             self.assertEqual(summarize_tokenomics(root=home)["by_tier"], {"negative": 1})
 
+    def test_out_of_range_clock_cannot_break_unrelated_receipt_reads(self):
+        from z0int.receipt import append_receipt, build_receipt, find_receipt, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            target = append_receipt(build_receipt(), root=home)
+            append_receipt({"trace_id": "unrelated", "ts": 10 ** 400,
+                            "outcome": {"test_pass": False, "source": "ci"}}, root=home)
+            self.assertEqual(find_receipt(target["trace_id"], root=home)["trace_id"], target["trace_id"])
+            self.assertEqual(summarize_tokenomics(root=home)["by_tier"], {"negative": 1})
+
+    def test_equal_clock_conflicting_usage_cannot_restore_authoritative_savings(self):
+        from z0int.receipt import append_receipt, build_receipt, summarize_tokenomics
+
+        for state in ("partial", "complete"):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as tmp:
+                home = Path(tmp)
+                original = append_receipt(build_receipt(baseline_input_tokens=1000), root=home)
+                complete = {**original, "close_ts": 2, "measured_frontier_tokens": 400,
+                            "measurement_state": "complete"}
+                append_receipt(complete, root=home)
+                append_receipt({**complete, "measured_frontier_tokens": 450, "measurement_state": state}, root=home)
+                append_receipt(complete, root=home)
+                summary = summarize_tokenomics(root=home)
+                self.assertEqual(summary["actual_tokens_saved_authoritative"], 0)
+
 
 class ReceiptCli(unittest.TestCase):
     def test_cli_emit_join_summary(self):

@@ -448,7 +448,13 @@ def _merge_receipt_revisions(revisions: list[dict[str, Any]], decision_rows: lis
     """Select verdict and usage from original evidence, not a replayed envelope."""
     def timestamp(row: dict[str, Any], field: str, default: float) -> float:
         value = row.get(field, row.get("ts"))
-        return float(value) if type(value) in (int, float) and math.isfinite(value) else default
+        if type(value) not in (int, float):
+            return default
+        try:
+            value = float(value)
+        except OverflowError:
+            return default
+        return value if math.isfinite(value) else default
 
     def outcome_key(row: dict[str, Any]) -> tuple[int, float, bool]:
         outcome = row.get("outcome")
@@ -481,13 +487,20 @@ def _merge_receipt_revisions(revisions: list[dict[str, Any]], decision_rows: lis
     if decision_rows is not revisions and not any(row.get("close_ts") is not None for row in measurements):
         measurements = decision_rows[-1:]
     if measurements:
-        chosen = max(reversed(measurements), key=lambda row: (
-            row.get("close_ts") is not None, timestamp(row, "close_ts", -math.inf),
-        ))
+        def usage_key(row: dict[str, Any]) -> tuple[bool, float]:
+            return row.get("close_ts") is not None, timestamp(row, "close_ts", -math.inf)
+
+        chosen = max(reversed(measurements), key=usage_key)
         for field in usage_fields:
             merged.pop(field, None)
             if field in chosen:
                 merged[field] = chosen[field]
+        if any(usage_key(row) == usage_key(chosen)
+               and [row.get(k) for k in usage_fields[:5]] != [chosen.get(k) for k in usage_fields[:5]]
+               for row in measurements):
+            merged["measurement_state"] = "partial"
+            merged["state_reason"] = "conflicting_usage_at_same_revision"
+            merged.pop("actual_tokens_saved", None)
     return merged
 
 
