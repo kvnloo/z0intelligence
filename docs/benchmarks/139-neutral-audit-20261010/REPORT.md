@@ -46,3 +46,35 @@ Pristine full-suite `python -m pytest -q`: exit 2, collection error at `tests/te
 Scope is restricted to this report directory and, if needed, a small stdlib aggregate consumer/tests in the corresponding benchmark directory. Claude owns shadow/runtime; Codex owns reconciliation and independent evaluation. Preserve Claude `a90e3be` and Codex `199a849` without changes. [Evolution Lab PR35](https://github.com/kvnloo/evolution-lab/pull/35) is producer evidence, not independently qualified skill performance. EL-23-C remains blocked on independent validation. No issue closure, default merge, routing promotion, privacy-clearance or skill-installation claim.
 
 Next selected slice: behavior-tested neutral response-shape distributions with explicit missing-data denominators, safe labels and copied-identity refusal, using only existing derived tables.
+
+## Slice 2 — response-shape distributions
+
+The stdlib consumer `benchmarks/139-neutral-audit-20261010/aggregate.py` accepts only the existing derived `z0.latency_call.v1` schema. It emits fixed metric names, allowlisted harness/run aliases and response-ID **shape**, never response IDs, call IDs, model/source strings, action arguments or body hashes. Unknown labels remain unknown. Malformed/nonfinite/negative/bool measurements, fractional tokens, inconsistent duration/TTFT relations, invalid reasoning subsets and copied identities are refused with fixed messages. Synthetic behavior tests are authored independently, not copied source rows. Initial RED: missing consumer module, collection exit2; GREEN: 36 synthetic cases pass. Mutation=n/a.
+
+Percentiles use nearest rank on known measurements, not interpolated quantiles. All sums are explicitly observed-value sums with known/missing denominators. After-first-token duration is NOT measured reasoning time. Output throughput is output divided by known positive after-first-token duration, not wall throughput. Reasoning is subtracted from total output only with an explicit true subset label and known counts. Missing reasoning is not zero.
+
+This captured table is **not Claude's later 215-request correction cohort**. Its 269 OMP rows comprise 141 32hex and 128 UUID; 126 of the UUID rows are timed, two are not. No r16/r17-labelled rows are present in this historical table. Do not fill absent runs or reconcile differing cohorts by guessing. The correction's invalidation of comparisons is retained independently.
+
+| OMP captured stratum | Rows | Timed | Duration p50 / p95 (s) | TTFT p50 / p95 (s) | After-first-token p50 / p95 (s) | Output p50 / p95 | Reasoning known |
+| --- | ---: | ---: | --- | --- | --- | --- | --- |
+| 32hex | 141 | 141 | 11.744 / 70.190 | 3.548 / 7.371 | 7.268 / 63.909 | 322 / 2706 | 141 / 141 |
+| UUID | 128 | 126 | 7.046 / 26.412 | 2.411 / 3.927 | 3.912 / 23.217 | 841 / 5105 | 0 / 128 |
+
+32hex observed sums: duration 2802.529 s = TTFT 565.387 s + after-first-token 2237.142 s; output 99,881 including 78,366 reported reasoning and 21,515 nonreasoning. UUID timed sums: duration 1212.394 s = TTFT 353.179 s + after-first-token 859.215 s; output counts across 128 rows sum to 179,921, with reasoning unknown on every row. These cross-run sums are NOT a critical path, wall-time total or matched speed comparison. Output/after-first-token throughput p10/p50/p90: 32hex 35.638/45.228/53.265 tok/s (n=141); UUID 175.638/219.878/291.475 tok/s (n=126). Shape does not prove a specific provider.
+
+Per-run strata retained in the private aggregate projection:
+
+| Public run alias / shape | Rows (timed) | Duration sum (s) | TTFT sum (s) | After-first-token sum (s) | Output sum | Reasoning known / sum |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| r11 / 32hex | 24 (24) | 504.297 | 93.393 | 410.903 | 17,804 | 24 / 13,725 |
+| r12 / 32hex | 5 (5) | 71.933 | 12.701 | 59.232 | 2,530 | 5 / 2,115 |
+| r12 / UUID | 30 (30) | 406.241 | 82.205 | 324.035 | 64,668 | 0 / unknown |
+| r13b / UUID | 73 (73) | 577.145 | 204.621 | 372.524 | 80,233 | 0 / unknown |
+| r14 / 32hex | 8 (8) | 394.216 | 33.470 | 360.745 | 16,723 | 8 / 15,104 |
+| r15 / 32hex | 11 (11) | 191.211 | 54.630 | 136.582 | 6,243 | 11 / 3,829 |
+
+r12 explicitly retains its five 32hex and 30 UUID observations instead of pretending a whole-run upstream. Remaining labels are pooled unknown aliases, NOT one run: 93 32hex and 25 UUID OMP rows plus 13 other-harness observations. These unknown aliases are omissions in public run attribution, not dropped observations. Codex has nine usage observations (2,919 output, 769 reasoning) but no request duration/TTFT here; four Hermes records bind request-body observations without usage or duration. Neither supports a cross-harness latency comparison.
+
+Paired known-field cache ratios, defined only as `sum(cache_read)/(sum(cache_read)+sum(input_uncached))`, are 83.790% for 32hex (n=141) and 76.079% for UUID (n=128). Cache-write tokens are reported zero in both. These are descriptive ratios, not effective-cache/warmness equivalence or cache savings. Stable prompt/tool-schema matching and wire-effective reasoning remain unknown.
+
+Next selected slice: strengthen accounting refusal controls for unknown-run pooling, rates-versus-additive-time, native tool/approval uncertainty and sum-versus-wall boundaries; audit existing native summary and receipt aggregates without rebuilding timelines.
