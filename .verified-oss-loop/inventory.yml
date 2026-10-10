@@ -21,8 +21,8 @@ files:
     sha256: 9574879997ebba5aa369389f2bacc007ea22f870e5ff951a4d368514b5758d28
     kit_sha256: 9574879997ebba5aa369389f2bacc007ea22f870e5ff951a4d368514b5758d28
   - path: .github/scripts/check-receipt.py
-    source: kit
-    sha256: 188313013ff82f355612534a99f51efce0f2c2c5a1566cb5a4b1863f4e4b0063
+    source: modified
+    sha256: 7f9dff3c568d4054ac971cd9052eebda34efe7f01671d224fab35bc6b3b4a168
     kit_sha256: 188313013ff82f355612534a99f51efce0f2c2c5a1566cb5a4b1863f4e4b0063
   - path: .github/scripts/create-labels.sh
     source: kit
