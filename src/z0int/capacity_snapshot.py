@@ -156,9 +156,10 @@ def _ident(value: Any, prefix: str = "", limit: int = _MAX_TEXT) -> tuple[str, b
     otherwise a stable one-way stand-in. The same input always maps to the same output, so
     references between rows still join."""
     text = f"{prefix}{value}"
-    raw = str(value)
-    # The value is judged on its own first: a prefix must not hide a path or a secret shape
-    plain = _label(raw, limit) == raw and _label(text, limit) == text
+    # Judge the name itself, with or without the tern: prefix it may already carry: both
+    # spellings of one host must come out the same, and a prefix must not hide a path.
+    core = text[len("tern:"):] if text.startswith("tern:") else text
+    plain = _label(core, limit) == core and _label(text, limit) == text
     if isinstance(value, (str, int)) and not isinstance(value, bool) and plain:
         return text, False
     return _stable_id("redacted", text), True
