@@ -642,7 +642,7 @@ export function registerReuseAdapter(pi: ExtensionAPI, dependencies: ReuseDepend
 		return {
 			message: {
 				customType: "z0int-reuse-tools",
-				content: `z0int reuse gate: this session admits write and edit with explicit paths, and read-only search. Withheld because every call would be denied: ${withheld.join(", ")}. Code cannot be executed in this session. Do not look for another way to run it: finish the change, state the exact command that would verify it, and stop.`,
+				content: `z0int reuse gate: this session admits write and edit with explicit paths, and read-only search. Withheld because every call would be denied: ${withheld.join(", ")}. If the packet is OBSERVE or lacks implementation/test evidence, recover before writing with z0_file_search: kind exact_symbol, query one declared symbol found in the existing source, then wait for the updated packet. A descriptive phrase is not a symbol. Code cannot be executed in this session. Do not look for another way to run it: finish the change, state the exact command that would verify it, and stop.`,
 				display: true,
 			},
 		};
