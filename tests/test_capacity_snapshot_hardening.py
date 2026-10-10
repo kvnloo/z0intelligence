@@ -661,3 +661,24 @@ def test_a_path_shaped_host_name_is_never_published_behind_the_tern_prefix(raw):
 
     assert raw not in text
     assert f"tern:{raw}" not in text
+
+
+@pytest.mark.parametrize("host_key,host_value,session_host", [
+    ("name", "/etc/shadow", "tern:/etc/shadow"),
+    ("host_id", "tern:/etc/shadow", "/etc/shadow"),
+    ("name", "/etc/shadow", "/etc/shadow"),
+    ("host_id", "tern:/etc/shadow", "tern:/etc/shadow"),
+    ("name", "gpu-box-2", "tern:gpu-box-2"),
+    ("host_id", "tern:gpu-box-2", "gpu-box-2"),
+])
+def test_a_host_and_its_sessions_join_whichever_spelling_each_side_uses(host_key, host_value, session_host):
+    tern = _tern()
+    tern["hosts"] = [{host_key: host_value, "status": "offline", "observed_at": NOW - 3}]
+    tern["sessions"] = [{"session_id": "s1", "host": session_host, "status": "locked", "observed_at": NOW - 3}]
+
+    snap = _build(tern=tern)
+
+    host_ids = {h["host_id"] for h in snap["hosts"]}
+    session = next(s for s in snap["sessions"] if s["session_id"] == "s1")
+    assert session["host_id"] in host_ids
+    assert "/etc/shadow" not in json.dumps(snap)
