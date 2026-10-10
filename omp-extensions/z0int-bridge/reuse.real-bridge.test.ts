@@ -291,6 +291,8 @@ for (const stripUpdatedContext of [false, true]) {
 			const wrapperPath = join(tempRoot, "worker-fixture.py");
 			await writeFile(wrapperPath, fixtureSearchWorkerSource(true));
 			worker = await JsonlBridgeWorker.start(join(tempRoot, "z0int-home"), repoRoot, wrapperPath);
+			await worker.request({ op: "turn_open", trace_id: "trace-multi-edit", session_id: "multi-edit",
+				payload: { prompt: "normalize_rows", session_id: "multi-edit" } }, 10_000);
 			const exchanges: BridgeExchange[] = [];
 			const adapter = createReuseAdapter({
 				config: { mode: "enforce", canonicalRepo: "records", registryPath, candidateRoots: [repoRoot], verifierBinding },
@@ -319,10 +321,26 @@ for (const stripUpdatedContext of [false, true]) {
 				expect(admission).toBeUndefined();
 				expect(exchanges.filter(row => row.request.op === "reuse_resolve")).toHaveLength(2);
 				await writeFile(join(repoRoot, "result.py"), WRITE_CONTENT);
-				expect(runOwningVerifier(repoRoot).status).toBe(0);
+				const verified = runOwningVerifier(repoRoot);
+				expect(verified.status).toBe(0);
 				const checks = exchanges.filter(row => row.request.op === "reuse_check");
 				expect(checks).toHaveLength(2);
 				expect((checks[0].request.payload as JsonObject).packet_id).not.toBe((checks[1].request.payload as JsonObject).packet_id);
+				await adapter.toolResult({ toolName: "write", input: { path: "result.py" }, isError: false }, context);
+				const verifierEvidence = join(tempRoot, "terminal-verification.json");
+				await writeFile(verifierEvidence, JSON.stringify({ returncode: verified.status, stdout: verified.stdout, stderr: verified.stderr }));
+				const closed = await worker.request({ op: "turn_close", trace_id: "trace-multi-edit", session_id: "multi-edit",
+					payload: { execution_completed: true, verified_success: true, source: "independent_verifier",
+						verification_source: pathToFileURL(verifierEvidence).href } }, 10_000);
+				if (!isObject(closed) || !isObject(closed.closed) || !isObject(closed.closed.outcome_join))
+					throw new Error("terminal verified outcome did not join");
+				const joined = closed.closed.outcome_join;
+				const receipt = isObject(joined.receipt) ? joined.receipt : {};
+				const extra = isObject(receipt.extra) ? receipt.extra : {};
+				const lastCheck = isObject(checks[1].response) ? checks[1].response : {};
+				expect(joined.outcome_tier).toBe("gold");
+				expect(extra.reuse_last_mutation_admission_uid).toMatch(new RegExp(`^eventlog:${lastCheck.mutation_event_id}:[0-9a-f]{64}$`));
+				expect(isObject(extra.reuse) ? extra.reuse.model_input_event_id : undefined).toBeNull();
 			}
 		} finally {
 			if (worker) await worker.close();

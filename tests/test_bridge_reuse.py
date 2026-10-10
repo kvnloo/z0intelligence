@@ -422,6 +422,60 @@ class BridgeRepoReuseTests(unittest.TestCase):
         manifest = str((self.repo / "zer0.repo.yaml").resolve())
         self.assertIn(f"file:{manifest}", out["packet"]["context"]["recipe"]["source_epochs"])
 
+    def test_terminal_outcome_after_refresh_retains_mutation_admission(self):
+        from z0int.memory.event_log import EventLog
+        from z0int.receipt import Outcome, close_turn
+
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits(
+            "upstream/records.py", "tests/test_records.py",
+        )):
+            first = self.prepare()
+            self.injected(first)
+            self.model_input(first)
+            admitted = self.check(first, target_paths=["upstream/records.py"])
+            self.assertTrue(admitted["valid"])
+            self.code.write_text(self.code.read_text() + "\n# actual source changed\n")
+            refreshed = self.prepare()
+        self.assertNotEqual(first["packet_id"], refreshed["packet_id"])
+        closed = close_turn("trace-one", outcome=Outcome(
+            execution_completed=True, verified_success=False, source="independent_verifier",
+            verification_source="fixture:terminal-negative",
+        ))
+        extra = closed["outcome_join"]["receipt"]["extra"]
+        event = EventLog().get(admitted["mutation_event_id"])
+        self.assertEqual(extra["reuse_last_mutation_admission_uid"], f"eventlog:{event.event_id}:{event.checksum}")
+        self.assertEqual(event.payload["packet_id"], first["packet_id"])
+        self.assertEqual(extra["reuse"]["packet_id"], refreshed["packet_id"])
+        self.assertIsNone(extra["reuse"]["mutation_event_id"])
+        self.assertEqual(closed["outcome_join"]["outcome_tier"], "negative")
+
+    def test_rejected_checks_and_old_context_stages_preserve_latest_admission(self):
+        from z0int.memory.event_log import EventLog
+
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits(
+            "upstream/records.py", "tests/test_records.py",
+        )):
+            first = self.prepare()
+            self.injected(first)
+            self.model_input(first)
+            first_admission = self.check(first)
+            self.code.write_text(self.code.read_text() + "\n# source changed\n")
+            rejected = self.check(first)
+            self.assertFalse(rejected["valid"])
+            first_event = EventLog().get(first_admission["mutation_event_id"])
+            self.assertEqual(find_receipt("trace-one")["extra"]["reuse_last_mutation_admission_uid"],
+                             f"eventlog:{first_event.event_id}:{first_event.checksum}")
+            refreshed = self.prepare()
+            self.injected(refreshed)
+            self.model_input(refreshed)
+            latest_admission = self.check(refreshed)
+            self.assertTrue(latest_admission["valid"])
+            latest_event = EventLog().get(latest_admission["mutation_event_id"])
+            self.injected(first)
+            self.model_input(first)
+        self.assertEqual(find_receipt("trace-one")["extra"]["reuse_last_mutation_admission_uid"],
+                         f"eventlog:{latest_event.event_id}:{latest_event.checksum}")
+
     def test_manifest_index_hit_does_not_shadow_hydrated_manifest(self):
         with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits(
             "zer0.repo.yaml", "upstream/records.py", "tests/test_records.py",

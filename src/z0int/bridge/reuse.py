@@ -1309,7 +1309,7 @@ def _reuse_receipt_payload(record: PreparedReuse) -> dict[str, Any]:
     return {**(record.decision_extra or {}), "reuse": reuse_extra}
 
 
-def _append_reuse_receipt(record: PreparedReuse) -> None:
+def _append_reuse_receipt(record: PreparedReuse, *, mutation_admission_uid: str | None = None) -> None:
     """Append current reuse state onto the latest same-trace decision row."""
     receipt = dict(record.decision_receipt or {})
     latest = find_receipt(record.request["trace_id"])
@@ -1330,6 +1330,8 @@ def _append_reuse_receipt(record: PreparedReuse) -> None:
     if memory_use is not None:
         current_extra["memory"] = memory_use
     current_extra["reuse"] = reuse_payload["reuse"]
+    if mutation_admission_uid is not None:
+        current_extra["reuse_last_mutation_admission_uid"] = mutation_admission_uid
     receipt["trace_id"] = record.request["trace_id"]
     receipt["session_id"] = record.request["session_id"]
     receipt["extra"] = current_extra
@@ -1471,7 +1473,10 @@ def check(cache: dict[str, PreparedReuse], payload: dict[str, Any]) -> dict[str,
     }, source="bridge.reuse", session_id=record.request["session_id"], parent_event_ids=[record.model_input_event_id])
     record.mutation_event_id = event.event_id
     record.mutation_check_event_ids.append(event.event_id)
-    _append_reuse_receipt(record)
+    _append_reuse_receipt(record, mutation_admission_uid=(
+        f"eventlog:{event.event_id}:{event.checksum}"
+        if result["valid"] and result["status"] == "current" else None
+    ))
     return {
         "ok": True, **result, "event_id": event.event_id, "trace_id": record.request["trace_id"],
         "preparation_event_id": record.event_id,
