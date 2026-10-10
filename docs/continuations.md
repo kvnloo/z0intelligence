@@ -132,9 +132,18 @@ null, `last_error` says why (for example that the worktree content does not
 match the recorded patch) and the task stays resumable. A pre-seal checkpoint
 that reaches verification with no recorded after-image is not committed at
 all; it is verified by the content predicate alone, as before, and
-`verify_detail` says the commit was not checked. The after-image is compared to
-the raw blob bytes, so a Git clean filter or line-ending conversion on the
-target withholds verification instead of passing it. Another process that
+`verify_detail` says the commit was not checked. The blob git stores must be
+the after-image: either its raw bytes are, or what git checks out for it is,
+compared with CRLF line ends and `$Id$` expansion set aside. So a repository
+with `core.autocrlf`, an `eol` or `ident` attribute, or a clean/smudge filter
+pair verifies with git's own stored form, while a one-way clean filter that
+changes the content still withholds verification. The index entry must be a
+file (or a tracked link that `core.symlinks=false` checks out as a file) and
+the target must not be a symlink on disk. The target is named to git as a
+literal, normalised path (`sub/./a.py` is `sub/a.py`), whatever
+`GIT_LITERAL_PATHSPECS` says. If a pre-commit hook stages other files, git puts
+them in the commit; afterwards the index is pointed at the commit for exactly
+those paths, unless someone else had staged them. Another process that
 rewrites the target between the hash check and `git commit` is not excluded;
 the task-branch blob check after the commit then withholds verification.
 Verification otherwise remains the existing content predicate, not a claim that

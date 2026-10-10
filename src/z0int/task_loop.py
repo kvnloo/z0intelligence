@@ -25,7 +25,7 @@ import subprocess
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 from . import paths
@@ -275,10 +275,12 @@ def list_checkpoints() -> list[dict[str, Any]]:
     return out
 
 
-def _run_git(args: list[str], *, cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+def _run_git(args: list[str], *, cwd: Path | None = None, check: bool = True,
+             env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", *args],
         cwd=str(cwd) if cwd else None,
+        env=env,
         capture_output=True,
         text=True,
         check=check,
@@ -475,11 +477,48 @@ def _patch_target(cp: TaskCheckpoint) -> Path:
 _NOT_COMMITTED = "patch not committed: "
 
 
-def _branch_blob_sha256(wt: Path, branch: str, rel: str) -> str | None:
-    """sha256 of the task BRANCH ref's blob for the target (raw bytes), or None."""
-    out = subprocess.run(["git", "cat-file", "blob", f"refs/heads/{branch}:{rel}"],
-                         cwd=str(wt), capture_output=True)
-    return hashlib.sha256(out.stdout).hexdigest() if out.returncode == 0 else None
+_ID_KEYWORD = re.compile(rb"\$Id:[^$\n]*\$")
+
+
+def _git_form(data: bytes) -> bytes:
+    """Bytes with git's two built-in rewrites undone: CRLF line ends and $Id$ expansion."""
+    return _ID_KEYWORD.sub(b"$Id$", data.replace(b"\r\n", b"\n"))
+
+
+def _holds_patch(wt: Path, obj: str, after: str, on_disk: bytes) -> bool:
+    """True when the blob `obj` ("<rev>:<path>" or ":0:<path>") stores the recorded patch.
+
+    Either its raw bytes are the after-image, or what git checks out for it is: with
+    core.autocrlf, an eol or ident attribute or a clean/smudge filter pair the stored blob
+    is git's own form of the file. `on_disk` is the worktree content, already known to
+    hash to `after`. A one-way clean filter does not check out as the after-image.
+    """
+    raw = subprocess.run(["git", "cat-file", "blob", obj], cwd=str(wt), capture_output=True)
+    if raw.returncode != 0:
+        return False
+    if hashlib.sha256(raw.stdout).hexdigest() == after:
+        return True
+    out = subprocess.run(["git", "cat-file", "--filters", obj], cwd=str(wt), capture_output=True)
+    return out.returncode == 0 and _git_form(out.stdout) == _git_form(on_disk)
+
+
+def _sync_index_after_hooks(wt: Path) -> None:
+    """Point the index at HEAD for paths a pre-commit hook added to the commit just made.
+
+    `git commit --only` commits a temporary index, so a hook's `git add` reaches the commit
+    but not the worktree index, which is left showing those paths as staged reverts. Only
+    paths the index still holds exactly as the parent had them are touched (so never the
+    target, nor anything staged by someone else), and the worktree is left alone.
+    """
+    def names(*args: str) -> list[bytes]:
+        out = subprocess.run(["git", *args], cwd=str(wt), capture_output=True)
+        return [n for n in out.stdout.split(b"\0") if n] if out.returncode == 0 else []
+    staged = set(names("diff", "--cached", "--name-only", "-z", "HEAD~1"))
+    stale = [b":(literal)" + n for n in names("diff-tree", "-r", "-z", "--name-only", "--no-commit-id", "HEAD~1", "HEAD")
+             if n not in staged]
+    if stale:
+        subprocess.run([b"git", b"reset", b"-q", b"--", *stale], cwd=str(wt), capture_output=True,
+                       env={k: v for k, v in os.environ.items() if k != "GIT_LITERAL_PATHSPECS"})
 
 
 def _commit_patch(cp: TaskCheckpoint) -> str | None:
@@ -487,45 +526,50 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
 
     Commits only the target path, only while the worktree bytes equal the
     recorded after-image, and only when the worktree HEAD is the task branch.
-    None means the task branch ref's blob for the target equals the after-image,
-    so a repeat (or a resume after a kill between write and commit) is a no-op.
-    Never checks anything out or moves a branch.
+    None means the task branch ref's blob for the target stores the after-image
+    (see _holds_patch), so a repeat (or a resume after a kill between write and
+    commit) is a no-op. Never checks anything out or moves a branch.
     """
     wt = Path(cp.worktree_path or "")
-    rel = str((cp.patch or {}).get("relative_path"))
+    # Git looks a tree path up as written, so sub/./a.py and sub//a.py are named as sub/a.py.
+    rel = PurePosixPath(str((cp.patch or {}).get("relative_path"))).as_posix()
     branch = cp.branch or f"z0int/{cp.task_id}"
     after = (cp.pending_patch or {}).get("after")
+    # ":(literal)" is itself refused when the caller's environment already sets literal pathspecs.
+    env = {k: v for k, v in os.environ.items() if k != "GIT_LITERAL_PATHSPECS"}
     try:
         if not after:
             return _NOT_COMMITTED + "no recorded after-image"
-        if hashlib.sha256(_patch_target(cp).read_bytes()).hexdigest() != after:
+        on_disk = _patch_target(cp).read_bytes()
+        if hashlib.sha256(on_disk).hexdigest() != after:
             return _NOT_COMMITTED + "the worktree content does not match the recorded patch"
         head = _run_git(["symbolic-ref", "--quiet", "HEAD"], cwd=wt, check=False)
         if head.returncode != 0 or head.stdout.strip() != f"refs/heads/{branch}":
             return (_NOT_COMMITTED + f"the worktree HEAD is detached or on another branch, "
                     f"not the task branch {branch}; nothing was checked out or moved")
-        if _branch_blob_sha256(wt, branch, rel) != after:
+        if not _holds_patch(wt, f"refs/heads/{branch}:{rel}", after, on_disk):
             # The name is a file, never a pattern: a*.py must not also match ab.py
             literal = f":(literal){rel}"
-            _run_git(["add", "--", literal], cwd=wt)
-            # What git will store can differ from the bytes on disk (a clean filter,
-            # a symlink): commit only if the staged blob is the recorded after-image.
+            _run_git(["add", "--", literal], cwd=wt, env=env)
+            # What git will store can differ from the bytes on disk (a one-way clean filter,
+            # a symlink): commit only if the staged blob stores the recorded after-image.
             # ":0:<path>" names stage 0 outright; a bare ":<path>" would read a name like
             # "2:a.py" as stage 2 of a.py.
-            staged = subprocess.run(["git", "cat-file", "blob", f":0:{rel}"], cwd=wt, capture_output=True)
-            entry = subprocess.run(["git", "ls-files", "--stage", "--", literal], cwd=wt,
-                                   capture_output=True, text=True).stdout
-            regular = entry.startswith(("100644 ", "100755 "))  # a file, not a symlink or submodule
-            if (staged.returncode != 0 or not regular
-                    or hashlib.sha256(staged.stdout).hexdigest() != after):
-                _run_git(["reset", "-q", "--", literal], cwd=wt, check=False)
+            entry = _run_git(["ls-files", "--stage", "-z", "--", literal], cwd=wt, check=False, env=env).stdout
+            # A file, or a tracked link that core.symlinks=false checks out as a file; never a
+            # link on disk (git would store its text, not the content) and never a submodule.
+            storable = (entry.partition(" ")[0] in ("100644", "100755", "120000")
+                        and not os.path.islink(wt / rel))
+            if not storable or not _holds_patch(wt, f":0:{rel}", after, on_disk):
+                _run_git(["reset", "-q", "--", literal], cwd=wt, check=False, env=env)
                 return _NOT_COMMITTED + "what git would store for the target does not match the recorded patch"
             _run_git(
                 ["-c", "user.email=z0int@local", "-c", "user.name=z0int-task-loop",
                  "commit", "-m", f"z0int task {cp.task_id}: bounded patch", "--only", "--", literal],
-                cwd=wt,
+                cwd=wt, env=env,
             )
-        if _branch_blob_sha256(wt, branch, rel) != after:
+            _sync_index_after_hooks(wt)
+        if not _holds_patch(wt, f"refs/heads/{branch}:{rel}", after, on_disk):
             return _NOT_COMMITTED + f"the task branch {branch} does not carry the recorded patch"
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         return _NOT_COMMITTED + f"commit failed: {(getattr(exc, 'stderr', None) or str(exc))[:300]}"

@@ -423,6 +423,186 @@ resume_task(sys.argv[1])
         self.assertIsNot(cp.verified_success, True)
         self.assertEqual(self.git('rev-list', '--count', self.cp.base_ref + '..HEAD').strip(), '0')
 
+    # --- git's own stored form, unnormalised names, pathspec environment, hooks, index modes ---
+
+    def make_task(self, name='app.py', content=b'STATUS = "BROKEN"\nprint(STATUS)\n', config=(), attrs=None,
+                  files=None, setup=None, replace='STATUS = "READY"', mode=None):
+        """A task in a fresh repository whose config/attributes exist from the first commit."""
+        self.made = getattr(self, 'made', 0) + 1
+        repo = self.root / f'made-{self.made}'
+        repo.mkdir()
+        run = lambda *args: subprocess.run(['git', *args], cwd=repo, check=True, text=True, capture_output=True)
+        run('init')
+        for key, value in config:
+            run('config', key, value)
+        if attrs:
+            (repo / '.gitattributes').write_text(attrs)
+        for other, data in (files or {}).items():
+            (repo / other).write_bytes(data)
+        if setup:
+            setup(repo, run)
+        else:
+            (repo / name).parent.mkdir(parents=True, exist_ok=True)
+            (repo / name).write_bytes(content)
+            if mode:
+                (repo / name).chmod(mode)
+            run('--literal-pathspecs', 'add', '-A')
+        run('-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-m', 'fixture')
+        spec = PatchSpec(relative_path=name, find='STATUS = "BROKEN"', replace=replace, description='made task')
+        cp = authorize_task(base_repo=repo, patch=spec, task_id=f'made-{self.made}')
+        cp.status = 'resolved'
+        save_checkpoint(cp)
+        return step_worktree(cp, worktrees_root=self.root / 'wts')
+
+    def wt_git(self, cp, *args):
+        return subprocess.run(['git', *args], cwd=cp.worktree_path, check=True, text=True,
+                              capture_output=True).stdout
+
+    def assert_verified_with_one_commit_of(self, cp, *paths, status=''):
+        done = resume_task(cp.task_id)
+        self.assertTrue(done.verified_success, done.last_error)
+        self.assertEqual(resume_task(cp.task_id).to_dict(), done.to_dict())
+        self.assertEqual(self.wt_git(cp, 'rev-list', '--count', f'{cp.base_ref}..refs/heads/{cp.branch}').strip(), '1')
+        self.assertEqual(self.wt_git(cp, 'show', '--name-only', '--format=', '-z', 'HEAD').split('\0')[:-1],
+                         sorted(paths))
+        self.assertEqual(self.wt_git(cp, 'status', '--porcelain'), status)
+        return done
+
+    def test_a_repository_whose_git_stores_another_form_of_the_file_still_verifies(self):
+        rot13 = "tr 'A-Za-z' 'N-ZA-Mn-za-m'"
+        keyword = b'# $Id$\nSTATUS = "BROKEN"\nprint(STATUS)\n'
+        cases = {
+            'core.autocrlf=true': dict(config=[('core.autocrlf', 'true')]),
+            '* text=auto eol=crlf': dict(attrs='* text=auto eol=crlf\n'),
+            '*.py text eol=crlf': dict(attrs='*.py text eol=crlf\n'),
+            'text=auto and core.eol=crlf': dict(attrs='* text=auto\n', config=[('core.eol', 'crlf')]),
+            'ident keyword': dict(attrs='*.py ident\n', content=keyword),
+            'ident keyword with eol=crlf': dict(attrs='*.py ident text eol=crlf\n', content=keyword),
+            'clean and smudge filter pair': dict(attrs='*.py filter=rot\n', config=[
+                ('filter.rot.clean', rot13), ('filter.rot.smudge', rot13)]),
+            'autocrlf with an LF inside the replacement': dict(
+                config=[('core.autocrlf', 'true')], replace='STATUS = "READY"\nEXTRA = 1'),
+        }
+        for label, kwargs in cases.items():
+            with self.subTest(case=label):
+                cp = self.make_task(**kwargs)
+                self.assert_verified_with_one_commit_of(cp, 'app.py')
+                stored = subprocess.run(['git', 'cat-file', 'blob', 'HEAD:app.py'], cwd=cp.worktree_path,
+                                        check=True, capture_output=True).stdout
+                on_disk = (Path(cp.worktree_path) / 'app.py').read_bytes()
+                self.assertNotEqual(stored, on_disk, 'the case must store a form that differs from the file')
+
+    def test_a_stored_form_that_does_not_check_out_as_the_patch_is_withheld(self):
+        # Differences beyond line ends and the $Id$ keyword are not git's own form of the patch.
+        for label, clean in (('adds a line', "sh -c 'cat; echo stamped'"), ('rewrites a word', "sed s/READY/STEADY/")):
+            with self.subTest(case=label):
+                cp = self.make_task(attrs='*.py filter=lossy\n', config=[('filter.lossy.clean', clean)])
+                with patch.dict(os.environ, {'GIT_LITERAL_PATHSPECS': '1'}):
+                    done = resume_task(cp.task_id)
+                self.assertIsNone(done.verified_success)
+                self.assertIn('what git would store', done.last_error)
+                self.assertEqual(self.wt_git(cp, 'rev-list', '--count', f'{cp.base_ref}..HEAD').strip(), '0')
+                self.assertEqual(self.wt_git(cp, 'diff', '--cached', '--name-only'), '')  # unstaged again
+
+    def test_a_blob_holding_the_exact_bytes_needs_no_checkout_comparison(self):
+        # A smudge-only filter: the stored blob is the file byte for byte, though checking it
+        # out again would not reproduce it.
+        cp = self.make_task(attrs='*.py filter=stamp\n', config=[('filter.stamp.smudge', "sh -c 'cat; echo stamped'")])
+        self.assertIn('stamped', (Path(cp.worktree_path) / 'app.py').read_text())
+        self.assert_verified_with_one_commit_of(cp, 'app.py')
+
+    def test_an_emptied_target_that_git_does_not_track_is_still_committed(self):
+        # The after-image of an empty file hashes like a blob that could not be read at all.
+        def only_a_readme(repo, run):
+            (repo / 'README').write_text('fixture\n')
+            run('add', 'README')
+        cp = self.make_task(name='new.py', setup=only_a_readme, replace='')
+        (Path(cp.worktree_path) / 'new.py').write_bytes(b'STATUS = "BROKEN"')
+        self.assert_verified_with_one_commit_of(cp, 'new.py')
+        self.assertEqual(self.wt_git(cp, 'show', 'HEAD:new.py'), '')
+
+    def test_a_hook_that_commits_other_content_for_the_target_is_withheld(self):
+        cp = self.make_task()
+        self.install_hook(cp, 'oid=$(echo \'STATUS = "READY" # hook\' | git hash-object -w --stdin)\n'
+                              'git update-index --cacheinfo 100644,$oid,app.py\n')
+        done = resume_task(cp.task_id)
+        self.assertIsNone(done.verified_success)
+        self.assertIn('does not carry the recorded patch', done.last_error)
+        self.assertIn('# hook', self.wt_git(cp, 'show', 'HEAD:app.py'))
+
+    def test_unnormalised_target_paths_name_the_same_file(self):
+        for name in ('sub/./a.py', 'sub//a.py', './sub/a.py'):
+            with self.subTest(name=name):
+                self.assert_verified_with_one_commit_of(self.make_task(name=name), 'sub/a.py')
+
+    def test_literal_pathspecs_in_the_environment_do_not_block_the_commit(self):
+        with patch.dict(os.environ, {'GIT_LITERAL_PATHSPECS': '1'}):
+            self.assert_verified_with_one_commit_of(self.make_task(), 'app.py')
+            cp = self.make_task(name='a*.py', files={'ab.py': b'SIBLING = 1\n'})
+            (Path(cp.worktree_path) / 'ab.py').write_text('SIBLING = 2\n')
+            self.assert_verified_with_one_commit_of(cp, 'a*.py', status=' M ab.py\n')
+
+    def test_a_tracked_link_checked_out_as_a_file_is_committed_as_before(self):
+        def link_as_file(repo, run):
+            run('config', 'core.symlinks', 'false')
+            (repo / 'app.py').write_bytes(b'STATUS = "BROKEN"')
+            oid = subprocess.run(['git', 'hash-object', '-w', '--stdin'], cwd=repo, check=True, text=True,
+                                 capture_output=True, input='STATUS = "BROKEN"').stdout.strip()
+            run('update-index', '--add', '--cacheinfo', f'120000,{oid},app.py')
+        cp = self.make_task(setup=link_as_file)
+        self.assertFalse(os.path.islink(Path(cp.worktree_path) / 'app.py'))
+        self.assert_verified_with_one_commit_of(cp, 'app.py')
+        self.assertTrue(self.wt_git(cp, 'ls-tree', 'HEAD', '--', 'app.py').startswith('120000 '))
+        self.assertEqual(self.wt_git(cp, 'show', 'HEAD:app.py'), 'STATUS = "READY"')
+
+    def test_an_executable_target_is_committed_and_stays_executable(self):
+        cp = self.make_task(mode=0o755)
+        self.assert_verified_with_one_commit_of(cp, 'app.py')
+        self.assertTrue(self.wt_git(cp, 'ls-tree', 'HEAD', '--', 'app.py').startswith('100755 '))
+
+    def test_a_link_on_disk_is_not_committed_whatever_the_target_is_called(self):
+        # 'a!.py' sorts before 'a*.py' and is a regular file: a pattern lookup would read its mode.
+        # '100644 a.py' as a link lists as '120000 <oid> 0\t100644 a.py'.
+        for name, files in (('a*.py', {'a!.py': b'SIBLING = 1\n'}), ('100644 a.py', None)):
+            with self.subTest(name=name):
+                cp = self.make_task(name=name, content=b'STATUS = "BROKEN"', files=files)
+                self.kill_before_add(cp.task_id)
+                target = Path(cp.worktree_path) / name
+                after = target.read_bytes()
+                target.unlink()
+                (target.parent / os.fsdecode(after)).write_bytes(after)
+                os.symlink(after, target)
+                done = resume_task(cp.task_id)
+                self.assertIsNot(done.verified_success, True)
+                self.assertEqual(self.wt_git(cp, 'rev-list', '--count', f'{cp.base_ref}..HEAD').strip(), '0')
+
+    def install_hook(self, cp, body):
+        hooks = Path(cp.worktree_path) / self.wt_git(cp, 'rev-parse', '--git-common-dir').strip() / 'hooks'
+        hooks.mkdir(exist_ok=True)
+        (hooks / 'pre-commit').write_text('#!/bin/sh\n' + body)
+        (hooks / 'pre-commit').chmod(0o755)
+
+    def test_a_hook_that_stages_another_file_leaves_the_index_at_the_commit(self):
+        cp = self.make_task(files={'notes.txt': b'n\n'})
+        self.install_hook(cp, 'echo hooked > hooked.txt\necho more >> notes.txt\ngit add hooked.txt notes.txt\n')
+        # The hook's files are in the commit either way; the index must not show them as reverted.
+        self.assert_verified_with_one_commit_of(cp, 'app.py', 'hooked.txt', 'notes.txt')
+        self.assertEqual(self.wt_git(cp, 'diff', '--cached', '--name-only'), '')
+
+    def test_index_repair_after_a_hook_leaves_other_staged_work_alone(self):
+        cp = self.make_task(files={'notes.txt': b'n\n', 'hx.txt': b'm\n'})
+        wt = Path(cp.worktree_path)
+        (wt / 'hx.txt').write_text('staged by the user; matches h*.txt as a pattern\n')
+        (wt / 'notes.txt').write_text('user version\n')
+        self.wt_git(cp, 'add', '--', 'hx.txt', 'notes.txt')
+        (wt / 'notes.txt').write_text('n\n')
+        self.install_hook(cp, 'echo hooked > "h*.txt"\necho more >> notes.txt\n'
+                              'git --literal-pathspecs add "h*.txt" notes.txt\n')
+        with patch.dict(os.environ, {'GIT_LITERAL_PATHSPECS': '1'}):
+            self.assert_verified_with_one_commit_of(
+                cp, 'app.py', 'h*.txt', 'notes.txt', status='M  hx.txt\nMM notes.txt\n')
+        self.assertEqual(self.wt_git(cp, 'show', ':0:notes.txt'), 'user version\n')
+
     def test_uncommittable_patch_is_not_reported_verified(self):
         hooks = Path(self.git('rev-parse', '--git-common-dir').strip()) / 'hooks'
         hooks.mkdir(exist_ok=True)
