@@ -95,3 +95,50 @@ def test_nearest_rank_percentiles_and_empty():
 def test_unsupported_source_or_identity_refused(change):
     with pytest.raises(ValueError):
         aggregate.project([row(**change)])
+
+
+def test_rates_are_not_additive_measurements():
+    group = aggregate.project([row(), row("second")])["groups"][0]
+    rate = group["metrics"]["output_tokens_per_second_observed"]
+    assert rate["sum_observed"] is None
+    assert rate["additive"] is False
+    assert group["metrics"]["latency_ms"]["additive"] is True
+
+
+def test_unknown_runs_do_not_become_one_mixed_run():
+    result = aggregate.project([row(run="PRIVATE-ONE"), row("second", run="PRIVATE-TWO", native_response_id="00000000-0000-0000-0000-000000000001")])
+    assert result["unknown_omp_runs"] == 2
+    assert result["unknown_omp_mixed_stratum_runs"] == 0
+    assert all(g["run_attribution"] == "pooled-unknown" for g in result["groups"])
+    result = aggregate.project([row(run="PRIVATE-ONE"), row("second", run="PRIVATE-ONE", native_response_id="00000000-0000-0000-0000-000000000001")])
+    assert result["unknown_omp_mixed_stratum_runs"] == 1
+    assert "PRIVATE" not in json.dumps(result)
+
+
+def test_native_accounting_requires_union_not_sum_for_residual():
+    result = aggregate.account_native_summary(wall_ms=100, model_sum_ms=130, tool_union_ms=20)
+    assert result["model_sum_exceeds_wall"] is True
+    assert result["uncovered_wall_ms"] is None
+    assert result["tool_compute_ms"] is None
+    assert result["approval_wait_ms"] is None
+    assert result["verified_success"] is None
+    result = aggregate.account_native_summary(wall_ms=100, model_sum_ms=130, tool_union_ms=20, combined_union_ms=90)
+    assert result["uncovered_wall_ms"] == 10
+
+
+@pytest.mark.parametrize("value", [-1, True, float("nan"), float("inf"), "100"])
+def test_bad_native_summary_measurements_refused(value):
+    with pytest.raises(ValueError):
+        aggregate.account_native_summary(wall_ms=value, model_sum_ms=10)
+
+
+def test_union_exceeds_wall_refused_not_clipped():
+    with pytest.raises(ValueError, match="union exceeds wall"):
+        aggregate.account_native_summary(wall_ms=100, model_sum_ms=50, combined_union_ms=101)
+    with pytest.raises(ValueError, match="union exceeds wall"):
+        aggregate.account_native_summary(wall_ms=100, model_sum_ms=50, tool_union_ms=101)
+
+
+def test_overflow_rate_refused_without_serializing_nonfinite():
+    with pytest.raises(ValueError, match="invalid metric"):
+        aggregate.project([row(output_tokens=10**308, reasoning_tokens=None, latency_ms=1e-308, ttft_ms=0, after_first_token_ms=1e-308)])

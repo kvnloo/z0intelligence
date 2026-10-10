@@ -78,3 +78,27 @@ r12 explicitly retains its five 32hex and 30 UUID observations instead of preten
 Paired known-field cache ratios, defined only as `sum(cache_read)/(sum(cache_read)+sum(input_uncached))`, are 83.790% for 32hex (n=141) and 76.079% for UUID (n=128). Cache-write tokens are reported zero in both. These are descriptive ratios, not effective-cache/warmness equivalence or cache savings. Stable prompt/tool-schema matching and wire-effective reasoning remain unknown.
 
 Next selected slice: strengthen accounting refusal controls for unknown-run pooling, rates-versus-additive-time, native tool/approval uncertainty and sum-versus-wall boundaries; audit existing native summary and receipt aggregates without rebuilding timelines.
+
+## Slice 3 — native accounting and semantic refusals
+
+Ten new controls first failed (36 existing controls still passed); after minimal implementation, all 46 pass. Rate distributions now explicitly have `additive=false` and no sum: adding request throughputs is not a meaningful aggregate throughput. Unknown run aliases explicitly carry `pooled-unknown` attribution. Internally comparing existing run identity labels without exporting them finds eight unmapped OMP runs, two of which contain multiple response shapes. Thus r12 is not claimed to be the only mixed run in the captured cohort. The pooled-unknown groups are never treated as one experiment.
+
+`account_native_summary` consumes supplied native summary fields, not raw events or new intervals. It refuses invalid numeric/union bounds. Cumulative model time may exceed wall and is flagged, never clipped or silently renamed wall. An uncovered wall interval requires an explicitly supplied combined interval union; a model sum plus tool union does not supply that union. Tool compute, explicit approval wait and verified_success stay unknown. No approval inference argument is accepted. A finite-input rate that overflows is refused, rather than serialized as Infinity.
+
+| Existing native summary | First-request-to-last-response window (s) | Model-duration sum (s) | Dispatch-to-result tool union within window (s) | Historical subtraction remainder (s) |
+| --- | ---: | ---: | ---: | ---: |
+| r11 | 637.580 | 504.297 | 131.381 | 1.902 |
+| r12 | 2411.161 | 478.174 | 1884.122 | 48.865 |
+| r13b | 614.320 | 577.145 | 25.498 | 11.677 |
+| r14 | 397.218 | 394.216 | 0.898 | 2.104 |
+| r15 | 219.948 | 191.211 | 26.000 | 2.737 |
+
+The last column preserves the prior reducer's subtraction result; it is NOT independently demonstrated union idle, tool compute, approval time, savings or lost time. This consumer leaves combined union/uncovered wall unknown because those fields are absent in the derived summary. r15's model-sum/window ratio is descriptively 86.9349%, preserving the earlier rounded 86.93%; it is not an independently verified time-to-success claim. r14 is invalid completion evidence; r15's historical archived validator/strict qualification remains unresolved. Newer canonical functional verification/consumption in #137 does not rewrite these historical verdicts.
+
+The existing tool table has 399 dispatch-to-result records, zero duplicate `(session, native tool-call)` identities, 109 error-labelled results and 34 reuse-gate-denied results. Their elapsed sum is 2380.191 s across runs, not wall or active tool compute. **Zero rows carry an explicit approval event label.** Successful write intervals can include waiting; the historical r11 approval hypothesis remains unproven. Tool errors, gate denials and provider errors are different categories; no provider-error count is manufactured from the tool table.
+
+Across available native response ID sets, observed OMP–Codex, OMP–Hermes and Codex–Hermes overlaps are each zero. Different or missing source identities do not prove absence of cross-harness causal duplication; no overlap exclusion/savings credit follows. All 282 parent-session fields are absent; no complete subagent/parallel-path claim follows. Served-model identity is absent in all 282 rows; effective-thinking, stable-prefix and tool-schema fields are absent in 278, including every OMP/Codex usage row. Four Hermes request-body observations do not close the OMP wire-effective-effort or matched-prompt gap.
+
+Receipt inventory is not request-count evidence: 379 matched decision revisions map to 14 identities; 11 matched outcome revisions map to nine identities; matched Tokenomics identities are zero. One decision identity has 26 revisions (the prior r15 receipt warning), and another has 150. Nine recorded outcome dictionaries say execution_completed=true; only two also carry verified_success/test_pass/verifier_ok=true. The seven others remain missing/unknown, not successes. These are recorded metadata, not fresh independent adjudications or joins to every one of the 282 call rows. Do not add decision/outcome versions together or reinterpret the planner's 37.733 ms as provider latency. Cost/$ and subscriber marginal price remain unmeasured.
+
+Next selected slice: inspect the existing offline helper's interface without executing it, validate immutable stored gate aggregates and retain all negative-control/authority boundaries; rerun only if a genuine create-only output interface exists.
