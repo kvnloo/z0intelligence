@@ -48,6 +48,36 @@ tl._run_git = run_git
 tl.resume_task(sys.argv[1])
 '''
 
+# Resumes; a user commit lands on the task branch before one git step (argv[3]), and the process is
+# killed at one point (argv[2]): around a git step, straight after the commit just made was read back
+# ("read_back"), or straight after the first checkpoint written once git commit ran ("recorded").
+KILL_OR_RACE = SOCKET_GUARD + '''
+import os, subprocess, sys
+import z0int.task_loop as tl
+real_git, real_save, seen = tl._run_git, tl.save_checkpoint, set()
+USER = ["git", "-c", "user.email=t@local", "-c", "user.name=t"]
+def run_git(args, **kwargs):
+    verb = "commit" if "commit" in args else args[0]
+    if sys.argv[3] == "before_" + verb and "raced" not in seen:
+        seen.add("raced")
+        with open(os.path.join(kwargs["cwd"], "raced.txt"), "w") as handle: handle.write("user\\n")
+        subprocess.run(["git", "add", "--", "raced.txt"], cwd=kwargs["cwd"], check=True)
+        subprocess.run([*USER, "commit", "-q", "--no-verify", "-m", "racing", "--", "raced.txt"],
+                       cwd=kwargs["cwd"], check=True)
+    if sys.argv[2] == "before_" + verb: os._exit(90)
+    result = real_git(args, **kwargs)
+    if verb == "commit": seen.add("committed")
+    if sys.argv[2] == "after_" + verb: os._exit(90)
+    if sys.argv[2] == "read_back" and verb == "cat-file" and "committed" in seen: os._exit(90)
+    return result
+def save(cp):
+    path = real_save(cp)
+    if sys.argv[2] == "recorded" and "committed" in seen: os._exit(90)
+    return path
+tl._run_git, tl.save_checkpoint = run_git, save
+tl.resume_task(sys.argv[1])
+'''
+
 # Resumes and is killed with SIGKILL straight after one git step of the blob derivation.
 KILL_9_WHILE_DERIVING = SOCKET_GUARD + '''
 import os, signal, subprocess, sys
@@ -1316,13 +1346,32 @@ class GitDerivedBlobTests(unittest.TestCase):
         self.add_clean_filter('sed s/READY/BROKEN/')
         self.assert_nothing_to_commit_matches_the_baseline(cp)
 
-    def test_filter_that_changes_the_blob_between_add_and_commit_still_ends_in_one_commit(self):
+    def test_filter_that_changes_the_blob_between_add_and_commit_ends_in_one_commit_and_is_withheld(self):
+        # git commit --only reads the file again, so the commit stores what the new filter makes of it and
+        # not the blob this task staged and recorded. Nothing durable tells that from a hook that rewrote
+        # the commit, so it is treated the same: one commit, never another, and not verified on the
+        # strength of what git derives afterwards.
         cp = self.task('plain')
         with self.filter_appears_before('commit', 'tr a-z A-Z'):
             first = resume_task(cp.task_id, until='patched')
-        self.assertIn('does not carry the recorded patch', first.last_error)
-        self.assert_verified_with_one_clean_commit(cp)
-        self.assertEqual(self.blob(cp), ORDINARY.replace(b'BROKEN', b'READY').upper())
+        tip = self.rev(f'refs/heads/{cp.branch}')
+        patched = ORDINARY.replace(b'BROKEN', b'READY')
+        self.assertEqual(self.blob(cp), patched.upper())
+        record = first.measurements['patch_committed']
+        self.assertEqual(record, {'commit': tip, 'blob': first.measurements['patch_commit_intended']['blob'],
+                                  'stored': self.rev(f'{tip}:app.py')})
+        self.assertEqual(self.git(self.wt, 'cat-file', 'blob', record['blob']), patched)
+        self.assertEqual(self.derive(cp), record['stored'], 'git must derive what the commit stores now')
+        self.assert_withheld_on_the_one_changed_commit(cp, tip, first.last_error)
+        # The task branch carrying the recorded blob is all that is asked for.
+        self.attributes_file().unlink()
+        os.utime(self.target, (1, 1))
+        self.git(self.wt, '-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-m', 'by hand', '--', 'app.py')
+        done = resume_task(cp.task_id)
+        self.assertTrue(done.verified_success, done.last_error)
+        self.assertEqual(self.commits(cp), 2)
+        self.assertEqual(self.blob(cp), patched)
+        self.assertEqual(done.measurements['patch_committed'], record)
 
     # --- conditions no earlier test distinguished ---
 
@@ -1527,7 +1576,8 @@ class GitDerivedBlobTests(unittest.TestCase):
         self.kill(cp, 'after_add')
         waiting = load_checkpoint(cp.task_id).measurements
         self.assertEqual(waiting['patch_commit_intended'],
-                         {'blob': self.staged_oid(), 'parent': cp.base_ref})
+                         {'blob': self.staged_oid(), 'parent': cp.base_ref,
+                          'token': waiting['patch_commit_intended']['token']})
         self.assertNotIn('patch_committed', waiting)
         (self.wt / 'other.txt').write_text('unrelated\n')
         self.git(self.wt, 'add', '--', 'other.txt')
@@ -1552,7 +1602,8 @@ class GitDerivedBlobTests(unittest.TestCase):
         record = {'commit': self.rev(f'refs/heads/{cp.branch}'), 'blob': self.rev(f'refs/heads/{cp.branch}:app.py')}
         self.assertNotEqual(record['blob'], staged)
         self.assertEqual(done.measurements['patch_committed'], record)
-        self.assertEqual(done.measurements['patch_commit_intended'], {'blob': record['blob'], 'parent': cp.base_ref})
+        self.assertEqual(done.measurements['patch_commit_intended'],
+                         {'blob': record['blob'], 'parent': cp.base_ref, 'token': self.token_of(done)})
 
     def test_git_failure_reported_as_bytes_is_shown_as_text(self):
         cp = self.task('plain')
@@ -1640,13 +1691,20 @@ class GitDerivedBlobTests(unittest.TestCase):
         malformed = (
             lambda written: 'x',
             lambda written: {},
-            lambda written: {'blob': written['blob']},
-            lambda written: {'parent': written['parent']},
-            lambda written: {'blob': 7, 'parent': written['parent']},
-            lambda written: {'blob': written['blob'], 'parent': None},
-            lambda written: {'blob': written['blob'], 'parent': '--all'},
+            lambda written: {'blob': written['blob'], 'token': written['token']},
+            lambda written: {'parent': written['parent'], 'token': written['token']},
+            lambda written: {**written, 'blob': 7},
+            lambda written: {**written, 'parent': None},
+            lambda written: {**written, 'parent': '--all'},
             # a revision expression that names the right parent is still not a full object id
-            lambda written: {'blob': written['blob'], 'parent': 'HEAD~1'},
+            lambda written: {**written, 'parent': 'HEAD~1'},
+            # no token, or one that is not what this module writes: the attempt cannot be told from any other
+            lambda written: {'blob': written['blob'], 'parent': written['parent']},
+            lambda written: {**written, 'token': 7},
+            lambda written: {**written, 'token': written['token'] + '\n'},
+            lambda written: {**written, 'token': written['token'][:-1]},
+            lambda written: {**written, 'token': written['token'].upper() + 'A'},
+            lambda written: {**written, 'token': written['token'][:-1] + 'g'},
         )
         for index, make in enumerate(malformed):
             with self.subTest(index=index):
@@ -1654,7 +1712,8 @@ class GitDerivedBlobTests(unittest.TestCase):
                 self.kill(cp, 'after_commit')
                 cp = load_checkpoint(cp.task_id)
                 written = cp.measurements['patch_commit_intended']
-                self.assertEqual(written, {'blob': self.rev(f'{cp.branch}:app.py'), 'parent': cp.base_ref})
+                self.assertEqual(written, {'blob': self.rev(f'{cp.branch}:app.py'), 'parent': cp.base_ref,
+                                           'token': self.token_of(cp)})
                 self.assertEqual(self.rev('HEAD~1'), written['parent'])
                 cp.measurements['patch_commit_intended'] = make(written)
                 save_checkpoint(cp)
@@ -1766,7 +1825,6 @@ class GitDerivedBlobTests(unittest.TestCase):
         self.assertEqual(self.empty_commits(cp), [])
 
     def test_commit_whose_message_and_content_hooks_changed_is_still_the_one_commit(self):
-        # Nothing in the commit says it is the task's: it is HEAD, read straight after git commit succeeded.
         cp = self.task('plain')
         self.hook('pre-commit', self.REWRITES_THE_STAGED_TARGET)
         self.hook('commit-msg', self.REWORDS_THE_MESSAGE)
@@ -1776,7 +1834,7 @@ class GitDerivedBlobTests(unittest.TestCase):
         self.assertEqual(self.subjects(cp), ['PROJ-1 reworded by a hook'])
         self.assert_withheld_on_the_one_changed_commit(cp, self.rev(f'refs/heads/{cp.branch}'), first.last_error)
 
-    def test_reworded_and_rewritten_commit_is_found_after_a_kill_by_who_committed_it_where(self):
+    def test_reworded_and_rewritten_commit_is_found_after_a_kill(self):
         cp = self.task('plain')
         self.hook('pre-commit', self.REWRITES_THE_STAGED_TARGET)
         self.hook('commit-msg', self.REWORDS_THE_MESSAGE)
@@ -1785,8 +1843,7 @@ class GitDerivedBlobTests(unittest.TestCase):
         self.assertIn(b'\ncommitter z0int-task-loop <z0int@local> ', self.git(self.wt, 'cat-file', '-p', cp.branch))
         self.assert_withheld_on_the_one_changed_commit(cp, self.rev(f'refs/heads/{cp.branch}'))
 
-    def test_rewritten_commit_is_found_after_a_kill_by_its_message_under_a_trailer(self):
-        # Committed as somebody else (the environment names the committer), so only the message tells.
+    def test_rewritten_commit_with_a_trailer_made_as_somebody_else_is_found_after_a_kill(self):
         cp = self.task('plain')
         self.hook('pre-commit', self.REWRITES_THE_STAGED_TARGET)
         self.hook('commit-msg', self.ADDS_A_TRAILER)
@@ -1798,27 +1855,52 @@ class GitDerivedBlobTests(unittest.TestCase):
         self.assert_withheld_on_the_one_changed_commit(cp, tip)
 
     def test_commits_that_only_resemble_the_task_commit_are_not_taken_for_it(self):
+        # Neither the task's message nor the task's committer on the recorded parent makes a commit the task's.
         cp = self.task('plain')
         self.kill(cp, 'after_add')
         self.git(self.wt, 'reset', '-q', '--', 'app.py')
+        as_the_task = ('-c', 'user.email=z0int@local', '-c', 'user.name=z0int-task-loop')
         (self.wt / 'other.txt').write_text('one\n')
         self.git(self.wt, 'add', '--', 'other.txt')
-        # directly on the recorded parent, by somebody else, under a message that merely starts like the task's
-        self.git(self.wt, *self.BY_HAND, 'commit', '-m', 'z0int task plain: bounded patch (again)')
+        # directly on the recorded parent, committed (and authored) as the task commits, under the task's very message
+        self.git(self.wt, *as_the_task, 'commit', '-m', 'z0int task plain: bounded patch', '--', 'other.txt')
+        self.assertEqual(self.author('HEAD'), 'z0int-task-loop <z0int@local>')
+        self.assertEqual(self.rev('HEAD~1'), cp.base_ref)
         (self.wt / 'other.txt').write_text('two\n')
-        # committed as the task commits, with another message, but not on the recorded parent
-        self.git(self.wt, '-c', 'user.email=z0int@local', '-c', 'user.name=z0int-task-loop', 'commit', '-m',
-                 'something else', '--', 'other.txt')
+        self.git(self.wt, *self.BY_HAND, 'commit', '-m', 'z0int task plain: bounded patch\n\nChange-Id: I1\n', '--',
+                 'other.txt')
         cp = load_checkpoint(cp.task_id)
         self.assertEqual(cp.measurements['patch_commit_intended']['parent'], cp.base_ref)
         self.assertIsNone(task_loop._patch_commit_record(cp, self.wt, cp.branch, 'app.py'))
         self.assertNotIn('patch_committed', load_checkpoint(cp.task_id).measurements)
         done = resume_task(cp.task_id)
         self.assertTrue(done.verified_success, done.last_error)
-        self.assertEqual(self.subjects(cp), ['z0int task plain: bounded patch', 'something else',
-                                             'z0int task plain: bounded patch (again)'])
-        self.assertEqual(done.measurements['patch_committed'],
-                         {'commit': self.rev(f'refs/heads/{cp.branch}'), 'blob': self.rev(f'{cp.branch}:app.py')})
+        self.assertEqual(self.subjects(cp), ['z0int task plain: bounded patch'] * 3)
+        tip = self.rev(f'refs/heads/{cp.branch}')
+        self.assertEqual(done.measurements['patch_committed'], {'commit': tip, 'blob': self.rev(f'{cp.branch}:app.py')})
+        self.assertEqual(self.author(tip), f'z0int-task-loop <z0int+{self.token_of(done)}@local>')
+        self.assertEqual(self.blob(cp), self.PATCHED)
+
+    REPLACES_THE_COMMIT_AS_SOMEBODY_ELSE = (
+        'export GIT_AUTHOR_NAME=h GIT_AUTHOR_EMAIL=h@local GIT_COMMITTER_NAME=h GIT_COMMITTER_EMAIL=h@local\n'
+        'c=$(git commit-tree -p HEAD~1 -m "$(git log -1 --format=%B)" "HEAD^{tree}") && git update-ref HEAD $c\n')
+
+    def test_commit_a_hook_replaced_under_another_author_is_the_one_read_back_and_never_repeated(self):
+        # A post-commit hook replaced the commit, token and all: what stands on the recorded parent
+        # straight after git commit succeeded is the task's commit all the same.
+        cp = self.task('plain')
+        self.hook('pre-commit', self.REWRITES_THE_STAGED_TARGET)
+        self.hook('commit-msg', self.REWORDS_THE_MESSAGE)
+        self.hook('post-commit', self.REPLACES_THE_COMMIT_AS_SOMEBODY_ELSE)
+        first = resume_task(cp.task_id, until='patched')
+        tip = self.rev(f'refs/heads/{cp.branch}')
+        self.assertEqual(self.author(tip), 'h <h@local>')
+        self.assertEqual(self.subjects(cp), ['PROJ-1 reworded by a hook'])
+        self.assertEqual(self.blob(cp), b'hooked\n')
+        self.assertEqual(self.rev(f'{tip}~1'), cp.base_ref)
+        self.assertEqual(first.measurements['patch_committed']['commit'], tip)
+        self.assert_withheld_on_the_one_changed_commit(cp, tip, first.last_error)
+        self.assertEqual(self.empty_commits(cp), [])
 
     def test_commit_a_hook_stacked_on_the_task_commit_is_not_recorded_in_its_place(self):
         cp = self.task('plain')
@@ -1852,18 +1934,22 @@ class GitDerivedBlobTests(unittest.TestCase):
             self.assertEqual(self.blob(cp), self.PATCHED.upper())
             self.assertEqual(done.measurements['patch_committed']['commit'], tip)
 
-    def test_first_parent_committer_and_message_are_read_from_the_commit_object(self):
+    def test_first_parent_and_author_are_read_from_the_commit_object(self):
         cp = self.task('plain')
         base = self.rev('HEAD')
         self.git(self.wt, 'checkout', '-q', '-b', 'side')
         self.git(self.wt, *self.BY_HAND, 'commit', '-q', '--allow-empty', '-m', 'side')
         self.git(self.wt, 'checkout', '-q', cp.branch)
-        self.git(self.wt, *self.BY_HAND, 'commit', '-q', '--allow-empty', '-m', 'mine')
+        self.git(self.wt, *self.BY_HAND, 'commit', '-q', '--allow-empty', '--author', 'm n <o@p>', '-m', 'mine')
         mine = self.rev('HEAD')
         self.git(self.wt, *self.BY_HAND, 'merge', '-q', '--no-ff', '-m', 'two\n\nparents\n', 'side')
-        self.assertEqual(task_loop._commit_facts(self.wt, self.rev('HEAD')), (mine, b't <t@local>', b'two\n\nparents\n'))
-        self.assertEqual(task_loop._commit_facts(self.wt, mine), (base, b't <t@local>', b'mine\n'))
-        self.assertEqual(task_loop._commit_facts(self.wt, '0' * 40), (None, b'', b''))
+        self.assertEqual(task_loop._commit_facts(self.wt, self.rev('HEAD')), (mine, b't <t@local>'))
+        self.assertEqual(task_loop._commit_facts(self.wt, mine), (base, b'm n <o@p>'))
+        self.assertEqual(task_loop._commit_facts(self.wt, '0' * 40), (None, b''))
+        # the author is the header line, not the committer and not a line of the message that starts like one
+        self.git(self.wt, *self.BY_HAND, 'commit', '-q', '--allow-empty', '--author', 'a b <c@d>', '-m',
+                 'subject\n\nauthor x <y@z> 1 +0000\nparent ' + '1' * 40 + '\n')
+        self.assertEqual(task_loop._commit_facts(self.wt, self.rev('HEAD')), (self.rev('HEAD~1'), b'a b <c@d>'))
 
     def test_target_the_task_branch_does_not_have_is_committed_as_a_new_file(self):
         cp = self.task('plain', rel='new.py', tracked='app.py')
@@ -1906,6 +1992,252 @@ class GitDerivedBlobTests(unittest.TestCase):
         self.assertEqual(self.subjects(cp), ['by hand'])
         self.assertEqual(self.empty_commits(cp), [])
         self.assertEqual(done.measurements['patch_committed']['commit'], self.rev(f'refs/heads/{cp.branch}'))
+
+    # --- the task's own commit is found again by the token it was made with ---
+
+    SOMEONE = {'GIT_COMMITTER_NAME': 'someone', 'GIT_COMMITTER_EMAIL': 's@local'}
+    SOMEONE_WROTE_IT_TOO = {**SOMEONE, 'GIT_AUTHOR_NAME': 'someone', 'GIT_AUTHOR_EMAIL': 's@local'}
+    RESTAGES_THE_TARGET = 'git add -- app.py\n'
+    CONSTANT_FILTER = "sh -c 'cat >/dev/null; echo hooked'"  # git derives b'hooked\n' from any file
+
+    def token_of(self, cp):
+        token = load_checkpoint(cp.task_id).measurements['patch_commit_intended']['token']
+        self.assertRegex(token, r'\A[0-9a-f]{32}\Z')
+        return token
+
+    def author(self, commit):
+        return self.git(self.wt, 'log', '-1', '--format=%an <%ae>', commit).decode().strip()
+
+    def task_commits(self, cp):
+        """Every commit on the task branch that was authored as the task."""
+        listed = self.git(self.wt, 'log', '--format=%H %an', f'{cp.base_ref}..{cp.branch}').decode().splitlines()
+        return [line.split(' ', 1)[0] for line in listed if line.split(' ', 1)[1] == 'z0int-task-loop']
+
+    def user_commit_lands_before(self, verb):
+        real, landed = task_loop._run_git, []
+
+        def run_git(args, **kwargs):
+            if (args[0] == verb or (verb == 'commit' and 'commit' in args)) and not landed:
+                (self.wt / 'raced.txt').write_text('user\n')
+                self.git(self.wt, 'add', '--', 'raced.txt')
+                landed.append(self.git(self.wt, *self.BY_HAND, 'commit', '--no-verify', '-m', 'racing', '--',
+                                       'raced.txt'))
+            return real(args, **kwargs)
+
+        return patch.object(task_loop, '_run_git', run_git)
+
+    def test_task_commit_is_authored_with_the_token_recorded_before_anything_was_staged(self):
+        for name, env in (('plain', {}), ('author-in-the-environment', self.SOMEONE_WROTE_IT_TOO)):
+            with self.subTest(name=name), patch.dict(os.environ, env):
+                cp = self.task('plain')
+                self.kill(cp, 'before_add')
+                token = self.token_of(cp)
+                self.assertEqual(self.commits(cp), 0)
+                done = self.assert_verified_with_one_clean_commit(cp)
+                self.assertEqual(self.token_of(done), token)
+                self.assertEqual(self.author(cp.branch), f'z0int-task-loop <z0int+{token}@local>')
+                self.assertEqual(task_loop._task_author(token), self.author(cp.branch))
+                tip = self.rev(f'refs/heads/{cp.branch}')
+                self.assertTrue(task_loop._is_task_commit(self.wt, tip, token))
+                self.assertEqual(task_loop._commit_facts(self.wt, tip)[1], self.author(cp.branch).encode())
+                shutil.rmtree(self.root)
+                self.root.mkdir()
+
+    def test_attempt_on_another_parent_gets_another_token(self):
+        cp = self.task('plain')
+        self.kill(cp, 'after_add')
+        first = self.token_of(cp)
+        (self.wt / 'other.txt').write_text('unrelated\n')
+        self.git(self.wt, 'add', '--', 'other.txt')
+        self.git(self.wt, *self.BY_HAND, 'commit', '-m', 'unrelated', '--only', '--', 'other.txt')
+        self.kill(cp, 'before_commit')
+        second = self.token_of(cp)
+        self.assertNotEqual(second, first)
+        self.kill(cp, 'before_commit')  # the same attempt again: the same token
+        self.assertEqual(self.token_of(cp), second)
+        done = resume_task(cp.task_id)
+        self.assertTrue(done.verified_success, done.last_error)
+        self.assertEqual(self.author(cp.branch), f'z0int-task-loop <z0int+{second}@local>')
+        self.assertEqual(len(self.task_commits(cp)), 1)
+
+    def test_unusable_intent_is_replaced_before_anything_is_committed(self):
+        unusable = (
+            lambda written: 'x',
+            lambda written: {'blob': written['blob'], 'parent': written['parent']},
+            lambda written: {**written, 'token': 7},
+            lambda written: {**written, 'token': written['token'] + '\n'},
+            lambda written: {**written, 'token': 'not-a-token'},
+            lambda written: {**written, 'token': written['token'][:-1] + 'g'},
+        )
+        for index, make in enumerate(unusable):
+            with self.subTest(index=index):
+                cp = self.task('plain')
+                self.kill(cp, 'after_add')
+                cp = load_checkpoint(cp.task_id)
+                written = cp.measurements['patch_commit_intended']
+                cp.measurements['patch_commit_intended'] = make(written)
+                save_checkpoint(cp)
+                done = self.assert_verified_with_one_clean_commit(cp)
+                self.assertIs(type(done.measurements['patch_commit_intended']['token']), str)
+                token = self.token_of(done)
+                self.assertNotEqual(token, written['token'])
+                self.assertEqual(done.measurements['patch_commit_intended'],
+                                 {'blob': written['blob'], 'parent': written['parent'], 'token': token})
+                self.assertEqual(self.author(cp.branch), f'z0int-task-loop <z0int+{token}@local>')
+                shutil.rmtree(self.root)
+                self.root.mkdir()
+
+    def test_intent_is_written_again_when_the_entry_a_commit_was_needed_over_is_another(self):
+        cp = self.task('plain')
+        self.kill(cp, 'after_add')
+        cp = load_checkpoint(cp.task_id)
+        written, over = cp.measurements['patch_commit_intended'], cp.measurements['patch_commit_needed_over']
+        self.assertEqual(over, self.rev(f'{cp.branch}:app.py'))
+        cp.measurements['patch_commit_needed_over'] = ''
+        save_checkpoint(cp)
+        self.kill(cp, 'before_commit')
+        again = load_checkpoint(cp.task_id).measurements
+        self.assertEqual(again['patch_commit_needed_over'], over)
+        self.assertNotEqual(again['patch_commit_intended']['token'], written['token'])
+        self.assert_verified_with_one_clean_commit(cp)
+
+    def test_commit_authored_with_another_token_is_not_taken_for_the_task_commit(self):
+        cp = self.task('plain')
+        self.kill(cp, 'after_add')
+        token = self.token_of(cp)
+        self.git(self.wt, 'reset', '-q', '--', 'app.py')
+        other = 'f' * 32 if token != 'f' * 32 else 'e' * 32
+        for number, (author, message) in enumerate((
+                (f'z0int-task-loop <z0int+{other}@local>', 'another attempt'),
+                ('z0int-task-loop <z0int@local>', f'z0int+{token}@local'),
+                (f'z0int-task-loop <z0int+{token}@local.example>', 'longer'),
+                (f'somebody <z0int+{token}@local>', 'another name'))):
+            (self.wt / 'other.txt').write_text(f'{number}\n')
+            self.git(self.wt, 'add', '--', 'other.txt')
+            self.git(self.wt, *self.BY_HAND, 'commit', '--author', author, '-m', message, '--only', '--', 'other.txt')
+            self.assertFalse(task_loop._is_task_commit(self.wt, self.rev('HEAD'), token))
+        cp = load_checkpoint(cp.task_id)
+        self.assertIsNone(task_loop._patch_commit_record(cp, self.wt, cp.branch, 'app.py'))
+        done = resume_task(cp.task_id)
+        self.assertTrue(done.verified_success, done.last_error)
+        self.assertEqual(self.commits(cp), 5)
+        self.assertEqual(done.measurements['patch_committed']['commit'], self.rev(f'refs/heads/{cp.branch}'))
+
+    def test_reworded_and_rewritten_commit_made_as_somebody_else_is_found_after_a_kill_by_its_token(self):
+        # Hooks changed the message and the content, and the environment names the committer (and the author):
+        # only the token says whose commit it is.
+        for name, env in (('committer', self.SOMEONE), ('committer-and-author', self.SOMEONE_WROTE_IT_TOO)):
+            for point in ('after_commit', 'read_back'):
+                with self.subTest(name=name, point=point), patch.dict(os.environ, env):
+                    cp = self.task('plain')
+                    self.hook('pre-commit', self.REWRITES_THE_STAGED_TARGET)
+                    self.hook('commit-msg', self.REWORDS_THE_MESSAGE)
+                    result = subprocess.run([sys.executable, '-c', KILL_OR_RACE, cp.task_id, point, '-'],
+                                            text=True, capture_output=True, timeout=60)
+                    self.assertEqual(result.returncode, 90, result.stderr)
+                    self.assertNotIn('patch_committed', load_checkpoint(cp.task_id).measurements)
+                    tip = self.rev(f'refs/heads/{cp.branch}')
+                    raw = self.git(self.wt, 'cat-file', '-p', tip)
+                    self.assertIn(b'\ncommitter someone <s@local> ', raw)
+                    self.assertEqual(self.subjects(cp), ['PROJ-1 reworded by a hook'])
+                    self.assert_withheld_on_the_one_changed_commit(cp, tip)
+                    self.assertEqual(self.empty_commits(cp), [])
+                    self.assertIn(f'\nauthor z0int-task-loop <z0int+{self.token_of(cp)}@local> '.encode(), raw)
+                    shutil.rmtree(self.root)
+                    self.root.mkdir()
+
+    def test_commit_made_on_a_user_commit_that_landed_meanwhile_is_still_the_one_task_commit(self):
+        # The recorded parent is no longer the commit's parent, and hooks changed message and content.
+        for verb in ('add', 'commit'):
+            for point in (None, 'after_commit'):
+                with self.subTest(verb=verb, point=point):
+                    cp = self.task('plain')
+                    self.hook('pre-commit', self.REWRITES_THE_STAGED_TARGET)
+                    self.hook('commit-msg', self.REWORDS_THE_MESSAGE)
+                    first = None
+                    if point:
+                        result = subprocess.run(
+                            [sys.executable, '-c', KILL_OR_RACE, cp.task_id, point, 'before_' + verb],
+                            text=True, capture_output=True, timeout=60)
+                        self.assertEqual(result.returncode, 90, result.stderr)
+                    else:
+                        with self.user_commit_lands_before(verb):
+                            first = resume_task(cp.task_id).last_error
+                    self.assertEqual(self.subjects(cp), ['PROJ-1 reworded by a hook', 'racing'])
+                    tip = self.rev(f'refs/heads/{cp.branch}')
+                    self.assertEqual(load_checkpoint(cp.task_id).measurements['patch_commit_intended']['parent'],
+                                     cp.base_ref)
+                    self.assertEqual(self.rev(f'{tip}~2'), cp.base_ref)
+                    self.assert_withheld_on_the_one_changed_commit(cp, tip, first, commits=2)
+                    self.assertEqual(self.task_commits(cp), [tip])
+                    self.assertEqual(self.empty_commits(cp), [])
+                    shutil.rmtree(self.root)
+                    self.root.mkdir()
+
+    def test_filter_under_which_git_derives_what_a_hook_committed_does_not_verify_the_changed_commit(self):
+        def never(*args):
+            raise AssertionError('a blob was derived although the task commit exists')
+
+        for point in (None, 'after_commit'):
+            with self.subTest(point=point):
+                cp = self.task('plain')
+                hook = self.hook('pre-commit', self.REWRITES_THE_STAGED_TARGET)
+                if point:
+                    self.kill(cp, point)
+                first = resume_task(cp.task_id)
+                tip = self.rev(f'refs/heads/{cp.branch}')
+                hook.unlink()
+                self.add_clean_filter(self.CONSTANT_FILTER)
+                os.utime(self.target, (1, 1))
+                self.assertEqual(self.derive(cp), self.rev(f'{tip}:app.py'), 'git must derive what the hook stored')
+                self.assertEqual(self.blob(cp), b'hooked\n')
+                with patch.object(task_loop, '_git_derived_oid', never):
+                    done = self.assert_withheld_on_the_one_changed_commit(cp, tip, first.last_error)
+                self.assertNotEqual(self.rev(f'{tip}:app.py'), done.measurements['patch_committed']['blob'])
+                self.assertEqual(self.empty_commits(cp), [])
+                shutil.rmtree(self.root)
+                self.root.mkdir()
+
+    def assert_one_task_commit(self, pre, msg, someone, point, race):
+        """Whatever the hooks, the kill and the user commit: at most one task commit, at every stage."""
+        cp = self.task('plain')
+        for name, script in (('pre-commit', pre), ('commit-msg', msg)):
+            if script:
+                self.hook(name, script)
+        patched, reverts = ORDINARY.replace(b'BROKEN', b'READY'), pre == self.REVERTS_THE_STAGED_TARGET
+        changes = reverts or pre == self.REWRITES_THE_STAGED_TARGET
+
+        def stage():
+            mine, empty = self.task_commits(cp), self.empty_commits(cp)
+            self.assertLessEqual(len(mine), 1, 'the task committed twice')
+            self.assertEqual(empty, mine if reverts else [], 'an empty commit that git did not force')
+            self.assertLessEqual(self.commits(cp), 1 + bool(race))
+            return mine
+
+        with patch.dict(os.environ, self.SOMEONE if someone else {}):
+            result = subprocess.run([sys.executable, '-c', KILL_OR_RACE, cp.task_id, point or '-', race or '-'],
+                                    text=True, capture_output=True, timeout=60)
+            self.assertEqual(result.returncode, 90 if point else 0, result.stderr)
+            stage()
+            errors = []
+            for _ in range(3):
+                done = resume_task(cp.task_id)
+                mine = stage()
+                errors.append(done.last_error)
+                self.assertEqual(done.verified_success is True, self.blob(cp) == patched and not changes,
+                                 done.last_error)
+        self.assertEqual(len(mine), 1)
+        self.assertEqual(self.commits(cp), 1 + bool(race))
+        self.assertEqual(done.measurements['patch_committed']['commit'], mine[0])
+        self.assertEqual(self.author(mine[0]), f'z0int-task-loop <z0int+{self.token_of(done)}@local>')
+        self.assertEqual(len(set(errors)), 1, errors)
+        if changes:
+            self.assertIn('hook or filter changed what was committed', errors[0])
+            self.assertNotEqual(done.status, 'verified')
+            self.assertEqual(self.blob(cp), ORDINARY if reverts else b'hooked\n')
+        else:
+            self.assertIsNone(errors[0])
+            self.assertEqual(done.status, 'verified')
 
     # --- a patch committed by hand before the task ever asked git what it would store ---
 
@@ -2178,6 +2510,36 @@ class GitDerivedBlobTests(unittest.TestCase):
                     shutil.rmtree(self.root)
                     self.root.mkdir()
 
+
+
+def _one_task_commit_case(pre, msg, someone, point, race):
+    def test(self):
+        self.assert_one_task_commit(pre, msg, someone, point, race)
+    return test
+
+
+# Hooks that reword, add a trailer, re-stage, rewrite or revert; the committer named by the environment or
+# not; a kill at every step from the add to the durable record; a user commit landing before the add or
+# the commit. One test each.
+_HOOKS = {
+    'reword': (None, GitDerivedBlobTests.REWORDS_THE_MESSAGE),
+    'restage_trailer': (GitDerivedBlobTests.RESTAGES_THE_TARGET, GitDerivedBlobTests.ADDS_A_TRAILER),
+    'rewrite_reword': (GitDerivedBlobTests.REWRITES_THE_STAGED_TARGET, GitDerivedBlobTests.REWORDS_THE_MESSAGE),
+    'rewrite_trailer': (GitDerivedBlobTests.REWRITES_THE_STAGED_TARGET, GitDerivedBlobTests.ADDS_A_TRAILER),
+    'revert_reword': (GitDerivedBlobTests.REVERTS_THE_STAGED_TARGET, GitDerivedBlobTests.REWORDS_THE_MESSAGE),
+}
+_POINTS = (None, 'before_add', 'after_add', 'before_commit', 'after_commit', 'read_back', 'recorded')
+for _hooks, (_pre, _msg) in _HOOKS.items():
+    for _someone in (False, True):
+        _cases = [(_point, None) for _point in _POINTS]
+        if _someone:
+            _cases += [(_point, _race) for _point in (None, 'after_commit')
+                       for _race in ('before_add', 'before_commit')]
+        for _point, _race in _cases:
+            _name = '__'.join(('test_one_task_commit', _hooks, 'as_someone' if _someone else 'as_the_task',
+                               'killed_' + _point if _point else 'not_killed',
+                               'user_commit_' + _race if _race else 'no_user_commit'))
+            setattr(GitDerivedBlobTests, _name, _one_task_commit_case(_pre, _msg, _someone, _point, _race))
 
 if __name__ == '__main__':
     unittest.main()

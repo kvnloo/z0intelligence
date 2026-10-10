@@ -173,19 +173,37 @@ is not committed, whatever Git derives later: a clean filter that appears
 after the add and undoes the patch does not turn "nothing was committed" into
 "nothing to commit". Removing such a filter lets the next resume commit.
 The same save records what is about to be committed
-(`measurements.patch_commit_intended`: the blob id and the task-branch commit
-it goes on top of). Once a commit of the patch exists it is recorded
-(`measurements.patch_committed`: the commit id and the target's blob id) and
-the patch is **never committed again**: later resumes derive and stage nothing
-and compare the task branch with that record. If the branch still carries that
-blob for the target the task verifies, whatever Git would derive today (a clean
-filter or `ident` added after the commit changes nothing); if it no longer
-does, verification is withheld with a `last_error` saying so. After a kill
-straight after `git commit`, the record is rebuilt from the intent: the first
-commit the branch gained on top of the recorded parent whose target entry is
-the recorded blob. A branch that was moved off that commit before any resume
-could record it looks exactly like a commit that never happened, and is
-committed.
+(`measurements.patch_commit_intended`: the blob id, the task-branch commit it
+goes on top of, and a token unique to this attempt). The task's commit is
+authored as `z0int-task-loop <z0int+<token>@local>` (`git commit --author`,
+which Git takes over `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`): no commit hook is
+handed the author, so the commit can be found again whatever a hook made of its
+message or content, whoever the environment names as committer, and whatever
+landed on the branch between reading its tip and committing. Once a commit of
+the patch exists it is recorded (`measurements.patch_committed`: the commit id
+and the blob id the task meant to commit, plus `stored` when the commit holds
+something else for the target) and the patch is **never committed again**:
+later resumes derive and stage nothing and compare the task branch with that
+record. If the branch carries the recorded blob for the target the task
+verifies, whatever Git would derive today (a clean filter or `ident` added
+after the commit changes nothing); if it does not, verification is withheld
+with a `last_error` saying so. That holds for the task's own commit too: when a
+commit hook rewrote or reverted the staged target, or a filter that appeared
+between the add and the commit made `git commit` store another blob, the one
+commit stays, nothing is committed on top of it, and the task stays withheld
+until the branch carries the recorded blob (a commit made by hand does that).
+What Git derives from the file later decides nothing once the commit exists,
+even when it is exactly what that commit stores. A hook that reverts the
+staged target after Git decided there was something to commit leaves one
+commit that changes nothing; Git makes it, and the task makes no second one.
+After a kill straight after `git commit`, the record is rebuilt from the
+intent: among the commits the branch gained since the recorded parent, the
+first one authored with the recorded token, whatever its message, committer
+and parent; only when there is none, the first whose target entry is the
+recorded blob (a commit made by hand). A commit that merely carries the task's
+message or the task's committer is not taken for it. A branch that was
+moved off the task's commit before any resume could record it looks exactly
+like a commit that never happened, and is committed.
 Verification otherwise remains the existing content predicate, not a claim that
 arbitrary tests ran or all project requirements were satisfied.
 Atomic checkpoint writes flush the temporary file and POSIX parent directory;

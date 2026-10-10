@@ -640,8 +640,9 @@ def _git_derived_oid(wt: Path, branch: str, rel: str, scratch_root: Path) -> str
 # measurements key: the task-branch blob id of the target ("" when the branch has no such
 # regular file) at the moment a commit of the recorded patch was found to be needed.
 _COMMIT_NEEDED_OVER = "patch_commit_needed_over"
-# measurements key: {"blob", "parent"} - the blob id about to be committed for the target and
-# the task-branch commit it is committed on top of, written before anything is staged.
+# measurements key: {"blob", "parent", "token"} - the blob id about to be committed for the
+# target, the task-branch commit it is committed on top of, and the token this attempt's commit
+# is authored with (``_task_author``), written before anything is staged.
 _COMMIT_INTENDED = "patch_commit_intended"
 # measurements key: {"commit", "blob"} - the commit that put the recorded patch on the task
 # branch and the blob id of the recorded patch for the target. Once present, nothing is
@@ -649,6 +650,7 @@ _COMMIT_INTENDED = "patch_commit_intended"
 # something else for the target ("" for no regular file): a hook or filter changed it.
 _COMMITTED = "patch_committed"
 _OID = re.compile(r"[0-9a-f]{40,64}")
+_TOKEN = re.compile(r"[0-9a-f]{32}")
 
 
 _TASK_COMMITTER = ("z0int-task-loop", "z0int@local")  # who the task's own commit is made as
@@ -658,31 +660,40 @@ def _patch_commit_message(cp: TaskCheckpoint) -> str:
     return f"z0int task {cp.task_id}: bounded patch"
 
 
-def _commit_facts(wt: Path, commit: str) -> tuple[str | None, bytes, bytes]:
-    """First parent, committer (``name <email>``) and message of ``commit``, from the object itself."""
-    raw = _run_git(["cat-file", "-p", commit], cwd=wt, check=False, text=False)
-    header, _, message = raw.stdout.partition(b"\n\n")  # nothing is printed when git fails
-    lines = header.split(b"\n")
-    parents = [line[7:].decode("ascii", "replace") for line in lines if line.startswith(b"parent ")]
-    committer = next((line[10:] for line in lines if line.startswith(b"committer ")), b"")
-    return (parents[0] if parents else None), committer.rsplit(b" ", 2)[0], message
+def _task_author(token: str) -> str:
+    """Who the task's own commit is authored by: the task, under this attempt's token.
 
-
-def _is_task_message(cp: TaskCheckpoint, message: bytes) -> bool:
-    """The message this task gives its commit, alone or with lines a commit-msg hook added below it."""
-    mine = _patch_commit_message(cp).encode("utf-8")
-    return message.startswith(mine + b"\n")
-
-
-def _is_task_commit(cp: TaskCheckpoint, wt: Path, commit: str, parent: str) -> bool:
-    """Whether ``commit`` is the one this task made on top of ``parent``, whatever it stores.
-
-    It carries this task's message; or, where a hook reworded that, it sits directly
-    on the recorded parent and was committed as the task commits.
+    The author is the one part of a commit that nothing between ``git commit`` and
+    the finished commit object can change: a hook is handed the index and the
+    message, not the author, and ``--author`` is taken over ``GIT_AUTHOR_NAME`` and
+    ``GIT_AUTHOR_EMAIL``. The token is unique to the attempt and durable in the
+    checkpoint before anything is staged, so the commit can be found again after a
+    kill whatever a hook made of its message and content, whoever the environment
+    says committed it, and whatever it was committed on top of. (Git hands the
+    author on to the hooks it runs, so a commit a hook makes itself in that time is
+    authored the same; the task's own is the first of them on the branch.)
     """
-    made_on, committer, message = _commit_facts(wt, commit)
-    return _is_task_message(cp, message) or (
-        made_on == parent and committer == "{} <{}>".format(*_TASK_COMMITTER).encode("ascii"))
+    return f"{_TASK_COMMITTER[0]} <z0int+{token}@local>"
+
+
+def _commit_facts(wt: Path, commit: str) -> tuple[str | None, bytes]:
+    """First parent and author (``name <email>``, without the date) of ``commit``, from the object itself."""
+    raw = _run_git(["cat-file", "-p", commit], cwd=wt, check=False, text=False)
+    lines = raw.stdout.partition(b"\n\n")[0].split(b"\n")  # the header; nothing is printed when git fails
+    parents = [line[7:].decode("ascii", "replace") for line in lines if line.startswith(b"parent ")]
+    author = next((line[7:] for line in lines if line.startswith(b"author ")), b"")
+    return (parents[0] if parents else None), author.rsplit(b" ", 2)[0]
+
+
+def _is_task_commit(wt: Path, commit: str, token: str) -> bool:
+    """Whether ``commit`` is the one this task made under ``token``, whatever it stores.
+
+    It is authored with the token of the recorded attempt (``_task_author``), and
+    nothing else is asked: not its message, which a commit-msg hook rewrites, not
+    its committer, which the environment names, and not its parent, which is
+    whatever the branch tip was when git committed.
+    """
+    return _commit_facts(wt, commit)[1] == _task_author(token).encode("ascii")
 
 
 def _record_patch_commit(cp: TaskCheckpoint, wt: Path, name: str, commit: str, blob: str) -> dict[str, str]:
@@ -701,9 +712,10 @@ def _patch_commit_record(cp: TaskCheckpoint, wt: Path, branch: str, name: str) -
 
     The commit is found, not assumed: a kill straight after ``git commit`` leaves
     only the intent written before the add. The task's commit is known by what it
-    IS, not by what it holds: the first commit the task branch gained on top of the
-    recorded parent that is this task's (``_is_task_commit``). A hook may have changed
-    the blob it stores, and it is still this task's one commit. Only when there is no such
+    IS, not by what it holds: the first commit the task branch gained since the
+    recorded parent that is this task's (``_is_task_commit``), wherever in that
+    range it sits. A hook may have changed the blob it stores, and it is still this
+    task's one commit. Only when there is no such
     commit does content count: a commit made by hand whose entry for the target is
     the recorded blob. Found once, it is durable in the checkpoint.
     """
@@ -713,13 +725,14 @@ def _patch_commit_record(cp: TaskCheckpoint, wt: Path, branch: str, name: str) -
     intent = cp.measurements.get(_COMMIT_INTENDED)
     # The parent becomes part of a git argument: only a full object id is ever followed.
     if (type(intent) is not dict or type(intent.get("blob")) is not str
-            or type(intent.get("parent")) is not str or not _OID.fullmatch(intent["parent"])):
+            or type(intent.get("parent")) is not str or not _OID.fullmatch(intent["parent"])
+            or type(intent.get("token")) is not str or not _TOKEN.fullmatch(intent["token"])):
         return None
     listed = _run_git(["rev-list", "--first-parent", "--reverse", f"{intent['parent']}..refs/heads/{branch}"],
                       cwd=wt, check=False)
     commits = listed.stdout.split()  # nothing is listed when git fails
     for commit in commits:
-        if _is_task_commit(cp, wt, commit, intent["parent"]):
+        if _is_task_commit(wt, commit, intent["token"]):
             return _record_patch_commit(cp, wt, name, commit, intent["blob"])
     for commit in commits:
         if _tree_blob_oid(wt, commit, name) == intent["blob"]:
@@ -777,12 +790,13 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
     Once a commit of the patch exists on the task branch, that is durable too
     (``_patch_commit_record``): no later call derives, stages or commits anything.
     The task branch either carries the recorded patch blob for the target, or the
-    patch is reported as not there. This task's own commit is recognised by its
-    place and message even when a commit hook or filter changed the blob it stores:
-    it is never repeated, and it is reported until the task branch carries the
-    recorded blob or the blob git stores for the recorded patch now. A branch that
-    already holds the after-image itself, committed by hand, is recorded the same
-    way and nothing is committed.
+    patch is reported as not there. This task's own commit is recognised by the
+    token it was authored with even when a commit hook or filter changed the blob
+    it stores: it is never repeated, and it is reported until the task branch
+    carries the recorded blob, the one this task meant to commit. What git would
+    store for the recorded patch by then decides nothing: that is asked only while
+    no commit of the patch exists. A branch that already holds the after-image
+    itself, committed by hand, is recorded the same way and nothing is committed.
     """
     wt = Path(cp.worktree_path or "")
     rel = str((cp.patch or {}).get("relative_path"))
@@ -806,16 +820,11 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
         if name is None:
             return not_regular
         committed = _patch_commit_record(cp, wt, branch, name)
-        changed = None  # set when this task's own commit does not store the recorded blob
         if committed is not None:
             # What git derives from the file today (a clean filter or ``ident`` that
-            # appeared since) is no reason to commit the same patch a second time.
-            changed = _recorded_commit_error(committed, wt, branch, name)
-            if changed is None or type(committed) is not dict or "stored" not in committed:
-                return changed
-            # Below, git is only asked whether what the branch carries is what it stores
-            # for the recorded patch now (a filter that appeared between the add and the
-            # commit, and is still there). Nothing is staged or committed again.
+            # appeared since) is no reason to commit the same patch a second time, and
+            # no evidence that a commit which stores something else holds the patch.
+            return _recorded_commit_error(committed, wt, branch, name)
         expected = _git_derived_oid(wt, branch, name, _derive_root(cp.task_id))
         if expected is None:
             return not_regular
@@ -831,15 +840,13 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
                 # branch entry has not moved since. Git deriving that same old entry now
                 # (a clean filter that appeared after the add and undoes the patch) is
                 # not evidence that the patch was committed.
-                return changed or (_NOT_COMMITTED + f"a commit of the recorded patch was needed and the task "
-                                   f"branch {branch} still holds the entry it had then")
+                return (_NOT_COMMITTED + f"a commit of the recorded patch was needed and the task "
+                        f"branch {branch} still holds the entry it had then")
             # Nothing to commit. When the index entry is that blob too, re-adding it only
             # refreshes its stat data, which is what stops ``git status`` reporting a
             # rewritten file whose stored form did not change (CRLF to LF under autocrlf).
             if _staged_blob_oid(wt, name) == expected:
                 _run_git(["add", "--", literal], cwd=wt, check=False)
-        elif changed is not None:
-            return changed
         else:
             parent = _run_git(["rev-parse", "--verify", f"refs/heads/{branch}^{{commit}}"], cwd=wt).stdout.strip()
             if _branch_holds_after_image(wt, name, carried, after):
@@ -848,9 +855,12 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
                 cp.measurements[_COMMITTED] = {"commit": parent, "blob": carried}
                 save_checkpoint(cp)
                 return None
-            intended = {"blob": expected, "parent": parent}
-            if (cp.measurements.get(_COMMIT_NEEDED_OVER) != (carried or "")
-                    or cp.measurements.get(_COMMIT_INTENDED) != intended):
+            intended = cp.measurements.get(_COMMIT_INTENDED)
+            if (cp.measurements.get(_COMMIT_NEEDED_OVER) != (carried or "") or type(intended) is not dict
+                    or intended.get("blob") != expected or intended.get("parent") != parent
+                    or type(intended.get("token")) is not str or not _TOKEN.fullmatch(intended["token"])):
+                # Another attempt (another blob, or on another commit): another token.
+                intended = {"blob": expected, "parent": parent, "token": uuid.uuid4().hex}
                 cp.measurements[_COMMIT_NEEDED_OVER] = carried or ""
                 cp.measurements[_COMMIT_INTENDED] = intended
                 save_checkpoint(cp)  # durable before the index is touched: a kill after the add keeps it
@@ -861,12 +871,14 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
             # No --allow-empty: git itself refuses a commit that changes nothing.
             _run_git(
                 ["-c", f"user.email={_TASK_COMMITTER[1]}", "-c", f"user.name={_TASK_COMMITTER[0]}",
-                 "commit", "-m", _patch_commit_message(cp), "--only", "--", literal],
+                 "commit", "--author", _task_author(intended["token"]), "-m", _patch_commit_message(cp),
+                 "--only", "--", literal],
                 cwd=wt,
             )
             # The commit just made is this task's whatever a hook made of its content or
             # its message: it is HEAD, read straight away, on top of the recorded parent.
-            # Anything else there (a hook committed again on top) is looked for instead.
+            # Anything else there (a hook committed again on top, or the commit sits on
+            # one that landed on the branch meanwhile) is looked for instead.
             made = _run_git(["rev-parse", "--verify", "HEAD^{commit}"], cwd=wt, check=False).stdout.strip()
             if _commit_facts(wt, made)[0] == parent:
                 committed = _record_patch_commit(cp, wt, name, made, expected)
