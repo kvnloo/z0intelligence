@@ -52,10 +52,11 @@ AWKWARD_IDS = [
     "/srv/pool/alpha",
     "~alpha",
     "n" * 129,
-    1.5,
-    True,
     *SECRET_SHAPED,
 ]
+# JSON numbers and booleans used as identifiers: published as their text, exactly as the PR head did,
+# so a row that spells the same id as a string still refers to them.
+NUMERIC_IDS = [(1.5, "1.5"), (True, "True"), (7, "7"), (0.25, "0.25")]
 
 
 @pytest.fixture(autouse=True)
@@ -150,6 +151,25 @@ def test_awkward_identifier_keeps_the_row_under_a_stand_in():
             assert "rows_dropped" not in snap["sources"][name], (raw, name)
         if isinstance(raw, str):
             assert raw not in json.dumps(snap), raw
+
+
+def test_a_number_used_as_an_identifier_is_published_as_its_text():
+    for raw, text in NUMERIC_IDS:
+        for spelled in (raw, text):
+            snap = _build(
+                tern=_tern(
+                    hosts=[{"host_id": spelled, "status": "offline"}],
+                    sessions=[{"session_id": spelled, "status": "locked", "pane_id": spelled}],
+                ),
+                kerdoios=_kerdoios([_entry(offer_id=spelled)]),
+                leases=_leases([{"placement_id": spelled, "offer_id": spelled, "status": "active"}]),
+            )
+            assert [(h["host_id"], h.get("id_redacted")) for h in snap["hosts"]] == [(text, None)], raw
+            assert [(s["session_id"], s["pane_id"], s.get("id_redacted")) for s in snap["sessions"]] == [
+                (text, text, None)], raw
+            assert [(o["offer_id"], o.get("id_redacted")) for o in snap["offers"]] == [(text, None)], raw
+            assert [(row["placement_id"], row["offer_id"], row.get("id_redacted")) for row in snap["leases"]] == [
+                (text, text, None)], raw
 
 
 def test_provider_and_model_that_fail_the_label_policy_keep_the_offer():

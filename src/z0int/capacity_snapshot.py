@@ -152,15 +152,16 @@ def _scalar(value: Any) -> bool:
 
 
 def _ident(value: Any, prefix: str = "", limit: int = _MAX_TEXT) -> tuple[str, bool]:
-    """(published id, is_stand_in) for a scalar identifier: the id itself when it is a plain label,
-    otherwise a stable one-way stand-in. The same input always maps to the same output, so
-    references between rows still join."""
+    """(published id, is_stand_in) for a scalar identifier: its text when that is a plain label,
+    otherwise a stable one-way stand-in. The result depends only on the text, never on whether
+    JSON spelled the id as a string or a number, so two rows that spell an id the same way join."""
     text = f"{prefix}{value}"
-    # Judge the name itself, with or without the tern: prefix it may already carry: both
-    # spellings of one host must come out the same, and a prefix must not hide a path.
-    core = text[len("tern:"):] if text.startswith("tern:") else text
-    plain = _label(core, limit) == core and _label(text, limit) == text
-    if isinstance(value, (str, int)) and not isinstance(value, bool) and plain:
+    # Any number of leading tern: prefixes, added here or already there, must not hide a path:
+    # the name behind them is judged too. This decides publication only; the text is unchanged.
+    core = text
+    while core.startswith("tern:"):
+        core = core[len("tern:"):]
+    if _label(core) == core and _label(text, limit) == text:
         return text, False
     return _stable_id("redacted", text), True
 
@@ -433,7 +434,10 @@ def _normalize_session(session: Mapping[str, Any], *, now: float) -> Any:
         return _DROPPED
     session_id, redacted = _ident(raw_id)
     host_ref = _either(session, "host_id", "host")
-    host_id = _ref(host_ref, "" if str(host_ref).startswith("tern:") else "tern:")
+    # Mapped exactly as _normalize_host maps a named host, blank names included, so the two join.
+    host_id = None
+    if _scalar(host_ref):
+        host_id = _ident(host_ref, "" if str(host_ref).startswith("tern:") else "tern:")[0]
     current = _bool(session.get("current"))
     locked = _bool(session.get("locked"))
     raw_status = _either(session, "status", "state")
