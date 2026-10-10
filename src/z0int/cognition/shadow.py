@@ -335,7 +335,9 @@ def _decision_rows(
         with lock:
             results[index] = (decision, None)
 
-    deadline = time.monotonic() + max(0.1, float(timeout_s))
+    started = time.monotonic()
+    deadline = started + max(0.1, float(timeout_s))
+    waited_ms: dict[int, float] = {}
     threads: list[tuple[int, threading.Thread]] = []
     for index, (_, backend, _) in enumerate(resolved):
         if backend is None:
@@ -351,11 +353,18 @@ def _decision_rows(
             with lock:
                 if results[index][0] is None and results[index][1] is None:
                     results[index] = (None, "shadow_timeout")
+            # The call is abandoned, not cancelled: a model that was still loading
+            # keeps loading. Record the wait so a timeout is not read as instant.
+            waited_ms[index] = round((time.monotonic() - started) * 1000.0, 1)
 
     rows: list[dict[str, Any]] = []
     for index, (spec, backend, error) in enumerate(resolved):
         decision, failure = results[index]
-        rows.append(_row(spec, backend, decision, failure, error, legal_ids))
+        row = _row(spec, backend, decision, failure, error, legal_ids)
+        if decision is None and index in waited_ms:
+            row["timed_out"] = True
+            row["waited_ms"] = waited_ms[index]
+        rows.append(row)
     return rows
 
 
