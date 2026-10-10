@@ -508,3 +508,70 @@ def test_a_cold_load_timeout_still_leaves_the_model_warm_for_the_next_call(tmp_p
     assert warm["selected_action"] == "read"
     assert "timed_out" not in warm
     assert backend.calls == 2
+
+
+class _RaisesLate(_FakeBackend):
+    """Fails on its own, a little after the caller's budget has run out."""
+
+    def __init__(self, delay_s, **kwargs):
+        super().__init__(**kwargs)
+        self._delay_s = delay_s
+
+    def decide(self, request):
+        time.sleep(self._delay_s)
+        raise ConnectionError("late refused")
+
+
+def test_a_backend_error_that_lands_just_after_the_deadline_is_not_also_called_a_timeout(
+    tmp_path, monkeypatch
+):
+    import threading
+
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(backends={"m1": _RaisesLate(0.2)})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = 100
+
+    # Hold the worker between "still running at the deadline" and building the
+    # row, long enough for the backend's own error to arrive in between.
+    real_is_alive = threading.Thread.is_alive
+
+    def slow_is_alive(thread):
+        alive = real_is_alive(thread)
+        if alive and thread.name.startswith("z0int-shadow-"):
+            time.sleep(0.3)
+        return alive
+
+    monkeypatch.setattr(threading.Thread, "is_alive", slow_is_alive)
+
+    row = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+
+    # One story per row: either it timed out, or it failed with its own error.
+    if row["error"] == "shadow_timeout":
+        assert row["timed_out"] is True
+    else:
+        assert "late refused" in row["error"]
+        assert "timed_out" not in row
+        assert "waited_ms" not in row
+
+
+@pytest.mark.parametrize("budget", [1e18, 1e308, float("inf"), 10**400])
+def test_an_absurd_budget_is_capped_instead_of_raising(tmp_path, monkeypatch, budget):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(backends={"m1": _FakeBackend(action="read")})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = budget
+
+    row = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+
+    assert row["selected_action"] == "read"
+
+
+def test_an_absurd_budget_from_the_environment_is_capped_too(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    monkeypatch.setenv("Z0INT_COGNITION_SHADOW_SERVER_TIMEOUT_MS", "inf")
+    registry = _FakeRegistry(backends={"m1": _FakeBackend(action="read")})
+
+    row = run_shadow(_payload(shadows=["m1"]), registry=registry, write=False)["shadow"][0]
+
+    assert row["selected_action"] == "read"
