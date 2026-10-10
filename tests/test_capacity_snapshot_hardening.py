@@ -757,8 +757,8 @@ def test_a_plain_name_that_already_carries_the_prefix_is_published_as_before(key
     # Stripping prefixes only decides whether the text is published; it never changes the text.
     host_ids, session_ref, _ = _join({key: "tern:gpu-box-2"}, "tern:tern:gpu-box-2")
     assert host_ids == ["tern:tern:gpu-box-2"] == [session_ref]
-    host_ids, _, _ = _join({key: "rack/tern:/b"}, "x")
-    assert host_ids == ["tern:rack/tern:/b"]  # only leading prefixes are set aside
+    host_ids, _, _ = _join({key: "rack/tern:b"}, "x")
+    assert host_ids == ["tern:rack/tern:b"]  # only leading prefixes are set aside
 
 
 @pytest.mark.parametrize("raw", [" gpu", "gpu ", " gpu-box-2 ", "\tgpu"])

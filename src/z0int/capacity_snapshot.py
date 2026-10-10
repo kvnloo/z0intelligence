@@ -81,13 +81,24 @@ _DROPPED = object()  # a row whose identifier is a container; counted, never sil
 # credential prefix and no "password: x"-style pair; and, with a canonical UUID
 # counted as one character, has no alphanumeric run over 20 characters and no
 # space-free word over 32 characters (64 when the word has no uppercase letter).
-# The repo redactor is still applied.
+# The repo redactor is still applied. What follows any leading tern: prefixes
+# must pass the same policy.
 _LABEL_CHARS = re.compile(r"[A-Za-z0-9 ._:/-]+")
 _ALNUM_RUN = re.compile(r"[A-Za-z0-9]+")
 _UUID = re.compile(r"(?<![A-Za-z0-9])[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}(?![A-Za-z0-9])")
 _CREDENTIAL_PREFIX = re.compile(r"(?<![A-Za-z0-9])sk-|gh[pousr]_|xox[abpr]-|AKIA|AIza|eyJ")
 _CREDENTIAL_PAIR = re.compile(r"(?i)(?:passw|pwd|secret|token|key|auth|credential)[a-z_-]*\s*:|bearer\s")
 _EMBEDDED_SK = re.compile(r"(?<=[A-Za-z0-9])sk-")  # "task-", "desk-": not a key prefix
+# Path-shaped although it does not start with a slash. A slash alone is not a path: "build/arm64",
+# "k8s/ns/pod-1" and "free/model" are names. It is one when the slash opens a word or follows a
+# colon ("x /etc", "C:/x"), when a segment beside it starts with a dot ("./x", "../x", "a/.ssh"),
+# or when a segment that has more after it is a system root directory ("etc/shadow", "a/usr/bin").
+_PATH_SHAPED = re.compile(
+    r"[ :]/(?! )"
+    r"|(?:^|[ :])\.[^ /]*/"
+    r"|/\."
+    r"|(?i:(?:^|[ :/])(?:etc|home|root|usr|var|tmp|proc|sys|mnt|opt|users|volumes|windows)/)"
+)
 _MAX_RUN = 20
 _MAX_WORD = 32
 _MAX_LOWERCASE_WORD = 64
@@ -133,6 +144,11 @@ def _label(value: Any, limit: int = _MAX_TEXT) -> str | None:
     if not text or len(text) > limit or not _LABEL_CHARS.fullmatch(text):
         return None
     if text.startswith("/") or "//" in text or "/home/" in text or "/Users/" in text:
+        return None
+    if _PATH_SHAPED.search(text):
+        return None
+    # A tern: prefix must not carry a refused name through: what follows it is judged too.
+    if text.startswith("tern:") and _label(text[len("tern:"):], limit) is None:
         return None
     if _CREDENTIAL_PREFIX.search(text) or _CREDENTIAL_PAIR.search(text):
         return None
