@@ -1,0 +1,14 @@
+name: hermes-file-search
+version: "0.1.0"
+description: Thin repository search tool for the shared z0intelligence HTTP service.
+manifest_version: 2
+kind: standalone
+provides_tools:
+  - z0_file_search
+provides_hooks: []
+python_dependencies: []
+config_schema:
+  service_url:
+    type: str
+    description: Trusted z0intelligence service origin; defaults to Z0INT_SERVICE_URL or http://127.0.0.1:11501.
+tags: [repository, search, fff, z0intelligence]

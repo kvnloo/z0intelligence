@@ -290,10 +290,11 @@ def _fetch_exact_path(path_str: str, project_root: Path | None) -> EvidenceRef |
         return None
     # Bound excerpt — no full private dump
     try:
-        text = p.read_text(encoding="utf-8", errors="replace")
+        with p.open(encoding="utf-8", errors="replace") as stream:
+            text = stream.read(400)
     except OSError:
         return None
-    excerpt = text[:400].replace("\n", "\\n")
+    excerpt = text.replace("\n", "\\n")[:400]
     return EvidenceRef(
         source_id=f"file:{p}",
         source_version=_file_version(p),
@@ -366,6 +367,8 @@ def resolve_context(
     allow_fff: bool = True,
     allow_qmd: bool = True,
     allow_memory: bool = False,
+    repository_limit: int = 5,
+    repository_time_budget_ms: int = 120,
 ) -> ContextPacket:
     """Resolve information needs into a provenance-preserving packet.
 
@@ -443,9 +446,12 @@ def resolve_context(
         elif need.kind == "exact_symbol" or need.symbol:
             symbol = need.symbol or need.description
             if allow_fff and root is not None:
-                found = _fff_search_repository(root, symbol, kind="exact_symbol", limit=5)
+                found = _fff_search_repository(
+                    root, symbol, kind="exact_symbol", limit=repository_limit,
+                    time_budget_ms=repository_time_budget_ms,
+                )
                 fff_status = str(found.get("status") or "unknown")
-                refs = _fff_evidence_refs(found, root, limit=5)
+                refs = _fff_evidence_refs(found, root, limit=repository_limit)
                 fff_hits += len(refs)
                 fff_wall_ms += float(found.get("wall_ms") or 0.0)
                 if found.get("package_version") is not None:
@@ -483,10 +489,11 @@ def resolve_context(
                     root,
                     need.description,
                     kind="natural_language",
-                    limit=5,
+                    limit=repository_limit,
+                    time_budget_ms=repository_time_budget_ms,
                 )
                 fff_status = str(found.get("status") or "unknown")
-                refs = _fff_evidence_refs(found, root, limit=5)
+                refs = _fff_evidence_refs(found, root, limit=repository_limit)
                 fff_hits += len(refs)
                 fff_wall_ms += float(found.get("wall_ms") or 0.0)
                 if found.get("package_version") is not None:
