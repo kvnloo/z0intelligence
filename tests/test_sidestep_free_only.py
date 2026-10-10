@@ -578,3 +578,22 @@ def test_grok_is_never_called_as_sidestep_or_candidate_without_the_manifest_list
                                        {"provider": "openrouter", "model": OPENROUTER}])
     assert result["ok"] is False
     assert calls == ["openrouter"]
+
+
+# A blocked provider listed in a free-only plan is still an invalid plan: the call is
+# refused outright, as it was before the provider was added to the block list, rather
+# than quietly continuing with the next candidate.
+# (codex is not a provider key in the manifest, so a plan naming it was always skipped.)
+@pytest.mark.parametrize("blocked", ["grok"])
+@pytest.mark.parametrize("flag", [{}, {"sidestep": True}, {"sidestep": "true"}, {"sidestep": 1}])
+def test_a_blocked_provider_in_a_free_only_plan_refuses_the_whole_plan(monkeypatch, blocked, flag):
+    seen = []
+
+    def behaviour(provider, n):
+        seen.append(provider)
+        return 200, 0
+
+    with pytest.raises(ValueError, match="free_only"):
+        run(monkeypatch, behaviour,
+            candidates=[{"provider": blocked, "model": "some/model", **flag}, {"provider": "groq", "model": GROQ}])
+    assert seen == []

@@ -525,10 +525,16 @@ def execute_plan(args, policy, providers, plan, *, receipt_sink, receipt_locatio
     sidestep_http=set(policy.get('sidestep_http') or [402,429])
     while queue and len(attempts)<limit:
         candidate=queue.pop(0)
-        if candidate['provider'] in tried or blocked_provider(candidate['provider']) or candidate['provider'] not in providers:
+        if candidate['provider'] in tried or candidate['provider'] not in providers:
+            continue
+        sidestep=candidate.get('sidestep') is True
+        if blocked_provider(candidate['provider']):
+            # Never called. A plan that names one under free-only is still refused as a
+            # whole, exactly as before the provider was blocked.
+            if not sidestep:
+                require_free_route(policy,candidate['provider'],candidate['model'],args)
             continue
         tried.add(candidate['provider'])
-        sidestep=candidate.get('sidestep') is True
         require_free_route(policy,candidate['provider'],candidate['model'],args)
         result = execute_attempt(args, candidate, providers[candidate['provider']], policy, plan, route_id, len(attempts), receipt_sink=receipt_sink, admission=admission, sidestep=sidestep)
         attempts.append(result['receipt'])
