@@ -41,7 +41,7 @@ def _state(provider,rows,config,now):
         if not extra.get('physical_call_attempted',True):continue
         status=extra.get('http_status');last=status
         if status in (401,403):blocked=True
-        elif status==429:until=max(until,row['ts']+extra.get('cooldown_seconds',config.get('health_cooldown_seconds',60)))
+        elif status in (402,429):until=max(until,row['ts']+extra.get('cooldown_seconds',config.get('health_cooldown_seconds',60)))
         elif status==0 or (isinstance(status,int) and status>=500):
             until=max(until,row['ts']+config.get('health_error_ttl_seconds',30))
         # A late success from another in-flight call cannot erase a 403 or active cooldown.
@@ -51,7 +51,7 @@ def _state(provider,rows,config,now):
     if cap is None:reason='unmeasured_cap'
     elif cap<=0:reason='cap_zero'
     elif blocked:reason='account_blocked'
-    elif until>now:reason='cooldown'
+    elif until>now:reason='funds_exhausted' if last==402 else 'cooldown'
     elif inflight>=cap:reason='inflight_cap'
     return {'provider':provider,'cap':cap,'inflight':inflight,'available':reason in ('healthy','eligible_unprobed'),
         'reason':reason,'unhealthy':blocked or until>now,'cooldown_until':until,
@@ -71,6 +71,8 @@ def acquire(provider,call_id,context=None):
         quota=project(provider,context.get('quota_model'),config,context.get('quota_reserved_tokens'))
         if quota is not None and not quota['allowed']:
             state.update(available=False,reason=quota['reason'])
+        if context.get('sidestep') is True and state['reason']=='unmeasured_cap':
+            state.update(available=True,reason='sidestep_unmeasured_cap',cap=1)
         token='admission-'+hashlib.sha256((provider+'\0'+call_id).encode()).hexdigest()
         # No permit replay: a second caller cannot reuse another caller's admission.
         if any(r['trace_id']==token for r in rows):raise ValueError('Admission identity already used')

@@ -29,7 +29,9 @@ const CURRENT = join(RUNTIME, "bridge-current.json");
 
 const Z0_PY =
 	process.env.Z0INT_PYTHON ||
-	"python3";
+	(existsSync(join(homedir(), ".z0int", "bin", "python"))
+		? join(homedir(), ".z0int", "bin", "python")
+		: "python3");
 const Z0_ROOT =
 	process.env.Z0INT_ROOT ||
 	// Prefer the tree that owns this extension when possible.
