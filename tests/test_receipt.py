@@ -449,6 +449,9 @@ class ReceiptRevisionTruth(unittest.TestCase):
             self.assertEqual(summary["actual_tokens_saved_authoritative"], 600)
             self.assertEqual(summary["verified_tasks"], 0)
             self.assertEqual(find_receipt(trace, root=home)["cached_input_tokens"], 200)
+            physical = json.loads((home / "receipts" / "decisions.jsonl").read_text().splitlines()[-1])
+            self.assertEqual(physical.get("measured_frontier_tokens"), 400)
+            self.assertEqual(physical.get("cached_input_tokens"), 200)
             self.assertTrue((home / "receipts" / "decisions.jsonl").read_bytes().startswith(before))
 
     def test_stale_positive_replay_cannot_overwrite_later_negative(self):
