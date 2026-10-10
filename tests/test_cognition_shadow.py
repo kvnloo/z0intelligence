@@ -437,3 +437,74 @@ def test_a_model_inside_the_budget_is_recorded_as_having_answered(tmp_path, monk
 
     assert row["selected_action"] == "read"
     assert row["backend"] == "fake-backend"
+
+
+def test_a_timeout_row_records_how_long_the_worker_waited(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(backends={"m1": _SlowBackend(0.6, action="read")})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = 150
+
+    row = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+
+    # No inference completed, so latency stays 0. The wait is what was actually
+    # spent, and without it a timeout reads like a free, instant miss.
+    assert row["error"] == "shadow_timeout"
+    assert row["timed_out"] is True
+    assert row["latency_ms"] == 0.0
+    assert 140 <= row["waited_ms"] < 500
+
+
+def test_a_failure_that_is_not_a_timeout_reports_no_wait(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(
+        backends={"m1": _FakeBackend(raises=ConnectionError("refused"))}
+    )
+    payload = _payload(shadows=["m1", "absent"])
+    payload["timeout_ms"] = 2000
+
+    rows = run_shadow(payload, registry=registry, write=False)["shadow"]
+
+    for row in rows:
+        assert "timed_out" not in row
+        assert "waited_ms" not in row
+
+
+class _ColdThenWarmBackend(_FakeBackend):
+    """The first call pays a model load; later calls find the model resident."""
+
+    def __init__(self, load_s, **kwargs):
+        super().__init__(**kwargs)
+        self._load_s = load_s
+        self._loaded = False
+        self.calls = 0
+
+    def decide(self, request):
+        self.calls += 1
+        if not self._loaded:
+            time.sleep(self._load_s)
+            self._loaded = True
+        return super().decide(request)
+
+
+def test_a_cold_load_timeout_still_leaves_the_model_warm_for_the_next_call(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    backend = _ColdThenWarmBackend(0.4, action="read")
+    registry = _FakeRegistry(backends={"m1": backend})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = 150
+
+    cold = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+    assert cold["error"] == "shadow_timeout"
+    assert cold["timed_out"] is True
+
+    # The abandoned call is not cancelled: it finishes the load in the background.
+    deadline = time.monotonic() + 2.0
+    while not backend._loaded and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert backend._loaded
+
+    warm = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+    assert warm["selected_action"] == "read"
+    assert "timed_out" not in warm
+    assert backend.calls == 2
