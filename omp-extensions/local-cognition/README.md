@@ -48,7 +48,7 @@ Environment (wins over the settings file):
 | --- | --- | --- |
 | `OMP_Z0INT_COGNITION_SHADOW` | on | `0`/`false`/`off` disables the lane |
 | `OMP_Z0INT_COGNITION_TIMEOUT_MS` | `4000` | Hard client-side timeout for one shadow send |
-| `OMP_Z0INT_COGNITION_MODELS` | `nemotron_orchestrator_8b,functiongemma_270m` | Model ids to run in shadow |
+| `OMP_Z0INT_COGNITION_MODELS` | `functiongemma_270m` | Model ids to run in shadow. One by default: the local supervisor holds one resident model, and two different models per tool call never answer |
 | `OMP_Z0INT_COGNITION_TOOLS` | discovered/observed | Comma-separated tool allow-list for the action set |
 | `OMP_Z0INT_COGNITION_AUTHORITY` | `read` | Risk classes the compiler may declare legal |
 | `OMP_Z0INT_COGNITION_BRIDGE_FALLBACK` | on | `0` disables the sibling-extension import fallback |
@@ -60,7 +60,7 @@ Optional settings file `~/.z0int/config/cognition.json` (env still wins):
 {
   "shadow": true,
   "timeout_ms": 4000,
-  "models": ["nemotron_orchestrator_8b", "functiongemma_270m"],
+  "models": ["functiongemma_270m"],
   "authority": ["read"]
 }
 ```
