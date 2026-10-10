@@ -158,9 +158,10 @@ def _ident(value: Any, prefix: str = "", limit: int = _MAX_TEXT) -> tuple[str, b
     text = f"{prefix}{value}"
     # Any number of leading tern: prefixes, added here or already there, must not hide a path:
     # the name behind them is judged too. This decides publication only; the text is unchanged.
-    core = text
-    while core.startswith("tern:"):
-        core = core[len("tern:"):]
+    start = 0
+    while text.startswith("tern:", start):  # one pass: no copy per prefix
+        start += len("tern:")
+    core = text[start:]
     if _label(core) == core and _label(text, limit) == text:
         return text, False
     return _stable_id("redacted", text), True
