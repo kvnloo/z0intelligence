@@ -516,6 +516,11 @@ function appendObservation(
 	}
 }
 
+/** The share of the extension's timeout the worker may spend waiting on models. */
+export function workerBudgetMs(timeoutMs: number): number {
+	return Math.max(50, Math.floor(timeoutMs * 0.8));
+}
+
 /** Fire-and-forget. Resolves only after the send settles, but callers never await. */
 export async function sendShadow(
 	payload: Jsonish,
@@ -524,6 +529,11 @@ export async function sendShadow(
 	identity?: ObservationIdentity,
 ): Promise<StatusRow> {
 	const startedMs = Date.now();
+	// Give the worker a budget inside ours. Left to its own 30 s default it
+	// keeps waiting on a slow model after this side has recorded a timeout, and
+	// its receipt then says the model answered while the session entry says it
+	// did not. The margin leaves time for the timed-out rows to come back.
+	if (typeof payload.timeout_ms !== "number") payload.timeout_ms = workerBudgetMs(timeoutMs);
 	const tool = typeof payload.facts === "object" && payload.facts !== null
 		? String((payload.facts as Jsonish).tool_name ?? "")
 		: "";

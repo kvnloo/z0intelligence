@@ -106,3 +106,14 @@ statuses and the worker generation. Session entries are records, not messages:
 nothing is added to what the model reads. Tool input is not copied into the
 entry. `/z0int-cognition-status` reports coverage (tool calls seen against
 observations settled, by outcome) alongside the recent rows.
+
+## One time budget
+
+The extension gives up on an observation after `OMP_Z0INT_COGNITION_TIMEOUT_MS`
+(default 4000). It sends the worker 80% of that as `timeout_ms`, so the worker
+stops waiting on a slow or still-loading model inside the same budget and
+returns it as a `timeout` row. Without it the worker waits up to its own 30 s
+default and later writes a receipt saying the model answered, for a tool call
+whose session entry already says it timed out. A model's first call after it
+loads can exceed the budget (about 11 s was measured for a 3 B model); those
+observations are recorded as timeouts, by both records.

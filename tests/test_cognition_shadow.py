@@ -7,6 +7,7 @@ boundary without a GPU, a model server or the network.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -392,3 +393,47 @@ def test_receipt_carries_the_harness_tool_call_identity(tmp_path, monkeypatch):
     result = run_shadow(without, registry=_FakeRegistry(), write=True)
     receipt = json.loads(Path(result["receipts_path"]).read_text().splitlines()[-1])
     assert receipt["tool_call_id"] is None
+
+
+class _SlowBackend(_FakeBackend):
+    """Answers correctly, but only after ``delay_s`` — a model still loading."""
+
+    def __init__(self, delay_s, **kwargs):
+        super().__init__(**kwargs)
+        self._delay_s = delay_s
+
+    def decide(self, request):
+        time.sleep(self._delay_s)
+        return super().decide(request)
+
+
+def test_payload_budget_bounds_a_slow_model_and_records_it_as_a_timeout(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(backends={"m1": _SlowBackend(0.6, action="read")})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = 150
+
+    started = time.monotonic()
+    result = run_shadow(payload, registry=registry, write=True)
+    elapsed = time.monotonic() - started
+
+    # The caller's budget wins over the 30 s default: the op returns inside it.
+    assert elapsed < 0.5
+    row = result["shadow"][0]
+    assert row["error"] == "shadow_timeout"
+    assert row["backend"] is None
+    assert row["selected_action"] is None
+    receipt = json.loads(Path(result["receipts_path"]).read_text().splitlines()[0])
+    assert receipt["shadow"][0]["error"] == "shadow_timeout"
+
+
+def test_a_model_inside_the_budget_is_recorded_as_having_answered(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(backends={"m1": _SlowBackend(0.05, action="read")})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = 2000
+
+    row = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+
+    assert row["selected_action"] == "read"
+    assert row["backend"] == "fake-backend"
