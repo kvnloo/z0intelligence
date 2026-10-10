@@ -545,6 +545,7 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
     context = resolve_context(needs=hydrated_needs, **args)
     # Discovery failures cannot be erased by successful hydration on a retry.
     context.unresolved_gaps = list(dict.fromkeys([*discovery.unresolved_gaps, *context.unresolved_gaps]))
+    context.contradictions = list(dict.fromkeys([*discovery.contradictions, *context.contradictions]))
     if memory_scope is not None:
         selected = context.measurements.get("selected_claims") or []
         if not selected or any(claim.get("origin_trust") != "explicit_user" for claim in selected):
@@ -594,8 +595,10 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
                 for i, path in enumerate(declared_tests)
             )
             previous_gaps = context.unresolved_gaps
+            previous_contradictions = context.contradictions
             context = resolve_context(needs=hydrated_needs, **args)
             context.unresolved_gaps = list(dict.fromkeys([*previous_gaps, *context.unresolved_gaps]))
+            context.contradictions = list(dict.fromkeys([*previous_contradictions, *context.contradictions]))
             final_orientation = context.measurements.get("repo_orientation") or {}
             if any(final_orientation.get(key) != orientation.get(key) for key in ("status", "root", "repo_slug")):
                 context.unresolved_gaps.append("repository orientation changed during owning-test hydration")

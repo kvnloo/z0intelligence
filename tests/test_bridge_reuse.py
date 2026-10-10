@@ -511,6 +511,29 @@ class BridgeRepoReuseTests(unittest.TestCase):
         self.assertEqual(out["decision"]["mode"], "OBSERVE")
         self.assertFalse(out["packet"]["related_tests"])
 
+    def test_exact_symbol_test_hydration_retains_earlier_contradictions(self):
+        from z0int.context_resolve import resolve_context
+
+        for contradiction_call in (1, 2):
+            with self.subTest(contradiction_call=contradiction_call):
+                calls = 0
+
+                def resolve(**kwargs):
+                    nonlocal calls
+                    calls += 1
+                    result = resolve_context(**kwargs)
+                    if calls == contradiction_call:
+                        result.contradictions.append("Conflicting admitted workstream constraints")
+                    return result
+
+                with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits(
+                    "upstream/records.py",
+                )), patch("z0int.bridge.reuse.resolve_context", side_effect=resolve):
+                    out = self.prepare()
+                self.assertEqual(out["decision"]["mode"], "OBSERVE")
+                self.assertEqual(out["packet"]["context"]["contradictions"],
+                                 ["Conflicting admitted workstream constraints"])
+
     def test_manifest_identity_mismatch_fails_closed(self):
         (self.repo / "zer0.repo.yaml").write_text(
             "version: 1\nrepo: example/other-library\narchitecture:\n"
