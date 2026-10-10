@@ -184,7 +184,8 @@ def normalize_outcome(outcome: Outcome | dict[str, Any]) -> Outcome:
     oc = _outcome_from_mapping(outcome)
     d = oc.to_dict()
     src = d.get("source")
-    has_vsrc = bool(d.get("verification_source"))
+    vsrc = d.get("verification_source")
+    has_vsrc = isinstance(vsrc, str) and bool(vsrc.strip())
     if is_ambient_close_source(src if isinstance(src, str) else None) and not has_vsrc:
         for k in GOLD_SIGNALS:
             if getattr(oc, k, None) is True:
