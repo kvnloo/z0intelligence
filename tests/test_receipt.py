@@ -109,10 +109,41 @@ class OutcomeTiers(unittest.TestCase):
             "gold",
         )
 
+    def test_malformed_verification_source_cannot_credit_an_ambient_close(self):
+        from z0int.receipt import Outcome
+
+        for source in (" \t\n", True, 1, {"run": "ci"}):
+            with self.subTest(source=source):
+                self.assertEqual(
+                    Outcome(test_pass=True, source="bridge_turn_end", verification_source=source).tier(),
+                    "execution",
+                )
+
 
 
 
 class ReceiptJoin(unittest.TestCase):
+    def test_invalid_ambient_verifier_join_preserves_negative_history_without_credit(self):
+        from z0int.receipt import (
+            append_receipt, build_receipt, find_receipt, join_outcome, summarize_tokenomics,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            receipt = append_receipt(build_receipt(capability_id="coding.edit", route="local"), root=home)
+            trace = receipt["trace_id"]
+            for verdict, tier in ((True, "execution"), (False, "negative")):
+                joined = join_outcome(trace, {
+                    "source": "bridge_turn_end", "verified_success": verdict, "verification_source": " \t\n",
+                }, root=home)
+                self.assertEqual(joined["outcome_tier"], tier)
+            found = find_receipt(trace, root=home)
+            self.assertIs(found["outcome"]["verified_success"], False)
+            self.assertEqual(found["outcome"]["verification_source"], " \t\n")
+            rows = [json.loads(line) for line in (home / "receipts" / "outcomes.jsonl").read_text().splitlines()]
+            self.assertEqual([row["outcome_tier"] for row in rows], ["execution", "negative"])
+            self.assertEqual(summarize_tokenomics(root=home)["verified_tasks"], 0)
+
     def test_emit_join_summary_gold_from_test_pass(self):
         from z0int.receipt import (
             Outcome,
