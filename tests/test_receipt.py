@@ -517,6 +517,50 @@ class ReceiptRevisionTruth(unittest.TestCase):
             self.assertEqual(summary["rows"], 2)
             self.assertEqual(summary["verified_tasks"], 1)
 
+    def test_bridge_envelope_cannot_enter_a_canonical_outcome_join(self):
+        from z0int.receipt import Outcome, append_receipt, build_receipt, join_outcome
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            original = append_receipt(build_receipt(), root=home)
+            stream = home / "stream" / "bridge.jsonl"
+            stream.write_text(json.dumps({"trace_id": original["trace_id"], "receipt": original,
+                                          "prompt": "synthetic-private-prompt", "preflight": {"private": True}}) + "\n")
+            join_outcome(original["trace_id"], Outcome(test_pass=True, source="ci"), root=home)
+            for filename in ("decisions.jsonl", "outcomes.jsonl"):
+                self.assertNotIn("synthetic-private-prompt", (home / "receipts" / filename).read_text())
+
+    def test_metadata_only_legacy_revision_cannot_retag_usage_time(self):
+        from z0int.receipt import summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            stream = home / "stream" / "bridge.jsonl"
+            stream.parent.mkdir(parents=True)
+            stream.write_text("".join(json.dumps(row) + "\n" for row in [
+                {"trace_id": "legacy", "ts": 10, "baseline_input_tokens": 1000,
+                 "measured_frontier_tokens": 400, "measurement_state": "complete"},
+                {"trace_id": "legacy", "ts": 100, "capability_id": "metadata"},
+                {"trace_id": "legacy", "ts": 20, "baseline_input_tokens": 1000,
+                 "measured_frontier_tokens": 450, "measurement_state": "partial"},
+            ]))
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["measured_frontier_tokens_sum"], 450)
+            self.assertEqual(summary["actual_tokens_saved_authoritative"], 0)
+
+    def test_new_bridge_envelope_cannot_retag_a_stale_positive_outcome(self):
+        from z0int.receipt import append_receipt, build_receipt, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            original = append_receipt(build_receipt(), root=home)
+            append_receipt({**original, "outcome": {"ci_failed": True}, "outcome_ts": 20}, root=home)
+            stream = home / "stream" / "bridge.jsonl"
+            stream.write_text(json.dumps({"trace_id": original["trace_id"], "ts": 30, "receipt": {
+                "trace_id": original["trace_id"], "ts": 10, "outcome": {"test_pass": True, "source": "ci"},
+            }}) + "\n")
+            self.assertEqual(summarize_tokenomics(root=home)["by_tier"], {"negative": 1})
+
 
 class ReceiptCli(unittest.TestCase):
     def test_cli_emit_join_summary(self):

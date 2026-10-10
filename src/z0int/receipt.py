@@ -444,8 +444,8 @@ def _iter_jsonl(path: Path):
                 continue
 
 
-def _merge_receipt_revision(previous: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
-    """Keep outcome and usage revisions independent of replayed decision snapshots."""
+def _merge_receipt_revisions(revisions: list[dict[str, Any]], decision_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Select verdict and usage from original evidence, not a replayed envelope."""
     def timestamp(row: dict[str, Any], field: str, default: float) -> float:
         value = row.get(field, row.get("ts"))
         return float(value) if type(value) in (int, float) and math.isfinite(value) else default
@@ -459,10 +459,10 @@ def _merge_receipt_revision(previous: dict[str, Any], incoming: dict[str, Any]) 
         negative = tier == "negative"
         return strength, timestamp(row, "outcome_ts", math.inf if negative else -math.inf), negative
 
-    merged = {**previous, **incoming}
-    if isinstance(previous.get("extra"), dict) and isinstance(incoming.get("extra"), dict):
-        merged["extra"] = {**previous["extra"], **incoming["extra"]}
-    outcomes = [row for row in (previous, incoming) if row.get("outcome") or row.get("outcome_tier")]
+    merged: dict[str, Any] = {}
+    for row in decision_rows:
+        merged.update(row)
+    outcomes = [row for row in revisions if row.get("outcome") or row.get("outcome_tier")]
     if outcomes:
         chosen = max(reversed(outcomes), key=outcome_key)
         for field in ("outcome", "outcome_tier", "outcome_ts"):
@@ -474,8 +474,12 @@ def _merge_receipt_revision(previous: dict[str, Any], incoming: dict[str, Any]) 
         "input_tokens", "output_tokens", "cached_input_tokens", "measured_frontier_tokens",
         "measurement_state", "state_reason", "actual_tokens_saved", "latency_ms", "close_ts", "close_source",
     )
-    measurements = [row for row in (previous, incoming)
+    measurements = [row for row in revisions
                     if row.get("close_ts") is not None or any(row.get(k) is not None for k in usage_fields[:4])]
+    # Unclosed canonical snapshots retain their existing omission semantics.
+    # A measured close is independently revisioned and cannot be erased by one.
+    if decision_rows is not revisions and not any(row.get("close_ts") is not None for row in measurements):
+        measurements = decision_rows[-1:]
     if measurements:
         chosen = max(reversed(measurements), key=lambda row: (
             row.get("close_ts") is not None, timestamp(row, "close_ts", -math.inf),
@@ -489,10 +493,12 @@ def _merge_receipt_revision(previous: dict[str, Any], incoming: dict[str, Any]) 
 
 def _receipt_views(*, root: Path | None, limit: int | None = None, include_raw: bool = False) -> list[dict[str, Any]]:
     state_root = paths.home() if root is None else root
+    primary = receipts_path(root)
     candidates = ([state_root / "stream" / "raw.jsonl"] if include_raw else []) + [
-        state_root / "stream" / "bridge.jsonl", receipts_path(root),
+        state_root / "stream" / "bridge.jsonl", primary,
     ]
-    traces: dict[str, dict[str, Any]] = {}
+    traces: dict[str, list[dict[str, Any]]] = {}
+    canonical: dict[str, list[dict[str, Any]]] = {}
     unidentified: list[dict[str, Any]] = []
     for path in candidates:
         history = list(_iter_jsonl(path) or [])
@@ -500,16 +506,21 @@ def _receipt_views(*, root: Path | None, limit: int | None = None, include_raw: 
             if not isinstance(row, dict):
                 continue
             nested = row.get("receipt")
-            rec = {**nested, **{k: v for k, v in row.items() if k != "receipt"}} if isinstance(nested, dict) else row
+            rec = {**{k: v for k, v in row.items() if k != "receipt"}, **nested} if isinstance(nested, dict) else dict(row)
+            if isinstance(nested, dict) and row.get("outcome"):
+                rec["outcome"] = row["outcome"]
+                rec["outcome_tier"] = row.get("outcome_tier")
+                rec["outcome_ts"] = row.get("outcome_ts", row.get("ts"))
             trace = row.get("trace_id") or rec.get("trace_id")
-            if not trace and isinstance(nested, dict):
-                trace = nested.get("trace_id")
             if isinstance(trace, str) and trace:
                 rec["trace_id"] = trace
-                traces[trace] = _merge_receipt_revision(traces.get(trace, {}), rec)
+                traces.setdefault(trace, []).append(rec)
+                if path == primary:
+                    canonical.setdefault(trace, []).append(rec)
             else:
                 unidentified.append(rec)
-    return [*traces.values(), *unidentified]
+    return [_merge_receipt_revisions(rows, canonical.get(trace, rows))
+            for trace, rows in traces.items()] + unidentified
 
 
 def find_receipt(trace_id: str, *, root: Path | None = None) -> dict[str, Any] | None:
