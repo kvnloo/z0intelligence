@@ -369,6 +369,8 @@ def _compile_subsystem_discovery(task_text: str, project_root: Any) -> dict[str,
         named = task_stems & (
             _ownership_stems(subsystem["id"].replace("-", " ")) | _ownership_stems(subsystem.get("name"))
         )
+        if len(named) < 2:
+            continue
         described = (task_stems & _ownership_stems(subsystem.get("summary"))) - named
         scored.append((
             2 * len(named) + len(described), len(named), subsystem["id"], sorted(named | described),

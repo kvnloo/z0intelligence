@@ -621,6 +621,36 @@ class BridgeRepoReuseTests(unittest.TestCase):
         self.assertTrue(self.model_input(out)["ok"])
         self.assertTrue(self.check(out)["valid"])
 
+    def test_named_subsystem_is_not_blocked_by_incidental_summary_matches(self):
+        self.declare_subsystems()
+        manifest = self.repo / "zer0.repo.yaml"
+        manifest.write_text(manifest.read_text().replace(
+            "Totals provider cost and token accounting.",
+            "Preserves original evidence when verified references are blank.",
+        ))
+        out, search = self.first_turn(
+            "Fix row normalization when verified references are blank; preserve original evidence."
+        )
+        self.assertEqual(out["decision"]["mode"], "EXTEND", out["packet"]["unresolved_gaps"])
+        self.assertFalse(out["decision"]["authorizes_action"])
+        self.assertEqual(
+            [candidate["candidate_id"] for candidate in out["packet"]["reuse_candidates"]],
+            ["file:upstream/records.py"],
+        )
+        search.assert_not_called()
+
+    def test_one_named_term_cannot_veto_a_clearly_named_subsystem(self):
+        self.declare_subsystems()
+        out, search = self.first_turn(
+            "Fix row normalization while preserving ledger token accounting."
+        )
+        self.assertEqual(out["decision"]["mode"], "EXTEND", out["packet"]["unresolved_gaps"])
+        self.assertEqual(
+            [candidate["candidate_id"] for candidate in out["packet"]["reuse_candidates"]],
+            ["file:upstream/records.py"],
+        )
+        search.assert_not_called()
+
     def test_first_turn_stays_observe_when_no_single_subsystem_owns_the_task(self):
         self.declare_subsystems()
         for query in (
