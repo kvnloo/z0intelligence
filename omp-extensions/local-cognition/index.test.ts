@@ -417,3 +417,21 @@ test("the status command reports coverage by outcome", async () => {
 	await pi.commands.get("z0int-cognition-status")?.handler("", ctx);
 	expect(ctx.notifications[0].message).toContain('observed 1 tool calls, 1 settled {"unavailable":1}');
 });
+
+test("a result that arrives after the session changed is not written into the new session", async () => {
+	const { pi, entries } = observingPi();
+	let current = "session-a";
+	const ctx = fakeCtx({ sessionManager: { getSessionId: () => current } });
+	respondWith(() => new Promise(resolve => setTimeout(() => resolve({ ok: true, legal_ids: ["read"], shadow: [] }), 40)));
+	localCognition(pi as never);
+	pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "late", toolName: "read", input: {} }, ctx);
+	current = "session-b"; // the user switched sessions before the worker answered
+	await flush(120);
+	expect(entries).toHaveLength(0);
+	expect(statusRing.at(-1)).toMatchObject({ outcome: "compiler_only", session_id: "session-a", recorded: "session_changed" });
+	// The same observation in an unchanged session is recorded.
+	pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "on-time", toolName: "read", input: {} }, ctx);
+	await flush(120);
+	expect(entries.map(entry => [entry.data.session_id, entry.data.tool_call_id])).toEqual([["session-b", "on-time"]]);
+	expect(statusRing.at(-1)?.recorded).toBe("session_entry");
+});

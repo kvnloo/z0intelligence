@@ -97,6 +97,7 @@ live("every tool call in a real OMP session yields one correlated observation fr
 			})),
 			receipt_trace_ids: receiptRows.map(row => row.trace_id),
 			receipt_session_ids: [...new Set(receiptRows.map(row => row.session_id))],
+			receipt_tool_call_ids: receiptRows.map(row => row.tool_call_id),
 			model_facing_custom_messages: entries.filter(entry => entry.type === "custom_message").length,
 		};
 		if (process.env.Z0INT_COGNITION_LIVE_REPORT) {
@@ -122,6 +123,8 @@ live("every tool call in a real OMP session yields one correlated observation fr
 		// Linkage: each session entry's trace is the worker's receipt for the same session.
 		expect(observations.map(row => row.trace_id).sort()).toEqual([...report.receipt_trace_ids].sort());
 		expect(report.receipt_session_ids).toEqual([manager.getSessionId()]);
+		// The worker's own receipt names the native tool call, so it joins without the session entry.
+		expect([...report.receipt_tool_call_ids].sort()).toEqual([...toolCallIds].sort());
 		// Passive: nothing was added to what the parent model reads.
 		expect(report.model_facing_custom_messages).toBe(0);
 		expect(runtimeErrors).toEqual([]);

@@ -372,3 +372,23 @@ def test_shadow_lane_never_writes_outside_z0int_home(tmp_path, monkeypatch):
     inside = {p.resolve() for p in home.rglob("*") if p.is_file()}
     everything = {p.resolve() for p in tmp_path.rglob("*") if p.is_file()}
     assert everything - inside == set()
+
+
+def test_receipt_carries_the_harness_tool_call_identity(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    payload = _payload(shadows=["m1"])
+    payload["facts"] = {"tool_name": "read", "tool_call_id": "call-42"}
+
+    result = run_shadow(payload, registry=_FakeRegistry(), write=True)
+
+    receipt = json.loads(Path(result["receipts_path"]).read_text().splitlines()[0])
+    # A random trace id alone cannot be joined back to the native session's tool call.
+    assert receipt["tool_call_id"] == "call-42"
+    assert receipt["tool_name"] == "read"
+    assert receipt["session_id"] == "session-1"
+
+    without = _payload(shadows=["m1"])
+    without.pop("facts", None)
+    result = run_shadow(without, registry=_FakeRegistry(), write=True)
+    receipt = json.loads(Path(result["receipts_path"]).read_text().splitlines()[-1])
+    assert receipt["tool_call_id"] is None

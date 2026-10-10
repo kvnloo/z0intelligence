@@ -107,9 +107,18 @@ type StatusRow = {
 	tool?: string;
 	trace_id?: unknown;
 	error?: string;
+	session_id?: string | null;
+	/** Where the observation ended up: in the session, or nowhere because the session had changed. */
+	recorded?: "session_entry" | "session_changed" | "no_session_api";
 };
 
-type ObservationIdentity = { sessionId: string | null; toolCallId: string; tool: string };
+type ObservationIdentity = {
+	sessionId: string | null;
+	toolCallId: string;
+	tool: string;
+	/** Reads the session OMP is in now, so a late result is not written into a different one. */
+	currentSessionId?: () => string | null;
+};
 
 // --- settings / env -----------------------------------------------------
 
@@ -474,10 +483,14 @@ function appendObservation(
 	classified: ShadowClassification,
 	row: StatusRow,
 	elapsedMs: number,
-): void {
+): StatusRow["recorded"] {
 	try {
 		const append = pi?.appendEntry;
-		if (typeof append !== "function") return;
+		if (typeof append !== "function") return "no_session_api";
+		// pi.appendEntry writes to whichever session is current. If the user
+		// switched or restarted while the worker was answering, this observation
+		// belongs to the old session and must not appear in the new one.
+		if (identity.currentSessionId && identity.currentSessionId() !== identity.sessionId) return "session_changed";
 		const transport = getTransport();
 		(append as (customType: string, data: Jsonish) => void).call(pi, ENTRY_TYPE, {
 			schema: "z0int.cognition_shadow_observation.v1",
@@ -496,8 +509,10 @@ function appendObservation(
 				? { kind: transport.kind ?? null, generation: transport.generation ?? null, build_id: transport.buildId ?? null }
 				: null,
 		});
+		return "session_entry";
 	} catch {
 		/* observe-only: a session that cannot record must not affect the tool call */
+		return "no_session_api";
 	}
 }
 
@@ -521,9 +536,9 @@ export async function sendShadow(
 	};
 	const base: StatusRow = { ts: startedMs / 1000, ok: false, trace_id: payload.trace_id, tool };
 	const settle = (row: StatusRow, classified: ShadowClassification): StatusRow => {
-		const settled = { ...row, outcome: classified.outcome };
+		const settled: StatusRow = { ...row, outcome: classified.outcome, session_id: who.sessionId };
+		settled.recorded = appendObservation(pi, who, payload, classified, settled, Date.now() - startedMs);
 		recordStatus(settled);
-		appendObservation(pi, who, payload, classified, settled, Date.now() - startedMs);
 		return settled;
 	};
 	const answered = (response: unknown, via: string): StatusRow => {
@@ -667,6 +682,7 @@ export default function localCognition(pi: ExtensionAPI): void {
 				sessionId,
 				toolCallId: typeof toolCallId === "string" ? toolCallId : "",
 				tool: observed,
+				currentSessionId: () => liveSessionId(ctx),
 			});
 		} catch {
 			/* observe-only: never surface, never block */
