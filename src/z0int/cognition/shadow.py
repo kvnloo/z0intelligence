@@ -263,31 +263,31 @@ def build_shadow_plan(
 MAX_SERVER_TIMEOUT_S = 3600.0
 
 
-def _bounded_s(value: Any, divisor: float) -> float | None:
-    """A usable wait in seconds, or None when the value is not a positive number."""
-    try:
-        seconds = float(value) / divisor
-    except (TypeError, ValueError, OverflowError):
-        # An integer too large for a float is still a request to wait very long
-        return MAX_SERVER_TIMEOUT_S if isinstance(value, int) and value > 0 else None
-    if seconds != seconds or seconds <= 0:
-        return None
+def _capped_s(seconds: float) -> float:
+    """The wait actually used: at least 0.1 s (also for NaN), at most the cap."""
     return min(MAX_SERVER_TIMEOUT_S, max(0.1, seconds))
 
 
 def _timeout_s(payload: Mapping[str, Any], timeout_s: float | None) -> float:
+    # Each channel resolves exactly as before the cap existed; only a value too
+    # large for the platform's timers now resolves to the cap instead of raising.
     if timeout_s is not None:
-        return _bounded_s(timeout_s, 1.0) or 0.1
+        try:
+            return _capped_s(float(timeout_s))
+        except OverflowError:
+            return MAX_SERVER_TIMEOUT_S if timeout_s > 0 else 0.1
     raw = payload.get("timeout_ms")
-    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
-        bounded = _bounded_s(raw, 1000.0)
-        if bounded is not None:
-            return bounded
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw > 0:
+        try:
+            return _capped_s(float(raw) / 1000.0)
+        except OverflowError:
+            return MAX_SERVER_TIMEOUT_S
     env = os.environ.get("Z0INT_COGNITION_SHADOW_SERVER_TIMEOUT_MS")
     if env:
-        bounded = _bounded_s(env, 1000.0)
-        if bounded is not None:
-            return bounded
+        try:
+            return _capped_s(float(env) / 1000.0)
+        except ValueError:
+            pass
     return DEFAULT_SERVER_TIMEOUT_MS / 1000.0
 
 

@@ -575,3 +575,29 @@ def test_an_absurd_budget_from_the_environment_is_capped_too(tmp_path, monkeypat
     row = run_shadow(_payload(shadows=["m1"]), registry=registry, write=False)["shadow"][0]
 
     assert row["selected_action"] == "read"
+
+
+@pytest.mark.parametrize("value", ["0", "-0.0", "-1", "-5", "nan", "-inf", "5e-324"])
+def test_a_non_positive_environment_budget_still_means_the_shortest_wait(monkeypatch, value):
+    from z0int.cognition import shadow
+
+    monkeypatch.setenv("Z0INT_COGNITION_SHADOW_SERVER_TIMEOUT_MS", value)
+
+    assert shadow._timeout_s({}, None) == 0.1
+
+
+def test_the_cap_changes_no_ordinary_budget(monkeypatch):
+    from z0int.cognition import shadow
+
+    monkeypatch.delenv("Z0INT_COGNITION_SHADOW_SERVER_TIMEOUT_MS", raising=False)
+    default = shadow.DEFAULT_SERVER_TIMEOUT_MS / 1000.0
+    for raw in (0, -5, float("nan"), True, "150", None):
+        assert shadow._timeout_s({"timeout_ms": raw}, None) == default
+    assert shadow._timeout_s({"timeout_ms": 5e-324}, None) == 0.1
+    assert shadow._timeout_s({"timeout_ms": 1}, None) == 0.1
+    assert shadow._timeout_s({"timeout_ms": 150}, None) == 0.15
+    assert shadow._timeout_s({}, 0) == 0.1
+    assert shadow._timeout_s({}, 2) == 2.0
+    with pytest.raises(ValueError):
+        shadow._timeout_s({}, "abc")
+    assert shadow._timeout_s({"timeout_ms": 7_200_000}, None) == shadow.MAX_SERVER_TIMEOUT_S
