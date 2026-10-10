@@ -1,0 +1,915 @@
+diff --git a/packages/agent/src/agent.ts b/packages/agent/src/agent.ts
+index 8f80631..7853656 100644
+--- a/packages/agent/src/agent.ts
++++ b/packages/agent/src/agent.ts
+@@ -185,6 +185,8 @@ export interface AgentOptions {
+ 	 * Inspect or replace provider payloads before they are sent.
+ 	 */
+ 	onPayload?: SimpleStreamOptions["onPayload"];
++	/** Read-only observer for supported providers' final serialized request bodies. */
++	onPayloadFinalized?: SimpleStreamOptions["onPayloadFinalized"];
+ 	/**
+ 	 * Inspect provider response metadata after headers arrive and before streaming body consumption.
+ 	 */
+@@ -490,6 +492,7 @@ export class Agent {
+ 	#softToolRequirementState: NonNullable<AgentLoopConfig["softToolRequirementState"]> = { escalations: 0 };
+ 	#deferredToolChoice?: ToolChoice;
+ 	#onPayload?: SimpleStreamOptions["onPayload"];
++	#onPayloadFinalized?: SimpleStreamOptions["onPayloadFinalized"];
+ 	#onResponse?: SimpleStreamOptions["onResponse"];
+ 	#onSseEvent?: SimpleStreamOptions["onSseEvent"];
+ 	#onAssistantMessageEvent?: (message: AssistantMessage, event: AssistantMessageEvent) => void;
+@@ -569,6 +572,7 @@ export class Agent {
+ 		this.#maxRetryDelayMs = opts.maxRetryDelayMs;
+ 		this.getApiKey = opts.getApiKey;
+ 		this.#onPayload = opts.onPayload;
++		this.#onPayloadFinalized = opts.onPayloadFinalized;
+ 		this.#onResponse = opts.onResponse;
+ 		this.#onSseEvent = opts.onSseEvent;
+ 		this.#getToolContext = opts.getToolContext;
+@@ -1838,6 +1842,7 @@ export class Agent {
+ 			sentToolDefinitions: this.#sentToolDefinitions,
+ 			transformContext: this.#transformContext,
+ 			onPayload: this.#onPayload,
++			onPayloadFinalized: this.#onPayloadFinalized,
+ 			onResponse: this.#onResponse,
+ 			onSseEvent: this.#onSseEvent,
+ 			getApiKey: this.getApiKey,
+diff --git a/packages/agent/test/provider-payload-finalized.test.ts b/packages/agent/test/provider-payload-finalized.test.ts
+new file mode 100644
+index 0000000..441c46e
+--- /dev/null
++++ b/packages/agent/test/provider-payload-finalized.test.ts
+@@ -0,0 +1,26 @@
++import { describe, expect, it } from "bun:test";
++import { Agent } from "@oh-my-pi/pi-agent-core";
++import type { StreamFn } from "@oh-my-pi/pi-agent-core";
++import type { SimpleStreamOptions } from "@oh-my-pi/pi-ai";
++import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
++
++describe("Agent final provider payload callback", () => {
++	it("forwards the configured observer in main-turn stream options", async () => {
++		const mock = createMockModel({ responses: [{ content: ["done"] }] });
++		const finalized: NonNullable<SimpleStreamOptions["onPayloadFinalized"]> = () => {};
++		let captured: SimpleStreamOptions["onPayloadFinalized"];
++		const streamFn: StreamFn = (model, context, options) => {
++			captured = options?.onPayloadFinalized;
++			return mock.stream(model, context, options);
++		};
++		const agent = new Agent({
++			initialState: { model: mock.model, messages: [] },
++			streamFn,
++			onPayloadFinalized: finalized,
++		});
++
++		await agent.prompt("exercise the configured observer");
++
++		expect(captured).toBe(finalized);
++	});
++});
+diff --git a/packages/ai/src/providers/ollama.ts b/packages/ai/src/providers/ollama.ts
+index 37d1b46..4b04592 100644
+--- a/packages/ai/src/providers/ollama.ts
++++ b/packages/ai/src/providers/ollama.ts
+@@ -588,6 +588,8 @@ const streamOllamaOnce = (
+ 			const watchdog = armPreResponseTimeout(options.signal, firstEventTimeoutMs);
+ 			let response: Response;
+ 			try {
++				const serializedBody = JSON.stringify(body);
++				await options.onPayloadFinalized?.(serializedBody, model, watchdog.signal);
+ 				response = await fetchWithRetry(`${baseUrl}/api/chat`, {
+ 					method: "POST",
+ 					headers: {
+@@ -596,7 +598,7 @@ const streamOllamaOnce = (
+ 						Authorization: `Bearer ${apiKey}`,
+ 						"Content-Type": "application/json",
+ 					},
+-					body: JSON.stringify(body),
++					body: serializedBody,
+ 					signal: watchdog.signal,
+ 					defaultDelayMs: OLLAMA_RETRY_DELAYS_MS,
+ 					shouldRetryResponse: shouldRetryOllamaResponse,
+diff --git a/packages/ai/src/providers/openai-completions.ts b/packages/ai/src/providers/openai-completions.ts
+index 7b4e060..972e893 100644
+--- a/packages/ai/src/providers/openai-completions.ts
++++ b/packages/ai/src/providers/openai-completions.ts
+@@ -934,6 +934,8 @@ const streamOpenAICompletionsOnce = (
+ 							copilotCacheKey,
+ 							copilotCacheSnapshot,
+ 						),
++						onPayloadFinalized: serializedBody =>
++							options?.onPayloadFinalized?.(serializedBody, model, requestSignal),
+ 						// Transient 408/429/5xx get Retry-After-aware transport retries.
+ 						// The first-event watchdog above aborts `requestSignal`, which
+ 						// bounds every attempt and backoff sleep — retries cannot
+diff --git a/packages/ai/src/stream.ts b/packages/ai/src/stream.ts
+index d61db07..76821f5 100644
+--- a/packages/ai/src/stream.ts
++++ b/packages/ai/src/stream.ts
+@@ -1846,6 +1846,7 @@ function mapOptionsForApi<TApi extends Api>(
+ 		maxInFlightRequests: options?.maxInFlightRequests,
+ 		toolNamespacesInfo: options?.toolNamespacesInfo,
+ 		onPayload: options?.onPayload,
++		onPayloadFinalized: options?.onPayloadFinalized,
+ 		onResponse: options?.onResponse,
+ 		onSseEvent: options?.onSseEvent,
+ 		execHandlers: options?.execHandlers,
+diff --git a/packages/ai/src/types.ts b/packages/ai/src/types.ts
+index 303bc85..3f2822a 100644
+--- a/packages/ai/src/types.ts
++++ b/packages/ai/src/types.ts
+@@ -632,6 +632,18 @@ export interface StreamOptions {
+ 		model?: Model<Api>,
+ 		signal?: AbortSignal,
+ 	) => unknown | undefined | Promise<unknown | undefined>;
++	/**
++	 * Read-only observer for providers that expose their final serialized request body.
++	 * Supported implementations call this after `onPayload` replacement and provider
++	 * normalization, immediately before transport, with the exact string passed as the
++	 * HTTP body. Its return value is ignored; a rejection aborts the request before send.
++	 * Providers without an audited final-body handoff do not call this callback.
++	 */
++	onPayloadFinalized?: (
++		serializedBody: string,
++		model?: Model<Api>,
++		signal?: AbortSignal,
++	) => void | Promise<void>;
+ 	/**
+ 	 * Optional callback for provider response metadata after headers are received.
+ 	 */
+diff --git a/packages/ai/src/utils/openai-http.ts b/packages/ai/src/utils/openai-http.ts
+index 8d9b0c1..ef4578a 100644
+--- a/packages/ai/src/utils/openai-http.ts
++++ b/packages/ai/src/utils/openai-http.ts
+@@ -68,6 +68,8 @@ export interface OpenAIStreamRequestInit {
+ 	body: unknown;
+ 	signal: AbortSignal;
+ 	fetch?: FetchImpl;
++	/** Read-only observer invoked with the exact JSON string passed to fetch. */
++	onPayloadFinalized?: (serializedBody: string) => void | Promise<void>;
+ 	/** Optional caller-specific gate composed with shared transport retry exclusions. */
+ 	shouldRetryResponse?: (response: Response, bodyText: string) => boolean | Promise<boolean>;
+ 	/**
+@@ -96,10 +98,13 @@ export interface OpenAIStreamHandle<TEvent> {
+  * watchdog timers and abort-reason bookkeeping.
+  */
+ export async function postOpenAIStream<TEvent>(init: OpenAIStreamRequestInit): Promise<OpenAIStreamHandle<TEvent>> {
++	const serializedBody = JSON.stringify(init.body);
++	if (serializedBody === undefined) throw new TypeError("OpenAI stream request body did not serialize to JSON");
++	await init.onPayloadFinalized?.(serializedBody);
+ 	const response = await fetchWithRetry(init.url, {
+ 		method: "POST",
+ 		headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...init.headers },
+-		body: JSON.stringify(init.body),
++		body: serializedBody,
+ 		signal: init.signal,
+ 		fetch: init.fetch,
+ 		maxAttempts: DEFAULT_MAX_ATTEMPTS,
+diff --git a/packages/ai/test/provider-payload-finalized.test.ts b/packages/ai/test/provider-payload-finalized.test.ts
+new file mode 100644
+index 0000000..b568125
+--- /dev/null
++++ b/packages/ai/test/provider-payload-finalized.test.ts
+@@ -0,0 +1,201 @@
++import { describe, expect, it } from "bun:test";
++import { streamOllama } from "@oh-my-pi/pi-ai/providers/ollama";
++import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
++import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
++import type { Context, FetchImpl, Model } from "@oh-my-pi/pi-ai/types";
++import { buildModel } from "@oh-my-pi/pi-catalog/build";
++import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
++
++const ollamaModel: Model<"ollama-chat"> = buildModel({
++	id: "qwen3.6-coder:27b",
++	name: "Qwen 3.6 Coder 27B",
++	api: "ollama-chat",
++	provider: "ollama",
++	baseUrl: "http://127.0.0.1:11434",
++	reasoning: false,
++	input: ["text"],
++	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
++	contextWindow: 131_072,
++	maxTokens: 8192,
++});
++
++const bundledOpenAIModel = getBundledModel<"openai-completions">("openai", "gpt-4o-mini");
++if (!bundledOpenAIModel) throw new Error("Expected bundled OpenAI completions model");
++const openAIModel = {
++	...bundledOpenAIModel,
++	api: "openai-completions",
++} satisfies Model<"openai-completions">;
++const openAIResponsesModel: Model<"openai-responses"> = buildModel({
++	id: "gpt-4o-mini",
++	name: "GPT-4o mini",
++	api: "openai-responses",
++	provider: "openai",
++	baseUrl: "https://api.openai.com/v1",
++	reasoning: false,
++	input: ["text"],
++	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
++	contextWindow: 128_000,
++	maxTokens: 16_384,
++});
++
++function objectValue(value: unknown): value is Record<string, unknown> {
++	return value !== null && typeof value === "object" && !Array.isArray(value);
++}
++
++const context: Context = {
++	messages: [{ role: "user", content: "Use the prepared context", timestamp: 1 }],
++};
++
++function openAIResponse(): Response {
++	const events = [
++		{
++			id: "finalized-test",
++			object: "chat.completion.chunk",
++			created: 1,
++			model: openAIModel.id,
++			choices: [{ index: 0, delta: { content: "ok" } }],
++		},
++		{
++			id: "finalized-test",
++			object: "chat.completion.chunk",
++			created: 1,
++			model: openAIModel.id,
++			choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
++		},
++	];
++	const body = `${events.map(event => `data: ${JSON.stringify(event)}`).join("\n\n")}\n\ndata: [DONE]\n\n`;
++	return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
++}
++
++describe("final provider payload observer", () => {
++	it("observes the exact Ollama JSON body after replacement", async () => {
++		let observed: string | undefined;
++		let sent: string | undefined;
++		const fetchMock = async (_input: string | URL | Request, init?: RequestInit): Promise<Response> => {
++			sent = typeof init?.body === "string" ? init.body : undefined;
++			return new Response('{"message":{"content":"ok"},"done":true,"done_reason":"stop"}\n', {
++				status: 200,
++			});
++		};
++
++		const result = await streamOllama(ollamaModel, context, {
++			apiKey: "test-key",
++			fetch: fetchMock,
++			onPayload: payload => objectValue(payload) ? { ...payload, options: { temperature: 0.25 } } : payload,
++			onPayloadFinalized: serializedBody => {
++				observed = serializedBody;
++			},
++		}).result();
++
++		expect(result.stopReason).toBe("stop");
++		expect(observed).toBeDefined();
++		expect(observed).toBe(sent);
++		expect(JSON.parse(sent ?? "null")).toMatchObject({ options: { temperature: 0.25 } });
++	}, 10_000);
++
++	it("aborts an Ollama send when final observation fails", async () => {
++		let sends = 0;
++		const result = await streamOllama(ollamaModel, context, {
++			apiKey: "test-key",
++			fetch: async () => {
++				sends += 1;
++				return new Response('{"message":{"content":"unexpected"},"done":true}\n');
++			},
++			onPayloadFinalized: () => {
++				throw new Error("observer failed closed");
++			},
++		}).result();
++
++		expect(sends).toBe(0);
++		expect(result.stopReason).toBe("error");
++		expect(result.errorMessage).toContain("observer failed closed");
++	}, 10_000);
++
++	it("observes the exact OpenAI Completions JSON body and aborts on observer failure", async () => {
++		let observed: string | undefined;
++		let sent: string | undefined;
++		const fetchMock: FetchImpl = async (_input, init) => {
++			sent = typeof init?.body === "string" ? init.body : undefined;
++			return openAIResponse();
++		};
++
++		const result = await streamOpenAICompletions(openAIModel, context, {
++			apiKey: "test-key",
++			fetch: fetchMock,
++			onPayload: payload => objectValue(payload) ? { ...payload, temperature: 0.25 } : payload,
++			onPayloadFinalized: serializedBody => {
++				observed = serializedBody;
++			},
++		}).result();
++
++		expect(result.stopReason).toBe("stop");
++		expect(observed).toBeDefined();
++		expect(observed).toBe(sent);
++		expect(JSON.parse(sent ?? "null")).toMatchObject({ temperature: 0.25 });
++
++		let sends = 0;
++		const failed = await streamOpenAICompletions(openAIModel, context, {
++			apiKey: "test-key",
++			fetch: async () => {
++				sends += 1;
++				return openAIResponse();
++			},
++			onPayloadFinalized: () => {
++				throw new Error("observer failed closed");
++			},
++		}).result();
++		expect(sends).toBe(0);
++		expect(failed.stopReason).toBe("error");
++		expect(failed.errorMessage).toContain("observer failed closed");
++	}, 10_000);
++
++	it("does not claim final-body observation for OpenAI Responses", async () => {
++		let observations = 0;
++		let sent: string | undefined;
++		const events = [
++			{
++				type: "response.output_item.added",
++				item: { type: "message", id: "msg-finalized", role: "assistant", status: "in_progress", content: [] },
++			},
++			{ type: "response.content_part.added", part: { type: "output_text", text: "" } },
++			{ type: "response.output_text.delta", delta: "ok" },
++			{
++				type: "response.output_item.done",
++				item: {
++					type: "message",
++					id: "msg-finalized",
++					role: "assistant",
++					status: "completed",
++					content: [{ type: "output_text", text: "ok" }],
++				},
++			},
++			{
++				type: "response.completed",
++				response: {
++					status: "completed",
++					usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
++				},
++			},
++		];
++		const response = new Response(
++			`${events.map(event => `data: ${JSON.stringify(event)}`).join("\n\n")}\n\n`,
++			{ status: 200, headers: { "content-type": "text/event-stream" } },
++		);
++		const fetchMock: FetchImpl = async (_input, init) => {
++			sent = typeof init?.body === "string" ? init.body : undefined;
++			return response;
++		};
++
++		const result = await streamOpenAIResponses(openAIResponsesModel, context, {
++			apiKey: "test-key",
++			fetch: fetchMock,
++			onPayloadFinalized: () => {
++				observations += 1;
++			},
++		}).result();
++
++		expect(sent).toBeDefined();
++		expect(observations).toBe(0);
++		expect(result.stopReason).toBe("stop");
++	}, 10_000);
++});
+diff --git a/packages/coding-agent/src/extensibility/extensions/runner.ts b/packages/coding-agent/src/extensibility/extensions/runner.ts
+index a667b81..4487eec 100644
+--- a/packages/coding-agent/src/extensibility/extensions/runner.ts
++++ b/packages/coding-agent/src/extensibility/extensions/runner.ts
+@@ -52,6 +52,7 @@ import type {
+ 	BeforeAgentStartEventResult,
+ 	BeforeProviderRequestEvent,
+ 	BeforeProviderRequestEventResult,
++	ProviderPayloadFinalizedEvent,
+ 	BeforeSubagentSpawnEvent,
+ 	BeforeSubagentSpawnEventResult,
+ 	CompactOptions,
+@@ -389,6 +390,7 @@ type RunnerEmitEvent = Exclude<
+ 	| ContextEvent
+ 	| CacheWarmingDecisionEvent
+ 	| BeforeProviderRequestEvent
++	| ProviderPayloadFinalizedEvent
+ 	| AfterProviderResponseEvent
+ 	| BeforeAgentStartEvent
+ 	| ResourcesDiscoverEvent
+@@ -2072,6 +2074,45 @@ export class ExtensionRunner {
+ 		return currentPayload;
+ 	}
+ 
++	/** Observe a supported provider's exact serialized body before transport. */
++	async emitProviderPayloadFinalized(
++		serializedBody: string,
++		model: Model,
++		signal?: AbortSignal,
++	): Promise<void> {
++		if (!this.hasHandlers("provider_payload_finalized")) return;
++		const ctx = this.createContext(model);
++		const event: ProviderPayloadFinalizedEvent = Object.freeze({
++			type: "provider_payload_finalized",
++			serializedBody,
++			provider: model.provider,
++			api: model.api,
++			model: model.id,
++		});
++		const throwOnFailure = (kind: "timeout" | "error", message: string): never => {
++			throw new Error(`provider_payload_finalized handler ${kind}: ${message}`);
++		};
++
++		for (const ext of this.extensions) {
++			const handlers = ext.handlers.get("provider_payload_finalized");
++			if (!handlers || handlers.length === 0) continue;
++
++			for (const handler of handlers) {
++				signal?.throwIfAborted();
++				await this.#runHandlerWithTimeout(
++					handler,
++					event,
++					ctx,
++					ext,
++					extensionHandlerTimeoutMs,
++					throwOnFailure,
++					signal,
++				);
++				signal?.throwIfAborted();
++			}
++		}
++	}
++
+ 	/** Runs response hooks with the model that produced that provider response. */
+ 	async emitAfterProviderResponse(
+ 		response: ProviderResponseMetadata,
+diff --git a/packages/coding-agent/src/extensibility/extensions/types.ts b/packages/coding-agent/src/extensibility/extensions/types.ts
+index 0253739..9581c53 100644
+--- a/packages/coding-agent/src/extensibility/extensions/types.ts
++++ b/packages/coding-agent/src/extensibility/extensions/types.ts
+@@ -836,6 +836,21 @@ export interface BeforeProviderRequestEvent {
+ 	payload: unknown;
+ }
+ 
++/**
++ * Read-only observation of a supported provider's final serialized request body.
++ * The SDK wires this for primary conversation-Agent requests; advisors, auto-learn
++ * capture, handoff, and ephemeral side requests do not inherit that observer.
++ * A raw stream can opt in explicitly. Handler return values are ignored. Observer
++ * failures prevent the provider send.
++ */
++export interface ProviderPayloadFinalizedEvent {
++	readonly type: "provider_payload_finalized";
++	readonly serializedBody: string;
++	readonly provider: string;
++	readonly api: Api;
++	readonly model: string;
++}
++
+ /** Fired after a provider response is received, before its stream body is consumed. */
+ export interface AfterProviderResponseEvent extends ProviderResponseMetadata {
+ 	type: "after_provider_response";
+@@ -1207,6 +1222,7 @@ export type ExtensionEvent =
+ 	| ContextEvent
+ 	| CacheWarmingDecisionEvent
+ 	| BeforeProviderRequestEvent
++	| ProviderPayloadFinalizedEvent
+ 	| AfterProviderResponseEvent
+ 	| BeforeAgentStartEvent
+ 	| BeforeSubagentSpawnEvent
+@@ -1408,6 +1424,7 @@ export interface ExtensionAPI {
+ 		event: "before_provider_request",
+ 		handler: ExtensionHandler<BeforeProviderRequestEvent, BeforeProviderRequestEventResult>,
+ 	): void;
++	on(event: "provider_payload_finalized", handler: ExtensionHandler<ProviderPayloadFinalizedEvent, void>): void;
+ 	on(event: "after_provider_response", handler: ExtensionHandler<AfterProviderResponseEvent>): void;
+ 	on(event: "before_agent_start", handler: ExtensionHandler<BeforeAgentStartEvent, BeforeAgentStartEventResult>): void;
+ 	on(
+diff --git a/packages/coding-agent/src/extensibility/extensions/wrapper.ts b/packages/coding-agent/src/extensibility/extensions/wrapper.ts
+index d8150f4..18d180d 100644
+--- a/packages/coding-agent/src/extensibility/extensions/wrapper.ts
++++ b/packages/coding-agent/src/extensibility/extensions/wrapper.ts
+@@ -211,6 +211,11 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
+ 		applyToolProxy(tool, this);
+ 	}
+ 
++	/** Rebind this native tool's extension events when another Agent owns the dispatch. */
++	forAgent(agent: ExtensionAgentIdentity): ExtensionToolWrapper<TParameters, TDetails> {
++		return new ExtensionToolWrapper(this.tool, this.runner, agent);
++	}
++
+ 	/**
+ 	 * Forward browser mode changes when available.
+ 	 */
+diff --git a/packages/coding-agent/src/sdk.ts b/packages/coding-agent/src/sdk.ts
+index 2181d8a..1db1588 100644
+--- a/packages/coding-agent/src/sdk.ts
++++ b/packages/coding-agent/src/sdk.ts
+@@ -1564,12 +1564,21 @@ export function createAutoLearnCaptureRunner(
+ 	options: AutoLearnCaptureRunnerOptions,
+ ): (content: string, signal?: AbortSignal) => Promise<void> {
+ 	return async (content, signal) => {
+-		const captureTools = options.captureTools();
+-		if (captureTools.length === 0 || signal?.aborted) return;
++		const availableCaptureTools = options.captureTools();
++		if (availableCaptureTools.length === 0 || signal?.aborted) return;
+ 		const captureModel = options.sourceAgent.state.model;
+ 		if (!captureModel) return;
+ 
+ 		const captureSessionId = options.createSessionId?.() ?? Bun.randomUUIDv7();
++		const captureAgentIdentity: ExtensionAgentIdentity = {
++			kind: "sub",
++			id: `autolearn-${captureSessionId}`,
++			name: "autolearn",
++			depth: 0,
++		};
++		const captureTools = availableCaptureTools.map(tool =>
++			tool instanceof ExtensionToolWrapper ? tool.forAgent(captureAgentIdentity) : tool,
++		);
+ 		const captureProviderSessionState = new Map<string, ProviderSessionState>();
+ 		const captureMessages = options.sourceAgent.state.messages.map((message): AgentMessage => {
+ 			if (message.role === "assistant") {
+@@ -4192,6 +4201,16 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+ 		const onPayload = async (payload: unknown, model?: Model, signal?: AbortSignal) => {
+ 			return await extensionRunner.emitBeforeProviderRequest(payload, model, signal);
+ 		};
++		// This observer belongs to the primary Agent's conversation requests only.
++		// Session side streams keep their own request-local callback (if any).
++		const onPayloadFinalized: SimpleStreamOptions["onPayloadFinalized"] = async (
++			serializedBody,
++			model,
++			signal,
++		) => {
++			if (!model) throw new Error("Final provider payload model identity is missing");
++			await extensionRunner.emitProviderPayloadFinalized(serializedBody, model, signal);
++		};
+ 		const onResponse: SimpleStreamOptions["onResponse"] = async (response, model, signal) => {
+ 			await extensionRunner.emitAfterProviderResponse(response, model, signal);
+ 		};
+@@ -4314,6 +4333,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
+ 			cwdResolver: () => sessionManager.getCwd(),
+ 			convertToLlm: convertToLlmFinal,
+ 			onPayload,
++			onPayloadFinalized,
+ 			onResponse,
+ 			sessionId: providerSessionId,
+ 			promptCacheKey: providerPromptCacheKey,
+diff --git a/packages/coding-agent/src/session/agent-session.ts b/packages/coding-agent/src/session/agent-session.ts
+index f8372ca..1548589 100644
+--- a/packages/coding-agent/src/session/agent-session.ts
++++ b/packages/coding-agent/src/session/agent-session.ts
+@@ -5105,10 +5105,12 @@ export class AgentSession implements SettingsScope {
+ 		if (!warmer) return;
+ 		const armMessages = this.messages;
+ 		const retentionSetting = cfgProvidersCacheRetention.get(this.settings);
+-		const warmingOptions = {
+-			...options,
+-			cacheRetention: options.cacheRetention ?? (retentionSetting === "auto" ? undefined : retentionSetting),
+-		};
++		const warmingOptions = { ...options };
++		// A warm replay is a background cache operation, not another primary
++		// conversation request. Do not retain or call its finalized-payload observer.
++		delete warmingOptions.onPayloadFinalized;
++		warmingOptions.cacheRetention =
++			options.cacheRetention ?? (retentionSetting === "auto" ? undefined : retentionSetting);
+ 		const armShape = this.#cacheWarmingShape(model);
+ 		warmer.start({ model, context, options: warmingOptions }, () => {
+ 			// The armed request must still be a prefix of the live messages by
+diff --git a/packages/coding-agent/src/session/session-provider-boundary.ts b/packages/coding-agent/src/session/session-provider-boundary.ts
+index a13c3e2..cbd6a40 100644
+--- a/packages/coding-agent/src/session/session-provider-boundary.ts
++++ b/packages/coding-agent/src/session/session-provider-boundary.ts
+@@ -248,6 +248,10 @@ export class SessionProviderBoundary {
+ 			};
+ 		}
+ 
++		// Final-payload observers are request-local. The primary Agent owns the
++		// conversation witness callback; side requests (handoff, ephemeral turns)
++		// must opt in on their own stream options instead of inheriting that witness.
++
+ 		if (sessionOnResponse) {
+ 			const requestOnResponse = options.onResponse;
+ 			preparedOptions.onResponse = async (response, model) => {
+diff --git a/packages/coding-agent/test/provider-payload-finalized.test.ts b/packages/coding-agent/test/provider-payload-finalized.test.ts
+new file mode 100644
+index 0000000..418c979
+--- /dev/null
++++ b/packages/coding-agent/test/provider-payload-finalized.test.ts
+@@ -0,0 +1,216 @@
++import { afterEach, beforeEach, describe, expect, it } from "bun:test";
++import * as fs from "node:fs";
++import * as path from "node:path";
++import type { Agent } from "@oh-my-pi/pi-agent-core";
++import { streamSimple, type Context, type FetchImpl, type Model } from "@oh-my-pi/pi-ai";
++import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
++import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
++import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
++import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
++import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
++import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
++import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
++import {
++	SessionProviderBoundary,
++	type SessionProviderBoundaryHost,
++} from "@oh-my-pi/pi-coding-agent/session/session-provider-boundary";
++import { TempDir } from "@oh-my-pi/pi-utils";
++
++const bundledModel = getBundledModel<"openai-completions">("openai", "gpt-4o-mini");
++if (!bundledModel) throw new Error("Expected bundled OpenAI completions model");
++const model = {
++	...bundledModel,
++	api: "openai-completions",
++} satisfies Model<"openai-completions">;
++
++const context: Context = {
++	messages: [{ role: "user", content: "Do the task", timestamp: 1 }],
++};
++
++function sseResponse(): Response {
++	const events = [
++		{
++			id: "provider-payload-test",
++			object: "chat.completion.chunk",
++			created: 1,
++			model: model.id,
++			choices: [{ index: 0, delta: { content: "ok" } }],
++		},
++		{
++			id: "provider-payload-test",
++			object: "chat.completion.chunk",
++			created: 1,
++			model: model.id,
++			choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
++		},
++	];
++	const body = `${events.map(event => `data: ${JSON.stringify(event)}`).join("\n\n")}\n\ndata: [DONE]\n\n`;
++	return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
++}
++
++describe("provider_payload_finalized production provider boundary", () => {
++	let tempDir: TempDir;
++	let extensionsDir: string;
++	let registry: ModelRegistry;
++	let authStorage: AuthStorage;
++
++	beforeEach(async () => {
++		tempDir = TempDir.createSync("@pi-provider-payload-");
++		extensionsDir = tempDir.join("extensions");
++		fs.mkdirSync(extensionsDir, { recursive: true });
++		authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
++		registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
++	});
++
++	afterEach(() => {
++		authStorage.close();
++		tempDir.removeSync();
++	});
++
++	async function makeRunner(): Promise<ExtensionRunner> {
++		const loaded = await loadExtensions(
++			fs.readdirSync(extensionsDir).sort().map(name => path.join(extensionsDir, name)),
++			tempDir.path(),
++		);
++		return new ExtensionRunner(loaded.extensions, loaded.runtime, tempDir.path(), SessionManager.inMemory(), registry);
++	}
++
++	function makeBoundary(runner: ExtensionRunner): SessionProviderBoundary {
++		const sessionManager = SessionManager.inMemory(tempDir.path());
++		const host: SessionProviderBoundaryHost = {
++			agent: { metadataForProvider: () => undefined } as unknown as Agent,
++			sessionManager,
++			settings: Settings.isolated(),
++			modelRegistry: registry,
++			model: () => model,
++			sessionId: () => "provider-payload-session",
++			localProtocolOptions: () => ({
++				getArtifactsDir: () => tempDir.path(),
++				getSessionId: () => "provider-payload-session",
++			}),
++			transformContext: messages => messages,
++			convertToLlm: () => context.messages,
++			onPayload: (payload, requestModel, signal) =>
++				runner.emitBeforeProviderRequest(payload, requestModel, signal),
++			onResponse: undefined,
++			onSseEvent: undefined,
++			obfuscator: () => undefined,
++		};
++		// A legacy session-wide observer must not be inherited by side requests.
++		Object.assign(host, {
++			onPayloadFinalized: (serializedBody: string, requestModel: Model, signal?: AbortSignal) =>
++				runner.emitProviderPayloadFinalized(serializedBody, requestModel, signal),
++		});
++		return new SessionProviderBoundary(host);
++	}
++
++	it("keeps the session observer off side requests but preserves an explicit raw callback", async () => {
++		const observerFile = path.join(tempDir.path(), "provider-payload.json");
++		const observerOrderFile = path.join(tempDir.path(), "observer-order.txt");
++		fs.writeFileSync(
++			path.join(extensionsDir, "01-add-context.ts"),
++			`export default function(pi) {
++				pi.on("before_provider_request", event => {
++					const payload = event.payload;
++					if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
++					const messages = Array.isArray(payload.messages) ? payload.messages : [];
++					return { ...payload, messages: [...messages, { role: "user", content: "must-not-survive" }] };
++				});
++			}`,
++		);
++		fs.writeFileSync(
++			path.join(extensionsDir, "02-strip-context.ts"),
++			`export default function(pi) {
++				pi.on("before_provider_request", event => {
++					const payload = event.payload;
++					if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
++					const messages = Array.isArray(payload.messages) ? payload.messages : [];
++					return {
++						...payload,
++						messages: messages.filter(message => {
++							if (!message || typeof message !== "object" || Array.isArray(message)) return true;
++							return message.content !== "must-not-survive";
++						}),
++					};
++				});
++			}`,
++		);
++		fs.writeFileSync(
++			path.join(extensionsDir, "03-observe-final.ts"),
++			`import * as fs from "node:fs";
++			export default function(pi) {
++				pi.on("provider_payload_finalized", event => {
++					if (!Object.isFrozen(event)) throw new Error("final provider payload event must be immutable");
++					if (
++						event.provider !== "openai" ||
++						event.api !== "openai-completions" ||
++						event.model !== ${JSON.stringify(model.id)}
++					) {
++						throw new Error("final provider model metadata mismatch");
++					}
++					fs.writeFileSync(${JSON.stringify(observerFile)}, event.serializedBody, "utf8");
++					fs.appendFileSync(${JSON.stringify(observerOrderFile)}, "session\\n", "utf8");
++					return "observer return must be ignored";
++				});
++			}`,
++		);
++
++		const runner = await makeRunner();
++		const boundary = makeBoundary(runner);
++		let sentBody: string | undefined;
++		let requestObserverBody: string | undefined;
++		const fetchMock: FetchImpl = async (_input, init) => {
++			sentBody = typeof init?.body === "string" ? init.body : undefined;
++			return sseResponse();
++		};
++		const preparedOptions = boundary.prepareSimpleStreamOptions({
++			apiKey: "test-key",
++			fetch: fetchMock,
++			onPayloadFinalized: serializedBody => {
++				requestObserverBody = serializedBody;
++				fs.appendFileSync(observerOrderFile, "request\n", "utf8");
++			},
++		}, "openai");
++		const result = await streamSimple(model, context, preparedOptions).result();
++
++		expect(result.stopReason).toBe("stop");
++		expect(sentBody).toBeDefined();
++		expect(fs.existsSync(observerFile)).toBe(false);
++		if (sentBody === undefined) throw new Error("Expected the provider fetch to receive a serialized body");
++		expect(requestObserverBody).toBe(sentBody);
++		expect(fs.readFileSync(observerOrderFile, "utf8").split("\n").filter(Boolean)).toEqual([
++			"request",
++		]);
++		expect(sentBody).not.toContain("must-not-survive");
++	}, 10_000);
++
++	it("fails closed when an observer handler errors before the actual provider fetch", async () => {
++		fs.writeFileSync(
++			path.join(extensionsDir, "observer-error.ts"),
++			`export default function(pi) {
++				pi.on("provider_payload_finalized", () => { throw new Error("final observer error"); });
++			}`,
++		);
++		const runner = await makeRunner();
++		const boundary = makeBoundary(runner);
++		let sends = 0;
++		const observedErrors: string[] = [];
++		runner.onError(error => observedErrors.push(error.event));
++		const preparedOptions = boundary.prepareSimpleStreamOptions({
++			apiKey: "test-key",
++			fetch: async () => {
++				sends += 1;
++				return sseResponse();
++			},
++			onPayloadFinalized: (serializedBody, requestModel, signal) =>
++				runner.emitProviderPayloadFinalized(serializedBody, requestModel ?? model, signal),
++		}, "openai");
++		const result = await streamSimple(model, context, preparedOptions).result();
++
++		expect(sends).toBe(0);
++		expect(result.stopReason).toBe("error");
++		expect(result.errorMessage).toContain("final observer error");
++		expect(observedErrors.length).toBeGreaterThan(0);
++		expect(observedErrors.every(event => event === "provider_payload_finalized")).toBe(true);
++	}, 10_000);
++});
+diff --git a/packages/coding-agent/test/session/rpc-auto-maintenance-scope.test.ts b/packages/coding-agent/test/session/rpc-auto-maintenance-scope.test.ts
+index e60d390..282d3af 100644
+--- a/packages/coding-agent/test/session/rpc-auto-maintenance-scope.test.ts
++++ b/packages/coding-agent/test/session/rpc-auto-maintenance-scope.test.ts
+@@ -1,7 +1,13 @@
+ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+ import * as path from "node:path";
+ import { Agent } from "@oh-my-pi/pi-agent-core";
+-import type { AssistantMessage, Model } from "@oh-my-pi/pi-ai";
++import {
++	streamSimple,
++	type AssistantMessage,
++	type FetchImpl,
++	type Model,
++	type SimpleStreamOptions,
++} from "@oh-my-pi/pi-ai";
+ import { buildModel } from "@oh-my-pi/pi-catalog/build";
+ import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+ import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
+@@ -74,7 +80,8 @@ describe("AgentSession auto-maintenance controls and cache-warming retention", (
+ 		warmer = new CacheWarmer({
+ 			getMode: () => cfgProvidersCacheWarming.get(settings),
+ 			getPromptTokens: () => 100_000,
+-			stream: () => {
++			stream: (requestModel, context, options) => {
++				if (options?.fetch) return streamSimple(requestModel, context, options);
+ 				refreshCount++;
+ 				const message: AssistantMessage = {
+ 					role: "assistant",
+@@ -211,6 +218,76 @@ describe("AgentSession auto-maintenance controls and cache-warming retention", (
+ 		}
+ 	});
+ 
++	it("does not replay the primary final-payload observer from cache warming", async () => {
++		const bundledOpenAi = getBundledModel<"openai-completions">("openai", "gpt-4o-mini");
++		if (!bundledOpenAi) throw new Error("Expected bundled OpenAI model");
++		const requestModel = {
++			...bundledOpenAi,
++			api: "openai-completions",
++			promptCache: { short: 10.001 },
++			cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
++		} satisfies Model<"openai-completions">;
++		session.agent.setModel(requestModel);
++
++		let fetchCalls = 0;
++		const events = [
++			{
++				id: "cache-warm-payload-scope",
++				object: "chat.completion.chunk",
++				created: 1,
++				model: requestModel.id,
++				choices: [{ index: 0, delta: { content: "x" } }],
++			},
++			{
++				id: "cache-warm-payload-scope",
++				object: "chat.completion.chunk",
++				created: 1,
++				model: requestModel.id,
++				choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
++			},
++			{
++				id: "cache-warm-payload-scope",
++				object: "chat.completion.chunk",
++				created: 1,
++				model: requestModel.id,
++				choices: [],
++				usage: {
++					prompt_tokens: 100_000,
++					completion_tokens: 1,
++					total_tokens: 100_001,
++					prompt_tokens_details: { cached_tokens: 100_000 },
++				},
++			},
++		];
++		const fetch: FetchImpl = async () => {
++			fetchCalls++;
++			const body = `${events.map(event => `data: ${JSON.stringify(event)}`).join("\n\n")}\n\ndata: [DONE]\n\n`;
++			return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
++		};
++		const finalizedBodies: string[] = [];
++		const capturedPrimaryOptions: SimpleStreamOptions = {
++			apiKey: "test-key",
++			fetch,
++			cacheRetention: "short",
++			onPayloadFinalized: serializedBody => {
++				finalizedBodies.push(serializedBody);
++			},
++		};
++		const primaryResult = await streamSimple(requestModel, { messages: [] }, capturedPrimaryOptions).result();
++		expect(primaryResult.stopReason).toBe("stop");
++		expect(finalizedBodies).toHaveLength(1);
++
++		// This is the exact merged option snapshot the SDK gives to the session
++		// streamFn before arming its cache warmer.
++		vi.useFakeTimers();
++		session.startCacheWarming(requestModel, { messages: [] }, capturedPrimaryOptions);
++		vi.advanceTimersByTime(1);
++		for (let i = 0; i < 150; i++) await Promise.resolve();
++
++		expect(fetchCalls).toBe(2);
++		expect(finalizedBodies).toHaveLength(1);
++	});
++
+ 	it("disabling cache warming cancels the live timer through the settings override", async () => {
+ 		vi.useFakeTimers();
+ 		warmer.start({ model, context: { messages: [] }, options: { cacheRetention: "short" } }, () => true);

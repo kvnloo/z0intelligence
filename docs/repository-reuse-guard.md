@@ -95,6 +95,38 @@ Only Ollama Chat and OpenAI Completions are covered. Unpatched OMP and unsupport
 providers produce no final witness, so enforce remains blocked. This change
 does not activate an installed harness or change its approval settings.
 
+The companion patch is registered at
+`omp-extensions/z0int-bridge/patches/omp-provider-boundary.patch`
+(SHA-256 `d1fa022ce901efaa6a0bba7cf77ee2bb0913313f6f1539c6a286c97e55cffac8`).
+Applied to the base above, it reconstructs the tree of the original OMP commit
+`b8f06caf3d4c16d15549dc43c90620165ffcf742`:
+`1744f67c2f25241fad2a993e499875edce999699`. Core unit CI verifies that tree,
+installs its frozen lockfile using Bun 1.3.14, and runs the Python owning tests
+and all three reuse TypeScript suites at the exact PR head. Their scripted
+provider responses verify transport and guards; they are not fresh live agent
+behavior.
+
+## Integration provenance and acceptance
+
+The integration branch starts from the live-verified source
+`532a444ffaaa8de3623d4c97d77eaff8b5e34313`. It retains the original Claude
+`686db4db2551f59806e27e2f964b74647bc3861e` and Hermes
+`c71b4e27883ae957fa64ed75364a7e7872a05672` histories as merge parents.
+The Hermes capture files already matched the original branch exactly. Earlier
+Claude changes were also equivalent to the base's selected patches; the new
+workstream discovery change was reconciled without reapplying those changes.
+Current user decisions can supply the owner and manifest discovery vocabulary
+for a continuation prompt. Discovery and delivery use the same subject and
+predicate filters. A manifest match remains an EXTEND hypothesis.
+
+Strict launcher acceptance and independent functional verification are separate.
+The prior D2 proof at source `532a444` verified the accepted artifact after
+feedback; its strict launcher result remains unresolved. Failed proposals,
+OBSERVE blocks, negative outcomes and historical unresolved verdicts remain
+evidence. This integration's offline checks do not replace that proof or claim
+fresh multi-harness acceptance. The shared launcher correction remains owned by
+z0evals PR #94; its resolved receipt metadata error is not an open blocker.
+
 Scoped lookup also works through the existing CLI:
 
 ```sh
