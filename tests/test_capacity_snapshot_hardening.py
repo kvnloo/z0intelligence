@@ -809,3 +809,14 @@ def test_no_identifier_publishes_text_that_fails_the_label_rule_behind_the_prefi
     assert json.dumps(raw) not in json.dumps(snap)
     assert snap["sessions"][0]["session_id"] == snap["sessions"][0]["pane_id"] == snap["leases"][0]["placement_id"]
     assert snap["leases"][0]["offer_id"] == next(o["offer_id"] for o in snap["offers"] if o.get("id_redacted"))
+
+
+def test_a_very_long_run_of_prefixes_is_handled_in_one_pass():
+    import time
+    from z0int import capacity_snapshot
+
+    started = time.perf_counter()
+    published, stand_in = capacity_snapshot._ident("tern:" * 200_000, "")
+
+    assert stand_in is True and published.startswith("redacted-")
+    assert time.perf_counter() - started < 1.0
