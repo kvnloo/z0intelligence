@@ -65,6 +65,15 @@ function stripReuseContextFromPayload(payload: unknown): unknown {
 	return { ...payload, messages: payload.messages.filter(message => !messageContainsReuseContext(message)) };
 }
 
+function responsesDecoyPayload(payload: unknown): unknown {
+	if (!isObject(payload) || !Array.isArray(payload.input)) throw new Error("Expected Responses input");
+	return { model: payload.model, messages: payload.input.map(message => {
+		if (!isObject(message) || !Array.isArray(message.content)) return message;
+		return { ...message, content: message.content.map(part =>
+			isObject(part) && part.type === "input_text" ? { ...part, type: "text" } : part) };
+	}) };
+}
+
 function jsonLine(value: JsonObject): string {
 	return `${JSON.stringify(value)}\n`;
 }
@@ -331,12 +340,12 @@ for (const stripUpdatedContext of [false, true]) {
 			const context = { cwd: repoRoot, agent: { id: "primary" }, sessionManager: { getSessionId: () => "multi-edit" } };
 			await adapter.beforeAgentStart({ prompt: "normalize_rows" }, context);
 			const first = await adapter.context({ messages: [] }, context);
-			await adapter.providerPayloadFinalized({ serializedBody: JSON.stringify({ messages: first?.messages }) }, context);
+			await adapter.providerPayloadFinalized({ api: "openai-completions", serializedBody: JSON.stringify({ messages: first?.messages }) }, context);
 			expect(await adapter.toolCall({ toolName: "write", input: { path: "upstream/records.py" } }, context)).toBeUndefined();
 			await writeFile(join(repoRoot, "upstream/records.py"), "def normalize_rows(rows):\n    # changed after the first witnessed request\n    return list(dict.fromkeys(rows))\n");
 			await adapter.toolResult({ toolName: "write", input: { path: "upstream/records.py" }, isError: false }, context);
 			const second = await adapter.context({ messages: [] }, context);
-			await adapter.providerPayloadFinalized({ serializedBody: JSON.stringify({ messages: stripUpdatedContext ? [] : second?.messages }) }, context);
+			await adapter.providerPayloadFinalized({ api: "openai-completions", serializedBody: JSON.stringify({ messages: stripUpdatedContext ? [] : second?.messages }) }, context);
 			const admission = await adapter.toolCall({ toolName: "write", input: { path: "result.py" } }, context);
 			if (stripUpdatedContext) {
 				expect(admission?.block).toBe(true);
@@ -373,12 +382,14 @@ for (const stripUpdatedContext of [false, true]) {
 	}, 30_000);
 }
 
-const runtimeScenarios = [
+type RuntimeScenario = { name: string; stripContext: boolean; useFixtureSearch: boolean; responses: boolean; decoyMessages?: boolean };
+const runtimeScenarios: readonly RuntimeScenario[] = [
 	{ name: "fixture-backed witness", stripContext: false, useFixtureSearch: true, responses: false },
 	{ name: "context stripping blocks write", stripContext: true, useFixtureSearch: true, responses: false },
 	{ name: "resident FFF discovery reaches native write", stripContext: false, useFixtureSearch: false, responses: false },
 	{ name: "Responses input_text witness reaches native write", stripContext: false, useFixtureSearch: true, responses: true },
 	{ name: "Responses stripped input blocks native write", stripContext: true, useFixtureSearch: true, responses: true },
+	{ name: "Responses decoy messages without input block native write", stripContext: true, useFixtureSearch: true, responses: true, decoyMessages: true },
 ] as const;
 
 for (const scenario of runtimeScenarios) {
@@ -493,6 +504,7 @@ for (const scenario of runtimeScenarios) {
 			const extension: ExtensionFactory = pi => {
 				pi.on("before_provider_request", event => {
 					beforePayloads.push(event.payload);
+					if (scenario.decoyMessages) return responsesDecoyPayload(event.payload);
 					if (stripContext) return stripReuseContextFromPayload(event.payload);
 				});
 				pi.on("provider_payload_finalized", event => {
@@ -695,6 +707,7 @@ for (const scenario of runtimeScenarios) {
 				expect(modelInputPayload.context_sha256).toBe("missing");
 				expect(modelInputPayload.context_sha256).not.toBe(injectionPayload.context_sha256);
 				expect(providerBodyText).not.toContain("<z0int-reuse-context>");
+				if (scenario.decoyMessages) expect(serializedProviderBody).toContain("<z0int-reuse-context>");
 				expect(checkResult.valid).toBe(false);
 				expect(checkResult.status).toBe("unavailable");
 				expect(checkDecision.mode).toBe("OBSERVE");

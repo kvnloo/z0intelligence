@@ -149,7 +149,7 @@ test("successful primary edits refresh recovered discovery before the next model
 	await h.adapter.beforeAgentStart({ prompt: "Repair the existing receipt" }, CONTEXT);
 	await h.adapter.toolResult({ toolName: "z0_file_search", input: { kind: "exact_symbol", query: "normalize_outcome" }, isError: false }, CONTEXT);
 	const before = await h.adapter.context({ messages: [] }, CONTEXT);
-	await h.adapter.providerPayloadFinalized({ serializedBody: JSON.stringify({ messages: before?.messages }) }, CONTEXT);
+	await h.adapter.providerPayloadFinalized({ api: "openai-completions", serializedBody: JSON.stringify({ messages: before?.messages }) }, CONTEXT);
 	await h.adapter.toolCall(toolCall("edit", { path: "src/receipt.py", old_string: "old", new_string: "new" }), CONTEXT);
 	await h.adapter.toolResult({ toolName: "edit", input: { path: "src/receipt.py" }, isError: false }, CONTEXT);
 	const resolves = h.sent.filter(row => row.body.op === "reuse_resolve");
@@ -159,7 +159,7 @@ test("successful primary edits refresh recovered discovery before the next model
 	const injected = await h.adapter.context({ messages: [] }, CONTEXT);
 	expect(JSON.stringify(injected)).toContain("updated source evidence");
 	expect(h.sent.filter(row => row.body.op === "reuse_injected").at(-1)?.body.payload).toMatchObject({ packet_id: "after-edit" });
-	await h.adapter.providerPayloadFinalized({ serializedBody: JSON.stringify({ messages: injected?.messages }) }, CONTEXT);
+	await h.adapter.providerPayloadFinalized({ api: "openai-completions", serializedBody: JSON.stringify({ messages: injected?.messages }) }, CONTEXT);
 	expect(h.sent.filter(row => row.body.op === "reuse_model_input").at(-1)?.body.payload).toMatchObject({ packet_id: "after-edit" });
 });
 
@@ -398,11 +398,11 @@ for (const shape of ["input_text", "string"] as const) {
 		const h = harness();
 		await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
 		const injected = await h.adapter.context({ messages: [] }, CONTEXT);
-		const block = injected?.messages.at(-1);
+		const block = injected?.messages?.at(-1);
 		if (!block || block.role !== "user" || typeof block.content !== "string") throw new Error("Expected appended user context");
 		const content = shape === "string" ? block.content : [{ type: "input_text", text: block.content }];
 		const serializedBody = JSON.stringify({ input: [{ role: "user", content }] });
-		await h.adapter.providerPayloadFinalized({ serializedBody }, CONTEXT);
+		await h.adapter.providerPayloadFinalized({ api: "openai-responses", serializedBody }, CONTEXT);
 		expect(h.sent.find(row => row.body.op === "reuse_model_input")?.body.payload).toMatchObject({
 			context_sha256: sha256Utf8(block.content), request_sha256: sha256Utf8(serializedBody),
 			injection_id: 7, stage: "provider_payload", boundary: "sdk_final_payload",
@@ -416,7 +416,7 @@ test("Responses witness ignores metadata, tool output, unsupported parts and dec
 		const h = harness();
 		await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
 		const injected = await h.adapter.context({ messages: [] }, CONTEXT);
-		const block = injected?.messages.at(-1);
+		const block = injected?.messages?.at(-1);
 		if (!block || block.role !== "user" || typeof block.content !== "string") throw new Error("Expected appended user context");
 		const text = block.content;
 		const bodies: Record<typeof cases[number], RequestBody> = {
@@ -428,8 +428,24 @@ test("Responses witness ignores metadata, tool output, unsupported parts and dec
 			decoy: { input: [], messages: [{ role: "user", content: text }] },
 			"malformed-input": { input: null, messages: [{ role: "user", content: text }] },
 		};
-		await h.adapter.providerPayloadFinalized({ serializedBody: JSON.stringify(bodies[kind]) }, CONTEXT);
+		await h.adapter.providerPayloadFinalized({ api: "openai-responses", serializedBody: JSON.stringify(bodies[kind]) }, CONTEXT);
 		expect(h.sent.find(row => row.body.op === "reuse_model_input")?.body.payload).toMatchObject({ context_sha256: "missing" });
+	}
+});
+
+
+test("provider API rejects Responses decoy messages and preserves Chat or Ollama messages with unrelated input", async () => {
+	for (const api of ["openai-responses", "openai-completions", "ollama-chat", "anthropic-messages"] as const) {
+		const h = harness();
+		await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
+		const injected = await h.adapter.context({ messages: [] }, CONTEXT);
+		const block = injected?.messages?.at(-1);
+		if (!block || block.role !== "user" || typeof block.content !== "string") throw new Error("Expected appended user context");
+		const body = { messages: [{ role: "user", content: block.content }], ...(api === "openai-responses" ? {} : { input: [] }) };
+		await h.adapter.providerPayloadFinalized({ api, serializedBody: JSON.stringify(body) }, CONTEXT);
+		expect(h.sent.find(row => row.body.op === "reuse_model_input")?.body.payload).toMatchObject({
+			context_sha256: api === "openai-completions" || api === "ollama-chat" ? sha256Utf8(block.content) : "missing",
+		});
 	}
 });
 
@@ -437,15 +453,15 @@ test("Responses auxiliary input cannot create or revoke a primary payload witnes
 	const h = harness();
 	await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
 	const injected = await h.adapter.context({ messages: [] }, CONTEXT);
-	const block = injected?.messages.at(-1);
+	const block = injected?.messages?.at(-1);
 	if (!block || block.role !== "user" || typeof block.content !== "string") throw new Error("Expected appended user context");
 	const serializedBody = JSON.stringify({ input: [{ role: "user", content: [{ type: "input_text", text: block.content }] }] });
 	for (const auxiliary of [ADVISOR_CONTEXT, UNKNOWN_AGENT_CONTEXT]) {
-		await h.adapter.providerPayloadFinalized({ serializedBody }, auxiliary);
+		await h.adapter.providerPayloadFinalized({ api: "openai-responses", serializedBody }, auxiliary);
 	}
 	expect(h.sent.filter(row => row.body.op === "reuse_model_input")).toHaveLength(0);
-	await h.adapter.providerPayloadFinalized({ serializedBody }, CONTEXT);
-	await h.adapter.providerPayloadFinalized({ serializedBody: "{", }, ADVISOR_CONTEXT);
+	await h.adapter.providerPayloadFinalized({ api: "openai-responses", serializedBody }, CONTEXT);
+	await h.adapter.providerPayloadFinalized({ api: "openai-responses", serializedBody: "{", }, ADVISOR_CONTEXT);
 	expect(h.sent.filter(row => row.body.op === "reuse_model_input")).toHaveLength(1);
 	expect(h.sent.find(row => row.body.op === "reuse_model_input")?.body.payload).toMatchObject({ context_sha256: sha256Utf8(block.content) });
 });
@@ -462,12 +478,12 @@ test("non-primary finalized payloads cannot qualify or revoke the primary witnes
 	].join("\n");
 	for (const auxiliaryContext of [ADVISOR_CONTEXT, UNKNOWN_AGENT_CONTEXT]) {
 		await h.adapter.providerPayloadFinalized(
-			{ serializedBody: JSON.stringify({ messages: [{ role: "user", content: contextBlock }] }) },
+			{ api: "openai-completions", serializedBody: JSON.stringify({ messages: [{ role: "user", content: contextBlock }] }) },
 			auxiliaryContext,
 		);
 	}
 	const requestsBeforePrimaryWitness = h.sent.length;
-	await h.adapter.providerPayloadFinalized({ serializedBody: JSON.stringify({ messages: [{ role: "user", content: contextBlock }] }) }, CONTEXT);
+	await h.adapter.providerPayloadFinalized({ api: "openai-completions", serializedBody: JSON.stringify({ messages: [{ role: "user", content: contextBlock }] }) }, CONTEXT);
 
 	expect(h.sent.slice(0, requestsBeforePrimaryWitness).filter(item => item.body.op === "reuse_model_input")).toHaveLength(0);
 	expect(h.sent.filter(item => item.body.op === "reuse_model_input")).toHaveLength(1);
@@ -478,7 +494,7 @@ test("enforce blocks advisor mutations but leaves advisor reads alone", async ()
 	const h = harness();
 	await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
 	await h.adapter.context({ messages: [] }, CONTEXT);
-	await h.adapter.providerPayloadFinalized({ serializedBody: "{}" }, CONTEXT);
+	await h.adapter.providerPayloadFinalized({ api: "openai-completions", serializedBody: "{}" }, CONTEXT);
 
 	for (const auxiliaryContext of [ADVISOR_CONTEXT, UNKNOWN_AGENT_CONTEXT]) {
 		const readResult = await h.adapter.toolCall(toolCall("read", { path: "src/a.py" }), auxiliaryContext);
@@ -496,7 +512,7 @@ test("shadow marks advisor and unknown-purpose mutations unresolved without bloc
 		const h = harness({ mode: "shadow" });
 		await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
 		await h.adapter.context({ messages: [] }, CONTEXT);
-		await h.adapter.providerPayloadFinalized({ serializedBody: "{}" }, CONTEXT);
+		await h.adapter.providerPayloadFinalized({ api: "openai-completions", serializedBody: "{}" }, CONTEXT);
 
 		const result = await h.adapter.toolCall(toolCall("write", { path: "src/a.py", content: "x" }), auxiliaryContext);
 		const check = h.sent.find(item => item.body.op === "reuse_check")?.body;
@@ -905,7 +921,7 @@ for (const mode of ["shadow", "enforce"] as const) {
 		});
 		await adapter.beforeAgentStart({ prompt: "Use existing implementation" }, CONTEXT);
 		const injected = await adapter.context({ messages: [] }, CONTEXT);
-		const event = { serializedBody: JSON.stringify({ messages: injected?.messages }) };
+		const event = { api: "openai-completions" as const, serializedBody: JSON.stringify({ messages: injected?.messages }) };
 		await adapter.providerPayloadFinalized(event, CONTEXT);
 		failWitness = true;
 		await expect(adapter.providerPayloadFinalized(event, CONTEXT)).resolves.toBeUndefined();

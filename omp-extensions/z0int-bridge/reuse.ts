@@ -291,7 +291,7 @@ export interface ReuseAdapter {
 	) => Promise<ToolCallEventResult | void>;
 	toolResult: (event: Pick<ToolResultEvent, "toolName" | "input" | "isError">, context: ReuseHookContext) => Promise<void>;
 	providerPayloadFinalized: (
-		event: Pick<ProviderPayloadFinalizedEvent, "serializedBody">,
+		event: Pick<ProviderPayloadFinalizedEvent, "serializedBody" | "api">,
 		context: ReuseHookContext,
 	) => Promise<void>;
 	/** Checkout the current turn's packet resolved to, when the session started elsewhere. */
@@ -464,7 +464,7 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 	}
 
 	async function providerPayloadFinalized(
-		event: Pick<ProviderPayloadFinalizedEvent, "serializedBody">,
+		event: Pick<ProviderPayloadFinalizedEvent, "serializedBody" | "api">,
 		context: ReuseHookContext,
 	): Promise<void> {
 		if (primaryAgentId === null || context.agent.id !== primaryAgentId) return;
@@ -474,12 +474,12 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 		let found = false;
 		try {
 			const body: unknown = JSON.parse(event.serializedBody);
-			if (isObject(body) && "input" in body) {
-				// Responses consumes input, not a possible decoy messages field.
+			if (event.api === "openai-responses" && isObject(body)) {
 				found = Array.isArray(body.input) && body.input.some(message => isObject(message) &&
 					message.role === "user" && (message.type === undefined || message.type === "message") &&
 					containsContext(message.content, state.contextBlock, "input_text"));
-			} else if (isObject(body) && Array.isArray(body.messages)) {
+			} else if ((event.api === "openai-completions" || event.api === "ollama-chat") &&
+				isObject(body) && Array.isArray(body.messages)) {
 				found = body.messages.some(message => isObject(message) && containsContext(message.content, state.contextBlock));
 			}
 		} catch {
@@ -512,9 +512,10 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 		if (!activeMode(mode) || isRecoveryTool(event.toolName)) return;
 		const binding = dependencies.config.verifierBinding;
 		const verifierCommand = configuredVerifierCommand(binding);
-		if (event.toolName === "bash" && verifierCommand !== null &&
-			event.input.command === verifierCommand && !event.input.async && !event.input.service &&
-			(event.input.cwd === undefined || event.input.cwd === "." || event.input.cwd === context.cwd)) {
+		const input: unknown = event.input;
+		if (event.toolName === "bash" && verifierCommand !== null && isObject(input) &&
+			input.command === verifierCommand && !input.async && !input.service &&
+			(input.cwd === undefined || input.cwd === "." || input.cwd === context.cwd)) {
 			const state = prepared;
 			if (state.kind !== "ready" || context.agent.id !== primaryAgentId ||
 				!matchesTurn(state, contextIdentity(context), dependencies.getTraceId()))

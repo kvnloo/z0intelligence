@@ -89,9 +89,10 @@ never grant tool authorization or establish provider delivery, model use or
 verified success.
 
 For Responses, the witness reads the exact current context block from user
-messages in `input`, with string or `input_text` content. A supplied `input`
-field takes precedence over any `messages` field. Metadata, function outputs,
-unsupported parts and auxiliary agent requests cannot supply this witness.
+messages in `input`, with string or `input_text` content. The SDK event API
+selects the consumed wire fields: Responses uses `input`; Chat and Ollama use
+`messages`. Decoy fields, metadata, function outputs, unsupported parts and
+auxiliary agent requests cannot supply a Responses witness.
 
 The final observer requires the companion OMP patch based on
 `v18.8.5@4bf0d9d3e9f910ef4af25dec9733fbb4d6912d4c`. It adds the read-only
