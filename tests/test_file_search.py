@@ -312,6 +312,61 @@ class FileSearchTests(unittest.TestCase):
             self.assertTrue(second["generation_reliable"])
             self.assertEqual(second["coverage"], "complete")
 
+    def test_cold_scan_wait_also_waits_for_epoch_watcher(self):
+        class StartingFinder(_Finder):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.progress_reads = 0
+
+            @property
+            def scan_progress(self):
+                self.progress_reads += 1
+                progress = _Progress()
+                progress.is_watcher_ready = self.progress_reads >= 3
+                return progress
+
+            @scan_progress.setter
+            def scan_progress(self, _value):
+                pass
+
+            def watch(self, pattern, callback):
+                if not self.scan_progress.is_watcher_ready:
+                    raise RuntimeError("File system watcher is not ready")
+                return super().watch(pattern, callback)
+
+        class StartingFFF:
+            __version__ = "0.11.0"
+            FileFinder = StartingFinder
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "z0int.file_search._load_fff", return_value=StartingFFF
+        ):
+            out = file_search.search_repository(tmp, "find_context", kind="exact_symbol")
+            self.assertEqual(out["coverage"], "complete")
+            self.assertTrue(out["generation_reliable"])
+
+    def test_watcher_timeout_stays_warming_and_partial(self):
+        class WaitingFinder(_Finder):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.scan_progress = _Progress()
+                self.scan_progress.is_watcher_ready = False
+
+            def watch(self, pattern, callback):
+                raise RuntimeError("File system watcher is not ready")
+
+        class WaitingFFF:
+            __version__ = "0.11.0"
+            FileFinder = WaitingFinder
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "z0int.file_search._load_fff", return_value=WaitingFFF
+        ), mock.patch.dict("os.environ", {"Z0INT_FFF_SCAN_TIMEOUT_MS": "1"}):
+            out = file_search.search_repository(tmp, "find_context", kind="exact_symbol")
+            self.assertEqual(out["status"], "warming")
+            self.assertEqual(out["coverage"], "partial")
+            self.assertFalse(out["generation_reliable"])
+
     def test_missing_binding_fails_open(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch(
             "z0int.file_search._load_fff", return_value=None

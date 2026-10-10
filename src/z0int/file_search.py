@@ -132,15 +132,16 @@ def _resident(root: Path) -> tuple[_ResidentFinder | None, str, bool, str | None
                 enable_content_indexing=True,
                 follow_symlinks=False,
             )
-            ready = bool(
-                finder.wait_for_scan_blocking(
-                    timeout_ms=_int_env(
-                        "Z0INT_FFF_SCAN_TIMEOUT_MS",
-                        _DEFAULT_SCAN_TIMEOUT_MS,
-                        1,
-                    )
-                )
-            )
+            timeout_ms = _int_env("Z0INT_FFF_SCAN_TIMEOUT_MS", _DEFAULT_SCAN_TIMEOUT_MS, 1)
+            deadline = time.monotonic() + timeout_ms / 1000.0
+            ready = bool(finder.wait_for_scan_blocking(timeout_ms=timeout_ms))
+            # Initial scan completion precedes watcher startup in FFF 0.11.
+            # Use the same startup budget before subscribing to source epochs.
+            while ready and not getattr(finder.scan_progress, "is_watcher_ready", True):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                time.sleep(min(0.01, remaining))
             resident = _ResidentFinder(
                 root=root,
                 finder=finder,
@@ -438,7 +439,7 @@ def search_repository(
         scanning = bool(getattr(progress, "is_scanning", False)) if progress is not None else not resident.ready
         watcher_ready = bool(getattr(progress, "is_watcher_ready", not scanning)) if progress is not None else not scanning
         warmup_complete = bool(getattr(progress, "is_warmup_complete", resident.ready)) if progress is not None else resident.ready
-        if not scanning and warmup_complete:
+        if not scanning and warmup_complete and watcher_ready:
             resident.ready = True
             status = "ready"
         else:
