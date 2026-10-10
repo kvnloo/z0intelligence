@@ -22,6 +22,7 @@ import re
 import sys
 from contextlib import contextmanager
 import subprocess
+import tempfile
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -475,11 +476,57 @@ def _patch_target(cp: TaskCheckpoint) -> Path:
 _NOT_COMMITTED = "patch not committed: "
 
 
-def _branch_blob_sha256(wt: Path, branch: str, rel: str) -> str | None:
-    """sha256 of the task BRANCH ref's blob for the target (raw bytes), or None."""
-    out = subprocess.run(["git", "cat-file", "blob", f"refs/heads/{branch}:{rel}"],
-                         cwd=str(wt), capture_output=True)
-    return hashlib.sha256(out.stdout).hexdigest() if out.returncode == 0 else None
+_REGULAR_MODES = ("100644", "100755")  # a file; not a symlink (120000) or a submodule (160000)
+
+
+def _branch_blob_oid(wt: Path, branch: str, rel: str) -> str | None:
+    """Blob id of the task BRANCH ref's regular-file entry for the target, or None.
+
+    ``ls-tree`` with literal pathspecs: the name is never a pattern or a ``<stage>:<path>``.
+    """
+    out = _run_git(["--literal-pathspecs", "ls-tree", "-z", "--full-tree", f"refs/heads/{branch}", "--", rel],
+                   cwd=wt, check=False)
+    for record in out.stdout.split("\0") if out.returncode == 0 else ():
+        meta, _, path = record.partition("\t")
+        fields = meta.split()
+        if path == rel and len(fields) == 3 and fields[0] in _REGULAR_MODES and fields[1] == "blob":
+            return fields[2]
+    return None
+
+
+def _staged_blob_oid(wt: Path, rel: str, env: dict[str, str] | None = None) -> str | None:
+    """Blob id of the index's stage-0 regular-file entry for the target, or None."""
+    out = subprocess.run(["git", "--literal-pathspecs", "ls-files", "--stage", "-z", "--", rel],
+                         cwd=str(wt), capture_output=True, text=True, env=env)
+    for record in out.stdout.split("\0") if out.returncode == 0 else ():
+        meta, _, path = record.partition("\t")
+        fields = meta.split()
+        if path == rel and len(fields) == 3 and fields[0] in _REGULAR_MODES and fields[2] == "0":
+            return fields[1]
+    return None
+
+
+def _git_derived_oid(wt: Path, branch: str, rel: str) -> str | None:
+    """Blob id that ``git add`` itself stores for the worktree target on the task branch.
+
+    Git, not this module, decides what a file becomes on the way in: clean filters,
+    line-ending conversion, ``ident``, and the rule that a path whose indexed blob
+    already holds CRLF is not converted under ``core.autocrlf``/``text=auto``. That
+    last rule reads the index, which ``git hash-object`` never loads, so the id is
+    taken from a real ``git add`` into a scratch index read from the task branch,
+    writing to a scratch object directory: the worktree's own index and the
+    repository's object store gain nothing. None when git stores no regular file.
+    """
+    objects = _run_git(["rev-parse", "--path-format=absolute", "--git-path", "objects"], cwd=wt).stdout.strip()
+    with tempfile.TemporaryDirectory(prefix="z0int-derive-") as scratch:
+        (Path(scratch) / "objects").mkdir()
+        alternates = [objects, os.environ.get("GIT_ALTERNATE_OBJECT_DIRECTORIES", "")]
+        env = dict(os.environ, GIT_INDEX_FILE=str(Path(scratch) / "index"),
+                   GIT_OBJECT_DIRECTORY=str(Path(scratch) / "objects"),
+                   GIT_ALTERNATE_OBJECT_DIRECTORIES=os.pathsep.join(a for a in alternates if a))
+        for args in (["read-tree", f"refs/heads/{branch}"], ["add", "--", f":(literal){rel}"]):
+            subprocess.run(["git", *args], cwd=str(wt), capture_output=True, text=True, check=True, env=env)
+        return _staged_blob_oid(wt, rel, env)
 
 
 def _commit_patch(cp: TaskCheckpoint) -> str | None:
@@ -487,45 +534,53 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
 
     Commits only the target path, only while the worktree bytes equal the
     recorded after-image, and only when the worktree HEAD is the task branch.
-    None means the task branch ref's blob for the target equals the after-image,
-    so a repeat (or a resume after a kill between write and commit) is a no-op.
+    None means the task branch ref's blob for the target is the blob git derives
+    from the after-image under this repository's attributes and config, so a
+    repeat (or a resume after a kill between write and commit) is a no-op.
     Never checks anything out or moves a branch.
     """
     wt = Path(cp.worktree_path or "")
     rel = str((cp.patch or {}).get("relative_path"))
     branch = cp.branch or f"z0int/{cp.task_id}"
     after = (cp.pending_patch or {}).get("after")
+    mismatch = _NOT_COMMITTED + "the worktree content does not match the recorded patch"
     try:
         if not after:
             return _NOT_COMMITTED + "no recorded after-image"
-        if hashlib.sha256(_patch_target(cp).read_bytes()).hexdigest() != after:
-            return _NOT_COMMITTED + "the worktree content does not match the recorded patch"
+        target = _patch_target(cp)
+        if (wt / rel).is_symlink():  # the hash below would read through the link
+            return _NOT_COMMITTED + "the target is a symlink, not the patched file"
+        if hashlib.sha256(target.read_bytes()).hexdigest() != after:
+            return mismatch
         head = _run_git(["symbolic-ref", "--quiet", "HEAD"], cwd=wt, check=False)
         if head.returncode != 0 or head.stdout.strip() != f"refs/heads/{branch}":
             return (_NOT_COMMITTED + f"the worktree HEAD is detached or on another branch, "
                     f"not the task branch {branch}; nothing was checked out or moved")
-        if _branch_blob_sha256(wt, branch, rel) != after:
-            # The name is a file, never a pattern: a*.py must not also match ab.py
-            literal = f":(literal){rel}"
+        expected = _git_derived_oid(wt, branch, rel)
+        if expected is None:
+            return _NOT_COMMITTED + "git would not store the target as a regular file"
+        # The id was derived from the file as it was read just now: it stands for
+        # the recorded patch only if the bytes are still the after-image.
+        if (wt / rel).is_symlink() or hashlib.sha256(target.read_bytes()).hexdigest() != after:
+            return mismatch
+        literal = f":(literal){rel}"  # the name is a file, never a pattern: a*.py must not also match ab.py
+        if _branch_blob_oid(wt, branch, rel) == expected:
+            # Nothing to commit. When the index entry is that blob too, re-adding it only
+            # refreshes its stat data, which is what stops ``git status`` reporting a
+            # rewritten file whose stored form did not change (CRLF to LF under autocrlf).
+            if _staged_blob_oid(wt, rel) == expected:
+                _run_git(["add", "--", literal], cwd=wt, check=False)
+        else:
             _run_git(["add", "--", literal], cwd=wt)
-            # What git will store can differ from the bytes on disk (a clean filter,
-            # a symlink): commit only if the staged blob is the recorded after-image.
-            # ":0:<path>" names stage 0 outright; a bare ":<path>" would read a name like
-            # "2:a.py" as stage 2 of a.py.
-            staged = subprocess.run(["git", "cat-file", "blob", f":0:{rel}"], cwd=wt, capture_output=True)
-            entry = subprocess.run(["git", "ls-files", "--stage", "--", literal], cwd=wt,
-                                   capture_output=True, text=True).stdout
-            regular = entry.startswith(("100644 ", "100755 "))  # a file, not a symlink or submodule
-            if (staged.returncode != 0 or not regular
-                    or hashlib.sha256(staged.stdout).hexdigest() != after):
+            if _staged_blob_oid(wt, rel) != expected:
                 _run_git(["reset", "-q", "--", literal], cwd=wt, check=False)
-                return _NOT_COMMITTED + "what git would store for the target does not match the recorded patch"
+                return _NOT_COMMITTED + "what git staged for the target is not what it derives from the recorded patch"
             _run_git(
                 ["-c", "user.email=z0int@local", "-c", "user.name=z0int-task-loop",
                  "commit", "-m", f"z0int task {cp.task_id}: bounded patch", "--only", "--", literal],
                 cwd=wt,
             )
-        if _branch_blob_sha256(wt, branch, rel) != after:
+        if _branch_blob_oid(wt, branch, rel) != expected:
             return _NOT_COMMITTED + f"the task branch {branch} does not carry the recorded patch"
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         return _NOT_COMMITTED + f"commit failed: {(getattr(exc, 'stderr', None) or str(exc))[:300]}"

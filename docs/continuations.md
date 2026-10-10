@@ -117,8 +117,9 @@ Before editing, persist the exact before/after byte hashes. On process restart:
 A recovered after-image does **not** prove a Git commit completed, so resume
 checks it against the recorded after-image, never against whatever bytes are in
 the worktree. The patch is committed when the **task branch ref**
-(`z0int/<task_id>`) has a blob for the target whose sha256 equals the recorded
-after-image. On every path (apply, reconcile, verify) the commit step:
+(`z0int/<task_id>`) has, for the target, the blob that Git itself derives from
+the recorded after-image under the repository's attributes and config. On every
+path (apply, reconcile, verify) the commit step:
 
 - commits only while the worktree target's sha256 equals the recorded
   after-image; any other content is left untouched and uncommitted;
@@ -132,11 +133,23 @@ null, `last_error` says why (for example that the worktree content does not
 match the recorded patch) and the task stays resumable. A pre-seal checkpoint
 that reaches verification with no recorded after-image is not committed at
 all; it is verified by the content predicate alone, as before, and
-`verify_detail` says the commit was not checked. The after-image is compared to
-the raw blob bytes, so a Git clean filter or line-ending conversion on the
-target withholds verification instead of passing it. Another process that
-rewrites the target between the hash check and `git commit` is not excluded;
-the task-branch blob check after the commit then withholds verification.
+`verify_detail` says the commit was not checked. The stored blob is not
+required to equal the worktree bytes: a clean filter, line-ending conversion
+(`core.autocrlf`, `text`/`eol` attributes) or `ident` legitimately changes the
+file on the way in. The expected blob id is taken from a real `git add` of the
+target into a scratch index read from the task branch, with a scratch object
+directory, so the worktree's index and the object store are not touched; the
+staged entry and the task branch entry must both be that id, as a regular
+file. (`git hash-object` is not used: it does not load the index, so it
+converts a path whose stored blob already holds CRLF where `git add` does
+not.) A filter that appears after the write is therefore applied, exactly as
+if it had always been configured. A target that is a symlink in the worktree
+is refused outright. When Git derives the blob the branch already has (a patch
+that only turns CRLF into LF under `core.autocrlf`, or only edits `$Id$` text
+under `ident`), there is nothing to commit and the content predicate decides.
+Another process that rewrites the target while the commit step runs is not
+excluded; the worktree hash is re-checked after the blob id is derived, and
+the task-branch check after the commit then withholds verification.
 Verification otherwise remains the existing content predicate, not a claim that
 arbitrary tests ran or all project requirements were satisfied.
 Atomic checkpoint writes flush the temporary file and POSIX parent directory;
