@@ -65,9 +65,91 @@ def test_groq_quota_projects_without_kerdoios_package(monkeypatch):
     assert result["reason"] != "quota_backend_unavailable"
 
 
-def test_omp_hot_path_does_not_spawn():
+def _interpreter_fixture(tmp_path, monkeypatch, kind):
+    """Build one interpreter state under tmp_path; nothing here is ever executed."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    monkeypatch.setenv("PATH", str(bindir))
+    real = bindir / "fake-python"
+    real.write_text("#!/bin/sh\n")
+    real.chmod(0o755)
+    if kind == "missing":
+        return str(tmp_path / "absent" / "bin" / "python")
+    if kind == "directory":
+        (tmp_path / "dir-python").mkdir()
+        return str(tmp_path / "dir-python")
+    if kind == "dangling_symlink":
+        (tmp_path / "dangling-python").symlink_to(tmp_path / "nowhere")
+        return str(tmp_path / "dangling-python")
+    if kind == "not_executable":
+        target = tmp_path / "nonexec-python"
+        target.write_text("#!/bin/sh\n")
+        target.chmod(0o644)
+        return str(target)
+    if kind == "bare_name_not_on_path":
+        return "no-such-python-zz9"
+    if kind == "absolute_executable":
+        return str(real)
+    if kind == "symlink_to_executable":
+        (tmp_path / "link-python").symlink_to(real)
+        return str(tmp_path / "link-python")
+    assert kind == "bare_name_on_path"
+    return "fake-python"
+
+
+def _kerdoios_calls(tmp_path, monkeypatch, interpreter):
+    calls = []
+
+    class Proc:
+        returncode = 0
+        stdout = '{"ok": true, "fake": true}\n'
+        stderr = ""
+
+    monkeypatch.setenv("KERDOIOS_PYTHON", interpreter)
+    monkeypatch.setenv("KERDOIOS_ROOT", str(tmp_path))
+    monkeypatch.setattr(bridge_runtime.subprocess, "run", lambda cmd, **kwargs: calls.append(cmd) or Proc())
+    plan = bridge_runtime.kerdoios_plan("coding.generic", {"mode": "balanced", "coding": 1})
+    after_plan = len(calls)
+    record = bridge_runtime.kerdoios_record(
+        provider="groq",
+        model="openai/gpt-oss-20b",
+        capability_id="coding.generic",
+        completed=False,
+        input_tokens=None,
+        output_tokens=None,
+    )
+    return plan, record, calls, after_plan
+
+
+@pytest.mark.parametrize(
+    "kind", ["missing", "directory", "dangling_symlink", "not_executable", "bare_name_not_on_path"]
+)
+def test_unusable_kerdoios_interpreter_never_spawns(tmp_path, monkeypatch, kind):
+    interpreter = _interpreter_fixture(tmp_path, monkeypatch, kind)
+    plan, record, calls, _ = _kerdoios_calls(tmp_path, monkeypatch, interpreter)
+    assert calls == []
+    assert plan == {"ok": False, "error": f"interpreter_missing:{interpreter}", "spawned": False}
+    assert record is None
+
+
+@pytest.mark.parametrize("kind", ["absolute_executable", "symlink_to_executable", "bare_name_on_path"])
+def test_usable_kerdoios_interpreter_still_spawns_once_per_call(tmp_path, monkeypatch, kind):
+    interpreter = _interpreter_fixture(tmp_path, monkeypatch, kind)
+    plan, record, calls, after_plan = _kerdoios_calls(tmp_path, monkeypatch, interpreter)
+    assert plan == {"ok": True, "fake": True}
+    assert record is None
+    assert after_plan == 1 and len(calls) == 2
+    assert calls[0][:4] == [interpreter, "-m", "kerdoios", "plan"]
+    assert calls[1][:4] == [interpreter, "-m", "kerdoios", "record"]
+
+
+def test_omp_hot_path_does_not_spawn(tmp_path):
+    import os
     import subprocess
 
+    z0home = tmp_path / "z0home"
+    home = tmp_path / "home"
+    home.mkdir()
     module_url = (Path(__file__).resolve().parents[1] / "harness-adapters" / "automatic-client.mjs").as_uri()
     script = """
 import { ompHotPath, scheduleOmpAutomatic } from __Z0_CLIENT_URL__;
@@ -84,9 +166,14 @@ console.log(JSON.stringify({blocked_ms: scheduled.blocked_ms, spawn: scheduled.s
         capture_output=True,
         text=True,
         timeout=10,
+        env={**os.environ, "Z0INT_HOME": str(z0home), "HOME": str(home)},
     )
     assert proc.returncode == 0, proc.stderr
     assert '"spawn": false' in proc.stdout or '"spawn":false' in proc.stdout
+    # The timing row lands in the isolated Z0INT_HOME, never in the host's.
+    rows = [json.loads(line) for line in (z0home / "stream" / "hook_rtt.jsonl").read_text().splitlines()]
+    assert [(row["session_id"], row["turn_id"], row["spawn"]) for row in rows] == [("s", "t", False)]
+    assert list(home.iterdir()) == []
 
 
 def test_nous_oauth_does_not_import_hermes_cli_auth(monkeypatch):

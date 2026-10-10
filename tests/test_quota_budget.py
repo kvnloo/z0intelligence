@@ -20,7 +20,28 @@ def test_minute_requests_bind():assert not project([call(99900+n*2,0) for n in r
 def test_latest_physical_row_not_double_counted():
  a=call(99990,500);b={**a,'input_tokens':1000}
  assert project([a,b])['tokens_24h']==1000
-def test_groq_requests_header_is_daily():
+def _stub_header_parser(headers,*,provider,model,now):
+ # Host-independent stand-in for kerdoios.quota.parse.quota_state_from_headers,
+ # keeping the legacy mapping project() normalizes around: unsuffixed
+ # "-requests" is per-minute, "-requests-day" is per-day.
+ from types import SimpleNamespace
+ dims={}
+ for name,dim in (('requests','rpm'),('requests-day','rpd'),('tokens','tpm'),('tokens-day','tpd')):
+  remaining=headers.get('x-ratelimit-remaining-'+name)
+  if remaining is None:continue
+  reset=headers.get('x-ratelimit-reset-'+name)
+  dims[dim]=SimpleNamespace(limit=int(headers.get('x-ratelimit-limit-'+name,0)),remaining=int(remaining),
+   reset_at=now+float(reset[:-1])*{'s':1,'m':60,'h':3600}[reset[-1]] if reset else None)
+ return SimpleNamespace(dimensions=dims)
+def test_exact_capacity_request_fits():
+ assert project([],needed=8000)['allowed']
+ assert not project([call(99990,1)],needed=8000)['allowed']
+def test_groq_requests_header_is_daily(monkeypatch):
+ import sys,types
+ parse=types.ModuleType('kerdoios.quota.parse');parse.quota_state_from_headers=_stub_header_parser
+ for name in ('kerdoios','kerdoios.quota'):
+  package=types.ModuleType(name);package.__path__=[];monkeypatch.setitem(sys.modules,name,package)
+ monkeypatch.setitem(sys.modules,'kerdoios.quota.parse',parse)
  r=project([call(99990,1,{'x-ratelimit-remaining-requests':'0','x-ratelimit-limit-requests':'1000','x-ratelimit-reset-requests':'30m'})])
  assert not r['allowed'];assert r['quota']['dimensions']['rpd']['remaining']==0
  assert r['quota']['dimensions']['rpm']['remaining']==29

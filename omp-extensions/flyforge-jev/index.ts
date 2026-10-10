@@ -12,9 +12,9 @@
  */
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync } from "node:fs";
+import { accessSync, appendFileSync, constants, mkdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
 const SHADOW_LOG = join(homedir(), ".z0int", "shadow", "jev-fly.jsonl");
@@ -76,8 +76,23 @@ function isHighInfo(row: {
 	return false;
 }
 
+/** True only for an executable regular file; a bare name is looked up on PATH. */
+function interpreterReady(py: string): boolean {
+	const candidates = py.includes("/")
+		? [py]
+		: (process.env.PATH ?? "").split(delimiter).filter(Boolean).map(dir => join(dir, py));
+	return candidates.some(candidate => {
+		try {
+			accessSync(candidate, constants.X_OK);
+			return statSync(candidate).isFile();
+		} catch {
+			return false;
+		}
+	});
+}
+
 async function shadow(prompt: string, sessionId: string | undefined): Promise<void> {
-	if (PY.includes("/") && !existsSync(PY)) return;
+	if (!interpreterReady(PY)) return;
 	const t0 = Date.now();
 	const [decideRaw, jevRaw] = await Promise.all([
 		runPy(["-m", "evolution_lab", "next-action-decide", prompt], 8000),

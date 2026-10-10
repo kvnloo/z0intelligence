@@ -139,7 +139,7 @@ def preflight(prompt: str) -> dict[str, Any]:
 def _interpreter_ready(path: str) -> bool:
     interpreter = Path(path)
     if interpreter.is_absolute() or "/" in path:
-        return interpreter.is_file()
+        return interpreter.is_file() and os.access(interpreter, os.X_OK)
     return shutil.which(path) is not None
 
 
