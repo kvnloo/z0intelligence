@@ -84,4 +84,26 @@ PYTHONPATH=src python -m pytest tests/test_cognition_shadow.py -q
 (cd omp-extensions/local-cognition && bun test)
 ```
 
-Both use fake registries / fake transports, so they need no GPU and no server.
+The unit tests use fake registries / fake transports, so they need no GPU and no
+server. `shadow.real-omp.test.ts` is a separate, explicitly gated live qualifier;
+ordinary offline runs skip it. The existing `Core unit` workflow runs the shadow
+unit tests alongside the reuse Python and native OMP boundary tests against the
+same frozen OMP SDK and native addon. Passing that workflow does not establish a
+fresh live agent qualification.
+
+## Integration provenance
+
+The factory integration starts at reuse source
+`199a849d1f064685b572bb614ddc9d1fb90dc781` and merges Claude's published shadow
+history through `bd07c5d74b84f179c5d7615cb2319a426dfb7ea4`. This retains
+`a90e3be0d2306eef0d62bacd9dbdf731bc491f7a`'s one-model default and
+`d1a9f3a915efa16798913d7958b72e3f7f68d4da`'s session/tool-call joins without
+copying the implementation or rewriting its authorship.
+
+The previous live shadow receipt used a scripted parent provider and a real
+served child model. It verifies the observation path, not a primary agent's
+learned task behavior. Preserve the withdrawn cross-upstream latency comparisons
+and remaining observations in
+[the two-upstream correction](https://github.com/kvnloo/z0intelligence/issues/137#issuecomment-6092268035).
+This integration neither repeats the completed D2 proof nor activates the
+shadow extension in the user's installation.
