@@ -629,7 +629,7 @@ class BridgeRepoReuseTests(unittest.TestCase):
             "Preserves original evidence when verified references are blank.",
         ))
         out, search = self.first_turn(
-            "Fix row normalization when verified references are blank; preserve original evidence."
+            "Fix normalization of records when verified references are blank; preserve original evidence."
         )
         self.assertEqual(out["decision"]["mode"], "EXTEND", out["packet"]["unresolved_gaps"])
         self.assertFalse(out["decision"]["authorizes_action"])
@@ -642,7 +642,7 @@ class BridgeRepoReuseTests(unittest.TestCase):
     def test_one_named_term_cannot_veto_a_clearly_named_subsystem(self):
         self.declare_subsystems()
         out, search = self.first_turn(
-            "Fix row normalization while preserving ledger token accounting."
+            "Fix normalization of records while preserving ledger token accounting."
         )
         self.assertEqual(out["decision"]["mode"], "EXTEND", out["packet"]["unresolved_gaps"])
         self.assertEqual(
