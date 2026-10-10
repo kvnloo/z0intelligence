@@ -9,6 +9,7 @@ from typing import Any
 
 SHA_RE = re.compile(r"^[0-9a-f]{7,40}$", re.I)
 REQUIRED_TOP = ("issue", "base_revision", "head_revision")
+QUOTED_RE = re.compile(r"""^(["'])(.*?)\1(?:\s+#.*)?$""")
 
 
 def extract_yaml_blocks(text: str) -> list[str]:
@@ -21,6 +22,17 @@ def extract_yaml_blocks(text: str) -> list[str]:
     return [text]
 
 
+def scalar(val: str) -> str:
+    """Plain value of a YAML scalar: drop matching quotes and a trailing comment."""
+    val = val.strip()
+    quoted = QUOTED_RE.match(val)
+    if quoted:
+        return quoted.group(2)
+    if val[:1] in ("'", '"'):
+        return val  # malformed quoting stays as written, so it is rejected
+    return re.sub(r"\s+#.*$", "", val)
+
+
 def parse_simple_yaml(block: str) -> dict[str, Any]:
     """Tiny YAML subset: top-level keys and one nested mapping (tests)."""
     data: dict[str, Any] = {}
@@ -31,7 +43,7 @@ def parse_simple_yaml(block: str) -> dict[str, Any]:
             continue
         nested = re.match(r"^  ([A-Za-z0-9_]+)\s*:\s*(.*)$", raw)
         if nested and current_map is not None:
-            current_map[nested.group(1)] = nested.group(2).strip()
+            current_map[nested.group(1)] = scalar(nested.group(2))
             continue
         top = re.match(r"^([A-Za-z0-9_]+)\s*:\s*(.*)$", raw)
         if not top:
@@ -42,7 +54,7 @@ def parse_simple_yaml(block: str) -> dict[str, Any]:
             data[key] = current_map
             current_key = key
             continue
-        data[key] = val
+        data[key] = scalar(val)
         current_map = None
         current_key = key
     _ = current_key
