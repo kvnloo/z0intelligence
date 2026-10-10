@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import fcntl
+import math
 import os
 import time
 import uuid
@@ -443,32 +444,78 @@ def _iter_jsonl(path: Path):
                 continue
 
 
-def find_receipt(trace_id: str, *, root: Path | None = None) -> dict[str, Any] | None:
-    """Latest canonical receipt, falling back to legacy streams in the same root."""
-    hits: list[dict[str, Any]] = []
-    primary = receipts_path(root)
+def _merge_receipt_revision(previous: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
+    """Keep outcome and usage revisions independent of replayed decision snapshots."""
+    def timestamp(row: dict[str, Any], field: str, default: float) -> float:
+        value = row.get(field, row.get("ts"))
+        return float(value) if type(value) in (int, float) and math.isfinite(value) else default
+
+    def outcome_key(row: dict[str, Any]) -> tuple[int, float, bool]:
+        outcome = row.get("outcome")
+        stored = row.get("outcome_tier")
+        tier = effective_tier(outcome if isinstance(outcome, dict) else None,
+                              stored_tier=stored if isinstance(stored, str) else None)
+        strength = 2 if tier in {"gold", "negative"} else 1 if tier == "execution" else 0
+        negative = tier == "negative"
+        return strength, timestamp(row, "outcome_ts", math.inf if negative else -math.inf), negative
+
+    merged = {**previous, **incoming}
+    if isinstance(previous.get("extra"), dict) and isinstance(incoming.get("extra"), dict):
+        merged["extra"] = {**previous["extra"], **incoming["extra"]}
+    outcomes = [row for row in (previous, incoming) if row.get("outcome") or row.get("outcome_tier")]
+    if outcomes:
+        chosen = max(reversed(outcomes), key=outcome_key)
+        for field in ("outcome", "outcome_tier", "outcome_ts"):
+            merged.pop(field, None)
+            if field in chosen:
+                merged[field] = chosen[field]
+        merged["outcome_ts"] = chosen.get("outcome_ts", chosen.get("ts"))
+    usage_fields = (
+        "input_tokens", "output_tokens", "cached_input_tokens", "measured_frontier_tokens",
+        "measurement_state", "state_reason", "actual_tokens_saved", "latency_ms", "close_ts", "close_source",
+    )
+    measurements = [row for row in (previous, incoming)
+                    if row.get("close_ts") is not None or any(row.get(k) is not None for k in usage_fields[:4])]
+    if measurements:
+        chosen = max(reversed(measurements), key=lambda row: (
+            row.get("close_ts") is not None, timestamp(row, "close_ts", -math.inf),
+        ))
+        for field in usage_fields:
+            merged.pop(field, None)
+            if field in chosen:
+                merged[field] = chosen[field]
+    return merged
+
+
+def _receipt_views(*, root: Path | None, limit: int | None = None, include_raw: bool = False) -> list[dict[str, Any]]:
     state_root = paths.home() if root is None else root
-    for path in (
-        primary,
-        state_root / "stream" / "bridge.jsonl",
-        state_root / "stream" / "raw.jsonl",
-    ):
-        for row in _iter_jsonl(path) or []:
+    candidates = ([state_root / "stream" / "raw.jsonl"] if include_raw else []) + [
+        state_root / "stream" / "bridge.jsonl", receipts_path(root),
+    ]
+    traces: dict[str, dict[str, Any]] = {}
+    unidentified: list[dict[str, Any]] = []
+    for path in candidates:
+        history = list(_iter_jsonl(path) or [])
+        for row in history if limit is None else history[-limit:]:
             if not isinstance(row, dict):
                 continue
-            if row.get("trace_id") == trace_id:
-                # bridge nests receipt
-                if "receipt" in row and isinstance(row["receipt"], dict):
-                    merged = dict(row)
-                    nested = dict(row["receipt"])
-                    for k, v in nested.items():
-                        merged.setdefault(k, v)
-                    hits.append(merged)
-                else:
-                    hits.append(row)
-        if path == primary and hits:
-            return hits[-1]
-    return hits[-1] if hits else None
+            nested = row.get("receipt")
+            rec = {**nested, **{k: v for k, v in row.items() if k != "receipt"}} if isinstance(nested, dict) else row
+            trace = row.get("trace_id") or rec.get("trace_id")
+            if not trace and isinstance(nested, dict):
+                trace = nested.get("trace_id")
+            if isinstance(trace, str) and trace:
+                rec["trace_id"] = trace
+                traces[trace] = _merge_receipt_revision(traces.get(trace, {}), rec)
+            else:
+                unidentified.append(rec)
+    return [*traces.values(), *unidentified]
+
+
+def find_receipt(trace_id: str, *, root: Path | None = None) -> dict[str, Any] | None:
+    """Canonical decision fields joined to retained same-root outcome and usage evidence."""
+    return next((row for row in _receipt_views(root=root, include_raw=True)
+                 if row.get("trace_id") == trace_id), None)
 
 
 def find_receipt_by_extra(
@@ -629,8 +676,9 @@ def close_turn(
 def summarize_tokenomics(*, root: Path | None = None, limit: int = 5000) -> dict[str, Any]:
     """Aggregate estimated + measured frontier-token economics.
 
-    Count the latest receipt per trace, preferring canonical receipts over
-    legacy bridge mirrors. Retain unidentified rows as separate observations.
+    Count one joined view per trace. Canonical decision fields take precedence;
+    outcome and measured close revisions survive stale snapshots and mirrors.
+    Retain unidentified rows as separate observations.
     Verified counts always re-derive from outcome *fields* via
     ``normalize_outcome``; a stored ``outcome_tier=gold`` without
     verification signals does not count.
@@ -653,87 +701,72 @@ def summarize_tokenomics(*, root: Path | None = None, limit: int = 5000) -> dict
     false_gold_ignored = 0
     by_cap: dict[str, int] = {}
     by_tier: dict[str, int] = {}
-    paths_home = paths.home() if root is None else root
-    candidates = [
-        receipts_path(root),
-        paths_home / "stream" / "bridge.jsonl",
-    ]
-    seen_traces: set[str] = set()
-    for path in candidates:
-        for row in reversed(list(_iter_jsonl(path) or [])[-limit:]):
-            rec = row.get("receipt") if isinstance(row.get("receipt"), dict) else row
-            if not isinstance(rec, dict):
-                continue
-            trace_id = row.get("trace_id") or rec.get("trace_id")
-            if isinstance(trace_id, str) and trace_id:
-                if trace_id in seen_traces:
-                    continue
-                seen_traces.add(trace_id)
-            rows += 1
-            state = normalize_measurement_state(rec.get("measurement_state")) or "unknown"
-            measurement_state_counts[state] = measurement_state_counts.get(state, 0) + 1
-            av = rec.get("estimated_frontier_tokens_avoided")
-            if av is not None:
-                try:
-                    avoided += int(av)
-                except (TypeError, ValueError):
-                    pass
-            b_in = rec.get("baseline_input_tokens")
-            b_out = rec.get("baseline_output_tokens")
-            base_tot = None
+    for rec in _receipt_views(root=root, limit=limit):
+        rows += 1
+        state = normalize_measurement_state(rec.get("measurement_state")) or "unknown"
+        measurement_state_counts[state] = measurement_state_counts.get(state, 0) + 1
+        av = rec.get("estimated_frontier_tokens_avoided")
+        if av is not None:
             try:
-                if b_in is not None or b_out is not None:
-                    base_tot = int(b_in or 0) + int(b_out or 0)
-                    baseline += base_tot
+                avoided += int(av)
             except (TypeError, ValueError):
-                base_tot = None
-            meas = rec.get("measured_frontier_tokens")
-            meas_i = None
-            if meas is not None:
-                try:
-                    meas_i = int(meas)
-                    measured += meas_i
-                except (TypeError, ValueError):
-                    meas_i = None
-            if base_tot is not None and meas_i is not None:
-                rows_with_both += 1
-                if state not in EXPLICIT_INCOMPLETE_MEASUREMENT_STATES:
-                    saved = max(0, base_tot - meas_i)
-                    actual_saved += saved
-                    if state == "complete":
-                        actual_saved_authoritative += saved
-                    else:
-                        actual_saved_provisional += saved
-            outcome = rec.get("outcome") or row.get("outcome")
-            stored_tier = rec.get("outcome_tier") or row.get("outcome_tier")
-            if outcome or stored_tier:
-                with_outcome += 1
-                tier = effective_tier(
-                    outcome if isinstance(outcome, dict) else None,
-                    stored_tier=stored_tier if isinstance(stored_tier, str) else None,
+                pass
+        b_in = rec.get("baseline_input_tokens")
+        b_out = rec.get("baseline_output_tokens")
+        base_tot = None
+        try:
+            if b_in is not None or b_out is not None:
+                base_tot = int(b_in or 0) + int(b_out or 0)
+                baseline += base_tot
+        except (TypeError, ValueError):
+            base_tot = None
+        meas = rec.get("measured_frontier_tokens")
+        meas_i = None
+        if meas is not None:
+            try:
+                meas_i = int(meas)
+                measured += meas_i
+            except (TypeError, ValueError):
+                meas_i = None
+        if base_tot is not None and meas_i is not None:
+            rows_with_both += 1
+            if state not in EXPLICIT_INCOMPLETE_MEASUREMENT_STATES:
+                saved = max(0, base_tot - meas_i)
+                actual_saved += saved
+                if state == "complete":
+                    actual_saved_authoritative += saved
+                else:
+                    actual_saved_provisional += saved
+        outcome = rec.get("outcome")
+        stored_tier = rec.get("outcome_tier")
+        if outcome or stored_tier:
+            with_outcome += 1
+            tier = effective_tier(
+                outcome if isinstance(outcome, dict) else None,
+                stored_tier=stored_tier if isinstance(stored_tier, str) else None,
+            )
+            if stored_tier == "gold" and tier != "gold":
+                false_gold_ignored += 1
+            if tier:
+                by_tier[tier] = by_tier.get(tier, 0) + 1
+            if tier == "gold":
+                verified += 1
+                tok = meas_i if meas_i is not None else (
+                    base_tot if base_tot is not None else None
                 )
-                if stored_tier == "gold" and tier != "gold":
-                    false_gold_ignored += 1
-                if tier:
-                    by_tier[tier] = by_tier.get(tier, 0) + 1
-                if tier == "gold":
-                    verified += 1
-                    tok = meas_i if meas_i is not None else (
-                        base_tot if base_tot is not None else None
-                    )
-                    if tok is None and av is not None:
-                        try:
-                            tok = int(av)
-                        except (TypeError, ValueError):
-                            tok = None
-                    if tok is not None:
-                        verified_tokens += int(tok)
-                        verified_with_token_measurement += 1
-                        if state == "complete":
-                            verified_complete_tokens += int(tok)
-                            verified_complete_token_measurements += 1
-            cap = rec.get("capability_id") or row.get("capability_id") or "unknown"
-            by_cap[str(cap)] = by_cap.get(str(cap), 0) + 1
+                if tok is None and av is not None:
+                    try:
+                        tok = int(av)
+                    except (TypeError, ValueError):
+                        tok = None
+                if tok is not None:
+                    verified_tokens += int(tok)
+                    verified_with_token_measurement += 1
+                    if state == "complete":
+                        verified_complete_tokens += int(tok)
+                        verified_complete_token_measurements += 1
+        cap = rec.get("capability_id") or "unknown"
+        by_cap[str(cap)] = by_cap.get(str(cap), 0) + 1
     t_per_v = (verified_tokens / verified) if verified else None
     verified_tokens_authoritative = (
         verified > 0
@@ -818,11 +851,7 @@ def scrub_contaminated_outcomes(
             for c in corrections:
                 fh.write(json.dumps(c, default=str) + "\n")
                 rewritten += 1
-                base = (
-                    c.get("receipt")
-                    if isinstance(c.get("receipt"), dict)
-                    else find_receipt(c["trace_id"], root=root)
-                )
+                base = find_receipt(c["trace_id"], root=root) or c.get("receipt")
                 if isinstance(base, dict):
                     updated = dict(base)
                     updated["outcome"] = c["outcome"]
