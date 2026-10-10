@@ -13,8 +13,7 @@ Limits these tests pin (the last value published, the first value refused):
     the same, as a named host's name       27 and 59        28 and 60  ("tern:" is part of the word)
     UUID inside a word                     counts as 1 character
     slash-joined lowercase (redactor)      47               48
-    integer label (JSON number)            2**63 - 1        2**63  (either sign)
-    integer identifier                     judged by its text: 20 digits published, 21 a stand-in
+    integer label or identifier            20 digits        21 digits  (either sign: judged by its text)
     number (_num)                          2**63 - 1        2**63  (either sign), NaN, Infinity, bool
     count (_count)                         0 .. 2**63 - 1   -1, 2**63, a fraction, bool
     GPU rows per host                      64               the 65th is cut
@@ -380,18 +379,33 @@ def test_sk_dash_inside_a_word_is_not_a_key_prefix(text):
 # --------------------------------------------------------------------------- (5) integers and numbers
 
 
-INSIDE = [0, 1, -1, BOUND - 2, BOUND - 1, -(BOUND - 2), -(BOUND - 1)]
-OUTSIDE = [BOUND, BOUND + 1, -BOUND, -(BOUND + 1), 2**64, -(2**64), 10**30]
+DIGITS_20 = 10**20 - 1  # the largest integer whose text is a run of 20 digits
+INSIDE = [0, 1, -1, BOUND - 1, BOUND, BOUND + 1, -BOUND, 2**64, 10**19, DIGITS_20 - 1, DIGITS_20, -DIGITS_20]
+OUTSIDE = [DIGITS_20 + 1, DIGITS_20 + 2, -(DIGITS_20 + 1), 10**21, 10**30, -(10**30)]
+# Past the 4300 digits Python will convert: refused without being turned into text at all.
+HUGE = [pytest.param(10**5000, id="10**5000"), pytest.param(-(10**5000), id="-10**5000")]
 
 
 @pytest.mark.parametrize("value", INSIDE)
-def test_an_integer_label_inside_the_bound_is_published_as_its_digits(value):
+def test_an_integer_label_of_up_to_20_digits_is_published_as_its_digits(value):
     _assert_label(value, True)
 
 
-@pytest.mark.parametrize("value", OUTSIDE)
-def test_an_integer_label_at_or_past_the_bound_is_null(value):
+@pytest.mark.parametrize("value", OUTSIDE + HUGE)
+def test_an_integer_label_of_21_digits_or_more_is_null(value):
     _assert_label(value, False)
+
+
+@pytest.mark.parametrize("value", INSIDE + OUTSIDE)
+def test_an_integer_is_a_label_exactly_when_its_text_is_and_exactly_when_it_is_an_id(value):
+    # One rule for a JSON number and for the same digits in a JSON string, for a label and for an id.
+    text = str(value)
+    assert cs._label(value) == cs._label(text)
+    assert (cs._label(value) is not None) is (cs._ident(value)[1] is False)
+    for key in LABEL_KEYS:
+        assert _publish(key, value)[0] == _publish(key, text)[0], key
+    label, reference = _publish("host.label", value)[0], _publish("lease.demand_id", value)[0]
+    assert (label, reference) == ((text, text) if value in INSIDE else (None, _stand_in(text)))
 
 
 @pytest.mark.parametrize("value", [True, False, 1.0, 0.0, 1.5, float(BOUND), float("nan"), float("inf")])
@@ -639,7 +653,7 @@ def test_a_host_label_wins_over_its_name_and_the_name_is_used_when_the_label_is_
     assert label({"label": "a" * 21, "name": "back"}) == "back"
     assert label({"label": "front", "name": "a" * 21}) == "front"
     assert label({"label": "a" * 21, "name": "b" * 21}) is None
-    assert label({"label": BOUND, "name": BOUND - 1}) == str(BOUND - 1)
+    assert label({"label": DIGITS_20 + 1, "name": DIGITS_20}) == str(DIGITS_20)
 
 
 def test_a_session_runtime_wins_over_its_program():

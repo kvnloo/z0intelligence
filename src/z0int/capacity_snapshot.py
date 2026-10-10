@@ -82,7 +82,8 @@ _DROPPED = object()  # a row whose identifier is a container; counted, never sil
 # counted as one character, has no alphanumeric run over 20 characters and no
 # space-free word over 32 characters (64 when the word has no uppercase letter).
 # The repo redactor is still applied. What follows any leading tern: prefixes
-# must pass the same policy.
+# must pass the same policy. An integer is a label when its digits are, as an
+# integer id is: a run of at most 20 of them.
 _LABEL_CHARS = re.compile(r"[A-Za-z0-9 ._:/-]+")
 _ALNUM_RUN = re.compile(r"[A-Za-z0-9]+")
 _UUID = re.compile(r"(?<![A-Za-z0-9])[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}(?![A-Za-z0-9])")
@@ -144,7 +145,7 @@ def _enum(value: Any, allowed: frozenset[str], default: str = "unknown") -> str:
 
 def _label(value: Any, limit: int = _MAX_TEXT) -> str | None:
     """A short plain label that passes the label policy above, or None."""
-    if isinstance(value, int) and not isinstance(value, bool) and abs(value) < _MAX_NUMBER:
+    if isinstance(value, int) and not isinstance(value, bool) and abs(value) < 10**_MAX_RUN:
         return str(value)
     if not isinstance(value, str):
         return None
