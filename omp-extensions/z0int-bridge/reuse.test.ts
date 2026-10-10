@@ -392,6 +392,64 @@ test("non-primary resolver and context hooks cannot replace the primary packet",
 	});
 });
 
+
+for (const shape of ["input_text", "string"] as const) {
+	test(`final Responses user ${shape} content qualifies the exact injected block`, async () => {
+		const h = harness();
+		await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
+		const injected = await h.adapter.context({ messages: [] }, CONTEXT);
+		const block = injected?.messages.at(-1);
+		if (!block || block.role !== "user" || typeof block.content !== "string") throw new Error("Expected appended user context");
+		const content = shape === "string" ? block.content : [{ type: "input_text", text: block.content }];
+		const serializedBody = JSON.stringify({ input: [{ role: "user", content }] });
+		await h.adapter.providerPayloadFinalized({ serializedBody }, CONTEXT);
+		expect(h.sent.find(row => row.body.op === "reuse_model_input")?.body.payload).toMatchObject({
+			context_sha256: sha256Utf8(block.content), request_sha256: sha256Utf8(serializedBody),
+			injection_id: 7, stage: "provider_payload", boundary: "sdk_final_payload",
+		});
+	});
+}
+
+test("Responses witness ignores metadata, tool output, unsupported parts and decoy Chat messages", async () => {
+	const cases = ["metadata", "tool", "part", "nonmessage", "stale", "decoy", "malformed-input"] as const;
+	for (const kind of cases) {
+		const h = harness();
+		await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
+		const injected = await h.adapter.context({ messages: [] }, CONTEXT);
+		const block = injected?.messages.at(-1);
+		if (!block || block.role !== "user" || typeof block.content !== "string") throw new Error("Expected appended user context");
+		const text = block.content;
+		const bodies: Record<typeof cases[number], RequestBody> = {
+			metadata: { input: [], metadata: { text } },
+			tool: { input: [{ type: "function_call_output", call_id: "call", output: text, content: text }] },
+			part: { input: [{ role: "user", content: [{ type: "output_text", text }] }] },
+			nonmessage: { input: [{ type: "reasoning", role: "user", content: text }] },
+			stale: { input: [{ role: "user", content: text.replace("raw canonical packet", "stale packet") }] },
+			decoy: { input: [], messages: [{ role: "user", content: text }] },
+			"malformed-input": { input: null, messages: [{ role: "user", content: text }] },
+		};
+		await h.adapter.providerPayloadFinalized({ serializedBody: JSON.stringify(bodies[kind]) }, CONTEXT);
+		expect(h.sent.find(row => row.body.op === "reuse_model_input")?.body.payload).toMatchObject({ context_sha256: "missing" });
+	}
+});
+
+test("Responses auxiliary input cannot create or revoke a primary payload witness", async () => {
+	const h = harness();
+	await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);
+	const injected = await h.adapter.context({ messages: [] }, CONTEXT);
+	const block = injected?.messages.at(-1);
+	if (!block || block.role !== "user" || typeof block.content !== "string") throw new Error("Expected appended user context");
+	const serializedBody = JSON.stringify({ input: [{ role: "user", content: [{ type: "input_text", text: block.content }] }] });
+	for (const auxiliary of [ADVISOR_CONTEXT, UNKNOWN_AGENT_CONTEXT]) {
+		await h.adapter.providerPayloadFinalized({ serializedBody }, auxiliary);
+	}
+	expect(h.sent.filter(row => row.body.op === "reuse_model_input")).toHaveLength(0);
+	await h.adapter.providerPayloadFinalized({ serializedBody }, CONTEXT);
+	await h.adapter.providerPayloadFinalized({ serializedBody: "{", }, ADVISOR_CONTEXT);
+	expect(h.sent.filter(row => row.body.op === "reuse_model_input")).toHaveLength(1);
+	expect(h.sent.find(row => row.body.op === "reuse_model_input")?.body.payload).toMatchObject({ context_sha256: sha256Utf8(block.content) });
+});
+
 test("non-primary finalized payloads cannot qualify or revoke the primary witness", async () => {
 	const h = harness();
 	await h.adapter.beforeAgentStart({ prompt: "Primary task" }, CONTEXT);

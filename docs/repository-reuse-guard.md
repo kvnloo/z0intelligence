@@ -88,27 +88,32 @@ when fresh source observations differ or become unavailable. These observations
 never grant tool authorization or establish provider delivery, model use or
 verified success.
 
+For Responses, the witness reads the exact current context block from user
+messages in `input`, with string or `input_text` content. A supplied `input`
+field takes precedence over any `messages` field. Metadata, function outputs,
+unsupported parts and auxiliary agent requests cannot supply this witness.
+
 The final observer requires the companion OMP patch based on
-`v18.8.1@4ff490a1cd3e567e0f4d0bc76643bf679fac4138`. It adds the read-only
+`v18.8.5@4bf0d9d3e9f910ef4af25dec9733fbb4d6912d4c`. It adds the read-only
 `provider_payload_finalized` event after payload replacements and serialization.
-Only Ollama Chat and OpenAI Completions are covered. Unpatched OMP and unsupported
-providers produce no final witness, so enforce remains blocked. This change
-does not activate an installed harness or change its approval settings.
+Ollama Chat, OpenAI Completions and OpenAI Responses are covered. Unpatched OMP
+and unsupported providers produce no final witness, so enforce remains blocked.
+This change does not activate an installed harness or change its approval settings.
 
 The companion patch is registered at
 `omp-extensions/z0int-bridge/patches/omp-provider-boundary.patch`
-(SHA-256 `d1fa022ce901efaa6a0bba7cf77ee2bb0913313f6f1539c6a286c97e55cffac8`).
-Applied to the base above, it reconstructs the tree of the original OMP commit
-`b8f06caf3d4c16d15549dc43c90620165ffcf742`:
-`1744f67c2f25241fad2a993e499875edce999699`. Core unit CI verifies that tree,
+(SHA-256 `99cd8086afd7a0db9b6d1685d4e14471fa60f3cb412df9e1c66c1bb5f274d14c`).
+Applied to the base above, it reconstructs the tree of the isolated OMP candidate
+`267cc7290cdeee0dd7797326c8d44f200c064a10`:
+`a5769cdd3c7bf03ddde0a4891e9f3e8ab4378905`. Core unit CI verifies that tree,
 installs its frozen lockfile using Bun 1.3.14, and runs the Python owning tests
 and all three reuse TypeScript suites at the exact PR head. Their scripted
 provider responses verify transport and guards; they are not fresh live agent
 behavior.
 
 Clean-checkout tests generate OMP's export asset from that source and use the
-matching `@oh-my-pi/pi-natives-linux-x64@18.8.1` addon. Its archive integrity is
-`sha512-oH63mF6CtMuPmQd7sbwOXyBczw/+Rv/ZvGO+e9OtqgzQi6LfKt8ECwitxZhIkYyhy964p+ylV0/bVK1dppM3qg==`.
+matching `@oh-my-pi/pi-natives-linux-x64@18.8.5` addon. Its archive integrity is
+`sha512-XtxSGlQfwfirIo4qdXDxiVR8yjEOfKHIAb8y2dWqok7iMw6PkkvrVMvR6SbiB0TXjq6Lk9RyAZwMYfx/wd3EcQ==`.
 CI verifies this before placing the two binaries in OMP's workspace native directory;
 an installed client's generated assets or native binaries cannot supply these
 dependencies implicitly.

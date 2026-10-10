@@ -474,7 +474,12 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 		let found = false;
 		try {
 			const body: unknown = JSON.parse(event.serializedBody);
-			if (isObject(body) && Array.isArray(body.messages)) {
+			if (isObject(body) && "input" in body) {
+				// Responses consumes input, not a possible decoy messages field.
+				found = Array.isArray(body.input) && body.input.some(message => isObject(message) &&
+					message.role === "user" && (message.type === undefined || message.type === "message") &&
+					containsContext(message.content, state.contextBlock, "input_text"));
+			} else if (isObject(body) && Array.isArray(body.messages)) {
 				found = body.messages.some(message => isObject(message) && containsContext(message.content, state.contextBlock));
 			}
 		} catch {
@@ -670,10 +675,10 @@ export function registerReuseAdapter(pi: ExtensionAPI, dependencies: ReuseDepend
 	return adapter;
 }
 
-function containsContext(value: unknown, block: string): boolean {
+function containsContext(value: unknown, block: string, textType = "text"): boolean {
 	if (typeof value === "string") return value.includes(block);
 	if (!Array.isArray(value)) return false;
-	return value.some(part => isObject(part) && part.type === "text" && typeof part.text === "string" && part.text.includes(block));
+	return value.some(part => isObject(part) && part.type === textType && typeof part.text === "string" && part.text.includes(block));
 }
 
 function isRecoveryTool(toolName: string): boolean {

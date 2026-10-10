@@ -51,13 +51,17 @@ function messageContainsReuseContext(message: unknown): boolean {
 	if (typeof message.content === "string") return message.content.includes("<z0int-reuse-context>");
 	if (!Array.isArray(message.content)) return false;
 	return message.content.some(part =>
-		isObject(part) && part.type === "text" && typeof part.text === "string" &&
+		isObject(part) && (part.type === "text" || part.type === "input_text") && typeof part.text === "string" &&
 		part.text.includes("<z0int-reuse-context>"),
 	);
 }
 
 function stripReuseContextFromPayload(payload: unknown): unknown {
-	if (!isObject(payload) || !Array.isArray(payload.messages)) return payload;
+	if (!isObject(payload)) return payload;
+	if (Array.isArray(payload.input)) {
+		return { ...payload, input: payload.input.filter(message => !messageContainsReuseContext(message)) };
+	}
+	if (!Array.isArray(payload.messages)) return payload;
 	return { ...payload, messages: payload.messages.filter(message => !messageContainsReuseContext(message)) };
 }
 
@@ -124,6 +128,26 @@ function sseResponse(modelId: string, toolCall: boolean, target: string): Respon
 			];
 	const body = `${chunks.map(chunk => `data: ${JSON.stringify(chunk)}`).join("\n\n")}\n\ndata: [DONE]\n\n`;
 	return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+}
+
+
+function responsesSse(toolCall: boolean, target: string): Response {
+	const args = JSON.stringify({ path: target, content: WRITE_CONTENT });
+	const item = { type: "function_call", id: "fc-write", call_id: "call-write", name: "write" };
+	const events: JsonObject[] = toolCall ? [
+		{ type: "response.output_item.added", output_index: 0, item: { ...item, arguments: "", status: "in_progress" } },
+		{ type: "response.function_call_arguments.delta", output_index: 0, item_id: item.id, delta: args },
+		{ type: "response.function_call_arguments.done", output_index: 0, item_id: item.id, arguments: args },
+		{ type: "response.output_item.done", output_index: 0, item: { ...item, arguments: args, status: "completed" } },
+	] : [
+		{ type: "response.output_item.added", output_index: 0, item: { type: "message", id: "msg-done", role: "assistant", status: "in_progress", content: [] } },
+		{ type: "response.output_text.delta", output_index: 0, item_id: "msg-done", delta: "The existing implementation was used." },
+		{ type: "response.output_item.done", output_index: 0, item: { type: "message", id: "msg-done", role: "assistant", status: "completed", content: [{ type: "output_text", text: "The existing implementation was used." }] } },
+	];
+	events.push({ type: "response.completed", response: { status: "completed", usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } } });
+	return new Response(`${events.map(event => `data: ${JSON.stringify(event)}`).join("\n\n")}\n\n`, {
+		status: 200, headers: { "content-type": "text/event-stream" },
+	});
 }
 
 class JsonlBridgeWorker {
@@ -350,19 +374,21 @@ for (const stripUpdatedContext of [false, true]) {
 }
 
 const runtimeScenarios = [
-	{ name: "fixture-backed witness", stripContext: false, useFixtureSearch: true },
-	{ name: "context stripping blocks write", stripContext: true, useFixtureSearch: true },
-	{ name: "resident FFF discovery reaches native write", stripContext: false, useFixtureSearch: false },
+	{ name: "fixture-backed witness", stripContext: false, useFixtureSearch: true, responses: false },
+	{ name: "context stripping blocks write", stripContext: true, useFixtureSearch: true, responses: false },
+	{ name: "resident FFF discovery reaches native write", stripContext: false, useFixtureSearch: false, responses: false },
+	{ name: "Responses input_text witness reaches native write", stripContext: false, useFixtureSearch: true, responses: true },
+	{ name: "Responses stripped input blocks native write", stripContext: true, useFixtureSearch: true, responses: true },
 ] as const;
 
 for (const scenario of runtimeScenarios) {
-	const { stripContext, useFixtureSearch } = scenario;
+	const { stripContext, useFixtureSearch, responses } = scenario;
 	test(`patched final provider payload ${scenario.name}`, async () => {
 		const tempRoot = await mkdtemp(join(tmpdir(), "z0int-reuse-real-bridge-"));
 		const repoRoot = join(tempRoot, "repository");
 		const registryPath = join(tempRoot, "components.yaml");
 		const target = join(repoRoot, "result.py");
-		const model = openAiModel();
+		const model: Model = responses ? { ...openAiModel(), api: "openai-responses" } : openAiModel();
 		const transportBodies: string[] = [];
 		const finalizedBodies: string[] = [];
 		const beforePayloads: unknown[] = [];
@@ -408,7 +434,7 @@ for (const scenario of runtimeScenarios) {
 					if (typeof init?.body !== "string") throw new Error("provider request body was not the observed JSON string");
 					transportBodies.push(init.body);
 					const firstRequest = providerCalls++ === 0;
-					return sseResponse(model.id, firstRequest, target);
+					return responses ? responsesSse(firstRequest, target) : sseResponse(model.id, firstRequest, target);
 				},
 				{ preconnect: globalThis.fetch.preconnect },
 			);
@@ -554,15 +580,18 @@ for (const scenario of runtimeScenarios) {
 			const checkVerifierBinding = isObject(checkResult.verifier_binding) ? checkResult.verifier_binding : {};
 			const serializedProviderBody = transportBodies[0];
 			const parsedProviderBody: unknown = serializedProviderBody ? JSON.parse(serializedProviderBody) : null;
-			const providerMessages = isObject(parsedProviderBody) && Array.isArray(parsedProviderBody.messages)
-				? parsedProviderBody.messages
-				: [];
+			const wireMessages = isObject(parsedProviderBody) ? (responses ? parsedProviderBody.input : parsedProviderBody.messages) : null;
+			const providerMessages = Array.isArray(wireMessages) ? wireMessages : [];
+			if (responses && !stripContext) {
+				expect(providerMessages.some(message => isObject(message) && message.role === "user" && Array.isArray(message.content) &&
+					message.content.some(part => isObject(part) && part.type === "input_text" && String(part.text).includes("<z0int-reuse-context>")))).toBe(true);
+			}
 			const providerBodyText = providerMessages.map(message => {
 				if (!isObject(message)) return "";
 				if (typeof message.content === "string") return message.content;
 				if (!Array.isArray(message.content)) return "";
 				return message.content
-					.filter((part): part is JsonObject => isObject(part) && part.type === "text" && typeof part.text === "string")
+					.filter((part): part is JsonObject => isObject(part) && (part.type === "text" || part.type === "input_text") && typeof part.text === "string")
 					.map(part => String(part.text)).join("\n");
 			}).join("\n");
 			const contextStart = providerBodyText.indexOf("Untrusted repository context follows.");
