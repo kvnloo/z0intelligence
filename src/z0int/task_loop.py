@@ -505,10 +505,18 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
             return (_NOT_COMMITTED + f"the worktree HEAD is detached or on another branch, "
                     f"not the task branch {branch}; nothing was checked out or moved")
         if _branch_blob_sha256(wt, branch, rel) != after:
-            _run_git(["add", "--", rel], cwd=wt)
+            # The name is a file, never a pattern: a*.py must not also match ab.py
+            literal = f":(literal){rel}"
+            _run_git(["add", "--", literal], cwd=wt)
+            # What git will store can differ from the bytes on disk (a clean filter,
+            # a symlink): commit only if the staged blob is the recorded after-image.
+            staged = subprocess.run(["git", "cat-file", "blob", f":{rel}"], cwd=wt, capture_output=True)
+            if staged.returncode != 0 or hashlib.sha256(staged.stdout).hexdigest() != after:
+                _run_git(["reset", "-q", "--", literal], cwd=wt, check=False)
+                return _NOT_COMMITTED + "what git would store for the target does not match the recorded patch"
             _run_git(
                 ["-c", "user.email=z0int@local", "-c", "user.name=z0int-task-loop",
-                 "commit", "-m", f"z0int task {cp.task_id}: bounded patch", "--only", "--", rel],
+                 "commit", "-m", f"z0int task {cp.task_id}: bounded patch", "--only", "--", literal],
                 cwd=wt,
             )
         if _branch_blob_sha256(wt, branch, rel) != after:

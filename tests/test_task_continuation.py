@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from z0int.continuation import InvalidCheckpoint, StaleCheckpoint
 from z0int.task_loop import (
-    TaskCheckpoint, authorize_task, checkpoint_path, list_checkpoints, load_checkpoint,
+    PatchSpec, TaskCheckpoint, authorize_task, checkpoint_path, list_checkpoints, load_checkpoint,
     make_fixture_repo, record_task_checkpoint, resume_task, run_until, save_checkpoint,
     step_apply_patch, step_worktree, task_continuation,
 )
@@ -327,6 +327,60 @@ resume_task(sys.argv[1])
 
     def test_kill_again_after_resume_committed(self):
         self.kill_points_then_resume('before_add', 'after_commit')
+
+    def kill_before_add(self, task_id=None):
+        result = subprocess.run([sys.executable, '-c', KILL_AT_GIT_STEP, task_id or self.cp.task_id, 'before_add'],
+                                text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 90, result.stderr)
+
+    def assert_nothing_committed_and_not_verified(self):
+        cp = resume_task(self.cp.task_id)
+        self.assertIsNot(cp.verified_success, True)
+        self.assertNotEqual(cp.status, 'verified')
+        self.assertEqual(self.git('rev-list', '--count', self.cp.base_ref + '..HEAD').strip(), '0')
+        self.assertIn('BROKEN', self.git('show', 'HEAD:app.py'))
+
+    def test_target_swapped_for_a_symlink_is_not_committed(self):
+        self.kill_before_add()
+        real = self.target.with_name('real.py')
+        self.target.rename(real)
+        self.target.symlink_to('real.py')
+        self.assert_nothing_committed_and_not_verified()
+
+    def test_content_changed_by_a_clean_filter_is_not_committed(self):
+        self.kill_before_add()
+        self.git('config', 'filter.shout.clean', 'tr a-z A-Z')
+        info = Path(self.git('rev-parse', '--git-common-dir').strip()) / 'info'
+        info.mkdir(exist_ok=True)
+        (info / 'attributes').write_text('app.py filter=shout\n')
+        self.assert_nothing_committed_and_not_verified()
+        self.assertEqual(self.git('diff', '--cached', '--name-only').strip(), '')
+
+    def test_a_target_name_with_glob_characters_commits_only_that_file(self):
+        repo = self.root / 'globrepo'
+        repo.mkdir()
+        run = lambda *args: subprocess.run(['git', *args], cwd=repo, check=True, text=True, capture_output=True)
+        run('init')
+        (repo / 'a*.py').write_text('STATUS = "BROKEN"\n')
+        (repo / 'ab.py').write_text('SIBLING = 1\n')
+        run('add', '-A')
+        run('-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-m', 'fixture')
+        spec = PatchSpec(relative_path='a*.py', find='STATUS = "BROKEN"', replace='STATUS = "READY"',
+                         description='glob-named target')
+        cp = authorize_task(base_repo=repo, patch=spec, task_id='glob-task')
+        cp.status = 'resolved'
+        save_checkpoint(cp)
+        cp = step_worktree(cp, worktrees_root=self.root / 'wts')
+        self.kill_before_add(cp.task_id)
+        wt = Path(cp.worktree_path)
+        (wt / 'ab.py').write_text('SIBLING = 2\n')
+        done = resume_task(cp.task_id)
+        self.assertTrue(done.verified_success, done.last_error)
+        changed = subprocess.run(['git', 'show', '--name-only', '--format=', 'HEAD'], cwd=wt, check=True,
+                                 text=True, capture_output=True).stdout.split()
+        self.assertEqual(changed, ['a*.py'])
+        self.assertIn('ab.py', subprocess.run(['git', 'status', '--porcelain'], cwd=wt, check=True, text=True,
+                                              capture_output=True).stdout)
 
     def test_uncommittable_patch_is_not_reported_verified(self):
         hooks = Path(self.git('rev-parse', '--git-common-dir').strip()) / 'hooks'
