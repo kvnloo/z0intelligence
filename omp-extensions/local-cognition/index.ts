@@ -27,7 +27,11 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 const DEFAULT_TIMEOUT_MS = 4000;
-const DEFAULT_MODELS = ["nemotron_orchestrator_8b", "functiongemma_270m"];
+// One model. The local supervisor keeps a single model resident, and a tool
+// call that asks two different models at once makes it swap between them
+// until both requests time out; that was measured, with a 4 s and a 60 s
+// budget alike. Configure several only against a server that holds them all.
+const DEFAULT_MODELS = ["functiongemma_270m"];
 const DEFAULT_AUTHORITY = ["read"];
 const DEFAULT_TOOL_NAMES = ["bash", "read", "write", "edit", "grep", "glob"];
 const MAX_STATE_CHARS = 2000;
@@ -76,13 +80,44 @@ type BridgeTransport = {
 	warm?: (backend: string) => Promise<Jsonish>;
 };
 
+/** What the lane learned from one tool call. `ok` is true only when the worker answered. */
+type ShadowOutcome = "slm_executed" | "compiler_only" | "unavailable" | "timeout" | "error" | "no_transport";
+
+/** What one requested model did. A model that never ran is never an abstention. */
+type ModelStatus = "selected" | "abstained" | "invalid_call" | "unavailable" | "timeout";
+
+type ModelObservation = {
+	label: string;
+	model: string | null;
+	backend: string | null;
+	status: ModelStatus;
+	ran: boolean;
+	selected_action: string | null;
+	agrees_with_observed: boolean | null;
+	latency_ms: number | null;
+};
+
+type ShadowClassification = { outcome: ShadowOutcome; models: ModelObservation[]; legal_count: number | null };
+
 type StatusRow = {
 	ts: number;
 	ok: boolean;
+	outcome?: ShadowOutcome;
 	via?: string;
 	tool?: string;
 	trace_id?: unknown;
 	error?: string;
+	session_id?: string | null;
+	/** Where the observation ended up: in the session, or nowhere because the session had changed. */
+	recorded?: "session_entry" | "session_changed" | "no_session_api";
+};
+
+type ObservationIdentity = {
+	sessionId: string | null;
+	toolCallId: string;
+	tool: string;
+	/** Reads the session OMP is in now, so a late result is not written into a different one. */
+	currentSessionId?: () => string | null;
 };
 
 // --- settings / env -----------------------------------------------------
@@ -124,6 +159,9 @@ export function loadCognitionSettings(): Jsonish {
 export function __resetLocalCognitionForTest(): void {
 	settingsCache = null;
 	statusRing.length = 0;
+	counters.tool_calls = 0;
+	counters.settled = 0;
+	counters.by_outcome = {};
 }
 
 function parseBool(raw: unknown): boolean | null {
@@ -292,13 +330,22 @@ function buildActions(toolNames: string[]): Jsonish[] {
 	}));
 }
 
-export function buildShadowPayload(event: ToolCallLike, toolNames: string[]): Jsonish {
+/** The session OMP is actually running, read from the handler context. */
+export function liveSessionId(ctx: unknown): string | null {
+	const manager = (ctx as { sessionManager?: unknown } | undefined)?.sessionManager;
+	const id = safeCall(manager, "getSessionId");
+	return typeof id === "string" && id.length > 0 ? id : null;
+}
+
+export function buildShadowPayload(event: ToolCallLike, toolNames: string[], sessionId: string | null = null): Jsonish {
 	const toolName = typeof event?.toolName === "string" ? event.toolName : "";
 	const input = event?.input && typeof event.input === "object" ? event.input : {};
 	return {
 		op: "cognition_shadow",
 		trace_id: randomUUID().replaceAll("-", ""),
-		session_id: process.env.OMP_SESSION_ID ?? null,
+		// An environment variable describes the process, not the session a
+		// tool call belongs to; it is only a fallback when OMP offers no id.
+		session_id: sessionId ?? process.env.OMP_SESSION_ID ?? null,
 		state: `OMP tool_call: ${toolName}\ninput: ${safeJson(input).slice(0, MAX_STATE_CHARS)}`,
 		actions: buildActions(toolNames),
 		granted_capabilities: toolNames,
@@ -354,57 +401,186 @@ export function withTimeout<T>(value: Promise<T> | T, ms: number): Promise<T> {
 }
 
 const statusRing: StatusRow[] = [];
+const counters: { tool_calls: number; settled: number; by_outcome: Record<string, number> } = {
+	tool_calls: 0,
+	settled: 0,
+	by_outcome: {},
+};
 
 function recordStatus(row: StatusRow): void {
 	statusRing.push(row);
 	if (statusRing.length > STATUS_RING) statusRing.shift();
+	counters.settled += 1;
+	const outcome = row.outcome ?? "error";
+	counters.by_outcome[outcome] = (counters.by_outcome[outcome] ?? 0) + 1;
+}
+
+/** Tool calls seen against observations that settled, by outcome. */
+export function coverage(): { tool_calls: number; settled: number; by_outcome: Record<string, number> } {
+	return { tool_calls: counters.tool_calls, settled: counters.settled, by_outcome: { ...counters.by_outcome } };
+}
+
+function text(value: unknown): string | null {
+	return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/**
+ * Read a worker response for what each requested model actually did.
+ *
+ * The worker marks every row without a decision `abstained`, including models
+ * that were never reached. Here a model has abstained only if its backend
+ * answered; an unreached model is `unavailable` and one that ran out of time
+ * is `timeout`. With no model rows at all the worker only compiled the legal
+ * action set.
+ */
+export function classifyShadowResponse(response: unknown, observedTool: string): ShadowClassification {
+	const body = response && typeof response === "object" ? (response as Jsonish) : {};
+	if (body.ok !== true) return { outcome: "error", models: [], legal_count: null };
+	const legal = Array.isArray(body.legal_ids) ? body.legal_ids.length : null;
+	const rows = Array.isArray(body.shadow) ? (body.shadow as unknown[]) : [];
+	const models: ModelObservation[] = rows
+		.filter((row): row is Jsonish => !!row && typeof row === "object")
+		.map(row => {
+			const backend = text(row.backend);
+			const failure = text(row.error) ?? (backend === null ? text(row.parse_error) : null);
+			const ran = backend !== null && text(row.error) === null;
+			const selected = ran ? text(row.selected_action) : null;
+			let status: ModelStatus;
+			if (!ran) status = failure === "shadow_timeout" ? "timeout" : "unavailable";
+			else if (row.invalid_call === true) status = "invalid_call";
+			else if (selected !== null) status = "selected";
+			else status = "abstained";
+			return {
+				label: text(row.label) ?? "?",
+				model: text(row.model),
+				backend,
+				status,
+				ran,
+				selected_action: status === "selected" ? selected : null,
+				agrees_with_observed: status === "selected" ? selected === observedTool : null,
+				latency_ms: ran && typeof row.latency_ms === "number" ? row.latency_ms : null,
+			};
+		});
+	let outcome: ShadowOutcome;
+	if (models.length === 0) outcome = "compiler_only";
+	else if (models.some(model => model.ran)) outcome = "slm_executed";
+	else if (models.every(model => model.status === "timeout")) outcome = "timeout";
+	else outcome = "unavailable";
+	return { outcome, models, legal_count: legal };
+}
+
+const ENTRY_TYPE = "z0int-cognition-shadow";
+
+/**
+ * Put the observation in the OMP session it belongs to, so OMP's own trace
+ * can show it beside the tool call. A session entry is a record, not a
+ * message: it is never part of what the model reads.
+ */
+function appendObservation(
+	pi: ExtensionAPI | undefined,
+	identity: ObservationIdentity,
+	payload: Jsonish,
+	classified: ShadowClassification,
+	row: StatusRow,
+	elapsedMs: number,
+): StatusRow["recorded"] {
+	try {
+		const append = pi?.appendEntry;
+		if (typeof append !== "function") return "no_session_api";
+		// pi.appendEntry writes to whichever session is current. If the user
+		// switched or restarted while the worker was answering, this observation
+		// belongs to the old session and must not appear in the new one.
+		if (identity.currentSessionId && identity.currentSessionId() !== identity.sessionId) return "session_changed";
+		const transport = getTransport();
+		(append as (customType: string, data: Jsonish) => void).call(pi, ENTRY_TYPE, {
+			schema: "z0int.cognition_shadow_observation.v1",
+			session_id: identity.sessionId,
+			tool_call_id: identity.toolCallId,
+			tool: identity.tool,
+			trace_id: payload.trace_id,
+			outcome: classified.outcome,
+			models: classified.models,
+			legal_count: classified.legal_count,
+			requested_models: Array.isArray(payload.shadows) ? payload.shadows : [],
+			round_trip_ms: Math.round(elapsedMs),
+			via: row.via ?? null,
+			error: row.error ?? null,
+			worker: transport
+				? { kind: transport.kind ?? null, generation: transport.generation ?? null, build_id: transport.buildId ?? null }
+				: null,
+		});
+		return "session_entry";
+	} catch {
+		/* observe-only: a session that cannot record must not affect the tool call */
+		return "no_session_api";
+	}
 }
 
 /** Fire-and-forget. Resolves only after the send settles, but callers never await. */
-export async function sendShadow(payload: Jsonish, timeoutMs: number): Promise<StatusRow> {
-	const started = Date.now() / 1000;
+export async function sendShadow(
+	payload: Jsonish,
+	timeoutMs: number,
+	pi?: ExtensionAPI,
+	identity?: ObservationIdentity,
+): Promise<StatusRow> {
+	const startedMs = Date.now();
 	const tool = typeof payload.facts === "object" && payload.facts !== null
 		? String((payload.facts as Jsonish).tool_name ?? "")
 		: "";
-	const base: StatusRow = { ts: started, ok: false, trace_id: payload.trace_id, tool };
+	const who: ObservationIdentity = identity ?? {
+		sessionId: typeof payload.session_id === "string" ? payload.session_id : null,
+		toolCallId: typeof payload.facts === "object" && payload.facts !== null
+			? String((payload.facts as Jsonish).tool_call_id ?? "")
+			: "",
+		tool,
+	};
+	const base: StatusRow = { ts: startedMs / 1000, ok: false, trace_id: payload.trace_id, tool };
+	const settle = (row: StatusRow, classified: ShadowClassification): StatusRow => {
+		const settled: StatusRow = { ...row, outcome: classified.outcome, session_id: who.sessionId };
+		settled.recorded = appendObservation(pi, who, payload, classified, settled, Date.now() - startedMs);
+		recordStatus(settled);
+		return settled;
+	};
+	const answered = (response: unknown, via: string): StatusRow => {
+		const classified = classifyShadowResponse(response, tool);
+		// The worker answering is not the same as a model running; the outcome says which.
+		const reason = classified.outcome === "error" && response && typeof response === "object"
+			? text((response as Jsonish).reason) ?? "worker_error"
+			: undefined;
+		return settle({ ...base, ok: classified.outcome !== "error", via, ...(reason ? { error: reason } : {}) }, classified);
+	};
+	const failed = (outcome: ShadowOutcome, error: string): StatusRow =>
+		settle({ ...base, error }, { outcome, models: [], legal_count: null });
 	try {
 		const transport = getTransport();
 		if (transport) {
-			await withTimeout(transport.request(payload, timeoutMs), timeoutMs);
-			const row = { ...base, ok: true, via: "transport" };
-			recordStatus(row);
-			return row;
+			return answered(await withTimeout(transport.request(payload, timeoutMs), timeoutMs), "transport");
 		}
 		if (parseBool(process.env.OMP_Z0INT_COGNITION_BRIDGE_FALLBACK) === false) {
-			const row = { ...base, error: "no_transport" };
-			recordStatus(row);
-			return row;
+			return failed("no_transport", "no_transport");
 		}
 		const module = await bridgeModule();
 		const ensureWorker = module?.ensureWorker;
 		const request = module?.request;
 		if (typeof ensureWorker === "function" && typeof request === "function") {
 			const handle = await (ensureWorker as () => Promise<unknown>)();
-			await withTimeout(
-				(request as (h: unknown, body: Jsonish, ms: number) => Promise<Jsonish>)(
-					handle,
-					payload,
+			return answered(
+				await withTimeout(
+					(request as (h: unknown, body: Jsonish, ms: number) => Promise<Jsonish>)(
+						handle,
+						payload,
+						timeoutMs,
+					),
 					timeoutMs,
 				),
-				timeoutMs,
+				"z0int-bridge-import",
 			);
-			const row = { ...base, ok: true, via: "z0int-bridge-import" };
-			recordStatus(row);
-			return row;
 		}
-		const row = { ...base, error: "no_transport" };
-		recordStatus(row);
-		return row;
+		return failed("no_transport", "no_transport");
 	} catch (error) {
 		// Swallowed on purpose: a shadow timeout is not a tool failure.
-		const row = { ...base, error: error instanceof Error ? error.message : String(error) };
-		recordStatus(row);
-		return row;
+		const message = error instanceof Error ? error.message : String(error);
+		return failed(message.startsWith("cognition_shadow timeout") ? "timeout" : "error", message);
 	}
 }
 
@@ -465,6 +641,10 @@ function formatReceiptRow(row: Jsonish): string {
 				return `${label}:invalid(${String(entry.attempted_action ?? "?")})`;
 			}
 			if (entry.selected_action) return `${label}:${String(entry.selected_action)}`;
+			// The worker writes `abstained` for unreached models too; say which it was.
+			if (entry.backend === null || entry.backend === undefined) {
+				return `${label}:${entry.error === "shadow_timeout" ? "timeout" : "unavailable"}`;
+			}
 			return `${label}:abstain`;
 		})
 		.join(" ");
@@ -493,9 +673,17 @@ export default function localCognition(pi: ExtensionAPI): void {
 					: "";
 			if (!observed) return undefined;
 			seenTools.add(observed);
+			counters.tool_calls += 1;
 			const toolNames = resolveAvailableTools(pi, ctx, observed, seenTools);
-			const payload = buildShadowPayload(event as ToolCallLike, toolNames);
-			void sendShadow(payload, cognitionTimeoutMs());
+			const sessionId = liveSessionId(ctx);
+			const payload = buildShadowPayload(event as ToolCallLike, toolNames, sessionId);
+			const toolCallId = (event as ToolCallLike).toolCallId;
+			void sendShadow(payload, cognitionTimeoutMs(), pi, {
+				sessionId,
+				toolCallId: typeof toolCallId === "string" ? toolCallId : "",
+				tool: observed,
+				currentSessionId: () => liveSessionId(ctx),
+			});
 		} catch {
 			/* observe-only: never surface, never block */
 		}
@@ -513,10 +701,13 @@ export default function localCognition(pi: ExtensionAPI): void {
 				rows = statusRing.slice(-limit) as unknown as Jsonish[];
 				source = "memory";
 			}
+			const seen = coverage();
+			const summary = `observed ${seen.tool_calls} tool calls, ${seen.settled} settled ${JSON.stringify(seen.by_outcome)}`;
 			const text =
 				rows.length === 0
-					? "z0int cognition: no shadow rows yet"
+					? `z0int cognition: no shadow rows yet (${summary})`
 					: [
+							`z0int cognition: ${summary}`,
 							`z0int cognition (${source}, last ${rows.length}):`,
 							...rows.map(row =>
 								source === "receipts" ? formatReceiptRow(row) : JSON.stringify(row),

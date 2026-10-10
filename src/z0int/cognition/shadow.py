@@ -457,6 +457,9 @@ def run_shadow(
     session_id = payload.get("session_id")
     if not isinstance(session_id, str):
         session_id = None
+    facts = payload.get("facts") if isinstance(payload.get("facts"), Mapping) else {}
+    tool_call_id = facts.get("tool_call_id") if isinstance(facts.get("tool_call_id"), str) else None
+    tool_name = facts.get("tool_name") if isinstance(facts.get("tool_name"), str) else None
 
     try:
         # Compile first, and only then let any backend see the result.
@@ -510,6 +513,10 @@ def run_shadow(
             "ts": time.time(),
             "trace_id": trace_id,
             "session_id": session_id,
+            # The harness's own identity for the observed call. A random trace
+            # id cannot be joined back to a native session on its own.
+            "tool_call_id": tool_call_id or None,
+            "tool_name": tool_name or None,
             "state": context.state[:400],
             "graph_digest": legal.graph_digest,
             "candidate_action_count": legal.candidate_count,
