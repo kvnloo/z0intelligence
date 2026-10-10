@@ -11,6 +11,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -36,17 +37,14 @@ _RESOURCE_INT_KEYS = (
 )
 _QUOTA_REMAINING_KEYS = ("remaining_free_quota", "remaining_tokens", "remaining", "day_tokens_remaining")
 _QUOTA_LIMIT_KEYS = ("limit", "daily_limit", "day_tokens_limit")
-_LEASE_TEXT_KEYS = (
-    "placement_id",
-    "demand_id",
-    "offer_id",
-    "selected_offer_id",
-    "selection_reason",
-    "policy_revision",
-)
+_LEASE_REF_KEYS = ("demand_id", "offer_id", "selected_offer_id")
+_LEASE_LABEL_KEYS = ("selection_reason", "policy_revision")
 
 # Every emitted value is one of: a finite bounded number, a bool, a member of a
-# fixed set, or a short single-line label. Anything else becomes null/unknown.
+# fixed set, a short single-line label, or a stand-in for an identifier that is
+# not such a label. Anything else becomes null/unknown. A row is never dropped
+# for the shape of its identifier: only a container-typed id drops it, and that
+# degrades the source with a rows_dropped count.
 _HOST_MODES = frozenset({"direct", "kubernetes", "remote"})
 _HOST_STATUSES = frozenset(
     {"online", "offline", "connected", "disconnected", "connecting", "degraded", "error", "unknown"}
@@ -74,6 +72,25 @@ _MAX_GPUS = 64
 _MAX_NUMBER = 2**63
 _MAX_EPOCH = 32_503_680_000.0  # year 3000; keeps datetime conversion in range
 _FUTURE_SKEW_S = 5.0
+_ROW_ID_NOT_SCALAR = "row_id_not_scalar"
+_DIMENSIONS_TRUNCATED = "dimensions_truncated"
+_DROPPED = object()  # a row whose identifier is a container; counted, never silently skipped
+
+# Label policy. A string is published verbatim only if it is 1-128 characters of
+# letters, digits, space and . _ : / - ; is not path- or URL-shaped; carries no
+# credential prefix and no "password: x"-style pair; and, with a canonical UUID
+# counted as one character, has no alphanumeric run over 20 characters and no
+# space-free word over 32 characters (64 when the word has no uppercase letter).
+# The repo redactor is still applied.
+_LABEL_CHARS = re.compile(r"[A-Za-z0-9 ._:/-]+")
+_ALNUM_RUN = re.compile(r"[A-Za-z0-9]+")
+_UUID = re.compile(r"(?<![A-Za-z0-9])[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}(?![A-Za-z0-9])")
+_CREDENTIAL_PREFIX = re.compile(r"(?<![A-Za-z0-9])sk-|gh[pousr]_|xox[abpr]-|AKIA|AIza|eyJ")
+_CREDENTIAL_PAIR = re.compile(r"(?i)(?:passw|pwd|secret|token|key|auth|credential)[a-z_-]*\s*:|bearer\s")
+_EMBEDDED_SK = re.compile(r"(?<=[A-Za-z0-9])sk-")  # "task-", "desk-": not a key prefix
+_MAX_RUN = 20
+_MAX_WORD = 32
+_MAX_LOWERCASE_WORD = 64
 
 
 class _Unreadable:
@@ -106,20 +123,49 @@ def _enum(value: Any, allowed: frozenset[str], default: str = "unknown") -> str:
     return value if isinstance(value, str) and value in allowed else default
 
 
-def _text(value: Any, limit: int = _MAX_TEXT) -> str | None:
-    """A short plain label, or None. Never a container, a path, or anything the repo's redactor would scrub."""
+def _label(value: Any, limit: int = _MAX_TEXT) -> str | None:
+    """A short plain label that passes the label policy above, or None."""
     if isinstance(value, int) and not isinstance(value, bool) and abs(value) < _MAX_NUMBER:
         return str(value)
     if not isinstance(value, str):
         return None
     text = value.strip()
-    if not text or len(text) > limit or not text.isprintable():
+    if not text or len(text) > limit or not _LABEL_CHARS.fullmatch(text):
         return None
-    if text.startswith(("/", "~")) or "/home/" in text or "/Users/" in text:
+    if text.startswith("/") or "//" in text or "/home/" in text or "/Users/" in text:
         return None
-    if redact(text, limit=len(text) + 1) != " ".join(text.split()):
+    if _CREDENTIAL_PREFIX.search(text) or _CREDENTIAL_PAIR.search(text):
+        return None
+    shape = _UUID.sub("0", text)
+    if any(len(run) > _MAX_RUN for run in _ALNUM_RUN.findall(shape)):
+        return None
+    if any(len(word) > (_MAX_LOWERCASE_WORD if word == word.lower() else _MAX_WORD) for word in shape.split(" ")):
+        return None
+    probe = _EMBEDDED_SK.sub("sk ", text)
+    if redact(probe, limit=len(probe) + 1) != " ".join(probe.split()):
         return None
     return text
+
+
+def _scalar(value: Any) -> bool:
+    return isinstance(value, (str, int, float))
+
+
+def _ident(value: Any, prefix: str = "", limit: int = _MAX_TEXT) -> tuple[str, bool]:
+    """(published id, is_stand_in) for a scalar identifier: the id itself when it is a plain label,
+    otherwise a stable one-way stand-in. The same input always maps to the same output, so
+    references between rows still join."""
+    text = f"{prefix}{value}"
+    if isinstance(value, (str, int)) and not isinstance(value, bool) and _label(text, limit) == text:
+        return text, False
+    return _stable_id("redacted", text), True
+
+
+def _ref(value: Any, prefix: str = "") -> str | None:
+    """A reference to another row's identifier, mapped exactly as that row's own id is."""
+    if value is None or not _scalar(value) or (isinstance(value, str) and not value.strip()):
+        return None
+    return _ident(value, prefix)[0]
 
 
 def _first(src: Mapping[str, Any], *keys: str) -> Any:
@@ -127,6 +173,16 @@ def _first(src: Mapping[str, Any], *keys: str) -> Any:
         if src.get(key) is not None:
             return src.get(key)
     return None
+
+
+def _either(src: Mapping[str, Any], *keys: str) -> Any:
+    """`src.get(a) or src.get(b) or ...`: the first truthy value, else the last key's value."""
+    value = None
+    for key in keys:
+        value = src.get(key)
+        if value:
+            return value
+    return value
 
 
 def _epoch(value: Any) -> float | None:
@@ -324,8 +380,8 @@ def _safe_resources(value: Any) -> dict[str, Any]:
         if isinstance(raw_gpus, list):
             gpus = [
                 {
-                    "id": _text(gpu.get("id")),
-                    "name": _text(gpu.get("name")),
+                    "id": _ref(gpu.get("id")),
+                    "name": _label(gpu.get("name")),
                     "memory_total_bytes": _count(gpu.get("memory_total_bytes")),
                     "memory_free_bytes": _count(gpu.get("memory_free_bytes")),
                     "utilization_pct": _num(gpu.get("utilization_pct")),
@@ -339,34 +395,43 @@ def _safe_resources(value: Any) -> dict[str, Any]:
     return out
 
 
-def _normalize_host(host: Mapping[str, Any], *, now: float) -> dict[str, Any] | None:
-    explicit_host_id = _text(host.get("host_id"))
-    raw_id = explicit_host_id
-    for key in ("id", "name", "label", "slot"):
-        raw_id = raw_id or _text(host.get(key))
+def _normalize_host(host: Mapping[str, Any], *, now: float) -> Any:
+    raw_id = _either(host, "host_id", "id", "name", "label", "slot")
     if raw_id is None:
         return None
-    return {
-        "host_id": explicit_host_id if explicit_host_id is not None else f"tern:{raw_id}",
-        "label": _text(host.get("label")) or _text(host.get("name")),
+    explicit_host_id = host.get("host_id")
+    if not _scalar(raw_id if explicit_host_id is None else explicit_host_id):
+        return _DROPPED
+    if explicit_host_id is not None:
+        host_id, redacted = _ident(explicit_host_id)
+    else:
+        host_id, redacted = _ident(raw_id, "tern:")
+    out = {
+        "host_id": host_id,
+        "label": _label(host.get("label")) or _label(host.get("name")),
         "mode": _enum(host.get("mode"), _HOST_MODES, "remote"),
-        "status": _enum(_first(host, "status", "state"), _HOST_STATUSES),
+        "status": _enum(_either(host, "status", "state"), _HOST_STATUSES),
         "rtt_ms": _num(host.get("rtt_ms")),
         "resources": _safe_resources(host.get("resources")),
         "observed_at": _observed(host.get("observed_at"), now=now)[0],
     }
+    if redacted:
+        out["id_redacted"] = True
+    return out
 
 
-def _normalize_session(session: Mapping[str, Any], *, now: float) -> dict[str, Any] | None:
-    raw_id = _text(session.get("session_id")) or _text(session.get("id"))
+def _normalize_session(session: Mapping[str, Any], *, now: float) -> Any:
+    raw_id = _either(session, "session_id", "id")
     if raw_id is None:
         return None
-    host_id = _text(session.get("host_id")) or _text(session.get("host"))
-    if host_id is not None and not host_id.startswith("tern:"):
-        host_id = f"tern:{host_id}"
+    if not _scalar(raw_id):
+        return _DROPPED
+    session_id, redacted = _ident(raw_id)
+    host_ref = _either(session, "host_id", "host")
+    host_id = _ref(host_ref, "" if str(host_ref).startswith("tern:") else "tern:")
     current = _bool(session.get("current"))
     locked = _bool(session.get("locked"))
-    raw_status = _first(session, "status", "state")
+    raw_status = _either(session, "status", "state")
     if raw_status is not None:
         status = _enum(raw_status, _SESSION_STATUSES)
     elif current is True and locked is True:
@@ -377,21 +442,24 @@ def _normalize_session(session: Mapping[str, Any], *, now: float) -> dict[str, A
         status = "locked"
     else:
         status = "available"
-    return {
-        "session_id": raw_id,
-        "name": _text(session.get("name")),
+    out = {
+        "session_id": session_id,
+        "name": _label(session.get("name")),
         "host_id": host_id,
-        "runtime": _text(session.get("runtime")) or _text(session.get("program")),
+        "runtime": _label(session.get("runtime")) or _label(session.get("program")),
         "status": status,
         "current": current,
         "locked": locked,
-        "tab_count": _count(_first(session, "tab_count", "tabs")),
+        "tab_count": _count(_either(session, "tab_count", "tabs")),
         "rtt_ms": _num(session.get("rtt_ms")),
-        "pane_id": _text(session.get("pane_id")),
+        "pane_id": _ref(session.get("pane_id")),
         "session_sticky": True,
         "migration_allowed": False,
         "observed_at": _observed(session.get("observed_at"), now=now)[0],
     }
+    if redacted:
+        out["id_redacted"] = True
+    return out
 
 
 def _normalize_tern(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
@@ -405,35 +473,54 @@ def _normalize_tern(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], list
     raw_sessions = raw.get("sessions") if raw.get("sessions") is not None else []
     if not isinstance(raw_hosts, list) or not isinstance(raw_sessions, list):
         return [], [], _source("error", reason="invalid_tern_export")
+    dropped = 0
     hosts = []
     for host in raw_hosts:
         if isinstance(host, Mapping) and (normalized := _normalize_host(host, now=now)):
-            hosts.append(normalized)
+            if normalized is _DROPPED:
+                dropped += 1
+            else:
+                hosts.append(normalized)
     sessions = []
     for session in raw_sessions:
         if isinstance(session, Mapping) and (normalized := _normalize_session(session, now=now)):
-            sessions.append(normalized)
-    return hosts, sessions, _observed_source(
-        _first(raw, "observed_at", "generated_at"),
-        now=now,
-        reason=None if hosts or sessions else "empty_tern_export",
-    )
+            if normalized is _DROPPED:
+                dropped += 1
+            else:
+                sessions.append(normalized)
+    reason = _ROW_ID_NOT_SCALAR if dropped else (None if hosts or sessions else "empty_tern_export")
+    source = _observed_source(_first(raw, "observed_at", "generated_at"), now=now, reason=reason)
+    if dropped:
+        source["rows_dropped"] = dropped
+    return hosts, sessions, source
 
 
-def _safe_quota(quota: Any, *, now: float, entry_reset_at: float | None) -> tuple[dict[str, Any], bool]:
-    """Typed quota facts, and whether any of them was observed before its reset (see posture.py)."""
+def _exhausted(dimension: Mapping[str, Any]) -> bool:
+    remaining = _num(dimension.get("remaining"))
+    return remaining is not None and remaining <= 0
+
+
+def _safe_quota(quota: Any, *, now: float, entry_reset_at: float | None) -> tuple[dict[str, Any], bool, int]:
+    """Typed quota facts, whether any of them was observed before its reset (see posture.py), and how
+    many dimensions the size cap cut."""
     src = quota if isinstance(quota, Mapping) else {}
     out: dict[str, Any] = {}
     reset_at = _epoch(src.get("reset_at"))
     window_passed = _reset_passed(entry_reset_at, now) or _reset_passed(reset_at, now)
     stale = window_passed
     dimensions: dict[str, Any] = {}
+    truncated = 0
     raw_dimensions = src.get("dimensions")
     if isinstance(raw_dimensions, Mapping):
-        for raw_name, dimension in list(raw_dimensions.items())[:_MAX_DIMENSIONS]:
-            name = _text(raw_name, _MAX_DIMENSION_NAME) if isinstance(raw_name, str) else None
-            if name is None or not isinstance(dimension, Mapping):
-                continue
+        rows = [
+            (name, row) for name, row in raw_dimensions.items() if isinstance(name, str) and isinstance(row, Mapping)
+        ]
+        if len(rows) > _MAX_DIMENSIONS:
+            # The cap bounds the output; it cuts exhausted dimensions last and the caller degrades the source.
+            truncated = len(rows) - _MAX_DIMENSIONS
+            rows = sorted(rows, key=lambda row: not _exhausted(row[1]))[:_MAX_DIMENSIONS]
+        for raw_name, dimension in rows:
+            name, name_redacted = _ident(raw_name, limit=_MAX_DIMENSION_NAME)
             clean: dict[str, Any] = {}
             dimension_reset_at = _epoch(dimension.get("reset_at"))
             passed = _reset_passed(dimension_reset_at, now) if dimension_reset_at is not None else window_passed
@@ -448,6 +535,8 @@ def _safe_quota(quota: Any, *, now: float, entry_reset_at: float | None) -> tupl
             if passed:
                 clean["stale_reason"] = OBSERVATION_PREDATES_RESET
                 stale = True
+            if name_redacted:
+                clean["id_redacted"] = True
             dimensions[name] = clean
     if dimensions:
         out["dimensions"] = dimensions
@@ -459,7 +548,7 @@ def _safe_quota(quota: Any, *, now: float, entry_reset_at: float | None) -> tupl
             out[key] = _num(src.get(key))
     if "reset_at" in src:
         out["reset_at"] = reset_at
-    return out, stale
+    return out, stale, truncated
 
 
 def _normalize_kerdoios(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -476,22 +565,33 @@ def _normalize_kerdoios(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], 
         return [], _source("error", reason="invalid_kerdoios_export")
     offers: list[dict[str, Any]] = []
     any_stale = False
+    dropped = truncated = 0
     for entry in entries:
         if not isinstance(entry, Mapping):
             continue
-        provider = _text(entry.get("provider"))
-        model = _text(entry.get("model"))
-        if not provider:
+        raw_provider = entry.get("provider")
+        raw_offer_id = entry.get("offer_id")
+        if not raw_provider:
             continue
+        if not _scalar(raw_provider) or (raw_offer_id and not _scalar(raw_offer_id)):
+            dropped += 1
+            continue
+        if raw_offer_id:
+            offer_id, redacted = _ident(raw_offer_id)
+        else:
+            offer_id, redacted = _stable_id("offer", "provider", raw_provider, entry.get("model")), False
+        provider = _ident(raw_provider)[0]
+        model = _ref(entry.get("model"))
         reset_at = _epoch(entry.get("reset_at"))
-        quota, stale = _safe_quota(entry.get("quota"), now=now, entry_reset_at=reset_at)
+        quota, stale, cut = _safe_quota(entry.get("quota"), now=now, entry_reset_at=reset_at)
+        truncated += cut
         offer = {
-            "offer_id": _text(entry.get("offer_id")) or _stable_id("offer", "provider", provider, model),
+            "offer_id": offer_id,
             "origin": "provider",
             "provider": provider,
             "model": model,
             "actor_id": model,
-            "health": _enum(_first(entry, "health", "status"), _HEALTH),
+            "health": _enum(_either(entry, "health", "status"), _HEALTH),
             "quota": quota,
             "price": _num(entry.get("price")),
             "predicted_cost": _num(entry.get("predicted_cost")),
@@ -505,13 +605,23 @@ def _normalize_kerdoios(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], 
         if stale:
             offer["stale_reason"] = OBSERVATION_PREDATES_RESET
             any_stale = True
+        if redacted:
+            offer["id_redacted"] = True
         offers.append(offer)
-    reason = None if offers else "empty_kerdoios_export"
-    return offers, _observed_source(
-        _first(raw, "generated_at", "saved_at", "observed_at"),
-        now=now,
-        reason=OBSERVATION_PREDATES_RESET if any_stale else reason,
-    )
+    if any_stale:
+        reason = OBSERVATION_PREDATES_RESET
+    elif dropped:
+        reason = _ROW_ID_NOT_SCALAR
+    elif truncated:
+        reason = _DIMENSIONS_TRUNCATED
+    else:
+        reason = None if offers else "empty_kerdoios_export"
+    source = _observed_source(_first(raw, "generated_at", "saved_at", "observed_at"), now=now, reason=reason)
+    if dropped:
+        source["rows_dropped"] = dropped
+    if truncated:
+        source["dimensions_truncated"] = truncated
+    return offers, source
 
 
 def _local_offer(host: Mapping[str, Any]) -> dict[str, Any]:
@@ -541,18 +651,29 @@ def _normalize_leases(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], di
     if not isinstance(rows, list):
         return [], _source("error", reason="invalid_lease_projection")
     out = []
+    dropped = 0
     for row in rows:
-        if not isinstance(row, Mapping):
+        if not isinstance(row, Mapping) or not row.get("placement_id"):
             continue
-        clean: dict[str, Any] = {key: _text(row.get(key)) for key in _LEASE_TEXT_KEYS if key in row}
+        if not _scalar(row.get("placement_id")):
+            dropped += 1
+            continue
+        placement_id, redacted = _ident(row.get("placement_id"))
+        clean: dict[str, Any] = {"placement_id": placement_id}
+        clean.update({key: _ref(row.get(key)) for key in _LEASE_REF_KEYS if key in row})
+        clean.update({key: _label(row.get(key)) for key in _LEASE_LABEL_KEYS if key in row})
         if "status" in row:
             clean["status"] = _enum(row.get("status"), _LEASE_STATUSES)
         if "lease_expires_at" in row:
             clean["lease_expires_at"] = _epoch(row.get("lease_expires_at"))
-        if clean.get("placement_id"):
-            out.append(clean)
+        if redacted:
+            clean["id_redacted"] = True
+        out.append(clean)
     observed_at = _first(raw, "observed_at", "generated_at") if isinstance(raw, Mapping) else None
-    return out, _observed_source(observed_at, now=now)
+    source = _observed_source(observed_at, now=now, reason=_ROW_ID_NOT_SCALAR if dropped else None)
+    if dropped:
+        source["rows_dropped"] = dropped
+    return out, source
 
 
 def build_snapshot(
