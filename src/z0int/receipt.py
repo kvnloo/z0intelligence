@@ -629,6 +629,8 @@ def close_turn(
 def summarize_tokenomics(*, root: Path | None = None, limit: int = 5000) -> dict[str, Any]:
     """Aggregate estimated + measured frontier-token economics.
 
+    Count the latest receipt per trace, preferring canonical receipts over
+    legacy bridge mirrors. Retain unidentified rows as separate observations.
     Verified counts always re-derive from outcome *fields* via
     ``normalize_outcome``; a stored ``outcome_tier=gold`` without
     verification signals does not count.
@@ -656,11 +658,17 @@ def summarize_tokenomics(*, root: Path | None = None, limit: int = 5000) -> dict
         receipts_path(root),
         paths_home / "stream" / "bridge.jsonl",
     ]
+    seen_traces: set[str] = set()
     for path in candidates:
-        for row in list(_iter_jsonl(path) or [])[-limit:]:
+        for row in reversed(list(_iter_jsonl(path) or [])[-limit:]):
             rec = row.get("receipt") if isinstance(row.get("receipt"), dict) else row
             if not isinstance(rec, dict):
                 continue
+            trace_id = row.get("trace_id") or rec.get("trace_id")
+            if isinstance(trace_id, str) and trace_id:
+                if trace_id in seen_traces:
+                    continue
+                seen_traces.add(trace_id)
             rows += 1
             state = normalize_measurement_state(rec.get("measurement_state")) or "unknown"
             measurement_state_counts[state] = measurement_state_counts.get(state, 0) + 1
