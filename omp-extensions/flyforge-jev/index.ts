@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { accessSync, appendFileSync, constants, mkdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
 const SHADOW_LOG = join(homedir(), ".z0int", "shadow", "jev-fly.jsonl");
@@ -76,12 +76,13 @@ function isHighInfo(row: {
 	return false;
 }
 
-/** A path must be an executable regular file; a bare name is left for the OS to look up, as before. */
+/** A path must be an executable regular file where the child runs; a bare name is left for the OS to look up. */
 function interpreterReady(py: string): boolean {
 	if (!py.includes("/")) return true;
+	const path = resolve(CWD, py);
 	try {
-		accessSync(py, constants.X_OK);
-		return statSync(py).isFile();
+		accessSync(path, constants.X_OK);
+		return statSync(path).isFile();
 	} catch {
 		return false;
 	}

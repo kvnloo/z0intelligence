@@ -227,6 +227,8 @@ const usable = {
   absolute_executable: join(fx, 'bin', 'fake-python'),
   symlink_to_executable: join(fx, 'link-python'),
   bare_name_on_path: 'fake-python',
+  // A relative path is resolved where the child runs (EVOLUTION_LAB_ROOT), not where this process is.
+  relative_under_root: 'bin/fake-python',
   // A bare name is the OS's to resolve (PATH may be unset or hold relative entries): never refused here.
   bare_name_not_on_path: 'no-such-python-zz9',
 };
