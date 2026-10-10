@@ -129,6 +129,7 @@ def test_no_validated_slot_prints_refusals_and_exits_nonzero(probe, capsys):
     assert calls == []
     report = json.loads(capsys.readouterr().out)
     assert report["working"] == 0
+    assert report["cursor_used"] is False
     assert report["slots"][1] == {"slot": 1, "ok": False, "provider": "vercel",
                                   "model": "openai/gpt-oss-20b", "error": "no_validated_free_route"}
 
@@ -155,3 +156,11 @@ def test_cursor_used_is_computed_from_recorded_attempts(probe, monkeypatch):
     monkeypatch.setattr(ff, "execute_plan", lambda *args, **kwargs: {
         "ok": True, "provider": "cursor", "model": "m", "attempts": [{"provider": "cursor", "model": "m", "extra": {}}]})
     assert ff.run(1)["cursor_used"] is True
+
+
+def test_a_malformed_slot_is_reported_and_costs_no_other_slot(probe):
+    calls, _, policy, _ = probe
+    _, providers = ff.configuration()
+    row = ff._one({"slot": 1, "provider": "vercel"}, policy, providers)
+    assert calls == []
+    assert row == {"slot": 1, "ok": False, "provider": "vercel", "error": "KeyError"}

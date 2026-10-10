@@ -40,9 +40,9 @@ def _plan_for(slot: dict) -> dict:
 def _one(slot: dict, policy: dict, providers: dict) -> dict:
     if blocked_provider(slot["provider"]):
         return {"slot": slot["slot"], "ok": False, "provider": slot["provider"], "error": "cursor_or_paid_blocked"}
-    if free_route(policy, slot["provider"], slot["model"]) is None:
-        return {"slot": slot["slot"], "ok": False, "provider": slot["provider"], "model": slot["model"], "error": "no_validated_free_route"}
     try:
+        if free_route(policy, slot["provider"], slot["model"]) is None:
+            return {"slot": slot["slot"], "ok": False, "provider": slot["provider"], "model": slot["model"], "error": "no_validated_free_route"}
         result = execute_plan(
             {"task": "Reply with the single word pong.", "parent_agent": "free-fanout", "max_tokens": 128, "free_only": True},
             policy,
