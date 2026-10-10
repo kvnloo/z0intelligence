@@ -64,6 +64,19 @@ def normalize_state_reason(value: Any) -> str | None:
     return text[:500] if text else None
 
 
+def normalize_verification_source(value: Any) -> str | None:
+    """Canonical nonblank string reference, else ``None``.
+
+    Only a nonblank ``str`` counts as independent verification. Absent, blank,
+    or non-string values (``True``, ``0``, lists, dicts) are not references and
+    must not be credited as verification.
+    """
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    return text if text else None
+
+
 def receipts_path(root: Path | None = None) -> Path:
     layout = paths.ensure_layout(root)
     return layout["receipts"] / RECEIPTS_NAME
@@ -176,15 +189,15 @@ def normalize_outcome(outcome: Outcome | dict[str, Any]) -> Outcome:
     here so tip and stale hosts agree.
 
     Rules:
-    - verification_source set → trust gold signals (async CI/join/operator).
-    - ambient source without verification_source → strip gold claims;
+    - nonblank string verification_source → trust gold signals (async CI/join/operator).
+    - ambient source without a valid verification_source → strip gold claims;
       force execution_completed so bare success/tool_ok become ``execution``.
     - non-ambient success/tool_ok alone stay ``soft`` (probes, legacy).
     """
     oc = _outcome_from_mapping(outcome)
     d = oc.to_dict()
     src = d.get("source")
-    has_vsrc = bool(d.get("verification_source"))
+    has_vsrc = normalize_verification_source(d.get("verification_source")) is not None
     if is_ambient_close_source(src if isinstance(src, str) else None) and not has_vsrc:
         for k in GOLD_SIGNALS:
             if getattr(oc, k, None) is True:
