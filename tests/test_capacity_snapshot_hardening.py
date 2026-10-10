@@ -682,3 +682,130 @@ def test_a_host_and_its_sessions_join_whichever_spelling_each_side_uses(host_key
     session = next(s for s in snap["sessions"] if s["session_id"] == "s1")
     assert session["host_id"] in host_ids
     assert "/etc/shadow" not in json.dumps(snap)
+
+
+def _join(host, session_host):
+    """(host ids, the session's host reference, the snapshot as text) for one host and one session."""
+    tern = _tern()
+    tern["hosts"] = [{**host, "status": "offline", "observed_at": NOW - 3}]
+    tern["sessions"] = [{"session_id": "s1", "host": session_host, "status": "locked", "observed_at": NOW - 3}]
+    snap = _build(tern=tern)
+    session = next(s for s in snap["sessions"] if s["session_id"] == "s1")
+    return [h["host_id"] for h in snap["hosts"]], session["host_id"], json.dumps(snap)
+
+
+@pytest.mark.parametrize("key", ["id", "name", "label", "slot"])
+@pytest.mark.parametrize("number,spelled", [(1.5, "1.5"), (0.25, "0.25"), (True, "True"), (2.0, "2.0")])
+def test_a_host_id_given_as_a_number_joins_a_session_that_spells_it_as_text(key, number, spelled):
+    # JSON does not say whether an id is 1.5 or "1.5"; the PR head published tern:1.5 for both.
+    for host_value, session_host in [(number, spelled), (number, f"tern:{spelled}"), (spelled, number),
+                                     (number, number)]:
+        host_ids, session_ref, _ = _join({key: host_value}, session_host)
+        assert host_ids == [f"tern:{spelled}"]
+        assert session_ref == f"tern:{spelled}"
+
+
+@pytest.mark.parametrize("host,session_host", [
+    ({"slot": False}, "False"),
+    ({"slot": False}, False),
+    ({"slot": 0.0}, "0.0"),
+    ({"name": "False"}, False),
+])
+def test_a_falsy_host_slot_joins_a_session_that_spells_it_as_text(host, session_host):
+    host_ids, session_ref, _ = _join(host, session_host)
+    assert host_ids == [session_ref]
+    assert session_ref in {"tern:False", "tern:0.0"}
+
+
+@pytest.mark.parametrize("host,session_host", [
+    ({"slot": ""}, ""),
+    ({"name": " "}, " "),
+    ({"host_id": "tern:"}, ""),
+    ({"name": "\t"}, "\t"),
+])
+def test_a_blank_host_id_still_joins_a_session_with_the_same_blank_reference(host, session_host):
+    # The PR head joined these on "tern:"; the host row is a stand-in now, so the reference must be too.
+    host_ids, session_ref, _ = _join(host, session_host)
+    assert session_ref is not None
+    assert host_ids == [session_ref]
+    assert session_ref.startswith("redacted-")
+
+
+def test_a_session_without_a_host_reference_has_none():
+    for session in [{"session_id": "s1"}, {"session_id": "s1", "host": None}, {"session_id": "s1", "host": ["a"]}]:
+        tern = _tern()
+        tern["sessions"] = [{**session, "status": "locked", "observed_at": NOW - 3}]
+        assert _build(tern=tern)["sessions"][0]["host_id"] is None
+
+
+@pytest.mark.parametrize("key", ["id", "name", "label", "slot"])
+@pytest.mark.parametrize("path", ["/etc/shadow", "~/secrets"])
+def test_a_path_is_not_published_behind_any_number_of_tern_prefixes(key, path):
+    for host_value in [path, f"tern:{path}", f"tern:tern:{path}"]:
+        host_ids, session_ref, published = _join({key: host_value}, f"tern:{host_value}")
+        assert host_ids == [session_ref]  # the stand-in on both sides is the same one
+        assert session_ref.startswith("redacted-")
+        assert json.dumps(f"tern:{host_value}") not in published
+        if key in ("id", "slot"):  # name and label also feed the host's free-text label
+            assert path not in published
+    host_ids, session_ref, published = _join({"host_id": f"tern:tern:{path}"}, f"tern:tern:{path}")
+    assert path not in published and host_ids == [session_ref]
+
+
+@pytest.mark.parametrize("key", ["id", "name", "label", "slot"])
+def test_a_plain_name_that_already_carries_the_prefix_is_published_as_before(key):
+    # Stripping prefixes only decides whether the text is published; it never changes the text.
+    host_ids, session_ref, _ = _join({key: "tern:gpu-box-2"}, "tern:tern:gpu-box-2")
+    assert host_ids == ["tern:tern:gpu-box-2"] == [session_ref]
+    host_ids, _, _ = _join({key: "rack/tern:/b"}, "x")
+    assert host_ids == ["tern:rack/tern:/b"]  # only leading prefixes are set aside
+
+
+@pytest.mark.parametrize("raw", [" gpu", "gpu ", " gpu-box-2 ", "\tgpu"])
+def test_a_host_name_with_surrounding_whitespace_is_a_stand_in_on_both_sides(raw):
+    host_ids, session_ref, published = _join({"name": raw}, raw)
+    assert host_ids == [session_ref]
+    assert session_ref.startswith("redacted-")
+    assert json.dumps(f"tern:{raw}") not in published
+
+
+def test_a_host_id_is_never_longer_than_the_label_limit_once_prefixed():
+    name = " ".join(["rack-01"] * 16)
+    assert len(name) == 127 and cs._label(name) == name
+    host_ids, session_ref, _ = _join({"name": name}, name)
+    assert host_ids == [session_ref] and session_ref.startswith("redacted-")
+    short = " ".join(["rack-01"] * 15)
+    assert _join({"name": short}, short)[:2] == ([f"tern:{short}"], f"tern:{short}")
+
+
+def test_a_dimension_name_limit_counts_the_prefix_it_carries():
+    def names(raw_name):
+        entry = {"provider": "groq", "model": "free/model", "health": "ok", "updated_at": NOW - 6,
+                 "quota": {"dimensions": {raw_name: {"limit": 10, "remaining": 5}}}}
+        snap = _build(kerdoios={"generated_at": NOW - 5, "entries": [entry]})
+        return [name for offer in snap["offers"] for name in (offer.get("quota") or {}).get("dimensions", {})]
+
+    plain = "-".join(["req"] * 12) + "-"
+    assert len(plain) == 48 and names(plain) == [plain]
+    assert [name.startswith("redacted-") for name in names(plain + "r")] == [True]
+    prefixed = "tern:" + "-".join(["req"] * 11)
+    assert len(prefixed) == 48 and names(prefixed) == [prefixed]
+    # Without its prefix this name fits in 48 characters; the published text would not.
+    assert [name.startswith("redacted-") for name in names(prefixed + "-r")] == [True]
+
+
+@pytest.mark.parametrize("raw", ["tern:/etc/shadow", "tern:tern:/etc/shadow", "tern: gpu", "tern:"])
+def test_no_identifier_publishes_text_that_fails_the_label_rule_behind_the_prefix(raw):
+    # Deliberate, for every identifier and not only hosts: the prefix never buys publication.
+    tern = _tern()
+    tern["sessions"] = [{"session_id": raw, "pane_id": raw, "host_id": "tern:groot", "status": "locked",
+                         "observed_at": NOW - 3}]
+    entry = {"provider": raw, "model": raw, "offer_id": raw, "health": "ok", "updated_at": NOW - 6,
+             "quota": {"dimensions": {raw: {"limit": 10, "remaining": 5}}}}
+    leases = {"observed_at": NOW - 1, "leases": [{"placement_id": raw, "offer_id": raw, "status": "active",
+                                                  "observed_at": NOW - 1}]}
+    snap = _build(tern=tern, kerdoios={"generated_at": NOW - 5, "entries": [entry]}, leases=leases)
+
+    assert json.dumps(raw) not in json.dumps(snap)
+    assert snap["sessions"][0]["session_id"] == snap["sessions"][0]["pane_id"] == snap["leases"][0]["placement_id"]
+    assert snap["leases"][0]["offer_id"] == next(o["offer_id"] for o in snap["offers"] if o.get("id_redacted"))
