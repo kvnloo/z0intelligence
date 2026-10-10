@@ -217,7 +217,6 @@ const unusable = {
   directory: join(fx, 'dir-python'),
   not_executable: join(fx, 'nonexec-python'),
   dangling_symlink: join(fx, 'dangling-python'),
-  bare_name_not_on_path: 'no-such-python-zz9',
 };
 for (const [label, python] of Object.entries(unusable)) {
   assert.deepEqual(await spawnsFor(python), [], label);
@@ -228,6 +227,8 @@ const usable = {
   absolute_executable: join(fx, 'bin', 'fake-python'),
   symlink_to_executable: join(fx, 'link-python'),
   bare_name_on_path: 'fake-python',
+  // A bare name is the OS's to resolve (PATH may be unset or hold relative entries): never refused here.
+  bare_name_not_on_path: 'no-such-python-zz9',
 };
 for (const [label, python] of Object.entries(usable)) {
   const seen = await spawnsFor(python);
