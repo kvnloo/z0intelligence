@@ -276,12 +276,14 @@ def list_checkpoints() -> list[dict[str, Any]]:
     return out
 
 
-def _run_git(args: list[str], *, cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+def _run_git(args: list[str], *, cwd: Path | None = None, check: bool = True,
+             text: bool = True) -> subprocess.CompletedProcess[Any]:
+    """``text=False`` for any output that carries a path: text mode rewrites CR and CRLF as LF."""
     return subprocess.run(
         ["git", *args],
         cwd=str(cwd) if cwd else None,
         capture_output=True,
-        text=True,
+        text=text,
         check=check,
     )
 
@@ -479,28 +481,43 @@ _NOT_COMMITTED = "patch not committed: "
 _REGULAR_MODES = ("100644", "100755")  # a file; not a symlink (120000) or a submodule (160000)
 
 
-def _branch_blob_oid(wt: Path, branch: str, rel: str) -> str | None:
-    """Blob id of the task BRANCH ref's regular-file entry for the target, or None.
+def _z_records(out: subprocess.CompletedProcess[bytes]) -> list[tuple[list[str], str]]:
+    """``<meta>TAB<path>NUL`` records of a ``-z`` listing, read as bytes.
+
+    A path is split from its neighbours on NUL only and decoded as the file system
+    name it is, so a carriage return, a newline or a byte that is not UTF-8 in it
+    arrives as it was printed.
+    """
+    records = []
+    for record in out.stdout.split(b"\0") if out.returncode == 0 else ():
+        meta, _, path = record.partition(b"\t")
+        records.append((os.fsdecode(meta).split(), os.fsdecode(path)))
+    return records
+
+
+def _tree_blob_oid(wt: Path, tree: str, rel: str) -> str | None:
+    """Blob id of ``tree``'s regular-file entry for the target, or None.
 
     ``ls-tree`` with literal pathspecs: the name is never a pattern or a ``<stage>:<path>``.
     """
-    out = _run_git(["--literal-pathspecs", "ls-tree", "-z", "--full-tree", f"refs/heads/{branch}", "--", rel],
-                   cwd=wt, check=False)
-    for record in out.stdout.split("\0") if out.returncode == 0 else ():
-        meta, _, path = record.partition("\t")
-        fields = meta.split()
+    out = _run_git(["--literal-pathspecs", "ls-tree", "-z", "--full-tree", tree, "--", rel],
+                   cwd=wt, check=False, text=False)
+    for fields, path in _z_records(out):
         if path == rel and len(fields) == 3 and fields[0] in _REGULAR_MODES and fields[1] == "blob":
             return fields[2]
     return None
 
 
+def _branch_blob_oid(wt: Path, branch: str, rel: str) -> str | None:
+    """Blob id of the task BRANCH ref's regular-file entry for the target, or None."""
+    return _tree_blob_oid(wt, f"refs/heads/{branch}", rel)
+
+
 def _staged_blob_oid(wt: Path, rel: str, env: dict[str, str] | None = None) -> str | None:
     """Blob id of the index's stage-0 regular-file entry for the target, or None."""
     out = subprocess.run(["git", "--literal-pathspecs", "ls-files", "--stage", "-z", "--", rel],
-                         cwd=str(wt), capture_output=True, text=True, env=env)
-    for record in out.stdout.split("\0") if out.returncode == 0 else ():
-        meta, _, path = record.partition("\t")
-        fields = meta.split()
+                         cwd=str(wt), capture_output=True, env=env)
+    for fields, path in _z_records(out):
         if path == rel and len(fields) == 3 and fields[0] in _REGULAR_MODES and fields[2] == "0":
             return fields[1]
     return None
@@ -516,14 +533,14 @@ def _canonical_path(wt: Path, rel: str) -> str | None:
     nothing for (a trailing slash on a file) has no canonical form here. Read-only.
     """
     out = _run_git(["--literal-pathspecs", "ls-files", "-z", "--full-name", "--cached", "--others", "--", rel],
-                   cwd=wt, check=False)
-    names = {name for name in out.stdout.split("\0") if name} if out.returncode == 0 else set()
+                   cwd=wt, check=False, text=False)
+    names = {os.fsdecode(name) for name in out.stdout.split(b"\0") if name} if out.returncode == 0 else set()
     if len(names) == 1 and PurePosixPath(*names) == PurePosixPath(rel):
         return names.pop()
     return None
 
 
-def _c_quoted(path: str) -> bytes:
+def _c_quoted(path: str | bytes) -> bytes:
     """``path`` as one C-style quoted entry of a git alternates list.
 
     An unquoted entry cannot hold the list separator (a newline in
@@ -543,7 +560,55 @@ def _c_quoted(path: str) -> bytes:
     return bytes(out) + b'"'
 
 
-def _git_derived_oid(wt: Path, branch: str, rel: str) -> str | None:
+def _derive_root(task_id: str) -> Path:
+    """The one place this task's scratch areas are made: beside its other task files."""
+    return _tasks_dir() / task_id / "derive"
+
+
+@contextmanager
+def _derive_scratch(root: Path):
+    """A scratch directory under the task's own ``root``; none survives the next derivation.
+
+    Derivations of one task are serialised by a lock on ``root/lock``, held from
+    before the scratch directory is made until after it is removed. Whoever holds
+    the lock therefore knows that every scratch directory already there belongs to
+    no running derivation: it was left by a process that died (kill -9, power
+    loss) before it could clean up, and it is removed first. A directory in use is
+    never removed, because its owner holds the lock, and nothing accumulates.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    fd = os.open(root / "lock", os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    with os.fdopen(fd, "a+") as lock:
+        if os.name == "posix":
+            import fcntl
+
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            for stale in root.glob("z0int-derive-*"):
+                shutil.rmtree(stale, ignore_errors=True)
+        with tempfile.TemporaryDirectory(prefix="z0int-derive-", dir=root) as scratch:
+            yield Path(scratch)
+
+
+def _object_directories(wt: Path) -> list[bytes]:
+    """Alternates-file lines for every object directory the repository reads, deepest first.
+
+    Git follows alternates of alternates only five levels down. A scratch object
+    directory that named just the repository's own would sit one level above it, so
+    the last store of a repository already at that limit would be out of reach. The
+    whole chain is therefore listed directly, each store at the top level: the
+    repository's own directory, quoted here, and every alternate as git itself
+    reports and spells it (``count-objects -v`` quotes a path that needs it in the
+    form an alternates file is read in). Deepest first, so each store is already
+    known by the time a shallower one names it and nothing is followed again.
+    """
+    objects = _run_git(["rev-parse", "--path-format=absolute", "--git-path", "objects"],
+                       cwd=wt, text=False).stdout.removesuffix(b"\n")
+    listed = _run_git(["count-objects", "-v"], cwd=wt, text=False).stdout.split(b"\n")
+    alternates = [line.removeprefix(b"alternate: ") for line in listed if line.startswith(b"alternate: ")]
+    return alternates[::-1] + [_c_quoted(objects)]
+
+
+def _git_derived_oid(wt: Path, branch: str, rel: str, scratch_root: Path) -> str | None:
     """Blob id that ``git add`` itself stores for the worktree target on the task branch.
 
     Git, not this module, decides what a file becomes on the way in: clean filters,
@@ -555,18 +620,18 @@ def _git_derived_oid(wt: Path, branch: str, rel: str) -> str | None:
     repository's object store gain nothing. None when git stores no regular file.
 
     The scratch object directory reaches the repository's objects through its own
-    ``info/alternates`` file, one quoted entry. No list of paths is assembled, so no
-    character of the repository path can act as a separator, and an inherited
-    ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` is passed on exactly as it was received.
+    ``info/alternates`` file, one entry per line, each quoted wherever a byte of it
+    could be taken for a separator. No ``:``-separated list is assembled, and an
+    inherited ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` is passed on exactly as it was
+    received. The scratch area lives under ``scratch_root`` (see ``_derive_scratch``).
     """
-    objects = _run_git(["rev-parse", "--path-format=absolute", "--git-path", "objects"],
-                       cwd=wt).stdout.removesuffix("\n")
-    with tempfile.TemporaryDirectory(prefix="z0int-derive-") as scratch:
-        info = Path(scratch) / "objects" / "info"
+    alternates = _object_directories(wt)
+    with _derive_scratch(scratch_root) as scratch:
+        info = scratch / "objects" / "info"
         info.mkdir(parents=True)
-        (info / "alternates").write_bytes(_c_quoted(objects) + b"\n")
-        env = dict(os.environ, GIT_INDEX_FILE=str(Path(scratch) / "index"),
-                   GIT_OBJECT_DIRECTORY=str(Path(scratch) / "objects"))
+        (info / "alternates").write_bytes(b"".join(line + b"\n" for line in alternates))
+        env = dict(os.environ, GIT_INDEX_FILE=str(scratch / "index"),
+                   GIT_OBJECT_DIRECTORY=str(scratch / "objects"))
         for args in (["read-tree", f"refs/heads/{branch}"], ["add", "--", f":(literal){rel}"]):
             subprocess.run(["git", *args], cwd=str(wt), capture_output=True, text=True, check=True, env=env)
         return _staged_blob_oid(wt, rel, env)
@@ -575,6 +640,39 @@ def _git_derived_oid(wt: Path, branch: str, rel: str) -> str | None:
 # measurements key: the task-branch blob id of the target ("" when the branch has no such
 # regular file) at the moment a commit of the recorded patch was found to be needed.
 _COMMIT_NEEDED_OVER = "patch_commit_needed_over"
+# measurements key: {"blob", "parent"} - the blob id about to be committed for the target and
+# the task-branch commit it is committed on top of, written before anything is staged.
+_COMMIT_INTENDED = "patch_commit_intended"
+# measurements key: {"commit", "blob"} - the commit that put the recorded patch on the task
+# branch and the blob id it stored for the target. Once present, nothing is committed again.
+_COMMITTED = "patch_committed"
+_OID = re.compile(r"[0-9a-f]{40,64}")
+
+
+def _patch_commit_record(cp: TaskCheckpoint, wt: Path, branch: str, name: str) -> dict[str, str] | None:
+    """What was committed for this task's patch, or None when no such commit exists.
+
+    The commit is found, not assumed: a kill straight after ``git commit`` leaves
+    only the intent written before the add. The patch commit is then the first
+    commit the task branch gained on top of the recorded parent whose entry for the
+    target is the recorded blob. Found once, it is durable in the checkpoint.
+    """
+    record = cp.measurements.get(_COMMITTED)
+    if record is not None:
+        return record
+    intent = cp.measurements.get(_COMMIT_INTENDED)
+    # The parent becomes part of a git argument: only a full object id is ever followed.
+    if (type(intent) is not dict or type(intent.get("blob")) is not str
+            or type(intent.get("parent")) is not str or not _OID.fullmatch(intent["parent"])):
+        return None
+    listed = _run_git(["rev-list", "--first-parent", "--reverse", f"{intent['parent']}..refs/heads/{branch}"],
+                      cwd=wt, check=False)
+    for commit in listed.stdout.split():  # nothing is listed when git fails
+        if _tree_blob_oid(wt, commit, name) == intent["blob"]:
+            record = cp.measurements[_COMMITTED] = {"commit": commit, "blob": intent["blob"]}
+            save_checkpoint(cp)
+            return record
+    return None
 
 
 def _commit_patch(cp: TaskCheckpoint) -> str | None:
@@ -590,6 +688,11 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
     Once a commit has been found necessary, that is durable: the entry the branch
     held then is recorded before anything is staged, and while the branch still
     holds that entry the patch is not committed, whatever git derives later.
+
+    Once a commit of the patch exists on the task branch, that is durable too
+    (``_patch_commit_record``): no later call derives, stages or commits anything.
+    The task branch either still carries the blob that commit stored for the
+    target, or the patch is reported as no longer there.
     """
     wt = Path(cp.worktree_path or "")
     rel = str((cp.patch or {}).get("relative_path"))
@@ -612,7 +715,15 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
         name = _canonical_path(wt, rel)  # every later comparison and pathspec uses git's spelling
         if name is None:
             return not_regular
-        expected = _git_derived_oid(wt, branch, name)
+        committed = _patch_commit_record(cp, wt, branch, name)
+        if committed is not None:
+            # What git derives from the file today (a clean filter or ``ident`` that
+            # appeared since) is no reason to commit the same patch a second time.
+            if type(committed) is dict and _branch_blob_oid(wt, branch, name) == committed.get("blob"):
+                return None
+            return (_NOT_COMMITTED + f"not committing it again: the task branch {branch} no longer carries "
+                    f"the blob that this task's patch commit stored for the target; nothing was staged")
+        expected = _git_derived_oid(wt, branch, name, _derive_root(cp.task_id))
         if expected is None:
             return not_regular
         # The id was derived from the file as it was read just now: it stands for
@@ -635,8 +746,12 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
             if _staged_blob_oid(wt, name) == expected:
                 _run_git(["add", "--", literal], cwd=wt, check=False)
         else:
-            if cp.measurements.get(_COMMIT_NEEDED_OVER) != (carried or ""):
+            parent = _run_git(["rev-parse", "--verify", f"refs/heads/{branch}^{{commit}}"], cwd=wt).stdout.strip()
+            intended = {"blob": expected, "parent": parent}
+            if (cp.measurements.get(_COMMIT_NEEDED_OVER) != (carried or "")
+                    or cp.measurements.get(_COMMIT_INTENDED) != intended):
                 cp.measurements[_COMMIT_NEEDED_OVER] = carried or ""
+                cp.measurements[_COMMIT_INTENDED] = intended
                 save_checkpoint(cp)  # durable before the index is touched: a kill after the add keeps it
             _run_git(["add", "--", literal], cwd=wt)
             if _staged_blob_oid(wt, name) != expected:
@@ -647,10 +762,14 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
                  "commit", "-m", f"z0int task {cp.task_id}: bounded patch", "--only", "--", literal],
                 cwd=wt,
             )
+            _patch_commit_record(cp, wt, branch, name)  # durable now: no later call commits again
         if _branch_blob_oid(wt, branch, name) != expected:
             return _NOT_COMMITTED + f"the task branch {branch} does not carry the recorded patch"
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
-        return _NOT_COMMITTED + f"commit failed: {(getattr(exc, 'stderr', None) or str(exc))[:300]}"
+        stderr = getattr(exc, "stderr", None)
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", "replace")
+        return _NOT_COMMITTED + f"commit failed: {(stderr or str(exc))[:300]}"
     return None
 
 

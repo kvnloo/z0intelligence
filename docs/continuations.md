@@ -141,10 +141,20 @@ target into a scratch index read from the task branch, with a scratch object
 directory, so the worktree's index and the object store are not touched; the
 staged entry and the task branch entry must both be that id, as a regular
 file. The scratch object directory reaches the repository's objects through
-its own `info/alternates` file holding one C-style quoted entry, so no
-character of the repository path (a colon, a newline, a quote) is a list
-separator, and an inherited `GIT_ALTERNATE_OBJECT_DIRECTORIES` is passed on
-unchanged. Entries are compared under the name Git itself prints for the
+its own `info/alternates` file, so no character of a path (a colon, a newline,
+a carriage return, a quote) is a list separator, and an inherited
+`GIT_ALTERNATE_OBJECT_DIRECTORIES` is passed on unchanged. That file lists the
+repository's own object directory and every directory of its alternates chain
+(as `git count-objects -v` reports them), each directly and deepest first, so
+the scratch directory adds no level to the chain: a repository whose chain of
+alternates is as deep as Git itself reads still verifies. The
+scratch area is made under the task's own state directory
+(`state/tasks/<task_id>/derive/`), never in `TMPDIR`. Derivations of one task
+hold a lock on `derive/lock`; whoever holds it removes every scratch directory
+already there before making its own, so one left by a killed process (`kill
+-9`) is gone at the next derivation and none accumulate. Every Git output that
+carries a path is read as bytes and split on NUL, so a carriage return in the
+repository path or the target name is not rewritten. Entries are compared under the name Git itself prints for the
 target, so `./sub//a.py` is `sub/a.py`; a path Git matches no single file for
 (a directory, or a file named with a trailing slash) is withheld. (`git hash-object` is not used: it does not load the index, so it
 converts a path whose stored blob already holds CRLF where `git add` does
@@ -162,6 +172,20 @@ before anything is staged. While the branch still holds that entry the patch
 is not committed, whatever Git derives later: a clean filter that appears
 after the add and undoes the patch does not turn "nothing was committed" into
 "nothing to commit". Removing such a filter lets the next resume commit.
+The same save records what is about to be committed
+(`measurements.patch_commit_intended`: the blob id and the task-branch commit
+it goes on top of). Once a commit of the patch exists it is recorded
+(`measurements.patch_committed`: the commit id and the target's blob id) and
+the patch is **never committed again**: later resumes derive and stage nothing
+and compare the task branch with that record. If the branch still carries that
+blob for the target the task verifies, whatever Git would derive today (a clean
+filter or `ident` added after the commit changes nothing); if it no longer
+does, verification is withheld with a `last_error` saying so. After a kill
+straight after `git commit`, the record is rebuilt from the intent: the first
+commit the branch gained on top of the recorded parent whose target entry is
+the recorded blob. A branch that was moved off that commit before any resume
+could record it looks exactly like a commit that never happened, and is
+committed.
 Verification otherwise remains the existing content predicate, not a claim that
 arbitrary tests ran or all project requirements were satisfied.
 Atomic checkpoint writes flush the temporary file and POSIX parent directory;
