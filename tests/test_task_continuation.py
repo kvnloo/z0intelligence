@@ -382,6 +382,47 @@ resume_task(sys.argv[1])
         self.assertIn('ab.py', subprocess.run(['git', 'status', '--porcelain'], cwd=wt, check=True, text=True,
                                               capture_output=True).stdout)
 
+    def run_named_target(self, name, sibling=None):
+        repo = self.root / ('repo-' + str(abs(hash(name))))
+        repo.mkdir()
+        run = lambda *args: subprocess.run(['git', *args], cwd=repo, check=True, text=True, capture_output=True)
+        run('init')
+        (repo / name).write_text('STATUS = "BROKEN"\n')
+        if sibling:
+            (repo / sibling).write_text('STATUS = "READY"\n')
+        run('add', '-A')
+        run('-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-m', 'fixture')
+        spec = PatchSpec(relative_path=name, find='STATUS = "BROKEN"', replace='STATUS = "READY"',
+                         description='oddly named target')
+        cp = authorize_task(base_repo=repo, patch=spec, task_id='named-' + str(abs(hash(name))))
+        cp.status = 'resolved'
+        save_checkpoint(cp)
+        cp = step_worktree(cp, worktrees_root=self.root / 'wts')
+        return cp
+
+    def test_a_target_name_that_looks_like_an_index_stage_still_verifies(self):
+        for name in ('0:a.py', '2:a.py', '3:a.py'):
+            with self.subTest(name=name):
+                cp = self.run_named_target(name, sibling='a.py')
+                done = resume_task(cp.task_id)
+                self.assertTrue(done.verified_success, done.last_error)
+                wt = Path(cp.worktree_path)
+                changed = subprocess.run(['git', 'show', '--name-only', '--format=', 'HEAD'], cwd=wt, check=True,
+                                         text=True, capture_output=True).stdout.split()
+                self.assertEqual(changed, [name])
+
+    def test_a_symlink_whose_link_text_equals_the_patch_is_not_committed(self):
+        self.kill_before_add()
+        after = self.target.read_bytes()
+        self.target.unlink()
+        # A file named by the after-image text and holding it, with the target linked to it:
+        # both the link's text and the bytes read through it equal the recorded patch.
+        (self.target.parent / os.fsdecode(after)).write_bytes(after)
+        os.symlink(after, self.target)
+        cp = resume_task(self.cp.task_id)
+        self.assertIsNot(cp.verified_success, True)
+        self.assertEqual(self.git('rev-list', '--count', self.cp.base_ref + '..HEAD').strip(), '0')
+
     def test_uncommittable_patch_is_not_reported_verified(self):
         hooks = Path(self.git('rev-parse', '--git-common-dir').strip()) / 'hooks'
         hooks.mkdir(exist_ok=True)

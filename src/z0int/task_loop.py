@@ -510,8 +510,14 @@ def _commit_patch(cp: TaskCheckpoint) -> str | None:
             _run_git(["add", "--", literal], cwd=wt)
             # What git will store can differ from the bytes on disk (a clean filter,
             # a symlink): commit only if the staged blob is the recorded after-image.
-            staged = subprocess.run(["git", "cat-file", "blob", f":{rel}"], cwd=wt, capture_output=True)
-            if staged.returncode != 0 or hashlib.sha256(staged.stdout).hexdigest() != after:
+            # ":0:<path>" names stage 0 outright; a bare ":<path>" would read a name like
+            # "2:a.py" as stage 2 of a.py.
+            staged = subprocess.run(["git", "cat-file", "blob", f":0:{rel}"], cwd=wt, capture_output=True)
+            entry = subprocess.run(["git", "ls-files", "--stage", "--", literal], cwd=wt,
+                                   capture_output=True, text=True).stdout
+            regular = entry.startswith(("100644 ", "100755 "))  # a file, not a symlink or submodule
+            if (staged.returncode != 0 or not regular
+                    or hashlib.sha256(staged.stdout).hexdigest() != after):
                 _run_git(["reset", "-q", "--", literal], cwd=wt, check=False)
                 return _NOT_COMMITTED + "what git would store for the target does not match the recorded patch"
             _run_git(
