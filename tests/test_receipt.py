@@ -123,6 +123,70 @@ class OutcomeTiers(unittest.TestCase):
 
 
 class ReceiptJoin(unittest.TestCase):
+    def test_replayed_receipts_count_one_task_and_one_token_measurement(self):
+        from z0int.receipt import (
+            Outcome, append_receipt, build_receipt, close_turn, join_outcome, summarize_tokenomics,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            row = append_receipt(build_receipt(
+                capability_id="coding.edit", route="local", baseline_input_tokens=1000,
+                baseline_output_tokens=200, estimated_frontier_tokens_avoided=1200,
+            ), root=home)
+            trace = row["trace_id"]
+            close_turn(trace, measured_frontier_tokens=500, measurement_state="complete",
+                       outcome=Outcome(test_pass=True, source="ci"), root=home)
+            join_outcome(trace, Outcome(test_pass=True, source="ci"), root=home)
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["verified_tasks"], 1)
+            self.assertEqual(summary["rows"], 1)
+            self.assertEqual(summary["baseline_tokens_sum"], 1200)
+            self.assertEqual(summary["measured_frontier_tokens_sum"], 500)
+            self.assertEqual(summary["actual_tokens_saved_authoritative"], 700)
+            self.assertEqual(summary["frontier_tokens_avoided_est"], 1200)
+            self.assertEqual(len((home / "receipts" / "decisions.jsonl").read_text().splitlines()), 4)
+            other = append_receipt(build_receipt(capability_id="coding.edit", route="local"), root=home)
+            join_outcome(other["trace_id"], Outcome(test_pass=True, source="ci"), root=home)
+            self.assertEqual(summarize_tokenomics(root=home)["verified_tasks"], 2)
+
+    def test_latest_negative_canonical_outcome_beats_positive_history_and_bridge_mirror(self):
+        from z0int.receipt import Outcome, append_receipt, build_receipt, find_receipt, join_outcome, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            row = append_receipt(build_receipt(capability_id="coding.edit", route="local"), root=home)
+            trace = row["trace_id"]
+            join_outcome(trace, Outcome(test_pass=True, source="ci"), root=home)
+            positive = find_receipt(trace, root=home)
+            stream = home / "stream" / "bridge.jsonl"
+            stream.parent.mkdir(parents=True, exist_ok=True)
+            stream.write_text(json.dumps({"trace_id": trace, "receipt": positive}) + "\n")
+            join_outcome(trace, Outcome(test_pass=False, source="ci"), root=home)
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["verified_tasks"], 0)
+            self.assertEqual(summary["by_tier"], {"negative": 1})
+            self.assertEqual(summary["rows"], 1)
+            self.assertEqual(len((home / "receipts" / "outcomes.jsonl").read_text().splitlines()), 2)
+            self.assertEqual(json.loads(stream.read_text())["receipt"]["outcome_tier"], "gold")
+
+    def test_legacy_nested_receipt_uses_outer_trace_and_keeps_unknown_identities_separate(self):
+        from z0int.receipt import summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            stream = home / "stream" / "bridge.jsonl"
+            stream.parent.mkdir(parents=True)
+            rows = [
+                {"trace_id": "legacy-trace", "receipt": {"outcome": {"test_pass": verdict, "source": "ci"}}}
+                for verdict in (True, False)
+            ] + [{"receipt": {"outcome": {"success": True}}} for _ in range(2)]
+            stream.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["verified_tasks"], 0)
+            self.assertEqual(summary["rows"], 3)
+            self.assertEqual(summary["by_tier"], {"negative": 1, "soft": 2})
+
     def test_invalid_ambient_verifier_join_preserves_negative_history_without_credit(self):
         from z0int.receipt import (
             append_receipt, build_receipt, find_receipt, join_outcome, summarize_tokenomics,
@@ -313,6 +377,244 @@ class ReceiptJoin(unittest.TestCase):
             self.assertGreaterEqual(s["verified_tasks"], 1)
 
 
+
+
+class ReceiptRevisionTruth(unittest.TestCase):
+    def test_outcomeless_replay_preserves_verified_outcome_and_accounting(self):
+        from z0int.receipt import Outcome, append_receipt, build_receipt, close_turn, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            original = append_receipt(build_receipt(baseline_input_tokens=1000), root=home)
+            close_turn(original["trace_id"], measured_frontier_tokens=400,
+                       measurement_state="complete", outcome=Outcome(test_pass=True, source="ci"), root=home)
+            before = (home / "receipts" / "decisions.jsonl").read_bytes()
+            append_receipt(original, root=home)
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["verified_tasks"], 1)
+            self.assertEqual(summary["rows"], 1)
+            self.assertEqual(summary["measured_frontier_tokens_sum"], 400)
+            self.assertEqual(summary["actual_tokens_saved_authoritative"], 600)
+            self.assertTrue((home / "receipts" / "decisions.jsonl").read_bytes().startswith(before))
+
+    def test_bridge_only_negative_overrides_canonical_gold(self):
+        from z0int.receipt import Outcome, append_receipt, build_receipt, find_receipt, join_outcome, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            original = append_receipt(build_receipt(capability_id="canonical"), root=home)
+            trace = original["trace_id"]
+            joined = join_outcome(trace, Outcome(test_pass=True, source="ci"), root=home)
+            stream = home / "stream" / "bridge.jsonl"
+            stream.write_text(json.dumps({"trace_id": trace, "ts": joined["ts"] + 1,
+                                          "receipt": {"capability_id": "mirror"},
+                                          "outcome": {"ci_failed": True, "source": "ci"}}) + "\n")
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["verified_tasks"], 0)
+            self.assertEqual(summary["by_tier"], {"negative": 1})
+            self.assertEqual(summary["by_capability"], {"canonical": 1})
+            self.assertTrue(find_receipt(trace, root=home)["outcome"]["ci_failed"])
+
+    def test_bridge_only_outcome_is_joined_to_outcomeless_canonical_receipt(self):
+        from z0int.receipt import append_receipt, build_receipt, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            original = append_receipt(build_receipt(), root=home)
+            stream = home / "stream" / "bridge.jsonl"
+            stream.write_text(json.dumps({"trace_id": original["trace_id"],
+                                          "receipt": {"outcome": {"test_pass": True, "source": "ci"}}}) + "\n")
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["rows"], 1)
+            self.assertEqual(summary["verified_tasks"], 1)
+            self.assertEqual(summary["by_tier"], {"gold": 1})
+
+    def test_scrub_preserves_later_measured_close_and_original_evidence(self):
+        from z0int.receipt import append_receipt, build_receipt, close_turn, find_receipt, scrub_contaminated_outcomes, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            original = append_receipt(build_receipt(baseline_input_tokens=1000), root=home)
+            trace = original["trace_id"]
+            op = home / "receipts" / "outcomes.jsonl"
+            op.write_text(json.dumps({"trace_id": trace, "ts": original["ts"],
+                                      "outcome": {"success": True, "source": "bridge_turn_end"},
+                                      "outcome_tier": "gold", "receipt": original}) + "\n")
+            close_turn(trace, measured_frontier_tokens=400, input_tokens=300, output_tokens=100,
+                       cached_input_tokens=200, measurement_state="complete", root=home)
+            before = (home / "receipts" / "decisions.jsonl").read_bytes()
+            self.assertEqual(scrub_contaminated_outcomes(root=home)["rewritten"], 1)
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["measured_frontier_tokens_sum"], 400)
+            self.assertEqual(summary["actual_tokens_saved_authoritative"], 600)
+            self.assertEqual(summary["verified_tasks"], 0)
+            self.assertEqual(find_receipt(trace, root=home)["cached_input_tokens"], 200)
+            physical = json.loads((home / "receipts" / "decisions.jsonl").read_text().splitlines()[-1])
+            self.assertEqual(physical.get("measured_frontier_tokens"), 400)
+            self.assertEqual(physical.get("cached_input_tokens"), 200)
+            self.assertTrue((home / "receipts" / "decisions.jsonl").read_bytes().startswith(before))
+
+    def test_stale_positive_replay_cannot_overwrite_later_negative(self):
+        from z0int.receipt import Outcome, append_receipt, build_receipt, find_receipt, join_outcome, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            trace = append_receipt(build_receipt(), root=home)["trace_id"]
+            join_outcome(trace, Outcome(test_pass=True, source="ci"), root=home)
+            positive = find_receipt(trace, root=home)
+            join_outcome(trace, Outcome(test_pass=False, source="ci"), root=home)
+            append_receipt(positive, root=home)
+            self.assertEqual(summarize_tokenomics(root=home)["by_tier"], {"negative": 1})
+
+    def test_outcome_revision_controls(self):
+        from z0int.receipt import append_receipt, build_receipt, find_receipt, summarize_tokenomics
+
+        cases = [
+            # Explicit later verification can reopen a previously negative assessment.
+            ({"test_pass": False, "source": "ci"}, 1, {"test_pass": True, "source": "ci"}, 2, "gold"),
+            # Equal-time and unclocked contradictory evidence cannot mint success.
+            ({"test_pass": True, "source": "ci"}, 1, {"test_pass": False, "source": "ci"}, 1, "negative"),
+            ({"test_pass": True, "source": "ci"}, 1, {"ci_failed": True, "source": "ci"}, None, "negative"),
+            # A later ambient close is execution evidence, not a replacement verdict.
+            ({"test_pass": True, "source": "ci"}, 1, {"test_pass": True, "source": "bridge_turn_end"}, 2, "gold"),
+            ({"test_pass": False, "source": "ci"}, 1, {"execution_completed": True}, 2, "negative"),
+        ]
+        for first, first_ts, second, second_ts, tier in cases:
+            with self.subTest(tier=tier, second=second), tempfile.TemporaryDirectory() as tmp:
+                home = Path(tmp)
+                row = append_receipt(build_receipt(), root=home)
+                append_receipt({**row, "outcome": first, "outcome_ts": first_ts}, root=home)
+                append_receipt({**row, "outcome": second, "outcome_ts": second_ts}, root=home)
+                summary = summarize_tokenomics(root=home)
+                self.assertEqual(summary["by_tier"], {tier: 1})
+                self.assertEqual(summary["verified_tasks"], int(tier == "gold"))
+                self.assertEqual(summary["rows"], 1)
+                self.assertIsNotNone(find_receipt(row["trace_id"], root=home))
+
+    def test_new_partial_close_defeats_stale_complete_snapshot(self):
+        from z0int.receipt import append_receipt, build_receipt, close_turn, find_receipt, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            trace = append_receipt(build_receipt(baseline_input_tokens=1000), root=home)["trace_id"]
+            close_turn(trace, measured_frontier_tokens=400, measurement_state="complete", root=home)
+            complete = find_receipt(trace, root=home)
+            close_turn(trace, measured_frontier_tokens=450, measurement_state="partial", root=home)
+            append_receipt(complete, root=home)
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["measured_frontier_tokens_sum"], 450)
+            self.assertEqual(summary["actual_tokens_saved"], 0)
+            self.assertEqual(summary["measurement_state_counts"], {"partial": 1})
+
+    def test_malformed_legacy_rows_and_nested_identity_do_not_hide_evidence(self):
+        from z0int.receipt import summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            stream = home / "stream" / "bridge.jsonl"
+            stream.parent.mkdir(parents=True)
+            stream.write_text('[]\nnull\n' + json.dumps({"trace_id": None, "receipt": {
+                "trace_id": "nested", "outcome": {"test_pass": True, "source": "ci"},
+            }}) + "\n" + json.dumps({"trace_id": "malformed", "outcome": "invalid"}) + "\n")
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["rows"], 2)
+            self.assertEqual(summary["verified_tasks"], 1)
+
+    def test_bridge_envelope_cannot_enter_a_canonical_outcome_join(self):
+        from z0int.receipt import Outcome, append_receipt, build_receipt, join_outcome
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            original = append_receipt(build_receipt(), root=home)
+            stream = home / "stream" / "bridge.jsonl"
+            stream.write_text(json.dumps({"trace_id": original["trace_id"], "receipt": original,
+                                          "prompt": "synthetic-private-prompt", "preflight": {"private": True}}) + "\n")
+            join_outcome(original["trace_id"], Outcome(test_pass=True, source="ci"), root=home)
+            for filename in ("decisions.jsonl", "outcomes.jsonl"):
+                self.assertNotIn("synthetic-private-prompt", (home / "receipts" / filename).read_text())
+
+    def test_metadata_only_legacy_revision_cannot_retag_usage_time(self):
+        from z0int.receipt import summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            stream = home / "stream" / "bridge.jsonl"
+            stream.parent.mkdir(parents=True)
+            stream.write_text("".join(json.dumps(row) + "\n" for row in [
+                {"trace_id": "legacy", "ts": 10, "baseline_input_tokens": 1000,
+                 "measured_frontier_tokens": 400, "measurement_state": "complete"},
+                {"trace_id": "legacy", "ts": 100, "capability_id": "metadata"},
+                {"trace_id": "legacy", "ts": 20, "baseline_input_tokens": 1000,
+                 "measured_frontier_tokens": 450, "measurement_state": "partial"},
+            ]))
+            summary = summarize_tokenomics(root=home)
+            self.assertEqual(summary["measured_frontier_tokens_sum"], 450)
+            self.assertEqual(summary["actual_tokens_saved_authoritative"], 0)
+
+    def test_new_bridge_envelope_cannot_retag_a_stale_positive_outcome(self):
+        from z0int.receipt import append_receipt, build_receipt, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            original = append_receipt(build_receipt(), root=home)
+            append_receipt({**original, "outcome": {"ci_failed": True}, "outcome_ts": 20}, root=home)
+            stream = home / "stream" / "bridge.jsonl"
+            stream.write_text(json.dumps({"trace_id": original["trace_id"], "ts": 30, "receipt": {
+                "trace_id": original["trace_id"], "ts": 10, "outcome": {"test_pass": True, "source": "ci"},
+            }}) + "\n")
+            self.assertEqual(summarize_tokenomics(root=home)["by_tier"], {"negative": 1})
+
+    def test_out_of_range_clock_cannot_break_unrelated_receipt_reads(self):
+        from z0int.receipt import append_receipt, build_receipt, find_receipt, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            target = append_receipt(build_receipt(), root=home)
+            append_receipt({"trace_id": "unrelated", "ts": 10 ** 400,
+                            "outcome": {"test_pass": False, "source": "ci"}}, root=home)
+            self.assertEqual(find_receipt(target["trace_id"], root=home)["trace_id"], target["trace_id"])
+            self.assertEqual(summarize_tokenomics(root=home)["by_tier"], {"negative": 1})
+
+    def test_equal_clock_conflicting_usage_cannot_restore_authoritative_savings(self):
+        from z0int.receipt import append_receipt, build_receipt, summarize_tokenomics
+
+        for state in ("partial", "complete"):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as tmp:
+                home = Path(tmp)
+                original = append_receipt(build_receipt(baseline_input_tokens=1000), root=home)
+                complete = {**original, "close_ts": 2, "measured_frontier_tokens": 400,
+                            "measurement_state": "complete"}
+                append_receipt(complete, root=home)
+                append_receipt({**complete, "measured_frontier_tokens": 450, "measurement_state": state}, root=home)
+                append_receipt(complete, root=home)
+                summary = summarize_tokenomics(root=home)
+                self.assertEqual(summary["actual_tokens_saved_authoritative"], 0)
+
+    def test_raw_stream_is_only_a_fallback_for_canonical_trace_lookup(self):
+        from z0int.receipt import append_receipt, build_receipt, effective_tier, find_receipt, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            row = append_receipt(build_receipt(), root=home)
+            append_receipt({**row, "outcome": {"ci_failed": True}, "outcome_ts": 20}, root=home)
+            raw = home / "stream/raw.jsonl"
+            raw.write_text(json.dumps({"trace_id": row["trace_id"], "outcome_ts": 30,
+                                       "outcome": {"test_pass": True, "source": "ci"}}) + "\n")
+            self.assertEqual(effective_tier(find_receipt(row["trace_id"], root=home)["outcome"]), "negative")
+            self.assertEqual(summarize_tokenomics(root=home)["by_tier"], {"negative": 1})
+
+    def test_raw_only_receipt_remains_available_in_the_requested_root(self):
+        from z0int.receipt import effective_tier, find_receipt
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            raw = home / "stream/raw.jsonl"
+            raw.parent.mkdir(parents=True)
+            raw.write_text(json.dumps({"trace_id": "raw-only", "outcome": {"ci_failed": True},
+                                       "extra": {"origin": "retained"}}) + "\n")
+            found = find_receipt("raw-only", root=home)
+            self.assertEqual(effective_tier(found["outcome"]), "negative")
+            self.assertEqual(found["extra"], {"origin": "retained"})
 
 
 class ReceiptCli(unittest.TestCase):
