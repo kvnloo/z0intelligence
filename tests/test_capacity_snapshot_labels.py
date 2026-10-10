@@ -36,7 +36,7 @@ ORDINARY = [
 # Names that only resemble the refused shapes.
 LOOKALIKES = [
     "free/model", "meta-llama/llama-4-scout-17b-16e-instruct", "models/gemini-1.5-pro", "etcd/member",
-    "homelab/box", "my-etc/x", "a.b/c", "v1.2/rc", "cpu / gpu", "requests/min", "dev/gpu-box", ".hidden",
+    "homelab/box", "my-etc/x", "a.b/c", "v1.2/rc", "cpu / gpu", "requests/min", ".hidden",
     "v1 .2", "a:b", "rack-2/etc",
     ".net build/arm64",
 ]

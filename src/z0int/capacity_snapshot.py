@@ -92,13 +92,21 @@ _EMBEDDED_SK = re.compile(r"(?<=[A-Za-z0-9])sk-")  # "task-", "desk-": not a key
 # Path-shaped although it does not start with a slash. A slash alone is not a path: "build/arm64",
 # "k8s/ns/pod-1" and "free/model" are names. It is one when the slash opens a word or follows a
 # colon ("x /etc", "C:/x"), when a segment beside it starts with a dot ("./x", "../x", "a/.ssh"),
-# or when a segment that has more after it is a system root directory ("etc/shadow", "a/usr/bin").
+# or when a segment with a slash after it is a system root directory ("etc/shadow", "a/usr/bin",
+# "dev/sda"). A root word is a name anywhere else: "dev", "dev-box", "run 7", "team/system-x".
 _PATH_SHAPED = re.compile(
     r"[ :]/(?! )"
     r"|(?:^|[ :])\.[^ /]*/"
     r"|/\."
-    r"|(?i:(?:^|[ :/])(?:etc|home|root|usr|var|tmp|proc|sys|mnt|opt|users|volumes|windows)/)"
+    r"|(?i:(?:^|[ :/])(?:etc|home|root|usr|var|tmp|proc|sys|mnt|opt|users|volumes|windows"
+    r"|bin|sbin|lib|lib64|dev|run|boot|srv|snap|private|library|applications|system|programdata)/)"
 )
+# Ids this module makes up. Input shaped like one is never published as text: it would be taken for
+# the row that really carries that id. A stand-in is refused wherever an id or a reference is read;
+# a synthesized host or offer id is refused as a host's or an offer's own id, and a reference to one
+# is still published, since it can only reach the row the module gave that id to.
+_STAND_IN = re.compile(r"redacted-[0-9a-f]{20}")
+_SYNTHESIZED = re.compile(r"(?:host|offer)-[0-9a-f]{20}")
 _MAX_RUN = 20
 _MAX_WORD = 32
 _MAX_LOWERCASE_WORD = 64
@@ -167,10 +175,11 @@ def _scalar(value: Any) -> bool:
     return isinstance(value, (str, int, float))
 
 
-def _ident(value: Any, prefix: str = "", limit: int = _MAX_TEXT) -> tuple[str, bool]:
+def _ident(value: Any, prefix: str = "", limit: int = _MAX_TEXT, own: bool = False) -> tuple[str, bool]:
     """(published id, is_stand_in) for a scalar identifier: its text when that is a plain label,
     otherwise a stable one-way stand-in. The result depends only on the text, never on whether
-    JSON spelled the id as a string or a number, so two rows that spell an id the same way join."""
+    JSON spelled the id as a string or a number, so two rows that spell an id the same way join.
+    `own` marks the id of a host or offer row itself, which must not be a synthesized id."""
     text = f"{prefix}{value}"
     # Any number of leading tern: prefixes, added here or already there, must not hide a path:
     # the name behind them is judged too. This decides publication only; the text is unchanged.
@@ -178,7 +187,8 @@ def _ident(value: Any, prefix: str = "", limit: int = _MAX_TEXT) -> tuple[str, b
     while text.startswith("tern:", start):  # one pass: no copy per prefix
         start += len("tern:")
     core = text[start:]
-    if _label(core) == core and _label(text, limit) == text:
+    made_up = _STAND_IN.fullmatch(core) or (own and _SYNTHESIZED.fullmatch(text))
+    if not made_up and _label(core) == core and _label(text, limit) == text:
         return text, False
     return _stable_id("redacted", text), True
 
@@ -426,7 +436,7 @@ def _normalize_host(host: Mapping[str, Any], *, now: float) -> Any:
     if not _scalar(raw_id if explicit_host_id is None else explicit_host_id):
         return _DROPPED
     if explicit_host_id is not None:
-        host_id, redacted = _ident(explicit_host_id)
+        host_id, redacted = _ident(explicit_host_id, own=True)
     else:
         host_id, redacted = _ident(raw_id, "tern:")
     out = {
@@ -603,7 +613,7 @@ def _normalize_kerdoios(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], 
             dropped += 1
             continue
         if raw_offer_id:
-            offer_id, redacted = _ident(raw_offer_id)
+            offer_id, redacted = _ident(raw_offer_id, own=True)
         else:
             offer_id, redacted = _stable_id("offer", "provider", raw_provider, entry.get("model")), False
         provider = _ident(raw_provider)[0]
