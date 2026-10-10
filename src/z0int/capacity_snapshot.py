@@ -156,7 +156,10 @@ def _ident(value: Any, prefix: str = "", limit: int = _MAX_TEXT) -> tuple[str, b
     otherwise a stable one-way stand-in. The same input always maps to the same output, so
     references between rows still join."""
     text = f"{prefix}{value}"
-    if isinstance(value, (str, int)) and not isinstance(value, bool) and _label(text, limit) == text:
+    raw = str(value)
+    # The value is judged on its own first: a prefix must not hide a path or a secret shape
+    plain = _label(raw, limit) == raw and _label(text, limit) == text
+    if isinstance(value, (str, int)) and not isinstance(value, bool) and plain:
         return text, False
     return _stable_id("redacted", text), True
 
@@ -266,7 +269,8 @@ def _mtime(path: Path | None) -> float | None:
 
 def _stable_id(kind: str, *parts: object) -> str:
     raw = "\0".join("" if part is None else str(part) for part in parts)
-    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:20]
+    # A lone surrogate from a JSON escape is not valid UTF-8 but must still hash
+    digest = hashlib.sha256(raw.encode("utf-8", "surrogatepass")).hexdigest()[:20]
     return f"{kind}-{digest}"
 
 

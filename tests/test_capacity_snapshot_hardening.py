@@ -628,3 +628,36 @@ def test_remote_host_without_gpu_facts_does_not_report_zero():
     tern["hosts"][0]["resources"] = {"cpu_logical": 8, "gpu_count": "many"}
     host = next(h for h in _build(tern=tern)["hosts"] if h["host_id"] == "tern:groot")
     assert host["resources"]["gpu_count"] is None
+
+
+def test_an_identifier_with_a_lone_surrogate_costs_no_other_row():
+    tern = _tern()
+    tern["hosts"].append({"host_id": "tern:gpu-box-2", "label": "gpu-box-2", "status": "offline",
+                          "observed_at": NOW - 3})
+    tern["sessions"] = [
+        {"session_id": "s1", "host_id": "tern:groot", "status": "locked", "observed_at": NOW - 3},
+        {"session_id": "bad\ud83d", "host_id": "tern:groot", "status": "locked", "observed_at": NOW - 3},
+    ]
+
+    snap = _build(tern=tern)
+
+    assert snap["sources"]["tern"]["status"] != "error"
+    assert {h["host_id"] for h in snap["hosts"]} >= {"tern:groot", "tern:gpu-box-2"}
+    sessions = {s["session_id"]: s for s in snap["sessions"]}
+    assert "s1" in sessions
+    stand_ins = [s for s in snap["sessions"] if s.get("id_redacted")]
+    assert len(stand_ins) == 1 and stand_ins[0]["session_id"].startswith("redacted-")
+    # The published snapshot is still plain UTF-8 JSON
+    json.dumps(snap, allow_nan=False).encode("utf-8")
+
+
+@pytest.mark.parametrize("raw", ["/etc/shadow", "/abs/path/x", "~/secrets", "~root"])
+def test_a_path_shaped_host_name_is_never_published_behind_the_tern_prefix(raw):
+    tern = _tern()
+    tern["hosts"].append({"name": raw, "status": "offline", "observed_at": NOW - 3})
+    tern["sessions"] = [{"session_id": "s9", "host": raw, "status": "locked", "observed_at": NOW - 3}]
+
+    text = json.dumps(_build(tern=tern))
+
+    assert raw not in text
+    assert f"tern:{raw}" not in text
