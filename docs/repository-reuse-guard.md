@@ -61,6 +61,8 @@ OMP configuration is opt-in:
 | `OMP_Z0INT_REUSE_CANDIDATE_ROOTS` | JSON array of checkout paths |
 | `OMP_Z0INT_REUSE_TASK_ID` | Stable workstream ID, separate from turn trace |
 | `OMP_Z0INT_REUSE_MEMORY_SCOPE` | Optional JSON object with explicit user/project/repo/task |
+| `OMP_Z0INT_REUSE_MEMORY_SUBJECT` | Optional subject filter for current decisions and discovery hints |
+| `OMP_Z0INT_REUSE_MEMORY_PREDICATE` | Optional predicate filter for current decisions and discovery hints |
 | `OMP_Z0INT_REUSE_VERIFIER` | Optional JSON verifier binding with candidate ID, argv and owning test paths |
 
 When memory scope is configured, its task supplies the fallback workstream ID.

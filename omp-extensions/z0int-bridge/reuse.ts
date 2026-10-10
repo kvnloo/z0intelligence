@@ -26,6 +26,8 @@ export interface ReuseConfig {
 	candidateRoots: string[];
 	taskId?: string | null;
 	memoryScope?: JsonObject | null;
+	memorySubject?: string | null;
+	memoryPredicate?: string | null;
 	verifierBinding?: JsonObject | null;
 	configurationError?: string | null;
 }
@@ -163,6 +165,8 @@ export function reuseConfigFromEnv(env: Record<string, string | undefined> = pro
 		candidateRoots: readCandidateRoots(env.OMP_Z0INT_REUSE_CANDIDATE_ROOTS),
 		taskId: nonEmptyString(env.OMP_Z0INT_REUSE_TASK_ID),
 		memoryScope,
+		memorySubject: nonEmptyString(env.OMP_Z0INT_REUSE_MEMORY_SUBJECT),
+		memoryPredicate: nonEmptyString(env.OMP_Z0INT_REUSE_MEMORY_PREDICATE),
 		verifierBinding,
 		configurationError,
 	};
@@ -355,6 +359,8 @@ export function createReuseAdapter(dependencies: ReuseDependencies): ReuseAdapte
 						...discovery,
 						task_id: dependencies.config.taskId ?? nonEmptyString(dependencies.config.memoryScope?.task) ?? traceId,
 						...(dependencies.config.memoryScope ? { memory_scope: dependencies.config.memoryScope } : {}),
+						...(dependencies.config.memorySubject ? { memory_subject: dependencies.config.memorySubject } : {}),
+						...(dependencies.config.memoryPredicate ? { memory_predicate: dependencies.config.memoryPredicate } : {}),
 						...(dependencies.config.verifierBinding ? { verifier_binding: dependencies.config.verifierBinding } : {}),
 						session_id: identity.sessionId,
 						trace_id: traceId,

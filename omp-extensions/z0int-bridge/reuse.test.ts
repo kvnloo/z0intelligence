@@ -228,6 +228,30 @@ test("configured memory scope retains a stable task independently of turn traces
 	expect(payload).toMatchObject({ task_id: "workstream", trace_id: "new-turn-trace" });
 });
 
+test("configured decision filters reach evidence preparation with the stable scope", async () => {
+	const scope = { user: "u", project: "p", repo: "org/repository", task: "workstream" };
+	const configured = reuseConfigFromEnv({
+		OMP_Z0INT_REUSE_MODE: "enforce",
+		OMP_Z0INT_REUSE_CANONICAL_REPO: "org/repository",
+		OMP_Z0INT_REUSE_REGISTRY_PATH: "/config/repos.json",
+		OMP_Z0INT_REUSE_CANDIDATE_ROOTS: '["/work/task"]',
+		OMP_Z0INT_REUSE_MEMORY_SCOPE: JSON.stringify(scope),
+		OMP_Z0INT_REUSE_MEMORY_SUBJECT: "fixture-implementation",
+		OMP_Z0INT_REUSE_MEMORY_PREDICATE: "strategy",
+	});
+	const sent: RequestBody[] = [];
+	const adapter = createReuseAdapter({
+		config: configured,
+		getTraceId: () => "new-turn-trace",
+		request: async body => { sent.push(body); return resolveResponse("new-turn-trace"); },
+	});
+	await adapter.beforeAgentStart({ prompt: "Implement it as currently decided" }, CONTEXT);
+	expect(sent[0]?.payload).toMatchObject({
+		task_id: "workstream", trace_id: "new-turn-trace", memory_scope: scope,
+		memory_subject: "fixture-implementation", memory_predicate: "strategy",
+	});
+});
+
 test("a configured verifier is supplied before evidence preparation", async () => {
 	const binding = {
 		verifier_id: "owning-tests", candidate_id: "file:src/rows.py",
