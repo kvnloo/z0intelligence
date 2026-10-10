@@ -1,6 +1,7 @@
 """Run the Kerdoios free-fanout plan. Five free slots, never Cursor.
 
-402 and 429 jump to the next free provider in the same call.
+Always free-only: a slot without validated zero-cost evidence is refused, not called.
+402 and 429 jump to the next validated free provider in the same call.
 """
 
 from __future__ import annotations
@@ -25,12 +26,9 @@ def fanout_plan(workers: int = 5) -> dict:
     return build_fanout([], workers=workers)
 
 
-def _plan_for(slot: dict, policy: dict) -> dict:
-    candidate = {"provider": slot["provider"], "model": slot["model"]}
-    if free_route(policy, slot["provider"], slot["model"]) is None:
-        candidate["sidestep"] = True
+def _plan_for(slot: dict) -> dict:
     return {
-        "candidates": [candidate],
+        "candidates": [{"provider": slot["provider"], "model": slot["model"]}],
         "source": "z0int.free_fanout",
         "category": "probe",
         "reason": "free fanout probe",
@@ -42,12 +40,14 @@ def _plan_for(slot: dict, policy: dict) -> dict:
 def _one(slot: dict, policy: dict, providers: dict) -> dict:
     if blocked_provider(slot["provider"]):
         return {"slot": slot["slot"], "ok": False, "provider": slot["provider"], "error": "cursor_or_paid_blocked"}
+    if free_route(policy, slot["provider"], slot["model"]) is None:
+        return {"slot": slot["slot"], "ok": False, "provider": slot["provider"], "model": slot["model"], "error": "no_validated_free_route"}
     try:
         result = execute_plan(
-            {"task": "Reply with the single word pong.", "parent_agent": "free-fanout", "max_tokens": 128},
+            {"task": "Reply with the single word pong.", "parent_agent": "free-fanout", "max_tokens": 128, "free_only": True},
             policy,
             providers,
-            _plan_for(slot, policy),
+            _plan_for(slot),
             receipt_sink=append_receipt,
         )
     except Exception as exc:
@@ -82,7 +82,7 @@ def run(workers: int = 5) -> dict:
     working = [slot for slot in slots if slot["ok"]]
     return {
         "schema": "z0int.free_fanout_probe.v1",
-        "cursor_used": False,
+        "cursor_used": any(blocked_provider(a["provider"]) for slot in slots for a in slot.get("attempts", [])),
         "requested_workers": workers,
         "working": len(working),
         "slots": slots,
