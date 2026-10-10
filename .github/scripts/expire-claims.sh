@@ -28,7 +28,9 @@ export VOL_MAX_AGE_SECS=$((MAX_HOURS * 3600))
 
 lease_state() {
   # JSON comments array on stdin → two lines: yes|no and reason
-  python3 - <<'PY'
+  # The program is passed with -c: a heredoc on "python3 -" would take over
+  # stdin and the piped comments would never reach json.load.
+  python3 -c "$(cat <<'PY'
 import datetime, json, os, re, sys
 now = int(os.environ["VOL_NOW_EPOCH"])
 max_age = int(os.environ["VOL_MAX_AGE_SECS"])
@@ -57,7 +59,7 @@ for c in comments:
             pass
 if expiry is not None:
     expired = expiry <= now
-    reason = f"expires_at {expiry} <= now {now}"
+    reason = f"expires_at {expiry} {'<=' if expired else '>'} now {now}"
 elif claim_at is not None:
     expired = (now - claim_at) >= max_age
     reason = f"claim comment age {now - claim_at}s >= {max_age}s"
@@ -67,6 +69,7 @@ else:
 print("yes" if expired else "no")
 print(reason)
 PY
+)"
 }
 
 issues="$(gh issue list --label claimed --state open --limit 100 --json number --jq '.[].number')"
