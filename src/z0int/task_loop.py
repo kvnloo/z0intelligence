@@ -228,6 +228,10 @@ def load_checkpoint(task_id: str) -> TaskCheckpoint:
     if type(row) is not dict:
         raise InvalidCheckpoint("task checkpoint must be an object")
     sealed = row.pop("_continuation", None)
+    # Every writer since the seal was introduced emits both `_continuation` and
+    # `pending_patch`. Only the pre-seal shape (neither key) may load unsealed.
+    if sealed is None and "pending_patch" in row:
+        raise InvalidCheckpoint("unsealed task checkpoint in the sealed format; seal removal refused")
     cp = TaskCheckpoint.from_dict(row)
     if cp.task_id != task_id:
         raise InvalidCheckpoint("task identity mismatch")
@@ -243,7 +247,7 @@ def load_checkpoint(task_id: str) -> TaskCheckpoint:
                      allowed_entrypoints=set(_NEXT.values()))
         if generic.checkpoint_id != task_continuation(cp).checkpoint_id:
             raise InvalidCheckpoint("task state and continuation metadata disagree")
-    # Unsealed v1 files remain readable; next save migrates them. They have no integrity proof.
+    # Pre-seal v1 files remain readable; next save migrates them. They have no integrity proof.
     return cp
 
 
@@ -252,7 +256,13 @@ def list_checkpoints() -> list[dict[str, Any]]:
     for p in sorted(_tasks_dir().glob("*.json")):
         try:
             d = load_checkpoint(p.stem).to_dict()
-        except (OSError, ValueError):
+        except (OSError, ValueError) as exc:
+            # Refused is not absent: keep the task visible, with no outcome claimed.
+            out.append({
+                "task_id": p.stem, "status": "refused", "family_id": None,
+                "verified_success": None, "execution_completed": None, "path": str(p),
+                "reason": f"{type(exc).__name__}: {exc}"[:500],
+            })
             continue
         out.append({
             "task_id": d.get("task_id"),
@@ -462,6 +472,29 @@ def _patch_target(cp: TaskCheckpoint) -> Path:
     return target
 
 
+def _commit_patch(cp: TaskCheckpoint) -> str | None:
+    """Idempotently put the patched target on the task branch. Returns an error or None.
+
+    Committed means HEAD's blob for the target equals the worktree file, so a
+    repeat (or a resume after a kill anywhere between write and commit) is a no-op.
+    """
+    wt = Path(cp.worktree_path or "")
+    rel = str((cp.patch or {}).get("relative_path"))
+    try:
+        head = _run_git(["rev-parse", "--verify", "--quiet", f"HEAD:{rel}"], cwd=wt, check=False)
+        if head.returncode == 0 and head.stdout == _run_git(["hash-object", "--", rel], cwd=wt).stdout:
+            return None
+        _run_git(["add", "--", rel], cwd=wt)
+        _run_git(
+            ["-c", "user.email=z0int@local", "-c", "user.name=z0int-task-loop",
+             "commit", "-m", f"z0int task {cp.task_id}: bounded patch"],
+            cwd=wt,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return f"commit failed: {(getattr(exc, 'stderr', None) or str(exc))[:300]}"
+    return None
+
+
 def _reconcile_patch(cp: TaskCheckpoint) -> bool:
     """Under the task owner's lock, reconcile this ONE bounded file edit.
 
@@ -481,11 +514,15 @@ def _reconcile_patch(cp: TaskCheckpoint) -> bool:
     except OSError as exc:
         raise InvalidCheckpoint("pending patch requires readback reconciliation") from exc
     if actual == op["after"]:
+        error = _commit_patch(cp)  # before "patched" is durable; step_verify re-checks
+        if error:
+            cp.last_error = error
         op["status"] = "completed"
         cp.status = "patched"
         cp.execution_completed = True
         cp.verified_success = None
-        cp.notes.append("after-image reconciled; no patch replay; git commit not inferred")
+        cp.notes.append("after-image reconciled; no patch replay; git commit not inferred: "
+                        + (error or "checked on the task branch"))
         save_checkpoint(cp)
         return True
     if actual == op["before"] and op["status"] != "completed":
@@ -500,7 +537,6 @@ def step_apply_patch(cp: TaskCheckpoint) -> TaskCheckpoint:
         raise ValueError(f"need worktree_ready before patch; got {cp.status}")
     if not cp.worktree_path or not cp.patch:
         raise ValueError("missing worktree or patch")
-    wt = Path(cp.worktree_path)
     spec = PatchSpec.from_dict(cp.patch)
     target = _patch_target(cp)
     if _reconcile_patch(cp):
@@ -533,16 +569,10 @@ def step_apply_patch(cp: TaskCheckpoint) -> TaskCheckpoint:
     save_checkpoint(cp)  # Intent MUST be durable before touching the target.
     target.write_bytes(new_text.encode("utf-8"))
     # commit inside worktree for durability (still no merge)
-    try:
-        _run_git(["add", "--", spec.relative_path], cwd=wt)
-        _run_git(
-            ["-c", "user.email=z0int@local", "-c", "user.name=z0int-task-loop",
-             "commit", "-m", f"z0int task {cp.task_id}: bounded patch"],
-            cwd=wt,
-        )
-    except subprocess.CalledProcessError as exc:
-        cp.last_error = f"commit failed: {(exc.stderr or '')[:300]}"
-        # still mark patched on disk
+    error = _commit_patch(cp)
+    if error:
+        cp.last_error = error
+        # still mark patched on disk; step_verify will not report verified without the commit
     cp.status = "patched"
     cp.execution_completed = True  # worker finished applying; NOT verified
     cp.verified_success = None
@@ -585,6 +615,20 @@ def step_verify(cp: TaskCheckpoint) -> TaskCheckpoint:
                 if Path(cp.base_repo).resolve() == wt.resolve():
                     base_ok = False
                     detail += "; base==worktree (not isolated)"
+    if ok and base_ok:
+        # "verified" must mean the task branch carries the change, not only the worktree.
+        error = _commit_patch(cp)
+        if error:
+            cp.execution_completed = True
+            cp.verified_success = None
+            cp.last_error = error
+            cp.measurements["verify_detail"] = f"{detail}; not committed on the task branch"
+            cp.measurements.pop("verifier_ref", None)
+            cp.notes.append(f"verify withheld: {error}")
+            save_checkpoint(cp)  # status stays resumable; a later resume retries the commit
+            return cp
+        if cp.last_error and cp.last_error.startswith("commit failed"):
+            cp.last_error = None
     cp.execution_completed = True
     cp.verified_success = bool(ok and base_ok)
     cp.status = "verified" if cp.verified_success else "failed"

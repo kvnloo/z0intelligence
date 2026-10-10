@@ -76,10 +76,22 @@ External runtimes still need their own lease/epoch and deadline enforcement.
 ## Existing local task loop
 
 Top-level v1 fields remain readable. `_continuation` adds metadata and a hash
-without duplicating task state. Legacy unsealed v1 files remain readable and are
-sealed on the next save; they have **no retroactive integrity guarantee**. Bad
-schemas/IDs/statuses and corrupted sealed state are rejected. A legacy success
-flag without verifier evidence is not exported as newly verified success.
+without duplicating task state. Bad schemas/IDs/statuses and corrupted sealed
+state are rejected. A legacy success flag without verifier evidence is not
+exported as newly verified success.
+
+The seal is mandatory for every checkpoint in the sealed format. Every writer
+since the seal was introduced emits both `_continuation` and the `pending_patch`
+field, so a file that has `pending_patch` but no `_continuation` has had its
+seal removed and is refused. Only the pre-seal shape (neither key) loads
+unsealed; it is sealed on the next save and has **no retroactive integrity
+guarantee**. This needs no second store, and it is a corruption/hand-edit check
+only: the hash is not keyed, so a writer who rewrites the whole file (removes
+both keys, or recomputes the hash) is not detected.
+
+`list_checkpoints()` / `z0int task status` keep a refused checkpoint (corrupt,
+stale or unsealed) visible as `status: "refused"` with a `reason` and no outcome
+flags, instead of omitting the task.
 
 The local adapter fingerprints `task_loop.py`, the Python major/minor version,
 and the persisted AODL/context artifacts. A changed required artifact is not
@@ -101,9 +113,14 @@ Before editing, persist the exact before/after byte hashes. On process restart:
 | Anything else, or missing target | Leave data untouched and require reconciliation. |
 | Terminal/abandoned task | No further dispatch. |
 
-A recovered after-image does **not** prove a Git commit completed. Notes state
-that explicitly. Verification remains the existing content predicate, not a
-claim that arbitrary tests ran or all project requirements were satisfied.
+A recovered after-image does **not** prove a Git commit completed, so resume
+checks it: the patch is committed when the task branch HEAD blob for the target
+equals the worktree file. If it is not, resume completes the `git add`/`commit`
+(a no-op when already committed) before the task can be reported verified. If
+the commit cannot be completed, `verified_success` stays null, `last_error`
+says why, and the task stays resumable. Verification otherwise remains the
+existing content predicate, not a claim that arbitrary tests ran or all project
+requirements were satisfied.
 Atomic checkpoint writes flush the temporary file and POSIX parent directory;
 Windows lacks the directory fsync guarantee. The local task owner currently
 requires POSIX; the pure contract does not.

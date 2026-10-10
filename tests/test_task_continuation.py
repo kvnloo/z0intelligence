@@ -1,6 +1,7 @@
 """Real git/worktree and process-loss tests; no model or provider required."""
 import json
 import os
+import socket
 import subprocess
 import sys
 import tempfile
@@ -10,10 +11,68 @@ from unittest.mock import patch
 
 from z0int.continuation import InvalidCheckpoint, StaleCheckpoint
 from z0int.task_loop import (
-    TaskCheckpoint, authorize_task, checkpoint_path, load_checkpoint, make_fixture_repo,
-    record_task_checkpoint, resume_task, run_until, save_checkpoint, step_apply_patch,
-    step_worktree, task_continuation,
+    TaskCheckpoint, authorize_task, checkpoint_path, list_checkpoints, load_checkpoint,
+    make_fixture_repo, record_task_checkpoint, resume_task, run_until, save_checkpoint,
+    step_apply_patch, step_worktree, task_continuation,
 )
+
+# Fails any non-loopback connection, here and (via exec) in every child process.
+SOCKET_GUARD = '''
+import socket as _socket
+_guarded_connect = _socket.socket.connect
+def _loopback_only(sock, address, *args):
+    host = address[0] if isinstance(address, tuple) else None
+    if sock.family in (_socket.AF_INET, _socket.AF_INET6) and not (
+            host == "localhost" or host == "::1" or str(host).startswith("127.")):
+        raise AssertionError(f"non-loopback connection refused by test guard: {address!r}")
+    return _guarded_connect(sock, address, *args)
+_socket.socket.connect = _loopback_only
+'''
+
+# Kills the process at one named point around the git steps that follow the patch write.
+KILL_AT_GIT_STEP = SOCKET_GUARD + '''
+import os, sys
+import z0int.task_loop as tl
+real_git = tl._run_git
+def run_git(args, **kwargs):
+    verb = "commit" if "commit" in args else args[0]
+    if sys.argv[2] == "before_" + verb: os._exit(90)
+    result = real_git(args, **kwargs)
+    if sys.argv[2] == "after_" + verb: os._exit(90)
+    return result
+tl._run_git = run_git
+tl.resume_task(sys.argv[1])
+'''
+
+# Waits for a shared start signal, then resumes; holds the patch write open so
+# that every unserialized resumer reaches it too. Each write of the target is logged.
+RACING_RESUMER = SOCKET_GUARD + '''
+import os, sys, time
+from pathlib import Path
+from z0int.task_loop import resume_task
+race = Path(sys.argv[2])
+original = Path.write_bytes
+def logged_slow_write(self, data):
+    if self.name == "app.py":
+        fd = os.open(race / "writes.log", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        os.write(fd, f"{os.getpid()}\\n".encode()); os.close(fd)
+        time.sleep(0.5)
+    return original(self, data)
+Path.write_bytes = logged_slow_write
+(race / f"ready.{os.getpid()}").touch()
+deadline = time.monotonic() + 30
+while not (race / "go").exists():
+    if time.monotonic() > deadline: sys.exit(3)
+    time.sleep(0.001)
+cp = resume_task(sys.argv[1])
+assert cp.verified_success, cp.last_error
+'''
+
+
+def setUpModule():
+    real = socket.socket.connect
+    exec(SOCKET_GUARD, {})
+    unittest.addModuleCleanup(setattr, socket.socket, 'connect', real)
 
 
 @unittest.skipUnless(os.name == 'posix', 'local task owner uses POSIX flock')
@@ -201,6 +260,131 @@ resume_task(sys.argv[1])
         self.assertEqual(a['replay_key'], b['replay_key'])
         self.assertTrue(a['verified_success'])
         self.assertEqual(a['work_item_id'], cp.task_id)
+
+    # --- evidence for single-owner resume, commit completion, refusals, seal ---
+
+    def git(self, *args):
+        return subprocess.check_output(['git', *args], cwd=self.cp.worktree_path, text=True)
+
+    def assert_patch_committed_once(self):
+        self.assertEqual(self.git('status', '--porcelain'), '')
+        self.assertEqual(self.git('rev-list', '--count', self.cp.base_ref + '..HEAD').strip(), '1')
+        self.assertIn('READY', self.git('show', 'HEAD:app.py'))
+        self.assertIn('BROKEN', (self.repo / 'app.py').read_text())
+
+    def test_socket_guard_refuses_non_loopback(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            with self.assertRaisesRegex(AssertionError, 'non-loopback'):
+                sock.connect(('192.0.2.1', 9))
+
+    def test_racing_resumers_write_the_patch_once(self):
+        import time
+        race = self.root / 'race'
+        race.mkdir()
+        count = 4
+        procs = [subprocess.Popen([sys.executable, '-c', RACING_RESUMER, self.cp.task_id, str(race)],
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                 for _ in range(count)]
+        try:
+            deadline = time.monotonic() + 30
+            while len(list(race.glob('ready.*'))) < count:
+                self.assertLess(time.monotonic(), deadline, 'resumers did not all start')
+                time.sleep(0.005)
+            (race / 'go').touch()  # all resumers are imported and waiting: release together
+            results = [(p.returncode, *p.communicate(timeout=60)) for p in procs]
+            results = [(p.returncode, out, err) for p, (_, out, err) in zip(procs, results)]
+        finally:
+            for p in procs:
+                p.kill()
+        writers = (race / 'writes.log').read_text().split()
+        self.assertEqual(len(writers), 1, f'{len(writers)} resumers wrote the same patch')
+        for code, out, err in results:
+            self.assertEqual(code, 0, out + err)
+        self.assert_patch_committed_once()
+
+    def kill_points_then_resume(self, *points):
+        for point in points:
+            result = subprocess.run([sys.executable, '-c', KILL_AT_GIT_STEP, self.cp.task_id, point],
+                                    text=True, capture_output=True, timeout=30)
+            self.assertEqual(result.returncode, 90, f'kill point {point} not reached: {result.stderr}')
+        cp = resume_task(self.cp.task_id)
+        self.assertTrue(cp.verified_success, cp.last_error)
+        self.assert_patch_committed_once()
+        self.assertEqual(resume_task(cp.task_id).to_dict(), cp.to_dict())
+        self.assert_patch_committed_once()
+
+    def test_kill_after_write_before_git_add(self):
+        self.kill_points_then_resume('before_add')
+
+    def test_kill_after_git_add_before_commit(self):
+        self.kill_points_then_resume('after_add')
+
+    def test_kill_after_commit_before_checkpoint(self):
+        self.kill_points_then_resume('after_commit')
+
+    def test_kill_again_while_resume_completes_the_commit(self):
+        self.kill_points_then_resume('before_add', 'after_add')
+
+    def test_kill_again_after_resume_committed(self):
+        self.kill_points_then_resume('before_add', 'after_commit')
+
+    def test_uncommittable_patch_is_not_reported_verified(self):
+        hooks = Path(self.git('rev-parse', '--git-common-dir').strip()) / 'hooks'
+        hooks.mkdir(exist_ok=True)
+        hook = hooks / 'pre-commit'
+        hook.write_text('#!/bin/sh\nexit 1\n')
+        hook.chmod(0o755)
+        cp = resume_task(self.cp.task_id)
+        self.assertIsNot(cp.verified_success, True)
+        self.assertNotEqual(cp.status, 'verified')
+        self.assertIn('commit', cp.last_error)
+        hook.unlink()  # once the commit can complete, the same task resumes to verified
+        self.assertTrue(resume_task(self.cp.task_id).verified_success)
+        self.assert_patch_committed_once()
+
+    def test_refused_checkpoints_are_listed_with_reason(self):
+        _, spec = make_fixture_repo(self.root / 'repo')
+        corrupt = authorize_task(base_repo=self.repo, patch=spec, task_id='corrupt-task')
+        checkpoint_path(corrupt.task_id).write_text('{"task_id": "corrupt-task", "sta')
+        stale = authorize_task(base_repo=self.repo, patch=spec, task_id='stale-task')
+        source = self.root / 'aodl.json'
+        source.write_text('{"policy":1}')
+        stale.aodl_path = str(source)
+        save_checkpoint(stale)
+        source.write_text('{"policy":2}')
+        rows = {row['task_id']: row for row in list_checkpoints()}
+        self.assertEqual(set(rows), {self.cp.task_id, 'corrupt-task', 'stale-task'})
+        self.assertEqual(rows[self.cp.task_id]['status'], 'worktree_ready')
+        self.assertNotIn('reason', rows[self.cp.task_id])
+        self.assertEqual(rows['corrupt-task']['status'], 'refused')
+        self.assertIn('InvalidCheckpoint', rows['corrupt-task']['reason'])
+        self.assertEqual(rows['stale-task']['status'], 'refused')
+        self.assertIn('StaleCheckpoint', rows['stale-task']['reason'])
+        self.assertIsNone(rows['stale-task']['verified_success'])
+        shown = subprocess.run([sys.executable, '-m', 'z0int.cli', 'task', 'status'],
+                               text=True, capture_output=True, timeout=60)
+        self.assertEqual(shown.returncode, 0, shown.stderr)
+        listed = {row['task_id']: row for row in json.loads(shown.stdout)['tasks']}
+        self.assertEqual(listed['corrupt-task']['status'], 'refused')
+        self.assertEqual(listed['stale-task']['status'], 'refused')
+        self.assertTrue(listed['stale-task']['reason'])
+
+    def test_removing_the_seal_does_not_unlock_an_edited_patch(self):
+        path = checkpoint_path(self.cp.task_id)
+        row = json.loads(path.read_text())
+        del row['_continuation']
+        path.write_text(json.dumps(row))  # seal stripped, nothing else changed
+        with self.assertRaisesRegex(InvalidCheckpoint, 'unsealed'):
+            load_checkpoint(self.cp.task_id)
+        row['patch']['replace'] = 'STATUS = "TAMPERED"'
+        path.write_text(json.dumps(row))
+        with self.assertRaisesRegex(InvalidCheckpoint, 'unsealed'):
+            resume_task(self.cp.task_id)
+        self.assertIn('BROKEN', self.target.read_text())
+        self.assertEqual(self.git('rev-list', '--count', self.cp.base_ref + '..HEAD').strip(), '0')
+        listed = {r['task_id']: r for r in list_checkpoints()}[self.cp.task_id]
+        self.assertEqual(listed['status'], 'refused')
+        self.assertIn('unsealed', listed['reason'])
 
 
 if __name__ == '__main__':
