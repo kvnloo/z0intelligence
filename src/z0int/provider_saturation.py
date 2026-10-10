@@ -71,7 +71,7 @@ def acquire(provider,call_id,context=None):
         quota=project(provider,context.get('quota_model'),config,context.get('quota_reserved_tokens'))
         if quota is not None and not quota['allowed']:
             state.update(available=False,reason=quota['reason'])
-        if context.get('sidestep') is True and state['reason']=='unmeasured_cap':
+        if context.get('sidestep') is True and state['reason']=='unmeasured_cap' and not state['unhealthy']:
             state.update(available=True,reason='sidestep_unmeasured_cap',cap=1)
         token='admission-'+hashlib.sha256((provider+'\0'+call_id).encode()).hexdigest()
         # No permit replay: a second caller cannot reuse another caller's admission.
