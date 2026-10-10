@@ -160,14 +160,15 @@ test("payload actions contain only the available tool names", async () => {
 	}
 });
 
-test("payload keeps read-only authority and the example shadow models by default", async () => {
+test("payload keeps read-only authority and asks one model by default", async () => {
 	process.env.OMP_Z0INT_COGNITION_TOOLS = "read,write";
 	const { handler } = installed();
 	handler(toolCall("write", { path: "x" }), fakeCtx());
 	await flush();
 
 	expect(sent[0].authority).toEqual(["read"]);
-	expect(sent[0].shadows).toEqual(["nemotron_orchestrator_8b", "functiongemma_270m"]);
+	// One resident model is what the local supervisor holds; asking two at once never answers.
+	expect(sent[0].shadows).toEqual(["functiongemma_270m"]);
 	expect(sent[0].risk_class).toBe("write");
 	const actions = sent[0].actions as Array<Record<string, unknown>>;
 	const writeAction = actions.find(action => action.tool === "write");

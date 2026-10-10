@@ -27,7 +27,11 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 const DEFAULT_TIMEOUT_MS = 4000;
-const DEFAULT_MODELS = ["nemotron_orchestrator_8b", "functiongemma_270m"];
+// One model. The local supervisor keeps a single model resident, and a tool
+// call that asks two different models at once makes it swap between them
+// until both requests time out; that was measured, with a 4 s and a 60 s
+// budget alike. Configure several only against a server that holds them all.
+const DEFAULT_MODELS = ["functiongemma_270m"];
 const DEFAULT_AUTHORITY = ["read"];
 const DEFAULT_TOOL_NAMES = ["bash", "read", "write", "edit", "grep", "glob"];
 const MAX_STATE_CHARS = 2000;
