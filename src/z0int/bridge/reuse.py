@@ -306,7 +306,9 @@ def _path_is_declared(relative_path: Path, declaration: tuple[Path, bool]) -> bo
 _MAX_COMPILED_DISCOVERY_PATHS = 6
 
 
-def _current_decision_text(scope_fields: dict[str, Any]) -> list[str]:
+def _current_decision_text(
+    scope_fields: dict[str, Any], *, subject: str | None = None, predicate: str | None = None,
+) -> list[str]:
     """Text of the workstream's current explicit user decisions, for discovery only.
 
     Superseded decisions are excluded by the same reducer that selects what is
@@ -317,7 +319,7 @@ def _current_decision_text(scope_fields: dict[str, Any]) -> list[str]:
     try:
         from z0int.memory.claims import project_claims
 
-        projection = project_claims(MemoryScope(**scope_fields))
+        projection = project_claims(MemoryScope(**scope_fields), subject=subject, predicate=predicate)
     except Exception:
         return []
     if projection.unresolved_gaps or projection.measurements.get("coverage") != "complete":
@@ -411,7 +413,9 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
     discovery_text = request["query"]
     scope_fields = request.get("memory_scope")
     if scope_fields and not request.get("symbol"):
-        discovery_text = "\n".join([discovery_text, *_current_decision_text(scope_fields)])
+        discovery_text = "\n".join([discovery_text, *_current_decision_text(
+            scope_fields, subject=request.get("memory_subject"), predicate=request.get("memory_predicate"),
+        )])
     if request["canonical_repo"] is None and scope_fields and scope_fields.get("repo"):
         # The workstream is already bound to a repository; that binding is the owner.
         request["canonical_repo"] = scope_fields["repo"]

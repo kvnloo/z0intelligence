@@ -794,6 +794,28 @@ class BridgeRepoReuseTests(unittest.TestCase):
         self.assertEqual(out["decision"]["mode"], "OBSERVE")
         self.assertIsNone(json.loads(out["context_text"])["root"])
 
+    def test_filtered_out_decisions_cannot_shape_subsystem_discovery(self):
+        self.declare_subsystems()
+        scope = self.admit_workstream_requirement()
+        for fields in ({"memory_subject": "unrelated"}, {"memory_predicate": "unrelated"}):
+            with self.subTest(fields=fields):
+                out, _neutral = self.workstream_turn(scope, **fields)
+                self.assertTrue(out["ok"], out)
+                brief = json.loads(out["context_text"])
+                self.assertNotIn("subsystem", brief)
+                self.assertEqual(brief["current_user_decisions"], [])
+                self.assertEqual(out["packet"]["reuse_candidates"], [])
+                self.assertEqual(out["decision"]["mode"], "OBSERVE")
+
+    def test_matching_decision_filters_preserve_workstream_discovery(self):
+        self.declare_subsystems()
+        scope = self.admit_workstream_requirement()
+        out, _neutral = self.workstream_turn(scope, memory_subject="deployment", memory_predicate="strategy")
+        brief = json.loads(out["context_text"])
+        self.assertEqual(brief["subsystem"], "records")
+        self.assertEqual(out["decision"]["mode"], "EXTEND")
+        self.assertEqual(len(brief["current_user_decisions"]), 1)
+
     def test_verifier_binding_accepts_pytest_node_for_exact_owning_file(self):
         from z0int.bridge.reuse import _normalize_verifier_binding
 
