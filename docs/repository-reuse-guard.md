@@ -106,6 +106,13 @@ and all three reuse TypeScript suites at the exact PR head. Their scripted
 provider responses verify transport and guards; they are not fresh live agent
 behavior.
 
+Clean-checkout tests generate OMP's export asset from that source and use the
+matching `@oh-my-pi/pi-natives-linux-x64@18.8.1` addon. Its archive integrity is
+`sha512-oH63mF6CtMuPmQd7sbwOXyBczw/+Rv/ZvGO+e9OtqgzQi6LfKt8ECwitxZhIkYyhy964p+ylV0/bVK1dppM3qg==`.
+CI verifies this before placing the two binaries in OMP's workspace native directory;
+an installed client's generated assets or native binaries cannot supply these
+dependencies implicitly.
+
 ## Integration provenance and acceptance
 
 The integration branch starts from the live-verified source

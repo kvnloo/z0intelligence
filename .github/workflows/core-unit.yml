@@ -120,6 +120,14 @@ jobs:
           (cd .test-deps/omp && bun install --frozen-lockfile --ignore-scripts)
           (cd .test-deps/omp && bun --cwd=packages/coding-agent run gen:tool-views)
           test -f .test-deps/omp/packages/coding-agent/src/export/html/tool-views.generated.js
+      - name: Supply the matching frozen native addon
+        run: |
+          mkdir .test-deps/omp-native
+          curl --fail --silent --show-error --location 'https://registry.npmjs.org/@oh-my-pi/pi-natives-linux-x64/-/pi-natives-linux-x64-18.8.1.tgz' -o .test-deps/omp-native.tgz
+          echo 'a07eb7985e82b4cb8f99077bb1bc0e5f205ccf0ffe46ffd9bc63be7bd3adaa0cd08ba2df2adf040b08adc59848918ca1cbdeb8a7eca5574fdb54ad5da69337aa  .test-deps/omp-native.tgz' | sha512sum -c -
+          tar -xzf .test-deps/omp-native.tgz -C .test-deps/omp-native
+          cp .test-deps/omp-native/package/pi_natives.linux-x64-modern.node .test-deps/omp/packages/natives/native/
+          cp .test-deps/omp-native/package/pi_natives.linux-x64-baseline.node .test-deps/omp/packages/natives/native/
           ln -s .test-deps/omp/node_modules node_modules
       - name: Install focused Python dependencies
         run: |
