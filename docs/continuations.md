@@ -90,7 +90,8 @@ only: the hash is not keyed, so a writer who rewrites the whole file (removes
 both keys, or recomputes the hash) is not detected.
 
 `list_checkpoints()` / `z0int task status` keep a refused checkpoint (corrupt,
-stale or unsealed) visible as `status: "refused"` with a `reason` and no outcome
+stale, unsealed, or unreadable: a directory, dangling symlink or permission
+error) visible as `status: "refused"` with a `reason` and no outcome
 flags, instead of omitting the task.
 
 The local adapter fingerprints `task_loop.py`, the Python major/minor version,
@@ -114,13 +115,30 @@ Before editing, persist the exact before/after byte hashes. On process restart:
 | Terminal/abandoned task | No further dispatch. |
 
 A recovered after-image does **not** prove a Git commit completed, so resume
-checks it: the patch is committed when the task branch HEAD blob for the target
-equals the worktree file. If it is not, resume completes the `git add`/`commit`
-(a no-op when already committed) before the task can be reported verified. If
-the commit cannot be completed, `verified_success` stays null, `last_error`
-says why, and the task stays resumable. Verification otherwise remains the
-existing content predicate, not a claim that arbitrary tests ran or all project
-requirements were satisfied.
+checks it against the recorded after-image, never against whatever bytes are in
+the worktree. The patch is committed when the **task branch ref**
+(`z0int/<task_id>`) has a blob for the target whose sha256 equals the recorded
+after-image. On every path (apply, reconcile, verify) the commit step:
+
+- commits only while the worktree target's sha256 equals the recorded
+  after-image; any other content is left untouched and uncommitted;
+- commits only the target path (`git commit --only -- <target>`), so anything
+  else staged in the worktree stays staged and out of the "bounded patch";
+- commits only when the worktree HEAD is the task branch. A detached worktree,
+  or one on another branch, is never checked out, moved or committed to.
+
+If any of these fails, or the commit itself fails, `verified_success` stays
+null, `last_error` says why (for example that the worktree content does not
+match the recorded patch) and the task stays resumable. A pre-seal checkpoint
+that reaches verification with no recorded after-image is not committed at
+all; it is verified by the content predicate alone, as before, and
+`verify_detail` says the commit was not checked. The after-image is compared to
+the raw blob bytes, so a Git clean filter or line-ending conversion on the
+target withholds verification instead of passing it. Another process that
+rewrites the target between the hash check and `git commit` is not excluded;
+the task-branch blob check after the commit then withholds verification.
+Verification otherwise remains the existing content predicate, not a claim that
+arbitrary tests ran or all project requirements were satisfied.
 Atomic checkpoint writes flush the temporary file and POSIX parent directory;
 Windows lacks the directory fsync guarantee. The local task owner currently
 requires POSIX; the pure contract does not.

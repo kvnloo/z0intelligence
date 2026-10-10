@@ -386,6 +386,128 @@ resume_task(sys.argv[1])
         self.assertEqual(listed['status'], 'refused')
         self.assertIn('unsealed', listed['reason'])
 
+    # --- after-image-bound commit, target-only commit, task-branch proof, OSError refusals ---
+
+    def commits(self, ref='HEAD'):
+        return int(self.git('rev-list', '--count', f'{self.cp.base_ref}..{ref}').strip())
+
+    def assert_withheld(self, cp, phrase):
+        self.assertIsNone(cp.verified_success)
+        self.assertNotIn(cp.status, ('verified', 'failed'))
+        self.assertIn(phrase, cp.last_error or '')
+        self.assertIsNone(task_continuation(cp).body['verified_success'])
+
+    def test_resume_never_commits_content_beyond_the_recorded_patch(self):
+        cp = resume_task(self.cp.task_id, until='patched')
+        self.assertEqual(cp.status, 'patched')
+        self.assert_patch_committed_once()
+        recorded = self.target.read_bytes()
+        self.target.write_bytes(recorded + b'EXTRA = "not part of the patch"\n')  # predicate still holds
+        cp = resume_task(self.cp.task_id)
+        self.assert_withheld(cp, 'does not match the recorded patch')
+        self.assertEqual(self.commits(), 1, 'a second "bounded patch" commit was made')
+        self.assertNotIn('EXTRA', self.git('show', 'HEAD:app.py'))
+        self.assertIn('EXTRA', self.target.read_text())  # the foreign edit is left alone
+        self.target.write_bytes(recorded)  # still resumable once the worktree matches again
+        self.assertTrue(resume_task(self.cp.task_id).verified_success)
+        self.assert_patch_committed_once()
+
+    def test_uncommitted_patch_with_extra_content_is_not_committed(self):
+        hook = Path(self.git('rev-parse', '--git-common-dir').strip()) / 'hooks' / 'pre-commit'
+        hook.parent.mkdir(exist_ok=True)
+        hook.write_text('#!/bin/sh\nexit 1\n')
+        hook.chmod(0o755)
+        self.assert_withheld(resume_task(self.cp.task_id), 'commit')
+        hook.unlink()
+        recorded = self.target.read_bytes()
+        self.target.write_bytes(recorded + b'EXTRA = 1\n')
+        cp = resume_task(self.cp.task_id)
+        self.assert_withheld(cp, 'does not match the recorded patch')
+        self.assertEqual(self.commits(), 0)
+        self.target.write_bytes(recorded)
+        self.assertTrue(resume_task(self.cp.task_id).verified_success)
+        self.assert_patch_committed_once()
+
+    def test_legacy_checkpoint_without_after_image_is_not_committed_at_verify(self):
+        self.target.write_text(self.target.read_text().replace('BROKEN', 'READY'))
+        row = self.cp.to_dict()
+        row.pop('pending_patch')  # pre-seal shape: no after-image, no seal
+        row.update(status='patched', execution_completed=True)
+        checkpoint_path(self.cp.task_id).write_text(json.dumps(row))
+        cp = resume_task(self.cp.task_id)
+        self.assertIsNone(cp.pending_patch)
+        self.assertEqual(self.commits(), 0, 'verify committed bytes with no recorded after-image')
+        self.assertEqual(self.git('status', '--porcelain'), ' M app.py\n')
+        self.assertTrue(cp.verified_success)  # same outcome as before the commit check existed
+
+    def test_other_staged_files_stay_out_of_the_patch_commit(self):
+        other = Path(self.cp.worktree_path) / 'other.txt'
+        other.write_text('staged by someone else\n')
+        self.git('add', '--', 'other.txt')
+        cp = resume_task(self.cp.task_id)
+        self.assertTrue(cp.verified_success, cp.last_error)
+        self.assertEqual(self.commits(), 1)
+        self.assertEqual(self.git('show', '--name-only', '--format=', 'HEAD').split(), ['app.py'])
+        self.assertEqual(self.git('status', '--porcelain'), 'A  other.txt\n')
+
+    def test_detached_worktree_is_not_reported_verified(self):
+        branch = 'refs/heads/' + self.cp.branch
+        self.git('checkout', '--quiet', '--detach')
+        cp = resume_task(self.cp.task_id)
+        self.assert_withheld(cp, 'task branch')
+        self.assertEqual(self.git('rev-parse', branch).strip(), self.cp.base_ref)
+        self.assertEqual(self.git('rev-parse', 'HEAD').strip(), self.cp.base_ref)  # nothing committed
+        self.assertNotEqual(subprocess.run(['git', 'symbolic-ref', '--quiet', 'HEAD'],
+                                           cwd=self.cp.worktree_path).returncode, 0)  # nothing checked out
+        self.git('checkout', '--quiet', self.cp.branch)  # the operator reattaches; edit carries over
+        self.assertTrue(resume_task(self.cp.task_id).verified_success)
+        self.assert_patch_committed_once()
+        self.assertIn('READY', self.git('show', branch + ':app.py'))
+
+    def test_worktree_on_another_branch_is_not_reported_verified(self):
+        resume_task(self.cp.task_id, until='patched')
+        self.assert_patch_committed_once()
+        self.git('checkout', '--quiet', '-b', 'elsewhere', self.cp.base_ref)
+        self.target.write_text(self.target.read_text().replace('BROKEN', 'READY'))  # after-image bytes
+        cp = resume_task(self.cp.task_id)
+        self.assert_withheld(cp, 'task branch')
+        self.assertEqual(self.commits('elsewhere'), 0)
+        self.assertEqual(self.commits(self.cp.branch), 1)
+        self.assertEqual(self.git('symbolic-ref', 'HEAD').strip(), 'refs/heads/elsewhere')
+
+    def test_detached_at_the_patch_commit_is_still_withheld(self):
+        resume_task(self.cp.task_id, until='patched')
+        self.git('checkout', '--quiet', '--detach')
+        cp = resume_task(self.cp.task_id)
+        self.assert_withheld(cp, 'task branch')
+        self.assertEqual(self.commits(self.cp.branch), 1)
+
+    def test_unreadable_checkpoint_entries_are_listed_as_refused(self):
+        tasks = checkpoint_path(self.cp.task_id).parent
+        (tasks / 'a-directory.json').mkdir()
+        (tasks / 'dangling-link.json').symlink_to(tasks / 'no-such-target.json')
+        unreadable = tasks / 'unreadable-file.json'
+        unreadable.write_text('{}')
+        unreadable.chmod(0)
+        self.addCleanup(unreadable.chmod, 0o600)
+        expected = {'a-directory': 'IsADirectoryError', 'dangling-link': 'FileNotFoundError'}
+        if os.geteuid() != 0:  # root reads through mode 000
+            expected['unreadable-file'] = 'PermissionError'
+        rows = {row['task_id']: row for row in list_checkpoints()}
+        self.assertEqual(set(rows), {self.cp.task_id, 'a-directory', 'dangling-link', 'unreadable-file'})
+        self.assertEqual(rows[self.cp.task_id]['status'], 'worktree_ready')
+        for name, error in expected.items():
+            self.assertEqual(rows[name]['status'], 'refused')
+            self.assertIn(error, rows[name]['reason'])
+            self.assertIsNone(rows[name]['verified_success'])
+            self.assertIsNone(rows[name]['execution_completed'])
+        shown = subprocess.run([sys.executable, '-m', 'z0int.cli', 'task', 'status'],
+                               text=True, capture_output=True, timeout=60)
+        self.assertEqual(shown.returncode, 0, shown.stderr)
+        listed = {row['task_id']: row for row in json.loads(shown.stdout)['tasks']}
+        for name in expected:
+            self.assertEqual(listed[name]['status'], 'refused')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -472,26 +472,49 @@ def _patch_target(cp: TaskCheckpoint) -> Path:
     return target
 
 
-def _commit_patch(cp: TaskCheckpoint) -> str | None:
-    """Idempotently put the patched target on the task branch. Returns an error or None.
+_NOT_COMMITTED = "patch not committed: "
 
-    Committed means HEAD's blob for the target equals the worktree file, so a
-    repeat (or a resume after a kill anywhere between write and commit) is a no-op.
+
+def _branch_blob_sha256(wt: Path, branch: str, rel: str) -> str | None:
+    """sha256 of the task BRANCH ref's blob for the target (raw bytes), or None."""
+    out = subprocess.run(["git", "cat-file", "blob", f"refs/heads/{branch}:{rel}"],
+                         cwd=str(wt), capture_output=True)
+    return hashlib.sha256(out.stdout).hexdigest() if out.returncode == 0 else None
+
+
+def _commit_patch(cp: TaskCheckpoint) -> str | None:
+    """Idempotently put the RECORDED patch on the task branch. Returns an error or None.
+
+    Commits only the target path, only while the worktree bytes equal the
+    recorded after-image, and only when the worktree HEAD is the task branch.
+    None means the task branch ref's blob for the target equals the after-image,
+    so a repeat (or a resume after a kill between write and commit) is a no-op.
+    Never checks anything out or moves a branch.
     """
     wt = Path(cp.worktree_path or "")
     rel = str((cp.patch or {}).get("relative_path"))
+    branch = cp.branch or f"z0int/{cp.task_id}"
+    after = (cp.pending_patch or {}).get("after")
     try:
-        head = _run_git(["rev-parse", "--verify", "--quiet", f"HEAD:{rel}"], cwd=wt, check=False)
-        if head.returncode == 0 and head.stdout == _run_git(["hash-object", "--", rel], cwd=wt).stdout:
-            return None
-        _run_git(["add", "--", rel], cwd=wt)
-        _run_git(
-            ["-c", "user.email=z0int@local", "-c", "user.name=z0int-task-loop",
-             "commit", "-m", f"z0int task {cp.task_id}: bounded patch"],
-            cwd=wt,
-        )
-    except (OSError, subprocess.CalledProcessError) as exc:
-        return f"commit failed: {(getattr(exc, 'stderr', None) or str(exc))[:300]}"
+        if not after:
+            return _NOT_COMMITTED + "no recorded after-image"
+        if hashlib.sha256(_patch_target(cp).read_bytes()).hexdigest() != after:
+            return _NOT_COMMITTED + "the worktree content does not match the recorded patch"
+        head = _run_git(["symbolic-ref", "--quiet", "HEAD"], cwd=wt, check=False)
+        if head.returncode != 0 or head.stdout.strip() != f"refs/heads/{branch}":
+            return (_NOT_COMMITTED + f"the worktree HEAD is detached or on another branch, "
+                    f"not the task branch {branch}; nothing was checked out or moved")
+        if _branch_blob_sha256(wt, branch, rel) != after:
+            _run_git(["add", "--", rel], cwd=wt)
+            _run_git(
+                ["-c", "user.email=z0int@local", "-c", "user.name=z0int-task-loop",
+                 "commit", "-m", f"z0int task {cp.task_id}: bounded patch", "--only", "--", rel],
+                cwd=wt,
+            )
+        if _branch_blob_sha256(wt, branch, rel) != after:
+            return _NOT_COMMITTED + f"the task branch {branch} does not carry the recorded patch"
+    except (OSError, ValueError, subprocess.CalledProcessError) as exc:
+        return _NOT_COMMITTED + f"commit failed: {(getattr(exc, 'stderr', None) or str(exc))[:300]}"
     return None
 
 
@@ -615,8 +638,11 @@ def step_verify(cp: TaskCheckpoint) -> TaskCheckpoint:
                 if Path(cp.base_repo).resolve() == wt.resolve():
                     base_ok = False
                     detail += "; base==worktree (not isolated)"
-    if ok and base_ok:
-        # "verified" must mean the task branch carries the change, not only the worktree.
+    if ok and base_ok and not (cp.pending_patch or {}).get("after"):
+        # Pre-seal checkpoint: no recorded after-image, so nothing is committed here.
+        detail += "; no recorded after-image: commit on the task branch not checked"
+    elif ok and base_ok:
+        # "verified" must mean the task branch ref carries exactly the recorded patch.
         error = _commit_patch(cp)
         if error:
             cp.execution_completed = True
@@ -627,7 +653,7 @@ def step_verify(cp: TaskCheckpoint) -> TaskCheckpoint:
             cp.notes.append(f"verify withheld: {error}")
             save_checkpoint(cp)  # status stays resumable; a later resume retries the commit
             return cp
-        if cp.last_error and cp.last_error.startswith("commit failed"):
+        if cp.last_error and cp.last_error.startswith(_NOT_COMMITTED):
             cp.last_error = None
     cp.execution_completed = True
     cp.verified_success = bool(ok and base_ok)
