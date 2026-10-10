@@ -331,6 +331,26 @@ def error_status(exc):
     return None
 
 
+def record_reported_cost(row, body, free_only):
+    """Read usage.cost off a 200 response body and judge it, before any content-shape check.
+
+    Under free-only a cost field that is present must be exactly a finite zero. Null, negative,
+    non-numeric, boolean, NaN and Infinity are violations. An absent cost field (or no usage
+    object to hold one) is not a violation. Returns True on a violation.
+    """
+    usage = body.get('usage') if isinstance(body, dict) else None
+    present = isinstance(usage, dict) and 'cost' in usage
+    cost = usage['cost'] if present else None
+    number = type(cost) is int or (type(cost) is float and math.isfinite(cost))  # bool is not a number here
+    # The receipt stays strict JSON and never stores a provider-chosen non-number.
+    row.extra['provider_reported_cost_usd'] = cost if number or not present else (
+        'unreadable:' + (repr(cost) if type(cost) is float else type(cost).__name__))
+    violation = bool(free_only) and present and not (number and cost == 0)
+    if violation:
+        row.extra['free_only_violation'] = 'provider_reported_nonzero_cost'
+    return violation
+
+
 def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_index, *, receipt_sink, admission, sidestep=False):
     provider, model = candidate['provider'], candidate['model']
     if blocked_provider(provider):
@@ -380,6 +400,7 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         constraints = request_constraints(policy, provider, model, args)
         response = transport.chat(messages, max_tokens=args.get('max_tokens', 512), temperature=0, seed=None, extra_body=permit.get('request_constraints', constraints))
         transport_status=200
+        cost_violation = record_reported_cost(row, {'usage': response.usage}, free_required(policy,args) or row.extra.get('free_only'))
         output = response.content
         if not isinstance(output, str):
             raise ValueError('Provider returned non-text content')
@@ -390,12 +411,8 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         row.cached_input_tokens = token(response.usage.get('prompt_tokens_details') or {}, 'cached_tokens')
         metered = row.input_tokens is not None and row.output_tokens is not None
         identified = bool(response.raw.get('model'))
-        cost = response.usage.get('cost')
-        row.extra['provider_reported_cost_usd'] = cost
-        cost_violation = (free_required(policy,args) or row.extra.get('free_only')) and cost is not None and (type(cost) not in (int,float) or cost != 0)
         ok = complete and metered and identified and not cost_violation
         row.outcome = {'execution_completed': complete, 'source': 'codex_plugin'}
-        if cost_violation:row.extra['free_only_violation']='provider_reported_nonzero_cost'
         row.extra.update(status='completed' if ok else ('failed' if cost_violation else 'completed_unmetered_or_unidentified' if complete else 'incomplete'),
                          response_model=response.raw.get('model'), response_id=response.raw.get('id'), finish_reason=finish,
                          usage_source='provider_response' if metered else 'missing',
@@ -417,6 +434,10 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         ok = False
         row.outcome = {'execution_completed': False, 'source': 'codex_plugin'}
         row.extra.update(status='failed', error_type=type(exc).__name__, http_status=error_status(exc))
+        # A 200 body the transport parsed and then rejected for its shape still reports its cost.
+        body = getattr(transport, 'last_body', None)
+        if body is not None and 'provider_reported_cost_usd' not in row.extra:
+            record_reported_cost(row, body, free_required(policy,args) or row.extra.get('free_only'))
     finally:
         if transport is not None:row.extra['quota_headers']=getattr(transport,'quota_headers',{})
         if row.extra.get('physical_call_attempted'):row.extra['physical_finished_at']=time.time()

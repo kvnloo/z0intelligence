@@ -48,7 +48,7 @@ def isolated(tmp_path, monkeypatch):
 
 
 def run(monkeypatch, behaviour, *, candidates=None, policy_edit=None, args_extra=None):
-    """behaviour(provider, call_number) -> (http_status, reported_cost)."""
+    """behaviour(provider, call_number) -> (http_status, reported_cost[, whole 200 body])."""
     calls, bodies = [], []
 
     class Handler(BaseHTTPRequestHandler):
@@ -60,11 +60,16 @@ def run(monkeypatch, behaviour, *, candidates=None, policy_edit=None, args_extra
             provider = self.path.strip("/").split("/")[0]
             calls.append(provider)
             bodies.append(body)
-            status, cost = behaviour(provider, len(calls))
+            status, cost, *override = behaviour(provider, len(calls))
             self.send_response(status)
             self.end_headers()
             if status != 200:
                 self.wfile.write(b'{"error":{"message":"stub"}}')
+                return
+            if override:
+                # A third element replaces the whole 200 body: a dict, or raw bytes.
+                raw = override[0](body) if callable(override[0]) else override[0]
+                self.wfile.write(raw if isinstance(raw, bytes) else json.dumps(raw).encode())
                 return
             self.wfile.write(json.dumps({
                 "model": body["model"],
@@ -290,3 +295,286 @@ def test_free_validated_sidestep_succeeds_on_shipped_manifest(monkeypatch):
     result, calls, _ = run(monkeypatch, lambda provider, n: (402, 0) if provider == "openrouter" else (200, 0))
     assert result["ok"] is True
     assert calls == ["openrouter", "groq"]
+
+
+# ---- repair round 2 -------------------------------------------------------------
+TWO = [{"provider": "openrouter", "model": OPENROUTER}, {"provider": "groq", "model": GROQ}]
+
+
+def body_with(message, usage, **top):
+    """A 200 body whose first choice carries `message`; `usage` is sent exactly as given."""
+    def build(request):
+        out = {"model": request["model"], "choices": [{"message": message, "finish_reason": "stop"}], "usage": usage}
+        out.update(top)
+        return out
+    return build
+
+
+def first_then_free(first_body):
+    """The first provider answers 200 with `first_body`; any later one answers a clean free 200."""
+    return lambda provider, n: (200, None, first_body) if n == 1 else (200, 0)
+
+
+def assert_refused_for_cost(result, calls):
+    assert result["ok"] is False
+    assert result["requires_parent"] is True
+    assert calls == ["openrouter"], "no candidate may be tried after a cost violation"
+    last = extras(result)[-1]
+    assert last["status"] == "failed"
+    assert last["free_only"] is True
+    assert last["free_only_violation"] == "provider_reported_nonzero_cost"
+    assert "cost" in result["refusal_reason"]
+    return last
+
+
+# (R1) the cost is read and checked before any content-shape check, on every 200 response.
+@pytest.mark.parametrize("content", [
+    [{"type": "text", "text": "pong"}],          # OpenAI-style content parts
+    7,                                           # a number
+    {"text": "pong"},
+    True,
+])
+def test_non_string_content_with_positive_cost_is_a_violation(monkeypatch, content):
+    paid = body_with({"content": content}, {"prompt_tokens": 2, "completion_tokens": 1, "cost": 0.25})
+    result, calls, _ = run(monkeypatch, first_then_free(paid), candidates=TWO)
+    last = assert_refused_for_cost(result, calls)
+    assert last["provider_reported_cost_usd"] == 0.25
+
+
+def shapeless(kind):
+    usage = {"prompt_tokens": 2, "completion_tokens": 1, "cost": 0.25}
+    return {
+        "no_choices": lambda request: {"model": request["model"], "choices": [], "usage": usage},
+        "choices_missing": lambda request: {"model": request["model"], "usage": usage},
+        "choice_not_object": lambda request: {"model": request["model"], "choices": ["pong"], "usage": usage},
+        "message_not_object": lambda request: {"model": request["model"], "choices": [{"message": "pong", "finish_reason": "stop"}], "usage": usage},
+        "choices_not_list": lambda request: {"model": request["model"], "choices": {"a": 1}, "usage": usage},
+        "token_counts_not_objects": lambda request: {"model": request["model"], "choices": [{"message": {"content": "pong"}, "finish_reason": "stop"}],
+                                                     "usage": {"prompt_tokens": 2, "completion_tokens": 1, "prompt_tokens_details": "x", "cost": 0.25}},
+    }[kind]
+
+
+@pytest.mark.parametrize("kind", ["no_choices", "choices_missing", "choice_not_object", "message_not_object",
+                                  "choices_not_list", "token_counts_not_objects"])
+def test_malformed_200_with_positive_cost_is_a_violation(monkeypatch, kind):
+    result, calls, _ = run(monkeypatch, first_then_free(shapeless(kind)), candidates=TWO)
+    last = assert_refused_for_cost(result, calls)
+    assert last["provider_reported_cost_usd"] == 0.25
+
+
+def test_non_string_content_with_positive_cost_on_sidestep_is_a_violation(monkeypatch):
+    paid = body_with({"content": [{"type": "text", "text": "pong"}]}, {"prompt_tokens": 2, "completion_tokens": 1, "cost": 0.25})
+    result, calls, _ = run(monkeypatch, lambda provider, n: (402, 0) if provider == "openrouter" else (200, None, paid),
+                           policy_edit=head_order)
+    assert result["ok"] is False
+    assert calls == ["openrouter", "groq"]
+    last = extras(result)[-1]
+    assert last["sidestep"] is True
+    assert last["free_only_violation"] == "provider_reported_nonzero_cost"
+    assert last["provider_reported_cost_usd"] == 0.25
+
+
+def test_caller_free_only_non_string_content_with_positive_cost_is_a_violation(monkeypatch):
+    def edit(policy):
+        policy["free_only"] = False
+
+    paid = body_with({"content": 7}, {"prompt_tokens": 2, "completion_tokens": 1, "cost": 0.25})
+    result, calls, _ = run(monkeypatch, first_then_free(paid), candidates=TWO, policy_edit=edit, args_extra={"free_only": True})
+    assert_refused_for_cost(result, calls)
+
+
+# Held before and still holds: a shape failure that reports no money spent is an ordinary
+# failed attempt, so the next plan candidate is still tried.
+@pytest.mark.parametrize("usage", [
+    {"prompt_tokens": 2, "completion_tokens": 1, "cost": 0},
+    {"prompt_tokens": 2, "completion_tokens": 1},
+])
+def test_non_string_content_without_reported_cost_is_not_a_violation(monkeypatch, usage):
+    result, calls, _ = run(monkeypatch, first_then_free(body_with({"content": [{"type": "text", "text": "pong"}]}, usage)), candidates=TWO)
+    assert result["ok"] is True
+    assert calls == ["openrouter", "groq"]
+    first = extras(result)[0]
+    assert first["status"] == "failed"
+    assert "free_only_violation" not in first
+
+
+# (R2) under free-only a present cost is acceptable only when it is exactly a finite zero.
+def raw_cost(literal):
+    """A 200 body with the cost written as a raw JSON literal (NaN and Infinity included)."""
+    def build(request):
+        return ('{"model": %s, "choices": [{"message": {"content": "pong"}, "finish_reason": "stop"}], '
+                '"usage": {"prompt_tokens": 2, "completion_tokens": 1, "cost": %s}}' % (json.dumps(request["model"]), literal)).encode()
+    return build
+
+
+BAD_COSTS = {
+    "negative_float": ("-0.01", -0.01),
+    "negative_int": ("-1", -1),
+    "tiny_positive": ("1e-12", 1e-12),
+    "positive_int": ("3", 3),
+    "huge_int": ("1" + "0" * 400, 10 ** 400),          # too large for a float: must not raise
+    "huge_negative_int": ("-1" + "0" * 400, -10 ** 400),
+    "string_zero": ('"0"', "unreadable:str"),
+    "string_zero_decimal": ('"0.00"', "unreadable:str"),
+    "string_word": ('"free"', "unreadable:str"),
+    "empty_string": ('""', "unreadable:str"),
+    "empty_list": ("[]", "unreadable:list"),
+    "list_of_zero": ("[0]", "unreadable:list"),
+    "empty_object": ("{}", "unreadable:dict"),
+    "object": ('{"usd": 0}', "unreadable:dict"),
+    "null": ("null", "unreadable:NoneType"),
+    "true": ("true", "unreadable:bool"),
+    "false": ("false", "unreadable:bool"),
+    "nan": ("NaN", "unreadable:nan"),
+    "infinity": ("Infinity", "unreadable:inf"),
+    "negative_infinity": ("-Infinity", "unreadable:-inf"),
+    "overflowing_float": ("1e999", "unreadable:inf"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(BAD_COSTS))
+def test_free_only_refuses_any_present_cost_that_is_not_a_finite_zero(monkeypatch, name):
+    literal, recorded = BAD_COSTS[name]
+    result, calls, _ = run(monkeypatch, first_then_free(raw_cost(literal)), candidates=TWO)
+    last = assert_refused_for_cost(result, calls)
+    assert last["provider_reported_cost_usd"] == recorded
+    assert type(last["provider_reported_cost_usd"]) is type(recorded)
+    # The receipt on disk stays strict JSON even when the provider sent NaN or Infinity.
+    json.dumps(last, allow_nan=False)
+
+
+@pytest.mark.parametrize("literal", ["0", "0.0", "-0.0", "0e0", "0.000"])
+def test_free_only_accepts_an_exact_finite_zero_cost(monkeypatch, literal):
+    result, calls, _ = run(monkeypatch, first_then_free(raw_cost(literal)), candidates=TWO)
+    assert result["ok"] is True
+    assert calls == ["openrouter"]
+    last = extras(result)[-1]
+    assert last["status"] == "completed"
+    assert last["provider_reported_cost_usd"] == 0
+    assert "free_only_violation" not in last
+
+
+# Stated explicitly: an ABSENT cost field is not a violation. This is the behaviour at
+# ddf5a0c and it is left unchanged; only a cost field that is present is judged.
+def test_absent_cost_field_is_not_a_violation_under_free_only(monkeypatch):
+    no_cost = body_with({"content": "pong"}, {"prompt_tokens": 2, "completion_tokens": 1})
+    result, calls, _ = run(monkeypatch, first_then_free(no_cost), candidates=TWO)
+    assert result["ok"] is True
+    assert calls == ["openrouter"]
+    last = extras(result)[-1]
+    assert last["status"] == "completed"
+    assert last["provider_reported_cost_usd"] is None
+    assert "free_only_violation" not in last
+
+
+@pytest.mark.parametrize("usage_literal", ["null", "{}", None])
+def test_absent_usage_is_not_a_violation_but_is_not_a_success_either(monkeypatch, usage_literal):
+    def build(request):
+        usage = "" if usage_literal is None else ', "usage": ' + usage_literal
+        return ('{"model": %s, "choices": [{"message": {"content": "pong"}, "finish_reason": "stop"}]%s}'
+                % (json.dumps(request["model"]), usage)).encode()
+
+    result, calls, _ = run(monkeypatch, first_then_free(build), candidates=TWO)
+    first = extras(result)[0]
+    assert first["status"] == "completed_unmetered_or_unidentified"
+    assert first["provider_reported_cost_usd"] is None
+    assert "free_only_violation" not in first
+    assert calls == ["openrouter", "groq"]
+    assert result["ok"] is True
+
+
+# Without free-only (manifest off, caller silent) a reported cost is recorded, never judged.
+@pytest.mark.parametrize("literal,recorded", [("0.5", 0.5), ("-1", -1), ("null", "unreadable:NoneType"), ("NaN", "unreadable:nan")])
+def test_reported_cost_is_not_judged_without_free_only(monkeypatch, literal, recorded):
+    def edit(policy):
+        policy["free_only"] = False
+
+    result, calls, _ = run(monkeypatch, first_then_free(raw_cost(literal)), candidates=TWO, policy_edit=edit)
+    assert result["ok"] is True
+    assert result["free_only"] is False
+    assert calls == ["openrouter"]
+    last = extras(result)[-1]
+    assert last["provider_reported_cost_usd"] == recorded
+    assert "free_only_violation" not in last
+
+
+# (R3a) execute_plan strips a plan's own sidestep flag even when nothing is free-only.
+# nous has an unmeasured cap: only a real sidestep (402/429 in this call) may be admitted on it.
+@pytest.mark.parametrize("flag", [{}, {"sidestep": True}])
+def test_plan_sidestep_flag_is_not_an_admission_ticket_on_a_non_free_manifest(monkeypatch, flag):
+    def edit(policy):
+        policy["free_only"] = False
+
+    nous = "inclusionai/ling-3.0-flash-sante:free"
+    assert wr.configuration()[0]["provider_caps"]["nous"] is None
+    assert wr.free_route(wr.configuration()[0], "nous", nous) is None
+    result, calls, _ = run(monkeypatch, lambda provider, n: (200, 0), policy_edit=edit,
+                           candidates=[{"provider": "nous", "model": nous, **flag}])
+    assert result["free_only"] is False
+    assert calls == [], "a flagged plan candidate was admitted on an unmeasured cap"
+    assert result["ok"] is False
+    only = extras(result)
+    assert len(only) == 1
+    assert only[0]["sidestep"] is False
+    assert only[0]["status"] == "rejected"
+    assert only[0]["admission_reason"] == "unmeasured_cap"
+    assert only[0]["physical_call_attempted"] is False
+    permits = [row for row in saturation._rows() if row["provider"] == "nous"]
+    assert [row["extra"]["reason"] for row in permits] == ["unmeasured_cap"]
+    assert not [row for row in permits if row["extra"].get("sidestep")]
+
+
+# The flag is honoured only when this call itself saw the 402/429 (control for the test above).
+def test_real_sidestep_is_still_admitted_on_an_unmeasured_cap_on_a_non_free_manifest(monkeypatch):
+    nous = "inclusionai/ling-3.0-flash-sante:free"
+
+    def edit(policy):
+        policy["free_only"] = False
+        policy["sidestep_order"] = [{"provider": "nous", "model": nous}]
+
+    result, calls, _ = run(monkeypatch, lambda provider, n: (402, 0) if provider == "openrouter" else (200, 0), policy_edit=edit)
+    assert calls == ["openrouter", "nous"]
+    assert result["ok"] is True
+    assert extras(result)[-1]["sidestep"] is True
+
+
+# (R3b) grok and codex are blocked by the built-in set, not only by the manifest list.
+@pytest.mark.parametrize("listed", [None, [], ["cursor"]])
+@pytest.mark.parametrize("provider", ["grok", "codex"])
+def test_grok_and_codex_are_blocked_without_the_manifest_list(monkeypatch, provider, listed):
+    real = wr.configuration
+
+    def without_list():
+        policy, providers = real()
+        policy.pop("sidestep_blocked_providers", None)
+        if listed is not None:
+            policy["sidestep_blocked_providers"] = list(listed)
+        return policy, providers
+
+    monkeypatch.setattr(wr, "configuration", without_list)
+    assert provider not in (wr.configuration()[0].get("sidestep_blocked_providers") or [])
+    assert wr.blocked_provider(provider)
+    assert wr.blocked_provider(provider.upper())
+    assert not wr.blocked_provider("groq")
+    assert not wr.blocked_provider("openrouter")
+
+
+def test_grok_is_never_called_as_sidestep_or_candidate_without_the_manifest_list(monkeypatch):
+    real = wr.configuration
+
+    def without_list():
+        policy, providers = real()
+        policy.pop("sidestep_blocked_providers", None)
+        return policy, providers
+
+    monkeypatch.setattr(wr, "configuration", without_list)
+
+    def edit(policy):
+        policy["free_only"] = False
+        policy["sidestep_order"] = [{"provider": "grok", "model": "grok-4.20-0309-non-reasoning"}]
+
+    result, calls, _ = run(monkeypatch, lambda provider, n: (402, 0) if n == 1 else (200, 0), policy_edit=edit,
+                           candidates=[{"provider": "grok", "model": "grok-4.20-0309-non-reasoning"},
+                                       {"provider": "openrouter", "model": OPENROUTER}])
+    assert result["ok"] is False
+    assert calls == ["openrouter"]
