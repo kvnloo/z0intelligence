@@ -7,53 +7,155 @@ leases into one inspectable snapshot for CompanyOS/Tern-style HUDs.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
 import shutil
 import socket
 import subprocess
+import tempfile
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
 from . import paths
+from .posture import OBSERVATION_PREDATES_RESET, observation_predates_reset, parse_time
+from .state_packet import redact
 
 SCHEMA = "z0.capacity.snapshot.v1"
 DEFAULT_FILENAME = "capacity_snapshot.json"
 
-_SAFE_HOST_RESOURCE_KEYS = {
+_RESOURCE_INT_KEYS = (
     "cpu_logical",
     "ram_total_bytes",
     "ram_available_bytes",
     "storage_total_bytes",
     "storage_free_bytes",
-    "gpu_count",
-    "gpus",
-}
-_SAFE_GPU_KEYS = {
-    "id",
-    "name",
-    "memory_total_bytes",
-    "memory_free_bytes",
-    "utilization_pct",
-}
-_SAFE_QUOTA_DIMENSION_KEYS = {
-    "limit",
-    "remaining",
-    "reset_at",
-    "source",
-}
-_SAFE_LEASE_KEYS = {
+)
+_QUOTA_REMAINING_KEYS = ("remaining_free_quota", "remaining_tokens", "remaining", "day_tokens_remaining")
+_QUOTA_LIMIT_KEYS = ("limit", "daily_limit", "day_tokens_limit")
+_LEASE_TEXT_KEYS = (
     "placement_id",
     "demand_id",
     "offer_id",
-    "status",
-    "lease_expires_at",
     "selected_offer_id",
     "selection_reason",
     "policy_revision",
-}
+)
+
+# Every emitted value is one of: a finite bounded number, a bool, a member of a
+# fixed set, or a short single-line label. Anything else becomes null/unknown.
+_HOST_MODES = frozenset({"direct", "kubernetes", "remote"})
+_HOST_STATUSES = frozenset(
+    {"online", "offline", "connected", "disconnected", "connecting", "degraded", "error", "unknown"}
+)
+_SESSION_STATUSES = frozenset(
+    {"running", "idle", "current", "current_locked", "locked", "available", "detached", "attached",
+     "exited", "stopped", "unknown"}
+)
+_HEALTH = frozenset(
+    {"ok", "healthy", "available", "online", "degraded", "rate_limited", "cooldown", "exhausted",
+     "unhealthy", "unavailable", "offline", "down", "error", "unknown"}
+)
+_QUOTA_SOURCES = frozenset(
+    {"provider", "headers", "header", "api", "observed", "estimated", "configured", "config",
+     "static", "default", "local", "cache", "unknown"}
+)
+_LEASE_STATUSES = frozenset(
+    {"proposed", "pending", "selected", "granted", "leased", "active", "released", "completed",
+     "expired", "revoked", "rejected", "cancelled", "failed", "unknown"}
+)
+_MAX_TEXT = 128
+_MAX_DIMENSION_NAME = 48
+_MAX_DIMENSIONS = 32
+_MAX_GPUS = 64
+_MAX_NUMBER = 2**63
+_MAX_EPOCH = 32_503_680_000.0  # year 3000; keeps datetime conversion in range
+_FUTURE_SKEW_S = 5.0
+
+
+class _Unreadable:
+    """A source file that exists but could not be read as JSON."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+
+
+def _num(value: Any) -> int | float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if value != value or abs(value) >= _MAX_NUMBER:  # NaN, +-Infinity, absurd magnitudes
+        return None
+    return value
+
+
+def _count(value: Any) -> int | None:
+    number = _num(value)
+    if number is None or number < 0 or number != int(number):
+        return None
+    return int(number)
+
+
+def _bool(value: Any) -> bool | None:
+    return value if isinstance(value, bool) else None
+
+
+def _enum(value: Any, allowed: frozenset[str], default: str = "unknown") -> str:
+    return value if isinstance(value, str) and value in allowed else default
+
+
+def _text(value: Any, limit: int = _MAX_TEXT) -> str | None:
+    """A short plain label, or None. Never a container, a path, or anything the repo's redactor would scrub."""
+    if isinstance(value, int) and not isinstance(value, bool) and abs(value) < _MAX_NUMBER:
+        return str(value)
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text or len(text) > limit or not text.isprintable():
+        return None
+    if text.startswith(("/", "~")) or "/home/" in text or "/Users/" in text:
+        return None
+    if redact(text, limit=len(text) + 1) != " ".join(text.split()):
+        return None
+    return text
+
+
+def _first(src: Mapping[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if src.get(key) is not None:
+            return src.get(key)
+    return None
+
+
+def _epoch(value: Any) -> float | None:
+    """Epoch seconds from a number or ISO-8601 string; None when absent or not a real instant."""
+    if isinstance(value, str):
+        parsed = parse_time(value) if len(value) <= 40 else None
+        value = parsed.timestamp() if parsed else None
+    number = _num(value)
+    if number is None or not 0 < number < _MAX_EPOCH:
+        return None
+    return float(number)
+
+
+def _observed(value: Any, *, now: float) -> tuple[float | None, str | None]:
+    """(observation time, None), or (None, why it is unknown). A missing time is never replaced by now."""
+    if value is None:
+        return None, "missing_observed_at"
+    observed_at = _epoch(value)
+    if observed_at is None or observed_at > now + _FUTURE_SKEW_S:
+        return None, "invalid_observed_at"
+    return observed_at, None
+
+
+def _reset_passed(reset_at: float | None, now: float) -> bool:
+    if reset_at is None or not 0 < now < _MAX_EPOCH:
+        return False
+    return observation_predates_reset(
+        datetime.fromtimestamp(reset_at, timezone.utc), datetime.fromtimestamp(now, timezone.utc)
+    )
 
 
 def _source(status: str, *, observed_at: float | None = None, reason: str | None = None) -> dict[str, Any]:
@@ -65,12 +167,44 @@ def _source(status: str, *, observed_at: float | None = None, reason: str | None
     return out
 
 
+def _observed_source(value: Any, *, now: float, reason: str | None = None) -> dict[str, Any]:
+    """Source record with an honest age: unknown time means unknown age and a non-ok status."""
+    observed_at, time_reason = _observed(value, now=now)
+    reason = time_reason or reason
+    out: dict[str, Any] = {
+        "status": "degraded" if reason else "ok",
+        "observed_at": observed_at,
+        "age_s": None if observed_at is None else max(0.0, now - observed_at),
+    }
+    if reason:
+        out["reason"] = reason
+    return out
+
+
+def _non_finite(name: str) -> Any:
+    raise ValueError(f"non-finite JSON number: {name}")
+
+
 def _read_json(path: Path | None) -> Any:
+    """Parsed JSON, None when the file is absent, or _Unreadable when it exists but is malformed."""
     if path is None:
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        data = path.read_bytes()
+    except FileNotFoundError:
+        return None
+    except OSError:
+        return _Unreadable("unreadable_export")
+    try:
+        return json.loads(data.decode("utf-8"), parse_constant=_non_finite)
+    except (ValueError, RecursionError):
+        return _Unreadable("invalid_json")
+
+
+def _mtime(path: Path | None) -> float | None:
+    try:
+        return None if path is None else path.stat().st_mtime
+    except OSError:
         return None
 
 
@@ -110,9 +244,10 @@ def _disk() -> tuple[int | None, int | None]:
         return None, None
 
 
-def _nvidia_gpus() -> list[dict[str, Any]]:
+def _nvidia_gpus() -> list[dict[str, Any]] | None:
+    """GPU rows, or None when they could not be observed (unknown is not zero)."""
     if not shutil.which("nvidia-smi"):
-        return []
+        return None
     argv = [
         "nvidia-smi",
         "--query-gpu=uuid,name,memory.total,memory.free,utilization.gpu",
@@ -127,9 +262,9 @@ def _nvidia_gpus() -> list[dict[str, Any]]:
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return []
+        return None
     if proc.returncode != 0:
-        return []
+        return None
     out: list[dict[str, Any]] = []
     for line in proc.stdout.splitlines():
         parts = [part.strip() for part in line.split(",", 4)]
@@ -140,7 +275,7 @@ def _nvidia_gpus() -> list[dict[str, Any]]:
             total_bytes = int(float(total_mb) * 1024 * 1024)
             free_bytes = int(float(free_mb) * 1024 * 1024)
             utilization = float(util)
-        except ValueError:
+        except (ValueError, OverflowError):
             total_bytes = free_bytes = None
             utilization = None
         out.append(
@@ -173,7 +308,7 @@ def probe_local_host(*, now: float | None = None) -> dict[str, Any]:
             "ram_available_bytes": ram_available,
             "storage_total_bytes": storage_total,
             "storage_free_bytes": storage_free,
-            "gpu_count": len(gpus),
+            "gpu_count": None if gpus is None else len(gpus),
             "gpus": gpus,
         },
         "observed_at": now,
@@ -182,154 +317,200 @@ def probe_local_host(*, now: float | None = None) -> dict[str, Any]:
 
 def _safe_resources(value: Any) -> dict[str, Any]:
     src = value if isinstance(value, Mapping) else {}
-    out = {key: src.get(key) for key in _SAFE_HOST_RESOURCE_KEYS if key in src}
-    gpus = []
-    for gpu in src.get("gpus") or []:
-        if isinstance(gpu, Mapping):
-            gpus.append({key: gpu.get(key) for key in _SAFE_GPU_KEYS if key in gpu})
-    if "gpus" in out or gpus:
+    out: dict[str, Any] = {key: _count(src.get(key)) for key in _RESOURCE_INT_KEYS if key in src}
+    if "gpus" in src or "gpu_count" in src:
+        raw_gpus = src.get("gpus")
+        gpus = None
+        if isinstance(raw_gpus, list):
+            gpus = [
+                {
+                    "id": _text(gpu.get("id")),
+                    "name": _text(gpu.get("name")),
+                    "memory_total_bytes": _count(gpu.get("memory_total_bytes")),
+                    "memory_free_bytes": _count(gpu.get("memory_free_bytes")),
+                    "utilization_pct": _num(gpu.get("utilization_pct")),
+                }
+                for gpu in raw_gpus[:_MAX_GPUS]
+                if isinstance(gpu, Mapping)
+            ]
+        count = _count(src.get("gpu_count"))
         out["gpus"] = gpus
-        out["gpu_count"] = src.get("gpu_count", len(gpus))
+        out["gpu_count"] = count if count is not None else (None if gpus is None else len(gpus))
     return out
 
 
 def _normalize_host(host: Mapping[str, Any], *, now: float) -> dict[str, Any] | None:
-    raw_id = host.get("host_id") or host.get("id") or host.get("name") or host.get("label") or host.get("slot")
+    explicit_host_id = _text(host.get("host_id"))
+    raw_id = explicit_host_id
+    for key in ("id", "name", "label", "slot"):
+        raw_id = raw_id or _text(host.get(key))
     if raw_id is None:
         return None
-    explicit_host_id = host.get("host_id")
-    normalized_host_id = str(explicit_host_id) if explicit_host_id is not None else f"tern:{raw_id}"
     return {
-        "host_id": normalized_host_id,
-        "label": host.get("label") or host.get("name"),
-        "mode": host.get("mode") if host.get("mode") in {"direct", "kubernetes", "remote"} else "remote",
-        "status": host.get("status") or host.get("state") or "unknown",
-        "rtt_ms": host.get("rtt_ms"),
+        "host_id": explicit_host_id if explicit_host_id is not None else f"tern:{raw_id}",
+        "label": _text(host.get("label")) or _text(host.get("name")),
+        "mode": _enum(host.get("mode"), _HOST_MODES, "remote"),
+        "status": _enum(_first(host, "status", "state"), _HOST_STATUSES),
+        "rtt_ms": _num(host.get("rtt_ms")),
         "resources": _safe_resources(host.get("resources")),
-        "observed_at": host.get("observed_at") or now,
+        "observed_at": _observed(host.get("observed_at"), now=now)[0],
     }
 
 
 def _normalize_session(session: Mapping[str, Any], *, now: float) -> dict[str, Any] | None:
-    raw_id = session.get("session_id") or session.get("id")
+    raw_id = _text(session.get("session_id")) or _text(session.get("id"))
     if raw_id is None:
         return None
-    host_id = session.get("host_id") or session.get("host")
-    if host_id is not None:
-        host_id = str(host_id)
-        if not host_id.startswith("tern:"):
-            host_id = f"tern:{host_id}"
-    status = session.get("status") or session.get("state")
-    if status is None:
-        if session.get("current") is True and session.get("locked") is True:
-            status = "current_locked"
-        elif session.get("current") is True:
-            status = "current"
-        elif session.get("locked") is True:
-            status = "locked"
-        else:
-            status = "available"
+    host_id = _text(session.get("host_id")) or _text(session.get("host"))
+    if host_id is not None and not host_id.startswith("tern:"):
+        host_id = f"tern:{host_id}"
+    current = _bool(session.get("current"))
+    locked = _bool(session.get("locked"))
+    raw_status = _first(session, "status", "state")
+    if raw_status is not None:
+        status = _enum(raw_status, _SESSION_STATUSES)
+    elif current is True and locked is True:
+        status = "current_locked"
+    elif current is True:
+        status = "current"
+    elif locked is True:
+        status = "locked"
+    else:
+        status = "available"
     return {
-        "session_id": str(raw_id),
-        "name": session.get("name"),
+        "session_id": raw_id,
+        "name": _text(session.get("name")),
         "host_id": host_id,
-        "runtime": session.get("runtime") or session.get("program"),
+        "runtime": _text(session.get("runtime")) or _text(session.get("program")),
         "status": status,
-        "current": session.get("current"),
-        "locked": session.get("locked"),
-        "tab_count": session.get("tab_count") or session.get("tabs"),
-        "rtt_ms": session.get("rtt_ms"),
-        "pane_id": session.get("pane_id"),
+        "current": current,
+        "locked": locked,
+        "tab_count": _count(_first(session, "tab_count", "tabs")),
+        "rtt_ms": _num(session.get("rtt_ms")),
+        "pane_id": _text(session.get("pane_id")),
         "session_sticky": True,
         "migration_allowed": False,
-        "observed_at": session.get("observed_at") or now,
+        "observed_at": _observed(session.get("observed_at"), now=now)[0],
     }
 
 
 def _normalize_tern(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-    if not isinstance(raw, Mapping):
+    if raw is None:
         return [], [], _source("missing", reason="tern_export_missing")
+    if isinstance(raw, _Unreadable):
+        return [], [], _source("error", reason=raw.reason)
+    if not isinstance(raw, Mapping):
+        return [], [], _source("error", reason="invalid_tern_export")
+    raw_hosts = raw.get("hosts") if raw.get("hosts") is not None else []
+    raw_sessions = raw.get("sessions") if raw.get("sessions") is not None else []
+    if not isinstance(raw_hosts, list) or not isinstance(raw_sessions, list):
+        return [], [], _source("error", reason="invalid_tern_export")
     hosts = []
-    for host in raw.get("hosts") or []:
+    for host in raw_hosts:
         if isinstance(host, Mapping) and (normalized := _normalize_host(host, now=now)):
             hosts.append(normalized)
     sessions = []
-    for session in raw.get("sessions") or []:
+    for session in raw_sessions:
         if isinstance(session, Mapping) and (normalized := _normalize_session(session, now=now)):
             sessions.append(normalized)
-    observed_at = raw.get("observed_at") or raw.get("generated_at") or now
-    status = "ok" if hosts or sessions else "degraded"
-    return hosts, sessions, _source(status, observed_at=observed_at, reason=None if status == "ok" else "empty_tern_export")
+    return hosts, sessions, _observed_source(
+        _first(raw, "observed_at", "generated_at"),
+        now=now,
+        reason=None if hosts or sessions else "empty_tern_export",
+    )
 
 
-def _safe_quota(quota: Any) -> dict[str, Any]:
+def _safe_quota(quota: Any, *, now: float, entry_reset_at: float | None) -> tuple[dict[str, Any], bool]:
+    """Typed quota facts, and whether any of them was observed before its reset (see posture.py)."""
     src = quota if isinstance(quota, Mapping) else {}
     out: dict[str, Any] = {}
+    reset_at = _epoch(src.get("reset_at"))
+    window_passed = _reset_passed(entry_reset_at, now) or _reset_passed(reset_at, now)
+    stale = window_passed
     dimensions: dict[str, Any] = {}
     raw_dimensions = src.get("dimensions")
     if isinstance(raw_dimensions, Mapping):
-        for name, dimension in raw_dimensions.items():
-            if not isinstance(name, str) or not isinstance(dimension, Mapping):
+        for raw_name, dimension in list(raw_dimensions.items())[:_MAX_DIMENSIONS]:
+            name = _text(raw_name, _MAX_DIMENSION_NAME) if isinstance(raw_name, str) else None
+            if name is None or not isinstance(dimension, Mapping):
                 continue
-            dimensions[name] = {
-                key: dimension.get(key)
-                for key in _SAFE_QUOTA_DIMENSION_KEYS
-                if key in dimension
-            }
+            clean: dict[str, Any] = {}
+            dimension_reset_at = _epoch(dimension.get("reset_at"))
+            passed = _reset_passed(dimension_reset_at, now) if dimension_reset_at is not None else window_passed
+            if "limit" in dimension:
+                clean["limit"] = _num(dimension.get("limit"))
+            if "remaining" in dimension:
+                clean["remaining"] = None if passed else _num(dimension.get("remaining"))
+            if "reset_at" in dimension:
+                clean["reset_at"] = dimension_reset_at
+            if "source" in dimension:
+                clean["source"] = _enum(dimension.get("source"), _QUOTA_SOURCES)
+            if passed:
+                clean["stale_reason"] = OBSERVATION_PREDATES_RESET
+                stale = True
+            dimensions[name] = clean
     if dimensions:
         out["dimensions"] = dimensions
-    for key in (
-        "remaining_free_quota",
-        "remaining_tokens",
-        "remaining",
-        "day_tokens_remaining",
-        "limit",
-        "daily_limit",
-        "day_tokens_limit",
-        "reset_at",
-    ):
+    for key in _QUOTA_REMAINING_KEYS:
         if key in src:
-            out[key] = src.get(key)
-    return out
+            out[key] = None if window_passed else _num(src.get(key))
+    for key in _QUOTA_LIMIT_KEYS:
+        if key in src:
+            out[key] = _num(src.get(key))
+    if "reset_at" in src:
+        out["reset_at"] = reset_at
+    return out, stale
 
 
 def _normalize_kerdoios(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    if not isinstance(raw, Mapping):
+    if raw is None:
         return [], _source("missing", reason="kerdoios_export_missing")
-    entries = raw.get("entries") or []
+    if isinstance(raw, _Unreadable):
+        return [], _source("error", reason=raw.reason)
+    if not isinstance(raw, Mapping):
+        return [], _source("error", reason="invalid_kerdoios_export")
+    entries = raw.get("entries") if raw.get("entries") is not None else []
     if isinstance(entries, Mapping):
         entries = list(entries.values())
+    if not isinstance(entries, list):
+        return [], _source("error", reason="invalid_kerdoios_export")
     offers: list[dict[str, Any]] = []
-    for entry in entries if isinstance(entries, list) else []:
+    any_stale = False
+    for entry in entries:
         if not isinstance(entry, Mapping):
             continue
-        provider = entry.get("provider")
-        model = entry.get("model")
+        provider = _text(entry.get("provider"))
+        model = _text(entry.get("model"))
         if not provider:
             continue
-        offers.append(
-            {
-                "offer_id": str(entry.get("offer_id") or _stable_id("offer", "provider", provider, model)),
-                "origin": "provider",
-                "provider": provider,
-                "model": model,
-                "actor_id": model,
-                "health": entry.get("health") or entry.get("status") or "unknown",
-                "quota": _safe_quota(entry.get("quota")),
-                "price": entry.get("price"),
-                "predicted_cost": entry.get("predicted_cost"),
-                "burn_rate": entry.get("burn_rate"),
-                "time_to_exhaustion": entry.get("time_to_exhaustion"),
-                "time_to_reset": entry.get("time_to_reset"),
-                "reset_at": entry.get("reset_at"),
-                "observed_at": entry.get("updated_at") or entry.get("observed_at") or now,
-            }
-        )
-    observed_at = raw.get("generated_at") or raw.get("saved_at") or raw.get("observed_at") or now
-    return offers, _source(
-        "ok" if offers else "degraded",
-        observed_at=observed_at,
-        reason=None if offers else "empty_kerdoios_export",
+        reset_at = _epoch(entry.get("reset_at"))
+        quota, stale = _safe_quota(entry.get("quota"), now=now, entry_reset_at=reset_at)
+        offer = {
+            "offer_id": _text(entry.get("offer_id")) or _stable_id("offer", "provider", provider, model),
+            "origin": "provider",
+            "provider": provider,
+            "model": model,
+            "actor_id": model,
+            "health": _enum(_first(entry, "health", "status"), _HEALTH),
+            "quota": quota,
+            "price": _num(entry.get("price")),
+            "predicted_cost": _num(entry.get("predicted_cost")),
+            # Derived from the pre-reset observation, so unknown once that observation is stale.
+            "burn_rate": None if stale else _num(entry.get("burn_rate")),
+            "time_to_exhaustion": None if stale else _num(entry.get("time_to_exhaustion")),
+            "time_to_reset": None if stale else _num(entry.get("time_to_reset")),
+            "reset_at": reset_at,
+            "observed_at": _observed(_first(entry, "updated_at", "observed_at"), now=now)[0],
+        }
+        if stale:
+            offer["stale_reason"] = OBSERVATION_PREDATES_RESET
+            any_stale = True
+        offers.append(offer)
+    reason = None if offers else "empty_kerdoios_export"
+    return offers, _observed_source(
+        _first(raw, "generated_at", "saved_at", "observed_at"),
+        now=now,
+        reason=OBSERVATION_PREDATES_RESET if any_stale else reason,
     )
 
 
@@ -354,17 +535,24 @@ def _local_offer(host: Mapping[str, Any]) -> dict[str, Any]:
 def _normalize_leases(raw: Any, *, now: float) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if raw is None:
         return [], _source("missing", reason="lease_projection_missing")
+    if isinstance(raw, _Unreadable):
+        return [], _source("error", reason=raw.reason)
     rows = raw.get("leases") if isinstance(raw, Mapping) else raw
     if not isinstance(rows, list):
-        return [], _source("degraded", reason="invalid_lease_projection")
+        return [], _source("error", reason="invalid_lease_projection")
     out = []
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        clean = {key: row.get(key) for key in _SAFE_LEASE_KEYS if key in row}
+        clean: dict[str, Any] = {key: _text(row.get(key)) for key in _LEASE_TEXT_KEYS if key in row}
+        if "status" in row:
+            clean["status"] = _enum(row.get("status"), _LEASE_STATUSES)
+        if "lease_expires_at" in row:
+            clean["lease_expires_at"] = _epoch(row.get("lease_expires_at"))
         if clean.get("placement_id"):
             out.append(clean)
-    return out, _source("ok", observed_at=now)
+    observed_at = _first(raw, "observed_at", "generated_at") if isinstance(raw, Mapping) else None
+    return out, _observed_source(observed_at, now=now)
 
 
 def build_snapshot(
@@ -374,31 +562,54 @@ def build_snapshot(
     leases: Any = None,
     include_local: bool = True,
     now: float | None = None,
+    file_mtimes: Mapping[str, float | None] | None = None,
 ) -> dict[str, Any]:
     now = time.time() if now is None else now
     hosts: list[dict[str, Any]] = []
     offers: list[dict[str, Any]] = []
     sources: dict[str, Any] = {}
 
+    # Each source fails soft: one bad input marks that source "error" and the rest is still emitted.
     if include_local:
-        local = probe_local_host(now=now)
-        hosts.append(local)
-        offers.append(_local_offer(local))
-        sources["local"] = _source("ok", observed_at=now)
+        try:
+            local = probe_local_host(now=now)
+            local_offer = _local_offer(local)
+        except Exception:
+            sources["local"] = _source("error", reason="local_probe_failed")
+        else:
+            hosts.append(local)
+            offers.append(local_offer)
+            sources["local"] = {"status": "ok", "observed_at": now, "age_s": 0.0}
 
-    tern_hosts, sessions, tern_source = _normalize_tern(tern, now=now)
+    try:
+        tern_hosts, sessions, tern_source = _normalize_tern(tern, now=now)
+    except Exception:
+        tern_hosts, sessions, tern_source = [], [], _source("error", reason="tern_normalization_failed")
     by_id = {host["host_id"]: host for host in hosts}
     for host in tern_hosts:
         by_id[host["host_id"]] = {**by_id.get(host["host_id"], {}), **host}
     hosts = list(by_id.values())
     sources["tern"] = tern_source
 
-    provider_offers, kerdoios_source = _normalize_kerdoios(kerdoios, now=now)
+    try:
+        provider_offers, kerdoios_source = _normalize_kerdoios(kerdoios, now=now)
+    except Exception:
+        provider_offers, kerdoios_source = [], _source("error", reason="kerdoios_normalization_failed")
     offers.extend(provider_offers)
     sources["kerdoios"] = kerdoios_source
 
-    normalized_leases, lease_source = _normalize_leases(leases, now=now)
+    try:
+        normalized_leases, lease_source = _normalize_leases(leases, now=now)
+    except Exception:
+        normalized_leases, lease_source = [], _source("error", reason="lease_normalization_failed")
     sources["leases"] = lease_source
+
+    # A file's mtime says when the file was written, not when its contents were observed: label it as such.
+    for name, mtime in (file_mtimes or {}).items():
+        mtime = _epoch(mtime)
+        if name in sources and mtime is not None:
+            sources[name]["file_mtime"] = mtime
+            sources[name]["file_age_s"] = max(0.0, now - mtime)
 
     required = ("local",) if include_local else ()
     overall = "ok"
@@ -434,14 +645,17 @@ def write_snapshot(snapshot: Mapping[str, Any], path: Path | None = None) -> Pat
         raise ValueError(f"expected schema {SCHEMA}")
     dest = path or default_snapshot_path()
     dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_name(f".{dest.name}.{os.getpid()}.tmp")
     payload = json.dumps(snapshot, indent=2, sort_keys=True, allow_nan=False) + "\n"
-    tmp.write_text(payload, encoding="utf-8")
+    # mkstemp: unpredictable name, O_EXCL | O_NOFOLLOW, mode 0600, in the destination directory.
+    fd, tmp = tempfile.mkstemp(dir=dest.parent, prefix=f".{dest.name}.", suffix=".tmp")
     try:
-        os.chmod(tmp, 0o600)
-    except OSError:
-        pass
-    os.replace(tmp, dest)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+        os.replace(tmp, dest)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
     return dest
 
 
@@ -473,6 +687,7 @@ def main(argv: list[str] | None = None) -> int:
         kerdoios=_read_json(kerdoios_path),
         leases=_read_json(leases_path),
         include_local=not args.no_local,
+        file_mtimes={"tern": _mtime(tern_path), "kerdoios": _mtime(kerdoios_path), "leases": _mtime(leases_path)},
     )
     dest = write_snapshot(snapshot, Path(args.output).expanduser() if args.output else None)
     if args.json:
