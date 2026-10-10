@@ -200,7 +200,8 @@ def free_route(policy, provider, model):
         return None
     return next((entry for entry in policy.get('validated_free_routes', [])
                  if entry.get('provider') == provider and entry.get('model') == model
-                 and entry.get('validated') is True and entry.get('price_usd') == 0
+                 and entry.get('validated') is True
+                 and type(entry.get('price_usd')) in (int, float) and entry.get('price_usd') == 0
                  and entry.get('evidence_sha256')), None)
 
 

@@ -25,6 +25,14 @@ def test_groq_requests_header_is_daily():
  assert not r['allowed'];assert r['quota']['dimensions']['rpd']['remaining']==0
  assert r['quota']['dimensions']['rpm']['remaining']==29
  assert r['next_eligible_at']==101790
+def test_groq_requests_header_is_daily_real_kerdoios_parser():
+ # Same expectations as above against the real parser, no injection: runs where kerdoios is importable, skipped elsewhere.
+ real=pytest.importorskip('kerdoios.quota.parse').quota_state_from_headers
+ r=project([call(99990,1,{'x-ratelimit-remaining-requests':'0','x-ratelimit-limit-requests':'1000','x-ratelimit-reset-requests':'30m'})])
+ assert __import__('sys').modules['kerdoios.quota.parse'].quota_state_from_headers is real
+ assert not r['allowed'];assert r['quota']['dimensions']['rpd']['remaining']==0
+ assert r['quota']['dimensions']['rpm']['remaining']==29
+ assert r['next_eligible_at']==101790
 def test_expired_header_does_not_restore_daily_local_budget():
  assert not project([call(90000,199000,{'x-ratelimit-remaining-tokens':'0','x-ratelimit-reset-tokens':'1s'})])['allowed']
 def test_unknown_usage_reserved_until_window_passes():
