@@ -118,7 +118,8 @@ jobs:
           git -C .test-deps/omp add --all
           test "$(git -C .test-deps/omp write-tree)" = 1744f67c2f25241fad2a993e499875edce999699
           (cd .test-deps/omp && bun install --frozen-lockfile --ignore-scripts)
-          (cd .test-deps/omp && bun --cwd packages/coding-agent run gen:tool-views)
+          (cd .test-deps/omp && bun --cwd=packages/coding-agent run gen:tool-views)
+          test -f .test-deps/omp/packages/coding-agent/src/export/html/tool-views.generated.js
           ln -s .test-deps/omp/node_modules node_modules
       - name: Install focused Python dependencies
         run: |
