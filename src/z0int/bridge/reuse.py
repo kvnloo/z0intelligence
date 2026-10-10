@@ -549,7 +549,6 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
         selected = context.measurements.get("selected_claims") or []
         if not selected or any(claim.get("origin_trust") != "explicit_user" for claim in selected):
             context.unresolved_gaps.append("Required admitted user decisions are not backed by validated native sources")
-    refs = [ref for ref in context.evidence if ref.trust_class == "code" and ref.source_id.startswith("file:")]
     manifest_ref = next((
         ref for ref in context.evidence
         if manifest_path is not None and ref.source_id == f"file:{manifest_path}"
@@ -560,6 +559,58 @@ def resolve_packet(request: dict[str, Any]) -> tuple[ArchitectureReusePacket, Pa
         subsystem_paths, manifest_error = _load_subsystem_paths(
             root, manifest_path, manifest_ref, str(orientation["repo_slug"]),
         )
+    if symbol and not request.get("test_query") and subsystem_paths:
+        implementation_paths = [
+            relative for ref in context.evidence
+            if ref.trust_class == "code" and ref.source_id.startswith("file:")
+            and (relative := _relative_to_root(root, Path(ref.source_id[5:]))) is not None
+            and not _is_test(root / relative, root)
+        ]
+        owning_groups = [
+            declarations for _subsystem_id, declarations in subsystem_paths
+            if any(_path_is_declared(relative, declaration)
+                   for relative in implementation_paths for declaration in declarations)
+        ]
+        has_owning_test = any(
+            ref.trust_class == "code" and ref.source_id.startswith("file:")
+            and (relative := _relative_to_root(root, Path(ref.source_id[5:]))) is not None
+            and _is_test(root / relative, root)
+            and any(_path_is_declared(relative, declaration)
+                    for declarations in owning_groups for declaration in declarations)
+            for ref in context.evidence
+        )
+        declared_tests = sorted({
+            path for declarations in owning_groups
+            for path, is_directory in declarations
+            if not is_directory and _is_test(root / path, root)
+            and not any(ref.source_id == f"file:{root / path}" and ref.trust_class == "code"
+                        for ref in context.evidence)
+        })[:_MAX_COMPILED_DISCOVERY_PATHS] if not has_owning_test else []
+        if declared_tests:
+            # Declared paths locate tests; only fresh hydrated evidence can support reuse.
+            hydrated_needs.extend(
+                InformationNeed(id=f"reuse-file-{len(paths) + i}", description="Hydrate declared owning test",
+                                kind="exact_path", path=str(root / path), required=True)
+                for i, path in enumerate(declared_tests)
+            )
+            previous_gaps = context.unresolved_gaps
+            context = resolve_context(needs=hydrated_needs, **args)
+            context.unresolved_gaps = list(dict.fromkeys([*previous_gaps, *context.unresolved_gaps]))
+            final_orientation = context.measurements.get("repo_orientation") or {}
+            if any(final_orientation.get(key) != orientation.get(key) for key in ("status", "root", "repo_slug")):
+                context.unresolved_gaps.append("repository orientation changed during owning-test hydration")
+            manifest_ref = next((
+                ref for ref in context.evidence
+                if ref.source_id == f"file:{manifest_path}" and ref.trust_class == "project_constraint"
+            ), None)
+            subsystem_paths, manifest_error = _load_subsystem_paths(
+                root, manifest_path, manifest_ref, str(orientation["repo_slug"]),
+            )
+    if memory_scope is not None:
+        selected = context.measurements.get("selected_claims") or []
+        if not selected or any(claim.get("origin_trust") != "explicit_user" for claim in selected):
+            context.unresolved_gaps.append("Required admitted user decisions are not backed by validated native sources")
+    refs = [ref for ref in context.evidence if ref.trust_class == "code" and ref.source_id.startswith("file:")]
     path_rows: list[tuple[Any, Path]] = []
     for ref in refs:
         relative = _relative_to_root(root, Path(ref.source_id[5:]))

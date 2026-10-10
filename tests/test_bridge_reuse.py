@@ -438,6 +438,79 @@ class BridgeRepoReuseTests(unittest.TestCase):
             out = self.rt.reuse_resolve(request)
         self.assertEqual(out["decision"]["mode"], "REUSE", out["packet"]["unresolved_gaps"])
 
+    def test_exact_symbol_recovers_declared_owning_test_without_test_query(self):
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits(
+            "upstream/records.py",
+        )):
+            out = self.prepare()
+        self.assertEqual(out["decision"]["mode"], "REUSE", out["packet"]["unresolved_gaps"])
+        self.assertFalse(out["decision"]["authorizes_action"])
+        self.assertEqual(
+            [Path(ref["locator"]).name for ref in out["packet"]["related_tests"]],
+            ["test_records.py"],
+        )
+
+    def test_exact_symbol_cannot_infer_undeclared_test_ownership(self):
+        (self.repo / "zer0.repo.yaml").write_text(
+            "version: 1\nrepo: example/known-library\narchitecture:\n"
+            "  subsystems:\n"
+            "  - id: records\n    paths: [upstream/records.py]\n"
+            "  - id: records-tests\n    paths: [tests/test_records.py]\n"
+        )
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits(
+            "upstream/records.py",
+        )):
+            out = self.prepare()
+        self.assertEqual(out["decision"]["mode"], "OBSERVE")
+        self.assertFalse(out["packet"]["related_tests"])
+
+    def test_exact_symbol_does_not_expand_declared_test_directories(self):
+        (self.repo / "zer0.repo.yaml").write_text(
+            "version: 1\nrepo: example/known-library\narchitecture:\n"
+            "  subsystems:\n  - id: records\n    paths: [upstream/records.py, tests/]\n"
+        )
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits(
+            "upstream/records.py",
+        )):
+            out = self.prepare()
+        self.assertEqual(out["decision"]["mode"], "OBSERVE")
+        self.assertFalse(out["packet"]["related_tests"])
+
+    def test_exact_symbol_with_hydrated_owning_test_does_not_resolve_again(self):
+        from z0int.context_resolve import resolve_context
+
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits(
+            "upstream/records.py", "tests/test_records.py",
+        )), patch("z0int.bridge.reuse.resolve_context", wraps=resolve_context) as resolve:
+            out = self.prepare()
+        self.assertEqual(out["decision"]["mode"], "REUSE")
+        self.assertEqual(resolve.call_count, 2)
+
+    def test_exact_symbol_revalidates_manifest_after_owning_test_hydration(self):
+        from z0int.context_resolve import resolve_context
+
+        calls = 0
+
+        def resolve(**kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 3:
+                (self.repo / "zer0.repo.yaml").write_text(
+                    "version: 1\nrepo: example/known-library\narchitecture:\n"
+                    "  subsystems:\n"
+                    "  - id: records\n    paths: [upstream/records.py]\n"
+                    "  - id: records-tests\n    paths: [tests/test_records.py]\n"
+                )
+            return resolve_context(**kwargs)
+
+        with patch("z0int.context_resolve._fff_search_repository", return_value=self.fff_hits(
+            "upstream/records.py",
+        )), patch("z0int.bridge.reuse.resolve_context", side_effect=resolve):
+            out = self.prepare()
+        self.assertEqual(calls, 3)
+        self.assertEqual(out["decision"]["mode"], "OBSERVE")
+        self.assertFalse(out["packet"]["related_tests"])
+
     def test_manifest_identity_mismatch_fails_closed(self):
         (self.repo / "zer0.repo.yaml").write_text(
             "version: 1\nrepo: example/other-library\narchitecture:\n"
