@@ -119,6 +119,31 @@ class OutcomeTiers(unittest.TestCase):
                     "execution",
                 )
 
+    def test_placeholder_verification_source_cannot_credit_an_ambient_close(self):
+        from z0int.receipt import Outcome
+
+        placeholders = (
+            "null", "NULL", "None", "none", "false", "False", "0", "n/a", "N/A", "na", "nil",
+            "~", "-", "\u200b", "\u200b\u200c\u200d\ufeff", " null ", "\u00a0n/a\u00a0", "\u2060",
+            "\u200bnull", "None\u200b", False, 0, 0.0, None,
+        )
+        for source in placeholders:
+            with self.subTest(source=source):
+                self.assertEqual(
+                    Outcome(test_pass=True, source="bridge_turn_end", verification_source=source).tier(),
+                    "execution",
+                )
+
+    def test_named_verification_source_still_credits_an_ambient_close(self):
+        from z0int.receipt import Outcome
+
+        for source in ("ci", "pinned-d2-oracle-and-owning-tests", "sha256:3a396dc5", "operator", "0x1", "nullable-check"):
+            with self.subTest(source=source):
+                self.assertEqual(
+                    Outcome(test_pass=True, source="bridge_turn_end", verification_source=source).tier(),
+                    "gold",
+                )
+
 
 
 
