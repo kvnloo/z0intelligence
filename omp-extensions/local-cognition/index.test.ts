@@ -138,7 +138,7 @@ test("sends a cognition_shadow request through the bridge transport", async () =
 	const request = sent[0];
 	expect(request.op).toBe("cognition_shadow");
 	expect(Array.isArray(request.actions)).toBe(true);
-	expect(request.state).toContain("OMP tool_call: read");
+	expect(request.state).toBe("OMP session. Previous tool calls, oldest first: none");
 	expect((request.facts as Record<string, unknown>).tool_name).toBe("read");
 });
 
@@ -160,19 +160,70 @@ test("payload actions contain only the available tool names", async () => {
 	}
 });
 
-test("payload keeps read-only authority and asks one model by default", async () => {
+test("authority and budget cover every available tool, whatever the observed call", () => {
+	const tools = ["read", "grep", "glob", "ls", "fetch", "todo", "task", "ask", "bash", "write", "edit"];
+	const asRead = buildShadowPayload(toolCall("read"), tools);
+	const asWrite = buildShadowPayload(toolCall("write", { path: "x" }), tools);
+
+	// Enough authority and budget that no tool is eliminated, so the observed one is always legal.
+	expect(asWrite.authority).toEqual(["read", "write"]);
+	expect(asWrite.budget_units).toBe(tools.length);
+	// Nothing the model is shown differs between a read call and a write call.
+	for (const field of ["state", "actions", "granted_capabilities", "authority", "budget_units", "risk_class"]) {
+		expect(asRead[field]).toEqual(asWrite[field]);
+	}
+
+	// A session with only read tools is not handed write authority.
+	const readOnly = buildShadowPayload(toolCall("read"), ["read", "grep"]);
+	expect(readOnly.authority).toEqual(["read"]);
+	expect(readOnly.budget_units).toBe(8);
+	expect(readOnly.risk_class).toBe("read");
+});
+
+test("asks one model by default", async () => {
 	process.env.OMP_Z0INT_COGNITION_TOOLS = "read,write";
 	const { handler } = installed();
 	handler(toolCall("write", { path: "x" }), fakeCtx());
 	await flush();
 
-	expect(sent[0].authority).toEqual(["read"]);
 	// One resident model is what the local supervisor holds; asking two at once never answers.
 	expect(sent[0].shadows).toEqual(["functiongemma_270m"]);
-	expect(sent[0].risk_class).toBe("write");
 	const actions = sent[0].actions as Array<Record<string, unknown>>;
 	const writeAction = actions.find(action => action.tool === "write");
 	expect(writeAction?.risk_class).toBe("write");
+});
+
+test("state shows only the tools called before, never the observed call", async () => {
+	process.env.OMP_Z0INT_COGNITION_TOOLS = "read,grep,glob,edit,bash,write,task";
+	const { handler } = installed();
+	const calls = ["read", "grep", "glob", "edit", "bash", "write", "task"];
+	calls.forEach((tool, index) => handler(toolCall(tool, { secret: `needle-${index}` }), fakeCtx()));
+	await flush();
+
+	expect(sent).toHaveLength(calls.length);
+	sent.forEach((request, index) => {
+		const state = String(request.state);
+		// Every call here uses a tool not called before, so its name cannot be history.
+		expect(state).not.toContain(calls[index]);
+		expect(state).not.toContain("needle");
+		expect(state).not.toContain("secret");
+		// The observed call is still recorded, outside what the model is shown.
+		expect((request.facts as Record<string, unknown>).tool_name).toBe(calls[index]);
+	});
+	expect(sent[0].state).toContain("none");
+	expect(sent[3].state).toContain("read, grep, glob");
+	// A ring of five: the seventh call no longer sees the first.
+	expect(sent[6].state).toContain("grep, glob, edit, bash, write");
+	expect(sent[6].state).not.toContain("read");
+});
+
+test("a new session starts with an empty history", async () => {
+	const { pi, handler } = installed();
+	handler(toolCall("grep"), fakeCtx());
+	pi.handlers.get("session_start")?.();
+	handler(toolCall("read"), fakeCtx());
+	await flush();
+	expect(sent[1].state).not.toContain("grep");
 });
 
 // --- kill switch --------------------------------------------------------
@@ -229,13 +280,49 @@ test("timeout comes from the env override", () => {
 	expect(cognitionTimeoutMs()).toBe(4000);
 });
 
-test("resolveAvailableTools prefers ctx.getTools and always includes the observed tool", () => {
-	const names = resolveAvailableTools(
-		{},
-		{ getTools: () => [{ name: "bash" }, { name: "read" }] },
-		"glob",
+test("resolveAvailableTools prefers ctx.getTools, then OMP's getActiveTools, then the builtin list", () => {
+	const active = { getActiveTools: () => ["task", "read"] };
+	expect(resolveAvailableTools(active, { getTools: () => [{ name: "read" }, { name: "bash" }] })).toEqual(["bash", "read"]);
+	expect(resolveAvailableTools(active, {})).toEqual(["read", "task"]);
+	expect(resolveAvailableTools({}, {})).toEqual(["bash", "edit", "glob", "grep", "read", "write"]);
+});
+
+/** Everything in a request that the model's prompt is built from, apart from `state`. */
+function choiceFields(request: Record<string, unknown>): string {
+	return JSON.stringify(
+		["actions", "granted_capabilities", "authority", "budget_units", "risk_class"].map(field => request[field]),
 	);
-	expect(new Set(names)).toEqual(new Set(["bash", "read", "glob"]));
+}
+
+test("with no tool list from OMP, the choices do not depend on the call or on earlier calls", async () => {
+	const { pi, handler } = installed();
+	// New tools, a repeat, write tools after read tools, and one outside the builtin list.
+	const calls = ["read", "bash", "read", "grep", "write", "mcp__unlisted", "mcp__unlisted"];
+	for (const tool of calls) handler(toolCall(tool), fakeCtx());
+	pi.handlers.get("session_start")?.();
+	handler(toolCall("glob"), fakeCtx());
+	await flush();
+
+	expect(sent).toHaveLength(calls.length + 1);
+	const ids = (sent[0].actions as Array<Record<string, unknown>>).map(action => action.action_id);
+	expect(ids).toEqual(["bash", "edit", "glob", "grep", "read", "write"]);
+	expect(sent[0].authority).toEqual(["read", "write"]);
+	expect(sent[0].risk_class).toBe("write");
+	// One set of choices for every call: none of them can be read off it.
+	expect(new Set(sent.map(choiceFields)).size).toBe(1);
+});
+
+test("a call to a tool outside OMP's tool list does not add it to the choices", async () => {
+	const { pi, handler } = installed();
+	(pi as Record<string, unknown>).getActiveTools = () => ["read", "grep", "bash"];
+	for (const tool of ["read", "mcp__unlisted", "bash", "mcp__unlisted"]) handler(toolCall(tool), fakeCtx());
+	await flush();
+
+	expect(sent).toHaveLength(4);
+	expect(sent[1].granted_capabilities).toEqual(["bash", "grep", "read"]);
+	expect(new Set(sent.map(choiceFields)).size).toBe(1);
+	// The call itself is still recorded for the scorecard, outside what the model is shown.
+	expect((sent[1].facts as Record<string, unknown>).tool_name).toBe("mcp__unlisted");
 });
 
 test("buildShadowPayload is self-contained and schema-shaped", () => {
