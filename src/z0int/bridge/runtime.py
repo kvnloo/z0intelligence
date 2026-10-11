@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -198,7 +199,16 @@ def kerdoios_record(
         or "/workspace/evolution-lab/.venv/bin/python"
     )
     if not _interpreter_ready(kerd_py):
-        return
+        # Nothing configured and the default venv is absent: record with the running
+        # interpreter, but only when `-m kerdoios` resolves from the spawn cwd. An
+        # explicitly configured interpreter is never second-guessed.
+        if (
+            os.environ.get("KERDOIOS_PYTHON")
+            or os.environ.get("EVOLUTION_LAB_PYTHON")
+            or not (kerd_root / "kerdoios" / "__main__.py").is_file()
+        ):
+            return
+        kerd_py = sys.executable
     args = [
         kerd_py,
         "-m",
