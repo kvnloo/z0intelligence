@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-import sys
+import shutil
 import subprocess
 import time
 import uuid
@@ -136,6 +136,13 @@ def preflight(prompt: str) -> dict[str, Any]:
     return preflight_dict(prompt)
 
 
+def _interpreter_ready(path: str) -> bool:
+    interpreter = Path(path)
+    if interpreter.is_absolute() or "/" in path:
+        return interpreter.is_file()
+    return shutil.which(path) is not None
+
+
 def kerdoios_plan(capability_id: str, work: dict[str, Any] | None) -> dict[str, Any] | None:
     if not work:
         return None
@@ -148,6 +155,8 @@ def kerdoios_plan(capability_id: str, work: dict[str, Any] | None) -> dict[str, 
         or os.environ.get("EVOLUTION_LAB_PYTHON")
         or "/workspace/evolution-lab/.venv/bin/python"
     )
+    if not _interpreter_ready(kerd_py):
+        return {"ok": False, "error": f"interpreter_missing:{kerd_py}", "spawned": False}
     args = [
         kerd_py,
         "-m",
@@ -188,6 +197,8 @@ def kerdoios_record(
         or os.environ.get("EVOLUTION_LAB_PYTHON")
         or "/workspace/evolution-lab/.venv/bin/python"
     )
+    if not _interpreter_ready(kerd_py):
+        return
     args = [
         kerd_py,
         "-m",
