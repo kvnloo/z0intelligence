@@ -138,7 +138,7 @@ test("sends a cognition_shadow request through the bridge transport", async () =
 	const request = sent[0];
 	expect(request.op).toBe("cognition_shadow");
 	expect(Array.isArray(request.actions)).toBe(true);
-	expect(request.state).toContain("OMP tool_call: read");
+	expect(request.state).toBe("OMP session. Previous tool calls, oldest first: none");
 	expect((request.facts as Record<string, unknown>).tool_name).toBe("read");
 });
 
@@ -173,6 +173,39 @@ test("payload keeps read-only authority and asks one model by default", async ()
 	const actions = sent[0].actions as Array<Record<string, unknown>>;
 	const writeAction = actions.find(action => action.tool === "write");
 	expect(writeAction?.risk_class).toBe("write");
+});
+
+test("state shows only the tools called before, never the observed call", async () => {
+	process.env.OMP_Z0INT_COGNITION_TOOLS = "read,grep,glob,edit,bash,write,task";
+	const { handler } = installed();
+	const calls = ["read", "grep", "glob", "edit", "bash", "write", "task"];
+	calls.forEach((tool, index) => handler(toolCall(tool, { secret: `needle-${index}` }), fakeCtx()));
+	await flush();
+
+	expect(sent).toHaveLength(calls.length);
+	sent.forEach((request, index) => {
+		const state = String(request.state);
+		// Every call here uses a tool not called before, so its name cannot be history.
+		expect(state).not.toContain(calls[index]);
+		expect(state).not.toContain("needle");
+		expect(state).not.toContain("secret");
+		// The observed call is still recorded, outside what the model is shown.
+		expect((request.facts as Record<string, unknown>).tool_name).toBe(calls[index]);
+	});
+	expect(sent[0].state).toContain("none");
+	expect(sent[3].state).toContain("read, grep, glob");
+	// A ring of five: the seventh call no longer sees the first.
+	expect(sent[6].state).toContain("grep, glob, edit, bash, write");
+	expect(sent[6].state).not.toContain("read");
+});
+
+test("a new session starts with an empty history", async () => {
+	const { pi, handler } = installed();
+	handler(toolCall("grep"), fakeCtx());
+	pi.handlers.get("session_start")?.();
+	handler(toolCall("read"), fakeCtx());
+	await flush();
+	expect(sent[1].state).not.toContain("grep");
 });
 
 // --- kill switch --------------------------------------------------------

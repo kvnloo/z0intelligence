@@ -34,7 +34,8 @@ const DEFAULT_TIMEOUT_MS = 4000;
 const DEFAULT_MODELS = ["functiongemma_270m"];
 const DEFAULT_AUTHORITY = ["read"];
 const DEFAULT_TOOL_NAMES = ["bash", "read", "write", "edit", "grep", "glob"];
-const MAX_STATE_CHARS = 2000;
+// How many earlier tool names of the session the shadow model is shown.
+const RECENT_TOOLS = 5;
 const STATUS_RING = 100;
 
 /** Tool names whose call has real filesystem/process side effects. */
@@ -235,14 +236,6 @@ export function authorityList(): string[] {
 
 // --- payload ------------------------------------------------------------
 
-function safeJson(value: unknown): string {
-	try {
-		return JSON.stringify(value) ?? "";
-	} catch {
-		return String(value);
-	}
-}
-
 function riskFor(toolName: string): string {
 	return WRITE_TOOLS.has(toolName) ? "write" : "read";
 }
@@ -337,16 +330,26 @@ export function liveSessionId(ctx: unknown): string | null {
 	return typeof id === "string" && id.length > 0 ? id : null;
 }
 
-export function buildShadowPayload(event: ToolCallLike, toolNames: string[], sessionId: string | null = null): Jsonish {
+/**
+ * `recent` is the session's tool names before this call, oldest first. The
+ * model is asked to predict this call, so `state` is built from that history
+ * alone: the observed tool name and its input stay in `facts`, which no model
+ * is shown.
+ */
+export function buildShadowPayload(
+	event: ToolCallLike,
+	toolNames: string[],
+	sessionId: string | null = null,
+	recent: readonly string[] = [],
+): Jsonish {
 	const toolName = typeof event?.toolName === "string" ? event.toolName : "";
-	const input = event?.input && typeof event.input === "object" ? event.input : {};
 	return {
 		op: "cognition_shadow",
 		trace_id: randomUUID().replaceAll("-", ""),
 		// An environment variable describes the process, not the session a
 		// tool call belongs to; it is only a fallback when OMP offers no id.
 		session_id: sessionId ?? process.env.OMP_SESSION_ID ?? null,
-		state: `OMP tool_call: ${toolName}\ninput: ${safeJson(input).slice(0, MAX_STATE_CHARS)}`,
+		state: `OMP session. Previous tool calls, oldest first: ${recent.join(", ") || "none"}`,
 		actions: buildActions(toolNames),
 		granted_capabilities: toolNames,
 		authority: authorityList(),
@@ -669,9 +672,11 @@ function formatReceiptRow(row: Jsonish): string {
 export default function localCognition(pi: ExtensionAPI): void {
 	pi.setLabel?.("z0int local cognition (shadow-only)");
 	const seenTools = new Set<string>();
+	const recentTools: string[] = [];
 
 	pi.on?.("session_start", () => {
 		seenTools.clear();
+		recentTools.length = 0;
 	});
 
 	pi.on?.("tool_call", (event, ctx) => {
@@ -686,7 +691,10 @@ export default function localCognition(pi: ExtensionAPI): void {
 			counters.tool_calls += 1;
 			const toolNames = resolveAvailableTools(pi, ctx, observed, seenTools);
 			const sessionId = liveSessionId(ctx);
-			const payload = buildShadowPayload(event as ToolCallLike, toolNames, sessionId);
+			// Copied before this call is recorded, so the history never holds the answer.
+			const payload = buildShadowPayload(event as ToolCallLike, toolNames, sessionId, [...recentTools]);
+			recentTools.push(observed);
+			if (recentTools.length > RECENT_TOOLS) recentTools.shift();
 			const toolCallId = (event as ToolCallLike).toolCallId;
 			void sendShadow(payload, cognitionTimeoutMs(), pi, {
 				sessionId,
