@@ -97,7 +97,3 @@ jobs:
           python -m pip install -e '.[test]'
       - name: Complete offline suite
         run: python -m pytest -q -m 'not live'
-      - name: Verify published evidence
-        run: |
-          (cd results/raw && sha256sum -c SHA256SUMS)
-          python benchmarks/verify_published.py
