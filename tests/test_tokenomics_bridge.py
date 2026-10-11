@@ -237,30 +237,22 @@ class TokenomicsBridgeTests(unittest.TestCase):
             Path(__file__).resolve().parents[1]
             / "results"
             / "decision-backends"
-            / "20260919T023249Z"
+            / "20260930-mbp-dcv1"
             / "tokenomics-events.jsonl"
         )
-        if not live.is_file():
-            self.skipTest("live tokenomics events fixture not present")
         a = load_materialized_rows(live)
         b = load_materialized_rows(live)
+        self.assertTrue(a)
         self.assertEqual(a, b)
         self.assertEqual(compare_rows(a, b), [])
 
-    def test_golden_semantic_parity_from_live_events(self):
-        golden = (
-            Path(__file__).resolve().parent
-            / "fixtures"
-            / "tokenomics-bench-parity"
-            / "four-way"
-            / "raw.jsonl"
-        )
-        live = Path(__file__).resolve().parents[1] / "results" / "decision-backends" / "20260919T023249Z"
-        events = live / "tokenomics-events.jsonl"
-        if not events.is_file():
-            self.skipTest("live tokenomics events not present")
-        old_rows = [json.loads(line) for line in golden.read_text(encoding="utf-8").splitlines() if line.strip()]
-        new_rows = load_materialized_rows(events)
+    def test_committed_run_rows_match_its_events(self):
+        """The committed run's raw.jsonl must be what its event log materializes to."""
+        live = Path(__file__).resolve().parents[1] / "results" / "decision-backends" / "20260930-mbp-dcv1"
+        raw = live / "raw.jsonl"
+        old_rows = [json.loads(line) for line in raw.read_text(encoding="utf-8").splitlines() if line.strip()]
+        new_rows = load_materialized_rows(live / "tokenomics-events.jsonl")
+        self.assertTrue(old_rows)
         errs = compare_rows(old_rows, new_rows, fields=SEMANTIC_FIELDS, float_tol=1e-3)
         self.assertEqual(errs, [], msg=errs[:10])
 
