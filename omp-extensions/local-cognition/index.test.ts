@@ -160,16 +160,34 @@ test("payload actions contain only the available tool names", async () => {
 	}
 });
 
-test("payload keeps read-only authority and asks one model by default", async () => {
+test("authority and budget cover every available tool, whatever the observed call", () => {
+	const tools = ["read", "grep", "glob", "ls", "fetch", "todo", "task", "ask", "bash", "write", "edit"];
+	const asRead = buildShadowPayload(toolCall("read"), tools);
+	const asWrite = buildShadowPayload(toolCall("write", { path: "x" }), tools);
+
+	// Enough authority and budget that no tool is eliminated, so the observed one is always legal.
+	expect(asWrite.authority).toEqual(["read", "write"]);
+	expect(asWrite.budget_units).toBe(tools.length);
+	// Nothing the model is shown differs between a read call and a write call.
+	for (const field of ["state", "actions", "granted_capabilities", "authority", "budget_units", "risk_class"]) {
+		expect(asRead[field]).toEqual(asWrite[field]);
+	}
+
+	// A session with only read tools is not handed write authority.
+	const readOnly = buildShadowPayload(toolCall("read"), ["read", "grep"]);
+	expect(readOnly.authority).toEqual(["read"]);
+	expect(readOnly.budget_units).toBe(8);
+	expect(readOnly.risk_class).toBe("read");
+});
+
+test("asks one model by default", async () => {
 	process.env.OMP_Z0INT_COGNITION_TOOLS = "read,write";
 	const { handler } = installed();
 	handler(toolCall("write", { path: "x" }), fakeCtx());
 	await flush();
 
-	expect(sent[0].authority).toEqual(["read"]);
 	// One resident model is what the local supervisor holds; asking two at once never answers.
 	expect(sent[0].shadows).toEqual(["functiongemma_270m"]);
-	expect(sent[0].risk_class).toBe("write");
 	const actions = sent[0].actions as Array<Record<string, unknown>>;
 	const writeAction = actions.find(action => action.tool === "write");
 	expect(writeAction?.risk_class).toBe("write");

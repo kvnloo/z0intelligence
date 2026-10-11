@@ -343,6 +343,11 @@ export function buildShadowPayload(
 	recent: readonly string[] = [],
 ): Jsonish {
 	const toolName = typeof event?.toolName === "string" ? event.toolName : "";
+	// Authority and budget are sized to the tool list, so every tool the session
+	// could call is a legal choice. They are not taken from the observed tool:
+	// that would show the model whether the call was a write. Nothing is granted
+	// by this; the worker fixes the selected and executed action to null.
+	const risks = new Set(toolNames.map(riskFor));
 	return {
 		op: "cognition_shadow",
 		trace_id: randomUUID().replaceAll("-", ""),
@@ -352,15 +357,15 @@ export function buildShadowPayload(
 		state: `OMP session. Previous tool calls, oldest first: ${recent.join(", ") || "none"}`,
 		actions: buildActions(toolNames),
 		granted_capabilities: toolNames,
-		authority: authorityList(),
-		budget_units: 8,
+		authority: [...new Set([...authorityList(), ...risks])],
+		budget_units: Math.max(8, toolNames.length),
 		satisfied: [],
 		facts: {
 			tool_name: toolName,
 			tool_call_id: typeof event?.toolCallId === "string" ? event.toolCallId : "",
 		},
 		objective: null,
-		risk_class: riskFor(toolName),
+		risk_class: risks.has("write") ? "write" : "read",
 		shadows: shadowModels(),
 	};
 }

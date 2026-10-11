@@ -50,7 +50,7 @@ Environment (wins over the settings file):
 | `OMP_Z0INT_COGNITION_TIMEOUT_MS` | `4000` | Hard client-side timeout for one shadow send |
 | `OMP_Z0INT_COGNITION_MODELS` | `functiongemma_270m` | Model ids to run in shadow. One by default: the local supervisor holds one resident model, and two different models per tool call never answer |
 | `OMP_Z0INT_COGNITION_TOOLS` | discovered/observed | Comma-separated tool allow-list for the action set |
-| `OMP_Z0INT_COGNITION_AUTHORITY` | `read` | Risk classes the compiler may declare legal |
+| `OMP_Z0INT_COGNITION_AUTHORITY` | `read` | Risk classes the compiler may declare legal, in addition to those of the available tools (shadow-only: nothing is executed) |
 | `OMP_Z0INT_COGNITION_BRIDGE_FALLBACK` | on | `0` disables the sibling-extension import fallback |
 | `Z0INT_HOME` | `~/.z0int` | Receipt + settings root |
 
