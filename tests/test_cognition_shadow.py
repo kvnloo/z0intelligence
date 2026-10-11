@@ -7,6 +7,7 @@ boundary without a GPU, a model server or the network.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -372,3 +373,231 @@ def test_shadow_lane_never_writes_outside_z0int_home(tmp_path, monkeypatch):
     inside = {p.resolve() for p in home.rglob("*") if p.is_file()}
     everything = {p.resolve() for p in tmp_path.rglob("*") if p.is_file()}
     assert everything - inside == set()
+
+
+def test_receipt_carries_the_harness_tool_call_identity(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    payload = _payload(shadows=["m1"])
+    payload["facts"] = {"tool_name": "read", "tool_call_id": "call-42"}
+
+    result = run_shadow(payload, registry=_FakeRegistry(), write=True)
+
+    receipt = json.loads(Path(result["receipts_path"]).read_text().splitlines()[0])
+    # A random trace id alone cannot be joined back to the native session's tool call.
+    assert receipt["tool_call_id"] == "call-42"
+    assert receipt["tool_name"] == "read"
+    assert receipt["session_id"] == "session-1"
+
+    without = _payload(shadows=["m1"])
+    without.pop("facts", None)
+    result = run_shadow(without, registry=_FakeRegistry(), write=True)
+    receipt = json.loads(Path(result["receipts_path"]).read_text().splitlines()[-1])
+    assert receipt["tool_call_id"] is None
+
+
+class _SlowBackend(_FakeBackend):
+    """Answers correctly, but only after ``delay_s`` — a model still loading."""
+
+    def __init__(self, delay_s, **kwargs):
+        super().__init__(**kwargs)
+        self._delay_s = delay_s
+
+    def decide(self, request):
+        time.sleep(self._delay_s)
+        return super().decide(request)
+
+
+def test_payload_budget_bounds_a_slow_model_and_records_it_as_a_timeout(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(backends={"m1": _SlowBackend(0.6, action="read")})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = 150
+
+    started = time.monotonic()
+    result = run_shadow(payload, registry=registry, write=True)
+    elapsed = time.monotonic() - started
+
+    # The caller's budget wins over the 30 s default: the op returns inside it.
+    assert elapsed < 0.5
+    row = result["shadow"][0]
+    assert row["error"] == "shadow_timeout"
+    assert row["backend"] is None
+    assert row["selected_action"] is None
+    receipt = json.loads(Path(result["receipts_path"]).read_text().splitlines()[0])
+    assert receipt["shadow"][0]["error"] == "shadow_timeout"
+
+
+def test_a_model_inside_the_budget_is_recorded_as_having_answered(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(backends={"m1": _SlowBackend(0.05, action="read")})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = 2000
+
+    row = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+
+    assert row["selected_action"] == "read"
+    assert row["backend"] == "fake-backend"
+
+
+def test_a_timeout_row_records_how_long_the_worker_waited(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(backends={"m1": _SlowBackend(0.6, action="read")})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = 150
+
+    row = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+
+    # No inference completed, so latency stays 0. The wait is what was actually
+    # spent, and without it a timeout reads like a free, instant miss.
+    assert row["error"] == "shadow_timeout"
+    assert row["timed_out"] is True
+    assert row["latency_ms"] == 0.0
+    assert 140 <= row["waited_ms"] < 500
+
+
+def test_a_failure_that_is_not_a_timeout_reports_no_wait(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(
+        backends={"m1": _FakeBackend(raises=ConnectionError("refused"))}
+    )
+    payload = _payload(shadows=["m1", "absent"])
+    payload["timeout_ms"] = 2000
+
+    rows = run_shadow(payload, registry=registry, write=False)["shadow"]
+
+    for row in rows:
+        assert "timed_out" not in row
+        assert "waited_ms" not in row
+
+
+class _ColdThenWarmBackend(_FakeBackend):
+    """The first call pays a model load; later calls find the model resident."""
+
+    def __init__(self, load_s, **kwargs):
+        super().__init__(**kwargs)
+        self._load_s = load_s
+        self._loaded = False
+        self.calls = 0
+
+    def decide(self, request):
+        self.calls += 1
+        if not self._loaded:
+            time.sleep(self._load_s)
+            self._loaded = True
+        return super().decide(request)
+
+
+def test_a_cold_load_timeout_still_leaves_the_model_warm_for_the_next_call(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    backend = _ColdThenWarmBackend(0.4, action="read")
+    registry = _FakeRegistry(backends={"m1": backend})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = 150
+
+    cold = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+    assert cold["error"] == "shadow_timeout"
+    assert cold["timed_out"] is True
+
+    # The abandoned call is not cancelled: it finishes the load in the background.
+    deadline = time.monotonic() + 2.0
+    while not backend._loaded and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert backend._loaded
+
+    warm = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+    assert warm["selected_action"] == "read"
+    assert "timed_out" not in warm
+    assert backend.calls == 2
+
+
+class _RaisesLate(_FakeBackend):
+    """Fails on its own, a little after the caller's budget has run out."""
+
+    def __init__(self, delay_s, **kwargs):
+        super().__init__(**kwargs)
+        self._delay_s = delay_s
+
+    def decide(self, request):
+        time.sleep(self._delay_s)
+        raise ConnectionError("late refused")
+
+
+def test_a_backend_error_that_lands_just_after_the_deadline_is_not_also_called_a_timeout(
+    tmp_path, monkeypatch
+):
+    import threading
+
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(backends={"m1": _RaisesLate(0.2)})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = 100
+
+    # Hold the worker between "still running at the deadline" and building the
+    # row, long enough for the backend's own error to arrive in between.
+    real_is_alive = threading.Thread.is_alive
+
+    def slow_is_alive(thread):
+        alive = real_is_alive(thread)
+        if alive and thread.name.startswith("z0int-shadow-"):
+            time.sleep(0.3)
+        return alive
+
+    monkeypatch.setattr(threading.Thread, "is_alive", slow_is_alive)
+
+    row = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+
+    # One story per row: either it timed out, or it failed with its own error.
+    if row["error"] == "shadow_timeout":
+        assert row["timed_out"] is True
+    else:
+        assert "late refused" in row["error"]
+        assert "timed_out" not in row
+        assert "waited_ms" not in row
+
+
+@pytest.mark.parametrize("budget", [1e18, 1e308, float("inf"), 10**400])
+def test_an_absurd_budget_is_capped_instead_of_raising(tmp_path, monkeypatch, budget):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    registry = _FakeRegistry(backends={"m1": _FakeBackend(action="read")})
+    payload = _payload(shadows=["m1"])
+    payload["timeout_ms"] = budget
+
+    row = run_shadow(payload, registry=registry, write=False)["shadow"][0]
+
+    assert row["selected_action"] == "read"
+
+
+def test_an_absurd_budget_from_the_environment_is_capped_too(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    monkeypatch.setenv("Z0INT_COGNITION_SHADOW_SERVER_TIMEOUT_MS", "inf")
+    registry = _FakeRegistry(backends={"m1": _FakeBackend(action="read")})
+
+    row = run_shadow(_payload(shadows=["m1"]), registry=registry, write=False)["shadow"][0]
+
+    assert row["selected_action"] == "read"
+
+
+@pytest.mark.parametrize("value", ["0", "-0.0", "-1", "-5", "nan", "-inf", "5e-324"])
+def test_a_non_positive_environment_budget_still_means_the_shortest_wait(monkeypatch, value):
+    from z0int.cognition import shadow
+
+    monkeypatch.setenv("Z0INT_COGNITION_SHADOW_SERVER_TIMEOUT_MS", value)
+
+    assert shadow._timeout_s({}, None) == 0.1
+
+
+def test_the_cap_changes_no_ordinary_budget(monkeypatch):
+    from z0int.cognition import shadow
+
+    monkeypatch.delenv("Z0INT_COGNITION_SHADOW_SERVER_TIMEOUT_MS", raising=False)
+    default = shadow.DEFAULT_SERVER_TIMEOUT_MS / 1000.0
+    for raw in (0, -5, float("nan"), True, "150", None):
+        assert shadow._timeout_s({"timeout_ms": raw}, None) == default
+    assert shadow._timeout_s({"timeout_ms": 5e-324}, None) == 0.1
+    assert shadow._timeout_s({"timeout_ms": 1}, None) == 0.1
+    assert shadow._timeout_s({"timeout_ms": 150}, None) == 0.15
+    assert shadow._timeout_s({}, 0) == 0.1
+    assert shadow._timeout_s({}, 2) == 2.0
+    with pytest.raises(ValueError):
+        shadow._timeout_s({}, "abc")
+    assert shadow._timeout_s({"timeout_ms": 7_200_000}, None) == shadow.MAX_SERVER_TIMEOUT_S

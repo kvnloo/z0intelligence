@@ -84,3 +84,29 @@ def test_authority_exports_constraints_and_rejects_paid_completion():
  saved=a.emit(request,owner,1,payload)
  assert saved['extra']['status']=='failed' and saved['extra']['cost_policy_violation']
  with pytest.raises(ValueError):a.complete(request,owner,{'ok':True,'output':'ok','attempts':[saved]})
+
+def _route_policy(**entry):
+ return {'validated_free_routes':[{'provider':'p','model':'m','validated':True,'price_usd':0,'evidence_sha256':'0'*64,**entry}]}
+
+@pytest.mark.parametrize('price',[0,0.0,-0.0])
+def test_free_route_accepts_numeric_zero_price(price):
+ assert w.free_route(_route_policy(price_usd=price),'p','m') is not None
+
+@pytest.mark.parametrize('price',[False,True,None,'0','0.0','',[],[0],{},float('nan'),-1,-0.01,0.01,1,float('inf'),float('-inf')],ids=repr)
+def test_free_route_rejects_price_that_is_not_a_number_equal_to_zero(price):
+ """False == 0 in Python: a boolean (or any non-number) price is not a measured $0 price."""
+ assert w.free_route(_route_policy(price_usd=price),'p','m') is None
+
+def test_free_route_rejects_missing_price():
+ policy=_route_policy();del policy['validated_free_routes'][0]['price_usd']
+ assert w.free_route(policy,'p','m') is None
+
+@pytest.mark.parametrize('evidence',[None,'',0,False],ids=repr)
+def test_free_route_requires_evidence_digest(evidence):
+ assert w.free_route(_route_policy(evidence_sha256=evidence),'p','m') is None
+ policy=_route_policy();del policy['validated_free_routes'][0]['evidence_sha256']
+ assert w.free_route(policy,'p','m') is None
+
+@pytest.mark.parametrize('validated',[1,'true','yes',[True],None,False],ids=repr)
+def test_free_route_requires_validated_exactly_true(validated):
+ assert w.free_route(_route_policy(validated=validated),'p','m') is None

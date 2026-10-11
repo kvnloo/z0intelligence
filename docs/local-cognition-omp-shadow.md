@@ -45,7 +45,7 @@ Request (flat fields; a nested `payload` object is also accepted):
   "facts": {},
   "objective": null,
   "risk_class": "read",
-  "shadows": ["nemotron_orchestrator_8b", "functiongemma_270m"]
+  "shadows": ["functiongemma_270m"]
 }
 ```
 

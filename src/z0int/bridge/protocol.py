@@ -27,6 +27,7 @@ OPS = frozenset(
         "decision_warm",
         "cognition_shadow",
         "file_search",
+        "automatic_event",
     }
 )
 
