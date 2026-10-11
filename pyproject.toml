@@ -46,6 +46,9 @@ games = [
   "pillow>=11",
   "vizdoom>=1.2.4",
 ]
+[tool.setuptools.package-data]
+"z0int.optchat" = ["*.mjs"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

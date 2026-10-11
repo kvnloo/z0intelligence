@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import subprocess
 import time
 import uuid
 from .cognition.adapters.transport import OpenAICompatTransport, ServerConfig
@@ -110,17 +111,76 @@ def _local_route_evidenced(provider, route):
             and isinstance(route.get('model'), str) and route.get('provider', provider) == provider)
 
 
+def hermes_root() -> Path | None:
+    env = os.environ.get('Z0INT_HERMES_ROOT') or os.environ.get('HERMES_ROOT') or HERMES_ROOT
+    if env:
+        path = Path(env).expanduser()
+        if (path / 'hermes_cli').is_dir():
+            return path
+    home = Path.home() / '.hermes' / 'hermes-agent'
+    if (home / 'hermes_cli').is_dir():
+        return home
+    return None
+
+
+def hermes_python() -> Path | None:
+    env = os.environ.get('Z0INT_HERMES_PYTHON')
+    if env and Path(env).expanduser().is_file():
+        return Path(env).expanduser()
+    root = hermes_root()
+    if root is None:
+        return None
+    candidate = root / 'venv' / 'bin' / 'python'
+    return candidate if candidate.is_file() else None
+
+
+_OAUTH_CACHE: dict[str, tuple[float, dict]] = {}
+_OAUTH_SCRIPT = (
+    'import json,sys\n'
+    'sys.path.insert(0, sys.argv[1])\n'
+    'from hermes_cli.auth_nous import resolve_nous_runtime_credentials\n'
+    'from hermes_cli.auth_xai import resolve_xai_oauth_runtime_credentials\n'
+    'provider=sys.argv[2]\n'
+    'data=resolve_xai_oauth_runtime_credentials() if provider=="grok" else resolve_nous_runtime_credentials()\n'
+    'print(json.dumps({"ok":True,"api_key":data.get("api_key") or "","base_url":data.get("base_url") or ""}))\n'
+)
+
+
+def resolve_hermes_oauth(provider: str) -> dict:
+    """Ask the Hermes venv for OAuth credentials. Do not import hermes_cli here.
+
+    hermes_cli.auth pulls ruamel through hermes_yaml. The bridge interpreter does
+    not ship that package; the Hermes venv does.
+    """
+    cached = _OAUTH_CACHE.get(provider)
+    if cached and time.time() - cached[0] < 60:
+        return cached[1]
+    py, root = hermes_python(), hermes_root()
+    if py is None or root is None:
+        raise RuntimeError('hermes oauth runtime missing; set Z0INT_HERMES_PYTHON to the Hermes venv')
+    proc = subprocess.run(
+        [str(py), '-c', _OAUTH_SCRIPT, str(root), 'grok' if provider == 'grok' else 'nous'],
+        capture_output=True, text=True, timeout=20, check=False,
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        detail = (proc.stderr or '').strip().splitlines()
+        tail = detail[-1][:180] if detail else f'exit_{proc.returncode}'
+        raise RuntimeError('hermes oauth resolve failed: ' + tail)
+    data = json.loads(proc.stdout.strip().splitlines()[-1])
+    if not data.get('api_key') or not data.get('base_url'):
+        raise RuntimeError('hermes oauth resolve returned no credential')
+    _OAUTH_CACHE[provider] = (time.time(), data)
+    return data
+
+
 def oauth_module():
-    if HERMES_ROOT and HERMES_ROOT not in sys.path:
-        sys.path.insert(0, HERMES_ROOT)
-    from hermes_cli import auth
-    return auth
+    raise RuntimeError('import hermes_cli.auth in-process; use resolve_hermes_oauth')
 
 
 def credential_available(provider, config):
     if config.get('auth') == 'hermes-oauth':
         try:
-            return bool(oauth_module().get_provider_auth_state('xai-oauth' if provider == 'grok' else 'nous'))
+            return bool(resolve_hermes_oauth('grok' if provider == 'grok' else 'nous').get('api_key'))
         except Exception:
             return False
     if config.get('auth') == 'none':
@@ -144,6 +204,22 @@ def free_route(policy, provider, model):
 
 def free_required(policy, args=None):
     return policy.get('free_only') is True or (args or {}).get('free_only') is True
+
+def blocked_provider(provider):
+    name=str(provider or '').lower()
+    blocked={p.lower() for p in (configuration()[0].get('sidestep_blocked_providers') or [])}
+    return name in blocked or name.startswith('cursor') or name in {'cursor','paid-api','openai-codex','xai','xai-oauth'}
+
+
+def sidestep_candidates(policy, tried):
+    out=[]
+    for item in policy.get('sidestep_order') or []:
+        provider, model = item.get('provider'), item.get('model')
+        if not isinstance(provider, str) or not isinstance(model, str) or provider in tried or blocked_provider(provider):
+            continue
+        out.append({'provider': provider, 'model': model, 'sidestep': True})
+    return out
+
 
 
 def require_free_route(policy, provider, model, args=None):
@@ -228,9 +304,7 @@ def estimate(text):
 
 def credentials(provider, config):
     if config.get('auth') == 'hermes-oauth':
-        auth = oauth_module()
-        data = (auth.resolve_xai_oauth_runtime_credentials() if provider == 'grok'
-                else auth.resolve_nous_runtime_credentials())
+        data = resolve_hermes_oauth(provider)
         return data['api_key'], data['base_url'].removesuffix('/v1')
     if config.get('auth') == 'none':
         return None, config['base_url']
@@ -252,9 +326,11 @@ def error_status(exc):
     return None
 
 
-def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_index, *, receipt_sink, admission):
+def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_index, *, receipt_sink, admission, sidestep=False):
     provider, model = candidate['provider'], candidate['model']
-    free = require_free_route(policy, provider, model, args)
+    if blocked_provider(provider):
+        raise ValueError('paid parent is not a test or sidestep route: '+provider)
+    free = None if sidestep else require_free_route(policy, provider, model, args)
     call_id = uuid.uuid4().hex
     messages = messages_for(args)
     row = DecisionReceipt(trace_id=call_id, session_id=args['parent_agent'], capability_id='codex.delegated_text',
@@ -268,11 +344,12 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
                'task_sha256': hashlib.sha256(args['task'].encode()).hexdigest(),
                'context_sha256': hashlib.sha256(args.get('context', '').encode()).hexdigest(),
                'usage_source': 'unknown', 'expected_cost': None})
-    row.extra.update(free_only=free_required(policy,args),free_tier_validated=free is not None,
+    row.extra.update(free_only=free_required(policy,args) and not sidestep,free_tier_validated=free is not None,
                      free_tier_evidence=free.get('evidence_sha256') if free else None,
-                     validated_price_usd=free.get('price_usd') if free else None)
+                     validated_price_usd=free.get('price_usd') if free else None,
+                     sidestep=sidestep)
     from .quota_budget import reservation
-    permit=admission.acquire(provider,call_id,{'harness':plan.get('harness','codex'),'caller_trace_id':plan.get('caller_trace_id'),'quota_model':model,'quota_reserved_tokens':reservation(args)})
+    permit=admission.acquire(provider,call_id,{'harness':plan.get('harness','codex'),'caller_trace_id':plan.get('caller_trace_id'),'quota_model':model,'quota_reserved_tokens':reservation(args),'sidestep':sidestep})
     if permit.get('execution_policy'):
         row.extra.update(permit['execution_policy'])
     if permit.get('quota_budget'):row.extra['quota_budget']=permit['quota_budget']
@@ -295,7 +372,8 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
             timeout_s=policy['timeout_s'], runtime='api', extra_headers={'User-Agent': 'z0int-api-eval/1.0 (+https://github.com/kvnloo/z0intelligence)'}))
         row.extra['physical_call_attempted'] = True
         row.extra['physical_started_at'] = time.time()
-        response = transport.chat(messages, max_tokens=args.get('max_tokens', 512), temperature=0, seed=None, extra_body=permit.get('request_constraints',request_constraints(policy,provider,model,args)))
+        constraints = {} if sidestep else request_constraints(policy, provider, model, args)
+        response = transport.chat(messages, max_tokens=args.get('max_tokens', 512), temperature=0, seed=None, extra_body=permit.get('request_constraints', constraints))
         transport_status=200
         output = response.content
         if not isinstance(output, str):
@@ -309,7 +387,7 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         identified = bool(response.raw.get('model'))
         cost = response.usage.get('cost')
         row.extra['provider_reported_cost_usd'] = cost
-        cost_violation = (free_required(policy,args) or row.extra.get('free_only')) and cost is not None and (type(cost) not in (int,float) or cost != 0)
+        cost_violation = (not sidestep) and (free_required(policy,args) or row.extra.get('free_only')) and cost is not None and (type(cost) not in (int,float) or cost != 0)
         ok = complete and metered and identified and not cost_violation
         row.outcome = {'execution_completed': complete, 'source': 'codex_plugin'}
         row.extra.update(status='completed' if ok else ('failed' if cost_violation else 'completed_unmetered_or_unidentified' if complete else 'incomplete'),
@@ -413,13 +491,27 @@ def execute_plan(args, policy, providers, plan, *, receipt_sink, receipt_locatio
     started = time.monotonic()
     attempts = []
     result = {'ok': False, 'output': ''}
-    for index, candidate in enumerate(plan['candidates']):
-        # Recheck at execution: stale or forged plans cannot introduce paid fallback.
-        require_free_route(policy,candidate['provider'],candidate['model'],args)
-        result = execute_attempt(args, candidate, providers[candidate['provider']], policy, plan, route_id, index, receipt_sink=receipt_sink, admission=admission)
+    queue=[dict(candidate) for candidate in plan['candidates']]
+    tried=set()
+    limit=int(policy.get('max_attempts',3))+len(policy.get('sidestep_order') or [])
+    sidestep_http=set(policy.get('sidestep_http') or [402,429])
+    while queue and len(attempts)<limit:
+        candidate=queue.pop(0)
+        if candidate['provider'] in tried or blocked_provider(candidate['provider']) or candidate['provider'] not in providers:
+            continue
+        tried.add(candidate['provider'])
+        sidestep=candidate.get('sidestep') is True
+        if not sidestep:
+            require_free_route(policy,candidate['provider'],candidate['model'],args)
+        result = execute_attempt(args, candidate, providers[candidate['provider']], policy, plan, route_id, len(attempts), receipt_sink=receipt_sink, admission=admission, sidestep=sidestep)
         attempts.append(result['receipt'])
         if result['ok']:
             break
+        status=(result['receipt'].get('extra') or {}).get('http_status')
+        if status in sidestep_http:
+            queued={item['provider'] for item in queue}
+            for extra in sidestep_candidates(policy, tried|queued):
+                queue.append(extra)
     return {'ok': result['ok'], 'subagent_id': route_id, 'route': plan, 'output': result['output'],
             'provider': attempts[-1]['provider'] if attempts else None,
             'model': attempts[-1]['model'] if attempts else None,

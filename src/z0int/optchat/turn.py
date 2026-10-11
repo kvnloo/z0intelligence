@@ -2,7 +2,10 @@
 """
 from __future__ import annotations
 
-from .log import PLACEHOLDER, ChatLog
+import threading
+import time
+
+from .log import ChatLog
 
 MARKS = (50_000, 80_000, 100_000)
 
@@ -45,7 +48,32 @@ you act, guess or ask. date(id) gives the date and time of message id."""
 
 
 def ready(chat: ChatLog) -> bool:
-    return PLACEHOLDER not in chat.render()
+    with chat.condition:
+        return chat.missing() == 0
+
+
+def wait_ready(
+    chat: ChatLog,
+    timeout: float | None = None,
+    cancel: threading.Event | None = None,
+) -> dict[str, object]:
+    """Wait on fit/append/abort notifications, without polling or model calls."""
+    deadline = None if timeout is None else time.monotonic() + max(0.0, timeout)
+    with chat.condition:
+        while True:
+            missing = chat.missing()
+            cancelled = cancel is not None and cancel.is_set()
+            if cancelled or missing == 0:
+                return {
+                    "ready": not cancelled and missing == 0,
+                    "cancelled": cancelled,
+                    "placeholders": missing,
+                    "messages": len(chat.messages),
+                }
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                return {"ready": False, "cancelled": False, "placeholders": missing, "messages": len(chat.messages)}
+            chat.condition.wait(remaining)
 
 
 def system_prompt(agents: str) -> str:
@@ -79,19 +107,20 @@ def cache_pieces(view: str) -> list[str]:
 
 
 def begin(chat: ChatLog, texts: list[str], agents: str = "") -> dict[str, object]:
-    """Render, then log. Refuse without logging when any view line is still a placeholder."""
-    if not ready(chat):
-        return {"ready": False}
-    view = chat.render()
-    for text in texts:
-        chat.append("user", text)
-    return {
-        "ready": True,
-        "view": view,
-        "system": system_prompt(agents),
-        "blocks": [view, "\n\n".join(texts)],
-        "pieces": cache_pieces(view),
-    }
+    """Render, then log. Refuse when any view node is still unbuilt."""
+    with chat.condition:
+        if not ready(chat):
+            return {"ready": False}
+        view = chat.render()
+        for text in texts:
+            chat.append("user", text)
+        return {
+            "ready": True,
+            "view": view,
+            "system": system_prompt(agents),
+            "blocks": [view, "\n\n".join(texts)],
+            "pieces": cache_pieces(view),
+        }
 
 
 
@@ -101,31 +130,44 @@ class Queue:
     def __init__(self) -> None:
         self.pending: list[str] = []
         self.running = False
+        self._lock = threading.Lock()
 
     def submit(self, text: str) -> str:
-        self.pending.append(text)
-        return "inject" if self.running else "turn"
+        with self._lock:
+            self.pending.append(text)
+            return "inject" if self.running else "turn"
 
     def take(self) -> list[str]:
-        texts = self.pending
-        self.pending = []
-        self.running = bool(texts)
-        return texts
+        with self._lock:
+            texts = self.pending
+            self.pending = []
+            self.running = bool(texts)
+            return texts
 
     def boundary(self) -> list[str]:
-        texts = self.pending
-        self.pending = []
-        return texts
+        with self._lock:
+            texts = self.pending
+            self.pending = []
+            return texts
 
     def finish(self) -> list[str]:
-        self.running = False
-        return list(self.pending)
+        with self._lock:
+            self.running = False
+            return list(self.pending)
+
+    def cancel(self) -> list[str]:
+        with self._lock:
+            texts = self.pending
+            self.pending = []
+            self.running = False
+            return texts
 
 
 def leave_unanswered(chat: ChatLog, texts: list[str]) -> int:
-    for text in texts:
-        chat.append("user", text)
-    return len(texts)
+    with chat.condition:
+        for text in texts:
+            chat.append("user", text)
+        return len(texts)
 
 
 def subagent_text(ident: str, report: str) -> str:
@@ -136,4 +178,4 @@ def record(chat: ChatLog, kind: str, text: str) -> dict[str, object]:
     if kind in {"thought", "thinking"}:
         return {"logged": False}
     msg = chat.append(kind, text)
-    return {"logged": True, "i": msg.i, "kind": msg.kind}
+    return {"logged": True, "i": msg.i, "kind": msg.kind, "text": msg.text}
