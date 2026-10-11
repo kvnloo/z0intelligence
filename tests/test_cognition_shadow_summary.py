@@ -69,6 +69,24 @@ def test_counts(tmp_path: Path) -> None:
     }
 
 
+def test_a_row_without_a_backend_or_with_an_error_did_not_answer(tmp_path: Path) -> None:
+    shadow = [
+        # No backend and no failure text: nothing ran.
+        {"label": "a", "backend": None, "selected_action": "read"},
+        # A backend is named, but the row carries an error.
+        _model("b", selected_action="read", abstained=False, error="shadow_timeout"),
+        _model("c", selected_action="read", abstained=False, error="URLError: refused"),
+    ]
+    out = summarize_shadow_receipts(
+        _write(tmp_path, [{"ts": 1.0, "tool_name": "read", "legal_ids": ["read"], "shadow": shadow}])
+    )
+    assert out["selections"] == 0
+    assert out["agreements"] == 0
+    assert [out["models"][m]["answered"] for m in "abc"] == [0, 0, 0]
+    assert [out["models"][m]["unreachable"] for m in "abc"] == [1, 0, 1]
+    assert [out["models"][m]["timed_out"] for m in "abc"] == [0, 1, 0]
+
+
 def test_since_ts_and_empty(tmp_path: Path) -> None:
     out = summarize_shadow_receipts(_write(tmp_path, ROWS), since_ts=400.0)
     assert out["receipts"] == 3
