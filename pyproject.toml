@@ -25,16 +25,8 @@ dependencies = [
 ]
 
 [project.scripts]
-openjev-score = "openjev_phase1.cli:main"
 openjev-data = "openjev_phase1.jevlike.data:main"
-openjev-train = "openjev_phase1.jevlike.train:main"
-openjev-eval = "openjev_phase1.jevlike.eval:main"
-openjev-predict = "openjev_phase1.jevlike.predict:main"
-openjev-bridge-score = "openjev_phase1.jevlike.bridge:main"
 z0int = "z0int.cli:main"
-z0int-compile = "z0int.compile:main"
-z0int-train-next-action = "z0int.train:main"
-z0int-image-decide = "z0int.image_decision_cli:main"
 [project.optional-dependencies]
 test = ["pytest==8.4.2", "PyYAML==6.0.3", "agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@2ae90511a900fdb3dcc576c9634cd8d9ee1c8d6a"]
 analytics = ["agent-tokenomics @ git+https://github.com/kvnloo/tokenomics.git@2ae90511a900fdb3dcc576c9634cd8d9ee1c8d6a"]
