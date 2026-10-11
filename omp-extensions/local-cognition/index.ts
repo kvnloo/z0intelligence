@@ -274,16 +274,13 @@ function extractToolNames(value: unknown): string[] {
  * The set of tool names available this turn.
  *
  * OMP does not hand the `tool_call` event a tool list, so we look for one on
- * the injected extension API / handler context, then fall back to the names
- * observed in this session, then to a small builtin default. The observed tool
- * is always included so its own action is a candidate.
+ * the injected extension API / handler context, then fall back to a small
+ * builtin default. The list never depends on the call being observed or on
+ * earlier calls: a tool that is in it only because it was called is the answer
+ * the model is asked for. A call to a tool outside the list is therefore not a
+ * legal choice, and the scorecard counts it as such.
  */
-export function resolveAvailableTools(
-	pi: unknown,
-	ctx: unknown,
-	observed: string,
-	seen: Iterable<string> = [],
-): string[] {
+export function resolveAvailableTools(pi: unknown, ctx: unknown): string[] {
 	const env = process.env.OMP_Z0INT_COGNITION_TOOLS;
 	let names: string[] = env && env.trim() ? splitList(env) : [];
 	if (names.length === 0) {
@@ -294,6 +291,8 @@ export function resolveAvailableTools(
 			(pi as Jsonish | undefined)?.tools,
 			safeCall((pi as Jsonish | undefined)?.pi, "getTools"),
 			safeCall((pi as Jsonish | undefined)?.pi, "getAllRegisteredTools"),
+			// What OMP's extension API actually offers: the enabled tool names.
+			safeCall(pi, "getActiveTools"),
 		];
 		for (const source of sources) {
 			const extracted = extractToolNames(source);
@@ -303,12 +302,8 @@ export function resolveAvailableTools(
 			}
 		}
 	}
-	if (names.length === 0) names = [...seen];
 	if (names.length === 0) names = [...DEFAULT_TOOL_NAMES];
-	const set = new Set(names.filter(Boolean));
-	if (observed) set.add(observed);
-	// Sorted, so a tool added because it was just called is not recognisable by coming last.
-	return [...set].sort();
+	return [...new Set(names.filter(Boolean))].sort();
 }
 
 function buildActions(toolNames: string[]): Jsonish[] {
@@ -677,11 +672,9 @@ function formatReceiptRow(row: Jsonish): string {
 
 export default function localCognition(pi: ExtensionAPI): void {
 	pi.setLabel?.("z0int local cognition (shadow-only)");
-	const seenTools = new Set<string>();
 	const recentTools: string[] = [];
 
 	pi.on?.("session_start", () => {
-		seenTools.clear();
 		recentTools.length = 0;
 	});
 
@@ -693,9 +686,8 @@ export default function localCognition(pi: ExtensionAPI): void {
 					? String((event as ToolCallLike).toolName)
 					: "";
 			if (!observed) return undefined;
-			seenTools.add(observed);
 			counters.tool_calls += 1;
-			const toolNames = resolveAvailableTools(pi, ctx, observed, seenTools);
+			const toolNames = resolveAvailableTools(pi, ctx);
 			const sessionId = liveSessionId(ctx);
 			// Copied before this call is recorded, so the history never holds the answer.
 			const payload = buildShadowPayload(event as ToolCallLike, toolNames, sessionId, [...recentTools]);
