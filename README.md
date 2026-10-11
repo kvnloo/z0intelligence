@@ -141,7 +141,7 @@ A 300-file sample produced:
 
 That immediately exposed the real bottleneck: several useful decision families are now data-rich, while others still lack the counterfactual or verifier labels required for trustworthy learning.
 
-See PR #43 and [docs/decision-capability-v2-plan.md](docs/decision-capability-v2-plan.md).
+See PR #43.
 
 ### Measurement completeness is part of correctness
 
@@ -198,8 +198,6 @@ The in-tree cognition stack includes:
 - shadow cascade execution;
 - replayable cognition receipts;
 - a serving/probe layer for what is actually resident on the machine.
-
-See [docs/local-cognition-portfolio.md](docs/local-cognition-portfolio.md).
 
 ## Compilation is mechanism-neutral
 
@@ -265,9 +263,6 @@ whole-task success nor an AODL admission grant.
   Existing personal stores are not automatically migrated or granted instruction authority.
 - **Mutation receipts**: a pure disposition kernel distinguishes provider retries from
   ambiguous world effects; it does not itself retry tools or authorize execution.
-
-For exact source PRs, integrated/retained status, verification and reproducible test setup,
-see [the current reconciliation audit](docs/pr-reconciliation-2026-10-02.md).
 
 ## Experience → outcome → learning
 
@@ -433,7 +428,7 @@ payloads contain chat content. Keep them outside the repository.
 
 ~~~bash
 pip install -e '.[image]'
-z0int-image-decide run --input benchmarks/image-jev-bench/red-square.json
+z0int-image-decide run --input <request.json>
 ~~~
 
 ### Historical OpenJev compatibility
@@ -472,7 +467,7 @@ They are compatibility/research surfaces, not the product identity.
 | `omp-extensions/` | OMP integration surfaces |
 | `adapters/`, `harness-adapters/` | external harness bridges |
 | `deploy/k8s/` | host-authority / cluster-executor deployment lane |
-| `benchmarks/` | replayable benchmark/data-extraction surfaces |
+| `benchmarks/fixtures/` | benchmark fixtures read by the offline suite and eval scripts |
 | `manifests/` | models, capabilities, routing, and evidence contracts |
 | `zer0.repo.yaml` | z0archy exact-ref architecture metadata |
 

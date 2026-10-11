@@ -569,8 +569,7 @@ The integrated State Packet/DecisionOpportunity, EventLog/OptMem/scoped-memory,
 AODL admission/drift/governed canary, AgentWeb and AO reporting surfaces now
 have a joint offline verification path. This is code integration and structural
 qualification; configured model inference, real canary deployment, causal task
-benefit and mechanism promotion remain separate work. See
-[the complete PR disposition](docs/pr-reconciliation-2026-10-02.md).
+benefit and mechanism promotion remain separate work.
 
 The stopped ThermoContext cohort remains an experimental archive (#108).
 Oversized historical source branches #10 and #21 remain salvage references,

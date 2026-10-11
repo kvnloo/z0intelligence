@@ -6,7 +6,6 @@ on:
       - "src/z0int/backends/image_decision.py"
       - "src/z0int/image_decision_cli.py"
       - "tests/test_image_decision_backend.py"
-      - "benchmarks/image-jev-bench/**"
       - "pyproject.toml"
       - ".github/workflows/image-decision-unit.yml"
   pull_request:
@@ -14,7 +13,6 @@ on:
       - "src/z0int/backends/image_decision.py"
       - "src/z0int/image_decision_cli.py"
       - "tests/test_image_decision_backend.py"
-      - "benchmarks/image-jev-bench/**"
       - "pyproject.toml"
       - ".github/workflows/image-decision-unit.yml"
 

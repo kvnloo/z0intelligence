@@ -113,8 +113,7 @@ Network, CUDA wheels, and HF downloads are **out of scope** for the default smok
 
 ## Current stack and optional activation
 
-Read [the PR reconciliation audit](pr-reconciliation-2026-10-02.md) for current
-master capabilities and reproducible offline verification. State Packets and
+State Packets and
 DecisionOpportunities are available through `z0int context packet` and the
 existing harness shadow adapters. Memory modules do not migrate personal stores.
 
