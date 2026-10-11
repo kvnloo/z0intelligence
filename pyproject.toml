@@ -25,12 +25,6 @@ dependencies = [
 ]
 
 [project.scripts]
-openjev-score = "openjev_phase1.cli:main"
-openjev-data = "openjev_phase1.jevlike.data:main"
-openjev-train = "openjev_phase1.jevlike.train:main"
-openjev-eval = "openjev_phase1.jevlike.eval:main"
-openjev-predict = "openjev_phase1.jevlike.predict:main"
-openjev-bridge-score = "openjev_phase1.jevlike.bridge:main"
 z0int = "z0int.cli:main"
 z0int-compile = "z0int.compile:main"
 z0int-train-next-action = "z0int.train:main"
