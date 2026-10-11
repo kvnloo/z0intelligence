@@ -107,7 +107,7 @@ def _local_route_evidenced(provider, route):
         ok = hashlib.sha256(path.read_bytes()).hexdigest() == route['evidence_sha256']
     except (KeyError, OSError, TypeError):
         return False
-    return (ok and route.get('validated') is True and route.get('price_usd') == 0
+    return (ok and route.get('validated') is True and zero_price(route.get('price_usd'))
             and isinstance(route.get('model'), str) and route.get('provider', provider) == provider)
 
 
@@ -194,6 +194,11 @@ def available(provider, config):
     return credential_available(provider,config) and snapshot(provider)['available'] and (not free_required(policy) or free_route(policy,provider,policy['defaults'].get(provider)) is not None)
 
 
+def zero_price(value):
+    """The one definition of a $0 price: a real number equal to zero (False == 0 is not a price)."""
+    return type(value) in (int, float) and value == 0
+
+
 def free_route(policy, provider, model):
     """Exact measured route allowlist; credits and model-name guesses are not $0."""
     if provider in (policy.get('free_policy_exclusions') or {}):
@@ -201,7 +206,7 @@ def free_route(policy, provider, model):
     return next((entry for entry in policy.get('validated_free_routes', [])
                  if entry.get('provider') == provider and entry.get('model') == model
                  and entry.get('validated') is True
-                 and type(entry.get('price_usd')) in (int, float) and entry.get('price_usd') == 0
+                 and zero_price(entry.get('price_usd'))
                  and entry.get('evidence_sha256')), None)
 
 

@@ -84,3 +84,24 @@ def test_host_local_order_prefers_faster_box_and_never_adds_remote(monkeypatch):
     monkeypatch.setattr(r, 'available', lambda *a, **k: True)
     plan = r.plan_route('local-only: answer', policy, providers)
     assert plan['primary_provider'] == 'groot' and [c['provider'] for c in plan['candidates']] == ['groot', 'local']
+
+
+import pytest
+
+
+@pytest.mark.parametrize('price,kept', [(0, True), (0.0, True), (False, False), (True, False), (-1, False),
+                                        (None, False), ('', False), ('0', False)])
+def test_host_route_is_imported_only_with_a_numeric_zero_price(monkeypatch, tmp_path, price, kept):
+    import hashlib
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
+    (tmp_path / 'config').mkdir()
+    ev = tmp_path / 'ev.json'
+    ev.write_text('{"call": "ok"}')
+    route = {'model': 'm-probe', 'validated': True, 'price_usd': price, 'evidence_path': str(ev),
+             'evidence_sha256': hashlib.sha256(ev.read_bytes()).hexdigest()}
+    (tmp_path / 'config' / 'worker_routing.local.json').write_text(json.dumps({'providers': {
+        'local': {'validated_free_routes': [route]}}}))
+    policy, _ = wr.configuration()
+    imported = [r for r in policy['validated_free_routes'] if r.get('model') == 'm-probe']
+    assert imported == ([{**route, 'provider': 'local'}] if kept else [])
+    assert (wr.free_route(policy, 'local', 'm-probe') is not None) is kept

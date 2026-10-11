@@ -441,13 +441,13 @@ def pools_from_kerdoios(offers: Any) -> list[Pool]:
 
 def pools_from_worker_routes() -> list[Pool]:
     """Offload targets the z0int router can actually use: validated $0 routes (incl. host-local ones)."""
-    from .worker_routing import configuration
+    from .worker_routing import configuration, free_route
 
     policy, providers = configuration()
     pools = []
     for route in policy.get("validated_free_routes") or []:
         provider, model = route.get("provider"), route.get("model")
-        if not provider or route.get("validated") is not True or route.get("price_usd") != 0:
+        if not provider or free_route(policy, provider, model) is None:
             continue
         cohort = (providers.get(provider) or {}).get("cohort")
         kind = "local" if cohort == "local" else "fast" if provider in FAST_PROVIDERS else "free"

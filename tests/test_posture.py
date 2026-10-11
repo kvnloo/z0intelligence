@@ -284,3 +284,27 @@ def test_group_tie_prefers_more_constrained_pool():
     busy = pool(id="codex:weekly", group="codex", remaining=50.0, resets_at=iso(74), burn_rate_per_hour=0.5)
     out = P.evaluate([idle, busy], NOW)
     assert out["groups"]["codex"]["binding_pool"] == "codex:weekly"
+
+
+_FREE_ROUTE = {'provider': 'groq', 'model': 'm-probe', 'validated': True, 'price_usd': 0, 'evidence_sha256': 'a' * 64}
+_FREE_ROUTE_CASES = [({}, True), ({'price_usd': 0.0}, True)] + [(change, False) for change in (
+    {'price_usd': False}, {'price_usd': True}, {'price_usd': -1}, {'price_usd': None}, {'price_usd': ''},
+    {'price_usd': '0'}, {'validated': 1}, {'evidence_sha256': ''}, {'provider': 'vercel'})]
+
+
+def _policy_with_one_route(monkeypatch, tmp_path, change):
+    from z0int import worker_routing as wr
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
+    policy, providers = wr.configuration()
+    entry = {**_FREE_ROUTE, **change}
+    policy['validated_free_routes'] = [entry]
+    monkeypatch.setattr(wr, 'configuration', lambda: (policy, providers))
+    return entry, wr.free_route(policy, entry['provider'], entry['model']) is not None
+
+
+@pytest.mark.parametrize('change,free', _FREE_ROUTE_CASES)
+def test_worker_route_pools_are_exactly_the_routes_free_route_accepts(monkeypatch, tmp_path, change, free):
+    from z0int import posture
+    entry, routed = _policy_with_one_route(monkeypatch, tmp_path, change)
+    assert routed is free
+    assert [p.id for p in posture.pools_from_worker_routes()] == ([f"route:{entry['provider']}"] if free else [])

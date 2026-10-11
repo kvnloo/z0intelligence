@@ -172,3 +172,42 @@ def test_agentweb_bridge_endpoint_is_explicit_and_separate(monkeypatch):
             assert result["executed"] is False
     finally:
         server.shutdown();server.server_close();thread.join()
+
+
+import pytest
+
+_FREE_ROUTE = {'provider': 'groq', 'model': 'm-probe', 'validated': True, 'price_usd': 0, 'evidence_sha256': 'a' * 64}
+_FREE_ROUTE_CASES = [({}, True), ({'price_usd': 0.0}, True)] + [(change, False) for change in (
+    {'price_usd': False}, {'price_usd': True}, {'price_usd': -1}, {'price_usd': None}, {'price_usd': ''},
+    {'price_usd': '0'}, {'validated': 1}, {'evidence_sha256': ''}, {'provider': 'vercel'})]
+
+
+def _policy_with_one_route(monkeypatch, tmp_path, change):
+    from z0int import worker_routing as wr
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
+    policy, providers = wr.configuration()
+    entry = {**_FREE_ROUTE, **change}
+    policy['validated_free_routes'] = [entry]
+    monkeypatch.setattr(wr, 'configuration', lambda: (policy, providers))
+    return entry, wr.free_route(policy, entry['provider'], entry['model']) is not None
+
+
+@pytest.mark.parametrize('change,free', _FREE_ROUTE_CASES)
+def test_providers_lists_exactly_the_models_free_route_accepts(monkeypatch, tmp_path, change, free):
+    import z0int.intelligence_service as svc
+    entry, routed = _policy_with_one_route(monkeypatch, tmp_path, change)
+    monkeypatch.setattr(svc, 'aodl_admission_state', lambda: {})
+    monkeypatch.setattr(svc, 'governed_worker_state', lambda: {})
+
+    class Request:
+        path = '/v1/providers'
+
+        def reply(self, status, value):
+            self.sent = (status, value)
+
+    request = Request()
+    Handler.do_GET(request)  # the real GET handler, no socket and no server
+    status, body = request.sent
+    assert status == 200 and routed is free
+    assert body['validated_free_models'][entry['provider']] == (['m-probe'] if free else [])
+    assert sum(len(models) for models in body['validated_free_models'].values()) == (1 if free else 0)
