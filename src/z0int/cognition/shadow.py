@@ -570,6 +570,133 @@ def run_shadow(
     return result
 
 
+# --- scorecard (read-only) ----------------------------------------------
+
+_OLD_STATE_PREFIX = "OMP tool_call: "
+
+
+def _observed_tool(receipt: Mapping[str, Any]) -> str | None:
+    """The tool the harness actually called, or ``None`` if the row does not say."""
+    name = receipt.get("tool_name")
+    if isinstance(name, str) and name:
+        return name
+    # Rows written before ``tool_name`` existed carry it on the first state line.
+    state = receipt.get("state")
+    if isinstance(state, str) and state.startswith(_OLD_STATE_PREFIX):
+        return state[len(_OLD_STATE_PREFIX) :].split("\n", 1)[0].strip() or None
+    return None
+
+
+def summarize_shadow_receipts(
+    path: str | os.PathLike[str], since_ts: float | None = None
+) -> dict[str, Any]:
+    """Count what the shadow receipts at ``path`` hold. Reads only; returns counts only.
+
+    A model row is ``unreachable`` or ``timed_out`` when no backend answered, and
+    otherwise ``answered``: one of ``selections``, ``invalid`` or ``abstained``.
+    """
+    totals = {
+        "receipts": 0,
+        "unreadable_lines": 0,
+        "observed_tool_known": 0,
+        "observed_in_legal": 0,
+        "selections": 0,
+        "agreements": 0,
+    }
+    models: dict[str, dict[str, int]] = {}
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            try:
+                receipt = json.loads(line)
+            except ValueError:
+                receipt = None
+            if not isinstance(receipt, Mapping):
+                totals["unreadable_lines"] += 1
+                continue
+            ts = receipt.get("ts")
+            if since_ts is not None and not (
+                isinstance(ts, (int, float)) and ts >= since_ts
+            ):
+                continue
+            totals["receipts"] += 1
+            observed = _observed_tool(receipt)
+            legal = receipt.get("legal_ids")
+            if observed is not None:
+                totals["observed_tool_known"] += 1
+                if isinstance(legal, list) and observed in legal:
+                    totals["observed_in_legal"] += 1
+            rows = receipt.get("shadow")
+            for row in rows if isinstance(rows, list) else ():
+                if not isinstance(row, Mapping):
+                    continue
+                counts = models.setdefault(
+                    str(row.get("label") or row.get("model") or "?"),
+                    dict.fromkeys(
+                        (
+                            "rows",
+                            "answered",
+                            "unreachable",
+                            "timed_out",
+                            "abstained",
+                            "invalid",
+                            "selections",
+                            "agreements",
+                        ),
+                        0,
+                    ),
+                )
+                counts["rows"] += 1
+                # A backend that could not reach its server still returns a row
+                # of its own, with the failure in ``parse_error``.
+                failure = row.get("error") or row.get("parse_error")
+                failure = failure if isinstance(failure, str) else ""
+                if not row.get("backend") or row.get("error") or failure.startswith(
+                    "transport_error"
+                ):
+                    timed_out = failure == "shadow_timeout" or "timed out" in failure
+                    counts["timed_out" if timed_out else "unreachable"] += 1
+                    continue
+                counts["answered"] += 1
+                selected = row.get("selected_action")
+                if row.get("invalid_call") is True:
+                    counts["invalid"] += 1
+                elif isinstance(selected, str) and selected:
+                    counts["selections"] += 1
+                    agrees = row.get("agrees_with_observed")
+                    if not isinstance(agrees, bool):
+                        agrees = observed is not None and selected == observed
+                    counts["agreements"] += int(agrees)
+                else:
+                    counts["abstained"] += 1
+    totals["selections"] = sum(m["selections"] for m in models.values())
+    totals["agreements"] = sum(m["agreements"] for m in models.values())
+    known = totals["observed_tool_known"]
+    return {
+        **totals,
+        "observed_in_legal_share": round(totals["observed_in_legal"] / known, 4)
+        if known
+        else None,
+        "models": dict(sorted(models.items())),
+    }
+
+
+def _main(argv: Sequence[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="python -m z0int.cognition.shadow",
+        description="Print counts over the shadow receipts. Reads only.",
+    )
+    parser.add_argument("path", nargs="?", default=None, help="default: the live receipt file")
+    parser.add_argument("--since", type=float, default=None, help="only receipts with ts >= this")
+    args = parser.parse_args(argv)
+    path = args.path or shadow_receipt_path()
+    print(json.dumps(summarize_shadow_receipts(path, args.since), indent=2))
+    return 0
+
+
 __all__ = [
     "DEFAULT_SERVER_TIMEOUT_MS",
     "RECEIPT_NAME",
@@ -581,4 +708,9 @@ __all__ = [
     "build_shadow_plan",
     "run_shadow",
     "shadow_receipt_path",
+    "summarize_shadow_receipts",
 ]
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())
