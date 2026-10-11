@@ -2,9 +2,9 @@ name: Core unit
 
 on:
   push:
-    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
+    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "manifests/**", "harness-adapters/**", "contracts/**", "results/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
   pull_request:
-    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
+    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "manifests/**", "harness-adapters/**", "contracts/**", "results/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
   workflow_dispatch:
 
 permissions:
@@ -58,6 +58,16 @@ jobs:
           module.test_provider_usage_preserves_explicit_measurement_state()
           module.test_provider_usage_does_not_invent_measurement_state()
           PY
+
+  omp-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+      - name: Local-cognition extension tests
+        run: cd omp-extensions/local-cognition && bun test
 
   offline-suite:
     runs-on: ubuntu-latest
