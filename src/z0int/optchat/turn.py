@@ -1,181 +1,51 @@
-"""Fresh turn request. No session history. The view is rendered before the new text is logged.
+"""A turn: one fresh call, [tools] [system] [view] [message].
+
+    wait until every message before m is summarized
+    render the view, then log m
+    call in a fresh session; log each reply, tool call and result as it happens
+
+Nothing carries over between turns: the view is the only continuity.
 """
+
 from __future__ import annotations
 
-import threading
-import time
+import sys
+from pathlib import Path
 
-from .log import ChatLog
-
-MARKS = (50_000, 80_000, 100_000)
-
-MASTER = """You are OptChat, an AI agent that works for one user in a single chat that
-never ends. Do the user's tasks yourself, with your tools, following
-the user's instructions at the end of this prompt: they say who the
-user is, how their files are organized and how they want work done.
-Use subagents only when the user asks for them.
-
-You keep no memory between turns. Each turn starts with the view below,
-followed by the user's new message. Summaries keep little of tool
-output, so say in your reply what you learned that will matter later.
-Messages the user sends while you work reach you between tool calls.
-
-Subagents and computer tasks run in the background. Each one's report
-reaches you as a message starting "[id] ": between your tool calls
-while you work, or as a new turn once yours has ended. So never wait
-for one (no sleep, no polling): go on, or end your turn and tell the
-user what is running."""
-
-VIEW_DOC = """The view: the whole chat between OptChat and the user, oldest first, inside
-<chat> tags, as one-line summaries. Each line is
-
-  id+n|text   the n messages from id on, summarized (newlines shown as spaces)
-
-A summary tags each item with its kind: user (the user's words), talk
-(OptChat's replies), tool (OptChat's tool calls), echo (their results), note
-(memories from before this chat), or work (the report of a subagent or
-a computer task, which the log holds as a user message starting
-"[id] "). A short message is its own line, word for word. Recent lines
-cover one message each; the older the messages, the more a line covers.
-A message not summarized yet shows as "(not summarized yet: zoom it)".
-No message appears in full, not even the last ones.
-
-Navigating: zoom(id, n) opens line id+n into the two lines of n/2
-messages it was made from; zoom(id, 1) gives message id in full. Zoom
-whenever a summary only mentions something you need, such as what your
-last reply said, a decision, a past attempt or where a file is, before
-you act, guess or ask. date(id) gives the date and time of message id."""
+from .claude_cli import SERVER
 
 
-def ready(chat: ChatLog) -> bool:
-    with chat.condition:
-        return chat.missing() == 0
+class NotReady(RuntimeError):
+    """Some message before this one still has no line."""
 
 
-def wait_ready(
-    chat: ChatLog,
-    timeout: float | None = None,
-    cancel: threading.Event | None = None,
-) -> dict[str, object]:
-    """Wait on fit/append/abort notifications, without polling or model calls."""
-    deadline = None if timeout is None else time.monotonic() + max(0.0, timeout)
-    with chat.condition:
-        while True:
-            missing = chat.missing()
-            cancelled = cancel is not None and cancel.is_set()
-            if cancelled or missing == 0:
-                return {
-                    "ready": not cancelled and missing == 0,
-                    "cancelled": cancelled,
-                    "placeholders": missing,
-                    "messages": len(chat.messages),
-                }
-            remaining = None if deadline is None else deadline - time.monotonic()
-            if remaining is not None and remaining <= 0:
-                return {"ready": False, "cancelled": False, "placeholders": missing, "messages": len(chat.messages)}
-            chat.condition.wait(remaining)
+def tools_config(root: Path, *, callable_: bool = True) -> dict:
+    """zoom and date over this chat root. A compaction gets the same tools, never called."""
+    src = str(Path(__file__).resolve().parents[2])
+    return {
+        "mcp": {SERVER: {"command": sys.executable,
+                         "args": ["-m", "z0int.optchat", "mcp", "--root", str(Path(root).resolve())],
+                         "env": {"PYTHONPATH": src}}},
+        "allowed": [f"mcp__{SERVER}__zoom", f"mcp__{SERVER}__date"] if callable_ else [],
+    }
 
 
-def system_prompt(agents: str) -> str:
-    parts = [MASTER, VIEW_DOC]
-    extra = agents.strip()
-    if extra:
-        parts.append(extra)
-    return "\n\n".join(parts)
+def run_turn(chat, backend, model: str, text: str, *, compactor=None, tools: dict | None = None,
+             show=None) -> dict:
+    chat.ready.retry()                      # m is a new message: failed nodes are tried again
+    compaction = compactor.run("leaves") if compactor else None
+    if chat.unbuilt_leaves():
+        raise NotReady(f"{chat.unbuilt_leaves()} messages before this one are not summarized")
+    view = chat.render()                    # before logging m: the view never holds m
+    first = chat.append("user", text)[0].i
 
+    def on_block(kind: str, body: str) -> None:
+        chat.append(kind, body)
+        if show:
+            show(kind, body)
 
-def cache_pieces(view: str) -> list[str]:
-    """Split the view at the last line end before each mark. Marks past the end are skipped."""
-    cuts: list[int] = []
-    for mark in MARKS:
-        if mark >= len(view):
-            continue
-        newline = view.rfind("\n", 0, mark)
-        if newline < 0:
-            continue
-        end = newline + 1
-        if cuts and end <= cuts[-1]:
-            continue
-        cuts.append(end)
-    pieces: list[str] = []
-    start = 0
-    for end in cuts:
-        pieces.append(view[start:end])
-        start = end
-    pieces.append(view[start:])
-    return pieces
-
-
-def begin(chat: ChatLog, texts: list[str], agents: str = "") -> dict[str, object]:
-    """Render, then log. Refuse when any view node is still unbuilt."""
-    with chat.condition:
-        if not ready(chat):
-            return {"ready": False}
-        view = chat.render()
-        for text in texts:
-            chat.append("user", text)
-        return {
-            "ready": True,
-            "view": view,
-            "system": system_prompt(agents),
-            "blocks": [view, "\n\n".join(texts)],
-            "pieces": cache_pieces(view),
-        }
-
-
-
-class Queue:
-    """One turn queue. A running call receives new text at the next tool boundary."""
-
-    def __init__(self) -> None:
-        self.pending: list[str] = []
-        self.running = False
-        self._lock = threading.Lock()
-
-    def submit(self, text: str) -> str:
-        with self._lock:
-            self.pending.append(text)
-            return "inject" if self.running else "turn"
-
-    def take(self) -> list[str]:
-        with self._lock:
-            texts = self.pending
-            self.pending = []
-            self.running = bool(texts)
-            return texts
-
-    def boundary(self) -> list[str]:
-        with self._lock:
-            texts = self.pending
-            self.pending = []
-            return texts
-
-    def finish(self) -> list[str]:
-        with self._lock:
-            self.running = False
-            return list(self.pending)
-
-    def cancel(self) -> list[str]:
-        with self._lock:
-            texts = self.pending
-            self.pending = []
-            self.running = False
-            return texts
-
-
-def leave_unanswered(chat: ChatLog, texts: list[str]) -> int:
-    with chat.condition:
-        for text in texts:
-            chat.append("user", text)
-        return len(texts)
-
-
-def subagent_text(ident: str, report: str) -> str:
-    return f"[{ident}] {report}"
-
-
-def record(chat: ChatLog, kind: str, text: str) -> dict[str, object]:
-    if kind in {"thought", "thinking"}:
-        return {"logged": False}
-    msg = chat.append(kind, text)
-    return {"logged": True, "i": msg.i, "kind": msg.kind, "text": msg.text}
+    with backend.open(model, chat.system(), view, tools, label=f"turn {first}") as session:
+        reply = session.send(text, on_block=on_block)
+    return {"message": first, "view_bytes": len(view.encode("utf-8")), "reply": reply.text,
+            "usage": reply.usage, "requests": reply.requests, "wall_s": reply.wall_s,
+            "model": reply.model, "logged_to": chat.total - 1, "compaction": compaction}

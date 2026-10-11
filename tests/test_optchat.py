@@ -1,736 +1,665 @@
-"""Creator-spec behavior with isolated logs, controlled model calls and native RPC."""
+"""UniiChat core against the gist (tests/fixtures/uniichat_gist.md). No model is called."""
+
 from __future__ import annotations
 
-import io
+import hashlib
 import json
-import os
-import queue
-import random
 import subprocess
 import sys
 import threading
-import unittest
-import urllib.error
-from concurrent.futures import ThreadPoolExecutor
+import time
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from unittest.mock import patch
-
-from z0int.optchat.__main__ import Resident
-from z0int.optchat.compact import (
-    CompactorMessages, Scheduler, SonnetBridge, commit_line, compactor_messages,
-    cut_utf8, due, enforce, ollama_complete, pump,
-)
-from z0int.optchat.log import NODE, PLACEHOLDER, ChatLog, Part, cap_echo, utf8_len
-from z0int.optchat.turn import Queue, begin, cache_pieces, record, wait_ready
-
-
-def step(messages: CompactorMessages) -> str:
-    content = messages[1]["content"]
-    assert isinstance(content, list)
-    return str(content[1]["text"])
-
-
-def wait_built(chat: ChatLog, level: int, index: int) -> bool:
-    with chat.condition:
-        return chat.condition.wait_for(lambda: chat.built(level, index), timeout=3)
-
-
-class LogTests(unittest.TestCase):
-    def test_short_source_is_verbatim_but_view_and_zoom_children_are_one_line(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            text = "x  y\n\t spaced"
-            chat.append("user", text)
-            chat.append("talk", "beta\n  continuation")
-            calls: list[CompactorMessages] = []
-            pump(chat, lambda messages: calls.append(messages) or "wrong")
-            self.assertEqual(calls, [])
-            self.assertEqual(chat.nodes[(0, 0)], "user: " + text)
-            self.assertEqual(chat.nodes[(1, 0)], "user: " + text + "\ntalk: beta\n  continuation")
-            chat.view = [Part(1, 0)]
-            self.assertEqual(chat.render(), "<chat>\n0+2|user: x  y \t spaced talk: beta   continuation\n</chat>")
-            self.assertEqual(chat.zoom(0, 2), "0+1|user: x  y \t spaced\n1+1|talk: beta   continuation")
-            self.assertEqual(chat.zoom(0, 1), "0+0|user: " + text)
-            loaded = ChatLog(chat.root)
-            loaded.load()
-            self.assertEqual(loaded.nodes[(0, 0)], "user: " + text)
-
-    def test_long_message_is_never_cut_into_the_view(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("echo", "x" * (NODE + 50))
-            self.assertIn(PLACEHOLDER, chat.render())
-            self.assertNotIn("x" * 40, chat.render())
-            self.assertEqual(chat.zoom(0, 1), "0+0|echo: " + "x" * (NODE + 50))
-            self.assertEqual(chat.zoom(0, 3), "No line 0+3.")
-            self.assertEqual(chat.zoom(-1, 1), "No line -1+1.")
-
-    def test_torn_row_preserves_ids_dates_tree_and_next_append(self) -> None:
-        from z0int.optchat.browse import render_html
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            chat = ChatLog(root)
-            for text in ("one", "two", "three"):
-                chat.append("user", text, date="time-" + text)
-            path = next((root / "main").glob("*.jsonl"))
-            rows = path.read_bytes().splitlines()
-            path.write_bytes(rows[0] + b"\n{broken\n" + rows[2])
-            loaded = ChatLog(root)
-            loaded.load()
-            self.assertEqual([msg.i for msg in loaded.messages], [0, 2])
-            self.assertEqual(loaded.torn, 1)
-            self.assertTrue(path.read_bytes().endswith(b"\n"))
-            self.assertEqual(loaded.zoom(2, 1), "2+0|user: three")
-            self.assertEqual(loaded.zoom(1, 1), "No line 1+1.")
-            self.assertEqual(loaded.date_of(2), "time-three")
-            self.assertEqual(loaded.date_of(1), "No message 1.")
-            self.assertEqual(loaded.nodes[(0, 2)], "user: three")
-            self.assertIn("2+1 user time-three", render_html(loaded))
-            self.assertEqual(loaded.append("user", "four").i, 3)
-            reloaded = ChatLog(root)
-            reloaded.load()
-            self.assertEqual([msg.i for msg in reloaded.messages], [0, 2, 3])
-            self.assertEqual(reloaded.zoom(3, 1), "3+0|user: four")
-            self.assertIn((1, 1), due(reloaded))
-            self.assertEqual(compactor_messages(reloaded, 1, 1)[1]["content"][0]["text"],
-                             "<chat>\nuser: one\nuser: three\nuser: four\n</chat>")
-
-    def test_missing_last_source_cannot_reuse_a_persisted_tree_id(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("user", "one")
-            chat.append("user", "two")
-            path = next((chat.root / "main").glob("*.jsonl"))
-            path.write_bytes(path.read_bytes().splitlines()[0] + b"\n{torn")
-            loaded = ChatLog(chat.root)
-            loaded.load()
-            self.assertEqual(loaded.append("user", "new").i, 2)
-            self.assertEqual(loaded.zoom(1, 1), "No line 1+1.")
-
-    def test_fsync_precedes_message_and_node_visibility(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            observations: list[tuple[int, bool]] = []
-            real_fsync = os.fsync
-
-            def observe(fd: int) -> None:
-                observations.append((len(chat.messages), chat.built(0, 0)))
-                real_fsync(fd)
-
-            with patch("z0int.optchat.log.os.fsync", side_effect=observe):
-                chat.append("user", "kept")
-            self.assertEqual(observations, [(0, False), (1, False)])
-            self.assertTrue(chat.built(0, 0))
-            loaded = ChatLog(chat.root)
-            loaded.load()
-            self.assertEqual(loaded.zoom(0, 1), "0+0|user: kept")
-            self.assertEqual(loaded.nodes[(0, 0)], "user: kept")
-
-    def test_failed_node_fsync_does_not_expose_a_built_node(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("user", "long " + "x" * 700)
-            with patch("z0int.optchat.log.os.fsync", side_effect=OSError("disk failed")):
-                with self.assertRaisesRegex(OSError, "disk failed"):
-                    commit_line(chat, 0, 0, "user: compacted")
-            self.assertFalse(chat.built(0, 0))
-            self.assertFalse(begin(chat, ["next"])["ready"])
-
-    def test_load_folds_using_each_prefix_age_not_the_final_age(self) -> None:
-        def fit(parts: list[Part], nodes: dict[tuple[int, int], str], total: int, budget: int) -> None:
-            while sum(utf8_len(nodes[(part.level, part.index)]) for part in parts) > budget:
-                eligible = [
-                    ((total - left.start) / (1 << (left.level + 2)), at)
-                    for at, (left, right) in enumerate(zip(parts, parts[1:]))
-                    if left.level == right.level and left.index % 2 == 0
-                    and right.index == left.index + 1 and (left.level + 1, left.index // 2) in nodes
-                ]
-                if not eligible:
-                    return
-                _, at = max(eligible, key=lambda pair: pair[0])
-                left = parts[at]
-                parts[at:at + 2] = [Part(left.level + 1, left.index // 2)]
-
-        with TemporaryDirectory() as tmp, patch("z0int.optchat.log.VIEW", 1800):
-            chat = ChatLog(Path(tmp))
-            rng = random.Random(731)
-            for ident in range(80):
-                chat.append("user", f"u{ident} " + "x" * rng.randint(200, 490))
-            for level in range(1, 7):
-                for index in range(80 // (1 << level)):
-                    chat._store_node(level, index, f"parent{level},{index} " + "p" * rng.randint(30, 490))
-            expected: list[Part] = []
-            for total in range(1, 81):
-                expected.append(Part(0, total - 1))
-                fit(expected, chat.nodes, total, 1800)
-            loaded = ChatLog(chat.root)
-            loaded.load()
-            self.assertEqual(loaded.view, expected)
-
-    def test_browse_preserves_ranges_dates_sizes_and_source_text(self) -> None:
-        from z0int.optchat.browse import render_html
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("user", "visible <content>", date="time-one")
-            page = render_html(chat)
-            self.assertIn("<h1>view</h1>", page)
-            self.assertIn("<h1>log</h1>", page)
-            self.assertIn("level 0", page)
-            self.assertIn("0+1 time-one", page)
-            self.assertIn("bytes", page)
-            self.assertIn("visible &lt;content&gt;", page)
-
-
-class CompactorTests(unittest.TestCase):
-    def test_complete_source_and_summarized_context_are_never_truncated(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            sources = [f"CONTEXT_FACT_{ident} " + "x" * 420 for ident in range(8)]
-            for text in sources:
-                chat.append("user", text)
-            source = "HEAD\n" + "x" * 3000 + "\nMIDDLE_DECISION: blue not red\n" + "y" * 3000 + "\nTAIL"
-            chat.append("user", source)
-            messages = compactor_messages(chat, 0, 8)
-            content = messages[1]["content"]
-            self.assertEqual(content[0]["text"], "<chat>\n" + "\n".join("user: " + text for text in sources) + "\n</chat>")
-            self.assertTrue(content[1]["text"].endswith("user: " + source))
-            self.assertNotIn("+1|", content[0]["text"])
-            self.assertNotIn("... cut ...", content[1]["text"])
-
-    def test_placeholder_literal_is_built_context_not_a_missing_node(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("user", PLACEHOLDER)
-            self.assertTrue(wait_ready(chat, 0)["ready"])
-            opened = begin(chat, ["next"])
-            self.assertTrue(opened["ready"])
-            chat.append("user", "x" * 700)
-            self.assertIn("user: " + PLACEHOLDER, compactor_messages(chat, 0, 2)[1]["content"][0]["text"])
-
-    def test_http400_preserves_full_input_and_surfaces_provider_error(self) -> None:
-        messages: CompactorMessages = [
-            {"role": "system", "content": "system"},
-            {"role": "user", "content": [{"type": "text", "text": "full\n" + "z" * 7000}]},
-        ]
-        error = urllib.error.HTTPError("http://local", 400, "bad context", {}, io.BytesIO(b"context size too small"))
-        with patch("z0int.optchat.compact.HOST", "http://local"), patch(
-            "z0int.optchat.compact.urllib.request.urlopen", side_effect=error,
-        ) as send:
-            with self.assertRaisesRegex(RuntimeError, "HTTP 400: context size too small"):
-                ollama_complete(messages)
-        self.assertEqual(send.call_count, 1)
-        self.assertEqual(json.loads(send.call_args.args[0].data)["messages"], messages)
-
-    def test_size_attempts_keep_same_conversation_and_shortest_of_five(self) -> None:
-        replies = ["a" * 700, "b" * 600, "c" * 650, "d" * 620, "e" * 630]
-        calls: list[CompactorMessages] = []
-
-        def complete(messages: CompactorMessages) -> str:
-            calls.append(list(messages))
-            return replies[len(calls) - 1]
-
-        initial: CompactorMessages = [{"role": "system", "content": "system"}, {"role": "user", "content": "source"}]
-        self.assertEqual(enforce(initial, complete), replies[1])
-        self.assertEqual([len(messages) for messages in calls], [2, 4, 6, 8, 10])
-        for attempt in range(1, 5):
-            self.assertEqual(calls[attempt][:2], initial)
-            self.assertEqual(calls[attempt][-2]["content"], replies[attempt - 1])
-            self.assertIn("| ← LIMIT", calls[attempt][-1]["content"])
-        self.assertEqual(len(initial), 2)
-
-    def test_empty_response_fails_even_after_an_oversized_response(self) -> None:
-        for replies in (["   \n"], ["x" * 700, "\t\n  "]):
-            with self.subTest(replies=len(replies)):
-                answers = iter(replies)
-                with self.assertRaisesRegex(RuntimeError, "returned empty"):
-                    enforce([], lambda _: next(answers))
-
-    def test_response_only_trims_edges_and_utf8_feedback_never_splits(self) -> None:
-        expected = "user: keep    two spaces; echo: line\ncontinuation"
-        self.assertEqual(enforce([], lambda _: " \n" + expected + "\t "), expected)
-        self.assertEqual(cut_utf8("é", 1), "")
-        self.assertNotIn("\ufffd", cut_utf8("é" * 10, 3))
-
-    def test_long_leaf_frontier_stops_later_leaves_and_unready_merges(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("user", "A" * 700)
-            chat.append("user", "B" * 700)
-            self.assertEqual(due(chat), [(0, 0)])
-            pump(chat, lambda _: "user: summarized A", limit=1)
-            self.assertEqual(due(chat), [(0, 1)])
-
-
-class TurnTests(unittest.TestCase):
-    def test_fresh_begin_renders_before_logging_and_drops_reasoning(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            record(chat, "thought", "hidden")
-            record(chat, "thinking", "hidden too")
-            self.assertEqual(chat.messages, [])
-            chat.append("user", "prior")
-            opened = begin(chat, ["new", "second"], "AGENTS: instructions")
-            self.assertTrue(opened["ready"])
-            self.assertEqual(opened["blocks"], ["<chat>\n0+1|user: prior\n</chat>", "new\n\nsecond"])
-            self.assertEqual([msg.text for msg in chat.messages], ["prior", "new", "second"])
-            self.assertTrue(opened["system"].endswith("AGENTS: instructions"))
-
-    def test_unready_begin_does_not_log_and_empty_view_needs_no_compactor(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            self.assertTrue(wait_ready(chat)["ready"])
-            chat.append("user", "long " + "x" * 700)
-            self.assertFalse(begin(chat, ["must not log"])["ready"])
-            self.assertEqual(len(chat.messages), 1)
-            self.assertFalse(wait_ready(chat, 0)["ready"])
-
-    def test_record_returns_exact_canonical_capped_echo_for_the_model(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            source = "H" * 20000 + "M" * 20000 + "T" * 20000
-            saved = record(chat, "echo", source)
-            self.assertTrue(saved["logged"])
-            self.assertEqual(saved["text"], chat.messages[0].text)
-            self.assertLessEqual(len(saved["text"]), 30000)
-            self.assertTrue(saved["text"].startswith("H" * 100))
-            self.assertTrue(saved["text"].endswith("T" * 100))
-            for source in ("x" * 30000, "😀" * 30001):
-                with self.subTest(characters=len(source)):
-                    capped = cap_echo(source)
-                    self.assertLessEqual(len(capped), 30000)
-                    if len(source) <= 30000:
-                        self.assertEqual(capped, source)
-                    else:
-                        self.assertTrue(capped.startswith("😀") and capped.endswith("😀"))
-
-    def test_cache_pieces_preserve_bytes_at_stable_line_end_marks(self) -> None:
-        from z0int.optchat.turn import MARKS
-        view = "<chat>\n" + ("0+1|user: " + "word " * 20 + "\n") * 4000 + "</chat>"
-        pieces = cache_pieces(view)
-        self.assertEqual("".join(pieces), view)
-        cursor = 0
-        for piece, mark in zip(pieces, MARKS):
-            cursor += len(piece)
-            self.assertLessEqual(cursor, mark)
-            self.assertTrue(piece.endswith("\n"))
-
-    def test_queue_boundaries_preserve_each_submitted_occurrence(self) -> None:
-        pending = Queue()
-        self.assertEqual(pending.submit("first"), "turn")
-        self.assertEqual(pending.take(), ["first"])
-        self.assertEqual(pending.submit("during"), "inject")
-        self.assertEqual(pending.boundary(), ["during"])
-        pending.submit("same")
-        pending.submit("same")
-        self.assertEqual(pending.finish(), ["same", "same"])
-        self.assertEqual(pending.cancel(), ["same", "same"])
-        self.assertEqual(pending.cancel(), [])
-
-
-class RetainedBehaviorTests(unittest.TestCase):
-    def test_switch_defaults_off_without_mutating_the_callers_home(self) -> None:
-        from z0int.optchat.switch import enabled, set_enabled
-        with TemporaryDirectory() as tmp, patch.dict(os.environ, {"Z0INT_HOME": tmp}):
-            self.assertFalse(enabled())
-            set_enabled(True)
-            self.assertTrue(enabled())
-            set_enabled(False)
-            self.assertFalse(enabled())
-
-    def test_subagent_report_is_logged_as_the_users_named_work(self) -> None:
-        from z0int.optchat.turn import subagent_text
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            msg = chat.append("user", subagent_text("7", "done"))
-            self.assertEqual(msg.text, "[7] done")
-            self.assertEqual(chat.zoom(msg.i, 1), "0+0|user: [7] done")
-
-    def test_persist_commits_the_isolated_chat_directory(self) -> None:
-        from z0int.optchat.persist import persist
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            chat = ChatLog(root)
-            chat.append("note", "kept")
-            self.assertTrue(persist(root))
-            self.assertTrue((root / ".git").is_dir())
-
-
-class SchedulerTests(unittest.TestCase):
-    def test_idle_append_and_enable_wake_immediately_and_short_joins_are_free(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            started = threading.Event()
-            calls: list[str] = []
-
-            def complete(messages: CompactorMessages) -> str:
-                calls.append(step(messages))
-                started.set()
-                return "user: compacted"
-
-            scheduler = Scheduler(chat, complete, on=False)
-            scheduler.start()
-            try:
-                chat.append("user", "alpha")
-                chat.append("talk", "beta")
-                chat.append("user", "long " + "x" * 700)
-                scheduler.set_enabled(True)
-                self.assertTrue(started.wait(1))
-                self.assertTrue(wait_built(chat, 1, 0))
-                self.assertEqual(len(calls), 1)
-                self.assertIn("Compress this message", calls[0])
-                self.assertTrue(wait_ready(chat, 1)["ready"])
-                started.clear()
-                chat.append("user", "another " + "y" * 700)
-                self.assertTrue(started.wait(1))
-                self.assertTrue(wait_ready(chat, 1)["ready"])
-            finally:
-                scheduler.stop()
-            self.assertFalse(scheduler.thread.is_alive())
-
-    def test_eight_parallel_merges_overlap_without_duplicate_or_ninth_dispatch(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            for ident in range(20):
-                chat.append("user", f"M{ident} " + "x" * 300)
-            gate = threading.Event()
-            changed = threading.Condition()
-            starts: list[str] = []
-            active = 0
-            maximum = 0
-            def complete(messages: CompactorMessages) -> str:
-                nonlocal active, maximum
-                source = step(messages)
-                with changed:
-                    starts.append(source)
-                    active += 1
-                    maximum = max(maximum, active)
-                    changed.notify_all()
-                gate.wait(5)
-                with changed:
-                    active -= 1
-                return "user: merged"
-
-            scheduler = Scheduler(chat, complete)
-            scheduler.start()
-            try:
-                with changed:
-                    self.assertTrue(changed.wait_for(lambda: len(starts) >= 8, timeout=2))
-                    self.assertEqual(len(starts), 8)
-                    self.assertEqual(maximum, 8)
-                # Main turn work can acquire the chat lock during all model I/O.
-                self.assertTrue(begin(chat, ["while models work"])["ready"])
-                gate.set()
-                with chat.condition:
-                    self.assertTrue(chat.condition.wait_for(
-                        lambda: all(chat.built(1, index) for index in range(10)),
-                        timeout=3,
-                    ))
-                self.assertEqual(len(starts), 10)
-                self.assertEqual(len(set(starts)), 10)
-                self.assertLessEqual(maximum, 8)
-            finally:
-                gate.set()
-                scheduler.stop()
-
-    def test_failed_leaf_retry_does_not_block_unrelated_merge_or_later_retry(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("user", "A " + "x" * 300)
-            chat.append("user", "B " + "x" * 300)
-            chat.append("user", "long " + "y" * 700)
-            leaf_failed = threading.Event()
-            merge_started = threading.Event()
-            attempts = 0
-
-            def complete(messages: CompactorMessages) -> str:
-                nonlocal attempts
-                if "Compress this message" in step(messages):
-                    attempts += 1
-                    if attempts <= 2:
-                        leaf_failed.set()
-                        raise RuntimeError("provider failed visibly")
-                    return "user: compacted"
-                merge_started.set()
-                return "user: merged"
-
-            # Only retry duration is accelerated; no idle loop or model scheduling is mocked.
-            with patch("z0int.optchat.compact.RETRY_S", 0.15):
-                scheduler = Scheduler(chat, complete)
-                scheduler.start()
-                try:
-                    self.assertTrue(leaf_failed.wait(1))
-                    self.assertTrue(merge_started.wait(1))
-                    self.assertTrue(wait_ready(chat, 2)["ready"])
-                    self.assertEqual(attempts, 3)
-                    self.assertEqual(len(scheduler.reports), 1)
-                    self.assertIn("provider failed visibly", scheduler.reports[0])
-                    self.assertEqual(scheduler.errors, {})
-                finally:
-                    scheduler.stop()
-
-    def test_only_first_long_leaf_runs_until_its_context_is_built(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("user", "A" * 700)
-            chat.append("user", "B" * 700)
-            first = threading.Event()
-            second = threading.Event()
-            release = threading.Event()
-
-            def complete(messages: CompactorMessages) -> str:
-                source = step(messages)
-                if source.endswith("A" * 700):
-                    first.set()
-                    release.wait(5)
-                    return "user: summarized A"
-                self.assertTrue(chat.built(0, 0))
-                self.assertIn("user: summarized A", messages[1]["content"][0]["text"])
-                second.set()
-                return "user: summarized B"
-
-            scheduler = Scheduler(chat, complete)
-            scheduler.start()
-            try:
-                self.assertTrue(first.wait(1))
-                self.assertFalse(second.is_set())
-                release.set()
-                self.assertTrue(second.wait(1))
-                self.assertTrue(wait_ready(chat, 1)["ready"])
-            finally:
-                release.set()
-                scheduler.stop()
-
-
-class ResidentTests(unittest.TestCase):
-    def test_first_failure_is_visible_without_resolving_an_indefinite_wait(self) -> None:
-        with TemporaryDirectory() as tmp, patch("z0int.optchat.compact.RETRY_S", 0.05):
-            chat = ChatLog(Path(tmp))
-            chat.append("user", "long " + "x" * 700)
-            emitted: queue.Queue[dict[str, object]] = queue.Queue()
-            retried = threading.Event()
-            attempts = 0
-            error = "No native Anthropic credentials. Run omp login anthropic."
-
-            def complete(_: CompactorMessages) -> str:
-                nonlocal attempts
-                attempts += 1
-                if attempts >= 2:
-                    retried.set()
-                raise RuntimeError(error)
-
-            scheduler = Scheduler(chat, complete)
-            resident = Resident(chat, emitted.put, scheduler)
-            resident.dispatch({"id": "wait", "op": "settle", "wait_id": "w"})
-            scheduler.start()
-            try:
-                event = emitted.get(timeout=1)
-                self.assertEqual(event["event"], "compactor_error")
-                self.assertNotIn("id", event)
-                self.assertEqual(event["error"], error)
-                self.assertTrue(retried.wait(1))
-                self.assertTrue(emitted.empty())
-                status = resident.dispatch({"op": "status"})
-                self.assertEqual(status["errors"], [event])
-                self.assertEqual(status["backend"], event["backend"])
-                self.assertEqual(status["model"], event["model"])
-                self.assertFalse(status["ready"])
-                resident.dispatch({"op": "cancel", "wait_id": "w"})
-                self.assertTrue(emitted.get(timeout=1)["cancelled"])
-            finally:
-                resident.close()
-
-    def test_settle_keeps_status_responsive_and_cancel_logs_pending_once(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("user", "long " + "x" * 700)
-            emitted: queue.Queue[dict[str, object]] = queue.Queue()
-            release = threading.Event()
-            started = threading.Event()
-
-            def complete(_: CompactorMessages) -> str:
-                started.set()
-                release.wait(5)
-                return "user: compacted"
-
-            scheduler = Scheduler(chat, complete)
-            resident = Resident(chat, emitted.put, scheduler)
-            scheduler.start()
-            try:
-                self.assertTrue(started.wait(1))
-                resident.dispatch({"op": "submit", "text": "pending"})
-                self.assertIsNone(resident.dispatch({"id": "wait", "op": "settle", "wait_id": "w"}))
-                status = resident.dispatch({"op": "status"})
-                self.assertFalse(status["ready"])
-                self.assertEqual(status["pending"], 1)
-                self.assertEqual(status["placeholders"], 1)
-                self.assertTrue(emitted.empty())
-                cancelled = resident.dispatch({"op": "cancel", "wait_id": "w"})
-                self.assertEqual(cancelled["logged"], 1)
-                reply = emitted.get(timeout=1)
-                self.assertFalse(reply["ready"])
-                self.assertTrue(reply["cancelled"])
-                self.assertEqual(resident.dispatch({"op": "abort"})["logged"], 0)
-                self.assertEqual(resident.dispatch({"op": "finish"})["texts"], [])
-                loaded = ChatLog(chat.root)
-                loaded.load()
-                self.assertEqual([msg.text for msg in loaded.messages].count("pending"), 1)
-            finally:
-                release.set()
-                resident.close()
-
-    def test_off_cancels_all_waits_but_abort_and_finish_cleanup_remain_available(self) -> None:
-        with TemporaryDirectory() as tmp, patch.dict(os.environ, {"Z0INT_HOME": tmp}):
-            chat = ChatLog(Path(tmp) / "chat")
-            chat.append("user", "long " + "x" * 700)
-            emitted: queue.Queue[dict[str, object]] = queue.Queue()
-            release = threading.Event()
-            scheduler = Scheduler(chat, lambda _: release.wait(5) and "user: compacted")
-            resident = Resident(chat, emitted.put, scheduler)
-            scheduler.start()
-            try:
-                resident.dispatch({"op": "submit", "text": "caller owned"})
-                taken = resident.dispatch({"op": "take"})["texts"]
-                resident.dispatch({"op": "submit", "text": "never taken"})
-                for ident in ("one", "two"):
-                    resident.dispatch({"id": ident, "op": "settle", "wait_id": ident})
-                resident.dispatch({"op": "enabled", "on": False})
-                replies = [emitted.get(timeout=1), emitted.get(timeout=1)]
-                self.assertTrue(all(reply["cancelled"] and not reply["ready"] for reply in replies))
-                self.assertEqual(resident.dispatch({"op": "abort", "texts": taken})["logged"], 1)
-                self.assertEqual(resident.dispatch({"op": "finish"})["texts"], [])
-                self.assertEqual(resident.dispatch({"op": "record", "kind": "talk", "text": "forbidden"})["error"], "optchat_off")
-                loaded = ChatLog(chat.root)
-                loaded.load()
-                texts = [msg.text for msg in loaded.messages]
-                self.assertEqual(texts.count("never taken"), 1)
-                self.assertEqual(texts.count("caller owned"), 1)
-                self.assertNotIn("forbidden", texts)
-                status = resident.dispatch({"op": "status"})
-                self.assertFalse(status["enabled"])
-                self.assertFalse(status["running"])
-                self.assertEqual(status["pending"], 0)
-            finally:
-                release.set()
-                resident.close()
-
-    def test_explicit_wait_timeout_is_bounded_and_later_wait_resolves_on_commit(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("user", "long " + "x" * 700)
-            emitted: queue.Queue[dict[str, object]] = queue.Queue()
-            release = threading.Event()
-            scheduler = Scheduler(chat, lambda _: release.wait(5) and "user: compacted")
-            resident = Resident(chat, emitted.put, scheduler)
-            scheduler.start()
-            try:
-                resident.dispatch({"id": "probe", "op": "settle", "wait_id": "probe", "timeout": 0})
-                self.assertFalse(emitted.get(timeout=1)["ready"])
-                resident.dispatch({"id": "real", "op": "settle", "wait_id": "real"})
-                self.assertTrue(emitted.empty())
-                release.set()
-                self.assertTrue(emitted.get(timeout=1)["ready"])
-            finally:
-                release.set()
-                resident.close()
-
-    def test_concurrent_cancel_preserves_pending_occurrences_exactly_once(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("user", "long " + "x" * 700)
-            emitted: queue.Queue[dict[str, object]] = queue.Queue()
-            release = threading.Event()
-            scheduler = Scheduler(chat, lambda _: release.wait(5) and "user: compacted")
-            resident = Resident(chat, emitted.put, scheduler)
-            scheduler.start()
-            try:
-                for text in ("same", "same", "other"):
-                    resident.dispatch({"op": "submit", "text": text})
-                resident.dispatch({"id": "wait", "op": "settle", "wait_id": "w"})
-                barrier = threading.Barrier(2)
-
-                def cancel() -> int:
-                    barrier.wait(2)
-                    reply = resident.dispatch({"op": "cancel", "wait_id": "w"})
-                    return int(reply["logged"])
-
-                with ThreadPoolExecutor(max_workers=2) as pool:
-                    one = pool.submit(cancel)
-                    two = pool.submit(cancel)
-                    self.assertEqual(sorted([one.result(timeout=3), two.result(timeout=3)]), [0, 3])
-                self.assertTrue(emitted.get(timeout=1)["cancelled"])
-                resident.dispatch({"op": "abort"})
-                loaded = ChatLog(chat.root)
-                loaded.load()
-                texts = [msg.text for msg in loaded.messages]
-                self.assertEqual(texts.count("same"), 2)
-                self.assertEqual(texts.count("other"), 1)
-                self.assertEqual(resident.dispatch({"op": "status"})["pending"], 0)
-            finally:
-                release.set()
-                resident.close()
-
-    def test_literal_placeholder_status_counts_only_unbuilt_nodes(self) -> None:
-        with TemporaryDirectory() as tmp:
-            chat = ChatLog(Path(tmp))
-            chat.append("user", PLACEHOLDER)
-            scheduler = Scheduler(chat, lambda _: "unused")
-            resident = Resident(chat, lambda _: None, scheduler)
-            scheduler.start()
-            try:
-                status = resident.dispatch({"op": "status"})
-                self.assertTrue(status["ready"])
-                self.assertEqual(status["placeholders"], 0)
-                self.assertEqual(status["messages"], 1)
-            finally:
-                resident.close()
-
-
-class NativeBridgeTests(unittest.TestCase):
-    def test_multiplexes_jobs_and_preserves_same_job_retry_session(self) -> None:
-        # A local protocol fixture, not a model or credential stub: the actual client
-        # reads out-of-order replies from a subprocess and must keep jobs distinct.
-        fixture = '''import json, sys, threading
-lock = threading.Lock()
-barrier = threading.Barrier(2)
-def reply(row):
+
+import pytest
+
+from z0int.optchat import tree
+from z0int.optchat.chat import Chat, NoView
+from z0int.optchat.claude_cli import Reply, blocks_of
+from z0int.optchat.compact import (LEAF_TASK, MERGE_TASK, RULER, TOO_LONG, Compactor, build_line,
+                                   first_bytes, leaf_task, merge_task, too_long)
+from z0int.optchat.log import CAP, SPLIT, ChatLog, Locked, clip_echo, split_text
+from z0int.optchat.mcp import handle
+from z0int.optchat.prompt import DATE, GIST_PROMPT, TOOLS, ZOOM, system_prompt
+from z0int.optchat.turn import NotReady, run_turn
+from z0int.optchat.view import PLACEHOLDER, View, merge_at, pick
+
+GIST = (Path(__file__).parent / "fixtures" / "uniichat_gist.md").read_text().split("\n")
+SRC = str(Path(__file__).resolve().parents[1] / "src")
+
+
+def gist(first: int, last: int) -> str:
+    """Lines first..last of the gist, 1-based and inclusive."""
+    return "\n".join(GIST[first - 1:last])
+
+
+# -- Taelin's push, and the merge order ----------------------------------------
+
+def push(states: list, new) -> None:
+    """rollback_state_list.js `push` on a newest-first list of [keep, state] (life stays 0)."""
+    at = 0
+    while True:
+        if at == len(states):
+            states.append([0, new])
+            return
+        if states[at][0] == 0:
+            states[at][0] = 1          # a 0 absorbs: the new state is dropped
+            return
+        new, states[at] = states[at][1], [0, new]   # a 1 carries
+        at += 1
+
+
+def push_lines(states: list, total: int) -> list:
+    """Each state starts a line that runs up to the next newer state (the newest, to now)."""
+    lines, until = [], total
+    for _, state in states:
+        n = until - state
+        lines.append(tree.key_of(state, n))
+        until = state
+    return lines[::-1]
+
+
+def pick_first(lines, total):
+    """The wrong recipe: age measured from the pair's first message."""
+    top = max(key[0] for key in lines)
+    best, best_due = None, None
+    for at in range(len(lines) - 1):
+        (level, index), right = lines[at], lines[at + 1]
+        if index & 1 or right != (level, index + 1):
+            continue
+        due = (total - (index << level)) << (top - level)
+        if best_due is None or due > best_due:
+            best, best_due = at, due
+    return best
+
+
+def test_push_matches_the_gist_table():
+    states, seen = [], []
+    for t in range(10):
+        push(states, t)
+        seen.append(", ".join(("+" if keep else "-") + str(state) for keep, state in states))
+    assert seen == ["-0", "+0", "-2, -0", "+2, -0", "-4, +0", "+4, +0", "-6, -4, -0", "+6, -4, -0",
+                    "-8, +4, -0", "+8, +4, -0"]
+    assert push_lines(states, 10) == [tree.key_of(0, 4), tree.key_of(4, 4), tree.key_of(8, 2)]
+
+
+def test_merge_order_is_push_for_t_0_to_20000():
+    states, lines, wrong, wrong_ok = [], [], [], 0
+    for t in range(20_001):
+        push(states, t)
+        target = push_lines(states, t + 1)
+        for view, chooser in ((lines, pick), (wrong, pick_first)):
+            view.append((0, t))
+            while len(view) > len(states):
+                merge_at(view, chooser(view, t + 1))
+        assert lines == target, t
+        wrong_ok += wrong == target
+    assert wrong_ok == 481          # the gist: the first-message recipe matches at only 481 steps
+
+
+def test_t10_counterexample():
+    lines = [tree.key_of(0, 4), tree.key_of(4, 4), (0, 8), (0, 9)]
+    assert lines[pick(lines, 10)] == (0, 8)            # push merges 8-9
+    assert lines[pick_first(lines, 10)] == (2, 0)      # the first-message recipe merges 0-7
+
+
+def test_ties_pick_the_oldest_and_an_unbuilt_parent_is_skipped():
+    lines = [(0, 0), (0, 1), (0, 2), (0, 3)]
+    # T=4: pair 0-1 has due (4-1)/1 = 3, pair 2-3 has due 1
+    assert pick(lines, 4) == 0
+    assert pick(lines, 4, built=lambda key: key != (1, 0)) == 2
+    assert pick(lines, 4, built=lambda key: False) is None
+    # equal due at T=7: 0+2|2+2 ended 4 ago in size 2 (due 2); 4+1|5+1 ended 2 ago in size 1 (due 2)
+    lines = [(1, 0), (1, 1), (0, 4), (0, 5), (0, 6)]
+    assert pick(lines, 7) == 0
+    assert pick(lines, 8) == 2                         # one message later the newer pair is more due
+    assert pick([(0, 0), (0, 1)], 2, built=None) == 0
+    assert pick([(0, 1), (0, 2)], 3) is None           # adjacent but not siblings
+
+
+# -- the view's sawtooth --------------------------------------------------------
+
+def test_batches_from_high_down_to_low_and_nothing_between():
+    text = lambda key: "x" * 90
+    built = lambda key: True
+    view = View(high=16_000, low=8_000)
+    batches, peak = 0, 0
+    for t in range(6_000):
+        before = list(view.lines)
+        view.append(t)
+        merged = view.settle(t + 1, text, built)
+        size = view.size(text)
+        if merged:
+            batches += 1
+            assert size <= 8_000 and not view.pending
+        else:
+            assert view.lines[:-1] == before             # one line appended, nothing else changed
+            assert size <= 16_000
+        peak = max(peak, size)
+        assert view.covered() == t + 1
+    assert batches > 10 and 15_800 < peak <= 16_000
+
+
+def test_blocked_batch_stays_pending_and_resumes_at_each_message():
+    text = lambda key: "x" * 90
+    frontier = [0]
+    built = lambda key: tree.end(key) < frontier[0]
+    view = View(high=4_000, low=2_000)
+    t = 0
+    while not view.pending:
+        view.append(t)
+        assert view.settle(t + 1, text, built) == 0
+        t += 1
+    assert view.size(text) > 4_000                       # no parent is built: nothing may merge
+    frontier[0] = 16
+    view.append(t)
+    assert view.settle(t + 1, text, built) == 15         # what it can: every pair under messages 0..15
+    assert view.pending and view.lines[:3] == [(4, 0), (0, 16), (0, 17)]
+    t += 1
+    frontier[0] = 10 ** 9
+    view.append(t)
+    assert view.settle(t + 1, text, built) > 0
+    assert not view.pending and view.size(text) <= 2_000
+
+
+def rewrite_cost(batched: bool, messages: int = 30_000) -> float:
+    """Lines sent uncached per message: every line from the first changed one on."""
+    text = lambda key: "x" * 500
+    built = lambda key: True
+    view = View(high=128_000, low=64_000) if batched else View(high=96_000, low=96_000)
+    cost = 0
+    for t in range(messages):
+        before = list(view.lines)
+        view.append(t)
+        view.settle(t + 1, text, built)
+        same = 0
+        while same < len(before) and same < len(view.lines) and before[same] == view.lines[same]:
+            same += 1
+        cost += len(view.lines) - same
+    return cost / messages
+
+
+def test_batching_rewrites_far_fewer_lines_than_merging_at_every_message():
+    batched, every = rewrite_cost(True, 6_000), rewrite_cost(False, 6_000)
+    assert batched * 2 < every, (batched, every)
+
+
+# -- the log --------------------------------------------------------------------
+
+def new_chat(tmp_path, **limits) -> Chat:
+    root = tmp_path / "chat"
+    Chat.init(root, **limits)
+    return Chat(root, write=True, fsync=False)
+
+
+def digest(root: Path) -> str:
+    out = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            out.update(path.name.encode() + path.read_bytes())
+    return out.hexdigest()
+
+
+def test_record_shapes_kinds_and_day_files(tmp_path):
+    chat = new_chat(tmp_path)
+    for kind in ("user", "unii", "tool", "echo", "work", "note"):
+        chat.append(kind, f"hello {kind}")
+    with pytest.raises(ValueError):
+        chat.append("thought", "thoughts are never logged")
+    with pytest.raises(ValueError):
+        chat.append("talk", "old kind")
+    chat.close()
+    day = time.strftime("%Y-%m-%d")
+    rows = [json.loads(raw) for raw in (tmp_path / "chat" / "main" / f"{day}.jsonl").read_text().splitlines()]
+    assert [list(row) for row in rows] == [["i", "kind", "text", "size", "date"]] * 6
+    assert [row["i"] for row in rows] == list(range(6)) and rows[1]["size"] == len("hello unii")
+    nodes = [json.loads(raw) for raw in (tmp_path / "chat" / "tree" / f"{day}.jsonl").read_text().splitlines()]
+    assert all(list(node) == ["l", "i", "text", "size"] for node in nodes)
+    assert nodes[0] == {"l": 0, "i": 0, "text": "user: hello user", "size": 16}
+    assert json.loads((tmp_path / "chat" / "view.json").read_text())[-1] == [0, 5]
+
+
+def test_echo_is_clipped_head_and_tail_and_other_long_text_is_split(tmp_path):
+    chat = new_chat(tmp_path)
+    echo = "H" * 40_000 + "T" * 40_000
+    (message,) = chat.append("echo", echo)
+    assert len(message.text) == CAP == 30_000
+    assert message.text.startswith("HHHH") and message.text.endswith("TTTT") and "characters cut" in message.text
+    assert clip_echo("short") == "short"
+    long = "".join(chr(0x4E00 + i % 500) for i in range(SPLIT * 2 + 17))
+    parts = chat.append("user", long)
+    assert [m.i for m in parts] == [1, 2, 3] and all(m.kind == "user" for m in parts)
+    assert "".join(m.text for m in parts) == long            # never cut
+    assert split_text("") == [""]
+    assert parts[0].size == len(parts[0].text.encode())
+
+
+def test_single_writer_lock_and_readers_never_write(tmp_path):
+    chat = new_chat(tmp_path)
+    chat.append("user", "one")
+    with pytest.raises(Locked):
+        Chat(tmp_path / "chat", write=True)
+    before = digest(tmp_path / "chat")
+    reader = Chat(tmp_path / "chat")
+    assert reader.total == 1 and reader.render() == chat.render()
+    with pytest.raises(Locked):
+        reader.append("user", "no")
+    chat.append("user", "two")
+    reader.refresh()
+    assert reader.total == 2 and reader.zoom(1, 1) == "user: two"
+    assert digest(tmp_path / "chat") != before
+    after = digest(tmp_path / "chat")
+    Chat(tmp_path / "chat").status()
+    assert digest(tmp_path / "chat") == after
+    chat.close()
+    Chat(tmp_path / "chat", write=True).close()             # the lock is free again
+
+
+def test_each_write_is_on_disk_at_once_and_a_torn_line_is_skipped(tmp_path):
+    chat = new_chat(tmp_path)
+    chat.append("user", "kept")
+    path = next((tmp_path / "chat" / "main").glob("*.jsonl"))
+    assert json.loads(path.read_text().splitlines()[-1])["text"] == "kept"   # flushed, no close needed
+    chat.close()
+    with path.open("ab") as fh:
+        fh.write(b'{"i": 1, "kind": "user", "te')
+    chat = Chat(tmp_path / "chat", write=True, fsync=False)
+    assert chat.total == 1
+    assert chat.append("user", "next")[0].i == 1
+    chat.close()
+    assert Chat(tmp_path / "chat").zoom(1, 1) == "user: next"
+    assert path.read_bytes().count(b'"te\n') == 1            # the torn line was closed, never edited
+
+
+# -- the tree -------------------------------------------------------------------
+
+def test_names_and_zoom_addresses():
+    assert tree.name((3, 5)) == "40+8" and tree.key_of(40, 8) == (3, 5)
+    assert tree.start((3, 5)) == 40 and tree.end((3, 5)) == 47 and tree.halves((3, 5)) == ((2, 10), (2, 11))
+    for bad in ((40, 3), (41, 8), (-8, 8), (0, 0)):
+        with pytest.raises(ValueError):
+            tree.key_of(*bad)
+
+
+def test_free_leaf_and_free_merge_need_no_model(tmp_path):
+    chat = new_chat(tmp_path)
+    chat.append("user", "fix the parser")
+    chat.append("unii", "done:\nparser.py line 9")
+    assert chat.text((0, 0)) == "user: fix the parser"
+    assert chat.text((1, 0)) == "user: fix the parser\nunii: done:\nparser.py line 9"   # joined by a newline
+    assert chat.ready.pop() is None
+    exact = "x" * (512 - len("user: "))
+    chat.append("user", exact)
+    assert chat.text((0, 2)) == "user: " + exact
+    chat.append("user", exact + "y")                         # 513 bytes: needs a model
+    assert chat.text((0, 3)) is None and chat.ready.pop() == (0, 3)
+    assert chat.render().splitlines()[-2] == f"3+1|{PLACEHOLDER}"
+    with pytest.raises(ValueError):
+        chat.log.add_node(0, 0, "again")                     # each node is built once
+
+
+def test_leaf_gate_and_merge_queue(tmp_path):
+    chat = new_chat(tmp_path)
+    long = "word " * 200
+    for _ in range(20):
+        chat.append("user", long)
+    popped = [chat.ready.pop() for _ in range(9)]
+    assert popped[:8] == [(0, i) for i in range(8)] and popped[8] is None   # 8 unbuilt lines before 8
+    assert chat.ready.idle()
+    chat.commit((0, 3), "line 3 " + "z" * 300)
+    assert chat.ready.pop() == (0, 8) and chat.ready.pop() is None
+    assert not chat.ready.merges                              # 2's half is still unbuilt
+    chat.commit((0, 2), "line 2 " + "z" * 300)
+    assert list(chat.ready.merges) == [(1, 1)]                # queued when its second half was built
+    chat.commit((0, 0), "a")
+    chat.commit((0, 1), "b")
+    assert chat.text((1, 0)) == "a\nb" and list(chat.ready.merges) == [(1, 1)]
+    chat.ready.fail((0, 4))
+    assert (0, 4) not in [chat.ready.pop() for _ in range(4)]   # a failed node waits...
+    chat.append("user", "short")
+    assert chat.ready.pop() == (0, 4)                            # ...for the next message
+
+
+def test_queues_do_no_scanning(tmp_path):
+    chat = new_chat(tmp_path)
+    looked = [0]
+
+    class Counting(dict):
+        def __contains__(self, key):
+            looked[0] += 1
+            return dict.__contains__(self, key)
+
+    chat.log.nodes = Counting(chat.log.nodes)
+    per_append = []
+    for i in range(3_000):
+        before = looked[0]
+        chat.append("user", f"message {i} " + "pad " * 150)   # one model-sized node per message
+        if chat.ready.pop() is not None:
+            chat.commit((0, i), f"m{i} " + "s" * 400)
+            while (key := chat.ready.pop()) is not None:
+                chat.commit(key, f"n{key} " + "s" * 400)
+        per_append.append(looked[0] - before)
+    assert max(per_append[2_000:]) <= max(per_append[:500]) + 8   # work per message does not grow with the chat
+    assert len(chat.log.nodes) == 2 * 3_000 - bin(3_000).count("1")
+
+
+# -- view.json ------------------------------------------------------------------
+
+def test_view_is_saved_and_loaded_never_rebuilt(tmp_path):
+    chat = new_chat(tmp_path, high=4_000, low=2_000, chigh=1_000, clow=500)
+    for i in range(300):
+        chat.append("user", f"message {i}: " + "detail " * 8)
+    assert chat.merges > 0
+    lines, rendered, cview = list(chat.view.lines), chat.render(), list(chat.cview.lines)
+    chat.close()
+    saved = json.loads((tmp_path / "chat" / "view.json").read_text())
+    assert [tuple(pair) for pair in saved] == lines and all(len(pair) == 2 for pair in saved)
+    again = Chat(tmp_path / "chat", write=True, fsync=False)
+    assert again.view.lines == lines and again.render() == rendered and again.cview.lines == cview
+    again.close()
+    (tmp_path / "chat" / "view.json").unlink()
+    with pytest.raises(NoView):
+        Chat(tmp_path / "chat")
+
+
+def test_an_interrupted_append_is_finished_by_appending(tmp_path):
+    chat = new_chat(tmp_path)
+    chat.append("user", "a")
+    chat.log.add_message("user", "logged, then the process died")
+    chat.close()
+    again = Chat(tmp_path / "chat", write=True, fsync=False)
+    assert again.view.lines == [(1, 0)] or again.view.lines == [(0, 0), (0, 1)]
+    assert again.view.covered() == 2 and again.text((0, 1)) is not None
+
+
+def test_compaction_view_sawtooth_and_remerge_with_the_chat_view(tmp_path):
+    chat = new_chat(tmp_path, high=8_000, low=4_000, chigh=2_000, clow=1_000)
+    epochs, chat_merges = set(), 0
+    for i in range(600):
+        before = chat.merges
+        chat.append("user", f"message {i}: " + "detail " * 8)
+        while (key := chat.ready.pop()) is not None:   # a stand-in compactor that keeps up
+            chat.commit(key, f"merged {tree.name(key)} " + "m" * 80)
+        size = chat.cview.size(chat.text)
+        assert size <= 2_000 + 120                  # it passes the limit by at most the line that tripped it
+        if chat.merges > before:
+            chat_merges += 1
+            assert size <= 1_000 or chat.cview.pending   # the chat's view merged: so did the compaction view
+        epochs.add(chat.epoch)
+        assert chat.cview.covered() == chat.view.covered() == i + 1
+    assert chat_merges >= 3 and len(epochs) > chat_merges
+    assert len(chat.cview.lines) < len(chat.view.lines)
+
+
+# -- compactions ----------------------------------------------------------------
+
+def test_task_and_retry_texts_are_the_gists_byte_for_byte():
+    ruler_shown = "------------…------------"
+    assert RULER == "-" * 512
+    assert LEAF_TASK.replace("{ruler}", ruler_shown) == gist(265, 270)
+    assert MERGE_TASK.replace("{ruler}", ruler_shown) == gist(274, 282)
+    assert TOO_LONG == gist(290, 293)
+    assert leaf_task(7, "user", "do {it} now") == gist(265, 270).replace(ruler_shown, RULER).replace(
+        "{id}", "7").replace("{kind}: {the message, whole}", "user: do {it} now")
+    task = merge_task((2, 10), (2, 11), "left {b}\nline", "right")
+    assert task == gist(274, 282).replace(ruler_shown, RULER).replace("{a}", "40+4").replace(
+        "{b} and", "{b} and").replace("lines 40+4 and {b}", "lines 40+4 and 44+4").replace(
+        "{id} to {end}", "40 to 47").replace("{line a}", "40+4|left {b} line").replace("{line b}", "44+4|right")
+    line = "é" * 300
+    assert too_long(line) == gist(290, 293).replace("{N}", "600").replace("{its first 512 bytes}", "é" * 256)
+    assert first_bytes("a" + "é" * 300) == "a" + "é" * 255        # never half a character
+
+
+class FakeSession:
+    def __init__(self, backend, model, system, view, tools, label):
+        self.backend, self.model, self.system, self.view, self.tools, self.label = (
+            backend, model, system, view, tools, label)
+        self.sent = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        pass
+
+    def send(self, text, on_start=None, on_block=None):
+        self.sent.append(text)
+        return Reply(self.backend.answer(self, on_start, on_block), {})
+
+
+class FakeBackend:
+    def __init__(self, answer):
+        self.answer, self.sessions, self.lock = answer, [], threading.Lock()
+
+    def open(self, model, system, view="", tools=None, label="", effort=None):
+        session = FakeSession(self, model, system, view, tools, label)
+        with self.lock:
+            self.sessions.append(session)
+        return session
+
+
+def test_too_long_is_retried_in_the_same_conversation_five_times_keeping_the_shortest():
+    sizes = iter([600, 530, 560, 520, 515, 100])
+    backend = FakeBackend(lambda session, *_: "y" * next(sizes))
+    session = backend.open("m", "s")
+    line, tries = build_line(session, "TASK")
+    assert tries == 5 and len(line) == 515 and len(session.sent) == 5
+    assert session.sent[0] == "TASK" and session.sent[1] == too_long("y" * 600)
+    assert session.sent[1].startswith("Too long: your line is 600 bytes, over the 512-byte limit.")
+    assert session.sent[1].endswith("y" * 512 + "| ← LIMIT")
+    fits = FakeBackend(lambda session, *_: " fits \n").open("m", "s")
+    assert build_line(fits, "TASK") == ("fits", 1) and len(fits.sent) == 1
+    with pytest.raises(RuntimeError):
+        build_line(FakeBackend(lambda session, *_: "  ").open("m", "s"), "TASK")
+
+
+def test_compactor_contexts_concurrency_and_retry_at_next_message(tmp_path):
+    chat = new_chat(tmp_path, high=64_000, low=32_000, chigh=6_000, clow=3_000)
+    long = "word " * 200
+    for i in range(40):
+        chat.append("user", f"m{i} {long}")
+    running, peak, fail = [0], [0], {12}
+    gate = threading.Lock()
+
+    def answer(session, on_start, on_block):
+        with gate:
+            running[0] += 1
+            peak[0] = max(peak[0], running[0])
+        if on_start:
+            time.sleep(0.05)
+            on_start()
+        time.sleep(0.01)
+        with gate:
+            running[0] -= 1
+        if session.label == "compact 12+1" and fail:
+            fail.clear()
+            raise OSError("boom")
+        return f"line for {session.label} " + "s" * 300
+
+    backend = FakeBackend(answer)
+    compactor = Compactor(chat, backend, "cheap", system="SYS", tools={"t": 1})
+    stats = compactor.run()
+    assert 1 < peak[0] <= 8 and compactor.peak <= 8
+    assert [f["node"] for f in stats["failed"]] == ["12+1"]
+    assert chat.text((0, 12)) is None and chat.unbuilt_leaves() == 1
+    first = backend.sessions[0]
+    assert first.view == "<chat>\n</chat>" and first.system == "SYS" and first.tools == {"t": 1}
+    for session in backend.sessions:
+        assert PLACEHOLDER not in session.view                 # no call ever sees a placeholder
+        node = session.label.split()[1]
+        ident, n = (int(part) for part in node.split("+"))
+        heads = [row.split("|")[0] for row in session.view.splitlines()[1:-1]]
+        ends = [int(h.split("+")[0]) + int(h.split("+")[1]) for h in heads]
+        if n == 1:
+            assert all(e <= ident for e in ends)               # the lines before the message
+            assert session.sent[0].startswith(f"Compaction: compress message {ident} into one line")
+        else:
+            assert all(e <= ident + n for e in ends)           # up to the merge's last message
+            assert ends[-1] in (ident + n, 12)                 # its halves are in the view (or it stopped at unbuilt 12)
+            assert session.sent[0].startswith(f"Compaction: merge lines {ident}+{n // 2} and {ident + n // 2}+{n // 2},")
+        starts = [int(h.split("+")[0]) for h in heads]
+        assert starts == sorted(starts) and (not starts or starts[0] == 0)
+        assert all(a + (e - a) == b for a, e, b in zip(starts, ends, starts[1:]))   # no gap: it stops at the first unbuilt line
+    after_13 = [s for s in backend.sessions if s.label == "compact 13+1"][0]
+    assert after_13.view.count("\n") - 1 <= 12                 # stops at unbuilt 12
+    calls = len(backend.sessions)
+    assert compactor.run()["built"] == [] and len(backend.sessions) == calls   # not retried on its own
+    chat.append("user", "next message")
+    again = compactor.run()
+    assert "12+1" in [b["node"] for b in again["built"]] and chat.unbuilt_leaves() == 0
+    assert chat.ready.idle() and not chat.ready.failed
+    built = [s.label for s in backend.sessions]
+    assert len(built) - 1 == len(set(built))                   # every node built once (12+1 tried twice)
+
+
+def test_prefix_gate_one_call_writes_the_prefix_before_the_rest_start(tmp_path):
+    chat = new_chat(tmp_path)
+    for i in range(12):
+        chat.append("user", f"m{i} " + "word " * 200)
+    order, gate = [], threading.Lock()
+
+    def answer(session, on_start, on_block):
+        with gate:
+            order.append(("in", session.label, bool(on_start)))
+        time.sleep(0.15 if on_start else 0.02)
+        if on_start:
+            with gate:
+                order.append(("started", session.label, True))
+            on_start()
+        return "line " + "s" * 200
+
+    Compactor(chat, FakeBackend(answer), "cheap", system="SYS").run("leaves")
+    assert order[0] == ("in", "compact 0+1", True) and order[1] == ("started", "compact 0+1", True)
+    assert sum(1 for _, _, warm in order if warm) == 2          # only the first call waited on nobody
+    assert chat.unbuilt_leaves() == 0
+
+
+# -- the prompt and the tools ---------------------------------------------------
+
+def test_system_prompt_is_the_gists_verbatim():
+    assert GIST_PROMPT == gist(321, 409)
+    assert system_prompt("Unii", computers=True) == gist(321, 409)
+    ours = system_prompt("Unii")
+    assert ours == gist(321, 370) + "\n" + gist(376, 409)        # the paragraph on computers dropped
+    assert "computers" not in ours and "# Compactions" in ours and "\n\n\n" not in ours
+    named = system_prompt("Zed")
+    assert "Unii" not in named and named.startswith("You are Zed, an AI agent")
+    assert "- unii: Zed's replies" in named                      # the kind keeps its name
+    assert system_prompt("Zed", instructions="Be terse.\n") == named + "\n\nBe terse."
+    assert len({system_prompt("Zed") for _ in range(100)}) == 1
+    assert ZOOM == ("Open the line id+n of the view into the two lines of n/2 under it; "
+                    "n = 1 gives the message whole.")
+    assert ZOOM in gist(445, 446).replace("\n  ", " ") and DATE in gist(448, 448)
+    assert [tool["name"] for tool in TOOLS] == ["zoom", "date"]
+
+
+def test_view_blocks_of_four_lines_with_a_mark_on_the_last_whole_block():
+    view = "<chat>\n" + "\n".join(f"{i}+1|line {i}" for i in range(10)) + "\n</chat>"
+    blocks = blocks_of(view)
+    assert "".join(block["text"] for block in blocks) == view
+    assert [block["text"].count("\n") for block in blocks] == [5, 4, 2]
+    assert [("cache_control" in block) for block in blocks] == [False, True, False]
+    longer = blocks_of(view.replace("\n</chat>", "\n10+1|line 10\n11+1|line 11\n12+1|line 12\n</chat>"))
+    assert [b["text"] for b in longer[:2]] == [b["text"] for b in blocks[:2]]   # the old marked prefix, byte for byte
+    assert "cache_control" in longer[2] and len(longer) == 4
+    assert "".join(b["text"] for b in blocks_of("<chat>\n</chat>")) == "<chat>\n</chat>"
+
+
+# -- a turn, and zoom/date ------------------------------------------------------
+
+def test_turn_renders_the_view_before_logging_the_message(tmp_path):
+    chat = new_chat(tmp_path)
+    chat.append("user", "the deploy key lives in vault path kv/ops/deploy")
+    chat.append("unii", "noted")
+
+    def answer(session, on_start, on_block):
+        assert chat.log.messages[2].kind == "user" and chat.log.messages[2].text == "where is the key?"
+        on_block("tool", 'zoom {"id": 0, "n": 1}')
+        on_block("echo", chat.zoom(0, 1))
+        on_block("unii", "kv/ops/deploy")
+        return "kv/ops/deploy"
+
+    backend = FakeBackend(answer)
+    out = run_turn(chat, backend, "smart", "where is the key?", tools={"t": 1})
+    (session,) = backend.sessions
+    assert session.view == "<chat>\n0+1|user: the deploy key lives in vault path kv/ops/deploy\n1+1|unii: noted\n</chat>"
+    assert "where is the key?" not in session.view and session.sent == ["where is the key?"]
+    assert session.system == system_prompt("Unii") and "20" + time.strftime("%y") not in session.system
+    assert [(m.kind, m.text) for m in chat.log.messages[2:]] == [
+        ("user", "where is the key?"), ("tool", 'zoom {"id": 0, "n": 1}'),
+        ("echo", "user: the deploy key lives in vault path kv/ops/deploy"), ("unii", "kv/ops/deploy")]
+    assert out["message"] == 2 and out["reply"] == "kv/ops/deploy"
+
+
+def test_turn_waits_until_everything_before_the_message_is_summarized(tmp_path):
+    chat = new_chat(tmp_path)
+    chat.append("echo", "result " * 400)
+    turns = FakeBackend(lambda *a: "ok")
+    with pytest.raises(NotReady):
+        run_turn(chat, turns, "smart", "go on")
+    assert chat.total == 1 and not turns.sessions               # nothing was logged or sent
+    cheap = FakeBackend(lambda *a: "echo: a long result")
+    out = run_turn(chat, turns, "smart", "go on",
+                   compactor=Compactor(chat, cheap, "cheap", system=chat.system()))
+    assert turns.sessions[0].view == "<chat>\n0+1|echo: a long result\n</chat>"
+    assert out["compaction"]["built"][0]["node"] == "0+1"
+    assert cheap.sessions[0].system == turns.sessions[0].system   # one system prompt for both
+
+
+def test_zoom_and_date(tmp_path):
+    chat = new_chat(tmp_path)
+    for i in range(6):
+        chat.append("user", f"fact {i}")
+    assert chat.zoom(4, 1) == "user: fact 4"
+    assert chat.zoom(0, 4) == "0+2|user: fact 0 user: fact 1\n2+2|user: fact 2 user: fact 3"
+    assert chat.zoom(0, 2) == "0+1|user: fact 0\n1+1|user: fact 1"
+    assert chat.zoom(0, 8) == f"0+4|{chat.text((2, 0)).replace(chr(10), ' ')}\n4+4|{PLACEHOLDER}"
+    assert chat.zoom(8, 8).startswith("No line 8+8") and "power of 2" in chat.zoom(0, 3)
+    assert chat.date(2) == chat.log.messages[2].date and chat.date(2)[:4] == time.strftime("%Y")
+    assert chat.date(99) == "No message 99."
+    reply = handle(chat, {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                          "params": {"name": "zoom", "arguments": {"id": 4, "n": 2}}})
+    assert reply["result"]["content"][0]["text"] == "4+1|user: fact 4\n5+1|user: fact 5"
+    assert handle(chat, {"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
+
+
+def test_mcp_server_round_trip_over_stdio(tmp_path):
+    chat = new_chat(tmp_path)
+    chat.append("user", "the port is 8443")
+    proc = subprocess.Popen([sys.executable, "-m", "z0int.optchat", "mcp", "--root", str(tmp_path / "chat")],
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env={"PYTHONPATH": SRC})
+
+    def ask(method, params=None, ident=[0]):
+        ident[0] += 1
+        proc.stdin.write(json.dumps({"jsonrpc": "2.0", "id": ident[0], "method": method, "params": params or {}}) + "\n")
+        proc.stdin.flush()
+        return json.loads(proc.stdout.readline())["result"]
+
     try:
-        if len(row["messages"]) == 2: barrier.wait(3)
-        result = {"id": row["id"], "ok": True, "text": row["session"]}
-    except threading.BrokenBarrierError:
-        result = {"id": row["id"], "ok": False, "error": "parallel request never arrived"}
-    with lock:
-        print(json.dumps(result), flush=True)
-workers = []
-for line in sys.stdin:
-    worker = threading.Thread(target=reply, args=(json.loads(line),))
-    workers.append(worker); worker.start()
-for worker in workers: worker.join()
-'''
-        popen = subprocess.Popen
-
-        def launch(_command: list[str], **kwargs) -> subprocess.Popen[str]:
-            return popen([sys.executable, "-u", "-c", fixture], **kwargs)
-
-        initial: CompactorMessages = [{"role": "system", "content": "system"}, {"role": "user", "content": "source"}]
-        bridge = SonnetBridge()
-
-        def job() -> tuple[str, str]:
-            first = bridge.complete(initial)
-            retry = bridge.complete(initial + [{"role": "assistant", "content": "oversized"}, {"role": "user", "content": "shorter"}])
-            return first, retry
-
-        try:
-            with patch("z0int.optchat.compact.subprocess.Popen", side_effect=launch), ThreadPoolExecutor(max_workers=2) as pool:
-                one = pool.submit(job)
-                two = pool.submit(job)
-                results = [one.result(timeout=5), two.result(timeout=5)]
-            self.assertEqual(results[0][0], results[0][1])
-            self.assertEqual(results[1][0], results[1][1])
-            self.assertNotEqual(results[0][0], results[1][0])
-        finally:
-            bridge.close()
+        assert ask("initialize", {"protocolVersion": "2025-06-18"})["protocolVersion"] == "2025-06-18"
+        tools = ask("tools/list")["tools"]
+        assert [(t["name"], t["description"]) for t in tools] == [("zoom", ZOOM), ("date", DATE)]
+        assert ask("tools/call", {"name": "zoom", "arguments": {"id": 0, "n": 1}})["content"][0]["text"] == "user: the port is 8443"
+        chat.append("unii", "written while the server runs")       # the turn's process is the writer
+        assert ask("tools/call", {"name": "zoom", "arguments": {"id": 1, "n": 1}})["content"][0]["text"] == "unii: written while the server runs"
+        assert ask("tools/call", {"name": "date", "arguments": {"id": 1}})["content"][0]["text"] == chat.date(1)
+    finally:
+        proc.stdin.close()
+        proc.wait(timeout=10)
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_cli_init_append_view_status(tmp_path, capsys):
+    from z0int.optchat.__main__ import main
+    root = str(tmp_path / "c")
+    assert main(["init", "--root", root, "--name", "Zed", "--high", "16000", "--low", "8000"]) == 0
+    with pytest.raises(FileExistsError):
+        main(["init", "--root", root])
+    main(["append", "--root", root, "--kind", "note", "--text", "imported memory"])
+    main(["append", "--root", root, "--text", "hello"])
+    capsys.readouterr()
+    main(["view", "--root", root])
+    assert capsys.readouterr().out == "<chat>\n0+1|note: imported memory\n1+1|user: hello\n</chat>\n"
+    main(["status", "--root", root])
+    status = json.loads(capsys.readouterr().out)
+    assert status["messages"] == 2 and status["view_limits"] == [16000, 8000] and status["name"] == "Zed"
+    main(["zoom", "--root", root, "0", "2"])
+    assert capsys.readouterr().out == "0+1|note: imported memory\n1+1|user: hello\n"
