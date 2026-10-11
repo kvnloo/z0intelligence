@@ -162,3 +162,11 @@ def test_parser_unquotes_scalars_and_keeps_nested_mapping() -> None:
 def test_quoted_empty_tests_value_does_not_open_a_mapping() -> None:
     text = body().replace("tests:\n", 'tests: ""\n')
     assert "missing tests mapping with red/green" in R.check(text, HEAD)
+
+
+def test_workflow_skips_only_dependabot_authored_prs() -> None:
+    # The skip is keyed on the PR author, not github.actor, and on Dependabot only.
+    # The skip itself can only be observed in GitHub Actions.
+    lines = (ROOT / ".github" / "workflows" / "receipt.yml").read_text(encoding="utf-8").splitlines()
+    conditions = [ln.strip() for ln in lines if ln.strip().startswith("if:")]
+    assert conditions == ["if: github.event.pull_request.user.login != 'dependabot[bot]'"]

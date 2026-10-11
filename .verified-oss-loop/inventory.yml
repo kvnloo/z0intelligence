@@ -53,8 +53,8 @@ files:
     sha256: 0d27a95441c4f8483b4ffe6773d6323d40083615da77886536ab25b86d39da6d
     kit_sha256: 0d27a95441c4f8483b4ffe6773d6323d40083615da77886536ab25b86d39da6d
   - path: .github/workflows/receipt.yml
-    source: kit
-    sha256: 3b06f0f0928b6149beb187de8588280c637d2ed9167c2d4ad2c3457feb0af91f
+    source: modified
+    sha256: a67d936683d1907a9897b4d241c37e95eeb3ad3dd5ed27e795ae4b0209997dd6
     kit_sha256: 3b06f0f0928b6149beb187de8588280c637d2ed9167c2d4ad2c3457feb0af91f
   - path: .github/workflows/scorecard.yml
     source: kit
