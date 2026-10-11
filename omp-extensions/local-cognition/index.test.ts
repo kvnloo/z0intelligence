@@ -289,6 +289,12 @@ test("resolveAvailableTools prefers ctx.getTools and always includes the observe
 	expect(new Set(names)).toEqual(new Set(["bash", "read", "glob"]));
 });
 
+test("the position of a tool in the list does not say which one was called", () => {
+	const host = { getTools: () => ["read", "bash"] };
+	expect(resolveAvailableTools({}, host, "glob")).toEqual(["bash", "glob", "read"]);
+	expect(resolveAvailableTools({}, host, "read")).toEqual(resolveAvailableTools({}, host, "bash"));
+});
+
 test("buildShadowPayload is self-contained and schema-shaped", () => {
 	const payload = buildShadowPayload(toolCall("grep", { pattern: "x" }), ["grep"]);
 	expect(payload.op).toBe("cognition_shadow");

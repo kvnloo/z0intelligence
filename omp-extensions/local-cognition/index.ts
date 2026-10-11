@@ -307,7 +307,8 @@ export function resolveAvailableTools(
 	if (names.length === 0) names = [...DEFAULT_TOOL_NAMES];
 	const set = new Set(names.filter(Boolean));
 	if (observed) set.add(observed);
-	return [...set];
+	// Sorted, so a tool added because it was just called is not recognisable by coming last.
+	return [...set].sort();
 }
 
 function buildActions(toolNames: string[]): Jsonish[] {
