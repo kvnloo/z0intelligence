@@ -61,7 +61,7 @@ Stale writers (generation < current) are quarantined to
 | Var | Default |
 |-----|---------|
 | `Z0INT_ROOT` | tree with `src/z0int` (integrate tip) |
-| `Z0INT_PYTHON` | venv python |
+| `Z0INT_PYTHON` | `$Z0INT_HOME/bin/python` if it exists, else `python3` |
 | `Z0INT_BRIDGE_TIMEOUT_MS` | 45000 |
 
 ## Still log_only
