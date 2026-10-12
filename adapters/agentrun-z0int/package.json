@@ -1,0 +1,14 @@
+{
+  "name": "@zer0/agentrun-z0int",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.19.0" },
+  "dependencies": {
+    "@parcha/agentrun-dsl": "0.1.0-beta.2",
+    "@parcha/agentrun-jev": "0.1.0-beta.2"
+  },
+  "scripts": {
+    "test": "node --test ../../harness-adapters/test-agentrun-z0int.mjs ./plan-review.test.mjs"
+  }
+}

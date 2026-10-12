@@ -1,0 +1,40 @@
+name: AgentRun read-only plan review
+
+on:
+  pull_request:
+    paths:
+      - 'harness-adapters/agentrun-z0int.mjs'
+      - 'harness-adapters/test-agentrun-z0int.mjs'
+      - 'adapters/agentrun-z0int/**'
+      - '.github/workflows/agentrun-plan-review.yml'
+  push:
+    paths:
+      - 'harness-adapters/agentrun-z0int.mjs'
+      - 'harness-adapters/test-agentrun-z0int.mjs'
+      - 'adapters/agentrun-z0int/**'
+      - '.github/workflows/agentrun-plan-review.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+      - name: Install exact upstream beta packages
+        working-directory: adapters/agentrun-z0int
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Test actual DSL and Jev adapter with offline fixtures
+        working-directory: adapters/agentrun-z0int
+        run: npm test
+      - name: Ensure exact revision was checked
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
