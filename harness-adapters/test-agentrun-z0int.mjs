@@ -47,14 +47,14 @@ test('only connect to the local service, never remote or credential-bearing URLs
   for (const url of ['https://localhost:11501','http://example.com',
                      'http://127.0.0.1:11501/execute', 'http://user:pass@localhost:11501',
                      'file:///etc/passwd', 'http://localhost:11501?path=/v1/intelligence']) {
-    assert.throws(() => planEndppoint(url), Z0intPlanError);
+    assert.throws(() => planEndpoint(url), Z0intPlanError);
   }
 });
 
-test('reject execution-shaped responses, malformed JSON, and service failures', asyc () => {
+test('reject execution-shaped responses, malformed JSON, and service failures', async () => {
   for (const candidate of [
     {...plan('REMOTE_WORKER'), executed:true},
-    {...plan(	REMOTE_WORKER'), route:{kind:'REMOTE_WORKER',reason:'x',executed:true}},
+    {...plan('REMOTE_WORKER'), route:{kind:'REMOTE_WORKER',reason:'x',executed:true}},
     {ok:true,mode:'active',executed:false,route:{kind:'PARENT_ONLY', reason:'x', executed:false}},
   ]) {
     const effect = createZ0intPlanEffect({fetchImpl:async()=>({ok:true,text:async()=>JSON.stringify(candidate)})});
@@ -62,6 +62,6 @@ test('reject execution-shaped responses, malformed JSON, and service failures', 
   }
   for (const response of [{ok:false,text:async()=>''},{ok:true,text:async()=>'not json'}]) {
     const effect = createZ0intPlanEffect({fetchImpl:async()=>response});
-  await assert.rejects(effect({node:{via:'tool',tool:'z0int.plan'},input:{request:req}}), Z0intPlanError);
+    await assert.rejects(effect({node:{via:'tool',tool:'z0int.plan'},input:{request:req}}), Z0intPlanError);
   }
 });
