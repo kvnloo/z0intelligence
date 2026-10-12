@@ -1,0 +1,6 @@
+schema = 1
+id = "carly-nav"
+name = "Carly navigation fast path"
+version = "0.1.0"
+description = "Tern navigation without a Carly model turn: local intents, then learned TypeSafe Jev options, then Carly. Every request feeds the z0int carly-nav inlet."
+window = "window.luau"

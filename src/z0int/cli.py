@@ -446,6 +446,9 @@ def build_parser() -> argparse.ArgumentParser:
     # Future compiler stack — remainder args forwarded to module CLIs.
 
 
+    cn = sub.add_parser("carly-nav", help="Tern Carly navigation inlet: Jev fast path that learns options")
+    cn.add_argument("carly_nav_args", nargs=argparse.REMAINDER)
+
     cx = sub.add_parser("context", help="Provenance-preserving context resolution")
     cx_sub = cx.add_subparsers(dest="context_cmd", required=True)
     cxr = cx_sub.add_parser("resolve", help="resolve_context — source-backed evidence packet")
@@ -912,6 +915,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_doctor(as_json=as_json)
     if args.cmd == "status":
         return cmd_status(as_json=as_json)
+    if args.cmd == "carly-nav":
+        from z0int.carly_nav.__main__ import main as carly_nav_main
+
+        return carly_nav_main(args.carly_nav_args)
     if args.cmd == "context":
         return _cmd_context(args)
     if args.cmd == "task":
