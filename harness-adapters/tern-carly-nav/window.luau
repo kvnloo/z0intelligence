@@ -395,8 +395,11 @@ tern.carly.export("go", {
 	return call:wait(DECIDE_DEADLINE_MS + 1000)
 end)
 
+-- Tern disables a context provider for the window's lifetime after one call over
+-- 4 ms (seen live once, likely a process stall), so the provider does no work.
+local NAV_HINT = "Navigation (switch/focus a tab or block, next/previous/Nth tab): first run lua "
+	.. "`return await(plugins['carly-nav'].go(\"<user's words>\"))`. "
+	.. "handled=true means it is done: confirm in a few words. Otherwise do it yourself."
 tern.carly.context(function()
-	return "Navigation (switch/focus a tab or block, next/previous/Nth tab): first run lua "
-		.. "`return await(plugins['carly-nav'].go(\"<user's words>\"))`. "
-		.. "handled=true means it is done: confirm in a few words. Otherwise do it yourself."
+	return NAV_HINT
 end)
