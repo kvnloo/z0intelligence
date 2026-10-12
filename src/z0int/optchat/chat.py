@@ -13,13 +13,25 @@ from pathlib import Path
 
 from . import tree
 from .prompt import system_prompt
-from .log import ChatLog, Message, clip_echo, split_text
+from .log import ChatLog, Message, clip_echo, split_text, utf8_len
 from .tree import Key, Ready
 from .view import CHIGH, CLOW, HIGH, LOW, PLACEHOLDER, View, line, load_json, save_json
 
 
+SLACK = 4_096      # how far past its high mark a rendered view may be before a run is refused
+
+
 class NoView(RuntimeError):
-    """The log has messages but no saved view. The view is never rebuilt."""
+    """The log has messages the saved view does not cover. The view is never rebuilt."""
+
+
+class ViewOver(RuntimeError):
+    """A rendered view is far past its high mark: the chat was not fed in live order.
+
+    The view merges only at an append, and only pairs whose parent is built. So
+    messages must arrive as in a real chat: one turn's messages, compact to idle,
+    then the next. A bulk load leaves a view of several hundred KB.
+    """
 
 
 class Chat:
@@ -41,6 +53,7 @@ class Chat:
         self.config = load_json(self.root / "config.json")
         self.name = self.config["name"]
         self.lock = threading.RLock()
+        self.writer = write
         self.log = ChatLog(self.root, write=write, clock=clock, fsync=fsync)
         self.ready = Ready()
         self.merges = 0                 # view merges done by this process (for tests and status)
@@ -87,10 +100,12 @@ class Chat:
         self.epoch = saved.get("epoch", 0)   # bumps when the compaction view is rewritten
 
     def _save(self) -> None:
-        save_json(self.root / "view.json", [list(key) for key in self.view.lines])
+        # cview.json first: it holds both pending flags. A crash between the two saves
+        # leaves view.json one line short, which the next start appends; no flag is lost.
         save_json(self.root / "cview.json", {"lines": [list(key) for key in self.cview.lines],
                                              "pending": self.cview.pending,
                                              "chat_pending": self.view.pending, "epoch": self.epoch})
+        save_json(self.root / "view.json", [list(key) for key in self.view.lines])
 
     def _recover(self) -> None:
         """One linear pass at start: refill the queues, finish an interrupted append."""
@@ -105,7 +120,11 @@ class Chat:
             if not key[1] & 1:
                 self._after(key)
         late = False
-        for view in (self.view, self.cview):
+        for view, file in ((self.view, "view.json"), (self.cview, "cview.json")):
+            missing = self.total - view.covered()
+            if missing > 1:                 # a crash loses at most the last message's line
+                raise NoView(f"{self.root / file} lacks the last {missing} messages, and the view "
+                             "is never rebuilt from the log")
             for ident in range(view.covered(), self.total):
                 view.append(ident)          # a line per message: an append, not a rebuild
                 late = True
@@ -172,6 +191,19 @@ class Chat:
         with self.lock:
             return self.view.render(self.text)
 
+    def gist_limits(self) -> bool:
+        return [self.view.high, self.view.low, self.cview.high, self.cview.low] == [HIGH, LOW, CHIGH, CLOW]
+
+    def over(self, slack: int = SLACK) -> int:
+        """Bytes by which the rendered view passes its high mark plus the slack (0 if it does not)."""
+        return max(0, utf8_len(self.render()) - self.view.high - slack)
+
+    def check(self, slack: int = SLACK) -> None:
+        over = self.over(slack)
+        if over:
+            raise ViewOver(f"the view is {over + self.view.high + slack} bytes, over {self.view.high} + {slack}: "
+                           "feed the chat in live order (one turn's messages, compact to idle, the next)")
+
     def context(self, key: Key) -> str:
         """A compaction's view: the lines before the message, or up to the merge's
         last message, stopping at the first unbuilt line."""
@@ -194,7 +226,8 @@ class Chat:
                 return f"No line {ident}+{n}: the chat has messages 0 to {self.total - 1}."
             if n == 1:
                 return self.log.messages[ident].source()
-            return "\n".join(line(half, self.text(half)) for half in tree.halves(key))
+            return "\n".join(line(half, self.text(half)) if tree.start(half) < self.total
+                             else f"{tree.name(half)}|(no messages yet)" for half in tree.halves(key))
 
     def date(self, ident: int) -> str:
         with self.lock:
@@ -207,7 +240,10 @@ class Chat:
             return {
                 "root": str(self.root), "name": self.name, "messages": self.total,
                 "nodes": len(self.log.nodes), "unbuilt_leaves": self.unbuilt_leaves(),
-                "ready_merges": len(self.ready.merges), "failed": len(self.ready.failed),
+                # the queues live in the writer: a reader has none to show
+                "ready_merges": len(self.ready.merges) if self.writer else None,
+                "failed": len(self.ready.failed) if self.writer else None,
+                "gist_limits": self.gist_limits(), "view_over": self.over(),
                 "view_lines": len(self.view.lines), "view_bytes": self.view.size(self.text),
                 "view_limits": [self.view.high, self.view.low], "view_pending": self.view.pending,
                 "cview_lines": len(self.cview.lines), "cview_bytes": self.cview.size(self.text),

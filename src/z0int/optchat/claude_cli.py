@@ -2,18 +2,39 @@
 
 Every call is isolated from the owner's setup: fixed empty cwd, no setting
 sources, strict MCP config, no skills, no built-in tools unless asked, no
-session persistence, never `--resume`. A conversation is one `claude -p`
-process fed over stream-json stdin, so a compaction's "Too long" retry stays
-in the same conversation without resuming a session.
+session persistence, never `--resume`, permission mode `dontAsk` (a tool
+that is not on the allow list is denied), none of the parent session's
+CLAUDE*/Z0INT_* environment except CLAUDE_CONFIG_DIR (the login), and its
+temp files under the work directory, not /tmp. A conversation is one
+`claude -p` process fed over stream-json stdin, so a compaction's "Too long"
+retry stays in the same conversation without resuming a session.
 
-Every send is saved as one JSONL row (flags, byte sizes, usage, wall time,
-raw events), and counted against the per-model call caps in a ledger file.
+Every send is saved as one JSONL row (flags, effort, view limits, byte sizes,
+usage, wall time, raw events). Requests are counted against per-model caps in
+one shared ledger: a send reserves its requests before it starts
+(`--max-turns` holds it to them) and returns what it did not use, so the caps
+cannot be passed, however many sends run at once.
+
+What Claude Code really sends (seen on the wire by the reviewer, 2.1.296; not
+something this module controls):
+
+    [tools] [SDK identity line + our system prompt]
+    [user: <system-reminder> the account's email address, ... ] [view blocks] [message]
+    [Claude Code's own date/environment message]
+
+So the request is not byte for byte the gist's `[tools] [system prompt] [view]
+[new message]`: an identity line precedes the gist prompt, and a reminder
+block holding the login's real email address precedes the view in every call.
+No flag removes either. Both are constant, so they do not move the cache
+prefix; the email is real data in an otherwise synthetic trial.
 """
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
+import shutil
 import queue
 import subprocess
 import tempfile
@@ -27,6 +48,8 @@ CAPS = {"haiku": 1500, "sonnet": 250, "opus": 60}
 PLACEMENTS = ("user", "user-blocks", "system")
 SYSTEM_MODES = ("replace", "append")
 SERVER = "chat"
+MIN_FREE = 256 << 20                  # refuse to start with less temp space than this
+KEEP_ENV = ("CLAUDE_CONFIG_DIR",)     # the login; every other CLAUDE*/Z0INT_* variable is the parent's
 _io = threading.Lock()
 
 
@@ -36,6 +59,21 @@ class BackendError(RuntimeError):
 
 class LimitError(BackendError):
     """Rate limit, usage limit or the trial's own call cap: stop, never loop."""
+
+
+class ToolCalled(BackendError):
+    """A call that may make one request tried to go on (a compaction called a tool)."""
+
+
+def child_env(tmp: Path, extra: dict | None = None) -> dict:
+    """The parent's environment without its Claude Code session, temp files under `tmp`."""
+    env = {k: v for k, v in os.environ.items()
+           if k in KEEP_ENV or not (k.startswith("CLAUDE") or k.startswith("Z0INT_"))}
+    env.update({"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1", "DISABLE_AUTOUPDATER": "1",
+                "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "ENABLE_TOOL_SEARCH": "false",
+                "TMPDIR": str(tmp), "CLAUDE_CODE_TMPDIR": str(tmp)})
+    env.update(extra or {})
+    return env
 
 
 def family(model: str) -> str:
@@ -77,59 +115,84 @@ def blocks_of(view: str, per: int = 4, ttl: str = "1h") -> list[dict]:
 class ClaudeCLI:
     """Factory for conversations. `work` holds the fixed cwd and prompt files."""
 
-    def __init__(self, work: Path, *, calls: Path | None = None, ledger: Path | None = None,
+    def __init__(self, work: Path, *, ledger: Path, calls: Path | None = None,
                  experiment: str = "", placement: str = "user", system_mode: str = "replace",
                  effort: str | None = None, caps: dict | None = None, timeout: float = 900.0,
-                 extra: list[str] | None = None, partial: bool = False, binary: str = "claude"):
+                 extra: list[str] | None = None, partial: bool = False, binary: str = "claude",
+                 meta: dict | None = None, min_free: int = MIN_FREE):
         if placement not in PLACEMENTS or system_mode not in SYSTEM_MODES:
             raise ValueError("bad placement or system mode")
-        self.work = Path(work)
+        if not ledger:
+            raise ValueError("a ledger is required: the call caps hold only when every run shares one")
+        self.work = Path(work).resolve()
         self.cwd = self.work / "cwd"  # fixed and empty: the cwd may be named in the request
         self.cwd.mkdir(parents=True, exist_ok=True)
         if any(self.cwd.iterdir()):
             raise BackendError(f"{self.cwd} must stay empty")
+        self.tmp = self.work / "tmp"  # Claude Code's temp files: never the shared /tmp
+        self.tmp.mkdir(exist_ok=True)
+        free = shutil.disk_usage(self.tmp).free
+        if free < min_free:
+            raise BackendError(f"{self.tmp} has {free} bytes free, under {min_free}: free space first")
         self.calls = Path(calls) if calls else None
-        self.ledger = Path(ledger) if ledger else None
+        self.ledger = Path(ledger)
         self.experiment, self.placement, self.system_mode = experiment, placement, system_mode
         self.effort, self.caps, self.timeout = effort, dict(CAPS if caps is None else caps), timeout
         self.extra, self.partial, self.binary = list(extra or []), partial, binary
+        self.meta = dict(meta or {})  # copied into every row (the chat's view limits)
+
+    def _ledger(self, fam: str, n: int, label: str, kind: str, want: int = 0) -> int:
+        """One locked read-and-append on the ledger, safe across threads and processes.
+
+        kind "reserve": grant up to `want` requests (at least `n`) if the cap
+        has room, write them down, return how many. kind "settle": add `n`
+        (negative returns what a send did not use).
+        """
+        self.ledger.parent.mkdir(parents=True, exist_ok=True)
+        with _io, self.ledger.open("a+") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            if kind == "reserve":
+                fh.seek(0)
+                spent = 0
+                for line in fh.read().splitlines():
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if row.get("family") == fam:
+                        spent += int(row.get("n", 0))
+                cap = self.caps.get(fam, 0)
+                if spent + n > cap:
+                    raise LimitError(f"call cap reached for {fam}: {spent} of {cap} used, {n} needed")
+                n = min(want, cap - spent)
+            if n:
+                fh.write(json.dumps({"ts": time.time(), "family": fam, "n": n, "kind": kind,
+                                     "experiment": self.experiment, "label": label}) + "\n")
+                fh.flush()
+            return n
 
     def spent(self, fam: str) -> int:
-        if not self.ledger or not self.ledger.exists():
+        if not self.ledger.exists():
             return 0
-        total = 0
-        for line in self.ledger.read_text().splitlines():
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if row.get("family") == fam:
-                total += int(row.get("n", 0))
-        return total
-
-    def charge(self, fam: str, n: int, label: str) -> None:
-        if not self.ledger:
-            return
-        with _io:
-            self.ledger.parent.mkdir(parents=True, exist_ok=True)
-            with self.ledger.open("a") as fh:
-                fh.write(json.dumps({"ts": time.time(), "family": fam, "n": n,
-                                     "experiment": self.experiment, "label": label}) + "\n")
+        rows = (json.loads(line) for line in self.ledger.read_text().splitlines() if line.strip())
+        return sum(int(row.get("n", 0)) for row in rows if row.get("family") == fam)
 
     def open(self, model: str, system: str, view: str = "", tools: dict | None = None,
-             label: str = "", effort: str | None = None) -> "Session":
-        return Session(self, model, system, view, tools, label, effort or self.effort)
+             label: str = "", effort: str | None = None, max_requests: int = 1) -> "Session":
+        """`max_requests`: the most API requests one send may make (1 = no tool can be used)."""
+        return Session(self, model, system, view, tools, label, effort or self.effort, max_requests)
 
     def complete(self, model: str, system: str, user_text: str, tools_config: dict | None = None,
-                 view: str = "", label: str = "") -> Reply:
-        with self.open(model, system, view, tools_config, label) as session:
+                 view: str = "", label: str = "", max_requests: int = 1) -> Reply:
+        with self.open(model, system, view, tools_config, label, max_requests=max_requests) as session:
             return session.send(user_text)
 
 
 class Session:
     def __init__(self, cli: ClaudeCLI, model: str, system: str, view: str, tools: dict | None,
-                 label: str, effort: str | None):
+                 label: str, effort: str | None, max_requests: int = 1):
         self.cli, self.model, self.view, self.label = cli, model, view, label
+        self.effort, self.max_requests, self.granted = effort, max(1, max_requests), 0
         self.first, self.sends, self.proc = True, 0, None
         self.dir = Path(tempfile.mkdtemp(prefix="call-", dir=cli.work))
         text = system + ("\n\n" + view if view and cli.placement == "system" else "")
@@ -143,7 +206,7 @@ class Session:
             "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
             flag, str(self.dir / "system.txt"),
             "--setting-sources", "", "--strict-mcp-config", "--mcp-config", str(self.dir / "mcp.json"),
-            "--disable-slash-commands", "--no-session-persistence",
+            "--disable-slash-commands", "--no-session-persistence", "--permission-mode", "dontAsk",
             "--tools", tools.get("builtin", ""),
         ]
         if tools.get("allowed"):
@@ -153,10 +216,7 @@ class Session:
         if cli.partial:
             self.argv += ["--include-partial-messages"]
         self.argv += cli.extra
-        self.env = dict(os.environ)
-        self.env.update({"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1", "DISABLE_AUTOUPDATER": "1",
-                         "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "ENABLE_TOOL_SEARCH": "false"})
-        self.env.update(tools.get("env", {}))
+        self.env = child_env(cli.tmp, tools.get("env"))
         self.events: queue.Queue = queue.Queue()
 
     def __enter__(self):
@@ -191,9 +251,13 @@ class Session:
         tool results ("echo") arrive. Thinking blocks are never passed on.
         """
         fam = family(self.model)
-        with _io:
-            if self.cli.spent(fam) >= self.cli.caps.get(fam, 0):
-                raise LimitError(f"call cap reached for {fam}: {self.cli.caps.get(fam, 0)}")
+        # Reserve before sending. The first send takes what the cap still allows, up to
+        # max_requests, and the process is held to it; a later send needs the same again.
+        if self.proc is None:
+            self.granted = self.cli._ledger(fam, 1, self.label, "reserve", want=self.max_requests)
+            self.argv += ["--max-turns", str(self.granted)]
+        else:
+            self.cli._ledger(fam, self.granted, self.label, "reserve", want=self.granted)
         content = self._content(text)
         user_bytes = sum(len(b["text"].encode()) for b in content)
         if self.proc is None:
@@ -248,12 +312,14 @@ class Session:
             on_start()
         wall = time.time() - began
         n = max(1, len(per_request))
-        self.cli.charge(fam, n, self.label)
+        self.cli._ledger(fam, n - self.granted, self.label, "settle")
         usage = (result or {}).get("usage", {})
+        cut = (result or {}).get("subtype") == "error_max_turns"
         row = {
             "ts": began, "experiment": self.cli.experiment, "label": self.label, "send": self.sends,
             "model_requested": self.model, "model": model, "placement": self.cli.placement,
-            "system_mode": self.cli.system_mode,
+            "system_mode": self.cli.system_mode, "effort": self.effort, **self.cli.meta,
+            "reserved": self.granted, "max_turns_hit": cut,
             "argv": self.argv, "system_bytes": self.system_bytes, "user_bytes": user_bytes,
             "view_bytes": len(self.view.encode()), "blocks": len(content),
             "usage": usage, "model_usage": (result or {}).get("modelUsage"), "requests": n,
@@ -268,7 +334,11 @@ class Session:
                 self.cli.calls.parent.mkdir(parents=True, exist_ok=True)
                 with self.cli.calls.open("a") as fh:
                     fh.write(json.dumps(row, ensure_ascii=False) + "\n")
-        if row["is_error"]:
+        if cut and self.granted > 1:
+            pass                            # a turn stopped at its request allowance: keep what it said
+        elif cut:
+            raise ToolCalled(f"{self.label}: stopped after {self.granted} request(s) with a tool call pending")
+        elif row["is_error"]:
             detail = str(row["result"] or (self.dir / "stderr.txt").read_text()[-2000:])
             limited = any(e.get("type") == "rate_limit_event"
                           and e.get("rate_limit_info", {}).get("status") == "rejected" for e in raw)
@@ -276,7 +346,7 @@ class Session:
             if limited or "429" in low or "rate limit" in low or "usage limit" in low or "limit reached" in low:
                 raise LimitError(detail)
             raise BackendError(detail or "claude -p ended without a result")
-        return Reply("\n".join(texts) if len(texts) > 1 else (texts[0] if texts else str(row["result"] or "")),
+        return Reply("\n".join(texts) if texts else str(row["result"] or ""),
                      usage, model, n, wall, row)
 
     def close(self, kill: bool = False) -> None:

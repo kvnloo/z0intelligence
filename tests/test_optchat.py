@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from z0int.optchat import tree
-from z0int.optchat.chat import Chat, NoView
-from z0int.optchat.claude_cli import Reply, blocks_of
+from z0int.optchat.chat import SLACK, Chat, NoView, ViewOver
+from z0int.optchat.claude_cli import BackendError, ClaudeCLI, LimitError, Reply, ToolCalled, blocks_of
 from z0int.optchat.compact import (LEAF_TASK, MERGE_TASK, RULER, TOO_LONG, Compactor, build_line,
                                    first_bytes, leaf_task, merge_task, too_long)
 from z0int.optchat.log import CAP, SPLIT, ChatLog, Locked, clip_echo, split_text
@@ -430,8 +430,9 @@ class FakeBackend:
     def __init__(self, answer):
         self.answer, self.sessions, self.lock = answer, [], threading.Lock()
 
-    def open(self, model, system, view="", tools=None, label="", effort=None):
+    def open(self, model, system, view="", tools=None, label="", effort=None, max_requests=1):
         session = FakeSession(self, model, system, view, tools, label)
+        session.max_requests = max_requests
         with self.lock:
             self.sessions.append(session)
         return session
@@ -663,3 +664,331 @@ def test_cli_init_append_view_status(tmp_path, capsys):
     assert status["messages"] == 2 and status["view_limits"] == [16000, 8000] and status["name"] == "Zed"
     main(["zoom", "--root", root, "0", "2"])
     assert capsys.readouterr().out == "0+1|note: imported memory\n1+1|user: hello\n"
+
+
+# -- how a trial drives the build (the review's findings) -----------------------
+
+FAKE = str(Path(__file__).parent / "fixtures" / "fake_claude.py")
+LONG = "word " * 200                                             # 1,000 bytes: needs a model call
+
+
+def summarizer():
+    return FakeBackend(lambda session, *_: f"line for {session.label} " + "s" * 440)
+
+
+def live_turn(chat, turns, cheap, i, steps=1, slack=SLACK, **kw):
+    """One turn of a real chat: the user's message, then tool calls, their results and a reply."""
+    def answer(session, on_start, on_block):
+        for _ in range(steps):
+            on_block("tool", f"shell {LONG}")
+            on_block("echo", f"result {i} {LONG}")
+        on_block("unii", f"reply {i} {LONG}")
+        return "ok"
+    turns.answer = answer
+    return run_turn(chat, turns, "smart", f"ask {i} {LONG}", slack=slack,
+                    compactor=Compactor(chat, cheap, "cheap", system=chat.system(), slack=slack), **kw)
+
+
+def test_turn_runs_the_compactor_to_idle_so_merges_never_pile_up(tmp_path):
+    chat = new_chat(tmp_path)
+    turns, cheap = FakeBackend(None), summarizer()
+    out = live_turn(chat, turns, cheap, 0)
+    assert out["after"]["stopped"] is None and chat.unbuilt_leaves() == 0
+    assert chat.ready.idle() and not chat.ready.merges         # leaves and merges: nothing is left ready
+    assert chat.built((1, 0)) and chat.built((1, 1)) and chat.built((2, 0))
+    assert turns.sessions[0].max_requests > 1                  # a turn may use its tools ...
+    assert {s.max_requests for s in cheap.sessions} == {1}     # ... a compaction gets one request
+    out = live_turn(chat, turns, cheap, 1, after=False)        # the deviation: leaves only, at the next turn
+    assert out["after"] is None and chat.unbuilt_leaves() == 4 and chat.total == 8
+
+
+def test_live_order_keeps_the_real_limits_and_only_idle_compaction_does(tmp_path):
+    """The gist's sizes, 128,000/64,000 and 32,000/16,000, with 4 messages a turn."""
+    chat = new_chat(tmp_path)
+    assert chat.gist_limits() and chat.status()["view_limits"] == [128_000, 64_000]
+    turns, cheap = FakeBackend(None), summarizer()
+    views, batches = [], 0
+    for i in range(160):                                       # 640 messages: past the first batch
+        before = chat.merges
+        views.append(live_turn(chat, turns, cheap, i)["view_bytes"])
+        batches += chat.merges > before
+    assert max(views) <= 128_000 + SLACK and batches >= 1
+    assert max(views) > 120_000 and min(views[-20:]) > 60_000   # the sawtooth: up to 128 KB, back to 64 KB
+    contexts = [len(s.view.encode()) for s in cheap.sessions]
+    assert max(contexts) <= 32_000 + SLACK and not any(PLACEHOLDER in s.view for s in cheap.sessions)
+
+    # 26 long messages a turn, as the reviewer ran it. A view counts an unbuilt line at
+    # its placeholder's size, so such turns need more slack (about 480 bytes a message).
+    wide = 16_000
+    busy = new_chat(tmp_path / "busy")
+    turns, cheap = FakeBackend(None), summarizer()
+    views = [live_turn(busy, turns, cheap, i, steps=12, slack=wide)["view_bytes"] for i in range(30)]
+    assert 120_000 < max(views) <= 128_000 + wide and busy.merges
+    assert max(len(s.view.encode()) for s in cheap.sessions) <= 32_000 + wide
+
+    lazy = new_chat(tmp_path / "lazy")                         # the same chat, leaves only before each call
+    turns, cheap = FakeBackend(None), summarizer()
+    with pytest.raises((ViewOver, NotReady), match="live order"):
+        for i in range(30):
+            live_turn(lazy, turns, cheap, i, steps=12, slack=wide, after=False)
+    total = lazy.total
+    assert lazy.cview.pending and len(lazy.ready.merges) > 8   # a blocked batch, merges piled up
+    assert lazy.log.messages[-1].kind == "unii"                # refused before the next message was logged
+    with pytest.raises((ViewOver, NotReady), match="live order"):
+        run_turn(lazy, turns, "smart", "one more", compactor=Compactor(lazy, cheap, "cheap", system="S"))
+    assert lazy.total == total
+
+
+def test_a_bulk_load_is_refused_loudly_by_compact_and_by_turn(tmp_path, capsys):
+    chat = new_chat(tmp_path)
+    for i in range(400):                                       # a whole conversation appended at once
+        chat.append("user", f"m{i} {LONG}")
+    cheap = summarizer()
+    stats = Compactor(chat, cheap, "cheap", system="SYS", stop_on=(ViewOver,)).run()
+    assert "compaction view" in stats["stopped"] and "live order" in stats["stopped"]
+    assert stats["context_max"] <= 32_000 + SLACK              # no oversized call was sent
+    assert max(len(s.view.encode()) for s in cheap.sessions) <= 32_000 + SLACK
+    assert chat.unbuilt_leaves() > 300
+    for i in range(400):                                       # even with every line built, the view is 200 KB
+        if not chat.built((0, i)):
+            chat.commit((0, i), "x" * 500)
+    assert chat.over() > 60_000 and chat.status()["view_over"] == chat.over()
+    with pytest.raises(ViewOver):
+        run_turn(chat, FakeBackend(lambda *a: "ok"), "smart", "go on")
+    assert chat.total == 400
+    chat.close()
+
+    from z0int.optchat.__main__ import main                    # the commands end with a non-zero code
+    common = ["--root", str(tmp_path / "chat"), "--ledger", str(tmp_path / "ledger.jsonl"),
+              "--claude-binary", FAKE, "--model", "haiku"]
+    assert main(["compact", *common]) in (2, 3)
+    assert "live order" in capsys.readouterr().err
+    assert main(["turn", *common, "--compact-model", "haiku", "--text", "go on"]) == 2
+    assert "ViewOver" in capsys.readouterr().err
+    with Chat(tmp_path / "chat") as reader:
+        assert reader.total == 400
+
+
+def cli(tmp_path, **kw) -> ClaudeCLI:
+    return ClaudeCLI(tmp_path / "work", ledger=tmp_path / "ledger.jsonl", calls=tmp_path / "calls.jsonl",
+                     binary=FAKE, **kw)
+
+
+def ledger_sums(tmp_path) -> list[int]:
+    out, total = [], 0
+    for raw in (tmp_path / "ledger.jsonl").read_text().splitlines():
+        total += json.loads(raw)["n"]
+        out.append(total)
+    return out
+
+
+def test_call_caps_are_reserved_before_a_send_and_cannot_be_passed(tmp_path, monkeypatch):
+    with pytest.raises((TypeError, ValueError)):
+        ClaudeCLI(tmp_path / "w0", ledger=None)                # no ledger, no backend
+    monkeypatch.setenv("FAKE_SLEEP", "0.3")
+    backend = cli(tmp_path, caps={"haiku": 5})
+    results = []
+
+    def one(i):
+        try:
+            with backend.open("haiku", "SYS", label=f"compact {i}+1") as session:
+                results.append(session.send("task").text[:4])
+        except LimitError:
+            results.append("cap")
+
+    threads = [threading.Thread(target=one, args=(i,)) for i in range(8)]   # 8 at once on one cap
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(results) == ["cap"] * 3 + ["line"] * 5
+    assert backend.spent("haiku") == 5 and max(ledger_sums(tmp_path)) == 5
+    assert len((tmp_path / "calls.jsonl").read_text().splitlines()) == 5   # the refused ones never ran
+
+    other = cli(tmp_path, caps={"haiku": 5, "opus": 10})       # a second backend on the same ledger
+    with pytest.raises(LimitError):
+        other.complete("haiku", "SYS", "task")
+    monkeypatch.setenv("FAKE_SLEEP", "0")
+    monkeypatch.setenv("FAKE_REQUESTS", "3")                   # a turn that uses tools: 3 requests
+    reply = other.complete("claude-opus-x", "SYS", "ask", label="turn 0", max_requests=4)
+    assert reply.requests == 3 and reply.row["reserved"] == 4 and other.spent("opus") == 3
+    reply = other.complete("opus", "SYS", "ask", label="turn 1", max_requests=4)
+    assert other.spent("opus") == 6
+    monkeypatch.setenv("FAKE_REQUESTS", "9")                   # wants 9: 4 are left, so it is held to 4
+    reply = other.complete("opus", "SYS", "ask", label="turn 2", max_requests=16)
+    assert reply.row["reserved"] == 4 and reply.row["argv"][-2:] == ["--max-turns", "4"]
+    assert reply.requests == 4 and reply.row["max_turns_hit"] and other.spent("opus") == 10
+    assert reply.text == ""                                    # cut before it answered: reported, not raised
+    with pytest.raises(LimitError):
+        other.complete("opus", "SYS", "ask", label="turn 3", max_requests=16)
+    assert other.spent("opus") == 10 and max(ledger_sums(tmp_path)) <= 15   # 5 haiku + 10 opus, never more
+
+
+def test_calls_are_isolated_from_the_parent_session_and_from_tmp(tmp_path, monkeypatch):
+    log = tmp_path / "fake.jsonl"
+    monkeypatch.setenv("FAKE_LOG", str(log))
+    for name in ("CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_EFFORT", "CLAUDECODE",
+                 "Z0INT_CLAUDE_CODE_PACKET"):
+        monkeypatch.setenv(name, "parent")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", "/login/dir")
+    backend = cli(tmp_path)
+    backend.complete("haiku", "SYS", "task", label="compact 0+1")
+    seen = json.loads(log.read_text().splitlines()[0])
+    env, argv = seen["env"], seen["argv"]
+    assert not [k for k in env if k.startswith(("CLAUDE", "Z0INT_")) and env[k] == "parent"]
+    assert env["CLAUDE_CONFIG_DIR"] == "/login/dir"            # the login is kept as inherited
+    work = str((tmp_path / "work").resolve())
+    assert env["TMPDIR"] == env["CLAUDE_CODE_TMPDIR"] == work + "/tmp" and seen["cwd"] == work + "/cwd"
+    assert argv[argv.index("--permission-mode") + 1] == "dontAsk"   # a tool off the allow list is denied
+    assert argv[argv.index("--setting-sources") + 1] == "" and "--strict-mcp-config" in argv
+    assert "--no-session-persistence" in argv and "--resume" not in argv
+    assert argv[argv.index("--max-turns") + 1] == "1"
+    with pytest.raises(BackendError, match="free space"):      # a full temp directory is refused up front
+        cli(tmp_path, min_free=1 << 60)
+
+
+def test_compactions_go_out_at_xhigh_and_rows_name_effort_and_limits(tmp_path, capsys, monkeypatch):
+    from z0int.optchat.__main__ import main, summarize
+    log = tmp_path / "fake.jsonl"
+    monkeypatch.setenv("FAKE_LOG", str(log))
+
+    def args(name, *more):
+        return ["--root", str(tmp_path / name), "--ledger", str(tmp_path / "ledger.jsonl"),
+                "--results", str(tmp_path / "results"), "--claude-binary", FAKE, *more]
+
+    def efforts():
+        out = [(a["argv"][a["argv"].index("--effort") + 1] if "--effort" in a["argv"] else None)
+               for a in map(json.loads, log.read_text().splitlines())]
+        log.write_text("")
+        return out
+
+    main(["init", "--root", str(tmp_path / "real")])
+    main(["append", "--root", str(tmp_path / "real"), "--text", LONG])
+    assert main(["compact", *args("real"), "--model", "haiku"]) == 0
+    assert efforts() == ["xhigh"]                              # the gist: Haiku at xhigh, without asking
+    assert main(["turn", *args("real"), "--model", "sonnet", "--compact-model", "haiku", "--text", LONG]) == 0
+    assert sorted(efforts(), key=str) == [None, "xhigh"]       # the turn's call; then its message, compacted
+    main(["append", "--root", str(tmp_path / "real"), "--text", LONG])
+    assert main(["compact", *args("real"), "--model", "haiku", "--effort", "default"]) == 0
+    assert set(efforts()) == {None}
+
+    main(["init", "--root", str(tmp_path / "small"), "--high", "16000", "--low", "8000",
+          "--chigh", "4000", "--clow", "2000"])
+    main(["append", "--root", str(tmp_path / "small"), "--text", LONG])
+    assert main(["compact", *args("small"), "--model", "haiku"]) == 0
+    capsys.readouterr()
+    rows = [json.loads(raw) for raw in (tmp_path / "results" / "calls.jsonl").read_text().splitlines()]
+    assert [row["effort"] for row in rows] == ["xhigh", None, "xhigh", None, None, "xhigh"]
+    assert [row["gist_limits"] for row in rows] == [True] * 5 + [False]
+    assert rows[0]["limits"] == [128_000, 64_000, 32_000, 16_000] and rows[5]["limits"] == [16000, 8000, 4000, 2000]
+    groups = summarize(tmp_path / "results" / "calls.jsonl")
+    assert sorted(groups) == [
+        "fake-haiku compact effort=default [deviation: not xhigh]",
+        "fake-haiku compact effort=xhigh",
+        "fake-haiku compact effort=xhigh [deviation: limits 16000/8000/4000/2000]",
+        "fake-haiku turn effort=default"]
+    assert groups["fake-haiku compact effort=xhigh"]["sends"] == 2
+    with pytest.raises(SystemExit):                            # no ledger, no model command
+        main(["compact", "--root", str(tmp_path / "real"), "--model", "haiku"])
+
+
+def test_a_compaction_that_calls_a_tool_fails_and_is_counted(tmp_path, monkeypatch):
+    from z0int.optchat.__main__ import summarize
+    twice = type("S", (), {"label": "compact 0+1",
+                           "send": lambda self, text, on_start=None: Reply("line", {}, requests=2)})()
+    with pytest.raises(ToolCalled):                            # two requests in one compaction: a tool was used
+        build_line(twice, "TASK")
+    chat = new_chat(tmp_path)
+    chat.append("user", LONG)
+    monkeypatch.setenv("FAKE_REQUESTS", "2")                   # the model calls zoom before it answers
+    backend = cli(tmp_path)
+    compactor = Compactor(chat, backend, "haiku", system=chat.system(),
+                          tools={"mcp": {}, "allowed": []})
+    stats = compactor.run()
+    assert stats["tool_calls"] == 1 and stats["built"] == [] and chat.unbuilt_leaves() == 1
+    assert "ToolCalled" in stats["failed"][0]["error"]
+    assert backend.spent("haiku") == 1                         # held to its one request by --max-turns 1
+    (row,) = [json.loads(raw) for raw in (tmp_path / "calls.jsonl").read_text().splitlines()]
+    assert row["max_turns_hit"] and row["requests"] == 1 and "--allowedTools" not in row["argv"]
+    assert summarize(tmp_path / "calls.jsonl")["fake-haiku compact effort=default [deviation: not xhigh]"]["tool_violations"] == 1
+    monkeypatch.setenv("FAKE_REQUESTS", "1")
+    chat.append("user", "next")                                # tried again at the next message
+    assert Compactor(chat, backend, "haiku", system=chat.system()).run()["tool_calls"] == 0
+    assert chat.unbuilt_leaves() == 0
+
+
+def test_feed_logs_a_conversation_in_live_order(tmp_path, capsys):
+    from z0int.optchat.__main__ import main
+    root, script = tmp_path / "c", tmp_path / "turns.jsonl"
+    turn = [{"kind": "user", "text": LONG}, {"kind": "tool", "text": "shell ls"},
+            {"kind": "echo", "text": LONG}, {"kind": "unii", "text": LONG}]
+    script.write_text("".join(json.dumps(turn) + "\n" for _ in range(3)))
+    main(["init", "--root", str(root)])
+    common = ["--root", str(root), "--ledger", str(tmp_path / "ledger.jsonl"), "--claude-binary", FAKE,
+              "--model", "haiku", "--file", str(script)]
+    capsys.readouterr()
+    assert main(["feed", *common, "--turns", "2"]) == 0
+    assert main(["feed", *common, "--skip", "2"]) == 0
+    lines = [json.loads(raw) for raw in capsys.readouterr().out.splitlines()]
+    assert [line["messages"] for line in lines] == [[0, 3], [4, 7], [8, 11]]
+    assert all(line["stopped"] is None and line["tool_calls"] == 0 for line in lines)
+    with Chat(root) as chat:
+        assert chat.total == 12 and chat.unbuilt_leaves() == 0 and chat.built((3, 0)) and chat.built((2, 2))
+    rows = [json.loads(raw) for raw in (tmp_path / "c.work" / "calls.jsonl").read_text().splitlines()]
+    order = [row["label"] for row in rows]
+    assert max(order.index(f"compact {i}+1") for i in (0, 2, 3)) < order.index("compact 4+1")   # turn by turn
+
+
+# -- smaller points from the review ---------------------------------------------
+
+def test_a_view_file_that_lost_more_than_one_line_is_refused_not_refilled(tmp_path):
+    chat = new_chat(tmp_path)
+    for i in range(5):
+        chat.append("user", f"m{i}")
+    chat.close()
+    root = tmp_path / "chat"
+    saved = (root / "view.json").read_text()
+    (root / "view.json").write_text("[]")
+    with pytest.raises(NoView):
+        Chat(root, write=True)
+    (root / "view.json").write_text(json.dumps(json.loads(saved)[:-2]))
+    with pytest.raises(NoView):
+        Chat(root, write=True)
+    (root / "view.json").write_text(json.dumps(json.loads(saved)[:-1]))   # one line short: an interrupted append
+    with Chat(root, write=True) as again:
+        assert again.view.covered() == 5
+
+
+def test_a_crash_between_the_two_view_saves_keeps_the_pending_batch(tmp_path, monkeypatch):
+    from z0int.optchat import chat as chat_module
+    chat = new_chat(tmp_path, high=300, low=150, chigh=200, clow=100)
+    for i in range(16):
+        chat.append("user", f"m{i} {LONG}")                    # unbuilt: the batch stays blocked
+    assert chat.view.pending
+    real = chat_module.save_json
+
+    def crash(path, value):
+        if path.name == "view.json":
+            raise OSError("power cut")
+        real(path, value)
+
+    monkeypatch.setattr(chat_module, "save_json", crash)
+    with pytest.raises(OSError):
+        chat.append("user", f"m16 {LONG}")
+    monkeypatch.setattr(chat_module, "save_json", real)
+    chat.close()
+    with Chat(tmp_path / "chat", write=True) as again:
+        assert again.view.pending and again.cview.pending and again.view.covered() == 17
+
+
+def test_zoom_past_the_end_and_a_readers_status(tmp_path):
+    chat = new_chat(tmp_path)
+    for i in range(5):
+        chat.append("user", f"fact {i}")
+    chat.append("user", LONG)
+    assert chat.zoom(4, 4) == f"4+2|{PLACEHOLDER}\n6+2|(no messages yet)"
+    assert chat.zoom(8, 8).startswith("No line 8+8")
+    assert chat.status()["failed"] == 0 and chat.status()["ready_merges"] == 0
+    with Chat(tmp_path / "chat") as reader:
+        status = reader.status()
+        assert status["ready_merges"] is None and status["failed"] is None and status["unbuilt_leaves"] == 1

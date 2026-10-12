@@ -376,19 +376,44 @@ code it depended on.
 
 ~~~bash
 export PYTHONPATH=src
-python -m z0int.optchat init    --root /path/to/chat            # --high/--low/--chigh/--clow scale a trial
+L=/path/to/trial/ledger.jsonl                                   # one ledger for the whole trial
+python -m z0int.optchat init    --root /path/to/chat            # the gist's 128,000/64,000/32,000/16,000
+python -m z0int.optchat feed    --root /path/to/chat --ledger $L --model haiku --file turns.jsonl
 python -m z0int.optchat append  --root /path/to/chat --kind user --text "..."
-python -m z0int.optchat compact --root /path/to/chat --model haiku --effort xhigh
+python -m z0int.optchat compact --root /path/to/chat --ledger $L --model haiku
 python -m z0int.optchat view    --root /path/to/chat
-python -m z0int.optchat turn    --root /path/to/chat --model sonnet --compact-model haiku --text "..."
+python -m z0int.optchat turn    --root /path/to/chat --ledger $L --model sonnet --compact-model haiku --text "..."
 python -m z0int.optchat usage   --calls /path/to/chat.work/calls.jsonl
-python -m pytest -q tests/test_optchat.py                       # no model is called
+TMPDIR=/big/disk/tmp python -m pytest -q tests/test_optchat.py --basetemp=/big/disk/tmp/base   # no model is called
 ~~~
+
+How a trial must drive it:
+
+- **Live order.** The view merges only at an append, and only pairs whose parent is
+  built. Feed a chat as it would happen: one turn's messages, compact to idle, the
+  next turn (`feed` does this from a file with one JSON list of `{kind, text}` per
+  line). `turn` compacts to idle after its call. A bulk load is refused: `turn`,
+  `compact` and `feed` exit 2 or 3 when a view is more than `--view-slack` (4,096)
+  bytes past its high mark. A view counts an unbuilt line at its placeholder's size,
+  so a turn that logs many long messages needs about 480 bytes of slack for each.
+- **One ledger.** `--ledger` is required. A send reserves its requests before it
+  starts (`--max-turns` holds it to them), so the caps (Haiku 1,500, Sonnet 250,
+  Opus 60) cannot be passed. A compaction gets one request: one that calls a tool
+  fails and is counted (`tool_calls`, and `tool_violations` in `usage`).
+- **Effort.** Compactions go out at `xhigh`. `--effort default` (or
+  `--compact-effort default` on `turn`) is a deviation, and `usage` labels it, as it
+  labels rows from a chat whose limits are not the gist's.
+- **Temp files** go under the work directory (`<root>.work/tmp`), not `/tmp`.
 
 `--placement` chooses where the view goes: `user-blocks` (default: start of the user
 message, 4-line blocks, a cache mark on the last whole block), `user` (one block) or
 `system` (appended to the system prompt). Every model call is saved as one row of
 `calls.jsonl` with its usage.
+
+The request is not byte for byte the gist's `[tools] [system prompt] [view] [message]`.
+Claude Code puts an SDK identity line before the system prompt, a `<system-reminder>`
+block holding the login's email address before the view, and its own date and
+environment message after the user message. No flag removes them.
 
 ### Image decision experiments
 

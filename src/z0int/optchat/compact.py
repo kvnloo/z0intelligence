@@ -14,6 +14,8 @@ import threading
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 from . import tree
+from .chat import SLACK, ViewOver
+from .claude_cli import ToolCalled
 from .log import NODE, utf8_len
 from .tree import Key
 from .view import line as view_line
@@ -83,6 +85,8 @@ def build_line(session, task: str, tries: int = TRIES, on_start=None) -> tuple[s
     best, text = None, task
     for attempt in range(1, tries + 1):
         reply = session.send(text, on_start=on_start if attempt == 1 else None)
+        if reply.requests > 1:              # the tools are there to match the turns' cache, never to be called
+            raise ToolCalled(f"{session.label}: {reply.requests} requests")
         got = reply.text.strip()
         if not got:
             raise RuntimeError("empty compaction reply")
@@ -96,9 +100,9 @@ def build_line(session, task: str, tries: int = TRIES, on_start=None) -> tuple[s
 
 class Compactor:
     def __init__(self, chat, backend, model: str, *, system: str, tools: dict | None = None,
-                 jobs: int = JOBS, tries: int = TRIES, stop_on=()):
+                 jobs: int = JOBS, tries: int = TRIES, stop_on=(), slack: int = SLACK):
         self.chat, self.backend, self.model = chat, backend, model
-        self.system, self.tools, self.jobs, self.tries = system, tools, jobs, tries
+        self.system, self.tools, self.jobs, self.tries, self.slack = system, tools, jobs, tries, slack
         self.stop_on = tuple(stop_on)     # errors that end the run at once (rate limits)
         self.warm = None                  # the compaction-view epoch whose prefix is in the cache
         self.peak = 0
@@ -116,16 +120,22 @@ class Compactor:
     def _build(self, key: Key, view: str, task: str, started) -> tuple[str, int]:
         try:
             with self.backend.open(self.model, self.system, view, self.tools,
-                                   label=f"compact {tree.name(key)}") as session:
+                                   label=f"compact {tree.name(key)}", max_requests=1) as session:
                 return build_line(session, task, self.tries, started.set if started else None)
         finally:
             if started:
                 started.set()
 
     def run(self, until: str = "idle") -> dict:
-        """Build ready nodes until none is left ("idle") or every message has its line ("leaves")."""
+        """Build ready nodes until none is left ("idle") or every message has its line ("leaves").
+
+        A compaction view more than `slack` bytes past its high mark stops the run
+        before the call is sent (the chat was bulk loaded). A compaction that calls
+        a tool fails and is counted in `tool_calls`.
+        """
         chat = self.chat
-        stats = {"built": [], "failed": [], "over": 0, "retries": 0, "stopped": None}
+        stats = {"built": [], "failed": [], "over": 0, "retries": 0, "stopped": None,
+                 "tool_calls": 0, "context_max": 0}
         inflight, warming, stop = {}, None, None
         pool = ThreadPoolExecutor(self.jobs)
         try:
@@ -149,6 +159,14 @@ class Compactor:
                         if cold:
                             warming = (started, chat.epoch)
                         view, task = self._job(key)
+                        size = utf8_len(view)
+                        if size > chat.cview.high + self.slack:
+                            chat.ready.fail(key)
+                            warming = None if cold else warming
+                            stop = ViewOver(f"the compaction view for {tree.name(key)} is {size} bytes, over "
+                                            f"{chat.cview.high} + {self.slack}: feed the chat in live order")
+                            break
+                        stats["context_max"] = max(stats["context_max"], size)
                         inflight[pool.submit(self._build, key, view, task, started)] = key
                     self.peak = max(self.peak, len(inflight))
                 if not inflight:
@@ -161,6 +179,7 @@ class Compactor:
                     except Exception as error:      # a failed call is tried again at the next message
                         chat.ready.fail(key)
                         stats["failed"].append({"node": tree.name(key), "error": f"{type(error).__name__}: {error}"[:500]})
+                        stats["tool_calls"] += isinstance(error, ToolCalled)
                         if isinstance(error, self.stop_on):
                             stop = error
                         continue
