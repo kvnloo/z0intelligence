@@ -96,30 +96,32 @@ local function basename(path: string?): string
 	return string.match(path, "([^/]+)/*$") or ""
 end
 
--- Tabs of the session the focused block is in, by position.
-local function session_tabs(cx): { any }
-	local focused = cx.session:focused()
-	local tab_id
-	for _, pane in cx.session:panes() do
-		if pane.pane == focused then
-			tab_id = pane.tab
-		end
-	end
-	local all = cx.session:tabs()
-	local session
-	for _, tab in all do
-		if tab.id == tab_id then
-			session = tab.session
-		end
-	end
+-- Tabs of the session this window shows, by position. Not derived from the
+-- focused block: while Carly's overlay is open it can hold focus, and remote
+-- hosts' sessions also have a "tab 1".
+local function session_tabs(cx): ({ any }, number?)
+	local session = cx.sessions:current().id
 	local out = {}
-	for _, tab in all do
-		if session == nil or tab.session == session then
+	for _, tab in cx.session:tabs() do
+		if tab.session == session then
 			table.insert(out, tab)
 		end
 	end
 	table.sort(out, function(a, b) return a.position < b.position end)
-	return out
+	return out, session
+end
+
+-- The tab id holding `pane`, or nil.
+local function tab_of(cx, pane: number?): number?
+	if pane == nil then
+		return nil
+	end
+	for _, info in cx.session:panes() do
+		if info.pane == pane then
+			return info.tab
+		end
+	end
+	return nil
 end
 
 local function candidates(cx): { Candidate }
@@ -131,12 +133,16 @@ local function candidates(cx): { Candidate }
 			table.insert(list, { id = id, label = label, pane = pane, words = tokenize(name) })
 		end
 	end
-	for _, tab in cx.session:tabs() do
+	-- Only the shown session: goto_tab cannot reach another session's tabs.
+	local tabs = session_tabs(cx)
+	local here: { [number]: boolean } = {}
+	for _, tab in tabs do
+		here[tab.id] = true
 		local name = (tab.name ~= nil and tab.name ~= "") and tab.name or tab.title
 		add("t" .. tostring(tab.id), string.format("tab %d: %s — %s %s", tab.position, name, tab.program, basename(tab.cwd)), name, tab.pane)
 	end
 	for _, pane in cx.session:panes() do
-		if not pane.parked and pane.kind ~= "carly" then
+		if not pane.parked and pane.kind ~= "carly" and pane.tab and here[pane.tab] then
 			local what = (pane.program or pane.kind or "") .. " " .. basename(pane.cwd or pane.path)
 			add("p" .. tostring(pane.pane), string.format("%s block: %s — %s", pane.kind or "block", pane.title, what), pane.title, pane.pane)
 		end
@@ -245,34 +251,80 @@ local function local_intent(cx, text: string, list: { Candidate }): Decision?
 	return overlap_focus(words, list)
 end
 
--- Runs a decision; returns what it did, or nil when nothing was executable.
-local function apply(cx, decision: Decision, episode: string, started: number): string?
+local VERIFY_MS = 150 -- actions may apply after the handler returns; look again then
+local TAB_MOVES = { next_tab = true, previous_tab = true }
+
+-- Runs a decision, then checks the window really changed before claiming it.
+-- `done(did, fresh_cx)`: `did` is nil when nothing ran or the check failed.
+-- Live 2026-10-12: `cx.layout:focus(pane)` reported success yet left another
+-- tab shown, so tab changes go through Tern's `goto_tab:N` action.
+local function apply(cx, decision: Decision, episode: string, started: number, done: (string?, any) -> ())
 	local exec = decision.exec
 	if exec == nil then
-		return nil
+		done(nil, cx)
+		return
 	end
 	local from = cx.session:focused()
-	local did
+	local from_tab = tab_of(cx, from)
+	local want_tab: number? = nil
+	local did: string
 	if exec.type == "focus" and decision.pane ~= nil then
-		cx.layout:focus(decision.pane)
+		local pane = decision.pane :: number
+		want_tab = tab_of(cx, pane)
+		local position
+		for _, tab in session_tabs(cx) do
+			if tab.id == want_tab then
+				position = tab.position
+			end
+		end
+		if position == nil then
+			done(nil, cx)
+			return
+		end
+		if not pcall(function()
+			cx:action("goto_tab:" .. tostring(position))
+			cx.layout:focus(pane)
+		end) then
+			outcome(episode, "error")
+			done(nil, cx)
+			return
+		end
 		did = "Switched to " .. (decision.label or "block")
 	elseif exec.type == "tern_action" and exec.name then
-		local name = exec.name
+		local name = exec.name :: string
 		if not pcall(function() cx:action(name) end) then
 			outcome(episode, "error")
-			return nil
+			done(nil, cx)
+			return
 		end
 		did = (name:gsub("_", " "))
 	else
-		return nil
+		done(nil, cx)
+		return
 	end
-	outcome(episode, "applied")
-	if from ~= nil then
-		pending_undo = { episode = episode, pane = from, at = tern.now() }
-	end
-	cx:toast("success", did, string.format("%s%s · %d ms", decision.backend,
-		decision.confidence and string.format(" %.2f", decision.confidence) or "", math.floor(tern.now() - started)))
-	return did
+	tern.timer(VERIFY_MS, function(fresh)
+		-- A focused block outside every tab (Carly's overlay) proves nothing either
+		-- way; only a block seen in the wrong tab counts as failure.
+		local now_tab = tab_of(fresh, fresh.session:focused())
+		local failed = false
+		if now_tab ~= nil and want_tab ~= nil then
+			failed = now_tab ~= want_tab
+		elseif now_tab ~= nil and from_tab ~= nil and TAB_MOVES[exec.name or ""] then
+			failed = now_tab == from_tab
+		end
+		if failed then
+			outcome(episode, "error")
+			done(nil, fresh)
+			return
+		end
+		outcome(episode, "applied")
+		if from ~= nil then
+			pending_undo = { episode = episode, pane = from, at = tern.now() }
+		end
+		fresh:toast("success", did, string.format("%s%s · %d ms", decision.backend,
+			decision.confidence and string.format(" %.2f", decision.confidence) or "", math.floor(tern.now() - started)))
+		done(did, fresh)
+	end)
 end
 
 local function report_universe(cx)
@@ -296,9 +348,8 @@ local function finish(episode: string, did: string?, backend: string, started: n
 	return { handled = did ~= nil, did = did, backend = backend, ms = math.floor(tern.now() - started), episode = episode }
 end
 
--- Returns a Result when the local path decided synchronously; otherwise nil,
--- and `done(result, fresh_cx)` runs once Jev answers.
-local function route(cx, text: string, done: (Result, any) -> ()): Result?
+-- `done(result, fresh_cx)` runs once, after the action was checked or Jev passed.
+local function route(cx, text: string, done: (Result, any) -> ())
 	local started = tern.now()
 	report_universe(cx)
 	local list = candidates(cx)
@@ -309,7 +360,10 @@ local function route(cx, text: string, done: (Result, any) -> ()): Result?
 			kind = "episode", id = episode, backend = "local", utterance = text,
 			decision = { action = decision.action, confidence = decision.confidence },
 		})
-		return finish(episode, apply(cx, decision, episode, started), "local", started)
+		apply(cx, decision, episode, started, function(did, fresh)
+			done(finish(episode, did, "local", started), fresh)
+		end)
+		return
 	end
 	local request = { utterance = text, candidates = tern.json.array() }
 	local panes: { [string]: Candidate } = {}
@@ -322,17 +376,18 @@ local function route(cx, text: string, done: (Result, any) -> ()): Result?
 			return
 		end
 		local episode = (answer and answer.episode) or new_episode()
-		local did = nil
-		if answer and answer.action ~= "none" and answer.exec then
-			local target = answer.target and panes[answer.target] or nil
-			did = apply(next_cx, {
-				action = answer.action, exec = answer.exec, backend = "jev", confidence = answer.confidence,
-				pane = target and target.pane or nil, label = target and target.label or nil,
-			}, episode, started)
+		if not (answer and answer.action ~= "none" and answer.exec) then
+			done(finish(episode, nil, "jev", started), next_cx)
+			return
 		end
-		done(finish(episode, did, "jev", started), next_cx)
+		local target = answer.target and panes[answer.target] or nil
+		apply(next_cx, {
+			action = answer.action, exec = answer.exec, backend = "jev", confidence = answer.confidence,
+			pane = target and target.pane or nil, label = target and target.label or nil,
+		}, episode, started, function(did, fresh)
+			done(finish(episode, did, "jev", started), fresh)
+		end)
 	end)
-	return nil
 end
 
 -- Focus jumping straight back after a fast-path action means it was wrong.
@@ -366,14 +421,11 @@ tern.command({
 				if err or next_cx == nil or request == "" then
 					return
 				end
-				local sync = route(next_cx, request, function(result, fresh_cx)
+				route(next_cx, request, function(result, fresh_cx)
 					if not result.handled then
 						fresh_cx:ask_carly(request)
 					end
 				end)
-				if sync and not sync.handled then
-					next_cx:ask_carly(request)
-				end
 			end)
 	end,
 })
@@ -386,12 +438,9 @@ tern.carly.export("go", {
 	if text == "" then
 		return { handled = false }
 	end
-	local sync = route(cx, text, function(result)
+	route(cx, text, function(result)
 		call:reply(result)
 	end)
-	if sync then
-		return sync
-	end
 	return call:wait(DECIDE_DEADLINE_MS + 1000)
 end)
 
