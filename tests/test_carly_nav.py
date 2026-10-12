@@ -99,6 +99,29 @@ def test_learn_promotes_action_carly_keeps_running(isolated):
     assert "zoom" in hot.offered_actions(catalog)
 
 
+def test_voice_delegation_after_export_miss_labels_carlys_action(isolated):
+    """Voice reaches Carly as a live-delegation row; she calls the export first,
+    so the episode is logged seconds after her turn began."""
+    from datetime import datetime, timezone
+
+    turn_ts = 1_800_000_000.0
+    iso = datetime.fromtimestamp(turn_ts, timezone.utc).isoformat().replace("+00:00", "Z")
+    export = "return await(plugins['carly-nav'].go(\"blow this pane up\"))"
+    rows = [
+        {"type": "custom_message", "customType": "live-delegation", "timestamp": iso,
+         "content": "Hey, can you blow this pane up for me"},
+        {"type": "message", "timestamp": iso, "message": {"role": "assistant", "content": [
+            {"type": "toolCall", "name": "lua", "arguments": {"code": export}},
+            {"type": "toolCall", "name": "run_command", "arguments": {"command": "zoom"}}]}},
+    ]
+    with open(isolated / "carly" / "voice.jsonl", "w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row) + "\n")
+    fallback("v", "blow this pane up", turn_ts + 6)
+    [label] = learner.collect_labels()
+    assert label["label"] == "zoom" and label["source"] == "carly"
+
+
 def test_learn_needs_support_and_never_learns_destructive_actions(isolated):
     now = 1_800_000_000.0
     universe("zoom", "close_pane")

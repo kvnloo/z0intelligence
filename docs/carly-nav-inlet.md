@@ -1,18 +1,29 @@
 # Carly navigation inlet
 
-Tern navigation without a Carly model turn. The set of navigation actions that
-Jev can choose from grows from what Carly actually does.
+Fast Tern navigation for Carly. The set of navigation actions that Jev can
+choose from grows from what Carly actually does.
+
+Two entries share one router:
+
+- **Carly, typed or voice.** Tern has no hook before Carly's model turn, so the
+  plugin adds a request-context line telling her to call
+  `plugins['carly-nav'].go("<user's words>")` first. One tool call replaces her
+  guessing (`first_tab` does not exist; her own Lua then needed 2 more calls).
+  The model turn remains; the work inside it shrinks.
+- **Quick navigation prompt** (`ctrl+alt+shift+space`): no model turn at all.
 
 ```mermaid
 flowchart LR
-  ask[Quick navigation prompt] --> local{Local intent}
-  local -- next/prev, name match --> run[Run in Tern]
-  local -- no --> jev{Jev: action + target}
+  carly[Carly request, typed or voice] -- context hint --> go[go export]
+  quick[Quick navigation prompt] --> router
+  go --> router{Local intent: next/prev/Nth tab, name}
+  router -- match --> run[Run in Tern]
+  router -- no --> jev{Jev: action + target}
   jev -- learned action, confident --> run
-  jev -- none / low confidence / error --> carly[Ask Carly]
+  jev -- none / low confidence / error --> self[Carly does it herself]
   run --> inlet[(episodes + outcomes)]
-  carly --> inlet
-  carly -. transcript .-> learn[z0int carly-nav learn]
+  self --> inlet
+  self -. transcript .-> learn[z0int carly-nav learn]
   inlet --> learn
   learn --> catalog[(catalog: options, exemplars, threshold)]
   catalog --> jev
@@ -33,8 +44,15 @@ Set `Z0INT_PYTHON` in Tern's environment to choose another interpreter.
 ## Install
 
 ```sh
-tern plugin link harness-adapters/tern-carly-nav
+harness-adapters/tern-carly-nav/install.sh
 ```
+
+The script installs a **copy** into Tern's plugin directory and records this
+checkout's `src` path in the plugin's data directory. Rerun it after changing
+the plugin. Do not use `tern plugin link` from a busy data disk: Tern gives a
+window entry 50 ms to load and disables it on overrun until the next reload.
+On 2026-10-11 a cold read from `/mnt/zer0models` during an `rsync` did exactly
+that. The plugin itself executes its load in about 0.1 ms and reads no files then.
 
 Press `ctrl+alt+shift+space` (palette: **Carly: Quick navigation**), type a
 request, press Enter. Toasts name the backend (`local`/`jev`), its confidence and
@@ -109,6 +127,16 @@ z0int carly-nav tune       # live option-budget replay (Jev calls)
 - In Tern (headless `serve`, Carly Lua VM, real plugin source): local focus and
   `previous tab`, Jev focus, learned `zoom` changing the tab to zoomed, fallback
   to Carly, and the universe report (207 actions).
-- Not yet verified in a signed-in desktop window: the keybind, the prompt field,
-  and focus-based undo detection. An isolated window stops at Tern's closed-beta
-  sign-in, which tests must not bypass.
+- Carly's export path (Lua harness on the real plugin source): "Yo, what's up.
+  Can you switch to the first tab" handled locally in 5 ms; "can you go to the
+  next tab", "tab 3" and "take me to where the logs stream" handled; a weather
+  question went through Jev (348 ms) and came back not handled.
+- Carly's model (OMP RPC with Carly's exact flags, system prompt and `@smol`
+  Haiku, a `lua` host tool, the context line in an approximated Plugins
+  section): navigation requests call `go` once and confirm (5.3 s per turn,
+  model time included); the weather question makes no call.
+- Voice delegations (`live-delegation` rows) are read by `learn`.
+- Not yet verified in a signed-in desktop window: the keybind, the prompt
+  field, focus-based undo detection, and Tern's exact Plugins-section wording.
+  An isolated window stops at Tern's closed-beta sign-in, which tests must not
+  bypass, and `tern serve` does not run window-plugin halves.

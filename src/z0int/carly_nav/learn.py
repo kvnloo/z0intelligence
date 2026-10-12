@@ -96,26 +96,32 @@ def labels_from_calls(calls: Iterable[dict[str, Any]]) -> list[str]:
 
 
 def carly_turns() -> list[tuple[float, str, list[dict[str, Any]]]]:
-    """(timestamp, user text, tool calls until the next user message) per Carly turn."""
+    """(timestamp, user text, tool calls until the next user message) per Carly turn.
+
+    Typed requests are ``user`` messages. Voice requests reach Carly's backend as
+    ``custom_message`` rows (``live-delegation``) written by the live voice model.
+    """
     turns: list[tuple[float, str, list[dict[str, Any]]]] = []
     for pattern in transcript_roots():
         for file in glob.glob(os.path.join(pattern, "*.jsonl")):
             current: tuple[float, str, list[dict[str, Any]]] | None = None
             for row in store.read_jsonl(Path(file)):
-                if row.get("type") != "message":
-                    continue
+                text: str | None = None
                 message = row.get("message") or {}
                 content = message.get("content")
-                if not isinstance(content, list):
+                if row.get("type") == "custom_message" and row.get("customType") == "live-delegation":
+                    raw = row.get("content")
+                    text = raw if isinstance(raw, str) else " ".join(
+                        c.get("text", "") for c in raw or [] if isinstance(c, dict) and c.get("type") == "text")
+                elif row.get("type") != "message" or not isinstance(content, list):
                     continue
-                if message.get("role") == "user":
+                elif message.get("role") == "user":
                     text = " ".join(c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text")
+                if text is not None:
                     ts = _parse_ts(row.get("timestamp")) or _parse_ts(message.get("timestamp"))
-                    if ts is None:
-                        current = None
-                        continue
-                    current = (ts, text, [])
-                    turns.append(current)
+                    current = None if ts is None else (ts, text, [])
+                    if current is not None:
+                        turns.append(current)
                 elif message.get("role") == "assistant" and current is not None:
                     current[2].extend(c for c in content if isinstance(c, dict) and c.get("type") == "toolCall")
     return turns
@@ -128,9 +134,15 @@ def label_for_fallback(episode: dict[str, Any], turns: list[tuple[float, str, li
     if not needle:
         return None
     for turn_ts, text, calls in turns:
-        if not (ts - EARLY_SKEW_S <= turn_ts <= ts + MATCH_WINDOW_S):
-            continue
-        if needle not in normalize(text):
+        # Carly's own `plugins['carly-nav'].go(...)` call carries the exact words,
+        # and it runs after her turn started, so it may precede the episode.
+        via_export = any(
+            call.get("name") == "lua" and "carly-nav" in str((call.get("arguments") or {}).get("code"))
+            and needle in normalize(str((call.get("arguments") or {}).get("code")))
+            for call in calls
+        )
+        typed_here = needle in normalize(text) and ts - EARLY_SKEW_S <= turn_ts <= ts + MATCH_WINDOW_S
+        if not (typed_here or (via_export and abs(turn_ts - ts) <= MATCH_WINDOW_S)):
             continue
         labels = list(dict.fromkeys(labels_from_calls(calls)))
         if not labels:
