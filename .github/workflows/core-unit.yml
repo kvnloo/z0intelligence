@@ -35,7 +35,7 @@ jobs:
           persist-credentials: false
       - name: Install pinned CPU test environment
         run: |
-          python -m pip install torch==2.10.0+cpu --index-url https://download.pytorch.org/whl/cpu
-          python -m pip install -e '.[test]'
+          # This donor has no src/ package: its tests only need pytest and PyYAML.
+          python -m pip install pytest pyyaml
       - name: Complete offline suite
         run: python -m pytest -q -m 'not live'
