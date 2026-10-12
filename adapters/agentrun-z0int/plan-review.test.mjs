@@ -94,3 +94,10 @@ test('live execution requires opt-in and real Jev configuration before calling m
   await assert.rejects(runLivePlanReview(input,{}), AgentRunSetupError);
   await assert.rejects(runLivePlanReview(input,{allowRemoteJev:true,env:{}}),AgentRunSetupError);
 });
+
+test('live host rejects unsupported Jev configuration before network access', async () => {
+  await assert.rejects(
+    runLivePlanReview(input, {allowRemoteJev:true,jev:{runJudge:() => {}},env:{TYPESAFE_API_KEY:'fixture-key'}}),
+    AgentRunSetupError,
+  );
+});
