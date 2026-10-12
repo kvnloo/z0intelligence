@@ -54,7 +54,7 @@ export async function runLivePlanReview(input, {
     throw new AgentRunSetupError('Explicit allowRemoteJev=true is required before transmitting any task to Jev.');
   }
   if (!isRecord(jev) || Object.keys(jev).some(key => !['apiKey', 'baseURL', 'model', 'timeoutMs', 'maxAttempts'].includes(key))) {
-    throw new AgentrunSetupError('Unsupported Jev host configuration.');
+    throw new AgentRunSetupError('Unsupported Jev host configuration.');
   }
   const apiKey = jev.apiKey ?? env.TYPESAFE_API_KEY;
   if (typeof apiKey !== 'string' || !apiKey.trim()) {
