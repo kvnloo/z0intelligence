@@ -11,6 +11,7 @@ kept. A failed node waits for the next message.
 from __future__ import annotations
 
 import threading
+import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 from . import tree
@@ -106,6 +107,8 @@ class Compactor:
         self.stop_on = tuple(stop_on)     # errors that end the run at once (rate limits)
         self.warm = None                  # the compaction-view epoch whose prefix is in the cache
         self.peak = 0
+        self.poll = None                  # seconds between looks at the queues while calls are in flight;
+                                          # None: nothing is appended during a run (Background sets it)
 
     def _job(self, key: Key) -> tuple[str, str]:
         chat = self.chat
@@ -171,7 +174,7 @@ class Compactor:
                     self.peak = max(self.peak, len(inflight))
                 if not inflight:
                     break
-                done, _ = wait(inflight, timeout=0.05 if warming else None, return_when=FIRST_COMPLETED)
+                done, _ = wait(inflight, timeout=0.05 if warming else self.poll, return_when=FIRST_COMPLETED)
                 for future in done:
                     key = inflight.pop(future)
                     try:
@@ -193,3 +196,88 @@ class Compactor:
         if stop is not None:
             stats["stopped"] = str(stop)[:500]
         return stats
+
+
+class Background:
+    """The gist's background compactor: one thread of the chat's own process that
+    keeps building ready nodes while turns run.
+
+    `Compactor.run` ends when nothing is ready; this calls it again whenever
+    something is. A turn waits only for the lines before its message
+    (`wait_leaves`); merges go on behind it. Still one writer, one lock, up to
+    `jobs` calls at once.
+    """
+
+    def __init__(self, compactor: Compactor, poll: float = 0.05):
+        self.compactor, self.chat, self.poll = compactor, compactor.chat, poll
+        compactor.poll = poll             # messages arrive while calls are in flight: keep looking
+        self.runs: list[dict] = []        # one entry per run: {"t0", "t1", stats...}
+        self.busy = False
+        self.busy_s = 0.0
+        self.stopped: str | None = None   # why the compactor gave up (a limit, an oversized view)
+        self._halt = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> "Background":
+        if self._thread is None:
+            self._thread = threading.Thread(target=self._loop, name="compactor", daemon=True)
+            self._thread.start()
+        return self
+
+    def _loop(self) -> None:
+        chat = self.chat
+        while not self._halt.is_set():
+            with chat.lock:
+                self.busy = not chat.ready.idle()
+            if not self.busy:
+                self._halt.wait(self.poll)
+                continue
+            began = time.time()
+            try:
+                stats = self.compactor.run("idle")
+            except Exception as error:                 # never die silently: a turn would wait for ever
+                stats = {"built": [], "failed": [], "over": 0, "retries": 0, "tool_calls": 0,
+                         "context_max": 0, "stopped": f"{type(error).__name__}: {error}"[:500]}
+            ended = time.time()
+            with chat.lock:
+                self.busy_s += ended - began
+                self.runs.append({"t0": began, "t1": ended, **stats})
+                if stats["stopped"]:
+                    self.stopped = stats["stopped"]
+                    self.busy = False
+                    return
+
+    def quiet(self) -> bool:
+        """Nothing running and nothing ready (failed nodes may still be parked)."""
+        with self.chat.lock:
+            return not self.busy and self.chat.ready.idle()
+
+    def wait_leaves(self, timeout: float | None = None) -> float:
+        """Block until every message has its line, or no more can be built now. Seconds waited."""
+        began = time.time()
+        while self.chat.unbuilt_leaves() and not self.stopped and not self.quiet():
+            if timeout is not None and time.time() - began > timeout:
+                break
+            time.sleep(self.poll)
+        return time.time() - began
+
+    def wait_idle(self, timeout: float | None = None) -> float:
+        began = time.time()
+        while not self.stopped and not self.quiet():
+            if timeout is not None and time.time() - began > timeout:
+                break
+            time.sleep(self.poll)
+        return time.time() - began
+
+    def drain(self) -> list[dict]:
+        """The runs finished since the last drain."""
+        with self.chat.lock:
+            out, self.runs = self.runs, []
+            return out
+
+    def stop(self) -> None:
+        """Let the calls in flight finish, then end the thread."""
+        self._halt.set()
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None

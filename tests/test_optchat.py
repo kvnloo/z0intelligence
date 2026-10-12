@@ -15,7 +15,7 @@ import pytest
 from z0int.optchat import tree
 from z0int.optchat.chat import SLACK, Chat, NoView, ViewOver
 from z0int.optchat.claude_cli import BackendError, ClaudeCLI, LimitError, Reply, ToolCalled, blocks_of
-from z0int.optchat.compact import (LEAF_TASK, MERGE_TASK, RULER, TOO_LONG, Compactor, build_line,
+from z0int.optchat.compact import (LEAF_TASK, MERGE_TASK, RULER, TOO_LONG, Background, Compactor, build_line,
                                    first_bytes, leaf_task, merge_task, too_long)
 from z0int.optchat.log import CAP, SPLIT, ChatLog, Locked, clip_echo, split_text
 from z0int.optchat.mcp import handle
@@ -992,3 +992,84 @@ def test_zoom_past_the_end_and_a_readers_status(tmp_path):
     with Chat(tmp_path / "chat") as reader:
         status = reader.status()
         assert status["ready_merges"] is None and status["failed"] is None and status["unbuilt_leaves"] == 1
+
+
+# -- round 2: the background compactor, and a batch on real sizes ----------------
+
+def test_background_compactor_builds_behind_the_turn_and_the_turn_waits_only_for_leaves(tmp_path):
+    chat = new_chat(tmp_path)
+    gate, seen = threading.Event(), {}
+
+    def slow(session, *_):
+        if session.label.startswith("compact 0+2") or session.label.startswith("compact 2+2"):
+            gate.wait(10)                                      # merges are held back: the turn must not wait for them
+        return f"line for {session.label} " + "s" * 440
+
+    cheap = FakeBackend(slow)
+    back = Background(Compactor(chat, cheap, "cheap", system=chat.system())).start()
+    try:
+        def answer(session, on_start, on_block):
+            on_block("tool", f"shell {LONG}")
+            on_block("echo", f"result {LONG}")
+            deadline = time.time() + 10                        # this turn's lines are built while the call runs
+            while chat.unbuilt_leaves() > 0 and time.time() < deadline:
+                time.sleep(0.01)
+            seen["built_during_call"] = chat.unbuilt_leaves() == 0
+            on_block("unii", f"reply {LONG}")
+            return "ok"
+
+        turns = FakeBackend(answer)
+        out = run_turn(chat, turns, "smart", f"ask 0 {LONG}", background=back)
+        assert seen["built_during_call"] and out["compaction"] is None and out["after"] is None
+        turns.answer = lambda *a: "ok"
+        out = run_turn(chat, turns, "smart", "ask 1", background=back)    # waits for the reply's line only
+        assert out["waited_s"] is not None and chat.built((0, 3))
+        assert not chat.built((1, 0)) and not gate.is_set()   # the merges are still running behind it
+        assert PLACEHOLDER not in turns.sessions[1].view and "3+1|line for compact 3+1" in turns.sessions[1].view
+        gate.set()
+        back.wait_idle(10)
+        assert chat.built((1, 0)) and chat.built((1, 1)) and chat.built((2, 0)) and back.quiet()
+        assert back.drain() and back.stopped is None
+    finally:
+        gate.set()
+        back.stop()
+
+
+def test_background_compactor_reports_a_limit_and_the_turn_is_refused(tmp_path):
+    chat = new_chat(tmp_path)
+    chat.append("echo", LONG)
+
+    def limited(session, *_):
+        raise LimitError("usage limit reached")
+
+    back = Background(Compactor(chat, FakeBackend(limited), "cheap", system="S", stop_on=(LimitError,))).start()
+    try:
+        turns = FakeBackend(lambda *a: "ok")
+        with pytest.raises(NotReady, match="usage limit"):
+            run_turn(chat, turns, "smart", "go on", background=back)
+        assert chat.total == 1 and not turns.sessions and "usage limit" in back.stopped
+    finally:
+        back.stop()
+
+
+def test_a_batch_due_on_real_sizes_happens_before_the_turn_renders(tmp_path):
+    """Lines are counted at the placeholder's size until they are built. A turn of many long
+    messages can so leave the view far past 128,000 bytes with no append left to see it."""
+    chat = new_chat(tmp_path)
+    cheap = summarizer()
+    compactor = Compactor(chat, cheap, "cheap", system="S", slack=10 ** 9)
+    while chat.view.size(chat.text) < 120_000:
+        chat.append("echo", LONG)
+        compactor.run("idle")
+    assert chat.merges == 0
+    for _ in range(40):                                        # one turn's 40 long messages, none built yet
+        chat.append("echo", LONG)
+    assert chat.merges == 0 and chat.view.size(chat.text) < 128_000    # placeholders: no batch seen
+    compactor.run("idle")
+    assert chat.view.size(chat.text) > 128_000 + SLACK         # real sizes: 15 KB over, nothing noticed
+    with pytest.raises(ViewOver):
+        chat.check()
+    turns = FakeBackend(lambda *a: "ok")
+    out = run_turn(chat, turns, "smart", "next", compactor=compactor)
+    assert out["batch_merges"] > 0 and out["view_bytes"] <= 64_000 + 8
+    assert chat.settle() == 0                                  # nothing is due twice

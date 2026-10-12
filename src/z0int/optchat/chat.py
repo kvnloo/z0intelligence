@@ -162,6 +162,27 @@ class Chat:
                 self._save()
         return out
 
+    def settle(self) -> int:
+        """Run a due batch now, on the lines' real sizes. Returns how many pairs merged.
+
+        `append` settles while the newest lines are still placeholders (29 bytes
+        each, whatever their real size turns out to be), so a view can pass its
+        high mark after the last append of a turn, once its lines are built,
+        with no append left to notice. A turn calls this once every line before
+        its message is built and before it renders: the batch that the view's
+        real size calls for happens then, not one turn late. Which pairs merge
+        is unchanged.
+        """
+        with self.lock:
+            merged = self.view.settle(self.total, self.text, self.built)
+            self.merges += merged
+            moved = self.cview.settle(self.total, self.text, self.built, force=bool(merged))
+            if moved:
+                self.epoch += 1
+            if merged or moved:
+                self._save()
+            return merged
+
     def commit(self, key: Key, text: str) -> None:
         """Log a built node once, then queue or freely build what it completes."""
         with self.lock:

@@ -41,12 +41,26 @@ def tools_config(root: Path, *, callable_: bool = True) -> dict:
 
 
 def run_turn(chat, backend, model: str, text: str, *, compactor=None, tools: dict | None = None,
-             show=None, after: bool = True, slack: int = SLACK, max_requests: int = MAX_REQUESTS) -> dict:
-    chat.ready.retry()                      # m is a new message: failed nodes are tried again
-    compaction = compactor.run("leaves") if compactor else None
-    if chat.unbuilt_leaves():
-        why = f": {compaction['stopped']}" if compaction and compaction["stopped"] else ""
-        raise NotReady(f"{chat.unbuilt_leaves()} messages before this one are not summarized{why}")
+             show=None, after: bool = True, slack: int = SLACK, max_requests: int = MAX_REQUESTS,
+             background=None) -> dict:
+    """`background`: a started compact.Background. The turn then only waits for the
+    lines before its message; leaves and merges of this turn are built behind it,
+    while the call runs, and `compactor`/`after` are not used."""
+    with chat.lock:
+        chat.ready.retry()                  # m is a new message: failed nodes are tried again
+    waited = None
+    if background is not None:
+        waited = background.wait_leaves()
+        compaction, compactor = None, None
+        if chat.unbuilt_leaves():
+            why = f": {background.stopped}" if background.stopped else ""
+            raise NotReady(f"{chat.unbuilt_leaves()} messages before this one are not summarized{why}")
+    else:
+        compaction = compactor.run("leaves") if compactor else None
+        if chat.unbuilt_leaves():
+            why = f": {compaction['stopped']}" if compaction and compaction["stopped"] else ""
+            raise NotReady(f"{chat.unbuilt_leaves()} messages before this one are not summarized{why}")
+    batch = chat.settle()                   # every line is built: a batch due on real sizes happens now
     chat.check(slack)                       # a view far past 128,000 bytes is refused, before anything is logged
     view = chat.render()                    # before logging m: the view never holds m
     first = chat.append("user", text)[0].i
@@ -63,5 +77,6 @@ def run_turn(chat, backend, model: str, text: str, *, compactor=None, tools: dic
     return {"message": first, "view_bytes": len(view.encode("utf-8")), "reply": reply.text,
             "usage": reply.usage, "requests": reply.requests, "wall_s": reply.wall_s,
             "model": reply.model, "logged_to": logged_to, "compaction": compaction,
+            "waited_s": waited, "batch_merges": batch,
             "cut": bool(reply.row.get("max_turns_hit")),      # stopped at max_requests, maybe mid-work
             "after": compactor.run("idle") if compactor and after else None}
