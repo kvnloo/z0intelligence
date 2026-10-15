@@ -645,6 +645,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("outcomes", "Verified turn outcomes + credit join (→ z0int.outcome_verifier)"),
         ("loop", "Verified learning loop: export tables, merge hosts, scheduled tick (→ z0int.loop_export)"),
         ("memory", "z0 memory surface: doctor, bench, eval, rules (→ z0int.memory.cli)"),
+        ("episodes", "Routing episode compiler: build, split, baseline, sft-plan (→ z0int.episodes_cli)"),
     ):
         sp = sub.add_parser(name, help=help_txt)
         sp.add_argument(
@@ -1187,7 +1188,7 @@ def main(argv: list[str] | None = None) -> int:
         return int(_util_run(rest))
 
     if args.cmd in ("routine", "cascade", "aodl", "repair", "abab", "claude-code", "hermes", "outcomes", "loop",
-                    "memory"):
+                    "memory", "episodes"):
         rest = list(getattr(args, "module_argv", None) or [])
         # argparse REMAINDER keeps a leading "--" when users write: z0int routine -- compile ...
         if rest and rest[0] == "--":
@@ -1213,6 +1214,8 @@ def main(argv: list[str] | None = None) -> int:
             from .loop_export import _main as _mod_main
         elif args.cmd == "memory":
             from .memory.cli import main as _mod_main
+        elif args.cmd == "episodes":
+            from .episodes_cli import _main as _mod_main
         else:
             from .abab import _main as _mod_main
         return int(_mod_main(rest))
