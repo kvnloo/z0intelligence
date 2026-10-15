@@ -449,6 +449,31 @@ def reconstruct_session(session: Mapping[str, Any], *, root: Mapping[str, Any], 
 
 
 # ----------------------------------------------------------------------------- the run (watermarked, lock-aware)
+SZZ_BUDGET = 1500  # SZZ fix-origin checks (git diff + blame) per repository per run
+
+
+def bounded_index(budget: int = SZZ_BUDGET) -> Any:
+    """The verifier's RepoIndex with a per-repository SZZ budget. A busy upstream fork can hold tens of thousands of
+    'fix' commits in the window; past the budget a fix candidate is not examined (counted in ``szz_truncated``).
+    That can only miss a negative ``commit_szz_fixed`` signal; the survival signal it leaves is low-confidence soft and
+    never decides a label on its own, so truncation never creates a success label."""
+    from . import outcome_verifier as ov
+
+    class BoundedRepoIndex(ov.RepoIndex):
+        def __init__(self) -> None:
+            super().__init__()
+            self.szz_calls: Counter = Counter()
+            self.szz_truncated: Counter = Counter()
+
+        def origins(self, repo, fix):  # type: ignore[override]
+            key = (str(repo), fix.sha)
+            if key not in self._szz and self.szz_calls[str(repo)] >= budget:
+                self.szz_truncated[str(repo)] += 1
+                return set()
+            self.szz_calls[str(repo)] += key not in self._szz
+            return super().origins(repo, fix)
+    return BoundedRepoIndex()
+
 class SharedLock:
     """flock(2) LOCK_SH on the quiet-lane lock (the same kernel lock ``flock -s`` and the loop tick take), held in
     bounded slices so an exclusive quiet window can always get in between them."""
@@ -511,7 +536,7 @@ def load_watermarks(root: Path) -> dict[str, Any]:
 def run(home: str | Path | None = None, *, agentsview: str | Path | None = None, agents: Iterable[str] = AGENT_ORDER,
         budget_s: float | None = None, as_of: float | None = None, fix_days: int = 7, lock: str | Path | None = None,
         hold_s: float = 300.0, lock_wait_s: float = 7200.0, limit: int | None = None,
-        host: str | None = None) -> dict[str, Any]:
+        host: str | None = None, szz_budget: int = SZZ_BUDGET) -> dict[str, Any]:
     """Reconstruct every session whose watermark changed. Counts-only report; rows land under the out root."""
     from . import outcome_verifier as ov
     from .turn_readers import AgentsViewReader
@@ -530,12 +555,13 @@ def run(home: str | Path | None = None, *, agentsview: str | Path | None = None,
     log = root / 'logs' / f"run-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.jsonl"
     log.parent.mkdir(parents=True, exist_ok=True)
     status = 'complete'
+    index, szz_seen = None, 0
     saved_env = {k: os.environ.get(k) for k in OFFLINE_GIT_ENV}
     os.environ.update(OFFLINE_GIT_ENV)
     try:
         sessions = list_sessions(reader.conn, agents)
         by_id = {s['id']: s for s in sessions}
-        index = ov.RepoIndex()
+        index = bounded_index(szz_budget)
         if not lk.acquire():
             return {'status': 'skipped_exclusive_window', 'lock_waited_s': round(lk.waited_s, 1)}
         done = 0
@@ -567,6 +593,10 @@ def run(home: str | Path | None = None, *, agentsview: str | Path | None = None,
                 c[f'session_error:{type(exc).__name__}'] += 1
                 continue
             c.update({k: v for k, v in sc.items()})
+            trunc = sum(index.szz_truncated.values())
+            if trunc > szz_seen:
+                c['sessions_with_szz_truncated'] += 1
+            szz_seen = trunc
             c['sessions_reconstructed'] += 1
             if s['agent'] == 'claude':
                 c['claude_transcript_found' if claude_transcript(s) else 'claude_transcript_missing'] += 1
@@ -599,6 +629,9 @@ def run(home: str | Path | None = None, *, agentsview: str | Path | None = None,
               'lock': {'path': str(lk.path) if lk.path else None, 'mode': 'flock(2) LOCK_SH, sliced',
                        'slices': lk.slices, 'waited_s': round(lk.waited_s, 1), 'hold_s': hold_s},
               'per_harness': {h: dict(sorted(c.items())) for h, c in per_harness.items()},
+              'szz': {'budget_per_repo': szz_budget,
+                      'repos_truncated': len(index.szz_truncated) if index is not None else 0,
+                      'candidates_skipped': sum(index.szz_truncated.values()) if index is not None else 0},
               'privacy': 'counts only'}
     with log.open('a') as fh:
         fh.write(json.dumps(report, sort_keys=True) + '\n')

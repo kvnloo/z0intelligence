@@ -274,3 +274,24 @@ def test_git_runs_offline_during_a_run_and_the_env_is_restored(world, monkeypatc
     _run(world)
     assert seen == rr.OFFLINE_GIT_ENV
     assert 'GIT_NO_LAZY_FETCH' not in rr.os.environ
+
+
+def test_szz_budget_stops_examining_fix_candidates_past_the_budget(tmp_path):
+    from z0int import outcome_verifier as ov
+    idx = rr.bounded_index(budget=2)
+    calls = []
+    real = ov.RepoIndex.origins
+    def fake(self, repo, fix):  # the real method's cache, without git
+        key = (str(repo), fix.sha)
+        if key not in self._szz:
+            calls.append(fix.sha)
+            self._szz[key] = {'x'}
+        return self._szz[key]
+    ov.RepoIndex.origins = fake
+    try:
+        fixes = [ov.Landed(f's{i}', 0.0, 'fix', '', frozenset()) for i in range(4)]
+        out = [idx.origins(tmp_path, f) for f in fixes] + [idx.origins(tmp_path, fixes[0])]
+    finally:
+        ov.RepoIndex.origins = real
+    assert calls == ['s0', 's1'] and out == [{'x'}, {'x'}, set(), set(), {'x'}]
+    assert sum(idx.szz_truncated.values()) == 2
