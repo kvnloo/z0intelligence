@@ -14,7 +14,7 @@ The current repository is much more than the original OpenJev prototype.
 
 | Surface | Current role |
 | --- | --- |
-| Provenance-backed context and state | ContextPacket resolver plus source-backed State Packets, question-scoped DecisionOpportunities and explicit invalidation; retrieval is not authority |
+| Provenance-backed context and state | ContextPacket resolver with resident FFF codebase search + QMD docs fallback, source-backed State Packets, question-scoped DecisionOpportunities and explicit invalidation; retrieval is not authority |
 | Capability router | `z0int.intelligence.route(request, snapshot)` chooses only from evidence-backed eligible capabilities; missing evidence returns `PARENT_ONLY` |
 | Dispatch authority | Owns execution identity, replay/conflict protection, canonical receipts, and “do not execute twice when prior execution is uncertain” semantics |
 | Local cognition | Deterministic legal-action compiler + provider-neutral candidate model + risk/quality gates + escalation + shadow cascade |
@@ -365,6 +365,70 @@ z0int cognition serving
 z0int cognition probe
 ~~~
 
+### OptChat fresh-view turns
+
+The OMP extension follows [Victor Taelin's OptChat specification](https://gist.github.com/VictorTaelin/91837951a5ce5b38f341ec1ba1df6449/f51fe5c910427fd6f384d22823140b1693c76207).
+Each enabled turn sends the summarized view and queued input in a fresh request.
+It does not send the OMP session history. **All OMP sessions share one permanent
+OptChat log** under `$Z0INT_HOME/optchat`, or `~/.z0int/optchat`. A new OMP session
+does not reset that log.
+
+The main turn uses the active OMP model and selected thinking effort, including
+`max` when supported. OpenAI-family requests keep a stable prompt-cache routing
+key for the shared log, without retaining a server conversation. A stable key
+does not prove a cache hit; verify the real provider's token-usage report.
+
+The related [OptMem repository](https://github.com/VictorTaelin/OptMem) is the tree
+memory predecessor. Its `wake` tiling is not OptChat's append-and-merge view.
+The creator's [AI-scripts Anthropic adapter](https://github.com/VictorTaelin/AI-scripts/blob/906c4feb8e3345dfab8675c3961182ab8b647637/askai/Vendors/Anthropic.ts)
+also documents prefix caching and signed assistant-block replay.
+
+The default compactor is native `anthropic/claude-sonnet-4-6` at medium effort,
+through the installed OMP SDK and its normal credential store. It requires a
+model context of at least 200,000 tokens. It sends the full prefix and source,
+with no input truncation and no provider fallback. This route incurs Anthropic
+API cost. Invalid model configuration fails before credential lookup or requests.
+
+~~~bash
+omp login anthropic
+bun src/z0int/optchat/sonnet.mjs --check
+# In OMP:
+/optchat on
+/optchat status
+# Escape cancels the current turn or readiness wait.
+/optchat off
+~~~
+
+Use `Z0INT_OPTCHAT_AGENT_DIR` for a separate compactor credential/config directory.
+Use `Z0INT_OMP_ROOT` for a nonstandard SDK install and `Z0INT_PYTHON` for the Python
+runtime. An explicit `Z0INT_OPTCHAT_HOST` selects an OpenAI-compatible compactor
+instead. Set its model with `Z0INT_OPTCHAT_MODEL` and provide enough context.
+An undersized endpoint fails visibly rather than discard the middle of the input.
+
+The resident wakes on new work, runs at most eight independent compactor jobs,
+and performs short joins without a model call. Failed nodes retry after ten
+seconds. A missing credential or provider error appears during the readiness
+wait. Escape and `/optchat off` preserve unanswered input exactly once.
+Native SDK stream errors and empty completions fail the node. Hidden SDK
+resampling does not run inside a compactor attempt.
+
+Reproduce the behavioral and emitted-wire checks:
+
+~~~bash
+PYTHONPATH=src python -m pytest -q tests/test_optchat.py
+bun scripts/prove-optchat-conformance.mjs all /tmp/optchat-omp-proof
+bun scripts/prove-optchat-sonnet.mjs /tmp/optchat-sonnet-proof
+~~~
+
+The native Sonnet probe requires Bun and Node. Node hosts the loopback HTTP
+fixture so that an aborted pre-header request emits a real socket-close event.
+
+These probes use the real resident and installed provider SDK, but scripted
+loopback responses. They prove contracts, cancellation and serialized cache
+boundaries, **not** real summary quality or provider cache hits.
+`Z0INT_OPTCHAT_DUMP` captures final provider payloads for a private trace. Those
+payloads contain chat content. Keep them outside the repository.
+
 ### Image decision experiments
 
 ~~~bash
@@ -391,6 +455,7 @@ They are compatibility/research surfaces, not the product identity.
 | `src/z0int/intelligence.py` | pure capability selection |
 | `src/z0int/dispatch_authority.py` | canonical execution/replay authority |
 | `src/z0int/context_resolve.py` | provenance-backed context resolution |
+| `src/z0int/file_search.py` | resident FFF path/content index + watcher; bounded retrieval only |
 | `src/z0int/cognition/` | deterministic legal-action compiler, candidate model, cascade, serving, shadow path |
 | `src/z0int/backends/` | typed decision backends + benchmark harness |
 | `src/z0int/functions/` | named function-level verification implementations |

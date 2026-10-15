@@ -133,6 +133,10 @@ function recordDrop(harness: string, reason: string, kind = "opportunity_record"
 		/* a lost drop marker never affects the host */
 	}
 }
+let pendingReload: {
+	reason: string;
+	notify?: (message: string, level: "info" | "warning" | "error") => void;
+} | null = null;
 
 function ensureDir(path: string): void {
 	mkdirSync(path, { recursive: true });
@@ -435,6 +439,23 @@ async function reload(reason: string): Promise<Jsonish> {
 		reloadPromise = null;
 	});
 	return reloadPromise;
+}
+
+async function flushPendingReload(): Promise<void> {
+	if (!pendingReload || activeTurns.size) return;
+	const pending = pendingReload;
+	pendingReload = null;
+	const result = await reload(pending.reason);
+	if (result.deferred === true) {
+		pendingReload = pending;
+		return;
+	}
+	pending.notify?.(
+		result.ok === true
+			? `z0int bridge → generation ${result.generation} build=${result.build_id}`
+			: `z0int bridge reload failed (${result.error}); keeping generation ${generation}`,
+		result.ok === true ? "info" : "warning",
+	);
 }
 
 /** The host session id: OMP and senpi expose it through ctx.sessionManager.getSessionId() (salvaged, 815c680). */
@@ -772,6 +793,12 @@ export function registerBridgeCapture(
 				const notify = (ctx as { ui?: { notify?: (m: string, l?: string) => void } } | undefined)?.ui?.notify;
 				try {
 					const result = await reload("omp_reload_plugins");
+					if (result.deferred === true) {
+						// A reload that arrives mid-turn is queued and applied when the turn closes (#128).
+						pendingReload = { reason: "omp_reload_plugins", notify: (message, level) => notify?.(message, level) };
+						notify?.(`z0int bridge reload deferred until this turn ends; keeping generation ${generation}`, "info");
+						return undefined;
+					}
 					const ok = result.ok === true;
 					notify?.(
 						ok
@@ -848,6 +875,7 @@ export function registerBridgeCapture(
 					"bridge_agent_end",
 					eventField(event, "aborted") !== true,
 				);
+				await flushPendingReload();
 			} catch {
 				counters.handler_errors = (counters.handler_errors ?? 0) + 1;
 			}
@@ -881,6 +909,64 @@ export default function z0intBridge(pi: ExtensionAPI) {
 	pi.setLabel("z0int bridge v2 (capture)");
 	registerBridgeCapture(pi, { harness: "omp" });
 
+	// Retrieval evidence only (#135), not routing: routing stays with the z0int-intelligence link. A host
+	// without zod/registerTool still gets capture and the bridge commands.
+	const z = (pi as { zod?: ExtensionAPI["zod"] }).zod;
+	if (z && typeof pi.registerTool === "function") pi.registerTool({
+		name: "z0_file_search",
+		label: "z0 file search",
+		loadMode: "essential",
+		description:
+			"Fast repository path/content search through z0's resident FFF index. Returns source-backed evidence only; it does not authorize actions.",
+		parameters: z.object({
+			query: z.string().describe("Filename, symbol, or content to find"),
+			kind: z
+				.string()
+				.optional()
+				.describe("natural_language (default), exact_symbol, or exact_path"),
+			allowQmd: z
+				.boolean()
+				.optional()
+				.describe("Allow QMD docs/notes fallback after FFF misses (default true)"),
+		}),
+		async execute(_toolCallId, params, _onUpdate, ctx, _signal) {
+			try {
+				const h = await ensureWorker();
+				const sessionId = resolveSessionId(ctx);
+				const traceId = activeTurns.get(sessionId)?.traceId;
+				const result = await request(
+					h,
+					{
+						op: "file_search",
+						trace_id: traceId,
+						session_id: sessionId,
+						payload: {
+							query: params.query,
+							kind: params.kind || "natural_language",
+							project_root: ctx.cwd,
+							session_id: sessionId,
+							trace_id: traceId,
+							allow_qmd: params.allowQmd ?? true,
+							record: true,
+						},
+					},
+					10_000,
+				);
+				return {
+					content: [{ type: "text", text: JSON.stringify(result.packet ?? result) }],
+					details: result,
+					isError: result.ok !== true,
+				};
+			} catch (error) {
+				return {
+					content: [{ type: "text", text: String(error) }],
+					details: { ok: false, error: String(error) },
+					isError: true,
+				};
+			}
+		},
+	});
+
 	pi.registerCommand("z0int-bridge-status", {
 		description: "Show resident z0int bridge worker generation/build",
 		async handler(_args, ctx) {
@@ -901,6 +987,17 @@ export default function z0intBridge(pi: ExtensionAPI) {
 		description: "Hot-reload resident z0int bridge worker (same as /reload-plugins intercept)",
 		async handler(_args, ctx) {
 			const result = await reload("z0int-bridge-reload-cmd");
+			if (result.deferred === true) {
+				pendingReload = {
+					reason: "z0int-bridge-reload-cmd",
+					notify: (message, level) => ctx.ui.notify(message, level),
+				};
+				ctx.ui.notify(
+					`reload deferred until this turn ends; keeping generation ${generation}`,
+					"info",
+				);
+				return;
+			}
 			ctx.ui.notify(
 				result.ok
 					? `z0int bridge → generation ${result.generation} build=${result.build_id}`
@@ -943,6 +1040,7 @@ export default function z0intBridge(pi: ExtensionAPI) {
 					),
 				);
 				if (activeTurns.get(turn.sessionId)?.traceId === turn.traceId) activeTurns.delete(turn.sessionId);
+				await flushPendingReload();
 				ctx.ui.notify(
 					`z0int close: ${JSON.stringify({ ok: closed.ok !== false, trace: turn.traceId, gen: h.generation })}`,
 					closed.ok === false ? "error" : "info",

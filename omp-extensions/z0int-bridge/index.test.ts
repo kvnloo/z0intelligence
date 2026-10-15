@@ -102,6 +102,14 @@ test("the default export is capture plus the bridge commands only: no routing ha
 	expect(pi.commands.sort()).toEqual(["z0int-bridge-status", "z0int-bridge-reload", "z0int-close"].sort());
 });
 
+test("with zod the bridge adds only the z0_file_search retrieval tool, never a routing tool", () => {
+	// A chainable stand-in for pi.zod: every call returns another chainable.
+	const chain: unknown = new Proxy(() => chain, { get: () => chain, apply: () => chain });
+	const pi = { ...fakePi(), zod: chain };
+	expect(() => m.default(pi as never)).not.toThrow();
+	expect(pi.tools).toEqual(["z0_file_search"]);
+});
+
 test("routing loaded from its own z0int-intelligence link registers exactly once next to the bridge", async () => {
 	const intelligence = (await import("../z0int-intelligence/index.ts")).default as (pi: unknown) => void;
 	const pi = fakePi();

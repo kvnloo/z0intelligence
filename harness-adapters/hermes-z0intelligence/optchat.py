@@ -87,6 +87,11 @@ class OptChat:
             return self._proc
         if not self.python:
             raise RuntimeError("z0int_python is not configured")
+        # optchat_mode is this harness's switch: turn on the Hermes-local OptChat flag (next to its
+        # own log), never the OMP /optchat flag, before the resident reads it at start.
+        flag = self.root.parent / "enabled"
+        flag.parent.mkdir(parents=True, exist_ok=True)
+        flag.write_text("on\n", encoding="utf-8")
         env = dict(os.environ, Z0INT_HOME=str(self.home), Z0INT_OPTCHAT_ROOT=str(self.root))
         self._proc = subprocess.Popen(
             [self.python, "-m", "z0int.optchat"],

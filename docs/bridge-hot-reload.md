@@ -35,7 +35,7 @@ After that:
 
 If N+1 fails: keep N. Never accept traffic on a broken generation.
 
-Reload is deferred while a turn is in flight (`turn_in_flight`).
+Reload requested during a turn is queued and run when that turn closes (`turn_in_flight`). It is not a failed reload.
 
 ## Per-session trace ownership
 

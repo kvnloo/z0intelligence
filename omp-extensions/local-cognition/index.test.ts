@@ -11,6 +11,8 @@ import { join } from "node:path";
 import localCognition, {
 	__resetLocalCognitionForTest,
 	buildShadowPayload,
+	classifyShadowResponse,
+	coverage,
 	cognitionTimeoutMs,
 	loadCognitionSettings,
 	receiptPath,
@@ -136,7 +138,7 @@ test("sends a cognition_shadow request through the bridge transport", async () =
 	const request = sent[0];
 	expect(request.op).toBe("cognition_shadow");
 	expect(Array.isArray(request.actions)).toBe(true);
-	expect(request.state).toContain("OMP tool_call: read");
+	expect(request.state).toBe("OMP session. Previous tool calls, oldest first: none");
 	expect((request.facts as Record<string, unknown>).tool_name).toBe("read");
 });
 
@@ -158,18 +160,70 @@ test("payload actions contain only the available tool names", async () => {
 	}
 });
 
-test("payload keeps read-only authority and the example shadow models by default", async () => {
+test("authority and budget cover every available tool, whatever the observed call", () => {
+	const tools = ["read", "grep", "glob", "ls", "fetch", "todo", "task", "ask", "bash", "write", "edit"];
+	const asRead = buildShadowPayload(toolCall("read"), tools);
+	const asWrite = buildShadowPayload(toolCall("write", { path: "x" }), tools);
+
+	// Enough authority and budget that no tool is eliminated, so the observed one is always legal.
+	expect(asWrite.authority).toEqual(["read", "write"]);
+	expect(asWrite.budget_units).toBe(tools.length);
+	// Nothing the model is shown differs between a read call and a write call.
+	for (const field of ["state", "actions", "granted_capabilities", "authority", "budget_units", "risk_class"]) {
+		expect(asRead[field]).toEqual(asWrite[field]);
+	}
+
+	// A session with only read tools is not handed write authority.
+	const readOnly = buildShadowPayload(toolCall("read"), ["read", "grep"]);
+	expect(readOnly.authority).toEqual(["read"]);
+	expect(readOnly.budget_units).toBe(8);
+	expect(readOnly.risk_class).toBe("read");
+});
+
+test("asks one model by default", async () => {
 	process.env.OMP_Z0INT_COGNITION_TOOLS = "read,write";
 	const { handler } = installed();
 	handler(toolCall("write", { path: "x" }), fakeCtx());
 	await flush();
 
-	expect(sent[0].authority).toEqual(["read"]);
-	expect(sent[0].shadows).toEqual(["nemotron_orchestrator_8b", "functiongemma_270m"]);
-	expect(sent[0].risk_class).toBe("write");
+	// One resident model is what the local supervisor holds; asking two at once never answers.
+	expect(sent[0].shadows).toEqual(["functiongemma_270m"]);
 	const actions = sent[0].actions as Array<Record<string, unknown>>;
 	const writeAction = actions.find(action => action.tool === "write");
 	expect(writeAction?.risk_class).toBe("write");
+});
+
+test("state shows only the tools called before, never the observed call", async () => {
+	process.env.OMP_Z0INT_COGNITION_TOOLS = "read,grep,glob,edit,bash,write,task";
+	const { handler } = installed();
+	const calls = ["read", "grep", "glob", "edit", "bash", "write", "task"];
+	calls.forEach((tool, index) => handler(toolCall(tool, { secret: `needle-${index}` }), fakeCtx()));
+	await flush();
+
+	expect(sent).toHaveLength(calls.length);
+	sent.forEach((request, index) => {
+		const state = String(request.state);
+		// Every call here uses a tool not called before, so its name cannot be history.
+		expect(state).not.toContain(calls[index]);
+		expect(state).not.toContain("needle");
+		expect(state).not.toContain("secret");
+		// The observed call is still recorded, outside what the model is shown.
+		expect((request.facts as Record<string, unknown>).tool_name).toBe(calls[index]);
+	});
+	expect(sent[0].state).toContain("none");
+	expect(sent[3].state).toContain("read, grep, glob");
+	// A ring of five: the seventh call no longer sees the first.
+	expect(sent[6].state).toContain("grep, glob, edit, bash, write");
+	expect(sent[6].state).not.toContain("read");
+});
+
+test("a new session starts with an empty history", async () => {
+	const { pi, handler } = installed();
+	handler(toolCall("grep"), fakeCtx());
+	pi.handlers.get("session_start")?.();
+	handler(toolCall("read"), fakeCtx());
+	await flush();
+	expect(sent[1].state).not.toContain("grep");
 });
 
 // --- kill switch --------------------------------------------------------
@@ -226,13 +280,49 @@ test("timeout comes from the env override", () => {
 	expect(cognitionTimeoutMs()).toBe(4000);
 });
 
-test("resolveAvailableTools prefers ctx.getTools and always includes the observed tool", () => {
-	const names = resolveAvailableTools(
-		{},
-		{ getTools: () => [{ name: "bash" }, { name: "read" }] },
-		"glob",
+test("resolveAvailableTools prefers ctx.getTools, then OMP's getActiveTools, then the builtin list", () => {
+	const active = { getActiveTools: () => ["task", "read"] };
+	expect(resolveAvailableTools(active, { getTools: () => [{ name: "read" }, { name: "bash" }] })).toEqual(["bash", "read"]);
+	expect(resolveAvailableTools(active, {})).toEqual(["read", "task"]);
+	expect(resolveAvailableTools({}, {})).toEqual(["bash", "edit", "glob", "grep", "read", "write"]);
+});
+
+/** Everything in a request that the model's prompt is built from, apart from `state`. */
+function choiceFields(request: Record<string, unknown>): string {
+	return JSON.stringify(
+		["actions", "granted_capabilities", "authority", "budget_units", "risk_class"].map(field => request[field]),
 	);
-	expect(new Set(names)).toEqual(new Set(["bash", "read", "glob"]));
+}
+
+test("with no tool list from OMP, the choices do not depend on the call or on earlier calls", async () => {
+	const { pi, handler } = installed();
+	// New tools, a repeat, write tools after read tools, and one outside the builtin list.
+	const calls = ["read", "bash", "read", "grep", "write", "mcp__unlisted", "mcp__unlisted"];
+	for (const tool of calls) handler(toolCall(tool), fakeCtx());
+	pi.handlers.get("session_start")?.();
+	handler(toolCall("glob"), fakeCtx());
+	await flush();
+
+	expect(sent).toHaveLength(calls.length + 1);
+	const ids = (sent[0].actions as Array<Record<string, unknown>>).map(action => action.action_id);
+	expect(ids).toEqual(["bash", "edit", "glob", "grep", "read", "write"]);
+	expect(sent[0].authority).toEqual(["read", "write"]);
+	expect(sent[0].risk_class).toBe("write");
+	// One set of choices for every call: none of them can be read off it.
+	expect(new Set(sent.map(choiceFields)).size).toBe(1);
+});
+
+test("a call to a tool outside OMP's tool list does not add it to the choices", async () => {
+	const { pi, handler } = installed();
+	(pi as Record<string, unknown>).getActiveTools = () => ["read", "grep", "bash"];
+	for (const tool of ["read", "mcp__unlisted", "bash", "mcp__unlisted"]) handler(toolCall(tool), fakeCtx());
+	await flush();
+
+	expect(sent).toHaveLength(4);
+	expect(sent[1].granted_capabilities).toEqual(["bash", "grep", "read"]);
+	expect(new Set(sent.map(choiceFields)).size).toBe(1);
+	// The call itself is still recorded for the scorecard, outside what the model is shown.
+	expect((sent[1].facts as Record<string, unknown>).tool_name).toBe("mcp__unlisted");
 });
 
 test("buildShadowPayload is self-contained and schema-shaped", () => {
@@ -245,17 +335,16 @@ test("buildShadowPayload is self-contained and schema-shaped", () => {
 	expect(payload.objective).toBeNull();
 });
 
-test("the shadow request gives the served-only local backend the bounded tool input and a structured actual_tool", async () => {
-	// The input goes to the local shadow model only; the Python receipt persists actual_tool, never state/input.
+test("the shadow request carries a structured actual_tool and keeps the tool input out of the model state", async () => {
+	// The Python receipt persists actual_tool; the model state is the prior tool history only (#155).
 	process.env.OMP_Z0INT_COGNITION_TOOLS = "bash,read";
 	const { handler } = installed();
 	handler(toolCall("bash", { command: "cat SECRET_TOOL_INPUT_MARKER_7", pad: "x".repeat(5000) }), fakeCtx());
 	await flush();
 	expect(sent).toHaveLength(1);
 	expect(sent[0].actual_tool).toEqual({ name: "bash", risk_class: "write" });
-	expect(String(sent[0].state)).toStartWith("OMP tool_call: bash\ninput: ");
-	expect(String(sent[0].state)).toContain("SECRET_TOOL_INPUT_MARKER_7");
-	expect(String(sent[0].state).length).toBeLessThanOrEqual("OMP tool_call: bash\ninput: ".length + 2000);
+	expect(String(sent[0].state)).toStartWith("OMP session. Previous tool calls, oldest first: ");
+	expect(String(sent[0].state)).not.toContain("SECRET_TOOL_INPUT_MARKER_7");
 });
 
 test("registers z0int-cognition-status and the command never throws", async () => {
@@ -274,4 +363,229 @@ test("registers z0int-cognition-status and the command never throws", async () =
 	} finally {
 		rmSync(home, { recursive: true, force: true });
 	}
+});
+
+
+// --- correlated, classified observations --------------------------------
+
+function observingPi() {
+	const pi = makePi();
+	const entries: Array<{ customType: string; data: Record<string, unknown> }> = [];
+	const messages: unknown[] = [];
+	Object.assign(pi, {
+		appendEntry: (customType: string, data: Record<string, unknown>) => entries.push({ customType, data }),
+		sendMessage: (message: unknown) => messages.push(message),
+	});
+	return { pi, entries, messages };
+}
+
+function sessionCtx(sessionId = "omp-session-7") {
+	return fakeCtx({ sessionManager: { getSessionId: () => sessionId } });
+}
+
+function respondWith(response: unknown | (() => Promise<unknown>)) {
+	globalHolder.__omp_z0int_bridge_transport__ = {
+		kind: "z0int-bridge",
+		generation: 3,
+		buildId: "build-x",
+		request: async (body: Record<string, unknown>) => {
+			sent.push(body);
+			return typeof response === "function" ? (response as () => Promise<unknown>)() : response;
+		},
+	};
+}
+
+const RAN = { label: "a", backend: "vllm", model: "m-a", abstained: false, invalid_call: false, latency_ms: 41 };
+
+test("an observation carries the live OMP session and tool-call identities, not an environment guess", async () => {
+	process.env.OMP_SESSION_ID = "stale-env-session";
+	const { pi } = observingPi();
+	respondWith({ ok: true, trace_id: "t", legal_ids: ["read"], shadow: [] });
+	localCognition(pi as never);
+	pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "call-42", toolName: "read", input: {} }, sessionCtx());
+	await flush();
+	expect(sent[0].session_id).toBe("omp-session-7");
+	expect((sent[0].facts as Record<string, unknown>).tool_call_id).toBe("call-42");
+	delete process.env.OMP_SESSION_ID;
+});
+
+test("worker responses are classified by what actually ran", () => {
+	const cases: Array<[unknown, string, string[]]> = [
+		[{ ok: true, legal_ids: ["read"], shadow: [{ ...RAN, selected_action: "read" }] }, "slm_executed", ["selected"]],
+		[{ ok: true, legal_ids: ["read"], shadow: [{ ...RAN, selected_action: null, abstained: true }] }, "slm_executed", ["abstained"]],
+		[{ ok: true, legal_ids: ["read"], shadow: [{ ...RAN, selected_action: null, abstained: true, invalid_call: true, attempted_action: "rm" }] }, "slm_executed", ["invalid_call"]],
+		[{ ok: true, legal_ids: ["read"], shadow: [{ label: "a", backend: null, model: "m-a", abstained: true, error: "shadow_timeout" }] }, "timeout", ["timeout"]],
+		[{ ok: true, legal_ids: ["read"], shadow: [{ label: "a", backend: null, model: "m-a", abstained: true, error: "ConnectionError: refused" }] }, "unavailable", ["unavailable"]],
+		[{ ok: true, legal_ids: ["read"], shadow: [] }, "compiler_only", []],
+		[{ ok: false, reason: "compile_failed: X" }, "error", []],
+		[
+			{ ok: true, legal_ids: ["read"], shadow: [
+				{ ...RAN, selected_action: "read" },
+				{ label: "b", backend: null, model: "m-b", abstained: true, error: "shadow_timeout" },
+			] },
+			"slm_executed", ["selected", "timeout"],
+		],
+	];
+	for (const [response, outcome, statuses] of cases) {
+		const classified = classifyShadowResponse(response, "read");
+		expect(classified.outcome).toBe(outcome);
+		expect(classified.models.map(model => model.status)).toEqual(statuses);
+	}
+	// A model that never ran is never reported as having abstained.
+	const down = classifyShadowResponse({ ok: true, shadow: [{ label: "a", backend: null, abstained: true, error: "unavailable" }] }, "read");
+	expect(down.models[0].status).toBe("unavailable");
+	expect(down.models[0].ran).toBe(false);
+	const agreed = classifyShadowResponse({ ok: true, shadow: [{ ...RAN, selected_action: "read" }, { ...RAN, label: "b", selected_action: "grep" }] }, "read");
+	expect(agreed.models.map(model => model.agrees_with_observed)).toEqual([true, false]);
+});
+
+test("each observation is appended to the OMP session once, correlated, and nothing is sent to the model", async () => {
+	const { pi, entries, messages } = observingPi();
+	respondWith({ ok: true, trace_id: "ignored", legal_ids: ["read", "grep"], shadow: [{ ...RAN, selected_action: "grep" }] });
+	localCognition(pi as never);
+	const result = pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "call-9", toolName: "read", input: {} }, sessionCtx("s-1"));
+	expect(result).toBeUndefined();
+	await flush();
+	expect(entries).toHaveLength(1);
+	expect(entries[0].customType).toBe("z0int-cognition-shadow");
+	const data = entries[0].data;
+	expect(data.session_id).toBe("s-1");
+	expect(data.tool_call_id).toBe("call-9");
+	expect(data.tool).toBe("read");
+	expect(data.trace_id).toBe(sent[0].trace_id);
+	expect(data.outcome).toBe("slm_executed");
+	expect(data.legal_count).toBe(2);
+	expect(data.worker).toEqual({ kind: "z0int-bridge", generation: 3, build_id: "build-x" });
+	expect((data.models as Array<Record<string, unknown>>)[0]).toMatchObject({ label: "a", status: "selected", selected_action: "grep", agrees_with_observed: false, latency_ms: 41 });
+	// The tool input and the compiled state stay out of the session entry.
+	expect(JSON.stringify(data)).not.toContain("input");
+	expect(messages).toHaveLength(0);
+});
+
+test("a transport timeout, a failed send and a missing transport are recorded as such, never as success", async () => {
+	process.env.OMP_Z0INT_COGNITION_TIMEOUT_MS = "20";
+	process.env.OMP_Z0INT_COGNITION_BRIDGE_FALLBACK = "0";
+	const { pi, entries } = observingPi();
+	localCognition(pi as never);
+	const fire = (id: string) => pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: id, toolName: "read", input: {} }, sessionCtx());
+
+	respondWith(() => new Promise(resolve => setTimeout(() => resolve({ ok: true, shadow: [] }), 200)));
+	fire("slow");
+	await flush(80);
+	respondWith(() => Promise.reject(new Error("worker gone")));
+	fire("broken");
+	await flush();
+	delete globalHolder.__omp_z0int_bridge_transport__;
+	fire("alone");
+	await flush();
+
+	expect(entries.map(entry => [entry.data.tool_call_id, entry.data.outcome])).toEqual([
+		["slow", "timeout"], ["broken", "error"], ["alone", "no_transport"],
+	]);
+	expect(statusRing.map(row => row.ok)).toEqual([false, false, false]);
+});
+
+test("coverage counts every observed tool call against the observations that settled", async () => {
+	const { pi } = observingPi();
+	respondWith({ ok: true, legal_ids: ["read"], shadow: [] });
+	localCognition(pi as never);
+	for (const id of ["a", "b", "c"]) {
+		pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: id, toolName: "read", input: {} }, sessionCtx());
+	}
+	expect(coverage().tool_calls).toBe(3);
+	await flush();
+	expect(coverage()).toMatchObject({ tool_calls: 3, settled: 3, by_outcome: { compiler_only: 3 } });
+});
+
+test("a session without appendEntry still observes and never throws", async () => {
+	const pi = makePi();
+	respondWith({ ok: true, legal_ids: ["read"], shadow: [] });
+	localCognition(pi as never);
+	expect(pi.handlers.get("tool_call")?.(toolCall(), sessionCtx())).toBeUndefined();
+	await flush();
+	expect(statusRing.at(-1)?.outcome).toBe("compiler_only");
+});
+
+test("the status command reports coverage by outcome", async () => {
+	const { pi } = observingPi();
+	respondWith({ ok: true, legal_ids: ["read"], shadow: [{ label: "a", backend: null, abstained: true, error: "unavailable" }] });
+	localCognition(pi as never);
+	pi.handlers.get("tool_call")?.(toolCall(), sessionCtx());
+	await flush();
+	const ctx = sessionCtx();
+	await pi.commands.get("z0int-cognition-status")?.handler("", ctx);
+	expect(ctx.notifications[0].message).toContain('observed 1 tool calls, 1 settled {"unavailable":1}');
+});
+
+test("a result that arrives after the session changed is not written into the new session", async () => {
+	const { pi, entries } = observingPi();
+	let current = "session-a";
+	const ctx = fakeCtx({ sessionManager: { getSessionId: () => current } });
+	respondWith(() => new Promise(resolve => setTimeout(() => resolve({ ok: true, legal_ids: ["read"], shadow: [] }), 40)));
+	localCognition(pi as never);
+	pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "late", toolName: "read", input: {} }, ctx);
+	current = "session-b"; // the user switched sessions before the worker answered
+	await flush(120);
+	expect(entries).toHaveLength(0);
+	expect(statusRing.at(-1)).toMatchObject({ outcome: "compiler_only", session_id: "session-a", recorded: "session_changed" });
+	// The same observation in an unchanged session is recorded.
+	pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "on-time", toolName: "read", input: {} }, ctx);
+	await flush(120);
+	expect(entries.map(entry => [entry.data.session_id, entry.data.tool_call_id])).toEqual([["session-b", "on-time"]]);
+	expect(statusRing.at(-1)?.recorded).toBe("session_entry");
+});
+
+// --- one time budget for the extension and the worker ---------------------
+
+/** A stand-in for the worker: it waits for the model unless told a shorter budget, as run_shadow does. */
+function workerWithSlowModel(modelMs: number, workerDefaultMs: number) {
+	const finished: Array<{ status: string; atMs: number }> = [];
+	const started = Date.now();
+	globalHolder.__omp_z0int_bridge_transport__ = {
+		kind: "z0int-bridge",
+		generation: 1,
+		buildId: "b",
+		request: async (body: Record<string, unknown>) => {
+			sent.push(body);
+			const budget = typeof body.timeout_ms === "number" ? body.timeout_ms : workerDefaultMs;
+			const ran = modelMs <= budget;
+			await new Promise(resolve => setTimeout(resolve, Math.min(modelMs, budget)));
+			finished.push({ status: ran ? "selected" : "timeout", atMs: Date.now() - started });
+			return ran
+				? { ok: true, legal_ids: ["read"], shadow: [{ label: "m", backend: "llama", model: "m", selected_action: "read", abstained: false, latency_ms: modelMs }] }
+				: { ok: true, legal_ids: ["read"], shadow: [{ label: "m", backend: null, model: "m", abstained: true, error: "shadow_timeout" }] };
+		},
+	};
+	return finished;
+}
+
+test("the worker is given the extension's budget, so both records of a slow model agree", async () => {
+	process.env.OMP_Z0INT_COGNITION_TIMEOUT_MS = "100";
+	const { pi, entries } = observingPi();
+	// The model needs 250 ms (a cold load); the worker's own default would wait for it.
+	const finished = workerWithSlowModel(250, 30_000);
+	localCognition(pi as never);
+	pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "cold", toolName: "read", input: {} }, sessionCtx());
+	await flush(400);
+
+	expect(typeof sent[0].timeout_ms).toBe("number");
+	expect(sent[0].timeout_ms as number).toBeLessThan(100);
+	expect(sent[0].timeout_ms as number).toBeGreaterThan(0);
+	// The session entry and what the worker concluded say the same thing, and name the model.
+	expect(finished).toHaveLength(1);
+	expect(finished[0].status).toBe("timeout");
+	expect(entries[0].data.outcome).toBe("timeout");
+	expect((entries[0].data.models as Array<Record<string, unknown>>).map(model => model.status)).toEqual(["timeout"]);
+	// The worker stopped inside the budget instead of working on for an answer nobody is waiting for.
+	expect(finished[0].atMs).toBeLessThan(200);
+});
+
+test("a model that answers inside the budget is unaffected", async () => {
+	process.env.OMP_Z0INT_COGNITION_TIMEOUT_MS = "400";
+	const { pi, entries } = observingPi();
+	workerWithSlowModel(30, 30_000);
+	localCognition(pi as never);
+	pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "warm", toolName: "read", input: {} }, sessionCtx());
+	await flush(150);
+	expect(entries[0].data.outcome).toBe("slm_executed");
 });

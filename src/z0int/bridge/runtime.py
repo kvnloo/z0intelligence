@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import os
-import sys
+import shutil
 import subprocess
 import time
 import uuid
@@ -144,6 +144,13 @@ def preflight(prompt: str) -> dict[str, Any]:
     return preflight_dict(prompt)
 
 
+def _interpreter_ready(path: str) -> bool:
+    interpreter = Path(path)
+    if interpreter.is_absolute() or "/" in path:
+        return interpreter.is_file()
+    return shutil.which(path) is not None
+
+
 def kerdoios_plan(capability_id: str, work: dict[str, Any] | None) -> dict[str, Any] | None:
     if not work:
         return None
@@ -156,6 +163,8 @@ def kerdoios_plan(capability_id: str, work: dict[str, Any] | None) -> dict[str, 
         or os.environ.get("EVOLUTION_LAB_PYTHON")
         or "/workspace/evolution-lab/.venv/bin/python"
     )
+    if not _interpreter_ready(kerd_py):
+        return {"ok": False, "error": f"interpreter_missing:{kerd_py}", "spawned": False}
     args = [
         kerd_py,
         "-m",
@@ -196,6 +205,8 @@ def kerdoios_record(
         or os.environ.get("EVOLUTION_LAB_PYTHON")
         or "/workspace/evolution-lab/.venv/bin/python"
     )
+    if not _interpreter_ready(kerd_py):
+        return
     args = [
         kerd_py,
         "-m",
@@ -348,6 +359,81 @@ class BridgeRuntime:
         except Exception as exc:  # noqa: BLE001 - the op must fail open
             out = {"ok": False, "reason": f"{type(exc).__name__}: {exc}"}
         out.update(self.identity())
+        return out
+
+    def file_search(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Resolve codebase evidence through the shared resident FFF path.
+
+        Read-only evidence retrieval only. The EventLog record says what was
+        surfaced; it never grants execution permission or verified success.
+        """
+        if self.draining:
+            return {"ok": False, "error": "draining", **self.identity()}
+
+        from z0int.context_resolve import (
+            InformationNeed,
+            append_context_packet_event,
+            resolve_context,
+        )
+
+        query = str(payload.get("query") or "").strip()
+        if not query:
+            return {"ok": False, "error": "query required", **self.identity()}
+
+        root_raw = payload.get("project_root") or payload.get("cwd") or str(repo_root())
+        try:
+            root = Path(str(root_raw)).expanduser().resolve()
+        except OSError as exc:
+            return {"ok": False, "error": f"project_root:{exc}", **self.identity()}
+
+        kind = str(payload.get("kind") or "natural_language")
+        if kind not in {"natural_language", "exact_symbol", "exact_path"}:
+            return {"ok": False, "error": f"unsupported kind:{kind}", **self.identity()}
+
+        need = InformationNeed(
+            id="file-search",
+            description=query,
+            kind=kind,  # type: ignore[arg-type]
+            path=query if kind == "exact_path" else None,
+            symbol=query if kind == "exact_symbol" else None,
+            required=True,
+        )
+        trace_id = str(payload.get("trace_id") or "") or None
+        session_id = str(payload.get("session_id") or "") or None
+        packet = resolve_context(
+            needs=[need],
+            task_id=trace_id,
+            project_root=root,
+            allow_fff=True,
+            allow_qmd=bool(payload.get("allow_qmd", True)),
+            allow_memory=False,
+            use_cache=False,
+        )
+
+        event_id = None
+        event_error = None
+        if bool(payload.get("record", True)):
+            try:
+                event = append_context_packet_event(
+                    packet,
+                    source="harness:omp",
+                    project=str(root),
+                    session_id=session_id,
+                )
+                event_id = event.event_id
+            except Exception as exc:  # evidence persistence must not break read-only search
+                event_error = f"{type(exc).__name__}: {exc}"
+
+        out = {
+            "ok": True,
+            "schema": "z0int.harness_context.v1",
+            "harness_id": "omp",
+            "event_id": event_id,
+            "packet": packet.to_dict(),
+            **self.identity(),
+        }
+        if event_error:
+            out["event_log_error"] = event_error
         return out
 
     def _maybe_quarantine(self, row: dict[str, Any], writer_generation: int | None) -> bool:
