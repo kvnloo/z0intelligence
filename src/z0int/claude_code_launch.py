@@ -115,10 +115,27 @@ def decisions_report(root=None):
             'table': {f'{g}->{o}': n for (g, o), n in sorted(table.items())}, 'disagreements': examples}
 
 
+def z0_mcp_config(plugin_dir=PLUGIN):
+    """``--mcp-config`` JSON holding only the plugin's own MCP server (``route_worker``).
+
+    ``--strict-mcp-config`` (lean) drops every MCP server not passed via ``--mcp-config``,
+    plugin servers included, so without this the tool never loads in lean sessions
+    (z0evals claude-code-savings-v1). The server is read from the plugin's ``.mcp.json``;
+    ``${CLAUDE_PLUGIN_ROOT}`` is not expanded outside plugins, so it is made absolute here.
+    """
+    root = Path(plugin_dir)
+    servers = json.loads((root / '.mcp.json').read_text(encoding='utf-8'))['mcpServers']
+    for server in servers.values():
+        server['command'] = server['command'].replace('${CLAUDE_PLUGIN_ROOT}', str(root))
+    return json.dumps({'mcpServers': servers}, separators=(',', ':'), sort_keys=True)
+
+
 def build_argv(profile, claude_args, plugin=True):
     argv = ['claude', *PROFILES[profile]]
     if plugin and PLUGIN.is_dir():
         argv += ['--plugin-dir', str(PLUGIN)]
+        if '--strict-mcp-config' in PROFILES[profile]:
+            argv += ['--mcp-config', z0_mcp_config()]
     return argv + list(claude_args)
 
 

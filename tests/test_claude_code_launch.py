@@ -19,6 +19,20 @@ def test_profiles_and_argv():
     assert argv[0] == 'claude' and '--disable-slash-commands' in argv and argv[-2:] == ['-p', 'hi']
 
 
+def test_lean_keeps_only_the_z0_mcp_server():
+    import json
+    # --strict-mcp-config drops plugin MCP servers; lean must pass route_worker's server explicitly.
+    argv = L.build_argv('lean', ['-p', 'hi'], plugin=True)
+    config = json.loads(argv[argv.index('--mcp-config') + 1])
+    assert list(config['mcpServers']) == ['z0intelligence']
+    server = config['mcpServers']['z0intelligence']
+    assert server['command'] == str(L.PLUGIN / 'bin' / 'z0int-mcp') and '${' not in server['command']
+    assert server['env']['Z0INT_HARNESS'] == 'claude-code'
+    assert argv[-2:] == ['-p', 'hi']
+    assert '--mcp-config' not in L.build_argv('stock', [], plugin=True)
+    assert '--mcp-config' not in L.build_argv('lean', [], plugin=False)
+
+
 def test_warm_ranking_tracks_ttl_profile_and_snapshot(tmp_path):
     root = tmp_path / 'home'
     a, b, c = repo(tmp_path, 'a'), repo(tmp_path, 'b'), repo(tmp_path, 'c')
