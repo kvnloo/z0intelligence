@@ -266,6 +266,39 @@ class ChatLog:
         lines.append("</chat>")
         return "\n".join(lines)
 
+    def render_ids(self, ids: list[int]) -> str | None:
+        """Render only imported history, with no placeholders or adjacent messages.
+
+        A caller freezes the returned string. Later compaction cannot change it.
+        Unbuilt sources return None so the host can retain its original history.
+        """
+        with self.condition:
+            if any(type(ident) is not int or ident < 0 for ident in ids):
+                raise ValueError("ids must be nonnegative integers")
+            if ids != sorted(set(ids)) or any(self.message(ident) is None for ident in ids):
+                raise ValueError("ids must name existing messages in increasing order")
+            lines = ["<chat>"]
+            at = 0
+            while at < len(ids):
+                ident = ids[at]
+                if not self.built(0, ident):
+                    return None
+                level = 0
+                while True:
+                    span = 1 << (level + 1)
+                    if (
+                        ident % span or at + span > len(ids)
+                        or ids[at:at + span] != list(range(ident, ident + span))
+                        or not self.built(level + 1, ident // span)
+                    ):
+                        break
+                    level += 1
+                span = 1 << level
+                lines.append(f"{ident}+{span}|{one_line(self.nodes[(level, ident // span)])}")
+                at += span
+            lines.append("</chat>")
+            return "\n".join(lines)
+
     def zoom(self, ident: int, n: int) -> str:
         if ident < 0 or n < 1 or n & (n - 1) or ident % n or ident + n > self.total:
             return f"No line {ident}+{n}."

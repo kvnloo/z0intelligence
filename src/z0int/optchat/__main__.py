@@ -182,6 +182,12 @@ class Resident:
                 return None
             if op == "view":
                 return {"ok": True, "view": self.chat.render(), "messages": len(self.chat.messages)}
+            if op == "view_ids":
+                ids = req.get("ids")
+                if not isinstance(ids, list):
+                    raise ValueError("ids must be a list")
+                view = self.chat.render_ids(ids)
+                return {"ok": True, "ready": view is not None, "view": view}
             if op == "zoom":
                 return {"ok": True, "text": self.chat.zoom(int(req.get("msg_id")), int(req.get("n") or 1))}
             if op == "date":
