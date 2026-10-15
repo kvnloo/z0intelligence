@@ -40,7 +40,10 @@ SCHEMA = 'z0int.routing_episode.v0'
 COMPILER_VERSION = '0.1.0'
 RECEIPT_SCHEMA = 'z0int.episode_dataset_receipt.v0'
 FAMILIES = ('worker_route', 'omp_route', 'decision_opportunity', 'shadow')
-PROVENANCE = ('observed', 'synthetic')
+# reconstructed: features rebuilt from history after the fact (replay_reconstruct); its labels carry their own class
+# namespace and it is never observed truth for a live consumer (``is_labelled`` is observed-only).
+PROVENANCE = ('observed', 'synthetic', 'reconstructed')
+RECONSTRUCTED_LABEL_NS = 'reconstructed/'
 PARENT_ONLY = 'PARENT_ONLY'
 # Escalation-class actions per family: the expensive / human / frontier choice the utility charges when unnecessary.
 ESCALATION = {
@@ -235,8 +238,13 @@ def validate(ep: Mapping[str, Any]) -> None:
         raise EpisodeInvalid(f"bad schema/family {ep.get('schema')}/{ep.get('family')}")
     prov = ep.get('provenance') or {}
     if prov.get('kind') not in PROVENANCE:
-        raise EpisodeInvalid('provenance.kind must be observed|synthetic')
+        raise EpisodeInvalid('provenance.kind must be observed|synthetic|reconstructed')
     out = ep.get('outcome') or {}
+    if prov['kind'] == 'reconstructed' and out.get('observed') and \
+            not str(out.get('label_class') or '').startswith(RECONSTRUCTED_LABEL_NS):
+        raise EpisodeInvalid('reconstructed outcome outside its own label class namespace: never pooled with observed')
+    if prov['kind'] != 'reconstructed' and str(out.get('label_class') or '').startswith(RECONSTRUCTED_LABEL_NS):
+        raise EpisodeInvalid('reconstructed label class on a non-reconstructed episode')
     if prov['kind'] == 'synthetic' and (out.get('observed') or out.get('y_success') is not None):
         raise EpisodeInvalid('synthetic episode carries an observed outcome: a teacher label never becomes truth')
     if out.get('observed') and not out.get('independent'):
@@ -842,6 +850,10 @@ def lineage_check(episodes: list[dict[str, Any]]) -> dict[str, Any]:
             rep['dangling_parent_ids'] += sum(1 for p in pids if p not in ids)
         elif out.get('observed') and str(out.get('source') or '').startswith(('shadow', 'teacher', 'synthetic')):
             fatal.append(e['episode_id'])
+        if prov['kind'] == 'reconstructed':
+            rep['reconstructed'] += 1
+            if out.get('observed') and not str(out.get('label_class') or '').startswith(RECONSTRUCTED_LABEL_NS):
+                fatal.append(e['episode_id'])
     return {'counts': dict(rep), 'fatal': len(fatal), 'fatal_ids': fatal[:20]}
 
 

@@ -49,7 +49,10 @@ AUTHORITY_SOURCES = ('aodl', 'harness-default')
 COHORTS = ('interactive', 'agent', 'harness', 'unknown')  # the cohort= feature one-hot (a TABLE_VERSION bump to change)
 # Tables are split by cohort, so the full classifier vocabulary needs no feature change: automated / eval / legacy
 # rows carry cohort=unknown in the one-hot and their own cohort in the row, the table and the manifest.
-TABLE_COHORTS = ('interactive', 'agent', 'automated', 'harness', 'eval', 'unknown', 'legacy')
+# Reconstructed rows (replay_reconstruct: features rebuilt from history, provenance 'reconstructed') live ONLY in
+# their own cohorts, and those cohorts hold nothing else: a reconstructed row is never pooled with an observed one.
+RECONSTRUCTED_COHORTS = ('reconstructed', 'reconstructed-agent')
+TABLE_COHORTS = ('interactive', 'agent', 'automated', 'harness', 'eval', 'unknown', 'legacy') + RECONSTRUCTED_COHORTS
 STATES = ('verified_success', 'verified_failure', 'contested', 'unverified')
 # Record kinds the export reads from state/<harness>/ (z0int.<harness>.<kind>.v0); any other schema is counted.
 RECORD_KINDS = ('opportunity_record', 'turn_outcome', 'turn_outcome_verified', 'failure', 'drop', 'imported_turn',
@@ -430,6 +433,11 @@ class Table:
         if stray:
             raise ValueError(f'{stray} rows of another harness or cohort in {self.harness}/{self.cohort}: '
                              'tables are never pooled')
+        recon = self.cohort in RECONSTRUCTED_COHORTS
+        mixed = sum(1 for r in self.rows if (r.get('provenance') == 'reconstructed') != recon)
+        if mixed:
+            raise ValueError(f'{mixed} rows of the wrong provenance in {self.harness}/{self.cohort}: reconstructed '
+                             'rows live only in reconstructed cohorts and are never pooled with observed rows')
 
 
 def imported_row(r: Mapping[str, Any]) -> dict[str, Any]:

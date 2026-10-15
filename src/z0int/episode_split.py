@@ -76,8 +76,14 @@ def resolve_lock(lock_path: Path, eval_start: str | None, eval_end: str | None) 
 
 
 def split(episodes: Iterable[Mapping[str, Any]], *, eval_start: str, eval_end: str,
-          dev_days: int = 7) -> tuple[dict[str, list[str]], dict[str, Any]]:
+          dev_days: int = 7, provenance: str = 'observed') -> tuple[dict[str, list[str]], dict[str, Any]]:
+    """One provenance per split: ``observed`` (with its synthetic teacher rows, train only) or ``reconstructed``
+    (replay_reconstruct; its own split, never pooled with observed -- a mixed input is refused)."""
+    if provenance not in ('observed', 'reconstructed'):
+        raise ValueError(f'cannot split provenance {provenance!r}')
     eps = sorted(episodes, key=lambda e: (e.get('decided_at') or '~', e['episode_id']))
+    if provenance == 'reconstructed' and any(e['provenance']['kind'] != 'reconstructed' for e in eps):
+        raise ValueError('refusing to split reconstructed episodes together with observed/synthetic ones')
     es, ee = _d(eval_start), _d(eval_end)
     ds = es - timedelta(days=dev_days)
     removed: Counter = Counter()
@@ -86,7 +92,9 @@ def split(episodes: Iterable[Mapping[str, Any]], *, eval_start: str, eval_end: s
 
     # 1. date windows (observed first; synthetic follow their parents)
     for e in eps:
-        if e['provenance']['kind'] != 'observed':
+        if e['provenance']['kind'] != provenance:
+            if e['provenance']['kind'] not in ('synthetic', provenance):
+                removed[f"other_provenance:{e['provenance']['kind']}"] += 1
             continue
         w = window_of(e.get('day'), ds, es, ee)
         if w is None:
@@ -153,7 +161,7 @@ def split(episodes: Iterable[Mapping[str, Any]], *, eval_start: str, eval_end: s
         seen.add(key)
 
     ids = {s: [eid for eid in by_id if assign.get(eid) == s] for s in SPLITS}
-    residual = _residual_overlap(ids, by_id)
+    residual = _residual_overlap(ids, by_id, provenance)
     manifest = {
         'schema': SCHEMA, 'locked_eval_window': {'start': str(es), 'end': str(ee)},
         'dev_window': {'start': str(ds), 'end': str(es)}, 'train_window': {'end': str(ds)},
@@ -170,7 +178,8 @@ def split(episodes: Iterable[Mapping[str, Any]], *, eval_start: str, eval_end: s
     return ids, manifest
 
 
-def _residual_overlap(ids: Mapping[str, list[str]], by_id: Mapping[str, Mapping[str, Any]]) -> dict[str, int]:
+def _residual_overlap(ids: Mapping[str, list[str]], by_id: Mapping[str, Mapping[str, Any]],
+                      provenance: str = 'observed') -> dict[str, int]:
     def keys(s: str, f) -> set:
         return {f(by_id[i]) for i in ids[s]} - {None}
     group = lambda e: e['lineage'].get('group')  # noqa: E731
@@ -180,13 +189,16 @@ def _residual_overlap(ids: Mapping[str, list[str]], by_id: Mapping[str, Mapping[
         out[f'train∩{held}:group'] = len(keys('train', group) & keys(held, group))
         out[f'train∩{held}:content'] = len(keys('train', content) & keys(held, content))
     out['dev∩eval:group'] = len(keys('dev', group) & keys('eval', group))
-    out['eval:synthetic'] = sum(1 for i in ids['eval'] if by_id[i]['provenance']['kind'] != 'observed')
+    out['eval:synthetic'] = sum(1 for i in ids['eval'] if by_id[i]['provenance']['kind'] != provenance)
+    out['any:mixed_provenance'] = len({by_id[i]['provenance']['kind'] for s in SPLITS for i in ids[s]}
+                                      - {provenance, 'synthetic' if provenance == 'observed' else provenance})
     return out
 
 
 def _counts(eps: list[Mapping[str, Any]]) -> dict[str, Any]:
     days = sorted(e['day'] for e in eps if e.get('day'))
     return {'episodes': len(eps), 'labelled': sum(map(is_labelled, eps)),
+            'outcome_observed': sum(1 for e in eps if (e.get('outcome') or {}).get('observed')),
             'synthetic': sum(1 for e in eps if e['provenance']['kind'] == 'synthetic'),
             'groups': len({e['lineage'].get('group') for e in eps}),
             'by_family': dict(sorted(Counter(e['family'] for e in eps).items())),
