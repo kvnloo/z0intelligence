@@ -749,19 +749,25 @@ def _latest(root: Path, kind: str, given: str | None) -> str:
 
 def split(home: str | Path | None = None, *, build_id: str | None = None, eval_start: str | None = None,
           eval_end: str | None = None, dev_days: int = 7) -> dict[str, Any]:
-    """The episode_split rules on reconstructed episodes only, with live-lineage groups quarantined first, then the
-    split's ids projected onto each stratum's training rows (train / dev / eval / recent tables)."""
+    """The episode_split rules on reconstructed episodes only, then the split's ids projected onto each stratum's
+    training rows (train / dev / eval / recent tables). A group with live capture on this host is removed from train
+    and dev (it shares lineage with the LIVE validation pool); it may stay in the held-out eval/recent windows, which
+    never feed fitting."""
     from .episode_split import resolve_lock, split as do_split
     root = out_root(home)
     bid = _latest(root, 'build', build_id)
     d = root / 'builds' / bid
     lock = resolve_lock(root / 'locks' / 'eval_window.json', eval_start, eval_end)
     eps = [json.loads(x) for x in (d / 'episodes.jsonl').read_text().splitlines() if x.strip()]
-    quarantined = [e for e in eps if e['lineage'].get('live_capture_group')]
-    keep = [e for e in eps if not e['lineage'].get('live_capture_group')]
-    ids, man = do_split(keep, eval_start=lock['eval_start'], eval_end=lock['eval_end'], dev_days=dev_days,
+    ids, man = do_split(eps, eval_start=lock['eval_start'], eval_end=lock['eval_end'], dev_days=dev_days,
                         provenance=PROVENANCE)
-    man['removed']['live_capture_group'] = len(quarantined)
+    live = {e['episode_id'] for e in eps if e['lineage'].get('live_capture_group')}
+    for s in ('train', 'dev'):
+        n = sum(1 for i in ids[s] if i in live)
+        ids[s] = [i for i in ids[s] if i not in live]
+        man['removed'][f'live_capture_group:{s}'] = n
+        man['counts'][s]['live_capture_group_removed'] = n
+    man['ids_sha256'] = {s: hashlib.sha256('\n'.join(xs).encode()).hexdigest() for s, xs in ids.items()}
     split_id = _sha({'build': bid, 'lock': [lock['eval_start'], lock['eval_end']], 'dev_days': dev_days,
                      'ids': man['ids_sha256']}, 16)
     sd = root / 'splits' / split_id

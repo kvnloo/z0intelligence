@@ -207,9 +207,10 @@ def test_split_quarantines_groups_with_live_capture_and_writes_stratum_tables(wo
     rec = rr.build(world['home'], agentsview=world['db'], host='fixture')
     assert rec['strata']['claude-code/reconstructed']['live_capture_group_rows'] == 3
     assert rec['provenance'] == 'reconstructed' and rec['sources']['sessions']['count'] == 2
-    man = rr.split(world['home'], eval_start='2026-05-01', eval_end='2026-06-30')
-    assert man['removed']['live_capture_group'] == 3
-    assert man['strata']['codex/reconstructed']['eval']['turns'] == 1
+    man = rr.split(world['home'], eval_start='2026-06-10', eval_end='2026-06-20')  # fixture turns: 2026-05-28
+    assert man['removed']['live_capture_group:train'] == 3  # lineage shared with live rows: never trained on
+    assert man['strata']['claude-code/reconstructed']['train']['turns'] == 0
+    assert man['strata']['codex/reconstructed']['train']['turns'] == 1
     with pytest.raises(es.LockConflict):
         rr.split(world['home'], eval_start='2026-10-07', eval_end='2026-10-15')
 
@@ -247,3 +248,15 @@ def test_unmapped_agents_are_counted_not_emitted(tmp_path):
     rep = rr.run(home, agentsview=db, as_of=T0, lock=None, host='fixture')
     assert rep['per_harness'] == {}
     assert rr._agentsview_source(db)['unmapped_agents'] == ['cursor']
+
+
+def test_live_captured_group_may_stay_in_the_held_out_window(world):
+    state = world['home'] / 'state' / 'claude-code'
+    state.mkdir(parents=True)
+    (state / 'opportunities.jsonl').write_text(json.dumps(
+        {'schema': 'z0int.claude_code.opportunity_record.v0', 'session_id': ROOT_SID}) + '\n')
+    _run(world)
+    rr.build(world['home'], agentsview=world['db'], host='fixture')
+    man = rr.split(world['home'], eval_start='2026-05-20', eval_end='2026-06-20')
+    assert man['strata']['claude-code/reconstructed']['eval']['turns'] == 3
+    assert man['removed']['live_capture_group:train'] == 0
