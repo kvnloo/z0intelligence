@@ -36,9 +36,10 @@ def request(operation, payload):
 
 def execute(args):
     owner=secrets.token_hex(32)
-    common={'request':args,'owner':owner,'protocol_version':2}
+    common={'request':args,'owner':owner,'protocol_version':3}
     claim=request('claim',common)
     if not claim['claimed']:return claim['result']
+    admission_id=claim.get('aodl_admission_receipt_id')
     worker,policy,providers,plan=validate_remote(args)
     if args['provider'] not in os.environ.get('Z0INT_EXECUTOR_PROVIDERS','openrouter').split(','):
         raise ValueError('Provider not enabled on this executor')
@@ -60,6 +61,8 @@ def execute(args):
     plan={**plan,'harness':args['harness'],'caller_trace_id':args['trace_id']}
     result=execute_plan(worker,policy,providers,plan,receipt_sink=sink,
         admission=RemoteAdmission(),receipt_location=os.environ.get('Z0INT_AUTHORITY_URL','http://127.0.0.1:11501')+'/canonical-receipts')
+    result={**result,'trace_id':args['trace_id']}
+    if admission_id:result['aodl_admission_receipt_id']=admission_id
     return request('complete',{**common,'result':result})
 
 
@@ -95,7 +98,8 @@ class Handler(BaseHTTPRequestHandler):
             enabled=os.environ.get('Z0INT_EXECUTOR_PROVIDERS','openrouter').split(',')
             with urllib.request.urlopen(os.environ['Z0INT_AUTHORITY_URL']+'/v1/providers',timeout=2) as r:
                 state=json.load(r)
-            if state.get('authority_protocol_version')!=2:raise ValueError('authority protocol mismatch')
+            if state.get('authority_protocol_version')!=3 or state.get('aodl_admission_ready') is not True:
+                raise ValueError('authority protocol/AODL admission mismatch')
             ready=any(os.environ.get(providers[p]['api_key_env']) and state['providers'][p]['available']
                       and (not free_required(policy) or free_route(policy,p,policy['defaults'].get(p)))
                       and (not state.get('free_only') or policy['defaults'].get(p) in state.get('validated_free_models',{}).get(p,[])) for p in enabled)
@@ -105,7 +109,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path!='/v1/execute':return self.reply(404,{'ok':False})
         try:
             size=int(self.headers.get('Content-Length','0'))
-            if not 0<size<=40000:return self.reply(413,{'ok':False})
+            if not 0<size<=131072:return self.reply(413,{'ok':False})
             self.reply(200,execute(json.loads(self.rfile.read(size))))
         except ValueError:self.reply(400,{'ok':False,'error':'invalid_remote_request'})
         except Exception:self.reply(503,{'ok':False,'execution_status':'uncertain','reason':'Reconcile the identical request; never mint a new trace to retry execution'})

@@ -1,0 +1,30 @@
+{"prompt": "Fix the failing unit test in src/stats.py so pytest passes.", "need": []}
+{"prompt": "Refactor the receipt module to remove duplicated JSON parsing.", "need": []}
+{"prompt": "Why does this function return None for empty lists? Explain and fix.", "need": []}
+{"prompt": "Add a --json flag to the CLI and a test for it.", "need": []}
+{"prompt": "Write a migration that renames the users.email column.", "need": []}
+{"prompt": "Implement binary search in Rust with property tests.", "need": []}
+{"prompt": "Summarize what changed in the last 5 commits.", "need": []}
+{"prompt": "Make a 30 second promo video for our landing page.", "need": ["hyperframes", "product", "general", "media"]}
+{"prompt": "Animate the title card with a punch-in zoom and add background music.", "need": ["hyperframes", "media"]}
+{"prompt": "Render the composition in index.html to mp4.", "need": ["hyperframes"]}
+{"prompt": "Add captions and a voiceover to the explainer clip.", "need": ["hyperframes", "media"]}
+{"prompt": "Create a product launch video from https://example.com.", "need": ["product", "hyperframes"]}
+{"prompt": "QA the staging site and fix any bugs you find.", "need": ["pstack"]}
+{"prompt": "Open localhost:3000 in a browser and take a screenshot of the signup form.", "need": ["pstack"]}
+{"prompt": "Review this PR diff before I merge it.", "need": ["pstack"]}
+{"prompt": "Ship it: run tests, bump the version and open a PR.", "need": ["pstack", "no"]}
+{"prompt": "Do a security audit of the repo: secrets, dependencies, OWASP.", "need": ["pstack"]}
+{"prompt": "Deploy to production and monitor for errors afterwards.", "need": ["pstack"]}
+{"prompt": "Our page load time regressed, benchmark core web vitals against main.", "need": ["pstack"]}
+{"prompt": "Run a weekly retro on what I shipped.", "need": ["pstack"]}
+{"prompt": "I have a startup idea, help me think through whether it's worth building.", "need": ["pstack"]}
+{"prompt": "Be careful, we're touching prod: don't let me rm -rf anything.", "need": ["pstack"]}
+{"prompt": "Research what people on Reddit and X are saying about Bend language.", "need": ["agent"]}
+{"prompt": "Look up the latest papers on recursive language models.", "need": ["agent"]}
+{"prompt": "Find recent GitHub repos that port SoL-Pi to Claude Code.", "need": ["agent"]}
+{"prompt": "What are my tmux sessions and agent windows doing right now?", "need": ["workspace"]}
+{"prompt": "My Hyprland workspaces are a mess, suggest a better layout.", "need": ["workspace"]}
+{"prompt": "Validate my changes with no-mistakes before pushing.", "need": ["no"]}
+{"prompt": "Update the README and CHANGELOG to match what shipped.", "need": ["pstack"]}
+{"prompt": "Debug why the websocket reconnect loop never terminates.", "need": []}

@@ -1,0 +1,14 @@
+{
+ "schema": "z0int.state_packet.results.v0",
+ "label": "S2 composition, DEV set (questions.json), --gh --raw-gh, 2 reps, sonnet low, same time window; correctness vs frozen key (q05 key stale in all cells)",
+ "commit": "state-packet runner --profile",
+ "cells": {
+  "stock_raw_tools":    {"correct": "15/20", "cost_usd_total": 1.773, "cost_usd_median": 0.0983, "tool_calls_mean": 4.1, "input_tokens_mean": 155538},
+  "stock_packet_tools": {"correct": "18/20", "cost_usd_total": 1.235, "cost_usd_median": 0.0696, "tool_calls_mean": 0.8, "input_tokens_mean": 66953},
+  "lean_raw_tools":     {"correct": "16/20", "cost_usd_total": 0.672, "cost_usd_median": 0.0269, "tool_calls_mean": 2.6, "input_tokens_mean": 79876},
+  "lean_packet_tools":  {"correct": "18/20", "cost_usd_total": 0.467, "cost_usd_median": 0.0249, "tool_calls_mean": 0.8, "input_tokens_mean": 43020}
+ },
+ "factors": {"packet_cost_factor_stock": 0.697, "packet_cost_factor_lean": 0.695, "lean_cost_factor_raw": 0.379, "lean_cost_factor_packet": 0.378,
+             "combined_vs_stock_raw": 0.263},
+ "verdict": "effects compose multiplicatively (independent); lean+packet = -74% total cost vs stock+raw with 18/20 vs 15/20"
+}

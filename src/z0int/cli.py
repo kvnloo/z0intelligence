@@ -312,6 +312,27 @@ def build_parser() -> argparse.ArgumentParser:
     dd = data_sub.add_parser("discover", help="Find Hermes/OMP/Codex/export paths")
     _json_flag(dd)
 
+    ao = sub.add_parser("ao", help="Agent Orchestrator integration evidence")
+    ao_sub = ao.add_subparsers(dest="ao_cmd", required=True)
+    aor = ao_sub.add_parser("report", help="Frozen AO shadow promotion evidence")
+    _json_flag(aor)
+    aop = ao_sub.add_parser("pair", help="Register an explicit AO candidate/reference pair")
+    _json_flag(aop)
+    aop.add_argument("--experiment-id", required=True)
+    aop.add_argument("--pair-id", required=True)
+    aop.add_argument("--task-snapshot-id", required=True)
+    aop.add_argument("--candidate-trace-id", required=True)
+    aop.add_argument(
+        "--reference-trace-id",
+        default=None,
+        help="Existing reference receipt; omit to materialize the frozen task snapshot",
+    )
+    aops = ao_sub.add_parser("pairs", help="List registered AO experiment pairs")
+    _json_flag(aops)
+    aoref = ao_sub.add_parser("reference", help="Materialize a frozen counterfactual snapshot as a reference receipt")
+    _json_flag(aoref)
+    aoref.add_argument("task_snapshot_id")
+
     rc = sub.add_parser("receipt", help="Decision receipt spine (trace → outcome → tokens)")
     rc_sub = rc.add_subparsers(dest="receipt_cmd", required=True)
     re = rc_sub.add_parser("emit", help="Append a decision receipt")
@@ -613,6 +634,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("repair", "Counterexample-driven routine repair (→ z0int.refinement)"),
         ("abab", "ABAB experiment archive helpers (→ z0int.abab)"),
         ("claude-code", "Claude Code launch profiles + prefix-cache residency (→ z0int.claude_code_launch)"),
+        ("hermes", "Hermes shadow DecisionOpportunity records + turn outcomes (→ z0int.hermes_decisions)"),
     ):
         sp = sub.add_parser(name, help=help_txt)
         sp.add_argument(
@@ -921,6 +943,39 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "data":
         if args.data_cmd == "discover":
             return cmd_data_discover(as_json=as_json)
+    if args.cmd == "ao":
+        if args.ao_cmd == "report":
+            from .ao_report import build_ao_promotion_report, format_ao_promotion_report
+
+            report = build_ao_promotion_report()
+            _print(report, as_json=as_json, human=format_ao_promotion_report(report))
+            return 0
+        if args.ao_cmd == "pair":
+            from .ao_experiment import register_pair
+
+            pair = register_pair(
+                experiment_id=args.experiment_id,
+                pair_id=args.pair_id,
+                task_snapshot_id=args.task_snapshot_id,
+                candidate_trace_id=args.candidate_trace_id,
+                reference_trace_id=args.reference_trace_id,
+            )
+            _print(pair, as_json=True)
+            return 0
+        if args.ao_cmd == "pairs":
+            from .ao_experiment import list_pairs
+
+            _print(
+                {"schema": "ao.z0int.experiment_pairs.v1", "pairs": list_pairs()},
+                as_json=True,
+            )
+            return 0
+        if args.ao_cmd == "reference":
+            from .ao_experiment import materialize_reference_snapshot
+
+            result = materialize_reference_snapshot(args.task_snapshot_id)
+            _print(result, as_json=True)
+            return 0
     if args.cmd == "receipt":
         if args.receipt_cmd == "emit":
             return cmd_receipt_emit(args=args)
@@ -1113,7 +1168,7 @@ def main(argv: list[str] | None = None) -> int:
         _print(out, as_json=as_json)
         return 0
 
-    if args.cmd in ("routine", "cascade", "aodl", "repair", "abab", "claude-code"):
+    if args.cmd in ("routine", "cascade", "aodl", "repair", "abab", "claude-code", "hermes"):
         rest = list(getattr(args, "module_argv", None) or [])
         # argparse REMAINDER keeps a leading "--" when users write: z0int routine -- compile ...
         if rest and rest[0] == "--":
@@ -1131,6 +1186,8 @@ def main(argv: list[str] | None = None) -> int:
             from .refinement import main as _mod_main
         elif args.cmd == "claude-code":
             from .claude_code_launch import _main as _mod_main
+        elif args.cmd == "hermes":
+            from .hermes_decisions import _main as _mod_main
         else:
             from .abab import _main as _mod_main
         return int(_mod_main(rest))

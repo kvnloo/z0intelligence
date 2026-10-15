@@ -8,7 +8,7 @@ from typing import Any, Literal
 from z0int.models_mgmt import decision_roster, load_manifest
 
 from ..base import DecisionBackend
-from .contract import ROSTER_CANDIDATES
+from .contract import LLAMA_HTTP_ARM_PREFIX, ROSTER_CANDIDATES, is_roster_candidate
 
 StatusKind = Literal["available", "unavailable", "unsupported"]
 
@@ -55,7 +55,79 @@ def _commercial(meta: dict[str, Any]) -> bool | None:
     return None
 
 
+def _probe_health(
+    candidate_id: str,
+    factory,
+    *,
+    backend_impl: str,
+    commercial_use: bool | None,
+    platforms: tuple[str, ...],
+    license: str | None,
+    optional: bool,
+    family: str | None,
+) -> CandidateStatus:
+    """Generic readiness probe: construct cheaply, then ``health(load=False)``."""
+    try:
+        health = factory().health(load=False)
+        ok = bool(health.ready)
+        reason = None if ok else (health.detail or "not ready")
+    except Exception as exc:  # noqa: BLE001
+        ok, reason = False, f"{type(exc).__name__}: {exc}"
+    return CandidateStatus(
+        candidate_id=candidate_id,
+        status="available" if ok else "unavailable",
+        reason=reason,
+        backend_impl=backend_impl,
+        commercial_use=commercial_use,
+        platforms=platforms,
+        license=license,
+        optional=optional,
+        family=family,
+    )
+
+
+def _llama_arm_meta(candidate_id: str) -> dict[str, Any]:
+    from ..llama_http import configured_arms
+
+    arm = candidate_id[len(LLAMA_HTTP_ARM_PREFIX):] if candidate_id.startswith(LLAMA_HTTP_ARM_PREFIX) else None
+    return dict(configured_arms().get(arm) or {}) if arm else {}
+
+
 def probe_candidate(candidate_id: str) -> CandidateStatus:
+    if candidate_id == "julia_1":
+        from ..julia import JuliaBackend
+
+        meta = _meta(candidate_id)
+        return _probe_health(
+            candidate_id,
+            lambda: JuliaBackend.for_manifest_id(candidate_id),
+            backend_impl="julia",
+            commercial_use=True,
+            platforms=tuple(meta.get("platforms") or ("cpu", "cuda")),
+            license=meta.get("license") or "apache-2.0",
+            optional=True,
+            family=meta.get("family"),
+        )
+    if candidate_id == "llama_http" or candidate_id.startswith(LLAMA_HTTP_ARM_PREFIX):
+        from ..llama_http import LlamaHttpBackend
+
+        arm_meta = _llama_arm_meta(candidate_id)
+        if candidate_id == "llama_http":
+            factory = LlamaHttpBackend.from_env
+        else:
+            arm = candidate_id[len(LLAMA_HTTP_ARM_PREFIX):]
+            factory = lambda: LlamaHttpBackend.from_arm(arm)  # noqa: E731
+        lic = arm_meta.get("license")
+        return _probe_health(
+            candidate_id,
+            factory,
+            backend_impl="llama_http",
+            commercial_use=_commercial({"license": lic, "commercial_use": arm_meta.get("commercial_use")}),
+            platforms=tuple(arm_meta.get("platforms") or ("llama.cpp",)),
+            license=lic,
+            optional=True,
+            family="direct_readout",
+        )
     if candidate_id not in ROSTER_CANDIDATES:
         return CandidateStatus(
             candidate_id=candidate_id,
@@ -317,6 +389,18 @@ def create_backend_for_candidate(candidate_id: str) -> DecisionBackend:
         from ..openjev_direct import OpenJevDirectBackend
 
         return OpenJevDirectBackend.for_manifest_id(candidate_id)
+    if candidate_id == "julia_1":
+        from ..julia import JuliaBackend
+
+        return JuliaBackend.for_manifest_id(candidate_id)
+    if candidate_id == "llama_http":
+        from ..llama_http import LlamaHttpBackend
+
+        return LlamaHttpBackend.from_env()
+    if candidate_id.startswith(LLAMA_HTTP_ARM_PREFIX):
+        from ..llama_http import LlamaHttpBackend
+
+        return LlamaHttpBackend.from_arm(candidate_id[len(LLAMA_HTTP_ARM_PREFIX):])
     raise RuntimeError(f"no factory for {candidate_id}")
 
 

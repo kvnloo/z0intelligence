@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kvnloo/z0intelligence/schemas/agentweb-z0-bridge.v1.schema.json",
+  "title": "AgentWeb <-> z0intelligence bridge request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "mode",
+    "operation_id",
+    "trace_id",
+    "integration_instance",
+    "parent_agent",
+    "deadline_unix_ms",
+    "capability",
+    "policy"
+  ],
+  "properties": {
+    "protocol_version": {"const": "agentweb.z0.bridge.v1"},
+    "mode": {"enum": ["shadow", "advisory", "active"]},
+    "operation_id": {"type": "string", "minLength": 1, "maxLength": 200},
+    "trace_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "integration_instance": {
+      "type": "string",
+      "pattern": "^agentweb-instance:[0-9a-f]{16,64}$"
+    },
+    "parent_agent": {
+      "type": "string",
+      "pattern": "^agentweb:[0-9a-f]{24,64}$"
+    },
+    "deadline_unix_ms": {"type": "integer", "minimum": 1},
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["function", "task"],
+      "properties": {
+        "function": {"type": "string", "minLength": 1, "maxLength": 200},
+        "task": {"type": "string", "minLength": 1, "maxLength": 24000},
+        "context": {"type": "string"},
+        "state": {},
+        "expected_parent_tokens": {"type": "number", "minimum": 0},
+        "expected_parent_ms": {"type": "number", "minimum": 0},
+        "experimental": {"type": "boolean"},
+        "automatic": {"type": "boolean"},
+        "max_tokens": {"type": "integer", "minimum": 1, "maximum": 2048}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allow_remote_context",
+        "free_only",
+        "risk_class",
+        "approval_state"
+      ],
+      "properties": {
+        "allow_remote_context": {"type": "boolean"},
+        "free_only": {"type": "boolean"},
+        "risk_class": {
+          "enum": ["read", "artifact", "mutation", "external_side_effect"]
+        },
+        "approval_state": {
+          "enum": ["not_required", "required", "granted", "denied", "unknown"]
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_id", "retrieved_at", "sha256", "content"],
+        "properties": {
+          "source_id": {"type": "string", "minLength": 1, "maxLength": 200},
+          "retrieved_at": {"type": "string", "format": "date-time", "maxLength": 64},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "content": {"type": "string", "minLength": 1, "maxLength": 8000}
+        }
+      }
+    },
+    "correlation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reliability_event_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "observation_id": {"type": "string", "minLength": 1, "maxLength": 200}
+      }
+    }
+  }
+}

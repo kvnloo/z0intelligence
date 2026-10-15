@@ -1,0 +1,749 @@
+{
+ "schema": "z0int.state_packet_bench.results.v0",
+ "sanitized": "aggregates only; no model answers, result text, transcript content or session ids",
+ "runs": [
+  {
+   "label": "dev (questions.json, post-iteration, OVERFIT RISK: key used for iteration)",
+   "note": "same frozen key used while iterating the packet (082c7de)",
+   "run_id": "6874e90fe0",
+   "z0int_revision": "082c7de",
+   "questions": "questions.json",
+   "model": "sonnet",
+   "effort": "low",
+   "github_adapter": true,
+   "raw_gh": false,
+   "started_at": "2026-09-30T06:34:13Z",
+   "ended_at": "2026-09-30T06:38:57Z",
+   "source_drift": {
+    "z0intelligence": [],
+    "z0evals": [],
+    "aodl": []
+   },
+   "packet_rendered_approx_tokens": {
+    "aodl": 1012,
+    "z0evals": 1048,
+    "z0intelligence": 1497
+   },
+   "packet_cold_build_ms": {
+    "aodl": 5892.72,
+    "z0evals": 7179.7,
+    "z0intelligence": 7248.92
+   },
+   "arms": {
+    "packet_only": {
+     "n": 20,
+     "correct": 20,
+     "abstentions_emitted": 2,
+     "abstention_items_correct": "2/2",
+     "action_ok": 20,
+     "protocol_failures": 0,
+     "hook_seen": 20,
+     "mean_tool_calls": 0,
+     "mean_tool_result_bytes": 0,
+     "mean_input_tokens": 5877.8,
+     "median_input_tokens": 5927.5,
+     "mean_latency_s": 19.6,
+     "median_latency_s": 19.3,
+     "cost_usd": 0.288
+    },
+    "packet_tools": {
+     "n": 20,
+     "correct": 20,
+     "abstentions_emitted": 2,
+     "abstention_items_correct": "2/2",
+     "action_ok": 20,
+     "protocol_failures": 0,
+     "hook_seen": 20,
+     "mean_tool_calls": 0.7,
+     "mean_tool_result_bytes": 484.2,
+     "mean_input_tokens": 40451.1,
+     "median_input_tokens": 24068.5,
+     "mean_latency_s": 22.6,
+     "median_latency_s": 19.4,
+     "cost_usd": 0.524
+    },
+    "raw_tools": {
+     "n": 20,
+     "correct": 18,
+     "abstentions_emitted": 2,
+     "abstention_items_correct": "2/2",
+     "action_ok": 20,
+     "protocol_failures": 0,
+     "hook_seen": 0,
+     "mean_tool_calls": 2.9,
+     "mean_tool_result_bytes": 2551.8,
+     "mean_input_tokens": 83716.6,
+     "median_input_tokens": 55626.5,
+     "mean_latency_s": 22.4,
+     "median_latency_s": 19.3,
+     "cost_usd": 0.606
+    }
+   },
+   "per_question": {
+    "q01-z0evals-head": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5577,
+      "mean_latency_s": 18.5
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 23693,
+      "mean_latency_s": 18.5
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 2,
+      "mean_tool_result_bytes": 259,
+      "mean_input_tokens": 66249,
+      "mean_latency_s": 17.6
+     }
+    },
+    "q02-aodl-worktree-state": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5973,
+      "mean_latency_s": 17.7
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 24089,
+      "mean_latency_s": 19.7
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 1,
+      "mean_tool_result_bytes": 33.5,
+      "mean_input_tokens": 44847.5,
+      "mean_latency_s": 16.1
+     }
+    },
+    "q03-aodl-unmerged-branches": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5981,
+      "mean_latency_s": 20.4
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 24097,
+      "mean_latency_s": 18.2
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 3,
+      "mean_tool_result_bytes": 373,
+      "mean_input_tokens": 90623.5,
+      "mean_latency_s": 24.3
+     }
+    },
+    "q04-aodl-remote-freshness": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5994,
+      "mean_latency_s": 16.9
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 24110,
+      "mean_latency_s": 19.3
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 1,
+      "mean_tool_result_bytes": 319,
+      "mean_input_tokens": 45004,
+      "mean_latency_s": 19.0
+     }
+    },
+    "q05-z0int-main-branch": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5915.5,
+      "mean_latency_s": 21.5
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0.5,
+      "mean_tool_result_bytes": 19,
+      "mean_input_tokens": 36199.5,
+      "mean_latency_s": 26.8
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 1,
+      "mean_tool_result_bytes": 38,
+      "mean_input_tokens": 43201,
+      "mean_latency_s": 18.6
+     }
+    },
+    "q06-z0int-state-packet-worktree": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5897.5,
+      "mean_latency_s": 19.0
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 24013.5,
+      "mean_latency_s": 20.6
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 2,
+      "mean_tool_result_bytes": 1535.5,
+      "mean_input_tokens": 44076.5,
+      "mean_latency_s": 17.4
+     }
+    },
+    "q07-z0int-last-cc-session": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5931.5,
+      "mean_latency_s": 23.7
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 3.5,
+      "mean_tool_result_bytes": 1009,
+      "mean_input_tokens": 112812.5,
+      "mean_latency_s": 31.9
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 10,
+      "mean_tool_result_bytes": 8876,
+      "mean_input_tokens": 279487.5,
+      "mean_latency_s": 48.4
+     }
+    },
+    "q08-z0int-p0-priority": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5923.5,
+      "mean_latency_s": 20.7
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 24039.5,
+      "mean_latency_s": 20.1
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 0,
+      "protocol_failures": 0,
+      "mean_tool_calls": 4,
+      "mean_tool_result_bytes": 12753.5,
+      "mean_input_tokens": 75298.5,
+      "mean_latency_s": 23.2
+     }
+    },
+    "q09-aodl-abstain-worktree-session": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5963,
+      "mean_latency_s": 18.8
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 2.5,
+      "mean_tool_result_bytes": 3814,
+      "mean_input_tokens": 87719,
+      "mean_latency_s": 32.4
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 4.5,
+      "mean_tool_result_bytes": 1330,
+      "mean_input_tokens": 126429.5,
+      "mean_latency_s": 27.3
+     }
+    },
+    "q10-z0evals-legal-next": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5622,
+      "mean_latency_s": 19.3
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 23738,
+      "mean_latency_s": 18.1
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 21949,
+      "mean_latency_s": 12.0
+     }
+    }
+   }
+  },
+  {
+   "label": "held-out (questions_holdout.json, frozen at e3e1611 before this run)",
+   "note": "only holdout run; no packet/prompt/key change after seeing results",
+   "run_id": "5019e5b30d",
+   "z0int_revision": "3aca77c",
+   "questions": "benchmarks/state_packet/questions_holdout.json",
+   "model": "sonnet",
+   "effort": "low",
+   "github_adapter": true,
+   "raw_gh": true,
+   "started_at": "2026-09-30T06:39:51Z",
+   "ended_at": "2026-09-30T06:49:02Z",
+   "source_drift": {
+    "z0intelligence": [
+     "head",
+     "status"
+    ],
+    "z0evals": [],
+    "aodl": []
+   },
+   "packet_rendered_approx_tokens": {
+    "aodl": 1012,
+    "z0evals": 1048,
+    "z0intelligence": 1497
+   },
+   "packet_cold_build_ms": {
+    "aodl": 6535.12,
+    "z0evals": 6241.07,
+    "z0intelligence": 6572.65
+   },
+   "arms": {
+    "packet_only": {
+     "n": 14,
+     "correct": 8,
+     "abstentions_emitted": 0,
+     "abstention_items_correct": "0/0",
+     "action_ok": 8,
+     "protocol_failures": 6,
+     "hook_seen": 14,
+     "mean_tool_calls": 0,
+     "mean_tool_result_bytes": 0,
+     "mean_input_tokens": 5897.1,
+     "median_input_tokens": 5936.5,
+     "mean_latency_s": 69.5,
+     "median_latency_s": 12.9,
+     "cost_usd": 1.491
+    },
+    "packet_tools": {
+     "n": 14,
+     "correct": 14,
+     "abstentions_emitted": 0,
+     "abstention_items_correct": "0/0",
+     "action_ok": 14,
+     "protocol_failures": 0,
+     "hook_seen": 14,
+     "mean_tool_calls": 1.6,
+     "mean_tool_result_bytes": 452.4,
+     "mean_input_tokens": 57330.9,
+     "median_input_tokens": 36630.5,
+     "mean_latency_s": 15.5,
+     "median_latency_s": 16.0,
+     "cost_usd": 0.423
+    },
+    "raw_tools": {
+     "n": 14,
+     "correct": 12,
+     "abstentions_emitted": 0,
+     "abstention_items_correct": "0/0",
+     "action_ok": 13,
+     "protocol_failures": 0,
+     "hook_seen": 0,
+     "mean_tool_calls": 3.4,
+     "mean_tool_result_bytes": 2140.4,
+     "mean_input_tokens": 82215.6,
+     "median_input_tokens": 78521.0,
+     "mean_latency_s": 18.5,
+     "median_latency_s": 16.7,
+     "cost_usd": 0.484
+    }
+   },
+   "per_question": {
+    "h01-z0evals-studies": {
+     "packet_only": {
+      "n": 2,
+      "correct": 0,
+      "protocol_failures": 2,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5579.5,
+      "mean_latency_s": 281.8
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 2,
+      "mean_tool_result_bytes": 934.5,
+      "mean_input_tokens": 72024,
+      "mean_latency_s": 17.1
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 3,
+      "mean_tool_result_bytes": 591.5,
+      "mean_input_tokens": 78107,
+      "mean_latency_s": 16.7
+     }
+    },
+    "h02-aodl-worktree-sha": {
+     "packet_only": {
+      "n": 2,
+      "correct": 0,
+      "protocol_failures": 2,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 6696,
+      "mean_latency_s": 138.4
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 6,
+      "mean_tool_result_bytes": 389,
+      "mean_input_tokens": 148018.5,
+      "mean_latency_s": 18.9
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 3.5,
+      "mean_tool_result_bytes": 398.5,
+      "mean_input_tokens": 90707,
+      "mean_latency_s": 16.3
+     }
+    },
+    "h03-z0evals-remote-freshness": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5594,
+      "mean_latency_s": 11.5
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 1,
+      "mean_tool_result_bytes": 195,
+      "mean_input_tokens": 47760,
+      "mean_latency_s": 12.6
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 1,
+      "mean_tool_result_bytes": 210,
+      "mean_input_tokens": 44178.5,
+      "mean_latency_s": 15.5
+     }
+    },
+    "h04-z0int-external-worktree": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5917.5,
+      "mean_latency_s": 15.5
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 24033.5,
+      "mean_latency_s": 15.4
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 3.5,
+      "mean_tool_result_bytes": 7411.5,
+      "mean_input_tokens": 102894,
+      "mean_latency_s": 15.8
+     }
+    },
+    "h05-z0int-worktree-session": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5964.5,
+      "mean_latency_s": 14.8
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 24082.5,
+      "mean_latency_s": 15.7
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 1,
+      "protocol_failures": 0,
+      "mean_tool_calls": 6,
+      "mean_tool_result_bytes": 2346.5,
+      "mean_input_tokens": 124118.5,
+      "mean_latency_s": 24.8
+     }
+    },
+    "h06-z0evals-priority": {
+     "packet_only": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5571,
+      "mean_latency_s": 9.9
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 23687,
+      "mean_latency_s": 10.4
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 1,
+      "protocol_failures": 0,
+      "mean_tool_calls": 4.5,
+      "mean_tool_result_bytes": 2495.5,
+      "mean_input_tokens": 91379,
+      "mean_latency_s": 29.8
+     }
+    },
+    "h07-z0int-legal-pr": {
+     "packet_only": {
+      "n": 2,
+      "correct": 0,
+      "protocol_failures": 2,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5957,
+      "mean_latency_s": 14.4
+     },
+     "packet_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 2.5,
+      "mean_tool_result_bytes": 1648.5,
+      "mean_input_tokens": 61710.5,
+      "mean_latency_s": 18.4
+     },
+     "raw_tools": {
+      "n": 2,
+      "correct": 2,
+      "protocol_failures": 0,
+      "mean_tool_calls": 2,
+      "mean_tool_result_bytes": 1529,
+      "mean_input_tokens": 44125.5,
+      "mean_latency_s": 10.6
+     }
+    }
+   }
+  },
+  {
+   "label": "failure injection (injection.json, conversation source removed, packet_only)",
+   "note": "injection1 invalidated: harness bug (relative PYTHONPATH=src made the SessionStart hook import the main checkout, which has no z0int.state_packet; hook_seen=0/6). Rerun unchanged.",
+   "run_id": "efb0622ae4",
+   "z0int_revision": "751276f",
+   "questions": "benchmarks/state_packet/injection.json",
+   "model": "sonnet",
+   "effort": "low",
+   "github_adapter": true,
+   "raw_gh": false,
+   "started_at": "2026-09-30T08:41:03Z",
+   "ended_at": "2026-09-30T08:50:43Z",
+   "source_drift": {
+    "z0intelligence": [],
+    "z0evals": [],
+    "aodl": []
+   },
+   "packet_rendered_approx_tokens": {
+    "z0intelligence": 1443
+   },
+   "packet_cold_build_ms": {
+    "z0intelligence": 1940.38
+   },
+   "arms": {
+    "packet_only": {
+     "n": 6,
+     "correct": 0,
+     "abstentions_emitted": 0,
+     "abstention_items_correct": "0/4",
+     "action_ok": 2,
+     "protocol_failures": 4,
+     "hook_seen": 6,
+     "mean_tool_calls": 0,
+     "mean_tool_result_bytes": 0,
+     "mean_input_tokens": 4810.7,
+     "median_input_tokens": 5762.0,
+     "mean_latency_s": 195.0,
+     "median_latency_s": 4.6,
+     "cost_usd": 1.356
+    }
+   },
+   "per_question": {
+    "i01-removed-last-cc-session": {
+     "packet_only": {
+      "n": 2,
+      "correct": 0,
+      "protocol_failures": 2,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 2908,
+      "mean_latency_s": 576.7
+     }
+    },
+    "i02-removed-worktree-session": {
+     "packet_only": {
+      "n": 2,
+      "correct": 0,
+      "protocol_failures": 2,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5773,
+      "mean_latency_s": 4.4
+     }
+    },
+    "i03-control-git-fact": {
+     "packet_only": {
+      "n": 2,
+      "correct": 0,
+      "protocol_failures": 0,
+      "mean_tool_calls": 0,
+      "mean_tool_result_bytes": 0,
+      "mean_input_tokens": 5751,
+      "mean_latency_s": 4.0
+     }
+    }
+   }
+  }
+ ],
+ "verdict": {
+  "holdout": "packet_tools 14/14 vs raw_tools 12/14 at 1.6 vs 3.4 mean tool calls, 452 vs 2140 tool-result bytes, 57.3k vs 82.2k mean (36.6k vs 78.5k median) input tokens, 15.5 vs 18.5 s mean latency. Equal-or-better correctness with fewer tokens/calls on held-out; small n (7 Qs x 2 reps), no abstention items in the holdout set. Exception: h02 (aodl .worktrees sha) packet_tools 6.0 calls/148k tok vs raw 3.5/91k.",
+  "packet_only": "Not viable standalone: holdout 8/14, all 6 misses are protocol failures (model emits tool calls it does not have instead of abstaining), incl. one $1.29 / 282 s budget-cap trial.",
+  "failure_injection": "Packet correctly reported conv.latest_session as a BLOCKING UNKNOWN with DECISION: OBSERVE (0 transcripts scanned), but packet_only never abstained (0/4): the model treated '0 transcripts scanned' as a scanner gap and tried to call tools it lacked (4/4 protocol failures; one trial hit the $1 budget cap after ~10 min). Product gap: the packet does not distinguish 'source absent/unreadable' from 'source present, no match'."
+ },
+ "post_hoc_notes": [
+  "i03 (control) key is stale: frozen upstream 'origin/master', but the main checkout's upstream was changed to origin/feat/claude-code-harness by another lane after freezing. Both i03 answers gave branch=feat/claude-code-harness, upstream=origin/feat/claude-code-harness, which matches live git. Frozen-key score 0/2; live-truth 2/2. Key NOT edited.",
+  "holdout1 z0int revision 3aca77c = e3e1611 (freeze) + gh TTL cache/tests only; committed before the holdout run started (06:34:51Z freeze, 06:39:51Z start).",
+  "injection1 run discarded (harness bug, hook_seen 0/6): relative PYTHONPATH=src resolved to the main checkout's src inside the hook's cwd. injection2 is the unchanged rerun."
+ ]
+}

@@ -1,0 +1,131 @@
+{
+  "schema": "z0int.backends_bench.uncertainty.v1",
+  "by_backend": {
+    "decider_2b": {
+      "tool_family_select": {
+        "n": 77,
+        "accuracy": 0.4025974025974026,
+        "accuracy_ci95": [
+          0.3002184586296985,
+          0.5142335066950848
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 0.03896103896103896,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 0.03896103896103896"
+      }
+    },
+    "julia_1": {
+      "tool_family_select": {
+        "n": 77,
+        "accuracy": 0.1038961038961039,
+        "accuracy_ci95": [
+          0.053592282957973164,
+          0.19184570936281223
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 0.03896103896103896,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 0.03896103896103896"
+      }
+    },
+    "laya_421m": {
+      "tool_family_select": {
+        "n": 77,
+        "accuracy": 0.19480519480519481,
+        "accuracy_ci95": [
+          0.12176294266340365,
+          0.2968532153542507
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 0.03896103896103896,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 0.03896103896103896"
+      }
+    },
+    "llama_http:functiongemma_270m_q8": {
+      "tool_family_select": {
+        "n": 77,
+        "accuracy": 0.0,
+        "accuracy_ci95": [
+          3.469446951953614e-18,
+          0.047520088667220836
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 0.03896103896103896,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 0.03896103896103896"
+      }
+    },
+    "llama_http:hammer21_15b_q4": {
+      "tool_family_select": {
+        "n": 77,
+        "accuracy": 0.4675324675324675,
+        "accuracy_ci95": [
+          0.36029890673598886,
+          0.5778517483722723
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 0.03896103896103896,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 0.03896103896103896"
+      }
+    },
+    "llama_http:qwen3_06b_q8": {
+      "tool_family_select": {
+        "n": 77,
+        "accuracy": 0.36363636363636365,
+        "accuracy_ci95": [
+          0.26505270593089814,
+          0.47518004552379856
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 0.03896103896103896,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 0.03896103896103896"
+      }
+    },
+    "llama_http:qwen3_17b_q4": {
+      "tool_family_select": {
+        "n": 77,
+        "accuracy": 0.5714285714285714,
+        "accuracy_ci95": [
+          0.46010331091803647,
+          0.6759652478437891
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 0.03896103896103896,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 0.03896103896103896"
+      }
+    },
+    "nanojev_06b": {
+      "tool_family_select": {
+        "n": 77,
+        "accuracy": 0.18181818181818182,
+        "accuracy_ci95": [
+          0.11151152010047759,
+          0.28236489996048114
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 0.03896103896103896,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 0.03896103896103896"
+      }
+    },
+    "openjev_06b": {
+      "tool_family_select": {
+        "n": 77,
+        "accuracy": 0.4155844155844156,
+        "accuracy_ci95": [
+          0.31209010264563286,
+          0.5271016006358461
+        ],
+        "dangerous_false_count": 0,
+        "dangerous_false_rate": 0.0,
+        "dangerous_false_upper_95": 0.03896103896103896,
+        "note": "Zero observed dangerous failures does not imply true rate is 0; upper bound ≈ 0.03896103896103896"
+      }
+    }
+  }
+}

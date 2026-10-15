@@ -69,8 +69,12 @@ def digest(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def load_causal_model(source: str, revision: str):
-    """Load one pinned causal model on the sole visible CUDA device."""
+def load_causal_model(source: str, revision: str, device: str = "cuda"):
+    """Load one pinned causal model on the sole visible CUDA device, or on CPU.
+
+    ``device="cpu"`` loads FP32 weights and computes in FP32 (bf16 matmuls
+    without AVX512-BF16/AMX are several times slower on CPU).
+    """
     import torch
     import transformers
 
@@ -79,7 +83,8 @@ def load_causal_model(source: str, revision: str):
         raise ValueError("Remote models require a pinned 40-character commit revision")
     if local and not revision:
         raise ValueError("Local models require an explicit manifest/revision string")
-    if not torch.cuda.is_available() or torch.cuda.device_count() != 1:
+    on_cpu = str(device).startswith("cpu")
+    if not on_cpu and (not torch.cuda.is_available() or torch.cuda.device_count() != 1):
         raise ValueError("Expose exactly one CUDA GPU, for example with CUDA_VISIBLE_DEVICES")
     common = {"revision": None if local else revision, "local_files_only": local, "trust_remote_code": False}
     config = transformers.AutoConfig.from_pretrained(source, **common)
@@ -93,8 +98,8 @@ def load_causal_model(source: str, revision: str):
     model, loading = cls.from_pretrained(
         source,
         config=config,
-        dtype=torch.bfloat16,
-        device_map={"": "cuda:0"},
+        dtype=torch.float32 if on_cpu else torch.bfloat16,
+        device_map={"": "cpu" if on_cpu else "cuda:0"},
         low_cpu_mem_usage=True,
         output_loading_info=True,
         **common,
@@ -105,7 +110,8 @@ def load_causal_model(source: str, revision: str):
     metadata = {
         "source": source,
         "revision": revision,
-        "dtype": "bfloat16",
+        "dtype": "float32" if on_cpu else "bfloat16",
+        "device": "cpu" if on_cpu else "cuda:0",
         "torch_version": torch.__version__,
         "transformers_version": transformers.__version__,
     }

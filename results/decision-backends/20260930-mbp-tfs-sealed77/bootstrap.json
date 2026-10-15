@@ -1,0 +1,134 @@
+{
+  "schema": "z0int.backends_bench.bootstrap_pareto.v1",
+  "n_bootstrap": 500,
+  "seed": 0,
+  "valid_draws": 500,
+  "note": "Inclusion probability is the fraction of fixture-resampled datasets in which a backend remained on the eligible Pareto frontier. At small n this can be unstable — treat provisional evidence seriously.",
+  "by_capability": {
+    "rlm.worker_needed": {
+      "n_bootstrap": 500,
+      "inclusion_probability": {
+        "decider_2b": 0.0,
+        "julia_1": 0.0,
+        "laya_421m": 0.0,
+        "llama_http:functiongemma_270m_q8": 0.0,
+        "llama_http:hammer21_15b_q4": 0.0,
+        "llama_http:qwen3_06b_q8": 0.0,
+        "llama_http:qwen3_17b_q4": 0.0,
+        "nanojev_06b": 0.0,
+        "openjev_06b": 0.0
+      },
+      "eligible_probability": {
+        "decider_2b": 0.0,
+        "julia_1": 0.0,
+        "laya_421m": 0.0,
+        "llama_http:functiongemma_270m_q8": 0.0,
+        "llama_http:hammer21_15b_q4": 0.0,
+        "llama_http:qwen3_06b_q8": 0.0,
+        "llama_http:qwen3_17b_q4": 0.0,
+        "nanojev_06b": 0.0,
+        "openjev_06b": 0.0
+      }
+    },
+    "tool_family_select": {
+      "n_bootstrap": 500,
+      "inclusion_probability": {
+        "decider_2b": 0.004,
+        "julia_1": 0.028,
+        "laya_421m": 0.0,
+        "llama_http:functiongemma_270m_q8": 0.0,
+        "llama_http:hammer21_15b_q4": 0.856,
+        "llama_http:qwen3_06b_q8": 1.0,
+        "llama_http:qwen3_17b_q4": 1.0,
+        "nanojev_06b": 0.0,
+        "openjev_06b": 0.0
+      },
+      "eligible_probability": {
+        "decider_2b": 1.0,
+        "julia_1": 0.028,
+        "laya_421m": 0.616,
+        "llama_http:functiongemma_270m_q8": 0.0,
+        "llama_http:hammer21_15b_q4": 1.0,
+        "llama_http:qwen3_06b_q8": 1.0,
+        "llama_http:qwen3_17b_q4": 1.0,
+        "nanojev_06b": 0.554,
+        "openjev_06b": 1.0
+      }
+    },
+    "retry_or_escalate": {
+      "n_bootstrap": 500,
+      "inclusion_probability": {
+        "decider_2b": 0.0,
+        "julia_1": 0.0,
+        "laya_421m": 0.0,
+        "llama_http:functiongemma_270m_q8": 0.0,
+        "llama_http:hammer21_15b_q4": 0.0,
+        "llama_http:qwen3_06b_q8": 0.0,
+        "llama_http:qwen3_17b_q4": 0.0,
+        "nanojev_06b": 0.0,
+        "openjev_06b": 0.0
+      },
+      "eligible_probability": {
+        "decider_2b": 0.0,
+        "julia_1": 0.0,
+        "laya_421m": 0.0,
+        "llama_http:functiongemma_270m_q8": 0.0,
+        "llama_http:hammer21_15b_q4": 0.0,
+        "llama_http:qwen3_06b_q8": 0.0,
+        "llama_http:qwen3_17b_q4": 0.0,
+        "nanojev_06b": 0.0,
+        "openjev_06b": 0.0
+      }
+    },
+    "context_compress_needed": {
+      "n_bootstrap": 500,
+      "inclusion_probability": {
+        "decider_2b": 0.0,
+        "julia_1": 0.0,
+        "laya_421m": 0.0,
+        "llama_http:functiongemma_270m_q8": 0.0,
+        "llama_http:hammer21_15b_q4": 0.0,
+        "llama_http:qwen3_06b_q8": 0.0,
+        "llama_http:qwen3_17b_q4": 0.0,
+        "nanojev_06b": 0.0,
+        "openjev_06b": 0.0
+      },
+      "eligible_probability": {
+        "decider_2b": 0.0,
+        "julia_1": 0.0,
+        "laya_421m": 0.0,
+        "llama_http:functiongemma_270m_q8": 0.0,
+        "llama_http:hammer21_15b_q4": 0.0,
+        "llama_http:qwen3_06b_q8": 0.0,
+        "llama_http:qwen3_17b_q4": 0.0,
+        "nanojev_06b": 0.0,
+        "openjev_06b": 0.0
+      }
+    },
+    "verification_needed": {
+      "n_bootstrap": 500,
+      "inclusion_probability": {
+        "decider_2b": 0.0,
+        "julia_1": 0.0,
+        "laya_421m": 0.0,
+        "llama_http:functiongemma_270m_q8": 0.0,
+        "llama_http:hammer21_15b_q4": 0.0,
+        "llama_http:qwen3_06b_q8": 0.0,
+        "llama_http:qwen3_17b_q4": 0.0,
+        "nanojev_06b": 0.0,
+        "openjev_06b": 0.0
+      },
+      "eligible_probability": {
+        "decider_2b": 0.0,
+        "julia_1": 0.0,
+        "laya_421m": 0.0,
+        "llama_http:functiongemma_270m_q8": 0.0,
+        "llama_http:hammer21_15b_q4": 0.0,
+        "llama_http:qwen3_06b_q8": 0.0,
+        "llama_http:qwen3_17b_q4": 0.0,
+        "nanojev_06b": 0.0,
+        "openjev_06b": 0.0
+      }
+    }
+  }
+}

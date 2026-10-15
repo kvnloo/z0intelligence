@@ -1,0 +1,70 @@
+{
+  "schema": "z0int.state_packet_bench.questions.v0",
+  "frozen_at": "2026-09-30T06:45:00Z",
+  "authored_before_running": true,
+  "note": "Held-out set authored after run2 exposed the packet to questions.json, and BEFORE any holdout run, to measure the post-run2 packet (082c7de) on questions it was not iterated against. Key from direct read-only inspection (plain git, file listing, gh issue list) independent of z0int.state_packet. Structural facts only.",
+  "key_revisions": {
+    "z0intelligence": {"head": "435479b", "branch": "feat/claude-code-harness"},
+    "z0evals": {"head": "bb8ad2c", "branch": "main"},
+    "aodl": {"head": "ddcea2e", "branch": "ai-native/oss-loop"}
+  },
+  "answer_contract": "Reply with ONLY a JSON object: {\"action\": \"answer\"|\"abstain\"|\"conflict\", \"fields\": {...}, \"evidence\": [\"source pointers you relied on\"]}. Use action=abstain when local evidence does not establish the answer; use action=conflict when sources disagree (report each side in fields).",
+  "questions": [
+    {
+      "id": "h01-z0evals-studies",
+      "repo": "z0evals",
+      "kind": "outside-packet",
+      "prompt": "Which study directories exist under studies/ in ~/workspace/z0evals, and which one is the cross-harness unified memory study?",
+      "fields": {"studies": "list of directory names", "unified_memory_study": "string"},
+      "key": {"action": "answer", "fields": {"studies": {"contains_all": ["slm-router-v0", "unified-memory-v0"]}, "unified_memory_study": {"re": "^unified-memory-v0$"}}}
+    },
+    {
+      "id": "h02-aodl-worktree-sha",
+      "repo": "aodl",
+      "kind": "exact",
+      "prompt": "In ~/workspace/aodl: which branch is checked out in the .worktrees/dash-wired worktree, and at which commit (short sha)?",
+      "fields": {"branch": "string", "sha": "string"},
+      "key": {"action": "answer", "fields": {"branch": {"re": "^catalog/dash-pi-fx$"}, "sha": {"re": "^14fc125"}}}
+    },
+    {
+      "id": "h03-z0evals-remote-freshness",
+      "repo": "z0evals",
+      "kind": "staleness",
+      "prompt": "In ~/workspace/z0evals: roughly how many hours ago were the remote-tracking refs last fetched, and is the checked-out branch in sync with its upstream according to those refs?",
+      "fields": {"remote_refs_age_hours": "number", "in_sync_with_upstream": "boolean"},
+      "key": {"action": "answer", "fields": {"remote_refs_age_hours": {"num": 6.0, "tol": 5.5}, "in_sync_with_upstream": {"bool": true}}}
+    },
+    {
+      "id": "h04-z0int-external-worktree",
+      "repo": "z0intelligence",
+      "kind": "open-work",
+      "prompt": "Does ~/workspace/z0intelligence have a git worktree located OUTSIDE the repository directory? If so, which branch and path?",
+      "fields": {"exists": "boolean", "branch": "string", "path": "string"},
+      "key": {"action": "answer", "fields": {"exists": {"bool": true}, "branch": {"re": "^feat/portable-lab$"}, "path": {"re": "z0intelligence-lab"}}}
+    },
+    {
+      "id": "h05-z0int-worktree-session",
+      "repo": "z0intelligence",
+      "kind": "cross-source",
+      "prompt": "Per local Claude Code history (~/.claude/projects), has any Claude Code session (including subagents) worked with its working directory inside the z0intelligence worktree .claude/worktrees/agent-a5a881e0f9d9b6456? Which branch is that worktree on?",
+      "fields": {"any_session": "boolean", "worktree_branch": "string"},
+      "key": {"action": "answer", "fields": {"any_session": {"bool": true}, "worktree_branch": {"re": "^exp/bend-aodl-gate$"}}}
+    },
+    {
+      "id": "h06-z0evals-priority",
+      "repo": "z0evals",
+      "kind": "contradiction",
+      "prompt": "What is the current P0 priority for z0evals? Consider the repository docs and the repository's GitHub issues; if they disagree, report each claim with its source instead of picking one.",
+      "fields": {"claims": "list of {priority, source}"},
+      "key": {"action": "conflict", "fields": {"claims": {"contains_all": ["reproducible study", "current-work reconstruction|#56"]}}}
+    },
+    {
+      "id": "h07-z0int-legal-pr",
+      "repo": "z0intelligence",
+      "kind": "next-legal-action",
+      "prompt": "In ~/workspace/z0intelligence: may an agent push the checked-out branch and open a PR targeting master right now, and may it merge? Per the repository's own rules, what is the required target/path instead?",
+      "fields": {"may_open_pr_into_master": "boolean", "may_merge": "boolean", "required_path": "string"},
+      "key": {"action": "answer", "fields": {"may_open_pr_into_master": {"bool": false}, "may_merge": {"bool": false}, "required_path": {"re": "preview|nightly"}}}
+    }
+  ]
+}

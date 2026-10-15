@@ -1,0 +1,12 @@
+{
+ "schema": "z0int.state_packet.results.v0",
+ "label": "Z-arm router headroom: pinned held-out set (questions_pinned.json, fixtures of Lane E), lean profile, model haiku, 2 reps; compare Lane E sonnet lean cells",
+ "haiku_lean":  {"raw_tools": {"correct": "16/22", "abstain_ok": "4/4", "cost_usd_total": 1.230, "tool_calls_mean": 8.0, "input_tokens_mean": 258664},
+                 "packet_tools": {"correct": "20/22", "abstain_ok": "3/4", "cost_usd_total": 0.632, "tool_calls_mean": 2.6, "input_tokens_mean": 94346}},
+ "sonnet_lean": {"raw_tools": {"correct": "20/22", "cost_usd_total": 1.063}, "packet_tools": {"correct": "22/22", "cost_usd_total": 0.861}},
+ "findings": [
+  "Without the packet, haiku is both less correct and more expensive than sonnet (more exploration: 8.0 vs ~5 tool calls).",
+  "With the packet, haiku is 27% cheaper than sonnet but loses 2/22 answers and 1 abstention: no router promoted for this task family.",
+  "The packet helps the weaker model more: haiku cost x0.51 and +4 correct vs sonnet x0.81 and +2."
+ ]
+}

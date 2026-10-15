@@ -14,7 +14,7 @@ seam, Tokenomics usage receipts, and levers promoted only on paired, verified ev
 | Usage receipts | plugin `Stop` + `SessionEnd` | equal to Claude Code's billed usage on all four token fields | on |
 | Automatic routing | plugin `UserPromptSubmit` | inert in shadow (default) | shadow |
 | ObservationPack | `--plugin-dir harness-adapters/claude-code-z0-obspack` | short tasks: null; long recall task (n=12): −30.3% total, Wilcoxon p=0.0068, 12/12 verified; on top of lean a further −38.2% median (6/6, p=0.031) | **opt-in for long, output-heavy sessions** |
-| Skill exposure | `z0int.claude_code_skills` (nightly only) | best 2/30 misses; bar ≤1/30 | not promoted |
+| Skill exposure | `z0int.claude_code_skills` | best 2/30 misses; bar ≤1/30 | not promoted |
 
 ## Install
 
@@ -42,8 +42,7 @@ claude -p "Reply with just OK." --output-format json | jq '.usage'
 
 ## Failure behaviour (measured)
 
-`benchmarks/claude_code/failure_injection.sh` (bench harness; rides nightly on
-`integrate/claude-code-z0-stack`): with the router down, a missing
+`benchmarks/claude_code/failure_injection.sh`: with the router down, a missing
 `Z0INT_PYTHON`, the packet enabled outside git, or an unwritable `Z0INT_HOME`, every session
 still answered normally (1.1–1.7 s, no hook stderr). Usage receipts are written whenever z0 can
 run and write (3/3 expected cases).
@@ -55,3 +54,10 @@ run and write (3/3 expected cases).
 - `Stop` fires before the final assistant message is in the transcript; sweep again at
   `SessionEnd` (dedupe by message id).
 - Hook input carries `prompt_id`; use it as the turn id.
+
+## Portable lab
+
+`deploy/lab/up` brings up the same `hermes-lab` Kind lane on any fleet host with detected
+host deltas (bridge gateway, GPU). `z0-slm.service` serves a GGUF on the host's best device
+(e.g. Radeon R9 M370X via Vulkan); the `llama_http` decision backend reads it
+(`Z0INT_SLM_URL`). See `deploy/lab/README.md`.

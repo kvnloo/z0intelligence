@@ -32,6 +32,8 @@ def detect_harness_id(explicit: str | None = None) -> str:
         return "omp"
     if os.environ.get("HERMES_HOME") or os.environ.get("HERMES_PROFILE"):
         return "hermes"
+    if os.environ.get("CLAUDECODE") == "1":
+        return "claude-code"
     return "unknown"
 
 

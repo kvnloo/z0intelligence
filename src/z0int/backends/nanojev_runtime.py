@@ -254,13 +254,18 @@ class NanoJevEngine:
         from safetensors.torch import load_file
         from transformers import AutoConfig, AutoModel, AutoTokenizer
 
-        if not torch.cuda.is_available():
-            raise ValueError("NanoJev V0 requires CUDA")
         device = torch.device(device_name)
-        if device.type != "cuda":
-            raise ValueError("NanoJev V0 requires a CUDA device")
-        if precision == "bf16" and not torch.cuda.is_bf16_supported():
-            raise ValueError("requested BF16 but device does not support it")
+        if device.type == "cuda":
+            if not torch.cuda.is_available():
+                raise ValueError("NanoJev on cuda requires a visible CUDA device")
+            if precision == "bf16" and not torch.cuda.is_bf16_supported():
+                raise ValueError("requested BF16 but device does not support it")
+        elif device.type == "cpu":
+            # CPU runs FP32 compute: bf16 autocast without AVX512-BF16/AMX is a
+            # large slowdown, and FP32 is the reference numerics anyway.
+            precision = "fp32"
+        else:
+            raise ValueError(f"NanoJev supports cuda or cpu, not {device.type!r}")
 
         config = json.loads((checkpoint_dir / "config.json").read_text())
         set_head = config.get("set_head")
@@ -308,19 +313,26 @@ class NanoJevEngine:
     def predict(self, request):
         torch = self._torch
         examples = build_examples(request, self.tokenizer, self.max_length)
-        started = torch.cuda.Event(enable_timing=True)
-        ended = torch.cuda.Event(enable_timing=True)
+        if self.device.type == "cuda":
+            started = torch.cuda.Event(enable_timing=True)
+            ended = torch.cuda.Event(enable_timing=True)
+            started.record()
+            with torch.inference_mode(), torch.autocast(
+                "cuda",
+                dtype=torch.bfloat16,
+                enabled=self.precision == "bf16",
+            ):
+                logits, _ = self.model(examples, self.tokenizer.pad_token_id)
+            ended.record()
+            torch.cuda.synchronize(self.device)
+            forward_ms = float(started.elapsed_time(ended))
+        else:
+            import time as _time
 
-        started.record()
-        with torch.inference_mode(), torch.autocast(
-            "cuda",
-            dtype=torch.bfloat16,
-            enabled=self.precision == "bf16",
-        ):
-            logits, _ = self.model(examples, self.tokenizer.pad_token_id)
-        ended.record()
-        torch.cuda.synchronize(self.device)
-        forward_ms = float(started.elapsed_time(ended))
+            t0 = _time.perf_counter()
+            with torch.inference_mode():
+                logits, _ = self.model(examples, self.tokenizer.pad_token_id)
+            forward_ms = (_time.perf_counter() - t0) * 1000.0
 
         answers = []
         for ex, row in zip(examples, logits):

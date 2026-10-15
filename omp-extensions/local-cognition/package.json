@@ -1,0 +1,10 @@
+{
+  "name": "omp-local-cognition",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shadow-only OMP extension: compile the legal action set and record what local z0int models would choose.",
+  "scripts": {
+    "test": "bun test"
+  }
+}

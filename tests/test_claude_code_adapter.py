@@ -3,7 +3,7 @@ import json
 import subprocess
 import sys
 
-from z0int import automatic, claude_code
+from z0int import automatic, claude_code, harness_id
 
 
 def assistant(mid, model='claude-sonnet-5-5', **usage):
@@ -18,6 +18,10 @@ def test_claude_code_is_a_harness(monkeypatch):
     assert 'claude-code' in automatic.HARNESSES
     monkeypatch.setenv('Z0INT_AUTO_CLAUDE_CODE', '0')
     assert automatic.settings('claude-code')[0] is False
+    for name in ('Z0INT_HARNESS_ID', 'HARNESS_ID', 'OMP_SESSION_ID', 'PI_SESSION_ID', 'HERMES_HOME', 'HERMES_PROFILE'):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv('CLAUDECODE', '1')
+    assert harness_id.detect_harness_id() == 'claude-code'
 
 
 def test_shadow_prompt_is_inert(monkeypatch, tmp_path):

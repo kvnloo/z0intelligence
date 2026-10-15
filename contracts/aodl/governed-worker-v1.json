@@ -1,0 +1,79 @@
+{
+  "specVersion": "0.2",
+  "graphId": "z0int-governed-worker-canary",
+  "revision": 1,
+  "intentGraph": {
+    "nodes": [
+      {
+        "id": "parent",
+        "kind": "task",
+        "ports": [
+          {"id": "in", "direction": "in", "schema": "Task"},
+          {"id": "out", "direction": "out", "schema": "Task"}
+        ],
+        "capabilities": ["execute"],
+        "authorityCeiling": ["execute"],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "child",
+        "kind": "task",
+        "ports": [
+          {"id": "in", "direction": "in", "schema": "Task"},
+          {"id": "out", "direction": "out", "schema": "Task"}
+        ],
+        "capabilities": ["execute"],
+        "authorityCeiling": ["execute"],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "verify",
+        "kind": "verifier",
+        "ports": [
+          {"id": "in", "direction": "in", "schema": "Task"},
+          {"id": "out", "direction": "out", "schema": "Task"}
+        ],
+        "capabilities": ["execute"],
+        "authorityCeiling": ["execute"],
+        "lifecycle": "declared"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-parent-child",
+        "relation": "delegation",
+        "from": "parent",
+        "to": "child",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {"order": "ordered", "idempotent": true, "timeoutMs": 60000, "maxRetries": 0},
+        "authority": {"grant": ["execute"], "delegationDepth": 1},
+        "provenance": {"sourceHash": "fb7c01ddf8b82e81d7003a259f508067abe96577c77302d1ce8b29c82ef0bd24"}
+      },
+      {
+        "id": "e-child-verify",
+        "relation": "verification",
+        "from": "child",
+        "to": "verify",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {"order": "ordered", "idempotent": true, "timeoutMs": 60000, "maxRetries": 0},
+        "authority": {"grant": ["execute"], "delegationDepth": 0},
+        "provenance": {"sourceHash": "fb7c01ddf8b82e81d7003a259f508067abe96577c77302d1ce8b29c82ef0bd24"}
+      }
+    ]
+  },
+  "policies": {
+    "kinds": ["recursion"],
+    "fanIn": "all",
+    "dynamic": {"allowed": true, "maxChildren": 1, "maxDepth": 1}
+  },
+  "constraints": {
+    "budgets": {"tokens": 4096},
+    "termination": {"on": "verifier.succeeded"}
+  },
+  "provenance": {
+    "source": "z0int-governed-worker-canary-v1",
+    "sourceHash": "fb7c01ddf8b82e81d7003a259f508067abe96577c77302d1ce8b29c82ef0bd24"
+  }
+}

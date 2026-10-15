@@ -30,12 +30,12 @@ def _default_device() -> str:
     return os.environ.get("Z0INT_LAYA_DEVICE", "cpu")
 
 
-def _resolve_model_dir(*, hf: str, revision: str) -> Path:
+def _resolve_model_dir(*, hf: str, revision: str, local_files_only: bool = False) -> Path:
     from z0int.models_mgmt import model_cached
 
     from huggingface_hub import snapshot_download
 
-    if model_cached(hf, revision):
+    if local_files_only or model_cached(hf, revision):
         return Path(snapshot_download(repo_id=hf, revision=revision, local_files_only=True))
     return Path(snapshot_download(repo_id=hf, revision=revision))
 
@@ -107,10 +107,10 @@ class LayaBackend:
             local=True,
         )
 
-    def _model_path(self) -> Path:
+    def _model_path(self, *, local_files_only: bool = False) -> Path:
         if self._model_dir is not None:
             return self._model_dir.expanduser()
-        return _resolve_model_dir(hf=self.hf, revision=self.revision)
+        return _resolve_model_dir(hf=self.hf, revision=self.revision, local_files_only=local_files_only)
 
     def health(self, *, load: bool = False) -> BackendHealth:
         err = _laya_import_error()
@@ -125,7 +125,7 @@ class LayaBackend:
                 diagnostics={"hf": self.hf, "manifest_id": self.model_id, "revision": self.revision},
             )
         try:
-            path = self._model_path()
+            path = self._model_path(local_files_only=not load)
             present = path.is_dir() and (path / "model.safetensors").is_file()
         except Exception as exc:  # noqa: BLE001
             return BackendHealth(

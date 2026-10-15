@@ -1,0 +1,5 @@
+# One node; the host keeps models and credentials (host authority pattern).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane

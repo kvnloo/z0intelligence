@@ -1,0 +1,15 @@
+MESA-INTEL: warning: Haswell Vulkan support is incomplete
+0.00.292.044 I srv  llama_server: initializing ...
+0.00.292.299 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.292.873 I srv  init_listene: The UI is disabled
+0.00.292.993 I srv  init_listene: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.307.945 I srv    operator(): Available models (4):
+0.00.308.122 I srv    operator():   [models_dir] functiongemma-270m-q8
+0.00.308.211 I srv    operator():   [models_dir] hammer2.1-1.5b-q4km
+0.00.308.296 I srv    operator():   [models_dir] qwen3-0.6b-q8
+0.00.308.382 I srv    operator():   [models_dir] qwen3-1.7b-q4km
+0.00.308.927 W srv  llama_server: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)
+0.00.309.079 W srv  llama_server: security: router mode enabled - do not expose to untrusted environments
+0.00.309.177 I srv  llama_server: starting server in router mode. models will be automatically loaded on-demand
+0.00.313.151 I srv  llama_server: listening on http://127.0.0.1:11520
+10.32.087.754 I srv    operator(): operator(): cleaning up before exit...

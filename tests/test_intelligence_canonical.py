@@ -1,24 +1,28 @@
 """Canonical ownership and routing boundary regressions; no live model calls."""
 import json
-import sys
-from types import SimpleNamespace
 import pytest
 from z0int.functions import jev
 from z0int import automatic, intelligence
 
 @pytest.mark.parametrize('choice,status',[('supported','SUPPORTED'),('insufficient','UNKNOWN'),('contradicted','UNSUPPORTED')])
 def test_jev_uses_canonical_client_once(monkeypatch,choice,status):
+    import httpx2
     calls=[]
-    def ask(state,questions,**kwargs):
-        calls.append((state,questions,kwargs))
-        kwargs['transport'].model='jev-1.13.0'
-        return {'answers':{'assess':{'type':'choice','choice':choice,'probabilities':{'supported':.8,'insufficient':.1,'contradicted':.1}}},'usage':{'input_tokens':10,'output_tokens':1}}
-    monkeypatch.setitem(sys.modules,'jevkit',SimpleNamespace(client=SimpleNamespace(ask=ask,choice=lambda text,options:{'type':'choice','instructions':text,'criteria':options})))
+    def send(request):
+        calls.append(json.loads(request.content))
+        return httpx2.Response(200,json={
+            'model':'jev-1.13.0', 'usage':{'input_tokens':10,'output_tokens':1},
+            'answers':{'decision':{'type':'choice','choice':choice,'confidence':0.8,
+                'probabilities':{'supported':.8,'insufficient':.1,'contradicted':.1}}}})
+    real_ask=jev.ask_choice
+    transport=httpx2.MockTransport(send)
+    monkeypatch.setattr(jev,'ask_choice',lambda *args,**kwargs:real_ask(*args,transport=transport,**kwargs))
     monkeypatch.setattr(jev,'ensure_credential',lambda:'test-only')
     monkeypatch.setattr(jev,'credential_source',lambda:'test')
     out=jev.assess_claim({'question':'public claim','evidence':'public evidence'})
     assert out['status']==status and len(calls)==1
-    assert calls[0][2]['retries']==0 and calls[0][2]['model']=='jev-1.13.0'
+    assert calls[0]['model']=='jev-1.13.0'
+    assert calls[0]['questions']['decision']['type']=='choice'
 
 
 def test_unmeasured_or_excluded_capability_is_not_automatic():

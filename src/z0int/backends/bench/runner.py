@@ -32,7 +32,7 @@ from .analytics import (
     build_paired_comparisons,
     render_analytics_md,
 )
-from .contract import BENCH_CONTRACT, BENCH_SCHEMA, CAPABILITIES, ROSTER_CANDIDATES
+from .contract import BENCH_CONTRACT, BENCH_SCHEMA, CAPABILITIES, ROSTER_CANDIDATES, is_roster_candidate
 from .eligibility import ELIGIBILITY_SCHEMA, enrich_backend_summaries
 from .fixtures import BenchExample, default_fixtures_path, load_fixtures
 from .bootstrap import (
@@ -70,20 +70,60 @@ def _results_root() -> Path:
     return _repo_root() / "results" / "decision-backends"
 
 
-def _ram_mb() -> float | None:
+def _proc_rss_mb(pid: int | str = "self") -> float | None:
     try:
-        usage = resource.getrusage(resource.RUSAGE_SELF)
-        rss = usage.ru_maxrss
-        if rss > 10_000_000:
-            return rss / (1024 * 1024)
-        return rss / 1024
-    except Exception:
+        for line in Path(f"/proc/{pid}/status").read_text().splitlines():
+            if line.startswith("VmRSS:"):
+                return int(line.split()[1]) / 1024.0
+    except (OSError, ValueError, IndexError):
         return None
+    return None
+
+
+def _ram_mb(backend: Any = None) -> float | None:
+    """Resident RAM attributable to the candidate right now.
+
+    ``ru_maxrss`` is a process-lifetime high-water mark, so in a multi-candidate
+    run every later candidate inherited the earlier ones' peak. On Linux sample
+    the current RSS instead, plus any out-of-process workers the backend
+    declares via ``resident_pids()`` (e.g. the Julia worker). Other platforms
+    keep the old high-water mark.
+    """
+    own = _proc_rss_mb()
+    if own is None:
+        try:
+            usage = resource.getrusage(resource.RUSAGE_SELF)
+            rss = usage.ru_maxrss
+            if rss > 10_000_000:
+                return rss / (1024 * 1024)
+            return rss / 1024
+        except Exception:
+            return None
+    extra = 0.0
+    pids = getattr(backend, "resident_pids", None)
+    if callable(pids):
+        try:
+            for pid in pids() or ():
+                extra += _proc_rss_mb(pid) or 0.0
+        except Exception:  # noqa: BLE001
+            pass
+    return own + extra
+
+
+def _amdgpu_vram_mb() -> float | None:
+    """Device-level VRAM in use on amdgpu cards (the nvidia-smi analogue)."""
+    vals = []
+    for used in Path("/sys/class/drm").glob("card[0-9]*/device/mem_info_vram_used"):
+        try:
+            vals.append(int(used.read_text().strip()) / (1024 * 1024))
+        except (OSError, ValueError):
+            continue
+    return max(vals) if vals else None
 
 
 def _vram_mb() -> float | None:
     if shutil.which("nvidia-smi") is None:
-        return None
+        return _amdgpu_vram_mb()
     try:
         out = subprocess.check_output(
             [
@@ -198,7 +238,7 @@ def run_candidate(
             scored = score_example(ex, probabilities=ans.get("probabilities"), pred=pred)
             abstain_id = ex.abstain_option_id or "abstain"
             abstained = pred == abstain_id
-            ram_mb = _ram_mb()
+            ram_mb = _ram_mb(backend)
             vram_mb = _vram_mb()
             result_dict = result_to_dict(result)
             tm_session.emit_success(
@@ -239,6 +279,14 @@ def run_candidate(
                 device=str(device) if device is not None else None,
             )
             rows.append(_materialize_emitted(tm_session, trace_id))
+    close = getattr(backend, "close", None)
+    if callable(close):
+        # Out-of-process workers (Julia) must not outlive their candidate: they
+        # would hold RAM through every later candidate's measurement.
+        try:
+            close()
+        except Exception:  # noqa: BLE001
+            pass
     summary = {
         "candidate_id": candidate_id,
         "status": "available",
@@ -270,6 +318,12 @@ def run_bench(
         examples = [e for e in examples if e.capability == capability_filter]
 
     candidates = list(ROSTER_CANDIDATES)
+    try:
+        from ..llama_http import configured_arms
+
+        candidates += [f"llama_http:{arm}" for arm in sorted(configured_arms())]
+    except Exception:  # noqa: BLE001
+        pass
     if backend_filter:
         aliases = {
             "nanojev": "nanojev_06b",
@@ -277,12 +331,15 @@ def run_bench(
             "openjev_4b": "openjev_4b",
             "laya": "laya_421m",
             "decider": "decider_2b",
+            "julia": "julia_1",
+            "julia-1": "julia_1",
+            "slm": "llama_http",
         }
         requested = [x.strip() for x in str(backend_filter).split(",") if x.strip()]
         candidates = []
         for raw in requested:
             bid = aliases.get(raw, raw)
-            if bid not in ROSTER_CANDIDATES:
+            if not is_roster_candidate(bid):
                 raise ValueError(f"unknown backend candidate {raw!r}")
             if bid not in candidates:
                 candidates.append(bid)

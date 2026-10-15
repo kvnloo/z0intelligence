@@ -59,12 +59,15 @@ def replay(row):
         'reason':'Previous dispatch interrupted or uncertain; not re-executed'}
 
 
-def started(request,key,owner=None):
+def started(request,key,owner=None,admission_id=None):
     row={'trace_id':'dispatch-'+key,'session_id':request['parent_agent'],
         'capability_id':'intelligence.dispatch','execution':'orchestration',
         'extra':{'harness':request['harness'],'caller_trace_id':request['trace_id'],
                  'request_sha256':fingerprint(request),'status':'started'}}
+    if request.get('caller_request_sha256'):
+        row['extra']['caller_request_sha256']=request['caller_request_sha256']
     if owner:row['extra']['authority_owner_sha256']=hashlib.sha256(owner.encode()).hexdigest()
+    if admission_id:row['extra']['aodl_admission_receipt_id']=admission_id
     return append_receipt(row)
 
 
@@ -95,11 +98,11 @@ def run(request, work):
 
 def validate_remote(request, *, enforce_free=False):
     from .worker_routing import validate_request, configuration, explicit_plan
-    allowed={'harness','trace_id','function','parent_agent','task','context','provider','model','reason','max_tokens','free_only'}
+    allowed={'harness','trace_id','function','parent_agent','task','context','provider','model','reason','max_tokens','free_only','aodl'}
     if not isinstance(request,dict) or set(request)-allowed:raise ValueError('Invalid remote request fields')
     identity(request)
     if request['function']!='cheap_bounded_worker':raise ValueError('Remote executor only supports bounded text workers')
-    worker={k:v for k,v in request.items() if k not in ('harness','trace_id','function')}
+    worker={k:v for k,v in request.items() if k not in ('harness','trace_id','function','aodl')}
     validate_request(worker,automatic=False)
     policy,providers=configuration()
     plan=explicit_plan(worker,policy,providers)
@@ -112,15 +115,21 @@ def validate_remote(request, *, enforce_free=False):
     return worker,policy,providers,plan
 
 
-def claim(request,owner):
+def claim(request,owner,*,require_aodl=False):
     if not isinstance(owner,str) or len(owner)!=64:raise ValueError('Invalid owner capability')
     key=identity(request)
     with locked(key):
         row=previous(request,key)
         if row:return {'claimed':False,'result':replay(row)}
         validate_remote(request,enforce_free=True)
-        row=started(request,key,owner)
-        return {'claimed':True,'dispatch_receipt_id':row['trace_id']}
+        from . import aodl_dispatch
+        admission=aodl_dispatch.ensure(request,key,fingerprint(request),required=require_aodl)
+        if admission is not None and not aodl_dispatch.is_allowed(admission):
+            return {'claimed':False,'result':aodl_dispatch.denied_result(admission)}
+        row=started(request,key,owner,admission['trace_id'] if admission is not None else None)
+        out={'claimed':True,'dispatch_receipt_id':row['trace_id']}
+        if admission is not None:out['aodl_admission_receipt_id']=admission['trace_id']
+        return out
 
 
 def owned(request,owner):
@@ -207,9 +216,10 @@ def complete(request,owner,result):
 
 def rpc(operation,args):
     if not isinstance(args,dict):raise ValueError('Invalid authority request')
-    if args.get('protocol_version')!=2:raise ValueError('Executor protocol v2 with authority admission is required')
+    version=args.get('protocol_version')
+    if version not in (2,3):raise ValueError('Executor protocol v2 or v3 is required')
     request=args['request'];owner=args['owner']
-    if operation=='claim':return claim(request,owner)
+    if operation=='claim':return claim(request,owner,require_aodl=version==3)
     if operation in ('acquire','release'):
         from .provider_saturation import acquire,release
         with locked(identity(request)):

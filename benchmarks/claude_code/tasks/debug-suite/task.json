@@ -1,0 +1,5 @@
+{"id": "debug-suite", "family": "debugging",
+ "source": {"repo": "z0intelligence", "sha": "c4a4554", "paths": ["src", "tests", "pyproject.toml"]},
+ "sabotage": {"file": "src/z0int/receipt.py", "old": "    return state if state in MEASUREMENT_STATES else None", "new": "    return state if state in MEASUREMENT_STATES - {\"partial\"} else None"},
+ "prompt": "Some unit tests in this repo started failing after a recent change to library code. Run the test suite with `PYTHONPATH=src python -m pytest -q -p no:cacheprovider tests/test_receipt.py tests/test_tokenomics_emit.py`, find the root cause in src/, and fix it without modifying any test.",
+ "check": ["python3", "-m", "pytest", "-q", "{work}/tests/test_receipt.py"]}

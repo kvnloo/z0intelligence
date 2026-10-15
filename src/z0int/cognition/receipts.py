@@ -30,6 +30,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
+
+from z0int.cognition.mutation_outcome import MutationOutcome, mutation_outcome_from_dict
 import json
 import time
 
@@ -172,6 +174,7 @@ class CognitionReceipt:
     tokens: TokenState = field(default_factory=TokenState)
     cost: CostState = field(default_factory=CostState)
     execution_outcome: ExecutionOutcome = field(default_factory=ExecutionOutcome)
+    mutation_outcome: MutationOutcome | None = None
     retries: int = 0
     extra: Mapping[str, Any] = field(default_factory=dict)
     ts: float = field(default_factory=time.time)
@@ -208,6 +211,9 @@ class CognitionReceipt:
             "cached_input_tokens": self.tokens.cached_input_tokens,
             "cost": self.cost.to_dict(),
             "execution_outcome": self.execution_outcome.to_dict(),
+            "mutation_outcome": (
+                self.mutation_outcome.to_dict() if self.mutation_outcome is not None else None
+            ),
             "verified_outcome": _drop_none(
                 {
                     "verified_success": self.execution_outcome.verified_success,
@@ -249,6 +255,13 @@ class CognitionReceipt:
                 error=error,
             ),
         )
+
+    def mark_mutation_outcome(self, outcome: MutationOutcome) -> "CognitionReceipt":
+        """Attach the world-mutation state without rewriting the cognition decision.
+
+        Selection/provider retries and world-effect retries are separate facts.
+        """
+        return replace(self, mutation_outcome=outcome)
 
     def mark_verification(
         self,
@@ -341,6 +354,11 @@ def receipt_from_dict(raw: Mapping[str, Any]) -> CognitionReceipt:
             verifier=outcome.get("verifier"),
             note=outcome.get("note"),
         ),
+        mutation_outcome=(
+            mutation_outcome_from_dict(dict(raw["mutation_outcome"]))
+            if isinstance(raw.get("mutation_outcome"), Mapping)
+            else None
+        ),
         retries=int(raw.get("retries") or 0),
         extra=dict(raw.get("extra") or {}),
         ts=float(raw.get("ts") or time.time()),
@@ -353,6 +371,7 @@ __all__ = [
     "CostState",
     "ExecutionOutcome",
     "LatencyState",
+    "MutationOutcome",
     "QuotaState",
     "TokenState",
     "receipt_from_dict",

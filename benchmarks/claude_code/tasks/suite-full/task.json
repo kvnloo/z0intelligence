@@ -1,0 +1,26 @@
+{
+ "id": "suite-full",
+ "family": "long_output",
+ "source": {
+  "repo": "z0intelligence",
+  "sha": "c4a4554",
+  "paths": [
+   "src",
+   "tests",
+   "pyproject.toml",
+   "adapters",
+   "harness-adapters",
+   "benchmarks",
+   "manifests",
+   "examples",
+   "scripts"
+  ]
+ },
+ "prompt": "Run the whole test suite with `PYTHONPATH=src:. python -m pytest -q -p no:cacheprovider tests` and read its full output (do not pipe it through head/tail/grep). Then write to ANSWER.txt the sorted list of test files (paths like tests/test_x.py) that have at least one failure or error, one per line, nothing else. Then, for each failing file, append one sentence to NOTES.txt with the most likely root cause based on its traceback.",
+ "check": [
+  "python3",
+  "-c",
+  "import sys; a=open('ANSWER.txt').read().split(); sys.exit(0 if a==['tests/test_bridge_worker.py','tests/test_functions_verify.py','tests/test_intelligence.py','tests/test_julia_backend.py','tests/test_provider_saturation.py','tests/test_quota_budget.py'] else 1)"
+ ],
+ "env_note": "truth measured on this machine's .venv (py3.11) at c4a4554; env-dependent failures, identical for all arms"
+}
