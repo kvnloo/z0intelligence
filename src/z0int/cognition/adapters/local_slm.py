@@ -17,7 +17,7 @@ Safety invariants (z0intelligence#20, oh-my-pi#83):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Protocol, runtime_checkable
+from typing import Any, Literal, Mapping, Protocol, runtime_checkable
 import time
 
 from ..actions import LegalActionSet
@@ -73,6 +73,7 @@ class ToolDecision:
     parse_error: str | None = None
     reasoning_metadata: Mapping[str, Any] = field(default_factory=dict)
     diagnostics: Mapping[str, Any] = field(default_factory=dict)
+    error_kind: Literal["transport", "timeout", "parse", "none"] = "none"
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -89,6 +90,7 @@ class ToolDecision:
             "invalid_call": self.invalid_call,
             "irrelevant_call": self.irrelevant_call,
             "unnecessary_call": self.unnecessary_call,
+            "error_kind": self.error_kind,
         }
         for key in (
             "ttft_ms",
@@ -133,6 +135,7 @@ def _abstain(
     reason: str,
     invalid_call: bool = False,
     extra: Mapping[str, Any] | None = None,
+    error_kind: Literal["transport", "timeout", "parse", "none"] = "none",
 ) -> ToolDecision:
     diagnostics: dict[str, Any] = {"reason": reason}
     if extra:
@@ -149,7 +152,8 @@ def _abstain(
         abstained=True,
         candidate_action_count=candidate_count,
         invalid_call=invalid_call,
-        parse_error=reason,
+        parse_error=reason if error_kind == "parse" else None,
+        error_kind=error_kind,
         diagnostics=diagnostics,
     )
 
@@ -235,6 +239,16 @@ class LocalSLMBackend:
         )
         return info
 
+    def prewarm(self) -> None:
+        """Optionally load this model before deciding; raises TransportError on failure.
+
+        Call immediately before its first decision: a different model on the same
+        supervisor will evict it. The one-token response is never parsed.
+        """
+        self._transport.chat(
+            [{"role": "user", "content": "Hi"}], max_tokens=1, temperature=0.0
+        )
+
     def decide(self, request: ToolDecisionRequest) -> ToolDecision:
         legal = request.legal
         ids = legal.ids()
@@ -289,6 +303,10 @@ class LocalSLMBackend:
                 candidate_count=len(ids),
                 latency_ms=(time.perf_counter() - started) * 1000.0,
                 reason=f"transport_error: {exc}",
+                error_kind=(
+                    "timeout" if "timeout" in str(exc).lower() or "timed out" in str(exc).lower()
+                    else "transport"
+                ),
             )
 
         invocation = self._dialect.parse(
@@ -339,7 +357,7 @@ class LocalSLMBackend:
                 distribution=None,
                 latency_ms=outcome.latency_ms,
                 abstained=True,
-                parse_error=f"invalid_call:{invocation.tool}",
+                parse_error=None,
                 invalid_call=True,
                 diagnostics={
                     "attempted_action": invocation.tool,
@@ -419,6 +437,7 @@ class LocalSLMBackend:
             candidate_action_count=candidate_count,
             invalid_call=invalid_call,
             parse_error=parse_error,
+            error_kind="parse" if parse_error else "none",
             diagnostics=merged,
         )
 

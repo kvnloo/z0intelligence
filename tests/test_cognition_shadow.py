@@ -275,7 +275,9 @@ def test_unreachable_backend_fails_open_with_a_partial_shadow_list():
     assert by_label["m1"]["selected_action"] in {"read", "grep"}
     assert by_label["m2"]["selected_action"] is None
     assert by_label["m2"]["abstained"] is True
-    assert "connection refused" in by_label["m2"]["parse_error"]
+    assert by_label["m2"]["parse_error"] is None
+    assert by_label["m2"]["error_kind"] == "transport"
+    assert "connection refused" in by_label["m2"]["error"]
 
 
 def test_missing_model_is_recorded_and_does_not_fail_the_op():
@@ -286,7 +288,8 @@ def test_missing_model_is_recorded_and_does_not_fail_the_op():
     assert result["ok"] is True
     by_label = {row["label"]: row for row in result["shadow"]}
     assert by_label["m2"]["selected_action"] is None
-    assert "not served" in by_label["m2"]["parse_error"]
+    assert by_label["m2"]["parse_error"] is None
+    assert "not served" in by_label["m2"]["error"]
 
 
 def test_no_models_served_still_returns_the_compiled_legal_set(tmp_path, monkeypatch):
@@ -417,10 +420,12 @@ def test_payload_budget_bounds_a_slow_model_and_records_it_as_a_timeout(tmp_path
     result = run_shadow(payload, registry=registry, write=True)
     elapsed = time.monotonic() - started
 
-    # The caller's budget wins over the 30 s default: the op returns inside it.
+    # The caller's budget wins over the cold-load default.
     assert elapsed < 0.5
     row = result["shadow"][0]
     assert row["error"] == "shadow_timeout"
+    assert row["error_kind"] == "timeout"
+    assert row["parse_error"] is None
     assert row["backend"] is None
     assert row["selected_action"] is None
     receipt = json.loads(Path(result["receipts_path"]).read_text().splitlines()[0])
@@ -601,3 +606,154 @@ def test_the_cap_changes_no_ordinary_budget(monkeypatch):
     with pytest.raises(ValueError):
         shadow._timeout_s({}, "abc")
     assert shadow._timeout_s({"timeout_ms": 7_200_000}, None) == shadow.MAX_SERVER_TIMEOUT_S
+
+
+def test_default_timeout_covers_cold_load_and_overrides_still_work(monkeypatch):
+    from z0int.cognition import shadow
+
+    monkeypatch.delenv("Z0INT_COGNITION_SHADOW_SERVER_TIMEOUT_MS", raising=False)
+    assert shadow._timeout_s({}, None) == 120.0
+    monkeypatch.setenv("Z0INT_COGNITION_SHADOW_SERVER_TIMEOUT_MS", "180000")
+    assert shadow._timeout_s({}, None) == 180.0
+    assert shadow._timeout_s({"timeout_ms": 150000}, None) == 150.0
+    assert shadow._timeout_s({}, 200) == 200.0
+
+
+def _at_server(backend, url="http://127.0.0.1:11500"):
+    from z0int.cognition.adapters.transport import ServerConfig
+
+    backend.config = ServerConfig(base_url=url, model=backend._model)
+    return backend
+
+
+def test_shared_supervisor_challengers_get_sequential_calls_and_separate_budgets():
+    import threading
+
+    active = 0
+    overlap = []
+    lock = threading.Lock()
+
+    class Backend(_FakeBackend):
+        def decide(self, request):
+            nonlocal active
+            with lock:
+                active += 1
+                overlap.append(active)
+            try:
+                time.sleep(0.08)
+                return super().decide(request)
+            finally:
+                with lock:
+                    active -= 1
+
+    registry = _FakeRegistry(backends={
+        "m1": _at_server(Backend(action="read")),
+        "m2": _at_server(Backend(action="grep"), "http://127.0.0.1:11500/"),
+    }, served=("m1", "m2"))
+    rows = run_shadow(_payload(shadows=["m1", "m2"]), registry=registry,
+                      timeout_s=0.13, write=False)["shadow"]
+    assert overlap == [1, 1]
+    assert [r["selected_action"] for r in rows] == ["read", "grep"]
+
+
+def test_different_supervisors_can_run_concurrently():
+    import threading
+
+    barrier = threading.Barrier(2)
+
+    class Backend(_FakeBackend):
+        def decide(self, request):
+            barrier.wait(1)
+            return super().decide(request)
+
+    registry = _FakeRegistry(backends={
+        "m1": _at_server(Backend(action="read")),
+        "m2": _at_server(Backend(action="grep"), "http://127.0.0.1:11501"),
+    }, served=("m1", "m2"))
+    rows = run_shadow(_payload(shadows=["m1", "m2"]), registry=registry,
+                      timeout_s=2, write=False)["shadow"]
+    assert [r["selected_action"] for r in rows] == ["read", "grep"]
+
+
+def test_outage_writes_one_unavailable_row_until_a_response(tmp_path, monkeypatch):
+    from z0int.cognition import shadow
+
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    monkeypatch.setattr(shadow, "_outages", set())
+    backends = {m: _at_server(_FakeBackend(raises=ConnectionError("refused")))
+                for m in ("m1", "m2")}
+    registry = _FakeRegistry(backends=backends, served=("m1", "m2"))
+    payload = _payload(shadows=["m1", "m2"])
+    first = run_shadow(payload, registry=registry)
+    for _ in range(3):
+        run_shadow(payload, registry=registry)
+    path = Path(first["receipts_path"])
+    receipts = [json.loads(line) for line in path.read_text().splitlines()]
+    assert len(receipts) == 1
+    assert len(receipts[0]["shadow"]) == 1
+    row = receipts[0]["shadow"][0]
+    assert row["status"] == "unavailable"
+    assert row["error_kind"] == "transport"
+    assert row["parse_error"] is None
+
+    for backend in backends.values():
+        backend._raises = None
+        backend._action = "read"
+    run_shadow(payload, registry=registry)
+    for backend in backends.values():
+        backend._raises = ConnectionError("refused again")
+    run_shadow(payload, registry=registry)
+    run_shadow(payload, registry=registry)
+    receipts = [json.loads(line) for line in path.read_text().splitlines()]
+    assert len(receipts) == 3
+    assert len(receipts[1]["shadow"]) == 2
+    assert len(receipts[2]["shadow"]) == 1
+
+
+def test_concurrent_outage_calls_write_once(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from z0int.cognition import shadow
+
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    monkeypatch.setattr(shadow, "_outages", set())
+    registry = _FakeRegistry(backends={"m1": _at_server(
+        _FakeBackend(raises=ConnectionError("refused")))})
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(lambda _: run_shadow(_payload(), registry=registry), range(8)))
+    receipts = shadow_receipt_path().read_text().splitlines()
+    assert len(receipts) == 1
+
+
+def test_timed_out_request_keeps_its_supervisor_until_it_finishes():
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    entered = threading.Event()
+    finish = threading.Event()
+    second_entered = threading.Event()
+
+    class Loading(_FakeBackend):
+        def decide(self, request):
+            entered.set()
+            assert finish.wait(2)
+            return super().decide(request)
+
+    class Next(_FakeBackend):
+        def decide(self, request):
+            second_entered.set()
+            return super().decide(request)
+
+    # Another run_shadow call must also respect the abandoned call's lock.
+    first = _FakeRegistry(backends={"m1": _at_server(Loading(action="read"))})
+    second = _FakeRegistry(backends={"m1": _at_server(Next(action="grep"))})
+    try:
+        row = run_shadow(_payload(), registry=first, timeout_s=0.1, write=False)["shadow"][0]
+        assert entered.is_set()
+        assert row["error_kind"] == "timeout"
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pending = pool.submit(run_shadow, _payload(), registry=second, timeout_s=0.2, write=False)
+            assert not second_entered.wait(0.05)
+            finish.set()
+            assert pending.result()["shadow"][0]["selected_action"] == "grep"
+    finally:
+        finish.set()

@@ -187,6 +187,76 @@ def test_upstream_failure_is_reported_not_raised(supervisor, monkeypatch):
     assert "unreachable" in out["error"]["type"]
 
 
+@pytest.mark.parametrize("operation", ["swap", "release", "idle"])
+def test_residency_cannot_change_during_an_upstream_request(supervisor, monkeypatch, operation):
+    import z0int.cognition.server as server_mod
+
+    reading = threading.Event()
+    finish = threading.Event()
+    changed = threading.Event()
+    attempting = threading.Event()
+    replies = []
+    child = supervisor.ensure("hammer2.1_3b")
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            reading.set()
+            assert finish.wait(2)
+            assert not child.stopped
+            return b'{"choices": []}'
+
+    monkeypatch.setattr(server_mod, "urlopen", lambda *a, **kw: Response())
+
+    def change_residency():
+        attempting.set()
+        if operation == "swap":
+            supervisor.ensure("functiongemma_270m")
+        elif operation == "release":
+            supervisor.release()
+        else:
+            supervisor.idle_unload_s = 0.000001
+            supervisor.maybe_idle_unload()
+        changed.set()
+
+    request = threading.Thread(target=lambda: replies.append(supervisor.forward("hammer2.1_3b", {})))
+    mutation = threading.Thread(target=change_residency)
+    request.start()
+    try:
+        assert reading.wait(2)
+        mutation.start()
+        assert attempting.wait(2)
+        assert not changed.wait(0.05)
+    finally:
+        finish.set()
+        request.join(2)
+        mutation.join(2)
+    assert replies[0][0] == 200
+    assert changed.is_set()
+
+
+def test_systemd_execstart_matches_the_cognition_serve_cli():
+    import shlex
+    from pathlib import Path
+    from z0int.cli import build_parser
+
+    unit = Path(__file__).resolve().parents[1] / "deploy/systemd/z0-cognition.service"
+    command = next(line.removeprefix("ExecStart=") for line in unit.read_text().splitlines()
+                   if line.startswith("ExecStart="))
+    shell_args = shlex.split(command)
+    cli_args = shlex.split(shell_args[2])
+    args = build_parser().parse_args(cli_args[cli_args.index("cognition"):])
+    assert args.cognition_cmd == "serve"
+    assert args.host == "127.0.0.1"
+    assert args.port == 11500
+    assert args.idle_unload == 600.0
+
+
 def test_max_tokens_is_capped(supervisor, monkeypatch):
     seen = {}
 

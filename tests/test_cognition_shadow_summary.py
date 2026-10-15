@@ -97,6 +97,19 @@ def test_since_ts_and_empty(tmp_path: Path) -> None:
     assert empty["models"] == {}
 
 
+def test_error_kinds_keep_transport_and_timeouts_out_of_answered(tmp_path):
+    rows = [_model("a", error_kind="transport", parse_error=None),
+            _model("b", error_kind="timeout", parse_error=None),
+            _model("c", error_kind="parse", parse_error="unparseable_response"),
+            _model("d", error_kind="none", selected_action="read")]
+    out = summarize_shadow_receipts(_write(tmp_path, [{"shadow": rows}]))["models"]
+    assert out["a"]["unreachable"] == 1
+    assert out["b"]["timed_out"] == 1
+    assert out["c"]["answered"] == 1
+    assert out["c"]["abstained"] == 1
+    assert out["d"]["selections"] == 1
+
+
 def test_output_is_counts_only_and_file_is_untouched(tmp_path: Path) -> None:
     rows = [dict(ROWS[0], state="PRIVATE-TEXT", session_id="PRIVATE-SESSION")]
     path = _write(tmp_path, rows)

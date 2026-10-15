@@ -39,7 +39,12 @@ RECEIPT_NAME = "cognition-shadow.jsonl"
 
 _ALLOWED_KINDS = ("tool", "model", "control")
 _ALLOWED_RISKS = ("read", "write", "destructive", "publish", "credential", "payment")
-DEFAULT_SERVER_TIMEOUT_MS = 30_000
+DEFAULT_SERVER_TIMEOUT_MS = 120_000
+
+_server_locks: dict[str, Any] = {}
+_server_locks_lock = threading.Lock()
+_outages: set[str] = set()
+_outages_lock = threading.Lock()
 
 
 class ShadowPayloadError(ValueError):
@@ -330,7 +335,46 @@ def _resolve_shadows(
     return resolved
 
 
+def _server_base_url(backend: Any) -> str | None:
+    url = getattr(getattr(backend, "config", None), "base_url", None)
+    return url.rstrip("/") if isinstance(url, str) and url else None
+
+
 def _decision_rows(
+    resolved: Sequence[tuple[ShadowSpec, Any, str | None]],
+    legal_ids: frozenset[str],
+    request: ToolDecisionRequest,
+    *,
+    timeout_s: float,
+) -> list[dict[str, Any]]:
+    # One challenger per supervisor in each batch, each with a fresh timeout.
+    pending = list(enumerate(resolved))
+    rows: dict[int, dict[str, Any]] = {}
+    while pending:
+        batch = []
+        remaining = []
+        servers: set[str] = set()
+        for index, entry in pending:
+            url = _server_base_url(entry[1])
+            if url is not None and url in servers:
+                remaining.append((index, entry))
+            else:
+                batch.append((index, entry))
+                if url is not None:
+                    servers.add(url)
+        answers = _parallel_decision_rows(
+            [entry for _, entry in batch], legal_ids, request, timeout_s=timeout_s
+        )
+        for (index, entry), row in zip(batch, answers):
+            url = _server_base_url(entry[1])
+            if url is not None:
+                row["server_base_url"] = url
+            rows[index] = row
+        pending = remaining
+    return [rows[index] for index in range(len(resolved))]
+
+
+def _parallel_decision_rows(
     resolved: Sequence[tuple[ShadowSpec, Any, str | None]],
     legal_ids: frozenset[str],
     request: ToolDecisionRequest,
@@ -344,12 +388,26 @@ def _decision_rows(
     lock = threading.Lock()
 
     def run(index: int, backend: Any) -> None:
+        server_lock = None
+        url = _server_base_url(backend)
+        if url is not None:
+            with _server_locks_lock:
+                server_lock = _server_locks.setdefault(url, threading.Lock())
+            # A timed-out call may still be loading. Never overlap it, including
+            # calls from another run_shadow invocation, or run expired work later.
+            if not server_lock.acquire(timeout=max(0.0, deadline - time.monotonic())):
+                return
         try:
+            if server_lock is not None and time.monotonic() >= deadline:
+                return
             decision = backend.decide(request)
         except BaseException as exc:  # noqa: BLE001 - shadow must never raise
             with lock:
                 results[index] = (None, f"{type(exc).__name__}: {exc}")
             return
+        finally:
+            if server_lock is not None:
+                server_lock.release()
         with lock:
             results[index] = (decision, None)
 
@@ -382,9 +440,11 @@ def _decision_rows(
         row = _row(spec, backend, decision, failure, error, legal_ids)
         # A backend can fail on its own just after the deadline; that row keeps
         # its own error and is not also reported as a timeout.
-        if decision is None and failure == "shadow_timeout" and index in waited_ms:
+        if decision is None and failure == "shadow_timeout":
             row["timed_out"] = True
-            row["waited_ms"] = waited_ms[index]
+            row["waited_ms"] = waited_ms.get(
+                index, round((time.monotonic() - started) * 1000.0, 1)
+            )
         rows.append(row)
     return rows
 
@@ -398,6 +458,11 @@ def _row(
     legal_ids: frozenset[str],
 ) -> dict[str, Any]:
     if decision is None:
+        error = failure or resolve_error or "unavailable"
+        kind = (
+            "timeout" if "timeout" in error.lower() or "timed out" in error.lower()
+            else "transport"
+        )
         return {
             "label": spec.label,
             "backend": None,
@@ -406,8 +471,10 @@ def _row(
             "abstained": True,
             "invalid_call": False,
             "latency_ms": 0.0,
-            "parse_error": failure or resolve_error or "unavailable",
-            "error": failure or resolve_error or "unavailable",
+            "parse_error": None,
+            "error_kind": kind,
+            "status": "unavailable" if kind == "transport" else "timeout",
+            "error": error,
         }
 
     selected = decision.selected_action
@@ -429,8 +496,13 @@ def _row(
         "invalid_call": invalid_call,
         "latency_ms": decision.latency_ms,
         "candidate_action_count": decision.candidate_action_count,
-        "parse_error": decision.parse_error if selected is None else None,
+        "parse_error": decision.parse_error
+        if selected is None and decision.error_kind == "parse" else None,
+        "error_kind": decision.error_kind,
     }
+    if decision.error_kind in ("transport", "timeout"):
+        row["error"] = decision.diagnostics.get("reason", decision.error_kind)
+        row["status"] = "unavailable" if decision.error_kind == "transport" else "timeout"
     if decision.confidence is not None:
         row["confidence"] = decision.confidence
     if attempted is not None:
@@ -563,7 +635,26 @@ def run_shadow(
             "executed_action": None,
         }
         try:
-            result["receipts_path"] = str(append_shadow_receipt(receipt))
+            # Check and append together so concurrent decisions cannot each
+            # announce the same outage. A response, even a parse failure, ends it.
+            with _outages_lock:
+                outages = _outages.copy()
+                recorded = []
+                for row in shadow_rows:
+                    url = row.get("server_base_url")
+                    if url is not None:
+                        if row.get("error_kind") == "transport":
+                            if url in outages:
+                                continue
+                            outages.add(url)
+                        elif row.get("error_kind") != "timeout":
+                            outages.discard(url)
+                    recorded.append(row)
+                if not shadow_rows or recorded:
+                    receipt["shadow"] = recorded
+                    result["receipts_path"] = str(append_shadow_receipt(receipt))
+                    _outages.clear()
+                    _outages.update(outages)
         except Exception:  # noqa: BLE001 - a write failure must not fail the op
             result["receipts_path"] = None
 
@@ -648,14 +739,17 @@ def summarize_shadow_receipts(
                     ),
                 )
                 counts["rows"] += 1
-                # A backend that could not reach its server still returns a row
-                # of its own, with the failure in ``parse_error``.
+                # Read legacy receipts that put transport failures in parse_error.
                 failure = row.get("error") or row.get("parse_error")
                 failure = failure if isinstance(failure, str) else ""
-                if not row.get("backend") or row.get("error") or failure.startswith(
-                    "transport_error"
+                kind = row.get("error_kind")
+                if (
+                    kind in ("transport", "timeout") or not row.get("backend")
+                    or row.get("error") or failure.startswith("transport_error")
                 ):
-                    timed_out = failure == "shadow_timeout" or "timed out" in failure
+                    timed_out = (
+                        kind == "timeout" or failure == "shadow_timeout" or "timed out" in failure
+                    )
                     counts["timed_out" if timed_out else "unreachable"] += 1
                     continue
                 counts["answered"] += 1

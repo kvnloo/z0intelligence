@@ -228,7 +228,9 @@ def test_backend_never_readmits_a_filtered_action():
     assert decision.selected_action is None
     assert decision.abstained is True
     assert decision.invalid_call is True
-    assert "fs.rm" in (decision.parse_error or "")
+    assert decision.parse_error is None
+    assert decision.error_kind == "none"
+    assert decision.diagnostics["attempted_action"] == "fs.rm"
 
 
 def test_backend_fails_open_on_transport_error():
@@ -237,7 +239,10 @@ def test_backend_fails_open_on_transport_error():
     assert decision.abstained is True
     assert decision.selected_action is None
     assert decision.invalid_call is False
-    assert "transport_error" in (decision.parse_error or "")
+    assert decision.parse_error is None
+    assert decision.error_kind == "transport"
+    assert "transport_error" in decision.diagnostics["reason"]
+    assert decision.to_dict()["error_kind"] == "transport"
 
 
 def test_backend_fails_open_on_unparseable_output():
@@ -246,6 +251,7 @@ def test_backend_fails_open_on_unparseable_output():
     assert decision.abstained is True
     assert decision.selected_action is None
     assert decision.parse_error == "unparseable_response"
+    assert decision.error_kind == "parse"
 
 
 def test_backend_abstains_when_nothing_is_legal_and_makes_no_call():
@@ -261,8 +267,29 @@ def test_backend_abstains_when_nothing_is_legal_and_makes_no_call():
     transport = _FakeTransport(_outcome())
     decision = _backend(transport).decide(ToolDecisionRequest(state="s", legal=legal))
     assert decision.abstained is True
-    assert decision.parse_error == "no legal actions"
+    assert decision.parse_error is None
+    assert decision.error_kind == "none"
+    assert decision.diagnostics["reason"] == "no legal actions"
     assert transport.calls == []
+
+
+@pytest.mark.parametrize("error", [TransportError("TimeoutError: timed out"),
+                                  TransportError("URLError: <urlopen error timed out>")])
+def test_backend_timeout_is_not_a_parse_failure(error):
+    decision = _backend(_FakeTransport(error=error)).decide(
+        ToolDecisionRequest(state="s", legal=_legal()))
+    assert decision.error_kind == "timeout"
+    assert decision.parse_error is None
+
+
+def test_prewarm_loads_the_model_with_one_token_without_parsing():
+    transport = _FakeTransport(_outcome(content="warm"))
+    backend = _backend(transport)
+    backend.prewarm()
+    assert transport.calls[0]["max_tokens"] == 1
+    assert transport.calls[0].get("tools") is None
+    decision = backend.decide(ToolDecisionRequest(state="s", legal=_legal()))
+    assert decision.error_kind == "parse"
 
 
 def test_backend_only_advertises_the_legal_action_ids():
