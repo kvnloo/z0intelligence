@@ -331,7 +331,16 @@ def test_sft_examples_and_remote_gate(home, tmp_path):
 
 
 # ----------------------------------------------------------------------------- CLI
-def test_cli_end_to_end_read_only(home, tmp_path, capsys):
+def _worktree_check_below(base: Path):
+    # hosts may carry a stray repo above the pytest temp root (e.g. /tmp/.git): only look up to tmp_path
+    def check(path):
+        p = Path(path).resolve()
+        return any((q / '.git').exists() for q in (p, *p.parents) if q == base or base in q.parents)
+    return check
+
+
+def test_cli_end_to_end_read_only(home, tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(CLI, 'in_git_worktree', _worktree_check_below(tmp_path))
     out = tmp_path / 'out-home'
     before = tree_digest(home)
     assert CLI._main(['--home', str(out), 'build', '--source-home', str(home), '--host', 'test']) == 0
@@ -353,8 +362,10 @@ def test_cli_end_to_end_read_only(home, tmp_path, capsys):
     assert SECRET not in capsys.readouterr().out
 
 
-def test_cli_refuses_output_inside_git_worktree(tmp_path):
+def test_cli_refuses_output_inside_git_worktree(tmp_path, monkeypatch):
     repo = tmp_path / 'repo'
     (repo / '.git').mkdir(parents=True)
+    assert CLI.in_git_worktree(repo / 'home' / 'episodes')  # the unpatched rule
+    monkeypatch.setattr(CLI, 'in_git_worktree', _worktree_check_below(tmp_path))
     with pytest.raises(SystemExit, match='git worktree'):
         CLI._main(['--home', str(repo / 'home'), 'build', '--source-home', str(tmp_path)])
