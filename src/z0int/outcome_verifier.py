@@ -145,6 +145,19 @@ def projects_dir() -> Path:
     return Path(os.environ.get('CLAUDE_CONFIG_DIR', Path.home() / '.claude')).expanduser() / 'projects'
 
 
+EXTRA_PROJECTS_ENV = 'Z0INT_CLAUDE_PROJECTS_DIRS'
+
+
+def projects_dirs() -> list[Path]:
+    """The Claude Code projects trees a session id is looked up in, in order: ``projects_dir()``, then every dir in
+    ``$Z0INT_CLAUDE_PROJECTS_DIRS`` (os.pathsep-separated; a host that runs several CLAUDE_CONFIG_DIRs)."""
+    dirs = [projects_dir()]
+    for raw in (os.environ.get(EXTRA_PROJECTS_ENV) or '').split(os.pathsep):
+        if raw.strip() and (d := Path(raw.strip()).expanduser()) not in dirs:
+            dirs.append(d)
+    return dirs
+
+
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows = []
     try:
@@ -383,10 +396,32 @@ def session_turns(path: Path) -> list[dict[str, Any]]:
     return turns
 
 
+TRANSCRIPT_SOURCES = ('projects_dir', 'extra_projects_dir', 'agentsview_index')
+
+
+def locate_transcript(session_id: str, base: Path | None = None) -> tuple[Path | None, str | None]:
+    """(transcript, how it was found) for one Claude Code session; (None, None) when no source holds it.
+
+    An explicit ``base`` is the only tree searched. Otherwise ``projects_dirs()`` in order, then the AgentsView index
+    (``agentsview_ro.claude_transcript``: the file AgentsView parsed for that session, read-only), so a timer without
+    the interactive CLAUDE_CONFIG_DIR still finds the sessions the hooks captured.
+    """
+    if not session_id:
+        return None, None
+    if base is not None:
+        hits = sorted(base.glob(f'*/{session_id}.jsonl'))
+        return (hits[0], 'projects_dir') if hits else (None, None)
+    for i, d in enumerate(projects_dirs()):
+        hits = sorted(d.glob(f'*/{session_id}.jsonl'))
+        if hits:
+            return hits[0], 'projects_dir' if i == 0 else 'extra_projects_dir'
+    from . import agentsview_ro
+    p = agentsview_ro.claude_transcript(session_id)
+    return (p, 'agentsview_index') if p else (None, None)
+
+
 def find_transcript(session_id: str, base: Path | None = None) -> Path | None:
-    base = base or projects_dir()
-    hits = sorted(base.glob(f'*/{session_id}.jsonl'))
-    return hits[0] if hits else None
+    return locate_transcript(session_id, base)[0]
 
 
 # ----------------------------------------------------------------------------- git (read-only)
@@ -1111,9 +1146,12 @@ def verify_harness(harness: str, *, root: Path | None = None, agentsview: str | 
                       now=now, extra_repo_roots=extra_repo_roots, density=density)
         sids = {r.get('session_id') for name in ('opportunities.jsonl', 'outcomes.jsonl')
                 for r in read_jsonl(state_dir(root) / name)} - {None}
-        if sids and not any(find_transcript(sid, projects) for sid in sids):
-            failures.append(_failure(harness, 'label_source_empty', {'resolved_dir': str(projects or projects_dir()),
-                                                                     'sessions': len(sids)}))
+        found = Counter(locate_transcript(sid, projects)[1] or 'missing' for sid in sids)
+        if sids and found['missing'] == len(sids):
+            failures.append(_failure(harness, 'label_source_empty', {
+                'resolved_dir': str(projects or projects_dir()), 'searched_dirs': 1 if projects else len(projects_dirs()),
+                'agentsview_index': projects is None, 'sessions': len(sids)}))
+        transcripts = {k: found[k] for k in (*TRANSCRIPT_SOURCES, 'missing')}
         join = Counter()
     elif harness in tr.JOIN_RULES:
         rows = _verify_agentsview(harness, root=root, agentsview=agentsview, since=since, gh=gh, fix_days=fix_days,
@@ -1136,6 +1174,8 @@ def verify_harness(harness: str, *, root: Path | None = None, agentsview: str | 
     manifest['manifest_sha256'] = _sha(manifest, 64)
     report = {'harness': harness, 'status': 'degraded' if any(f['kind'] in DEGRADING for f in failures) else 'success',
               'rows': rows, 'failures': failures, 'join': dict(join), 'appended': appended, 'manifest': manifest}
+    if harness == HARNESS:
+        report['transcripts'] = transcripts  # captured sessions by where their transcript was found (counts only)
     if harness in tr.JOIN_RULES:
         report['test_label_polarity'] = tr.JOIN_RULES[harness].test_labels
     return report

@@ -1,4 +1,5 @@
-"""Suite-wide isolation: no test may reach the developer's real AgentsView database (~/.agentsview)."""
+"""Suite-wide isolation: no test may reach the developer's real AgentsView database (~/.agentsview) or extra
+Claude transcript trees ($Z0INT_CLAUDE_PROJECTS_DIRS)."""
 from __future__ import annotations
 
 import pytest
@@ -7,3 +8,4 @@ import pytest
 @pytest.fixture(autouse=True)
 def _isolated_agentsview(tmp_path_factory, monkeypatch):
     monkeypatch.setenv('AGENTSVIEW_DATA_DIR', str(tmp_path_factory.mktemp('agentsview')))
+    monkeypatch.delenv('Z0INT_CLAUDE_PROJECTS_DIRS', raising=False)  # nor extra Claude transcript trees

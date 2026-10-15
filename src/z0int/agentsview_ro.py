@@ -65,3 +65,31 @@ def staleness_hours(conn: sqlite3.Connection, now: float | None = None) -> float
     except (sqlite3.Error, ValueError, TypeError):
         return None
     return ((time.time() if now is None else now) - t) / 3600.0
+
+
+def claude_transcript(session_id: str, path: str | Path | None = None) -> Path | None:
+    """Where AgentsView indexed this Claude Code session's transcript, when that file is on this host; else None.
+
+    Claude Code keeps one transcript tree per config dir (``<CLAUDE_CONFIG_DIR>/projects/<project>/<session>.jsonl``)
+    and a host can run several config dirs, so the hooks' session id alone does not say which tree holds it.
+    AgentsView already indexed every tree it syncs: its ``sessions.file_path`` for ``agent = 'claude'`` names the
+    file. Only a path of exactly that shape that exists here is returned. Read-only (``connect``); any problem is None.
+    """
+    if not session_id:
+        return None
+    conn = connect(path)
+    if isinstance(conn, Unavailable):
+        return None
+    try:
+        row = conn.execute("select file_path from sessions where id = ? and agent = 'claude' and deleted_at is null",
+                           (str(session_id),)).fetchone()
+    except sqlite3.Error:
+        return None
+    finally:
+        conn.close()
+    if not row or not row[0]:
+        return None
+    p = Path(row[0])
+    if p.name != f'{session_id}.jsonl' or p.parent.parent.name != 'projects' or not p.is_file():
+        return None
+    return p
