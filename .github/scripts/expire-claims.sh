@@ -82,7 +82,8 @@ fi
 released=0
 while IFS= read -r num; do
   [[ -n "$num" ]] || continue
-  comments="$(gh api "repos/{owner}/{repo}/issues/${num}/comments" --jq '[.[] | {body, createdAt: .created_at}]')"
+  # gh --paginate concatenates REST array pages; lease_state accepts raw created_at.
+  comments="$(gh api "repos/{owner}/{repo}/issues/${num}/comments" --paginate)"
   result="$(printf '%s' "$comments" | lease_state)"
   expired="$(printf '%s\n' "$result" | sed -n '1p')"
   reason="$(printf '%s\n' "$result" | sed -n '2p')"
