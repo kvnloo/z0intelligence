@@ -7,7 +7,8 @@ Hermes (`pre_llm_call`), OMP (`before_agent_start`) and DSH (`llm/stream`) use.
 | --- | --- | --- |
 | `UserPromptSubmit` | `z0int.claude_code prompt` → `automatic.handle_event` | shadow: routed and receipted, never injected |
 | `Stop`, `SessionEnd` | `z0int.claude_code stop` → Tokenomics `claude-code.provider_usage.v0` | on |
-| MCP `route_worker` | `z0int.intelligence_mcp` with `Z0INT_HARNESS=claude-code` | on |
+| `SessionStart` | `z0int.claude_code session-start` → State Packet `additionalContext` (includes `resource.posture` facts) | off (opt-in `Z0INT_CLAUDE_CODE_PACKET=1` or `packet: true` in `~/.z0int/config/claude-code.json`) |
+| MCP `route_worker` | `z0int.intelligence_mcp` with `Z0INT_HARNESS=claude-code` | on; under `z0int claude-code launch --profile lean` the launcher passes this server via `--mcp-config` |
 
 Requires `pip install -e .` of this repo (or `Z0INT_PYTHON` pointing at that
 environment). Every hook fails open.
