@@ -18,7 +18,8 @@ Steps (each reuses its module; nothing here re-derives a label or a threshold th
   export       loop_export.export_tables: one table per harness x cohort, never pooled
   sufficiency  per stratum, the evolution-lab verified-loop v0 gate (MIN_ROWS/MIN_NEG/MIN_GROUPS/K) + a projection
   learn        `python -m evolution_lab.verified_loop` per stratum covered by a registered prereg (v0: claude-code),
-               from the learner pinned by learner_sha in $Z0INT_HOME/config/loop.json; cohort legacy never
+               from the learner pinned by learner_sha in $Z0INT_HOME/config/loop.json (imported from the checkout
+               at learner_path when set, else from the tick venv); cohort legacy never
   promote      a SHADOW_CANDIDATE writes promotion_request.v0 for the owner and nothing else
 
 Writes only under $Z0INT_HOME/state and the out root ($Z0INT_HOME/loop by default; refused inside a git worktree, so
@@ -105,16 +106,33 @@ def acquire_shared(lock: Path, wait_s: float) -> Any:
 
 
 # ----------------------------------------------------------------------------- learner pin
+def learner_env(cfg: Mapping[str, Any]) -> dict[str, str]:
+    """The learner subprocess environment: ``learner_path`` (an evolution-lab checkout) first on PYTHONPATH."""
+    env = dict(os.environ)
+    lp = cfg.get('learner_path')
+    if lp:
+        env['PYTHONPATH'] = os.pathsep.join(x for x in (str(Path(lp).expanduser()), env.get('PYTHONPATH')) if x)
+    return env
+
+
 def learner_status(cfg: Mapping[str, Any], python: str) -> dict[str, Any]:
-    """ok only when evolution_lab.verified_loop imports from the tick venv at the commit loop.json pins."""
+    """ok only when evolution_lab.verified_loop imports (from ``learner_path`` when set, else the tick venv) at the
+    commit loop.json pins. A learner_path that holds no evolution_lab package is ``learner_missing``, not a fallback
+    to whatever the venv has."""
     pinned = cfg.get('learner_sha')
+    lp = cfg.get('learner_path')
+    if lp and not (Path(lp).expanduser() / 'evolution_lab' / 'verified_loop.py').is_file():
+        return {'status': 'learner_missing', 'reason': 'learner_path_missing', 'pinned': pinned}
     try:
-        p = subprocess.run([python, '-c', LEARNER_PROBE], capture_output=True, text=True, timeout=60)
+        p = subprocess.run([python, '-c', LEARNER_PROBE], capture_output=True, text=True, timeout=60,
+                           env=learner_env(cfg))
     except (OSError, subprocess.TimeoutExpired):
         p = None
     if p is None or p.returncode != 0:
         return {'status': 'learner_missing', 'reason': 'not_importable'}
     info = json.loads(p.stdout.strip().splitlines()[-1])
+    if lp and Path(info['dir']).resolve() != (Path(lp).expanduser() / 'evolution_lab').resolve():
+        return {'status': 'learner_missing', 'reason': 'learner_path_shadowed', 'pinned': pinned}
     g = subprocess.run(['git', '--no-optional-locks', '-C', info['dir'], 'rev-parse', 'HEAD'], capture_output=True,
                        text=True, env=dict(os.environ, GIT_OPTIONAL_LOCKS='0'))
     found = g.stdout.strip() if g.returncode == 0 and g.stdout.strip() else info.get('dist_sha')
@@ -215,7 +233,7 @@ def _harness_counts(home: Path, harness: str, verify: Mapping[str, Any] | None,
             'verified': len(latest), 'labelled': sum(1 for y in latest.values() if y is not None),
             'join': dict(join), 'join_rate': join.get('joined', 0) / tried if tried else None,
             'drops': hc.drop_count(harness, home), 'failures': (records.get(harness) or {}).get('failures', {}),
-            'verify_status': (verify or {}).get('status')}
+            'verify_status': (verify or {}).get('status'), 'transcripts': (verify or {}).get('transcripts')}
 
 
 def run_tick(z0int_home: str | Path, *, lock: str | Path = QUIET_LANE_LOCK, lock_wait_s: float = 1800.0,
@@ -407,7 +425,8 @@ def _learn(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, **
         table = out / 'tables' / s['harness'] / f"{s['cohort']}.jsonl"
         try:
             p = subprocess.run([python, '-m', 'evolution_lab.verified_loop', '--table', str(table), '--out', str(res),
-                                '--md', str(res.with_suffix('.md'))], capture_output=True, text=True, timeout=left)
+                                '--md', str(res.with_suffix('.md'))], capture_output=True, text=True, timeout=left,
+                               env=learner_env(cfg))
             decision = json.loads(res.read_text())['primary']['decision'] if p.returncode == 0 else None
         except subprocess.TimeoutExpired:
             s['learn'] = 'skipped_budget'
