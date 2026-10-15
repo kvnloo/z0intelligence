@@ -36,3 +36,16 @@ test("standalone harness prints both table and parseable JSON", async () => {
 	const rows = JSON.parse(text.slice(jsonStart));
 	expect(rows.map((row: { mode: string }) => row.mode)).toEqual(["legacy", "new", "off"]);
 });
+
+import { regressions, slowPreparation } from "./replay/regressions.ts";
+
+test("replay covers all five review regressions with real asynchronous completions", async () => {
+	const rows = await regressions(150, 15);
+	expect(rows).toHaveLength(5);
+	expect(rows.every(row => row.passed)).toBe(true);
+});
+
+test("29 historical messages at 1.1s per RPC freeze fallback before OMP's 30s deadline", async () => {
+	const row = await slowPreparation();
+	expect(row.elapsedMs).toBeLessThan(29_000);
+});

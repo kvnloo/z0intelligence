@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { regressions } from "./regressions.ts";
 import { installOptchat } from "../native.ts";
 import type { Message } from "../native.ts";
 import { FakeBackend, FakePi } from "./fake.ts";
@@ -103,7 +104,11 @@ export async function comparison(): Promise<Metrics[]> {
 
 if (import.meta.main) {
 	const mode = process.argv[2];
-	if (mode && !["legacy", "new", "off"].includes(mode)) throw new Error("usage: replay.ts [legacy|new|off]");
+	if (mode === "regressions") {
+		console.log(JSON.stringify(await regressions(), null, 2));
+		process.exit(0);
+	}
+	if (mode && !["legacy", "new", "off"].includes(mode)) throw new Error("usage: replay.ts [legacy|new|off|regressions]");
 	const results = mode === "legacy" || mode === "new" || mode === "off" ? [await replay(mode)] : await comparison();
 	console.log("Simulated message-prefix cache estimates (chars/4), not provider billing. Cold call excluded from stability %.");
 	console.table(results.map(({ perCall: _, ...row }) => row));

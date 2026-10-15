@@ -61,7 +61,7 @@ describe("native OMP OptChat", () => {
 		expect(pi.toolUpdates).toBe(0);
 		expect(pi.ui).toEqual([]);
 		expect(backend.calls).toEqual([]);
-		expect(Object.keys(pi.hooks)).not.toContain("input");
+		expect(pi.hooks.session_before_compact).toBeUndefined();
 	});
 	test("commands toggle schemas, preserve native tools and report status", async () => {
 		const { pi, backend } = setup(false);
@@ -121,6 +121,47 @@ describe("native OMP OptChat", () => {
 		first[0].content = "another extension mutated this call";
 		expect(JSON.stringify((await pi.context())[0])).toBe(bytes);
 	});
+	test("delayed message_start cannot install a new prefix or reset zoom after the first context", async () => {
+		const { pi } = setup();
+		pi.history = [user("prior")];
+		const notify = pi.hooks.message_start;
+		delete pi.hooks.message_start;
+		const prompt = user("real non-interactive prompt", 2);
+		await pi.start(prompt, false);
+		const first = await pi.context();
+		expect(first[0]?.content).toContain("OptChat history");
+		await pi.zoom(); await pi.zoom();
+		notify?.({ message: prompt }, pi.ctx);
+		expect(await pi.context()).toEqual(first);
+		expect(await pi.zoom()).toContain("limit reached");
+	});
+	test("timeout discards every tentative chunk and retains the previous frozen prefix", async () => {
+		const pi = new FakePi();
+		const backend = new FakeBackend();
+		installOptchat(pi, backend, { preparationBudgetMs: 50 });
+		pi.history = [user("oldest")];
+		await pi.start(user("first turn", 2));
+		const frozen = (await pi.context())[0];
+		backend.ready = false;
+		await pi.start(user("second turn", 3));
+		const previous = await pi.context();
+		backend.ready = true;
+		const originalCall = backend.call;
+		const late = Promise.withResolvers<Record<string, unknown>>();
+		let views = 0;
+		backend.call = async (op, args, timeout) => {
+			if (op === "view_ids" && ++views === 2) return late.promise;
+			return originalCall(op, args, timeout);
+		};
+		await pi.start(user("third turn", 4));
+		const output = await pi.context();
+		expect(views).toBe(2);
+		expect(output).toEqual([...previous, user("third turn", 4)]);
+		expect(output[0]).toEqual(frozen);
+		late.resolve({ ok: true, ready: true, view: "late summary" });
+		await Bun.sleep(1);
+		expect(await pi.context()).toEqual(output);
+	});
 	test("unavailable summaries keep originals for the whole turn and retry next turn", async () => {
 		const { pi, backend } = setup();
 		backend.ready = false;
@@ -164,7 +205,7 @@ describe("native OMP OptChat", () => {
 		pi.history = [user("compaction replaced the anchor", 6)];
 		expect(await pi.context()).toEqual(pi.history);
 	});
-	test("off during asynchronous preparation cannot publish a stale prefix", async () => {
+	test("off during asynchronous preparation stays pending until the next user turn", async () => {
 		const { pi, backend } = setup();
 		const pending = Promise.withResolvers<Record<string, unknown>>();
 		backend.call = async () => pending.promise;
@@ -173,8 +214,15 @@ describe("native OMP OptChat", () => {
 		const context = pi.context();
 		await pi.command("optchat", "off");
 		pending.resolve({ ok: true, i: 0, ready: true, view: "old" });
-		expect(await context).toEqual(pi.history);
+		const first = await context;
+		expect(first[0]?.content).toContain("OptChat history");
+		expect(await pi.context()).toEqual(first);
+		expect(pi.activeTools).toContain("optchat_zoom");
+		expect(backend.on).toBe(true);
+		await pi.start(user("next", 3));
+		expect(await pi.context()).toEqual(pi.history);
 		expect(pi.activeTools).toEqual(["read", "bash"]);
+		expect(backend.on).toBe(false);
 		expect(backend.calls).toEqual([]);
 	});
 	test("shutdown disposes once and leaves subsequent context inert", async () => {
@@ -184,13 +232,16 @@ describe("native OMP OptChat", () => {
 		expect(backend.disposals).toBe(1);
 		expect(await pi.context()).toEqual(pi.history);
 	});
-	test("an external off flag removes active OptChat tools without an RPC or UI change", async () => {
+	test("an external off flag is sampled at the next user turn", async () => {
 		const { pi, backend } = setup();
 		pi.history = [user("prior")];
 		await pi.start(user("now", 2));
-		await pi.context();
+		const first = await pi.context();
 		const calls = backend.calls.length;
 		backend.on = false;
+		expect(await pi.context()).toEqual(first);
+		expect(pi.activeTools).toContain("optchat_zoom");
+		await pi.start(user("next", 3));
 		expect(await pi.context()).toEqual(pi.history);
 		expect(pi.activeTools).toEqual(["read", "bash"]);
 		expect(backend.calls.length).toBe(calls);

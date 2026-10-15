@@ -11,7 +11,9 @@ export class FakePi implements Pi {
 	history: Message[] = [];
 	session = "replay-session";
 	toolUpdates = 0;
+	streaming = false;
 	ctx: Context = {
+		isIdle: () => !this.streaming,
 		sessionManager: {
 			getSessionId: () => this.session,
 			getBranch: () => this.history.map(message => ({ type: "message", message })),
@@ -23,9 +25,16 @@ export class FakePi implements Pi {
 	registerCommand(name: string, command: Parameters<Pi["registerCommand"]>[1]): void { this.commands.set(name, command); }
 	getActiveTools(): string[] { return this.activeTools; }
 	async setActiveTools(names: string[]): Promise<void> { this.toolUpdates++; this.activeTools = names; }
-	async start(prompt: Message): Promise<void> {
+	async start(prompt: Message, input = true): Promise<void> {
+		this.streaming = false;
+		if (input) await this.hooks.input?.({ text: String(prompt.content), source: "interactive" }, this.ctx);
 		await this.hooks.before_agent_start?.({ prompt: String(prompt.content) }, this.ctx);
+		this.streaming = true;
+		this.hooks.message_start?.({ message: prompt }, this.ctx);
 		this.history.push(prompt);
+	}
+	async continueAutomatically(): Promise<void> {
+		await this.start({ role: "developer", attribution: "agent", synthetic: true, content: "Continue automatically.", timestamp: 12345 }, false);
 	}
 	async context(): Promise<Message[]> {
 		const messages = structuredClone(this.history);
