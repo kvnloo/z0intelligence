@@ -260,3 +260,17 @@ def test_live_captured_group_may_stay_in_the_held_out_window(world):
     man = rr.split(world['home'], eval_start='2026-05-20', eval_end='2026-06-20')
     assert man['strata']['claude-code/reconstructed']['eval']['turns'] == 3
     assert man['removed']['live_capture_group:train'] == 0
+
+
+def test_git_runs_offline_during_a_run_and_the_env_is_restored(world, monkeypatch):
+    seen = {}
+    real = rr.reconstruct_session
+
+    def spy(*a, **kw):
+        seen.update({k: rr.os.environ.get(k) for k in rr.OFFLINE_GIT_ENV})
+        return real(*a, **kw)
+    monkeypatch.setattr(rr, 'reconstruct_session', spy)
+    monkeypatch.delenv('GIT_NO_LAZY_FETCH', raising=False)
+    _run(world)
+    assert seen == rr.OFFLINE_GIT_ENV
+    assert 'GIT_NO_LAZY_FETCH' not in rr.os.environ

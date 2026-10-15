@@ -71,6 +71,10 @@ AGENT_HARNESS = {'claude': 'claude-code', 'codex': 'codex', 'hermes': 'hermes', 
                  'deepseek-harness': 'dsh', 'omo': 'omo'}
 AGENT_ORDER = tuple(AGENT_HARNESS)
 DEFAULT_LOCK = '~/.z0int/loop/quiet-lane.lock'
+# The verifier's git calls are read-only and local. A partial clone would lazily fetch missing objects (blame, show)
+# over its remote: forbidden here. Set for the duration of a run; a missing object is then an unresolved signal.
+OFFLINE_GIT_ENV = {'GIT_NO_LAZY_FETCH': '1', 'GIT_ALLOW_PROTOCOL': 'file', 'GIT_TERMINAL_PROMPT': '0',
+                   'GIT_SSH_COMMAND': 'false', 'GIT_ASKPASS': 'false'}
 MIN_CONTENT_CHARS = 32  # below this a normalised request is not a content identity (split contamination/dedup)
 GIT_STATE = {'state': 'unknown', 'why': 'git state at decision time was not recorded; never guessed'}
 TOOL_FAMILIES = ('shell', 'edit', 'read', 'search', 'web', 'delegate', 'ask', 'plan', 'mcp', 'skill', 'other')
@@ -526,6 +530,8 @@ def run(home: str | Path | None = None, *, agentsview: str | Path | None = None,
     log = root / 'logs' / f"run-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.jsonl"
     log.parent.mkdir(parents=True, exist_ok=True)
     status = 'complete'
+    saved_env = {k: os.environ.get(k) for k in OFFLINE_GIT_ENV}
+    os.environ.update(OFFLINE_GIT_ENV)
     try:
         sessions = list_sessions(reader.conn, agents)
         by_id = {s['id']: s for s in sessions}
@@ -578,12 +584,18 @@ def run(home: str | Path | None = None, *, agentsview: str | Path | None = None,
                                          'harness': harness, 'turns': sum(x['turns'] for x in per_harness.values())},
                                         sort_keys=True) + '\n')
     finally:
+        for k, v in saved_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
         lk.release()
         reader.close()
         _write_json(root / 'watermarks.json', wm)
     report = {'schema': 'z0int.reconstructed_run.v0', 'status': status, 'host': host,
               'reconstructor': RECONSTRUCTOR, 'as_of': _iso(as_of), 'fix_days': fix_days,
               'runtime_s': round(time.monotonic() - t0, 1),
+              'network': 'none: GitHub disabled, git offline (no lazy fetch, file protocol only)',
               'lock': {'path': str(lk.path) if lk.path else None, 'mode': 'flock(2) LOCK_SH, sliced',
                        'slices': lk.slices, 'waited_s': round(lk.waited_s, 1), 'hold_s': hold_s},
               'per_harness': {h: dict(sorted(c.items())) for h, c in per_harness.items()},
