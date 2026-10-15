@@ -2,9 +2,9 @@ name: Core unit
 
 on:
   push:
-    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "manifests/**", "harness-adapters/**", "contracts/**", "results/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
+    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "manifests/**", "harness-adapters/**", "contracts/**", "results/**", "zer0.repo.yaml", ".github/scripts/expire-claims.sh", ".github/workflows/core-unit.yml"]
   pull_request:
-    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "manifests/**", "harness-adapters/**", "contracts/**", "results/**", "zer0.repo.yaml", ".github/workflows/core-unit.yml"]
+    paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "manifests/**", "harness-adapters/**", "contracts/**", "results/**", "zer0.repo.yaml", ".github/scripts/expire-claims.sh", ".github/workflows/core-unit.yml"]
   workflow_dispatch:
 
 permissions:
@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Claim-expiry script (offline, fake gh)
+        run: python3 tests/expire_claims.py
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
