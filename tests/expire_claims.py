@@ -36,7 +36,7 @@ COMMENTS = {
         + [{"body": f"ordinary discussion {i}", "created_at": "2026-10-13T00:00:00Z"} for i in range(30)]
         + [{"body": "claiming for worker-new\nexpires: 2999-01-01T00:00:00Z", "created_at": "2026-10-15T00:00:00Z"}]
     ),
-    # 102 comments: an actual second gh --paginate API page (100 per_page).
+    # 102 comments: a second REST comment page requiring paginated --slurp.
     "6": (
         [{"body": "claiming for worker-old\nexpires: 2020-01-01T00:00:00Z", "created_at": "2019-12-31T00:00:00Z"}]
         + [{"body": f"ordinary discussion {i}", "created_at": "2026-10-13T00:00:00Z"} for i in range(100)]
@@ -58,17 +58,17 @@ if args and args[0] == "api":
         sys.stderr.write("the `--slurp` option is not supported with `--jq` or `--template`\n")
         sys.exit(2)
     if "--paginate" in args:
-        # gh's REST paginator increases per_page to 100, then flattens pages.
-        # With neither --slurp nor --jq, paginatedArrayReader yields one array.
-        if "--slurp" in args or "--jq" in args:
-            sys.stderr.write("This fixture requires raw --paginate, no other filter\n")
-            sys.exit(3)
-        pages = [data[num][i:i+100] for i in range(0, len(data[num]), 100)]
-        selected = [c for page in pages for c in page]
-    else:
-        selected = data[num][:30]
-        if "--jq" in args:
-            selected = [{"body": c["body"], "createdAt": c["created_at"]} for c in selected]
+        # GitHub CLI exposes raw page arrays; --slurp wraps those arrays.
+        pages = [data[num][i:i + 100] for i in range(0, len(data[num]), 100)]
+        if "--slurp" in args:
+            print(json.dumps(pages))
+        else:
+            for page in pages:
+                print(json.dumps(page))
+        sys.exit(0)
+    selected = data[num][:30]
+    if "--jq" in args:
+        selected = [{"body": c["body"], "createdAt": c["created_at"]} for c in selected]
     print(json.dumps(selected))
     sys.exit(0)
 sys.stderr.write("fake gh: unexpected call %r\n" % (args,))
