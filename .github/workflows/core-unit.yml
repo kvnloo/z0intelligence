@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Claim-expiry script (offline, fake gh)
         run: python3 tests/expire_claims.py
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Syntax-check touched Python
@@ -84,7 +84,7 @@ jobs:
       Z0INT_KERDOIOS_ROOT: ${{ github.workspace }}/.test-deps/kerdoios
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       - uses: actions/checkout@v7
