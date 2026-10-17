@@ -11,6 +11,7 @@ import json
 import fcntl
 import os
 import time
+import unicodedata
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -167,6 +168,21 @@ def is_ambient_close_source(source: str | None) -> bool:
     return False
 
 
+# Placeholder spellings a writer emits when it has no verifier. Compared after
+# dropping invisible format characters and surrounding whitespace, casefolded.
+PLACEHOLDER_VERIFICATION_SOURCES = frozenset(
+    {"null", "none", "nil", "false", "0", "n/a", "na", "~", "-"}
+)
+
+
+def named_verification_source(value: Any) -> bool:
+    """True only for a non-placeholder string that names who verified."""
+    if not isinstance(value, str):
+        return False
+    visible = "".join(ch for ch in value if unicodedata.category(ch) != "Cf").strip()
+    return bool(visible) and visible.casefold() not in PLACEHOLDER_VERIFICATION_SOURCES
+
+
 def normalize_outcome(outcome: Outcome | dict[str, Any]) -> Outcome:
     """Demote stale ambient closes so they cannot contaminate gold.
 
@@ -184,7 +200,7 @@ def normalize_outcome(outcome: Outcome | dict[str, Any]) -> Outcome:
     oc = _outcome_from_mapping(outcome)
     d = oc.to_dict()
     src = d.get("source")
-    has_vsrc = bool(d.get("verification_source"))
+    has_vsrc = named_verification_source(d.get("verification_source"))
     if is_ambient_close_source(src if isinstance(src, str) else None) and not has_vsrc:
         for k in GOLD_SIGNALS:
             if getattr(oc, k, None) is True:
