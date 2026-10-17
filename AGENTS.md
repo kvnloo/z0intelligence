@@ -23,15 +23,13 @@ This repo follows the [Verified OSS Loop](https://github.com/kvnloo/verified-oss
 ## Runtime / bench
 
 - Run commands from the repository root in an isolated environment installed with `pip install -e '.[test]'` (or `./scripts/bootstrap.sh`).
-- FlyForge stack bootstrap (legacy, still valid): `bash scripts/setup-flyforge.sh`. Prefer `z0int onboard` for new setups. See `docs/evolution-lab.md`.
-- Route C (vLLM DiffusionGemma structured reads): `docs/vllm-diffusion-route.md`, `openjev-score --mode vllm`, `scripts/setup-vllm-diffusion.sh`. Requires vLLM PR #57250 or equivalent.
+- FlyForge stack bootstrap (legacy, still valid): `bash scripts/setup-flyforge.sh`. Prefer `z0int onboard` for new setups.
+- Route C (vLLM DiffusionGemma structured reads): `openjev-score --mode vllm`, `scripts/setup-vllm-diffusion.sh`. Requires vLLM PR #57250 or equivalent.
 - OMP plugins live in `omp-extensions/` and must be symlinked into `~/.omp/agent/extensions/` (`flyforge-recovery`, `flyforge-jev` shadow-only, `vllm-jev`, `openjev`, `openjev-06b`, `z0int-bridge`). `z0int onboard` links them when OMP is present. Do not edit copies only under `~/.omp`. OpenJev 4B: `Qwen/Qwen3.5-4B` @ `851bf6e…`. 0.6B test lane: `Qwen/Qwen3-0.6B` @ `c1899de…`. Do not load both SLMs on 12GB. Shadow: `EVOLUTION_LAB_PYTHON` / `EVOLUTION_LAB_ROOT` optional (`~/.z0int/config/env_hints.json`).
-- Validate changes with `pytest -q`, `(cd results/raw && sha256sum -c SHA256SUMS)`, and `python benchmarks/verify_published.py`.
+- Validate changes with `pytest -q`.
 - Benchmark outputs are create-only. Use a new output path and expose exactly one CUDA GPU per scorer process.
-- Do not change headline claims or `results/phase1-summary.json` without committing the supporting row-level evidence, regenerating the relevant raw report, updating `results/raw/SHA256SUMS`, and updating the method/results text.
-- Preserve exact model and source revisions. Fetch third-party evaluation records only through `benchmarks/fetch_sources.py`; do not commit model weights, caches, or third-party raw records.
+- Preserve exact model and source revisions. Do not commit model weights, caches, or third-party raw records.
 - Personalized state lives under **`~/.z0int/`** only (episodes, specialists, stream, research). Never default champions into the git tree.
-- `webgpu-demo/` is static and has no build step. Preserve `_headers`, runtime version pins, browser-only inference, and the explicit probability limitations.
 
 ## Decision backends
 
@@ -51,18 +49,17 @@ This repo follows the [Verified OSS Loop](https://github.com/kvnloo/verified-oss
 
 ## Brand (background)
 
-Product name **z0intelligence** (stochastic-parrot play; abundance under finite frontier budgets with Kerdoios). Details: `docs/brand.md`. Do not mass-rename the `z0int` package in drive-by PRs.
+Product name **z0intelligence** (stochastic-parrot play; abundance under finite frontier budgets with Kerdoios). Do not mass-rename the `z0int` package in drive-by PRs.
 
 ## Context resolve (critical path)
 
 - `z0int context resolve --query '…' --json` or `--path file`
 - Primitive: `z0int.context_resolve.resolve_context` — provenance packet, not authorization.
 - Do not flip z0int-bridge `log_only` live without host consumption + verifier.
-- See `docs/critical-path-phase0.md`.
 - State Packet v0 (#22): `z0int context packet --repo PATH [--json|--render|--check FILE [--authorize ACTION]]`;
   primitive `z0int.state_packet.build_state_packet`. Read-only adapters: git, repo docs, local Claude Code
   transcripts (opt-in GitHub via `Z0INT_PACKET_GH=1`). Missing required fact => `OBSERVE`; stale packet cannot
-  authorize. SessionStart hook: `python -m z0int.state_packet --hook`. Bench + results: `benchmarks/state_packet/`.
+  authorize. SessionStart hook: `python -m z0int.state_packet --hook`.
   Raw conversation text never enters the repo or fixtures.
 
 ## Verified task loop

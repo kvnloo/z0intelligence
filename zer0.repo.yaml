@@ -93,7 +93,6 @@ architecture:
     - tests/test_worker_routing.py
     - src/z0int/agentweb_bridge.py
     - schemas/agentweb-z0-bridge.v1.schema.json
-    - docs/rfc/agentweb-z0-bridge-v1.md
     depends_on:
     - dispatch-authority
     - typed-decision-backends
@@ -146,9 +145,7 @@ architecture:
     summary: Defines the runtime/evolution boundary, export paths, locked split expectations, specialist deployment
       contract and evidence-backed promotion expectations with Evolution Lab.
     paths:
-    - docs/evolution-lab.md
     - docs/observer-evaluation.md
-    - docs/decision-capability-v2-plan.md
     - src/z0int/specialists/
     - src/z0int/routines.py
     depends_on:
@@ -163,7 +160,6 @@ architecture:
     paths:
     - src/z0int/aodl.py
     - docs/aodl-integration.md
-    - examples/aodl/
     depends_on:
     - context-resolution
     - local-cognition-compiler
@@ -304,13 +300,9 @@ architecture:
     - ROADMAP.md
     - docs/intelligence-layer.md
     - docs/file-search.md
-    - docs/local-cognition-portfolio.md
     - docs/aodl-integration.md
-    - docs/evolution-lab.md
     - docs/observer-evaluation.md
     - adapters/hermes-z0int/README.md
-    - docs/agentweb-emma-integration.md
-    - docs/pr-reconciliation-2026-10-02.md
     tests:
     - tests/test_context_resolve.py
     - tests/test_intelligence.py
