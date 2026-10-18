@@ -34,7 +34,8 @@ const DEFAULT_TIMEOUT_MS = 4000;
 const DEFAULT_MODELS = ["functiongemma_270m"];
 const DEFAULT_AUTHORITY = ["read"];
 const DEFAULT_TOOL_NAMES = ["bash", "read", "write", "edit", "grep", "glob"];
-const MAX_STATE_CHARS = 2000;
+// How many earlier tool names of the session the shadow model is shown.
+const RECENT_TOOLS = 5;
 const STATUS_RING = 100;
 
 /** Tool names whose call has real filesystem/process side effects. */
@@ -235,14 +236,6 @@ export function authorityList(): string[] {
 
 // --- payload ------------------------------------------------------------
 
-function safeJson(value: unknown): string {
-	try {
-		return JSON.stringify(value) ?? "";
-	} catch {
-		return String(value);
-	}
-}
-
 function riskFor(toolName: string): string {
 	return WRITE_TOOLS.has(toolName) ? "write" : "read";
 }
@@ -281,16 +274,13 @@ function extractToolNames(value: unknown): string[] {
  * The set of tool names available this turn.
  *
  * OMP does not hand the `tool_call` event a tool list, so we look for one on
- * the injected extension API / handler context, then fall back to the names
- * observed in this session, then to a small builtin default. The observed tool
- * is always included so its own action is a candidate.
+ * the injected extension API / handler context, then fall back to a small
+ * builtin default. The list never depends on the call being observed or on
+ * earlier calls: a tool that is in it only because it was called is the answer
+ * the model is asked for. A call to a tool outside the list is therefore not a
+ * legal choice, and the scorecard counts it as such.
  */
-export function resolveAvailableTools(
-	pi: unknown,
-	ctx: unknown,
-	observed: string,
-	seen: Iterable<string> = [],
-): string[] {
+export function resolveAvailableTools(pi: unknown, ctx: unknown): string[] {
 	const env = process.env.OMP_Z0INT_COGNITION_TOOLS;
 	let names: string[] = env && env.trim() ? splitList(env) : [];
 	if (names.length === 0) {
@@ -301,6 +291,8 @@ export function resolveAvailableTools(
 			(pi as Jsonish | undefined)?.tools,
 			safeCall((pi as Jsonish | undefined)?.pi, "getTools"),
 			safeCall((pi as Jsonish | undefined)?.pi, "getAllRegisteredTools"),
+			// What OMP's extension API actually offers: the enabled tool names.
+			safeCall(pi, "getActiveTools"),
 		];
 		for (const source of sources) {
 			const extracted = extractToolNames(source);
@@ -310,11 +302,8 @@ export function resolveAvailableTools(
 			}
 		}
 	}
-	if (names.length === 0) names = [...seen];
 	if (names.length === 0) names = [...DEFAULT_TOOL_NAMES];
-	const set = new Set(names.filter(Boolean));
-	if (observed) set.add(observed);
-	return [...set];
+	return [...new Set(names.filter(Boolean))].sort();
 }
 
 function buildActions(toolNames: string[]): Jsonish[] {
@@ -337,27 +326,42 @@ export function liveSessionId(ctx: unknown): string | null {
 	return typeof id === "string" && id.length > 0 ? id : null;
 }
 
-export function buildShadowPayload(event: ToolCallLike, toolNames: string[], sessionId: string | null = null): Jsonish {
+/**
+ * `recent` is the session's tool names before this call, oldest first. The
+ * model is asked to predict this call, so `state` is built from that history
+ * alone: the observed tool name and its input stay in `facts`, which no model
+ * is shown.
+ */
+export function buildShadowPayload(
+	event: ToolCallLike,
+	toolNames: string[],
+	sessionId: string | null = null,
+	recent: readonly string[] = [],
+): Jsonish {
 	const toolName = typeof event?.toolName === "string" ? event.toolName : "";
-	const input = event?.input && typeof event.input === "object" ? event.input : {};
+	// Authority and budget are sized to the tool list, so every tool the session
+	// could call is a legal choice. They are not taken from the observed tool:
+	// that would show the model whether the call was a write. Nothing is granted
+	// by this; the worker fixes the selected and executed action to null.
+	const risks = new Set(toolNames.map(riskFor));
 	return {
 		op: "cognition_shadow",
 		trace_id: randomUUID().replaceAll("-", ""),
 		// An environment variable describes the process, not the session a
 		// tool call belongs to; it is only a fallback when OMP offers no id.
 		session_id: sessionId ?? process.env.OMP_SESSION_ID ?? null,
-		state: `OMP tool_call: ${toolName}\ninput: ${safeJson(input).slice(0, MAX_STATE_CHARS)}`,
+		state: `OMP session. Previous tool calls, oldest first: ${recent.join(", ") || "none"}`,
 		actions: buildActions(toolNames),
 		granted_capabilities: toolNames,
-		authority: authorityList(),
-		budget_units: 8,
+		authority: [...new Set([...authorityList(), ...risks])],
+		budget_units: Math.max(8, toolNames.length),
 		satisfied: [],
 		facts: {
 			tool_name: toolName,
 			tool_call_id: typeof event?.toolCallId === "string" ? event.toolCallId : "",
 		},
 		objective: null,
-		risk_class: riskFor(toolName),
+		risk_class: risks.has("write") ? "write" : "read",
 		shadows: shadowModels(),
 	};
 }
@@ -668,10 +672,10 @@ function formatReceiptRow(row: Jsonish): string {
 
 export default function localCognition(pi: ExtensionAPI): void {
 	pi.setLabel?.("z0int local cognition (shadow-only)");
-	const seenTools = new Set<string>();
+	const recentTools: string[] = [];
 
 	pi.on?.("session_start", () => {
-		seenTools.clear();
+		recentTools.length = 0;
 	});
 
 	pi.on?.("tool_call", (event, ctx) => {
@@ -682,11 +686,13 @@ export default function localCognition(pi: ExtensionAPI): void {
 					? String((event as ToolCallLike).toolName)
 					: "";
 			if (!observed) return undefined;
-			seenTools.add(observed);
 			counters.tool_calls += 1;
-			const toolNames = resolveAvailableTools(pi, ctx, observed, seenTools);
+			const toolNames = resolveAvailableTools(pi, ctx);
 			const sessionId = liveSessionId(ctx);
-			const payload = buildShadowPayload(event as ToolCallLike, toolNames, sessionId);
+			// Copied before this call is recorded, so the history never holds the answer.
+			const payload = buildShadowPayload(event as ToolCallLike, toolNames, sessionId, [...recentTools]);
+			recentTools.push(observed);
+			if (recentTools.length > RECENT_TOOLS) recentTools.shift();
 			const toolCallId = (event as ToolCallLike).toolCallId;
 			void sendShadow(payload, cognitionTimeoutMs(), pi, {
 				sessionId,

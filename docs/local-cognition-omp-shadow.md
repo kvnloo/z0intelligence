@@ -77,6 +77,10 @@ The extension is installed by symlinking `omp-extensions/local-cognition` into
 env vars (`OMP_Z0INT_COGNITION_SHADOW`, `..._TIMEOUT_MS`, `..._MODELS`) and the
 `/z0int-cognition-status` command.
 
+The shadow models are served from `127.0.0.1:11500`. To keep that supervisor running, copy
+`deploy/systemd/z0-cognition.service` to `~/.config/systemd/user/` (it reads the same
+`service.env` as `z0intelligence.service`), then `systemctl --user enable --now z0-cognition`.
+
 ## Tests
 
 ```bash
