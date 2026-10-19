@@ -28,9 +28,10 @@ def repository(tmp_path):
 
 
 @pytest.fixture
-def service(tmp_path, monkeypatch):
+def service(tmp_path, monkeypatch, repository):
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("Z0INT_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("Z0INT_FILE_SEARCH_ROOTS", json.dumps([str(repository)]))
     monkeypatch.delenv("Z0INT_FFF_DISABLE", raising=False)
     file_search.close_all()
     server = Service(("127.0.0.1", 0), Handler)

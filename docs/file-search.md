@@ -79,6 +79,15 @@ adapters record the packet as a `context.resolve` EventLog observation with
 `POST /v1/file-search` on the **existing** intelligence service (default
 `http://127.0.0.1:11501`). No new daemon or backend. Example request:
 
+The operator must first set `Z0INT_FILE_SEARCH_ROOTS` on the **service process**
+to a JSON array of allowed absolute repository directories, for example
+`["/workspace/project-a", "/workspace/project-b"]`. An unset, empty or invalid
+configuration denies file search. Request arguments cannot add allowed roots.
+Requested and configured roots are resolved before exact comparison; subdirectories
+need their own entries. Roots containing private `Z0INT_HOME` state, inside that
+state, or equal to it are always refused. Configure repository directories only,
+not home or state directories. OMP's existing in-process bridge is unchanged.
+
 ```json
 {
   "repository_root": "/absolute/repository/on/service/host",
@@ -110,7 +119,9 @@ adapters record the packet as a `context.resolve` EventLog observation with
   `source=harness:<caller>`, project, session and trace (`packet.task_id`).
   Retrieval is an observation: `execution_completed=false`, `verified_success=null`.
 - Invalid input: HTTP 400; existing body limit/admission/drain policies still
-  apply (413/503). Missing/disabled/failed FFF yields `ok=false`, explicit gaps,
+  apply (413/503). A root outside the operator allowlist or overlapping private
+  state returns HTTP 403 `file_search_root_denied` before retrieval or EventLog
+  writes. Missing/disabled/failed FFF yields `ok=false`, explicit gaps,
   and `file_search_unavailable`. A normal zero-hit search has `ok=true` with gaps.
   EventLog failure preserves the packet but returns `event_id=null` and
   `event_log_error`; it never claims successful persistence.
@@ -120,9 +131,11 @@ adapters record the packet as a `context.resolve` EventLog observation with
   create another observation, not a worker execution receipt.
 
 **Trust boundary:** this is the existing trusted-host service, not an authenticated
-filesystem sandbox. Roots name files on the service host, not a remote harness's
-machine. A raw HTTP caller supplies its harness identity; the allowlist validates
-attribution, not authentication. Do not expose the endpoint to untrusted callers.
+filesystem sandbox. Roots name explicitly allowed repositories on the service host,
+not a remote harness's machine. A raw HTTP caller still supplies its harness
+identity; the harness-name check validates attribution, not authentication. The
+server-owned root allowlist limits file access independently of that identity.
+Do not expose the endpoint to untrusted callers.
 Containment checks do not provide isolation against a hostile same-UID process
 concurrently replacing filesystem components. Evidence is not authorization.
 
@@ -136,7 +149,7 @@ isolated `HOME`/`Z0INT_HOME`/`HERMES_HOME`, and a canonical (resolved) scratch
 `TMPDIR`; then run from the repository root:
 
 ```bash
-python -m pytest -q tests/test_shared_file_search.py tests/test_hermes_file_search_plugin.py
+python -m pytest -q tests/test_shared_file_search.py tests/test_shared_file_search_access.py tests/test_hermes_file_search_plugin.py
 ```
 
 For the real Hermes `PluginContext.register_tool` → registry handler probe, also

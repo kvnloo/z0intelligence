@@ -12,7 +12,10 @@ resident index and canonical EventLog. No backend replica is created in Hermes.
 ## Operator activation (not performed by implementation/tests)
 
 1. Deploy the reviewed service/MCP code and make sure its runtime has the pinned
-   FFF wheel. Existing service admission and trusted-interface policies remain.
+   FFF wheel. On that service process, set `Z0INT_FILE_SEARCH_ROOTS` to a JSON
+   array of allowed absolute repository directories. File search is denied by
+   default; private `Z0INT_HOME` state and overlapping directories are excluded.
+   Existing service admission and trusted-interface policies remain.
 2. Copy this directory into the intended active profile's
    `$HERMES_HOME/plugins/hermes-file-search/` (not another profile).
 3. Enable with `hermes plugins enable hermes-file-search`, then start a fresh

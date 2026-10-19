@@ -1,6 +1,7 @@
 """Bounded host intelligence service; share one host authority, not model replicas."""
 import argparse
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
 import signal
@@ -153,6 +154,21 @@ def resolve_file_search(args):
             raise ValueError('repository_root must be a bounded directory')
     except (OSError, RuntimeError) as exc:
         raise ValueError('invalid repository_root') from exc
+    # HTTP clients choose a root only within the operator's explicit allowlist.
+    # Never expose private z0 state, even through an allowed parent directory.
+    from . import paths
+    try:
+        configured = json.loads(os.environ.get('Z0INT_FILE_SEARCH_ROOTS', '[]'))
+        if not isinstance(configured, list) or not all(
+            isinstance(value, str) and Path(value).is_absolute() for value in configured
+        ):
+            raise ValueError('invalid file-search root configuration')
+        allowed = {Path(value).resolve(strict=True) for value in configured}
+        private = paths.home()
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise PermissionError('file-search root configuration unavailable') from exc
+    if root not in allowed or root.is_relative_to(private) or private.is_relative_to(root):
+        raise PermissionError('repository_root is not allowed')
     if kind == 'exact_path':
         try:
             target = (root / query).resolve()
@@ -241,7 +257,11 @@ class Handler(BaseHTTPRequestHandler):
             max_size = 262144 if self.path.startswith('/v1/authority/') else (48000 if self.path=='/v1/agentweb' else (8000 if self.path=='/v1/agentweb/observation' else 40000))
             if not 0<size<=max_size:return self.reply(413,{'error':'request_size'})
             args=json.loads(self.rfile.read(size))
-            if self.path=='/v1/file-search':return self.reply(200,resolve_file_search(args))
+            if self.path=='/v1/file-search':
+                try:
+                    return self.reply(200,resolve_file_search(args))
+                except PermissionError:
+                    return self.reply(403,{'error':'file_search_root_denied'})
             bridge_envelope=None
             if self.path in ('/v1/intelligence','/v1/plan','/v1/experimental/choice','/v1/experimental/noul'):
                 bridge_envelope,args=unwrap_agentweb_bridge_request(self.path,args)
