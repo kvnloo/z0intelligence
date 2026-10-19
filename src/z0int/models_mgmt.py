@@ -258,6 +258,7 @@ def gguf_bundle_complete(model_id: str, meta: dict[str, Any] | None = None) -> b
     patterns = (meta or {}).get("allow_patterns") or []
     if not patterns or not all(
         isinstance(name, str) and Path(name).name == name and name.endswith(".gguf")
+        and not any(char in name for char in "*?[]")
         for name in patterns
     ):
         return False
@@ -319,6 +320,7 @@ def sync_models(
                 patterns = meta.get("allow_patterns") or []
                 if not patterns or not all(
                     isinstance(name, str) and Path(name).name == name and name.endswith(".gguf")
+        and not any(char in name for char in "*?[]")
                     for name in patterns
                 ):
                     results.append({"id": mid, "status": "invalid_allow_patterns"})
