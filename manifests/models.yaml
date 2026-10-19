@@ -162,7 +162,7 @@ models:
     roles: [tiny_action_specialist, general_function_caller]
     resident_preferred: false
     optional: true
-    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Single resident model; see docs/bonsai2-3080ti.md.
+    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Managed at ~/.z0int/models/bonsai2_2b/; one GGUF resident at a time; see docs/bonsai2-3080ti.md.
 
 
   bonsai2_4b:
@@ -180,7 +180,7 @@ models:
     roles: [general_function_caller, semantic_orchestrator]
     resident_preferred: false
     optional: true
-    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Single resident model; see docs/bonsai2-3080ti.md.
+    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Managed at ~/.z0int/models/bonsai2_4b/; one GGUF resident at a time; see docs/bonsai2-3080ti.md.
 
 
   bonsai2_9b:
@@ -198,7 +198,7 @@ models:
     roles: [semantic_orchestrator, general_local_fallback, general_function_caller]
     resident_preferred: false
     optional: true
-    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Single resident model; see docs/bonsai2-3080ti.md.
+    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Managed at ~/.z0int/models/bonsai2_9b/; one GGUF resident at a time; see docs/bonsai2-3080ti.md.
 
 
   bonsai2_27b:
@@ -216,7 +216,7 @@ models:
     roles: [semantic_orchestrator, general_local_fallback]
     resident_preferred: false
     optional: true
-    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Single resident model; see docs/bonsai2-3080ti.md.
+    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Managed at ~/.z0int/models/bonsai2_27b/; one GGUF resident at a time; see docs/bonsai2-3080ti.md.
 
   local_mb:
     family: mushroom_body
