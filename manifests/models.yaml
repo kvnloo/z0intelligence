@@ -269,6 +269,10 @@ policies:
       - nanojev_06b
       - openjev_06b
       - system_one_4b
+      - bonsai2_2b
+      - bonsai2_4b
+      - bonsai2_9b
+      - bonsai2_27b
     never_coreside:
       - [nanojev_06b, openjev_06b]
       - [nanojev_06b, system_one_4b]
