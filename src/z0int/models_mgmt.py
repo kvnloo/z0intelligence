@@ -320,7 +320,7 @@ def sync_models(
                 patterns = meta.get("allow_patterns") or []
                 if not patterns or not all(
                     isinstance(name, str) and Path(name).name == name and name.endswith(".gguf")
-        and not any(char in name for char in "*?[]")
+                    and not any(char in name for char in "*?[]")
                     for name in patterns
                 ):
                     results.append({"id": mid, "status": "invalid_allow_patterns"})
