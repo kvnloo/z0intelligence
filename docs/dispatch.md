@@ -28,6 +28,13 @@ Cost is a shadow price:
 | metered | 0.1 + dollars (only when Kerdoios allows metered lanes) |
 | agentic lane on a one-shot `label` | +0.6 harness overhead |
 
+One-shot API lanes (nim, groq, cerebras) take `scan`, `qa` and `review` jobs only when the
+job carries its evidence inline (`"context": "inline"`, e.g. the factory scan pod packs the
+repo's README, contract files and CI config into the prompt). One request per job is what
+makes NIM's 40 RPM / 10k RPD a bulk lane; an agentic harness spends ~20 requests per scan.
+Status `quota` (a spent daily/credit window, `retry_class` `stop_lane`) rests the lane in
+Kerdoios at once and, like `rate_limited`, teaches nothing about quality.
+
 Hard rules: `code` goes to opus/sol only; a job's privacy may not exceed what the
 provider's data policy allows; quality must meet the job's bar; QA avoids the checked
 family. A job waits for a busy lane rather than taking one that is more than 0.6 dearer, so
