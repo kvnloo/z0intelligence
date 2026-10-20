@@ -50,9 +50,13 @@ LANE_CAPS: dict[str, dict[str, Any]] = {
     "ds": {"family": "deepseek", "kinds": {"scan", "label", "qa", "review"}, "agentic": True},
     "glm": {"family": "zhipu", "kinds": {"scan", "label", "qa", "review"}, "agentic": True},
     "minimax": {"family": "minimax", "kinds": {"scan", "label", "review"}, "agentic": True},
-    "groq": {"family": "openai-oss", "kinds": {"label"}, "agentic": False},
-    "nim": {"family": "nvidia", "kinds": {"label"}, "agentic": False},
-    "cerebras": {"family": "openai-oss", "kinds": {"label"}, "agentic": False},
+    # One-shot API lanes cannot open files, so they take a scan/qa/review only when the job
+    # carries its evidence inline (``context: "inline"``: the factory scan pod packs the repo's
+    # README, contract files and CI config into the prompt). One request per job is also what
+    # keeps NIM's 40 RPM / 10k RPD useful: an agentic harness spends ~20 requests per scan.
+    "groq": {"family": "openai-oss", "kinds": {"label", "scan", "qa", "review"}, "agentic": False},
+    "nim": {"family": "nvidia", "kinds": {"label", "scan", "qa", "review"}, "agentic": False},
+    "cerebras": {"family": "openai-oss", "kinds": {"label", "scan", "qa", "review"}, "agentic": False},
     "local": {"family": "host", "kinds": {"test"}, "agentic": False},
 }
 
@@ -77,6 +81,9 @@ DEFAULT_SUB_SHARE = 0.8  # leave a fifth of the headroom to interactive sessions
 NOUS_RESERVE_FRACTION = 0.1
 NOUS_BATCH_USD = 2.0
 BULK_KINDS = {"scan", "label"}
+INLINE_KINDS = {"scan", "qa", "review"}  # kinds a one-shot lane may take only with inline evidence
+# Outcomes that say nothing about a lane's answer quality.
+NO_QUALITY_SIGNAL = ("rate_limited", "quota", "not_run", "harness_error")
 # A job waits for a busy cheaper lane only when the alternative is this much dearer:
 # capped bulk (about +1.0) waits, while free lanes still add speed beside a busy paid pool (0.52).
 WAIT_MARGIN = 0.6
@@ -146,7 +153,7 @@ def quality_posterior(con: sqlite3.Connection) -> dict[tuple[str, str], tuple[fl
     sums: dict[tuple[str, str], list[float]] = {}
     for lane, kind, status, valid, agree in con.execute(
             "SELECT lane, kind, status, schema_valid, qa_agree FROM outcomes "
-            "WHERE status NOT IN ('rate_limited', 'not_run', 'harness_error')"):
+            f"WHERE status NOT IN ({','.join(repr(s) for s in NO_QUALITY_SIGNAL)})"):
         score = agree if agree is not None else float(status == "ok" and bool(valid))
         row = sums.setdefault((lane, kind), [0.0, 0])
         row[0] += score
@@ -181,7 +188,8 @@ def pct_per_job(con: sqlite3.Connection, lane: str) -> tuple[float, str]:
         # Subtract what the pool's other consumers were burning when the batch began.
         background = float((start.get("recent_pct_per_h") or {}).get(pool) or 0)
         b = max(a, b - background * max(0.0, (t1 or 0) - (t0 or 0)) / 3600)
-        jobs = con.execute("SELECT count(*) FROM outcomes WHERE batch = ? AND lane = ? AND status != 'rate_limited'",
+        jobs = con.execute("SELECT count(*) FROM outcomes WHERE batch = ? AND lane = ? "
+                           "AND status NOT IN ('rate_limited', 'quota')",
                            (batch, lane)).fetchone()[0]
         if jobs >= 5 and b >= a:
             num += b - a
@@ -233,7 +241,7 @@ def load_capacity(path: str | None = None) -> dict[str, Any]:
 
 
 def observe_capacity(lane: str, status: str, *, retry_after: float | None = None,
-                     nous: tuple[float, float] | None = None) -> None:
+                     nous: tuple[float, float] | None = None, seconds: float | None = None) -> None:
     """Report an outcome to Kerdoios so the next capacity read sees throttles and spend."""
     src = os.environ.get("KERDOIOS_SRC")
     if src and src not in sys.path:
@@ -242,8 +250,13 @@ def observe_capacity(lane: str, status: str, *, retry_after: float | None = None
         from kerdoios.capacity import observe
     except ImportError:
         return
-    observe(lane, status, retry_after_s=retry_after,
-            nous_used=nous[0] if nous else None, nous_cap=nous[1] if nous else None)
+    kw = {"seconds": seconds} if seconds else {}  # older kerdoios has no latency feedback
+    try:
+        observe(lane, status, retry_after_s=retry_after,
+                nous_used=nous[0] if nous else None, nous_cap=nous[1] if nous else None, **kw)
+    except TypeError:
+        observe(lane, status, retry_after_s=retry_after,
+                nous_used=nous[0] if nous else None, nous_cap=nous[1] if nous else None)
 
 
 # ---------------------------------------------------------------- decision
@@ -308,7 +321,7 @@ def make_budget(con: sqlite3.Connection, views: Mapping[str, LaneView], batch: s
         headroom = float(v.pacing.get("headroom_pct_per_h") or 0) * share
         spent = con.execute(
             "SELECT coalesce(sum(pct_est), 0) FROM decisions d WHERE lane = ? AND ts > ? AND NOT EXISTS ("
-            "SELECT 1 FROM outcomes o WHERE o.decision_id = d.id AND o.status IN ('not_run', 'rate_limited'))",
+            "SELECT 1 FROM outcomes o WHERE o.decision_id = d.id AND o.status IN ('not_run', 'rate_limited', 'quota'))",
             (lane, now - 3600)).fetchone()[0]
         sub_left[lane] = headroom - float(spent)
     nous_left = 0.0
@@ -335,6 +348,8 @@ def candidates(job: Job, views: Mapping[str, LaneView], budget: Budget,
         lat = latency.get((lane, job.kind), v.latency_s) * (f if caps["agentic"] else 1)
         if job.kind not in caps["kinds"]:
             why = f"cannot run {job.kind}"
+        elif job.kind in INLINE_KINDS and not caps["agentic"] and job.payload.get("context") != "inline":
+            why = f"one-shot lane needs inline evidence for {job.kind}"
         elif job.kind == "code" and lane not in ("opus", "sol"):
             why = "code goes to opus/sol only"
         elif PRIVACY.index(job.privacy) > PRIVACY.index(v.privacy_max):
@@ -506,8 +521,11 @@ def record_outcome(con: sqlite3.Connection, outcome: Mapping[str, Any], *, now: 
     nous = outcome.get("nous_notice")
     if not lane or status == "not_run":
         return
-    observe_capacity(lane, {"ok": "ok", "rate_limited": "rate_limited"}.get(status, "error"),
-                     retry_after=outcome.get("retry_after"), nous=tuple(nous) if nous else None)
+    # "quota" (a spent daily/credit window, retry_class stop_lane) rests the lane at once in
+    # Kerdoios instead of waiting for three throttles.
+    observe_capacity(lane, {"ok": "ok", "rate_limited": "rate_limited", "quota": "quota"}.get(status, "error"),
+                     retry_after=outcome.get("retry_after"), nous=tuple(nous) if nous else None,
+                     seconds=outcome.get("seconds") if status == "ok" else None)
 
 
 def record_qa(con: sqlite3.Connection, job_id: str, agree: float, *, qa_lane: str | None = None) -> int:

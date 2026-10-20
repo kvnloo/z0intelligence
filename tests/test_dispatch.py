@@ -169,3 +169,38 @@ def test_subscription_cost_subtracts_the_pools_background_burn(con):
     # 5% total minus 1.9 %/h x 2.1 h of background leaves 1.01% for 36 jobs, blended with the 0.05 prior.
     assert 0.03 < pct < 0.04
     assert "background" in how
+
+
+def nim_capacity(**over):
+    cap = capacity(**over)
+    cap["lanes"]["nim"] = {"cost_class": "free", "data_policy": "trial-no-confidential", "slots_now": 8, "reason": "ok",
+                           "window_jobs_left": 9000, "limits": {"window_jobs": {"value": 10000},
+                                                                "jobs_per_min": {"value": 36}}}
+    return cap
+
+
+def test_one_shot_lane_takes_scans_only_with_inline_evidence(con):
+    ceiling = {"nim": 8, "ds": 2}
+    bare = d.assign(jobs(2, privacy="public"), nim_capacity(), con=con, now=1000.0, ceiling=ceiling)
+    assert "nim" not in lanes_of(bare)
+    out = d.assign(jobs(4, privacy="public", context="inline"), nim_capacity(), con=con, now=1000.0, ceiling=ceiling)
+    assert lanes_of(out).count("nim") >= 2
+    assert all(a["pace_s"] == round(60 / 36, 1) for a in out["assign"] if a["lane"] == "nim")
+
+
+def test_inline_scans_still_respect_privacy(con):
+    out = d.assign(jobs(2, privacy="internal", context="inline"), nim_capacity(), con=con, now=1000.0,
+                   ceiling={"nim": 8})
+    assert out["assign"] == []
+    assert "privacy" in out["wait"][0]["rejected"]["nim"]
+
+
+def test_quota_outcome_rests_lane_and_teaches_no_quality(con, monkeypatch):
+    seen = []
+    monkeypatch.setattr(d, "observe_capacity", lambda lane, status, **k: seen.append((lane, status)))
+    out = d.assign(jobs(1, privacy="public", context="inline"), nim_capacity(), con=con, now=1000.0,
+                   ceiling={"nim": 8})
+    did = out["assign"][0]["decision_id"]
+    d.record_outcome(con, {"decision_id": did, "status": "quota", "schema_valid": False})
+    assert seen == [("nim", "quota")]
+    assert ("nim", "scan") not in d.quality_posterior(con)
