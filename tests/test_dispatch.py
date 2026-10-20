@@ -32,6 +32,7 @@ def capacity(**over):
 def con(tmp_path, monkeypatch):
     monkeypatch.setenv("Z0INT_DISPATCH_LEDGER", str(tmp_path / "ledger.sqlite"))
     monkeypatch.setattr(d, "observe_capacity", lambda *a, **k: None)
+    monkeypatch.setattr(d, "PCT_PER_JOB_PRIOR", {"opus": 0.05, "sol": 0.05})  # tests pin the cost prior
     return d.connect()
 
 

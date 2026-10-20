@@ -65,9 +65,12 @@ POLICY_PRIVACY = {"subscription": "private", "zero-retention": "internal", "unst
 QUALITY_PRIOR = {"opus": 0.92, "sol": 0.88, "haiku": 0.8, "luna": 0.8, "ds": 0.66, "glm": 0.62,
                  "minimax": 0.55, "groq": 0.62, "nim": 0.62, "cerebras": 0.62, "local": 0.95}
 PRIOR_WEIGHT = 6.0
-# Seed share of a weekly subscription window one M-size agentic job consumes (low confidence;
-# learned from burn-pace deltas per batch).
-PCT_PER_JOB_PRIOR = {"opus": 0.05, "sol": 0.05}
+# Seed share of a weekly subscription window one M-size agentic job consumes; learned from
+# burn-pace deltas per batch. Opus evidence (2026-10-20, Hermes state.db): a read-only repo
+# scan costs about $0.32 API-equivalent (166k cache-read, 37k cache-write, 5k output tokens),
+# and Hermes alone logged $520 of Claude usage this week at 52% used, so 1% >= $10 and a
+# scan <= 0.032%. Sol has no measurement yet.
+PCT_PER_JOB_PRIOR = {"opus": 0.03, "sol": 0.05}
 LATENCY_PRIOR_S = {"opus": 120, "sol": 150, "haiku": 120, "luna": 150, "ds": 240, "glm": 240,
                    "minimax": 240, "groq": 3, "nim": 8, "cerebras": 2, "local": 60}
 DEFAULT_SUB_SHARE = 0.8  # leave a fifth of the headroom to interactive sessions
