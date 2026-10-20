@@ -57,10 +57,14 @@ def on_post_tool_use(hook):
 
 
 def recall(handle, start=None, count=None, grep=None, session=None):
+    # Generated handles are 12 lowercase hex digits; reject path/glob syntax.
+    if not isinstance(handle, str) or re.fullmatch(r'[0-9a-f]{12}', handle) is None:
+        return 'z0obs: invalid observation handle'
     folder = paths.ensure_layout()['state'] / 'obs'
     matches = sorted(folder.glob(f'*/{handle}.txt'))
-    if session:
-        matches = [m for m in matches if m.parent == archive_dir(session)] or matches
+    if session is not None:
+        # An explicit session is a boundary, never a best-effort preference.
+        matches = [m for m in matches if m.parent == archive_dir(session)]
     if not matches:
         return f'z0obs: no archived observation {handle}'
     lines = matches[0].read_text().splitlines()
