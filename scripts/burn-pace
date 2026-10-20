@@ -10,9 +10,20 @@ that, this script turns the weekly numbers into concrete knobs for the agent:
   ratio > 1  -> burning too fast: shrink workflows, offload to free lanes
   ratio < 1  -> under-burning: spend more on high-value work
 
+The window average lags a burst (2026-10-20: average 0.42 %/h while the last three hours ran
+at 1.66 %/h), so the band and its knobs use a weighted rate: the recent rate over the last
+RECENT_H hours of this script's own samples (burn-pace.jsonl) blended with the window
+average, weight RECENT_WEIGHT x (sample span / RECENT_H). `pace_ratio` and
+`observed_pct_per_h` keep their window-average meaning; `weighted_pace_ratio`,
+`recent_pct_per_h`, `recent_span_h` and `band_basis` are added beside them.
+
+The Nous Portal spend cap is not in codexbar. `nous_cap` reports the newest Hermes usage
+notice ("You've used $X of your $Y cap"), from kerdoios' capacity state (executors report
+notices there) or from files matching BURN_PACE_NOTICE_GLOBS / KERDOIOS_NOTICE_GLOBS.
+
 Usage: burn-pace [--json]
 """
-import json, subprocess, sys
+import glob, json, os, re, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,6 +32,12 @@ STATE = Path.home() / ".z0int/state/posture"
 FRESH = STATE / "codexbar-fresh.json"
 SAMPLES = STATE / "burn-pace.jsonl"
 FREE_LANE = "opencode run -m opencode/deepseek-v4.1-flash-free"
+RECENT_H = 3.0
+RECENT_WEIGHT = 0.5
+MIN_RECENT_SPAN_H = 1.0
+KERDOIOS_STATE = Path.home() / ".hermes/cache/kerdoios/capacity_state.json"
+DEFAULT_NOTICE_GLOBS = ["/mnt/zer0models/workspace/zer0/data/operations/kitchen/scan-*/raw/*.txt"]
+NOTICE = re.compile(r"You.ve used \$([0-9][0-9,]*\.?[0-9]*) of your \$([0-9][0-9,]*\.?[0-9]*) cap")
 
 
 def fetch(provider):
@@ -43,6 +60,102 @@ def knobs(ratio):
     return {"band": "under-burn", "max_workflow_agents": 12, "effort": "high", "offload": "none-required"}
 
 
+def read_samples(path):
+    """Earlier burn-pace outputs: [(unix ts, {provider: weekly_used_pct})], oldest first."""
+    rows = []
+    try:
+        lines = path.read_text().splitlines()[-5000:]
+    except OSError:
+        return rows
+    for line in lines:
+        try:
+            d = json.loads(line)
+            ts = datetime.fromisoformat(d["at"]).timestamp()
+            rows.append((ts, {k: float(v["weekly_used_pct"]) for k, v in d["lanes"].items()}))
+        except (ValueError, KeyError, TypeError):
+            continue
+    return rows
+
+
+def recent_rate(history, provider, now, used_now, span_h=RECENT_H):
+    """Weekly-%/h over the last span_h hours, ending at the current reading.
+
+    Returns (pct_per_h, span_h_covered) or None with under MIN_RECENT_SPAN_H of samples.
+    A drop in used% is a window reset; only samples after it count."""
+    t_now = now.timestamp()
+    pts = [(ts, h[provider]) for ts, h in history if provider in h and t_now - span_h * 3600 <= ts < t_now]
+    pts.append((t_now, used_now))
+    for i in range(len(pts) - 1, 0, -1):
+        if pts[i][1] < pts[i - 1][1]:
+            pts = pts[i:]
+            break
+    covered = (pts[-1][0] - pts[0][0]) / 3600
+    if covered < MIN_RECENT_SPAN_H:
+        return None
+    return (pts[-1][1] - pts[0][1]) / covered, covered
+
+
+def lane_row(used, hours_left, elapsed_h, recent=None):
+    sustainable = (100 - used) / hours_left
+    observed = used / elapsed_h
+    ratio = observed / sustainable if sustainable > 0 else None
+    row = {"weekly_used_pct": used, "hours_to_reset": round(hours_left, 1),
+           "sustainable_pct_per_h": round(sustainable, 3), "observed_pct_per_h": round(observed, 3),
+           "pace_ratio": round(ratio, 2) if ratio else None,
+           "pct_budget_next_hour": round(sustainable, 2)}
+    basis, band_ratio = "window-average", ratio
+    if recent is not None:
+        rate, covered = recent
+        w = RECENT_WEIGHT * min(1.0, covered / RECENT_H)
+        weighted = w * rate + (1 - w) * observed
+        band_ratio = weighted / sustainable if sustainable > 0 else None
+        basis = "weighted"
+        row.update({"recent_pct_per_h": round(rate, 3), "recent_span_h": round(covered, 1),
+                    "weighted_pct_per_h": round(weighted, 3),
+                    "weighted_pace_ratio": round(band_ratio, 2) if band_ratio is not None else None})
+    else:
+        row.update({"recent_pct_per_h": None, "recent_span_h": None, "weighted_pct_per_h": None,
+                    "weighted_pace_ratio": None})
+    row["band_basis"] = basis
+    row.update(knobs(band_ratio))
+    return row
+
+
+def nous_cap(now, state_path=None, globs=None):
+    """Newest Hermes Nous spend-cap notice: kerdoios capacity state, else matching files."""
+    best = None
+    try:
+        s = json.loads(Path(state_path or KERDOIOS_STATE).read_text()).get("nous_cap") or {}
+        if s.get("cap_usd"):
+            best = (float(s.get("observed_at") or 0), float(s["used_usd"]), float(s["cap_usd"]),
+                    s.get("source") or "kerdoios capacity state")
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    if globs is None:
+        env = os.environ.get("BURN_PACE_NOTICE_GLOBS") or os.environ.get("KERDOIOS_NOTICE_GLOBS")
+        globs = [g for g in env.split(os.pathsep) if g] if env else DEFAULT_NOTICE_GLOBS
+    files = sorted({f for g in globs for f in glob.glob(os.path.expanduser(g))}, key=os.path.getmtime,
+                   reverse=True)
+    for name in files[:400]:
+        if best and os.path.getmtime(name) <= best[0]:
+            break
+        try:
+            hits = NOTICE.findall(Path(name).read_text(errors="replace"))
+        except OSError:
+            continue
+        if hits:
+            used, cap = (float(x.replace(",", "")) for x in hits[-1])
+            best = (os.path.getmtime(name), used, cap, name)
+            break
+    if not best:
+        return None
+    at, used, cap, source = best
+    return {"used_usd": round(used, 2), "cap_usd": round(cap, 2), "remaining_usd": round(cap - used, 2),
+            "used_pct": round(100 * used / cap, 1) if cap else None,
+            "observed_at": datetime.fromtimestamp(at, timezone.utc).isoformat(timespec="seconds"),
+            "age_h": round((now.timestamp() - at) / 3600, 1), "source": source}
+
+
 def main():
     now = datetime.now(timezone.utc)
     rows = fetch("claude") + fetch("codex")
@@ -54,6 +167,7 @@ def main():
     result = evaluate(pools_from_codexbar(rows, now), now)
 
     out = {"at": now.isoformat(timespec="seconds"), "z0_factory": result.get("factory"), "lanes": {}}
+    history = read_samples(SAMPLES)
     for r in rows:
         sec = r["usage"].get("secondary") or {}
         if not sec.get("resetsAt"):
@@ -63,15 +177,10 @@ def main():
         window_h = sec.get("windowMinutes", 10080) / 60
         elapsed_h = max(window_h - hours_left, 0.01)
         used = float(sec.get("usedPercent", 0))
-        sustainable = (100 - used) / hours_left
-        observed = used / elapsed_h
-        ratio = observed / sustainable if sustainable > 0 else None
-        out["lanes"][r["provider"]] = {
-            "weekly_used_pct": used, "hours_to_reset": round(hours_left, 1),
-            "sustainable_pct_per_h": round(sustainable, 3), "observed_pct_per_h": round(observed, 3),
-            "pace_ratio": round(ratio, 2) if ratio else None,
-            "pct_budget_next_hour": round(sustainable, 2), **knobs(ratio)}
+        out["lanes"][r["provider"]] = lane_row(used, hours_left, elapsed_h,
+                                               recent_rate(history, r["provider"], now, used))
     out["free_lane"] = FREE_LANE
+    out["nous_cap"] = nous_cap(now)
     with SAMPLES.open("a") as f:
         f.write(json.dumps(out) + "\n")
 
@@ -81,10 +190,16 @@ def main():
     f = out["z0_factory"] or {}
     print(f"z0 posture: {f.get('posture')} - {f.get('action', '')}")
     for name, l in out["lanes"].items():
+        recent = (f", last {l['recent_span_h']}h {l['recent_pct_per_h']}%/h -> weighted ratio "
+                  f"{l['weighted_pace_ratio']}" if l.get("recent_pct_per_h") is not None else "")
         print(f"{name}: {l['weekly_used_pct']}% used, {l['hours_to_reset']}h to reset | "
               f"burn {l['observed_pct_per_h']}%/h vs sustainable {l['sustainable_pct_per_h']}%/h "
-              f"(ratio {l['pace_ratio']}) -> {l['band']}: workflows<={l['max_workflow_agents']} agents, "
+              f"(ratio {l['pace_ratio']}{recent}) -> {l['band']}: workflows<={l['max_workflow_agents']} agents, "
               f"effort {l['effort']}, offload {l['offload']}")
+    n = out["nous_cap"]
+    if n:
+        print(f"nous: ${n['used_usd']:.2f} of ${n['cap_usd']:.2f} cap used ({n['used_pct']}%), "
+              f"${n['remaining_usd']:.2f} left, notice {n['age_h']}h old")
     print(f"free lane: {FREE_LANE}")
 
 
