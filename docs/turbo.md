@@ -40,8 +40,11 @@ controls `z0int run`, not arbitrary Hermes conversations or existing governed
   detached git worktrees; independent native Sol `openai-codex/gpt-6.1-sol`
   inspects candidates and integrates into another detached worktree. Never merge,
   push or deploy. These are trusted local agent processes, **not a sandbox**.
-* Native invocations use `--safe-mode`, explicit model/provider and check emitted
-  model identity. Repository rules must be read explicitly by code roles.
+* Native invocations use the installation-bound Hermes runtime and canonical
+  gateway with `safe_mode=True`, explicit provider/model, and check the gateway's
+  **observed** session model. `hermes --print-runtime-command` must be supported;
+  older installations fail closed. No shared profile settings are changed.
+  Repository rules must be read explicitly by code roles.
 * `--normal` performs one nondelegating Sol reference plus the same independent
   Sol verification phase, for matched A/B measurements.
 
@@ -63,7 +66,12 @@ hard token-capped.** A worktree or completed subprocess is not verified success.
 executed on the integration worktree; failing checks override a model verdict.
 
 Stop is cooperative for HTTP with a bounded socket timeout (up to 20 seconds),
-and process-group scoped for subprocess workers. A stop request is not terminal
+and process-group scoped for OpenCode/check subprocesses. Native Hermes work is
+owned by the shared gateway, not its CLI viewer: the adapter sends a fenced
+`session.interrupt` to its exact owned session and reads back the admission's
+terminal receipt. Merely killing/detaching a viewer is never cancellation.
+Native terminal reconciliation can add up to 40 seconds beyond the task deadline;
+unconfirmed cancellation is a failure/unknown, not confirmed stopped work. A stop request is not terminal
 confirmation; read status until `cancelled`/`deadline`/`failed`/`completed`. A 429
 persists a provider cooldown of at least 60 seconds and honors a longer numeric
 Retry-After (including HTTP-date) and longer reset headers; no immediate retry or silent fallback.
@@ -84,6 +92,19 @@ accounting gaps and the independent quality verdict. Inventory output tok/s is
 **output tokens/full request seconds**, not steady-state decode; first-output
 latency includes reasoning tokens. Missing CLI usage/latency remains null.
 One sample is not sustained capacity. No Jev approval is inferred; Sol is required.
+
+## Private source boundary
+
+Fast cloud workers receive task/context text and dependency outputs. Supply only
+scrubbed public-safe text; the runtime is not a content classifier or sandbox.
+For private repositories use `--no-code-workers`: it rejects any planner-authored
+code job before dispatch, uses source-free fast design/review helpers, then a
+native Sol implementer in its own detached worktree and a separate native Sol
+verifier/integrator. No private repository files are sent to OpenCode/DeepSeek in
+this mode. Native agents retain their normal approval boundary. Without this flag,
+code workers can read repository source; use only with approved public source.
+The matched Garden Room proof uses this private-source mode, **not** a DeepSeek
+private-code throughput benchmark. Native usage remains subscription/unknown.
 
 ## Voice follow-up
 
