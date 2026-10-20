@@ -57,11 +57,13 @@ def validate_jobs(plan):
     return plan
 
 
-def compile_graph(plan, run_id, token_budget, deadline_seconds):
+def compile_graph(plan, run_id, token_budget, deadline_seconds, native_code=False):
     from aodl_contract import validate_or_raise
 
     validate_jobs(plan)
-    source_hash = hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()
+    source_hash = hashlib.sha256(
+        json.dumps({"plan": plan, "native_code": native_code}, sort_keys=True).encode()
+    ).hexdigest()
 
     def node(name, kind="task"):
         return {
@@ -79,6 +81,7 @@ def compile_graph(plan, run_id, token_budget, deadline_seconds):
     nodes = (
         [node("intent")]
         + [node("work-" + j["id"]) for j in plan["jobs"]]
+        + ([node("native-implementer")] if native_code else [])
         + [node("verify", "verifier")]
     )
     edges = []
@@ -106,7 +109,12 @@ def compile_graph(plan, run_id, token_budget, deadline_seconds):
     for job in plan["jobs"]:
         for dep in job["depends_on"] or [None]:
             edge("work-" + dep if dep else "intent", "work-" + job["id"])
-        edge("work-" + job["id"], "verify", "verification")
+        if native_code:
+            edge("work-" + job["id"], "native-implementer")
+        else:
+            edge("work-" + job["id"], "verify", "verification")
+    if native_code:
+        edge("native-implementer", "verify", "verification")
     doc = {
         "specVersion": "0.2",
         "graphId": run_id,

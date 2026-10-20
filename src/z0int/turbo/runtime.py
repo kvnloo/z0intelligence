@@ -514,7 +514,13 @@ class Runner:
                 save(self.folder / "plan.json", plan)
                 save(
                     self.folder / "aodl.json",
-                    compile_graph(plan, self.run_id, self.budget, self.seconds),
+                    compile_graph(
+                        plan,
+                        self.run_id,
+                        self.budget,
+                        self.seconds,
+                        native_code=self.no_code_workers and self.repo is not None,
+                    ),
                 )
                 self.event(
                     "plan_validated", "AODL plan validated; dispatching bounded workers"
@@ -747,11 +753,26 @@ class Runner:
                 "jev_gate": "not_invoked_private_or_unavailable; Sol verification required",
             }
             save(self.folder / "receipt.json", receipt)
+            public_quality = {
+                "verified": verdict.get("verified") is True,
+                "reason": str(verdict.get("reason", ""))
+                .encode("utf-8")[:2000]
+                .decode("utf-8", errors="ignore"),
+                "answer": str(verdict.get("answer", ""))
+                .encode("utf-8")[:8000]
+                .decode("utf-8", errors="ignore"),
+            }
+            summary = (
+                "Verified result ready: "
+                + (public_quality["answer"] or public_quality["reason"])[:900]
+                if public_quality["verified"]
+                else "Run ended without verified success: "
+                + public_quality["reason"][:900]
+            )
             self.event(
                 state,
-                "Verified result ready"
-                if verdict.get("verified") is True
-                else "Run ended without verified success",
-                quality_verified=verdict.get("verified") is True,
+                summary,
+                quality_verified=public_quality["verified"],
+                quality=public_quality,
             )
         return receipt

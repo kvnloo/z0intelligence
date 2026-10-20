@@ -145,6 +145,60 @@ def test_native_missing_accounting_is_not_zero(tmp_path):
     assert got["input_tokens"] is None and got["output_tokens"] is None
 
 
+def test_terminal_stream_delivers_answer_and_fits_voice_line(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    events = []
+    answer = "Verified screenshot evidence. " + "🌿" * 20000
+    response = {
+        "provider": "openai-codex",
+        "model": "test",
+        "text": json.dumps({"verified": True, "reason": "test only", "answer": answer}),
+        "input_tokens": None,
+        "output_tokens": None,
+    }
+    runner = runtime.Runner("fixture", normal=True, emit=events.append)
+    with (
+        patch.object(adapters, "native", return_value=response),
+        patch.object(adapters, "load_keys"),
+    ):
+        receipt = runner.execute()
+    final = events[-1]
+    assert final["event"] == "completed" and final["quality"]["verified"] is True
+    assert final["quality"]["answer"].startswith("Verified screenshot evidence.")
+    assert final["summary"].startswith(
+        "Verified result ready: Verified screenshot evidence."
+    )
+    assert len(json.dumps(final)) < 65536
+    assert (
+        receipt["quality"]["answer"] == answer
+    )  # Full answer remains in private status receipt.
+
+
+def test_private_author_is_declared_before_independent_verifier():
+    from z0int.turbo.graph import compile_graph
+
+    plan = {
+        "jobs": [
+            {
+                "id": "design",
+                "lane": "fast",
+                "prompt": "public design",
+                "depends_on": [],
+            }
+        ],
+        "acceptance": ["real screenshot"],
+    }
+    public = compile_graph(plan, "turbo-1234567890abcdef", 1000, 30)
+    private = compile_graph(plan, "turbo-1234567890abcdef", 1000, 30, native_code=True)
+    assert "native-implementer" in {n["id"] for n in private["intentGraph"]["nodes"]}
+    assert {(e["from"], e["to"]) for e in private["intentGraph"]["edges"]} == {
+        ("intent", "work-design"),
+        ("work-design", "native-implementer"),
+        ("native-implementer", "verify"),
+    }
+    assert public["provenance"]["sourceHash"] != private["provenance"]["sourceHash"]
+
+
 def test_private_repo_guard_rejects_code_before_dispatch(tmp_path, monkeypatch):
     monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
     plan = {
