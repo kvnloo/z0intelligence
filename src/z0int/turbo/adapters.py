@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import math
 from email.utils import parsedate_to_datetime
@@ -129,7 +130,40 @@ def native_command(provider, model, cwd, query, stop, seconds):
         or any(not isinstance(x, str) for x in argv)
     ):
         raise ValueError("invalid_native_runtime_command")
-    return argv
+    return script_command(argv)
+
+
+def script_command(argv):
+    """Keep the emitted installation bootstrap; replace only its runpy entry.
+
+    `python -m runpy FILE` treats FILE as a module, not a script. Resolve the
+    launcher's actual initialization, validate its terminal entry structurally,
+    then use run_path without guessing/copying Hermes's environment bootstrap.
+    """
+    try:
+        code_index = argv.index("-c") + 1
+        tree = ast.parse(argv[code_index])
+        entry = tree.body[-1]
+        call = entry.value if isinstance(entry, ast.Expr) else None
+        if not (
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and isinstance(call.func.value, ast.Name)
+            and call.func.value.id == "runpy"
+            and call.func.attr == "run_module"
+            and call.args
+            and isinstance(call.args[0], ast.Constant)
+            and call.args[0].value == "runpy"
+        ):
+            raise ValueError("unsupported_native_runtime_bootstrap")
+        tree.body[-1] = ast.parse(
+            "runpy.run_path(sys.argv.pop(1), run_name='__main__')"
+        ).body[0]
+        command = list(argv)
+        command[code_index] = ast.unparse(ast.fix_missing_locations(tree))
+        return command
+    except (IndexError, SyntaxError) as exc:
+        raise ValueError("unsupported_native_runtime_bootstrap") from exc
 
 
 def native(prompt, role, cwd, folder, deadline, stop):

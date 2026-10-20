@@ -34,7 +34,7 @@ async def execute(args):
     async with connect_gateway() as client:
         description = await client.rpc("runtime.describe")
         parameters = description.get("session_create", {}).get("parameters", [])
-        policy = dict(
+        policy: dict[str, object] = dict(
             provider=args.provider,
             model=args.model,
             cwd=args.cwd,
@@ -43,6 +43,8 @@ async def execute(args):
         )
         if not set(policy) <= set(parameters):
             raise RuntimeError("native_gateway_contract_unsupported")
+        if "run_budget" in parameters:
+            policy["run_budget"] = max(0.1, deadline - time.monotonic())
         if stop.exists() or time.monotonic() >= deadline:
             return 130
         snapshot = await client.rpc(

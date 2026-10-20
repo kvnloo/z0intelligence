@@ -14,18 +14,37 @@ from z0int.turbo import adapters, hermes_gateway, runtime
 
 
 def test_native_command_uses_installation_bound_runtime(tmp_path):
+    script = tmp_path / "helper.py"
+    script.write_text("import json,sys;print(json.dumps(sys.argv[1:]))")
+    bootstrap = (
+        "import sys,runpy;runpy.run_module('runpy',run_name='__main__',alter_sys=True)"
+    )
+    emitted = [sys.executable, "-I", "-c", bootstrap, str(script), "literal;argument"]
+    real_run = adapters.subprocess.run
     with patch.object(
         adapters.subprocess,
         "run",
-        return_value=SimpleNamespace(stdout='["python", "bootstrap"]'),
+        return_value=SimpleNamespace(stdout=json.dumps(emitted)),
     ) as run:
-        assert adapters.native_command(
+        command = adapters.native_command(
             "anthropic", "locked", tmp_path, tmp_path / "q", tmp_path / "s", 10
-        ) == ["python", "bootstrap"]
+        )
     argv = run.call_args.args[0]
     assert "--print-runtime-command" in argv and "--run-budget" not in argv
     assert argv[argv.index("--model") + 1] == "locked"
     assert run.call_args.kwargs["timeout"] == 15
+    # Execute the transformed bootstrap; source-string assertions would miss the
+    # real runpy CLI's module-vs-file failure.
+    observed = real_run(command, capture_output=True, text=True, timeout=5, check=True)
+    assert json.loads(observed.stdout) == ["literal;argument"]
+
+
+@pytest.mark.parametrize(
+    "command", [["python"], ["python", "-c", "print('not a bootstrap')"]]
+)
+def test_unknown_native_bootstrap_fails_closed(command):
+    with pytest.raises(ValueError):
+        adapters.script_command(command)
 
 
 @pytest.mark.parametrize("stop_reason", [None, "cancelled", "deadline"])
@@ -47,6 +66,7 @@ def test_gateway_owns_stop_and_reads_terminal_receipt(
                             "cwd",
                             "safe_mode",
                             "max_turns",
+                            "run_budget",
                         ]
                     }
                 }
@@ -120,6 +140,7 @@ def test_gateway_owns_stop_and_reads_terminal_receipt(
         assert code == 0 and not any(c[0] == "/stop" for c in calls)
     create = next(c[1] for c in calls if c[0] == "session.create")
     assert create["safe_mode"] is True and create["model"] == "locked"
+    assert 0 < create["run_budget"] <= args.seconds
 
 
 def test_native_missing_accounting_is_not_zero(tmp_path):
