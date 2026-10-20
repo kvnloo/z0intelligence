@@ -58,6 +58,42 @@ export function planEndpoint(baseURL = 'http://127.0.0.1:11501') {
   return new URL('/v1/plan', url);
 }
 
+async function readBoundedPlanBody(response, maxBytes = 96_000) {
+  const declared = response.headers?.get?.('content-length');
+  if (declared != null && (!/^\d+$/.test(declared) || Number(declared) > maxBytes)) {
+    try { await response.body?.cancel?.(); } catch {}
+    throw new Z0intPlanError('Oversized or invalid plan response length.');
+  }
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    // Preserve injected text-only transports; native fetch bodies are streamed.
+    const raw = await response.text();
+    if (Buffer.byteLength(raw, 'utf8') > maxBytes) throw new Z0intPlanError('Oversized plan response.');
+    return raw;
+  }
+  const decoder = new TextDecoder('utf-8');
+  const pieces = [];
+  let bytes = 0;
+  let complete = false;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > maxBytes) throw new Z0intPlanError('Oversized plan response.');
+      pieces.push(decoder.decode(value, {stream:true}));
+    }
+    pieces.push(decoder.decode());
+    complete = true;
+    return pieces.join('');
+  } finally {
+    if (!complete) {
+      try { await reader.cancel(); } catch {}
+    }
+    reader.releaseLock();
+  }
+}
+
 export function createZ0intPlanEffect({ baseURL, fetchImpl = globalThis.fetch, timeoutMs = 5000 } = {}) {
   const endpoint = planEndpoint(baseURL);
   if (typeof fetchImpl !== 'function' || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30_000) {
@@ -77,8 +113,7 @@ export function createZ0intPlanEffect({ baseURL, fetchImpl = globalThis.fetch, t
       body: JSON.stringify(body), signal,
     });
     if (!response?.ok) throw new Z0intPlanError('z0intelligence plan endpoint rejected the request.');
-    const raw = await response.text();
-    if (Buffer.byteLength(raw, 'utf8') > 96_000) throw new Z0intPlanError('Oversized plan response.');
+    const raw = await readBoundedPlanBody(response);
     let result;
     try { result = JSON.parse(raw); }
     catch { throw new Z0intPlanError('Malformed plan response.'); }

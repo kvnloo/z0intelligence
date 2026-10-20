@@ -65,3 +65,84 @@ test('reject execution-shaped responses, malformed JSON, and service failures', 
     await assert.rejects(effect({node:{via:'tool',tool:'z0int.plan'},input:{request:req}}), Z0intPlanError);
   }
 });
+
+const runResponse = response => createZ0intPlanEffect({fetchImpl: async () => response})(
+  {node:{via:'tool',tool:'z0int.plan'},input:{request:req}},
+);
+
+test('cancel a chunked oversized response before consuming its whole body', async t => {
+  let pulls = 0;
+  let cancelled = false;
+  const response = new Response(new ReadableStream({
+    pull(controller) {
+      if (pulls === 512) return controller.close();
+      pulls++;
+      controller.enqueue(new Uint8Array(16_384));
+    },
+    cancel() { cancelled = true; },
+  }, {highWaterMark:0}));
+  await assert.rejects(runResponse(response), /Oversized plan response/);
+  t.diagnostic(`bytes pulled: ${pulls * 16_384}; cancelled: ${cancelled}`);
+  assert.ok(pulls * 16_384 <= 96_000 + 16_384, `pulled ${pulls * 16_384} bytes`);
+  assert.equal(cancelled, true);
+  assert.equal(response.body.locked, false);
+});
+
+test('refuse oversized or invalid declared length before reading any body', async () => {
+  for (const length of ['96001', '999999999999999999999999', '-1', 'invalid']) {
+    let pulls = 0;
+    let cancelled = false;
+    const response = new Response(new ReadableStream({
+      pull(controller) {
+        pulls++;
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(plan('PARENT_ONLY'))));
+        controller.close();
+      },
+      cancel() { cancelled = true; },
+    }, {highWaterMark:0}), {headers:{'content-length':length}});
+    await assert.rejects(runResponse(response), /plan response length/);
+    assert.equal(pulls, 0, length);
+    assert.equal(cancelled, true, length);
+  }
+});
+
+test('decode a valid UTF-8 plan across byte boundaries', async () => {
+  const expected = plan('PARENT_ONLY');
+  expected.route.reason = 'Local résumé — bounded 日本語 plan';
+  const bytes = new TextEncoder().encode(JSON.stringify(expected));
+  let offset = 0;
+  const response = new Response(new ReadableStream({
+    pull(controller) {
+      if (offset === bytes.length) return controller.close();
+      controller.enqueue(bytes.slice(offset, ++offset));
+    },
+  }));
+  assert.deepEqual(await runResponse(response), expected);
+});
+
+test('accept an exactly 96000-byte plan and reject one extra byte', async () => {
+  const expected = plan('PARENT_ONLY');
+  expected.padding = '';
+  expected.padding = 'x'.repeat(96_000 - Buffer.byteLength(JSON.stringify(expected), 'utf8'));
+  const raw = JSON.stringify(expected);
+  assert.equal(Buffer.byteLength(raw, 'utf8'), 96_000);
+  assert.deepEqual(await runResponse(new Response(raw)), expected);
+  await assert.rejects(runResponse(new Response(raw + ' ')), /Oversized plan response/);
+});
+
+test('release the reader when the response stream fails', async () => {
+  let pulls = 0;
+  const failure = new Error('fixture stream failure');
+  const response = new Response(new ReadableStream({
+    pull(controller) {
+      if (pulls++) return controller.error(failure);
+      controller.enqueue(new Uint8Array([123]));
+    },
+  }, {highWaterMark:0}));
+  await assert.rejects(runResponse(response), failure);
+  assert.equal(response.body.locked, false);
+});
+
+test('retain the size check for text-only injected transports', async () => {
+  await assert.rejects(runResponse({ok:true,text:async()=>'x'.repeat(96_001)}), /Oversized plan response/);
+});

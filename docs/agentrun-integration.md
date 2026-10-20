@@ -21,7 +21,7 @@ host / operator
 **Never calls /v1/intelligence or executes the plan.** Jev cannot grant tool permissions, alter z0 policy, or assert verified task success.
 
 Files:
-- `harness-adapters/agentrun-z0int.mjs`: allowlisted read-only HTTP tool, localhost-only, unknown-field rejection, deadline, fail-closed response validation, no retries.
+- `harness-adapters/agentrun-z0int.mjs`: allowlisted read-only HTTP tool, localhost-only, unknown-field rejection, deadline, fail-closed response validation, no retries. Native response bodies are limited to 96,000 bytes while streaming, with early cancellation on overflow and rejection of oversized or invalid declared lengths.
 - `adapters/agentrun-z0int/workflow.mjs`: typed v2 map/judge/escalation flow.
 - `adapters/agentrun-z0int/runner.mjs`: offline-injected adapters versus explicit live `createJevRunner`.
 - `adapters/agentrun-z0int/cli.mjs`: operator CLI with redacted output.
