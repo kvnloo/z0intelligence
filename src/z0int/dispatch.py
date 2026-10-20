@@ -241,7 +241,7 @@ def load_capacity(path: str | None = None) -> dict[str, Any]:
 
 
 def observe_capacity(lane: str, status: str, *, retry_after: float | None = None,
-                     nous: tuple[float, float] | None = None) -> None:
+                     nous: tuple[float, float] | None = None, seconds: float | None = None) -> None:
     """Report an outcome to Kerdoios so the next capacity read sees throttles and spend."""
     src = os.environ.get("KERDOIOS_SRC")
     if src and src not in sys.path:
@@ -250,8 +250,13 @@ def observe_capacity(lane: str, status: str, *, retry_after: float | None = None
         from kerdoios.capacity import observe
     except ImportError:
         return
-    observe(lane, status, retry_after_s=retry_after,
-            nous_used=nous[0] if nous else None, nous_cap=nous[1] if nous else None)
+    kw = {"seconds": seconds} if seconds else {}  # older kerdoios has no latency feedback
+    try:
+        observe(lane, status, retry_after_s=retry_after,
+                nous_used=nous[0] if nous else None, nous_cap=nous[1] if nous else None, **kw)
+    except TypeError:
+        observe(lane, status, retry_after_s=retry_after,
+                nous_used=nous[0] if nous else None, nous_cap=nous[1] if nous else None)
 
 
 # ---------------------------------------------------------------- decision
@@ -519,7 +524,8 @@ def record_outcome(con: sqlite3.Connection, outcome: Mapping[str, Any], *, now: 
     # "quota" (a spent daily/credit window, retry_class stop_lane) rests the lane at once in
     # Kerdoios instead of waiting for three throttles.
     observe_capacity(lane, {"ok": "ok", "rate_limited": "rate_limited", "quota": "quota"}.get(status, "error"),
-                     retry_after=outcome.get("retry_after"), nous=tuple(nous) if nous else None)
+                     retry_after=outcome.get("retry_after"), nous=tuple(nous) if nous else None,
+                     seconds=outcome.get("seconds") if status == "ok" else None)
 
 
 def record_qa(con: sqlite3.Connection, job_id: str, agree: float, *, qa_lane: str | None = None) -> int:
