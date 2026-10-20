@@ -43,7 +43,11 @@ controls `z0int run`, not arbitrary Hermes conversations or existing governed
 * Native invocations use the installation-bound Hermes runtime and canonical
   gateway with `safe_mode=True`, explicit provider/model, and check the gateway's
   **observed** session model. `hermes --print-runtime-command` must be supported;
-  older installations fail closed. No shared profile settings are changed.
+  older installations fail closed. The adapter preserves that emitted bootstrap
+  and structurally replaces only its terminal `run_module` entry with `run_path`
+  for the owned adapter file (the runpy CLI does not execute file paths).
+  An advertised per-session `run_budget` RPC field is used when available;
+  no shared profile settings are changed.
   Repository rules must be read explicitly by code roles.
 * `--normal` performs one nondelegating Sol reference plus the same independent
   Sol verification phase, for matched A/B measurements.
