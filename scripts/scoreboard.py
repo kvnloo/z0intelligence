@@ -7,17 +7,19 @@ Agent sessions are joined to pull requests by git branch:
           branch checked out at sessions.cwd; delegated children inherit their parent's
   Codex   ~/.codex/sessions/**/*.jsonl                      session_meta git.branch or cwd
   Claude  $CLAUDE_CONFIG_DIR, ~/.claude, ~/.claude-home     gitBranch per line, else the branch
-          (projects/*/*.jsonl)                              checked out at that line's cwd
+          (projects/**/*.jsonl, including subagents)        checked out at that line's cwd
 
 A merged PR counts as cross-checked when one of its comments starts with
 "VERDICT: ACCEPT" and names the merged head SHA on a "head:" line.
 
 Token fields: fresh = uncached input + cache writes + output (reasoning is part of
 output); cached = cache reads. Sessions on branches with no PR stay unattributed.
+Claude streamed messages use the last valid usage observation for each message id.
 """
 from __future__ import annotations
 
 import argparse
+import calendar
 import glob
 import json
 import os
@@ -114,35 +116,55 @@ def codex_sessions(root: str, since: float) -> list[dict]:
 
 
 def claude_sessions(roots: list[str], since: float) -> list[dict]:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    from z0int.claude_code import USAGE_KEYS
+
     rows, cache = [], {}
-    paths = {os.path.realpath(p) for root in roots for p in glob.glob(os.path.join(root, "*", "*.jsonl"))}
+    # Include nested workflows and subagents whose parent transcript was removed.
+    paths = {os.path.realpath(p) for root in roots for p in Path(root).rglob("*.jsonl")}
     for path in sorted(paths):
-        if os.path.getmtime(path) < since:
-            continue
-        per_branch, seen = defaultdict(lambda: [0, 0, 0, 0]), set()
+        latest = {}
         try:
-            with open(path) as fh:
-                for line in fh:
+            modified = os.path.getmtime(path)
+            if modified < since:
+                continue
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                for line_number, line in enumerate(fh):
                     if '"usage"' not in line:
                         continue
-                    item = json.loads(line)
-                    msg = item.get("message") or {}
-                    usage, mid = msg.get("usage") or {}, msg.get("id")
-                    if not usage or (mid and mid in seen):
+                    try:
+                        item = json.loads(line)
+                    except ValueError:
                         continue
-                    seen.add(mid)
+                    msg = item.get("message") if isinstance(item, dict) else None
+                    if not isinstance(msg, dict):
+                        continue
+                    usage, mid = msg.get("usage") or {}, msg.get("id")
+                    if not isinstance(usage, dict) or not usage:
+                        continue
+                    if mid is not None and not isinstance(mid, str):
+                        continue
+                    amounts = {key: 0 if usage.get(key) is None else usage[key] for key in USAGE_KEYS}
+                    if any(type(value) is not int or value < 0 for value in amounts.values()):
+                        continue
                     branch = item.get("gitBranch") or ""
+                    if not isinstance(branch, str):
+                        continue
                     if branch in SKIP_BRANCHES:  # detached or default: use the checkout at that line's cwd
-                        branch = _branch_at(item.get("cwd"), cache) or branch
-                    acc = per_branch[branch]
-                    acc[0] += usage.get("input_tokens") or 0
-                    acc[1] += usage.get("cache_creation_input_tokens") or 0
-                    acc[2] += usage.get("output_tokens") or 0
-                    acc[3] += usage.get("cache_read_input_tokens") or 0
-        except (OSError, ValueError):
+                        cwd = item.get("cwd")
+                        branch = _branch_at(cwd if isinstance(cwd, str) else None, cache) or branch
+                    key = ("id", mid) if isinstance(mid, str) and mid else ("line", line_number)
+                    latest[key] = (branch, amounts)
+        except OSError:
             continue
-        for branch, (fin, cw, out, cr) in per_branch.items():
-            rows.append(_row("claude", f"{Path(path).stem}:{branch}", branch, os.path.getmtime(path), fin, cw, out, cr))
+        per_branch = defaultdict(lambda: dict.fromkeys(USAGE_KEYS, 0))
+        for branch, usage in latest.values():
+            for key in USAGE_KEYS:
+                per_branch[branch][key] += usage[key]
+        for branch, usage in per_branch.items():
+            rows.append(_row("claude", f"{Path(path).stem}:{branch}", branch, modified,
+                             usage["input_tokens"], usage["cache_creation_input_tokens"],
+                             usage["output_tokens"], usage["cache_read_input_tokens"]))
     return rows
 
 
@@ -160,15 +182,18 @@ def cross_checked(pr: dict, comments: list[dict]) -> bool:
     return False
 
 
+def _utc_stamp(value: str | None) -> float:
+    return calendar.timegm(time.strptime(value[:19], "%Y-%m-%dT%H:%M:%S")) if value else 0
+
+
 def score(prs: list[dict], sessions: list[dict], comments: dict, since: float) -> dict:
     by_branch = defaultdict(lambda: {"fresh": 0, "cached": 0, "sessions": 0})
     for s in sessions:
         if s["branch"] not in SKIP_BRANCHES:
             b = by_branch[s["branch"]]
             b["fresh"] += s["fresh"]; b["cached"] += s["cached"]; b["sessions"] += 1
-    stamp = lambda v: time.mktime(time.strptime(v[:19], "%Y-%m-%dT%H:%M:%S")) - time.timezone if v else 0
-    merged = [p for p in prs if p.get("mergedAt") and stamp(p["mergedAt"]) >= since]
-    closed = [p for p in prs if p.get("closedAt") and not p.get("mergedAt") and stamp(p["closedAt"]) >= since]
+    merged = [p for p in prs if p.get("mergedAt") and _utc_stamp(p["mergedAt"]) >= since]
+    closed = [p for p in prs if p.get("closedAt") and not p.get("mergedAt") and _utc_stamp(p["closedAt"]) >= since]
     rows = []
     for p in merged:
         t = by_branch.get(p["headRefName"], {"fresh": 0, "cached": 0, "sessions": 0})
@@ -221,7 +246,7 @@ def main(argv: list[str] | None = None) -> int:
         prs = gh_json(["pr", "list", "-R", args.repo, "--state", "all", "--limit", "500", "--json",
                        "number,headRefName,headRefOid,state,mergedAt,closedAt"])
         comments = {p["number"]: gh_json(["pr", "view", str(p["number"]), "-R", args.repo, "--json", "comments"])["comments"]
-                    for p in prs if p.get("mergedAt") and time.mktime(time.strptime(p["mergedAt"][:19], "%Y-%m-%dT%H:%M:%S")) - time.timezone >= since}
+                    for p in prs if p.get("mergedAt") and _utc_stamp(p["mergedAt"]) >= since}
     result = score(prs, sessions, comments, since)
     result["receipts"] = receipts_summary()
     if args.json:
