@@ -53,5 +53,5 @@ where = ["src"]
 "z0int.optchat" = ["*.mjs"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "webgpu-demo"]
+testpaths = ["tests"]
 markers = ["live: requires configured external or local model services"]

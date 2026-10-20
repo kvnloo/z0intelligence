@@ -120,7 +120,7 @@ a source-revision change changes `semantic_id`.
 packet key namespace only); only unknowns/contradictions in those families block, and a required family
 with no claim becomes an explicit unknown (`source_unavailable` when the source was never collected).
 
-Pre-registered test (`benchmarks/decision_opportunity/falsification.py`, committed in 402d622 before any
+Pre-registered test (committed in 402d622 before any
 run) on the 11 pinned held-out questions, deterministic arms only:
 
 | arm | strict | answer | abstain | conflict | false ACT |
