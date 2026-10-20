@@ -170,12 +170,17 @@ def pct_per_job(con: sqlite3.Connection, lane: str) -> tuple[float, str]:
     """Weekly-window percent one job costs, learned from batch burn-pace deltas."""
     pool = {"opus": "claude", "sol": "codex"}.get(lane)
     num, den = 0.0, 0
-    for batch, ps, pe in con.execute("SELECT batch, pace_start, pace_end FROM batches WHERE pace_end IS NOT NULL"):
+    for batch, ps, pe, t0, t1 in con.execute(
+            "SELECT batch, pace_start, pace_end, started, ended FROM batches WHERE pace_end IS NOT NULL"):
         try:
-            a = json.loads(ps)["lanes"][pool]["weekly_used_pct"]
+            start = json.loads(ps)
+            a = start["lanes"][pool]["weekly_used_pct"]
             b = json.loads(pe)["lanes"][pool]["weekly_used_pct"]
         except (KeyError, TypeError, json.JSONDecodeError):
             continue
+        # Subtract what the pool's other consumers were burning when the batch began.
+        background = float((start.get("recent_pct_per_h") or {}).get(pool) or 0)
+        b = max(a, b - background * max(0.0, (t1 or 0) - (t0 or 0)) / 3600)
         jobs = con.execute("SELECT count(*) FROM outcomes WHERE batch = ? AND lane = ? AND status != 'rate_limited'",
                            (batch, lane)).fetchone()[0]
         if jobs >= 5 and b >= a:
@@ -184,8 +189,8 @@ def pct_per_job(con: sqlite3.Connection, lane: str) -> tuple[float, str]:
     prior = PCT_PER_JOB_PRIOR.get(lane, 0.05)
     if den == 0:
         return prior, "prior"
-    # Other sessions burn the same pool during a batch, so deltas over-count; blend with the prior.
-    return (prior * 10 + num) / (10 + den), f"learned from {den} jobs (upper bound: shared pool)"
+    # Background subtraction is approximate and the window reports whole percents; blend with the prior.
+    return (prior * 10 + num) / (10 + den), f"learned from {den} jobs (background-subtracted pool delta)"
 
 
 def usd_per_job(con: sqlite3.Connection, lanes: Iterable[str] = ("haiku", "luna")) -> float | None:
@@ -549,6 +554,14 @@ def report(con: sqlite3.Connection, batch: str | None = None) -> dict[str, Any]:
 def batch_mark(con: sqlite3.Connection, batch: str, phase: str, capacity: Mapping[str, Any] | None = None,
                note: str | None = None) -> None:
     pace = subprocess.run(["burn-pace", "--json"], capture_output=True, text=True, timeout=120).stdout or "{}"
+    try:
+        doc = json.loads(pace)
+        # The pool's burn rate just before the batch: other sessions keep spending during it.
+        doc["recent_pct_per_h"] = {row.get("pool"): (row.get("pacing") or {}).get("recent_pct_per_h")
+                                   for row in ((capacity or {}).get("lanes") or {}).values() if row.get("pacing")}
+        pace = json.dumps(doc)
+    except json.JSONDecodeError:
+        pass
     nous = json.dumps((capacity or {}).get("nous_cap"))
     if phase == "start":
         # A resumed batch keeps its first snapshot, so burn-pace deltas span the whole batch.

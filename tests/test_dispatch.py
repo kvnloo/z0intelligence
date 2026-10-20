@@ -155,3 +155,17 @@ def test_capped_cost_is_learned_from_spend_cap_snapshots(con):
     out = d.assign([qa], capacity(), con=con, batch="b2")
     assert out["assign"][0]["lane"] == "luna"
     assert con.execute("SELECT usd_est FROM decisions WHERE job_id='z'").fetchone()[0] == 0.1
+
+
+def test_subscription_cost_subtracts_the_pools_background_burn(con):
+    start = {"lanes": {"claude": {"weekly_used_pct": 52.0}}, "recent_pct_per_h": {"claude": 1.9}}
+    end = {"lanes": {"claude": {"weekly_used_pct": 57.0}}}
+    con.execute("INSERT INTO batches(batch, started, ended, pace_start, pace_end) VALUES ('w', 0, 7560, ?, ?)",
+                (json.dumps(start), json.dumps(end)))
+    for i in range(36):
+        d.record_outcome(con, {"decision_id": None, "batch": "w", "job_id": f"s{i}", "lane": "opus", "kind": "scan",
+                               "status": "ok", "schema_valid": True})
+    pct, how = d.pct_per_job(con, "opus")
+    # 5% total minus 1.9 %/h x 2.1 h of background leaves 1.01% for 36 jobs, blended with the 0.05 prior.
+    assert 0.03 < pct < 0.04
+    assert "background" in how
