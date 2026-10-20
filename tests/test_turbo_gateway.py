@@ -140,6 +140,9 @@ def test_gateway_owns_stop_and_reads_terminal_receipt(
         assert code == 0 and not any(c[0] == "/stop" for c in calls)
     create = next(c[1] for c in calls if c[0] == "session.create")
     assert create["safe_mode"] is True and create["model"] == "locked"
+    # A rendered code proof exhausted the old 12-call ceiling before repair and
+    # independent verification, despite having most of its wall budget left.
+    assert create["max_turns"] == 48
     assert 0 < create["run_budget"] <= args.seconds
 
 

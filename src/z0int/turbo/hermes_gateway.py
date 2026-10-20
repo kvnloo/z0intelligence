@@ -39,7 +39,10 @@ async def execute(args):
             model=args.model,
             cwd=args.cwd,
             safe_mode=True,
-            max_turns=12,
+            # Tool-using implementation and independent verification need room
+            # to diagnose a failed browser check; the task deadline still owns
+            # wall time and cancellation. Never relabel an exhausted turn green.
+            max_turns=48,
         )
         if not set(policy) <= set(parameters):
             raise RuntimeError("native_gateway_contract_unsupported")
