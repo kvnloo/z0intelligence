@@ -142,3 +142,16 @@ def test_unrun_and_throttled_decisions_do_not_spend_headroom(con):
         d.record_outcome(con, {"decision_id": a["decision_id"], "status": "not_run"})
     again = d.assign(jobs(4), capacity(), con=con, now=1001.0, ceiling={"opus": 4})
     assert lanes_of(again) == ["opus"] * 4
+
+
+def test_capped_cost_is_learned_from_spend_cap_snapshots(con):
+    con.execute("INSERT INTO batches(batch, started, ended, nous_start, nous_end) VALUES ('q', 1, 2, ?, ?)",
+                (json.dumps({"used_usd": 100.0}), json.dumps({"used_usd": 100.6})))
+    for i in range(6):
+        d.record_outcome(con, {"decision_id": None, "batch": "q", "job_id": f"q{i}", "lane": "luna", "kind": "qa",
+                               "status": "ok", "schema_valid": True})
+    assert d.usd_per_job(con) == 0.1
+    qa = d.Job.from_dict({"id": "z", "kind": "qa", "quality": 0.8, "avoid_family": "anthropic"})
+    out = d.assign([qa], capacity(), con=con, batch="b2")
+    assert out["assign"][0]["lane"] == "luna"
+    assert con.execute("SELECT usd_est FROM decisions WHERE job_id='z'").fetchone()[0] == 0.1

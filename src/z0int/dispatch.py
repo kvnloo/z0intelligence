@@ -188,6 +188,26 @@ def pct_per_job(con: sqlite3.Connection, lane: str) -> tuple[float, str]:
     return (prior * 10 + num) / (10 + den), f"learned from {den} jobs (upper bound: shared pool)"
 
 
+def usd_per_job(con: sqlite3.Connection, lanes: Iterable[str] = ("haiku", "luna")) -> float | None:
+    """Dollars per capped-lane job, from the Nous cap notices snapshotted at batch start and end.
+
+    Other sessions can spend the same cap during a batch, so this is an upper bound.
+    """
+    spent, jobs = 0.0, 0
+    marks = ",".join("?" * len(tuple(lanes)))
+    for batch, ns, ne in con.execute("SELECT batch, nous_start, nous_end FROM batches WHERE nous_end IS NOT NULL"):
+        try:
+            delta = float(json.loads(ne)["used_usd"]) - float(json.loads(ns)["used_usd"])
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            continue
+        n = con.execute(f"SELECT count(*) FROM outcomes WHERE batch = ? AND lane IN ({marks}) AND status = 'ok'",
+                        (batch, *lanes)).fetchone()[0]
+        if n and delta >= 0:
+            spent += delta
+            jobs += n
+    return round(spent / jobs, 4) if jobs else None
+
+
 # ---------------------------------------------------------------- capacity
 
 def load_capacity(path: str | None = None) -> dict[str, Any]:
@@ -299,7 +319,7 @@ def make_budget(con: sqlite3.Connection, views: Mapping[str, LaneView], batch: s
 def candidates(job: Job, views: Mapping[str, LaneView], budget: Budget,
                quality: Mapping[tuple[str, str], tuple[float, int]],
                latency: Mapping[tuple[str, str], float], pct_cost: Mapping[str, float],
-               *, need_slot: bool = True) -> tuple[list[dict[str, Any]], dict[str, str]]:
+               *, need_slot: bool = True, learned_usd: float | None = None) -> tuple[list[dict[str, Any]], dict[str, str]]:
     """Every lane scored for ``job``; infeasible lanes come back with the reason."""
     rows, rejected = [], {}
     f = SIZE_FACTOR.get(job.size, 1.0)
@@ -341,7 +361,7 @@ def candidates(job: Job, views: Mapping[str, LaneView], budget: Budget,
                 rejected[lane] = f"{band}: hourly headroom spent ({budget.sub_pct_left.get(lane, 0):.2f}%)"
                 continue
         elif v.cost_class == "capped":
-            usd = float((v.spend or {}).get("usd_per_job_prior") or 0.05) * f
+            usd = float(learned_usd or (v.spend or {}).get("usd_per_job_prior") or 0.05) * f
             remaining = float((v.spend or {}).get("remaining_usd") or 0)
             if usd > budget.nous_usd_left:
                 rejected[lane] = f"Nous batch/reserve budget left ${budget.nous_usd_left:.2f}"
@@ -388,18 +408,21 @@ def assign(jobs: list[Job], capacity: Mapping[str, Any], *, in_flight: Mapping[s
     budget = make_budget(con, views, batch, clock, share)
     quality, latency = quality_posterior(con), latency_estimates(con)
     pct_cost = {lane: pct_per_job(con, lane)[0] for lane in ("opus", "sol")}
+    learned = usd_per_job(con)
     placed, waiting = [], []
     for job in order_jobs(jobs):
-        rows, rejected = candidates(job, views, budget, quality, latency, pct_cost)
+        rows, rejected = candidates(job, views, budget, quality, latency, pct_cost, learned_usd=learned)
         if not rows:
             # Would any lane take it once a slot frees up?
-            later, _ = candidates(job, views, budget, quality, latency, pct_cost, need_slot=False)
+            later, _ = candidates(job, views, budget, quality, latency, pct_cost, need_slot=False,
+                                  learned_usd=learned)
             waiting.append({"job_id": job.id, "next_best": later[0]["lane"] if later else None,
                             "rejected": rejected, "infeasible": not later})
             continue
         best = rows[0]
         if job.deadline_s is None:
-            later, _ = candidates(job, views, budget, quality, latency, pct_cost, need_slot=False)
+            later, _ = candidates(job, views, budget, quality, latency, pct_cost, need_slot=False,
+                                  learned_usd=learned)
             if later and later[0]["cost"] + WAIT_MARGIN < best["cost"]:
                 waiting.append({"job_id": job.id, "next_best": later[0]["lane"], "infeasible": False,
                                 "rejected": {**rejected, best["lane"]: f"waits for cheaper {later[0]['lane']}"}})
@@ -439,6 +462,7 @@ def plan(jobs: list[Job], capacity: Mapping[str, Any], *, horizon_h: float = 1.0
     quality, latency = quality_posterior(con), latency_estimates(con)
     pct_cost = {lane: pct_per_job(con, lane)[0] for lane in ("opus", "sol")}
     budget = make_budget(con, views, None, time.time(), share)
+    learned = usd_per_job(con)
     budget.sub_pct_left = {k: v * horizon_h for k, v in budget.sub_pct_left.items()}
     for v in views.values():
         throughput = v.slots * horizon_h * 3600 / max(v.latency_s, 1)
@@ -446,7 +470,7 @@ def plan(jobs: list[Job], capacity: Mapping[str, Any], *, horizon_h: float = 1.0
     counts: dict[str, int] = {}
     unplaced = []
     for job in order_jobs(jobs):
-        rows, rejected = candidates(job, views, budget, quality, latency, pct_cost)
+        rows, rejected = candidates(job, views, budget, quality, latency, pct_cost, learned_usd=learned)
         if not rows:
             unplaced.append({"job_id": job.id, "rejected": rejected})
             continue
@@ -506,7 +530,8 @@ def report(con: sqlite3.Connection, batch: str | None = None) -> dict[str, Any]:
            "jobs_per_hour": round(span[2] / hours, 1) if hours else None,
            "quality_posterior": {f"{k[0]}/{k[1]}": {"mean": round(v[0], 3), "n": v[1]}
                                  for k, v in quality_posterior(con).items()},
-           "pct_per_job": {lane: pct_per_job(con, lane) for lane in ("opus", "sol")}}
+           "pct_per_job": {lane: pct_per_job(con, lane) for lane in ("opus", "sol")},
+           "nous_usd_per_job": usd_per_job(con)}
     if batch:
         b = con.execute("SELECT started, ended, pace_start, pace_end, nous_start, nous_end FROM batches "
                         "WHERE batch = ?", (batch,)).fetchone()
