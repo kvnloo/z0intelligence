@@ -143,7 +143,7 @@ def quality_posterior(con: sqlite3.Connection) -> dict[tuple[str, str], tuple[fl
     sums: dict[tuple[str, str], list[float]] = {}
     for lane, kind, status, valid, agree in con.execute(
             "SELECT lane, kind, status, schema_valid, qa_agree FROM outcomes "
-            "WHERE status NOT IN ('rate_limited', 'not_run')"):
+            "WHERE status NOT IN ('rate_limited', 'not_run', 'harness_error')"):
         score = agree if agree is not None else float(status == "ok" and bool(valid))
         row = sums.setdefault((lane, kind), [0.0, 0])
         row[0] += score
@@ -523,7 +523,8 @@ def batch_mark(con: sqlite3.Connection, batch: str, phase: str, capacity: Mappin
     pace = subprocess.run(["burn-pace", "--json"], capture_output=True, text=True, timeout=120).stdout or "{}"
     nous = json.dumps((capacity or {}).get("nous_cap"))
     if phase == "start":
-        con.execute("INSERT OR REPLACE INTO batches(batch, started, pace_start, nous_start, note) VALUES (?,?,?,?,?)",
+        # A resumed batch keeps its first snapshot, so burn-pace deltas span the whole batch.
+        con.execute("INSERT OR IGNORE INTO batches(batch, started, pace_start, nous_start, note) VALUES (?,?,?,?,?)",
                     (batch, time.time(), pace, nous, note))
     else:
         con.execute("UPDATE batches SET ended = ?, pace_end = ?, nous_end = ? WHERE batch = ?",
