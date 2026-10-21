@@ -1,0 +1,20 @@
+{
+  "_comment": "Which integration line each running service on groot is supposed to serve. Read by z0int.fsm.replay; host-specific.",
+  "local_repos": {
+    "kvnloo/noop": "/mnt/zer0models/workspace/zer0/products/noop"
+  },
+  "services": [
+    {"name": "dash-bridge", "port": 4747, "repo": "kvnloo/dash",
+     "integration_ref": "origin/integrate/dash-20261020",
+     "must_contain": ["origin/integrate/phone-20261020", "origin/main"]},
+    {"name": "dash-metro", "port": 8097, "repo": "kvnloo/dash",
+     "integration_ref": "origin/integrate/dash-20261020",
+     "must_contain": ["origin/integrate/phone-20261020", "origin/main"]},
+    {"name": "company-os-static", "port": 8788, "repo": "kvnloo/company-os",
+     "integration_ref": "parent/company-os-integrated", "must_contain": ["origin/main"]},
+    {"name": "company-os-chooser", "port": 8789, "repo": "kvnloo/company-os",
+     "integration_ref": "parent/company-os-integrated", "must_contain": ["origin/main"]},
+    {"name": "z0intelligence", "port": 11501, "repo": "kvnloo/z0intelligence",
+     "integration_ref": "origin/master"}
+  ]
+}
