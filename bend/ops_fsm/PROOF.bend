@@ -193,6 +193,9 @@ def Laws.o1_mbp_takes_heavy(c, p, h):
 def Laws.o2_txn_can_ff():
   {==}
 
+def Laws.o2_txn_can_rollback():
+  {==}
+
 def Laws.o2_served_refuses(op, txn, w):
   match op:
     case O.GEdit{}:
@@ -206,6 +209,8 @@ def Laws.o2_served_refuses(op, txn, w):
     case O.GMerge{}:
       w
     case O.GMergeFF{}:
+      w
+    case O.GRollback{}:
       w
 
 # the rollout transaction: what each outcome implies about its inputs

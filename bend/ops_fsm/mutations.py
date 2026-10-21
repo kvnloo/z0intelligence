@@ -38,7 +38,11 @@ MUTATIONS = [
      "    case True{}:\n      RunOn{LMbp{}}", "    case True{}:\n      Wait{}"),
     # O2 served worktree
     ("O2 o2_served_refuses", "served worktree accepts any op",
-     "    case GMergeFF{}:\n      txn\n    case _:\n      False{}", "    case GMergeFF{}:\n      txn\n    case _:\n      True{}"),
+     "    case GRollback{}:\n      txn\n    case _:\n      False{}", "    case GRollback{}:\n      txn\n    case _:\n      True{}"),
+    ("O2 o2_served_refuses", "rollback (moving the served branch backwards) outside the transaction",
+     "    case GRollback{}:\n      txn", "    case GRollback{}:\n      True{}"),
+    ("O2 o2_txn_can_rollback", "the transaction cannot roll back",
+     "    case GRollback{}:\n      txn", "    case GRollback{}:\n      False{}"),
     ("O2 o2_served_refuses", "ff-merge outside the rollout transaction",
      "    case GMergeFF{}:\n      txn", "    case GMergeFF{}:\n      True{}"),
     ("O2 o2_served_refuses", "the served lease is ignored",

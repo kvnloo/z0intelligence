@@ -92,11 +92,13 @@ def FFInTxn(op: O.GitOp, txn: Bool) -> Data:
   match op:
     case O.GMergeFF{}:
       T(txn)
+    case O.GRollback{}:
+      T(txn)
     case _:
       Empty
 
-# in a served worktree the only allowed op is merge --ff-only inside the
-# guarded rollout transaction
+# in a served worktree the only allowed ops are merge --ff-only and its
+# automatic rollback, both inside the guarded rollout transaction
 law o2_served_refuses:
   for op: O.GitOp
   for txn: Bool
@@ -106,6 +108,9 @@ law o2_served_refuses:
 # the guarded transaction can still fast-forward the served worktree
 law o2_txn_can_ff:
   {O.wt_allows(True{}, O.GMergeFF{}, True{}) == True{} : Bool}
+
+law o2_txn_can_rollback:
+  {O.wt_allows(True{}, O.GRollback{}, True{}) == True{} : Bool}
 
 # a rollout that merged and restarted was a fast-forward into an idle service
 def FFIdle(q: O.Req) -> Data:

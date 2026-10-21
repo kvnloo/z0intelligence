@@ -51,6 +51,18 @@
     },
     {
       "law": "O2 o2_served_refuses",
+      "mutation": "rollback (moving the served branch backwards) outside the transaction",
+      "proofs_check": false,
+      "where": "Laws.o2_served_refuses"
+    },
+    {
+      "law": "O2 o2_txn_can_rollback",
+      "mutation": "the transaction cannot roll back",
+      "proofs_check": false,
+      "where": "Laws.o2_txn_can_rollback"
+    },
+    {
+      "law": "O2 o2_served_refuses",
       "mutation": "ff-merge outside the rollout transaction",
       "proofs_check": false,
       "where": "Laws.o2_served_refuses"
@@ -242,7 +254,7 @@
       "where": "Laws.o9_resume_needs_session"
     }
   ],
-  "rejected": 39,
-  "total": 39,
+  "rejected": 41,
+  "total": 41,
   "reference_restored": true
 }

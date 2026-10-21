@@ -111,7 +111,8 @@ def runs_on_groot(x: Place) -> Bool:
 # ------------------------------------------------------------------ O2
 # Served worktree. A worktree holding a live-service lease accepts no edit,
 # commit, checkout, stash or merge, except `merge --ff-only` inside the guarded
-# rollout transaction (txn: the caller holds the rollout lease token).
+# rollout transaction (txn: the caller holds the rollout lease token), and that
+# same transaction's automatic rollback to the revision it replaced (O3b).
 
 type GitOp is Data:
   GEdit{}
@@ -120,10 +121,13 @@ type GitOp is Data:
   GStash{}
   GMerge{}
   GMergeFF{}
+  GRollback{}
 
 def served_allows(op: GitOp, txn: Bool) -> Bool:
   match op:
     case GMergeFF{}:
+      txn
+    case GRollback{}:
       txn
     case _:
       False{}
