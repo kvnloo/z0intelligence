@@ -21,6 +21,8 @@ def register(sub):
     turbo_mode.add_argument("--json", action="store_true", dest="as_json")
     turbo = sub.add_parser("turbo", help="Experimental bounded parallel execution")
     commands = turbo.add_subparsers(dest="turbo_cmd", required=True)
+    from . import app_fanout
+    app_fanout.register(commands)
     inv = commands.add_parser(
         "inventory", help="Live catalogs, optionally measured inference"
     )
@@ -116,6 +118,9 @@ def mode(action, duration=None):
 
 
 def main(args):
+    if getattr(args, "turbo_cmd", None) == "app-fanout":
+        from . import app_fanout
+        return app_fanout.main(args)
     try:
         if args.cmd == "mode":
             result = mode(args.action, args.duration)
