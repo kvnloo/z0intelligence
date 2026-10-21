@@ -213,12 +213,14 @@ def test_o3_admission_table():
 
 
 def _rollout(wt, cand, **kw):
-    return G.cmd_rollout(Namespace(worktree=str(wt), ref="cand", candidate=str(cand), gated=kw.get("gated", False),
-                                   review_receipt=kw.get("receipt"), check="web", dry_run=False))
+    return G.cmd_rollout(Namespace(worktree=str(wt), ref="cand", candidate=kw.get("candidate", str(cand)),
+                                   gated=kw.get("gated", False), review_receipt=kw.get("receipt"),
+                                   check=kw.get("check", "web"), dry_run=False, idle_wait=0))
 
 
 @pytest.fixture
 def fake_service(monkeypatch):
+    monkeypatch.setenv("Z0_GUARD_O3", "enforce")
     calls = {"restarts": 0}
     monkeypatch.setattr(G, "restart_unit", lambda u: calls.__setitem__("restarts", calls["restarts"] + 1) or True)
     monkeypatch.setattr(G, "wait_http", lambda url, t: (True, "ok"))
@@ -252,21 +254,48 @@ def test_o3_rollout_defers_during_owner_call(served, fake_service, monkeypatch):
     G.cmd_served(Namespace(action="mark", worktree=str(wt), unit="u", port=1, health=None, deeplink="exp://x",
                            serial="S", scratch=False))
     monkeypatch.setattr(G, "device_launch_check", lambda *a: pytest.fail("device check ran during a call"))
-    assert G.cmd_rollout(Namespace(worktree=str(wt), ref="cand", candidate=str(cand), gated=False,
-                                   review_receipt=None, check="adb", dry_run=False)) == 75
+    assert _rollout(wt, cand, check="adb") == 75
     assert git(wt, "rev-parse", "HEAD").stdout == prev and fake_service["restarts"] == 0
     assert "deferred" in (G.STATE / "pending-rollouts.jsonl").read_text()
 
 
 def test_o3_rollout_refuses_served_build_and_missing_review(served, fake_service, tmp_path):
     main, wt, cand = served
-    assert G.cmd_rollout(Namespace(worktree=str(wt), ref="cand", candidate=str(wt), gated=False,
-                                   review_receipt=None, check="web", dry_run=False)) == G.EXIT_REFUSED
+    assert _rollout(wt, cand, candidate=str(wt)) == G.EXIT_REFUSED
     assert _rollout(wt, cand, gated=True) == G.EXIT_REFUSED
     sha = git(cand, "rev-parse", "HEAD").stdout.strip()
     rc = tmp_path / "review.json"
     rc.write_text(json.dumps({"sha": sha, "verdict": "approve", "reviewer": "orchestrator"}))
     assert G.review_receipt_ok(str(rc), sha) and not G.review_receipt_ok(str(rc), "0" * 40)
+
+
+def test_o3_report_mode_runs_but_records(served, fake_service, monkeypatch):
+    main, wt, cand = served
+    monkeypatch.setenv("Z0_GUARD_O3", "report")
+    monkeypatch.setattr(G, "owner_call_live", lambda: True)
+    G.cmd_served(Namespace(action="mark", worktree=str(wt), unit="u", port=1, health=None, deeplink=None,
+                           serial=None, scratch=False))
+    monkeypatch.setattr(G, "device_launch_check", lambda *a: pytest.fail("device check ran during a call"))
+    assert _rollout(wt, cand, check="adb") == 0
+    assert git(wt, "rev-parse", "HEAD").stdout == git(cand, "rev-parse", "HEAD").stdout
+    assert "check-pending" in (G.STATE / "pending-rollouts.jsonl").read_text()
+
+
+def test_o3_report_mode_does_not_roll_back(served, fake_service, monkeypatch):
+    main, wt, cand = served
+    monkeypatch.setenv("Z0_GUARD_O3", "report")
+    monkeypatch.setattr(G, "device_launch_check", lambda *a: (False, {}))
+    _rollout(wt, cand)
+    assert git(wt, "rev-parse", "HEAD").stdout == git(cand, "rev-parse", "HEAD").stdout
+    assert "would-roll-back" in (G.STATE / "rollouts.jsonl").read_text()
+
+
+def test_o2_busy_service_defers_in_every_mode(served, fake_service, monkeypatch):
+    main, wt, cand = served
+    monkeypatch.setenv("Z0_GUARD_O3", "report")
+    monkeypatch.setattr(G, "service_idle", lambda port: False)
+    prev = git(wt, "rev-parse", "HEAD").stdout
+    assert _rollout(wt, cand) == 75 and git(wt, "rev-parse", "HEAD").stdout == prev
 
 
 def test_o3_web_check_refused_for_owner_device():

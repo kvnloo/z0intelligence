@@ -40,6 +40,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -299,6 +300,37 @@ def ref_txn_op(lines: list[str], wt: str, rollback_to: str | None = None) -> P.G
     return P.GitOp.MERGE_FF
 
 
+def restore_after_abort(gd: Path, wt: str, lines: list[str]) -> None:
+    """A fast-forward or branch switch writes the working tree BEFORE it updates refs, so a
+    refused ref update leaves the new files behind (and Metro would serve them). After the
+    refusal, put back exactly the files that differ between HEAD and the refused target, once
+    the refused command has released the index. Other paths are not touched."""
+    clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    head = sh("git", "-C", wt, "rev-parse", "HEAD", env=clean).stdout.strip()
+    files: set[str] = set()
+    for ln in lines:
+        parts = ln.split()
+        if len(parts) != 3 or not GUARDED_REF.match(parts[2]) or parts[2] in ("ORIG_HEAD", "MERGE_HEAD"):
+            continue
+        new = parts[1]
+        if new.startswith("ref:"):
+            new = sh("git", "-C", wt, "rev-parse", "--verify", "-q", new[4:].strip(), env=clean).stdout.strip()
+        if not new or new.strip("0") == "" or new == head:
+            continue
+        files |= set(sh("git", "-C", wt, "diff", "--name-only", head, new, env=clean).stdout.split("\n")) - {""}
+    if not files:
+        return
+    lock = gd / "index.lock"
+    script = ('l=$1; w=$2; shift 2; for i in $(seq 75); do [ -e "$l" ] || break; sleep 0.2; done; '
+              'for f; do git -C "$w" restore --source=HEAD --staged --worktree -- "$f" 2>/dev/null; done')
+    subprocess.Popen(["sh", "-c", script, "z0-restore", str(lock), wt, *sorted(files)], env=clean,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+    ledger({"gate": "O2", "worktree": wt, "restored_after_refusal": sorted(files)[:50], "head": head})
+    print(f"z0-guard O2: restoring {len(files)} file(s) in {wt} to HEAD {head[:12]} after the refused update.",
+          file=sys.stderr)
+
+
 def rollout_prev(gd: Path) -> str | None:
     try:
         return json.loads((gd / "z0-rollout.lock").read_text()).get("prev")
@@ -317,7 +349,11 @@ def cmd_hook(a) -> int:
     wt = info.get("worktree") or os.getcwd()
     txn = txn_valid(gd)
     if name == "reference-transaction":
-        if (args[:1] or [""])[0] != "prepared":
+        phase = (args[:1] or [""])[0]
+        if phase == "aborted" and not txn:
+            restore_after_abort(gd, wt, sys.stdin.read().splitlines())
+            return 0
+        if phase != "prepared":
             return 0
         lines = sys.stdin.read().splitlines()
         op = ref_txn_op(lines, wt, rollout_prev(gd) if txn else None)
@@ -397,17 +433,23 @@ def review_receipt_ok(path: str | None, sha: str) -> bool:
     return r.get("sha") == sha and r.get("verdict") in ("approve", "approved", "pass") and bool(r.get("reviewer"))
 
 
-def wait_http(url: str, timeout: float) -> tuple[bool, str]:
+def wait_http(url: str, timeout: float, fail_on_5xx: bool = False) -> tuple[bool, str]:
+    """Poll until HTTP 200. Connection errors mean "not up yet". With fail_on_5xx, a server
+    that answers 5xx has answered: that is the result (Metro serves a transform error as 500)."""
     end = time.time() + timeout
     last = ""
     while time.time() < end:
         try:
-            with urllib.request.urlopen(url, timeout=10) as r:
+            with urllib.request.urlopen(url, timeout=min(120, max(10, end - time.time()))) as r:
                 body = r.read(400_000).decode("utf-8", "replace")
                 if r.status == 200:
                     return True, body
                 last = f"HTTP {r.status}"
-        except Exception as e:  # noqa: BLE001 (any failure means not up yet)
+        except urllib.error.HTTPError as e:
+            last = f"HTTP Error {e.code}: {e.reason}"
+            if fail_on_5xx and e.code >= 500:
+                return False, last
+        except Exception as e:  # noqa: BLE001 (any other failure means not up yet)
             last = str(e)[:200]
         time.sleep(1)
     return False, last
@@ -433,7 +475,8 @@ def device_launch_check(info: dict, since: float, out_dir: Path, mode_: str) -> 
         if info.get("owner_device", True):
             return False, {**ev, "error": "web check is not a device check; refused for an owner-device service"}
         port = info["port"]
-        ok, body = wait_http(f"http://127.0.0.1:{port}/index.bundle?platform=android&dev=true&minify=false", 240)
+        ok, body = wait_http(f"http://localhost:{port}/index.bundle?platform=android&dev=true&minify=false", 240,
+                             fail_on_5xx=True)
         errs = journal_errors(unit, since)
         ev.update({"bundle_ok": ok, "bundle_bytes": len(body) if ok else 0,
                    "bundle_error": None if ok else body[:300], "journal_errors": errs})
@@ -468,44 +511,74 @@ def pending(rec: dict) -> None:
     ledger(rec, "pending-rollouts.jsonl")
 
 
+def wait_idle(port: int, budget_s: int) -> bool:
+    end = time.time() + budget_s
+    while True:
+        if service_idle(port):
+            return True
+        if time.time() >= end:
+            return False
+        time.sleep(2)
+
+
 def cmd_rollout(a) -> int:
+    """O2 (enforce by default): the served worktree changes only by merge --ff-only inside this
+    transaction, into an idle service, restarted at once. O3 (report by default): candidate
+    from a clean non-served worktree, review receipt for gated PRs, device launch check after
+    restart, automatic rollback. In O3 report mode the transaction still runs; what O3 would
+    have refused, deferred or rolled back is recorded, not done. The launch check never runs
+    while an owner call is live (O5), in any mode."""
     wt = str(Path(a.worktree).resolve())
     gd = git_dir(wt)
     info = served_info(gd)
     if not info:
         print(f"z0-guard rollout: {wt} is not marked served (z0-guard served mark ...)", file=sys.stderr)
         return 2
+    m3 = mode("O3")
     sha = git(wt, "rev-parse", a.ref)
     prev = git(wt, "rev-parse", "HEAD")
     clean, why_c = candidate_clean(a.candidate, wt, sha)
     ff = sh("git", "-C", wt, "merge-base", "--is-ancestor", prev, sha).returncode == 0
     dirty = git(wt, "status", "--porcelain", "--untracked-files=no")
     call = owner_call_live() if info.get("owner_device", True) else False
-    device_blocked = call is not False  # unknown counts as blocked (fail closed)
-    if a.check == "adb" and not (info.get("serial") and info.get("deeplink")):
-        device_blocked = True
-    idle = service_idle(int(info["port"]))
+    no_device = a.check == "adb" and not (info.get("serial") and info.get("deeplink"))
+    device_blocked = call is not False or no_device      # unknown call state counts as live
+    idle = wait_idle(int(info["port"]), a.idle_wait)
     q = P.Req(clean=clean and not dirty, ff=ff, gated=a.gated, receipt=review_receipt_ok(a.review_receipt, sha),
               call=device_blocked, idle=idle)
     base = {"worktree": wt, "unit": info["unit"], "ref": a.ref, "sha": sha, "prev": prev, "inputs": q.__dict__,
-            "candidate": a.candidate, "candidate_note": why_c, "served_dirty": bool(dirty), "owner_call_live": call}
-    pre = P.admission(q)
-    if pre is P.Out.REFUSED:
-        verdict("O3", True, {**base, "out": pre.value, "reasons": P.why_refused(q) + (
-            ["O2: served worktree has uncommitted edits"] if dirty else [])})
-        return EXIT_REFUSED
-    if pre is P.Out.DEFERRED:
-        rec = {**base, "out": pre.value, "reasons": P.why_deferred(q),
-               "retry": f"z0-guard rollout --worktree {shlex.quote(wt)} --ref {sha} --candidate {shlex.quote(a.candidate)}"
-                        + (" --gated" if a.gated else "")
-                        + (f" --review-receipt {shlex.quote(a.review_receipt)}" if a.review_receipt else "")}
+            "o3_mode": m3, "candidate": a.candidate, "candidate_note": why_c, "served_dirty": bool(dirty),
+            "owner_call_live": call, "device_check_available": not no_device}
+    retry = (f"z0-guard rollout --worktree {shlex.quote(wt)} --ref {sha} --candidate {shlex.quote(a.candidate)}"
+             + (" --gated" if a.gated else "") + (f" --review-receipt {shlex.quote(a.review_receipt)}" if a.review_receipt else ""))
+    # O2 is enforced in every O3 mode: no rewrite, no edits underneath, no busy restart
+    if not ff or dirty:
+        reasons = (["O2: served worktree does not fast-forward to the candidate"] if not ff else []) + (
+            ["O2: served worktree has uncommitted edits"] if dirty else [])
+        return verdict("O2", True, {**base, "out": "refused", "reasons": reasons})
+    if not idle:
+        rec = {**base, "out": "deferred", "reasons": ["O2: service not idle"], "retry": retry}
         pending(rec)
-        emit({"gate": "O3", "status": "pending", **rec})
+        emit({"gate": "O2", "status": "pending", **rec})
         return 75
+    pre = P.admission(q)
+    would: list[str] = []
+    if pre is P.Out.REFUSED:
+        if m3 == "enforce":
+            return verdict("O3", True, {**base, "out": "refused", "reasons": P.why_refused(q)})
+        would += [f"would-refuse: {r}" for r in P.why_refused(q)]
+    if q.call:
+        reason = ("owner z0live call live (O5)" if call else "owner call state unknown (fail closed)" if call is None
+                  else "no device serial/deep link recorded")
+        if m3 == "enforce":
+            rec = {**base, "out": "deferred", "reasons": P.why_deferred(q) + [reason], "retry": retry}
+            pending(rec)
+            emit({"gate": "O3", "status": "pending", **rec})
+            return 75
+        would.append(f"would-defer: device launch check cannot run: {reason}")
     if a.dry_run:
-        emit({"gate": "O3", "status": "would-run", **base})
+        emit({"gate": "O3", "status": "would-run", "would": would, **base})
         return 0
-    # the transaction: lease token, merge --ff-only, restart, launch check, rollback on failure
     token = secrets.token_hex(16)
     lock = gd / "z0-rollout.lock"
     try:
@@ -518,28 +591,44 @@ def cmd_rollout(a) -> int:
                    "sha": sha, "prev": prev, "at": now_iso()}, f)
     env = {**os.environ, "Z0_ROLLOUT_TOKEN": token}
     out_dir = STATE / "rollouts" / f"{int(time.time())}-{info['unit']}"
+    health = info.get("health") or f"http://localhost:{info['port']}/status"
     ev: dict = {}
     try:
         m = sh("git", "-C", wt, "merge", "--ff-only", sha, env=env, timeout=120)
         if m.returncode:
-            verdict("O3", True, {**base, "out": "refused", "reasons": ["merge --ff-only failed: " + m.stderr[-300:]]})
-            return EXIT_REFUSED
+            return verdict("O2", True, {**base, "out": "refused", "reasons": ["merge --ff-only failed: " + m.stderr[-300:]]})
         t_restart = time.time()
         restarted = restart_unit(info["unit"])
-        up, _ = wait_http(info.get("health") or f"http://127.0.0.1:{info['port']}/status", 120)
-        check, ev = device_launch_check(info, t_restart, out_dir, a.check) if (restarted and up) else (False, {
-            "restart_ok": restarted, "health_up": up})
-        out = P.rollout(q, check)
+        up, _ = wait_http(health, 120)
+        ev.update({"restart_ok": restarted, "health_up": up})
+        if q.call:   # report mode only: never run the device check during a call or without a device
+            check = None
+        elif restarted and up:
+            check, cev = device_launch_check(info, t_restart, out_dir, a.check)
+            ev.update(cev)
+        else:
+            check = False
+        out = P.rollout(q, bool(check)) if check is not None else None
+        if out is P.Out.ROLLED_BACK and m3 != "enforce":
+            would.append("would-roll-back: device launch check failed")
+            out = None
         if out is P.Out.ROLLED_BACK:
             r = sh("git", "-C", wt, "reset", "--keep", prev, env=env, timeout=120)
             rb_restart = restart_unit(info["unit"])
-            rb_up, _ = wait_http(info.get("health") or f"http://127.0.0.1:{info['port']}/status", 120)
+            rb_up, _ = wait_http(health, 120)
             ev["rollback"] = {"reset_ok": r.returncode == 0, "reset_err": r.stderr[-200:], "restart_ok": rb_restart,
                               "health_up": rb_up, "head": git(wt, "rev-parse", "HEAD")}
-        rec = {**base, "out": out.value, "check": check, "evidence": ev}
+        status = out.value if out else ("merged-check-pending" if check is None else
+                                        "merged-check-passed" if check else "merged-check-failed")
+        if check is None:
+            pending({**base, "out": "check-pending", "reasons": would, "retry_check":
+                     f"z0-guard rollout --worktree {shlex.quote(wt)} --ref {sha} --candidate {shlex.quote(a.candidate)} --check {a.check}"})
+        rec = {**base, "out": status, "check": check, "would": would, "evidence": ev}
         ledger({"gate": "O3", **rec}, "rollouts.jsonl")
-        emit({"gate": "O3", "status": out.value, **rec})
-        return 0 if out is P.Out.PROMOTED else 1
+        emit({"gate": "O3", "status": status, **rec})
+        if out is P.Out.ROLLED_BACK or not (restarted and up):
+            return 1
+        return 0
     finally:
         lock.unlink(missing_ok=True)
 
@@ -935,6 +1024,7 @@ def main(argv: list[str] | None = None) -> int:
     ro.add_argument("--gated", action="store_true", help="PR is marked review-gated")
     ro.add_argument("--review-receipt")
     ro.add_argument("--check", choices=["adb", "web"], default="adb")
+    ro.add_argument("--idle-wait", type=int, default=60, help="seconds to wait for the service to go idle")
     ro.add_argument("--dry-run", action="store_true")
     ro.set_defaults(fn=cmd_rollout)
 
