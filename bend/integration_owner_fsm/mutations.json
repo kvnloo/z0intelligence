@@ -1,0 +1,74 @@
+{
+  "reference_passes": true,
+  "verdict_mode": true,
+  "mutations": [
+    {
+      "law": "I1",
+      "implementation_compiles": true,
+      "rejected": true,
+      "proof_output": "SOME PROOFS FAIL\nError:\n- expected : False{}\n- observed : True{}\nLocation: Laws.I1_due\n474 | def Laws.I1_due():\n475>|   {==}\n    |   ^^^^\n476 | \nbend 2.0.38 is available: run bend update"
+    },
+    {
+      "law": "I2",
+      "implementation_compiles": true,
+      "rejected": true,
+      "proof_output": "SOME PROOFS FAIL\nError:\n- expected : F.Deployed{}\n- observed : F.OnIntegrationBranch{}\nLocation: Laws.I2_deploy\n477 | def Laws.I2_deploy():\n478>|   {==}\n    |   ^^^^\n479 | \nbend 2.0.38 is available: run bend update"
+    },
+    {
+      "law": "I2 drift",
+      "implementation_compiles": true,
+      "rejected": true,
+      "proof_output": "SOME PROOFS FAIL\nError:\n- expected : F.Deployed{}\n- observed : F.OnIntegrationBranch{}\nLocation: Laws.I2_drift\n480 | def Laws.I2_drift():\n481>|   {==}\n    |   ^^^^\n482 | \nbend 2.0.38 is available: run bend update"
+    },
+    {
+      "law": "I3 guard",
+      "implementation_compiles": true,
+      "rejected": true,
+      "proof_output": "SOME PROOFS FAIL\nError:\n- expected : F.pick(Bool.and(stack, independent), F.OnIntegrationBranch{}, F.Queued{})\n- observed : F.Queued{}\nContext:\n- stack       : Bool\n- independent : Bool\nLocation: Laws.I3_integration\n486 | def Laws.I3_integration(stack, independent):\n487>|   {==}\n    |   ^^^^\n488 | \nbend 2.0.38 is available: run bend update"
+    },
+    {
+      "law": "I3 lease",
+      "implementation_compiles": true,
+      "rejected": true,
+      "proof_output": "SOME PROOFS FAIL\nError:\n- expected : {F.lpick(Cmp.is_gt(Nat.cmp(until, now)), F.Held{a, until}, F.Held{o, expiry}) == F.Held{o, expiry} : F.Lease}\n- observed : {F.lpick(Bool.and(Cmp.is_ge(Nat.cmp(now, expiry)), Cmp.is_gt(Nat.cmp(until, now))), F.Held{a, until}, F.Held{o, expiry}) == F.Held{o, expiry} : F.Lease}\nContext:\n- o      : Nat\n- a      : Nat\n- expiry : Nat\n- until  : Nat\n- now    : Nat\n- h      : {Cmp.is_ge(Nat.cmp(now, expiry)) == False{} : Bool}\nLocation: Laws.I3_no_steal\n595 | def Laws.I3_no_steal(o, a, expiry, until, now, h):\n596>|   %Equal.sym(Bool, Nat.is_ge(now, expiry), False{}, h) : {F.lpick(Bool.and(_, Nat.is_gt(until, now)), F.Held{a, until}, F.Held{o, expiry}) == F.Held{o, expiry} : F.Lease}\n    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n597 |   {==}\nbend 2.0.38 is available: run bend update"
+    },
+    {
+      "law": "I4",
+      "implementation_compiles": true,
+      "rejected": true,
+      "proof_output": "SOME PROOFS FAIL\nError:\n- expected : F.OnIntegrationBranch{}\n- observed : F.Queued{}\nLocation: Laws.I4_stack\n491 |     case True{} True{}:\n492>|       {==}\n    |       ^^^^\n493 |     case True{} False{}:\nbend 2.0.38 is available: run bend update"
+    },
+    {
+      "law": "independent",
+      "implementation_compiles": true,
+      "rejected": true,
+      "proof_output": "SOME PROOFS FAIL\nError:\n- expected : F.OnIntegrationBranch{}\n- observed : F.Queued{}\nLocation: Laws.independent_review\n502 |     case True{} True{}:\n503>|       {==}\n    |       ^^^^\n504 |     case True{} False{}:\nbend 2.0.38 is available: run bend update"
+    },
+    {
+      "law": "I5 accept",
+      "implementation_compiles": true,
+      "rejected": true,
+      "proof_output": "SOME PROOFS FAIL\nError:\n- expected : F.OwnerAccepted{}\n- observed : F.Deployed{}\nLocation: Laws.I5_accept\n511 | def Laws.I5_accept():\n512>|   {==}\n    |   ^^^^\n513 | \nbend 2.0.38 is available: run bend update"
+    },
+    {
+      "law": "I5 merge",
+      "implementation_compiles": true,
+      "rejected": true,
+      "proof_output": "SOME PROOFS FAIL\nError:\n- expected : False{}\n- observed : True{}\nLocation: Laws.I5_all_events\n238 |     case F.Deployed{} F.Merge{}:\n239>|       {==}\n    |       ^^^^\n240 |     case F.Deployed{} F.Park{True{}, True{}}:\nbend 2.0.38 is available: run bend update"
+    },
+    {
+      "law": "parking reason",
+      "implementation_compiles": true,
+      "rejected": true,
+      "proof_output": "SOME PROOFS FAIL\nError:\n- expected : F.pick(future, F.Parked{}, F.Branch{})\n- observed : F.Branch{}\nContext:\n- future : Bool\nLocation: Laws.park_reason\n516 |     case F.Branch{}:\n517>|       {==}\n    |       ^^^^\n518 |     case F.DraftPR{}:\nbend 2.0.38 is available: run bend update"
+    },
+    {
+      "law": "parking expiry",
+      "implementation_compiles": true,
+      "rejected": true,
+      "proof_output": "SOME PROOFS FAIL\nError:\n- expected : F.Parked{}\n- observed : F.Branch{}\nLocation: Laws.park_expiry\n537 |     case F.Branch{} True{}:\n538>|       {==}\n    |       ^^^^\n539 |     case F.Branch{} False{}:\nbend 2.0.38 is available: run bend update"
+    }
+  ],
+  "rejected": 11,
+  "total": 11
+}

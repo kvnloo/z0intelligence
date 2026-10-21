@@ -1,0 +1,19 @@
+{
+  "equal": true,
+  "seed": 3,
+  "tapes": 625,
+  "prefixes": 16225,
+  "deadline_cases": 20,
+  "lease_cases": 300,
+  "states": [
+    "Branch",
+    "DraftPR",
+    "Queued",
+    "OnIntegrationBranch",
+    "Deployed",
+    "OwnerAccepted",
+    "Merged",
+    "Parked",
+    "Conflicted"
+  ]
+}

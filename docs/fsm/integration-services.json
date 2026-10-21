@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "policy": "Only owner-provided canonical branches are designated. Other integration-looking refs remain candidates, not silently promoted. No leases or acceptance are invented.",
+  "repos": [
+    {
+      "repo": "kvnloo/dash",
+      "integration_branch": "integrate/dash-20261020"
+    },
+    {
+      "repo": "kvnloo/company-os",
+      "integration_branch": "parent/company-os-integrated"
+    },
+    {
+      "repo": "kvnloo/noop",
+      "integration_branch": "integrate/s25-20261020"
+    },
+    {
+      "repo": "kvnloo/z0live",
+      "integration_branch": null
+    },
+    {
+      "repo": "kvnloo/z0intelligence",
+      "integration_branch": null
+    },
+    {
+      "repo": "kvnloo/z0evals",
+      "integration_branch": null
+    },
+    {
+      "repo": "kvnloo/.files",
+      "integration_branch": null
+    },
+    {
+      "repo": "kvnloo/z0bridge",
+      "integration_branch": null
+    }
+  ],
+  "services": [
+    {
+      "id": "dash-bridge-4747",
+      "repo": "kvnloo/dash",
+      "checkout": "/mnt/zer0models/workspace/zer0/products/dash/.worktrees/dash-20261020",
+      "unit": "dash-bridge-4747.service"
+    },
+    {
+      "id": "dash-metro-8097",
+      "repo": "kvnloo/dash",
+      "checkout": "/mnt/zer0models/workspace/zer0/products/dash/.worktrees/dash-20261020",
+      "unit": "dash-metro-8097.service"
+    },
+    {
+      "id": "z0live",
+      "repo": "kvnloo/z0live",
+      "checkout": "/mnt/zer0models/workspace/zer0/products/z0live",
+      "unit": "z0live.service",
+      "candidate_branch": "integration/chatgpt-z0live"
+    },
+    {
+      "id": "hapsland-fsm-view",
+      "repo": "kvnloo/.files",
+      "checkout": "/mnt/zer0models/worktrees/hapsland-fsm-20261021/.files",
+      "unit": "hapsland-fsm-view.service",
+      "artifact": "/mnt/zer0models/project-artifacts/hapsland-fsm-layers/site",
+      "candidate_branch": "docs/fsm-hapsland-layers-20261021"
+    },
+    {
+      "id": "company-os-chooser-8789",
+      "repo": "kvnloo/company-os",
+      "checkout": "/mnt/zer0models/z0-wt/company-os-integrated",
+      "port": 8789
+    },
+    {
+      "id": "noop-s25",
+      "repo": "kvnloo/noop",
+      "checkout": "/mnt/zer0models/noop-s25-integrate",
+      "kind": "android-build",
+      "runtime_observation": "No screen or phone input. Installed-build SHA unmeasured."
+    }
+  ]
+}
