@@ -1,0 +1,10 @@
+{
+  "_provenance": "SYNTHETIC contract replay. Real S25 read-only dump failed: could not get idle state. No recorded ChatGPT dump available.",
+  "outside": "<hierarchy><node package=\"launcher\" text=\"Home\"/></hierarchy>",
+  "home": "<?xml version=\"1.0\"?><hierarchy><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" text=\"New chat\"/><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" text=\"Codex\"/></hierarchy>",
+  "codex": "<?xml version=\"1.0\"?><hierarchy><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" text=\"New task\"/></hierarchy>",
+  "editor": "<?xml version=\"1.0\"?><hierarchy><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" text=\"kvnloo/dash\"/><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" class=\"android.widget.EditText\" text=\"\"/></hierarchy>",
+  "typed": "<?xml version=\"1.0\"?><hierarchy><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" class=\"android.widget.EditText\" text=\"BRIEF\"/><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" content-desc=\"Send prompt\"/></hierarchy>",
+  "sent": "<?xml version=\"1.0\"?><hierarchy><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" text=\"BRIEF\"/><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" class=\"android.widget.EditText\" text=\"\"/><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" text=\"Task started\"/></hierarchy>",
+  "task": "<?xml version=\"1.0\"?><hierarchy><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" text=\"kvnloo/dash\"/><node package=\"com.openai.chatgpt\" enabled=\"true\" bounds=\"[0,0][100,100]\" text=\"Choose repository\"/></hierarchy>"
+}
