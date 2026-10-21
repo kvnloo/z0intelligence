@@ -1,0 +1,525 @@
+{
+ "law": "O8",
+ "incident": "S22+ (galaxy-s22plus) offline since 01:47 with hundreds of silent strikes (363 by the incident report); no owner notification.",
+ "source": "~/.local/state/fleet/health/history.jsonl, node galaxy-s22plus, 00:00-04:00 CDT probes.",
+ "kind": "health",
+ "node": "galaxy-s22plus",
+ "limit_s": 1800,
+ "items": [
+  {
+   "ts": 1792558890,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792559030,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792559158,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792559294,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792559430,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792559569,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792559593,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792559704,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792559830,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792559971,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792560114,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792560251,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792560393,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792560534,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792560670,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792560812,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792560944,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792561083,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792561223,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792561369,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792561503,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792561638,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792561772,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792561907,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792562047,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792562193,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792562329,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792562465,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792562600,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792562743,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792562879,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792563015,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792563158,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792563299,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792563437,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792563579,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792563718,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792563860,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792563997,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792564137,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792564275,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792564417,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792564559,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792564697,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792564833,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792564970,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792565109,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792565235,
+   "healthy": true,
+   "action": "none"
+  },
+  {
+   "ts": 1792565383,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792565520,
+   "healthy": false,
+   "action": "paused"
+  },
+  {
+   "ts": 1792565657,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792565810,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792565956,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792566102,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792566250,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792566400,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792566546,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792566694,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792566840,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792566987,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792567139,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792567290,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792567438,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792567584,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792567720,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792567857,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792567997,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792568134,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792568270,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792568417,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792568554,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792568690,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792568828,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792568978,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792569124,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792569270,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792569420,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792569556,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792569692,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792569828,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792569970,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792570106,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792570242,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792570380,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792570516,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792570652,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792570800,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792570937,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792571088,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792571235,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792571385,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792571530,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792571680,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792571816,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792571962,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792572100,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792572247,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792572394,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792572540,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792572676,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792572811,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792572950,
+   "healthy": false,
+   "action": "none"
+  },
+  {
+   "ts": 1792573086,
+   "healthy": false,
+   "action": "none"
+  }
+ ]
+}
