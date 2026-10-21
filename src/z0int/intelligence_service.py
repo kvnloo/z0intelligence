@@ -1,7 +1,8 @@
 """Bounded host intelligence service; share one host authority, not model replicas."""
 import argparse
 import json
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
+from .http_security import LocalHTTPGuard
 import threading
 import signal
 import time
@@ -111,7 +112,8 @@ def plan_intelligence(args):
     return {'ok':True,'mode':'shadow','executed':False,'route':selected}
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(LocalHTTPGuard):
+    service_hostname = 'z0intelligence.hermes-lab.svc.cluster.local'
     def setup(self):
         super().setup();self.connection.settimeout(30)
 

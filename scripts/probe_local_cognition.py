@@ -62,6 +62,7 @@ def probe_model(
         endpoint = ServingEndpoint(
             model_id=model_id,
             base_url=server.base_url,
+            api_key=server.api_key,
             served_model=model_id,
             runtime=f"llama.cpp-{llama_build(binary)}",
             quantization=quant_from_name(gguf.name),

@@ -8,7 +8,8 @@ import urllib.request
 import urllib.error
 import time
 import random
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
+from .http_security import LocalHTTPGuard
 import threading
 from .dispatch_authority import validate_remote
 from .worker_routing import execute_plan
@@ -82,7 +83,8 @@ class Server(ThreadingHTTPServer):
         finally:SLOTS.release()
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(LocalHTTPGuard):
+    service_hostname = 'z0intelligence-executor.hermes-lab.svc.cluster.local'
     def setup(self):super().setup();self.connection.settimeout(30)
     def log_message(self,*args):pass
     def reply(self,status,value):
