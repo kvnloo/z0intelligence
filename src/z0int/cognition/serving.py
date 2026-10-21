@@ -17,6 +17,8 @@ import contextlib
 import json
 import os
 import signal
+import secrets
+import tempfile
 import socket
 import subprocess
 import time
@@ -100,8 +102,9 @@ class LlamaServer:
         self.context = context
         self.port = port or free_port()
         self.extra_args = extra_args
+        self.api_key = secrets.token_urlsafe(32)
         self.proc: subprocess.Popen[bytes] | None = None
-        self.log = Path(f"/tmp/z0int-llama-{self.port}.log")
+        self.log = Path(tempfile.gettempdir()) / f"z0int-llama-{self.port}.log"
 
     @property
     def base_url(self) -> str:
@@ -120,13 +123,18 @@ class LlamaServer:
             "--no-warmup",
             *self.extra_args,
         ]
-        handle = self.log.open("wb")
-        self.proc = subprocess.Popen(
-            cmd, stdout=handle, stderr=subprocess.STDOUT, start_new_session=True
-        )
-        if not wait_health(self.base_url):
-            self.stop()
-            raise RuntimeError(f"llama-server did not become ready; see {self.log}")
+        # The key is never exposed in argv or persisted beside model artifacts.
+        with tempfile.NamedTemporaryFile(mode="w", prefix="z0int-child-key-") as key_file:
+            key_file.write(self.api_key + "\n")
+            key_file.flush()
+            cmd.extend(("--api-key-file", key_file.name))
+            with self.log.open("wb") as handle:
+                self.proc = subprocess.Popen(
+                    cmd, stdout=handle, stderr=subprocess.STDOUT, start_new_session=True
+                )
+            if not wait_health(self.base_url):
+                self.stop()
+                raise RuntimeError(f"llama-server did not become ready; see {self.log}")
         return self
 
     def stop(self) -> None:

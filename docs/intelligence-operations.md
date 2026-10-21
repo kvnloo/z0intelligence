@@ -2,7 +2,7 @@
 
 Use Python 3.11 with the declared project environment. The optional Jev implementation requires the existing `jevkit` package on `PYTHONPATH`; reuse its existing credential store. KERD quota-controlled providers require the existing `kerdoios.quota` package, either installed or located with `Z0INT_KERDOIOS_ROOT`. Missing quota support refuses admission rather than bypassing the budget.
 
-Start the host service with `python -m z0int.intelligence_service --bind 127.0.0.1`. A second `--bind` can expose the existing Kind bridge interface. Keep this trusted-host API off public interfaces. Host and authority keep one durable `Z0INT_HOME`; remote executors never receive that directory.
+Start the host service with `python -m z0int.intelligence_service --bind 127.0.0.1`. A second `--bind` can expose the existing Kind bridge interface. Keep this trusted-host API off public interfaces. The mandatory Host/Origin/JSON guards and opt-in z0bridge bearer configuration are documented in [local-http-security.md](local-http-security.md). Host and authority keep one durable `Z0INT_HOME`; remote executors never receive that directory.
 
 `deploy/systemd/z0intelligence.service` is a user-service template. Set `Z0INT_PYTHON`, `Z0INT_BIND`, `PYTHONPATH` and the existing credential-loader environment in `~/.config/z0intelligence/service.env`. Do not duplicate secrets into the repository. The unit restarts on failure and drains accepted work on SIGTERM. Existing host installations may retain their established credential-loader ExecStart. An uncertain execution remains blocked after restart.
 

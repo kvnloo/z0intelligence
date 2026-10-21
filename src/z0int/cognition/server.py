@@ -28,7 +28,8 @@ import time
 from dataclasses import dataclass, field
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
+from ..http_security import LocalHTTPGuard
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -229,7 +230,8 @@ class ModelSupervisor:
         req = Request(
             f"{server.base_url}/v1/chat/completions",
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {server.api_key}"},
             method="POST",
         )
         try:
@@ -264,7 +266,7 @@ class ModelSupervisor:
 
 
 def _handler_factory(supervisor: ModelSupervisor):
-    class Handler(BaseHTTPRequestHandler):
+    class Handler(LocalHTTPGuard):
         protocol_version = "HTTP/1.1"
         server_version = "z0int-supervisor/1"
 
