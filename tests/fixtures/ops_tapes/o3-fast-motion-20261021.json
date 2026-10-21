@@ -1,0 +1,53 @@
+{
+ "law": "O3",
+ "incident": "fast-motion (3b3cb38) was promoted to the served Dash at 14:02 with an idle-checked restart and an Android bundle readback, but no launch on the real runtime; the phone crashed at launch (Reanimated non-worklet easing), reported 15:51, fixed by 5a46ace at 15:55.",
+ "source": "dash-20261020 reflog 14:02:01 ff to 3b3cb38; sol-runs/20261021-motion-speed/REPORT.md ('Both idle-checked rollouts and full served Android bundle readbacks succeeded'); owner crash report 15:51.",
+ "kind": "rollout",
+ "items": [
+  {
+   "label": "what happened (bundle readback, no device launch)",
+   "sha": "3b3cb38",
+   "req": {
+    "clean": true,
+    "ff": true,
+    "gated": false,
+    "receipt": false,
+    "call": false,
+    "idle": true
+   },
+   "check_kind": "bundle-readback",
+   "device_launch_result": "crash at launch (inferred from the 15:51 report)",
+   "expect": "rolled-back"
+  },
+  {
+   "label": "the same merge done in place in the served worktree",
+   "sha": "3b3cb38",
+   "req": {
+    "clean": false,
+    "ff": true,
+    "gated": false,
+    "receipt": false,
+    "call": false,
+    "idle": true
+   },
+   "check_kind": "none",
+   "device_launch_result": "n/a",
+   "expect": "refused"
+  },
+  {
+   "label": "the fix 5a46ace promoted during an owner call",
+   "sha": "5a46ace",
+   "req": {
+    "clean": true,
+    "ff": true,
+    "gated": false,
+    "receipt": false,
+    "call": true,
+    "idle": true
+   },
+   "check_kind": "adb",
+   "device_launch_result": "not run (O5)",
+   "expect": "deferred"
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+flowchart LR
+  subgraph Book["bend/ops_fsm (proven: bend PROOF.bend --verdict)"]
+    O1[O1 place/admits]:::law
+    O2[O2 wt_allows]:::law
+    O3[O3 rollout]:::law
+    O4[O4 push_allows]:::law
+    O5[O5 phone_allows]:::law
+    O6[O6 a11y_ok]:::law
+    O7[O7 route_ok]:::law
+    O8[O8 nstep/neff]:::law
+    O9[O9 rstep]:::law
+  end
+  Twin["src/z0int/fsm/ops.py\n(parity: exhaustive + seeded vs Bend)"]
+  Book ==> Twin
+  Twin --> G["z0-guard (guard.py)"]
+  G -->|run CLASS| FB["fleet-build -> mbp / phones; waits, never groot"]
+  G -->|hook| HK["served-worktree hooks\n(reference-transaction, pre-commit, ...)"]
+  G -->|rollout| RO["merge --ff-only -> idle restart -> launch check -> rollback"]
+  G -->|prepush| PP["z0-hooks pre-push (core.hooksPath, opt-in)"]
+  G -->|phone| ZL["z0live broker / phone tools"]
+  G -->|a11y| LC["lawnchair install-z0live-apk.sh"]
+  G -->|routing| RT["omp / Hermes / Dash role configs (timer)"]
+  G -->|health_step| FH["fleet health -> one owner notification"]
+  G -->|gateway-watch| GW["sol runs -> Interrupted + resume (timer)"]
+  O1 -.-> FB
+  O2 -.-> HK
+  O3 -.-> RO
+  O4 -.-> PP
+  O5 -.-> ZL
+  O6 -.-> LC
+  O7 -.-> RT
+  O8 -.-> FH
+  O9 -.-> GW
+  classDef law fill:#1d2b3a,stroke:#6cb6ff,color:#e6edf3
