@@ -133,6 +133,13 @@ def cmd_place(a) -> int:
     return 0
 
 
+def cmd_classify(a) -> int:
+    cmd = a.cmd[1:] if a.cmd and a.cmd[0] == "--" else a.cmd
+    c = P.classify_command(cmd) if cmd else None
+    print(c.value if c else "unknown")
+    return 0
+
+
 def cmd_run(a) -> int:
     cmd = a.cmd[1:] if a.cmd and a.cmd[0] == "--" else a.cmd
     if not cmd:
@@ -994,6 +1001,10 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--fleet-arg", action="append", default=[])
     r.add_argument("cmd", nargs=argparse.REMAINDER)
     r.set_defaults(fn=cmd_run)
+
+    cl = sub.add_parser("classify", help="O1: best-effort job class of a command")
+    cl.add_argument("cmd", nargs=argparse.REMAINDER)
+    cl.set_defaults(fn=cmd_classify)
 
     p = sub.add_parser("place", help="O1: pure placement decision")
     p.add_argument("cls")

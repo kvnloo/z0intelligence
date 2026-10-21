@@ -113,6 +113,13 @@ def test_o1_run_routes_heavy_to_fleet_build(tmp_path, monkeypatch):
     assert "here" in r.stdout and "would-refuse" in r.stdout
 
 
+def test_o1_classify_cli(capsys):
+    assert G.cmd_classify(Namespace(cmd=["--", "bun", "test", "app"])) == 0
+    assert capsys.readouterr().out.strip() == "test"
+    G.cmd_classify(Namespace(cmd=["--", "git", "status"]))
+    assert capsys.readouterr().out.strip() == "unknown"
+
+
 def test_o1_tiny_overrun_is_refused(monkeypatch):
     monkeypatch.setattr(P, "TINY_SECONDS", 1)
     monkeypatch.setenv("Z0_GUARD_HOST", "groot")
