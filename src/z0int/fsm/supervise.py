@@ -411,8 +411,9 @@ def local_commands(cmd: str) -> list[list[str]]:
         exe = Path(tokens[0]).name
         if exe in ("ssh", "fleet", "fleet-build") or tokens[0].endswith("scripts/fleet"):
             continue
-        if exe in ("bash", "sh", "zsh") and "-c" in tokens:
-            idx = tokens.index("-c")
+        shell_flag = next((i for i, token in enumerate(tokens[1:], 1) if re.fullmatch(r"-[a-zA-Z]*c[a-zA-Z]*", token)), None)
+        if exe in ("bash", "sh", "zsh") and shell_flag is not None:
+            idx = shell_flag
             if idx + 1 < len(tokens):
                 out.extend(local_commands(tokens[idx + 1]))
         else:
@@ -421,10 +422,35 @@ def local_commands(cmd: str) -> list[list[str]]:
 
 
 def local_heavy(cmd: str) -> bool:
-    return any(HEAVY_CMD.search(" ".join([Path(t[0]).name] + t[1:]))
-               and Path(t[0]).name in {"gradlew", "gradle", "cargo", "blender", "docker", "npm", "pnpm",
-                                      "bun", "yarn", "vitest", "playwright", "bend", "hermes", "cmake", "ninja", "make"}
-               for t in local_commands(cmd))
+    for tokens in local_commands(cmd):
+        exe, args = Path(tokens[0]).name, tokens[1:]
+        if not args:
+            if exe in ("ninja", "vitest"):
+                return True
+            continue
+        if exe in ("gradlew", "gradle") and any(not a.startswith("-") and a not in ("help", "tasks", "properties") for a in args):
+            return True
+        if exe == "cargo" and args[0] in ("build", "test", "clippy", "run"):
+            return True
+        if exe in ("npm", "pnpm", "bun", "yarn"):
+            action = args[1] if args[0] == "run" and len(args) > 1 else args[0]
+            if action in ("build", "test"):
+                return True
+        if exe == "blender" and "--background" in args:
+            return True
+        if exe == "docker" and (args[0] == "build" or args[:2] == ["buildx", "build"]):
+            return True
+        if exe in ("vitest", "ninja") and args[0] not in ("--help", "--version", "-h"):
+            return True
+        if exe == "playwright" and args[0] == "test":
+            return True
+        if exe in ("bend", "bend.bin") and "--verdict" in args:
+            return True
+        if exe == "hermes" and args[:2] == ["bend", "verify"]:
+            return True
+        if exe == "cmake" and "--build" in args or exe == "make" and any(a.startswith("-j") for a in args):
+            return True
+    return False
 
 
 def heavy_jobs_groot(calls: list[Call]) -> list[Job]:

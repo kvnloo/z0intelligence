@@ -11,6 +11,8 @@ from z0int.fsm import supervise as S
     "cd /repo && ssh mbp 'cargo build'", "timeout 20 ssh mbp 'npm test'",
     "cd /repo; fleet-build -- bun test", "python -c 'print(\"cargo build\")'",
     "cat <<'EOF'\ncargo build\nEOF", "git show HEAD:package.json",
+    "npm pkg set 'scripts.build=cargo build'", "cargo --list", "npm --help 'cargo build'",
+    "bash -lc \"cd /repo && ssh mbp 'cargo build'\"",
 ])
 def test_mentions_and_remote_are_not_local_heavy(cmd):
     assert not S.local_heavy(cmd)
@@ -18,7 +20,7 @@ def test_mentions_and_remote_are_not_local_heavy(cmd):
 
 @pytest.mark.parametrize("cmd", ["cargo build", "cd /r && npm run build", 
     "flock /x/heavy.lock nice -n 10 cargo test", "ssh mbp 'true'; cargo build",
-    "fleet-build -- true && bun test", "bash -c 'cargo build'"])
+    "fleet-build -- true && bun test", "bash -c 'cargo build'", "bash -lc 'cargo build'"])
 def test_actual_local_heavy(cmd):
     assert S.local_heavy(cmd)
 
