@@ -31,6 +31,7 @@ import json
 import os
 import re
 import sqlite3
+import shlex
 import subprocess
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
@@ -368,6 +369,64 @@ def exception_of(cmd: str) -> tuple[str, str]:
     return "none", ""
 
 
+def local_commands(cmd: str) -> list[list[str]]:
+    """Executable shell segments, not quoted data or remote payloads.
+
+    This is a conservative command view, not a general shell interpreter.
+    Unknown interpreter payloads are deliberately not treated as shell code.
+    """
+    # Here-doc bodies are data (often source code or documentation).
+    cmd = re.sub(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n[\s\S]*?\n\1\b", "", cmd)
+    try:
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=";&|()<>")
+        lex.whitespace = " \t\r"
+        lex.commenters = "#"
+        parts, part = [], []
+        for token in lex:
+            if token == "\n" or token in (";", "&&", "||", "|", "&", "(", ")"):
+                if part:
+                    parts.append(part)
+                part = []
+            else:
+                part.append(token)
+        if part:
+            parts.append(part)
+    except ValueError:
+        return []
+    out = []
+    for tokens in parts:
+        while tokens and (re.match(r"^[A-Za-z_]\w*=", tokens[0]) or tokens[0] in ("then", "do", "!")):
+            tokens = tokens[1:]
+        while tokens:
+            exe = Path(tokens[0]).name
+            if exe in ("env", "command", "exec", "sudo", "nice", "timeout", "flock"):
+                tokens = tokens[1:]
+                while tokens and (tokens[0].startswith("-") or re.match(r"^\d+[smh]?$", tokens[0])
+                                  or re.match(r"^[A-Za-z_]\w*=", tokens[0]) or tokens[0].endswith(".lock")):
+                    tokens = tokens[1:]
+                continue
+            break
+        if not tokens:
+            continue
+        exe = Path(tokens[0]).name
+        if exe in ("ssh", "fleet", "fleet-build") or tokens[0].endswith("scripts/fleet"):
+            continue
+        if exe in ("bash", "sh", "zsh") and "-c" in tokens:
+            idx = tokens.index("-c")
+            if idx + 1 < len(tokens):
+                out.extend(local_commands(tokens[idx + 1]))
+        else:
+            out.append(tokens)
+    return out
+
+
+def local_heavy(cmd: str) -> bool:
+    return any(HEAVY_CMD.search(" ".join([Path(t[0]).name] + t[1:]))
+               and Path(t[0]).name in {"gradlew", "gradle", "cargo", "blender", "docker", "npm", "pnpm",
+                                      "bun", "yarn", "vitest", "playwright", "bend", "hermes", "cmake", "ninja", "make"}
+               for t in local_commands(cmd))
+
+
 def heavy_jobs_groot(calls: list[Call]) -> list[Job]:
     """Every terminal command on groot that took heavy.lock or matched a heavy
     build/test command. Background jobs end at start + the largest
@@ -376,10 +435,8 @@ def heavy_jobs_groot(calls: list[Call]) -> list[Job]:
     jobs = []
     for c in calls:
         cmd = command_of(c) if c.name == "terminal" else ""
-        if not cmd or not (HEAVY_LOCK.search(cmd) or HEAVY_CMD.search(cmd)):
+        if not cmd or not local_heavy(cmd):
             continue
-        if FLEET_ROUTED.search(cmd) or REMOTE.search(cmd):
-            continue  # routed to the fleet (counted from its run logs) or run on another host
         pid = proc_started(c)
         start = c.ts
         if pid:
@@ -641,11 +698,26 @@ def writes(calls: list[Call], roots: Roots) -> list[tuple[float, str, str, str]]
             what = c.name
         elif c.name == "terminal":
             cmd = command_of(c)
-            for m in GIT_WRITE.finditer(cmd):
-                d = m.group(1)
-                if not d:
-                    cds = CD_DIR.findall(cmd[:m.start()])
-                    d = cds[-1].strip("\"'") if cds else str(c.args.get("workdir") or "")
+            cwd = str(c.args.get("workdir") or "")
+            for tokens in local_commands(cmd):
+                if tokens[0] == "cd" and len(tokens) > 1:
+                    cwd = os.path.normpath(os.path.join(cwd, tokens[1]))
+                    continue
+                if Path(tokens[0]).name != "git":
+                    continue
+                executable = " ".join(["git"] + tokens[1:])
+                m = GIT_WRITE.match(executable)
+                if not m:
+                    continue
+                # Listing tags is read-only; only creation/deletion changes refs.
+                tail = executable[m.end():].strip()
+                if m.group(2) == "tag" and (not tail or tail.startswith(("-l", "--list", "--contains", "--points-at", "--sort", "--format", "-n"))):
+                    continue
+                if m.group(2) == "stash" and tail.split()[:1] in (["list"], ["show"]):
+                    continue
+                if "--dry-run" in tokens or "-n" in tokens and m.group(2) == "push":
+                    continue
+                d = m.group(1) or cwd
                 targets.append(d)
                 what = "git " + m.group(2).split()[0]
         for t in targets:
@@ -787,6 +859,30 @@ def resumer(old: Task, later: list[Task], calls_by_session: dict[str, list[Call]
     return None, False
 
 
+def session_successors(tasks: list[Task], calls_by_session: dict[str, list[Call]],
+                       sessions: dict[str, dict]) -> list[Task]:
+    """Interactive/fleet harness sessions qualify by actually reading a prior log.
+
+    A title/branch mention alone does not establish adoption. The read time,
+    rather than the lifetime of a long-running parent session, orders takeover.
+    """
+    out = []
+    delegated = {t.session for t in tasks}
+    for sid, calls in calls_by_session.items():
+        if sid in delegated or not re.search(r"resume|continue|finish|take.over|recover|integrat", sessions.get(sid, {}).get("title", ""), re.I):
+            continue
+        for old in tasks:
+            reads = [c for c in calls if c.ts > old.last_write and (
+                c.name == "read_file" and c.args.get("path") == old.log or
+                c.name == "terminal" and any(Path(t[0]).name in ("cat", "head", "tail", "less")
+                    and old.log in t[1:] for t in local_commands(command_of(c))))]
+            if reads:
+                at = min(c.ts for c in reads)
+                out.append(Task(f"session:{sid}:{old.id}", sessions.get(sid, {}).get("title", ""),
+                                at, None, at, old.log, kickoff=old.log, session=sid))
+    return out
+
+
 def loop1_dropped(path: Path | None) -> set[str]:
     """Worker ids loop 1's replay flagged interrupted_dropped (cross-reference)."""
     try:
@@ -808,7 +904,8 @@ def load_decisions(path: Path | None) -> dict[str, dict[str, Any]]:
             d = json.loads(line)
         except ValueError:
             continue
-        if d.get("worker"):
+        if isinstance(d, dict) and d.get("worker") and d.get("action") in (
+                "abandon", "resume", "resumed", "integrated", "already integrated"):
             out[d["worker"]] = d
     return out
 
@@ -823,7 +920,8 @@ class Worker:
 
 
 def worker_traces(tasks: list[Task], calls_by_session: dict[str, list[Call]], bg: dict[str, Any],
-                  decisions: dict[str, dict], now: float, lim_s: int) -> list[Worker]:
+                  decisions: dict[str, dict], now: float, lim_s: int,
+                  successors: list[Task] | None = None) -> list[Worker]:
     spawned, reaped = bg["_spawned"], bg["_reaped"]
     ordered = sorted(tasks, key=lambda t: (t.started or 0, t.id))
     out = []
@@ -836,7 +934,8 @@ def worker_traces(tasks: list[Task], calls_by_session: dict[str, list[Call]], bg
         evs += [Ev("Spawn", t=start) for _ in mine]
         evs.append(Ev("Beat", t=hb))
         evs += [Ev("Reap", t=hb) for p in mine if p in reaped]
-        succ, from_log = resumer(t, [o for o in ordered[i + 1:] if o.id != t.id], calls_by_session)
+        succ, from_log = resumer(t, sorted([o for o in ordered[i + 1:] if o.id != t.id] + (successors or []),
+                                         key=lambda o: (o.started or 0, o.id)), calls_by_session)
         if t.end == "completed":
             evs.append(Ev("Finish", t=hb))
         elif t.end is not None:
@@ -850,8 +949,20 @@ def worker_traces(tasks: list[Task], calls_by_session: dict[str, list[Call]], bg
             wk.meta["successor"] = succ.id
             wk.meta["resumed_from_log"] = from_log
         d = decisions.get(t.id)
-        if d and d.get("action") == "abandon":
-            evs.append(Ev("Abandon", t=int(now)))
+        if d:
+            action = d.get("action")
+            wk.meta["decision"] = d
+            if action == "abandon":
+                evs.append(Ev("Abandon", t=int(now)))
+            elif action in ("resume", "resumed"):
+                # A recorded routing decision clears the human queue, not proof
+                # that the worker actually ran or read its log.
+                wk.meta["disposition"] = "resume requested"
+            elif action in ("integrated", "already integrated"):
+                wk.meta["disposition"] = "integration recorded"
+                # External disposition, not fabricated log-read/Finish evidence.
+                # The projection below preserves the process-reaping guard.
+
         evs.append(Ev("Tick", t=int(now)))
         s = St(Phase.DISPATCHED, W(i + 1))
         for e in evs:
@@ -863,6 +974,10 @@ def worker_traces(tasks: list[Task], calls_by_session: dict[str, list[Call]], bg
                 wk.findings.append(Finding(3, "violation", "abandon_with_live_processes",
                                            "abandon refused: background processes still running", {"bg": s.bg}))
             s = step(s, e, lim_s)
+        if d and d.get("action") in ("resume", "resumed"):
+            s = St(Phase.RESUMED, s.w, bg=s.bg, by=i + 1)
+        elif d and d.get("action") in ("integrated", "already integrated") and s.bg == 0:
+            s = St(Phase.INTEGRATED, s.w)
         wk.events, wk.final = evs, s
         wk.meta.update({"log": t.log, "goal": t.goal[:160], "started": iso(t.started), "last_write": iso(hb),
                         "end": t.end or "none", "session": t.session, "background_spawned": len(mine),
@@ -1073,14 +1188,16 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
     ws = writes(calls, roots)
     lease_f, holders = lease_findings(ws, sessions)
     phone_f, phone_stats = phone_findings(calls)
-    workers = worker_traces(tasks, by_sess, bg, load_decisions(args.decisions), now, lim_s)
+    workers = worker_traces(tasks, by_sess, bg, load_decisions(args.decisions), now, lim_s,
+                            session_successors(tasks, by_sess, sessions))
 
     ordered = sorted(tasks, key=lambda t: (t.started or 0, t.id))
     pos = {t.id: i for i, t in enumerate(ordered)}
     loop1 = loop1_dropped(args.loop1_report)
     batch = []
     for wk in workers:
-        if not wk.final or not (needs_kevin(wk.final) or wk.task.id in loop1):
+        if not wk.final or wk.final.phase in (Phase.RESUMED, Phase.INTEGRATED, Phase.ABANDONED) or not (
+                needs_kevin(wk.final) or wk.task.id in loop1):
             continue
         wt_paths = touched_worktrees(wk, by_sess, roots)
         mine = written_paths(wk, by_sess)
@@ -1197,6 +1314,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--limit-hours", type=float, default=LIMIT_HOURS)
     ap.add_argument("--now", help="ISO time to judge ages against (default: now); fixes the output")
     ap.add_argument("--json", type=Path, help="write the full report here")
+    ap.add_argument("--live-dir", type=Path, help="publish atomic state and append-only needs-Kevin ledger here")
     ap.add_argument("--worktree", help="dispatch check: is this worktree's lease free?")
     ap.add_argument("--heavy", action="store_true", help="dispatch check: the new work is heavy")
     ap.add_argument("--exception", choices=["gpu", "toolchain"], help="declared groot exception for --heavy")
@@ -1209,12 +1327,15 @@ def main(argv: list[str] | None = None) -> int:
     rep = build(args)
     if args.json:
         args.json.write_text(json.dumps(rep, indent=1, default=str) + "\n")
+    if args.live_dir:
+        from .live import publish
+        publish(rep, args.live_dir)
     print(render(rep))
     if args.worktree or args.heavy:
         reasons = dispatch_check(rep, args.worktree, args.heavy, args.exception)
         print("\ndispatch: " + ("GO" if not reasons else "HOLD\n  " + "\n  ".join(reasons)))
         return 3 if reasons else 0
-    return 1 if any(v["violation"] for v in rep["summary"].values()) else 0
+    return 0 if args.live_dir else (1 if any(v["violation"] for v in rep["summary"].values()) else 0)
 
 
 if __name__ == "__main__":
