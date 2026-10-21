@@ -50,6 +50,13 @@ def test_non_delegated_successor(source):
     assert not S.session_successors([t], calls, {"next": {"title": "audit logs"}})
 
 
+def test_exception_mentions_do_not_exempt_unrelated_builds():
+    calls = [S.Call("s", 1, "terminal", {"command": "echo cuda; cargo build"}, "")]
+    assert S.heavy_jobs_groot(calls)[0].exception == "none"
+    calls[0].args["command"] = "Z0_HEAVY_EXCEPTION=toolchain cargo build"
+    assert S.heavy_jobs_groot(calls)[0].exception == "toolchain"
+
+
 def test_read_only_git_mentions_do_not_take_lease():
     calls = [S.Call("s", i, "terminal", {"command": cmd, "workdir": "/r"}, "")
              for i, cmd in enumerate(["git status", "git tag", "git tag --list", 

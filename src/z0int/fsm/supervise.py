@@ -446,7 +446,13 @@ def heavy_jobs_groot(calls: list[Call]) -> list[Job]:
             end = c.result_ts
             if c.result and "timed out after" in c.result[:300]:
                 end = c.result_ts  # foreground timeout kills the command
-        exc, why = exception_of(cmd)
+        heavy_segments = [" ".join(t) for t in local_commands(cmd) if local_heavy(" ".join(t))]
+        placements = [exception_of(segment) for segment in heavy_segments]
+        # An unrelated CUDA/Bend mention cannot exempt another local build.
+        exc, why = next((p for p in placements if p[0] == "none"), placements[0])
+        declared = re.match(r"\s*Z0_HEAVY_EXCEPTION=(gpu|toolchain|bend)\s+", cmd)
+        if declared and len(heavy_segments) == 1:
+            exc, why = ("toolchain" if declared.group(1) == "bend" else declared.group(1)), "declared"
         ec = re.search(r'"exit_code": (-?\d+)', c.result[:600]) if not pid else None
         jobs.append(Job(id=pid or f"fg:{c.session}:{c.ts:.3f}", host="groot", start=start, end=end, cmd=cmd[:400],
                         session=c.session, locked=bool(HEAVY_LOCK.search(cmd)),
