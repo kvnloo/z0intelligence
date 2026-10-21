@@ -159,7 +159,10 @@ authorizes anything. The full overlay contains worker goals and stays local
 | `integration-debt` / `role-ledger` z0evals studies | not landed yet (only an untracked `studies/role-ledger/tools`). This checker produces integration-debt evidence directly; the role ledger should replace ROLES-v0's guesses in the role table. |
 | Verified OSS Loop (preview/nightly channels) | L3/L4 are its exact-head-evidence rule made executable. Note: z0intelligence `preview`/`nightly` are 63 commits behind `master` (last moved 2026-09-18): the channel itself is stale. |
 
-## Next two loops (proposal)
+## Next loops
+
+Worker supervision was built second: [worker-supervision.md](worker-supervision.md)
+(`bend/worker_supervision_fsm`, `python -m z0int.fsm.supervise`). Proposals:
 
 **Loop 2: GUI action loop.** `Observe -> Decide(tier0 word match -> promoted
 SLM >= 0.95 -> Jev -> owner queue) -> Act -> CheckLanded -> (Observe | Done |
@@ -169,7 +172,7 @@ yes (through the batched queue, L7); Act is followed by CheckLanded before
 the next Act; an SLM acts only on a promoted task family at >= 0.95. Replay:
 `phone_goal`/`phone_exec` traces and the S22+ `flock` logs.
 
-**Loop 3: worker supervision.** `Dispatched -> Running -> (Done | Interrupted
+**Loop 3 (built as loop 2, see [worker-supervision.md](worker-supervision.md)): worker supervision.** `Dispatched -> Running -> (Done | Interrupted
 -> Resumed | Abandoned)`, with heartbeats. Laws: an Interrupted worker is
 resumed from its checkpoint or explicitly abandoned within TTL; no two
 workers own the same worktree; a resumed worker starts from the last pushed
