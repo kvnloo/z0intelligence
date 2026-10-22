@@ -215,6 +215,78 @@ promote verified winner
 
 The ABAB meta-loop can evolve both **what data to train on** and **which architecture to use**. The benchmark, privacy boundary, and sealed evaluation set stay outside the evolvable surface.
 
+### Private read-only memory MCP (#22)
+
+`python -m z0int.memory_mcp` serves **only `search` and `fetch` over stdio**.
+It does not start an HTTP listener or expose the broader intelligence MCP tools.
+Stores remain separate; results include source, host, date, exact scope, collection,
+privacy tier, and a provenance-only ContextPacket. All retrieved memory is untrusted
+data, never instructions or authorization.
+The bounded stdio parser validates JSON-RPC with the pinned `mcp==1.26.0` SDK
+dependency. Install the package into the service's Python environment before
+starting it; a missing SDK fails closed rather than starting a partial server.
+
+```bash
+export Z0INT_MEMORY_MCP_POLICY="$PWD/manifests/memory-mcp-readonly.json"
+python -m z0int.memory_mcp
+```
+
+The checked-in JSON is an explicit, narrow project allowlist, **not a grant to
+all personal history**. Copy it to operator-controlled configuration and review
+each collection before enabling a tunnel. Missing/malformed policy fails closed;
+both search and fetch reload it, including revocations. No wildcard or unknown
+scope/privacy is permitted; `secret` is never permitted. Sources without native
+privacy labels require an explicit `private` classification. Such a grant is the
+operator's assertion that the collection is suitable for disclosure: do not grant
+credential/vault collections or unreviewed highly sensitive history. Redaction of
+dotenv assignments, secret fields, authorization headers, provider tokens and
+private keys is a second layer, not a substitute for corpus curation.
+
+`search(query, limit=5)` accepts at most 10 hits and 1024 UTF-8 query bytes.
+Backend rank positions are combined using reciprocal-rank ordering. Backends
+have independent deadlines and bounded HTTP/subprocess output; failed backends
+report `unavailable` without exception text, while other sources still return.
+The facade uses lexical search only, with no GPU/model calls or index refresh.
+AgentsView reads `auth_token` and `port` (default 8080) by reference from its own
+`~/.agentsview/config.toml`; its collection is `history` and scope is an exact
+returned project. ctx uses collection `history`, an exact workspace/cwd scope,
+and `CTX_DATA_ROOT=/mnt/zer0models/host-offload/home_kvn_.ctx`. **Current ctx
+versions omit workspace/cwd from search/show/locate JSON**: nonempty hits from
+those versions are unavailable, not guessed into an authorized scope.
+QMD grants name a collection with scope `qmd://COLLECTION`.
+TencentDB supports read-only POST `/v3/atomic/search` and
+`/v3/conversation/search` at loopback port 8420. Grants use collection `atomic`
+or `conversation` and exact scope `team=ID;agent=ID;user=ID` (each ID 1–128 ASCII
+letters/digits/underscore/hyphen). Every returned row must carry matching tenancy;
+conversation versions omitting it are unavailable. It is not initially granted.
+Gateway credentials are environment references (`MEMORY_TENCENTDB_GATEWAY_API_KEY`
+or `TDAI_GATEWAY_API_KEY`); the local gateway's documented `local` token is the
+fallback. No blind global search or fallback scope is authorized.
+
+`fetch(id)` returns the same bounded record issued by search, not an arbitrary
+URL/path or a bulk session export. IDs are opaque, HMAC-signed and bound to the
+source/collection/scope/privacy identity, expire after 10 minutes, are retained
+in a 256-entry in-memory cache, and cannot cross server sessions. Only redacted
+bounded content is cached. Changing the process invalidates all IDs.
+
+Policy limits bound each compact-JSON UTF-8 record (including its ID) and the
+whole tool payload (including provenance and backend status). The stdio MCP
+envelope adds JSON framing/escaping overhead. Requests are bounded to 8192
+bytes. Default rate is 30 tool calls per rolling minute, shared across search
+and fetch in this private server process; run one process per tunnel grant.
+`Z0INT_MEMORY_MCP_STATE` defaults to `~/.z0int/state/memory-mcp`. The directory
+must be private (0700); `audit.jsonl` is 0600 and contains timestamps, fixed tool
+names, process-keyed HMAC query/ID hashes, counts, byte totals and decisions,
+never raw queries, records or credentials. Query hashes intentionally change
+after restart. Audit failure prevents memory disclosure. Operators own retention
+and rotation of this private audit file.
+
+Run behind an operator-managed Secure MCP Tunnel stdio profile, not as a public
+unauthenticated service. Stdio access is the trust boundary; this module does not
+implement HTTP/OAuth or grant a ChatGPT workspace access by itself. The tunnel
+must be associated with the intended workspace. Provider-side consent and
+eligibility remain separate from the server's corpus allowlist.
+
 ## Current foundation: OpenJev runtime
 
 The code in this repository currently reproduces the useful *interface pattern* of TypeSafe Jev with open components. It does not reproduce Jev's undisclosed model or training.
