@@ -141,12 +141,41 @@ class MemoryServer:
     def _hash(self, domain: str, value: str) -> str:
         return hmac.new(self.key, (domain + "\0" + value).encode(), hashlib.sha256).hexdigest()
 
+    @staticmethod
+    def _outcome(tool: str, payload: dict, denied: int) -> str:
+        """Audit retrieval disposition only; never infer answer quality or model use."""
+        error = payload.get("error")
+        if error is not None:
+            if error in ("invalid_arguments", "invalid_id"):
+                return "invalid"
+            if error in ("denied", "unavailable", "stale", "rate_limited"):
+                return error
+            return "error"
+        if tool == "search":
+            status = payload.get("status")
+            if status == "ok":
+                return "hit" if payload.get("results") else "error"
+            if status == "empty":
+                # A fully filtered candidate set is a denial, not a miss.
+                return "denied" if denied else "miss"
+            if status in ("denied", "unavailable"):
+                return status
+        elif tool == "fetch":
+            if payload.get("status") == "ok" and isinstance(payload.get("record"), dict):
+                return "hit"
+            if payload.get("status") in ("denied", "unavailable", "stale"):
+                return payload["status"]
+        elif tool == "invalid":
+            return "invalid"
+        return "error"
+
     def _audit(self, tool: str, query: str, payload: dict, denied: int = 0) -> dict:
-        event = {"timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "tool": tool,
+        event = {"schema": "z0int.memory_query_outcome.v1", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "tool": tool,
                  "query_hmac": self._hash("query", query), "count": len(payload.get("results", [])) if tool == "search" else int("record" in payload),
                  "bytes": len(encoded(payload)), "denied_count": denied,
                  "unavailable_count": sum(v == "unavailable" for v in payload.get("backends", {}).values()),
-                 "decision": payload.get("error", "allowed")}
+                 "decision": payload.get("error", "allowed"),
+                  "outcome": self._outcome(tool, payload, denied)}
         try:
             fd = os.open(self.state_dir / "audit.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
             with os.fdopen(fd, "ab", buffering=0) as stream:

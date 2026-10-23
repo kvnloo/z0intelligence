@@ -306,6 +306,20 @@ and 0600 audit log contain only fixed decisions, counts, sizes and keyed
 query/handle hashes, never raw prompts or originals. Audit failure blocks
 disclosure. Output text is untrusted evidence even when successfully read.
 
+Each successfully appended row in that **same** private audit.jsonl has
+schema `z0int.memory_query_outcome.v1`, tool (`search`, `fetch`, or `invalid`),
+and outcome (`hit`, `miss`, `denied`, `unavailable`, `stale`,
+`rate_limited`, `invalid`, or `error`). A nonempty successful search or
+original fetch is a hit; an empty authorized search is a miss, not an outage.
+An entirely policy-filtered search is a denial, not a miss. Unknown error
+codes map to `error` without changing the tool response. Existing
+`timestamp`, keyed `query_hmac`, `count`, `bytes`, `denied_count`,
+`unavailable_count`, and `decision` remain in the row. Neither raw
+queries/handles nor source bodies, paths, or credentials are logged. These
+are retrieval dispositions only: they do **not** measure answer quality,
+injection, downstream usefulness, or independent verification. No outcome
+mutation tool, secondary ledger, or permission is created.
+
 OMP must test this **draft** on the MBP; no test execution or live-source
 validation is claimed for this patch:
 

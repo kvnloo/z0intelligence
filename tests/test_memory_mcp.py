@@ -463,3 +463,140 @@ def test_long_native_locator_survives_original_content_hash(factory):
     hydrated = server.fetch(hit["id"])
     assert hydrated["record"]["locator"] == original["locator"]
     assert hydrated["context_packet"]["evidence"][0]["locator"] == original["locator"]
+
+def outcome_rows(server):
+    """Read the actual private JSONL audit, not a stubbed audit callback."""
+    return [json.loads(line) for line in
+            (server.state_dir / "audit.jsonl").read_text().splitlines()]
+
+
+def test_query_outcomes_record_real_hit_rows_without_evidence(factory):
+    server, _, _, _ = factory(rows=[record(text="SYNTHETIC_PRIVATE_ORIGINAL")])
+    query = "SYNTHETIC_PRIVATE_QUERY"
+    found = server.search(query)
+    fetched = server.fetch(found["results"][0]["id"])
+    rows = outcome_rows(server)
+    assert [row["outcome"] for row in rows] == ["hit", "hit"]
+    assert [row["tool"] for row in rows] == ["search", "fetch"]
+    assert [row["count"] for row in rows] == [1, 1]
+    assert [row["bytes"] for row in rows] == [
+        len(serialized(found)), len(serialized(fetched))]
+    for row in rows:
+        assert set(row) == {
+            "schema", "timestamp", "tool", "query_hmac", "count", "bytes",
+            "denied_count", "unavailable_count", "decision", "outcome",
+        }
+        assert row["schema"] == "z0int.memory_query_outcome.v1"
+        assert row["timestamp"].endswith("Z")
+        assert len(row["query_hmac"]) == 64
+        assert row["denied_count"] == row["unavailable_count"] == 0
+        assert row["decision"] == "allowed"
+    assert rows[0]["query_hmac"] == server._hash("query", query)
+    assert rows[1]["query_hmac"] == server._hash("query", found["results"][0]["id"])
+    audit = (server.state_dir / "audit.jsonl").read_text()
+    for forbidden in (query, "SYNTHETIC_PRIVATE_ORIGINAL",
+                      found["results"][0]["locator"], found["results"][0]["id"]):
+        assert forbidden not in audit
+
+
+def test_query_outcome_empty_authorized_search_is_miss_not_outage(factory):
+    server, _, _, _ = factory(rows=[])
+    reply = server.search("no matching synthetic message")
+    assert reply["status"] == "empty"
+    assert reply["backends"] == {"agentsview": "available"}
+    row = outcome_rows(server)[-1]
+    assert row["tool"] == "search" and row["outcome"] == "miss"
+    assert (row["count"], row["denied_count"], row["unavailable_count"]) == (0, 0, 0)
+
+
+def test_query_outcome_policy_denials_are_not_misses(factory):
+    chatgpt, _, source, _ = factory(principal="chatgpt")
+    assert chatgpt.search("no grant")["status"] == "denied"
+    assert outcome_rows(chatgpt)[-1]["outcome"] == "denied"
+    assert source.search_calls == []
+
+    filtered, _, _, _ = factory(rows=[record(scope="sibling-project",
+                                              text="SYNTHETIC_SIBLING_SECRET")])
+    result = filtered.search("filtered native candidate")
+    assert result["status"] == "empty"  # Preserve the existing public response.
+    assert result["results"] == []
+    row = outcome_rows(filtered)[-1]
+    assert row["outcome"] == "denied"
+    assert row["denied_count"] == 1 and row["count"] == 0
+    assert "SYNTHETIC_SIBLING_SECRET" not in (filtered.state_dir / "audit.jsonl").read_text()
+
+
+def test_query_outcome_search_and_fetch_outages_are_unavailable(factory):
+    server, _, native, _ = factory()
+    native.down = True
+    lost = server.search("source offline")
+    assert lost["status"] == "unavailable"
+    assert lost["backends"] == {"agentsview": "unavailable"}
+    native.down = False
+    token = server.search("source online")["results"][0]["id"]
+    native.down = True
+    assert server.fetch(token) == {"error": "unavailable"}
+    rows = outcome_rows(server)
+    assert [row["outcome"] for row in rows] == ["unavailable", "hit", "unavailable"]
+    assert rows[0]["unavailable_count"] == 1
+    assert rows[-1]["decision"] == "unavailable"
+    assert "SYNTHETIC_SECRET_BACKEND_ERROR" not in (server.state_dir / "audit.jsonl").read_text()
+
+
+def test_query_outcome_changed_source_and_expired_handle_are_stale(factory):
+    server, _, native, clock = factory(rows=[record(text="version-one")])
+    token = server.search("source revision")["results"][0]["id"]
+    native.records[0]["text"] = "version-two"
+    assert server.fetch(token) == {"error": "stale"}
+    latest = server.search("latest revision")["results"][0]["id"]
+    clock.now += 601
+    assert server.fetch(latest) == {"error": "stale"}
+    assert [row["outcome"] for row in outcome_rows(server)] == [
+        "hit", "stale", "hit", "stale"]
+
+
+def test_query_outcome_shared_rate_limit_is_not_miss(factory):
+    server, _, _, _ = factory(limits={"calls_per_minute": 1})
+    token = server.search("first")["results"][0]["id"]
+    assert server.fetch(token) == {"error": "rate_limited"}
+    rows = outcome_rows(server)
+    assert [row["outcome"] for row in rows] == ["hit", "rate_limited"]
+    assert rows[-1]["tool"] == "fetch"
+    assert rows[-1]["decision"] == "rate_limited"
+    assert rows[-1]["count"] == 0
+
+
+def test_query_outcome_invalid_arguments_handles_and_rpc_are_invalid(factory):
+    server, _, _, _ = factory()
+    assert server.search("", limit=0) == {"error": "invalid_arguments"}
+    assert server.fetch("../not-a-handle") == {"error": "invalid_id"}
+    reply = server.handle({
+        "jsonrpc": "2.0", "id": 9, "method": "tools/call",
+        "params": {"name": "erase", "arguments": {}},
+    })
+    assert reply["result"]["isError"] is True
+    rows = outcome_rows(server)
+    assert [(row["tool"], row["outcome"]) for row in rows] == [
+        ("search", "invalid"), ("fetch", "invalid"), ("invalid", "invalid")]
+    assert [row["decision"] for row in rows] == [
+        "invalid_arguments", "invalid_id", "invalid_arguments"]
+
+
+def test_query_outcome_unknown_internal_error_defaults_to_error(factory):
+    server, _, _, _ = factory()
+    coded = {"error": "synthetic_unknown_error_code"}
+    assert server._audit("fetch", "opaque synthetic handle", coded) == coded
+    row = outcome_rows(server)[-1]
+    assert row["outcome"] == "error"
+    assert row["decision"] == "synthetic_unknown_error_code"
+    assert row["count"] == 0
+
+
+def test_query_outcome_failed_audit_blocks_search_before_disclosure(factory):
+    server, _, _, _ = factory(rows=[record(text="SYNTHETIC_PRIVATE_ORIGINAL")])
+    (server.state_dir / "audit.jsonl").mkdir()
+    reply = server.search("SYNTHETIC_PRIVATE_QUERY")
+    assert reply == {"error": "audit_unavailable"}
+    assert "record" not in reply and "results" not in reply
+    assert "SYNTHETIC_PRIVATE_ORIGINAL" not in serialized(reply).decode()
+
