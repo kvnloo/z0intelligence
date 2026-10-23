@@ -57,6 +57,13 @@ Needs Kevin is pull-only, batched for one or two deep-work blocks/day, never a
 worker dispatch prerequisite. Every item has why, recommended_action, options
 and evidence_path. Do not turn this batch into page-by-page interruptions.
 
+Shell classification preserves complete shell words, including colon-bearing
+codec flags such as `ffmpeg -c:v h264_nvenc`, and treats shell operators and
+unquoted newlines as command boundaries. Quoted data and remote ssh/fleet
+payloads remain data, not local work. This lexical correction does not grant
+permission or change the standing host GPU policy; native adapters still
+classify the preserved arguments under that policy.
+
 ## Opt-in write leases (W1, #185/#186)
 
 Acquire before dispatching a writer, not after its first write:

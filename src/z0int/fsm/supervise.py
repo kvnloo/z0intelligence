@@ -380,12 +380,13 @@ def local_commands(cmd: str) -> list[list[str]]:
     # Here-doc bodies are data (often source code or documentation).
     cmd = re.sub(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n[\s\S]*?\n\1\b", "", cmd)
     try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=";&|()<>")
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=";&|()<>\n")
         lex.whitespace = " \t\r"
+        lex.whitespace_split = True
         lex.commenters = "#"
         parts, part = [], []
         for token in lex:
-            if token == "\n" or token in (";", "&&", "||", "|", "&", "(", ")"):
+            if token and not token.strip(";&|()\n"):
                 if part:
                     parts.append(part)
                 part = []
