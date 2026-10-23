@@ -218,6 +218,7 @@ class ContextSourceFreshnessTests(unittest.TestCase):
                     packet = resolve(root, need(path))
 
                 self.assertTrue(swapped, "reader must be reached after canonical admission")
+                self.assertEqual(_file_version(canonical), "unavailable")
                 self.assertEqual(packet.evidence, [])
                 self.assertTrue(any("missing path" in gap for gap in packet.unresolved_gaps))
                 serialized = json.dumps(packet.to_dict())
@@ -253,6 +254,7 @@ class ContextSourceFreshnessTests(unittest.TestCase):
             ):
                 packet = resolve(root)
             self.assertTrue(swapped)
+            self.assertEqual(_file_version(source), "unavailable")
             self.assertEqual(packet.evidence, [])
             self.assertTrue(packet.unresolved_gaps)
             self.assertNotIn("PRIVATE_SIBLING_PAYLOAD", json.dumps(packet.to_dict()))
