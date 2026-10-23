@@ -1,0 +1,21 @@
+{
+  "title":"Work lifecycle · owner acceptance",
+  "kind":"Precomputed Bend trace · 12 recorded results",
+  "nodes":["Proposed","Claimed","Implementing","Verifying","DraftPR","Integrated","Deployed","Accepted","Merged"],
+  "boundary":"A privacy-minimized projection of the committed owner-acceptance tape. Original state IDs, verdicts, and law IDs are retained. Actor IDs and deployment counters are omitted. Event arguments are not supplied by the replay artifact. This is not live execution, authorization, or verified deployment.",
+  "source":"https://github.com/kvnloo/.files/blob/2f69c19c7d491b3e4a4a85c7ccaf0a40edf51a38/docs/spec-diagram/fsm/replay.json",
+  "steps":[
+    {"event":"Recorded transition 01","state":"Claimed","accepted":true,"verdict":"accepted","reason":"Recorded law L6","note":"The stored projection moves from Proposed to Claimed.","facts":{"before":0,"state":1,"laws":"L6"}},
+    {"event":"Recorded transition 02","state":"Implementing","accepted":true,"verdict":"accepted","reason":"Recorded law L2","note":"The stored projection moves from Claimed to Implementing.","facts":{"before":1,"state":2,"laws":"L2"}},
+    {"event":"Recorded transition 03","state":"Implementing","accepted":true,"verdict":"accepted","reason":"Recorded law L2","note":"An accepted event can leave the state constructor unchanged.","facts":{"before":2,"state":2,"laws":"L2"}},
+    {"event":"Recorded transition 04","state":"Verifying","accepted":true,"verdict":"accepted","reason":"Recorded law L2","note":"The stored projection moves from Implementing to Verifying.","facts":{"before":2,"state":3,"laws":"L2"}},
+    {"event":"Recorded transition 05","state":"DraftPR","accepted":true,"verdict":"accepted","reason":"Recorded laws L2 + L3","note":"The stored projection moves from Verifying to DraftPR.","facts":{"before":3,"state":4,"laws":"L2 + L3"}},
+    {"event":"Recorded transition 06","state":"DraftPR","accepted":false,"verdict":"refused","reason":"Recorded laws L2 + L3","note":"The event is refused. The recorded state remains DraftPR. The replay artifact does not contain the event arguments.","facts":{"before":4,"state":4,"laws":"L2 + L3"}},
+    {"event":"Recorded transition 07","state":"Integrated","accepted":true,"verdict":"accepted","reason":"Recorded laws L2 + L3","note":"The stored projection moves from DraftPR to Integrated. This is an abstract fixture, not a deployment receipt.","facts":{"before":4,"state":5,"laws":"L2 + L3"}},
+    {"event":"Recorded transition 08","state":"Deployed","accepted":true,"verdict":"accepted","reason":"Recorded law L4","note":"The abstract state is Deployed. This browser does not observe any running system.","facts":{"before":5,"state":6,"laws":"L4"}},
+    {"event":"Recorded transition 09","state":"Deployed","accepted":false,"verdict":"refused","reason":"Recorded laws L1 + L2 + L7","note":"The event is refused. The recorded state remains Deployed.","facts":{"before":6,"state":6,"laws":"L1 + L2 + L7"}},
+    {"event":"Recorded transition 10","state":"Deployed","accepted":false,"verdict":"held","reason":"Recorded laws L1 + L2 + L7","note":"This result is held, not refused or accepted. The recorded state remains Deployed.","facts":{"before":6,"state":6,"laws":"L1 + L2 + L7"}},
+    {"event":"Recorded transition 11","state":"Accepted","accepted":true,"verdict":"accepted","reason":"Recorded laws L1 + L2 + L7","note":"The abstract fixture reaches Accepted. A replay is not a fresh owner approval.","facts":{"before":6,"state":7,"laws":"L1 + L2 + L7"}},
+    {"event":"Recorded transition 12","state":"Merged","accepted":true,"verdict":"accepted","reason":"Recorded law L1","note":"The stored projection reaches Merged. No repository mutation occurs in this page.","facts":{"before":7,"state":8,"laws":"L1"}}
+  ]
+}
