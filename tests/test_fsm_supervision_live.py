@@ -34,6 +34,7 @@ def test_actual_local_heavy(cmd):
     ("printf ok;\n\ncargo test", [["printf", "ok"], ["cargo", "test"]]),
     ("printf ok\r\ncargo test", [["printf", "ok"], ["cargo", "test"]]),
     ("printf 'cargo build\\nnot a command'", [["printf", "cargo build\\nnot a command"]]),
+    ("printf 'cargo build\nnot a command'", [["printf", "cargo build\nnot a command"]]),
     ("printf 'a&&b' && cargo test", [["printf", "a&&b"], ["cargo", "test"]]),
 ])
 def test_shell_words_preserve_non_operator_punctuation(command, expected):
