@@ -72,6 +72,10 @@ def qualify_toolchain() -> tuple[Path, dict[str, Path]]:
     pinned(base, manifest.get("base_bend_sha256"), "Bend Base source")
     pinned(source, manifest.get("bendtt_source_sha256"), "BendTT source")
     pinned(kernel, manifest.get("bendtt_kernel_sha256"), "BendTT kernel")
+    # Observed Bend layout has an adjacent executable payload. An unrelated,
+    # independently supplied binary hash does not qualify the invoked wrapper.
+    if runtime != exe.with_name("bend.bin"):
+        raise ToolchainBlocked("Bend wrapper must resolve to the pinned adjacent bend.bin")
     out = checked_cmd([str(exe), "version"], DIR, timeout=30)
     if out.returncode or out.stdout.strip() != manifest.get("bend_version_banner"):
         raise ToolchainBlocked("Bend version mismatch or genuine version command unavailable")
@@ -194,7 +198,7 @@ def main() -> int:
     original = {p: sha256(DIR / p) for p in ("MODEL.bend", "LAWS.bend", "PROOF.bend")}
     manifest = json.loads((DIR / "toolchain.json").read_text(encoding="utf-8"))
     content = (DIR / "LAWS.bend").read_bytes()
-    git_blob = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\\0" + content).hexdigest()
+    git_blob = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
     if git_blob != manifest.get("laws_git_blob_sha1"):
         print("TOOLCHAIN_BLOCKED: exact owner-reviewed LAWS blob pin mismatch", file=sys.stderr)
         return 2
@@ -211,13 +215,14 @@ def main() -> int:
     if original != {p: sha256(DIR / p) for p in original}:
         print("VERIFICATION_FAILED: source changed while checking", file=sys.stderr)
         return 1
-    if any(sha256(path) != sha256_before for path, sha256_before in
-           ((path, manifest[key]) for key, path in (
-               ("bend_runtime_sha256", files["runtime"]),
-               ("base_bend_sha256", files["base"]),
-               ("bendtt_source_sha256", files["source"]),
-               ("bendtt_kernel_sha256", files["kernel"])
-           ))):
+    pinned_paths = {
+        exe: manifest["bend_wrapper_sha256"],
+        files["runtime"]: manifest["bend_runtime_sha256"],
+        files["base"]: manifest["base_bend_sha256"],
+        files["source"]: manifest["bendtt_source_sha256"],
+        files["kernel"]: manifest["bendtt_kernel_sha256"],
+    }
+    if any(sha256(path) != expected for path, expected in pinned_paths.items()):
         print("VERIFICATION_FAILED: toolchain changed while checking", file=sys.stderr)
         return 1
     print("BEND2_MEMORY_LAW: emitted-book verdict PASS; source_semantics_attested=false")
