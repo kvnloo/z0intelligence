@@ -1,10 +1,22 @@
 {
-  "version": 1,
-  "allow": [
-    {"source": "agentsview", "collection": "history", "scope": "z0intelligence", "privacy": ["private"]},
-    {"source": "ctx", "collection": "history", "scope": "/mnt/zer0models/turbo-mode-20261019/z0intelligence", "privacy": ["private"]},
-    {"source": "qmd", "collection": "z0intelligence", "scope": "qmd://z0intelligence", "privacy": ["private"]}
-  ],
-  "limits": {"result_bytes": 4096, "total_bytes": 32768, "calls_per_minute": 30},
+  "version": 2,
+  "principals": {
+    "operator": [
+      {
+        "source": "agentsview",
+        "collection": "history",
+        "scope": "z0intelligence",
+        "privacy": [
+          "private"
+        ]
+      }
+    ],
+    "chatgpt": []
+  },
+  "limits": {
+    "result_bytes": 4096,
+    "total_bytes": 32768,
+    "calls_per_minute": 30
+  },
   "timeout_seconds": 3
 }
