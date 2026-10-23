@@ -22,18 +22,19 @@ jobs:
     timeout-minutes: 15
     env:
       PYTHONPATH: src
-      # These are explicit runner-local paths, not download/install guesses.
-      # On an unqualified GitHub-hosted runner they are absent: FAIL CLOSED.
-      BEND2_BIN: ${{ vars.BEND2_BIN_PATH }}
-      BEND2_RUNTIME_BIN: ${{ vars.BEND2_RUNTIME_BIN_PATH }}
-      BEND2_BASE_SOURCE: ${{ vars.BEND2_BASE_SOURCE_PATH }}
-      BEND2_KERNEL_SOURCE: ${{ vars.BEND2_KERNEL_SOURCE_PATH }}
-      BEND2_KERNEL_BIN: ${{ vars.BEND2_KERNEL_BIN_PATH }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install isolated hash-pinned official toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zstd
+          bash bend/memory_authority/bootstrap.sh "$RUNNER_TEMP/memory-bend"
+          echo "BEND2_BIN=$RUNNER_TEMP/memory-bend/bend/bin/bend" >> "$GITHUB_ENV"
+          # Host clang must win over Lean's bundled clang.
+          echo "PATH=/usr/bin:/bin:$PATH:$RUNNER_TEMP/memory-bend/lean-4.34.0-linux/bin" >> "$GITHUB_ENV"
       - name: Pure Python contracts and native synthetic replay
         run: |
           python -m unittest -v tests.test_memory_authority_law tests.test_memory_contract tests.test_memory_event_log tests.test_memory_optmem_tree

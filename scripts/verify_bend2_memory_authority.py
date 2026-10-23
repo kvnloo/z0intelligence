@@ -60,26 +60,20 @@ def qualify_toolchain() -> tuple[Path, dict[str, Path]]:
     manifest = json.loads((DIR / "toolchain.json").read_text(encoding="utf-8"))
     if manifest.get("source_semantics_attested") is not False:
         raise ToolchainBlocked("source_semantics_attested must remain false")
-    if "BENDTT" in os.environ:
-        raise ToolchainBlocked("ambient BENDTT override is not accepted")
     exe = regular_path("BEND2_BIN")
-    runtime = regular_path("BEND2_RUNTIME_BIN")
-    base = regular_path("BEND2_BASE_SOURCE")
-    source = regular_path("BEND2_KERNEL_SOURCE")
-    kernel = regular_path("BEND2_KERNEL_BIN")
-    pinned(exe, manifest.get("bend_wrapper_sha256"), "Bend wrapper")
-    pinned(runtime, manifest.get("bend_runtime_sha256"), "actual Bend binary")
+    package = exe.parent.parent
+    base = package / "bend2/base.bend"
+    source = package / "bend2/bendtt.lean"
+    pinned(exe, manifest.get("bend_runtime_sha256"), "official Bend executable")
     pinned(base, manifest.get("base_bend_sha256"), "Bend Base source")
     pinned(source, manifest.get("bendtt_source_sha256"), "BendTT source")
-    pinned(kernel, manifest.get("bendtt_kernel_sha256"), "BendTT kernel")
-    # Observed Bend layout has an adjacent executable payload. An unrelated,
-    # independently supplied binary hash does not qualify the invoked wrapper.
-    if runtime != exe.with_name("bend.bin"):
-        raise ToolchainBlocked("Bend wrapper must resolve to the pinned adjacent bend.bin")
     out = checked_cmd([str(exe), "version"], DIR, timeout=30)
     if out.returncode or out.stdout.strip() != manifest.get("bend_version_banner"):
-        raise ToolchainBlocked("Bend version mismatch or genuine version command unavailable")
-    return exe, {"runtime": runtime, "base": base, "source": source, "kernel": kernel}
+        raise ToolchainBlocked("Bend version mismatch")
+    lean = checked_cmd(["lean", "--version"], DIR, timeout=30)
+    if lean.returncode or "version 4.34.0," not in lean.stdout or manifest["lean_commit"][:12] not in lean.stdout:
+        raise ToolchainBlocked("pinned Lean version/commit mismatch")
+    return exe, {"base": base, "source": source}
 
 
 def verdict(exe: Path, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -216,11 +210,9 @@ def main() -> int:
         print("VERIFICATION_FAILED: source changed while checking", file=sys.stderr)
         return 1
     pinned_paths = {
-        exe: manifest["bend_wrapper_sha256"],
-        files["runtime"]: manifest["bend_runtime_sha256"],
+        exe: manifest["bend_runtime_sha256"],
         files["base"]: manifest["base_bend_sha256"],
         files["source"]: manifest["bendtt_source_sha256"],
-        files["kernel"]: manifest["bendtt_kernel_sha256"],
     }
     if any(sha256(path) != expected for path, expected in pinned_paths.items()):
         print("VERIFICATION_FAILED: toolchain changed while checking", file=sys.stderr)
@@ -230,4 +222,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # A new HOME for every invocation prevents reuse of a host-built checker.
+    # Bend builds its kernel from the pinned adjacent Lean source on first use.
+    with tempfile.TemporaryDirectory(prefix="z0-bend2-home-") as home:
+        os.environ["HOME"] = home
+        os.environ.pop("BENDTT", None)
+        raise SystemExit(main())
