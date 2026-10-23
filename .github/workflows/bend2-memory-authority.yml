@@ -8,9 +8,6 @@ on:
       - 'tests/test_memory_authority_law.py'
       - 'scripts/verify_bend2_memory_authority.py'
       - '.github/workflows/bend2-memory-authority.yml'
-  push:
-    branches:
-      - 'feat/bend2-memory-authority-law'
   workflow_dispatch:
 
 permissions:
