@@ -53,6 +53,10 @@ class BackendDenied(BackendUnavailable):
     """The native source no longer proves the exact authorized scope or class."""
 
 
+class BackendIdentityDenied(BackendDenied):
+    """A session or stable message identity is missing, foreign, or replaced."""
+
+
 def _remaining(deadline: float) -> float:
     left = deadline - time.monotonic()
     if left <= 0:
@@ -156,12 +160,43 @@ def _native_id(session_id: Any, ordinal: Any) -> dict[str, Any]:
     return {"session_id": session_id, "ordinal": ordinal}
 
 
+def _message_id(value: Any) -> int:
+    """AgentsView db.Message.id is a positive signed int64, not an ordinal."""
+    if type(value) is not int or not 1 <= value <= (1 << 63) - 1:
+        raise BackendIdentityDenied("native_message_id_denied")
+    return value
+
+
+def agentsview_locator(native: Any) -> str:
+    """Lossless native locator; both stable ID and ordinal survive content hashing."""
+    if not isinstance(native, dict) or set(native) != {"session_id", "ordinal", "id"}:
+        raise BackendIdentityDenied("native_identity_denied")
+    try:
+        address = _native_id(native.get("session_id"), native.get("ordinal"))
+    except BackendUnavailable:
+        raise BackendIdentityDenied("native_identity_denied") from None
+    message_id = _message_id(native.get("id"))
+    locator = (
+        f"agentsview:{address['session_id']}:message:{message_id}:"
+        f"ordinal:{address['ordinal']}"
+    )
+    # A long native identifier must be denied, never truncated into a collision.
+    if len(locator.encode("utf-8")) > 256:
+        raise BackendIdentityDenied("native_locator_too_long")
+    return locator
+
+
 def _original(grant: dict[str, Any], native: dict[str, Any],
               port: int, headers: dict[str, str], deadline: float) -> dict[str, Any]:
     """Verify native project both before and after the bounded original read."""
     _supported_grant(grant)
-    native = _native_id(native.get("session_id"), native.get("ordinal"))
-    session_id, ordinal = native["session_id"], native["ordinal"]
+    if not isinstance(native, dict):
+        raise BackendIdentityDenied("native_identity_denied")
+    # Search starts with a session/ordinal cursor. Fetch must carry the stable
+    # native ID returned by the first original read, not just that cursor.
+    expected_id = _message_id(native["id"]) if "id" in native else None
+    address = _native_id(native.get("session_id"), native.get("ordinal"))
+    session_id, ordinal = address["session_id"], address["ordinal"]
     segment = quote(session_id, safe="")
     detail_path = f"/api/v1/sessions/{segment}"
     message_path = f"/api/v1/sessions/{segment}/messages?around={ordinal}&before=0&after=0"
@@ -181,6 +216,15 @@ def _original(grant: dict[str, Any], native: dict[str, Any],
     if len(page["messages"]) != 1 or len(matches) != 1:
         raise BackendStale("message_missing")
     message = matches[0]
+    # This check precedes reading *any* content or display metadata. A matching
+    # ordinal from another session is not the requested source, and an ID swap
+    # with identical text is still a distinct native message.
+    message_id = _message_id(message.get("id"))
+    if (message.get("session_id") != session_id or
+            (expected_id is not None and message_id != expected_id)):
+        raise BackendIdentityDenied("native_identity_denied")
+    proven_native = {**address, "id": message_id}
+    locator = agentsview_locator(proven_native)
     content = message.get("content")
     # The full session content may contain rendered thinking/tool blocks, while
     # FTS search snippets do not. Exclude those originals rather than exposing
@@ -195,13 +239,12 @@ def _original(grant: dict[str, Any], native: dict[str, Any],
             (message.get("privacy") not in (None, "private"))):
         raise BackendDenied("message_class_denied")
     check_scope()
-    locator = f"agentsview:{session_id}:{ordinal}"
     return {
         "source": "agentsview", "collection": "history",
         "scope": grant["scope"], "privacy": "private",
         "host": session.get("machine") if isinstance(session.get("machine"), str) else "unknown",
         "date": message.get("timestamp") if isinstance(message.get("timestamp"), str) else "unknown",
-        "text": content, "locator": locator, "native": native,
+        "text": content, "locator": locator, "native": proven_native,
         "source_version": "sha256:" + hashlib.sha256(content.encode("utf-8")).hexdigest(),
     }
 
@@ -238,6 +281,8 @@ def search_backend(source: str, query: str, grants: list[dict[str, Any]], limit:
             try:
                 native = _native_id(row.get("session_id"), row.get("ordinal"))
                 original = _original(grant, native, port, headers, deadline)
+            except BackendIdentityDenied:
+                raise  # No candidate can be disclosed after an identity violation.
             except BackendDenied:
                 continue
             except BackendUnavailable as exc:
@@ -256,8 +301,8 @@ def fetch_backend(source: str, identity: dict[str, Any], grant: dict[str, Any],
     if source != "agentsview":
         raise BackendUnavailable("exact_source_unavailable")
     _supported_grant(grant)
-    if not isinstance(identity, dict) or not isinstance(identity.get("native"), dict):
-        raise BackendUnavailable("invalid_native_identity")
+    if not isinstance(identity, dict) or identity.get("locator") != agentsview_locator(identity.get("native")):
+        raise BackendIdentityDenied("native_identity_denied")
     if type(timeout_s) not in (int, float) or not math.isfinite(timeout_s) or not 0 < timeout_s <= 10:
         raise BackendUnavailable("invalid_timeout")
     deadline = time.monotonic() + timeout_s

@@ -227,9 +227,15 @@ Session API](https://www.agentsview.io/docs/session-api/) documents
 `GET /api/v1/search/content`, `GET /api/v1/sessions/{id}` and
 `GET /api/v1/sessions/{id}/messages?around=N&before=0&after=0`.
 Search is FTS on dialogue messages with `reveal=false`, constrained to
-an exactly granted project. A message match's native `session_id` and
-`ordinal` are retained. The backend independently checks the session's
-native project **before and after** reading that original archived message.
+an exactly granted project. A message match's native `session_id` and `ordinal` are used only
+to locate an original. Before reading any message content or metadata, the
+adapter verifies that the returned message's own `session_id` equals the
+requested session and that `db.Message.id` is a valid positive int64.
+It retains that stable native message ID separately from the ordinal and
+includes both in the full, untruncated source locator. Fetch requires the same
+native ID; sibling/missing identities and identical-text ordinal replacements
+are denied even when their SHA-256 content hashes match. The backend also
+checks the session's native project **before and after** the original read.
 Thinking, tool-use, system and unknown-class messages fail closed.
 
 `source_version` is SHA-256 of the **complete normalized AgentsView
@@ -255,9 +261,16 @@ Review the archive's suitability and copy that file into private operator-owned
 configuration before any connection. Missing/invalid/v1 policy, wildcard,
 unknown scope and unreviewed secrets never grant access. AgentsView's
 `project` is an archive metadata label, not an independent source
-ACL; only use an archive/corpus you control and have explicitly classified.
-Redaction of credentials occurs **before** UTF-8 clipping, not in lieu of
-curation or provider consent.
+ACL. Its `auth_token` bearer is **broad access to the local AgentsView API**,
+not scoped to a provider, session, project or MCP principal. The operator and
+ChatGPT grants are separate **facade-side** allowlists enforced only by this
+MCP process, through exact project and native message checks. They do not
+reduce the privileges of the underlying AgentsView bearer or isolate a
+different process with direct API access. Keep that token private, use an
+operator-controlled archive/corpus classified for the granted scope, and
+validate tunnel identity and consent before exposing stdio. Redaction of
+credentials occurs **before** UTF-8 clipping, not in lieu of curation
+or provider consent.
 
 `Z0INT_MEMORY_MCP_PRINCIPAL` is required **at process startup** and
 must be set by the operator's stdio/tunnel configuration, never by the model or

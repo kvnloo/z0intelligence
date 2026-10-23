@@ -33,6 +33,7 @@ def native(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
     original = {
+        "id": 701, "session_id": SESSION,
         "ordinal": 7, "role": "assistant", "is_system": False,
         "has_thinking": False, "has_tool_use": False,
         "thinking_text": "", "content": "Corrected synthetic answer.",
@@ -102,7 +103,7 @@ def test_real_adapter_search_reads_original_and_fetch_rereads_native_message(nat
     hit = response["results"][0]
     assert hit["text"] == native["original"]["content"]
     assert "UNTRUSTED_CACHED_SNIPPET" not in json.dumps(response)
-    assert hit["locator"] == f"agentsview:{SESSION}:7"
+    assert hit["locator"] == f"agentsview:{SESSION}:message:701:ordinal:7"
     digest = "sha256:" + hashlib.sha256(native["original"]["content"].encode()).hexdigest()
     assert hit["source_version"] == digest
     assert digest in json.dumps(response["context_packet"])
@@ -243,9 +244,79 @@ def test_http_transport_rejects_nonfixed_endpoints_before_network(path):
 
 def test_encoded_native_id_and_invalid_id_are_bounded(native):
     rows = backend.search_backend("agentsview", "verified", [grant()], 1, 2)
-    assert rows[0]["native"] == {"session_id": SESSION, "ordinal": 7}
+    assert rows[0]["native"] == {"session_id": SESSION, "ordinal": 7, "id": 701}
     assert any("%3A" in url for url in native["calls"])
     with pytest.raises(backend.BackendUnavailable, match="unsupported_native_identity"):
         backend._native_id("../outside", 7)
     with pytest.raises(backend.BackendUnavailable, match="unsupported_native_identity"):
         backend._native_id(SESSION, -1)
+
+
+@pytest.mark.parametrize("bad_session", ["codex:sibling-session", None])
+def test_adapter_search_denies_wrong_or_missing_message_session(native, tmp_path, bad_session):
+    native["original"]["session_id"] = bad_session
+    facade, _ = server(tmp_path)
+    result = facade.search("same ordinal but wrong session")
+    assert result == {"error": "denied"}
+    assert "Corrected synthetic answer." not in json.dumps(result)
+    assert "machine" not in json.dumps(result)
+    assert not any("UNTRUSTED_CACHED_SNIPPET" in str(x) for x in result.values())
+
+
+@pytest.mark.parametrize("bad_session", ["codex:sibling-session", None])
+def test_adapter_fetch_denies_wrong_or_missing_message_session(native, tmp_path, bad_session):
+    facade, _ = server(tmp_path)
+    token = facade.search("authorized")["results"][0]["id"]
+    native["original"]["session_id"] = bad_session
+    result = facade.fetch(token)
+    assert result == {"error": "denied"}
+    assert "record" not in result and "context_packet" not in result
+    assert "Corrected synthetic answer." not in json.dumps(result)
+
+
+@pytest.mark.parametrize("bad_id", [None, 0, -1, True, 1 << 63, "701"])
+def test_adapter_search_denies_missing_or_invalid_stable_message_id(native, tmp_path, bad_id):
+    if bad_id is None:
+        native["original"].pop("id")
+    else:
+        native["original"]["id"] = bad_id
+    facade, _ = server(tmp_path)
+    result = facade.search("native id required")
+    assert result == {"error": "denied"}
+    assert "Corrected synthetic answer." not in json.dumps(result)
+
+
+def test_adapter_fetch_denies_missing_native_message_id(native, tmp_path):
+    facade, _ = server(tmp_path)
+    token = facade.search("before missing id")["results"][0]["id"]
+    native["original"].pop("id")
+    result = facade.fetch(token)
+    assert result == {"error": "denied"}
+    assert "record" not in result and "context_packet" not in result
+
+
+def test_adapter_identical_text_replacement_changes_locator_and_denies_old_handle(native, tmp_path):
+    facade, _ = server(tmp_path)
+    hit = facade.search("original")["results"][0]
+    old_hash = hit["source_version"]
+    old_locator = hit["locator"]
+    native["original"]["id"] = 702  # Same session/ordinal/date/content.
+    result = facade.fetch(hit["id"])
+    assert result == {"error": "denied"}
+    assert "record" not in result and "context_packet" not in result
+    current = facade.search("replacement")["results"][0]
+    assert current["source_version"] == old_hash  # Content hash remains byte-pinned.
+    assert current["locator"] == f"agentsview:{SESSION}:message:702:ordinal:7"
+    assert current["locator"] != old_locator
+
+
+def test_backend_direct_fetch_requires_full_native_locator(native):
+    rows = backend.search_backend("agentsview", "verified", [grant()], 1, 2)
+    valid = rows[0]
+    assert valid["locator"] == backend.agentsview_locator(valid["native"])
+    for broken in (
+        {**valid, "native": {"session_id": SESSION, "ordinal": 7}},
+        {**valid, "locator": "agentsview:bad:message:701:ordinal:7"},
+    ):
+        with pytest.raises(backend.BackendIdentityDenied):
+            backend.fetch_backend("agentsview", broken, grant(), 2)

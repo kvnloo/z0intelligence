@@ -16,12 +16,15 @@ def grant(source="agentsview", collection="history", scope="project-A"):
 
 def record(*, text="Safe original text", source="agentsview", scope="project-A",
            collection="history", privacy="private", ordinal=3,
+           session_id="codex:synthetic-session", message_id=None,
            locator=None, **extras):
-    native = {"session_id": "codex:synthetic-session", "ordinal": ordinal}
+    message_id = 1000 + ordinal if message_id is None else message_id
+    native = {"session_id": session_id, "ordinal": ordinal, "id": message_id}
     result = {
         "source": source, "collection": collection, "scope": scope,
         "privacy": privacy, "host": "synthetic-host", "date": "2026-10-22",
-        "text": text, "locator": locator or f"agentsview:{native['session_id']}:{ordinal}",
+        "text": text, "locator": locator or
+        f"agentsview:{session_id}:message:{message_id}:ordinal:{ordinal}",
         "native": native,
         "source_version": "sha256:" + hashlib.sha256(text.encode()).hexdigest(),
     }
@@ -60,13 +63,16 @@ class NativeFixture:
         if self.down:
             raise OSError("SYNTHETIC_SECRET_BACKEND_ERROR")
         for row in self.records:
-            if row["native"] == identity["native"] and row["source"] == source:
-                # Calculate the native revision on *every* source read.
+            if (row["source"] == source and
+                    row["native"].get("session_id") == identity["native"]["session_id"] and
+                    row["native"].get("ordinal") == identity["native"]["ordinal"]):
+                # Native ordinal lookup can return another stable ID with identical text.
                 return record(**{
                     "text": row["text"], "source": row["source"],
                     "scope": row["scope"], "collection": row["collection"],
                     "privacy": row["privacy"], "ordinal": row["native"]["ordinal"],
-                    "locator": row["locator"],
+                    "session_id": row["native"]["session_id"],
+                    "message_id": row["native"].get("id"),
                 })
         raise OSError("synthetic missing original")
 
@@ -116,7 +122,7 @@ def test_search_proves_content_revision_and_fetch_reads_original_again(factory):
     hit = found["results"][0]
     assert hit["mode"] == "preview"
     assert hit["source_version"] == record()["source_version"]
-    assert hit["locator"] == "agentsview:codex:synthetic-session:3"
+    assert hit["locator"] == "agentsview:codex:synthetic-session:message:1003:ordinal:3"
     assert hit["source_version"] in serialized(found).decode()
     fetched = server.fetch(hit["id"])
     assert fetched["status"] == "ok"
@@ -380,3 +386,80 @@ def test_inconsistent_digest_row_not_issued(factory):
     reply = server.search("tampered digest")
     assert reply["status"] == "empty"
     assert reply["results"] == []
+
+
+@pytest.mark.parametrize("tamper", [
+    "sibling_session", "missing_session", "missing_message_id",
+    "zero_id", "boolean_id", "overflow_id", "ordinal_mismatch",
+])
+def test_facade_search_denies_unstable_or_foreign_native_identity(factory, tamper):
+    row = record(text="SIBLING_PAYLOAD_NEVER_VISIBLE")
+    native = row["native"]
+    if tamper == "sibling_session":
+        native["session_id"] = "codex:sibling-session"
+    elif tamper == "missing_session":
+        native.pop("session_id")
+    elif tamper == "missing_message_id":
+        native.pop("id")
+    elif tamper == "zero_id":
+        native["id"] = 0
+    elif tamper == "boolean_id":
+        native["id"] = True
+    elif tamper == "overflow_id":
+        native["id"] = 1 << 63
+    elif tamper == "ordinal_mismatch":
+        native["ordinal"] = 4
+    server, _, _, _ = factory(rows=[row])
+    reply = server.search("foreign native")
+    assert reply == {"error": "denied"}
+    assert "SIBLING_PAYLOAD" not in serialized(reply).decode()
+    assert row["locator"] not in serialized(reply).decode()
+    assert "synthetic-host" not in serialized(reply).decode()
+
+
+@pytest.mark.parametrize("tamper", ["sibling", "missing_session", "missing_id"])
+def test_facade_fetch_denies_sibling_or_missing_identity_without_metadata(factory, tamper):
+    server, _, _, _ = factory()
+    token = server.search("before native tamper")["results"][0]["id"]
+    replaced = record(text="SIBLING_PAYLOAD_NEVER_VISIBLE")
+    replaced["host"] = "SIBLING_PRIVATE_HOST"
+    if tamper == "sibling":
+        replaced["native"]["session_id"] = "codex:sibling-session"
+    elif tamper == "missing_session":
+        replaced["native"].pop("session_id")
+    else:
+        replaced["native"].pop("id")
+    server.backend_fetch = lambda *args: replaced
+    reply = server.fetch(token)
+    assert reply == {"error": "denied"}
+    assert "record" not in reply and "context_packet" not in reply
+    assert "SIBLING_PAYLOAD" not in serialized(reply).decode()
+    assert "SIBLING_PRIVATE_HOST" not in serialized(reply).decode()
+
+
+def test_facade_identical_text_reused_ordinal_cannot_replace_native_message(factory):
+    original = record(text="identical evidence bytes")
+    server, _, native, _ = factory(rows=[original])
+    hit = server.search("exact identity")["results"][0]
+    native.records[0]["native"]["id"] += 1
+    # Text and SHA-256 are unchanged. Source-native message ID is not.
+    replacement = record(text=original["text"], message_id=1004)
+    assert replacement["source_version"] == hit["source_version"]
+    assert replacement["locator"] != hit["locator"]
+    denied = server.fetch(hit["id"])
+    assert denied == {"error": "denied"}
+    assert "record" not in denied and "context_packet" not in denied
+
+
+def test_long_native_locator_survives_original_content_hash(factory):
+    session = "codex:" + "a" * 175
+    original = record(session_id=session, message_id=(1 << 63) - 1)
+    server, _, _, _ = factory(rows=[original])
+    hit = server.search("full locator")["results"][0]
+    assert hit["locator"] == original["locator"]
+    assert str((1 << 63) - 1) in hit["locator"]
+    assert hit["source_version"] == original["source_version"]
+    assert hit["locator"] in serialized(server.search("same original")["context_packet"]).decode()
+    hydrated = server.fetch(hit["id"])
+    assert hydrated["record"]["locator"] == original["locator"]
+    assert hydrated["context_packet"]["evidence"][0]["locator"] == original["locator"]

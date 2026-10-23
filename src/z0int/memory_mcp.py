@@ -20,7 +20,10 @@ from collections import OrderedDict, deque
 from typing import Any
 
 from .context_resolve import ContextPacket, EvidenceRef
-from .memory_mcp_backends import search_backend, fetch_backend, BackendUnavailable, BackendDenied, BackendStale
+from .memory_mcp_backends import (
+    search_backend, fetch_backend, BackendUnavailable, BackendDenied,
+    BackendIdentityDenied, BackendStale, agentsview_locator,
+)
 
 SOURCES = ("agentsview", "ctx", "qmd", "tencentdb")
 PRIVACY = {"public", "personal", "private"}
@@ -103,6 +106,17 @@ def allowed(record: dict, policy: dict) -> bool:
                    ("source", "collection", "scope")) and
                record.get("privacy") in g["privacy"] for g in policy["allow"])
 
+
+def exact_native_record(record: Any) -> bool:
+    """Only qualified native AgentsView originals may cross this facade."""
+    if not isinstance(record, dict) or record.get("source") != "agentsview":
+        return False
+    try:
+        return record.get("locator") == agentsview_locator(record.get("native"))
+    except BackendIdentityDenied:
+        return False
+
+
 class MemoryServer:
     def __init__(self, policy_path: Path, state_dir: Path, *,
                  principal: str, backend_search=search_backend,
@@ -174,6 +188,8 @@ class MemoryServer:
         return token
 
     def _public(self, raw: dict, cap: int, *, preview: bool) -> dict | None:
+        if not exact_native_record(raw):
+            return None
         fields = ("source", "collection", "scope", "privacy", "host",
                   "date", "text", "locator", "source_version")
         if any(not isinstance(raw.get(k), str) or not raw[k] for k in fields):
@@ -186,6 +202,8 @@ class MemoryServer:
         if len(raw["locator"].encode("utf-8")) > 256:
             return None
         result = {k: redact(raw[k]) for k in fields if k != "text"}
+        if result["locator"] != raw["locator"]:
+            return None  # Never publish a redacted/truncated native locator.
         result["host"] = clip(result["host"], 256)
         result["date"] = clip(result["date"], 256)
         result["id"] = "x" * 89
@@ -238,11 +256,14 @@ class MemoryServer:
                 for raw in rows[:limit]:
                     if (not isinstance(raw, dict) or raw.get("source") != source or
                             not allowed(raw, policy) or
-                            not isinstance(raw.get("native"), dict) or
                             not isinstance(raw.get("source_version"), str)):
                         denied += 1
                         continue
+                    if not exact_native_record(raw):
+                        return self._audit("search", query, {"error": "denied"})
                     candidates.append(raw)
+            except BackendIdentityDenied:
+                return self._audit("search", query, {"error": "denied"})
             except Exception:
                 statuses[source] = "unavailable"
         # Revocation between search and response is never ignored.
@@ -302,6 +323,9 @@ class MemoryServer:
         if self.clock() - issued > ID_TTL_SECONDS:
             self.cache.pop(id, None)
             return self._audit("fetch", id, {"error": "stale"})
+        if not exact_native_record(identity):
+            self.cache.pop(id, None)
+            return self._audit("fetch", id, {"error": "denied"})
         grant = next((g for g in policy["allow"]
                       if all(identity.get(k) == g[k] for k in
                              ("source", "collection", "scope")) and
@@ -321,7 +345,7 @@ class MemoryServer:
             return self._audit("fetch", id, {"error": "unavailable"})
         # The native source may have been replaced without changing its date,
         # length, or ordinal. A new content digest invalidates the old handle.
-        if (not isinstance(original, dict) or
+        if (not exact_native_record(original) or
                 not allowed(original, policy) or
                 original.get("locator") != identity["locator"] or
                 original.get("native") != identity["native"]):
