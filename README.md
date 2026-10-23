@@ -215,6 +215,121 @@ promote verified winner
 
 The ABAB meta-loop can evolve both **what data to train on** and **which architecture to use**. The benchmark, privacy boundary, and sealed evaluation set stay outside the evolvable surface.
 
+### Private read-only memory MCP (#22 / #194)
+
+`python -m z0int.memory_mcp` exposes only `search` and `fetch` via a private **stdio**
+process. Memory is source evidence, never permission or a command. No HTTP
+listener, tool execution, source mutation, import, setup, refresh, arbitrary
+path/URL, or automatic context injection is added.
+
+**Exact recovery qualified for one source only.** The [AgentsView public
+Session API](https://www.agentsview.io/docs/session-api/) documents
+`GET /api/v1/search/content`, `GET /api/v1/sessions/{id}` and
+`GET /api/v1/sessions/{id}/messages?around=N&before=0&after=0`.
+Search is FTS on dialogue messages with `reveal=false`, constrained to
+an exactly granted project. A message match's native `session_id` and `ordinal` are used only
+to locate an original. Before reading any message content or metadata, the
+adapter verifies that the returned message's own `session_id` equals the
+requested session and that `db.Message.id` is a valid positive int64.
+It retains that stable native message ID separately from the ordinal and
+includes both in the full, untruncated source locator. Fetch requires the same
+native ID; sibling/missing identities and identical-text ordinal replacements
+are denied even when their SHA-256 content hashes match. The backend also
+checks the session's native project **before and after** the original read.
+Thinking, tool-use, system and unknown-class messages fail closed.
+
+`source_version` is SHA-256 of the **complete normalized AgentsView
+message `content` UTF-8 bytes**, read from the message endpoint (not
+a display date and **not** a digest of the underlying provider's raw JSONL).
+Search exposes a small, labeled `preview` from that original plus an
+opaque HMAC handle. `fetch` checks the current principal grant, re-reads
+the original under a bounded deadline, rechecks its scope, compares
+`source_version`, and returns a labeled `original_read` with the same
+native locator. A changed same-date/same-size message is **stale**; source
+outage is **unavailable**; revoked or wrong scope is **denied**; missing results
+are **empty**. The fetch output remains bounded and may be marked
+`text_truncated=true`; it is never a cached search snippet. Source
+identity/revision, not date, enters the provenance-only ContextPacket.
+The handle retains a detached snapshot of the native identity, so later backend
+record mutation cannot rewrite the identity covered by its signature.
+
+**Explicit principal grants (policy schema v2).** The reviewed operator and
+least-privileged ChatGPT profiles must be separately granted; no scope or
+credential from one is inherited by the other. The checked-in
+`manifests/memory-mcp-readonly.json` grants the operator only the
+AgentsView `history` collection at exact project `z0intelligence`,
+with `private` classification; ChatGPT's allowlist is **empty**.
+Review the archive's suitability and copy that file into private operator-owned
+configuration before any connection. Missing/invalid/v1 policy, wildcard,
+unknown scope and unreviewed secrets never grant access. AgentsView's
+`project` is an archive metadata label, not an independent source
+ACL. Its `auth_token` bearer is **broad access to the local AgentsView API**,
+not scoped to a provider, session, project or MCP principal. The operator and
+ChatGPT grants are separate **facade-side** allowlists enforced only by this
+MCP process, through exact project and native message checks. They do not
+reduce the privileges of the underlying AgentsView bearer or isolate a
+different process with direct API access. Keep that token private, use an
+operator-controlled archive/corpus classified for the granted scope, and
+validate tunnel identity and consent before exposing stdio. Redaction of
+credentials occurs **before** UTF-8 clipping, not in lieu of curation
+or provider consent.
+
+`Z0INT_MEMORY_MCP_PRINCIPAL` is required **at process startup** and
+must be set by the operator's stdio/tunnel configuration, never by the model or
+tool arguments:
+
+```bash
+export Z0INT_MEMORY_MCP_POLICY="$PWD/manifests/memory-mcp-readonly.json"
+export Z0INT_MEMORY_MCP_PRINCIPAL=operator
+PYTHONPATH=src python -m z0int.memory_mcp
+```
+
+For a ChatGPT tunnel, use a **separate, explicitly reviewed `chatgpt` grant**
+and start a dedicated process with `Z0INT_MEMORY_MCP_PRINCIPAL=chatgpt`.
+The server has no OAuth or ChatGPT workspace authentication of its own:
+the operator controls stdio exposure and validates the tunnel's identity
+and consent independently. Never assume the example grants ChatGPT access.
+
+The backend reads AgentsView's `port` and `auth_token` by reference
+from `~/.agentsview/config.toml` and connects only to its loopback port.
+It never follows a redirect or arbitrary URL. **ctx, QMD and TencentDB
+return `unavailable`** from this facade until their native exact-source
+rehydration and authorization interfaces are qualified. ctx remains a
+separate, explicit pull via the existing integration path; this server never
+runs ctx refresh, import or the latency-sensitive automatic 300ms path.
+Do not mistake a lexical match or zero-hit smoke test for model-visible use.
+
+Output is capped by policy (default 4096 bytes per record, 32768 bytes per
+payload), with a 10-minute, process-bound, 256-handle metadata-only cache
+and 30 calls/minute shared across tools. The private 0700 state directory
+and 0600 audit log contain only fixed decisions, counts, sizes and keyed
+query/handle hashes, never raw prompts or originals. Audit failure blocks
+disclosure. Output text is untrusted evidence even when successfully read.
+
+Each successfully appended row in that **same** private audit.jsonl has
+schema `z0int.memory_query_outcome.v1`, tool (`search`, `fetch`, or `invalid`),
+and outcome (`hit`, `miss`, `denied`, `unavailable`, `stale`,
+`rate_limited`, `invalid`, or `error`). A nonempty successful search or
+original fetch is a hit; an empty authorized search is a miss, not an outage.
+An entirely policy-filtered search is a denial, not a miss. Unknown error
+codes map to `error` without changing the tool response. Existing
+`timestamp`, keyed `query_hmac`, `count`, `bytes`, `denied_count`,
+`unavailable_count`, and `decision` remain in the row. Neither raw
+queries/handles nor source bodies, paths, or credentials are logged. These
+are retrieval dispositions only: they do **not** measure answer quality,
+injection, downstream usefulness, or independent verification. No outcome
+mutation tool, secondary ledger, or permission is created.
+
+Run the focused suites on the MBP. Revision regressions replace the original
+and its content digest together, then independently exercise stale handles and
+fresh searches; synthetic tests do not claim live-source validation:
+
+```bash
+PYTHONPATH=src python -m pytest -q tests/test_memory_mcp.py
+PYTHONPATH=src python -m pytest -q tests/test_memory_mcp_backends.py
+PYTHONPATH=src python -m pytest -q tests/test_memory_mcp.py tests/test_memory_mcp_backends.py
+```
+
 ## Current foundation: OpenJev runtime
 
 The code in this repository currently reproduces the useful *interface pattern* of TypeSafe Jev with open components. It does not reproduce Jev's undisclosed model or training.
