@@ -1,5 +1,5 @@
-// Every transition decision on this page comes from JavaScript emitted by bend 2.0.34.
-// The adapter only maps JSON <-> Bend constructors and names the guarding law.
+// Interactive next-state values come from JavaScript emitted by bend 2.0.34.
+// The authored adapter validates the ABI and derives the verdict/reason labels; the recorded tape is played back.
 import { transition } from '../bend/fsm/adapter.mjs';
 import { bendMetadata as META } from '../bend/fsm/Runtime.generated.mjs';
 import MEM from '../bend/memory/MemRuntime.mjs';
@@ -49,8 +49,8 @@ function rail() {
 const SHORT = { W1: 'one owner per worktree', L3: 'receipt bound to the head', L5: 'interrupted is never dropped', L1: 'no merge without owner acceptance', L4: 'deployed == integrated', W4: 'heavy work off the desktop' };
 const INCIDENTS = [
   { id: 'W1', what: 'writes by a second agent session into a worktree another session already held (19 worktrees)', md: 'One agent per worktree.' },
-  { id: 'L3', what: 'integrations where the head being landed had no passing test receipt; an older commit’s “green” was reused', md: 'Make sure tests pass before merging.' },
-  { id: 'L5', what: 'interrupted work items that nobody resumed, opened as a PR or explicitly abandoned. They just vanished', md: 'Resume dead workers from their log.' },
+  { id: 'L3', what: 'integrations with no recorded passing receipt for the head being landed. The law also blocks reusing an older commit’s green receipt', md: 'Make sure tests pass before merging.' },
+  { id: 'L5', what: 'interrupted work items with no recorded resume, PR or explicit abandonment', md: 'Resume dead workers from their log.' },
   { id: 'L1', what: 'PRs merged with no recorded owner acceptance of a deployed head', md: 'Never merge before Kevin has seen it.' },
   { id: 'L4', what: 'services found stale, diverged or missing merged commits; the running build was not the integrated one', md: 'Restart the service after merging.' },
   { id: 'W4', what: 'heavy builds and tests run on the interactive desktop with no exception, instead of on the build machine', md: 'Heavy work goes to the build machine.' },
@@ -180,9 +180,9 @@ function movesFor(st) {
     case 'Proposed': return [m(ACT.free, 'claim the work (free tier, fast)', { tag: 'Claim', a: ACT.free }, true), m(ACT.chat, 'claim it from the ChatGPT app', { tag: 'Claim', a: ACT.chat }, true), m(ACT.opus, 'claim the work', { tag: 'Claim', a: ACT.opus }), m(ACT.sol, 'claim the work', { tag: 'Claim', a: ACT.sol })];
     case 'Claimed': return [m(other, 'start on it anyway', { tag: 'Start', a: other }, true), m(au, 'start implementing', { tag: 'Start', a: au }), m(null, 'worker process dies', { tag: 'Interrupt' })];
     case 'Implementing': return [m(other, 'push a commit to their branch', { tag: 'Push', a: other, sha: hd + 1 }, true), m(au, `push a commit (head ${hd + 1})`, { tag: 'Push', a: au, sha: hd + 1 }), m(au, 'submit for verification', { tag: 'Submit', a: au }), m(null, 'worker process dies', { tag: 'Interrupt' }), m(au, 'mark blocked', { tag: 'Block', a: au })];
-    case 'Verifying': return [m(au, 'verify my own work: “tests pass”', { tag: 'Verify', a: au, r: { sha: hd, pass: true } }, true), m(ACT.ci, `use the green receipt from head ${Math.max(0, hd - 1)}`, { tag: 'Verify', a: ACT.ci, r: { sha: Math.max(0, hd - 1), pass: true } }, true), m(ACT.ci, `failing receipt for head ${hd}`, { tag: 'Verify', a: ACT.ci, r: { sha: hd, pass: false } }), m(ACT.ci, `passing receipt for exactly head ${hd}`, { tag: 'Verify', a: ACT.ci, r: { sha: hd, pass: true } })];
-    case 'DraftPR': return [m(au, 'integrate my own PR', { tag: 'Integrate', a: au, ish: hd, r: { sha: hd, pass: true } }, true), m(au, 'skip ahead: merge to main', { tag: 'Merge', a: au }, true), m(ACT.ci, `integrate with a receipt for head ${Math.max(0, hd - 1)}`, { tag: 'Integrate', a: ACT.ci, ish: hd, r: { sha: Math.max(0, hd - 1), pass: true } }, true), m(ACT.ci, `integrate head ${hd} with its receipt`, { tag: 'Integrate', a: ACT.ci, ish: hd, r: { sha: hd, pass: true } })];
-    case 'Integrated': return [m(ACT.ci, `deploy, but the service serves head ${Math.max(0, st.ig - 1)}`, { tag: 'Deploy', a: ACT.ci, served: Math.max(0, st.ig - 1) }, true), m(au, 'merge now, deploy later', { tag: 'Merge', a: au }, true), m(ACT.ci, `deploy exactly head ${st.ig}`, { tag: 'Deploy', a: ACT.ci, served: st.ig })];
+    case 'Verifying': return [m(au, 'verify my own work: “tests pass”', { tag: 'Verify', a: au, r: { sha: hd, pass: true } }, true), m(ACT.ci, `use a green receipt for head ${hd > 0 ? hd - 1 : hd + 1} (not this head)`, { tag: 'Verify', a: ACT.ci, r: { sha: hd > 0 ? hd - 1 : hd + 1, pass: true } }, true), m(ACT.ci, `failing receipt for head ${hd}`, { tag: 'Verify', a: ACT.ci, r: { sha: hd, pass: false } }), m(ACT.ci, `passing receipt for exactly head ${hd}`, { tag: 'Verify', a: ACT.ci, r: { sha: hd, pass: true } })];
+    case 'DraftPR': return [m(au, 'integrate my own PR', { tag: 'Integrate', a: au, ish: hd, r: { sha: hd, pass: true } }, true), m(au, 'skip ahead: merge to main', { tag: 'Merge', a: au }, true), m(ACT.ci, `integrate with a receipt for head ${hd > 0 ? hd - 1 : hd + 1} (not this head)`, { tag: 'Integrate', a: ACT.ci, ish: hd, r: { sha: hd > 0 ? hd - 1 : hd + 1, pass: true } }, true), m(ACT.ci, `integrate head ${hd} with its receipt`, { tag: 'Integrate', a: ACT.ci, ish: hd, r: { sha: hd, pass: true } })];
+    case 'Integrated': return [m(ACT.ci, `deploy, but the service serves head ${st.ig > 0 ? st.ig - 1 : st.ig + 1}`, { tag: 'Deploy', a: ACT.ci, served: st.ig > 0 ? st.ig - 1 : st.ig + 1 }, true), m(au, 'merge now, deploy later', { tag: 'Merge', a: au }, true), m(ACT.ci, `deploy exactly head ${st.ig}`, { tag: 'Deploy', a: ACT.ci, served: st.ig })];
     case 'Deployed': return [m(au, 'accept my own deployed work', { tag: 'Accept', a: au }, true), m(ACT.ci, 'merge without waiting for Kevin', { tag: 'Merge', a: ACT.ci }, true), m(ACT.jev, 'accept on Kevin’s behalf', { tag: 'Accept', a: ACT.jev }, true), m(null, `service seen serving head ${st.dp + 7}`, { tag: 'Observe', served: st.dp + 7 }), m(ACT.owner, 'look at the running result and accept', { tag: 'Accept', a: ACT.owner })];
     case 'Accepted': return [m(ACT.free, 'merge it', { tag: 'Merge', a: ACT.free }, true), m(ACT.ci, 'merge on Kevin’s recorded acceptance', { tag: 'Merge', a: ACT.ci })];
     case 'Blocked': return [m(ACT.free, 'unblock it', { tag: 'Unblock', a: ACT.free }, true), m(ACT.free, 'abandon it quietly', { tag: 'Abandon', a: ACT.free }, true), m(ACT.opus, 'unblock', { tag: 'Unblock', a: ACT.opus }), m(ACT.owner, 'abandon (explicit decision)', { tag: 'Abandon', a: ACT.owner })];
@@ -244,7 +244,7 @@ function renderLedger() {
 /* ───────────── 04 replay ───────────── */
 // event kinds/roles and report|what-if labels from the public scenarios.json (owner-acceptance tape)
 const TAPE_META = [['report', 'Opus', 'Claim'], ['report', 'Opus', 'Start'], ['report', 'Opus', 'Push'], ['report', 'Opus', 'Submit'], ['report', 'Ci', 'Verify'], ['report', 'Opus (author)', 'Integrate'],
-  ['what-if', 'Ci', 'Integrate'], ['what-if', 'Ci', 'Deploy'], ['what-if', 'Opus (author)', 'Accept'], ['what-if', 'Kevin, asleep', 'Accept'], ['what-if', 'Kevin', 'Accept'], ['what-if', 'Ci', 'Merge']];
+  ['what-if', 'Ci', 'Integrate'], ['what-if', 'Ci', 'Deploy'], ['what-if', 'Opus (author)', 'Accept'], ['what-if', 'Kevin, marked off', 'Accept'], ['what-if', 'Kevin', 'Accept'], ['what-if', 'Ci', 'Merge']];
 async function replay() {
   const trace = await (await fetch('trace.json')).json();
   const chart = makeChart($('#chart-replay'));
@@ -290,16 +290,16 @@ function memory() {
     $$('#mem .switch').forEach((sw) => sw.setAttribute('aria-checked', String(S[sw.dataset.k])));
     vbtn.forEach(([t, b]) => b.setAttribute('aria-pressed', t === S.view ? 'true' : 'false'));
     const p = project();
-    out.replaceChildren(box('capability', p.bounded, 'may act now'), box('evidence', p.evidence, 'history available'), box('instruction', p.instruction, 'memory as authority'));
+    out.replaceChildren(box('capability', p.bounded, 'explicit ∧ policy (not an execution token)'), box('evidence', p.evidence, 'history available'), box('instruction', p.instruction, 'memory as authority'));
     const viewTxt = S.view === 'MemAbsent' ? 'MemAbsent{}' : `${S.view}{attempt: ${S.attempt}}`;
     call.textContent = `MODEL.project(${S.explicit}, ${S.policy}, ${viewTxt}) → MemProjection{evidence: ${p.evidence}, bounded: ${p.bounded}, instruction: ${p.instruction}}`;
   };
   $$('#mem .switch').forEach((sw) => sw.addEventListener('click', () => { S[sw.dataset.k] = !S[sw.dataset.k]; render(); }));
   const STORY = [
-    ['Monday: Kevin tells an agent “you may deploy the dashboard.”', { explicit: true, policy: true, view: 'MemAbsent', attempt: false }],
+    ['Monday (hypothetical): Kevin grants an agent permission to deploy a dashboard.', { explicit: true, policy: true, view: 'MemAbsent', attempt: false }],
     ['The grant is written to memory as an admitted note.', { explicit: true, policy: true, view: 'MemAdmitted', attempt: true }],
     ['Tuesday: Kevin revokes it. The current explicit grant is now false.', { explicit: false, policy: true, view: 'MemAdmitted', attempt: true }],
-    ['Next week a compacted summary is retrieved: “Kevin said yes, deploy.”', { explicit: false, policy: true, view: 'MemRetrieved', attempt: true }],
+    ['Next week a compacted summary that still records the old grant is retrieved.', { explicit: false, policy: true, view: 'MemRetrieved', attempt: true }],
     ['The agent tries to act on that memory. Capability: false. Evidence: still true.', { explicit: false, policy: true, view: 'MemReplayed', attempt: true }],
   ];
   const tl = $('#memstory'); const rows = STORY.map(([t], k) => { const r = h('div', { class: 'tl' }, h('span', { class: 'i' }, String(k + 1)), h('span', {}, t), h('span', { class: 'dot' })); tl.append(r); return r; });
@@ -318,13 +318,13 @@ function memory() {
 
 /* ───────────── 06 chain ───────────── */
 const CHAIN = [
-  ['Write the owner’s intent and the safety obligations separately from the implementation', 'impl', 'AODL types intent, authority and constraints. LAWS.bend imports the real transition model and PROOF.bend imports the laws.', 'A wrong law certifies the wrong thing. Law review stays with the owner.', 'https://github.com/kvnloo/aodl'],
+  ['Write the owner’s intent and the safety obligations separately from the implementation', 'impl', 'AODL types intent, authority and constraints, with a validator (implemented). LAWS.bend imports the real transition model and PROOF.bend imports the laws. The Bend consumers are draft PRs.', 'A wrong law certifies the wrong thing. Law review stays with the owner.', 'https://github.com/kvnloo/aodl'],
   ['Shrink the action set to what is legal before any model chooses', 'impl', 'z0intelligence compiles the legal actions deterministically. In Phase 1b, compiler-first arms made 0 dangerous selections against 6 for the unfiltered control.', 'That was a bounded decision task, not production safety. The FSM enforcement additions are drafts.', 'https://kvnloo.github.io/z0evals/'],
   ['Record the exact evidence: proposal, execution, refusal, result', 'impl', 'Runtime and tokenomics receipts. bend-native records input, toolchain and kernel identity, plus a scoped verdict with stale detection.', 'Completion isn’t success, and a verifier receipt isn’t authority.', 'https://github.com/kvnloo/bend-native'],
   ['Freeze the cohort, revisions, metrics and judge', 'impl', 'z0evals publishes only pinned, allowlisted artifacts, and negative or pending outcomes stay visible.', 'The candidate must never be able to edit its own judge.', 'https://github.com/kvnloo/z0evals'],
-  ['Admit only verified trajectories to an experiment queue', 'impl', '`enqueue_trace` rejects anything without verified_success plus a verifier identity, and rejects duplicate credit.', 'This is a caller contract, not cryptographic proof that the outcome label is true.', 'https://github.com/kvnloo/z0intelligence/blob/6cae99254bbb2f38329c081c15c2ce81c74a4be2/src/z0int/autoresearch/queue.py'],
+  ['Admit only verified trajectories to an experiment queue', 'impl', '`enqueue_trace` rejects anything without verified_success plus a verifier identity, and rejects duplicate credit. The source exists. Activation and integration are not established.', 'This is a caller contract, not cryptographic proof that the outcome label is true.', 'https://github.com/kvnloo/z0intelligence/blob/6cae99254bbb2f38329c081c15c2ce81c74a4be2/src/z0int/autoresearch/queue.py'],
   ['Freeze a champion, mutate one axis, run A/B/A/B', 'sim', 'The champion context policy is written once. Mutations drop one context operation. The arms are A0/B0/A1/B1 with hashes, and the outcome is KEEP_CHALLENGER_CANDIDATE, REJECT or NO_UPDATE.', 'The cost/quality model in replay.py is simulated. It doesn’t rerun agent turns, and no savings are claimed.', 'https://github.com/kvnloo/z0intelligence/blob/6cae99254bbb2f38329c081c15c2ce81c74a4be2/src/z0int/autoresearch/replay.py'],
-  ['Promote through the same gate as a merge', 'draft', 'Candidate → verified on its exact revision → owner acceptance → champion. These are the L1–L3 shapes from chapter 02, applied to policies.', 'There’s no automatic promotion today. The general shadow → canary → active path is unestablished.', 'https://github.com/kvnloo/z0/issues/15'],
+  ['Promote through the same gate as a merge', 'dir', 'Proposed protocol: candidate → verified on its exact revision → owner acceptance → champion. These are the L1–L3 shapes from chapter 02, applied to policies.', 'There’s no automatic promotion today. The general shadow → canary → active path is unestablished.', 'https://github.com/kvnloo/z0/issues/15'],
   ['Train small specialists on eligible experience, if that beats a rule or a cache', 'dir', 'An observe-only shadow lane exists: it compiles legal candidates and records local-model choices without ever executing them.', 'No chain yet of frozen corpus → trained checkpoint → held-out gain. This is your weights question, and it’s open.', 'https://github.com/kvnloo/z0intelligence/blob/6cae99254bbb2f38329c081c15c2ce81c74a4be2/src/z0int/cognition/shadow.py'],
 ];
 const CHIP = { impl: ['implemented', 'impl'], draft: ['draft', 'draft'], sim: ['simulated', 'sim'], dir: ['direction', 'dir'] };
@@ -409,7 +409,7 @@ function map() {
 const QS = [
   ['strong', 'Autoresearch that can’t quietly change what “better” means', 'Would a tiny verified promotion protocol (same spec hash, same benchmark manifest, evidence bound to the candidate revision) be useful next to the compiler proof? Or is the missing piece the formal cost model?', 'You’ve described evolving Bend-in-Bend under laws. A promotion FSM with a deliberately cheating mutant is small and checkable.', 'It proves a transition rule over modelled inputs. It doesn’t prove the benchmarks ran honestly or that compiled code preserves semantics.'],
   ['strong', 'Memory that remembers intent without reviving revoked authority', 'When a Unii summary remembers an old instruction, where should its authority end? Would a non-escalation law help keep that separate from recall quality?', 'Chapter 05 is exactly this boundary, as a proven pure law.', 'It doesn’t show that every tool call routes through the gate, or that summaries are faithful.'],
-  ['medium', 'Weights in the autoresearch loop', 'On-policy RL during search, periodic SFT/distillation on accepted solutions, or a hybrid? We can compare them only if the acceptance spec and holdout stay frozen.', 'The receipts, frozen champion and promotion gate make that experiment measurable.', 'SFT isn’t RL, and running a local model isn’t training one. Nothing here has trained weights yet.'],
+  ['medium', 'Weights in the autoresearch loop', 'On-policy RL during search, periodic SFT/distillation on accepted solutions, or a hybrid? We can compare them only if the acceptance spec and holdout stay frozen.', 'Receipts and a frozen champion exist. The promotion gate is a proposal. Together they would make that experiment measurable.', 'SFT isn’t RL, and running a local model isn’t training one. Nothing here has trained weights yet.'],
   ['strong', 'Evidence a downstream Bend adopter should publish', 'What would you want a small adopter to publish so you can tell an interesting use case apart from another green-check demo?', 'Revision-bound receipts, toolchain hashes, mutants and the honest scope line on every claim, as on this page.', 'Receipts can’t decide whether the laws captured the right intent.'],
 ];
 function questions() {
