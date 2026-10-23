@@ -25,6 +25,27 @@ def test_actual_local_heavy(cmd):
     assert S.local_heavy(cmd)
 
 
+@pytest.mark.parametrize("command,expected", [
+    ("ffmpeg -i input -c:v h264_nvenc out",
+     [["ffmpeg", "-i", "input", "-c:v", "h264_nvenc", "out"]]),
+    ("tool --define=key:value /tmp/source:file",
+     [["tool", "--define=key:value", "/tmp/source:file"]]),
+    ("printf ok\ncargo test", [["printf", "ok"], ["cargo", "test"]]),
+    ("printf ok;\n\ncargo test", [["printf", "ok"], ["cargo", "test"]]),
+    ("printf ok\r\ncargo test", [["printf", "ok"], ["cargo", "test"]]),
+    ("printf 'cargo build\\nnot a command'", [["printf", "cargo build\\nnot a command"]]),
+    ("printf 'cargo build\nnot a command'", [["printf", "cargo build\nnot a command"]]),
+    ("printf 'a&&b' && cargo test", [["printf", "a&&b"], ["cargo", "test"]]),
+])
+def test_shell_words_preserve_non_operator_punctuation(command, expected):
+    assert S.local_commands(command) == expected
+
+
+@pytest.mark.parametrize("separator", ["\n", ";\n", "&&\n", "||\n", "\r\n"])
+def test_newline_boundaries_still_find_actual_builds(separator):
+    assert S.local_heavy("printf harmless" + separator + "cargo build")
+
+
 def task():
     return S.Task("deleg_old/task-0", "recover widget", 1, "interrupted", 10, "/old/task-0.log")
 

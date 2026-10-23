@@ -153,10 +153,12 @@ class Task:
     last_activity: float | None = None
 
 
-def read_tasks(live: Path) -> list[Task]:
+def read_tasks(live: Path, changed_since: float = 0.0) -> list[Task]:
     out = []
     for log in sorted(live.glob("*/task-*.log")):
         try:
+            if log.stat().st_mtime < changed_since:
+                continue
             text = log.read_text(errors="replace")
         except OSError:
             continue
@@ -194,15 +196,15 @@ def open_db(path: Path) -> sqlite3.Connection:
     return sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=10)
 
 
-def read_calls(db: sqlite3.Connection, since: float = 0.0) -> list[Call]:
+def read_calls(db: sqlite3.Connection, since: float = 0.0, min_id: int = 0, max_id: int = 2**63-1) -> list[Call]:
     results: dict[str, tuple[float, str]] = {}
     for cid, ts, content in db.execute(
             "select tool_call_id, timestamp, substr(content, 1, 4000) from messages "
-            "where role='tool' and tool_call_id is not null and timestamp >= ?", (since,)):
+            "where id > ? and id <= ? and role='tool' and tool_call_id is not null and timestamp >= ?", (min_id, max_id, since)):
         results[cid] = (ts, content or "")
     out = []
     for sess, ts, tc in db.execute("select session_id, timestamp, tool_calls from messages "
-                                   "where tool_calls is not null and timestamp >= ? order by timestamp, id", (since,)):
+                                   "where id > ? and id <= ? and tool_calls is not null and timestamp >= ? order by timestamp, id", (min_id, max_id, since)):
         try:
             calls = json.loads(tc)
         except (TypeError, ValueError):
@@ -226,11 +228,11 @@ def read_calls(db: sqlite3.Connection, since: float = 0.0) -> list[Call]:
     return out
 
 
-def child_notices(db: sqlite3.Connection) -> list[Call]:
+def child_notices(db: sqlite3.Connection, min_id: int = 0, max_id: int = 2**63-1) -> list[Call]:
     """Parent-side 'Child left N background process(es)' notices, read in full
     (they sit at the end of long delegate_task results)."""
     return [Call(sess, ts, "notice", {}, "", ts, content or "") for sess, ts, content in db.execute(
-        "select session_id, timestamp, content from messages where content like '%Child left %background process%'")]
+        "select session_id, timestamp, content from messages where id > ? and id <= ? and content like '%Child left %background process%'", (min_id, max_id))]
 
 
 def read_sessions(db: sqlite3.Connection) -> dict[str, dict[str, Any]]:
@@ -378,12 +380,13 @@ def local_commands(cmd: str) -> list[list[str]]:
     # Here-doc bodies are data (often source code or documentation).
     cmd = re.sub(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n[\s\S]*?\n\1\b", "", cmd)
     try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=";&|()<>")
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=";&|()<>\n")
         lex.whitespace = " \t\r"
+        lex.whitespace_split = True
         lex.commenters = "#"
         parts, part = [], []
         for token in lex:
-            if token == "\n" or token in (";", "&&", "||", "|", "&", "(", ")"):
+            if token and not token.strip(";&|()\n"):
                 if part:
                     parts.append(part)
                 part = []
@@ -502,13 +505,15 @@ def estimate_waits(jobs: list[Job]) -> None:
         prev_end = max(prev_end, j.end or j.start)
 
 
-def fleet_jobs(runs: Path) -> list[Job]:
+def fleet_jobs(runs: Path, changed_since: float = 0.0) -> list[Job]:
     out = []
     for log in sorted(runs.glob("*.log")):
         m = re.match(r"(\d{8}-\d{6})-(\w{4})-(.+)\.log$", log.name)
         if not m:
             continue
         try:
+            if log.stat().st_mtime < changed_since:
+                continue
             text = log.read_text(errors="replace")
         except OSError:
             continue
@@ -1193,25 +1198,40 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
     now = (dt.datetime.fromisoformat(args.now.replace("Z", "+00:00")).timestamp() if args.now
            else dt.datetime.now(dt.timezone.utc).timestamp())
     lim_s = int(args.limit_hours * 3600)
-    tasks = read_tasks(Path(args.delegation_dir))
+    window = getattr(args, "operational_window", 0)
+    prior = None
+    if window:
+        if not args.live_dir:
+            raise ValueError("--operational-window requires --live-dir to preserve prior unresolved evidence")
+        state = Path(args.live_dir) / 'state.json'
+        if state.exists():
+            prior = json.loads(state.read_text())
+    tasks = read_tasks(Path(args.delegation_dir), now - lim_s if window else 0.0)
     db = open_db(Path(args.state_db))
     sessions = read_sessions(db)
     delegations = read_delegations(db)
-    calls = read_calls(db)
-    notices = child_notices(db)
+    max_id = db.execute('select coalesce(max(id), 0) from messages').fetchone()[0] if window else 0
+    min_id = max(0, max_id - window) if window else 0
+    calls = read_calls(db, min_id=min_id, max_id=max_id if window else 2**63-1)
+    notices = child_notices(db, min_id=min_id, max_id=max_id if window else 2**63-1)
     db.close()
     match_sessions(tasks, sessions)
     by_sess: dict[str, list[Call]] = defaultdict(list)
     for c in calls:
         by_sess[c.session].append(c)
 
-    commons = find_repos(args.roots)
-    inv = worktree_inventory(commons)
-    roots = Roots([r["path"] for r in inv])
+    # Operational ticks never walk every checkout or run git status over them.
+    # Full archival replay remains explicit, outside the desktop's live timer.
+    commons = [] if window else find_repos(args.roots)
+    inv = [] if window else worktree_inventory(commons)
+    known = [p for t in tasks for p in t.worktrees]
+    if prior:
+        known += [p for w in prior.get('workers', []) for p in w.get('meta', {}).get('worktrees', [])]
+    roots = Roots(known if window else [r["path"] for r in inv])
 
     groot = heavy_jobs_groot(calls)
     estimate_waits(groot)
-    fleet = fleet_jobs(Path(args.fleet_runs))
+    fleet = fleet_jobs(Path(args.fleet_runs), now - lim_s if window else 0.0)
     stats = wait_stats(groot, fleet, calls)
     stats["lslocks_observations"] = lock_observations(calls)
     stats["lslocks_max_waiters_seen"] = max((o["waiters"] for o in stats["lslocks_observations"]), default=0)
@@ -1233,17 +1253,27 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             continue
         wt_paths = touched_worktrees(wk, by_sess, roots)
         mine = written_paths(wk, by_sess)
-        wts = [worktree_state(p, mine) for p in wt_paths[:8]]
+        wts = [] if window else [worktree_state(p, mine) for p in wt_paths[:8]]
         repos = [x["path"] for x in wts if x.get("git")]
-        commits = own_commits(wk, by_sess, repos)
-        action, why = recommend(wk, wts, ordered[pos[wk.task.id] + 1:], commits)
+        commits = [] if window else own_commits(wk, by_sess, repos)
+        action, why = (('hold', 'bounded operational evidence; on-demand repository inspection required, not authorization to resume/abandon')
+                       if window else recommend(wk, wts, ordered[pos[wk.task.id] + 1:], commits))
         batch.append({"worker": wk.task.id, "goal": wk.task.goal[:140], "end": wk.task.end or "vanished",
                       "last_write": iso(max(wk.task.last_write, wk.task.last_activity or 0)),
                       "recommended": action, "why": why, "worktrees": wts, "own_commits": commits,
                       "branches": wk.task.branches, "log": wk.task.log, "phase": wk.final.phase.value,
                       "in_loop1_dropped": wk.task.id in loop1, "successor": wk.meta.get("successor"),
                       "resumed_from_log": wk.meta.get("resumed_from_log"),
-                      "decision_line": json.dumps({"worker": wk.task.id, "action": action, "by": "kevin"})})
+                      "decision_line": '' if window else json.dumps({"worker": wk.task.id, "action": action, "by": "kevin"})})
+
+    if window and prior:
+        seen = {x['worker'] for x in batch}
+        # Missing from a bounded window does not mean completed, abandoned or safe.
+        for old in prior.get('needs_kevin', {}).get('items', []):
+            if old['worker'] not in seen:
+                batch.append({**old, 'recommended': 'hold', 'decision_line': '',
+                              'stale_evidence_from': prior.get('generated_at'),
+                              'why': 'carried unresolved evidence; fresh on-demand inspection required'})
 
     findings = (lease_f + branch_findings(inv) + placement_findings(groot) + bg["findings"] + phone_f
                 + [f for wk in workers for f in wk.findings])
@@ -1263,7 +1293,9 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         "sources": {"delegation_dir": str(args.delegation_dir), "state_db": str(args.state_db),
                     "processes": str(args.processes), "roots": list(args.roots), "fleet_runs": str(args.fleet_runs),
                     "tasks": len(tasks), "tool_calls": len(calls), "delegate_task_lists": len(delegations),
-                    "repos": len(commons), "worktrees": len(inv), "sessions_matched": sum(1 for t in tasks if t.session)},
+                    "repos": len(commons), "worktrees": len(inv), "sessions_matched": sum(1 for t in tasks if t.session),
+                    "evidence_window": {'min_message_id_exclusive': min_id, 'max_message_id': max_id,
+                                        'rows_limit': window, 'repository_scans': not bool(window)}},
         "phases": dict(sorted(phases.items())), "live": live,
         "summary": dict(sorted(summary.items())),
         "needs_kevin": {"size": len(batch), "overdue": sum(1 for x in batch if x["phase"] == "Overdue"),
@@ -1281,7 +1313,9 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
                      "findings": [asdict(f) for f in wk.findings],
                      "events": [{"kind": e.kind, "t": iso(e.t) if e.t else None, "log": e.log}
                                 for e in wk.events]} for wk in workers],
-        "scope": "replay of observed evidence through the v0 worker statechart; findings are evidence, "
+        "carried_workers": ([w for w in (prior.get('workers', []) + prior.get('carried_workers', []))
+                             if w['id'] not in {wk.task.id for wk in workers}] if window and prior else []),
+        "scope": ("BOUNDED OPERATIONAL WINDOW; historical totals are not recomputed; unresolved prior items are held. " if window else "") + "replay of observed evidence through the v0 worker statechart; findings are evidence, "
                  "not authorization or verified_success; nothing was resumed, killed or deleted",
     }
 
@@ -1291,7 +1325,7 @@ def dispatch_check(rep: dict[str, Any], worktree: str | None, heavy: bool, excep
     out = []
     if worktree:
         wt = worktree.rstrip("/")
-        for wk in rep["workers"]:
+        for wk in rep["workers"] + rep.get('carried_workers', []):
             if wk["phase"] in ("Running", "Stalled", "Interrupted", "Overdue") and \
                     any(wt == p.rstrip("/") or wt.startswith(p.rstrip("/") + "/") for p in wk["meta"]["worktrees"]):
                 out.append(f"L1 lease: {wt} is held by {wk['id']} ({wk['phase']}); resume or abandon it first")
@@ -1344,6 +1378,8 @@ def main(argv: list[str] | None = None) -> int:
                     default=Path("/mnt/zer0models/workspace/zer0/data/operations/fsm/replay-20261021.json"),
                     help="loop-1 replay report; its dropped workers are cross-checked")
     ap.add_argument("--limit-hours", type=float, default=LIMIT_HOURS)
+    ap.add_argument("--operational-window", type=int, default=0,
+                    help="live ticks: inspect at most N newest message rows, no checkout scans; carry prior unresolved items as holds")
     ap.add_argument("--now", help="ISO time to judge ages against (default: now); fixes the output")
     ap.add_argument("--json", type=Path, help="write the full report here")
     ap.add_argument("--live-dir", type=Path, help="publish atomic state and append-only needs-Kevin ledger here")
@@ -1352,6 +1388,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--exception", choices=["gpu", "toolchain"], help="declared groot exception for --heavy")
     ap.add_argument("--mermaid", type=Path, help="write the statechart diagram (Mermaid) here and exit")
     args = ap.parse_args(argv)
+    if not 0 <= args.operational_window <= 10000:
+        ap.error('--operational-window must be 0 (explicit archival replay) or 1..10000')
     if args.mermaid:
         from .worker_supervision import mermaid
         args.mermaid.write_text(mermaid())
