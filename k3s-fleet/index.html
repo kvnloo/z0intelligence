@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>k3s is fine. The layer above it isn't. · a fleet handoff for Advith</title>
+<meta name="description" content="Placing thousands of small, bursty AI jobs across a two-node k3s cluster, a hot laptop and two phones: the failures we hit, and the questions for a Kubernetes expert.">
+<meta name="theme-color" content="#0c0c0a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%228%22 fill=%22%23d7b986%22/%3E%3C/svg%3E">
+<meta property="og:title" content="k3s is fine. The layer above it isn't.">
+<meta property="og:description" content="A z0 fleet handoff: scheduling, capacity and scaling policy for bursty AI jobs on a heterogeneous home fleet.">
+<link rel="preload" href="assets/fonts/CormorantGaramond_500Medium.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/HankenGrotesk_400Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/fleet.css">
+<script type="module" src="assets/app.js"></script>
+</head>
+<body>
+<a class="skip" href="#ch1">Skip to the handoff</a>
+
+<nav class="rail" aria-label="Chapters">
+  <span class="pill" aria-hidden="true"></span>
+  <a href="#top" data-ch="top">00<span class="tip">For Advith</span></a>
+  <a href="#ch1" data-ch="ch1">01<span class="tip">What we're building</span></a>
+  <a href="#ch2" data-ch="ch2">02<span class="tip">The fleet</span></a>
+  <a href="#ch3" data-ch="ch3">03<span class="tip">Nine failures from one night</span></a>
+  <a href="#ch4" data-ch="ch4">04<span class="tip">Where you change the trajectory</span></a>
+  <a href="#ch5" data-ch="ch5">05<span class="tip">Questions for you</span></a>
+  <a href="#ch6" data-ch="ch6">06<span class="tip">For your agent</span></a>
+</nav>
+
+<main>
+<!-- 00 ───────────────────────────────────────────── -->
+<section class="chapter hero" id="top" data-chapter>
+  <div class="inner">
+    <span class="to">advith —</span>
+    <h1>k3s is fine. <em>The layer above it isn't.</em></h1>
+    <p class="lede">The bottleneck is placing thousands of small, bursty AI jobs across a strange, mixed fleet, and learning from every run so placement gets better. That's a scheduling, capacity and scaling-policy problem, which is your home turf.</p>
+
+    <div class="glass outcomes reveal" aria-labelledby="out-h">
+      <div class="out-head">
+        <div><div class="label" id="out-h">One night, 624 job logs</div><div class="meta">Hover or tap a band. Each one is a different kind of failure.</div></div>
+        <div class="out-num"><span id="out-n">624</span><span class="meta">jobs</span></div>
+      </div>
+      <div class="bar" id="outbar" role="list"></div>
+      <div class="out-detail" id="outdetail" aria-live="polite"></div>
+    </div>
+
+    <div class="scroll">
+      <a class="btn primary" href="#ch3">Start with the failures</a>
+      <a class="btn" href="#ch5">Jump to the questions</a>
+    </div>
+  </div>
+</section>
+
+<!-- 01 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch1" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">01</span> What we're building</div>
+    <h2>Canary releases, <em>but for models.</em></h2>
+    <div class="split">
+      <div class="prose reveal">
+        <p><strong>The shadow network.</strong> Small local models learn to impersonate Jev, our fast judgment model, on narrow tasks: tool calling, routing, classification. Each one runs in shadow until its evals reach at least 95%. Only then does it take real traffic.</p>
+        <p><strong>The training data</strong> is five years of AI and harness conversation logs. They're labelled and replayed through the shadow network to find what each small model is good at, then fine-tuned.</p>
+        <p><strong>The workload</strong> is thousands of short experiments (replays, evals, fine-tuning runs, builds, test suites), with about 20 agent "leads" submitting jobs at the same time.</p>
+      </div>
+      <div class="glass shadowdemo reveal" aria-labelledby="sd-h">
+        <div class="label" id="sd-h">Try the promotion rule</div>
+        <div class="sd-row">
+          <div class="sd-model"><span class="dot info"></span> <b>tool-call SLM</b><span class="meta">shadowing Jev</span></div>
+          <div class="sd-score"><span id="sd-v">88.0</span><span class="meta">% eval agreement</span></div>
+        </div>
+        <input type="range" id="sd" min="80" max="100" step="0.5" value="88" aria-label="Eval agreement with Jev">
+        <div class="sd-track"><div class="sd-gate" style="left:75%"><span>95% gate</span></div></div>
+        <div class="sd-flow">
+          <div class="sd-node"><span class="label">request</span></div>
+          <div class="sd-arrow" id="sd-a1"></div>
+          <div class="sd-node strong"><span class="label">Jev</span><span class="meta" id="sd-jev">answers 100%</span></div>
+          <div class="sd-arrow dim" id="sd-a2"></div>
+          <div class="sd-node" id="sd-slm"><span class="label">SLM</span><span class="meta" id="sd-slmt">mirror only</span></div>
+        </div>
+        <p class="meta" id="sd-say">In shadow: it sees every request and answers none. Its answers are only scored against Jev's.</p>
+        <p class="meta foot">An illustration of the rule. Real gates are per task, and the open question is what the promotion analysis should look like at scale (chapter 04).</p>
+      </div>
+    </div>
+
+    <div class="types reveal">
+      <div class="label">Kerdoios places work across three kinds of resource at once</div>
+      <div class="type-grid" id="types"></div>
+      <p class="rule">The rule: <em class="it">autoscale typed capabilities against capacity offers, not sessions.</em> <a class="src" href="https://github.com/kvnloo/z0intelligence/issues/131">z0intelligence#131</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- 02 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch2" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">02</span> The fleet</div>
+    <h2>Two k3s nodes, two phones, <em>and a queue nobody uses.</em></h2>
+    <div class="nodes" id="nodes"></div>
+
+    <div class="split flip path-split">
+      <div class="glass pathbox reveal" aria-labelledby="path-h">
+        <div class="path-head">
+          <div class="label" id="path-h">How a job actually runs</div>
+          <div class="seg" role="group" aria-label="Path">
+            <button type="button" data-path="today" aria-pressed="true">today</button>
+            <button type="button" data-path="k8s" aria-pressed="false">the k8s path</button>
+          </div>
+        </div>
+        <ol class="path" id="path"></ol>
+        <p class="meta" id="path-say"></p>
+      </div>
+      <div class="prose reveal">
+        <p>Kueue is installed with three ClusterQueues, <code>factory</code>, <code>lanes</code> and <code>z0</code>, but they're empty. Jobs actually run through a host-lane wrapper: <code>fleet-build</code> checks heat, memory and disk, then starts a <code>systemd-run</code> scope on the build laptop. They never become Kubernetes Jobs.</p>
+        <p>The phones run Linux inside PRoot on Android: no cgroups, no netlink, no systemd. They can't run a kubelet, so they're host-lane workers with battery and thermal gates.</p>
+        <div class="label" style="margin:22px 0 10px">Observability installed</div>
+        <ul class="obs" id="obs"></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch3" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">03</span> Failures we actually hit</div>
+    <h2>Nine failures, <em>most of them already solved by Kubernetes.</em></h2>
+    <p class="lede">Each card shows what happened, what we did, and the Kubernetes-native answer we <em>suspect</em> exists. That last part is our guess, and it's what we'd like you to correct.</p>
+
+    <div class="glass evict reveal" aria-labelledby="ev-h">
+      <div class="ev-head">
+        <div><div class="label" id="ev-h">Failure 1, interactive: why DiskPressure wouldn't clear</div>
+        <div class="meta">317 GB build disk. The kubelet sets pressure below the threshold, then reclaims until free space reaches <b>threshold + minimum reclaim</b>.</div></div>
+      </div>
+      <div class="ev-controls">
+        <label>eviction threshold <output id="ev-to">10%</output><input type="range" id="ev-t" min="5" max="15" step="1" value="10"></label>
+        <label>evictionMinimumReclaim <output id="ev-ro">10%</output><input type="range" id="ev-r" min="0" max="15" step="1" value="10"></label>
+        <div class="seg" role="group" aria-label="How deletion is counted">
+          <button type="button" data-acct="du" aria-pressed="false">count as du says</button>
+          <button type="button" data-acct="btrfs" aria-pressed="true">count as btrfs frees</button>
+        </div>
+      </div>
+      <div class="disk" id="disk" aria-hidden="true">
+        <div class="disk-used" id="disk-used"></div>
+        <div class="disk-free" id="disk-free"></div>
+        <div class="disk-line trig" id="disk-trig"><span>pressure on</span></div>
+        <div class="disk-line clear" id="disk-clear"><span>pressure clears</span></div>
+      </div>
+      <div class="ev-read" id="ev-read" aria-live="polite"></div>
+      <div class="ev-presets">
+        <button class="btn" type="button" data-preset="before">what we had</button>
+        <button class="btn" type="button" data-preset="after">our 2% fix</button>
+      </div>
+      <p class="meta foot">Scenario: the disk starts at 9% free and a cleanup "deletes" 32 GB. With zstd compression on btrfs, du overstated what deleting would free: about 32 GB deleted, about 4 GB actually freed.</p>
+    </div>
+
+    <div class="fails" id="fails"></div>
+  </div>
+</section>
+
+<!-- 04 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch4" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">04</span> Where a Kubernetes expert changes the trajectory</div>
+    <h2>Six places we'd rather <em>not reinvent.</em></h2>
+    <div class="areas" id="areas"></div>
+  </div>
+</section>
+
+<!-- 05 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch5" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">05</span> Questions we'd love your take on</div>
+    <h2>Five questions. <em>Tell us where we're wrong.</em></h2>
+    <p class="lede">Under each question is what our own agents' research leaned toward. It's research only: none of it is deployed, and it's exactly the kind of reasoning we'd like you to check.</p>
+    <div class="qs" id="qs"></div>
+  </div>
+</section>
+
+<!-- 06 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch6" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">06</span> Pointers for your agent</div>
+    <h2>Everything is <em>public.</em></h2>
+    <div class="split">
+      <div class="ptrs reveal" id="ptrs"></div>
+      <div class="glass brief reveal">
+        <div class="brief-head"><div class="label">Brief for your coding agent</div><button class="btn primary" type="button" id="copy">Copy brief</button></div>
+        <pre id="brieftext" tabindex="0"></pre>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="chapter foot-ch">
+  <div class="inner prose">
+    <p class="meta">As of 23 October 2026. Fleet numbers and incidents are from our own job logs and reports for one night, not re-probed for this page. An earlier snapshot of the same night counted 557 jobs, bucketed differently (<a class="src" href="https://github.com/kvnloo/z0intelligence/issues/131#issuecomment-6356821555">Z01-K8S-MIGRATE</a>), and the steward counts 54 terminal exit-75 rows where this page uses the handoff's ~41 (<a class="src" href="https://github.com/kvnloo/.files/pull/46">.files#46</a>). The "k8s-native answer" lines are our guesses, not your advice.</p>
+    <p class="meta">Built by Kevin and his agents · <a class="src" href="../">other z0intelligence artifacts</a></p>
+  </div>
+</footer>
+</body>
+</html>
