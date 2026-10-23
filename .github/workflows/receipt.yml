@@ -3,6 +3,12 @@ name: Evidence receipt
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      red_base:
+        description: Exact pre-feature commit for the native outcome RED gate
+        required: false
+        default: bbcb4681bd2ad4251da6f58358330f05d7dc4d2b
 
 permissions:
   contents: read
@@ -14,9 +20,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check evidence receipt and exact head
+        if: github.event_name == 'pull_request'
         env:
           BODY: ${{ github.event.pull_request.body }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           printf '%s' "$BODY" > /tmp/pr-body.md
           python3 .github/scripts/check-receipt.py --file /tmp/pr-body.md --head "$HEAD"
+
+  memory-native-outcomes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the focused test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: GREEN exact-head native memory suites
+        env:
+          PYTHONPATH: src
+        run: |
+          set -o pipefail
+          git rev-parse HEAD
+          python -m pytest -q tests/test_memory_mcp.py tests/test_memory_mcp_backends.py tests/test_memory_native_outcomes.py --junitxml=memory-green.xml | tee memory-green.txt
+      - name: RED exact pre-feature source with the same outcome tests
+        if: github.event_name == 'workflow_dispatch' && inputs.red_base != ''
+        env:
+          RED_BASE: ${{ inputs.red_base }}
+        run: |
+          [[ "$RED_BASE" =~ ^[0-9a-f]{40}$ ]]
+          git worktree add --detach /tmp/memory-outcome-red "$RED_BASE"
+          git rev-parse "$RED_BASE"
+          set +e
+          PYTHONPATH=/tmp/memory-outcome-red/src python -m pytest -q tests/test_memory_native_outcomes.py --junitxml=memory-red.xml > memory-red.txt 2>&1
+          status=$?
+          set -e
+          cat memory-red.txt
+          test "$status" -eq 1
+          python -c 'from pathlib import Path; assert "bind_workstream" in Path("memory-red.txt").read_text(), "RED must exercise the absent native binding API"'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-memory-outcomes-${{ github.run_id }}
+          path: |
+            memory-green.txt
+            memory-green.xml
+            memory-red.txt
+            memory-red.xml

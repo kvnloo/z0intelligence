@@ -245,6 +245,7 @@ def _original(grant: dict[str, Any], native: dict[str, Any],
         "host": session.get("machine") if isinstance(session.get("machine"), str) else "unknown",
         "date": message.get("timestamp") if isinstance(message.get("timestamp"), str) else "unknown",
         "text": content, "locator": locator, "native": proven_native,
+        "role": message["role"],
         "source_version": "sha256:" + hashlib.sha256(content.encode("utf-8")).hexdigest(),
     }
 
