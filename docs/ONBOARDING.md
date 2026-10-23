@@ -110,3 +110,48 @@ python -m z0int status --json
 ```
 
 Network, CUDA wheels, and HF downloads are **out of scope** for the default smoke.
+
+
+## Scoped workstream capture (Draft integration, inactive)
+
+The canonical continuity plan is [z0intelligence#22](https://github.com/kvnloo/z0intelligence/issues/22).
+This capture-only branch reconciles identity-aware `EventLog` admission from
+`integrate/wiring-20261003@05e50151ec04ea40892be46645fb208aff2a1f70`
+with later native Hermes claim-attestation and correction from
+`feat/hermes-multiharness-20261009@285d74f18c68aec233b0be1bce472d9085bd5817`.
+It does **not** merge either aggregate branch, move original transcripts,
+or activate capture, retrieval, injection, a host hook or a service.
+
+The selected native adapter is `adapters/hermes_z0int/native_capture.py`.
+A trusted host must bind the persisted Hermes session, absolute
+`HERMES_HOME`, user/project/repo/task scope, message UID/row, and source-text
+SHA-256. Only unmarked native `role=user` decisions in the strict
+`z0int.hermes.native_decision.v1` grammar may be admitted with native
+references and bounded facts. Explicit same-scope `correction_of` preserves
+D1 history when D2 becomes current. Injected briefs, tool notifications and
+assistant prose never gain independent user provenance.
+
+Capture defaults **off**. This PR never changes a profile or environment.
+The existing `Z0INT_MEMORY_SOURCE_INGEST=references` opt-in is for an
+authorized host/operator only; disabled capture must create no ledger directory.
+Original content stays in the native Hermes database.
+
+**Stacked prerequisite:** this Draft PR depends on the minimal freshness/scope
+branch from [PR #198](https://github.com/kvnloo/z0intelligence/pull/198),
+pinned at `8aac6cf208d6be183332fffec68d64220d497fee`. That branch supplies
+the canonical `memory_contract.py` and `context_resolve.py`; no aggregate
+wiring branch is merged. Capture tests can run against this combined source.
+A trusted Hermes host/session/workstream binding is still missing, so runtime
+activation remains blocked independently of passing library tests.
+
+After those prerequisites, OMP should run from repo root:
+
+```bash
+PYTHONPATH=src python -m pytest -q tests/test_memory_event_log.py tests/test_memory_event_identity.py
+PYTHONPATH=src python -m pytest -q tests/test_memory_claims.py tests/test_memory_surface_capture.py
+PYTHONPATH=src python -m pytest -q tests/test_hermes_native_capture.py
+```
+
+Fixtures are synthetic, not the frozen real-user D1/D2 cross-client experiment.
+They do not qualify model-visible injection, independent verification, host
+activation, or downstream actions.
