@@ -1,0 +1,15 @@
+{
+  "schema": "z0int.bend2_memory_toolchain.v1",
+  "bend_version_banner": "bend 2.0.34",
+  "bend_wrapper_sha256": "66e5faf92d75d6e10a11427c8e4f3df72a4c14b1263a04431fdc015a5aa21317",
+  "bend_runtime_sha256": null,
+  "base_bend_sha256": "c742fae9c49b14f0cc9128429a2c6109364c8a933a142f2c90b9f2e5fd976661",
+  "bendtt_source_sha256": "61e0d2d9f4ddd7dd8bb1497fa612fb49a7274fcac647bf70702ba22321d7c292",
+  "bendtt_kernel_sha256": "a7e5203de58d989b97e759c014d2347d4355ebc652d696012c7552db0716bfca",
+  "lean_version": "Lean 4.34.0",
+  "lean_commit": "293d5d0c0c3f3dded4688b3ccd6a33939ac5102b",
+  "laws_git_blob_sha1": "1a715e22a3815227551eb8305158c672c131d6d5",
+  "pin_provenance": "https://github.com/kvnloo/z0intelligence/blob/eef21051b1910bcda14542fe5859414f629e4fad/bend/work_item_fsm/receipt.json",
+  "status": "BLOCKED: executing bend.bin digest is not attested by cited historical receipt",
+  "source_semantics_attested": false
+}
