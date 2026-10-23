@@ -89,6 +89,27 @@ class ReusePacketFreshnessTests(unittest.TestCase):
             self.assertIn("snapshot", packet.source_revisions)
             self.assertTrue(any(key.startswith("evidence:") for key in packet.source_revisions))
 
+    def test_required_evidence_or_snapshot_revision_missing_is_observe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "existing.py").write_text("value = 1\n", encoding="utf-8")
+            packet = packet_for(root)
+            missing = InformationNeed(
+                id="missing", description="required file", kind="exact_path",
+                path="missing.py", scope=SCOPE, required=True,
+            )
+            for changes in (
+                {"needs": [missing]},
+                {"workstream_revision": None},
+                {"compiler_revision": None},
+                {"policy_revision": ""},
+            ):
+                with self.subTest(changes=changes):
+                    fresh = context(root, **changes)
+                    self.assertTrue(fresh.unresolved_gaps)
+                    observed = observe_reuse_revisions(packet, fresh)
+                    assert_observe(self, check_reuse_packet(packet, observed))
+
     def test_same_second_same_size_replacement_invalidates_real_consumer(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

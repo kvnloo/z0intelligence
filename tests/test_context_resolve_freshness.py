@@ -13,6 +13,7 @@ from unittest import mock
 from z0int.context_resolve import (
     InformationNeed,
     _file_version,
+    _git_worktree_revision,
     project_to_aodl_fields,
     resolve_context,
 )
@@ -240,6 +241,78 @@ class ContextSourceFreshnessTests(unittest.TestCase):
             packet = resolve(root, need("../outside.py"))
             self.assertEqual(packet.evidence, [])
             self.assertNotIn("OFF_LIMITS", json.dumps(packet.to_dict()))
+
+    def test_porcelain_z_rename_and_copy_hash_second_raw_pathname(self):
+        """Rename/copy's second NUL field is not another XY-prefixed record."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("renamed.py", "old.py", "copied.py", "original.py"):
+                (root / name).write_text(f"{name}: first\n", encoding="utf-8")
+
+            def revision():
+                # Synthetic status isolates the -z parser. In a real rename,
+                # the old source is typically absent; a copy retains its source.
+                head = subprocess.CompletedProcess([], 0, stdout=b"abc123\n")
+                status = subprocess.CompletedProcess(
+                    [], 0,
+                    stdout=b"R  renamed.py\0old.py\0C  copied.py\0original.py\0",
+                )
+                with mock.patch(
+                    "z0int.context_resolve.subprocess.run",
+                    side_effect=[head, status],
+                ):
+                    return _git_worktree_revision(root)
+
+            prior = revision()
+            self.assertIsNotNone(prior)
+            (root / "old.py").write_text("rename source changed\n", encoding="utf-8")
+            rename_changed = revision()
+            self.assertNotEqual(prior, rename_changed)
+            (root / "original.py").write_text("copy source changed\n", encoding="utf-8")
+            self.assertNotEqual(rename_changed, revision())
+            (root / "renamed.py").write_text("rename target changed\n", encoding="utf-8")
+            changed_target = revision()
+            (root / "renamed.py").write_text("another target change\n", encoding="utf-8")
+            self.assertNotEqual(changed_target, revision())
+            copied = revision()
+            (root / "copied.py").write_text("copied target changed\n", encoding="utf-8")
+            self.assertNotEqual(copied, revision())
+
+    def test_porcelain_z_malformed_second_pathname_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            head = subprocess.CompletedProcess([], 0, stdout=b"abc123\n")
+            status = subprocess.CompletedProcess([], 0, stdout=b"R  renamed.py\0")
+            with mock.patch(
+                "z0int.context_resolve.subprocess.run",
+                side_effect=[head, status],
+            ):
+                self.assertIsNone(_git_worktree_revision(root))
+
+    def test_git_symlink_target_changes_are_content_bound(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            link = root / "source-link"
+            try:
+                link.symlink_to("one")
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks unavailable on this host")
+
+            def revision():
+                head = subprocess.CompletedProcess([], 0, stdout=b"abc123\n")
+                status = subprocess.CompletedProcess(
+                    [], 0, stdout=b" M source-link\0",
+                )
+                with mock.patch(
+                    "z0int.context_resolve.subprocess.run",
+                    side_effect=[head, status],
+                ):
+                    return _git_worktree_revision(root)
+
+            before = revision()
+            link.unlink()
+            link.symlink_to("two")
+            self.assertNotEqual(before, revision())
 
     def test_git_dirty_and_untracked_state_change_epoch_and_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp:

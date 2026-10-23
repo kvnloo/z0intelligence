@@ -189,15 +189,23 @@ There is no second index, memory database, store, registry or bridge.
 
 ### Integration status and remaining ownership
 
-At the specified preview base 11e1454b4d5af60a4edccfc65bc53715568131e7,
-the existing shared src/z0int/memory_contract.py (introduced by #68/#109)
-and resident src/z0int/file_search.py (#135) **are absent**. This scoped PR
-does not copy or create either unowned module. While the contract is absent,
-resolve_context fails closed for scoped evidence; without FFF the optional
-indexed tier reports unavailable. Contract-dependent tests cannot pass until
-the existing implementations are integrated through their respective owners.
-append_context_packet_event likewise awaits the existing
-memory/event_log.py rather than creating a second ledger.
+The exact canonical `src/z0int/memory_contract.py` and
+`tests/test_memory_contract.py` bytes from
+`integrate/wiring-20261003@05e50151ec04ea40892be46645fb208aff2a1f70`
+(#68/#109) are included in this Draft PR's preview branch. The resolver imports
+the required `MemoryScope`/`MemorySnapshot` directly, using the canonical
+`MemorySnapshot.build(scope, state_revision, source_revisions,
+policy_revision, ontology_revision)` arguments. Known authorized paths remain
+readable; an absent required revision leaves a gap and dependent reuse remains
+OBSERVE. Git porcelain `-z` parses rename/copy secondary names as raw NUL
+fields and hashes dirty/untracked bytes, with unknown or unreadable worktrees
+unverifiable rather than omitted.
+
+The optional resident `src/z0int/file_search.py` (#135) is still absent
+on preview; FFF remains unavailable without disabling exact-path reading.
+The `append_context_packet_event` helper retains its lazy import of the
+existing `src/z0int/memory/event_log.py` (PR #197 owns EventLog, claims
+and native capture). No second ledger or unrelated integration is added.
 
 The actual #47 OMP tool-policy/write consumer must still obtain fresh
 scope/policy/workstream/compiler inputs independently at the mutation
@@ -208,14 +216,15 @@ memory facade/hydration; #22/#62 and z0evals#56 own cross-client
 decision/correction, injection and verified outcome. No default activation,
 host change, claimed test run or global cache invalidation occurs here.
 
-### Operator verification (after existing contract integration)
+### Operator verification (exact PR head; no tests run by this worker)
 
 From the repo root, using the exact PR head:
 
 ```bash
+PYTHONPATH=src python -m pytest -q tests/test_memory_contract.py
 PYTHONPATH=src python -m pytest -q tests/test_context_resolve_freshness.py
 PYTHONPATH=src python -m pytest -q tests/test_reuse_packet_freshness.py
-PYTHONPATH=src python -m pytest -q tests/test_context_resolve_freshness.py tests/test_reuse_packet_freshness.py
+PYTHONPATH=src python -m pytest -q tests/test_memory_contract.py tests/test_context_resolve_freshness.py tests/test_reuse_packet_freshness.py
 ```
 
 ## Follow-on work

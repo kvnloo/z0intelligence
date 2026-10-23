@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import time
 from dataclasses import asdict, dataclass, field
@@ -20,8 +21,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from . import paths
-# These integrations live on other owned branches. Until integrated, every
-# dependent scoped/FFF read remains explicitly unavailable (never unscoped).
+# The resident FFF search package is optional on this preview branch.
 try:
     from .file_search import search_repository as _fff_search_repository
 except ModuleNotFoundError as exc:
@@ -29,13 +29,8 @@ except ModuleNotFoundError as exc:
         raise
     _fff_search_repository = None
 
-try:
-    from .memory_contract import MemoryScope, MemorySnapshot
-except ModuleNotFoundError as exc:
-    if exc.name != f"{__package__}.memory_contract":
-        raise
-    MemoryScope = None
-    MemorySnapshot = None
+# Scope and snapshot are the required, shared #68/#109 memory contracts.
+from .memory_contract import MemoryScope, MemorySnapshot
 
 SCHEMA = "z0int.context_resolve.v1"
 RECIPE_SCHEMA = "z0int.resolution_recipe.v1"
@@ -183,7 +178,13 @@ def _file_version(path: Path) -> str:
 
 
 def _git_worktree_revision(root: Path) -> str | None:
-    """Bind HEAD and dirty/untracked bytes; hashes only leave this function."""
+    """Bind Git HEAD plus changed/untracked file bytes to a worktree revision.
+
+    Porcelain v1 -z records start with XY<space>pathname. A rename/copy has
+    a *second raw pathname* (without an XY prefix); process both paths once.
+    Unknown records and unreadable live files make the revision unverifiable.
+    """
+    root = root.resolve()
     try:
         head = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "--verify", "HEAD"],
@@ -197,24 +198,57 @@ def _git_worktree_revision(root: Path) -> str | None:
         return None
     if head.returncode or status.returncode:
         return None
-    digest = hashlib.sha256(status.stdout)
-    for item in status.stdout.split(b"\0"):
-        if len(item) < 4:
-            continue
-        # Non-renamed status entries use XY<space>path; rename's second
-        # path is included in the porcelain digest even if not read here.
-        name = os.fsdecode(item[3:])
-        candidate = (root / name).resolve()
-        try:
-            candidate.relative_to(root)
-        except ValueError:
-            continue
-        version = _file_version(candidate)
-        digest.update(name.encode("utf-8", errors="surrogateescape"))
-        digest.update(version.encode("ascii"))
+    raw = status.stdout
+    if raw and not raw.endswith(b"\0"):
+        return None
+    entries = raw.split(b"\0")[:-1] if raw else []
+    digest = hashlib.sha256(raw)
+    i = 0
+    while i < len(entries):
+        item = entries[i]
+        i += 1
+        if len(item) < 4 or item[2:3] != b" ":
+            return None
+        xy = item[:2]
+        names = [item[3:]]
+        if b"R" in xy or b"C" in xy:
+            if i >= len(entries):
+                return None
+            names.append(entries[i])  # raw old/source pathname, no XY prefix
+            i += 1
+        for raw_name in names:
+            if not raw_name:
+                return None
+            relative = Path(os.fsdecode(raw_name))
+            if relative.is_absolute() or ".." in relative.parts:
+                return None
+            candidate = root / relative
+            try:
+                # Refuse a symlink in a parent directory that escapes root.
+                candidate.parent.resolve().relative_to(root)
+                info = candidate.lstat()
+            except FileNotFoundError:
+                version = "missing"
+            except (OSError, ValueError):
+                return None
+            else:
+                if stat.S_ISLNK(info.st_mode):
+                    try:
+                        target = os.fsencode(os.readlink(candidate))
+                    except OSError:
+                        return None
+                    version = "symlink:" + _source_version_from_bytes(target)
+                elif stat.S_ISREG(info.st_mode):
+                    data = _read_verified_bytes(candidate)
+                    if data is None:
+                        return None
+                    version = "file:" + _source_version_from_bytes(data)
+                else:
+                    # A submodule/directory with unknown contents is not
+                    # silently treated as a versioned regular file.
+                    return None
+            digest.update(b"\0path\0" + raw_name + b"\0" + version.encode("ascii"))
     return "head:" + head.stdout.decode("ascii", errors="replace").strip() + ":worktree:" + digest.hexdigest()
-
-
 
 
 def _scope_fingerprint(project_root: Path | None, collections: tuple[str, ...]) -> str:
@@ -486,8 +520,7 @@ def resolve_context(
     excluded = False
     for need in need_list:
         if (
-            MemoryScope is None
-            or not isinstance(request_scope, MemoryScope)
+            not isinstance(request_scope, MemoryScope)
             or not isinstance(need.scope, MemoryScope)
             or not request_scope.path()
             or not need.scope.path()
@@ -713,13 +746,7 @@ def resolve_context(
     )
 
     snapshot = None
-    if (
-        MemorySnapshot is not None
-        and workstream_revision
-        and compiler_revision
-        and policy_revision
-        and isinstance(request_scope, MemoryScope)
-    ):
+    if workstream_revision and compiler_revision and policy_revision:
         snapshot_sources = dict(epochs)
         for ref in evidence:
             snapshot_sources["evidence:" + _sha16(f"{ref.source_id}|{ref.locator}")] = ref.source_version
@@ -730,8 +757,6 @@ def resolve_context(
             policy_revision=policy_revision,
             ontology_revision=compiler_revision,
         )
-    else:
-        gaps.append("snapshot: shared MemorySnapshot contract unavailable")
 
     packet = ContextPacket(
         task_id=task_id,
