@@ -17,7 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass
-from typing import Any, Literal
+from typing import Any, Iterable, Literal
 
 SCHEMA = "z0int.memory_contract.v1"
 
@@ -399,3 +399,68 @@ class MemoryUseReceipt:
     def to_decision_extra(self) -> dict[str, Any]:
         """Projection for DecisionReceipt.extra; no second receipt schema."""
         return {"memory": self.to_dict()}
+
+
+@dataclass(frozen=True)
+class MemoryEvidenceProjection:
+    """Pure, scoped view of already-admitted claims; never an action grant.
+
+    `capability_within_explicit_bounds` only reflects the TWO explicit inputs
+    supplied by the caller. It is not a token, user consent, or an AODL verdict.
+    A harness must recheck current authorization before executing any effect.
+    """
+
+    included_claims: tuple[BitemporalClaim, ...]
+    evidence_event_uids: tuple[str, ...]
+    capability_within_explicit_bounds: bool
+
+    @property
+    def instruction_capability(self) -> Literal[False]:
+        """Untrusted memory has no way to carry instruction authority."""
+        return False
+
+
+def project_memory_evidence(
+    claims: Iterable[BitemporalClaim],
+    *,
+    request_scope: MemoryScope,
+    explicit_grant: bool,
+    policy_grant: bool,
+) -> MemoryEvidenceProjection:
+    """Project already-admitted evidence without widening explicit authority.
+
+    A scope-less request is *unknown*, not a request for user-global memory.
+    Global-origin claims are excluded here: a separately authenticated,
+    explicitly global source grant is required outside this narrow workstream
+    projection. Scope is checked before the claim's value/metadata is examined.
+
+    Replay of the same exact claim is idempotent; a conflicting claim ID is
+    rejected, rather than using arrival order as an authority or truth signal.
+    This is a pure read projection over existing records, not an admission
+    adapter, source attestation, store, runtime permission or policy engine.
+    """
+    if not isinstance(request_scope, MemoryScope) or not request_scope.path():
+        raise ValueError("memory projection requires an explicitly bound non-global request scope")
+    if type(explicit_grant) is not bool or type(policy_grant) is not bool:
+        raise TypeError("explicit_grant and policy_grant must be trusted boolean inputs")
+
+    accepted: dict[str, BitemporalClaim] = {}
+    for claim in claims:
+        if not isinstance(claim, BitemporalClaim):
+            raise TypeError("expected an admitted BitemporalClaim")
+        if not claim.scope.path() or not claim.scope.is_visible_to(request_scope):
+            continue
+        if claim.instruction_capability:
+            raise ValueError("persisted memory cannot carry instruction authority")
+        prior = accepted.get(claim.claim_id)
+        if prior is not None and prior != claim:
+            raise ValueError("conflicting claim identity during replay")
+        accepted[claim.claim_id] = claim
+
+    included = tuple(accepted[key] for key in sorted(accepted))
+    source_ids = tuple(sorted({uid for claim in included for uid in claim.evidence_event_uids}))
+    return MemoryEvidenceProjection(
+        included_claims=included,
+        evidence_event_uids=source_ids,
+        capability_within_explicit_bounds=explicit_grant and policy_grant,
+    )
