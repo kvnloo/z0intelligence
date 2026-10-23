@@ -74,6 +74,7 @@ class NativeFixture:
                     "session_id": row["native"]["session_id"],
                     "message_id": row["native"].get("id"),
                     "role": row.get("role"),
+                    "date": row["date"],
                 })
         raise OSError("synthetic missing original")
 
@@ -83,7 +84,7 @@ def factory(tmp_path):
     count = 0
 
     def make(*, rows=None, operator=None, chatgpt=None, principal="operator",
-             limits=None, fixture=None, clock=None):
+             limits=None, fixture=None, clock=None, wall_clock=None):
         nonlocal count
         count += 1
         directory = tmp_path / str(count)
@@ -105,6 +106,8 @@ def factory(tmp_path):
         server = MemoryServer(policy_path, directory / "state", principal=principal,
                               backend_search=backend.search, backend_fetch=backend.fetch,
                               clock=clock_)
+        if wall_clock is not None:
+            server.wall_clock = wall_clock
         return server, policy_path, backend, clock_
 
     return make
@@ -488,6 +491,7 @@ def test_query_outcomes_record_real_hit_rows_without_evidence(factory):
             "denied_count", "unavailable_count", "decision", "outcome",
             "receipt_id", "principal", "scope_hmac", "evidence_hmacs",
             "native_records", "native_session_hmac", "after_ordinal",
+            "through_ordinal", "observed_at",
         }
         assert row["schema"] == "z0int.memory_query_outcome.v1"
         assert row["timestamp"].endswith("Z")

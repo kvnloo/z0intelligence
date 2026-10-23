@@ -5,6 +5,7 @@ answer quality, or user benefit. Missing joins remain unknown, never ignored.
 """
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Iterable
 
@@ -16,12 +17,17 @@ def _digest(value: Any) -> bool:
     return isinstance(value, str) and _DIGEST.fullmatch(value) is not None
 
 
+def _timestamp(value: Any) -> bool:
+    return type(value) in (int, float) and math.isfinite(value)
+
+
 def _native(value: Any) -> bool:
     return (isinstance(value, dict) and
-            set(value) == {"identity_hmac", "revision_hmac", "session_hmac", "ordinal", "role", "complete"} and
+            set(value) == {"identity_hmac", "revision_hmac", "session_hmac", "ordinal", "role", "complete", "observed_at"} and
             all(_digest(value[k]) for k in ("identity_hmac", "revision_hmac", "session_hmac")) and
             type(value["ordinal"]) is int and value["ordinal"] >= 0 and
-            value["role"] in ("user", "assistant") and value["complete"] is True)
+            value["role"] in ("user", "assistant") and value["complete"] is True and
+            _timestamp(value["observed_at"]))
 
 
 def replay_outcomes(rows: Iterable[dict], *, scope_hmac: str, principal: str) -> list[dict]:
@@ -47,7 +53,10 @@ def replay_outcomes(rows: Iterable[dict], *, scope_hmac: str, principal: str) ->
                 fetched.get("principal") != principal or
                 native["session_hmac"] != query.get("native_session_hmac") or
                 type(query.get("after_ordinal")) is not int or
-                native["ordinal"] <= query["after_ordinal"] or
+                type(query.get("through_ordinal")) is not int or
+                not query["after_ordinal"] < native["ordinal"] <= query["through_ordinal"] or
+                not _timestamp(query.get("observed_at")) or
+                native["observed_at"] <= query["observed_at"] or
                 positions.get(join.get(key + "_fetch_receipt_id"), -1) <= positions.get(query["receipt_id"], -1)):
             raise ValueError("native join lacks a matching authorized original read")
     for index, row in enumerate(rows):
@@ -105,6 +114,7 @@ def replay_outcomes(rows: Iterable[dict], *, scope_hmac: str, principal: str) ->
                 if (row.get("prior_outcome") != expected or not _native(restated) or
                         restated["session_hmac"] != decision["session_hmac"] or
                         restated["identity_hmac"] == decision["identity_hmac"] or
+                        restated["observed_at"] <= decision["observed_at"] or
                         restated["ordinal"] <= decision["ordinal"]):
                     raise ValueError("native user restatement provenance mismatch")
                 prove_read(row, "restatement", query, "user")

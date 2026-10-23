@@ -17,6 +17,7 @@ import stat
 import sys
 import time
 from collections import OrderedDict, deque
+from datetime import datetime
 from typing import Any
 
 from .context_resolve import ContextPacket, EvidenceRef
@@ -122,7 +123,7 @@ def exact_native_record(record: Any) -> bool:
 class MemoryServer:
     def __init__(self, policy_path: Path, state_dir: Path, *,
                  principal: str, backend_search=search_backend,
-                 backend_fetch=fetch_backend, clock=time.monotonic):
+                 backend_fetch=fetch_backend, clock=time.monotonic, wall_clock=time.time):
         if principal not in ("operator", "chatgpt"):
             raise ValueError("explicit principal required")
         self.principal = principal  # Bound at stdio startup, never a tool argument.
@@ -131,6 +132,7 @@ class MemoryServer:
         self.backend_search = backend_search
         self.backend_fetch = backend_fetch
         self.clock = clock
+        self.wall_clock = wall_clock
         self.key = secrets.token_bytes(32)
         # Metadata/expected revision only, never cached transcript content.
         self.cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
@@ -138,6 +140,7 @@ class MemoryServer:
         self.workstream: MemoryScope | None = None
         self.native_session: str | None = None
         self.after_ordinal = 0
+        self.through_ordinal = 0
         self.query_receipts: OrderedDict[str, dict] = OrderedDict()
         load_policy(self.policy_path)
         self.state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -148,7 +151,7 @@ class MemoryServer:
         return hmac.new(self.key, (domain + "\0" + value).encode(), hashlib.sha256).hexdigest()
 
     def bind_workstream(self, scope: MemoryScope, *, native_session: str,
-                        after_ordinal: int) -> None:
+                        after_ordinal: int, through_ordinal: int) -> None:
         """Trusted startup binding, never a model-facing tool or argument."""
         if (self.calls or self.query_receipts or self.workstream is not None or
                 not isinstance(scope, MemoryScope) or
@@ -156,11 +159,13 @@ class MemoryServer:
                     v.strip().casefold() in {"unknown", "none", "null", "*"}
                     for v in (scope.user, scope.project, scope.repo, scope.task)) or
                 not isinstance(native_session, str) or not native_session.strip() or
-                type(after_ordinal) is not int or after_ordinal < 0):
+                type(after_ordinal) is not int or after_ordinal < 0 or
+                type(through_ordinal) is not int or through_ordinal <= after_ordinal):
             raise ValueError("immutable, fully bound native workstream required")
         self.workstream = scope
         self.native_session = native_session
         self.after_ordinal = after_ordinal
+        self.through_ordinal = through_ordinal
 
     def _scope_hmac(self) -> str | None:
         return (self._hash("workstream", self.workstream.fingerprint())
@@ -228,7 +233,8 @@ class MemoryServer:
         # Additive response metadata only. Error responses keep their fixed shape.
         if "error" not in payload:
             payload = {**payload, "receipt_id": receipt_id}
-        event = {"schema": "z0int.memory_query_outcome.v1", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "tool": tool,
+        observed_at = self.wall_clock()
+        event = {"schema": "z0int.memory_query_outcome.v1", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(observed_at)), "tool": tool,
                  "query_hmac": self._hash("query", query), "count": len(payload.get("results", [])) if tool == "search" else int("record" in payload),
                  "bytes": len(encoded(payload)), "denied_count": denied,
                  "unavailable_count": sum(v == "unavailable" for v in payload.get("backends", {}).values()),
@@ -240,7 +246,8 @@ class MemoryServer:
                  "native_records": native_records,
                  "native_session_hmac": (self._hash("session", self.native_session)
                                          if self.native_session is not None else None),
-                 "after_ordinal": self.after_ordinal}
+                 "after_ordinal": self.after_ordinal,
+                 "through_ordinal": self.through_ordinal, "observed_at": observed_at}
         if not self._append_audit(event):
             return {"error": "audit_unavailable"}
         self.query_receipts[receipt_id] = {
@@ -480,15 +487,24 @@ class MemoryServer:
                 record.get("scope") != self.workstream.project or
                 native.get("session_id") != self.native_session or
                 type(native.get("ordinal")) is not int or
-                native["ordinal"] <= self.after_ordinal):
+                not self.after_ordinal < native["ordinal"] <= self.through_ordinal):
             raise ValueError("exact complete native decision source required")
         return {**record, "native": native, "fetch_receipt_id": payload["receipt_id"]}
+
+    @staticmethod
+    def _native_timestamp(record: dict) -> float | None:
+        try:
+            timestamp = datetime.fromisoformat(record["date"].replace("Z", "+00:00"))
+            return timestamp.timestamp() if timestamp.tzinfo is not None else None
+        except (KeyError, TypeError, ValueError, OverflowError):
+            return None
 
     def _native_provenance(self, record: dict) -> dict:
         return {"identity_hmac": self._hash("native", record["locator"]),
                 "revision_hmac": self._evidence_hmac(record),
                 "session_hmac": self._hash("session", record["native"]["session_id"]),
                 "ordinal": record["native"]["ordinal"], "role": record["role"],
+                "observed_at": self._native_timestamp(record),
                 "complete": (record.get("text_truncated") is False and
                              record.get("text_redacted") is False)}
 
@@ -504,6 +520,9 @@ class MemoryServer:
                 query["event"]["scope_hmac"] != self._scope_hmac()):
             raise ValueError("live scoped search receipt required")
         decision = self._native_decision_record(decision_id, role="assistant")
+        timestamp = self._native_timestamp(decision)
+        if timestamp is None or timestamp <= query["event"]["observed_at"]:
+            raise ValueError("native decision must follow the actual search receipt")
         citations = re.findall(r"\[([^\]\n]+)@(sha256:[0-9a-f]{64})\]", decision["text"])
         cited = []
         for evidence in query["evidence"]:
@@ -524,7 +543,9 @@ class MemoryServer:
             marker = f'Restatement of [{decision["locator"]}@{decision["source_version"]}]:'
             # This is an explicit native user statement, not a semantic guess
             # from an assistant paraphrase or a retrieval match.
+            restated_at = self._native_timestamp(restatement)
             if (restatement["native"]["ordinal"] <= decision["native"]["ordinal"] or
+                    restated_at is None or restated_at <= timestamp or
                     not restatement["text"].startswith(marker) or
                     not restatement["text"][len(marker):].strip()):
                 raise ValueError("later native user restatement of this decision required")

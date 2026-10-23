@@ -316,9 +316,10 @@ codes map to `error` without changing the tool response. Existing
 `timestamp`, keyed `query_hmac`, `count`, `bytes`, `denied_count`,
 `unavailable_count`, and `decision` remain in the row. Additive fields include
 `receipt_id`, `principal`, `scope_hmac`, `evidence_hmacs`, `native_records`,
-`native_session_hmac`, and `after_ordinal`. Successful responses return their
-`receipt_id`. Native provenance contains keyed identity/revision/session hashes,
-ordinal, and the source's verified `user` or `assistant` role.
+`native_session_hmac`, `after_ordinal`, `through_ordinal`, and query wall time
+`observed_at`. Successful responses return their `receipt_id`.
+Native provenance contains keyed identity/revision/session hashes, ordinal,
+native timestamp, completeness flag, and verified `user` or `assistant` role.
 No raw queries/handles, source bodies, paths, or credentials are logged.
 Retrieval rows alone do not establish use, quality, or benefit.
 No outcome mutation tool, secondary ledger, or permission is created.
@@ -326,11 +327,12 @@ No outcome mutation tool, secondary ledger, or permission is created.
 #### Native output-use join and offline replay
 
 An operator-side integration can bind one fully specified `MemoryScope`
-(user/project/repo/task), native session, and decision-window lower ordinal
+(user/project/repo/task), native session, and finite decision-window ordinals
 before the first query:
 
 ```python
-server.bind_workstream(scope, native_session=native_session, after_ordinal=last_native_ordinal)
+server.bind_workstream(scope, native_session=native_session,
+                       after_ordinal=last_native_ordinal, through_ordinal=task_window_end)
 query = server.search("the prior decision")
 # The operator selects the closed, persisted assistant answer in that window.
 # decision_handle is an ordinary search/fetch handle for that exact source.
@@ -342,6 +344,14 @@ The binding is immutable and is not an MCP argument. The standard stdio
 entrypoint remains unbound. It does not activate capture or join decisions
 automatically. The integration must select the actual completed native answer,
 not an arbitrary assistant message from an earlier task.
+The trusted integration must attest that this exact finite native window
+belongs to the full workstream, including repo and task. The adapter cannot
+derive those dimensions from an AgentsView project label or transcript text.
+Every joined answer's timezone-qualified native timestamp must follow the
+actual search receipt's wall time. A pre-existing answer cannot establish use
+of a later retrieval, even if its citations match. Both native ordinals must
+stay within the attested task window. Missing, ambiguous, or backdated native
+timestamps fail closed. Restatement timestamps must follow the answer.
 
 `join_native_outcome` rehydrates the selected original through the existing
 authenticated AgentsView adapter. It checks the project, native session,

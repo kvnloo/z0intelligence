@@ -1,5 +1,6 @@
 """Native source-backed outcomes. All HTTP sources and content are synthetic."""
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -8,9 +9,11 @@ from z0int.memory_contract import MemoryScope
 
 
 SCOPE = MemoryScope(user="synthetic-user", project="project-A", repo="synthetic-repo", task="synthetic-task")
+NATIVE_START = datetime(2026, 10, 23, 12, tzinfo=timezone.utc)
 
 
 def record(**kwargs):
+    kwargs.setdefault("date", (NATIVE_START + timedelta(seconds=kwargs.get("ordinal", 3))).isoformat())
     return base_record(session_id="omp:synthetic-session", **kwargs)
 
 
@@ -21,8 +24,8 @@ def offline_replay(*args, **kwargs):
 
 
 def scoped(factory, rows):
-    server, path, backend, clock = factory(rows=rows)
-    server.bind_workstream(SCOPE, native_session="omp:synthetic-session", after_ordinal=0)
+    server, path, backend, clock = factory(rows=rows, wall_clock=lambda: NATIVE_START.timestamp())
+    server.bind_workstream(SCOPE, native_session="omp:synthetic-session", after_ordinal=0, through_ordinal=10)
     return server, path, backend, clock
 
 
@@ -214,7 +217,8 @@ def test_real_http_native_adapter_joins_output_and_later_user_source(tmp_path, m
     policy.write_text(json.dumps({"version": 2, "principals": {"operator": grants, "chatgpt": []}}))
     try:
         server = MemoryServer(policy, tmp_path / "state", principal="operator")
-        server.bind_workstream(SCOPE, native_session=session, after_ordinal=0)
+        server.wall_clock = lambda: NATIVE_START.timestamp()
+        server.bind_workstream(SCOPE, native_session=session, after_ordinal=0, through_ordinal=10)
         query = server.search("evidence")
         answer = server.search("answer")["results"][0]["id"]
         assert server.join_native_outcome(query["receipt_id"], answer, scope=SCOPE)["outcome"] == "hit_used"
@@ -286,7 +290,7 @@ def test_binding_is_immutable_and_expired_query_cannot_join(factory):
     server, _, backend, clock = scoped(factory, [record(role="user")])
     query = server.search("query")
     with pytest.raises(ValueError):
-        server.bind_workstream(SCOPE, native_session="omp:sibling", after_ordinal=0)
+        server.bind_workstream(SCOPE, native_session="omp:sibling", after_ordinal=0, through_ordinal=10)
     backend.records = [record(role="assistant", ordinal=5)]
     decision = server.search("answer")["results"][0]["id"]
     clock.now += 601
@@ -299,8 +303,45 @@ def test_bound_workstream_does_not_borrow_a_sibling_project_grant(factory):
                "scope": project, "privacy": ["private"]}
               for project in ("project-A", "project-B")]
     server, _, backend, _ = factory(operator=grants, rows=[record(role="user", scope="project-B")])
-    server.bind_workstream(SCOPE, native_session="omp:synthetic-session", after_ordinal=0)
+    server.bind_workstream(SCOPE, native_session="omp:synthetic-session", after_ordinal=0, through_ordinal=10)
     result = server.search("sibling")
     assert result["results"] == []
     assert server.replay_outcomes(SCOPE)[0]["retrieval"] == "denied"
     assert all(g["scope"] == "project-A" for call in backend.search_calls for g in call[2])
+
+
+@pytest.mark.parametrize("change", ["predates_query", "beyond_task_window", "unknown_time", "naive_time"])
+def test_native_causality_and_finite_task_window_are_required(factory, change):
+    server, _, backend, _ = scoped(factory, [record(role="user", ordinal=1)])
+    # A matching citation in an old answer is not use of this later retrieval.
+    server.wall_clock = lambda: (NATIVE_START + timedelta(seconds=5)).timestamp()
+    query = server.search("later query")
+    kwargs = {"role": "assistant", "ordinal": 2}
+    if change == "beyond_task_window":
+        kwargs["ordinal"] = 11
+    elif change == "unknown_time":
+        kwargs["date"] = "unknown"
+    elif change == "naive_time":
+        kwargs["date"] = "2026-10-23T12:00:06"
+    evidence = record(role="user", ordinal=1)
+    kwargs["text"] = f'Use [{evidence["locator"]}@{evidence["source_version"]}]'
+    backend.records = [record(**kwargs)]
+    decision = server.search("native answer")["results"][0]["id"]
+    with pytest.raises(ValueError):
+        server.join_native_outcome(query["receipt_id"], decision, scope=SCOPE)
+
+
+@pytest.mark.parametrize("change", ["query_time", "task_window"])
+def test_offline_replay_enforces_native_causality_and_task_window(factory, change):
+    server, _, backend, _ = scoped(factory, [record(role="user", ordinal=1)])
+    query = server.search("query")
+    backend.records = [record(role="assistant", ordinal=2)]
+    decision = server.search("native answer")["results"][0]["id"]
+    joined = server.join_native_outcome(query["receipt_id"], decision, scope=SCOPE)
+    rows = server._audit_rows()
+    if change == "query_time":
+        rows[0]["observed_at"] = joined["decision"]["observed_at"] + 1
+    else:
+        rows[0]["through_ordinal"] = joined["decision"]["ordinal"] - 1
+    with pytest.raises(ValueError):
+        offline_replay(rows, scope_hmac=joined["scope_hmac"], principal="operator")
