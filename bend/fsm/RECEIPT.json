@@ -1,0 +1,90 @@
+{
+  "what": "Byte-identical copies of the JavaScript that bend 2.0.34 emitted from the unchanged work-item / worker / integration fsm.bend files, plus the JSON<->constructor adapter.",
+  "source": {
+    "repo": "kvnloo/.files",
+    "commit": "2f69c19c7d491b3e4a4a85c7ccaf0a40edf51a38",
+    "dir": "docs/spec-diagram/fsm",
+    "git_blobs": {
+      "Runtime.generated.mjs": "7afb4e16ad3f370a22f34c4ffb935446615205a2",
+      "adapter.mjs": "d239f16a46b54bdc6486a98a90e16556b748863a"
+    }
+  },
+  "compiler": {
+    "producer": "docs/spec-diagram/fsm/build.mjs",
+    "compilerPin": "bend 2.0.34",
+    "compilerIdentitySha256": "66e5faf92d75d6e10a11427c8e4f3df72a4c14b1263a04431fdc015a5aa21317",
+    "note": "Same compiler identity that produced the PROOF.bend pass receipts. The .files architecture diagram keeps its own 2.0.37 pin."
+  },
+  "bend_sources": [
+    {
+      "path": "WorkItem.bend",
+      "upstream": "kvnloo/z0intelligence@b4c06eefb1fb276e4b999f9e59bbf58bbd9a6f74:bend/work_item_fsm/fsm.bend",
+      "gitBlob": "3e0e9922c8d9b13eb6f7647f8fb6128adcf009ea",
+      "kind": "bend-model"
+    },
+    {
+      "path": "WorkerSupervision.bend",
+      "upstream": "kvnloo/z0intelligence@b4c06eefb1fb276e4b999f9e59bbf58bbd9a6f74:bend/worker_supervision_fsm/fsm.bend",
+      "gitBlob": "30db3271ad03a4d59857dbb83842c8358f2be1ef",
+      "kind": "bend-model"
+    },
+    {
+      "path": "work-item.mmd",
+      "upstream": "kvnloo/z0intelligence@b4c06eefb1fb276e4b999f9e59bbf58bbd9a6f74:docs/fsm/work-item.mmd",
+      "gitBlob": "c5d3e07d02d6edb5171c70017811dda628a8a4ff",
+      "kind": "documented-statechart"
+    },
+    {
+      "path": "worker-supervision.mmd",
+      "upstream": "kvnloo/z0intelligence@b4c06eefb1fb276e4b999f9e59bbf58bbd9a6f74:docs/fsm/worker-supervision.mmd",
+      "gitBlob": "11edb752608ed203970019f963b32768017b58ce",
+      "kind": "documented-statechart"
+    },
+    {
+      "path": "IntegrationOwner.bend",
+      "upstream": "kvnloo/z0intelligence@1ef432f91223e74dcfb756c590aae82a950999ed:bend/integration_owner_fsm/fsm.bend",
+      "gitBlob": "beb728aad382ebcad19f8d602ab6a5cdafd9fe75",
+      "kind": "bend-model"
+    },
+    {
+      "path": "integration-owner.mmd",
+      "upstream": "kvnloo/z0intelligence@1ef432f91223e74dcfb756c590aae82a950999ed:docs/fsm/integration-owner.mmd",
+      "gitBlob": "ba3f617a2362e65bbc2fa9a6872601d9e795fd55",
+      "kind": "documented-statechart"
+    }
+  ],
+  "proofs": [
+    {
+      "project": "bend/work_item_fsm",
+      "pr": "kvnloo/z0intelligence#183",
+      "commit": "eef21051b1910bcda14542fe5859414f629e4fad",
+      "lawsBlob": "b564659c0471b66022c813933c4a99c0b342011e",
+      "proofBlob": "db234e6c68f363dbe56571dc749cc9203b3614ea",
+      "verdict": "pass",
+      "bend": "2.0.34",
+      "verifiedAt": "2026-10-21T03:45:45Z",
+      "scope": "bend-emitted-book; source_semantics_attested=false"
+    },
+    {
+      "project": "bend/worker_supervision_fsm",
+      "pr": "kvnloo/z0intelligence#184",
+      "commit": "b4c06eefb1fb276e4b999f9e59bbf58bbd9a6f74",
+      "lawsBlob": "5b5709d78a04205df93c4723a5577951053b7ae4",
+      "proofBlob": "f12965b9db0b19ed39c4dda25bee7f3a19b7f27e",
+      "verdict": "pass",
+      "bend": "2.0.34",
+      "verifiedAt": "2026-10-21T05:08:25Z",
+      "scope": "bend-emitted-book; source_semantics_attested=false"
+    },
+    {
+      "project": "bend/integration_owner_fsm",
+      "pr": "kvnloo/z0intelligence#188",
+      "commit": "1ef432f91223e74dcfb756c590aae82a950999ed",
+      "verdict": "pass",
+      "bend": "2.0.34",
+      "verifiedAt": "2026-10-21T07:40:49.968160+00:00",
+      "scope": "bend-emitted-book; source_semantics_attested=false"
+    }
+  ],
+  "scope": "Every next state on this page is computed by the emitted JavaScript. The proofs cover the emitted BendTT books named above (source_semantics_attested=false). The JS backend and the adapter are trusted, not proven. Nothing here observes or controls a live host."
+}

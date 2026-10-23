@@ -1,0 +1,15 @@
+{
+  "schema": "z0int.bend2_memory_toolchain.v1",
+  "bend_version_banner": "bend 2.0.34",
+  "bend_runtime_sha256": "7fafb749dd33df446a0cb5839c5694df237312a8e8048d2e9420480164ff5934",
+  "base_bend_sha256": "c742fae9c49b14f0cc9128429a2c6109364c8a933a142f2c90b9f2e5fd976661",
+  "bendtt_source_sha256": "61e0d2d9f4ddd7dd8bb1497fa612fb49a7274fcac647bf70702ba22321d7c292",
+  "lean_version": "Lean 4.34.0",
+  "lean_commit": "293d5d0c0c3f3dded4688b3ccd6a33939ac5102b",
+  "laws_git_blob_sha1": "1a715e22a3815227551eb8305158c672c131d6d5",
+  "bend_archive_sha256": "78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf",
+  "lean_archive_sha256": "caaa98356098c85dc0fcbbd28e1ec66f39eb6551829972b752ff20e1286b646b",
+  "pin_provenance": "Official bendlang/bend v2.0.34 linux-x64 and leanprover/lean4 v4.34.0 linux archives; independently downloaded and hashed 2026-10-23",
+  "status": "Official release pinned; proof, parity and mutant execution pending",
+  "source_semantics_attested": false
+}
