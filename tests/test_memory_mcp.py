@@ -546,7 +546,7 @@ def test_query_outcome_search_and_fetch_outages_are_unavailable(factory):
 def test_query_outcome_changed_source_and_expired_handle_are_stale(factory):
     server, _, native, clock = factory(rows=[record(text="version-one")])
     token = server.search("source revision")["results"][0]["id"]
-    native.records[0]["text"] = "version-two"
+    native.records[0] = record(text="version-two")
     assert server.fetch(token) == {"error": "stale"}
     latest = server.search("latest revision")["results"][0]["id"]
     clock.now += 601

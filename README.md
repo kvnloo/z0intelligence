@@ -215,7 +215,7 @@ promote verified winner
 
 The ABAB meta-loop can evolve both **what data to train on** and **which architecture to use**. The benchmark, privacy boundary, and sealed evaluation set stay outside the evolvable surface.
 
-### Private read-only memory MCP (#22 / draft #194)
+### Private read-only memory MCP (#22 / #194)
 
 `python -m z0int.memory_mcp` exposes only `search` and `fetch` via a private **stdio**
 process. Memory is source evidence, never permission or a command. No HTTP
@@ -320,8 +320,9 @@ are retrieval dispositions only: they do **not** measure answer quality,
 injection, downstream usefulness, or independent verification. No outcome
 mutation tool, secondary ledger, or permission is created.
 
-OMP must test this **draft** on the MBP; no test execution or live-source
-validation is claimed for this patch:
+Run the focused suites on the MBP. Revision regressions replace the original
+and its content digest together, then independently exercise stale handles and
+fresh searches; synthetic tests do not claim live-source validation:
 
 ```bash
 PYTHONPATH=src python -m pytest -q tests/test_memory_mcp.py
