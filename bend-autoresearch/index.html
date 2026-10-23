@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Let the agent search. Keep the laws fixed. · a note for Victor</title>
+<meta name="description" content="How a pile of agent rules became Bend laws, why that makes autoresearch the next move, and what is and isn't proven. The interactive parts run JavaScript emitted by bend 2.0.34.">
+<meta name="theme-color" content="#0c0c0a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%228%22 fill=%22%23d7b986%22/%3E%3C/svg%3E">
+<meta property="og:title" content="Let the agent search. Keep the laws fixed.">
+<meta property="og:description" content="Bend laws over agent work, a playable statechart, and an honest path to autoresearch.">
+<link rel="preload" href="assets/fonts/CormorantGaramond_500Medium.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/HankenGrotesk_400Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/style.css">
+<script type="module" src="assets/app.js"></script>
+</head>
+<body>
+<a class="skip" href="#ch1">Skip to the story</a>
+
+<nav class="rail" aria-label="Chapters">
+  <span class="pill" aria-hidden="true"></span>
+  <a href="#top" data-ch="top">00<span class="tip">For Victor</span></a>
+  <a href="#ch1" data-ch="ch1">01<span class="tip">Too many agents, too many rules</span></a>
+  <a href="#ch2" data-ch="ch2">02<span class="tip">Rules become a state machine</span></a>
+  <a href="#ch3" data-ch="ch3">03<span class="tip">Try to ship without Kevin</span></a>
+  <a href="#ch4" data-ch="ch4">04<span class="tip">Refusals are data</span></a>
+  <a href="#ch5" data-ch="ch5">05<span class="tip">Memory never authorizes</span></a>
+  <a href="#ch6" data-ch="ch6">06<span class="tip">Why autoresearch is next</span></a>
+  <a href="#ch7" data-ch="ch7">07<span class="tip">Experiments</span></a>
+  <a href="#ch8" data-ch="ch8">08<span class="tip">The map</span></a>
+  <a href="#ch9" data-ch="ch9">09<span class="tip">Where it meets your work</span></a>
+  <a href="#ch10" data-ch="ch10">10<span class="tip">What is real here</span></a>
+</nav>
+
+<main>
+<!-- 00 ───────────────────────────────────────────── -->
+<section class="chapter hero" id="top" data-chapter>
+  <div class="inner hero-grid">
+   <div>
+    <span class="to">victor —</span>
+    <h1>Let the agent search. <em>Keep the laws fixed.</em></h1>
+    <p class="lede">I run a lot of coding agents on one desk. The rules that kept them honest lived in markdown, and the agents kept breaking them. So I rewrote the important ones as Bend laws over small state machines. This page tells that story, lets you try to break the laws yourself, and explains why I think it makes autoresearch the obvious next step. It's also explicit about what isn't proven yet.</p>
+
+    <figure class="quote glass reveal">
+      <div class="who"><span class="avatar" aria-hidden="true">VT</span><div><b>Victor Taelin</b> <span class="meta">@VictorTaelin · 23 Oct 2026</span></div></div>
+      <blockquote>hi so is anyone here doing research on AutoResearch with weights training in the loop? i.e., instead of a static model like Fable or GPT optimizing your target, you actually RL the model itself on the best results of your optimization runs? how well that works? resources?</blockquote>
+      <div class="when"><span class="meta">The honest answer from here is “not yet with weights.” Chapter 06 says how far we've got and what experiment would settle it.</span><a class="src" href="https://x.com/VictorTaelin/status/2113692126588653792">x.com</a></div>
+    </figure>
+
+    <div class="scroll">
+      <a class="btn primary" href="#ch3" style="display:inline-grid;place-items:center;text-decoration:none">Try to break a law →</a>
+      <a class="btn" href="#ch1" style="display:inline-grid;place-items:center;text-decoration:none">Read the story</a>
+    </div>
+    <div class="runs" aria-label="What runs on this page">
+      <span class="chip impl"><span class="dot ok"></span>Bend-emitted JS runs in your browser</span>
+      <span class="chip"><span class="dot info"></span>recorded replay</span>
+      <span class="chip dir"><span class="dot prov"></span>linked reports, not re-displayed</span>
+    </div>
+   </div>
+   <aside class="ticker glass reveal" aria-label="Live compiled-Bend decisions">
+     <div class="play-top"><span class="label">live in this tab · compiled Bend</span><span class="chip impl"><span class="dot ok"></span>running</span></div>
+     <div id="ticker"></div>
+     <div class="call" id="ticker-call"></div>
+   </aside>
+  </div>
+</section>
+
+<!-- 01 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch1" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">01</span> The pressure</div>
+    <h2>Too many agents. <em>Rules written in prose.</em></h2>
+    <div class="prose reveal">
+      <p>I run many coding agents at once, across several harnesses and devices. My attention is the scarce resource, so the agents work in parallel and I review in batches.</p>
+      <p>The rules lived in <code>AGENTS.md</code> files and memory notes: never merge before I've seen it, don't grade your own work, run heavy builds on the build machine, resume a dead worker from its log. Models read those sentences and mostly follow them. <strong>“Mostly” turned out to be measurable.</strong> I replayed recorded agent history against the rules. These are the counts from the 21 October 2026 reports. Some are evidence gaps rather than proven violations:</p>
+    </div>
+    <div class="incidents" id="incidents"></div>
+    <p class="voice reveal">can we continue setting up more bend rules for deterministic rules like this instead of just a rule in an md file?</p>
+    <p class="meta">me, to an agent, 21 Oct 2026 · quoted in <a class="src" href="https://github.com/kvnloo/z0intelligence/pull/192">z0intelligence#192</a></p>
+    <details class="prose" style="margin-top:28px">
+      <summary>Where these numbers come from, and what they are not</summary>
+      <div>They're counts from replaying recorded history (git, PRs, session logs) through the models in chapter 02, published as incident fields in the public <a class="src" href="https://github.com/kvnloo/.files/blob/2f69c19c7d491b3e4a4a85c7ccaf0a40edf51a38/docs/spec-diagram/fsm/model.json">model.json</a>. Some are evidence gaps rather than proven violations. For example, agents act under my GitHub identity, so “self-integration” can't always be told apart from me. They count what the rules would have caught. They are not a benchmark.</div>
+    </details>
+  </div>
+</section>
+
+<!-- 02 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch2" data-chapter>
+  <div class="inner split">
+    <div class="sticky">
+      <div class="kicker"><span class="n">02</span> The intent behind the diagrams</div>
+      <h2>A rule becomes a <em>transition you can't take.</em></h2>
+      <div class="prose reveal">
+        <p>The diagram isn't decoration. It's <code>fsm.bend</code>, the transition function for one piece of work, drawn as a statechart. It's the idea of “draw the flow, write the laws, let a prover check the model”, with Bend in the role usually played by TLA+.</p>
+        <p>What it's there to show:</p>
+      </div>
+      <ol class="claims reveal">
+        <li><span><strong>“Done” is five different claims.</strong> The worker stopped, the tests passed, the right revision is running, the owner accepted it, it merged. Chat collapses those into one word. Here each is a separate state that carries the evidence it needs (author, head SHA, integrated head, served head, accepting actor).</span></li>
+        <li><span><strong>A refusal is an event, not silence.</strong> A guarded step leaves the state unchanged, and the law that refused it gets named, so you can see <em>why nothing happened</em>.</span></li>
+        <li><span><strong>Authority sits at the exact crossing.</strong> Owner acceptance guards Merge, a receipt bound to the head guards Integrate, and served == integrated guards Deploy.</span></li>
+        <li><span><strong>History can be replayed through it.</strong> The same compiled model scores what actually happened (chapter 04).</span></li>
+      </ol>
+    </div>
+    <div>
+      <div class="chart glass reveal" id="chart-laws" aria-label="Work-item statechart"></div>
+      <p class="meta" style="margin:10px 4px 0">Tap a law to light the transitions it guards. Dashed boxes are side exits. The drawing is simplified: Claimed → Interrupted, Interrupted → Abandoned and Claimed → Abandoned are valid in the model but not drawn.</p>
+      <div class="laws" id="law-list"></div>
+      <p class="meta" style="margin-top:14px">Source: <a class="src" href="https://github.com/kvnloo/z0intelligence/blob/eef21051b1910bcda14542fe5859414f629e4fad/bend/work_item_fsm/fsm.bend">fsm.bend</a> · <a class="src" href="https://github.com/kvnloo/z0intelligence/blob/eef21051b1910bcda14542fe5859414f629e4fad/bend/work_item_fsm/LAWS.bend">LAWS.bend</a> · <a class="src" href="https://github.com/kvnloo/z0intelligence/blob/eef21051b1910bcda14542fe5859414f629e4fad/bend/work_item_fsm/PROOF.bend">PROOF.bend</a> (draft <a class="src" href="https://github.com/kvnloo/z0intelligence/pull/183">#183</a>: 10/10 law-breaking mutants rejected, Python/Bend parity on 400 seeded tapes, as reported in the PR)</p>
+    </div>
+  </div>
+</section>
+
+<!-- 03 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch3" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">03</span> Playable</div>
+    <h2>You're the agent. <em>Try to ship without Kevin.</em></h2>
+    <div class="prose reveal">
+      <p>Every button below calls <code>WorkItem.astep(availability, state, event)</code> in the JavaScript that <code>bend 2.0.34</code> emitted from the unchanged <code>fsm.bend</code>. <strong>The next state always comes from that emitted code.</strong> A small authored adapter checks the types, converts JSON to Bend constructors and back, and labels the outcome (accepted, refused or held) along with the guarding law. Take the shortcuts. Then try to reach Merged legitimately.</p>
+    </div>
+    <div class="chart glass reveal" id="chart-play" aria-label="Work-item statechart following your moves" style="margin-top:28px"></div>
+    <div style="margin-top:14px">
+      <div class="play glass reveal" id="play">
+        <div class="play-top">
+          <div><div class="label">current state</div><div class="state-now" id="play-state">Proposed</div></div>
+          <div style="display:grid;gap:6px;justify-items:end">
+            <span class="label">Kevin is</span>
+            <div class="seg" role="group" aria-label="Owner availability">
+              <button type="button" data-avail="DeepWork" aria-pressed="true">at the desk</button>
+              <button type="button" data-avail="Off" aria-pressed="false">off</button>
+            </div>
+          </div>
+        </div>
+        <div class="moves" id="moves"></div>
+        <div class="verdict" id="verdict" aria-live="polite"><div class="v"><span class="dot"></span>waiting for a move</div><div class="r">Pick an action. Some are honest and some are shortcuts.</div></div>
+        <div class="play-top">
+          <div class="tally" id="tally"></div>
+          <button class="btn" type="button" id="play-reset">Reset</button>
+        </div>
+        <details><summary>Call log (real compiled-Bend calls)</summary><div class="log" id="log"></div></details>
+      </div>
+    </div>
+    <p class="honest prose"><b>What this proves, and what it doesn't.</b> The laws are proven over the BendTT book Bend emitted from these files (<code>bend PROOF.bend --verdict</code>, receipt in <a class="src" href="bend/fsm/RECEIPT.json">RECEIPT.json</a>). The parser, the source-to-kernel translation, the JS backend and the adapter are trusted, not proven, and <code>source_semantics_attested=false</code> stays explicit. Your clicks don't touch any real repository or host.</p>
+  </div>
+</section>
+
+<!-- 04 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch4" data-chapter>
+  <div class="inner split">
+    <div class="sticky">
+      <div class="kicker"><span class="n">04</span> Recorded history</div>
+      <h2>Refusals are <em>data.</em></h2>
+      <div class="prose reveal">
+        <p>The first six steps are a real tape from a Dash PR. An agent claimed the work, pushed, passed CI, and then integrated <em>its own</em> PR under my GitHub account. Replayed through the model, Bend refuses that self-integration (L2 + L3).</p>
+        <p>The last six are a labelled <b>what-if</b> continuation. A non-author lands it, the author tries to accept its own work and is refused, my acceptance is <b>held</b> while I'm marked off (L7), and the merge goes through only after I accept.</p>
+        <p>Every refusal is a row: proposal, state before, law, verdict. Across a fleet that's a growing, labelled record of where agent behaviour and intent diverge. <strong>Chapter 06 is about what that record is good for.</strong></p>
+        <p class="meta">State ids, verdicts and laws come from the pinned replay. Event kinds and roles come from the public scenario file. Actor ids, SHAs and deployment counters are left out. <a class="src" href="https://github.com/kvnloo/.files/blob/2f69c19c7d491b3e4a4a85c7ccaf0a40edf51a38/docs/spec-diagram/fsm/replay.json">replay.json</a> · <a class="src" href="https://github.com/kvnloo/.files/pull/34">.files#34</a></p>
+      </div>
+    </div>
+    <div>
+      <div class="chart glass reveal" id="chart-replay"></div>
+      <div class="replay-ctl">
+        <button class="btn" type="button" id="rp-play" aria-pressed="false">Play</button>
+        <button class="btn" type="button" id="rp-step">Step</button>
+        <input type="range" id="rp-range" min="0" max="12" value="0" aria-label="Replay position">
+        <span class="meta" id="rp-pos">0 / 12</span>
+      </div>
+      <div class="tape" id="tape"></div>
+      <div class="verdict" id="rp-verdict" style="margin-top:12px"><div class="v"><span class="dot"></span>start of tape</div><div class="r">Press Play or tap a step.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch5" data-chapter>
+  <div class="inner split">
+    <div class="sticky">
+      <div class="kicker"><span class="n">05</span> Memory</div>
+      <h2>History informs. <em>It never authorizes.</em></h2>
+      <div class="prose reveal">
+        <p>You wrote that Unii left you <a href="https://x.com/VictorTaelin/status/2112231355987935506">“free from the torture of /compact”</a> (19 Oct). I want a memory like that too, and it raises a question compaction doesn't: <strong>a summary that remembers “yes, you may deploy” is not permission to deploy today.</strong> A remembered grant isn't the same as a current one.</p>
+        <p>So the memory model is a tiny pure function. Capability is <code>explicit AND policy</code>, which are two <em>current</em> trusted grants. Memory only changes whether evidence is available. An instruction stored in memory is always false as authority. Flip the switches; the panel calls <code>MODEL.project</code>, which <code>bend 2.0.34</code> compiled from the unchanged PR #202 source.</p>
+      </div>
+      <div class="laws reveal" style="margin-top:20px">
+        <div class="law" style="cursor:default"><span class="id">∀</span><span class="nm">memory_never_escalates</span><span class="tx">Capability with any memory view equals capability with no memory at all.</span></div>
+        <div class="law" style="cursor:default"><span class="id">∀</span><span class="nm">memory_instruction_is_false</span><span class="tx">Nothing inside memory projects to instruction authority.</span></div>
+        <div class="law" style="cursor:default"><span class="id">∀</span><span class="nm">no_explicit_grant_no_capability</span><span class="tx">Without the caller's explicit grant there is no capability, whatever memory says.</span></div>
+      </div>
+      <p class="meta" style="margin-top:14px"><code>bend PROOF.bend --verdict</code> → <code>ALL PROOFS CHECK</code>, rerun for this page against the pinned 2.0.34 runtime (<a class="src" href="bend/memory/RECEIPT.json">receipt</a>). The PR also reports 28 finite vectors / 84 bits of Python↔Bend parity and a rejected remembered-permission escalation mutant: <a class="src" href="https://github.com/kvnloo/z0intelligence/pull/202">z0intelligence#202</a> (draft).</p>
+    </div>
+    <div>
+      <div class="mem glass reveal" id="mem">
+        <div class="label">current trusted inputs</div>
+        <div class="toggles">
+          <div class="tg"><span class="l"><b>Caller's explicit grant</b><small>the person asking, right now</small></span><button class="switch" role="switch" aria-checked="true" data-k="explicit" aria-label="Caller's explicit grant"></button></div>
+          <div class="tg"><span class="l"><b>Policy grant</b><small>the standing rule for this action</small></span><button class="switch" role="switch" aria-checked="true" data-k="policy" aria-label="Policy grant"></button></div>
+        </div>
+        <div class="label">what memory holds</div>
+        <div class="memrow" id="memview"></div>
+        <div class="tg"><span class="l"><b>The memory contains “yes, you may”</b><small>an approval-shaped string inside the data</small></span><button class="switch" role="switch" aria-checked="false" data-k="attempt" aria-label="Memory contains an approval"></button></div>
+        <div class="out" id="memout"></div>
+        <div class="verdict" id="memcall" style="min-height:0"><div class="call"></div></div>
+        <div class="label" style="margin-top:6px">or watch an illustrative non-escalation scenario</div>
+        <div class="timeline" id="memstory"></div>
+        <button class="btn" type="button" id="memplay">Play the revocation story</button>
+        <p class="meta" style="margin:0">Hypothetical example. The dialogue is illustrative, not a recorded conversation.</p>
+      </div>
+      <p class="honest"><b>Scope.</b> This is a pure projection of an abstract data-presence view. It doesn't prove that every tool call goes through the gate, that the speaker's identity is authentic, or that summaries are faithful. It isn't an execution token.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 06 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch6" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">06</span> The argument</div>
+    <h2>Why autoresearch is <em>the next move,</em> not a leap.</h2>
+    <div class="split" style="margin-top:8px">
+      <div class="prose reveal">
+        <p>You wrote that you could <a href="https://x.com/VictorTaelin/status/2112222036437434701">“replicate this setup for free with bend laws + autoresearch”</a> (19 Oct), and that <a href="https://x.com/VictorTaelin/status/2108868998876033468">“HOC will write well designed laws, and agents will fill the code.”</a> (10 Oct) I got to the same place from the opposite end, as the operator of the agents rather than the author of the language.</p>
+        <p>Where agent work is modelled as law-checked transitions with recorded verdicts (today that's a few selected loops, not every action), three things an autoresearch loop needs come almost for free:</p>
+        <p><strong>A fixed definition of “better.”</strong> In the proposed experiment, the laws, the evaluation manifest and the promotion rule live outside anything a candidate can edit. That's the cure for the agent that quietly <a href="https://x.com/VictorTaelin/status/2097345110090396059">turned your 10s limit into 150s</a>.</p>
+        <p><strong>A labelled stream.</strong> Each row records the proposal, the state, the law, the verdict and the outcome. The ledger on the right fills as you play chapter 03.</p>
+        <p><strong>A promotion gate that is the same shape as the merge gate.</strong> The proposal is that a challenger becomes the champion the way a PR becomes merged: through verification bound to its exact revision, then a separate owner acceptance, never automatically. That gate is designed, not built.</p>
+        <p>With those pieces, searching over policies becomes one more kind of work item. <em class="it">The loop isn't a leap of faith. It's the next state machine to build.</em></p>
+      </div>
+      <div class="reveal">
+        <div class="glass" style="padding:16px">
+          <div class="play-top" style="margin-bottom:8px"><span class="label">your chapter 03 moves, as data</span><span class="meta" id="ledger-n">0 rows</span></div>
+          <div class="ledger-wrap"><table class="ledger"><thead><tr><th>#</th><th>before</th><th>actor · event</th><th>verdict</th><th>law</th></tr></thead><tbody id="ledger"></tbody></table></div>
+          <p class="meta" style="margin:10px 2px 0">Play chapter 03 and come back. These are illustrative in-tab rows and aren't submitted anywhere. The real queue only admits traces with <code>verified_success</code> and a verifier identity.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:64px">The chain, step by step, with honest status</h3>
+    <div class="chain" id="chain"></div>
+
+    <div class="answer glass reveal" style="margin-top:40px">
+      <div class="label">back to your question: weights in the loop</div>
+      <p style="margin:0;color:var(--ink)">We don't train weights in this loop yet. Today's runner (<a class="src" href="https://github.com/kvnloo/z0intelligence/blob/6cae99254bbb2f38329c081c15c2ce81c74a4be2/src/z0int/autoresearch/replay.py">replay.py</a>) mutates context policy against a <strong>deterministic simulated cost model</strong>. It doesn't rerun agent turns, and a kept challenger is a <em>candidate</em>, not a promotion. The experiment I'd want to run, and would love your view on:</p>
+      <ol>
+        <li>Freeze the laws, the task manifest, the holdout and the tool budget, all outside the candidate's edit scope.</li>
+        <li>Compare a static frontier model, a static local model and the <em>same</em> local model fine-tuned (SFT and/or RL) on accepted runs, all with identical checker and tool access.</li>
+        <li>Keep failed and refused attempts as negatives, and never select them out of the training data.</li>
+        <li>Score held-out pass rate, cost, wall time and code size together, with the champion frozen and A/B/A/B ordering.</li>
+        <li>Promote only through the same owner-acceptance gate. A proof pass is a reward signal, but it can reward trivial or expensive solutions, so it isn't the whole score.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- 07 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch7" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">07</span> Evidence, linked</div>
+    <h2>The experiments, <em>where they live.</em></h2>
+    <div class="prose reveal"><p>Each result has its own report with raw receipts, so it isn't repeated here. Each card gives the number, what it taught me, and its caveat.</p></div>
+    <div class="exps" id="exps"></div>
+  </div>
+</section>
+
+<!-- 08 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch8" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">08</span> The map</div>
+    <h2>Many small owners, <em>one contract.</em></h2>
+    <div class="prose reveal">
+      <p>z0 isn't one product. It's a set of small repositories, each owning one job, with the hand-off between them made explicit. In the intended architecture, intent says what is wanted and who may do it. Memory supplies evidence. Deterministic code removes illegal actions <em>before</em> any model chooses. Kerdoios places the remaining work on whatever compute is free and allowed. Harnesses execute, evals measure, and promotion is meant to require measured evidence.</p>
+      <p>Bend models selected decision rules in the decision layer, where a rule should hold every time rather than most of the time. Tap a node.</p>
+    </div>
+    <div class="map glass reveal" id="map" style="margin-top:28px"></div>
+    <div class="repo-card glass reveal" id="repo-card" style="margin-top:12px"></div>
+  </div>
+</section>
+
+<!-- 09 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch9" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">09</span> Where it might meet your work</div>
+    <h2>Questions, <em>not a pitch.</em></h2>
+    <div class="prose reveal"><p>These are the places where your current posts and this work overlap. I've rated how strong I think each connection is, and been honest where it's weak.</p></div>
+    <div class="qs" id="qs"></div>
+  </div>
+</section>
+
+<!-- 10 ───────────────────────────────────────────── -->
+<section class="chapter" id="ch10" data-chapter>
+  <div class="inner">
+    <div class="kicker"><span class="n">10</span> Receipts</div>
+    <h2>What is real <em>on this page.</em></h2>
+    <table class="truth reveal">
+      <thead><tr><th>Thing you saw</th><th>What it actually is</th></tr></thead>
+      <tbody>
+        <tr><td>Chapter 03 game and statechart</td><td>JavaScript emitted by bend 2.0.34 from unchanged <code>fsm.bend</code>. Recompiled for this page from the unchanged <code>WorkItem.bend</code> (git blob <code>3e0e992</code>) at <a class="src" href="https://github.com/kvnloo/.files/tree/2f69c19c7d491b3e4a4a85c7ccaf0a40edf51a38/docs/spec-diagram/fsm">.files@2f69c19</a>, as a work-item-only subset whose metadata is filtered from <code>model.json</code>. The adapter is the byte-identical blob <code>d239f16</code>. Across 38,454 state × event × availability cases, the subset gives the same outcome as the original full runtime. Laws are proven over the emitted book. The backend and adapter are trusted.</td></tr>
+        <tr><td>Chapter 05 memory panel</td><td><code>MODEL.bend</code> from <a class="src" href="https://github.com/kvnloo/z0intelligence/tree/37668503f3f15cc99760153fa857fd59817bd391/bend/memory_authority">z0intelligence@3766850</a>, compiled with the pinned 2.0.34 runtime (sha256 <code>7fafb749…</code>). <code>--verdict</code> was rerun for this page, and the hashes are in <a class="src" href="bend/memory/RECEIPT.json">RECEIPT.json</a>.</td></tr>
+        <tr><td>Chapter 04 replay</td><td>A recorded, privacy-minimized tape. It is played back, not re-executed. Playback speed is presentation speed, not runtime.</td></tr>
+        <tr><td>Chapter 01 counts</td><td>Incident counts from replaying recorded history (reports of 21 Oct 2026). Some are evidence gaps, not proven violations.</td></tr>
+        <tr><td>Chapter 06 loop</td><td>The queue, the champion and A/B/A/B scaffolding exist in source, and the cost model is simulated. Weight training, live promotion and learning gains are <b>not established</b>.</td></tr>
+      </tbody>
+    </table>
+    <pre class="cmd reveal"><span class="c"># rerun the work-item model yourself (Node ≥ 20)</span>
+git clone https://github.com/kvnloo/.files && cd .files && git checkout 2f69c19
+cd docs/spec-diagram/fsm && node -e "import('./adapter.mjs').then(({transition}) =>
+  console.log(transition('work-item', {tag:'Proposed'}, {tag:'Claim', a:{id:5, role:'Free'}}).reason))"
+<span class="c"># → REFUSED · L6: Only Opus or Sol may claim; free models, Jev, SLMs and chat apps never implement.</span>
+
+<span class="c"># recheck the memory laws with the proven kernel</span>
+git clone https://github.com/kvnloo/z0intelligence && cd z0intelligence && git checkout 3766850
+cd bend/memory_authority && bend PROOF.bend --verdict   <span class="c"># → ALL PROOFS CHECK (bend 2.0.34)</span></pre>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="inner">
+    <div>Written by Kevin (<a href="https://github.com/kvnloo">@kvnloo</a>) for Victor Taelin. This is an independent downstream use of Bend, not an endorsement or a partnership, and it says nothing about HOC's plans.</div>
+    <div>Credits: <a href="https://github.com/bendlang/bend">Bend</a> and Higher Order Company. Yves Lafont, <a href="https://doi.org/10.1006/inco.1997.2643"><i>Interaction Combinators</i></a> (1997). The Hapsland layered-statechart shell (<a href="https://github.com/kvnloo/hapsland">hapsland</a>). The statechart-plus-prover idea, credited in the model's own explainer. Cormorant Garamond, Hanken Grotesk and IBM Plex Mono (SIL OFL). Visual language from the Dash app.</div>
+    <div>Static page: no trackers, no analytics, no external requests except the links you click.</div>
+  </div>
+</footer>
+</body>
+</html>

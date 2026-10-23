@@ -1,0 +1,45 @@
+{
+  "what": "Work-item-only subset of the Bend statechart runtime, recompiled for this page with bend 2.0.34 from the unchanged WorkItem.bend, plus the unchanged adapter.",
+  "source": {
+    "repo": "kvnloo/.files",
+    "commit": "2f69c19c7d491b3e4a4a85c7ccaf0a40edf51a38",
+    "dir": "docs/spec-diagram/fsm",
+    "inputs": {
+      "WorkItem.bend": {
+        "git_blob": "3e0e9922c8d9b13eb6f7647f8fb6128adcf009ea",
+        "upstream": "kvnloo/z0intelligence@b4c06eefb1fb276e4b999f9e59bbf58bbd9a6f74:bend/work_item_fsm/fsm.bend"
+      },
+      "adapter.mjs": {
+        "git_blob": "d239f16a46b54bdc6486a98a90e16556b748863a",
+        "byte_identical": true
+      }
+    }
+  },
+  "build": {
+    "command": "bend src/Runtime.bend -o <out>.mjs, then append bendMetadata filtered from model.json (work-item machine, its types/states/guards, laws L1-L7 plus W1/W4 incident counts)",
+    "compiler": "bend 2.0.34",
+    "compiler_identity_sha256": "66e5faf92d75d6e10a11427c8e4f3df72a4c14b1263a04431fdc015a5aa21317",
+    "Runtime.generated.mjs_sha256": "dcaec220a462185a594b986259509bf80e19a85e33c12d2fcc1ecf7d427965cc",
+    "privacy": "Device and host nicknames in metadata text are replaced with generic terms; no transition logic is affected."
+  },
+  "parity": {
+    "against": "original full Runtime.generated.mjs (git blob 7afb4e16ad3f370a22f34c4ffb935446615205a2) through the same adapter",
+    "cases": 38454,
+    "space": "34 states x 377 events x 3 availability facts (the build.mjs sample space)",
+    "mismatches": 0
+  },
+  "proofs": [
+    {
+      "project": "bend/work_item_fsm",
+      "pr": "kvnloo/z0intelligence#183",
+      "commit": "eef21051b1910bcda14542fe5859414f629e4fad",
+      "lawsBlob": "b564659c0471b66022c813933c4a99c0b342011e",
+      "proofBlob": "db234e6c68f363dbe56571dc749cc9203b3614ea",
+      "verdict": "pass",
+      "bend": "2.0.34",
+      "verifiedAt": "2026-10-21T03:45:45Z",
+      "scope": "bend-emitted-book; source_semantics_attested=false"
+    }
+  ],
+  "scope": "Interactive next-state values come from this Bend-emitted JavaScript. The adapter is authored code: it validates the ABI and derives verdict/reason labels. Proofs cover the emitted BendTT book (source_semantics_attested=false); the JS backend and adapter are trusted. The chapter 04 tape is recorded and played back. Nothing here observes or controls a live host."
+}

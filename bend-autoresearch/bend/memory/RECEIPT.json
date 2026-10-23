@@ -1,0 +1,29 @@
+{
+  "what": "Pure memory-authority model from kvnloo/z0intelligence PR #202, compiled to JavaScript for this page.",
+  "source": {
+    "repo": "kvnloo/z0intelligence",
+    "commit": "37668503f3f15cc99760153fa857fd59817bd391",
+    "dir": "bend/memory_authority",
+    "git_blobs": {
+      "MODEL.bend": "9cdf552a97881ed9f4a5b98046eab5e4f3e82e3b",
+      "LAWS.bend": "1a715e22a3815227551eb8305158c672c131d6d5",
+      "PROOF.bend": "e8bdb5d6724136b5ed9adb062125383b4dd135f6"
+    }
+  },
+  "toolchain": {
+    "banner": "bend 2.0.34",
+    "runtime_sha256": "7fafb749dd33df446a0cb5839c5694df237312a8e8048d2e9420480164ff5934",
+    "pinned_runtime_sha256": "7fafb749dd33df446a0cb5839c5694df237312a8e8048d2e9420480164ff5934"
+  },
+  "build": {
+    "command": "bend Runtime.bend -o MemRuntime.mjs",
+    "Runtime.bend_sha256": "eb30c6280412d3737d3575881bfeb11a68b29049425b8051ed1cfcd61d0a081d",
+    "MemRuntime.mjs_sha256": "300427605283d1e43b77dd46a35d1709b270c7153de83cf2f0556cf448acb3dc"
+  },
+  "verdict": {
+    "command": "bend PROOF.bend --verdict",
+    "output": "ALL PROOFS CHECK",
+    "ran_at": "2026-10-23T19:35:49+00:00"
+  },
+  "scope": "The verdict concerns the emitted BendTT book of these files. It does not attest parser/source-to-kernel translation, the JS backend, or any live authority path. source_semantics_attested=false."
+}
