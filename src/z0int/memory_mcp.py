@@ -175,7 +175,7 @@ class MemoryServer:
                  "bytes": len(encoded(payload)), "denied_count": denied,
                  "unavailable_count": sum(v == "unavailable" for v in payload.get("backends", {}).values()),
                  "decision": payload.get("error", "allowed"),
-                  "outcome": self._outcome(tool, payload, denied)}
+                 "outcome": self._outcome(tool, payload, denied)}
         try:
             fd = os.open(self.state_dir / "audit.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
             with os.fdopen(fd, "ab", buffering=0) as stream:

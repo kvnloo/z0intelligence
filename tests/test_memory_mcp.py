@@ -600,3 +600,13 @@ def test_query_outcome_failed_audit_blocks_search_before_disclosure(factory):
     assert "record" not in reply and "results" not in reply
     assert "SYNTHETIC_PRIVATE_ORIGINAL" not in serialized(reply).decode()
 
+def test_query_outcome_fetch_policy_revocation_logs_denied(factory):
+    server, path, backend, _ = factory()
+    token = server.search("before policy revocation")["results"][0]["id"]
+    replace_policy(path, lambda p: p["principals"]["operator"].clear())
+    assert server.fetch(token) == {"error": "denied"}
+    row = outcome_rows(server)[-1]
+    assert row["tool"] == "fetch" and row["outcome"] == "denied"
+    assert row["decision"] == "denied" and row["count"] == 0
+    assert not backend.fetch_calls
+
