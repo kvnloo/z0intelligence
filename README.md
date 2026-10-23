@@ -517,3 +517,14 @@ Unknown stays unknown. Partial measurement stays partial. Execution completion s
 8. **Exact revisions matter.** Experiments, adapters, and cross-repo claims must bind to the exact code/data revision that produced them.
 
 Project code is released under the [MIT License](LICENSE). Third-party models, runtimes, datasets, and trademarks retain their upstream terms; see [THIRD_PARTY.md](THIRD_PARTY.md).
+
+## Downstream Avrea CI
+
+On `ci/avrea-factory-20261023`, core CI uses 4-vCPU Avrea Ubuntu runners.
+`avrea-factory.yml` retains the core receipt/bridge tests, local-cognition
+extension tests, complete offline pytest suites on Python 3.11 and 3.13,
+the pinned Kerdoios dependency, and published-evidence verification.
+Its jobs and Python variants run sequentially to bound account concurrency.
+Dispatch `provider=github` for an exact-head control, followed by two
+`provider=avrea` runs on that same commit. Compare job and test-step timing,
+and use cache logs to distinguish measured cache behavior from run order.

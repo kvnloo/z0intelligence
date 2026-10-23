@@ -1,0 +1,123 @@
+name: Avrea factory verification
+'on':
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Use Avrea or an identical-scope GitHub-hosted control
+        type: choice
+        options:
+        - avrea
+        - github
+        default: avrea
+        required: true
+permissions:
+  contents: read
+jobs:
+  core-unit:
+    runs-on: ${{ inputs.provider == 'avrea' && 'avrea-ubuntu-latest-4-vcpu' || 'ubuntu-latest' }}
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - name: Claim-expiry script (offline, fake gh)
+      run: python3 tests/expire_claims.py
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Syntax-check touched Python
+      run: "python -m py_compile \\\n  src/z0int/receipt.py \\\n  src/z0int/ao_bridge.py \\\n  src/z0int/memory/event_log.py\
+        \ \\\n  src/z0int/memory/optmem_tree.py \\\n  src/z0int/intelligence_service.py \\\n  src/z0int/tokenomics_emit.py\
+        \ \\\n  src/z0int/bridge/worker.py \\\n  src/z0int/bridge/runtime.py \\\n  src/z0int/backends/bench/tokenomics_bridge.py\n"
+    - name: Receipt and bridge runtime tests
+      env:
+        PYTHONPATH: src
+        Z0INT_PYTHON: python
+      run: "python -m unittest \\\n  tests.test_receipt.ReceiptBuild \\\n  tests.test_receipt.ReceiptClose \\\n  tests.test_bridge_worker.BridgeRuntimeTests\
+        \ \\\n  tests.test_memory_event_log.EventLogTests \\\n  tests.test_memory_optmem_tree.OptMemTreeTests \\\n  tests.test_ao_bridge.AOBridgeTests\n"
+    - name: Tokenomics emitter fallback tests
+      env:
+        PYTHONPATH: src
+      run: 'python - <<''PY''
+
+        import importlib.util
+
+        from pathlib import Path
+
+
+        path = Path("tests/test_tokenomics_emit.py")
+
+        spec = importlib.util.spec_from_file_location("test_tokenomics_emit", path)
+
+        module = importlib.util.module_from_spec(spec)
+
+        assert spec.loader is not None
+
+        spec.loader.exec_module(module)
+
+        module.test_provider_usage_preserves_explicit_measurement_state()
+
+        module.test_provider_usage_does_not_invent_measurement_state()
+
+        PY
+
+        '
+    timeout-minutes: 60
+  omp-extension:
+    runs-on: ${{ inputs.provider == 'avrea' && 'avrea-ubuntu-latest-4-vcpu' || 'ubuntu-latest' }}
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: 1.3.14
+    - name: Local-cognition extension tests
+      run: cd omp-extensions/local-cognition && bun test
+    needs: core-unit
+    timeout-minutes: 60
+  offline-suite:
+    runs-on: ${{ inputs.provider == 'avrea' && 'avrea-ubuntu-latest-4-vcpu' || 'ubuntu-latest' }}
+    strategy:
+      matrix:
+        python:
+        - '3.11'
+        - '3.13'
+      max-parallel: 1
+    env:
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      Z0INT_HOME: ${{ github.workspace }}/.test-state/z0int-tests
+      Z0INT_PYTHON: python
+      Z0INT_KERDOIOS_ROOT: ${{ github.workspace }}/.test-deps/kerdoios
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+    - uses: actions/checkout@v7
+      with:
+        repository: kvnloo/kerdoios
+        ref: cdb43b05a328a50649d5120bffcdecea09492219
+        path: .test-deps/kerdoios
+        persist-credentials: false
+    - name: Install pinned CPU test environment
+      run: 'python -m pip install torch==2.10.0+cpu --index-url https://download.pytorch.org/whl/cpu
+
+        python -m pip install -e ''.[test]''
+
+        '
+    - name: Complete offline suite
+      run: python -m pytest -q -m 'not live'
+    - name: Verify published evidence
+      run: '(cd results/raw && sha256sum -c SHA256SUMS)
+
+        python benchmarks/verify_published.py
+
+        '
+    needs: omp-extension
+    timeout-minutes: 60

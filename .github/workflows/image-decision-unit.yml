@@ -1,6 +1,7 @@
 name: Image decision unit
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "src/z0int/backends/image_decision.py"
@@ -23,7 +24,7 @@ permissions:
 
 jobs:
   image-decision-unit:
-    runs-on: ubuntu-latest
+    runs-on: avrea-ubuntu-latest-2-vcpu
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

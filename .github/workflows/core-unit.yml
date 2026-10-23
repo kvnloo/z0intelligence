@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   core-unit:
-    runs-on: ubuntu-latest
+    runs-on: avrea-ubuntu-latest-4-vcpu
     steps:
       - uses: actions/checkout@v7
       - name: Claim-expiry script (offline, fake gh)
@@ -62,7 +62,7 @@ jobs:
           PY
 
   omp-extension:
-    runs-on: ubuntu-latest
+    runs-on: avrea-ubuntu-latest-4-vcpu
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -72,7 +72,7 @@ jobs:
         run: cd omp-extensions/local-cognition && bun test
 
   offline-suite:
-    runs-on: ubuntu-latest
+    runs-on: avrea-ubuntu-latest-4-vcpu
     strategy:
       matrix:
         python: ["3.11", "3.13"]
