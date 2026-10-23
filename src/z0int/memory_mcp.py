@@ -180,6 +180,8 @@ class MemoryServer:
                         "locator", "native", "source_version")}).decode()
 
     def _issue(self, record: dict) -> str:
+        # Backend-owned dictionaries must not mutate an already signed identity.
+        record = {**record, "native": dict(record["native"])}
         nonce = base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip("=")
         token = nonce + "." + self._hash("id", nonce + "\0" + self._identity(record))
         self.cache[token] = (self.clock(), record)

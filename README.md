@@ -250,6 +250,8 @@ outage is **unavailable**; revoked or wrong scope is **denied**; missing results
 are **empty**. The fetch output remains bounded and may be marked
 `text_truncated=true`; it is never a cached search snippet. Source
 identity/revision, not date, enters the provenance-only ContextPacket.
+The handle retains a detached snapshot of the native identity, so later backend
+record mutation cannot rewrite the identity covered by its signature.
 
 **Explicit principal grants (policy schema v2).** The reviewed operator and
 least-privileged ChatGPT profiles must be separately granted; no scope or
