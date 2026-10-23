@@ -173,9 +173,10 @@ def mutation(exe: Path) -> None:
         proc = verdict(exe, tmp)
         # An internal crash, import error or unqualified timeout is NOT evidence
         # that the deliberately invalid mathematical law was rejected.
-        if "ALL PROOFS CHECK" in proc.stdout.splitlines():
+        lines = (proc.stdout + "\n" + proc.stderr).splitlines()
+        if "ALL PROOFS CHECK" in lines:
             raise RuntimeError("LAW-BREAKING MUTANT ACCEPTED")
-        if "SOME PROOFS FAIL" not in proc.stdout.splitlines():
+        if proc.returncode == 0 or "SOME PROOFS FAIL" not in lines:
             raise RuntimeError(
                 "mutant did not yield a genuine failed-proof verdict: " +
                 repr((proc.returncode, proc.stdout[:500], proc.stderr[:500]))
