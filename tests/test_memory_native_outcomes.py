@@ -5,7 +5,6 @@ import pytest
 
 from test_memory_mcp import factory, record as base_record, replace_policy
 from z0int.memory_contract import MemoryScope
-from z0int.memory_outcomes import replay_outcomes
 
 
 SCOPE = MemoryScope(user="synthetic-user", project="project-A", repo="synthetic-repo", task="synthetic-task")
@@ -13,6 +12,12 @@ SCOPE = MemoryScope(user="synthetic-user", project="project-A", repo="synthetic-
 
 def record(**kwargs):
     return base_record(session_id="omp:synthetic-session", **kwargs)
+
+
+def offline_replay(*args, **kwargs):
+    # Keep collection runnable against the pre-feature source for the RED gate.
+    from z0int.memory_outcomes import replay_outcomes
+    return replay_outcomes(*args, **kwargs)
 
 
 def scoped(factory, rows):
@@ -142,7 +147,7 @@ def test_replay_rejects_native_provenance_tampering(factory, mutation):
     else:
         rows[-1]["cited_evidence_hmacs"] = ["0" * 64]
     with pytest.raises(ValueError):
-        replay_outcomes(rows, scope_hmac=joined["scope_hmac"], principal="operator")
+        offline_replay(rows, scope_hmac=joined["scope_hmac"], principal="operator")
 
 
 def test_real_http_native_adapter_joins_output_and_later_user_source(tmp_path, monkeypatch):
@@ -218,7 +223,7 @@ def test_real_http_native_adapter_joins_output_and_later_user_source(tmp_path, m
         assert joined["outcome"] == "user_restated"
         # Replay has no native source access and does not need the server key.
         before = len(calls)
-        assert replay_outcomes(server._audit_rows(), scope_hmac=joined["scope_hmac"], principal="operator")[0]["outcome"] == "user_restated"
+        assert offline_replay(server._audit_rows(), scope_hmac=joined["scope_hmac"], principal="operator")[0]["outcome"] == "user_restated"
         assert len(calls) == before
         originals[3]["role"] = "assistant"
         with pytest.raises(ValueError):

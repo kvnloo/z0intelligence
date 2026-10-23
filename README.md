@@ -346,7 +346,7 @@ not an arbitrary assistant message from an earlier task.
 `join_native_outcome` rehydrates the selected original through the existing
 authenticated AgentsView adapter. It checks the project, native session,
 ordinal boundary, stable message ID, content revision, native role, and
-complete disclosed text. Tool/thinking/system messages and truncated answers
+complete disclosed text. Tool/thinking/system messages and truncated or redacted answers
 cannot establish ignored use. Revoked grants and stale handles fail closed.
 The same private audit receives `z0int.memory_use_outcome.v1` rows.
 
