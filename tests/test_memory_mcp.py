@@ -73,6 +73,7 @@ class NativeFixture:
                     "privacy": row["privacy"], "ordinal": row["native"]["ordinal"],
                     "session_id": row["native"]["session_id"],
                     "message_id": row["native"].get("id"),
+                    "role": row.get("role"),
                 })
         raise OSError("synthetic missing original")
 
@@ -485,6 +486,8 @@ def test_query_outcomes_record_real_hit_rows_without_evidence(factory):
         assert set(row) == {
             "schema", "timestamp", "tool", "query_hmac", "count", "bytes",
             "denied_count", "unavailable_count", "decision", "outcome",
+            "receipt_id", "principal", "scope_hmac", "evidence_hmacs",
+            "native_records", "native_session_hmac", "after_ordinal",
         }
         assert row["schema"] == "z0int.memory_query_outcome.v1"
         assert row["timestamp"].endswith("Z")

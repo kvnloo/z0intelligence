@@ -24,6 +24,8 @@ from .memory_mcp_backends import (
     search_backend, fetch_backend, BackendUnavailable, BackendDenied,
     BackendIdentityDenied, BackendStale, agentsview_locator,
 )
+from .memory_contract import MemoryScope
+from .memory_outcomes import replay_outcomes
 
 SOURCES = ("agentsview", "ctx", "qmd", "tencentdb")
 PRIVACY = {"public", "personal", "private"}
@@ -133,6 +135,10 @@ class MemoryServer:
         # Metadata/expected revision only, never cached transcript content.
         self.cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
         self.calls: deque[float] = deque()
+        self.workstream: MemoryScope | None = None
+        self.native_session: str | None = None
+        self.after_ordinal = 0
+        self.query_receipts: OrderedDict[str, dict] = OrderedDict()
         load_policy(self.policy_path)
         self.state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         if self.state_dir.is_symlink() or stat.S_IMODE(self.state_dir.stat().st_mode) & 0o077:
@@ -140,6 +146,47 @@ class MemoryServer:
 
     def _hash(self, domain: str, value: str) -> str:
         return hmac.new(self.key, (domain + "\0" + value).encode(), hashlib.sha256).hexdigest()
+
+    def bind_workstream(self, scope: MemoryScope, *, native_session: str,
+                        after_ordinal: int) -> None:
+        """Trusted startup binding, never a model-facing tool or argument."""
+        if (self.calls or self.query_receipts or self.workstream is not None or
+                not isinstance(scope, MemoryScope) or
+                any(not isinstance(v, str) or not v.strip() or
+                    v.strip().casefold() in {"unknown", "none", "null", "*"}
+                    for v in (scope.user, scope.project, scope.repo, scope.task)) or
+                not isinstance(native_session, str) or not native_session.strip() or
+                type(after_ordinal) is not int or after_ordinal < 0):
+            raise ValueError("immutable, fully bound native workstream required")
+        self.workstream = scope
+        self.native_session = native_session
+        self.after_ordinal = after_ordinal
+
+    def _scope_hmac(self) -> str | None:
+        return (self._hash("workstream", self.workstream.fingerprint())
+                if self.workstream is not None else None)
+
+    def _grants(self, policy: dict) -> list[dict]:
+        grants = policy["principals"][self.principal]
+        return ([g for g in grants if g["scope"] == self.workstream.project]
+                if self.workstream is not None else grants)
+
+    def _evidence_hmac(self, record: dict) -> str:
+        return self._hash("evidence", record["locator"] + "\0" + record["source_version"])
+
+    def _append_audit(self, event: dict) -> bool:
+        try:
+            fd = os.open(self.state_dir / "audit.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+            with os.fdopen(fd, "ab", buffering=0) as stream:
+                info = os.fstat(stream.fileno())
+                if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) & 0o077:
+                    raise OSError("private audit file required")
+                data = encoded(event) + b"\n"
+                if stream.write(data) != len(data):
+                    raise OSError("incomplete audit write")
+        except OSError:
+            return False
+        return True
 
     @staticmethod
     def _outcome(tool: str, payload: dict, denied: int) -> str:
@@ -170,23 +217,38 @@ class MemoryServer:
         return "error"
 
     def _audit(self, tool: str, query: str, payload: dict, denied: int = 0) -> dict:
+        receipt_id = secrets.token_hex(32)
+        records = payload.get("results", []) if tool == "search" else (
+            [payload["record"]] if "record" in payload else [])
+        native_records = []
+        for record in records:
+            cached = self.cache.get(record.get("id"), (None, {}))[1]
+            if record.get("role") in ("user", "assistant") and cached.get("native"):
+                native_records.append(self._native_provenance({**record, "native": cached["native"]}))
+        # Additive response metadata only. Error responses keep their fixed shape.
+        if "error" not in payload:
+            payload = {**payload, "receipt_id": receipt_id}
         event = {"schema": "z0int.memory_query_outcome.v1", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "tool": tool,
                  "query_hmac": self._hash("query", query), "count": len(payload.get("results", [])) if tool == "search" else int("record" in payload),
                  "bytes": len(encoded(payload)), "denied_count": denied,
                  "unavailable_count": sum(v == "unavailable" for v in payload.get("backends", {}).values()),
                  "decision": payload.get("error", "allowed"),
-                 "outcome": self._outcome(tool, payload, denied)}
-        try:
-            fd = os.open(self.state_dir / "audit.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
-            with os.fdopen(fd, "ab", buffering=0) as stream:
-                info = os.fstat(stream.fileno())
-                if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) & 0o077:
-                    raise OSError("private audit file required")
-                data = encoded(event) + b"\n"
-                if stream.write(data) != len(data):
-                    raise OSError("incomplete audit write")
-        except OSError:
+                 "outcome": self._outcome(tool, payload, denied),
+                 "receipt_id": receipt_id, "principal": self.principal,
+                 "scope_hmac": self._scope_hmac(),
+                 "evidence_hmacs": sorted(set(self._evidence_hmac(r) for r in records)),
+                 "native_records": native_records,
+                 "native_session_hmac": (self._hash("session", self.native_session)
+                                         if self.native_session is not None else None),
+                 "after_ordinal": self.after_ordinal}
+        if not self._append_audit(event):
             return {"error": "audit_unavailable"}
+        self.query_receipts[receipt_id] = {
+            "event": event, "issued": self.clock(),
+            "evidence": [{k: r[k] for k in ("locator", "source_version")} for r in records],
+        }
+        while len(self.query_receipts) > MAX_CACHED:
+            self.query_receipts.popitem(last=False)
         return payload
 
     def _begin(self, tool: str, query: str) -> tuple[dict | None, dict | None]:
@@ -200,7 +262,7 @@ class MemoryServer:
         if len(self.calls) >= policy["limits"]["calls_per_minute"]:
             return None, self._audit(tool, query, {"error": "rate_limited"})
         self.calls.append(now)
-        policy["allow"] = policy["principals"][self.principal]
+        policy["allow"] = self._grants(policy)
         return policy, None
 
     def _identity(self, record: dict) -> str:
@@ -238,8 +300,11 @@ class MemoryServer:
         result["host"] = clip(result["host"], 256)
         result["date"] = clip(result["date"], 256)
         result["id"] = "x" * 89
+        if raw.get("role") in ("user", "assistant"):
+            result["role"] = raw["role"]
         result["mode"] = "preview" if preview else "original_read"
         result["text_truncated"] = False
+        result["text_redacted"] = redact(raw["text"]) != raw["text"]
         result["text"] = ""
         remaining = cap - len(encoded(result))
         if remaining < 0:
@@ -300,7 +365,7 @@ class MemoryServer:
         # Revocation between search and response is never ignored.
         try:
             current = load_policy(self.policy_path)
-            policy["allow"] = current["principals"][self.principal]
+            policy["allow"] = self._grants(current)
             policy["limits"] = current["limits"]
         except (OSError, ValueError, TypeError):
             return self._audit("search", query, {"error": "denied"})
@@ -325,7 +390,7 @@ class MemoryServer:
             result["id"] = token
             results.append(result)
             payload["context_packet"] = self._packet(results)
-            if len(encoded(payload)) > policy["limits"]["total_bytes"]:
+            if len(encoded({**payload, "receipt_id": "x" * 64})) > policy["limits"]["total_bytes"]:
                 results.pop()
                 self.cache.pop(token, None)
                 payload["context_packet"] = self._packet(results)
@@ -386,7 +451,7 @@ class MemoryServer:
             return self._audit("fetch", id, {"error": "stale"})
         try:
             latest = load_policy(self.policy_path)
-            policy["allow"] = latest["principals"][self.principal]
+            policy["allow"] = self._grants(latest)
             policy["limits"] = latest["limits"]
             if not allowed(identity, policy) or not allowed(original, policy):
                 return self._audit("fetch", id, {"error": "denied"})
@@ -399,9 +464,102 @@ class MemoryServer:
         payload = {"schema": "z0int.memory_mcp.v2", "untrusted": True,
                    "status": "ok", "record": record,
                    "context_packet": self._packet([record])}
-        if len(encoded(payload)) > policy["limits"]["total_bytes"]:
+        if len(encoded({**payload, "receipt_id": "x" * 64})) > policy["limits"]["total_bytes"]:
             return self._audit("fetch", id, {"error": "byte_limit"})
         return self._audit("fetch", id, payload)
+
+    def _native_decision_record(self, token: str, *, role: str) -> dict:
+        """Re-read the authenticated original, not the cached search preview."""
+        payload = self.fetch(token)
+        record = payload.get("record")
+        identity = self.cache.get(token, (None, {}))[1]
+        native = identity.get("native", {})
+        if (not isinstance(record, dict) or record.get("role") != role or
+                record.get("text_truncated") is not False or
+                record.get("text_redacted") is not False or
+                record.get("scope") != self.workstream.project or
+                native.get("session_id") != self.native_session or
+                type(native.get("ordinal")) is not int or
+                native["ordinal"] <= self.after_ordinal):
+            raise ValueError("exact complete native decision source required")
+        return {**record, "native": native, "fetch_receipt_id": payload["receipt_id"]}
+
+    def _native_provenance(self, record: dict) -> dict:
+        return {"identity_hmac": self._hash("native", record["locator"]),
+                "revision_hmac": self._evidence_hmac(record),
+                "session_hmac": self._hash("session", record["native"]["session_id"]),
+                "ordinal": record["native"]["ordinal"], "role": record["role"],
+                "complete": (record.get("text_truncated") is False and
+                             record.get("text_redacted") is False)}
+
+    def join_native_outcome(self, receipt_id: str, decision_id: str, *,
+                            scope: MemoryScope, restatement_id: str | None = None) -> dict:
+        """Join an operator-selected closed native answer; never expose as MCP."""
+        if self.workstream is None or scope != self.workstream:
+            raise ValueError("native outcome scope mismatch")
+        query = self.query_receipts.get(receipt_id)
+        if (query is None or self.clock() - query["issued"] > ID_TTL_SECONDS or
+                query["event"]["tool"] != "search" or
+                query["event"]["outcome"] not in ("hit", "miss") or
+                query["event"]["scope_hmac"] != self._scope_hmac()):
+            raise ValueError("live scoped search receipt required")
+        decision = self._native_decision_record(decision_id, role="assistant")
+        citations = re.findall(r"\[([^\]\n]+)@(sha256:[0-9a-f]{64})\]", decision["text"])
+        cited = []
+        for evidence in query["evidence"]:
+            versions = [version for locator, version in citations if locator == evidence["locator"]]
+            if any(version != evidence["source_version"] for version in versions):
+                raise ValueError("native citation revision mismatch")
+            if versions:
+                cited.append(self._evidence_hmac(evidence))
+        prior = ("miss" if query["event"]["outcome"] == "miss" else
+                 "hit_used" if cited else "hit_ignored")
+        event = {"schema": "z0int.memory_use_outcome.v1", "receipt_id": receipt_id,
+                 "principal": self.principal, "scope_hmac": self._scope_hmac(),
+                 "outcome": prior, "cited_evidence_hmacs": sorted(set(cited)),
+                 "decision": self._native_provenance(decision),
+                 "decision_fetch_receipt_id": decision["fetch_receipt_id"]}
+        if restatement_id is not None:
+            restatement = self._native_decision_record(restatement_id, role="user")
+            marker = f'Restatement of [{decision["locator"]}@{decision["source_version"]}]:'
+            # This is an explicit native user statement, not a semantic guess
+            # from an assistant paraphrase or a retrieval match.
+            if (restatement["native"]["ordinal"] <= decision["native"]["ordinal"] or
+                    not restatement["text"].startswith(marker) or
+                    not restatement["text"][len(marker):].strip()):
+                raise ValueError("later native user restatement of this decision required")
+            event.update(outcome="user_restated", prior_outcome=prior,
+                         restatement=self._native_provenance(restatement),
+                         restatement_fetch_receipt_id=restatement["fetch_receipt_id"])
+        rows = self._audit_rows()
+        existing = replay_outcomes(rows, scope_hmac=self._scope_hmac(), principal=self.principal)
+        previous = next((r for r in existing if r["receipt_id"] == receipt_id), None)
+        if previous:
+            # A fresh native read issues another fetch receipt. Repeated joins
+            # retain the original provenance link rather than appending copies.
+            prior_join = previous.get("native_join")
+            if prior_join and all(prior_join.get(k) == v for k, v in event.items()
+                                  if k not in {"decision_fetch_receipt_id", "restatement_fetch_receipt_id"}):
+                return prior_join
+        replay_outcomes([*rows, event], scope_hmac=self._scope_hmac(), principal=self.principal)
+        if not self._append_audit(event):
+            raise ValueError("audit unavailable")
+        return event
+
+    def _audit_rows(self) -> list[dict]:
+        # Same private audit path. No second ledger or content-bearing export.
+        fd = os.open(self.state_dir / "audit.jsonl", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "r", encoding="utf-8") as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) & 0o077:
+                raise ValueError("private audit file required")
+            return [json.loads(line) for line in stream]
+
+    def replay_outcomes(self, scope: MemoryScope, *, rows: list[dict] | None = None) -> list[dict]:
+        if self.workstream is None or scope != self.workstream:
+            raise ValueError("replay scope mismatch")
+        return replay_outcomes(self._audit_rows() if rows is None else rows,
+                               scope_hmac=self._scope_hmac(), principal=self.principal)
 
     def _invalid_call(self) -> dict:
         _, failure = self._begin("invalid", "")

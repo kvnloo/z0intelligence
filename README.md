@@ -302,9 +302,9 @@ Do not mistake a lexical match or zero-hit smoke test for model-visible use.
 Output is capped by policy (default 4096 bytes per record, 32768 bytes per
 payload), with a 10-minute, process-bound, 256-handle metadata-only cache
 and 30 calls/minute shared across tools. The private 0700 state directory
-and 0600 audit log contain only fixed decisions, counts, sizes and keyed
-query/handle hashes, never raw prompts or originals. Audit failure blocks
-disclosure. Output text is untrusted evidence even when successfully read.
+and 0600 audit log contain fixed decisions, counts, sizes, opaque receipt IDs,
+and keyed provenance hashes. They never contain raw prompts or originals.
+Audit failure blocks disclosure. Output text remains untrusted evidence.
 
 Each successfully appended row in that **same** private audit.jsonl has
 schema `z0int.memory_query_outcome.v1`, tool (`search`, `fetch`, or `invalid`),
@@ -314,11 +314,77 @@ original fetch is a hit; an empty authorized search is a miss, not an outage.
 An entirely policy-filtered search is a denial, not a miss. Unknown error
 codes map to `error` without changing the tool response. Existing
 `timestamp`, keyed `query_hmac`, `count`, `bytes`, `denied_count`,
-`unavailable_count`, and `decision` remain in the row. Neither raw
-queries/handles nor source bodies, paths, or credentials are logged. These
-are retrieval dispositions only: they do **not** measure answer quality,
-injection, downstream usefulness, or independent verification. No outcome
-mutation tool, secondary ledger, or permission is created.
+`unavailable_count`, and `decision` remain in the row. Additive fields include
+`receipt_id`, `principal`, `scope_hmac`, `evidence_hmacs`, `native_records`,
+`native_session_hmac`, and `after_ordinal`. Successful responses return their
+`receipt_id`. Native provenance contains keyed identity/revision/session hashes,
+ordinal, and the source's verified `user` or `assistant` role.
+No raw queries/handles, source bodies, paths, or credentials are logged.
+Retrieval rows alone do not establish use, quality, or benefit.
+No outcome mutation tool, secondary ledger, or permission is created.
+
+#### Native output-use join and offline replay
+
+An operator-side integration can bind one fully specified `MemoryScope`
+(user/project/repo/task), native session, and decision-window lower ordinal
+before the first query:
+
+```python
+server.bind_workstream(scope, native_session=native_session, after_ordinal=last_native_ordinal)
+query = server.search("the prior decision")
+# The operator selects the closed, persisted assistant answer in that window.
+# decision_handle is an ordinary search/fetch handle for that exact source.
+joined = server.join_native_outcome(query["receipt_id"], decision_handle, scope=scope)
+projection = server.replay_outcomes(scope)
+```
+
+The binding is immutable and is not an MCP argument. The standard stdio
+entrypoint remains unbound. It does not activate capture or join decisions
+automatically. The integration must select the actual completed native answer,
+not an arbitrary assistant message from an earlier task.
+
+`join_native_outcome` rehydrates the selected original through the existing
+authenticated AgentsView adapter. It checks the project, native session,
+ordinal boundary, stable message ID, content revision, native role, and
+complete disclosed text. Tool/thinking/system messages and truncated answers
+cannot establish ignored use. Revoked grants and stale handles fail closed.
+The same private audit receives `z0int.memory_use_outcome.v1` rows.
+
+The four outcomes have these exact meanings:
+
+- `hit_used`: The completed native assistant output cites returned evidence as
+  `[<native locator>@<source_version>]`. Both locator and digest must match.
+- `hit_ignored`: The completed, rehydrated assistant answer in the bound
+  decision window contains no relevant revision-bound citations.
+- `miss`: An actual authorized empty search receipt joins that native answer.
+  Denial, unavailability, and stale/error results never become misses.
+- `user_restated`: A later original native **user** message in the same
+  session explicitly starts with
+  `Restatement of [<earlier assistant locator>@<source_version>]: <user claim>`.
+  Its ordinal must follow the earlier answer. This explicit declaration pairs
+  the real user source with that exact prior decision. Assistant paraphrases,
+  tool output, unpaired text, and inferred semantic similarity do not qualify.
+  The row preserves the prior `hit_used`, `hit_ignored`, or `miss` outcome.
+
+Unjoined hits **and misses** remain unknown (`outcome: null`), not ignored.
+Joins are idempotent. A different decision cannot overwrite the first join.
+One later validated user restatement can refine that decision's outcome.
+
+For offline replay, call `z0int.memory_outcomes.replay_outcomes(rows,
+scope_hmac=reviewed_scope_token, principal="operator")`. Use the scope token
+from the saved reviewed receipt. Replay requires no server key or source read.
+It checks the original query, matching successful native fetch receipts,
+role/revision/session hashes, exact scope/principal, citation membership, and
+restatement chronology. Foreign scopes, missing provenance, and conflicting
+joins fail closed. Keyed hashes support equality joins, not authentication of
+an externally modified audit file.
+
+**Scope limits:** This proves evidenced use in persisted output, not final
+provider-input inclusion, answer correctness, or reduced re-explanation.
+Uncited use and free-form user restatements remain unclassified. The explicit
+restatement syntax avoids pretending that a lexical match proves a correction.
+Only AgentsView has a qualified native adapter. This change adds no harness
+capture, live client registration, service deployment, or Hermes restart.
 
 Run the focused suites on the MBP. Revision regressions replace the original
 and its content digest together, then independently exercise stale handles and
@@ -327,7 +393,7 @@ fresh searches; synthetic tests do not claim live-source validation:
 ```bash
 PYTHONPATH=src python -m pytest -q tests/test_memory_mcp.py
 PYTHONPATH=src python -m pytest -q tests/test_memory_mcp_backends.py
-PYTHONPATH=src python -m pytest -q tests/test_memory_mcp.py tests/test_memory_mcp_backends.py
+PYTHONPATH=src python -m pytest -q tests/test_memory_mcp.py tests/test_memory_mcp_backends.py tests/test_memory_native_outcomes.py
 ```
 
 ## Current foundation: OpenJev runtime
