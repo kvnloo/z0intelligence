@@ -14,10 +14,12 @@ from z0int.context_resolve import (
     InformationNeed,
     _file_version,
     _git_worktree_revision,
+    _read_verified_bytes,
     project_to_aodl_fields,
     resolve_context,
 )
 from z0int.memory_contract import MemoryScope
+from z0int.reuse_packet import build_reuse_packet
 
 
 REQUEST = MemoryScope(user="u1", project="p1", repo="r1", task="t1")
@@ -74,7 +76,7 @@ class ContextSourceFreshnessTests(unittest.TestCase):
             source.write_bytes(b"value = 1\n")
             os.utime(source, ns=(CLOCK_A, CLOCK_A))
             first = resolve(root)
-            version_before = _file_version(source)
+            version_before = _file_version(source.resolve())
 
             source.write_bytes(b"value = 2\n")
             os.utime(source, ns=(CLOCK_B, CLOCK_B))
@@ -83,7 +85,7 @@ class ContextSourceFreshnessTests(unittest.TestCase):
             self.assertEqual(len(b"value = 1\n"), len(b"value = 2\n"))
             self.assertEqual(CLOCK_A // 1_000_000_000, CLOCK_B // 1_000_000_000)
             self.assertTrue(first.evidence[0].source_version.startswith("sha256:"))
-            self.assertNotEqual(version_before, _file_version(source))
+            self.assertNotEqual(version_before, _file_version(source.resolve()))
             self.assertNotEqual(first.evidence[0].source_version, second.evidence[0].source_version)
             self.assertNotEqual(first.memory_snapshot.snapshot_id, second.memory_snapshot.snapshot_id)
             self.assertIn("value = 1", first.evidence[0].excerpt)
@@ -130,7 +132,7 @@ class ContextSourceFreshnessTests(unittest.TestCase):
             root = Path(tmp)
             source = root / "source.py"
             source.write_bytes(b"value = 1\n")
-            opened = Path.open
+            opened = os.fdopen
             changed = False
 
             class RacingFile:
@@ -158,16 +160,266 @@ class ContextSourceFreshnessTests(unittest.TestCase):
                             os.close(fd)
                     return original
 
-            def opening(path: Path, *args, **kwargs):
-                stream = opened(path, *args, **kwargs)
-                return RacingFile(stream) if path == source else stream
+            def opening(fd: int, *args, **kwargs):
+                stream = opened(fd, *args, **kwargs)
+                actual = os.fstat(stream.fileno())
+                target = source.stat()
+                if (actual.st_dev, actual.st_ino) == (target.st_dev, target.st_ino):
+                    return RacingFile(stream)
+                return stream
 
-            with mock.patch.object(Path, "open", new=opening):
+            # Exercise the production descriptor reader rather than the old
+            # Path.open path, which is intentionally no longer used.
+            with mock.patch("z0int.context_resolve.os.fdopen", side_effect=opening):
                 packet = resolve(root)
             self.assertTrue(changed)
             self.assertEqual(packet.evidence, [])
             self.assertTrue(packet.unresolved_gaps)
             self.assertNotIn("value = 1", json.dumps(packet.to_dict()))
+
+    def test_post_admission_file_and_parent_symlinks_never_redirect_bytes(self):
+        for swapped_parent in (False, True):
+            with self.subTest(swapped_parent=swapped_parent), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve() / "repo"
+                outside = Path(tmp).resolve() / "private-sibling"
+                root.mkdir()
+                outside.mkdir()
+                if swapped_parent:
+                    (root / "docs").mkdir()
+                    inside = root / "docs" / "source.py"
+                    sibling = outside / "source.py"
+                    path = "docs/source.py"
+                else:
+                    inside = root / "source.py"
+                    sibling = outside / "private.py"
+                    path = "source.py"
+                inside.write_text("PUBLIC_IN_ROOT\n", encoding="utf-8")
+                sibling.write_text("PRIVATE_OUT_OF_SCOPE_PAYLOAD\n", encoding="utf-8")
+                canonical = inside.resolve()
+                original_reader = _read_verified_bytes
+                swapped = False
+
+                def swap_then_read(admitted: Path):
+                    nonlocal swapped
+                    self.assertEqual(admitted, canonical)
+                    if not swapped:
+                        if swapped_parent:
+                            os.replace(root / "docs", root / "parked")
+                            (root / "docs").symlink_to(outside, target_is_directory=True)
+                        else:
+                            inside.unlink()
+                            inside.symlink_to(sibling)
+                        swapped = True
+                    return original_reader(admitted)
+
+                with mock.patch(
+                    "z0int.context_resolve._read_verified_bytes", side_effect=swap_then_read,
+                ):
+                    packet = resolve(root, need(path))
+
+                self.assertTrue(swapped, "reader must be reached after canonical admission")
+                self.assertEqual(packet.evidence, [])
+                self.assertTrue(any("missing path" in gap for gap in packet.unresolved_gaps))
+                serialized = json.dumps(packet.to_dict())
+                self.assertNotIn("PRIVATE_OUT_OF_SCOPE_PAYLOAD", serialized)
+                self.assertNotIn(str(outside), serialized)
+                self.assertNotIn(str(sibling), serialized)
+                reuse = build_reuse_packet(packet)
+                self.assertEqual(reuse.decision["mode"], "OBSERVE")
+                self.assertFalse(reuse.decision["implementation_allowed"])
+
+    def test_post_admission_symlink_to_same_root_sibling_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            secret = root / "sibling" / "private.py"
+            secret.parent.mkdir()
+            secret.write_text("PRIVATE_SIBLING_PAYLOAD\n", encoding="utf-8")
+            source = root / "source.py"
+            source.write_text("PUBLIC_ORIGINAL\n", encoding="utf-8")
+            original_reader = _read_verified_bytes
+            swapped = False
+
+            def swap_then_read(admitted: Path):
+                nonlocal swapped
+                self.assertEqual(admitted, source)
+                if not swapped:
+                    source.unlink()
+                    source.symlink_to(secret)
+                    swapped = True
+                return original_reader(admitted)
+
+            with mock.patch(
+                "z0int.context_resolve._read_verified_bytes", side_effect=swap_then_read,
+            ):
+                packet = resolve(root)
+            self.assertTrue(swapped)
+            self.assertEqual(packet.evidence, [])
+            self.assertTrue(packet.unresolved_gaps)
+            self.assertNotIn("PRIVATE_SIBLING_PAYLOAD", json.dumps(packet.to_dict()))
+            self.assertNotIn(str(secret), json.dumps(packet.to_dict()))
+            self.assertEqual(build_reuse_packet(packet).decision["mode"], "OBSERVE")
+
+    def test_parent_replaced_after_descriptor_open_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "repo"
+            outside = Path(tmp).resolve() / "private-sibling"
+            parent = root / "docs"
+            parent.mkdir(parents=True)
+            outside.mkdir()
+            source = parent / "source.py"
+            source.write_text("PUBLIC_BEFORE_SWAP\n", encoding="utf-8")
+            (outside / "source.py").write_text(
+                "PRIVATE_AFTER_SWAP\n", encoding="utf-8",
+            )
+            opened = os.fdopen
+            changed = False
+
+            class MoveParentOnRead:
+                def __init__(self, stream):
+                    self.stream = stream
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    return self.stream.__exit__(*args)
+
+                def read(self, *args):
+                    nonlocal changed
+                    data = self.stream.read(*args)
+                    if not changed:
+                        os.replace(parent, root / "parked")
+                        parent.symlink_to(outside, target_is_directory=True)
+                        changed = True
+                    return data
+
+            def opening(fd: int, *args, **kwargs):
+                stream = opened(fd, *args, **kwargs)
+                info = os.fstat(stream.fileno())
+                original = source.stat() if not changed else (root / "parked" / "source.py").stat()
+                if (info.st_dev, info.st_ino) == (original.st_dev, original.st_ino):
+                    return MoveParentOnRead(stream)
+                return stream
+
+            with mock.patch("z0int.context_resolve.os.fdopen", side_effect=opening):
+                packet = resolve(root, need("docs/source.py"))
+            self.assertTrue(changed)
+            self.assertEqual(packet.evidence, [])
+            self.assertTrue(packet.unresolved_gaps)
+            serialized = json.dumps(packet.to_dict())
+            self.assertNotIn("PUBLIC_BEFORE_SWAP", serialized)
+            self.assertNotIn("PRIVATE_AFTER_SWAP", serialized)
+            self.assertNotIn(str(outside), serialized)
+            self.assertEqual(build_reuse_packet(packet).decision["mode"], "OBSERVE")
+
+    def test_stable_in_root_symlink_resolves_to_authorized_canonical_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "docs").mkdir()
+            target = root / "docs" / "real.py"
+            target.write_text("AUTHORIZED_TARGET\n", encoding="utf-8")
+            try:
+                (root / "alias.py").symlink_to("docs/real.py")
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks unavailable on this host")
+            packet = resolve(root, need("alias.py"))
+            self.assertEqual(len(packet.evidence), 1)
+            self.assertFalse(packet.unresolved_gaps)
+            self.assertEqual(packet.evidence[0].source_id, f"file:{target}")
+            self.assertIn("AUTHORIZED_TARGET", packet.evidence[0].excerpt)
+
+    def test_fff_hydration_refuses_swapped_parent_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "repo"
+            outside = Path(tmp).resolve() / "private-sibling"
+            (root / "docs").mkdir(parents=True)
+            outside.mkdir()
+            inside = root / "docs" / "source.py"
+            inside.write_text("public = 1\n", encoding="utf-8")
+            sibling = outside / "source.py"
+            sibling.write_text("PRIVATE_FFF_SIBLING\n", encoding="utf-8")
+            original_reader = _read_verified_bytes
+            swapped = False
+
+            def swap_then_read(admitted: Path):
+                nonlocal swapped
+                self.assertEqual(admitted, inside)
+                if not swapped:
+                    os.replace(root / "docs", root / "parked")
+                    (root / "docs").symlink_to(outside, target_is_directory=True)
+                    swapped = True
+                return original_reader(admitted)
+
+            hit = {
+                "status": "ready", "package_version": "v0", "index_epoch": 1,
+                "content_hits": [{"path": "docs/source.py", "line": 1, "text": "PRIVATE_FFF_SIBLING"}],
+                "path_hits": [{"path": "docs/source.py"}],
+            }
+            item = InformationNeed(
+                id="symbol", description="private-symbol", kind="exact_symbol",
+                symbol="private-symbol", scope=REQUEST,
+            )
+            with (
+                mock.patch("z0int.context_resolve._fff_search_repository", return_value=hit),
+                mock.patch("z0int.context_resolve._read_verified_bytes", side_effect=swap_then_read),
+            ):
+                packet = resolve(root, item, allow_fff=True)
+            self.assertTrue(swapped)
+            self.assertEqual(packet.evidence, [])
+            self.assertTrue(packet.unresolved_gaps)
+            serialized = json.dumps(packet.to_dict())
+            self.assertNotIn("PRIVATE_FFF_SIBLING", serialized)
+            self.assertNotIn(str(outside), serialized)
+            self.assertEqual(build_reuse_packet(packet).decision["mode"], "OBSERVE")
+
+    def test_qmd_hydration_refuses_swapped_final_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "repo"
+            outside = Path(tmp).resolve() / "private-sibling"
+            root.mkdir()
+            outside.mkdir()
+            source = root / "source.py"
+            source.write_text("public = 1\n", encoding="utf-8")
+            sibling = outside / "private.py"
+            sibling.write_text("PRIVATE_QMD_SIBLING\n", encoding="utf-8")
+            original_reader = _read_verified_bytes
+            actual_run = subprocess.run
+            swapped = False
+
+            def swap_then_read(admitted: Path):
+                nonlocal swapped
+                self.assertEqual(admitted, source)
+                if not swapped:
+                    source.unlink()
+                    source.symlink_to(sibling)
+                    swapped = True
+                return original_reader(admitted)
+
+            def status_only(command, *args, **kwargs):
+                if command[:2] == ["qmd", "status"]:
+                    return subprocess.CompletedProcess(command, 0, stdout="ready")
+                return actual_run(command, *args, **kwargs)
+
+            item = InformationNeed(
+                id="query", description="find current implementation",
+                kind="natural_language", scope=REQUEST,
+            )
+            with (
+                mock.patch("z0int.context_resolve._qmd_bin", return_value="qmd"),
+                mock.patch("z0int.context_resolve._qmd_search", return_value=[
+                    {"path": "source.py", "snippet": "PRIVATE_QMD_SIBLING"},
+                ]),
+                mock.patch("z0int.context_resolve.subprocess.run", side_effect=status_only),
+                mock.patch("z0int.context_resolve._read_verified_bytes", side_effect=swap_then_read),
+            ):
+                packet = resolve(root, item, allow_fff=False, allow_qmd=True)
+            self.assertTrue(swapped)
+            self.assertEqual(packet.evidence, [])
+            self.assertTrue(packet.unresolved_gaps)
+            serialized = json.dumps(packet.to_dict())
+            self.assertNotIn("PRIVATE_QMD_SIBLING", serialized)
+            self.assertNotIn(str(outside), serialized)
+            self.assertEqual(build_reuse_packet(packet).decision["mode"], "OBSERVE")
 
     def test_stale_index_snippet_never_inherits_new_file_hash(self):
         with tempfile.TemporaryDirectory() as tmp:

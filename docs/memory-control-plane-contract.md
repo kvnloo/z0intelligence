@@ -149,10 +149,15 @@ z0int.architecture_reuse_packet.v0 (#140) are the bounded consumer paths.
 There is no second index, memory database, store, registry or bridge.
 
 - A file EvidenceRef.source_version is a sha256 digest of the **same verified
-  bytes** used to produce its excerpt. The read checks descriptor/path
-  identity and metadata before and after reading. A raced, missing or
-  unreadable file is unavailable; there is no fallback to integer-second
-  mtime/size. A later replacement is detected by re-observation at use time.
+  bytes** used to produce its excerpt. The admitted canonical absolute
+  path is opened component-by-component with directory-fd-relative
+  O_NOFOLLOW (including the final file), followed by descriptor and anchored
+  lstat identity checks before/after reading. Parent-directory or final
+  symlink replacement cannot redirect the reader into a sibling/out-of-root
+  file. An ordinary in-root symlink is eligible only when initial canonical
+  resolution admits its stable target. Unsupported nofollow hosts and
+  raced/missing/non-regular files fail closed; there is no mtime/size fallback.
+  A later replacement is still detected by independent re-observation.
 - FFF content hits are locators, not fresh source excerpts: the indexed
   line must still match the freshly hydrated source line before it is
   eligible. FFF path hits and eligible local QMD hits rehydrate current
@@ -215,6 +220,12 @@ version map, an index cache or the packet API alone cannot prove enforcement.
 memory facade/hydration; #22/#62 and z0evals#56 own cross-client
 decision/correction, injection and verified outcome. No default activation,
 host change, claimed test run or global cache invalidation occurs here.
+
+The #66 Z03 race regression drives real resolve_context exact-path, FFF
+and QMD hydration while replacing the leaf or parent after canonical admission.
+It asserts no sibling payload/locator/version, explicit gaps and OBSERVE.
+The earlier read-mutation regression now instruments descriptor-backed reads
+rather than the removed Path.open path; it must still exercise a real mutation.
 
 ### Operator verification (exact PR head; no tests run by this worker)
 

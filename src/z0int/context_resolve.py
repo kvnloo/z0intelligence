@@ -147,28 +147,82 @@ def _source_version_from_bytes(data: bytes) -> str:
 
 
 def _read_verified_bytes(path: Path) -> bytes | None:
-    """Read once; reject mutation/replacement observed during that read.
+    """Read only the admitted canonical path, not a later symlink redirect.
 
-    A subsequent change is rechecked by the independent consumer at use time.
-    Nothing here claims a permanent lease on a filesystem path.
+    Callers resolve/authorize the canonical absolute path before this read.
+    Open each component relative to the preceding directory descriptor with
+    O_NOFOLLOW, then lstat those same names to detect replaced parents/leaf.
+    The bytes, metadata, and source version therefore belong to one file.
+    A subsequent change still needs independent consumer re-observation.
     """
-    try:
-        with path.open("rb") as stream:
-            before = os.fstat(stream.fileno())
-            data = stream.read()
-            after = os.fstat(stream.fileno())
-        live = path.stat()
-    except (OSError, ValueError):
+    # Never resolve here: following a replaced link would discard the
+    # caller's earlier root/scope admission. Unsupported hosts fail closed.
+    if (
+        not path.is_absolute()
+        or not hasattr(os, "O_NOFOLLOW")
+        or not hasattr(os, "O_DIRECTORY")
+    ):
+        return None
+    parts = path.parts[1:]
+    if not parts or any(part in ("", ".", "..") for part in parts):
         return None
 
     def identity(st: os.stat_result) -> tuple[int, ...]:
-        return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+        return (st.st_dev, st.st_ino, st.st_mode, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
 
-    if identity(before) != identity(after) or identity(after) != identity(live):
+    def directory_identity(st: os.stat_result) -> tuple[int, ...]:
+        return (st.st_dev, st.st_ino, st.st_mode)
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0)
+    opened: list[int] = []
+    parents: list[tuple[int, str, int]] = []
+    try:
+        parent_fd = os.open(path.anchor, directory_flags)
+        opened.append(parent_fd)
+        for component in parts[:-1]:
+            child_fd = os.open(component, directory_flags, dir_fd=parent_fd)
+            opened.append(child_fd)
+            live = os.stat(component, dir_fd=parent_fd, follow_symlinks=False)
+            actual = os.fstat(child_fd)
+            if not stat.S_ISDIR(live.st_mode) or directory_identity(live) != directory_identity(actual):
+                return None
+            parents.append((parent_fd, component, child_fd))
+            parent_fd = child_fd
+
+        file_fd = os.open(parts[-1], file_flags, dir_fd=parent_fd)
+        opened.append(file_fd)
+        before = os.fstat(file_fd)
+        live = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISREG(live.st_mode) or identity(before) != identity(live):
+            return None
+
+        # Keep the anchored fd alive for the final lstat checks even when
+        # the buffered reader closes its duplicate.
+        with os.fdopen(os.dup(file_fd), "rb") as stream:
+            data = stream.read()
+            after = os.fstat(file_fd)
+        if identity(before) != identity(after) or len(data) != after.st_size:
+            return None
+
+        # Each directory must still be at the admitted canonical name.
+        # Checking only the leaf via path.stat would follow a swapped parent.
+        for ancestor_fd, component, child_fd in parents:
+            live = os.stat(component, dir_fd=ancestor_fd, follow_symlinks=False)
+            if (
+                not stat.S_ISDIR(live.st_mode)
+                or directory_identity(live) != directory_identity(os.fstat(child_fd))
+            ):
+                return None
+        live = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISREG(live.st_mode) or identity(live) != identity(after):
+            return None
+        return data
+    except (OSError, ValueError, NotImplementedError):
         return None
-    if not os.path.isfile(path) or len(data) != after.st_size:
-        return None
-    return data
+    finally:
+        for fd in reversed(opened):
+            os.close(fd)
 
 
 def _file_version(path: Path) -> str:

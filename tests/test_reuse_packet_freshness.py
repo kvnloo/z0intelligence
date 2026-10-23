@@ -8,8 +8,9 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from z0int.context_resolve import EvidenceRef, InformationNeed, resolve_context
+from z0int.context_resolve import EvidenceRef, InformationNeed, _read_verified_bytes, resolve_context
 from z0int.memory_contract import MemoryScope
 from z0int.reuse_packet import (
     ReuseCandidate,
@@ -166,6 +167,42 @@ class ReusePacketFreshnessTests(unittest.TestCase):
             )), next(value for key, value in packet.source_revisions.items()
                      if key.startswith("evidence:")))
             assert_observe(self, check_reuse_packet(packet, revisions))
+
+    def test_scoped_reobservation_after_symlink_swap_is_observe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "repo"
+            outside = Path(tmp).resolve() / "private-sibling"
+            root.mkdir()
+            outside.mkdir()
+            source = root / "existing.py"
+            source.write_text("public = 1\n", encoding="utf-8")
+            sibling = outside / "sibling.py"
+            sibling.write_text("PRIVATE_REOBSERVATION_PAYLOAD\n", encoding="utf-8")
+            original = packet_for(root)
+            swapped = False
+
+            def swap_after_admission(admitted: Path):
+                nonlocal swapped
+                self.assertEqual(admitted, source)
+                if not swapped:
+                    source.unlink()
+                    source.symlink_to(sibling)
+                    swapped = True
+                return _read_verified_bytes(admitted)
+
+            with mock.patch(
+                "z0int.context_resolve._read_verified_bytes", side_effect=swap_after_admission,
+            ):
+                fresh = context(root)
+            self.assertTrue(swapped)
+            self.assertEqual(fresh.evidence, [])
+            self.assertTrue(fresh.unresolved_gaps)
+            check = check_reuse_packet(original, observe_reuse_revisions(original, fresh))
+            assert_observe(self, check)
+            serialized = json.dumps({"fresh": fresh.to_dict(), "check": check})
+            self.assertNotIn("PRIVATE_REOBSERVATION_PAYLOAD", serialized)
+            self.assertNotIn(str(outside), serialized)
+            self.assertNotIn(str(sibling), serialized)
 
     def test_policy_workstream_compiler_and_scope_each_invalidate(self):
         with tempfile.TemporaryDirectory() as tmp:
