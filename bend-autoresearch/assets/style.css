@@ -371,3 +371,26 @@ footer .inner { display: grid; gap: 14px; color: var(--ink3); font-size: 13.5px;
 .law:hover, .law[aria-pressed="true"], .move:hover, .tl.cur { border-color: rgba(215,185,134,.5); border-top-color: var(--gold-rim); }
 .tape button[aria-current="true"] { border-color: var(--gold); border-top-color: var(--gold-rim); }
 .win { background: linear-gradient(180deg, rgba(215,185,134,.10), transparent), rgba(215,185,134,.05); border-top-color: var(--gold-rim); }
+
+/* ---------- phones ---------- */
+@media (max-width: 900px) {
+  body { padding-bottom: 84px; }
+  .rail { max-width: calc(100vw - 24px); overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 2px; }
+  .rail::-webkit-scrollbar { display: none; }
+  .rail a { width: 40px; height: 40px; flex: none; font-size: 11px; }
+  .rail .pill { width: 40px; height: 40px; }
+}
+@media (max-width: 700px) {
+  code, .mono { font-size: max(.82em, 12px); }
+  .src { display: inline-block; padding: 6px 0; }
+  .switch { position: relative; }
+  .switch::before { content: ""; position: absolute; inset: -8px -4px; }
+  .chart { scroll-snap-type: none; }
+  /* the outcome of a move shows above the moves, next to the current state, not below the list */
+  .play { display: flex; flex-direction: column; }
+  .play > .verdict { order: 1; min-height: 0; }
+  .play > .moves { order: 2; grid-template-columns: minmax(0, 1fr); }
+  .play > .play-top:not(:first-child) { order: 3; }
+  .play > details { order: 4; }
+  .play > .play-top:first-child { order: 0; flex-wrap: wrap; gap: 12px; }
+}

@@ -31,7 +31,7 @@ function rail() {
   const links = $$('.rail a'); const pill = $('.rail .pill');
   const place = (a) => {
     links.forEach((l) => l.setAttribute('aria-current', l === a ? 'true' : 'false'));
-    if (matchMedia('(max-width: 900px)').matches) { pill.style.left = a.offsetLeft + 'px'; pill.style.top = ''; }
+    if (matchMedia('(max-width: 900px)').matches) { pill.style.left = a.offsetLeft + 'px'; pill.style.top = ''; const r = a.parentElement; r.scrollTo({ left: a.offsetLeft - r.clientWidth / 2 + a.offsetWidth / 2, behavior: 'smooth' }); }
     else { pill.style.top = a.offsetTop + 'px'; pill.style.left = ''; }
   };
   const byId = Object.fromEntries(links.map((a) => [a.dataset.ch, a]));
@@ -145,6 +145,13 @@ function makeChart(host, { laws = true } = {}) {
       if (verdict === 'held') nodeEls[IDX[tag]].classList.add('hold');
       edgeEls.forEach((e) => e.classList.toggle('hot', verdict === 'accepted' && e.dataset.from === from && e.dataset.to === tag));
       token.setAttribute('cx', n.x + W - 14); token.setAttribute('cy', n.y + 14);
+      // Phones: the chart scrolls sideways, so keep the current state in view.
+      if (host.scrollWidth > host.clientWidth + 4) {
+        const k = svg.getBoundingClientRect().width / 1010;
+        const svgLeft = svg.getBoundingClientRect().left - host.getBoundingClientRect().left + host.scrollLeft;
+        const left = svgLeft + (n.x + W / 2) * k - host.clientWidth / 2;
+        host.scrollTo({ left: Math.max(0, left), behavior: reduced ? 'auto' : 'smooth' });
+      }
     },
     reset() { this.visited.clear(); this.set('Proposed'); },
     laws(ids) { edgeEls.forEach((e) => e.classList.toggle('lawhi', ids.length > 0 && e.dataset.laws.split(' ').some((l) => ids.includes(l)))); },
