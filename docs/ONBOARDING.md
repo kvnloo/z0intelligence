@@ -136,13 +136,13 @@ The existing `Z0INT_MEMORY_SOURCE_INGEST=references` opt-in is for an
 authorized host/operator only; disabled capture must create no ledger directory.
 Original content stays in the native Hermes database.
 
-**Peer-owned prerequisite:** pinned `preview@11e1454b4d5af60a4edccfc65bc53715568131e7`
-has neither `src/z0int/memory_contract.py` nor
-`src/z0int/context_resolve.py`. Those contracts are owned by separate
-freshness/scope workers and stay read-only here. This PR **cannot import or
-run its tests on untouched preview** until compatible shared dependencies
-are reconciled. A missing trusted Hermes host binding independently blocks
-runtime activation.
+**Stacked prerequisite:** this Draft PR depends on the minimal freshness/scope
+branch from [PR #198](https://github.com/kvnloo/z0intelligence/pull/198),
+pinned at `8aac6cf208d6be183332fffec68d64220d497fee`. That branch supplies
+the canonical `memory_contract.py` and `context_resolve.py`; no aggregate
+wiring branch is merged. Capture tests can run against this combined source.
+A trusted Hermes host/session/workstream binding is still missing, so runtime
+activation remains blocked independently of passing library tests.
 
 After those prerequisites, OMP should run from repo root:
 
