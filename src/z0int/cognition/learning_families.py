@@ -216,13 +216,23 @@ def project_prompt(family: str, features: Any, examples: list[dict], *,
     return _json(body), choices
 
 
-def _prior(db: sqlite3.Connection, row: Mapping, limit: int = 64) -> list[dict]:
+def _prior(db: sqlite3.Connection, row: Mapping, limit: int = 64, recent_sessions_n: int = 0) -> list[dict]:
     # Both start and label availability must precede the target start. This also
     # excludes outcomes of unfinished earlier calls and equal-time parallel calls.
+    session_clause = ''
+    params = [row["family"], row["ts"], row["ts"], row["id"]]
+    if recent_sessions_n:
+        sessions = [s[0] for s in db.execute('''SELECT session FROM family_jobs
+            WHERE family=? AND label IS NOT NULL AND ts<? AND label_ts<?
+            GROUP BY session ORDER BY MAX(ts) DESC LIMIT ?''',
+            (row["family"], row["ts"], row["ts"], recent_sessions_n))]
+        if not sessions:
+            return []
+        session_clause = ' AND session IN (' + ','.join('?' for _ in sessions) + ')'
+        params.extend(sessions)
     examples = db.execute("""SELECT label,features FROM family_jobs WHERE family=?
-        AND label IS NOT NULL AND ts<? AND label_ts<? AND id!=?
-        ORDER BY ts DESC,id DESC LIMIT ?""",
-        (row["family"], row["ts"], row["ts"], row["id"], limit)).fetchall()
+        AND label IS NOT NULL AND ts<? AND label_ts<? AND id!=?""" +
+        session_clause + " ORDER BY ts DESC,id DESC LIMIT ?", (*params, limit)).fetchall()
     return [{"label": ex["label"], "features": _history(ex["features"])} for ex in reversed(examples)]
 
 
@@ -254,14 +264,18 @@ def _answer(raw: Any, choices: list[str]) -> tuple[str | None, float, str | None
 
 
 def _strategy(strategy_id: str, prompt_bytes: int, candidate_k: int,
-              retrieval_k: int, history_width: int, model_cap: int = 3) -> dict:
+              retrieval_k: int, history_width: int, model_cap: int = 3,
+              candidate_source: str = 'history', recent_sessions_n: int = 5) -> dict:
     if not _name(strategy_id) or not 1 <= retrieval_k <= 512 or not 1 <= history_width <= 8:
         raise ValueError("invalid strategy identity or retrieval/history bound")
     if prompt_bytes < 384 or model_cap not in (3, 5) or not 1 <= candidate_k <= model_cap:
         raise ValueError("invalid strategy prompt/candidate model cap")
+    if candidate_source not in ('history', 'recent_sessions') or not 1 <= recent_sessions_n <= 64:
+        raise ValueError("invalid candidate-source session scope")
     return {"strategy_id": strategy_id, "prompt_bytes": prompt_bytes,
             "candidate_k": candidate_k, "retrieval_k": retrieval_k,
-            "history_width": history_width, "model_cap": model_cap}
+            "history_width": history_width, "model_cap": model_cap,
+            "candidate_source": candidate_source, "recent_sessions_n": recent_sessions_n}
 
 
 def _arm_key(db: sqlite3.Connection, base_arm: str, strategy: dict) -> str:
@@ -279,7 +293,8 @@ def _arm_key(db: sqlite3.Connection, base_arm: str, strategy: dict) -> str:
 def _evaluate(db: sqlite3.Connection, row: Mapping, predict: Predict, *, now: float,
               slm_arm: str, strategy: dict, prospective: bool) -> None:
     started = time.monotonic()
-    examples = _prior(db, row, strategy["retrieval_k"])
+    examples = _prior(db, row, strategy["retrieval_k"],
+        strategy["recent_sessions_n"] if strategy["candidate_source"] == "recent_sessions" else 0)
     prompt, choices = project_prompt(row["family"], row["features"], examples,
         prompt_bytes=strategy["prompt_bytes"], candidate_k=strategy["candidate_k"],
         history_width=strategy["history_width"], model_cap=strategy["model_cap"])

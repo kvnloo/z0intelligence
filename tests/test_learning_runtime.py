@@ -1,5 +1,6 @@
 import json
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 from z0int.cognition.learning import connect
@@ -94,3 +95,21 @@ def test_tool_comparison_keeps_abstentions_out_of_accuracy_denominator(tmp_path)
     slm = next(row for row in observations if row['identity']['kind'] == 'slm')
     assert slm['n'] == 1 and slm['total'] == 2
     db.close()
+
+
+def test_census_queue_keeps_only_exact_new_families_and_frozen_provenance(tmp_path):
+    folder = tmp_path/'loop'
+    folder.mkdir()
+    (folder/'shadow-census.json').write_text(json.dumps({'jobs': [
+        {'job': 'compaction_keep_drop', 'full_corpus_extraction': {'eligible_within_shard_unique_sum': 12},
+         'label_source': {'observed_literal_or_field': True, 'exact_trace_join': 'source+session+message.compacted',
+                          'quality_caveat': 'lifecycle flag only'}},
+        {'job': 'model_choice', 'full_corpus_extraction': {'eligible_within_shard_unique_sum': 3},
+         'label_source': {'observed_literal_or_field': False}},
+        {'job': 'outcome_error', 'label_source': {'observed_literal_or_field': False}},
+    ]}))
+    rows = runtime.census_queue(tmp_path, {})
+    assert len(rows) == 1
+    assert rows[0]['family'] == 'hermes.compaction_flag'
+    assert rows[0]['exact_labels'] == 12 and rows[0]['census_frozen'] is True
+    assert Path(rows[0]['source_path']).is_file()

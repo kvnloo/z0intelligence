@@ -84,7 +84,9 @@ def _configs(current: dict) -> dict:
         config = catalogue.get(strategy, catalogue['history-1'])
         result[family] = {'strategy_id': strategy, 'history_width': min(8, config['history_width']),
             'candidate_k': min(3, config['candidate_k']), 'prompt_bytes': min(3000, config['prompt_bytes']),
-            'retrieval_k': config.get('retrieval_k', 64)}
+            'retrieval_k': config.get('retrieval_k', 64),
+            'candidate_source': config.get('candidate_source', 'history'),
+            'recent_sessions_n': config.get('recent_sessions_n', 5)}
     return result
 
 
@@ -151,6 +153,23 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
     return list(groups.values()), comparison
 
 
+def census_queue(home: Path, config: dict) -> list[dict]:
+    if config.get('census_queue') is not None:
+        return config['census_queue']
+    path = Path(config.get('census_path') or home/'loop'/'shadow-census.json')
+    if not path.exists():
+        return []
+    census = json.loads(path.read_text())
+    names = {'compaction_keep_drop': 'hermes.compaction_flag',
+             'model_choice': 'hermes.model_argument'}
+    return [{'family': names[job['job']],
+        'exact_labels': job.get('full_corpus_extraction', {}).get('eligible_within_shard_unique_sum', 0),
+        'label_source': job['label_source']['exact_trace_join'], 'source_path': str(path.resolve()),
+        'scope_note': job['label_source']['quality_caveat'], 'census_frozen': True}
+        for job in census.get('jobs', []) if job.get('job') in names and
+        job.get('label_source', {}).get('observed_literal_or_field') is True]
+
+
 def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -> dict:
     """Derive exact labels, execute bounded trials, evolve, and publish every measured arm."""
     from .learning import atomic_json
@@ -197,14 +216,8 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
         min_improvement=float(config.get('min_improvement', .001)),
         credit_bar=float(config.get('credit_bar', .8)),
         min_observations=int(config.get('min_observations', 5)))
-    census = config.get('census_queue') or [
-        {'family': 'omp.argument_key', 'exact_labels': db.execute('SELECT COUNT(*) FROM calls WHERE arguments IS NOT NULL').fetchone()[0],
-         'label_source': 'exact native assistant tool-call argument keys',
-         'source_path': str(home/'loop'/'shadow-learning.sqlite')},
-        {'family': 'omp.target_extension', 'exact_labels': metrics['families'].get('omp.path_kind', {}).get('labels', 0),
-         'label_source': 'exact literal path extension in native tool-call arguments',
-         'source_path': str(home/'loop'/'shadow-learning.sqlite')},
-    ]
+    census = census_queue(home, config)
+    result['census_queue'] = census
     result['search'] = search_tick(db, tick_id=tick_id, now=now,
         observations=combined.values(), census_queue=census, config=search_config)
     artifact = home/'loop'/'findings-sources'/('shadow-' + hashlib.sha256(tick_id.encode()).hexdigest() + '.json')

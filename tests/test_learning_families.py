@@ -445,3 +445,19 @@ def test_zero_coverage_is_explicitly_blocked():
     assert score["status"] == "blocked"
     assert score["n"] == score["total"] == 1 and score["covered_n"] == 0
     assert score["ci_low"] == 0 and score["ci_high"] == 1
+
+
+def test_recent_session_strategy_retrieves_only_preceding_selected_sessions():
+    from z0int.cognition.learning_families import _prior
+    db = connection()
+    add(db, 'old', session='old', ts=1, arguments={'path': 'skill://old-skill'})
+    add(db, 'recent', session='recent', ts=2, arguments={'path': 'skill://recent-skill'})
+    add(db, 'target', session='target', ts=3, arguments={'path': 'skill://gold-not-input'})
+    add(db, 'future', session='future', ts=4, arguments={'path': 'skill://future-skill'})
+    derive_jobs(db, now=10)
+    row = db.execute("SELECT * FROM family_jobs WHERE session='target' AND family='omp.skill_choice'").fetchone()
+    scoped = _prior(db, row, limit=64, recent_sessions_n=1)
+    assert [example['label'] for example in scoped] == ['recent-skill']
+    all_prior = _prior(db, row, limit=64)
+    assert [example['label'] for example in all_prior] == ['old-skill', 'recent-skill']
+    db.close()
