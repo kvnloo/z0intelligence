@@ -551,7 +551,7 @@ def test_missing_policy_blocks_wide_model_request_before_transport(isolated_poli
     scope = {k: policy_body()["families"]["omp.tool"]["arm"][k]
              for k in ("model", "quant", "engine", "backend", "device")}
     legal = compile_actions(graph=cli._graph_from_payload({"actions": [
-        {"action_id": name, "kind": "tool"} for name in ("read", "glob", "grep"),
+        {"action_id": name, "kind": "tool"} for name in ("read", "glob", "grep")
     ]}), authority=("read",), budget_units=8)
     class NoSend:
         def chat(self, *args, **kwargs):
