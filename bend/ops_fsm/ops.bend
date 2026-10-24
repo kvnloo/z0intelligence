@@ -465,3 +465,20 @@ def policy_allows(+family: Nat, +named_family: Nat, stage: PolicyStage, named_ar
       Bool.or(Bool.not(Nat.is_eq(family, named_family)), policy_frontier(stage, healthy, abstain))
     case OffloadRoute{arm}:
       policy_local(family, named_family, stage, named_arm, arm)
+
+# ------------------------------------------------------------------ O13
+# Scope identifiers encode the exact model/quant/engine/backend/device tuple.
+# `credited` means valid, unexpired compiled ChoiceLadder evidence; never ledger
+# rows or a model's self-report. Absent credit, every scope is limited to two.
+def option_limit_by(ok: Bool, measured: Nat) -> Nat:
+  match ok:
+    case True{}:
+      measured
+    case False{}:
+      2n
+
+def option_limit(credited: Bool, actual_scope: Nat, named_scope: Nat, measured: Nat) -> Nat:
+  option_limit_by(Bool.and(credited, Nat.is_eq(actual_scope, named_scope)), measured)
+
+def option_capacity_allows(credited: Bool, actual_scope: Nat, named_scope: Nat, measured: Nat, count: Nat) -> Bool:
+  Bool.not(Nat.is_gt(count, option_limit(credited, actual_scope, named_scope, measured)))

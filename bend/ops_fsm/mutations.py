@@ -3,7 +3,7 @@
 (in a scratch copy), run `bend PROOF.bend`, and require SOME PROOFS FAIL.
 
 Each mutation is the bug a law exists to catch, written the way it would show
-up in the gate. Every law O1-O12 has at least one mutant. The reference
+up in the gate. Every law O1-O13 has at least one mutant. The reference
 ops.bend is never edited in place.
 
     python3 bend/ops_fsm/mutations.py [--verdict] [--out mutations.json]
@@ -146,6 +146,25 @@ MUTATIONS = [
      "      Bool.or(Bool.not(healthy), abstain)", "      Bool.not(healthy)"),
     ("O11 o11_named_family", "offload dispatcher bypasses the policy cell",
      "      policy_local(family, named_family, stage, named_arm, arm)", "      True{}"),
+    ("O13 o13_default_two", "missing evidence permits 24 candidates",
+     "    case False{}:\n      2n", "    case False{}:\n      24n"),
+    ("O13 o13_k2_passes", "missing evidence rejects a legal two-way choice",
+     "    case False{}:\n      2n", "    case False{}:\n      1n"),
+    ("O13 o13_exact_scope", "capacity transfers across physical scopes",
+     "Bool.and(credited, Nat.is_eq(actual_scope, named_scope))", "credited"),
+    ("O13 o13_default_two", "scope match substitutes for measured evidence",
+     "Bool.and(credited, Nat.is_eq(actual_scope, named_scope))", "Nat.is_eq(actual_scope, named_scope)"),
+    ("O13 o13_credited_limit", "measured capacity is ignored",
+     "    case True{}:\n      measured", "    case True{}:\n      2n"),
+    ("O13 o13_option_capacity", "request dispatcher ignores capacity",
+     "  Bool.not(Nat.is_gt(count, option_limit(credited, actual_scope, named_scope, measured)))",
+     "  True{}"),
+    ("O13 o13_k2_passes", "comparison rejects the boundary and admits excess",
+     "  Bool.not(Nat.is_gt(count, option_limit(credited, actual_scope, named_scope, measured)))",
+     "  Nat.is_gt(count, option_limit(credited, actual_scope, named_scope, measured))"),
+    ("O13 o13_credited_excess_rejected", "capacity has an off-by-one allowance",
+     "  Bool.not(Nat.is_gt(count, option_limit(credited, actual_scope, named_scope, measured)))",
+     "  Bool.not(Nat.is_gt(count, Nat.add(1n, option_limit(credited, actual_scope, named_scope, measured))))"),
 ]
 
 

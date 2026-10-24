@@ -72,6 +72,7 @@ command, git ref update, adb dump or config line becomes those inputs is classif
 | O10 | Phones receive all CPU/GPU and 100% RAM. Agent-selected phone resource caps are forbidden. Battery minima at or below 2% are allowed. Higher minima, including inherited health defaults, are forbidden. Explicit owner pause/call, reachability, capability, timeout and cleanup remain. | `z0-guard phone-caps --root ROOT` | enforce |
 | O11 | A non-frontier route must have current policy stage canary or live that names this family and the full selected arm. | `z0-guard policy` | audit, exit 3 on violations |
 | O12 | A healthy live arm requires offload. Frontier/Jev fallback requires a recorded confidence below the policy threshold. | `z0-guard policy` | audit, exit 3 on violations |
+| O13 | Shadow/canary/live requests and configured arms/families cannot exceed their exact-scope measured option capacity. No valid compiled capacity means two options. | `z0-guard policy` | audit, exit 3 with offending IDs |
 
 Switch a gate: `Z0_GUARD_O<n>=off|report|enforce` in the environment, or
 `~/.config/z0-guard/modes.json` (`{"O3": "enforce"}`). `z0-guard modes` prints the effective modes.
@@ -131,7 +132,7 @@ scans as `invariant_unavailable`. Its recurring check resolves the installed
 fleet checkout; an inventory entry can specify `health_invariant` with
 `{"kind": "phone_caps", "root": "/path/to/files"}`. No remediation is automatic.
 
-## O11/O12 policy audit
+## O11/O12/O13 policy audit
 
 ```sh
 z0-guard policy --receipts "$HOME/.z0int/receipts/*.jsonl" \
@@ -174,6 +175,31 @@ Expired evidence does not authorize offload. O12 requires an explicit boolean
 threshold and the recorded threshold matches it. A boolean or missing confidence
 does not establish abstention.
 
+O13 reads only the compiled policy's `option_capacity` map. Keys are canonical
+sorted compact UTF-8 JSON of exactly `model`, `quant`, `engine`, `backend`,
+`device`. A value grants `allowed_k` only when it has nonempty `finding_ids`
+and measured `task` names, finite `wilson_lower >= bar`, and a future
+`expires_at`. Missing, invalid, expired or differently scoped capacity defaults
+to **2**. The findings ledger cannot grant capacity to the guard.
+
+The audit checks actual `option_count` in shadow/canary/live receipts, including
+each model inside today's `shadow[]` envelopes (not the root's full legal
+catalogue). Missing/invalid counts on actual SLM attempts are violations.
+Session `data` wrappers inherit their timestamps. Rules/knn observations are
+not SLM choices. An honest pre-request refusal records `slm_requested: false`,
+`option_count: 0`, `attempted_option_count`, and reason
+`option_capacity_exceeded` (or `option_bound_exceeded`); it is not an O12
+offload failure or an O13 request.
+
+The same policy home is audited for configured `option_count`/`candidate_k`
+in `config/serving.json` endpoints, `shadow_learning` under `config/loop.json`
+and `config/z0int.json`, `config/shadow.json`, `shadow/config.json`, and active
+`loop/shadow-learning-status.json` projection configuration. A projection
+without its own model is checked against each serving endpoint. Missing scope
+dimensions do not earn credit. Active shadow/canary/live policy families with
+`option_count` are checked too. `counts.o13_option_capacity` counts offending
+entries; stderr findings carry each ID, scope, observed count and allowed bound.
+
 The command writes the same JSON to stdout and
 `$Z0INT_HOME/policy/guard-report.json` (default `~/.z0int/policy/guard-report.json`):
 
@@ -187,7 +213,8 @@ The command writes the same JSON to stdout and
     "unstamped": 0,
     "stale_policy": 0,
     "o11_evidence_bound_route": 0,
-    "o12_offload_obligation": 0
+    "o12_offload_obligation": 0,
+    "o13_option_capacity": 0
   },
   "offload_rate": {},
   "available": false,
@@ -216,7 +243,9 @@ evidence as unavailable. Static violations return 3.
 The Bend model names full arm identities and families with natural identifiers.
 O11 proves stage and both identity constraints. O12 proves healthy live fallback
 requires abstention, with positive laws for unhealthy and abstained fallback.
-See `bend/ops_fsm/README.md` for the MBP proof, 55-mutant and parity commands.
+O13 proves the hard capacity bound, default two, exact-scope credit, valid
+boundary admission, and rejection of the observed 24/119-option shapes.
+See `bend/ops_fsm/README.md` for the MBP proof, 63-mutant and parity commands.
 
 ### Synthetic evidence isolation
 

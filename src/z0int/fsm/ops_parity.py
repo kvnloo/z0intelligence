@@ -156,6 +156,11 @@ def cases(seed: int = 0, n_rand: int = 120) -> list[tuple[str, str, str, str]]:
         args = ", ".join(b(x) for x in bits)
         out.append(("O10 phone_admits", "Bool", f"O.phone_admits({args})", b(P.phone_admits(*bits))))
         out.append(("O10 phone_place", "O.Place", f"O.phone_place({args})", place_str(P.phone_place(*bits))))
+    for credited, actual, named, measured, count in itertools.product(
+            B2, (0, 1), (0, 1), (2, 3, 24), (0, 1, 2, 3, 24, 119)):
+        args = f"{b(credited)}, {n(actual)}, {n(named)}, {n(measured)}, {n(count)}"
+        out.append(("O13 option_capacity_allows", "Bool", f"O.option_capacity_allows({args})",
+                    b(P.option_capacity_allows(credited, actual, named, measured, count))))
     return out
 
 

@@ -424,3 +424,43 @@ law o12_abstain_can_fallback:
   for +family: Nat
   for arm: Nat
   T(O.policy_allows(family, family, O.StageLive{}, arm, O.FrontierRoute{}, True{}, True{}))
+
+# O13. No shadow/canary/live request exceeds its exact-scope measured capacity.
+law o13_option_capacity:
+  for +credited: Bool
+  for +actual: Nat
+  for +named: Nat
+  for +measured: Nat
+  for +count: Nat
+  for w: T(O.option_capacity_allows(credited, actual, named, measured, count))
+  T(Bool.not(Nat.is_gt(count, O.option_limit(credited, actual, named, measured))))
+
+law o13_default_two:
+  for actual: Nat
+  for named: Nat
+  for measured: Nat
+  {O.option_limit(False{}, actual, named, measured) == 2n : Nat}
+
+law o13_exact_scope:
+  for +actual: Nat
+  for +named: Nat
+  for measured: Nat
+  for w: T(Bool.not(Nat.is_eq(actual, named)))
+  {O.option_limit(True{}, actual, named, measured) == 2n : Nat}
+
+law o13_credited_limit:
+  for +scope: Nat
+  for +measured: Nat
+  {O.option_limit(True{}, scope, scope, measured) == measured : Nat}
+
+law o13_k2_passes:
+  {O.option_capacity_allows(False{}, 0n, 0n, 119n, 2n) == True{} : Bool}
+
+law o13_k24_rejected:
+  {O.option_capacity_allows(False{}, 0n, 0n, 24n, 24n) == False{} : Bool}
+
+law o13_k119_rejected:
+  {O.option_capacity_allows(False{}, 0n, 0n, 119n, 119n) == False{} : Bool}
+
+law o13_credited_excess_rejected:
+  {O.option_capacity_allows(True{}, 0n, 0n, 3n, 4n) == False{} : Bool}

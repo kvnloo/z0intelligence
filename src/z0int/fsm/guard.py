@@ -16,7 +16,7 @@ the inputs (git, systemd, adb, broker.db, configs, gh) and acts on the verdict.
     z0-guard health-step ...            O8  one node-health probe through the notify machine
     z0-guard gateway-watch              O9  gateway restart -> Interrupted runs with resume commands
     z0-guard phone-caps --root ROOT [--path PATH ...] O10 source-policy scanner
-    z0-guard policy --receipts GLOB --policy PATH --since 24h [--static ROOT] [--json] O11/O12 audit
+    z0-guard policy --receipts GLOB --policy PATH --since 24h [--static ROOT] [--json] O11/O12/O13 audit
     z0-guard replay TAPE...             replay incident tapes through the gates
     z0-guard modes                      show each gate's mode
 
@@ -997,7 +997,7 @@ def cmd_phone_caps(a) -> int:
                                          "checked": list(map(str, phone_caps_paths(root, paths)))})
 
 
-# ------------------------------------------------------------------ O11/O12 policy evidence
+# ------------------------------------------------------------------ O11/O12/O13 policy evidence
 
 def cmd_policy(a) -> int:
     from .policy_guard import audit, static_findings
@@ -1136,7 +1136,7 @@ def main(argv: list[str] | None = None) -> int:
     pc.add_argument("--path", action="append", help="explicit file, relative to root or absolute; replaces discovery")
     pc.set_defaults(fn=cmd_phone_caps)
 
-    pg = sub.add_parser("policy", help="O11/O12: audit decision receipts and literal routing overrides")
+    pg = sub.add_parser("policy", help="O11/O12/O13: audit receipts, option configurations and literal routing overrides")
     pg.add_argument("--receipts", help="JSON/JSONL receipt glob (quote it to avoid shell expansion)")
     pg.add_argument("--policy", help="z0.decision_policy.v1 file")
     pg.add_argument("--since", default="24h", help="audit window: seconds/minutes/hours/days, e.g. 24h")

@@ -275,6 +275,16 @@ def rstep(s: RSt, ev: str, x: int = 0, session: bool = False) -> RSt:
     return s
 
 
+# O13: the caller validates compiled evidence and encodes full physical scopes.
+def option_limit(credited: bool, actual_scope: int, named_scope: int, measured: int) -> int:
+    return measured if credited and actual_scope == named_scope else 2
+
+
+def option_capacity_allows(credited: bool, actual_scope: int, named_scope: int,
+                           measured: int, count: int) -> bool:
+    return count <= option_limit(credited, actual_scope, named_scope, measured)
+
+
 # =================================================================== classifiers
 # Heuristics that map real inputs to the abstract ones above. Not proven.
 

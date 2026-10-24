@@ -1,4 +1,4 @@
-"""Synthetic O11/O12 audit contracts. Do not run on groot."""
+"""Synthetic O11/O12/O13 audit contracts. Do not run on groot."""
 import copy
 import datetime as dt
 import hashlib
@@ -39,6 +39,7 @@ def receipt(doc, **changes):
             'policy_sha256': doc['version'], 'rule_id': 'F-omp.tool-1',
             'stage': next(iter(doc['families'].values()))['stage'], 'route': 'general_slm',
             'selected_arm': copy.deepcopy(ARM), 'serving_healthy': True,
+            'option_count': 2, 'model_id': ARM['model'], 'quant': ARM['quant'],
             'observed_identity': {key: value for key, value in IDENTITY.items() if key != 'model_sha256'},
             'props_model_id': IDENTITY['model_id'], 'expected_identity': copy.deepcopy(IDENTITY), **changes}
 
@@ -386,3 +387,181 @@ def test_envelope_cannot_clear_synthetic_taint_in_child(tmp_path, monkeypatch):
     report, findings = audit(tmp_path, doc, [{'synthetic': True, 'receipts': [row]}])
     assert report['counts']['o11_evidence_bound_route'] == 1
     assert any(finding.get('id') == 'nested-synthetic' for finding in findings)
+
+
+def rehash(doc):
+    doc.pop('version', None)
+    doc['version'] = hashlib.sha256(json.dumps(doc, sort_keys=True, separators=(',', ':'),
+                                              ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+    return doc
+
+
+def capacity(doc, allowed_k=24, **changes):
+    scope = {key: ARM[key] for key in P.PHYSICAL_KEYS}
+    key = json.dumps(scope, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
+    doc['option_capacity'] = {key: {'allowed_k': allowed_k, 'finding_ids': ['capacity-cell'],
+        'wilson_lower': .97, 'task': ['T1', 'T2'], 'bar': .95,
+        'expires_at': '2026-10-25T12:00:00Z', **changes}}
+    return rehash(doc)
+
+
+@pytest.mark.parametrize('stage', ['shadow', 'canary', 'live'])
+@pytest.mark.parametrize('k,expected', [(119, 1), (24, 1), (2, 0)])
+def test_o13_all_request_stages_use_default_two(tmp_path, stage, k, expected):
+    doc = policy(stage)
+    report, findings = audit(tmp_path, doc, [receipt(doc, id='request-1', option_count=k)])
+    assert report['counts']['o13_option_capacity'] == expected
+    bad = [f for f in findings if f['rule'] == 'o13_option_capacity']
+    assert [f['id'] for f in bad] == (['request-1'] if expected else [])
+    if bad:
+        assert bad[0]['allowed_k'] == 2
+        assert bad[0]['option_count'] == k
+
+
+def test_o13_todays_nested_shadow_receipt_shapes(tmp_path):
+    rows = [json.loads(line) for line in
+            (Path(__file__).parent / 'fixtures/policy-guard/o13-shadow.jsonl').read_text().splitlines()]
+    report, findings = audit(tmp_path, policy(), rows)
+    assert report['available']
+    assert report['counts']['o13_option_capacity'] == 2
+    assert [f['option_count'] for f in findings] == [119, 24]
+    assert all(f['id'].startswith(('synthetic-full-catalogue-119:', 'synthetic-projection-24:'))
+               for f in findings)
+    clean, findings = audit(tmp_path, policy(), rows[-1:])
+    assert clean['available']
+    assert not any(clean['counts'].values())
+    assert not findings
+
+
+@pytest.mark.parametrize('field', P.PHYSICAL_KEYS)
+def test_o13_capacity_credit_cannot_generalize_any_scope_dimension(tmp_path, field):
+    doc = capacity(policy('canary'))
+    row = receipt(doc, option_count=24)
+    row['selected_arm'][field] = 'different'
+    report, findings = audit(tmp_path, doc, [row])
+    assert report['counts']['o13_option_capacity'] == 1
+    assert next(f for f in findings if f['rule'] == 'o13_option_capacity')['allowed_k'] == 2
+
+
+@pytest.mark.parametrize('changes', [
+    {}, {'allowed_k': 24.0}, {'allowed_k': True}, {'finding_ids': []},
+    {'finding_ids': [None]}, {'task': []}, {'task': ['']}, {'wilson_lower': .94},
+    {'wilson_lower': True}, {'bar': None}, {'bar': False},
+    {'expires_at': '2026-10-24T11:59:59Z'}, {'expires_at': 'invalid'},
+])
+def test_o13_only_valid_unexpired_compiled_capacity_credits(tmp_path, changes):
+    doc = capacity(policy('canary'), **changes)
+    report, findings = audit(tmp_path, doc, [receipt(doc, option_count=24)])
+    assert report['counts']['o13_option_capacity'] == int(bool(changes))
+    assert report['available']
+    if not changes:
+        assert not findings
+
+
+@pytest.mark.parametrize('value', [None, True, '24', 2.5, -1])
+def test_o13_invalid_request_count_is_not_a_pass(tmp_path, value):
+    doc = policy('canary')
+    report, _ = audit(tmp_path, doc, [receipt(doc, option_count=value)])
+    assert report['counts']['o13_option_capacity'] == 1
+
+
+def test_o13_ledger_cannot_grant_capacity(tmp_path):
+    home = tmp_path / 'home'
+    (home / 'policy').mkdir(parents=True)
+    (home / 'findings').mkdir()
+    (home / 'findings/findings.jsonl').write_text(json.dumps({
+        'id': 'uncompiled', 'subject': {'family': 'choice.option_capacity'},
+        'arm': ARM, 'metric': {'option_count': 119, 'value': 1, 'n': 10000}}) + '\n')
+    doc = policy('canary')
+    path = home / 'policy/current.json'
+    path.write_text(json.dumps(doc))
+    rec = home / 'receipts.jsonl'
+    rec.write_text(json.dumps(receipt(doc, option_count=119)) + '\n')
+    report, _ = P.audit(str(rec), path, '24h', now=NOW)
+    assert report['counts']['o13_option_capacity'] == 1
+
+
+@pytest.mark.parametrize('relative,body', [
+    ('config/serving.json', {'schema': 'z0int.serving.v1',
+                            'endpoints': [{'id': 'configured-arm', **ARM, 'option_count': 24}]}),
+    ('config/loop.json', {'shadow_learning': {'arms': [
+        {'id': 'configured-arm', 'scope': ARM, 'option_count': 24}]}}),
+    ('config/z0int.json', {'shadow_learning': {'arms': [
+        {'id': 'configured-arm', 'arm': ARM, 'option_count': 24}]}}),
+    ('config/shadow.json', {'arms': [{'id': 'configured-arm', **ARM, 'candidate_k': 24}]}),
+    ('shadow/config.json', {'arms': [{'id': 'configured-arm', **ARM, 'option_count': 119}]}),
+    ('loop/shadow-learning-status.json', {'projection_config': {'candidate_k': 24}}),
+])
+def test_o13_configured_arms_are_audited_even_without_receipts(tmp_path, relative, body):
+    home = tmp_path / 'home'
+    (home / 'policy').mkdir(parents=True)
+    target = home / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(body))
+    path = home / 'policy/current.json'
+    path.write_text(json.dumps(policy()))
+    report, findings = P.audit(None, path, '24h', now=NOW)
+    assert report['counts']['o13_option_capacity'] == 1
+    assert findings[0]['id']
+    assert findings[0]['path'] == str(target)
+    assert findings[0]['allowed_k'] == 2
+
+
+def test_o13_projection_config_pairs_each_serving_endpoint(tmp_path):
+    home = tmp_path / 'home'
+    (home / 'policy').mkdir(parents=True)
+    (home / 'loop').mkdir()
+    (home / 'config').mkdir()
+    (home / 'loop/shadow-learning-status.json').write_text(
+        json.dumps({'projection_config': {'candidate_k': 24}}))
+    (home / 'config/serving.json').write_text(json.dumps({'schema': 'z0int.serving.v1',
+        'endpoints': [{'model_id': 'small-a'}, {'model_id': 'small-b'}]}))
+    path = home / 'policy/current.json'
+    path.write_text(json.dumps(policy()))
+    report, findings = P.audit(None, path, '24h', now=NOW)
+    assert report['counts']['o13_option_capacity'] == 2
+    assert {f['id'] for f in findings} == {'/projection_config@small-a', '/projection_config@small-b'}
+
+
+@pytest.mark.parametrize('stage', ['shadow', 'canary', 'live'])
+def test_o13_configured_policy_families_bind_compiled_capacity(tmp_path, stage):
+    doc = policy(stage)
+    doc['families']['omp.tool']['option_count'] = 24
+    rehash(doc)
+    report, findings = audit(tmp_path, doc, [])
+    assert report['counts']['o13_option_capacity'] == 1
+    assert findings[0]['id'] == 'F-omp.tool-1'
+    capacity(doc)
+    report, findings = audit(tmp_path, doc, [])
+    assert report['counts']['o13_option_capacity'] == 0
+    assert not findings
+
+
+@pytest.mark.parametrize('reason', ['option_bound_exceeded', 'option_capacity_exceeded'])
+def test_o13_honest_refusal_is_not_o12_or_o13_violation(tmp_path, reason):
+    doc = policy()
+    row = receipt(doc, route='frontier', stage='none', policy_stage='live', policy_reason=reason,
+                  slm_requested=False, option_count=0, attempted_option_count=119)
+    report, findings = audit(tmp_path, doc, [row])
+    assert report['available']
+    assert not any(report['counts'].values())
+    assert not findings
+
+
+def test_o13_dishonest_no_request_flag_does_not_hide_positive_count(tmp_path):
+    doc = policy()
+    report, _ = audit(tmp_path, doc, [receipt(doc, slm_requested=False, option_count=119)])
+    assert report['counts']['o13_option_capacity'] == 1
+
+
+def test_o13_cli_returns_three_and_lists_offending_id(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path / 'output'))
+    doc = policy('canary')
+    doc['families']['omp.tool']['option_count'] = 119
+    rehash(doc)
+    path = tmp_path / 'policy.json'
+    path.write_text(json.dumps(doc))
+    assert G.main(['policy', '--policy', str(path), '--since', '365d', '--json']) == 3
+    output = capsys.readouterr()
+    assert json.loads(output.out)['counts']['o13_option_capacity'] == 1
+    assert json.loads(output.err)['findings'][0]['id'] == 'F-omp.tool-1'

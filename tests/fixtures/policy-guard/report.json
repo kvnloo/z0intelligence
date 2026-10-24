@@ -3,7 +3,7 @@
   "ts": "2026-10-24T12:00:00+00:00",
   "policy_version": null,
   "window": {"since": "2026-10-23T12:00:00+00:00", "receipts": 0},
-  "counts": {"unstamped": 0, "stale_policy": 0, "o11_evidence_bound_route": 0, "o12_offload_obligation": 0},
+  "counts": {"unstamped": 0, "stale_policy": 0, "o11_evidence_bound_route": 0, "o12_offload_obligation": 0, "o13_option_capacity": 0},
   "offload_rate": {},
   "available": false,
   "unavailable_reason": "no policy path; no receipt files matched; no stamped receipts in window"
