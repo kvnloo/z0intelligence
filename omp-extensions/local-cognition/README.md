@@ -31,9 +31,9 @@ z0int extensions are installed:
 ln -s "$PWD/omp-extensions/local-cognition" ~/.omp/agent/extensions/local-cognition
 ```
 
-One OMP restart is required after adding an `index.ts` extension. The Python side
-(`src/z0int/cognition/shadow.py` and `src/z0int/bridge/`) is hot-swappable via
-`/reload-plugins` once the `z0int-bridge` shim owns the worker.
+A fresh OMP process is required after adding or changing this `index.ts`
+extension. `/reload-plugins` cannot replace a cached TypeScript extension.
+The Python bridge worker can reload through `/reload-plugins`.
 
 The lane prefers the transport published by `z0int-bridge`
 (`globalThis.__omp_z0int_bridge_transport__`). If it is missing it tries to
@@ -181,29 +181,56 @@ matching as gold. A legacy timestamp recovery census must remain a separate
 non-gold tier and be discarded when collisions are high.
 
 
-## Context-safe candidate projection
+## Context-safe binary scoring
 
 The farm's `-c 8192 --parallel 2` provides 4096 tokens per slot, not 8192.
-Real OMP sessions expose about 120 tools; sending every description can exceed
-that slot. Shadow model inputs now use a deterministic projection: the kNN
-recommendation, preceding tools, tools previously used in the session, common
-tools, then the remaining names in lexical order. The current observed tool is
-never used to build or rank that projection. Descriptions/schemas are compacted.
+The current `goal-binary` arm does not run a large multiclass projection or
+an eight-category hierarchy. Models of at most 1B parameters default to a
+three-option cap. The explicit 1.7B lane defaults to five options. Raw caller
+settings cannot raise these caps. A verified capacity policy can change the cap
+only for its exact model, quantization, engine, backend, and device identity.
+The policy must have a valid canonical hash, unexpired nonsynthetic findings,
+all four capacity tasks, and a Wilson lower bound at least its 0.95-or-higher bar.
+Missing or invalid policy evidence retains the default cap.
 
-The compiler's full `legal_ids` remain unchanged for scoring, including the
-executed tool even when it misses the projection. Each model records its actual
-`model_candidate_ids` and server-reported `prompt_tokens`. The model-only request
-uses a conservative 3000-byte serialized prompt/schema budget, including a
-512-byte template/control reserve, and at most 128 completion tokens. UTF-8 bytes
-bound byte-tokenizer input tokens; non-shadow requests are not pruned.
+History and deterministic rules produce the shortlist. Each RPC shows exactly
+one candidate with a one-line description. The existing transport requests
+one output token, a `yes`/`no` grammar, and both answer log probabilities
+(`logprobs: true`, `top_logprobs: 20`). The scorer selects the highest yes/no
+log-odds. A nonpositive top score or a small top-two margin causes abstention.
+The default minimum margin is 0.25 log-odds. Missing answer probabilities cause
+an explicit abstention. The scorer never invents a probability floor.
 
-`projection_recall` measures how often an exact executed-action label is in the
-model's candidate set, per family and projection configuration. It is separate
-from prediction accuracy and exposes its denominator. With at least five
-observations and recall below 0.8, the evolver tries wider candidate caps (48,
-then 64) and raises the conservative input budget to 3500 before attributing the
-failure to model quality. Old configurations and their outcomes remain in the
-ledger. Real prompt overflow is a distinct `context_overflow` failure class and
-daily counter; an abstaining local arm cannot mask a failed SLM observation into
-the normal journal. No shared farm context/parallel settings are changed.
+Tool descriptions use registration metadata when the API exposes it. Known
+builtins have short descriptions. Other tools report missing descriptions.
+The payload adds `goal_context` without changing the history-only `state` or
+`recent_tools` used by the history-bigram baseline. Context contains the latest
+user message (at most 600 UTF-8 bytes), the last visible assistant sentence
+(300 bytes), and five preceding tools with their preceding `i` intents
+(160 bytes each). Read-only session branches and message events supply this
+context. Session identity changes clear all cached context.
+The learner can add at most three strictly preceding transition examples.
+Each example contains only preceding tool names and its recorded next tool.
+If the slot budget is insufficient, diagnostics report omitted examples.
+
+The current tool and its arguments remain outside model inputs. Thinking
+blocks and tool results are never copied. Unavailable user or assistant text
+stays null with explicit `missing_fields` and evidence `sources`. Each RPC
+reserves 512 control tokens and one completion token within the 4096-token
+slot. Serialized UTF-8 bytes conservatively bound prompt tokens. If required,
+the scorer shortens prior intents and visible text without removing a prior
+tool. Per-RPC diagnostics report each shortening.
+
+The same binary scorer handles atomic-family jobs. It removes the top-level
+`choices` field from JSON prompt context before each single-candidate RPC.
+Private receipts retain raw RPC responses, byte bounds, server token counts,
+candidate yes/no log probabilities, and the top margin. Transport and context
+failures use `error`, not `parse_error`. No second transport or router is added.
+
+The compiler's complete `legal_ids` remain unchanged for scoring. The receipt's
+`model_candidate_ids` show the bounded shortlist, not a replacement denominator.
+Candidate recall is separate from prediction accuracy. Abstentions reduce
+coverage but do not count as wrong covered predictions. The history-bigram
+baseline uses the same receipts. Old large-projection results remain historical
+comparisons only. No fresh 24-, 48-, or 64-option projection is executed.
 

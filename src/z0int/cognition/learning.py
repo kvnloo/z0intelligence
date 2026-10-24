@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict, deque
 import argparse
+from datetime import datetime
 import fcntl
 import hashlib
 import json
@@ -27,14 +28,10 @@ STRATEGIES = (
     ('transition-rule', 'Exact last-tool transition rules beat similarity', 1, 1, 'rules'),
     ('history-bigram', 'Ordered tool bigrams distinguish workflow phases', 5, 3, 'bigram'),
 )
-PROJECTION_STRATEGIES = (
-    ('projection-wide', 'Raise candidate width and budget before judging model accuracy', 8, 5, 'knn'),
-    ('projection-maximum', 'Use maximum bounded candidate width to recover projection recall', 8, 9, 'knn'),
-)
 
 
 def projection_key(config: dict) -> str:
-    return f"k{config.get('candidate_k', 24)}-b{config.get('prompt_bytes', 3000)}"
+    return f"k{config.get('candidate_k', 3)}-b{config.get('prompt_bytes', 3000)}"
 
 
 def projection_metrics(db: sqlite3.Connection) -> dict:
@@ -87,6 +84,15 @@ def connect(home: Path) -> sqlite3.Connection:
         features TEXT, ts REAL);
       CREATE TABLE IF NOT EXISTS ticks(ts REAL PRIMARY KEY, body TEXT);
     ''')
+    columns = {r['name'] for r in db.execute('PRAGMA table_info(calls)')}
+    for name, kind in (('arguments', 'TEXT'), ('outcome_ts', 'REAL')):
+        if name not in columns:
+            db.execute(f'ALTER TABLE calls ADD COLUMN {name} {kind}')
+    # Re-read source events exactly once to populate new argument/timestamp fields.
+    db.execute('CREATE TABLE IF NOT EXISTS migrations(name TEXT PRIMARY KEY)')
+    if db.execute("INSERT OR IGNORE INTO migrations VALUES('call-arguments-v1')").rowcount:
+        db.execute("DELETE FROM files WHERE path NOT LIKE '%cognition-shadow%'")
+    db.commit()
     return db
 
 
@@ -127,6 +133,31 @@ def _result(message: dict) -> dict:
     return outcome
 
 
+def event_time(row: dict) -> float:
+    raw = row.get('timestamp') or row.get('ts')
+    if isinstance(raw, (int, float)):
+        return float(raw) / 1000 if raw > 1e12 else float(raw)
+    if isinstance(raw, str):
+        try:
+            return datetime.fromisoformat(raw.replace('Z', '+00:00')).timestamp()
+        except ValueError:
+            pass
+    return 0.0
+
+
+def record_call(db: sqlite3.Connection, sid: str, cid: str, tool: str,
+                history: deque, arguments: Any, ts: float) -> None:
+    inserted = db.execute('''INSERT OR IGNORE INTO calls
+        (session,call,tool,features,outcome,ts,arguments) VALUES(?,?,?,?,?,?,?)''',
+        (sid, cid, tool, json.dumps(list(history)), None, ts,
+         json.dumps(arguments) if isinstance(arguments, dict) else None)).rowcount
+    db.execute('''UPDATE calls SET arguments=COALESCE(?,arguments),
+        ts=CASE WHEN ts=0 THEN ? ELSE ts END WHERE session=? AND call=?''',
+        (json.dumps(arguments) if isinstance(arguments, dict) else None, ts, sid, cid))
+    if inserted:
+        history.append(tool)
+
+
 def ingest_sessions(db: sqlite3.Connection, sessions: Path, deadline: float) -> bool:
     for path in sessions.rglob('*.jsonl'):
         if time.monotonic() >= deadline:
@@ -152,10 +183,8 @@ def ingest_sessions(db: sqlite3.Connection, sessions: Path, deadline: float) -> 
                 data = row.get('data') or {}
                 cid, tool = data.get('toolCallId'), data.get('toolName')
                 if cid and tool:
-                    inserted = db.execute('INSERT OR IGNORE INTO calls VALUES(?,?,?,?,?,?)',
-                        (sid, cid, tool, json.dumps(list(history)), None, 0)).rowcount
-                    if inserted:
-                        history.append(tool)
+                    record_call(db, sid, cid, tool, history,
+                                data.get('args') or data.get('arguments'), event_time(row))
             msg = row.get('message') or {}
             if msg.get('role') == 'assistant':
                 for item in msg.get('content') or []:
@@ -163,13 +192,10 @@ def ingest_sessions(db: sqlite3.Connection, sessions: Path, deadline: float) -> 
                         continue
                     cid, tool = item.get('id'), item.get('name')
                     if cid and tool:
-                        inserted = db.execute('INSERT OR IGNORE INTO calls VALUES(?,?,?,?,?,?)',
-                            (sid, cid, tool, json.dumps(list(history)), None, 0)).rowcount
-                        if inserted:
-                            history.append(tool)
+                        record_call(db, sid, cid, tool, history, item.get('arguments'), event_time(row))
             if msg.get('role') == 'toolResult' and msg.get('toolCallId'):
-                db.execute('UPDATE calls SET outcome=? WHERE session=? AND call=?',
-                           (json.dumps(_result(msg)), sid, msg['toolCallId']))
+                db.execute('UPDATE calls SET outcome=?,outcome_ts=? WHERE session=? AND call=?',
+                           (json.dumps(_result(msg)), event_time(row), sid, msg['toolCallId']))
     return True
 
 
@@ -274,7 +300,7 @@ def shadow_portfolio(home: Path, history: list[str], family: str, legal: frozens
         return None
     status_path = home / 'loop' / 'shadow-learning-status.json'
     state = json.loads(status_path.read_text()) if status_path.exists() else {}
-    strategy = next((s for s in (*STRATEGIES, *PROJECTION_STRATEGIES)
+    strategy = next((s for s in STRATEGIES
                      if s[0] == state.get('current_strategy')), STRATEGIES[0])
     with sqlite3.connect(f'file:{path}?mode=ro', uri=True, timeout=.05) as db:
         rows = db.execute('SELECT action,features FROM examples WHERE family=? ORDER BY ts DESC LIMIT 512',
@@ -302,12 +328,12 @@ def evolve(folder: Path, state: dict, reasons: list, now: float, window: float) 
     path = folder / 'strategy-ledger.json'
     ledger = json.loads(path.read_text()) if path.exists() else {'trials': [], 'current': None}
     current = next((t for t in ledger['trials'] if t['id'] == ledger['current']), None)
+    if current and current['id'] not in {s[0] for s in STRATEGIES}:
+        current.update(result='retired_option_cap_policy', ended_at=now,
+                       reasons=['small_model_max_options_3'])
+        ledger['current'] = None
+        current = None
     def lower(strategy_id):
-        if strategy_id.startswith('projection-'):
-            key = projection_key({'candidate_k': 64 if strategy_id == 'projection-maximum' else 48,
-                                  'prompt_bytes': 3500})
-            return max((m['by_config'].get(key, {}).get('recall', 0)
-                        for m in state.get('projection_recall', {}).values()), default=0)
         arm = 'rules' if strategy_id == 'transition-rule' else strategy_id
         return max((arms.get(arm, {}).get('wilson95_lower', 0)
                     for arms in state['families'].values()), default=0)
@@ -321,17 +347,14 @@ def evolve(folder: Path, state: dict, reasons: list, now: float, window: float) 
     event = None
     if reasons and (not current or current['result'] != 'running'):
         used = {t['id'] for t in ledger['trials']}
-        choices = (*PROJECTION_STRATEGIES, *STRATEGIES) if any(
-            r.startswith('projection_recall') for r in reasons) else (*STRATEGIES, *PROJECTION_STRATEGIES)
+        choices = STRATEGIES
         candidate = next((s for s in choices if s[0] not in used), None)
         if candidate:
             best = lower(candidate[0])
             event = {'id': candidate[0], 'hypothesis': candidate[1], 'started_at': now,
                      'baseline': best, 'result': 'running', 'trigger': reasons,
                      'config': {'history_width': candidate[2], 'k': candidate[3], 'arm': candidate[4],
-                                'candidate_k': 64 if candidate[0] == 'projection-maximum' else
-                                               48 if candidate[0] == 'projection-wide' else 24,
-                                'prompt_bytes': 3500 if candidate[0].startswith('projection-') else 3000}}
+                                'candidate_k': 3, 'max_options': 3, 'prompt_bytes': 3000}}
             ledger['trials'].append(event)
             ledger['current'] = candidate[0]
         else:
@@ -341,8 +364,7 @@ def evolve(folder: Path, state: dict, reasons: list, now: float, window: float) 
     state['current_strategy'] = ledger['current'] or STRATEGIES[0][0]
     state['last_evolution'] = ledger.get('last_evolution')
     active = next((t for t in ledger['trials'] if t['id'] == ledger['current']), None)
-    state['projection_config'] = {k: (active or {}).get('config', {}).get(k, default)
-                                  for k, default in (('candidate_k', 24), ('prompt_bytes', 3000))}
+    state['projection_config'] = {'candidate_k': 3, 'max_options': 3, 'prompt_bytes': 3000}
     return event
 
 
@@ -370,6 +392,32 @@ def export_labels(db: sqlite3.Connection, folder: Path) -> None:
 
 
 
+def transport_metrics(db: sqlite3.Connection, since: float, *, revision: str | None = None) -> dict:
+    from .shadow import failure_class, TRANSPORT_FAILURES
+    counts = Counter()
+    attempts = answered = parse_errors = 0
+    for row in db.execute('SELECT body FROM receipts WHERE ts>=?', (since,)):
+        receipt = json.loads(row[0])
+        if revision is not None and receipt.get('source_revision') != revision:
+            continue
+        for trial in receipt.get('shadow', []):
+            if trial.get('backend') == 'shadow-portfolio':
+                continue
+            attempts += 1
+            # Reclassify old receipts too: their parse_error field held connection
+            # failures, which must not be counted as model parser failures.
+            kind = failure_class(trial.get('error') or trial.get('parse_error'))
+            if kind:
+                counts[kind] += 1
+            parse_errors += int(kind == 'parse_error')
+            answered += int(not kind and trial.get('selected_action') is not None)
+    errors = sum(counts[k] for k in TRANSPORT_FAILURES)
+    return {'since': since, 'attempts': attempts, 'errors': errors,
+            'error_rate': errors / attempts if attempts else None,
+            'answered': answered, 'parse_errors': parse_errors,
+            'failure_classes': dict(counts)}
+
+
 def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = None,
           now: float | None = None, config: dict | None = None) -> dict:
     home = Path(home)
@@ -392,14 +440,10 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
                 complete = score(db, float(cfg.get('confidence_threshold', .8)), deadline) and complete
                 families = arm_scores(db)
                 counts = dict(db.execute('SELECT family,COUNT(*) FROM labels GROUP BY family').fetchall())
-                recent = db.execute('SELECT body FROM receipts WHERE ts>=?', (now-86400,)).fetchall()
-                trials = [s for row in recent for s in json.loads(row[0]).get('shadow', [])]
-                from .shadow import failure_class
-                failure_counts = Counter(s.get('failure_class') or failure_class(
-                    s.get('parse_error') or s.get('error')) for s in trials)
-                context_errors = failure_counts['context_overflow']
-                errors = failure_counts['transport_error'] + failure_counts['timeout']
-                rate = errors/len(trials) if trials else None
+                transport_day = transport_metrics(db, now-86400)
+                context_errors = transport_day['failure_classes'].get('context_overflow', 0)
+                errors = transport_day['errors']
+                rate = transport_day['error_rate']
                 health_path = home/'shadow'/'cognition-shadow-health.json'
                 health = json.loads(health_path.read_text()) if health_path.exists() else {}
                 bucket = health.get('days', {}).get(time.strftime('%Y-%m-%d', time.gmtime(now)), {})
@@ -408,11 +452,20 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
                 labels_day = db.execute('SELECT COUNT(*) FROM labels WHERE ts>=?', (now-86400,)).fetchone()[0]
                 state = {'schema': SCHEMA, 'ts': now, 'families': families, 'labelled_per_family': counts,
                          'labelled_rows_added': added, 'labels_day': labels_day, 'credited_families': credited,
-                         'shadow_credit_only': True, 'transport_attempts_day': len(trials),
+                         'shadow_credit_only': True, 'transport_attempts_day': transport_day['attempts'],
                          'transport_errors_day': errors, 'transport_error_rate': rate,
                          'unjoined_receipts': db.execute('SELECT COUNT(*) FROM receipts WHERE id NOT IN (SELECT id FROM labels)').fetchone()[0],
                          'complete': complete, 'learning_curve': {}}
                 state['context_overflows_day'] = context_errors
+                state['transport_day'] = transport_day
+                state['transport_hour'] = transport_metrics(db, now-3600)
+                deployment_path = folder/'shadow-deployment.json'
+                if deployment_path.exists():
+                    deployment = json.loads(deployment_path.read_text())
+                    state['deployment'] = deployment
+                    state['transport_deployment'] = transport_metrics(db, float(deployment['ts']))
+                    state['transport_active_source'] = transport_metrics(db, float(deployment['ts']),
+                        revision=deployment['sha'])
                 state['projection_recall'] = projection_metrics(db)
                 state['new_writer_health'] = {'attempts_day': bucket.get('attempts', 0),
                     'failures_day': bucket.get('failures', 0), 'failure_rate': failure_rate}
@@ -425,6 +478,8 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
                 window = float(cfg.get('stall_window_s', 86400))
                 prior = db.execute('SELECT body FROM ticks WHERE ts<=? ORDER BY ts DESC LIMIT 1', (now-window,)).fetchone()
                 previous = db.execute('SELECT body FROM ticks ORDER BY ts DESC LIMIT 1').fetchone()
+                state['transport_tick'] = transport_metrics(db,
+                    json.loads(previous[0])['ts'] if previous else now-3600)
                 reasons = []
                 active_projection = (json.loads(previous[0]) if previous else {}).get('projection_config') or {}
                 for family, metric in state['projection_recall'].items():
@@ -460,7 +515,37 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
                     reasons.append('labels_unavailable')
                 state['degraded_by'] = sorted(set(reasons))
                 state['status'] = 'DEGRADED' if reasons else 'LEARNING'
-                state['evolution'] = evolve(folder, state, reasons, now, window)
+                experiments_enabled = cfg.get('experiments_enabled', (home/'config'/'serving.json').exists())
+                if not experiments_enabled:
+                    state['evolution'] = evolve(folder, state, reasons, now, window)
+                if experiments_enabled:
+                    from .learning_runtime import runtime_tick
+                    try:
+                        experiments = runtime_tick(db, home, now=now, deadline=deadline, config=cfg)
+                        state['experiments'] = experiments
+                        state['family_search'] = experiments.get('search', {})
+                        state['matched_tool_comparison'] = experiments.get('matched_tool_comparison', {})
+                        events = state['family_search'].get('events', [])
+                        state['evolution'] = events[-1] if events else None
+                        state['last_evolution'] = events[-1] if events else (json.loads(previous[0]) if previous else {}).get('last_evolution')
+                        tool_search = state['family_search'].get('families', {}).get('omp.tool', {})
+                        state['current_strategy'] = tool_search.get('current_strategy', 'history-1')
+                        state['projection_config'] = (tool_search.get('strategy') or {}).get('config', {
+                            'candidate_k': 3, 'max_options': 3, 'decision_method': 'per_candidate_binary_logit'})
+                        for family, metric in experiments.get('families', {}).items():
+                            if not metric['labels']:
+                                continue
+                            state['labelled_per_family'][family] = metric['labels']
+                            state.setdefault('labels_day_per_family', {})[family] = metric['labels_day']
+                            state['families'][family] = {
+                                arm: {evidence: score for evidence, score in classes.items()}
+                                for arm, classes in metric['arms'].items()}
+                        state['labels_day_per_family'] = {'omp.tool': labels_day,
+                            **state.get('labels_day_per_family', {})}
+                    except Exception as exc:
+                        state['experiments'] = {'error': f'{type(exc).__name__}: {exc}'}
+                        state['degraded_by'].append('experiment_runtime_error')
+                        state['status'] = 'DEGRADED'
                 db.execute('INSERT OR REPLACE INTO ticks VALUES(?,?)', (now, json.dumps(state)))
             export_labels(db, folder)
             atomic_json(folder/'shadow-learning-status.json', state)
@@ -492,5 +577,31 @@ def main(argv: list[str] | None = None) -> int:
     return 1 if state['status'] == 'DEGRADED' else 0
 
 
+
+
+def projection_examples(home: Path, payload: dict, config: dict) -> dict:
+    """Read preceding labels, excluding the identified current call."""
+    target = home/'loop'/'shadow-learning.sqlite'
+    if not target.exists():
+        return {}
+    with sqlite3.connect(f'file:{target}?mode=ro', uri=True, timeout=.05) as db:
+        sid = payload.get('session_id')
+        cid = (payload.get('facts') or {}).get('tool_call_id')
+        current = db.execute('SELECT ts FROM calls WHERE session=? AND call=?', (sid, cid)).fetchone()
+        cutoff = current[0] if current and current[0] > 0 else time.time()
+        rows = db.execute('''SELECT e.action,e.features,e.ts,l.session FROM examples e
+            JOIN labels l USING(id) WHERE e.ts<? AND NOT(l.session=? AND l.call=?)
+            ORDER BY e.ts DESC LIMIT 512''', (cutoff, sid or '', cid or '')).fetchall()
+    extra = {}
+    if config.get('candidate_source') == 'recent_sessions':
+        sessions = list(dict.fromkeys(r[3] for r in rows if r[3] != sid))[:int(config.get('recent_sessions_n', 5))]
+        counts = Counter(r[0] for r in rows if r[3] in sessions)
+        extra['shortlist'] = sorted(counts, key=lambda tool: (-counts[tool], tool))[:3]
+    if config.get('retrieval_k'):
+        history = set(payload.get('recent_tools') or [])
+        ranked = sorted(rows, key=lambda r: len(history & set(json.loads(r[1]))), reverse=True)
+        extra['examples'] = [{'previous_tools': json.loads(r[1]), 'next_tool': r[0]}
+                             for r in ranked[:int(config['retrieval_k'])]]
+    return extra
 if __name__ == '__main__':
     raise SystemExit(main())

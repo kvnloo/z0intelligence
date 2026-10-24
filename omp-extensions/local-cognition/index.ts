@@ -33,6 +33,14 @@ const DEFAULT_AUTHORITY = ["read"];
 const DEFAULT_TOOL_NAMES = ["bash", "read", "write", "edit", "grep", "glob"];
 // How many earlier tool names of the session the shadow model is shown.
 const RECENT_TOOLS = 8;
+const GOAL_RECENT_TOOLS = 5;
+
+type PreviousTool = { tool: string; intent: string | null; id?: string };
+type VisibleContext = {
+	latest_user_message: string | null;
+	last_assistant_sentence: string | null;
+	sources: { latest_user_message: string | null; last_assistant_sentence: string | null };
+};
 const STATUS_RING = 100;
 
 /** Tool names whose call has real filesystem/process side effects. */
@@ -255,7 +263,9 @@ function extractToolNames(value: unknown): string[] {
 				if (typeof item === "string") return item;
 				if (item && typeof item === "object") {
 					const record = item as Jsonish;
-					const name = record.name ?? record.id;
+					const definition = record.definition && typeof record.definition === "object"
+						? record.definition as Jsonish : record;
+					const name = definition.name ?? definition.id;
 					return typeof name === "string" ? name : "";
 				}
 				return "";
@@ -303,11 +313,66 @@ export function resolveAvailableTools(pi: unknown, ctx: unknown): string[] {
 	return [...new Set(names.filter(Boolean))].sort();
 }
 
-function buildActions(toolNames: string[]): Jsonish[] {
+/** Byte bounds, not UTF-16 character counts; never split a UTF-8 character. */
+function boundedText(value: string, bytes: number): string {
+	return Buffer.from(value, "utf8").subarray(0, bytes).toString("utf8").replace(/\uFFFD+$/u, "");
+}
+
+function oneLine(value: string, bytes = 160): string {
+	return boundedText(value.replace(/\s+/gu, " ").trim(), bytes);
+}
+
+const KNOWN_DESCRIPTIONS: Record<string, string> = {
+	read: "Read files, directories, documents, or static URLs.",
+	find: "Find code implementing a described behavior.",
+	grep: "Search file contents for literal text or regular expressions.",
+	glob: "Find files and directories by name patterns.",
+	edit: "Apply surgical edits to existing files.",
+	write: "Create files or replace whole file contents.",
+	bash: "Run shell commands and programs.",
+	eval: "Execute Python or JavaScript code.",
+	task: "Delegate work to another agent.",
+	wait: "Wait for running agents, jobs, or replies.",
+	web_search: "Search the public web for sources.",
+	hermes_memory: "Recall private historical conversations.",
+	tdai_memory_search: "Search shared agent memory.",
+	ask: "Ask the user a question or request a decision.",
+};
+
+/** Registration metadata is optional; never infer it from the current call. */
+export function resolveToolDescriptions(pi: unknown, ctx: unknown): Record<string, string> {
+	const out: Record<string, string> = {};
+	const collect = (source: unknown): void => {
+		if (!source || typeof source !== "object") return;
+		const entries = source instanceof Map ? [...source.entries()]
+			: Array.isArray(source) ? source.map(item => [undefined, item])
+			: Object.entries(source);
+		for (const [key, value] of entries) {
+			if (!value || typeof value !== "object") continue;
+			const row = value as Jsonish;
+			const definition = row.definition && typeof row.definition === "object"
+				? row.definition as Jsonish : row;
+			const name = definition.name ?? definition.id ?? key;
+			if (typeof name === "string" && typeof definition.description === "string" && definition.description.trim()) {
+				out[name] = oneLine(definition.description);
+			}
+		}
+	};
+	for (const holder of [(pi as Jsonish | undefined)?.pi, pi, ctx]) {
+		collect(safeCall(holder, "getAllRegisteredTools"));
+		collect(safeCall(holder, "getTools"));
+		collect((holder as Jsonish | undefined)?.tools);
+	}
+	return out;
+}
+
+function buildActions(toolNames: string[], descriptions: Record<string, string>): Jsonish[] {
 	return toolNames.map(name => ({
 		action_id: name,
 		kind: "tool",
-		description: `Call the OMP tool ${name}`,
+		description: descriptions[name] || KNOWN_DESCRIPTIONS[name]
+			|| `Registered tool: ${name.replace(/[_./-]+/gu, " ")} (description unavailable).`,
+		description_source: descriptions[name] ? "registration" : KNOWN_DESCRIPTIONS[name] ? "known_builtin" : "unavailable",
 		tool: name,
 		family: "omp.tool",
 		risk_class: riskFor(name),
@@ -323,6 +388,93 @@ export function liveSessionId(ctx: unknown): string | null {
 	return typeof id === "string" && id.length > 0 ? id : null;
 }
 
+function visibleText(message: unknown): string | null {
+	if (!message || typeof message !== "object") return null;
+	const content = (message as Jsonish).content;
+	if (typeof content === "string") return content.trim() || null;
+	if (!Array.isArray(content)) return null;
+	// Only text blocks: not thinking, tool calls, arguments, or tool results.
+	const text = content.filter(block => block && typeof block === "object"
+		&& block.type === "text" && typeof block.text === "string").map(block => block.text).join("\n");
+	return text.trim() || null;
+}
+
+function lastSentence(text: string): string {
+	const sentences = text.trim().match(/[^.!?。！？]+[.!?。！？]+(?:["'”’])?|[^.!?。！？]+$/gu);
+	return oneLine(sentences?.at(-1) ?? text, 300);
+}
+
+function emptyVisibleContext(): VisibleContext {
+	return { latest_user_message: null, last_assistant_sentence: null,
+		sources: { latest_user_message: null, last_assistant_sentence: null } };
+}
+
+function recordVisible(context: VisibleContext, message: unknown, source: string): void {
+	const role = (message as Jsonish | undefined)?.role;
+	if (role !== "user" && role !== "assistant") return;
+	const text = visibleText(message);
+	if (!text) return;
+	if (role === "user") {
+		context.latest_user_message = boundedText(text, 600);
+		context.sources.latest_user_message = source;
+	} else {
+		context.last_assistant_sentence = lastSentence(text);
+		context.sources.last_assistant_sentence = source;
+	}
+}
+
+function readVisibleContext(ctx: unknown, streamed: VisibleContext): VisibleContext {
+	const manager = (ctx as Jsonish | undefined)?.sessionManager;
+	const branch = safeCall(manager, "getBranch");
+	const context = emptyVisibleContext();
+	if (Array.isArray(branch)) {
+		for (const entry of branch) {
+			if (entry?.type === "message") recordVisible(context, entry.message, "sessionManager.getBranch");
+		}
+	}
+	// Events expose the assistant's visible text before its tool call has been
+	// appended to the session branch. These values are session-scoped below.
+	for (const field of ["latest_user_message", "last_assistant_sentence"] as const) {
+		if (streamed[field] !== null) {
+			context[field] = streamed[field];
+			context.sources[field] = streamed.sources[field];
+		}
+	}
+	return context;
+}
+
+function readPreviousTools(ctx: unknown, currentId: unknown, recent: readonly PreviousTool[]): PreviousTool[] {
+	if (typeof currentId !== "string" || !currentId) return [...recent];
+	const branch = safeCall((ctx as Jsonish | undefined)?.sessionManager, "getBranch");
+	if (!Array.isArray(branch)) return [...recent];
+	const earlier: PreviousTool[] = [];
+	const branchIds = new Set<string>();
+	let reachedCurrent = false;
+	for (const entry of branch) {
+		if (entry?.type !== "message" || entry.message?.role !== "assistant"
+			|| !Array.isArray(entry.message.content)) continue;
+		for (const block of entry.message.content) {
+			if (block?.type !== "toolCall") continue;
+			const id = block.id ?? block.toolCallId;
+			// An unidentified call cannot prove it precedes this observation.
+			if (typeof id !== "string") continue;
+			if (id === currentId) {
+				reachedCurrent = true;
+				break;
+			}
+			if (typeof block.name !== "string") continue;
+			earlier.push({ id, tool: block.name,
+				intent: typeof block.arguments?.i === "string" ? oneLine(block.arguments.i) : null });
+			branchIds.add(id);
+		}
+		if (reachedCurrent) break;
+	}
+	for (const row of recent) {
+		if (!row.id || !branchIds.has(row.id)) earlier.push(row);
+	}
+	return earlier.slice(-GOAL_RECENT_TOOLS);
+}
+
 /**
  * `recent` is the session's tool names before this call, oldest first. The
  * model is asked to predict this call, so `state` is built from that history
@@ -334,6 +486,9 @@ export function buildShadowPayload(
 	toolNames: string[],
 	sessionId: string | null = null,
 	recent: readonly string[] = [],
+	visible: VisibleContext = emptyVisibleContext(),
+	previousTools: readonly PreviousTool[] = [],
+	descriptions: Record<string, string> = {},
 ): Jsonish {
 	const toolName = typeof event?.toolName === "string" ? event.toolName : "";
 	// Authority and budget are sized to the tool list, so every tool the session
@@ -349,7 +504,16 @@ export function buildShadowPayload(
 		session_id: sessionId ?? process.env.OMP_SESSION_ID ?? null,
 		state: `OMP session. Previous tool calls, oldest first: ${recent.join(", ") || "none"}`,
 		recent_tools: [...recent],
-		actions: buildActions(toolNames),
+		actions: buildActions(toolNames, descriptions),
+		goal_context: {
+			...visible,
+			sources: { ...visible.sources },
+			previous_tools: previousTools.slice(-GOAL_RECENT_TOOLS).map(row => ({
+				tool: row.tool, intent: row.intent === null ? null : oneLine(row.intent),
+			})),
+			missing_fields: (["latest_user_message", "last_assistant_sentence"] as const)
+				.filter(field => visible[field] === null),
+		},
 		granted_capabilities: toolNames,
 		authority: [...new Set([...authorityList(), ...risks])],
 		budget_units: Math.max(8, toolNames.length),
@@ -358,7 +522,7 @@ export function buildShadowPayload(
 			tool_name: toolName,
 			tool_call_id: typeof event?.toolCallId === "string" ? event.toolCallId : "",
 		},
-		objective: null,
+		objective: visible.latest_user_message,
 		risk_class: risks.has("write") ? "write" : "read",
 		shadows: shadowModels(),
 	};
@@ -672,11 +836,31 @@ export default function localCognition(pi: ExtensionAPI): void {
 	pi.setLabel?.("z0int local cognition (shadow-only)");
 	const recentTools: string[] = [];
 	const sessionTools = new Set<string>();
-
-	pi.on?.("session_start", () => {
+	const previousTools: PreviousTool[] = [];
+	let visible = emptyVisibleContext();
+	let activeSessionId: string | null = null;
+	const resetSession = (): void => {
 		recentTools.length = 0;
 		sessionTools.clear();
-	});
+		previousTools.length = 0;
+		visible = emptyVisibleContext();
+		activeSessionId = null;
+	};
+	const scopeSession = (ctx: unknown): void => {
+		const id = liveSessionId(ctx);
+		if (id !== activeSessionId) resetSession();
+		activeSessionId = id;
+	};
+
+	pi.on?.("session_start", resetSession);
+	pi.on?.("session_switch", resetSession);
+	pi.on?.("session_tree", resetSession);
+	for (const eventName of ["message_start", "message_update", "message_end"]) {
+		pi.on?.(eventName, (event, ctx) => {
+			scopeSession(ctx);
+			recordVisible(visible, (event as Jsonish | undefined)?.message, eventName);
+		});
+	}
 
 	pi.on?.("tool_call", (event, ctx) => {
 		try {
@@ -687,14 +871,23 @@ export default function localCognition(pi: ExtensionAPI): void {
 					: "";
 			if (!observed) return undefined;
 			counters.tool_calls += 1;
+			scopeSession(ctx);
 			const toolNames = resolveAvailableTools(pi, ctx);
 			const sessionId = liveSessionId(ctx);
 			// Copied before this call is recorded, so the history never holds the answer.
-			const payload = buildShadowPayload(event as ToolCallLike, toolNames, sessionId, [...recentTools]);
+			const payload = buildShadowPayload(event as ToolCallLike, toolNames, sessionId, [...recentTools],
+				readVisibleContext(ctx, visible),
+				readPreviousTools(ctx, (event as ToolCallLike).toolCallId, previousTools),
+				resolveToolDescriptions(pi, ctx));
 			payload.session_tools = [...sessionTools].sort();
 			sessionTools.add(observed);
 			recentTools.push(observed);
 			if (recentTools.length > RECENT_TOOLS) recentTools.shift();
+			const input = (event as ToolCallLike).input;
+			const intent = input && typeof input === "object" ? (input as Jsonish).i : null;
+			previousTools.push({ tool: observed, intent: typeof intent === "string" ? oneLine(intent) : null,
+				id: typeof (event as ToolCallLike).toolCallId === "string" ? String((event as ToolCallLike).toolCallId) : undefined });
+			if (previousTools.length > GOAL_RECENT_TOOLS) previousTools.shift();
 			const toolCallId = (event as ToolCallLike).toolCallId;
 			void sendShadow(payload, cognitionTimeoutMs(), pi, {
 				sessionId,

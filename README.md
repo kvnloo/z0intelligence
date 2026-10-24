@@ -279,6 +279,42 @@ The in-tree cognition stack includes:
 
 See [docs/local-cognition-portfolio.md](docs/local-cognition-portfolio.md).
 
+### Private continuous shadow experiments
+
+The hourly cognition tick exact-joins OMP session and native tool-call IDs.
+Alongside `omp.tool`, it extracts literal skill choice, path kind, and the
+wrapper's error flag. The wrapper flag is **not** task success. Explicit model
+arguments form a separate family only when actually observed. Labels/day use
+native event timestamps, not the date old traces were ingested.
+
+Small-model decisions use deterministic narrowing followed by one yes/no
+logit query per candidate. Models up to 1B have a hard three-candidate cap;
+the explicit 1.7B lane has a five-candidate cap. Wide 24/64-option projections
+are retired. Tool prompts include the latest visible user goal, the last
+visible assistant sentence, and five preceding tools with their intent strings.
+Current tool names and arguments never enter the model projection. Missing
+yes/no probabilities or a small top margin produce an abstention. Accuracy
+and Wilson bounds use covered predictions; coverage reports abstentions.
+
+Each family's arms must all plateau over three ticks before search advances
+to an untried bounded history, recent-session, or few-shot strategy. Exhausted
+below-bar families propose the next exact-label census family. Selection is
+not execution: a trial starts only after an observation with that strategy.
+Every positive-covered arm emits a scoped, `synthetic:false` finding into the
+canonical findings ledger each tick. Historical inference remains
+`replayed_L1`; only a prediction stored before its exact label may be live
+shadow. Zero-covered arms record a publication blocker, never invented evidence.
+
+Status retains rolling-day errors and separately exposes current-hour,
+post-deployment, per-tick, and atomic-RPC counts. Transport errors live in
+`error`, while `parse_error` means a model response could not be parsed.
+Legacy receipts are classified without rewriting their source bytes.
+`operations/shadow-learner/deploy-proposed.sh` backs up private state and
+installs a committed content-stamped copy. Extension links must never point
+into a task worktree. Existing OMP processes cache extension modules: a fresh
+process is required; `/reload-plugins` is not an extension-code reload.
+
+
 ## Compilation is mechanism-neutral
 
 An earlier project story hard-coded a ladder like:

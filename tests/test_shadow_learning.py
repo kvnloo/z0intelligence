@@ -61,10 +61,11 @@ def test_dead_endpoint_degrades_and_evolves(tmp_path, monkeypatch):
         'qwen3_06b','http://127.0.0.1:1','qwen3-0.6b-q8','llama.cpp',timeout_s=.1)})
     monkeypatch.setenv('Z0INT_HOME', str(home))
     result = run_shadow({'session_id':'session','facts':{'tool_call_id':'0'},
-        'actions':[{'action_id':'read','tool':'read'}], 'authority':['read'],
+        'actions':[{'action_id':'read','tool':'read','family':'omp.tool'}], 'authority':['read'],
         'shadows':['qwen3_06b'], 'state':'previous tools: none'}, registry=registry)
     assert result['selected_action'] is None and result['executed_action'] is None
-    assert 'transport_error' in result['shadow'][0]['parse_error']
+    assert result['shadow'][0]['failure_class'] == 'connection_refused'
+    assert result['shadow'][0].get('parse_error') is None
     report = learn(home, sessions=sessions, now=now+1)
     assert report['status'] == 'DEGRADED'
     assert report['transport_error_rate'] > .05
@@ -164,6 +165,9 @@ def large_omp_payload():
         'facts':{'tool_call_id':'actual-call', 'tool_name':'zz_observed_tool'},
         'state':'OMP session. Previous tool calls, oldest first: read, bash, read',
         'recent_tools':['read','bash','read'], 'session_tools':['read','bash'],
+        'goal_context':{'latest_user_message':'Inspect the parser and its configuration.',
+                        'last_assistant_sentence':'I will read the parser.',
+                        'previous_tools':[{'tool':'read','intent':'Inspect parser context'}]},
         'actions':[{'action_id':name,'tool':name,'family':'omp.tool',
                     'description':f'Call the OMP tool {name}',
                     'arguments_schema':{'type':'object','description':'schema text '*100}}
@@ -188,12 +192,19 @@ def test_real_sized_omp_prompt_is_bounded_without_losing_scoring_actions(tmp_pat
             self.requests=[]
         def chat(self,messages,**kw):
             self.requests.append((messages,kw))
-            encoded=len(json.dumps({'messages':messages,'tools':kw['tools'],
-                                   'response_format':kw['response_format']}).encode())+512
-            assert encoded <= 3000
-            assert kw['max_tokens'] <= 128
-            return ChatOutcome('{"action_id":"read","confidence":0.9}',None,
-                               {'prompt_tokens':700},{},{},1)
+            encoded=len(json.dumps({'messages':messages,'max_tokens':kw['max_tokens'],
+                'temperature':kw['temperature'],'seed':kw['seed'],'logprobs':kw['logprobs'],
+                'top_logprobs':kw['top_logprobs'],**kw['extra_body']}).encode())+512
+            assert encoded + 1 <= 4096
+            assert kw['max_tokens'] == 1 and kw['top_logprobs'] == 20
+            assert 'tools' not in kw and 'response_format' not in kw
+            candidate=json.loads(messages[1]['content'])['candidate']['id']
+            positive=candidate=='read'
+            yes,no=(-.2,-2.) if positive else (-2.,-.2)
+            token,value=('yes',yes) if positive else ('no',no)
+            raw={'choices':[{'logprobs':{'content':[{'token':token,'logprob':value,
+                'top_logprobs':[{'token':'yes','logprob':yes},{'token':'no','logprob':no}]}]}}]}
+            return ChatOutcome(token,None,{'prompt_tokens':700,'completion_tokens':1},{},raw,1)
     transport=Transport()
     backend=sized_backend(transport)
     class Registry:
@@ -205,13 +216,16 @@ def test_real_sized_omp_prompt_is_bounded_without_losing_scoring_actions(tmp_pat
     assert 'zz_observed_tool' in result['legal_ids']
     model=result['shadow'][0]
     assert model['selected_action'] == 'read'
-    assert len(model['model_candidate_ids']) < 24
+    assert model['label'] == 'goal-binary'
+    assert model['requested_model'] == 'qwen3_06b'
+    assert len(model['model_candidate_ids']) == 3
     assert 'zz_observed_tool' not in model['model_candidate_ids']
-    assert model['prompt_tokens'] == 700
+    assert len(model['candidate_scores']) == 3
+    assert all(call['prompt_tokens'] == 700 for call in model['diagnostics']['calls'])
     # Changing the observed action cannot alter model inputs or candidate rank.
     payload['facts']['tool_name']='bash'
     run_shadow(payload,registry=Registry(),write=False)
-    assert transport.requests[0] == transport.requests[1]
+    assert transport.requests[:3] == transport.requests[3:]
 
 
 def test_context_overflow_has_distinct_failure_counter(tmp_path, monkeypatch):
@@ -226,27 +240,30 @@ def test_context_overflow_has_distinct_failure_counter(tmp_path, monkeypatch):
         def backend_for(self,*a,**kw): return backend
     result=run_shadow(large_omp_payload(),registry=Registry())
     assert result['shadow'][0]['failure_class'] == 'context_overflow'
-    assert result['shadow'][0]['parse_error'].startswith('context_overflow:')
+    assert 'exceeds the available context size' in result['shadow'][0]['error']
+    assert result['shadow'][0].get('parse_error') is None
     assert Path(result['receipts_path']).name == 'cognition-shadow-failures.jsonl'
     health=json.loads((tmp_path/'shadow'/'cognition-shadow-health.json').read_text())
     today=time.strftime('%Y-%m-%d',time.gmtime())
     assert health['days'][today]['failure_classes']['context_overflow'] == 1
 
 
-def test_low_projection_recall_evolves_width_and_budget_separately_from_gold(tmp_path):
+def test_low_candidate_recall_never_expands_the_small_model_option_cap(tmp_path):
     home,sessions,now=fixture(tmp_path,20)
     path=home/'shadow'/'cognition-shadow.jsonl'
     receipts=[json.loads(line) for line in path.read_text().splitlines()]
     for row in receipts:
         row['shadow'][0]['model_candidate_ids']=['bash']
-        row['projection_config']={'candidate_k':24,'prompt_bytes':3000}
+        row['projection_config']={'candidate_k':3,'max_options':3,'prompt_bytes':3000}
     path.write_text(''.join(json.dumps(r)+'\n' for r in receipts))
     result=learn(home,sessions=sessions,now=now)
     metric=result['projection_recall']['omp.tool']
     assert metric['n'] == 20 and metric['hits'] == 0 and metric['recall'] == 0
     assert result['labelled_per_family'] == {'omp.tool':20}
-    assert result['evolution']['id'] == 'projection-wide'
-    assert result['projection_config'] == {'candidate_k':48,'prompt_bytes':3500}
+    assert result['evolution']['id'] == 'history-1'
+    assert result['projection_config'] == {'candidate_k':3,'max_options':3,'prompt_bytes':3000}
+    assert result['evolution']['config']['candidate_k'] == 3
+    assert result['evolution']['config']['max_options'] == 3
 
 
 def test_local_abstention_cannot_mask_slm_failure_retention(tmp_path, monkeypatch):
@@ -256,3 +273,54 @@ def test_local_abstention_cannot_mask_slm_failure_retention(tmp_path, monkeypatc
         {'backend':'slm','parse_error':'context_overflow: oversized'},
         {'backend':'shadow-portfolio','selected_action':None,'abstained':True}]})
     assert path.name == 'cognition-shadow-failures.jsonl'
+
+
+def test_transport_classification_counts_legacy_errors_without_relabelling(tmp_path):
+    from z0int.cognition.learning import transport_metrics
+    from z0int.cognition.shadow import failure_class
+    db = connect(tmp_path)
+    failures = [
+        ('transport_error: [Errno 111] Connection refused', 'connection_refused'),
+        ('shadow_timeout', 'timeout'),
+        ('transport_error: HTTP 503 temporarily unavailable', 'http_5xx'),
+        ('transport_error: queue full', 'queue_full'),
+        ('request exceeds context size 4096', 'context_overflow'),
+        ('RuntimeError: functiongemma_270m is not served', 'model_not_served'),
+        ('unparseable_response', 'parse_error'),
+    ]
+    for index, (error, kind) in enumerate(failures):
+        assert failure_class(error) == kind
+        body = json.dumps({'shadow': [{'model': 'slm', 'parse_error': error}]})
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(index), 's', str(index), 100, 'omp.tool', body))
+    metrics = transport_metrics(db, 0)
+    assert metrics['attempts'] == 7
+    assert metrics['errors'] == 6
+    assert metrics['parse_errors'] == 1
+    assert metrics['failure_classes']['connection_refused'] == 1
+    assert json.loads(db.execute("SELECT body FROM receipts WHERE id='0'").fetchone()[0])['shadow'][0]['parse_error']
+    db.close()
+
+
+def test_argument_and_result_timestamp_join_is_exact(tmp_path):
+    from z0int.cognition.learning import ingest_sessions
+    home, sessions, now = fixture(tmp_path, 0)
+    events = [
+        {'type': 'session', 'id': 's'},
+        {'timestamp': '2026-10-24T22:00:00Z', 'message': {'role': 'assistant',
+         'content': [{'type': 'toolCall', 'id': 'one', 'name': 'read',
+                      'arguments': {'path': 'skill://ctx'}}]}},
+        {'timestamp': '2026-10-24T22:00:01Z', 'message': {'role': 'toolResult',
+         'toolCallId': 'other', 'isError': True}},
+        {'timestamp': '2026-10-24T22:00:02Z', 'message': {'role': 'toolResult',
+         'toolCallId': 'one', 'isError': False}},
+    ]
+    (sessions/'exact.jsonl').write_text(''.join(json.dumps(e)+'\n' for e in events))
+    db = connect(home)
+    assert ingest_sessions(db, sessions, time.monotonic()+5)
+    row = db.execute("SELECT * FROM calls WHERE session='s' AND call='one'").fetchone()
+    assert json.loads(row['arguments']) == {'path': 'skill://ctx'}
+    assert json.loads(row['outcome'])['tool_error'] is False
+    assert row['outcome_ts'] - row['ts'] == 2
+    assert json.loads(row['features']) == []
+    db.close()

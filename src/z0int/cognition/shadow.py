@@ -19,24 +19,26 @@ backends and no model server.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 import json
 import os
 import fcntl
 import threading
+import re
 import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from .actions import ActionCandidate, ActionGraph, Rule
 from .cascade import CascadeContext, CognitionCascade
-from .adapters.local_slm import ToolDecision, ToolDecisionRequest
 from .registry import LocalModelRegistry
 from ..receipt import new_trace_id
 
 SCHEMA = "z0int.cognition.shadow.v1"
 RECEIPT_SCHEMA = "z0int.cognition.shadow.receipt.v1"
 RECEIPT_NAME = "cognition-shadow.jsonl"
+_SOURCE_STAMP = Path(__file__).resolve().parents[3] / "DEPLOYED_SHA"
+SOURCE_REVISION = _SOURCE_STAMP.read_text().strip() if _SOURCE_STAMP.exists() else None
 
 _ALLOWED_KINDS = ("tool", "model", "control")
 _ALLOWED_RISKS = ("read", "write", "destructive", "publish", "credential", "payment")
@@ -333,153 +335,78 @@ def _resolve_shadows(
 
 def _decision_rows(
     resolved: Sequence[tuple[ShadowSpec, Any, str | None]],
-    legal_ids: frozenset[str],
-    request: ToolDecisionRequest,
-    *,
-    timeout_s: float,
+    legal: Any, payload: Mapping[str, Any], *, timeout_s: float,
+    shortlist: Sequence[str] = (), n_ctx: int = 4096,
+    policy_identity: dict | None = None, policy_home: Path | None = None,
 ) -> list[dict[str, Any]]:
-    results: list[tuple[ToolDecision | None, str | None]] = [
-        (None, error if backend is None else "shadow_timeout")
-        for _, backend, error in resolved
-    ]
+    """Run only binary-logit arms, under one shared caller deadline."""
+    from .shadow_binary import run_goal_binary
+    results: dict[int, dict] = {}
     lock = threading.Lock()
+    deadline = time.monotonic() + max(.1, timeout_s)
 
     def run(index: int, backend: Any) -> None:
-        try:
-            decision = backend.decide(request)
-        except BaseException as exc:  # noqa: BLE001 - shadow must never raise
-            with lock:
-                results[index] = (None, f"{type(exc).__name__}: {exc}")
-            return
+        row = run_goal_binary(payload, legal, backend, shortlist=shortlist, n_ctx=n_ctx,
+                             policy_identity=policy_identity, policy_home=policy_home)
+        row['failure_class'] = failure_class(row.get('error') or row.get('parse_error'))
         with lock:
-            results[index] = (decision, None)
+            results[index] = row
 
-    started = time.monotonic()
-    deadline = started + max(0.1, float(timeout_s))
-    waited_ms: dict[int, float] = {}
-    threads: list[tuple[int, threading.Thread]] = []
+    threads = []
     for index, (_, backend, _) in enumerate(resolved):
-        if backend is None:
-            continue
-        thread = threading.Thread(
-            target=run, args=(index, backend), daemon=True, name=f"z0int-shadow-{index}"
-        )
-        threads.append((index, thread))
-        thread.start()
-    for index, thread in threads:
-        thread.join(max(0.0, deadline - time.monotonic()))
-        if thread.is_alive():
-            with lock:
-                if results[index][0] is None and results[index][1] is None:
-                    results[index] = (None, "shadow_timeout")
-            # The call is abandoned, not cancelled: a model that was still loading
-            # keeps loading. Record the wait so a timeout is not read as instant.
-            waited_ms[index] = round((time.monotonic() - started) * 1000.0, 1)
-
-    rows: list[dict[str, Any]] = []
-    for index, (spec, backend, error) in enumerate(resolved):
+        if backend is not None:
+            thread = threading.Thread(target=run, args=(index, backend), daemon=True,
+                                      name=f'z0int-shadow-{index}')
+            threads.append(thread)
+            thread.start()
+    for thread in threads:
+        thread.join(max(0, deadline-time.monotonic()))
+    rows = []
+    for index, (spec, backend, resolve_error) in enumerate(resolved):
         with lock:
-            decision, failure = results[index]
-        row = _row(spec, backend, decision, failure, error, legal_ids)
-        # A backend can fail on its own just after the deadline; that row keeps
-        # its own error and is not also reported as a timeout.
-        if decision is None and failure == "shadow_timeout" and index in waited_ms:
-            row["timed_out"] = True
-            row["waited_ms"] = waited_ms[index]
+            row = results.get(index)
+        if row is None:
+            error = resolve_error or 'shadow_timeout'
+            row = {'label': 'goal-binary', 'arm': 'goal-binary', 'requested_model': spec.model_id,
+                'backend': None, 'model': spec.model_id, 'selected_action': None,
+                'abstained': True, 'invalid_call': False, 'error': error,
+                'failure_class': failure_class(error), 'latency_ms': timeout_s*1000 if backend else 0}
+            if backend is not None:
+                row['timed_out'] = True
+                row['waited_ms'] = timeout_s*1000
+        row['requested_model'] = spec.model_id
         rows.append(row)
     return rows
 
 
-def _row(
-    spec: ShadowSpec,
-    backend: Any,
-    decision: ToolDecision | None,
-    failure: str | None,
-    resolve_error: str | None,
-    legal_ids: frozenset[str],
-) -> dict[str, Any]:
-    if decision is None:
-        return {
-            "label": spec.label,
-            "backend": None,
-            "model": spec.model_id,
-            "selected_action": None,
-            "abstained": True,
-            "invalid_call": False,
-            "latency_ms": 0.0,
-            "parse_error": failure or resolve_error or "unavailable",
-            "error": failure or resolve_error or "unavailable",
-        }
-
-    selected = decision.selected_action
-    invalid_call = bool(decision.invalid_call)
-    attempted: str | None = None
-    if selected is not None and selected not in legal_ids:
-        # A backend is supposed to pick from the legal set; if it names anything
-        # else the answer is recorded as an illegal call, never as a selection.
-        attempted = selected
-        selected = None
-        invalid_call = True
-
-    row: dict[str, Any] = {
-        "label": spec.label,
-        "backend": decision.backend,
-        "model": decision.model or spec.model_id,
-        "selected_action": selected,
-        "abstained": bool(decision.abstained or selected is None),
-        "invalid_call": invalid_call,
-        "latency_ms": decision.latency_ms,
-        "candidate_action_count": decision.candidate_action_count,
-        "parse_error": decision.parse_error if selected is None else None,
-    }
-    if decision.confidence is not None:
-        row["confidence"] = decision.confidence
-    if attempted is not None:
-        row["attempted_action"] = attempted
-    row["failure_class"] = failure_class(row.get("parse_error"))
-    if "model_candidate_ids" in decision.diagnostics:
-        row["model_candidate_ids"] = decision.diagnostics["model_candidate_ids"]
-    if decision.prompt_tokens is not None:
-        row["prompt_tokens"] = decision.prompt_tokens
-    return row
+TRANSPORT_FAILURES = frozenset({
+    "connection_refused", "timeout", "http_5xx", "queue_full", "context_overflow",
+    "model_not_served", "transport_error",
+})
 
 
 def failure_class(error: Any) -> str | None:
+    """Classify legacy and current errors identically without rewriting receipts."""
     text = str(error or "").lower()
+    if not text:
+        return None
     if "context_overflow" in text or ("exceed" in text and "context" in text):
         return "context_overflow"
+    if "connection refused" in text or "errno 111" in text:
+        return "connection_refused"
     if "timeout" in text or "timed out" in text:
         return "timeout"
-    return "transport_error" if "transport_error" in text else ("backend_error" if text else None)
+    if "queue" in text and ("full" in text or "exceed" in text):
+        return "queue_full"
+    if re.search(r"http\s+5\d\d", text):
+        return "http_5xx"
+    if "is not served" in text or "no_model_requested" in text:
+        return "model_not_served"
+    if "transport_error" in text or "badstatusline" in text:
+        return "transport_error"
+    return "parse_error" if ("unparseable" in text or "invalid_call" in text) else "backend_error"
 
 
-def project_shadow_request(context: Any, legal: Any, payload: Mapping[str, Any],
-                           local: Mapping[str, Any] | None, config: Mapping[str, Any]) -> ToolDecisionRequest:
-    """Model-only projection. Never condition on the currently observed tool.
-
-    The full compiler set remains the scoring denominator, even when the actual
-    tool misses this projection. Candidate recall is measured separately.
-    """
-    available = {a.action_id: a for a in legal.legal}
-    priority: list[str] = []
-    if local and local.get("selected_action"):
-        priority.append(str(local["selected_action"]))
-    for field in ("recent_tools", "session_tools"):
-        values = payload.get(field)
-        if isinstance(values, list):
-            priority.extend(x for x in reversed(values) if isinstance(x, str))
-    priority.extend(("read", "find", "grep", "glob", "bash", "edit", "write",
-                     "eval", "task", "wait", "web_search", "hermes_memory"))
-    priority.extend(sorted(available))
-    ordered = list(dict.fromkeys(x for x in priority if x in available))
-    k = max(1, min(64, int(config.get("candidate_k", 24))))
-    actions = tuple(replace(available[x], description="", family=None,
-        arguments_schema={"type": "object"}) for x in ordered[:k])
-    state = context.state.encode("utf-8")[:512].decode("utf-8", "ignore")
-    return ToolDecisionRequest(state=state, legal=replace(legal, legal=actions),
-        objective=None, risk_class=context.risk_class, constraints={},
-        max_tokens=min(context.max_tokens, 128),
-        budget={"prompt_bytes": max(1024, min(3500, int(config.get("prompt_bytes", 3000))))})
 
 
 # --- receipt ------------------------------------------------------------
@@ -597,7 +524,10 @@ def run_shadow(
 
     legal_ids = frozenset(legal.ids())
     shadow_rows: list[dict[str, Any]] = []
-    projection_config = learning_state.get("projection_config") or {"candidate_k": 24, "prompt_bytes": 3000}
+    active = learning_state.get('family_search', {}).get('families', {}).get('omp.tool', {})
+    projection_strategy = active.get('current_strategy', 'history-1')
+    projection_config = {**(active.get('strategy') or {}).get('config', {}),
+                         'candidate_k': 3, 'max_options': 3, 'decision_method': 'per_candidate_binary_logit'}
     local = None
     recent = payload.get("recent_tools")
     if isinstance(recent, list) and all(isinstance(x, str) for x in recent):
@@ -607,12 +537,22 @@ def run_shadow(
         except Exception:
             pass  # missing/locked learner must not block the operator
     if specs and not legal.is_empty:
-        request = project_shadow_request(context, legal, payload, local, projection_config)
+        from .learning import projection_examples
+        try:
+            extra = projection_examples(paths.home(), dict(payload), projection_config)
+        except (OSError, ValueError):
+            extra = {}
+        shortlist = extra.get('shortlist') or ([local['selected_action']] if local and local.get('selected_action') else [])
+        binary_payload = dict(payload)
+        if extra.get('examples'):
+            binary_payload['goal_context'] = {**(payload.get('goal_context') or {}), 'examples': extra['examples']}
         resolved = _resolve_shadows(registry, specs)
         if resolved:
-            shadow_rows = _decision_rows(
-                resolved, legal_ids, request, timeout_s=_timeout_s(payload, timeout_s)
-            )
+            n_ctx = learning_state.get('experiments', {}).get('serving_scope', {}).get('n_ctx', 4096)
+            shadow_rows = _decision_rows(resolved, legal, binary_payload,
+                timeout_s=_timeout_s(payload, timeout_s), shortlist=shortlist, n_ctx=n_ctx,
+                policy_identity=learning_state.get('experiments', {}).get('identity'),
+                policy_home=paths.home())
     if local is not None:
         shadow_rows.append(local)
 
@@ -642,12 +582,14 @@ def run_shadow(
             # id cannot be joined back to a native session on its own.
             "tool_call_id": tool_call_id or None,
             "identity_contract": "session-tool-call.v1",
+            "source_revision": SOURCE_REVISION,
             "tool_name": tool_name or None,
             "state": context.state[:400],
             "graph_digest": legal.graph_digest,
             "candidate_action_count": legal.candidate_count,
             "legal_ids": list(legal.ids()),
             "projection_config": projection_config,
+            "projection_strategy": projection_strategy,
             "eliminated": [e.to_dict() for e in legal.eliminated],
             "deterministic_solution": legal.deterministic_solution,
             "escalation": escalation,
