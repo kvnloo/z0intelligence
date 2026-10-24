@@ -195,7 +195,7 @@ class LocalSLMBackend:
     def for_capability(cls, capability: ModelCapability, *, base_url: str, model: str | None = None,
                        api_key: str | None = None, runtime: str | None = None,
                        quantization: str | None = None, backend_id: str | None = None,
-                       dialect: ToolDialect | None = None) -> LocalSLMBackend:
+                       dialect: ToolDialect | None = None, timeout_s: float = 120.0) -> LocalSLMBackend:
         return cls(
             backend_id=backend_id or capability.model_id,
             config=ServerConfig(
@@ -205,6 +205,7 @@ class LocalSLMBackend:
                 runtime=runtime or (capability.supported_runtimes[0] if capability.supported_runtimes else "unknown"),
                 quantization=quantization or capability.tested_quantization,
                 revision=capability.revision,
+                timeout_s=timeout_s,
             ),
             dialect=dialect,
             capability=capability,
@@ -280,6 +281,8 @@ class LocalSLMBackend:
                 else request.max_tokens,
                 temperature=self._dialect.temperature,
                 stop=self._dialect.stop or None,
+                extra_body={"chat_template_kwargs": {"enable_thinking": False}}
+                if self._config.model.startswith("qwen3-") else None,
             )
         except TransportError as exc:
             return _abstain(

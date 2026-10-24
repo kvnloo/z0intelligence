@@ -28,6 +28,29 @@
     "remote_specialist_fallback": "Deliberately unset: remote seats resolve from the dynamically inventoried FREE provider paths, never from a static list here."
   },
   "models": {
+    "qwen3_06b": {
+      "model_id": "qwen3_06b",
+      "hf": "Qwen/Qwen3-0.6B",
+      "role_tags": ["tiny_action_specialist"],
+      "parameter_count": "0.6B",
+      "license": "apache-2.0",
+      "commercial_use": true,
+      "supported_runtimes": ["llama.cpp"],
+      "tool_parser": "plain_json",
+      "promotion_state": "shadow",
+      "notes": "Candidate served by the existing farm router; no production role or measured credit."
+    },
+    "qwen3_17b": {
+      "model_id": "qwen3_17b",
+      "hf": "Qwen/Qwen3-1.7B",
+      "role_tags": ["tiny_action_specialist"],
+      "parameter_count": "1.7B",
+      "license": "apache-2.0",
+      "commercial_use": true,
+      "supported_runtimes": ["llama.cpp"],
+      "tool_parser": "plain_json",
+      "promotion_state": "shadow"
+    },
     "nemotron_orchestrator_8b": {
       "model_id": "nemotron_orchestrator_8b",
       "hf": "nvidia/Nemotron-Orchestrator-8B",

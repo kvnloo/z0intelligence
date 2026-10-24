@@ -1,0 +1,156 @@
+import json
+from pathlib import Path
+import time
+
+from z0int.cognition.learning import learn, wilson, connect, STRATEGIES, predict
+from z0int.cognition.shadow import run_shadow
+from z0int.cognition.registry import LocalModelRegistry, ServingEndpoint
+from z0int.cognition.manifest import load_local_cognition
+
+
+def fixture(tmp_path, n=60):
+    home = tmp_path/'home'
+    sessions = tmp_path/'sessions'
+    sessions.mkdir()
+    (home/'shadow').mkdir(parents=True)
+    events = [{'type':'session', 'id':'session'}]
+    receipts = []
+    now = time.time()
+    for i in range(n):
+        events.extend([
+            {'type':'message','message':{'role':'assistant','content':[{'type':'toolCall','id':str(i),'name':'read'}]}},
+            {'type':'message','message':{'role':'toolResult','toolCallId':str(i),'isError':i==2,'details':{'exitCode':1 if i==2 else 0}}},
+        ])
+        receipts.append({'schema':'z0int.cognition.shadow.receipt.v1','trace_id':str(i),
+                         'session_id':'session','tool_call_id':str(i),'ts':now-100+i,
+                         'shadow':[{'model':'test','selected_action':'read','confidence':.95}],
+                         'executed_action':None})
+    (sessions/'session.jsonl').write_text(''.join(json.dumps(e)+'\n' for e in events))
+    (home/'shadow'/'cognition-shadow.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in receipts))
+    return home, sessions, now
+
+
+def test_prequential_join_credit_and_incremental_stall(tmp_path):
+    home, sessions, now = fixture(tmp_path)
+    first = learn(home, sessions=sessions, now=now)
+    assert first['labelled_rows_added'] == 60
+    assert first['labelled_per_family'] == {'omp.tool':60}
+    assert first['families']['omp.tool']['history-1']['n'] == 58
+    assert first['families']['omp.tool']['slm:test']['n'] == 60
+    assert first['credited_families'] == ['omp.tool']
+    assert first['status'] == 'LEARNING'
+    db = connect(home)
+    error = json.loads(db.execute("SELECT outcome FROM labels WHERE id='2'").fetchone()[0])
+    assert error['tool_error'] is True and error['exit_code'] == 1
+    db.close()
+    second = learn(home, sessions=sessions, now=now+86401)
+    assert second['status'] == 'DEGRADED'
+    assert 'labels_not_growing' in second['degraded_by']
+    assert 'plateau:omp.tool' in second['degraded_by']
+    assert second['evolution']['id'] == 'history-1'
+    third = learn(home, sessions=sessions, now=now+86402)
+    assert third['evolution']['id'] == 'history-3'
+    ledger = json.loads((home/'loop'/'strategy-ledger.json').read_text())
+    assert ledger['trials'][0]['result'] == 'failed'
+    assert len({t['id'] for t in ledger['trials']}) == len(ledger['trials'])
+
+
+def test_dead_endpoint_degrades_and_evolves(tmp_path, monkeypatch):
+    home, sessions, now = fixture(tmp_path, 1)
+    registry = LocalModelRegistry(load_local_cognition(), {'qwen3_06b': ServingEndpoint(
+        'qwen3_06b','http://127.0.0.1:1','qwen3-0.6b-q8','llama.cpp',timeout_s=.1)})
+    monkeypatch.setenv('Z0INT_HOME', str(home))
+    result = run_shadow({'session_id':'session','facts':{'tool_call_id':'0'},
+        'actions':[{'action_id':'read','tool':'read'}], 'authority':['read'],
+        'shadows':['qwen3_06b'], 'state':'previous tools: none'}, registry=registry)
+    assert result['selected_action'] is None and result['executed_action'] is None
+    assert 'transport_error' in result['shadow'][0]['parse_error']
+    report = learn(home, sessions=sessions, now=now+1)
+    assert report['status'] == 'DEGRADED'
+    assert report['transport_error_rate'] > .05
+    assert report['evolution']['result'] == 'running'
+    assert report['evolution']['hypothesis']
+
+
+def test_wilson_and_no_current_label_leak():
+    assert wilson(0, 0) == 0
+    assert wilson(5, 5) < .8
+    assert wilson(60, 60) > .9
+    assert predict(['read'], [], STRATEGIES[0]) == (None, 0)
+
+
+def test_tick_surfaces_cognition_degradation(tmp_path, monkeypatch):
+    from z0int import loop_tick as tick
+    home, sessions, now = fixture(tmp_path, 0)
+    monkeypatch.setenv('Z0INT_OMP_SESSIONS', str(sessions))
+    monkeypatch.setattr(tick, 'STEPS', ('cognition',))
+    monkeypatch.setattr(tick.le, 'scan_records', lambda _: {})
+    report = tick.run_tick(home, lock=tmp_path/'lock', budget_s=10)
+    assert report['status'] == 'degraded'
+    assert report['exit'] == tick.EXIT_DEGRADED
+    assert report['cognition']['evolution']['result'] == 'running'
+
+
+def test_failure_retention_preserves_backfill(tmp_path, monkeypatch):
+    from z0int.cognition.shadow import append_shadow_receipt
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
+    folder = tmp_path/'shadow'
+    folder.mkdir()
+    original = folder/'cognition-shadow.jsonl'
+    original.write_text('historical backfill input\n')
+    for index in range(20):
+        append_shadow_receipt({'state':'x'*220000, 'shadow':[
+            {'backend':None,'parse_error':'transport_error: refused'}]})
+    assert original.read_text() == 'historical backfill input\n'
+    health = json.loads((folder/'cognition-shadow-health.json').read_text())
+    assert health['failed_calls'] == 20 and health['successful_calls'] == 0
+    files = list(folder.glob('cognition-shadow-failures.jsonl*'))
+    assert len(files) == 4
+    assert all(p.stat().st_size < 1_048_576+221000 for p in files)
+
+
+def test_shadow_does_not_block_bridge_requests(monkeypatch):
+    import io
+    import threading
+    from z0int.bridge import worker
+    release = threading.Event()
+    done = threading.Event()
+    class Runtime:
+        def __init__(self, **kw):
+            pass
+        def identity(self):
+            return {'kind':'fixture'}
+        def cognition_shadow(self, payload):
+            release.wait(2)
+            return {'ok':True}
+    output = io.StringIO()
+    monkeypatch.setattr(worker, 'BridgeRuntime', Runtime)
+    monkeypatch.setattr(worker.sys, 'stdin', io.StringIO(
+        '{"id":"slow","op":"cognition_shadow"}\n{"id":"hello","op":"hello"}\n'))
+    monkeypatch.setattr(worker.sys, 'stdout', output)
+    original = worker._shadow_response
+    def tracked(*args):
+        try:
+            original(*args)
+        finally:
+            done.set()
+    monkeypatch.setattr(worker, '_shadow_response', tracked)
+    worker.serve()
+    assert [json.loads(x)['id'] for x in output.getvalue().splitlines()] == ['hello']
+    release.set()
+    assert done.wait(2)
+
+
+def test_missing_new_identity_is_quarantined_and_degrades(tmp_path, monkeypatch):
+    from z0int.cognition.shadow import append_shadow_receipt
+    home, sessions, now = fixture(tmp_path, 3)
+    monkeypatch.setenv('Z0INT_HOME', str(home))
+    path = append_shadow_receipt({'schema':'z0int.cognition.shadow.receipt.v1',
+        'trace_id':'missing-native-id','ts':now,'identity_contract':'session-tool-call.v1',
+        'session_id':None,'tool_call_id':None,
+        'shadow':[{'backend':'fake','model':'fake','selected_action':'read','confidence':1}]})
+    assert path.name == 'cognition-shadow-failures.jsonl'
+    report = learn(home, sessions=sessions, now=now+1)
+    assert report['new_writer_health']['identity_failures_day'] == 1
+    assert 'labels_identity_invariant' in report['degraded_by']
+    assert report['labelled_per_family'] == {'omp.tool':3}

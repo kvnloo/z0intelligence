@@ -32,6 +32,7 @@ class ServingEndpoint:
     quantization: str | None = None
     api_key: str | None = None
     backend_id: str | None = None
+    timeout_s: float = 120.0
 
     def to_dict(self) -> dict[str, Any]:
         out = {
@@ -72,6 +73,7 @@ def load_serving(path: Path | None = None) -> dict[str, ServingEndpoint]:
             quantization=entry.get("quantization"),
             api_key=entry.get("api_key") or os.environ.get("Z0INT_LOCAL_API_KEY"),
             backend_id=entry.get("backend_id"),
+            timeout_s=max(0.1, float(entry.get("timeout_s", 120.0))),
         )
     return endpoints
 
@@ -108,6 +110,7 @@ def build_backend(
         runtime=endpoint.runtime,
         quantization=endpoint.quantization or capability.tested_quantization,
         backend_id=backend_id or endpoint.backend_id or capability.model_id,
+        timeout_s=endpoint.timeout_s,
     )
 
 
