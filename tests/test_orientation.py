@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import tempfile
 import unittest
@@ -79,6 +80,42 @@ class OrientationTests(unittest.TestCase):
         self.assertEqual(out['hookEventName'], 'UserPromptSubmit')
         self.assertIn('fact 0', out['additionalContext'])
         self.assertLessEqual(len(out['additionalContext']), 9000)
+
+    def test_stamped_installer_preserves_unrelated_hooks_and_backup(self):
+        home = Path(self.tmp.name) / 'home'
+        repo = Path(self.tmp.name) / 'committed-source'
+        for relative in ('src/z0int/orientation.py', 'scripts/state-packet/generate_packet.py',
+                         'omp-extensions/z0-state-packet/index.ts', 'harness-adapters/hermes-state-packet/__init__.py',
+                         'harness-adapters/hermes-state-packet/plugin.yaml', 'bin/generate-packet',
+                         'bin/state-packet-hook', 'scripts/install-state-packet.py'):
+            target = repo / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative, target)
+        subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+        subprocess.run(['git', '-C', str(repo), 'add', '.'], check=True)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                        'commit', '-qm', 'fixture'], check=True)
+        settings = home / '.claude/settings.json'
+        settings.parent.mkdir(parents=True)
+        settings.write_text(json.dumps({'hooks': {'UserPromptSubmit': [
+            {'hooks': [{'type': 'command', 'command': 'unrelated-hook'}]}]}}))
+        result = subprocess.run([sys.executable, str(repo / 'scripts/install-state-packet.py'), '--home', str(home)],
+            text=True, capture_output=True, check=True)
+        receipt = json.loads(result.stdout)
+        install = Path(receipt['install'])
+        self.assertTrue(install.is_dir())
+        self.assertFalse(install.is_symlink())
+        extension = home / '.omp/agent/extensions/z0-state-packet'
+        self.assertEqual(extension.resolve(), install / 'omp-extensions/z0-state-packet')
+        self.assertNotIn(str(ROOT), str(extension.resolve()))
+        groups = json.loads(settings.read_text())['hooks']['UserPromptSubmit']
+        self.assertEqual(groups[0]['hooks'][0]['command'], 'unrelated-hook')
+        self.assertEqual(len(groups), 11)
+        backup = Path(receipt['backup']) / str(settings).lstrip('/')
+        self.assertEqual(len(json.loads(backup.read_text())['hooks']['UserPromptSubmit']), 1)
+        subprocess.run([sys.executable, str(repo / 'scripts/install-state-packet.py'), '--home', str(home)],
+            text=True, capture_output=True, check=True)
+        self.assertEqual(len(json.loads(settings.read_text())['hooks']['UserPromptSubmit']), 11)
 
     def test_hermes_registered_context_and_stale(self):
         module = load('hermes_state_packet', ROOT / 'harness-adapters/hermes-state-packet/__init__.py')
