@@ -30,6 +30,64 @@ The current repository is much more than the original OpenJev prototype.
 
 The source of truth for the current architectural boundary is [zer0.repo.yaml](zer0.repo.yaml).
 
+## Evidence-bound decision policy
+
+`z0int policy ingest` converts supported JSON measurements into an append-only,
+locked hash chain at `$Z0INT_HOME/findings/findings.jsonl`. It records skipped
+sources and their reasons in `findings/ingest-status.json`. Unknown layouts,
+prose reports, missing observation timestamps, missing source hashes and missing
+sample counts never become evidence. Repeated source hashes do not add findings.
+Configure discovery with `--operations-root` / `Z0INT_OPERATIONS_ROOT` and
+`--z0evals-root` / `Z0INT_Z0EVALS_ROOT`. Use `--sources sources.json` for a JSON
+array of `{kind,path,arm?,ts?,scope_note?,url?}` when a source omits runtime identity.
+No device, engine, backend, quantization, timestamp or sample count is guessed.
+
+`z0int policy compile [--now ISO8601] [--config config.json]` writes
+`policy/decision-policy.json` atomically and retains content-addressed versions
+under `policy/history/`. A corrupt findings chain stops compilation without
+overwriting the previous policy. Compilation is pure for fixed findings,
+previous policy, timestamp and compiler configuration. The CLI supplies the
+compiler Git revision. Library callers supply `CompilerConfig.compiler_revision`.
+Bars, minimum counts, expiry, endpoint outage duration and canary share are
+configuration fields. Promotion advances one stage per compile.
+
+Contract interpretations:
+- `prev` hashes the complete canonical previous line, excluding its newline.
+  Finding IDs exclude `id` and `prev`. Policy versions exclude only `version`.
+  Canonical JSON uses sorted keys, compact separators, UTF-8 and finite numbers.
+- Shadow uses the 0.80 retention bar. Canary/live use 0.95. A latest lower bound
+  below 0.80 removes credit. A bound below 0.95 demotes canary/live to shadow.
+  No fresh evidence or an outage longer than 24 hours removes all credit.
+  Expired promotion prerequisites demote immediately to the highest stage
+  whose prerequisites remain fresh. An expired outcome can reduce live to canary.
+- Observation expiry is the earlier of `expires_at` and `ts + expiry_days`.
+  Equality with the current timestamp means expired. Future observations cannot
+  promote an arm. Runtime outage evidence uses metric `endpoint_health` and
+  an explicit timezone-aware `unhealthy_since`.
+- Live shadow labels require `metric.live_shadow=true`. Replay non-inferiority
+  requires explicit `divergence <= aa_noise_floor`. Outcome promotion additionally
+  requires metric `task_success` and `outcome_ledger_verified=true`.
+  z0eval receipts need `verdict=KEEP` and all four architecture gates `pass`
+  for promotion. Negative receipts remain evidence, not promotion authority.
+- Scope is structural, never inferred from prose. Each explicit arm dimension
+  constrains the rule. `subject.scope` can add constraints but cannot erase arm
+  boundaries. Scoped rules use `family@<scope hash prefix>` keys, with base
+  `family` and `scope` fields. The narrowest matching rule wins, even at `none`.
+  Missing scope dimensions do not match narrower rules. No cross-device,
+  quantization or engine relaxation is inferred from `scope_note`.
+- Bench JSON uses `results` or `models` arrays, explicit arm identity and counts.
+  Offload JSON uses `opportunities` rows with subject/arm, evidence class,
+  recall confidence bounds and `retained_fraction=0.2`. z0eval receipts supply
+  an explicit `findings` array. Unsupported layouts are skipped with reasons.
+
+`z0int policy show`, `explain <family>` and
+`changelog [--from VERSION --to VERSION]` expose policy and evidence provenance.
+All commands support `--json`. The changelog defaults to the latest policy and
+the latest older compiled version. Markdown emits one entry per stage change,
+including finding IDs and source paths. Publication must replace local evidence
+links with authorized immutable links. Measured findings can supply serving
+URLs through source metadata. Prose URLs and inference never create endpoints.
+
 ## Architecture
 
 ~~~text
