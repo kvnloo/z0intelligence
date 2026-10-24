@@ -1,6 +1,9 @@
 """Exact policy-serving binding shared by live and observe-only consumers."""
 from __future__ import annotations
 
+import json
+from urllib.parse import quote
+from urllib.request import urlopen
 from dataclasses import replace
 from typing import Any
 
@@ -30,7 +33,7 @@ class PolicyArmBackend:
         base = endpoint["url"].rstrip("/")
         if base.endswith("/v1"):
             base = base[:-3]
-        config = ServerConfig(base_url=base, model=endpoint["model"],
+        config = ServerConfig(base_url=base, model=endpoint.get("expected_model_id") or endpoint["model"],
                               runtime=endpoint["engine"], quantization=endpoint["quant"],
                               timeout_s=30.0)
         self.transport = _PolicyTransport(config)
@@ -55,24 +58,48 @@ class PolicyArmBackend:
         decision = self.backend.decide(request)
         response = self.transport.response or {}
         model = response.get("model")
-        revision = response.get("revision") or response.get("model_revision")
+        expected = {
+            "model_id": self.endpoint.get("expected_model_id"),
+            "engine_build": self.endpoint.get("engine_build"),
+            "model_path": self.endpoint.get("model_path"),
+            "model_sha256": self.endpoint.get("model_sha256"),
+        }
+        props: dict[str, Any] = {}
+        try:
+            props_url = self.transport.config.base_url + "/props?model=" + quote(self.transport.config.model, safe="")
+            with urlopen(props_url, timeout=1.5) as reply:
+                parsed = json.loads(reply.read().decode("utf-8"))
+                if isinstance(parsed, dict):
+                    props = parsed
+        except Exception:
+            pass
+        observed = {"model_id": model, "engine_build": props.get("build_info"),
+                    "model_path": props.get("model_path")}
         actual = {k: self.endpoint[k] for k in ("model", "quant", "engine", "backend", "device")}
-        actual["model"] = model if isinstance(model, str) else "unknown"
         diagnostics = dict(decision.diagnostics)
-        diagnostics.update(selected_arm=actual, response_model=model, response_revision=revision,
-                           serving_url=self.endpoint["url"])
+        diagnostics.update(
+            selected_arm=actual, response_model=model, response_revision=None,
+            observed_identity=observed, expected_identity=expected,
+            props_model_id=props.get("model_alias"), serving_url=self.endpoint["url"],
+        )
         reason = None
-        if model != self.endpoint["model"]:
+        if not all(isinstance(value, str) and value for value in expected.values()):
+            reason = "endpoint_expected_identity_missing"
+        elif not props:
+            reason = "endpoint_identity_unknown"
+        elif model != expected["model_id"] or props.get("model_alias") != expected["model_id"]:
             reason = "endpoint_model_mismatch"
-        elif self.endpoint.get("revision") and revision != self.endpoint["revision"]:
-            reason = "endpoint_revision_mismatch"
+        elif observed["engine_build"] != expected["engine_build"]:
+            reason = "endpoint_build_mismatch"
+        elif observed["model_path"] != expected["model_path"]:
+            reason = "endpoint_path_mismatch"
         elif not self.shadow and (decision.confidence is None or decision.confidence < self.threshold):
             reason = "policy_confidence_abstain"
         if reason:
             diagnostics["reason"] = reason
         self.last = replace(
             decision, model=model if isinstance(model, str) else None,
-            revision=revision if isinstance(revision, str) else None,
+            revision=None,
             abstained=decision.abstained or reason is not None,
             selected_action=None if reason else decision.selected_action,
             diagnostics=diagnostics,

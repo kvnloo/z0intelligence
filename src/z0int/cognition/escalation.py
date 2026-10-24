@@ -118,6 +118,7 @@ class EscalationDecision:
     serving_healthy: bool | None = None
     family: str = "none"
     policy_family: str = "none"
+    synthetic: bool = False
 
     def __post_init__(self) -> None:
         # Threshold-table revisions and evidence-policy identities are separate.
@@ -125,7 +126,7 @@ class EscalationDecision:
             families = self.signals.get("families") or ()
             family = families[0] if len(families) == 1 else "none"
             stamp = policy_runtime.stamp({}, family)
-            for key in ("policy_version", "policy_sha256", "rule_id", "stage", "policy_reason", "serving_healthy", "family", "policy_family"):
+            for key in ("policy_version", "policy_sha256", "rule_id", "stage", "policy_reason", "serving_healthy", "family", "policy_family", "synthetic"):
                 object.__setattr__(self, key, stamp.get(key))
 
     def to_dict(self) -> dict[str, Any]:
@@ -140,6 +141,7 @@ class EscalationDecision:
             "serving_healthy": self.serving_healthy,
             "family": self.family,
             "policy_family": self.policy_family,
+            "synthetic": self.synthetic,
             "signals": dict(self.signals),
         }
         if self.policy_reason:

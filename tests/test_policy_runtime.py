@@ -103,6 +103,7 @@ def test_missing_policy_none_and_stamped(isolated_policy):
         "policy_version": "none", "policy_sha256": "none", "rule_id": "none",
         "stage": "none", "family": "omp.tool", "policy_reason": "policy_missing",
         "serving_healthy": None, "policy_family": "omp.tool",
+        "synthetic": False,
     }
 
 
@@ -276,25 +277,31 @@ def test_shadow_persisted_receipt_stamped(isolated_policy):
     assert "serving_healthy" in row
 
 
+@pytest.mark.parametrize("expected_alias", ["synthetic-06b", "synthetic model/+alias"])
 @pytest.mark.parametrize("confidence,returned_model,expected_status", [
     (0.99, "synthetic-06b", 0), (0.2, "synthetic-06b", 1),
     (0.99, "different-model", 1),
 ])
 def test_scoped_policy_binds_actual_endpoint_without_caller_scope(
-    isolated_policy, capsys, monkeypatch, confidence, returned_model, expected_status,
+    isolated_policy, capsys, monkeypatch, confidence, returned_model, expected_status, expected_alias,
 ):
     from z0int.cognition.adapters.transport import ChatOutcome
+    from urllib.parse import quote
+    if returned_model == "synthetic-06b":
+        returned_model = expected_alias
     body = policy_body("live")
     rule = body["families"].pop("omp.tool")
     rule.update(family="omp.tool", scope={k: rule["arm"][k] for k in ("model", "quant", "engine", "backend", "device")})
     body["families"]["omp.tool@synthetic"] = rule
     endpoint = {**rule["arm"], "url": "http://127.0.0.1:12345/v1", "evidence": ["e" * 64]}
+    endpoint.update(expected_model_id=expected_alias, engine_build="synthetic-build",
+                    model_path="/synthetic/model.gguf", model_sha256="a" * 64)
     body["serving"] = [endpoint]
     _, version = publish(isolated_policy, body)
     runtime._write_health(endpoint["url"], {
         "scope_sha256": runtime._scope_hash(endpoint), "status": "healthy",
         "checked_at": datetime.now(timezone.utc).isoformat(),
-        "model": endpoint["model"], "revision": "synthetic-revision",
+        "model": expected_alias, "revision": None,
     })
     calls = []
 
@@ -307,6 +314,19 @@ def test_scoped_policy_binds_actual_endpoint_without_caller_scope(
         )
 
     monkeypatch.setattr("z0int.cognition.adapters.transport.OpenAICompatTransport.chat", answer)
+    props_calls = []
+    class PropsResponse:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return None
+        def read(self):
+            return json.dumps({"model_alias": expected_alias, "build_info": "synthetic-build",
+                               "model_path": "/synthetic/model.gguf"}).encode()
+    def props(url, timeout):
+        props_calls.append((url, timeout))
+        return PropsResponse()
+    monkeypatch.setattr("z0int.cognition.adapters.policy.urlopen", props)
     # A role registry is not an authority for this decision, even if configured.
     monkeypatch.setattr(cli.LocalModelRegistry, "from_environment",
                         lambda: pytest.fail("policy arm must not use default registry routes"))
@@ -324,13 +344,15 @@ def test_scoped_policy_binds_actual_endpoint_without_caller_scope(
                               shadow=[], json=True)
     assert cli._cmd_decide(args) == expected_status
     result = json.loads(capsys.readouterr().out)
-    assert calls == [("http://127.0.0.1:12345", "synthetic-06b")]
+    assert calls == [("http://127.0.0.1:12345", expected_alias)]
+    assert props_calls == [("http://127.0.0.1:12345/props?model=" + quote(expected_alias, safe=""), 1.5)]
     assert result["policy_version"] == version
     assert result["policy_family"] == "omp.tool@synthetic"
-    assert result["selected_arm"] == {k: (returned_model if k == "model" else endpoint[k])
-                                      for k in ("model", "quant", "engine", "backend", "device")}
+    assert result["selected_arm"] == {k: endpoint[k] for k in ("model", "quant", "engine", "backend", "device")}
     assert result["response_model"] == returned_model
-    assert result["response_revision"] == "synthetic-revision"
+    assert result["response_revision"] is None
+    assert result["observed_identity"] == {"model_id": returned_model, "engine_build": "synthetic-build",
+                                           "model_path": "/synthetic/model.gguf"}
     assert result["serving_healthy"] is True
     if confidence < rule["threshold"]:
         assert result["route"] == "remote_frontier"
@@ -397,6 +419,8 @@ def test_unknown_shared_health_falls_back_with_reason(isolated_policy, capsys, m
     body = policy_body("live")
     endpoint = {**body["families"]["omp.tool"]["arm"],
                 "url": "http://127.0.0.1:12345/v1", "evidence": ["e" * 64]}
+    endpoint.update(expected_model_id="synthetic-06b", engine_build="synthetic-build",
+                    model_path="/synthetic/model.gguf", model_sha256="a" * 64)
     body["serving"] = [endpoint]
     publish(isolated_policy, body)
     runtime._write_health(endpoint["url"], {
@@ -409,3 +433,76 @@ def test_unknown_shared_health_falls_back_with_reason(isolated_policy, capsys, m
     assert result["policy_stage"] == "live"
     assert result["policy_reason"] == "serving_health_unknown"
     assert result["serving_healthy"] is None
+
+
+def test_compiled_none_demoted_reason_stays_on_receipt(isolated_policy):
+    body = policy_body("none")
+    body["families"]["omp.tool"]["demoted_reason"] = "evidence_expired"
+    publish(isolated_policy, body)
+    row = runtime.stamp({}, "omp.tool")
+    assert row["stage"] == "none"
+    assert row["policy_reason"] == "evidence_expired"
+
+
+def test_synthetic_rule_taint_reaches_nested_and_fallback_rows(isolated_policy):
+    body = policy_body("shadow")
+    body["families"]["omp.tool"]["synthetic"] = True
+    publish(isolated_policy, body)
+    row = {
+        "receipts": [{}], "attempts": [{}], "shadow": [{}], "escalation": {},
+    }
+    cli._stamp_decision(row, runtime.current(), ("omp.tool",), (), {})
+    for emitted in [row, row["escalation"], *row["receipts"], *row["attempts"], *row["shadow"]]:
+        assert emitted["synthetic"] is True
+    assert runtime.stamp({}, "unknown-family")["synthetic"] is True
+    assert runtime.stamp({"synthetic": False}, "omp.tool")["synthetic"] is True
+
+
+def test_payload_synthetic_taint_does_not_need_a_policy(isolated_policy, capsys, monkeypatch):
+    original = cli._graph_from_payload
+    def synthetic_graph(payload):
+        payload["synthetic"] = True
+        return original(payload)
+    monkeypatch.setattr(cli, "_graph_from_payload", synthetic_graph)
+    row, _ = run_cli(isolated_policy, capsys, monkeypatch)
+    for emitted in [row, row["escalation"], *row["receipts"], *row["attempts"]]:
+        assert emitted["synthetic"] is True
+
+
+@pytest.mark.parametrize("field,value,reason", [
+    ("build_info", "different-build", "endpoint_build_mismatch"),
+    ("model_path", "/synthetic/different.gguf", "endpoint_path_mismatch"),
+])
+def test_endpoint_observed_props_mismatch_abstains(isolated_policy, monkeypatch, field, value, reason):
+    from z0int.cognition.actions import compile_actions
+    from z0int.cognition.adapters.local_slm import ToolDecisionRequest
+    from z0int.cognition.adapters.policy import PolicyArmBackend
+    from z0int.cognition.adapters.transport import ChatOutcome
+    endpoint = {**policy_body("live")["families"]["omp.tool"]["arm"],
+                "url": "http://127.0.0.1:12345/v1", "expected_model_id": "synthetic-06b",
+                "engine_build": "synthetic-build", "model_path": "/synthetic/model.gguf",
+                "model_sha256": "a" * 64}
+    legal = compile_actions(graph=cli._graph_from_payload({"actions": [
+        {"action_id": "read", "kind": "tool", "family": "omp.tool"},
+        {"action_id": "glob", "kind": "tool", "family": "omp.tool"},
+    ]}), granted_capabilities=(), authority=("read",), budget_units=8)
+    monkeypatch.setattr("z0int.cognition.adapters.transport.OpenAICompatTransport.chat",
+                        lambda *args, **kwargs: ChatOutcome(
+                            content='{"action_id":"read","confidence":0.99}', tool_call=None,
+                            usage={}, timings={}, latency_ms=1.0, raw={"model": "synthetic-06b"},
+                        ))
+    observed = {"model_alias": "synthetic-06b", "build_info": "synthetic-build",
+                "model_path": "/synthetic/model.gguf", field: value}
+    class Props:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return None
+        def read(self):
+            return json.dumps(observed).encode()
+    monkeypatch.setattr("z0int.cognition.adapters.policy.urlopen", lambda *args, **kwargs: Props())
+    decision = PolicyArmBackend(endpoint, 0.95).decide(ToolDecisionRequest(state="synthetic", legal=legal))
+    assert decision.abstained is True
+    assert decision.selected_action is None
+    assert decision.diagnostics["reason"] == reason
+    assert decision.diagnostics["response_revision"] is None

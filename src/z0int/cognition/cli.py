@@ -304,13 +304,14 @@ def _cmd_decide(args: argparse.Namespace) -> int:
     endpoints = [policy.endpoint_for(family) for family in families]
     endpoint = endpoints[0] if endpoints and all(row == endpoints[0] for row in endpoints) else None
     eligible = bool(families) and all(family in credited for family in families)
-    healthy = policy_runtime.serving_health(endpoint["url"], endpoint, probe=True) if endpoint and eligible else None
-    ready = eligible and endpoint is not None and healthy is True
+    identity_ready = policy_runtime.serving_identity_complete(endpoint)
+    healthy = policy_runtime.serving_health(endpoint["url"], endpoint, probe=True) if identity_ready and eligible else None
+    ready = eligible and identity_ready and healthy is True
     threshold = max((policy.rule_for(family).get("threshold", 0.65) for family in families), default=0.65)
     bound = PolicyArmBackend(endpoint, threshold) if ready else None
     fallback_reason = None
     if eligible and not ready:
-        fallback_reason = "serving_health_unknown" if endpoint and healthy is None else "no_serving_for_scope"
+        fallback_reason = "serving_health_unknown" if identity_ready and healthy is None else "no_serving_for_scope"
     elif families and any(policy.stage(family) == "canary" for family in families) and not eligible:
         fallback_reason = "canary_cohort_excluded"
     thresholds = EscalationThresholds(
@@ -375,7 +376,11 @@ def _cmd_decide(args: argparse.Namespace) -> int:
                     model=bound.last.model, confidence=bound.last.confidence)
         body["scope"] = dict(observed["selected_arm"])
         body["escalation"].update(selected_arm=dict(observed["selected_arm"]), scope=dict(observed["selected_arm"]))
-        if observed.get("reason") in ("endpoint_model_mismatch", "endpoint_revision_mismatch"):
+        identity = {key: observed.get(key) for key in ("observed_identity", "expected_identity", "props_model_id")}
+        body.update(identity)
+        body["escalation"].update(identity)
+        if observed.get("reason") in ("endpoint_model_mismatch", "endpoint_build_mismatch", "endpoint_path_mismatch",
+                                      "endpoint_identity_unknown", "endpoint_expected_identity_missing"):
             fallback_reason = "no_serving_for_scope"
         for row in [*body["attempts"], *body["receipts"]]:
             if row.get("backend") == "decision-policy" or row.get("provider") == "decision-policy":
@@ -383,6 +388,7 @@ def _cmd_decide(args: argparse.Namespace) -> int:
                            response_model=observed.get("response_model"),
                            response_revision=observed.get("response_revision"))
                 row["scope"] = dict(observed["selected_arm"])
+                row.update(identity)
     if outcome.abstained:
         family = families[0] if len(families) == 1 else "none"
         destination = policy.rule_for(family).get("abstain_to", "frontier")
@@ -391,11 +397,14 @@ def _cmd_decide(args: argparse.Namespace) -> int:
             body["abstain"] = {"confidence": bound.last.confidence, "threshold": threshold,
                                "reason": bound.last.diagnostics.get("reason", "local_scorer_abstained")}
         row = {key: body[key] for key in ("trace_id", "route", "reason", "abstain",
-               "selected_arm", "scope", "response_model", "response_revision") if key in body}
+               "selected_arm", "scope", "response_model", "response_revision",
+               "observed_identity", "expected_identity", "props_model_id") if key in body}
         row.update(schema="z0int.cognition.fallback.v1", selected_action=None)
         policy.stamp(row, family)
         body["receipts"].append(row)
     def apply_binding(row: dict[str, Any]) -> None:
+        if payload.get("synthetic") is True:
+            row["synthetic"] = True
         if payload.get("policy_scope"):
             row["policy_scope"] = dict(payload["policy_scope"])
             row.setdefault("scope", dict(payload["policy_scope"]))

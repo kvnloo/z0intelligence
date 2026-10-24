@@ -22,6 +22,7 @@ import localCognition, {
 	receiptPath,
 	resolveAvailableTools,
 	shadowEnabled,
+	sendShadow,
 	statusRing,
 } from "./index.ts";
 
@@ -740,4 +741,29 @@ test("a new process can read fresh shared endpoint health without another probe"
 		expect(policyStamp().serving_healthy).toBe(true);
 		expect(probes).toBe(0);
 	} finally { globalThis.fetch = original; }
+});
+
+test("compiled none-stage demotions retain their reason and synthetic provenance", () => {
+	const body = policyFixture("none");
+	const rule = (body.families as Record<string, Record<string, unknown>>)["omp.tool"];
+	rule.demoted_reason = "evidence_expired";
+	rule.synthetic = true;
+	writePolicy(body);
+	expect(policyStamp().stage).toBe("none");
+	expect(policyStamp().policy_reason).toBe("evidence_expired");
+	expect(policyStamp().synthetic).toBe(true);
+});
+
+test("payload synthetic provenance survives empty policy and reaches model observations", async () => {
+	const { pi } = installed();
+	const entries: Array<Record<string, unknown>> = [];
+	Object.assign(pi, { appendEntry: (_type: string, data: Record<string, unknown>) => entries.push(data) });
+	globalHolder.__omp_z0int_bridge_transport__ = { request: async () => ({
+		ok: true, shadow: [{ label: "synthetic", model: "synthetic", backend: "synthetic",
+			selected_action: "read", confidence: 0.99 }],
+	}) };
+	await sendShadow({ synthetic: true, facts: { tool_name: "read" } }, 1000, pi);
+	expect(entries[0].synthetic).toBe(true);
+	expect((entries[0].models as Array<Record<string, unknown>>)[0].synthetic).toBe(true);
+	expect((statusRing[0] as unknown as Record<string, unknown>).synthetic).toBe(true);
 });

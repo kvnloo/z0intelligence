@@ -132,6 +132,7 @@ type DecisionPolicy = {
 	sha256: string;
 	reason?: string;
 	families: Record<string, Jsonish>;
+	synthetic?: boolean;
 	serving: Jsonish[];
 };
 let policyCache: { path: string; mtime: number; sha: string; policy: DecisionPolicy } | null = null;
@@ -221,6 +222,7 @@ export function loadDecisionPolicy(): DecisionPolicy {
 		if (!object(body) || body.schema !== "z0.decision_policy.v1" || typeof body.version !== "string"
 			|| !timestamp(body.compiled_at) || typeof body.findings_head !== "string" || typeof body.compiler !== "string"
 			|| !object(body.families) || !Array.isArray(body.serving) || !Array.isArray(body.changes)) throw new Error("invalid_schema");
+		if (body.synthetic !== undefined && typeof body.synthetic !== "boolean") throw new Error("invalid_synthetic");
 		for (const [key, rule] of Object.entries(body.families)) {
 			if (!key || !object(rule) || !POLICY_STAGES.includes(String(rule.stage)) || !object(rule.arm)
 				|| typeof rule.threshold !== "number" || !Number.isFinite(rule.threshold) || rule.threshold < 0 || rule.threshold > 1
@@ -228,6 +230,7 @@ export function loadDecisionPolicy(): DecisionPolicy {
 				|| !["jev", "frontier"].includes(String(rule.abstain_to)) || !strings(rule.evidence)
 				|| typeof rule.rule_id !== "string" || !rule.rule_id || !timestamp(rule.expires_at)
 				|| (rule.demoted_reason != null && typeof rule.demoted_reason !== "string")) throw new Error("invalid_family");
+			if (rule.synthetic !== undefined && typeof rule.synthetic !== "boolean") throw new Error("invalid_synthetic");
 			if (rule.stage !== "none" && (typeof rule.arm.kind !== "string" || !rule.arm.kind)) throw new Error("invalid_arm");
 			if (["kind", "model", "quant", "engine", "backend", "device"].some(k =>
 				k in (rule.arm as Jsonish) && (typeof (rule.arm as Jsonish)[k] !== "string" || !(rule.arm as Jsonish)[k]))) throw new Error("invalid_arm");
@@ -245,7 +248,7 @@ export function loadDecisionPolicy(): DecisionPolicy {
 		}
 		const digest = createHash("sha256").update(canonicalPolicyBody(raw)).digest("hex");
 		if (body.version !== digest) throw new Error("policy_hash_mismatch");
-		const policy = { version: digest, sha256: digest, families: body.families as Record<string, Jsonish>, serving: body.serving as Jsonish[] };
+		const policy = { version: digest, sha256: digest, synthetic: body.synthetic === true, families: body.families as Record<string, Jsonish>, serving: body.serving as Jsonish[] };
 		policyCache = { path, mtime, sha, policy };
 		return policy;
 	} catch (error) {
@@ -272,7 +275,7 @@ function servingHealth(endpoint: Jsonish | undefined): boolean | null {
 			&& row.scope_sha256 === digest && timestamp(row.checked_at)) {
 			const age = Date.now() - Date.parse(String(row.checked_at));
 			if (age >= 0 && age <= 60_000 && ["healthy", "unhealthy", "unknown"].includes(String(row.status))) {
-				return row.status === "healthy" && row.model === endpoint.model ? true : row.status === "unhealthy" ? false : null;
+				return row.status === "healthy" && row.model === (endpoint.expected_model_id ?? endpoint.model) ? true : row.status === "unhealthy" ? false : null;
 			}
 		}
 	} catch { /* missing/corrupt cache cannot authorize an offload */ }
@@ -289,7 +292,7 @@ function servingHealth(endpoint: Jsonish | undefined): boolean | null {
 			.then(async response => {
 				const body: unknown = await response.json();
 				const rows = object(body) && Array.isArray(body.data) ? body.data.filter(object) : [];
-				const match = rows.find(row => row.id === endpoint.model);
+				const match = rows.find(row => row.id === (endpoint.expected_model_id ?? endpoint.model));
 				const observed = match ?? rows[0];
 				return checked(response.ok && match ? "healthy" : "unhealthy", observed?.id, observed?.revision ?? observed?.model_revision);
 			})
@@ -331,16 +334,17 @@ export function policyStamp(policy = loadDecisionPolicy(), family = "omp.tool"):
 	const arm = object(rule?.arm) ? rule.arm : {};
 	const dimensions = ["device", "model", "quant", "engine", "backend"];
 	const endpoint = dimensions.every(k => typeof arm[k] === "string") ? policy.serving.find(row => dimensions.every(k => row[k] === arm[k])) : undefined;
-	const reason = policy.reason ?? (!rule ? "family_not_in_policy" : stage === "none" && rule.stage !== "none" ? "evidence_expired" : undefined);
+	const reason = policy.reason ?? (!rule ? "family_not_in_policy" : stage === "none" && rule.stage !== "none" ? "evidence_expired" : typeof rule.demoted_reason === "string" ? rule.demoted_reason : undefined);
 	return { policy_version: policy.version, policy_sha256: policy.sha256, policy_family: candidates[0]?.[0] ?? family,
 		rule_id: rule?.rule_id ?? "none", stage, family,
+		synthetic: policy.synthetic === true || Object.values(policy.families).some(entry => entry.synthetic === true),
 		serving_healthy: servingHealth(endpoint),
 		...(object(scope) ? { policy_scope: scope } : {}), ...(reason ? { policy_reason: reason } : {}) };
 }
 
 function receiptPolicyFields(payload: Jsonish): Jsonish {
 	const fields: Jsonish = {};
-	for (const key of ["policy_version", "policy_sha256", "policy_family", "policy_scope", "rule_id", "stage", "family", "policy_reason", "serving_healthy"]) {
+	for (const key of ["policy_version", "policy_sha256", "policy_family", "policy_scope", "rule_id", "stage", "family", "policy_reason", "serving_healthy", "synthetic"]) {
 		if (payload[key] !== undefined) fields[key] = payload[key];
 	}
 	return fields;
@@ -734,7 +738,7 @@ function appendObservation(
 			tool: identity.tool,
 			trace_id: payload.trace_id,
 			outcome: classified.outcome,
-			models: classified.models,
+			models: classified.models.map(model => ({ ...model, ...receiptPolicyFields(payload) })),
 			legal_count: classified.legal_count,
 			requested_models: Array.isArray(payload.shadows) ? payload.shadows : [],
 			round_trip_ms: Math.round(elapsedMs),
@@ -764,7 +768,9 @@ export async function sendShadow(
 	identity?: ObservationIdentity,
 ): Promise<StatusRow> {
 	const startedMs = Date.now();
+	const synthetic = payload.synthetic === true;
 	if (typeof payload.policy_version !== "string") Object.assign(payload, policyStamp());
+	payload.synthetic = synthetic || payload.synthetic === true;
 	// Give the worker a budget inside ours. Left to its own 30 s default it
 	// keeps waiting on a slow model after this side has recorded a timeout, and
 	// its receipt then says the model answered while the session entry says it

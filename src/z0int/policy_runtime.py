@@ -84,7 +84,7 @@ def _probe_health(url: str, scope: dict[str, Any] | None = None, timeout: float 
         with urlopen(base + "/v1/models", timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
             models = payload.get("data") or []
-            requested = (scope or {}).get("model")
+            requested = (scope or {}).get("expected_model_id") or (scope or {}).get("model")
             matched = next((row for row in models if isinstance(row, dict) and
                             (requested is None or row.get("id") == requested)), None)
             observed = matched or next((row for row in models if isinstance(row, dict)), {})
@@ -145,6 +145,15 @@ def serving_health(
     return None
 
 
+def serving_identity_complete(endpoint: dict[str, Any] | None) -> bool:
+    """A physical model call requires measured endpoint identity provenance."""
+    if not endpoint or not all(isinstance(endpoint.get(k), str) and endpoint[k] for k in
+                               ("expected_model_id", "engine_build", "model_path", "model_sha256")):
+        return False
+    digest = endpoint["model_sha256"]
+    return len(digest) == 64 and all(c in "0123456789abcdef" for c in digest)
+
+
 def _canonical(body: dict[str, Any]) -> bytes:
     return json.dumps(body, sort_keys=True, separators=(",", ":"),
                       ensure_ascii=False, allow_nan=False).encode("utf-8")
@@ -170,6 +179,8 @@ def _strings(value: Any) -> bool:
 def _validate(body: Any) -> None:
     if not isinstance(body, dict) or body.get("schema") != SCHEMA:
         raise ValueError("invalid_schema")
+    if "synthetic" in body and not isinstance(body["synthetic"], bool):
+        raise ValueError("invalid_synthetic")
     for key in ("version", "compiled_at", "findings_head", "compiler"):
         if not isinstance(body.get(key), str):
             raise ValueError(f"invalid_{key}")
@@ -179,6 +190,8 @@ def _validate(body: Any) -> None:
     for family, rule in body["families"].items():
         if not family or not isinstance(rule, dict) or rule.get("stage") not in STAGES:
             raise ValueError("invalid_family")
+        if "synthetic" in rule and not isinstance(rule["synthetic"], bool):
+            raise ValueError("invalid_synthetic")
         if not isinstance(rule.get("arm"), dict):
             raise ValueError("invalid_arm")
         if rule["stage"] != "none" and (
@@ -279,11 +292,15 @@ class Policy:
         stage = self.stage(family)
         receipt.update(policy_version=self.version, policy_sha256=self.sha256,
                        rule_id=entry.get("rule_id", rule or "none"), stage=stage, family=family)
+        # Keep synthetic provenance even on fallback/ambiguous-family rows.
+        receipt["synthetic"] = receipt.get("synthetic") is True or self._body.get("synthetic") is True or any(
+            value.get("synthetic") is True for value in self._body.get("families", {}).values()
+        )
         receipt["policy_family"] = next((key for key, value in self._body.get("families", {}).items()
                                         if value is entry), family)
         endpoint = self.endpoint_for(family)
         receipt["serving_healthy"] = serving_health(endpoint["url"], endpoint) if endpoint else None
-        reason = self.reason
+        reason = self.reason or entry.get("demoted_reason")
         if entry and stage == "none" and entry["stage"] != "none":
             reason = "evidence_expired"
         elif not entry and reason is None:
