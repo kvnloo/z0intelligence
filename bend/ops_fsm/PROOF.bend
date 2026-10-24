@@ -537,10 +537,10 @@ def Laws.o11_named_arm(family, named_family, stage, named_arm, arm, healthy, abs
     and_r(O.policy_credited(stage), Nat.is_eq(arm, named_arm),
       and_r(Nat.is_eq(family, named_family), Bool.and(O.policy_credited(stage), Nat.is_eq(arm, named_arm)), w)))
 
-def Laws.o11_none_not_credited:
+def Laws.o11_none_not_credited():
   {==}
 
-def Laws.o11_shadow_not_credited:
+def Laws.o11_shadow_not_credited():
   {==}
 
 def Laws.o11_canary_routes(family, arm):

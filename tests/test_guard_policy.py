@@ -13,6 +13,8 @@ from z0int.fsm import policy_guard as P
 NOW = dt.datetime(2026, 10, 24, 12, tzinfo=dt.timezone.utc)
 ARM = {'kind': 'slm', 'model': 'synthetic-0.6b@r1', 'quant': 'Q4_0',
        'engine': 'synthetic@r1', 'backend': 'cpu', 'device': 'test-worker'}
+IDENTITY = {'model_id': 'synthetic-alias', 'engine_build': 'synthetic-build',
+            'model_path': '/synthetic/models/test.gguf', 'model_sha256': 'f' * 64}
 
 
 def policy(stage='live'):
@@ -22,7 +24,10 @@ def policy(stage='live'):
                          'rule_id': 'F-omp.tool-1', 'expires_at': '2026-10-25T12:00:00Z',
                          'abstain_to': 'frontier', 'canary_share': 0.1,
                          'evidence': ['synthetic-finding'], 'demoted_reason': None}},
-            'serving': [], 'changes': []}
+            'serving': [{**ARM, 'kind': 'engine', 'url': 'http://127.0.0.1:9999/v1',
+                         'expected_model_id': IDENTITY['model_id'],
+                         **{key: value for key, value in IDENTITY.items() if key != 'model_id'}}],
+            'changes': []}
     body['version'] = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(',', ':'),
                                                ensure_ascii=False, allow_nan=False).encode()).hexdigest()
     return body
@@ -32,7 +37,9 @@ def receipt(doc, **changes):
     return {'ts': NOW.isoformat(), 'family': 'omp.tool', 'policy_version': doc['version'],
             'policy_sha256': doc['version'], 'rule_id': 'F-omp.tool-1',
             'stage': next(iter(doc['families'].values()))['stage'], 'route': 'general_slm',
-            'selected_arm': copy.deepcopy(ARM), 'serving_healthy': True, **changes}
+            'selected_arm': copy.deepcopy(ARM), 'serving_healthy': True,
+            'observed_identity': {key: value for key, value in IDENTITY.items() if key != 'model_sha256'},
+            'props_model_id': IDENTITY['model_id'], 'expected_identity': copy.deepcopy(IDENTITY), **changes}
 
 
 def audit(tmp_path, doc, rows):
@@ -245,3 +252,120 @@ def test_cli_invalid_duration_returns_usage_error(tmp_path, monkeypatch, capsys)
     monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
     assert G.main(['policy', '--since', 'yesterday', '--json']) == 2
     assert 'duration' in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('field', ['model_id', 'engine_build', 'model_path'])
+def test_o11_binds_observed_endpoint_identity(tmp_path, field):
+    doc = policy('canary')
+    row = receipt(doc)
+    row['observed_identity'][field] = 'wrong'
+    report, _ = audit(tmp_path, doc, [row])
+    assert report['counts']['o11_evidence_bound_route'] == 1
+
+
+def test_o11_binds_props_alias_and_does_not_require_revision(tmp_path):
+    doc = policy('canary')
+    row = receipt(doc, response_revision=None)
+    report, _ = audit(tmp_path, doc, [row])
+    assert not any(report['counts'].values())
+    row['props_model_id'] = 'another-model'
+    report, _ = audit(tmp_path, doc, [row])
+    assert report['counts']['o11_evidence_bound_route'] == 1
+
+
+@pytest.mark.parametrize('field', P.PHYSICAL_KEYS)
+def test_o11_rejects_partial_named_physical_arm(tmp_path, field):
+    doc = copy.deepcopy(policy('canary'))
+    del doc['families']['omp.tool']['arm'][field]
+    del doc['version']
+    doc['version'] = hashlib.sha256(json.dumps(doc, sort_keys=True, separators=(',', ':'),
+                                              ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+    report, _ = audit(tmp_path, doc, [receipt(doc)])
+    assert report['counts']['o11_evidence_bound_route'] == 1
+
+
+def synthetic_home(home, *, rule_marker=True, receipt_marker=True):
+    finding = {'schema': 'z0.finding.v1', 'prev': '0' * 64, 'ts': NOW.isoformat(),
+               'source': {'kind': 'manual', 'path': '/synthetic/fixture.json',
+                          'sha256': '0' * 64, 'run_id': 'fixture'},
+               'subject': {'family': 'omp.tool', 'job': 'synthetic guard fixture'}, 'arm': ARM,
+               'metric': {'name': 'acc_at_conf', 'value': 1.0, 'n': 100, 'ci_low': 0.96,
+                          'ci_high': 1.0, 'ci_method': 'wilson95', 'higher_is_better': True},
+               'baseline': {'arm': 'frontier', 'value': 1.0}, 'evidence_class': 'measured',
+               'scope_note': 'Synthetic fixture, never production evidence',
+               'expires_at': '2026-10-25T12:00:00Z', 'synthetic': True}
+    finding['id'] = hashlib.sha256(json.dumps(finding, sort_keys=True, separators=(',', ':'),
+                                             ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+    doc = policy('canary')
+    doc['findings_head'] = finding['id']
+    doc['families']['omp.tool']['evidence'] = [finding['id']]
+    if rule_marker:
+        doc['families']['omp.tool']['synthetic'] = True
+    del doc['version']
+    doc['version'] = hashlib.sha256(json.dumps(doc, sort_keys=True, separators=(',', ':'),
+                                              ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+    row = receipt(doc, route='frontier', trace_id='synthetic-trace', synthetic=receipt_marker)
+    path = home / 'policy/decision-policy.json'
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(doc))
+    ledger = home / 'findings/findings.jsonl'
+    ledger.parent.mkdir()
+    ledger.write_text(json.dumps(finding) + '\n')
+    receipts = home / 'receipts.jsonl'
+    receipts.write_text(json.dumps(row) + '\n')
+    return path, receipts, finding['id']
+
+
+def test_synthetic_tmp_home_allowed_even_when_process_z0int_home_is_overridden(tmp_path, monkeypatch):
+    home = tmp_path / 'isolated'
+    path, receipts, _ = synthetic_home(home)
+    monkeypatch.setenv('Z0INT_HOME', str(home))
+    report, findings = P.audit(str(receipts), path, '24h', now=NOW)
+    assert report['available']
+    assert not any(report['counts'].values())
+    assert not findings
+
+
+@pytest.mark.parametrize('rule_marker', [False, True])
+def test_synthetic_live_home_and_tmp_symlink_are_rejected(tmp_path, monkeypatch, rule_marker):
+    owner = tmp_path / 'owner'
+    live = owner / '.z0int'
+    path, receipts, finding_id = synthetic_home(live, rule_marker=rule_marker, receipt_marker=False)
+    monkeypatch.setattr(P.Path, 'home', staticmethod(lambda: owner))
+    link = tmp_path / 'looks-temporary'
+    link.symlink_to(live, target_is_directory=True)
+    report, findings = P.audit(str(receipts), link / 'policy/decision-policy.json', '24h', now=NOW)
+    synthetic = [finding for finding in findings if finding['rule'] == 'synthetic-evidence-outside-tmp']
+    assert report['counts']['o11_evidence_bound_route'] == 3
+    assert {finding['id'] for finding in synthetic} == {finding_id, 'F-omp.tool-1', 'synthetic-trace'}
+    assert path.resolve() == (link / 'policy/decision-policy.json').resolve()
+
+
+def test_explicit_live_home_is_protected_even_under_tmp(tmp_path, monkeypatch):
+    path, receipts, _ = synthetic_home(tmp_path / 'live')
+    monkeypatch.setenv('Z0INT_LIVE_HOME', str(path.parent.parent))
+    report, _ = P.audit(str(receipts), path, '24h', now=NOW)
+    assert report['counts']['o11_evidence_bound_route'] == 3
+
+
+def test_tmpfoo_is_not_tmp_and_cli_returns_three(tmp_path, monkeypatch, capsys):
+    doc = policy('canary')
+    doc['families']['omp.tool']['synthetic'] = True
+    del doc['version']
+    doc['version'] = hashlib.sha256(json.dumps(doc, sort_keys=True, separators=(',', ':'),
+                                              ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+    virtual = Path('/tmpfoo/policy-guard-fixture/policy/decision-policy.json')
+    original = Path.read_text
+    def fixture_read(path, *args, **kwargs):
+        return json.dumps(doc) if path == virtual else original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'read_text', fixture_read)
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path / 'output'))
+    receipts = tmp_path / 'receipts.jsonl'
+    current = dt.datetime.now(dt.timezone.utc).isoformat()
+    receipts.write_text(json.dumps(receipt(doc, ts=current, route='frontier', synthetic=True,
+                                            trace_id='tmpfoo-trace')) + '\n')
+    assert G.main(['policy', '--policy', str(virtual), '--receipts', str(receipts), '--json']) == 3
+    output = capsys.readouterr()
+    findings = json.loads(output.err)['findings']
+    assert {finding.get('id') for finding in findings} >= {'F-omp.tool-1', 'tmpfoo-trace'}
+    assert not P._synthetic_context(virtual)[1]
