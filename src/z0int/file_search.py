@@ -4,16 +4,18 @@ FFF is a read-only discovery accelerator. It never grants authority: callers
 receive normalized index hits and must carry them as provenance-bearing
 evidence through ContextPacket/EventLog before using them for decisions.
 
-The pool is process-local by design. OMP's resident bridge worker therefore
-keeps one Rust index + watcher warm across repeated turns; Hermes or another
-long-lived harness gets the same behavior when it imports this module.
+The process-local pool holds bounded, watcher-free indexes for admitted Git
+toplevels. A serialized lazy rebuild after ten minutes bounds freshness without
+recursive inotify churn from build/cache directories or unrelated worktrees.
 """
 
 from __future__ import annotations
 
 import atexit
 import importlib
+import logging
 import os
+import subprocess
 import threading
 import time
 from collections import OrderedDict
@@ -26,6 +28,37 @@ _DEFAULT_LIMIT = 8
 _DEFAULT_BUDGET_MS = 120
 _DEFAULT_SCAN_TIMEOUT_MS = 5000
 _DEFAULT_MAX_ROOTS = 4
+_DEFAULT_MAX_FILES = 200_000
+_LOG = logging.getLogger(__name__)
+_DEFAULT_INDEX_TTL_SECONDS = 600
+
+
+def _admit_root(root: Path) -> int:
+    """Fail before constructing an index or registering any filesystem watch."""
+    forbidden = {Path("/mnt/zer0models"), Path("/mnt/zer0models/workspace/zer0")}
+    if root in forbidden or root == Path(root.anchor):
+        raise ValueError(f"forbidden workspace root: {root}")
+    result = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+        capture_output=True, text=True, timeout=5, check=True,
+        env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+    )
+    if Path(result.stdout.strip()).resolve() != root:
+        raise ValueError(f"root is not a git toplevel: {root}")
+    ceiling = _int_env("Z0INT_FFF_MAX_FILES", _DEFAULT_MAX_FILES, 1)
+    count = 0
+    def failed(exc: OSError) -> None:
+        raise exc
+    for directory, dirs, files in os.walk(root, followlinks=False, onerror=failed):
+        here = Path(directory)
+        dirs[:] = [
+            name for name in dirs
+            if name != ".git" and not (here / name).is_symlink()
+        ]
+        count += len(files)
+        if count > ceiling:
+            raise ValueError(f"file count exceeds Z0INT_FFF_MAX_FILES={ceiling}: {root}")
+    return count
 
 
 def _load_fff() -> Any | None:
@@ -55,27 +88,13 @@ class _ResidentFinder:
     finder: Any
     package_version: str
     ready: bool
-    created_at: float = field(default_factory=time.time)
+    created_at: float = field(default_factory=time.monotonic)
     last_used: float = field(default_factory=time.time)
-    epoch: int = 0
-    subscription: Any | None = None
+    epoch: int = field(default_factory=time.monotonic_ns)
     lock: threading.RLock = field(default_factory=threading.RLock)
-
-    def on_change(self, _events: Any) -> None:
-        # The watcher already updates FFF's index. This counter is only a cheap
-        # invalidation/source-epoch signal for ContextPacket provenance.
-        with self.lock:
-            self.epoch += 1
 
     def close(self) -> None:
         with self.lock:
-            sub = self.subscription
-            self.subscription = None
-            if sub is not None:
-                try:
-                    sub.unsubscribe()
-                except Exception:
-                    pass
             try:
                 self.finder.close()
             except Exception:
@@ -104,49 +123,75 @@ def _resident(root: Path) -> tuple[_ResidentFinder | None, str, bool, str | None
     with _POOL_LOCK:
         existing = _POOL.get(key)
         if existing is not None:
-            existing.last_used = time.time()
-            _POOL.move_to_end(key)
-            status = "ready" if existing.ready else "warming"
-            return existing, status, True, None
+            ttl = _int_env("Z0INT_FFF_INDEX_TTL_SECONDS", _DEFAULT_INDEX_TTL_SECONDS, 1)
+            if time.monotonic() - existing.created_at < ttl:
+                existing.last_used = time.time()
+                _POOL.move_to_end(key)
+                status = "ready" if existing.ready else "warming"
+                return existing, status, True, None
+            _POOL.pop(key)
+            existing.close()
 
-        mod = _load_fff()
-        if mod is None:
-            return None, "absent", False, None
+        result: list[tuple[_ResidentFinder | None, str, bool, str | None]] = []
 
-        try:
-            finder = mod.FileFinder(
-                root,
-                watch=True,
-                ai_mode=True,
-                enable_content_indexing=True,
-                follow_symlinks=False,
-            )
-            ready = bool(
-                finder.wait_for_scan_blocking(
-                    timeout_ms=_int_env(
-                        "Z0INT_FFF_SCAN_TIMEOUT_MS",
-                        _DEFAULT_SCAN_TIMEOUT_MS,
-                        1,
-                    )
-                )
-            )
-            resident = _ResidentFinder(
-                root=root,
-                finder=finder,
-                package_version=str(getattr(mod, "__version__", "unknown")),
-                ready=ready,
-            )
+        def rebuild() -> None:
+            # A short-lived dedicated thread lets descendants inherit nice/idle
+            # IO without lowering (or trying to re-raise) the HTTP thread.
             try:
-                resident.subscription = finder.watch(None, resident.on_change)
-            except Exception:
-                # watch=True still lets FFF maintain its own index. The
-                # subscription is only for our source-epoch counter.
-                resident.subscription = None
+                os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), 10)
+                subprocess.run(
+                    ["ionice", "-c", "3", "-p", str(threading.get_native_id())],
+                    check=True, capture_output=True, timeout=5,
+                )
+                result.append(_build_resident(root))
+            except Exception as exc:
+                result.append((None, "error", False, f"{type(exc).__name__}: {exc}"))
+
+        worker = threading.Thread(target=rebuild, name="fff-index-build")
+        worker.start()
+        worker.join()
+        resident, status, reused, error = result[0]
+        if resident is not None:
             _POOL[key] = resident
             _evict_if_needed()
-            return resident, ("ready" if ready else "warming"), False, None
-        except Exception as exc:
-            return None, "error", False, f"{type(exc).__name__}: {exc}"
+        return resident, status, reused, error
+
+
+def _build_resident(root: Path) -> tuple[_ResidentFinder | None, str, bool, str | None]:
+
+    try:
+        count = _admit_root(root)
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
+        error = f"FFF root rejected: {root}: {exc}"
+        _LOG.warning("%s", error)
+        return None, "rejected_root", False, error
+    mod = _load_fff()
+    if mod is None:
+        return None, "absent", False, None
+    finder = None
+    try:
+        _LOG.info("FFF admitting root=%s files=%d watch=False", root, count)
+        finder = mod.FileFinder(
+            root, watch=False, ai_mode=True, enable_content_indexing=True,
+            follow_symlinks=False,
+        )
+        ready = bool(finder.wait_for_scan_blocking(timeout_ms=_int_env(
+            "Z0INT_FFF_SCAN_TIMEOUT_MS", _DEFAULT_SCAN_TIMEOUT_MS, 1,
+        )))
+        if not ready:
+            # Do not leave a background scan running after releasing the
+            # global rebuild lock: another root could otherwise overlap it.
+            finder.close()
+            return None, "scan_timeout", False, "FFF initial scan timed out"
+        resident = _ResidentFinder(
+            root=root, finder=finder,
+            package_version=str(getattr(mod, "__version__", "unknown")), ready=ready,
+        )
+        return resident, ("ready" if ready else "warming"), False, None
+    except Exception as exc:
+        if finder is not None:
+            finder.close()
+        return None, "error", False, f"{type(exc).__name__}: {exc}"
 
 
 def _score_dict(score: Any) -> dict[str, Any]:
