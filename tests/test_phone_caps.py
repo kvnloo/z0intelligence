@@ -213,6 +213,9 @@ def test_native_adb_helper_is_in_default_source_scope(tmp_path, monkeypatch):
     ('pct = p["cpu_load"]\n', True),
     ('pct = p["temperature"]\n', True),
     ('pct = p["mem_available_mb"]\n', True),
+    ('pct = p["battery_temp_c"]\n', True),
+    ('pct = p["power"]["batteries"][0]["temperature"]\n', True),
+    ('battery_pct = p["cpu_load"]\npct = battery_pct\n', True),
     ('pct = p["power"]["batteries"][0]["pct"]\npct = p["cpu_load"]\n', True),
     ('pct = p["power"]["batteries"][0]["pct"]\nif other:\n    pct = p["temperature"]\n', True),
 ])

@@ -107,16 +107,24 @@ def _python(path: Path, text: str) -> list[dict]:
             return bool(RESOURCE.search(node.attr))
         return any(resource(child, tainted) for child in ast.iter_child_nodes(node))
 
+    def battery_hint(value):
+        return bool(re.search(r'batt(?:ery|eries)?', str(value), re.I)) and not re.search(
+            r'temp|thermal|cpu|mem', str(value), re.I)
+
     def battery_source(node, tainted):
         if isinstance(node, ast.Name):
-            return 'battery:' + node.id in tainted or bool(re.search(r'batt(?:ery|eries)?', node.id, re.I))
+            return 'battery:' + node.id in tainted or (node.id not in tainted and battery_hint(node.id))
         if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant):
-            return bool(re.search(r'batt(?:ery|eries)?', str(node.slice.value), re.I)) or (
-                node.slice.value in ('pct', 'level') and battery_source(node.value, tainted))
+            key = node.slice.value
+            return battery_hint(key) or (
+                (key in ('pct', 'level') or type(key) is int) and battery_source(node.value, tainted))
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == 'get' and node.args:
             key = node.args[0]
-            if isinstance(key, ast.Constant) and re.search(r'batt(?:ery|eries)?', str(key.value), re.I):
-                return True
+            return isinstance(key, ast.Constant) and (battery_hint(key.value) or (
+                key.value in ('pct', 'level') and battery_source(node.func.value, tainted)))
+        if isinstance(node, ast.Attribute):
+            return battery_hint(node.attr) or (
+                node.attr in ('pct', 'level') and battery_source(node.value, tainted))
         return any(battery_source(child, tainted) for child in ast.iter_child_nodes(node))
 
     def low_battery(node, tainted):
