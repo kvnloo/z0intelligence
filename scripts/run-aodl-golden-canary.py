@@ -50,8 +50,11 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
-    if not os.environ.get("AI_GATEWAY_API_KEY"):
-        parser.error("AI_GATEWAY_API_KEY must already be configured in the environment")
+    policy=json.loads((ROOT / "manifests/aodl-paid-canary.v1.json").read_text())
+    provider=policy.get("canary_provider", "vercel")
+    credential=policy["providers"][provider].get("api_key_env")
+    if credential and not os.environ.get(credential):
+        parser.error(f"{credential} must already be configured in the environment")
     if not args.omp_root.is_dir():
         parser.error("--omp-root must be an existing OMP checkout")
     if shutil.which("bun") is None:

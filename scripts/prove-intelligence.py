@@ -18,11 +18,13 @@ parser.add_argument('--omp-root',type=Path,required=True)
 args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=False)
 
 root=Path(__file__).resolve().parents[1]
+canary_policy=json.loads((root/'manifests/aodl-paid-canary.v1.json').read_text())
+canary_provider=canary_policy.get('canary_provider','vercel')
 os.environ['Z0INT_HOME']=str(args.output/'state')
-os.environ['Z0INT_EXECUTOR_PROVIDERS']='vercel'
+os.environ['Z0INT_EXECUTOR_PROVIDERS']=canary_provider
 os.environ['Z0INT_PYTHON']=sys.executable
 os.environ['Z0INT_GOVERNED_REMOTE']='1'
-os.environ['Z0INT_GOVERNED_PROVIDER']='vercel'
+os.environ['Z0INT_GOVERNED_PROVIDER']=canary_provider
 os.environ['Z0INT_GOVERNED_HARNESS']='omp'
 os.environ['Z0INT_AODL_CONTRACT_PATH']=str(root/'contracts/aodl/governed-worker-v1.json')
 os.environ['PYTHONPATH']=str(root/'src')+os.pathsep+os.environ.get('PYTHONPATH','')
@@ -106,14 +108,14 @@ try:
         raise AssertionError('Conflicting governed request was accepted')
 
     # Provider cap refusal happens after structural admission but before physical call.
-    permit=caps.acquire('vercel','cap-proof')
+    permit=caps.acquire(canary_provider,'cap-proof')
     assert permit['admitted']
     try:
         capped=post('/v1/governed-worker',governed(parent_agent=omp['session_id'],trace='capped'))
         assert not capped['ok'] and capped['requires_parent']
         save('capped.json',capped)
     finally:
-        caps.release(permit['token'],'vercel',0,0,attempted=False)
+        caps.release(permit['token'],canary_provider,0,0,attempted=False)
 
     # Freeze the exact host-built envelope, create only dispatch-start, then
     # prove replay refuses takeover instead of minting another execution.
@@ -126,7 +128,7 @@ try:
     rows=[json.loads(line) for line in receipts_path().read_text().splitlines()]
     latest={r['trace_id']:r for r in rows}
     physical=[r for r in latest.values() if r.get('execution')=='live' and r.get('extra',{}).get('physical_call_attempted')]
-    free=[r for r in physical if r.get('provider')=='vercel']
+    free=[r for r in physical if r.get('provider')==canary_provider]
     admissions=[r for r in latest.values() if r.get('capability_id')=='aodl.structural_admission']
     preparations=[r for r in latest.values() if r.get('capability_id')=='aodl.governed_request']
 

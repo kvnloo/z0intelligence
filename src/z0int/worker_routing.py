@@ -33,6 +33,9 @@ def oauth_module():
 
 
 def credential_available(provider, config):
+    if config.get('auth') == 'omp-oauth':
+        from .omp_subscription import credential_available
+        return credential_available(provider)
     if config.get('auth') == 'hermes-oauth':
         try:
             return bool(oauth_module().get_provider_auth_state('xai-oauth' if provider == 'grok' else 'nous'))
@@ -74,8 +77,10 @@ def request_constraints(policy, provider, model, args=None):
         return entry.get('request_constraints', {})
     canary = policy.get('paid_canary')
     if canary:
-        if provider not in ('openrouter', 'vercel') or model not in canary['models']:
+        if provider not in ('openrouter', 'vercel', 'openai-codex', 'anthropic') or model not in canary['models']:
             raise ValueError('paid canary model is not pinned')
+        if provider in ('openai-codex', 'anthropic'):
+            return {}
         if provider == 'vercel':
             return {'reasoning': {'enabled': False}}
         return {'provider': {'max_price': canary['max_price'], 'allow_fallbacks': False}}
@@ -209,15 +214,26 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
     retry_after=None
     output = ''
     transport = None
+    reservation_id = None
+    usage_present = None
+    actual_cost = None
     try:
-        from .canary_budget import reserve
-        reserve(policy, provider, model, messages, args.get('max_tokens', 512))
-        key, base = credentials(provider, config)
-        transport = OpenAICompatTransport(ServerConfig(base_url=base, model=model, api_key=key,
-            timeout_s=policy['timeout_s'], runtime='api', extra_headers={'User-Agent': 'z0int-api-eval/1.0 (+https://github.com/kvnloo/z0intelligence)'}))
+        from .canary_budget import reserve, settle
+        reservation_id = reserve(policy, provider, model, messages, args.get('max_tokens', 512))
         row.extra['physical_call_attempted'] = True
         row.extra['physical_started_at'] = time.time()
-        response = transport.chat(messages, max_tokens=args.get('max_tokens', 512), temperature=None if config.get('temperature') is False else 0, seed=None, extra_body=permit.get('request_constraints',request_constraints(policy,provider,model,args)))
+        if config.get('auth') == 'omp-oauth':
+            from .omp_subscription import execute
+            response = execute(provider, model, messages, args.get('max_tokens', 512), timeout_s=policy['timeout_s'])
+            row.extra['output_limit_enforced'] = response.output_limit_enforced
+            row.extra['quota_headers'] = response.quota_headers
+        else:
+            key, base = credentials(provider, config)
+            transport = OpenAICompatTransport(ServerConfig(base_url=base, model=model, api_key=key,
+                timeout_s=policy['timeout_s'], runtime='api', extra_headers={'User-Agent': 'z0int-api-eval/1.0 (+https://github.com/kvnloo/z0intelligence)'}))
+            response = transport.chat(messages, max_tokens=args.get('max_tokens', 512), temperature=None if config.get('temperature') is False else 0, seed=None, extra_body=permit.get('request_constraints',request_constraints(policy,provider,model,args)))
+        usage_present = bool(response.usage)
+        actual_cost = response.usage.get('cost')
         transport_status=200
         output = response.content
         if not isinstance(output, str):
@@ -258,6 +274,10 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
     finally:
         if transport is not None:row.extra['quota_headers']=getattr(transport,'quota_headers',{})
         if row.extra.get('physical_call_attempted'):row.extra['physical_finished_at']=time.time()
+        if reservation_id is not None:
+            row.extra['canary_budget'] = settle(policy, reservation_id,
+                http_status=transport_status, usage_present=False if transport_status == 403 and usage_present is None else usage_present,
+                actual_cost_usd=actual_cost)
         admission.release(permit,transport_status,(time.monotonic()-start)*1000,retry_after=retry_after,attempted=row.extra.get('physical_call_attempted',False))
     row.latency_ms = (time.monotonic() - start) * 1000
     # Do not return success if canonical receipt persistence fails.
