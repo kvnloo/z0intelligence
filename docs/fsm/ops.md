@@ -105,12 +105,15 @@ returns 3 for findings and 0 when clean. Missing or malformed explicit files fai
 closed as `scan-unavailable`. `--path FILE` is repeatable and replaces discovery,
 including external paths, for isolated fixtures.
 
-Discovery includes fleet scripts, the phone-mode registry, fleet docs, and the
-known phone skill/report/chat-driver paths when present. Python AST parsing
+Discovery includes fleet scripts (including native `scripts/fleet-adb`), the
+phone-mode registry, fleet docs, and known phone skill/report/chat-driver paths
+when present. Python AST parsing
 distinguishes non-phone branches. YAML checks phone mappings, inherited defaults
 and referenced worker profiles. A phone's explicit health override replaces the
-matching default. `min_battery_pct_on_battery: 2` passes, `40` fails. Phone CPU
-counts cannot establish all cores and are flagged. `cpus: all`, `memory_pct: 100`
+matching default. `min_battery_pct_on_battery: 2` passes, `40` fails.
+The native Python battery gate `pct < 2 and not on_ac` is allowed, including
+nested `power["batteries"][0]["pct"]` readings. Higher floors are findings.
+Phone CPU counts cannot establish all cores and are flagged. `cpus: all`, `memory_pct: 100`
 and equivalent uncapped markers pass. Discovery rejects a scripts directory
 passed as the checkout root, even if external known files exist. Shell mode
 branches and agent-facing prose use bounded lexical checks. These are bounded

@@ -183,3 +183,25 @@ def test_scripts_directory_is_not_a_checkout_root(tmp_path, monkeypatch, capsys)
     report = json.loads(capsys.readouterr().out)
     assert report['findings'][0]['rule'] == 'scan-unavailable'
     assert 'checkout root' in report['findings'][0]['detail']
+
+
+@pytest.mark.parametrize('expression', ["battery_pct", "power['batteries'][0]['pct']"])
+@pytest.mark.parametrize('threshold,bad', [(1, False), (2, False), (2.01, True), (40, True)])
+def test_native_phone_battery_floor_at_most_two(tmp_path, expression, threshold, bad):
+    path = tmp_path / 'fleet-adb'
+    path.write_text('#!/usr/bin/env python3\n'
+                    f'if {expression} < {threshold} and not power["on_ac"]:\n'
+                    '    raise RuntimeError("below owner battery floor")\n')
+    assert bool(C.phone_caps_findings(tmp_path, [path])) is bad
+
+
+def test_native_adb_helper_is_in_default_source_scope(tmp_path, monkeypatch):
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    helper = scripts / 'fleet-adb'
+    helper.write_text('#!/usr/bin/env python3\n'
+                      'if power["batteries"][0]["pct"] < 2 and not power["on_ac"]:\n'
+                      '    raise RuntimeError("battery below 2% and not charging")\n')
+    monkeypatch.setattr(C, 'KNOWN_PATHS', ())
+    assert helper in C.phone_caps_paths(tmp_path)
+    assert C.phone_caps_findings(tmp_path) == []

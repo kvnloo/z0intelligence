@@ -37,7 +37,7 @@ def phone_caps_paths(root: Path, paths: list[Path] | None = None) -> list[Path]:
     root = Path(root).resolve()
     if paths is not None:
         return sorted({(p if p.is_absolute() else root / p).resolve() for p in map(Path, paths)})
-    candidates = [*(root / 'scripts' / name for name in ('fleet', 'fleet-build', 'fleet-polite-run')),
+    candidates = [*(root / 'scripts' / name for name in ('fleet', 'fleet-build', 'fleet-polite-run', 'fleet-adb')),
                   *sorted((root / 'scripts').glob('fleet-phone*')),
                   *sorted((root / 'scripts').glob('fleet_phone*.py')),
                   root / 'config/fleet/nodes.yaml',
@@ -97,7 +97,8 @@ def _python(path: Path, text: str) -> list[dict]:
         # A dictionary named memory can be prompt memory, not RAM: use
         # accessed field semantics instead of tainting all its metadata.
         if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant):
-            return bool(RESOURCE.search(str(node.slice.value)))
+            return bool(RESOURCE.search(str(node.slice.value)) or (
+                node.slice.value in ('pct', 'level') and re.search(r'batter(?:y|ies)', _source(node), re.I)))
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == 'get' and node.args and isinstance(node.args[0], ast.Constant):
             return bool(RESOURCE.search(str(node.args[0].value)))
         if isinstance(node, ast.Name):
@@ -105,6 +106,19 @@ def _python(path: Path, text: str) -> list[dict]:
         if isinstance(node, ast.Attribute):
             return bool(RESOURCE.search(node.attr))
         return any(resource(child, tainted) for child in ast.iter_child_nodes(node))
+
+    def low_battery(node):
+        if not isinstance(node, ast.Compare) or len(node.ops) != 1:
+            return False
+        left, right, op = node.left, node.comparators[0], node.ops[0]
+        if isinstance(op, (ast.Gt, ast.GtE)):
+            left, right = right, left
+        elif not isinstance(op, (ast.Lt, ast.LtE)):
+            return False
+        return (isinstance(right, ast.Constant) and type(right.value) in (int, float)
+                and 0 <= right.value <= 2
+                and bool(re.search(r'batt(?:ery|eries)?', _source(left), re.I))
+                and not re.search(r'mem|cpu|thermal|temp', _source(left), re.I))
 
     def expr(node, safe, tainted, bound):
         # Concrete registry identity, not the wrapper's name: worker = nodes["mbp"]
@@ -140,7 +154,7 @@ def _python(path: Path, text: str) -> list[dict]:
                         add(node, 'python-resource-default', 'resource CLI argument has an agent-chosen default')
             optional = isinstance(node, ast.Compare) and any(isinstance(v, ast.Constant) and v.value is None for v in [node.left, *node.comparators]) and all(isinstance(op, (ast.Is, ast.IsNot)) for op in node.ops)
             ranking = isinstance(node, ast.Compare) and any(isinstance(v, ast.Subscript) and isinstance(v.slice, ast.Constant) and isinstance(v.slice.value, int) for v in [node.left, *node.comparators])
-            if isinstance(node, ast.Compare) and resource(node, tainted) and not optional and not ranking:
+            if isinstance(node, ast.Compare) and resource(node, tainted) and not optional and not ranking and not low_battery(node):
                 add(node, 'python-resource-comparison', 'resource comparison outside a non-phone-only scope')
             if isinstance(node, ast.Constant) and isinstance(node.value, str) and re.search(r'\b(?:taskset|ulimit|CPUQuota|MemoryMax)\b', node.value):
                 add(node, 'python-resource-enforcement', 'phone-visible resource enforcement command')
