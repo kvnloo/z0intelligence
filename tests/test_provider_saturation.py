@@ -129,7 +129,7 @@ def test_release_idempotency_and_receipt_admission_fields():
     assert rows[0]['extra']['capped'] is False
 
 
-def test_real_http_429_falls_back_without_retry_storm(monkeypatch):
+def test_real_http_429_falls_back_without_retry_storm(monkeypatch, routing_policy_snapshot):
     calls=[]
     class H(BaseHTTPRequestHandler):
         def log_message(self,*a):pass
@@ -145,11 +145,18 @@ def test_real_http_429_falls_back_without_retry_storm(monkeypatch):
     monkeypatch.setenv('TEST_PROVIDER_KEY','local-test-only')
     try:
         plan=w.plan_route('Plain task',policy,providers);plan['source']='local_http_fixture'
+        routing_policy_snapshot(plan)
         result=w.execute_plan({'task':'Reply OK','parent_agent':'test'},policy,providers,plan,receipt_sink=append_receipt)
         assert result['ok'] and result['provider']=='deepseek'
         assert calls==['qwen-3.8-27b','deepseek-chat']
         assert w.plan_route('Plain task',policy,providers)['candidates'][0]['provider']=='deepseek'
         assert result['attempts'][0]['extra']['cap']==32
+        first, second = result["attempts"]
+        assert first["extra"]["model_routing"]["provider"] == "cerebras"
+        assert second["extra"]["model_routing"]["provider"] == "deepseek"
+        assert second["extra"]["model_routing"]["rule_id"] == "O14.model_routing"
+        assert second["extra"]["model_routing"]["failed_attempts"][0]["http_status"] == 429
+        assert second["extra"]["model_routing"]["request_tokens"]["estimated_output_tokens"] == 512
     finally:server.shutdown();server.server_close();thread.join()
 
 
