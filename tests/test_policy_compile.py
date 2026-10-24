@@ -16,7 +16,7 @@ CONFIG = CompilerConfig(compiler_revision="a" * 40)
 
 
 def finding(kind="measured", *, low=.98, n=200, ts="2026-10-24T10:00:00Z", arm=None,
-            metric=None, expires_at="2026-11-07T10:00:00Z", source=None):
+            metric=None, expires_at="2026-11-07T10:00:00Z", source=None, synthetic=False):
     values = {"name": "acc_at_conf", "value": max(low, .99), "n": n, "ci_low": low,
               "ci_high": 1., "ci_method": "wilson95", "higher_is_better": True}
     values.update(metric or {})
@@ -24,7 +24,7 @@ def finding(kind="measured", *, low=.98, n=200, ts="2026-10-24T10:00:00Z", arm=N
         "sha256": "b" * 64, "run_id": "test"}, subject={"family": "omp.tool", "job": "next-action"},
         arm=arm or {"kind": "slm", "model": "synthetic@rev"}, metric=values,
         evidence_class=kind, scope_note="Only synthetic next-action tasks and this exact arm.",
-        expires_at=expires_at).to_dict()
+        expires_at=expires_at, synthetic=synthetic).to_dict()
 
 
 def stage(policy):
@@ -249,3 +249,33 @@ def test_serving_preserves_quant_scope_and_missing_endpoint_annotation():
     missing = compile_rows(missing_rows, compile_rows(missing_rows))
     assert next(iter(missing["families"].values()))["serving_missing"] is True
     assert "Missing serving endpoints" in markdown_diff(None, missing, missing_rows)
+
+
+def test_synthetic_provenance_and_measured_identity_survive_compilation():
+    arm = {"kind": "slm", "model": "synthetic@rev", "quant": "Q8_0",
+           "engine": "synthetic-build", "backend": "cpu", "device": "fixture"}
+    metadata = {"expected_model_id": "synthetic-alias", "engine_build": "synthetic-build",
+                "model_path": "/synthetic/alias.gguf", "model_resolved_path": "/synthetic/model.gguf",
+                "model_sha256": "f" * 64}
+    source = {"kind": "manual", "path": "/synthetic/results.json", "sha256": "e" * 64,
+              "url": "http://127.0.0.1:9000/v1", **metadata}
+    measured = finding(arm=arm, source=source, synthetic=True, metric={"live_shadow": True})
+    replay = finding("replayed_L1", arm=arm, metric={"divergence": 0., "aa_noise_floor": .01})
+    rows = [measured, replay]
+    shadow = compile_rows(rows)
+    assert stage(shadow) == "shadow"  # Synthetic never skips a promotion gate.
+    policy = compile_rows(rows, shadow)
+    assert stage(policy) == "canary"
+    assert policy["synthetic"] is True
+    assert next(iter(policy["families"].values()))["synthetic"] is True
+    assert policy["serving"][0]["synthetic"] is True
+    assert {key: policy["serving"][0][key] for key in metadata} == metadata
+    assert policy_diff(None, policy, rows)["synthetic"] is True
+    assert "**Synthetic policy. This is not a real experiment promotion.**" in markdown_diff(None, policy, rows)
+
+
+def test_unused_synthetic_input_still_marks_whole_policy():
+    row = finding("inference", synthetic=True)
+    policy = compile_rows([row])
+    assert stage(policy) == "none"
+    assert policy["synthetic"] is True

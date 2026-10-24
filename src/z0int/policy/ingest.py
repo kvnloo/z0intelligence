@@ -38,7 +38,7 @@ def _finding(spec: dict, source: dict, ts: str, subject: dict, arm: dict, metric
                    evidence_class=evidence_class,
                    scope_note=scope_note or spec.get("scope_note", "Only this measured job and exact arm; no cross-device, quant or engine generalization."),
                    expires_at=expires_at or iso(timestamp(ts) + timedelta(days=14)),
-                   baseline=baseline or {}).to_dict()
+                   baseline=baseline or {}, synthetic=spec.get("synthetic", False)).to_dict()
 
 
 def _shadow(data: dict, spec: dict, source: dict, ts: str) -> list[dict]:
@@ -184,10 +184,24 @@ def ingest_sources(sources: list[dict], home: Path | None = None) -> dict:
             if path.suffix not in {".json", ".jsonl"}:
                 raise FindingsError("Prose-only source is not parsed")
             data = [json.loads(line) for line in raw.splitlines()] if path.suffix == ".jsonl" else json.loads(raw)
+            marked = [spec]
+            if isinstance(data, dict):
+                marked.append(data)
+                for key in ("findings", "models", "results", "opportunities"):
+                    if isinstance(data.get(key), list):
+                        marked.extend(row for row in data[key] if isinstance(row, dict))
+            elif isinstance(data, list):
+                marked.extend(row for row in data if isinstance(row, dict))
+            if any(type(row.get("synthetic", False)) is not bool for row in marked):
+                raise FindingsError("Source synthetic must be boolean")
+            spec = {**spec, "synthetic": any(row.get("synthetic", False) for row in marked)}
             source = {"kind": spec["kind"], "path": str(path), "sha256": sha,
                       "run_id": spec.get("run_id", sha[:16])}
             if spec.get("url"):
                 source["url"] = spec["url"]
+            for field in ("expected_model_id", "engine_build", "model_path", "model_resolved_path", "model_sha256"):
+                if field in spec:
+                    source[field] = spec[field]
             if isinstance(data, dict):
                 value = data.get("ts", spec.get("ts"))
             else:

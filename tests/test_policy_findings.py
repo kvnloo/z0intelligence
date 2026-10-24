@@ -187,3 +187,37 @@ def test_noncanonical_whitespace_is_tampering(tmp_path):
     path.write_text(json.dumps(rows[0], indent=None) + "\n")
     with pytest.raises(FindingsError, match="Noncanonical"):
         read_findings(path)
+
+
+def test_synthetic_finding_is_optional_hashed_and_chain_preserved(tmp_path):
+    real = finding()
+    synthetic = finding(synthetic=True)
+    assert "synthetic" not in real
+    assert synthetic["synthetic"] is True
+    assert real["id"] != synthetic["id"]
+    path = tmp_path / "findings.jsonl"
+    rows = append_findings([real, synthetic], path)
+    assert read_findings(path) == rows
+    rows[1]["synthetic"] = False
+    path.write_bytes(b"".join(canonical(row) + b"\n" for row in rows))
+    with pytest.raises(FindingsError):
+        read_findings(path)
+    with pytest.raises(FindingsError, match="boolean"):
+        finding(synthetic="true")
+
+
+def test_ingest_preserves_synthetic_receipt_and_endpoint_identity(tmp_path):
+    source = tmp_path / "eval.json"
+    row = finding(synthetic=True)
+    source.write_text(json.dumps({"schema": "z0eval.result.v1", "ts": row["ts"],
+        "verdict": "KEEP", "gates": {key: "pass" for key in
+            ("contract", "authority", "quality_noninferiority", "latency_tail")},
+        "findings": [row]}))
+    metadata = {"expected_model_id": "synthetic-alias", "engine_build": "synthetic-build",
+                "model_path": "/synthetic/alias.gguf", "model_resolved_path": "/synthetic/model.gguf",
+                "model_sha256": "f" * 64}
+    spec = {"kind": "z0eval_result", "path": str(source), **metadata}
+    assert ingest_sources([spec], tmp_path)["added"] == 1
+    emitted = read_findings(ledger_path(tmp_path))[0]
+    assert emitted["synthetic"] is True
+    assert {key: emitted["source"][key] for key in metadata} == metadata

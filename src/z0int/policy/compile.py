@@ -169,6 +169,7 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
                          "threshold": config.bar, "abstain_to": config.abstain_to,
                          "canary_share": config.canary_share, "evidence": evidence,
                          "rule_id": rule_id, "expires_at": iso(expiry), "demoted_reason": reason}
+        families[key]["synthetic"] = any(row.get("synthetic", False) for row in evidence_rows.values())
         if stage != before:
             changes.append({"rule_id": rule_id, "from": before, "to": stage, "because": evidence})
     serving = {}
@@ -186,6 +187,10 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
         scope = scope_of(row)
         identity = canonical(scope)
         serving[identity] = {**scope, "kind": arm["kind"], "url": url, "evidence": [row["id"]]}
+        serving[identity]["synthetic"] = row.get("synthetic", False)
+        for field in ("expected_model_id", "engine_build", "model_path", "model_resolved_path", "model_sha256"):
+            if field in row["source"]:
+                serving[identity][field] = row["source"][field]
     for rule in families.values():
         if rule["stage"] in {"canary", "live"}:
             rule["serving_missing"] = canonical(rule["scope"]) not in serving
@@ -193,6 +198,7 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
               "findings_head": findings[-1]["id"] if findings else "",
               "compiler": "z0int.policy.compile@" + config.compiler_revision,
               "families": families, "serving": [serving[k] for k in sorted(serving)], "changes": changes}
+    policy["synthetic"] = any(row.get("synthetic", False) for row in findings)
     policy["version"] = digest(policy)
     return policy
 
