@@ -32,9 +32,10 @@ git -C "$repo" archive "$revision:omp-extensions/z0-relay-guard" | tar -xf - -C 
 # Relative paths and sorted file digests make this SHA independent of staging paths and mtimes.
 content_sha() (
   cd -- "$1"
-  find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d ' ' -f 1
+  find . -type f ! -name .content-sha256 -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d ' ' -f 1
 )
 content=$(content_sha "$stage")
+printf '%s\n' "$content" > "$stage/.content-sha256"
 target="$store/$content"
 if [[ -e $target || -L $target ]]; then
   [[ -d $target && ! -L $target && $(content_sha "$target") == "$content" ]] || {
@@ -56,4 +57,4 @@ mv -Tf -- "$link_stage" "$link"
 link_stage=
 printf 'Installed commit: %s\nContent SHA256: %s\nExtension link: %s -> %s\n' "$revision" "$content" "$link" "$target"
 printf 'Enable command: bash %q %s\n' "$script_dir/install-z0-relay-guard.sh" "$revision"
-printf 'Start a new OMP session. Use omp --show for post-tool coverage notes.\n'
+printf 'Start a new OMP session. IntentService approval is required for CONTRACT-tier actions. Use omp --show for relay receipts.\n'
