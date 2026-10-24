@@ -93,18 +93,28 @@ If history cannot be read, the id list says `unavailable`. The relay remains blo
 
 ## Enable manually
 
-Run this command only when you choose to enable the extension:
+Choose a full, reviewed commit SHA. Then call the installer from that checkout:
 
 ```sh
-mkdir -p "$HOME/.omp/agent/extensions" && ln -s /mnt/zer0models/z0-wt/relay-guard/omp-extensions/z0-relay-guard "$HOME/.omp/agent/extensions/z0-relay-guard"
+bash /mnt/zer0models/z0-wt/relay-guard/scripts/install-z0-relay-guard.sh <full-commit-sha>
 ```
 
-An existing destination makes `ln -s` fail without replacing it.
+The installer reads only the extension's committed bytes at that exact revision.
+It copies those bytes into `~/.local/lib/z0-relay-guard/<content-sha256>/` and makes the snapshot read-only.
+The content digest covers sorted relative file paths and their SHA256 digests, independent of checkout paths and mtimes.
+The live `~/.omp/agent/extensions/z0-relay-guard` symlink points to that immutable copy, never to the task worktree.
+Repeated installation reuses the same verified snapshot. An altered snapshot or a non-symlink destination blocks installation.
+The installer serializes deployment changes and atomically replaces the extension symlink.
+It prints the installed commit, content digest, and final link target. It does not run OMP.
+This branch did not run the installer against the live home.
 Then start a new OMP session, or use OMP's extension reload.
-To disable, remove only this symlink and reload extensions.
+To disable, remove only this deployment symlink and reload extensions.
 OMP loads `index.js` directly. No dependencies or build step are required.
 
 Start OMP with `omp --show` to enable the registered Boolean flag.
+This is a real extension CLI flag, not an assumed built-in.
+OMP's `src/cli/extension-flags.ts` reparses arguments using registered extension flags and passes values to the runner.
+`src/cli/args.ts` accepts registered Boolean flags such as this extension's `show` flag.
 After a permitted tool completes, the `tool_result` handler sends its coverage blocks as a visible custom chat message.
 It sets `triggerTurn: false`. It does not send a user message or create user-authored history.
 Notes match the issuing session and tool-call id. A failed tool still shows its coverage, labelled `tool failed`.
