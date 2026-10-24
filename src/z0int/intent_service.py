@@ -230,25 +230,36 @@ class IntentService:
     def _directory(self, session_id):
         return self.root / "intent" / identity(session_id, "session_id")
 
-    def _load(self, session_id, contract_id):
+    async def _load(self, session_id, contract_id):
         directory = self._directory(session_id)
         contract_id = identity(contract_id, "contract_id")
-        # Gate-owned runtime receipts live in the approved root snapshot.
+        # Immutable approval authorizes a gate-owned, hash-bound runtime clone.
         for path in (directory / f"{contract_id}.json", directory / ".pending" / f"{contract_id}.json"):
             if path.is_file():
                 doc = json.loads(path.read_text())
                 if doc["plan"]["bindings"]["approval"]["session_id"] != session_id:
                     raise ValueError("Stored contract session mismatch")
+                if path.parent == directory:
+                    runtime_path = directory / "runtime" / f"{contract_id}.json"
+                    try:
+                        runtime = json.loads(runtime_path.read_text())
+                    except FileNotFoundError:
+                        return doc
+                    approval = doc["plan"]["bindings"]["approval"]
+                    if (runtime["plan"]["bindings"]["approval"] != approval
+                            or await self.bridge({"op": "hash", "doc": runtime}) != approval["contractHash"]):
+                        raise ValueError("Runtime contract approval/hash mismatch")
+                    return runtime
                 return doc
         raise ValueError("Unknown open contract")
 
-    def current(self, request):
+    async def current(self, request):
         directory = self._directory(request["session_id"])
         path = directory / ".pending" / "current.json"
         if not path.exists():
             return {"contract": None}
         contract_id = json.loads(path.read_text())["contract_id"]
-        doc = self._load(request["session_id"], contract_id)
+        doc = await self._load(request["session_id"], contract_id)
         if doc["plan"]["bindings"]["approval"]["status"] == "rejected":
             return {"contract": None}
         return {"contract": doc, "summary": render_contract(doc)}
@@ -269,7 +280,7 @@ class IntentService:
         open_id = request.get("open_contract")
         if open_id is not None and not isinstance(open_id, str):
             raise ValueError("open_contract must be a stored contract id, not a client graph")
-        open_doc = self._load(session_id, open_id) if open_id else None
+        open_doc = await self._load(session_id, open_id) if open_id else None
         doc = await self.bridge({"op": "prepare", "session_id": session_id, "entry_id": entry_id,
                                  "text": text, "timestamp": request.get("timestamp") or now(), "open": open_doc})
         retrieved = await self.retriever.retrieve(text, request.get("recent_user_msgs", []))
@@ -320,7 +331,7 @@ class IntentService:
         current = json.loads((directory / ".pending" / "current.json").read_text())
         if current["contract_id"] != contract_id:
             raise ValueError("Superseded contract cannot be approved")
-        doc = self._load(session_id, contract_id)
+        doc = await self._load(session_id, contract_id)
         approval = doc["plan"]["bindings"]["approval"]
         if approval["status"] != "pending":
             raise ValueError("Only pending proposals can receive a decision")
@@ -357,7 +368,7 @@ def make_handler(service):
                     elif self.path == "/check": result = asyncio.run(service.check(request))
                     elif self.path == "/approve": result = asyncio.run(service.decide(request, True))
                     elif self.path == "/reject": result = asyncio.run(service.decide(request, False))
-                    elif self.path == "/current": result = service.current(request)
+                    elif self.path == "/current": result = asyncio.run(service.current(request))
                     else:
                         self.send_error(404)
                         return

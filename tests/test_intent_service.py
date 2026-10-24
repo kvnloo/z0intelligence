@@ -86,7 +86,7 @@ def test_reject_never_writes_binding(tmp_path):
     decision = {"session_id": "test", **{k: result[k] for k in ("contract_id", "sourceHash", "contractHash", "revision")}}
     rejected = asyncio.run(srv.decide(decision, False))
     assert ".pending" in rejected["path"]
-    assert srv.current({"session_id": "test"}) == {"contract": None}
+    assert asyncio.run(srv.current({"session_id": "test"})) == {"contract": None}
 
 
 @pytest.mark.parametrize("value", ["../escape", "/tmp", "..", "", None])
@@ -119,3 +119,27 @@ def test_claimed_memory_requires_precondition_and_cannot_upgrade_to_observed():
     citation["evidence_kind"] = "observed"
     with pytest.raises(ValueError, match="memory"):
         validate_draft(draft, [record])
+
+
+@pytest.mark.parametrize("damage", [None, "approval", "hash", "json"])
+def test_runtime_clone_preserves_receipts_and_fails_closed(tmp_path, damage):
+    srv = service(tmp_path)
+    result = asyncio.run(srv.reconcile(request()))
+    decision = {"session_id": "test", **{k: result[k] for k in ("contract_id", "sourceHash", "contractHash", "revision")}}
+    approved = asyncio.run(srv.decide(decision, True))
+    runtime = copy.deepcopy(approved["contract"])
+    runtime["events"] = [{"type": "observed", "receipt": "kept"}]
+    if damage == "approval":
+        runtime["plan"]["bindings"]["approval"]["approved_by"] = "intruder"
+    if damage == "hash":
+        async def bad_hash(_):
+            return "different-hash"
+        srv.bridge = bad_hash
+    path = Path(approved["path"]).parent / "runtime" / Path(approved["path"]).name
+    path.parent.mkdir()
+    path.write_text("{" if damage == "json" else json.dumps(runtime))
+    if damage:
+        with pytest.raises((ValueError, json.JSONDecodeError)):
+            asyncio.run(srv._load("test", result["contract_id"]))
+    else:
+        assert asyncio.run(srv._load("test", result["contract_id"]))["events"] == runtime["events"]
