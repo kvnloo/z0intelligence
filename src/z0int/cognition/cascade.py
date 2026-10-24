@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from ..receipt import DecisionReceipt, new_trace_id
+from .. import policy_runtime
 from .actions import ActionGraph, LegalActionSet, compile_actions
 from .adapters.local_slm import ToolDecision, ToolDecisionBackend, ToolDecisionRequest
 from .candidates import CandidateModel, requirement_for_legal_set
@@ -93,9 +94,22 @@ class CascadeOutcome:
     #: The candidate-surface verdict for this pass, when a candidate inventory
     #: was supplied. ``None`` means the surface was not enforced.
     surface: SurfaceDecision | None = None
+    _runtime_policy: policy_runtime.Policy = field(default_factory=policy_runtime.current, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        # Also cover callers that use the Python cascade directly, not the CLI.
+        families = self.legal.family_options()
+        by_action = {a.action_id: a.family for a in self.legal.legal if a.family}
+        for name in ("receipts", "attempts", "shadow"):
+            stamped = []
+            for row in getattr(self, name):
+                family = by_action.get(row.get("selected_action") or row.get("prediction"))
+                family = family or (families[0] if len(families) == 1 else "none")
+                stamped.append(self._runtime_policy.stamp(dict(row), family))
+            object.__setattr__(self, name, tuple(stamped))
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        body = {
             "schema": SCHEMA,
             "trace_id": self.trace_id,
             "graph_digest": self.legal.graph_digest,
@@ -112,6 +126,14 @@ class CascadeOutcome:
             "shadow": [dict(s) for s in self.shadow],
             "receipts": [dict(r) for r in self.receipts],
         }
+        families = self.legal.family_options()
+        family = next((a.family for a in self.legal.legal if a.action_id == self.selected_action and a.family), None)
+        family = family or (families[0] if len(families) == 1 else "none")
+        self._runtime_policy.stamp(body, family)
+        self._runtime_policy.stamp(body["escalation"], family)
+        if body["surface"] is not None:
+            self._runtime_policy.stamp(body["surface"], family)
+        return body
 
 
 def _attempt_row(tier: str, decision: ToolDecision) -> dict[str, Any]:
@@ -453,7 +475,7 @@ class CognitionCascade:
                 escalation=EscalationDecision(
                     tier="deterministic",
                     reason=legal.deterministic_reason or "deterministic_solution",
-                    policy_version=self._policy.thresholds.version,
+                    escalation_version=self._policy.thresholds.version,
                 ),
                 tier="deterministic",
                 selected_action=legal.deterministic_solution,
@@ -476,7 +498,7 @@ class CognitionCascade:
                 escalation=EscalationDecision(
                     tier="deterministic",
                     reason="no_legal_actions",
-                    policy_version=self._policy.thresholds.version,
+                    escalation_version=self._policy.thresholds.version,
                 ),
                 tier="abstained",
                 selected_action=None,
