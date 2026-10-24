@@ -68,7 +68,6 @@ export function ompAutomaticContextEnabled() {
     return false;
   }
 }
-
 export function ompHotPath() {
   return {action: 'native', deferred: true, spawn: false};
 }
