@@ -302,14 +302,17 @@ Exempt blocks must use explicit `historical:`/`platform-observation:` and
             data, binding = _read(p)
             text = data.decode('utf-8')
             phone_spans = _phone_yaml_lines(text) if p.suffix in ('.yaml', '.yml') and 'fleet' in str(p) else None
-            phone_file = any(word in str(p).lower() for word in ('phone', 's22', 's25', 'fleet', 'mobile'))
+            phone_file = any(word in str(p).lower() for word in ('phone', 's22', 's25', 'mobile'))
             o10 = phone_caps_findings(p.parent.parent, [p]) if p.suffix in ('.py', '.sh', '.yaml', '.yml', '.md') or p.name == 'fleet' else []
             if any(finding['rule'] == 'scan-unavailable' for finding in o10):
                 errors.append(f'O10 source unavailable: {p}')
             o10_lines = {finding['line'] for finding in o10 if finding['rule'] != 'scan-unavailable'}
             historical = False
+            phone_context = phone_file
             for number, line in enumerate(text.splitlines(), 1):
                 marker = line.strip().lower()
+                if p.suffix == '.md' and line.startswith('#'):
+                    phone_context = phone_file or any(word in marker for word in ('phone', 's22', 's25'))
                 if marker in ('historical:', 'platform-observation:'):
                     historical = True
                     continue
@@ -320,7 +323,7 @@ Exempt blocks must use explicit `historical:`/`platform-observation:` and
                     continue
                 if phone_spans is not None and not any(start <= number < end for start, end in phone_spans):
                     continue
-                if not phone_file and not any(word in line.lower() for word in ('phone', 's22', 's25')):
+                if phone_spans is None and not phone_context and number not in o10_lines and not any(word in line.lower() for word in ('phone', 's22', 's25')):
                     continue
                 for rule, pattern in REVOKED.items():
                     matched = pattern.search(line) if rule == 'phone-disk-floor' else (

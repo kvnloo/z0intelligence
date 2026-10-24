@@ -234,3 +234,32 @@ def test_release_manifest_binds_approved_artifacts(tmp_path, monkeypatch, change
     assert len(rows) == 1
     assert rows[0]["id"] == "manifest-generation"
     assert rows[0]["status"] == status
+
+
+@pytest.mark.parametrize("native_status,exit_code,expected", [
+    ("degraded", 3, "violation"),
+    ("partial_measurement", 3, "violation"),
+    ("success", 0, "unknown"),
+])
+def test_native_tick_summary_cannot_promote_transport_to_success(tmp_path, native_status, exit_code, expected):
+    path = tmp_path / "tick.json"
+    put(path, {"schema": "z0int.loop.tick_summary.v0",
+               "status": native_status, "exit": exit_code, "rows_added": 2,
+               "cognition": {"transport_tick": True}})
+    row = S.sensor_outcome({"id": "native-tick", "path": str(path)})
+    assert row["status"] == expected
+    assert row["blocked"] is True
+    evidence = row["evidence"]
+    assert evidence["receipt"]["path"] == str(path.resolve())
+    assert evidence["receipt"]["sha256"] == digest(path.read_bytes())
+    assert evidence["observed_status"] == native_status
+    assert evidence["observed_exit"] == exit_code
+    assert evidence["rows_added"] == 2
+    assert evidence["transport_tick"] is True
+
+
+def test_generic_host_disk_example_does_not_become_phone_policy(tmp_path):
+    path = tmp_path / "fleet.md"
+    path.write_text("# Host health\nForce-test with --set min_disk_free_gb=99999.\n")
+    rows = S.sensor_revocations(revocation_spec(tmp_path, path))
+    assert rows[-1]["status"] == "pass"
