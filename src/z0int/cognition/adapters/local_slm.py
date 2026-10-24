@@ -233,6 +233,12 @@ class LocalSLMBackend:
         return self._backend_id
 
     @property
+    def model_scope(self):
+        from ...backends.base import ModelScope
+
+        return ModelScope(**self._scope)
+
+    @property
     def dialect(self) -> ToolDialect:
         return self._dialect
 

@@ -48,6 +48,13 @@ class OpenJevDirectBackend:
         return cls(model_id=manifest_id, hf=hf, revision=rev)
 
     @property
+    def model_scope(self):
+        from .base import ModelScope
+
+        return ModelScope(model=self.model_id, quant="unknown", engine="transformers",
+                          backend=self.ID, device=self.device)
+
+    @property
     def capabilities(self) -> BackendCapabilities:
         return BackendCapabilities(
             id=self.ID,
