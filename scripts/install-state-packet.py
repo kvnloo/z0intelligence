@@ -53,6 +53,7 @@ def main():
             import io
             with tarfile.open(fileobj=io.BytesIO(archive)) as tf:
                 tf.extractall(tmp, filter='data')
+            (Path(tmp) / 'DEPLOYED_SHA').write_text(sha + '\n')
             os.rename(tmp, dest)
     link(base / 'current', dest, backups)
     link(home / '.omp/agent/extensions/z0-state-packet', dest / 'omp-extensions/z0-state-packet', backups)

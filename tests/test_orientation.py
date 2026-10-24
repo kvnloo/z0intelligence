@@ -24,6 +24,22 @@ def load(name, path):
     return module
 
 
+class DeploymentIdentityTests(unittest.TestCase):
+    def test_valid_stamp_wins_and_mismatched_stamp_fails(self):
+        module = load('identity_generator', ROOT / 'scripts/state-packet/generate_packet.py')
+        with tempfile.TemporaryDirectory() as tmp:
+            sha = 'a' * 40
+            root = Path(tmp) / sha
+            child = root / 'omp-extensions/extension'
+            child.mkdir(parents=True)
+            stamp = root / 'DEPLOYED_SHA'
+            stamp.write_text(sha + '\n')
+            with patch.object(module, 'cmd', return_value=''):
+                self.assertEqual(module.deployment_identity(child), (str(root), sha, 'content-stamped', str(stamp)))
+                stamp.write_text('b' * 40)
+                self.assertEqual(module.deployment_identity(child), ('', '', '', ''))
+
+
 class OrientationTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

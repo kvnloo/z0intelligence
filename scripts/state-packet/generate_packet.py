@@ -19,7 +19,8 @@ from datetime import datetime, timezone
 
 OPS = Path('/mnt/zer0models/workspace/zer0/data/operations')
 HERE = OPS / 'repo-distill'
-DEFAULT_REPO = Path('/mnt/zer0models/z0-wt/z0intelligence')
+STAMPED_REPO = Path.home() / '.local/lib/z0int-shadow/current'
+DEFAULT_REPO = Path(os.environ.get('Z0INT_LIVE_REPO', str(STAMPED_REPO if STAMPED_REPO.is_dir() else Path('/mnt/zer0models/z0-wt/z0intelligence'))))
 EXCLUDE = {'repo-distill'}
 
 
@@ -35,6 +36,23 @@ def digest(path: Path) -> str:
 def clean(text: str, limit: int = 700) -> str:
     text = re.sub(r'\s+', ' ', text).strip().replace('`', "'")
     return text if len(text) <= limit else text[:limit] + ' [excerpt]'
+
+
+def deployment_identity(path: Path) -> tuple[str, str, str, str]:
+    """Read an exact stamped deployment before consulting actual Git checkouts."""
+    resolved = path.resolve()
+    for ancestor in (resolved, *resolved.parents):
+        stamp = ancestor / 'DEPLOYED_SHA'
+        try:
+            sha = stamp.read_text().strip()
+        except OSError:
+            continue
+        if re.fullmatch(r'[0-9a-f]{40}', sha) and ancestor.name == sha:
+            return str(ancestor), sha, 'content-stamped', str(stamp)
+    root = cmd(['git', 'rev-parse', '--show-toplevel'], resolved)
+    if root:
+        return root, cmd(['git', 'rev-parse', 'HEAD'], resolved), cmd(['git', 'branch', '--show-current'], resolved), ''
+    return '', '', '', ''
 
 
 def atomic_write(path: Path, text: str) -> None:
@@ -117,10 +135,10 @@ def main() -> None:
             continue
         if 'generate_packet.py' in argv or any(p in ('-c', '-p', '--prompt') for p in argv_parts):
             continue
-        root = cmd(['git', 'rev-parse', '--show-toplevel'], cwd)
-        sha = cmd(['git', 'rev-parse', 'HEAD'], cwd) if root else ''
-        branch = cmd(['git', 'branch', '--show-current'], cwd) if root else ''
-        live.append({'pid': int(item.name), 'cwd': str(cwd), 'git_root': root, 'sha': sha, 'branch': branch, 'command': clean(argv, 320)})
+        root, sha, branch, stamp = deployment_identity(cwd)
+        if stamp:
+            sources[stamp] = digest(Path(stamp))
+        live.append({'pid': int(item.name), 'cwd': str(cwd), 'git_root': root if not stamp else '', 'deployment_root': root, 'deployment_stamp': stamp, 'sha': sha, 'branch': branch, 'command': clean(argv, 320)})
     units = []
     for scope in (['--user'], []):
         names = cmd(['systemctl', *scope, 'list-unit-files', '--no-legend', '--no-pager']).splitlines()
@@ -144,7 +162,10 @@ def main() -> None:
         for p in sorted(ext.iterdir()):
             if p.is_symlink() and ('z0' in str(p.resolve()) or 'cognition' in p.name):
                 target = p.resolve()
-                links.append({'path': str(p), 'target': str(target), 'sha': cmd(['git', 'rev-parse', 'HEAD'], target), 'branch': cmd(['git', 'branch', '--show-current'], target)})
+                root, sha, branch, stamp = deployment_identity(target)
+                if stamp:
+                    sources[stamp] = digest(Path(stamp))
+                links.append({'path': str(p), 'target': str(target), 'sha': sha, 'branch': branch, 'deployment_root': root, 'deployment_stamp': stamp})
     runtime = {'processes': live, 'units': units, 'extension_links': links}
     runtime_path = args.out.with_name('packet-runtime.json')
     atomic_write(runtime_path, json.dumps(runtime, indent=2, sort_keys=True) + '\n')
@@ -252,7 +273,9 @@ def main() -> None:
         report_headers += extract(p, r'^#{1,2} ', 2, 240)
     section('Operations report header index', report_headers[:30])
 
-    repo_sha = cmd(['git', 'rev-parse', 'HEAD'], args.repo)
+    _, repo_sha, _, repo_stamp = deployment_identity(args.repo)
+    if repo_stamp:
+        sources[repo_stamp] = digest(Path(repo_stamp))
     generated_at = datetime.now(timezone.utc).isoformat()
     generator_sha = digest(Path(__file__))
     provenance = f'`{Path(__file__).resolve()}`'
