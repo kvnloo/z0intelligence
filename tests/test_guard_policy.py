@@ -31,7 +31,7 @@ def policy(stage='live'):
 def receipt(doc, **changes):
     return {'ts': NOW.isoformat(), 'family': 'omp.tool', 'policy_version': doc['version'],
             'policy_sha256': doc['version'], 'rule_id': 'F-omp.tool-1',
-            'stage': doc['families']['omp.tool']['stage'], 'route': 'general_slm',
+            'stage': next(iter(doc['families'].values()))['stage'], 'route': 'general_slm',
             'selected_arm': copy.deepcopy(ARM), 'serving_healthy': True, **changes}
 
 
@@ -50,7 +50,7 @@ def test_o11_requires_canary_or_live(tmp_path, stage, count):
     assert bool(findings) is bool(count)
 
 
-@pytest.mark.parametrize('field', list(ARM))
+@pytest.mark.parametrize('field', [key for key in ARM if key != 'kind'])
 def test_o11_binds_every_arm_dimension(tmp_path, field):
     doc = policy()
     row = receipt(doc)
@@ -65,6 +65,37 @@ def test_o11_model_string_is_not_full_arm_evidence(tmp_path):
     del row['selected_arm']
     report, _ = audit(tmp_path, doc, [row])
     assert report['counts']['o11_evidence_bound_route'] == 1
+
+
+def test_finding_role_is_not_physical_deployment_identity(tmp_path):
+    doc = policy()
+    row = receipt(doc)
+    row['selected_arm']['kind'] = 'engine'
+    report, _ = audit(tmp_path, doc, [row])
+    assert not any(report['counts'].values())
+
+
+@pytest.mark.parametrize('actual_family,actual_scope,violates', [
+    ('omp.tool', {'device': 'test-worker'}, False),
+    ('omp.tool', {'device': 'another-worker'}, True),
+    ('router.model', {'device': 'test-worker'}, True),
+])
+def test_scoped_rule_cannot_credit_another_scope_or_family(tmp_path, actual_family, actual_scope, violates):
+    doc = policy('canary')
+    entry = doc['families'].pop('omp.tool')
+    entry.update(family='omp.tool', scope={'device': 'test-worker'})
+    scope_sha = hashlib.sha256(json.dumps(entry['scope'], sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    key = 'omp.tool@' + scope_sha[:12]
+    entry['rule_id'] = 'F-' + key + '-1'
+    doc['families'][key] = entry
+    del doc['version']
+    doc['version'] = hashlib.sha256(json.dumps(doc, sort_keys=True, separators=(',', ':'),
+                                              ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+    row = receipt(doc, stage='canary', family=actual_family, policy_family=key,
+                  rule_id=entry['rule_id'], scope=actual_scope)
+    report, _ = audit(tmp_path, doc, [row])
+    assert bool(report['counts']['o11_evidence_bound_route']) is violates
+    assert bool(report['counts']['stale_policy']) is violates
 
 
 @pytest.mark.parametrize('healthy,abstain,expected', [

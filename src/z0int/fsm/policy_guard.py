@@ -85,9 +85,13 @@ def _records(path: Path):
 
 
 def _arm_matches(actual, named):
-    # A model name alone cannot establish device/quant/engine/backend identity.
-    return isinstance(actual, dict) and isinstance(named, dict) and bool(named) and all(
-        actual.get(key) == value for key, value in named.items())
+    if not isinstance(actual, dict) or not isinstance(named, dict) or not named:
+        return False
+    # kind classifies the finding (slm/rules/engine), not physical deployment.
+    identity = {key: value for key, value in named.items() if key != 'kind'}
+    if not identity:
+        return actual.get('kind') == named.get('kind')
+    return all(actual.get(key) == value for key, value in identity.items())
 
 
 def _abstained(receipt, rule):
@@ -175,20 +179,26 @@ def audit(receipts: str | None, policy_path: Path | None, since: str,
                     decisions = [row]
                 for rec in decisions:
                     family = rec.get('family')
-                    rule = families.get(family, {}) if isinstance(family, str) else {}
+                    policy_family = rec.get('policy_family', family)
+                    rule = families.get(policy_family, {}) if isinstance(policy_family, str) else {}
+                    route, arm = _route(rec)
+                    scope = rec.get('scope', arm if isinstance(arm, dict) else {})
+                    named_scope = rule.get('scope', {})
+                    applicable = (rule.get('family', policy_family) == family
+                                  and isinstance(scope, dict) and isinstance(named_scope, dict)
+                                  and all(scope.get(key) == value for key, value in named_scope.items()))
                     required = ('policy_version', 'policy_sha256', 'rule_id', 'stage', 'family')
                     if not all(isinstance(rec.get(k), str) and rec[k] for k in required):
                         counts['unstamped'] += 1
                         issues.append(_issue(path, line, 'unstamped', 'missing decision policy stamp'))
                     else:
                         stamped += 1
-                    if policy and (rec.get('policy_version') != policy['version']
+                    if policy and (not applicable or rec.get('policy_version') != policy['version']
                                    or rec.get('policy_sha256') != policy['version']
                                    or rec.get('stage') != rule.get('stage', 'none')
                                    or rec.get('rule_id') != rule.get('rule_id', 'none')):
                         counts['stale_policy'] += 1
                         issues.append(_issue(path, line, 'stale_policy', 'receipt differs from current policy'))
-                    route, arm = _route(rec)
                     if route is None:
                         unavailable.append(f'{path}:{line}: missing route/tier')
                         continue
@@ -199,12 +209,12 @@ def audit(receipts: str | None, policy_path: Path | None, since: str,
                             expired = timestamp(rule['expires_at']) <= at
                         except (KeyError, ValueError, TypeError):
                             expired = True
-                        if (rule.get('stage') not in ('canary', 'live') or expired
+                        if (not applicable or rule.get('stage') not in ('canary', 'live') or expired
                                 or not _arm_matches(arm, rule.get('arm'))):
                             counts['o11_evidence_bound_route'] += 1
                             issues.append(_issue(path, line, 'o11_evidence_bound_route', 'offload lacks current evidence naming this full arm'))
                     if rule.get('stage') == 'live':
-                        rate = report['offload_rate'][family]
+                        rate = report['offload_rate'][policy_family]
                         rate['live_decisions'] += 1
                         rate['frontier' if frontier else 'offloaded'] += 1
                         abstain = _abstained(rec, rule)

@@ -137,11 +137,17 @@ and `receipts`/`decisions` collections are supported. `policy_families` supplies
 family-specific stamps for multi-family decisions. The audit counts unstamped
 decisions and differences from the current content-addressed policy, including
 its version, SHA, rule and stage. It does not reconstruct historical policies.
+Scoped rules use `family` for the base family and `policy_family` for the
+policy mapping key. The rule's base family must match. Its `scope` must match
+the receipt's observed `scope`, or selected-arm fields when no explicit scope
+exists. A scoped frontier receipt must retain its actual request scope.
 
 Receipts identify the route with `route` or `tier`. `frontier`, `remote_frontier`,
 `jev` and `bounded_jev` are frontier fallback arms. Other routes must include
 `selected_arm` or `arm` with every identity field from the family policy arm.
 A model string alone cannot prove the device/engine/quant/backend binding.
+The finding's `kind` is not a physical identity field: an SLM finding can name
+an engine deployment. Kind-only rules/knn arms still require a matching kind.
 Expired evidence does not authorize offload. O12 requires an explicit boolean
 `serving_healthy` observation. An abstention is an object with numeric
 `confidence` and `threshold`, where confidence is below the current policy's
