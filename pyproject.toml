@@ -48,6 +48,7 @@ games = [
 ]
 [tool.setuptools.package-data]
 "z0int.optchat" = ["*.mjs"]
+"z0int" = ["intent_*.mjs"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
