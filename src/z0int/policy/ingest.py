@@ -38,7 +38,7 @@ def _finding(spec: dict, source: dict, ts: str, subject: dict, arm: dict, metric
                    evidence_class=evidence_class,
                    scope_note=scope_note or spec.get("scope_note", "Only this measured job and exact arm; no cross-device, quant or engine generalization."),
                    expires_at=expires_at or iso(timestamp(ts) + timedelta(days=14)),
-                   baseline=baseline or {}).to_dict()
+                   baseline=baseline or {}, synthetic=spec.get("synthetic", False)).to_dict()
 
 
 def _shadow(data: dict, spec: dict, source: dict, ts: str) -> list[dict]:
@@ -155,7 +155,9 @@ def _eval(data: dict, spec: dict, source: dict, ts: str) -> list[dict]:
     eligible = data.get("verdict") == "KEEP" and all(
         data.get("gates", {}).get(gate) == "pass"
         for gate in ("contract", "authority", "quality_noninferiority", "latency_tail"))
-    return [_finding(spec, source, _time(row.get("ts", ts)), row["subject"], row["arm"],
+    return [_finding(spec, {**source, **{key: value for key, value in (row.get("source") or {}).items()
+                     if key in {"url", "expected_model_id", "engine_build", "model_path", "model_resolved_path", "model_sha256"}}},
+                     _time(row.get("ts", ts)), row["subject"], row["arm"],
                      {**row["metric"], "promotion_eligible": eligible},
                      evidence_class=row["evidence_class"], scope_note=row["scope_note"],
                      expires_at=row.get("expires_at"), baseline=row.get("baseline")) for row in data["findings"]]
@@ -184,10 +186,25 @@ def ingest_sources(sources: list[dict], home: Path | None = None) -> dict:
             if path.suffix not in {".json", ".jsonl"}:
                 raise FindingsError("Prose-only source is not parsed")
             data = [json.loads(line) for line in raw.splitlines()] if path.suffix == ".jsonl" else json.loads(raw)
+            marked = [spec]
+            if isinstance(data, dict):
+                marked.append(data)
+                for key in ("findings", "models", "results", "opportunities"):
+                    if isinstance(data.get(key), list):
+                        marked.extend(row for row in data[key] if isinstance(row, dict))
+            elif isinstance(data, list):
+                marked.extend(row for row in data if isinstance(row, dict))
+            if any(type(row.get("synthetic", False)) is not bool for row in marked):
+                raise FindingsError("Source synthetic must be boolean")
+            spec = {**spec, "synthetic": any(row.get("synthetic", False) for row in marked)}
             source = {"kind": spec["kind"], "path": str(path), "sha256": sha,
                       "run_id": spec.get("run_id", sha[:16])}
-            if spec.get("url"):
-                source["url"] = spec["url"]
+            metadata = (data.get("source") or {}) if isinstance(data, dict) else {}
+            for field in ("url", "expected_model_id", "engine_build", "model_path", "model_resolved_path", "model_sha256"):
+                if field in metadata:
+                    source[field] = metadata[field]
+                if field in spec:
+                    source[field] = spec[field]
             if isinstance(data, dict):
                 value = data.get("ts", spec.get("ts"))
             else:
