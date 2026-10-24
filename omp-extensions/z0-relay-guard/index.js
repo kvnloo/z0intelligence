@@ -1,5 +1,7 @@
 import { openSync, readSync, closeSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { coverageLine, sentences } from "./coverage.js";
+import { registerAskChecks } from "./stop.js";
 
 // OMP loads index.js directly. No dependencies, generated files, or second history store.
 const record = value => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -40,6 +42,7 @@ function userTexts(entries) {
   const users = new Map();
   for (const entry of entries) {
     if (entry.type !== "message" || entry.message?.role !== "user") continue;
+    if (entry.message.attribution === "agent" || (entry.message.synthetic && entry.message.attribution !== "user")) continue;
     if (typeof entry.id !== "string" || !entry.id) fail("User entry has no id");
     const content = entry.message.content;
     const texts = typeof content === "string" ? [content] : Array.isArray(content)
@@ -74,7 +77,7 @@ function directives(manager) {
   }
   // Root history is authoritative. A child task's synthetic user prompt is not Kevin.
   // Current-session entries come from OMP's read-only manager, including pending writes.
-  return { users: userTexts(entries), session: header.id };
+  return { users: userTexts(entries), session: header.id, entries };
 }
 
 /** Split literal shell words, preserving quoted newlines and rejecting expansion. */
@@ -159,7 +162,7 @@ function coverage(payload, users) {
     if (!texts) fail(`SOURCE ${id} is not a root-session user entry`);
     for (const text of texts) {
       // A punctuation run is one boundary. Boundary punctuation and edge whitespace are not sentence text.
-      for (const sentence of text.split(/[.?!\r\n]+/).map(part => part.trim()).filter(Boolean)) {
+      for (const sentence of sentences(text)) {
         expected.set(sentence, (expected.get(sentence) ?? 0) + 1);
       }
     }
@@ -167,19 +170,16 @@ function coverage(payload, users) {
   let index = start + 1;
   for (; index < lines.length && !lines[index].startsWith("ADDED-BY-AGENT:"); index++) {
     const line = lines[index];
-    const match = /^- ("(?:[^"\\]|\\.)*") -> (covered|not-an-ask|dropped: .+|superseded by \S+)$/.exec(line);
-    if (!match) fail(`Invalid coverage line: ${line}`);
-    const sentence = JSON.parse(match[1]);
+    const mark = coverageLine(line, "relay");
+    const sentence = mark.sentence;
     const remaining = expected.get(sentence) ?? 0;
     if (!remaining) fail(`Duplicate or unknown coverage sentence: ${JSON.stringify(sentence)}`);
     expected.set(sentence, remaining - 1);
-    if (match[2].startsWith("dropped:") && !match[2].slice(8).trim()) fail("Dropped sentence requires a reason");
-    if (match[2].startsWith("superseded by ")) {
-      const newer = match[2].slice("superseded by ".length);
+    if (mark.kind === "superseded") {
+      const newer = mark.value;
       const newerIndex = ids.indexOf(newer);
       if (newerIndex === -1) fail(`Superseding id ${newer} must be cited in SOURCE`);
-      const earlier = ids.slice(0, newerIndex).some(id => users.get(id).some(text =>
-        text.split(/[.?!\r\n]+/).map(part => part.trim()).includes(sentence)));
+      const earlier = ids.slice(0, newerIndex).some(id => users.get(id).some(text => sentences(text).includes(sentence)));
       if (!earlier) fail(`Superseding id ${newer} must follow the sentence's source`);
     }
   }
@@ -191,6 +191,7 @@ function coverage(payload, users) {
 }
 
 export default function relayGuard(pi) {
+  registerAskChecks(pi, directives);
   const log = (level, message, fields) => pi.logger[level]("z0-relay-guard: " + message, fields);
   const notes = new Map();
   pi.registerFlag("show", { type: "boolean", default: false, description: "Show relay coverage in chat after the tool completes" });
