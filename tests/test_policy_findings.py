@@ -221,3 +221,23 @@ def test_ingest_preserves_synthetic_receipt_and_endpoint_identity(tmp_path):
     emitted = read_findings(ledger_path(tmp_path))[0]
     assert emitted["synthetic"] is True
     assert {key: emitted["source"][key] for key in metadata} == metadata
+
+
+def test_eval_identity_metadata_does_not_override_receipt_provenance(tmp_path):
+    source = tmp_path / "receipt.json"
+    row = finding(synthetic=True)
+    row["source"].update(url="http://127.0.0.1:9000/v1",
+                         expected_model_id="synthetic-alias",
+                         model_sha256="f" * 64)
+    source.write_text(json.dumps({"schema": "z0eval.result.v1", "ts": row["ts"],
+        "verdict": "KEEP", "gates": {key: "pass" for key in
+            ("contract", "authority", "quality_noninferiority", "latency_tail")},
+        "source": {"engine_build": "synthetic-build", "model_path": "/synthetic/model.gguf"},
+        "findings": [row]}))
+    assert ingest_sources([{"kind": "z0eval_result", "path": str(source)}], tmp_path)["added"] == 1
+    emitted = read_findings(ledger_path(tmp_path))[0]
+    assert emitted["source"]["path"] == str(source.resolve())
+    assert emitted["source"]["sha256"] == hashlib.sha256(source.read_bytes()).hexdigest()
+    assert emitted["source"]["expected_model_id"] == "synthetic-alias"
+    assert emitted["source"]["engine_build"] == "synthetic-build"
+    assert emitted["source"]["model_sha256"] == "f" * 64

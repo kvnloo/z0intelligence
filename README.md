@@ -101,8 +101,10 @@ They do not prove a real experiment promotion. Runtime and guard owners must
 reject synthetic authorization outside an explicitly owned temporary smoke context.
 
 Measured source metadata can include `expected_model_id`, `engine_build`,
-`model_path`, `model_resolved_path` and `model_sha256`. Source specifications
-preserve these fields in findings, and the compiler preserves them in endpoints.
+`model_path`, `model_resolved_path` and `model_sha256`. Source specifications,
+receipt `source` metadata and individual result finding `source` metadata
+preserve these fields and explicit URLs. Finding provenance always uses the
+actual receipt file path and hash. The compiler preserves endpoint metadata.
 The pure compiler never reads or hashes external model files. Identity metadata
 must come from the measurement owner, not from a guessed engine-path revision.
 
