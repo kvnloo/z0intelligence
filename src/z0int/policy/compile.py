@@ -76,6 +76,14 @@ def _noninferior(row: dict) -> bool:
             and 0 <= divergence <= floor)
 
 
+def _promotion_evidence(row: dict) -> bool:
+    if row.get("evidence_kind") == "proxy":
+        return False
+    if row["source"].get("adapter") == "agent_outcomes":
+        return row.get("evidence_kind") == "product_outcome" and isinstance(row.get("verifier_receipt"), dict)
+    return True
+
+
 def option_capacity_key(scope: dict) -> str:
     """Lossless key for an exact physical model scope, shared with O13 readers."""
     if set(scope) != set(SCOPE_FIELDS) or any(not isinstance(v, str) or not v for v in scope.values()):
@@ -116,7 +124,7 @@ def _compile_option_capacity(findings: list[dict], now: datetime, config: Compil
         if (row["subject"].get("family") != "choice.option_capacity"
                 or row["subject"].get("job") != "ChoiceLadder"
                 or row["metric"]["name"] != "choice_accuracy"
-                or row["evidence_class"] != "measured" or timestamp(row["ts"]) > now):
+                or row["evidence_class"] != "measured" or not _promotion_evidence(row) or timestamp(row["ts"]) > now):
             continue
         task = row["subject"].get("task", row["metric"].get("task"))
         k = row["metric"].get("option_count")
@@ -181,6 +189,7 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
         quality = [r for r in rows if r["metric"]["name"] in QUALITY
                    and r["metric"].get("higher_is_better") is True
                    and r["evidence_class"] not in {"inference", "published"}
+                   and _promotion_evidence(r)
                    and timestamp(r["ts"]) <= now]
         before = prior.get("stage", "none")
         if before not in STAGES:
@@ -206,6 +215,7 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
             elif before in {"canary", "live"} and latest["metric"]["ci_low"] < config.bar:
                 stage, reason = "shadow", "latest_ci_below_bar"
         health = [r for r in rows if r["arm"] == arm and r["evidence_class"] == "measured"
+                  and _promotion_evidence(r)
                   and r["metric"]["name"] == "endpoint_health" and timestamp(r["ts"]) <= now]
         if health:
             last_health = health[-1]["metric"]
@@ -258,7 +268,7 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
     serving = {}
     for row in sorted(findings, key=lambda r: (timestamp(r["ts"]), r["id"])):
         url = row["source"].get("url")
-        if (row["evidence_class"] != "measured" or not url or _expiry(row, config) <= now
+        if (row["evidence_class"] != "measured" or not _promotion_evidence(row) or not url or _expiry(row, config) <= now
                 or timestamp(row["ts"]) > now):
             continue
         parsed = urlsplit(url)
