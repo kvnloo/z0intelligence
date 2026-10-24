@@ -111,3 +111,18 @@ def test_cli_requires_root_and_reports_red_green(tmp_path, monkeypatch, capsys):
     source.write_text('TIMEOUT=3600\n')
     assert G.main(argv) == 0
     assert json.loads(capsys.readouterr().out)['findings'] == []
+
+
+@pytest.mark.parametrize('binding,clean', [
+    ("worker = nodes['mbp']", True),
+    ("selected = nodes['mbp']\nworker = selected", True),
+    ("worker = nodes['s25']", False),
+    ("worker = nodes['mbp']\nworker = nodes[target]", False),
+    ("worker = nodes['mbp']\nif selected_phone:\n    worker = nodes['s25']", False),
+])
+def test_concrete_host_node_binding_not_function_name(tmp_path, binding, clean):
+    path = tmp_path / 'fleet.py'
+    # The wrapper deliberately has a neutral name; only dataflow identifies MBP.
+    body = binding + "\nargv = ['fleet-kueue', '--mem', args.mem or worker['lane']['default_mem']]\n"
+    path.write_text('def queued():\n' + ''.join('    ' + line + '\n' for line in body.splitlines()))
+    assert bool(C.phone_caps_findings(tmp_path, [path])) is not clean

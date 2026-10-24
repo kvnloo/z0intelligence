@@ -88,6 +88,11 @@ def _python(path: Path, text: str) -> list[dict]:
     def add(node, rule, detail):
         found.append(_finding(path, node.lineno, rule, detail))
 
+    def root_name(node):
+        while isinstance(node, (ast.Subscript, ast.Attribute)):
+            node = node.value
+        return node.id if isinstance(node, ast.Name) else None
+
     def resource(node, tainted):
         # A dictionary named memory can be prompt memory, not RAM: use
         # accessed field semantics instead of tainting all its metadata.
@@ -101,12 +106,17 @@ def _python(path: Path, text: str) -> list[dict]:
             return bool(RESOURCE.search(node.attr))
         return any(resource(child, tainted) for child in ast.iter_child_nodes(node))
 
-    def expr(node, safe, tainted):
+    def expr(node, safe, tainted, bound):
+        # Concrete registry identity, not the wrapper's name: worker = nodes["mbp"]
+        # and aliases remain host-only until reassigned. Sibling phone inputs
+        # and comparisons still get checked.
+        access = node.func.value if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in ('get', 'setdefault') else node
+        safe = safe or (isinstance(access, (ast.Subscript, ast.Attribute)) and root_name(access) in bound)
         if isinstance(node, ast.IfExp):
             fact = _nonphone(node.test)
-            expr(node.test, safe or fact is not None, tainted)
-            expr(node.body, safe or fact is True, tainted)
-            expr(node.orelse, safe or fact is False, tainted)
+            expr(node.test, safe or fact is not None, tainted, bound)
+            expr(node.body, safe or fact is True, tainted, bound)
+            expr(node.orelse, safe or fact is False, tainted, bound)
             return
         # Generated systemd service limits apply to the Linux controller, not
         # the PRoot phone job. Phones have no systemd.
@@ -135,10 +145,11 @@ def _python(path: Path, text: str) -> list[dict]:
             if isinstance(node, ast.Constant) and isinstance(node.value, str) and re.search(r'\b(?:taskset|ulimit|CPUQuota|MemoryMax)\b', node.value):
                 add(node, 'python-resource-enforcement', 'phone-visible resource enforcement command')
         for child in ast.iter_child_nodes(node):
-            expr(child, safe, tainted)
+            expr(child, safe, tainted, bound)
 
-    def block(nodes, safe=False, tainted=None):
+    def block(nodes, safe=False, tainted=None, bound=None):
         tainted = set() if tainted is None else set(tainted)
+        bound = set() if bound is None else set(bound)
         for node in nodes:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not safe:
@@ -149,31 +160,46 @@ def _python(path: Path, text: str) -> list[dict]:
                 continue
             if isinstance(node, ast.If):
                 fact = _nonphone(node.test)
-                expr(node.test, safe or fact is not None, tainted)
-                block(node.body, safe or fact is True, tainted)
-                block(node.orelse, safe or fact is False, tainted)
+                expr(node.test, safe or fact is not None, tainted, bound)
+                block(node.body, safe or fact is True, tainted, bound)
+                block(node.orelse, safe or fact is False, tainted, bound)
+                # A conditional write invalidates the identity after the join;
+                # do not assume the branch that preserves MBP was selected.
+                bound.difference_update(n.id for branch in (*node.body, *node.orelse)
+                                        for n in ast.walk(branch) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store))
                 if fact is False and any(isinstance(n, (ast.Return, ast.Raise, ast.Continue)) for n in node.body):
                     safe = True
                 continue
             if isinstance(node, (ast.For, ast.While, ast.With, ast.Try)):
+                bound.difference_update(n.id for n in ast.walk(node)
+                                        if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store))
                 if isinstance(node, ast.While):
-                    expr(node.test, safe, tainted)
-                block(node.body, safe, tainted)
-                block(getattr(node, 'orelse', []), safe, tainted)
-                block(getattr(node, 'finalbody', []), safe, tainted)
+                    expr(node.test, safe, tainted, bound)
+                block(node.body, safe, tainted, bound)
+                block(getattr(node, 'orelse', []), safe, tainted, bound)
+                block(getattr(node, 'finalbody', []), safe, tainted, bound)
                 for handler in getattr(node, 'handlers', []):
-                    block(handler.body, safe, tainted)
+                    block(handler.body, safe, tainted, bound)
                 continue
             if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
                 targets = node.targets if isinstance(node, ast.Assign) else [node.target]
                 names = {t.id for t in targets if isinstance(t, ast.Name)}
+                if any(isinstance(t, (ast.Subscript, ast.Attribute)) and root_name(t) in bound for t in targets):
+                    bound.clear()
                 if not safe and isinstance(node.value, ast.Constant) and node.value.value not in (None, '') and any(RESOURCE.search(name) for name in names):
                     add(node, 'python-resource-default', 'resource variable has an agent-chosen default')
                 if resource(node.value, tainted):
                     tainted.update(names)
                 else:
                     tainted.difference_update(names)
-            expr(node, safe, tainted)
+                fixed = (isinstance(node.value, ast.Subscript) and isinstance(node.value.value, ast.Name)
+                         and node.value.value.id == 'nodes' and isinstance(node.value.slice, ast.Constant)
+                         and node.value.slice.value in ('mbp', 'groot'))
+                if fixed or isinstance(node.value, ast.Name) and node.value.id in bound:
+                    bound.update(names)
+                else:
+                    bound.difference_update(names)
+            expr(node, safe, tainted, bound)
     block(tree.body)
     return found
 
