@@ -33,6 +33,7 @@ class _FakeLlamaServer:
         self.context = context
         self.port = port or 19000 + type(self).instances
         self.stopped = False
+        self.api_key = "synthetic-test-key"
         self.calls: list[dict] = []
 
     @property

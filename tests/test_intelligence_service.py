@@ -14,7 +14,9 @@ def test_health_and_bounded_admission():
     try:
         with urllib.request.urlopen(f'http://127.0.0.1:{address[1]}/readyz') as r:assert r.status==200
         for _ in range(4):
-            s=socket.create_connection(address);s.sendall(b'POST /v1/intelligence HTTP/1.0\r\nContent-Length: 1\r\n\r\n');sockets.append(s)
+            s=socket.create_connection(address)
+            s.sendall((f'POST /v1/intelligence HTTP/1.0\r\nHost: 127.0.0.1:{address[1]}\r\nContent-Type: application/json\r\nContent-Length: 1\r\n\r\n').encode())
+            sockets.append(s)
         time.sleep(.1)
         with socket.create_connection(address) as s:
             s.sendall(b'GET /healthz HTTP/1.0\r\n\r\n')
