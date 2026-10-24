@@ -55,7 +55,7 @@ def governed(*,parent_agent,trace='remote-public-proof',task='Public synthetic d
         'parent_agent':parent_agent,
         'task':task,
         'context':'Public synthetic diagnostic only.',
-        'max_tokens':16,
+        'max_tokens':2048,
         'allow_remote':True,
     }
 
