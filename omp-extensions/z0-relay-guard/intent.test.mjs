@@ -187,6 +187,27 @@ test("runtime verification survives a fresh gate instance without altering appro
   assert.equal(await readFile(env.path, "utf8"), original);
 });
 
+test("approved amendment preserves runtime receipts and supersedes only its exact parent", async t => {
+  const env = await setup(t); await env.publish();
+  assert.equal((await env.invoke({ op: "verify", taskId: "task.1" })).details.verified, true);
+  const child = await env.runtime();
+  child.plan.bindings.compiler = { parent_contract_id: env.contractId, parent_contractHash: env.doc.plan.bindings.approval.contractHash };
+  child.plan.bindings.approval = { ...child.plan.bindings.approval, contract_id: "contract.child" };
+  child.plan.bindings.approval.contractHash = contractHash(child);
+  await writeFile(join(env.dir, "contract.child.json"), JSON.stringify(child));
+  env.restart();
+  const docs = JSON.parse((await env.invoke({ op: "view" })).content[0].text);
+  assert.equal(docs.length, 1);
+  assert.equal(docs[0].plan.bindings.approval.contract_id, "contract.child");
+  assert.equal(docs[0].plan.bindings["task.1"].status, "verified");
+  assert.equal(env.stop("DONE: task.1"), undefined);
+  child.plan.bindings.compiler.parent_contractHash = "0".repeat(64);
+  child.plan.bindings.approval.contractHash = contractHash(child);
+  await writeFile(join(env.dir, "contract.child.json"), JSON.stringify(child));
+  env.restart();
+  blocked(env.call("bash", { command: "touch artifact" }));
+});
+
 test("unresolved stop reinjects three times then surfaces once without recording completion", async t => {
   const env = await setup(t); await env.publish();
   for (let attempt = 1; attempt <= 3; attempt++) {
