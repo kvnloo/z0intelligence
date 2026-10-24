@@ -1,0 +1,32 @@
+[Unit]
+Description=Private asynchronous shadow interpretation evaluations
+After=network.target
+ConditionPathExists=%h/.config/z0int/shadow-evals.json
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+Environment=PYTHONPATH=@SNAPSHOT@/src
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=@PYTHON@ -m z0int.shadow_evals worker --config %h/.config/z0int/shadow-evals.json
+Restart=on-failure
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/tmp /var/tmp
+ReadWritePaths=/mnt/zer0models/workspace/zer0/data/operations/shadow-evals
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+# Session/context/OAuth paths remain readable, never writable by this service.
+# Enable only after replay, calibration, and live safety gates pass.
+[Install]
+WantedBy=default.target

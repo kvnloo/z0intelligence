@@ -1,0 +1,53 @@
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+from unittest.mock import patch
+
+from z0int import shadow_evals as service
+
+
+class OrchestrationTests(unittest.TestCase):
+    def test_atomic_private_receipt(self):
+        with TemporaryDirectory() as root:
+            path = Path(root) / 'result.json'
+            service.save(path, {'status': 'blocked'})
+            self.assertEqual(json.loads(path.read_text()), {'status': 'blocked'})
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            service.save(path, {'status': 'completed'})
+            self.assertEqual(json.loads(path.read_text())['status'], 'completed')
+            self.assertFalse(path.with_name('result.json.new').exists())
+
+    def test_no_calibration_never_enables_scores(self):
+        with TemporaryDirectory() as root:
+            self.assertFalse(service.calibration_state({'root': root})['scores_enabled'])
+
+    def test_insufficient_offers_prevents_provider_calls(self):
+        with TemporaryDirectory() as root:
+            job = {'job_id': 'a' * 64, 'session_id': 'session', 'entry_id': 'entry', 'sha256': 'b' * 64, 'tier': 'CHECK'}
+            with patch('z0int.shadow_evals_fanout.build_bundle', return_value={'packet': 'same'}), patch('z0int.shadow_evals_fanout.select_offers', return_value={'offers': [], 'exclusions': [{'reason': 'unknown_objective_inputs'}]}), patch('z0int.shadow_evals_fanout.run_candidates') as complete:
+                result = service.process_job(job, {'root': root})
+            complete.assert_not_called()
+            self.assertEqual(result['status'], 'blocked')
+            self.assertEqual(result['candidates'], [])
+            self.assertTrue((Path(root) / 'results' / (job['job_id'] + '.json')).exists())
+
+    def test_missing_judge_prevents_completion(self):
+        with patch('z0int.shadow_evals_fanout.complete') as complete:
+            result = service.judge_candidate({}, {}, {'content': 'draft'}, {})
+        complete.assert_not_called()
+        self.assertEqual(result['error'], 'frontier_subscription_judge_not_configured')
+
+    def test_calibration_gate_binds_judge_and_rubric(self):
+        from z0int.shadow_evals_judge import RUBRIC
+        with TemporaryDirectory() as root:
+            config = {'root': root, 'judge': {'provider': 'subscription', 'model': 'frontier'}}
+            service.save(Path(root) / 'calibration-summary.json', {'complete': True, 'scores_enabled': True, 'evaluated': 153, 'failures': 103, 'nonfailures': 50, 'judge': config['judge'], 'rubric_sha256': service.digest(RUBRIC)})
+            self.assertTrue(service.calibration_state(config)['scores_enabled'])
+            self.assertFalse(service.calibration_state({**config, 'judge': {'provider': 'different', 'model': 'frontier'}})['scores_enabled'])
+            service.save(Path(root) / 'calibration-summary.json', {'complete': True, 'scores_enabled': True, 'evaluated': 152, 'failures': 102, 'nonfailures': 50, 'judge': config['judge'], 'rubric_sha256': service.digest(RUBRIC)})
+            self.assertFalse(service.calibration_state(config)['scores_enabled'])
+
+
+if __name__ == '__main__':
+    unittest.main()

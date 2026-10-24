@@ -484,6 +484,41 @@ openjev-eval --help
 
 They are compatibility/research surfaces, not the product identity.
 
+## Private important-ask shadow evaluations
+
+`python -m z0int.shadow_evals` observes persisted OMP inputs in a separate
+worker; the real turn never waits for candidate generation or judging. It
+reuses IntentService CHECK/CONTRACT triage, memory retrieval and AODL outcome
+receipts. Candidate answers are text-only drafts, never tool execution.
+
+The `replay`, `calibrate`, `worker` and `report` commands require an explicit
+private JSON `--config`. Runtime inputs, queue, source bundles, account-budget
+observations and answers stay outside the repository under the configured
+experiment root. See [the anchored rubric](docs/shadow-evals-rubric.md).
+
+Normal selection uses Kerdoios' latency/burn/acceptance objective and abstains
+on missing measurements. An explicitly authorized `bootstrap` phase is
+unscored, bounded to ten real messages and at most five arms each, including
+an explicitly named Sol reference, with a separate calibration cap. It does
+not earn execution-success credit or automatically change a routing law.
+Unknown provider usage, costs or overrun remain unknown, not zero.
+
+Free remote providers need catalog-backed no-training and no-retention
+evidence; OpenCode is limited to Go/Zen free models. Private subscription and
+owned local GPU routes still need explicit entitlement, context-fit and
+budget checks. Oversized context is excluded, never silently truncated.
+
+`systemd/z0-shadow-evals.service` is a user-unit template, not an instruction
+to enable an unproven experiment. Enable only after the private report records
+remote test evidence, complete admitted judge calibration (103/50 full audit
+or explicitly approved 27/13 bootstrap subset with Wilson intervals), the
+ten-message replay and a successful real-message path. Calibration negatives
+are reviewed non-failure labels, not successful task execution.
+
+Reports contain per-model rubric scores, Wilson-bound findings and
+`LAW-CANDIDATES.md` proposals. Findings require the canonical policy package;
+draft quality and parent outcomes are distinct. Laws are never auto-applied.
+
 ## Repository map
 
 | Path | Purpose |
