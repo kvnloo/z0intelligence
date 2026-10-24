@@ -1,0 +1,208 @@
+{
+  "schema": "z0eval.unified_memory_cohort.v0",
+  "source": "promoted from validated public OMP fixture; no private transcript text",
+  "evidence": [
+    {
+      "source_id": "z0int:context_resolve",
+      "source_version": "SCHEMA",
+      "trust_class": "code",
+      "locator": "kvnloo/z0intelligence:src/z0int/context_resolve.py:SCHEMA",
+      "observed_at": "2026-09-29T04:37:50Z",
+      "claim": "z0int.context_resolve.v1",
+      "required_need": "schema"
+    },
+    {
+      "source_id": "donor:pr-77:spill-bytes",
+      "source_version": "20480",
+      "trust_class": "code",
+      "locator": "kvnloo/oh-my-pi#77:packages/coding-agent/src/rlm/store.ts:RLM_DEFAULT_SPILL_BYTES",
+      "observed_at": "2026-09-18T04:13:48Z",
+      "claim": "RLM_DEFAULT_SPILL_BYTES = 20480",
+      "required_need": "spill-bytes"
+    },
+    {
+      "source_id": "z0evals:56:harness-row",
+      "source_version": "issue-56",
+      "trust_class": "authoritative_task",
+      "locator": "kvnloo/z0evals#56:harness-matrix",
+      "observed_at": "2026-09-29T00:00:00Z",
+      "claim": "harness question_id evidence_refs injected answer_supported abstained raw_source_reads context_bytes",
+      "required_need": "harness-fields"
+    },
+    {
+      "source_id": "eval-fixture:cap:v1",
+      "source_version": "1",
+      "trust_class": "derived_memory",
+      "locator": "eval-fixture:cap@v1",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "claim": "eval-fixture-cap=8192",
+      "required_need": "cap"
+    },
+    {
+      "source_id": "eval-fixture:cap:v2",
+      "source_version": "2",
+      "trust_class": "derived_memory",
+      "locator": "eval-fixture:cap@v2",
+      "observed_at": "2026-09-18T04:13:48Z",
+      "claim": "eval-fixture-cap=20480",
+      "required_need": "cap"
+    },
+    {
+      "source_id": "eval-fixture:jsonl:retained",
+      "source_version": "a",
+      "trust_class": "unknown",
+      "locator": "eval-fixture:jsonl@retained",
+      "observed_at": "2026-06-01T00:00:00Z",
+      "claim": "eval-fixture-jsonl: retained",
+      "required_need": "jsonl"
+    },
+    {
+      "source_id": "eval-fixture:jsonl:deleted",
+      "source_version": "b",
+      "trust_class": "unknown",
+      "locator": "eval-fixture:jsonl@deleted",
+      "observed_at": "2026-06-02T00:00:00Z",
+      "claim": "eval-fixture-jsonl: deleted",
+      "required_need": "jsonl"
+    },
+    {
+      "source_id": "eval-fixture:old-uncontradicted",
+      "source_version": "1",
+      "trust_class": "code",
+      "locator": "eval-fixture:old@2020",
+      "observed_at": "2020-01-01T00:00:00Z",
+      "claim": "eval-fixture-old=still-current",
+      "required_need": "old"
+    }
+  ],
+  "questions": [
+    {
+      "id": "exact-identifier",
+      "kind": "exact",
+      "prompt": "What schema id does z0int context resolve publish?",
+      "needs": [
+        {
+          "id": "schema",
+          "required": true
+        }
+      ],
+      "expected_action": "answer",
+      "expected_support": [
+        "z0int.context_resolve.v1"
+      ],
+      "forbidden": [],
+      "evidence_ids": [
+        "z0int:context_resolve"
+      ]
+    },
+    {
+      "id": "supersession",
+      "kind": "temporal",
+      "prompt": "Which eval-fixture-cap is current, and which value remains inspectable as superseded?",
+      "needs": [
+        {
+          "id": "cap",
+          "required": true
+        }
+      ],
+      "expected_action": "answer",
+      "expected_support": [
+        "eval-fixture-cap=20480"
+      ],
+      "forbidden": [],
+      "evidence_ids": [
+        "eval-fixture:cap:v1",
+        "eval-fixture:cap:v2"
+      ]
+    },
+    {
+      "id": "cross-harness",
+      "kind": "cross-harness",
+      "prompt": "Which fields does z0evals#56 require on every harness receipt row?",
+      "needs": [
+        {
+          "id": "harness-fields",
+          "required": true
+        }
+      ],
+      "expected_action": "answer",
+      "expected_support": [
+        "evidence_refs",
+        "answer_supported",
+        "raw_source_reads",
+        "context_bytes"
+      ],
+      "forbidden": [],
+      "evidence_ids": [
+        "z0evals:56:harness-row"
+      ]
+    },
+    {
+      "id": "contradiction",
+      "kind": "contradiction",
+      "prompt": "Two eval-fixture-jsonl sources disagree. Report both with provenance. Do not pick a winner.",
+      "needs": [
+        {
+          "id": "jsonl",
+          "required": true
+        }
+      ],
+      "expected_action": "observe",
+      "expected_support": [
+        "eval-fixture-jsonl: retained",
+        "eval-fixture-jsonl: deleted"
+      ],
+      "forbidden": [
+        "JSONL-DELETED-WINNER"
+      ],
+      "evidence_ids": [
+        "eval-fixture:jsonl:retained",
+        "eval-fixture:jsonl:deleted"
+      ]
+    },
+    {
+      "id": "missing-evidence",
+      "kind": "abstention",
+      "prompt": "What did the absent standup source decide?",
+      "needs": [
+        {
+          "id": "standup-2024-01-01",
+          "required": true
+        }
+      ],
+      "expected_action": "abstain",
+      "expected_support": [],
+      "forbidden": [
+        "STANDUP-DECISION-ALPHA"
+      ],
+      "evidence_ids": [
+        "agentsview:standup-2024-01-01"
+      ]
+    },
+    {
+      "id": "minimal-context",
+      "kind": "efficiency",
+      "prompt": "Which schema id and donor spill default are sufficient without replaying the tool transcript?",
+      "needs": [
+        {
+          "id": "schema",
+          "required": true
+        },
+        {
+          "id": "spill-bytes",
+          "required": true
+        }
+      ],
+      "expected_action": "answer",
+      "expected_support": [
+        "z0int.context_resolve.v1",
+        "RLM_DEFAULT_SPILL_BYTES = 20480"
+      ],
+      "forbidden": [],
+      "evidence_ids": [
+        "z0int:context_resolve",
+        "donor:pr-77:spill-bytes"
+      ]
+    }
+  ]
+}

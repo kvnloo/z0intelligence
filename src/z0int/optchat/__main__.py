@@ -5,8 +5,8 @@ Reply:   {"id", "ok", ...}
 """
 from __future__ import annotations
 
+import argparse
 import json
-import os
 from collections.abc import Callable
 from pathlib import Path
 import signal
@@ -16,7 +16,7 @@ import threading
 
 from .browse import write_html
 from .compact import NodeKey, Scheduler
-from .log import ChatLog, load_chat
+from .log import ChatLog, chat_root, load_chat
 from .persist import persist
 from .switch import enabled, set_enabled
 from .turn import Queue, begin, leave_unanswered, record, subagent_text, wait_ready
@@ -46,10 +46,18 @@ def take_lock(path: Path) -> socket.socket:
 class Resident:
     """Own the chat, scheduler and asynchronous wait registry for one server."""
 
-    def __init__(self, chat: ChatLog, emit: Callable[[dict[str, object]], None], scheduler: Scheduler) -> None:
+    def __init__(
+        self,
+        chat: ChatLog,
+        emit: Callable[[dict[str, object]], None],
+        scheduler: Scheduler,
+        *,
+        shadow: bool = False,
+    ) -> None:
         self.chat = chat
         self.emit = emit
         self.scheduler = scheduler
+        self.shadow = shadow
         self.queue = Queue()
         self.waits: dict[str, threading.Event] = {}
         self.wait_threads: set[threading.Thread] = set()
@@ -73,6 +81,7 @@ class Resident:
         return {
             "ok": True,
             "enabled": self.scheduler.on,
+            "shadow": self.shadow,
             "ready": self.chat.missing() == 0,
             "messages": len(self.chat.messages),
             "view_bytes": self.chat.view_size(),
@@ -133,6 +142,7 @@ class Resident:
             if op == "enabled":
                 if "on" in req:
                     on = bool(req["on"])
+                    self.shadow = False
                     set_enabled(on)
                     self.scheduler.set_enabled(on)
                     if not on:
@@ -158,7 +168,7 @@ class Resident:
                     logged = leave_unanswered(self.chat, self.queue.cancel())
                     return {"ok": True, "texts": [], "logged": logged}
                 return {"ok": True, "texts": self.queue.finish()}
-            if not self.scheduler.on:
+            if not self.scheduler.on and not (self.shadow and op == "record"):
                 return {"ok": False, "error": "optchat_off"}
             if op == "append":
                 msg = self.chat.append(str(req.get("kind")), str(req.get("text") or ""))
@@ -210,9 +220,8 @@ class Resident:
             worker.join()
 
 
-def serve() -> int:
-    home = Path(os.environ.get("Z0INT_HOME", Path.home() / ".z0int"))
-    root = home / "optchat" / "chat"
+def serve(mode: str | None = None) -> int:
+    root = chat_root()
     holder = take_lock(root / "lock")
     output_lock = threading.Lock()
 
@@ -228,8 +237,8 @@ def serve() -> int:
 
         previous_handler = signal.signal(signal.SIGTERM, interrupted)
         chat = load_chat(root)
-        scheduler = Scheduler(chat, on=enabled())
-        resident = Resident(chat, emit, scheduler)
+        scheduler = Scheduler(chat, on=enabled() if mode is None else mode == "on")
+        resident = Resident(chat, emit, scheduler, shadow=mode == "shadow")
         scheduler.start()
         if chat.torn:
             print(f"OptChat skipped {chat.torn} torn rows", file=sys.stderr, flush=True)
@@ -258,4 +267,10 @@ def serve() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(serve())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--mode",
+        choices=("on", "shadow"),
+        help="Use process-local activation instead of the persisted OMP switch. Shadow records without compaction.",
+    )
+    raise SystemExit(serve(parser.parse_args().mode))

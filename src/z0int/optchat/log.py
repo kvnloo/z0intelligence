@@ -290,9 +290,14 @@ class ChatLog:
         return msg.date or "unknown"
 
 
-def load_chat(root: Path | None = None) -> ChatLog:
+def chat_root(root: Path | None = None) -> Path:
     home = Path(os.environ.get("Z0INT_HOME", Path.home() / ".z0int"))
-    chat = ChatLog(root or home / "optchat" / "chat")
+    configured = os.environ.get("Z0INT_OPTCHAT_ROOT")
+    return root if root is not None else (Path(configured).expanduser() if configured else home / "optchat" / "chat")
+
+
+def load_chat(root: Path | None = None) -> ChatLog:
+    chat = ChatLog(chat_root(root))
     chat.load()
     return chat
 

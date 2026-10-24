@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Unified memory harness receipt",
+  "type": "object",
+  "required": [
+    "schema",
+    "harness",
+    "question_id",
+    "session_id",
+    "trace_id",
+    "harness_revision",
+    "retrieval_capability",
+    "retrieval_ok",
+    "injected",
+    "answer_supported",
+    "verified",
+    "abstained",
+    "duplicate_injection",
+    "evidence_refs",
+    "latency_ms",
+    "context_bytes",
+    "raw_source_reads"
+  ],
+  "properties": {
+    "schema": {"const": "z0eval.unified_memory_receipt.v0"},
+    "harness": {"enum": ["dsh", "hermes", "omo", "omp"]},
+    "question_id": {"type": "string"},
+    "session_id": {"type": "string"},
+    "trace_id": {"type": "string"},
+    "harness_revision": {"type": "string", "pattern": "^[0-9a-f]{7,40}$"},
+    "z0int_revision": {"type": "string", "pattern": "^[0-9a-f]{7,40}$"},
+    "retrieval_capability": {"type": "string"},
+    "retrieval_ok": {"type": "boolean"},
+    "injected": {"type": "boolean"},
+    "answer_supported": {"type": "boolean"},
+    "verified": {"type": "boolean"},
+    "abstained": {"type": "boolean"},
+    "duplicate_injection": {"type": "boolean"},
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_id", "source_version", "trust_class"],
+        "properties": {
+          "source_id": {"type": "string"},
+          "source_version": {"type": "string"},
+          "trust_class": {"type": "string"},
+          "locator_hash": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "latency_ms": {"type": "number", "minimum": 0},
+    "retrieval_latency_ms": {"type": "number", "minimum": 0},
+    "context_bytes": {"type": "integer", "minimum": 0},
+    "raw_source_reads": {"type": "integer", "minimum": 0},
+    "evidence_count": {"type": "integer", "minimum": 0},
+    "superseded_answer": {"type": "boolean"},
+    "notes": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

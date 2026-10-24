@@ -5,6 +5,7 @@ on:
     paths: ["src/**", "tests/**", "benchmarks/**", "pyproject.toml", "requirements.txt", "omp-extensions/**", "manifests/**", "harness-adapters/**", "contracts/**", "results/**", "zer0.repo.yaml", ".github/scripts/expire-claims.sh", ".github/workflows/core-unit.yml"]
   # No path filter on PRs: required checks must run even for docs-only PRs.
   pull_request:
+
   workflow_dispatch:
 
 permissions:
@@ -99,6 +100,11 @@ jobs:
           python -m pip install -e '.[test]'
       - name: Complete offline suite
         run: python -m pytest -q -m 'not live'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: DSH plugin contract and memory seam tests
+        run: node --unhandled-rejections=strict --test tests/test-dsh-plugin.mjs tests/test-dsh-memory.mjs
       - name: Verify published evidence
         run: |
           (cd results/raw && sha256sum -c SHA256SUMS)

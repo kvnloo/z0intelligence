@@ -1,0 +1,448 @@
+{
+  "specVersion": "0.2",
+  "graphId": "intent-contract-loop",
+  "revision": 0,
+  "intentGraph": {
+    "nodes": [
+      {
+        "id": "want",
+        "kind": "task",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "agent",
+        "kind": "executor",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared",
+        "harness": "hermes"
+      },
+      {
+        "id": "lookup",
+        "kind": "tool",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "taste",
+        "kind": "memory",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "store",
+          "execute"
+        ],
+        "authorityCeiling": [
+          "store",
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "check",
+        "kind": "verifier",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      },
+      {
+        "id": "kevin",
+        "kind": "humanGate",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "schema": "Task"
+          },
+          {
+            "id": "out",
+            "direction": "out",
+            "schema": "Task"
+          }
+        ],
+        "capabilities": [
+          "execute"
+        ],
+        "authorityCeiling": [
+          "execute"
+        ],
+        "lifecycle": "declared"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-want-agent",
+        "relation": "dependency",
+        "from": "want",
+        "to": "agent",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225"
+        }
+      },
+      {
+        "id": "e-taste-agent",
+        "relation": "data",
+        "from": "taste",
+        "to": "agent",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225"
+        }
+      },
+      {
+        "id": "e-agent-lookup",
+        "relation": "delegation",
+        "from": "agent",
+        "to": "lookup",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225"
+        }
+      },
+      {
+        "id": "e-lookup-taste",
+        "relation": "data",
+        "from": "lookup",
+        "to": "taste",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225"
+        }
+      },
+      {
+        "id": "e-agent-check",
+        "relation": "verification",
+        "from": "agent",
+        "to": "check",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225"
+        }
+      },
+      {
+        "id": "e-check-kevin",
+        "relation": "control",
+        "from": "check",
+        "to": "kevin",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225"
+        }
+      },
+      {
+        "id": "e-kevin-want",
+        "relation": "observation",
+        "from": "kevin",
+        "to": "want",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225"
+        }
+      },
+      {
+        "id": "e-agent-want",
+        "relation": "observation",
+        "from": "agent",
+        "to": "want",
+        "fromPort": "out",
+        "toPort": "in",
+        "delivery": {
+          "order": "ordered",
+          "idempotent": true,
+          "timeoutMs": 60000,
+          "maxRetries": 0
+        },
+        "authority": {
+          "grant": [
+            "execute"
+          ],
+          "delegationDepth": 0
+        },
+        "provenance": {
+          "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225"
+        }
+      }
+    ]
+  },
+  "policies": {
+    "kinds": [
+      "sequence",
+      "retry",
+      "human_gate"
+    ],
+    "fanIn": "all",
+    "dynamic": {
+      "allowed": false,
+      "maxChildren": 0,
+      "maxDepth": 0
+    },
+    "protocol": "intent-contract"
+  },
+  "constraints": {
+    "budgets": {
+      "tokens": 0,
+      "attention": 1
+    },
+    "termination": {
+      "on": "humanGate.approved"
+    }
+  },
+  "provenance": {
+    "source": "profiles/intent-contract.md",
+    "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225"
+  },
+  "plan": {
+    "compiler": "hermes",
+    "profile": "hermes",
+    "status": "dry-run",
+    "specVersion": "0.2",
+    "graphId": "intent-contract-loop",
+    "revision": 0,
+    "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225",
+    "idempotencyKey": "c29b0b3e25c2ca564412086015906d23ea619bebe4156b9a1a039846caff11ab",
+    "tasks": [
+      {
+        "id": "t_71ac05c4",
+        "node": "agent",
+        "kind": "executor",
+        "harness": "hermes",
+        "parents": [
+          "t_48c50402"
+        ],
+        "reviewChildren": [
+          "t_dd624ac2"
+        ]
+      },
+      {
+        "id": "t_dd624ac2",
+        "node": "check",
+        "kind": "verifier",
+        "parents": [],
+        "reviewChildren": []
+      },
+      {
+        "id": "t_53d50f5d",
+        "node": "kevin",
+        "kind": "humanGate",
+        "parents": [],
+        "reviewChildren": []
+      },
+      {
+        "id": "t_f14bccc0",
+        "node": "lookup",
+        "kind": "tool",
+        "parents": [],
+        "reviewChildren": []
+      },
+      {
+        "id": "t_8ed5d178",
+        "node": "taste",
+        "kind": "memory",
+        "parents": [],
+        "reviewChildren": []
+      },
+      {
+        "id": "t_48c50402",
+        "node": "want",
+        "kind": "task",
+        "parents": [],
+        "reviewChildren": []
+      }
+    ]
+  },
+  "eventLog": [
+    {
+      "eventId": "ev-attempt",
+      "type": "stateUpdate",
+      "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225",
+      "revision": 1,
+      "causalParents": [],
+      "payload": {
+        "node": "agent",
+        "lifecycle": "failed",
+        "gap": "specification"
+      }
+    },
+    {
+      "eventId": "ev-repair",
+      "type": "retry",
+      "sourceHash": "f450c07104057409329d6c5191d950b99a8d17b8ead7e2bb28051b660c35e225",
+      "revision": 2,
+      "causalParents": [
+        "ev-attempt"
+      ],
+      "payload": {
+        "node": "agent"
+      }
+    }
+  ]
+}

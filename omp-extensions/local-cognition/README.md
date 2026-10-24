@@ -21,6 +21,14 @@ compiler's verdict and the local cognition portfolio.
   legal set to models, records an out-of-set answer as `invalid_call` with
   `selected_action: null`, and always writes `selected_action: null` /
   `executed_action: null` in its receipt.
+- The tool input is never persisted: the request to the local, served-only
+  shadow backend carries the tool name, the bounded tool input (2,000 chars) as
+  its question and the legal set, and the receipt names the observed tool as a
+  structured `actual_tool` (`{name, risk_class}`) with no state text. A receipt row is
+  written only when at least one backend answered; a backend that is not
+  served, raised, timed out or could not be reached only increments
+  `backend_unavailable` in `~/.z0int/shadow/cognition-shadow-counters.json`
+  (oh-my-pi#109).
 
 ## Install
 

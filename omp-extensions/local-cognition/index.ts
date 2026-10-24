@@ -351,6 +351,7 @@ export function buildShadowPayload(
 		// tool call belongs to; it is only a fallback when OMP offers no id.
 		session_id: sessionId ?? process.env.OMP_SESSION_ID ?? null,
 		state: `OMP session. Previous tool calls, oldest first: ${recent.join(", ") || "none"}`,
+		actual_tool: { name: toolName, risk_class: riskFor(toolName) },
 		actions: buildActions(toolNames),
 		granted_capabilities: toolNames,
 		authority: [...new Set([...authorityList(), ...risks])],

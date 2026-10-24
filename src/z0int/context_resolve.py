@@ -369,10 +369,16 @@ def resolve_context(
     allow_memory: bool = False,
     repository_limit: int = 5,
     repository_time_budget_ms: int = 120,
+    turn_key: str | None = None,
+    memory_policy: Any = None,
 ) -> ContextPacket:
     """Resolve information needs into a provenance-preserving packet.
 
-    Memory recall is off by default (avoid double-inject with TencentDB proxy).
+    Memory recall is off by default. With ``allow_memory=True`` a ``kind="memory"``
+    need resolves through the z0 memory surface, but only when no other injector
+    (e.g. the TencentDB proxy) already owns memory for ``turn_key``: the single
+    owner is claimed first, so two injectors can never both inject one turn. Without
+    a ``turn_key`` the guard cannot run and memory stays out (an explicit gap).
     Repository-scoped FFF is the first discovery tier: its process-resident Rust
     index + watcher amortizes repeated codebase searches. QMD remains the later
     lexical/docs tier. Neither retrieval layer grants action authority.
@@ -394,6 +400,7 @@ def resolve_context(
     gaps: list[str] = []
     contradictions: list[str] = []
     epochs: dict[str, str] = {"policy": policy_revision}
+    measurements_extra: dict[str, Any] = {}
 
     if use_cache:
         cached = load_recipe_cache(sig)
@@ -551,16 +558,34 @@ def resolve_context(
                     f"(fff={fff_status}, qmd={qmd_status})"
                 )
         elif need.kind == "memory":
-            ops.append({"op": "memory_skipped", "need": need.id, "reason": "allow_memory=False by default"})
-            if need.required and not allow_memory:
-                gaps.append(f"{need.id}: memory recall disabled (avoid double-inject)")
+            if not allow_memory:
+                ops.append({"op": "memory_skipped", "need": need.id, "reason": "allow_memory=False by default"})
+                if need.required:
+                    gaps.append(f"{need.id}: memory recall disabled (avoid double-inject)")
+                continue
+            from .memory import surface as memory_surface
+
+            if turn_key is None:  # without a turn the single-injector guard cannot run, so memory stays out
+                ops.append({"op": "memory_skipped", "need": need.id, "reason": "double_inject_guard: no turn_key"})
+                if need.required:
+                    gaps.append(f"{need.id}: double_inject_guard: no turn_key, cannot claim the turn's injection")
+                continue
+            if not memory_surface.claim_injection(turn_key, "context_resolve"):
+                ops.append({"op": "memory_skipped", "need": need.id, "reason": "double_inject_guard"})
+                if need.required:
+                    gaps.append(f"{need.id}: double_inject_guard: another injector owns memory for this turn")
+                continue
+            res = memory_surface.search(need.description, memory_policy)
+            ops.append({"op": "memory_resolve", "need": need.id, "hits": len(res["evidence"]),
+                        "layers": {k: v["status"] for k, v in res["layers"].items()}})
+            measurements_extra["memory_snapshot_id"] = res["memory_snapshot_id"]
+            evidence.extend(EvidenceRef(**e["evidence_ref"]) for e in res["evidence"])
+            if need.required and not res["evidence"]:
+                down = [f"{k}={v.get('reason')}" for k, v in res["layers"].items() if v["status"] != "ok"]
+                gaps.append(f"{need.id}: no memory evidence for {need.description!r}"
+                            + (f" (unavailable: {', '.join(down)})" if down else ""))
         else:
             gaps.append(f"{need.id}: unsupported kind {need.kind}")
-
-    if allow_memory:
-        contradictions.append(
-            "memory tier requested: ensure TencentDB proxy injection is not also active on the same turn"
-        )
 
     recipe = ResolutionRecipe(
         capability_id="context_resolve",
@@ -593,6 +618,7 @@ def resolve_context(
             "allow_memory": allow_memory,
             "gpu_loaded": False,
             "network_model_calls": 0,
+            **measurements_extra,
         },
     )
     packet.aodl_projection = project_to_aodl_fields(packet)
