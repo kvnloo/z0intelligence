@@ -30,6 +30,42 @@ The current repository is much more than the original OpenJev prototype.
 
 The source of truth for the current architectural boundary is [zer0.repo.yaml](zer0.repo.yaml).
 
+## Opt-in intent reconciliation
+
+`z0int.intent_service` serves loopback port 8431. The OMP extension
+`omp-extensions/z0-intent-service` classifies each input as FAST, CHECK, or CONTRACT.
+FAST proceeds directly. CHECK retrieves memory without approval. CONTRACT drafts
+a canonical HOTL 0.2 graph and asks **look good?** before execution.
+Use `/aodl` to require a contract. Use `quick:` to request the explicit FAST override.
+The separate AODL intent gate enforces execution authority for CONTRACT inputs.
+
+The service queries unified memory concurrently with a four-second retrieval
+deadline. It uses the existing OMP `openai-codex` OAuth subscription read-only.
+It does not use API keys, rotate tokens, or copy credentials.
+`Z0INT_INTENT_MODEL` selects the model. The default is `gpt-6-luna`.
+Each proposal records the exact provider/model ID and retrieved source statuses.
+The compiler has a bounded 60-second deadline. The client allows 90 seconds for
+retrieval and compilation. A failed draft stays refused, without automatic retries.
+Memory text is evidence, not instructions or proof of current live state.
+
+Pending proposals stay under `$Z0INT_HOME/intent/<session>/.pending/`.
+Only an explicit UI approval writes the binding `<contract_id>.json`.
+Approval freezes source and contract hashes. Edits produce a new proposal.
+The compiler reuses the gate's checker and the pinned `aodl_contract` validator.
+It rejects unknown citation IDs and nonexistent cited local paths.
+
+Install only after review. Create a Python 3.10–3.13 virtual environment and
+install the exact `aodl-contract` revision from `pyproject.toml`. Set
+`Z0INT_INTENT_PYTHON` to that environment's Python. Node and Bun are required.
+Then run `bash scripts/install-z0-intent-service.sh <full-commit-SHA>`.
+The installer copies committed files into a content-stamped, read-only snapshot.
+It installs the extension, on-demand skill, and user unit. It does **not** start,
+enable, or reload the service. Install the reviewed AODL gate and service together
+only after both frozen revisions pass MBP qualification. Use the combined,
+exact-revision command in the private qualification report, not separate activation.
+The unit accepts optional settings from `~/.config/z0int/intent-service.env`.
+No live installation is part of this change.
+
 ## Architecture
 
 ~~~text

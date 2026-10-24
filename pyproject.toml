@@ -46,11 +46,12 @@ games = [
   "pillow>=11",
   "vizdoom>=1.2.4",
 ]
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.setuptools.package-data]
 "z0int.optchat" = ["*.mjs"]
+"z0int" = ["intent_*.mjs"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "webgpu-demo"]

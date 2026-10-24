@@ -1,0 +1,25 @@
+[Unit]
+Description=Local intent reconciliation and human contract approval
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+Environment=PYTHONPATH=@SNAPSHOT@/src
+Environment=Z0INT_INTENT_MODEL=gpt-6-luna
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=Z0INT_INTENT_CHECKER=@SNAPSHOT@/omp-extensions/z0-relay-guard/checker.js
+EnvironmentFile=-%h/.config/z0int/intent-service.env
+ExecStart=@PYTHON@ -m z0int.intent_service --port 8431
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.z0int/intent
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=default.target
