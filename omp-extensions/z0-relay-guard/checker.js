@@ -7,7 +7,7 @@ const nonempty = v => typeof v === "string" && v.trim().length > 0;
 const time = value => typeof value === "number" ? value : typeof value === "string" ? Date.parse(value) : NaN;
 const validTime = value => Number.isFinite(time(value));
 const stable = value => Array.isArray(value) ? value.map(stable) : object(value) ? Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])])) : value;
-const hash = value => createHash("sha256").update(JSON.stringify(stable(value))).digest("hex");
+const hash = value => createHash("sha256").update(JSON.stringify(stable(value)) ?? "undefined").digest("hex");
 const idPattern = /^[A-Za-z][A-Za-z0-9_.:-]{0,127}$/;
 const bindings = doc => { ensure(object(doc?.plan?.bindings), "Missing intent bindings"); return doc.plan.bindings; };
 const tasks = doc => doc.intentGraph.nodes.filter(node => node.kind === "task").map(node => [node.id, bindings(doc)[node.id]]);
@@ -115,13 +115,24 @@ export function updateIntent(doc, input) {
     const verifier = normalizeVerifier(input.acceptance, input.target);
     const verifierId = `${input.taskId}.acceptance`;
     ensure(!Object.hasOwn(b, verifierId) && !doc.intentGraph.nodes.some(n => n.id === verifierId), "Duplicate verifier id");
+    ensure(input.preconditions === undefined || Array.isArray(input.preconditions), "Preconditions must be fixed verifier bindings");
+    const prerequisites = (input.preconditions ?? []).map((binding, index) => {
+      const id = `${input.taskId}.pre.${index}`;
+      ensure(idPattern.test(id) && !Object.hasOwn(b, id) && !doc.intentGraph.nodes.some(n => n.id === id), "Invalid or duplicate precondition verifier id");
+      return { id, binding: normalizeVerifier(binding) };
+    });
     b[verifierId] = verifier;
-    const task = { entryId: input.entryId, sentenceId: input.sentenceId, text: sentence.text, askedAt: source.timestamp, target: input.target, acceptance: verifierId, status: "open" };
+    const task = { entryId: input.entryId, sentenceId: input.sentenceId, text: sentence.text, askedAt: source.timestamp, target: input.target, acceptance: verifierId, ...(prerequisites.length ? { preconditions: prerequisites.map(p => p.id) } : {}), status: "open" };
     b[input.taskId] = task;
     sentence.classification = "add";
     doc.intentGraph.nodes.push(node(input.taskId, "task"), node(verifierId, "verifier"));
     edge(doc, "intent.root", input.taskId, "dependency"); edge(doc, input.taskId, verifierId, "verification");
-    appendEvent(doc, "addNode", { kind: "intent_add", taskId: input.taskId, verifierId, ...task, verifier });
+    for (const prerequisite of prerequisites) {
+      b[prerequisite.id] = prerequisite.binding;
+      doc.intentGraph.nodes.push(node(prerequisite.id, "verifier"));
+      edge(doc, prerequisite.id, input.taskId, "verification");
+    }
+    appendEvent(doc, "addNode", { kind: "intent_add", taskId: input.taskId, verifierId, ...task, verifier, ...(prerequisites.length ? { preconditionVerifiers: Object.fromEntries(prerequisites.map(p => [p.id, p.binding])) } : {}) });
     return task;
   }
   if (input.op === "not-an-ask" || (input.op === "drop" && !input.taskId)) {
@@ -134,7 +145,7 @@ export function updateIntent(doc, input) {
     return sentence;
   }
   const task = findTask(doc, input.taskId);
-  ensure(!Object.hasOwn(input, "target") && !Object.hasOwn(input, "acceptance"), "Task target and acceptance are immutable after add");
+  ensure(!Object.hasOwn(input, "target") && !Object.hasOwn(input, "acceptance") && !Object.hasOwn(input, "preconditions"), "Task target, acceptance and preconditions are immutable after add");
   if (input.op === "drop") {
     ensure(task.status !== "verified" && nonempty(input.reason), "Dropping requires unresolved task and reason");
     task.status = "dropped"; task.reason = input.reason;
@@ -176,22 +187,23 @@ function approvedOutcome(doc, task, reference) {
   return Boolean(sentence && validTime(source.timestamp) && time(source.timestamp) >= time(task.askedAt) && time(source.timestamp) <= Date.now() && sentences(source.texts).some(actual => actual.id === sentence.id && actual.text === sentence.text) && [ `APPROVE ${task.target}`, `I approve ${task.target}.`, `I approve ${task.target}` ].includes(sentence.text.trim()));
 }
 
-function receiptIssues(doc, taskId, task, verified) {
+function receiptIssues(doc, taskId, task, verified, kind = "verified") {
   const issues = [];
   const add = (law, reason) => issues.push({ law, taskId, reason });
   const v = bindings(doc)[task.acceptance], p = verified?.payload;
   if (!p) { add("I2", "No verified stateUpdate receipt"); return issues; }
-  if (verified.type !== "stateUpdate" || p.kind !== "verified" || p.taskId !== taskId || p.verifierId !== task.acceptance || p.verified !== true || p.passed !== true) add("I2", "Invalid verified update");
+  if (verified.type !== "stateUpdate" || p.kind !== kind || p.taskId !== taskId || p.verifierId !== task.acceptance || p.verified !== true || p.passed !== true) add("I2", "Invalid verified update");
   if (p.target !== task.target || v?.target !== task.target) add("I3", "Verification target differs from task identity");
   const matches = doc.eventLog.filter(event => event.type === "stateUpdate" && event.payload?.kind === "tool_result" && event.payload.toolCallId === p.toolCallId);
   if (!nonempty(p.toolCallId) || matches.length !== 1) { add("I2", "Missing or reused verifier tool call id"); return issues; }
   const execution = matches[0], r = execution.payload;
   if (r.taskId !== taskId || r.verifierId !== task.acceptance || r.toolName !== `intent_verifier:${v?.type}` || r.executed !== true || r.passed !== true || r.exitCode !== 0 || r.isError !== false) add("I2", "Tool result is not an actual passing task verifier execution");
   if (r.target !== task.target) add("I3", "Execution target mismatch");
-  if (!validTime(r.startedAt) || !validTime(r.finishedAt) || time(r.startedAt) < time(task.askedAt) || time(r.finishedAt) < time(r.startedAt) || time(r.finishedAt) > Date.now() || r.startedAt !== p.startedAt || r.finishedAt !== p.finishedAt) add("I2", "Stale, future, or inconsistent execution timestamps");
+  if (!validTime(r.startedAt) || !validTime(r.finishedAt) || time(r.startedAt) <= time(task.askedAt) || time(r.finishedAt) < time(r.startedAt) || time(r.finishedAt) > Date.now() || r.startedAt !== p.startedAt || r.finishedAt !== p.finishedAt) add("I2", "Stale, future, or inconsistent execution timestamps");
   if (doc.eventLog.indexOf(execution) >= doc.eventLog.indexOf(verified) || !verified.causalParents?.includes(execution.eventId)) add("I2", "Verification lacks causal execution provenance");
-  if (execution.sourceHash !== verified.sourceHash || verified.sourceHash !== doc.provenance.sourceHash || execution.revision >= verified.revision) add("I2", "Receipt revision or source provenance mismatch");
-  if (doc.eventLog.some(event => event !== verified && event.payload?.kind === "verified" && event.payload.toolCallId === p.toolCallId)) add("I2", "Verifier execution reused by another completion");
+  const knownSource = verified.sourceHash === doc.provenance.sourceHash || doc.eventLog.slice(0, doc.eventLog.indexOf(execution)).some(event => event.payload?.kind === "source" && event.sourceHash === verified.sourceHash);
+  if (execution.sourceHash !== verified.sourceHash || !knownSource || execution.revision >= verified.revision) add("I2", "Receipt revision or source provenance mismatch");
+  if (doc.eventLog.some(event => event !== verified && ["verified", "precondition_verified"].includes(event.payload?.kind) && event.payload.toolCallId === p.toolCallId)) add("I2", "Verifier execution reused by another completion");
   if (task.delegate) {
     const delegation = doc.eventLog.filter(event => event.type === "stateUpdate" && event.payload?.kind === "delegate" && event.payload.taskId === taskId).at(-1);
     const result = doc.eventLog.find(event => event.type === "stateUpdate" && event.payload?.kind === "delegate_result" && event.payload.taskId === taskId && event.payload.delegateId === task.delegate.id && event.payload.result !== null && event.payload.result !== undefined && time(event.payload.timestamp) >= time(delegation?.payload.timestamp) && time(event.payload.timestamp) <= time(r.startedAt) && doc.eventLog.indexOf(event) > doc.eventLog.indexOf(delegation) && doc.eventLog.indexOf(event) < doc.eventLog.indexOf(execution));
@@ -201,42 +213,71 @@ function receiptIssues(doc, taskId, task, verified) {
   return issues;
 }
 
-export async function verifyTask(doc, taskId, runner = createRunner()) {
+function preconditionReceipt(doc, taskId, task, verifierId) {
+  const binding = bindings(doc)[verifierId];
+  if (!binding) return { valid: false, issues: [{ law: "I3", taskId, reason: "Missing precondition verifier binding" }] };
+  const receipt = doc.eventLog.filter(event => event.type === "stateUpdate" && event.payload?.kind === "precondition_verified" && event.payload.taskId === taskId && event.payload.verifierId === verifierId).at(-1);
+  if (!receipt) return { valid: false, issues: [] };
+  const projected = { ...task, target: binding.target, acceptance: verifierId, delegate: undefined };
+  const issues = receiptIssues(doc, taskId, projected, receipt, "precondition_verified");
+  const execution = doc.eventLog.find(event => event.type === "stateUpdate" && event.payload?.kind === "tool_result" && event.payload.toolCallId === receipt.payload.toolCallId);
+  if (receipt.payload.prerequisite !== true || execution?.payload.prerequisite !== true) issues.push({ law: "I2", taskId, reason: "Precondition receipt lacks prerequisite execution identity" });
+  const latest = doc.eventLog.filter(event => event.type === "stateUpdate" && event.payload?.kind === "tool_result" && event.payload.taskId === taskId && event.payload.verifierId === verifierId).at(-1);
+  return { valid: issues.length === 0 && latest === execution, issues };
+}
+
+async function verifyBinding(doc, taskId, verifierId, runner, prerequisite) {
   const task = findTask(doc, taskId);
   const preconditionErrors = check(doc).violations;
   ensure(!preconditionErrors.length, preconditionErrors.map(issue => issue.reason).join("; "));
   ensure(["open", "delegated"].includes(task.status), "Only unresolved tasks can be verified");
-  ensure(!task.delegate || task.delegate.resultReceived === true, "Await delegated result before verification");
-  const verifier = normalizeVerifier(bindings(doc)[task.acceptance], task.target);
+  ensure(!prerequisite || task.preconditions?.includes(verifierId), "Verifier is not a fixed precondition of this task");
+  if (!prerequisite) {
+    ensure(!task.delegate || task.delegate.resultReceived === true, "Await delegated result before verification");
+    for (const id of task.preconditions ?? []) ensure(preconditionReceipt(doc, taskId, task, id).valid, `Task has unverified precondition ${id}`);
+  }
+  const verifier = normalizeVerifier(bindings(doc)[verifierId], prerequisite ? bindings(doc)[verifierId]?.target : task.target);
+  const projected = prerequisite ? { ...task, target: verifier.target, acceptance: verifierId, delegate: undefined } : task;
   ensure(typeof runner === "function", "Verifier runner required");
   const immutable = contractHash(doc), invocation = Date.now();
-  if (task.delegate) {
+  if (!prerequisite && task.delegate) {
     const delegation = doc.eventLog.filter(event => event.type === "stateUpdate" && event.payload?.kind === "delegate" && event.payload.taskId === taskId).at(-1);
     const actualResult = doc.eventLog.find(event => event.type === "stateUpdate" && event.payload?.kind === "delegate_result" && event.payload.taskId === taskId && event.payload.delegateId === task.delegate.id && event.payload.result !== null && event.payload.result !== undefined && time(event.payload.timestamp) >= time(delegation?.payload.timestamp) && time(event.payload.timestamp) <= invocation && doc.eventLog.indexOf(event) > doc.eventLog.indexOf(delegation));
     ensure(delegation?.payload.delegateId === task.delegate.id && actualResult, "Await current result from delegated task before verification");
   }
   let result;
   try { result = await runner(structuredClone(verifier)); }
-  catch (error) { result = { executed: true, passed: false, exitCode: 1, error: String(error), toolCallId: `intent-verifier:${randomUUID()}`, target: task.target, startedAt: new Date(invocation).toISOString(), finishedAt: new Date().toISOString() }; }
+  catch (error) { result = { executed: true, passed: false, exitCode: 1, error: String(error), toolCallId: `intent-verifier:${randomUUID()}`, target: verifier.target, startedAt: new Date(invocation).toISOString(), finishedAt: new Date().toISOString() }; }
   ensure(contractHash(doc) === immutable, "Contract changed during verifier execution");
   ensure(object(result) && result.executed === true && typeof result.passed === "boolean" && Number.isInteger(result.exitCode) && nonempty(result.toolCallId), "Runner returned no actual execution receipt");
-  ensure(result.target === task.target, "Runner target identity mismatch");
-  ensure(validTime(result.startedAt) && validTime(result.finishedAt) && time(result.startedAt) >= Math.max(invocation, time(task.askedAt)) && time(result.finishedAt) >= time(result.startedAt) && time(result.finishedAt) <= Date.now(), "Runner receipt is stale or invalid");
+  ensure(result.target === verifier.target, "Runner target identity mismatch");
+  ensure(validTime(result.startedAt) && validTime(result.finishedAt) && time(result.startedAt) >= invocation && time(result.startedAt) > time(task.askedAt) && time(result.finishedAt) >= time(result.startedAt) && time(result.finishedAt) <= Date.now(), "Runner receipt is stale or invalid");
   ensure(!doc.eventLog.some(event => event.payload?.toolCallId === result.toolCallId), "Runner tool call id already used");
-  const passed = result.passed === true && result.exitCode === 0 && result.isError !== true && (verifier.type !== "human_review" || approvedOutcome(doc, task, result.humanApproval));
-  const execution = appendEvent(doc, "stateUpdate", { ...result, kind: "tool_result", taskId, verifierId: task.acceptance, toolName: `intent_verifier:${verifier.type}`, passed, isError: result.exitCode !== 0 || result.isError === true });
-  if (!passed) return { verified: false, taskId, receipt: execution, reason: result.error ?? "Acceptance verifier did not pass" };
-  const payload = { kind: "verified", taskId, verifierId: task.acceptance, verified: true, passed: true, toolCallId: result.toolCallId, target: task.target, startedAt: result.startedAt, finishedAt: result.finishedAt };
+  const passed = result.passed === true && result.exitCode === 0 && result.isError !== true && (verifier.type !== "human_review" || approvedOutcome(doc, projected, result.humanApproval));
+  const execution = appendEvent(doc, "stateUpdate", { ...result, kind: "tool_result", taskId, verifierId, ...(prerequisite ? { prerequisite: true } : {}), toolName: `intent_verifier:${verifier.type}`, passed, isError: result.exitCode !== 0 || result.isError === true });
+  if (!passed) return { verified: false, taskId, verifierId, receipt: execution, reason: result.error ?? "Acceptance verifier did not pass" };
+  const kind = prerequisite ? "precondition_verified" : "verified";
+  const payload = { kind, taskId, verifierId, ...(prerequisite ? { prerequisite: true } : {}), verified: true, passed: true, toolCallId: result.toolCallId, target: verifier.target, startedAt: result.startedAt, finishedAt: result.finishedAt };
   const candidate = { eventId: `event:${randomUUID()}`, type: "stateUpdate", sourceHash: doc.provenance.sourceHash, revision: doc.revision + 1, causalParents: [execution.eventId], payload };
-  const issues = receiptIssues({ ...doc, eventLog: [...doc.eventLog, candidate] }, taskId, task, candidate);
+  const issues = receiptIssues({ ...doc, eventLog: [...doc.eventLog, candidate] }, taskId, projected, candidate, kind);
   ensure(!issues.length, issues.map(issue => issue.reason).join("; "));
   const verified = appendEvent(doc, "stateUpdate", payload, [execution.eventId]);
-  task.status = "verified";
-  doc.intentGraph.nodes.find(n => n.id === taskId).lifecycle = "succeeded";
-  return { verified: true, taskId, receipt: verified };
+  if (!prerequisite) {
+    task.status = "verified";
+    doc.intentGraph.nodes.find(n => n.id === taskId).lifecycle = "succeeded";
+  }
+  return { verified: true, taskId, verifierId, receipt: verified };
 }
 
-export function check(doc, { claims = [], relayTaskIds = [], forwardedTaskIds = [], turnEnd = false, mutating = false, requiresContract = true, sessionId } = {}) {
+export async function verifyTask(doc, taskId, runner = createRunner()) {
+  return verifyBinding(doc, taskId, findTask(doc, taskId).acceptance, runner, false);
+}
+
+export async function verifyPrecondition(doc, taskId, verifierId, runner = createRunner()) {
+  return verifyBinding(doc, taskId, verifierId, runner, true);
+}
+
+export function check(doc, { claims = [], relayTaskIds = [], forwardedTaskIds = [], turnEnd = false, mutating = false, requiresContract = true, verifyPrecondition: checkingPrecondition = false, sessionId } = {}) {
   const violations = [], openTasks = [];
   const add = (law, reason, taskId) => violations.push({ law, ...(taskId ? { taskId } : {}), reason });
   try {
@@ -276,6 +317,20 @@ export function check(doc, { claims = [], relayTaskIds = [], forwardedTaskIds = 
       catch (error) { add("I3", error.message, taskId); }
       const addition = doc.eventLog.find(event => event.type === "addNode" && event.payload?.kind === "intent_add" && event.payload.taskId === taskId);
       if (!addition || addition.payload.target !== task.target || addition.payload.verifierId !== task.acceptance || hash(addition.payload.verifier) !== hash(b[task.acceptance])) add("I3", "Task target or acceptance changed after add", taskId);
+      const prerequisiteIds = task.preconditions ?? [];
+      if (!Array.isArray(prerequisiteIds) || new Set(prerequisiteIds).size !== prerequisiteIds.length || prerequisiteIds.includes(task.acceptance)) add("I3", "Task preconditions must be distinct fixed verifier ids", taskId);
+      else {
+        if (hash(addition?.payload.preconditions ?? []) !== hash(prerequisiteIds) || prerequisiteIds.some(id => hash(addition?.payload.preconditionVerifiers?.[id]) !== hash(b[id]))) add("I3", "Task preconditions changed after add", taskId);
+        for (const id of prerequisiteIds) {
+          try {
+            ensure(doc.intentGraph.nodes.some(n => n.id === id && n.kind === "verifier"), "Precondition requires canonical verifier node");
+            normalizeVerifier(b[id]);
+          } catch (error) { add("I3", error.message, taskId); continue; }
+          const observed = preconditionReceipt(doc, taskId, task, id);
+          violations.push(...observed.issues);
+          if (!observed.valid && (task.status === "verified" || (mutating && requiresContract && !checkingPrecondition && ["open", "delegated"].includes(task.status)))) add(task.status === "verified" ? "I2" : "I0", `Unverified precondition ${id} blocks task mutation or completion`, taskId);
+        }
+      }
       if (task.status === "verified") {
         const verified = doc.eventLog.filter(event => event.payload?.kind === "verified" && event.payload.taskId === taskId).at(-1);
         violations.push(...receiptIssues(doc, taskId, task, verified));
