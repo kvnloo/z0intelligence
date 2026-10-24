@@ -108,6 +108,35 @@ actual receipt file path and hash. The compiler preserves endpoint metadata.
 The pure compiler never reads or hashes external model files. Identity metadata
 must come from the measurement owner, not from a guessed engine-path revision.
 
+### ChoiceLadder option capacity
+
+The pure compiler emits an evidence-bound `option_capacity` map. Each key is
+the canonical JSON string of the exact model, quant, engine, backend and device
+scope. `option_capacity_key(scope)` creates this lossless key. No capacity
+credit transfers between different physical scopes.
+
+Each value contains `allowed_k`, `finding_ids`, `wilson_lower`, `task`, `bar`
+and `expires_at`. `task` is the sorted list of required task names. The default
+catalogue is T1, T2, T3 and T4. Configure it with `option_capacity_tasks`.
+Observed measured task names also remain required, including failed or expired
+tasks. Configure the independent accuracy threshold with `option_capacity_bar`
+(default 0.95). Routing promotion thresholds remain unchanged.
+
+Capacity evidence requires `subject.family=choice.option_capacity`,
+`subject.job=ChoiceLadder`, `subject.task` (or `metric.task`), metric
+`choice_accuracy`, integer `metric.option_count >= 2`, `ci_method=wilson95`,
+positive `n`, and measured, unexpired observations. The compiler compares the
+smaller of the stated lower bound and a recomputed Wilson lower bound against
+the bar. An explicit correct count must agree with accuracy and sample count.
+The latest measured observation for a task and k supersedes older success.
+
+The compiler selects the largest passing k per task. The allowed capacity is
+the minimum across every required task. Missing, pending, expired, inference,
+ineligible or inconsistent evidence never counts as success. Any unsupported
+task limits capacity to the baseline of 2. An unknown scope also defaults to 2.
+Proof IDs and the earliest selected proof expiry accompany positive credit.
+O13 readers consume this content-addressed projection, not a live findings scan.
+
 ## Architecture
 
 ~~~text

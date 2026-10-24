@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
+import math
 import tempfile
 from urllib.parse import urlsplit
 
@@ -30,6 +31,8 @@ class CompilerConfig:
     unhealthy_hours: float = 24
     canary_share: float = .1
     abstain_to: str = "jev"
+    option_capacity_bar: float = .95
+    option_capacity_tasks: tuple[str, ...] = ("T1", "T2", "T3", "T4")
 
 
 def iso(value: datetime) -> str:
@@ -71,6 +74,86 @@ def _noninferior(row: dict) -> bool:
     divergence, floor = metric.get("divergence"), metric.get("aa_noise_floor")
     return (type(divergence) in (float, int) and type(floor) in (float, int)
             and 0 <= divergence <= floor)
+
+
+def option_capacity_key(scope: dict) -> str:
+    """Lossless key for an exact physical model scope, shared with O13 readers."""
+    if set(scope) != set(SCOPE_FIELDS) or any(not isinstance(v, str) or not v for v in scope.values()):
+        raise ValueError("Option capacity requires exact model/quant/engine/backend/device")
+    return canonical(scope).decode("utf-8")
+
+
+def _choice_lower(row: dict) -> float | None:
+    metric = row["metric"]
+    if (metric.get("ci_method") != "wilson95" or metric.get("higher_is_better") is not True
+            or not metric.get("promotion_eligible", True)
+            or not 0 <= metric["value"] <= 1 or not 0 <= metric["ci_low"] <= 1):
+        return None
+    p, n = metric["value"], metric["n"]
+    if "correct" in metric:
+        correct = metric["correct"]
+        if type(correct) is not int or not 0 <= correct <= n or abs(p - correct/n) > 1e-12:
+            return None
+    z = 1.959963984540054
+    lower = (p + z*z/(2*n) - z*math.sqrt(p*(1-p)/n + z*z/(4*n*n))) / (1 + z*z/n)
+    return min(metric["ci_low"], lower)
+
+
+def _compile_option_capacity(findings: list[dict], now: datetime, config: CompilerConfig) -> dict:
+    """Bound option counts across every required task, without routing credit."""
+    if not math.isfinite(config.option_capacity_bar) or not 0 <= config.option_capacity_bar <= 1:
+        raise ValueError("option_capacity_bar must be between zero and one")
+    tasks = set(config.option_capacity_tasks)
+    if any(not isinstance(task, str) or not task for task in tasks):
+        raise ValueError("option_capacity_tasks must contain nonempty task names")
+    scopes, cells = {}, {}
+    for row in findings:
+        scope = scope_of(row)
+        if set(scope) != set(SCOPE_FIELDS) or any(not isinstance(v, str) or not v for v in scope.values()):
+            continue
+        key = option_capacity_key(scope)
+        scopes[key] = scope
+        if (row["subject"].get("family") != "choice.option_capacity"
+                or row["subject"].get("job") != "ChoiceLadder"
+                or row["metric"]["name"] != "choice_accuracy"
+                or row["evidence_class"] != "measured" or timestamp(row["ts"]) > now):
+            continue
+        task = row["subject"].get("task", row["metric"].get("task"))
+        k = row["metric"].get("option_count")
+        if not isinstance(task, str) or not task or type(k) is not int or k < 2:
+            continue
+        tasks.add(task)
+        identity = (key, task, k)
+        old = cells.get(identity)
+        if old is None or (timestamp(row["ts"]), row["id"]) > (timestamp(old["ts"]), old["id"]):
+            cells[identity] = row
+    result = {}
+    for key in sorted(scopes):
+        maxima, selected = [], []
+        for task in sorted(tasks):
+            passing = []
+            for (cell_key, cell_task, k), row in cells.items():
+                if cell_key != key or cell_task != task or _expiry(row, config) <= now:
+                    continue
+                lower = _choice_lower(row)
+                if lower is not None and lower >= config.option_capacity_bar:
+                    passing.append((k, lower, row))
+            if passing:
+                best = max(passing, key=lambda cell: (cell[0], cell[1], cell[2]["id"]))
+                maxima.append(best[0])
+                selected.append((best[1], best[2]))
+            else:
+                maxima.append(2)
+        complete = bool(tasks) and len(selected) == len(tasks)
+        credited = selected if complete else []
+        result[key] = {
+            "allowed_k": min(maxima) if maxima else 2,
+            "finding_ids": sorted(row["id"] for _, row in credited),
+            "wilson_lower": min((lower for lower, _ in credited), default=None),
+            "task": sorted(tasks), "bar": config.option_capacity_bar,
+            "expires_at": iso(min((_expiry(row, config) for _, row in credited), default=now)),
+        }
+    return result
 
 
 def compile_policy(findings: list[dict], previous_policy: dict | None, now: datetime | str,
@@ -199,6 +282,7 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
               "compiler": "z0int.policy.compile@" + config.compiler_revision,
               "families": families, "serving": [serving[k] for k in sorted(serving)], "changes": changes}
     policy["synthetic"] = any(row.get("synthetic", False) for row in findings)
+    policy["option_capacity"] = _compile_option_capacity(findings, now, config)
     policy["version"] = digest(policy)
     return policy
 
