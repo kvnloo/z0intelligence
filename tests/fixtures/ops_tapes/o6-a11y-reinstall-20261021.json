@@ -1,0 +1,29 @@
+{
+ "law": "O6",
+ "incident": "Every Lawnchair reinstall turned off z0live in-app control: One UI drops a replaced package's accessibility services.",
+ "source": "enabled list from sol-runs/20261021-a11y-keepalive/phone-evidence-summary.json (16:15:44 putForUser); the post-install list is the documented One UI behaviour (package services dropped), reconstructed, not captured.",
+ "kind": "a11y",
+ "items": [
+  {
+   "label": "raw adb install -r (what happened)",
+   "pre": "app.lawnchair.debug/app.lawnchair.LawnchairAccessibilityService:app.lawnchair.play.debug/app.lawnchair.LawnchairAccessibilityService:app.lawnchair.play.debug/app.lawnchair.zer0.voice.z0live.Z0LiveAccessibilityService",
+   "post": "app.lawnchair.debug/app.lawnchair.LawnchairAccessibilityService",
+   "removed": "",
+   "expect": "refused"
+  },
+  {
+   "label": "owner switched z0live off in Settings at 16:15:05, then install",
+   "pre": "app.lawnchair.debug/app.lawnchair.LawnchairAccessibilityService:app.lawnchair.play.debug/app.lawnchair.LawnchairAccessibilityService:app.lawnchair.play.debug/app.lawnchair.zer0.voice.z0live.Z0LiveAccessibilityService",
+   "post": "app.lawnchair.debug/app.lawnchair.LawnchairAccessibilityService:app.lawnchair.play.debug/app.lawnchair.LawnchairAccessibilityService",
+   "removed": "app.lawnchair.play.debug/app.lawnchair.zer0.voice.z0live.Z0LiveAccessibilityService",
+   "expect": "allowed"
+  },
+  {
+   "label": "install wrapper restored the list",
+   "pre": "app.lawnchair.debug/app.lawnchair.LawnchairAccessibilityService:app.lawnchair.play.debug/app.lawnchair.LawnchairAccessibilityService:app.lawnchair.play.debug/app.lawnchair.zer0.voice.z0live.Z0LiveAccessibilityService",
+   "post": "app.lawnchair.debug/app.lawnchair.LawnchairAccessibilityService:app.lawnchair.play.debug/app.lawnchair.LawnchairAccessibilityService:app.lawnchair.play.debug/app.lawnchair.zer0.voice.z0live.Z0LiveAccessibilityService",
+   "removed": "",
+   "expect": "allowed"
+  }
+ ]
+}

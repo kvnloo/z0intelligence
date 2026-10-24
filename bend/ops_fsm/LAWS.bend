@@ -1,0 +1,357 @@
+# Ops plane: the laws. The owner states them (spec agreed 2026-10-21 from that
+# day's incidents); PROOF.bend proves them; `bend PROOF.bend --verdict` (or
+# `hermes bend verify`) is the check. Do not weaken a law to get a PASS.
+#
+# Scope, stated plainly. These are theorems about ops.bend's own decision
+# functions over abstract inputs. They do not say that the Python gates equal
+# ops.bend (measured by src/z0int/fsm/ops_parity.py), that a real command,
+# path, config or adb dump was classified faithfully, or that any rollout
+# succeeded. A PASS is never an authorization or verified_success.
+
+import Base
+import ./ops.bend as O
+
+# Boolean reflection: T(b) is Unit when b holds, Empty when it does not
+def T(b: Bool) -> Data:
+  match b:
+    case True{}:
+      Unit
+    case False{}:
+      Empty
+
+# O1. Compute placement
+# ---------------------
+# Written apart from ops.bend: the classes groot may run.
+def GrootClass(c: O.Cls) -> Data:
+  match c:
+    case O.CGpu{}:
+      Unit
+    case O.CBend{}:
+      Unit
+    case O.CLean{}:
+      Unit
+    case O.CService{}:
+      Unit
+    case O.CAgent{}:
+      Unit
+    case O.CTiny{}:
+      Unit
+    case _:
+      Empty
+
+# the classes that must leave groot
+def Heavy(c: O.Cls) -> Data:
+  match c:
+    case O.CTest{}:
+      Unit
+    case O.CMutation{}:
+      Unit
+    case O.CTypecheck{}:
+      Unit
+    case O.CGradle{}:
+      Unit
+    case O.CBundle{}:
+      Unit
+    case O.CEval{}:
+      Unit
+    case O.CShot{}:
+      Unit
+    case _:
+      Empty
+
+# groot admits only its own classes
+law o1_groot_admits_only:
+  for c: O.Cls
+  for w: T(O.admits(O.LGroot{}, c))
+  GrootClass(c)
+
+# no placement ever puts another class on groot, whatever the room elsewhere
+law o1_never_groot_fallback:
+  for c: O.Cls
+  for m: Bool
+  for p: Bool
+  for w: T(O.runs_on_groot(O.place(c, m, p)))
+  GrootClass(c)
+
+# a heavy job with no room on the MBP or a phone waits
+law o1_full_waits:
+  for c: O.Cls
+  for h: Heavy(c)
+  {O.place(c, False{}, False{}) == O.Wait{} : O.Place}
+
+# a heavy job runs on the MBP whenever the MBP has room (the queue drains)
+law o1_mbp_takes_heavy:
+  for c: O.Cls
+  for p: Bool
+  for h: Heavy(c)
+  {O.place(c, True{}, p) == O.RunOn{O.LMbp{}} : O.Place}
+
+# O2. Served worktree
+# -------------------
+def FFInTxn(op: O.GitOp, txn: Bool) -> Data:
+  match op:
+    case O.GMergeFF{}:
+      T(txn)
+    case O.GRollback{}:
+      T(txn)
+    case _:
+      Empty
+
+# in a served worktree the only allowed ops are merge --ff-only and its
+# automatic rollback, both inside the guarded rollout transaction
+law o2_served_refuses:
+  for op: O.GitOp
+  for txn: Bool
+  for w: T(O.wt_allows(True{}, op, txn))
+  FFInTxn(op, txn)
+
+# the guarded transaction can still fast-forward the served worktree
+law o2_txn_can_ff:
+  {O.wt_allows(True{}, O.GMergeFF{}, True{}) == True{} : Bool}
+
+law o2_txn_can_rollback:
+  {O.wt_allows(True{}, O.GRollback{}, True{}) == True{} : Bool}
+
+# a rollout that merged and restarted was a fast-forward into an idle service
+def FFIdle(q: O.Req) -> Data:
+  match q:
+    case O.Req{clean, ff, gated, receipt, call, idle}:
+      T(Bool.and(ff, idle))
+
+law o2_rollout_ff_idle:
+  for q: O.Req
+  for check: Bool
+  for w: T(O.touched(O.rollout(q, check)))
+  FFIdle(q)
+
+# O3. Device rollout gate
+# -----------------------
+def Clean(q: O.Req) -> Data:
+  match q:
+    case O.Req{clean, ff, gated, receipt, call, idle}:
+      T(clean)
+
+def Reviewed(q: O.Req) -> Data:
+  match q:
+    case O.Req{clean, ff, gated, receipt, call, idle}:
+      match gated:
+        case True{}:
+          T(receipt)
+        case False{}:
+          Unit
+
+def NoCall(q: O.Req) -> Data:
+  match q:
+    case O.Req{clean, ff, gated, receipt, call, idle}:
+      match call:
+        case True{}:
+          Empty
+        case False{}:
+          Unit
+
+# (a) promoted only from a candidate built outside the served worktree
+law o3_promoted_needs_clean:
+  for q: O.Req
+  for check: Bool
+  for w: T(O.promoted(O.rollout(q, check)))
+  Clean(q)
+
+# (b) promoted only after the device launch check passed
+law o3_promoted_needs_check:
+  for q: O.Req
+  for check: Bool
+  for w: T(O.promoted(O.rollout(q, check)))
+  T(check)
+
+# (b) a failed launch check is rolled back automatically, never left live
+law o3_failed_check_rolls_back:
+  for q: O.Req
+  for w: T(O.touched(O.rollout(q, False{})))
+  {O.rollout(q, False{}) == O.ORolledBack{} : O.Out}
+
+# every precondition met: the inputs the gate needs, written apart
+def Admissible(q: O.Req) -> Data:
+  match q:
+    case O.Req{clean, ff, gated, receipt, call, idle}:
+      T(Bool.and(clean, Bool.and(ff, Bool.and(Bool.or(Bool.not(gated), receipt), Bool.and(Bool.not(call), idle)))))
+
+# (b) an admissible rollout whose launch check fails is rolled back
+law o3_admissible_fail_rolls_back:
+  for q: O.Req
+  for h: Admissible(q)
+  {O.rollout(q, False{}) == O.ORolledBack{} : O.Out}
+
+# an admissible rollout whose launch check passes is promoted
+law o3_admissible_pass_promotes:
+  for q: O.Req
+  for h: Admissible(q)
+  {O.rollout(q, True{}) == O.OPromoted{} : O.Out}
+
+# (c) a review-gated PR is promoted only with an orchestrator review receipt
+law o3_promoted_needs_review:
+  for q: O.Req
+  for check: Bool
+  for w: T(O.promoted(O.rollout(q, check)))
+  Reviewed(q)
+
+# O3 x O5: while the owner's z0live call is live, the transaction (restart and
+# device launch check) does not run at all
+law o3_no_device_work_in_call:
+  for q: O.Req
+  for check: Bool
+  for w: T(O.touched(O.rollout(q, check)))
+  NoCall(q)
+
+# O4. Privacy boundary
+# --------------------
+law o4_private_stays_private:
+  for v: O.Vis
+  for w: T(O.push_allows(True{}, v))
+  {v == O.VPrivate{} : O.Vis}
+
+# a non-private artifact may go anywhere
+law o4_nonprivate_free:
+  for v: O.Vis
+  {O.push_allows(False{}, v) == True{} : Bool}
+
+# O5. Owner phone touch
+# ---------------------
+law o5_touch_needs_intent:
+  for intent: Bool
+  for fg: Bool
+  for call: Bool
+  for w: T(O.phone_allows(O.PTap{intent, fg}, call))
+  T(intent)
+
+law o5_touch_needs_foreground:
+  for intent: Bool
+  for fg: Bool
+  for call: Bool
+  for w: T(O.phone_allows(O.PTap{intent, fg}, call))
+  T(fg)
+
+law o5_no_chain_install_in_call:
+  for w: T(O.phone_allows(O.PInstall{True{}}, True{}))
+  Empty
+
+law o5_no_chain_restart_in_call:
+  for w: T(O.phone_allows(O.PRestart{True{}}, True{}))
+  Empty
+
+# O6. Accessibility preservation
+# ------------------------------
+# post ⊇ pre \ removed-by-owner, stated per element
+law o6_a11y_superset:
+  for pre: List<&2, Nat>
+  for +post: List<&2, Nat>
+  for +rm: List<&2, Nat>
+  for +x: Nat
+  for ok: T(O.a11y_ok(pre, post, rm))
+  for m: T(O.mem(x, pre))
+  T(Bool.or(O.mem(x, post), O.mem(x, rm)))
+
+# O7. Provider routing
+# --------------------
+law o7_no_cancelled_provider:
+  for sol: Bool
+  for design: Bool
+  for w: T(O.route_ok(True{}, sol, design))
+  Empty
+
+law o7_no_sol_design:
+  for cancelled: Bool
+  for w: T(O.route_ok(cancelled, True{}, True{}))
+  Empty
+
+# O8. Node health notifies exactly once
+# -------------------------------------
+# a node past the limit on a bad probe emits the notification (no silent strike)
+law o8_no_silent_strike:
+  for +s: Nat
+  for +now: Nat
+  for +lim: Nat
+  for k: T(Nat.is_gt(now, Nat.add(s, lim)))
+  {O.neff(O.NBad{s}, O.NProbe{False{}, now}, lim) == True{} : Bool}
+
+# once notified, nothing more is emitted until the node is healthy again
+law o8_notify_once:
+  for +s: Nat
+  for e: O.NEv
+  for lim: Nat
+  {O.neff(O.NNotified{s}, e, lim) == False{} : Bool}
+
+law o8_notified_sticks:
+  for +s: Nat
+  for +now: Nat
+  for lim: Nat
+  {O.nstep(O.NNotified{s}, O.NProbe{False{}, now}, lim) == O.NNotified{s} : O.NSt}
+
+# an emission moves the node to Notified (so the next one needs a recovery)
+law o8_emit_marks_notified:
+  for +s: O.NSt
+  for +e: O.NEv
+  for +lim: Nat
+  for w: T(O.neff(s, e, lim))
+  T(O.notified(O.nstep(s, e, lim)))
+
+# O9. Gateway restart interrupts, never silently fails
+# ----------------------------------------------------
+law o9_restart_interrupts:
+  for +g: Nat
+  {O.rstep(O.RActive{g}, O.GwRestart{g}) == O.RInterrupted{g} : O.RSt}
+
+law o9_restart_never_fails:
+  for +g: Nat
+  for +x: Nat
+  for w: T(O.rfailed(O.rstep(O.RActive{g}, O.GwRestart{x})))
+  Empty
+
+# an interrupted run stays Interrupted until resumed from its session or
+# reported; it never becomes Failed or Done
+def IntExit(s: O.RSt) -> Data:
+  match s:
+    case O.RInterrupted{g}:
+      Unit
+    case O.RResumed{}:
+      Unit
+    case O.RReported{}:
+      Unit
+    case _:
+      Empty
+
+def Resumed(s: O.RSt) -> Bool:
+  match s:
+    case O.RResumed{}:
+      True{}
+    case _:
+      False{}
+
+# a resume counts only when it comes from the run's session
+law o9_resume_needs_session:
+  for +g: Nat
+  for session: Bool
+  for w: T(Resumed(O.rstep(O.RInterrupted{g}, O.ResumeRun{session})))
+  T(session)
+
+law o9_interrupted_exits:
+  for +g: Nat
+  for e: O.REv
+  IntExit(O.rstep(O.RInterrupted{g}, e))
+
+# O10. Phone admission/placement cannot depend on agent resource limits.
+# Caller-explicit per-job memory is not a default or a phone admission gate.
+law o10_phone_no_agent_resource_caps:
+  for +ready: Bool
+  for memory: Bool
+  for cpu: Bool
+  for battery: Bool
+  for thermal: Bool
+  {O.phone_admits(ready, memory, cpu, battery, thermal) == ready : Bool}
+
+law o10_phone_placement_no_agent_resource_caps:
+  for +ready: Bool
+  for memory: Bool
+  for cpu: Bool
+  for battery: Bool
+  for thermal: Bool
+  {O.phone_place(ready, memory, cpu, battery, thermal) == O.place_phone(ready) : O.Place}
