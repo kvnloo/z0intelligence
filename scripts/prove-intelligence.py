@@ -3,7 +3,10 @@
 
 Runs the real host authority HTTP service and the real remote-executor HTTP
 service on loopback. The single physical provider call is initiated through the
-real registered OMP z0int_route_worker tool. No parent model is called.
+real registered OMP z0int_route_worker tool. No parent model is called. Only this
+proof selects manifests/aodl-paid-canary.v1.json. Normal routing stays free-only.
+The paid proof reserves $0.10 per attempt in a shared ledger, max three attempts
+under the $1 total cap. Never delete that ledger to retry a refused attempt.
 """
 import argparse,json,os,secrets,subprocess,sys,threading
 import urllib.error,urllib.request
