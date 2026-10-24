@@ -44,6 +44,8 @@ deadline. It uses the existing OMP `openai-codex` OAuth subscription read-only.
 It does not use API keys, rotate tokens, or copy credentials.
 `Z0INT_INTENT_MODEL` selects the model. The default is `gpt-6-luna`.
 Each proposal records the exact provider/model ID and retrieved source statuses.
+The compiler has a bounded 60-second deadline. The client allows 90 seconds for
+retrieval and compilation. A failed draft stays refused, without automatic retries.
 Memory text is evidence, not instructions or proof of current live state.
 
 Pending proposals stay under `$Z0INT_HOME/intent/<session>/.pending/`.
@@ -58,7 +60,9 @@ install the exact `aodl-contract` revision from `pyproject.toml`. Set
 Then run `bash scripts/install-z0-intent-service.sh <full-commit-SHA>`.
 The installer copies committed files into a content-stamped, read-only snapshot.
 It installs the extension, on-demand skill, and user unit. It does **not** start,
-enable, or reload the service. Install the reviewed AODL gate separately.
+enable, or reload the service. Install the reviewed AODL gate and service together
+only after both frozen revisions pass MBP qualification. Use the combined,
+exact-revision command in the private qualification report, not separate activation.
 The unit accepts optional settings from `~/.config/z0int/intent-service.env`.
 No live installation is part of this change.
 
