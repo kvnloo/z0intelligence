@@ -169,8 +169,18 @@ class OrientationTests(unittest.TestCase):
         pilot.parent.mkdir(parents=True)
         pilot.write_text('\n'.join(json.dumps({'task': task, 'k': k, 'correct': correct})
             for task, k, correct in [('T1', 2, True), ('T2', 2, True), ('T3', 3, True), ('T2', 8, False), ('T1', 32, False)]))
+        routing = repo / 'routing'
+        routing.mkdir()
+        formula = 'score_u = latency_u * (1 + λ * pace_u) / p_accept[u, task_class(t)]'
+        (routing / 'REPORT.md').write_text(
+            'latency_u = TTFT_u + out_tokens_t / tok/s_u\n'
+            'pace_u = burn_u * tokens_t / (remaining_u / time_to_reset_u)\n'
+            + formula + '\nLambda: λ=1, unmeasured\nOpenCode rule: only sourced free models.\n')
+        (routing / 'catalog.json').write_text(json.dumps({'generated_at': self.now.isoformat(),
+            'models': [{'provider': 'test', 'performance': {'ttft_p50_ms': {'value': None},
+                        'tokens_per_second': {'value': None}}}]}))
         out = Path(self.tmp.name) / 'state/STATE-PACKET.md'
-        with patch.object(module, 'OPS', ops), patch.object(module, 'HERE', here), patch.object(module, 'cmd', return_value=''), patch.dict(os.environ, {'Z0INT_POLICY_ROOT': str(repo)}), patch.object(sys, 'argv', ['generate_packet.py', '--offline', '--repo', str(repo), '--out', str(out)]), patch('sys.stdout', new=io.StringIO()):
+        with patch.object(module, 'OPS', ops), patch.object(module, 'HERE', here), patch.object(module, 'cmd', return_value=''), patch.dict(os.environ, {'Z0INT_POLICY_ROOT': str(repo), 'Z0INT_ROUTING_ROOT': str(routing)}), patch.object(sys, 'argv', ['generate_packet.py', '--offline', '--repo', str(repo), '--out', str(out)]), patch('sys.stdout', new=io.StringIO()):
             module.main()
         text = out.read_text()
         self.assertLessEqual(len(text.splitlines()), 223)
@@ -179,6 +189,10 @@ class OrientationTests(unittest.TestCase):
         self.assertIn('qwen2.5-0.5b pilot v1: k2 2/2, k3 1/1, k8 0/1, k32 0/1', text)
         self.assertIn(str(capacity), text)
         self.assertIn(str(pilot), text)
+        self.assertIn(formula, text)
+        self.assertIn('Lambda: λ=1, unmeasured', text)
+        self.assertIn('Known TTFT p50=0, decode throughput=0', text)
+        self.assertIn('Quota pools are shared-account evidence', text)
         manifest = json.loads(out.with_name('packet-manifest.json').read_text())
         self.assertEqual(manifest['packet_sha256'], hashlib.sha256(out.read_bytes()).hexdigest())
         self.assertIn('generated_at', manifest)

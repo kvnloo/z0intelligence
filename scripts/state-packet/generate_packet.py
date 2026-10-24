@@ -118,6 +118,20 @@ def main() -> None:
     policy_rows += extract(OPS / 'unified-memory/INDEX.md', r'^- S22 core policy|^- Phone worker lane|^- Native SLM|^- Owner-busy phone|^- Goal vs scripts|^- Phone knowledge loading|^- Retrieval boundary', 7)
     section('Policy declarations and cross-harness pointers', policy_rows)
 
+    routing_root = Path(os.environ.get('Z0INT_ROUTING_ROOT', '/mnt/zer0models/z0-wt/model-routing-o14/operations/model-routing'))
+    routing_rows = extract(routing_root / 'REPORT.md',
+        r'^latency_u =|^pace_u =|^score_u =|^Lambda:|^OpenCode rule:', 5)
+    catalog_path = routing_root / 'catalog.json'
+    if catalog_path.is_file():
+        catalog = json.loads(catalog_path.read_text())
+        sources[str(catalog_path)] = digest(catalog_path)
+        models = catalog.get('models', [])
+        providers = sorted({model['provider'] for model in models})
+        known_ttft = sum(model.get('performance', {}).get('ttft_p50_ms', {}).get('value') is not None for model in models)
+        known_tps = sum(model.get('performance', {}).get('tokens_per_second', {}).get('value') is not None for model in models)
+        routing_rows.append(f'- `{catalog_path}` → Catalog generated_at={catalog.get("generated_at")}; {len(models)} offers across {",".join(providers)}. Known TTFT p50={known_ttft}, decode throughput={known_tps}. Other unknown metrics remain null, not guessed scores. Catalog presence is not entitlement. Quota pools are shared-account evidence, not proven model membership; proxy outcomes are not task acceptance.')
+    section('Model routing — approved objective and evidence limits', routing_rows)
+
     # Observe actual cwd and configured unit targets without reading environment/secrets.
     live = []
     for item in sorted(Path('/proc').iterdir(), key=lambda p: int(p.name) if p.name.isdigit() else -1):
@@ -287,7 +301,7 @@ def main() -> None:
         f'{provenance} → Re-observe live state before action. No gold questions or experiment answers are inputs.',
     ]
     # Reserve space for every section. Headers and facts all carry source paths.
-    caps = [5,17,12,30,38,42,22,10,30]
+    caps = [5,17,12,6,30,38,35,22,10,30]
     for (name, rows), cap in zip(sections.items(), caps):
         lines += [f'{provenance} → ## {name}', *rows[:cap]]
     if len(lines) > 223:

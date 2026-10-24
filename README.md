@@ -38,6 +38,12 @@ orientation packet at `~/.local/state/z0int/STATE-PACKET.md`. Its header records
 The complete packet has at most 223 lines and 64 KiB. Every line names its source.
 The operations inputs remain under `/mnt/zer0models/workspace/zer0/data/operations`.
 No gold questions or experiment answers enter the generator.
+The packet retains the O13 default of two options and the preserved, explicitly
+nonfinal pooled pilot. Model-routing formula, lambda provenance, catalog coverage,
+unknown metrics and shared-quota limits come from the O14 report/catalog directory.
+Set `Z0INT_POLICY_ROOT`, `Z0INT_ROUTING_ROOT` or `Z0INT_LIVE_REPO` to select other
+observed source roots. Runtime identity prefers a validated `DEPLOYED_SHA` in an
+exact-SHA deployment directory and otherwise reads a real Git checkout.
 
 Install a committed feature with `python3 scripts/install-state-packet.py`.
 The installer archives exact Git content into `~/.local/lib/z0-state-packet/<SHA>/`,
