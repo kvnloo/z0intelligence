@@ -22,6 +22,7 @@ def policy_diff(before: dict | None, after: dict, findings: list[dict]) -> dict:
                         "serving_missing": current.get("serving_missing", False)})
     return {"from_version": (before or {}).get("version"), "to_version": after["version"],
             "changes": changes,
+            "synthetic": after.get("synthetic", False),
             "serving_missing": sorted(row["rule_id"] for row in new.values() if row.get("serving_missing")),
             "evidence": [{"id": finding_id, "path": indexed[finding_id]["source"]["path"],
                           "url": indexed[finding_id]["source"].get("url")}
@@ -33,6 +34,8 @@ def markdown_diff(before: dict | None, after: dict, findings: list[dict]) -> str
     evidence = {row["id"]: row for row in diff["evidence"]}
     lines = ["# Decision policy changelog", "",
              f"From: `{diff['from_version'] or 'none'}`", f"To: `{diff['to_version']}`", ""]
+    if diff["synthetic"]:
+        lines.extend(["**Synthetic policy. This is not a real experiment promotion.**", ""])
     for change in diff["changes"]:
         lines.append(f"- `{change['rule_id']}`: **{change['from']} → {change['to']}**")
         if change["reason"]:
