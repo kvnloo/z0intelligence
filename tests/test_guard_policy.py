@@ -79,6 +79,7 @@ def test_finding_role_is_not_physical_deployment_identity(tmp_path):
     ('omp.tool', {'device': 'test-worker'}, False),
     ('omp.tool', {'device': 'another-worker'}, True),
     ('router.model', {'device': 'test-worker'}, True),
+    ('omp.tool', None, False),
 ])
 def test_scoped_rule_cannot_credit_another_scope_or_family(tmp_path, actual_family, actual_scope, violates):
     doc = policy('canary')
@@ -93,6 +94,11 @@ def test_scoped_rule_cannot_credit_another_scope_or_family(tmp_path, actual_fami
                                               ensure_ascii=False, allow_nan=False).encode()).hexdigest()
     row = receipt(doc, stage='canary', family=actual_family, policy_family=key,
                   rule_id=entry['rule_id'], scope=actual_scope)
+    if actual_scope is None:
+        row.update(route='remote_frontier', stage='none', policy_stage='canary',
+                   policy_reason='no_serving_for_scope', serving_healthy=None)
+        del row['scope']
+        del row['selected_arm']
     report, _ = audit(tmp_path, doc, [row])
     assert bool(report['counts']['o11_evidence_bound_route']) is violates
     assert bool(report['counts']['stale_policy']) is violates

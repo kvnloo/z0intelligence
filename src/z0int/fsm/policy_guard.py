@@ -182,11 +182,13 @@ def audit(receipts: str | None, policy_path: Path | None, since: str,
                     policy_family = rec.get('policy_family', family)
                     rule = families.get(policy_family, {}) if isinstance(policy_family, str) else {}
                     route, arm = _route(rec)
+                    frontier = isinstance(route, str) and route in FRONTIER
                     scope = rec.get('scope', arm if isinstance(arm, dict) else {})
                     named_scope = rule.get('scope', {})
                     applicable = (rule.get('family', policy_family) == family
                                   and isinstance(scope, dict) and isinstance(named_scope, dict)
-                                  and all(scope.get(key) == value for key, value in named_scope.items()))
+                                  and (all(scope.get(key) == value for key, value in named_scope.items())
+                                       or (frontier and not scope)))
                     required = ('policy_version', 'policy_sha256', 'rule_id', 'stage', 'family')
                     if not all(isinstance(rec.get(k), str) and rec[k] for k in required):
                         counts['unstamped'] += 1
@@ -195,14 +197,13 @@ def audit(receipts: str | None, policy_path: Path | None, since: str,
                         stamped += 1
                     if policy and (not applicable or rec.get('policy_version') != policy['version']
                                    or rec.get('policy_sha256') != policy['version']
-                                   or rec.get('stage') != rule.get('stage', 'none')
+                                   or rec.get('policy_stage', rec.get('stage')) != rule.get('stage', 'none')
                                    or rec.get('rule_id') != rule.get('rule_id', 'none')):
                         counts['stale_policy'] += 1
                         issues.append(_issue(path, line, 'stale_policy', 'receipt differs from current policy'))
                     if route is None:
                         unavailable.append(f'{path}:{line}: missing route/tier')
                         continue
-                    frontier = route in FRONTIER
                     if not frontier:
                         expired = False
                         try:

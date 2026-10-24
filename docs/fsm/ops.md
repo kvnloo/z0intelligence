@@ -140,7 +140,10 @@ its version, SHA, rule and stage. It does not reconstruct historical policies.
 Scoped rules use `family` for the base family and `policy_family` for the
 policy mapping key. The rule's base family must match. Its `scope` must match
 the receipt's observed `scope`, or selected-arm fields when no explicit scope
-exists. A scoped frontier receipt must retain its actual request scope.
+exists. Frontier fallback can omit observed scope when no endpoint executed.
+Consumers can record effective `stage: none` with `policy_stage` set to the
+declared stage and a `policy_reason`. The audit compares the declared stage,
+but still requires actual arm/scope identity for every non-frontier route.
 
 Receipts identify the route with `route` or `tier`. `frontier`, `remote_frontier`,
 `jev` and `bounded_jev` are frontier fallback arms. Other routes must include
