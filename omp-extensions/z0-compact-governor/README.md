@@ -113,17 +113,22 @@ no production credentials or configuration writes, and the existing GPU router's
 `qwen3-0.6b-q8` via OpenAI-compatible HTTP. Smoke compactions force `soft` only
 inside that isolated profile; they do not alter the operator's method order.
 
-Initial forced smoke observations were poor: arm 25 retained 3/6 literals (0.50),
-2,683 → 2,521 projected tokens in 11.902 s, with a packet timeout; arm 50 retained
-1/6 (0.167), 2,634 → 2,478 in 21.024 s, with a successful State Packet. The weak
-0.6B summarizer also invented completion claims. These are integration measurements,
-not paired evidence for optimal thresholds or proof of semantic quality.
+Final source smoke: two fresh isolated sessions received identical fixture prompts
+and automatically compacted on `agent_end` at 60.9375% usage:
 
-Automatic idle-boundary dispatch was also exercised with identical fixture prompts:
-active arm 25 retained 0/6 literals, 2,591 → 2,360 tokens in 19.287 s; active
-arm 50 retained 3/6, 2,591 → 2,333 in 27.209 s. Both had successful packets and
-no extension runtime errors. The model itself called `compact_boundary`; these
-are override requests near 63% usage, **not** evidence about 25% versus 50% timing.
+| Arm | Retained literals | Projected tokens | Latency | Packet |
+| --- | --- | --- | --- | --- |
+| 25, active | 3/6 (0.50) | 2,517 → 2,421 | 33.618 s | timeout |
+| 50, active | 0/6 (0.00) | 2,517 → 2,461 | 19.057 s | ok |
+
+Earlier runs also exercised the model's `compact_boundary` tool and measurement-only
+manual compaction. No extension runtime errors were emitted. The weak 0.6B
+summarizer invented completion claims in an earlier run. These are integration
+measurements, not proof of semantic quality or optimal thresholds: both final
+fixtures crossed both thresholds at one boundary, and one packet timed out.
+The production summarizer and real-task outcome quality remain unqualified.
+
+MBP unit job `fleet-mbp-085cd7a333184f9e`: 13 passed, 0 failed, 32 assertions.
 
 **Recommended exact OMP settings change: none.** Keep thresholdPercent=-1,
 methodOrder=[remote,snapcompact,handoff,shake,soft], asyncEnabled=true,
