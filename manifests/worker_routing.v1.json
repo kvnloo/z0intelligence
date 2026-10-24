@@ -287,13 +287,10 @@
     "openrouter"
   ],
   "sidestep_http": [402, 429],
-  "sidestep_blocked_providers": ["cursor", "paid-api", "openai-codex", "xai", "xai-oauth"],
+  "sidestep_blocked_providers": ["cursor", "paid-api", "openai-codex", "codex", "xai", "xai-oauth", "grok"],
   "sidestep_order": [
-    {"provider": "nous", "model": "inclusionai/ling-3.0-flash-sante:free"},
-    {"provider": "vercel", "model": "openai/gpt-oss-20b"},
     {"provider": "openrouter", "model": "nvidia/nemotron-3-super-120b-a12b:free"},
-    {"provider": "groq", "model": "openai/gpt-oss-20b"},
-    {"provider": "nvidia", "model": "openai/gpt-oss-20b"}
+    {"provider": "groq", "model": "openai/gpt-oss-20b"}
   ],
   "validated_free_routes": [
     {

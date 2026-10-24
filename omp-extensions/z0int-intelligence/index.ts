@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { scheduleOmpAutomatic } from "../../harness-adapters/automatic-client.mjs";
+import { ompAutomaticContextEnabled, scheduleOmpAutomatic, route, delivered } from "../../harness-adapters/automatic-client.mjs";
 import { buildIntelligenceRequest } from "../../harness-adapters/governed-client.mjs";
 import { readFileSync } from "node:fs";
 
@@ -10,14 +10,27 @@ const registration = Symbol.for("z0intelligence.omp.registration");
 export default function(pi: ExtensionAPI) {
   if (Reflect.get(pi.events, registration) === true) return;
   Reflect.set(pi.events, registration, true);
-  pi.on("before_agent_start", (event, ctx) => {
+  pi.on("before_agent_start", async (event, ctx) => {
     const prompt = typeof event?.prompt === "string" ? event.prompt : "";
     if (!prompt || prompt.startsWith("/")) return;
+    const sessionId = ctx.sessionManager.getSessionId();
+    const turnId = randomUUID();
+    // The daemon's automatic_event op is receipt-only: it cannot supply a
+    // model-visible message to this turn. Retain the prior delivery behavior
+    // for operator-enabled specialization; optimize the default-disabled path.
+    if (ompAutomaticContextEnabled()) {
+      const result = await route("omp", sessionId, turnId, prompt);
+      if (result.action === "context" && typeof result.context === "string") {
+        const message = {customType:"z0intelligence",content:result.context,display:true};
+        await delivered("omp", result);
+        return {message};
+      }
+      await delivered("omp", result);
+      return undefined;
+    }
     const holder = globalThis as { __omp_z0int_bridge_transport__?: { request?: (body: unknown, timeoutMs?: number) => Promise<unknown> } };
     scheduleOmpAutomatic({
-      sessionId: ctx.sessionManager.getSessionId(),
-      turnId: randomUUID(),
-      text: prompt,
+      sessionId, turnId, text: prompt,
       request: holder.__omp_z0int_bridge_transport__?.request,
     });
     return undefined;

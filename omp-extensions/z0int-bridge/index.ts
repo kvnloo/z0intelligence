@@ -27,11 +27,11 @@ const Z0 = process.env.Z0INT_HOME || join(homedir(), ".z0int");
 const RUNTIME = join(Z0, "runtime");
 const CURRENT = join(RUNTIME, "bridge-current.json");
 
+// The onboarded interpreter wrapper, when present, carries fff and z0int's deps;
+// a bare system python3 usually has neither.
 const Z0_PY =
 	process.env.Z0INT_PYTHON ||
-	(existsSync(join(homedir(), ".z0int", "bin", "python"))
-		? join(homedir(), ".z0int", "bin", "python")
-		: "python3");
+	(existsSync(join(Z0, "bin", "python")) ? join(Z0, "bin", "python") : "python3");
 const Z0_ROOT =
 	process.env.Z0INT_ROOT ||
 	// Prefer the tree that owns this extension when possible.

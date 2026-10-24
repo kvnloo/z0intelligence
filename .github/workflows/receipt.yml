@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   receipt:
+    # Dependabot descriptions carry no receipt block. Keyed on the PR author,
+    # not github.actor, and on this one login, not on every bot.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

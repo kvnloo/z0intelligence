@@ -21,8 +21,8 @@ files:
     sha256: 9574879997ebba5aa369389f2bacc007ea22f870e5ff951a4d368514b5758d28
     kit_sha256: 9574879997ebba5aa369389f2bacc007ea22f870e5ff951a4d368514b5758d28
   - path: .github/scripts/check-receipt.py
-    source: kit
-    sha256: 188313013ff82f355612534a99f51efce0f2c2c5a1566cb5a4b1863f4e4b0063
+    source: modified
+    sha256: 7f9dff3c568d4054ac971cd9052eebda34efe7f01671d224fab35bc6b3b4a168
     kit_sha256: 188313013ff82f355612534a99f51efce0f2c2c5a1566cb5a4b1863f4e4b0063
   - path: .github/scripts/create-labels.sh
     source: kit
@@ -53,8 +53,8 @@ files:
     sha256: 0d27a95441c4f8483b4ffe6773d6323d40083615da77886536ab25b86d39da6d
     kit_sha256: 0d27a95441c4f8483b4ffe6773d6323d40083615da77886536ab25b86d39da6d
   - path: .github/workflows/receipt.yml
-    source: kit
-    sha256: 3b06f0f0928b6149beb187de8588280c637d2ed9167c2d4ad2c3457feb0af91f
+    source: modified
+    sha256: a67d936683d1907a9897b4d241c37e95eeb3ad3dd5ed27e795ae4b0209997dd6
     kit_sha256: 3b06f0f0928b6149beb187de8588280c637d2ed9167c2d4ad2c3457feb0af91f
   - path: .github/workflows/scorecard.yml
     source: kit

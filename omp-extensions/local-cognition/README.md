@@ -48,9 +48,9 @@ Environment (wins over the settings file):
 | --- | --- | --- |
 | `OMP_Z0INT_COGNITION_SHADOW` | on | `0`/`false`/`off` disables the lane |
 | `OMP_Z0INT_COGNITION_TIMEOUT_MS` | `4000` | Hard client-side timeout for one shadow send |
-| `OMP_Z0INT_COGNITION_MODELS` | `nemotron_orchestrator_8b,functiongemma_270m` | Model ids to run in shadow |
-| `OMP_Z0INT_COGNITION_TOOLS` | discovered/observed | Comma-separated tool allow-list for the action set |
-| `OMP_Z0INT_COGNITION_AUTHORITY` | `read` | Risk classes the compiler may declare legal |
+| `OMP_Z0INT_COGNITION_MODELS` | `functiongemma_270m` | Model ids to run in shadow. One by default: the local supervisor holds one resident model, and two different models per tool call never answer |
+| `OMP_Z0INT_COGNITION_TOOLS` | discovered, else builtin | Comma-separated tool allow-list for the action set |
+| `OMP_Z0INT_COGNITION_AUTHORITY` | `read` | Risk classes the compiler may declare legal, in addition to those of the available tools (shadow-only: nothing is executed) |
 | `OMP_Z0INT_COGNITION_BRIDGE_FALLBACK` | on | `0` disables the sibling-extension import fallback |
 | `Z0INT_HOME` | `~/.z0int` | Receipt + settings root |
 
@@ -60,7 +60,7 @@ Optional settings file `~/.z0int/config/cognition.json` (env still wins):
 {
   "shadow": true,
   "timeout_ms": 4000,
-  "models": ["nemotron_orchestrator_8b", "functiongemma_270m"],
+  "models": ["functiongemma_270m"],
   "authority": ["read"]
 }
 ```
@@ -80,3 +80,40 @@ bun test
 
 The tests use a fake `ExtensionAPI` and a fake bridge transport; they need no
 OMP runtime, no Python and no model server.
+
+## What an observation records
+
+Every observed tool call settles into exactly one outcome:
+
+| Outcome | Meaning |
+| --- | --- |
+| `slm_executed` | at least one requested model answered |
+| `compiler_only` | the worker compiled the legal action set; no model was served |
+| `unavailable` | models were requested and none could be reached |
+| `timeout` | every requested model, or the worker itself, ran out of time |
+| `error` | the worker answered with a failure, or the send failed |
+| `no_transport` | no bridge worker was reachable |
+
+Per model the status is `selected`, `abstained`, `invalid_call`, `unavailable` or
+`timeout`. A model has abstained only if its backend answered; the worker's
+receipt marks unreached models `abstained` as well, and this lane does not
+repeat that.
+
+Each observation is also appended to the OMP session as a
+`z0int-cognition-shadow` entry (`pi.appendEntry`), carrying the live session id,
+the tool-call id, the trace id sent to the worker, the outcome, the per-model
+statuses and the worker generation. Session entries are records, not messages:
+nothing is added to what the model reads. Tool input is not copied into the
+entry. `/z0int-cognition-status` reports coverage (tool calls seen against
+observations settled, by outcome) alongside the recent rows.
+
+## One time budget
+
+The extension gives up on an observation after `OMP_Z0INT_COGNITION_TIMEOUT_MS`
+(default 4000). It sends the worker 80% of that as `timeout_ms`, so the worker
+stops waiting on a slow or still-loading model inside the same budget and
+returns it as a `timeout` row. Without it the worker waits up to its own 30 s
+default and later writes a receipt saying the model answered, for a tool call
+whose session entry already says it timed out. A model's first call after it
+loads can exceed the budget (about 11 s was measured for a 3 B model); those
+observations are recorded as timeouts, by both records.

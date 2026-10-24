@@ -1,3 +1,4 @@
+import json
 import time
 
 import pytest
@@ -59,14 +60,17 @@ def test_groq_quota_projects_without_kerdoios_package(monkeypatch):
     result = project("groq", "openai/gpt-oss-20b", policy, 32, events=[], now=1_000_000.0)
     assert result["allowed"] is True
     assert result["quota_source"] == "local_receipts"
+    assert result["quota"]["provider"] == "groq"
+    assert result["quota"]["dimensions"]["tpm"]["source"] == "locally_reconstructed"
     assert result["reason"] != "quota_backend_unavailable"
 
 
 def test_omp_hot_path_does_not_spawn():
     import subprocess
 
+    module_url = (Path(__file__).resolve().parents[1] / "harness-adapters" / "automatic-client.mjs").as_uri()
     script = """
-import { ompHotPath, scheduleOmpAutomatic } from 'file:///mnt/zer0models/z0-wt/z0intelligence/harness-adapters/automatic-client.mjs';
+import { ompHotPath, scheduleOmpAutomatic } from __Z0_CLIENT_URL__;
 const decision = ompHotPath();
 if (decision.spawn !== false || decision.action !== 'native') process.exit(2);
 const started = Date.now();
@@ -74,7 +78,7 @@ const scheduled = scheduleOmpAutomatic({sessionId:'s', turnId:'t', text:'ping'})
 if (scheduled.spawn !== false || scheduled.blocked_ms > 50) process.exit(3);
 if (Date.now() - started > 50) process.exit(4);
 console.log(JSON.stringify({blocked_ms: scheduled.blocked_ms, spawn: scheduled.spawn}));
-"""
+""".replace("__Z0_CLIENT_URL__", json.dumps(module_url))
     proc = subprocess.run(
         ["node", "--input-type=module", "-e", script],
         capture_output=True,

@@ -6,10 +6,11 @@ z0intelligence separates **discovery latency** from **evidence authority**.
 
 1. **Exact path** — direct bounded read when the caller already knows the file.
 2. **FFF (high priority)** — resident Rust path/content index for codebases. One
-   `fff.FileFinder` is kept warm per repository root (bounded process-local LRU),
-   with content indexing and filesystem watching enabled. Codex, Claude Code,
-   DSH and native Hermes clients of the shared service reuse the same index.
-   OMP's existing resident bridge has its own process-local pool.
+   `fff.FileFinder` is kept warm per admitted Git toplevel (bounded process-local
+   LRU), with content indexing enabled and **all filesystem watching disabled**.
+   Repeated searches reuse it for up to ten minutes; the first query after
+   expiry lazily rebuilds it. Rebuilds are serialized and use a dedicated
+   nice-10, idle-IO thread, not the HTTP thread.
 3. **QMD (medium priority)** — markdown/notes retrieval. The existing QMD lane
    remains a complementary fallback after repository search misses. Hybrid
    FTS5/vector/rerank promotion is a separate measured tier, not something FFF
@@ -34,7 +35,7 @@ OMP native z0_file_search             |      Python resolve_repository_context
              +-----------------------+-----------------+
                                      v
               z0int.file_search.v1
-          resident FFF index + watcher
+          resident FFF index (no watchers)
                          |
                          v
               ContextPacket EvidenceRef
@@ -152,22 +153,42 @@ reuse and EventLog attribution, and shut the service down on completion.
 
 `fff-search==0.11.0` is installed with z0intelligence. Defaults:
 
-- `watch=True`
+- `watch=False` (including build/cache directories and nested worktrees)
 - `ai_mode=True`
 - content indexing enabled
 - symlink following disabled
-- initial scan wait: 5 s
+- initial scan wait: 5 s; timeout closes the index before another build can start
 - content query budget: 120 ms
 - at most 4 resident repository roots per process
+- only Git toplevels are admitted; `/mnt/zer0models`, the shared workspace root,
+  and filesystem roots are always rejected
+- a conservative admission ceiling of 200,000 files, counting build/cache and
+  nested repository files too (excluding `.git` metadata and symlink traversal)
+- admission errors fail closed before FFF construction and log the root/reason
+- ten-minute index lifetime, rebuilt lazily with at most one rebuild at a time
 
 Environment overrides:
 
 - `Z0INT_FFF_DISABLE=1` — fail open to the later retrieval layer.
 - `Z0INT_FFF_SCAN_TIMEOUT_MS=<n>` — initial scan wait.
 - `Z0INT_FFF_MAX_ROOTS=<n>` — process-local resident-root bound.
+- `Z0INT_FFF_MAX_FILES=<n>` — conservative per-root file admission ceiling.
+- `Z0INT_FFF_INDEX_TTL_SECONDS=<n>` — index lifetime (default 600 seconds).
 
-A watcher event increments the packet source epoch. Index failures are returned
-as explicit layer status and never become permission to fabricate evidence.
+Each rebuilt index has a distinct packet source epoch. There are no watch
+subscriptions: edits can remain absent from discovery until TTL expiry.
+Index failures are explicit layer statuses and never permission to fabricate
+evidence. FFF 0.11 has no constructor path exclusions; disabling watching avoids
+recursive watcher registration altogether rather than filtering events after
+registration. Its normal Git-ignore scan policy still applies, while admission
+counts conservatively bound trees even if cache directories are not ignored.
+
+The shared `/v1/providers` response is cached for 30 seconds; concurrent misses
+share one rebuild. Provider snapshots can therefore be up to 30 seconds old.
+This display/discovery cache does not replace execution-time admission checks.
+The repository's provider discovery callers (`remote_executor.py` readiness and
+`scripts/prove-intelligence.py`) make single GET attempts; there is no discovery
+retry loop to back off. Consequential POST calls are not retried automatically.
 
 ## QMD boundary
 
@@ -176,3 +197,39 @@ uses its lexical `search` command only after FFF misses. QMD's full `query`
 pipeline adds vector search/query expansion/reranking and can load local model
 resources, so enabling that hybrid path should be benchmarked and gated
 separately rather than silently inserting it into every code-search turn.
+
+## Deployment gate
+
+The live checkout is `/mnt/zer0models/z0-wt/z0intelligence`; the user unit reads
+`%h/.config/z0intelligence/service.env`. Kevin selected preservation and integration
+on `live-wip-20261023`, tracked by Draft PR #207. Commit `500ee41` preserves every
+original edit and untracked file as-is above the previous live commit `4de1aa9`.
+The branch then merges #206, retaining the live adapters and OptChat changes
+alongside bounded indexing and provider caching. Upstream free-only safeguards
+take precedence over WIP bypasses; no new provider authority is granted.
+
+The guard defaults enforce the 200,000-file ceiling and 600-second lifetime, so
+no root configuration or live environment edit is required. Roots come from
+requests: OMP's `z0_file_search` sends `ctx.cwd`; the Hermes Python adapter
+requires `project_root`, and Hermes HTTP/MCP adapters require an explicit
+`repository_root`.
+
+Run the merged revision's tests off-host before restarting only the existing
+`z0intelligence.service`. Do not overwrite future uncommitted changes.
+Rollback to the previous runtime while preserving the WIP/integration branch
+is this single shell command (it refuses incompatible uncommitted changes):
+
+```sh
+git -C /mnt/zer0models/z0-wt/z0intelligence switch --detach 4de1aa962cf4c9a19b18a6120ea27309b908da65 && systemctl --user restart z0intelligence.service
+```
+
+To return to the preserved integrated runtime, switch back to
+`live-wip-20261023` and restart the same unit.
+
+The existing-unit restart command is `systemctl --user restart
+z0intelligence.service`; use it only after the host's server-admission policy
+has approved that service. In OMP, run `/reload-plugins` to swap the Python
+bridge generation (or restart OMP). A service-only restart does not replace a
+resident OMP bridge. No install/model synchronization is needed for this
+Python-only change. Health readback is
+`curl --fail http://127.0.0.1:11501/healthz`.

@@ -36,7 +36,7 @@ def test_cursor_is_never_a_route():
     assert not blocked_provider("nous")
 
 
-def test_402_sidesteps_to_nous_not_cursor(monkeypatch):
+def test_402_sidesteps_to_validated_free_route_not_cursor(monkeypatch):
     calls = []
 
     class Handler(BaseHTTPRequestHandler):
@@ -68,7 +68,7 @@ def test_402_sidesteps_to_nous_not_cursor(monkeypatch):
     thread.start()
     policy, providers = configuration()
     providers = copy.deepcopy(providers)
-    for name in ("openrouter", "nous", "vercel"):
+    for name in ("openrouter", "nous", "vercel", "groq", "nvidia"):
         providers[name].update(base_url=f"http://127.0.0.1:{server.server_port}", api_key_env="TEST_SIDESTEP_KEY", auth="environment")
     monkeypatch.setenv("TEST_SIDESTEP_KEY", "local-test-only")
     plan = {
@@ -92,7 +92,7 @@ def test_402_sidesteps_to_nous_not_cursor(monkeypatch):
         server.server_close()
         thread.join()
     assert result["ok"]
-    assert result["provider"] == "nous"
+    assert result["provider"] == "groq"
     assert "cursor" not in calls
     assert calls[0] == policy["defaults"]["openrouter"]
-    assert calls[1] == policy["sidestep_order"][0]["model"]
+    assert calls == [policy["defaults"]["openrouter"], policy["defaults"]["groq"]]
