@@ -85,8 +85,12 @@ def main() -> None:
         extract(args.repo / 'AGENTS.md', r'never|must|free-first|privacy|authority', 5))
 
     policy_rows = []
-    policy_root = Path('/mnt/zer0models/z0-wt/policy-integration')
-    for relative in ('src/z0int/policy_runtime.py', 'bend/ops_fsm/LAWS.bend'):
+    policy_root = Path(os.environ.get('Z0INT_POLICY_ROOT', '/mnt/zer0models/z0-wt/bend-policy-laws'))
+    capacity_source = policy_root / 'src/z0int/fsm/policy_guard.py'
+    if capacity_source.is_file():
+        sources[str(capacity_source)] = digest(capacity_source)
+        policy_rows.append(f'- `{capacity_source}:179-200` → Small local models: max options per decision = policy.option_capacity allowed_k; default 2 until ChoiceLadder findings land (law O13, z0int #212).')
+    for relative in ('src/z0int/fsm/ops.py', 'bend/ops_fsm/LAWS.bend'):
         policy_rows += extract(policy_root / relative, r'allowed_k|option_capacity|o10_phone|o13_|no_agent_resource_caps', 4)
     serving = Path('/home/kvn/.z0int/config/serving.json')
     if serving.is_file():
@@ -152,19 +156,25 @@ def main() -> None:
     section('What is live where — observed, not inferred from branch names', rows[:35])
 
     pilot_rows = []
-    for model, folder in (('qwen25-05', 'fetched-qwen25-05'), ('qwen3-06', 'fetched-qwen3-06')):
+    for model, folder in (('qwen25-05', 'pilot-v1-qwen25-05'), ('qwen3-06', 'pilot-v1-qwen3-06')):
         path = OPS / 'choice-ladder' / folder / model / 'rows.jsonl'
         if not path.is_file():
             continue
         sources[str(path)] = digest(path)
         groups = {}
+        pooled = {}
         for line in path.read_text().splitlines():
             row = json.loads(line)
+            pooled_good, pooled_n = pooled.get(row['k'], (0, 0))
+            pooled[row['k']] = (pooled_good + int(row.get('correct') is True), pooled_n + 1)
             if row.get('task') != 'T1':
                 continue
             k = row['k']
             good, n = groups.get(k, (0, 0))
             groups[k] = (good + int(row.get('correct') is True), n + 1)
+        if model == 'qwen25-05':
+            measured = ', '.join(f'k{k} {pooled[k][0]}/{pooled[k][1]}' for k in (2, 3, 8, 32) if k in pooled)
+            pilot_rows.append(f'- `{path}` → qwen2.5-0.5b pilot v1: {measured}. Pooled synthetic partial pilot, excluded from final capacity gates; shows collapse past 3, not a general capability maximum.')
         for k, (good, n) in sorted(groups.items()):
             pilot_rows.append(f'- `{path}` → Excluded protocol-v1 synthetic T1 pilot: {model}, k={k}, {good}/{n} ({100*good/n:.1f}%) correct. Not a final capability gate.')
 

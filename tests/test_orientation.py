@@ -109,12 +109,23 @@ class OrientationTests(unittest.TestCase):
         repo = Path(self.tmp.name) / 'repo'
         repo.mkdir()
         (repo / 'README.md').write_text('**A provenance-backed cognition plane.**\n')
+        capacity = repo / 'src/z0int/fsm/policy_guard.py'
+        capacity.parent.mkdir(parents=True)
+        capacity.write_text('def allowed_k(): return 2\n')
+        pilot = ops / 'choice-ladder/pilot-v1-qwen25-05/qwen25-05/rows.jsonl'
+        pilot.parent.mkdir(parents=True)
+        pilot.write_text('\n'.join(json.dumps({'task': task, 'k': k, 'correct': correct})
+            for task, k, correct in [('T1', 2, True), ('T2', 2, True), ('T3', 3, True), ('T2', 8, False), ('T1', 32, False)]))
         out = Path(self.tmp.name) / 'state/STATE-PACKET.md'
-        with patch.object(module, 'OPS', ops), patch.object(module, 'HERE', here), patch.object(module, 'cmd', return_value=''), patch.object(sys, 'argv', ['generate_packet.py', '--offline', '--repo', str(repo), '--out', str(out)]), patch('sys.stdout', new=io.StringIO()):
+        with patch.object(module, 'OPS', ops), patch.object(module, 'HERE', here), patch.object(module, 'cmd', return_value=''), patch.dict(os.environ, {'Z0INT_POLICY_ROOT': str(repo)}), patch.object(sys, 'argv', ['generate_packet.py', '--offline', '--repo', str(repo), '--out', str(out)]), patch('sys.stdout', new=io.StringIO()):
             module.main()
         text = out.read_text()
         self.assertLessEqual(len(text.splitlines()), 223)
         self.assertTrue(all('`/' in line for line in text.splitlines()))
+        self.assertIn('default 2 until ChoiceLadder findings land (law O13, z0int #212)', text)
+        self.assertIn('qwen2.5-0.5b pilot v1: k2 2/2, k3 1/1, k8 0/1, k32 0/1', text)
+        self.assertIn(str(capacity), text)
+        self.assertIn(str(pilot), text)
         manifest = json.loads(out.with_name('packet-manifest.json').read_text())
         self.assertEqual(manifest['packet_sha256'], hashlib.sha256(out.read_bytes()).hexdigest())
         self.assertIn('generated_at', manifest)

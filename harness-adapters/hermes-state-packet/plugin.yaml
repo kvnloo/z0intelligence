@@ -2,3 +2,5 @@ name: hermes-state-packet
 version: 1.0.0
 description: Read-only source-linked startup orientation with a two-hour freshness gate.
 author: kvnloo
+provides_hooks:
+  - pre_llm_call
