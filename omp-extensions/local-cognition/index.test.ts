@@ -5,7 +5,8 @@
  * Python, no model server, no network.
  */
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, statSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import localCognition, {
@@ -15,6 +16,9 @@ import localCognition, {
 	coverage,
 	cognitionTimeoutMs,
 	loadCognitionSettings,
+	loadDecisionPolicy,
+	policyStamp,
+	shadowModels,
 	receiptPath,
 	resolveAvailableTools,
 	shadowEnabled,
@@ -56,6 +60,7 @@ function toolCall(toolName = "read", input: unknown = { path: "AGENTS.md" }) {
 const globalHolder = globalThis as { __omp_z0int_bridge_transport__?: unknown };
 const originalTransport = globalHolder.__omp_z0int_bridge_transport__;
 let sent: Array<Record<string, unknown>> = [];
+let testHome: string;
 
 const ENV_KEYS = [
 	"OMP_Z0INT_COGNITION_SHADOW",
@@ -75,6 +80,8 @@ beforeEach(() => {
 	__resetLocalCognitionForTest();
 	sent = [];
 	for (const key of ENV_KEYS) delete process.env[key];
+	testHome = mkdtempSync(join(tmpdir(), "z0int-policy-test-"));
+	process.env.Z0INT_HOME = testHome;
 	globalHolder.__omp_z0int_bridge_transport__ = {
 		kind: "z0int-bridge",
 		generation: 3,
@@ -92,6 +99,7 @@ afterEach(() => {
 	if (originalTransport === undefined) delete globalHolder.__omp_z0int_bridge_transport__;
 	else globalHolder.__omp_z0int_bridge_transport__ = originalTransport;
 	for (const key of ENV_KEYS) delete process.env[key];
+	rmSync(testHome, { recursive: true, force: true });
 });
 
 function installed() {
@@ -577,4 +585,159 @@ test("a model that answers inside the budget is unaffected", async () => {
 	pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "warm", toolName: "read", input: {} }, sessionCtx());
 	await flush(150);
 	expect(entries[0].data.outcome).toBe("slm_executed");
+});
+
+// --- evidence policy consumer ------------------------------------------
+
+function policyFixture(stage = "shadow"): Record<string, unknown> {
+	return {
+		schema: "z0.decision_policy.v1", compiled_at: "2026-10-24T00:00:00+00:00",
+		findings_head: "e".repeat(64), compiler: "z0int.policy.compile@synthetic",
+		families: { "omp.tool": {
+			stage, arm: { kind: "slm", model: "policy-model", quant: "Q4_0", engine: "synthetic", backend: "cpu", device: "test" },
+			threshold: 0.95, abstain_to: "frontier", canary_share: 0.1,
+			evidence: ["e".repeat(64)], rule_id: "F-omp.tool-test",
+			expires_at: "2099-01-01T00:00:00+00:00", demoted_reason: null,
+		} },
+		serving: [], changes: [],
+	};
+}
+
+function writePolicy(body = policyFixture(), pythonFloat = false): string {
+	const canonical = (value: unknown): string => {
+		if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+		if (value !== null && typeof value === "object") return `{${Object.keys(value).sort().map(key =>
+			`${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`).join(",")}}`;
+		return JSON.stringify(value);
+	};
+	let encoded = canonical(body);
+	if (pythonFloat) encoded = encoded.replace('"canary_share":0.1', '"canary_share":1.0');
+	const version = createHash("sha256").update(encoded).digest("hex");
+	mkdirSync(join(testHome, "policy"), { recursive: true });
+	writeFileSync(join(testHome, "policy", "decision-policy.json"), `{"version":"${version}",${encoded.slice(1)}`);
+	return version;
+}
+
+test("policy models take precedence over fallback environment and settings", () => {
+	writePolicy();
+	process.env.OMP_Z0INT_COGNITION_MODELS = "fallback-model";
+	expect(shadowModels()).toEqual(["policy-model"]);
+	expect(policyStamp().stage).toBe("shadow");
+	expect(policyStamp().rule_id).toBe("F-omp.tool-test");
+});
+
+test("loader verifies Python canonical float spellings without JS precision loss", () => {
+	const version = writePolicy(policyFixture("live"), true);
+	expect(loadDecisionPolicy().version).toBe(version);
+	expect(policyStamp().policy_sha256).toBe(version);
+});
+
+test("tampered policy is rejected even when mtime is unchanged", () => {
+	writePolicy();
+	expect(shadowModels()).toEqual(["policy-model"]);
+	const path = join(testHome, "policy", "decision-policy.json");
+	const stat = statSync(path);
+	writeFileSync(path, readFileSync(path, "utf8").replace("policy-model", "forged-model"));
+	utimesSync(path, stat.atime, stat.mtime);
+	expect(loadDecisionPolicy().version).toBe("none");
+	expect(policyStamp().stage).toBe("none");
+	expect(shadowModels()).toEqual(["qwen3_06b"]);
+});
+
+test("missing and corrupt policies fail open and always stamp observations", async () => {
+	expect(loadDecisionPolicy().version).toBe("none");
+	const { pi, handler } = installed();
+	const entries: Array<Record<string, unknown>> = [];
+	Object.assign(pi, { appendEntry: (_type: string, data: Record<string, unknown>) => entries.push(data) });
+	expect(handler(toolCall(), fakeCtx())).toBeUndefined();
+	await flush();
+	expect(entries.length).toBe(1);
+	for (const row of [entries[0], statusRing[0] as unknown as Record<string, unknown>]) {
+		expect(row.policy_version).toBe("none");
+		expect(row.policy_sha256).toBe("none");
+		expect(row.rule_id).toBe("none");
+		expect(row.stage).toBe("none");
+		expect(typeof row.policy_reason).toBe("string");
+		expect(row.serving_healthy).toBeNull();
+	}
+	expect(entries[0].route).toBe("shadow");
+	expect(typeof entries[0].ts).toBe("number");
+	mkdirSync(join(testHome, "policy"), { recursive: true });
+	writeFileSync(join(testHome, "policy", "decision-policy.json"), "not-json");
+	expect(loadDecisionPolicy().version).toBe("none");
+	expect(shadowModels()).toEqual(["qwen3_06b"]);
+});
+
+test("expired and none-stage families do not provide shadow models", () => {
+	const body = policyFixture();
+	const rule = (body.families as Record<string, Record<string, unknown>>)["omp.tool"];
+	rule.expires_at = "2000-01-01T00:00:00+00:00";
+	writePolicy(body);
+	expect(shadowModels()).toEqual(["qwen3_06b"]);
+	expect(policyStamp().stage).toBe("none");
+	expect(policyStamp().policy_reason).toBe("evidence_expired");
+});
+
+test("a late response retains the request policy snapshot", async () => {
+	const version = writePolicy();
+	const { pi, handler } = installed();
+	const entries: Array<Record<string, unknown>> = [];
+	Object.assign(pi, { appendEntry: (_type: string, data: Record<string, unknown>) => entries.push(data) });
+	const { promise, resolve: finish } = Promise.withResolvers<Record<string, unknown>>();
+	globalHolder.__omp_z0int_bridge_transport__ = { request: () => promise };
+	handler(toolCall(), fakeCtx());
+	const newer = policyFixture("live");
+	const nextVersion = writePolicy(newer);
+	expect(nextVersion).not.toBe(version);
+	finish({ ok: true });
+	await flush();
+	expect(entries[0].policy_version).toBe(version);
+	expect(entries[0].policy_sha256).toBe(version);
+});
+
+test("serving health is asynchronous and cached for receipts", async () => {
+	const body = policyFixture("live");
+	body.serving = [{ device: "test", model: "policy-model", quant: "Q4_0", engine: "synthetic", backend: "cpu",
+		url: "http://127.0.0.1:12345/v1", evidence: ["e".repeat(64)] }];
+	writePolicy(body);
+	const original = globalThis.fetch;
+	const urls: string[] = [];
+	try {
+		globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+			urls.push(String(url));
+			expect(init?.signal).toBeInstanceOf(AbortSignal);
+			return Response.json({ data: [{ id: "policy-model", revision: "synthetic-revision" }] });
+		}) as typeof fetch;
+		expect(policyStamp().serving_healthy).toBeNull();
+		expect(policyStamp().serving_healthy).toBeNull();
+		await flush();
+		expect(policyStamp().serving_healthy).toBe(true);
+		expect(urls).toEqual(["http://127.0.0.1:12345/v1/models"]);
+	} finally {
+		globalThis.fetch = original;
+	}
+});
+
+test("a new process can read fresh shared endpoint health without another probe", () => {
+	const body = policyFixture("live");
+	const endpoint = { device: "test", model: "policy-model", quant: "Q4_0", engine: "synthetic", backend: "cpu",
+		url: "http://127.0.0.1:12345/v1", evidence: ["e".repeat(64)] };
+	body.serving = [endpoint];
+	writePolicy(body);
+	const digest = createHash("sha256").update(JSON.stringify({
+		backend: "cpu", device: "test", engine: "synthetic", model: "policy-model", quant: "Q4_0",
+	})).digest("hex");
+	writeFileSync(join(testHome, "policy", "serving-health.json"), JSON.stringify({
+		schema: "z0.serving_health.v1", endpoints: { [endpoint.url]: {
+			scope_sha256: digest, status: "healthy", checked_at: new Date().toISOString(),
+			model: "policy-model", revision: "synthetic-revision",
+		} },
+	}));
+	const original = globalThis.fetch;
+	let probes = 0;
+	try {
+		globalThis.fetch = (() => { probes++; throw new Error("fresh shared health must not reprobe"); }) as typeof fetch;
+		expect(policyStamp().serving_healthy).toBe(true);
+		expect(probes).toBe(0);
+	} finally { globalThis.fetch = original; }
 });
