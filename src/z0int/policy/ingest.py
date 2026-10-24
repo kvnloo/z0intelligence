@@ -211,6 +211,13 @@ def _product_verifier(row: dict) -> tuple[dict | None, str | None]:
 
 def _outcome_metric(row: dict, metric: dict, checked: tuple | None = None) -> tuple[dict, str, dict | None]:
     proof, reason = checked if checked is not None else _product_verifier(row)
+    if proof is not None:
+        # A receipt observes one run, never an asserted aggregate or another metric.
+        low, high = wilson(int(proof["success"]), 1)
+        metric = {"name": "task_success", "value": float(proof["success"]), "n": 1,
+                  "ci_low": low, "ci_high": high, "ci_method": "wilson95",
+                  "higher_is_better": True,
+                  "promotion_eligible": metric.get("promotion_eligible", True)}
     metric = {**metric, "outcome_ledger_verified": proof is not None,
               "promotion_eligible": proof is not None and metric.get("promotion_eligible", True)}
     if proof is None:

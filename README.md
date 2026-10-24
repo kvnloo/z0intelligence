@@ -108,6 +108,34 @@ actual receipt file path and hash. The compiler preserves endpoint metadata.
 The pure compiler never reads or hashes external model files. Identity metadata
 must come from the measurement owner, not from a guessed engine-path revision.
 
+### Agent outcome evidence
+
+`policy ingest --sources specs.json` accepts source specs with
+`kind=agent_outcomes` for structured JSON/JSONL exports
+and frozen SQLite `runs` tables. Duplicate runs (`dup_of`) are excluded.
+SQLite inputs with a nonempty WAL are rejected; export a consistent snapshot.
+Discovery includes `operations/agent-outcomes/ledger.sqlite`.
+
+Pushes, PRs, passing tests and ledger success labels are proxy evidence.
+The adapter stamps `evidence_kind=proxy`, clears outcome verification and
+disables promotion. The compiler also excludes proxies independently.
+An exported z0eval receipt cannot restore promotion credit to these proxies.
+
+Product evidence requires `verifier_receipt` with an absolute `path` and the
+file's SHA-256. The file must contain either a verified `z0.product_check.v1`
+receipt or an AODL `stateUpdate` selected by `event_id`. Its run/trace ID must
+match the outcome row. AODL events also require a source hash consistent with
+document provenance when present. Both forms require a verifier, boolean
+success, receipt ID and structured `observed_target`: a product/UI/API/runtime/
+filesystem/database target ID, `observed=true`, and nonempty observed `state`.
+Tests and publication signals alone are not observed product targets.
+
+A valid receipt emits `evidence_kind=product_outcome` and one `task_success`
+observation (`n=1`), using the receipt's success rather than the ledger claim
+or any asserted aggregate metric. Missing, mismatched or malformed receipts
+remain proxies with an explicit reason. Receipt hashes establish provenance,
+not independent trust in the verifier's implementation.
+
 ### ChoiceLadder option capacity
 
 The pure compiler emits an evidence-bound `option_capacity` map. Each key is

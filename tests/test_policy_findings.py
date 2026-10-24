@@ -374,3 +374,30 @@ def test_sqlite_outcome_ledger_reads_frozen_snapshot_and_ignores_duplicates(tmp_
     assert emitted["source"]["sha256"] == hashlib.sha256(before).hexdigest()
     assert source.read_bytes() == before
     assert ingest_sources(spec, tmp_path)["added"] == 0
+
+
+@pytest.mark.parametrize("aodl", [False, True])
+def test_product_failure_overrides_claimed_aggregate_success(tmp_path, aodl):
+    reference, _ = product_receipt(tmp_path, success=False, aodl=aodl)
+    row = finding(synthetic=True)
+    row.update(run_id="fixture-run", outcome="verified_success", verifier_receipt=reference)
+    row["metric"].update(value=1., ci_low=.99, n=1000)
+    source = tmp_path / "outcomes.json"
+    source.write_text(json.dumps({"rows": [row]}))
+    assert ingest_sources([{"kind": "agent_outcomes", "path": str(source)}], tmp_path)["added"] == 1
+    emitted = read_findings(ledger_path(tmp_path))[0]
+    assert emitted["evidence_kind"] == "product_outcome"
+    assert emitted["metric"]["name"] == "task_success"
+    assert emitted["metric"]["value"] == 0.
+    assert emitted["metric"]["n"] == 1
+    assert emitted["verifier_receipt"]["success"] is False
+
+
+def test_sqlite_outcome_ledger_with_wal_is_rejected(tmp_path):
+    source = tmp_path / "ledger.sqlite"
+    source.write_bytes(b"not read while WAL exists")
+    tmp_path.joinpath("ledger.sqlite-wal").write_bytes(b"pending writes")
+    report = ingest_sources([{"kind": "agent_outcomes", "path": str(source)}], tmp_path)
+    assert report["added"] == 0
+    assert report["sources"][0]["status"] == "skipped"
+    assert "live WAL" in report["sources"][0]["reason"]
