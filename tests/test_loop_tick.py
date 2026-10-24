@@ -23,7 +23,7 @@ from z0int import harness_capture as hc
 from z0int import paths
 
 REPO = Path(__file__).resolve().parents[1]
-STEPS = ['verify', 'import', 'shadow', 'export', 'sufficiency', 'learn', 'promote']
+STEPS = ['cognition', 'verify', 'import', 'shadow', 'export', 'sufficiency', 'learn', 'promote']
 GIT_ENV = {'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_AUTHOR_NAME': 'f', 'GIT_AUTHOR_EMAIL': 'f@x',
            'GIT_COMMITTER_NAME': 'f', 'GIT_COMMITTER_EMAIL': 'f@x'}
 
@@ -70,6 +70,10 @@ def world(tmp_path, monkeypatch):
                  'AGENTSVIEW_DATA_DIR': w / 'av', 'XDG_CACHE_HOME': w / 'cache'}.items():
         monkeypatch.setenv(k, str(v))
     monkeypatch.setenv('PYTHONDONTWRITEBYTECODE', '1')
+    # These fixtures exercise the existing verified-turn lane. Its synthetic
+    # homes have no OMP sessions; cognition integration/stall cases are covered
+    # end-to-end in test_shadow_learning.py, not faked into this turn corpus.
+    monkeypatch.setitem(tick_mod()._STEP, 'cognition', lambda *a, **kw: None)
     (w / 'home').mkdir(parents=True)
     paths.ensure_layout(home)  # a real home already has the standard tree
     lock = tmp_path / 'locks' / 'quiet-lane.lock'
@@ -203,7 +207,7 @@ def test_cli_loop_tick_routes_to_the_tick(world, learner, capsys):
     code = le._main(['tick', '--z0int-home', str(world.home), '--lock', str(world.lock), '--lock-wait-s', '5',
                      '--budget-s', '120'])
     assert code in (0, 3)
-    assert summary_file(world.home)['steps'][0]['name'] == 'verify'
+    assert summary_file(world.home)['steps'][0]['name'] == 'cognition'
 
 
 # ----------------------------------------------------------------------------- 2. never promotes
@@ -364,7 +368,7 @@ def test_an_exhausted_budget_stops_releases_the_lock_and_is_partial(world, learn
     assert rep['status'] == 'partial_measurement' and rep['exit'] != 0
     status = {s['name']: s['status'] for s in rep['steps']}
     assert status['shadow'] == 'partial'  # the slot itself stops at the deadline; the rest waits for the next tick
-    assert [status[n] for n in STEPS[3:]] == ['skipped_budget'] * 4
+    assert [status[n] for n in STEPS[4:]] == ['skipped_budget'] * 4
     assert lock_is_free(world.lock)
     assert summary_file(world.home)['status'] == 'partial_measurement'
 
@@ -384,7 +388,7 @@ def test_the_verify_step_stops_between_harnesses_at_the_deadline(world, learner,
     rep = tick(world, budget_s=1.0)
     status = {s['name']: s['status'] for s in rep['steps']}
     assert status['verify'] == 'partial' and len(seen) == 1
-    assert [status[n] for n in STEPS[1:]] == ['skipped_budget'] * 6
+    assert [status[n] for n in STEPS[2:]] == ['skipped_budget'] * 6
     assert rep['status'] == 'partial_measurement' and rep['tokenomics']['lock_held_s'] < 1.0 + 1.5 + 1.0
     assert lock_is_free(world.lock)
 

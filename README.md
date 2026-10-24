@@ -30,6 +30,113 @@ The current repository is much more than the original OpenJev prototype.
 
 The source of truth for the current architectural boundary is [zer0.repo.yaml](zer0.repo.yaml).
 
+## Evidence-bound decision policy
+
+`z0int policy ingest` converts supported JSON measurements into an append-only,
+locked hash chain at `$Z0INT_HOME/findings/findings.jsonl`. It records skipped
+sources and their reasons in `findings/ingest-status.json`. Unknown layouts,
+prose reports, missing observation timestamps, missing source hashes and missing
+sample counts never become evidence. Repeated source hashes do not add findings.
+Configure discovery with `--operations-root` / `Z0INT_OPERATIONS_ROOT` and
+`--z0evals-root` / `Z0INT_Z0EVALS_ROOT`. Use `--sources sources.json` for a JSON
+array of `{kind,path,arm?,ts?,scope_note?,url?}` when a source omits runtime identity.
+No device, engine, backend, quantization, timestamp or sample count is guessed.
+
+`z0int policy compile [--now ISO8601] [--config config.json]` writes
+`policy/decision-policy.json` atomically and retains content-addressed versions
+under `policy/history/`. A corrupt findings chain stops compilation without
+overwriting the previous policy. Compilation is pure for fixed findings,
+previous policy, timestamp and compiler configuration. The CLI supplies the
+compiler Git revision. Library callers supply `CompilerConfig.compiler_revision`.
+Bars, minimum counts, expiry, endpoint outage duration and canary share are
+configuration fields. Promotion advances one stage per compile.
+
+Contract interpretations:
+- `prev` hashes the complete canonical previous line, excluding its newline.
+  Finding IDs exclude `id` and `prev`. Policy versions exclude only `version`.
+  Canonical JSON uses sorted keys, compact separators, UTF-8 and finite numbers.
+- Shadow uses the 0.80 retention bar. Canary/live use 0.95. A latest lower bound
+  below 0.80 removes credit. A bound below 0.95 demotes canary/live to shadow.
+  No fresh evidence or an outage longer than 24 hours removes all credit.
+  Expired promotion prerequisites demote immediately to the highest stage
+  whose prerequisites remain fresh. An expired outcome can reduce live to canary.
+- Observation expiry is the earlier of `expires_at` and `ts + expiry_days`.
+  Equality with the current timestamp means expired. Future observations cannot
+  promote an arm. Runtime outage evidence uses metric `endpoint_health` and
+  an explicit timezone-aware `unhealthy_since`.
+- Live shadow labels require `metric.live_shadow=true`. Replay non-inferiority
+  requires explicit `divergence <= aa_noise_floor`. Outcome promotion additionally
+  requires metric `task_success` and `outcome_ledger_verified=true`.
+  z0eval receipts need `verdict=KEEP` and all four architecture gates `pass`
+  for promotion. Negative receipts remain evidence, not promotion authority.
+- Scope is structural, never inferred from prose. Each explicit arm dimension
+  constrains the rule. `subject.scope` can add constraints but cannot erase arm
+  boundaries. Scoped rules use `family@<scope hash prefix>` keys, with base
+  `family` and `scope` fields. The narrowest matching rule wins, even at `none`.
+  Missing scope dimensions do not match narrower rules. No cross-device,
+  quantization or engine relaxation is inferred from `scope_note`.
+- Bench JSON uses `results` or `models` arrays, explicit arm identity and counts.
+  Offload JSON uses `opportunities` rows with subject/arm, evidence class,
+  recall confidence bounds and `retained_fraction=0.2`. z0eval receipts supply
+  an explicit `findings` array. Unsupported layouts are skipped with reasons.
+
+`z0int policy show`, `explain <family>` and
+`changelog [--from VERSION --to VERSION]` expose policy and evidence provenance.
+All commands support `--json`. The changelog defaults to the latest policy and
+the latest older compiled version. Markdown emits one entry per stage change,
+including finding IDs and source paths. Publication must replace local evidence
+links with authorized immutable links. Measured findings can supply serving
+URLs through source metadata. Prose URLs and inference never create endpoints.
+Serving entries preserve the complete measured model, quant, engine, backend
+and device scope, plus arm kind. Missing quantization metadata never becomes
+an endpoint with guessed identity. Canary/live rules without an exact measured
+endpoint retain their evidence-derived stage and carry `serving_missing=true`.
+JSON and Markdown changelogs expose these missing endpoint annotations.
+
+Optional finding `synthetic=true` is part of the content hash and hash chain.
+The compiler propagates synthetic provenance to affected rules and endpoints.
+Any synthetic input marks the whole policy and its changelog synthetic.
+Synthetic fixtures use the same promotion bars and stages as measured evidence.
+They do not prove a real experiment promotion. Runtime and guard owners must
+reject synthetic authorization outside an explicitly owned temporary smoke context.
+
+Measured source metadata can include `expected_model_id`, `engine_build`,
+`model_path`, `model_resolved_path` and `model_sha256`. Source specifications,
+receipt `source` metadata and individual result finding `source` metadata
+preserve these fields and explicit URLs. Finding provenance always uses the
+actual receipt file path and hash. The compiler preserves endpoint metadata.
+The pure compiler never reads or hashes external model files. Identity metadata
+must come from the measurement owner, not from a guessed engine-path revision.
+
+### ChoiceLadder option capacity
+
+The pure compiler emits an evidence-bound `option_capacity` map. Each key is
+the canonical JSON string of the exact model, quant, engine, backend and device
+scope. `option_capacity_key(scope)` creates this lossless key. No capacity
+credit transfers between different physical scopes.
+
+Each value contains `allowed_k`, `finding_ids`, `wilson_lower`, `task`, `bar`
+and `expires_at`. `task` is the sorted list of required task names. The default
+catalogue is T1, T2, T3 and T4. Configure it with `option_capacity_tasks`.
+Observed measured task names also remain required, including failed or expired
+tasks. Configure the independent accuracy threshold with `option_capacity_bar`
+(default 0.95). Routing promotion thresholds remain unchanged.
+
+Capacity evidence requires `subject.family=choice.option_capacity`,
+`subject.job=ChoiceLadder`, `subject.task` (or `metric.task`), metric
+`choice_accuracy`, integer `metric.option_count >= 2`, `ci_method=wilson95`,
+positive `n`, and measured, unexpired observations. The compiler compares the
+smaller of the stated lower bound and a recomputed Wilson lower bound against
+the bar. An explicit correct count must agree with accuracy and sample count.
+The latest measured observation for a task and k supersedes older success.
+
+The compiler selects the largest passing k per task. The allowed capacity is
+the minimum across every required task. Missing, pending, expired, inference,
+ineligible or inconsistent evidence never counts as success. Any unsupported
+task limits capacity to the baseline of 2. An unknown scope also defaults to 2.
+Proof IDs and the earliest selected proof expiry accompany positive credit.
+O13 readers consume this content-addressed projection, not a live findings scan.
+
 ## Architecture
 
 ~~~text
@@ -200,6 +307,43 @@ The in-tree cognition stack includes:
 - a serving/probe layer for what is actually resident on the machine.
 
 See [docs/local-cognition-portfolio.md](docs/local-cognition-portfolio.md).
+
+### Private continuous shadow experiments
+
+The hourly cognition tick exact-joins OMP session and native tool-call IDs.
+Alongside `omp.tool`, it extracts literal skill choice, path kind, and the
+wrapper's error flag. The wrapper flag is **not** task success. Explicit model
+arguments form a separate family only when actually observed. Labels/day use
+native event timestamps, not the date old traces were ingested.
+
+Small-model decisions use deterministic narrowing followed by one yes/no
+logit query per candidate. Models up to 1B have a hard three-candidate cap;
+the explicit 1.7B lane has a five-candidate cap. Wide 24/64-option projections
+are retired. Tool prompts include the latest visible user goal, the last
+visible assistant sentence, and five preceding tools with their intent strings.
+Current tool names and arguments never enter the model projection. Missing
+yes/no probabilities or a small top margin produce an abstention. Accuracy
+and Wilson bounds use covered predictions; coverage reports abstentions.
+Explicit binary abstentions are uncovered rows, not predictor errors.
+
+Each family's arms must all plateau over three ticks before search advances
+to an untried bounded history, recent-session, or few-shot strategy. Exhausted
+below-bar families propose the next exact-label census family. Selection is
+not execution: a trial starts only after an observation with that strategy.
+Every positive-covered arm emits a scoped, `synthetic:false` finding into the
+canonical findings ledger each tick. Historical inference remains
+`replayed_L1`; only a prediction stored before its exact label may be live
+shadow. Zero-covered arms record a publication blocker, never invented evidence.
+
+Status retains rolling-day errors and separately exposes current-hour,
+post-deployment, per-tick, and atomic-RPC counts. Transport errors live in
+`error`, while `parse_error` means a model response could not be parsed.
+Legacy receipts are classified without rewriting their source bytes.
+`operations/shadow-learner/deploy-proposed.sh` backs up private state and
+installs a committed content-stamped copy. Extension links must never point
+into a task worktree. Existing OMP processes cache extension modules: a fresh
+process is required; `/reload-plugins` is not an extension-code reload.
+
 
 ## Compilation is mechanism-neutral
 

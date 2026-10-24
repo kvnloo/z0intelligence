@@ -708,6 +708,16 @@ def _merge_main(argv: list[str]) -> int:
 
 def _main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ['status']:
+        from .cognition.learning import status_line
+        from . import paths
+        path = paths.home() / 'loop' / 'shadow-learning-status.json'
+        state = json.loads(path.read_text()) if path.exists() else {}
+        print(json.dumps(state, indent=2) if '--json' in argv else status_line(state))
+        return 0 if state.get('status') == 'LEARNING' else 1
+    if argv[:1] == ['shadow']:
+        from .cognition.learning import main as shadow_main
+        return shadow_main(argv[1:])
     if argv[:1] == ['export']:
         return _tables_main(argv[1:])
     if argv[:1] == ['merge']:

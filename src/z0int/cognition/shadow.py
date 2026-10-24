@@ -10,11 +10,7 @@ The bridge op ``cognition_shadow`` is a *safety boundary*, not a controller:
   disagreement between "what the compiler allows" and "what a local model
   wanted" is visible without ever being acted on;
 * it fails open. A bad payload, a missing model or a dead server produces a
-  result dict — never an exception into the host;
-* it records answers only (oh-my-pi#109): a backend that is not served, raised,
-  timed out or could not be reached gives no receipt row, only a persisted
-  ``backend_unavailable`` count; a receipt names the observed tool as a
-  structured ``actual_tool`` and never stores the state text or any tool input.
+  result dict — never an exception into the host.
 
 The pure part is :func:`build_shadow_plan`; :func:`run_shadow` is the small
 effectful shell the bridge worker calls. Both are unit-testable with fake
@@ -24,26 +20,25 @@ backends and no model server.
 from __future__ import annotations
 
 from dataclasses import dataclass
-import fcntl
 import json
 import os
-import re
+import fcntl
 import threading
+import re
 import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from .actions import ActionCandidate, ActionGraph, Rule
 from .cascade import CascadeContext, CognitionCascade
-from .adapters.local_slm import ToolDecision, ToolDecisionRequest
 from .registry import LocalModelRegistry
 from ..receipt import new_trace_id
 
 SCHEMA = "z0int.cognition.shadow.v1"
 RECEIPT_SCHEMA = "z0int.cognition.shadow.receipt.v1"
 RECEIPT_NAME = "cognition-shadow.jsonl"
-COUNTERS_NAME = "cognition-shadow-counters.json"
-_TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
+_SOURCE_STAMP = Path(__file__).resolve().parents[3] / "DEPLOYED_SHA"
+SOURCE_REVISION = _SOURCE_STAMP.read_text().strip() if _SOURCE_STAMP.exists() else None
 
 _ALLOWED_KINDS = ("tool", "model", "control")
 _ALLOWED_RISKS = ("read", "write", "destructive", "publish", "credential", "payment")
@@ -340,110 +335,78 @@ def _resolve_shadows(
 
 def _decision_rows(
     resolved: Sequence[tuple[ShadowSpec, Any, str | None]],
-    legal_ids: frozenset[str],
-    request: ToolDecisionRequest,
-    *,
-    timeout_s: float,
+    legal: Any, payload: Mapping[str, Any], *, timeout_s: float,
+    shortlist: Sequence[str] = (), n_ctx: int = 4096,
+    policy_identity: dict | None = None, policy_home: Path | None = None,
 ) -> list[dict[str, Any]]:
-    results: list[tuple[ToolDecision | None, str | None]] = [
-        (None, error if backend is None else "shadow_timeout")
-        for _, backend, error in resolved
-    ]
+    """Run only binary-logit arms, under one shared caller deadline."""
+    from .shadow_binary import run_goal_binary
+    results: dict[int, dict] = {}
     lock = threading.Lock()
+    deadline = time.monotonic() + max(.1, timeout_s)
 
     def run(index: int, backend: Any) -> None:
-        try:
-            decision = backend.decide(request)
-        except BaseException as exc:  # noqa: BLE001 - shadow must never raise
-            with lock:
-                results[index] = (None, f"{type(exc).__name__}: {exc}")
-            return
+        row = run_goal_binary(payload, legal, backend, shortlist=shortlist, n_ctx=n_ctx,
+                             policy_identity=policy_identity, policy_home=policy_home)
+        row['failure_class'] = failure_class(row.get('error') or row.get('parse_error'))
         with lock:
-            results[index] = (decision, None)
+            results[index] = row
 
-    started = time.monotonic()
-    deadline = started + max(0.1, float(timeout_s))
-    waited_ms: dict[int, float] = {}
-    threads: list[tuple[int, threading.Thread]] = []
+    threads = []
     for index, (_, backend, _) in enumerate(resolved):
-        if backend is None:
-            continue
-        thread = threading.Thread(
-            target=run, args=(index, backend), daemon=True, name=f"z0int-shadow-{index}"
-        )
-        threads.append((index, thread))
-        thread.start()
-    for index, thread in threads:
-        thread.join(max(0.0, deadline - time.monotonic()))
-        if thread.is_alive():
-            with lock:
-                if results[index][0] is None and results[index][1] is None:
-                    results[index] = (None, "shadow_timeout")
-            # The call is abandoned, not cancelled: a model that was still loading
-            # keeps loading. Record the wait so a timeout is not read as instant.
-            waited_ms[index] = round((time.monotonic() - started) * 1000.0, 1)
-
-    rows: list[dict[str, Any]] = []
-    for index, (spec, backend, error) in enumerate(resolved):
+        if backend is not None:
+            thread = threading.Thread(target=run, args=(index, backend), daemon=True,
+                                      name=f'z0int-shadow-{index}')
+            threads.append(thread)
+            thread.start()
+    for thread in threads:
+        thread.join(max(0, deadline-time.monotonic()))
+    rows = []
+    for index, (spec, backend, resolve_error) in enumerate(resolved):
         with lock:
-            decision, failure = results[index]
-        row = _row(spec, backend, decision, failure, error, legal_ids)
-        # A backend can fail on its own just after the deadline; that row keeps
-        # its own error and is not also reported as a timeout.
-        if decision is None and failure == "shadow_timeout" and index in waited_ms:
-            row["timed_out"] = True
-            row["waited_ms"] = waited_ms[index]
+            row = results.get(index)
+        if row is None:
+            error = resolve_error or 'shadow_timeout'
+            row = {'label': 'goal-binary', 'arm': 'goal-binary', 'requested_model': spec.model_id,
+                'backend': None, 'model': spec.model_id, 'selected_action': None,
+                'abstained': True, 'invalid_call': False, 'error': error,
+                'failure_class': failure_class(error), 'latency_ms': timeout_s*1000 if backend else 0}
+            if backend is not None:
+                row['timed_out'] = True
+                row['waited_ms'] = timeout_s*1000
+        row['requested_model'] = spec.model_id
         rows.append(row)
     return rows
 
 
-def _row(
-    spec: ShadowSpec,
-    backend: Any,
-    decision: ToolDecision | None,
-    failure: str | None,
-    resolve_error: str | None,
-    legal_ids: frozenset[str],
-) -> dict[str, Any]:
-    if decision is None:
-        return {
-            "label": spec.label,
-            "backend": None,
-            "model": spec.model_id,
-            "selected_action": None,
-            "abstained": True,
-            "invalid_call": False,
-            "latency_ms": 0.0,
-            "parse_error": failure or resolve_error or "unavailable",
-            "error": failure or resolve_error or "unavailable",
-        }
+TRANSPORT_FAILURES = frozenset({
+    "connection_refused", "timeout", "http_5xx", "queue_full", "context_overflow",
+    "model_not_served", "transport_error",
+})
 
-    selected = decision.selected_action
-    invalid_call = bool(decision.invalid_call)
-    attempted: str | None = None
-    if selected is not None and selected not in legal_ids:
-        # A backend is supposed to pick from the legal set; if it names anything
-        # else the answer is recorded as an illegal call, never as a selection.
-        attempted = selected
-        selected = None
-        invalid_call = True
 
-    row: dict[str, Any] = {
-        "label": spec.label,
-        "backend": decision.backend,
-        "model": decision.model or spec.model_id,
-        "selected_action": selected,
-        "abstained": bool(decision.abstained or selected is None),
-        "invalid_call": invalid_call,
-        "latency_ms": decision.latency_ms,
-        "candidate_action_count": decision.candidate_action_count,
-        "parse_error": decision.parse_error if selected is None else None,
-    }
-    if decision.confidence is not None:
-        row["confidence"] = decision.confidence
-    if attempted is not None:
-        row["attempted_action"] = attempted
-    return row
+def failure_class(error: Any) -> str | None:
+    """Classify legacy and current errors identically without rewriting receipts."""
+    text = str(error or "").lower()
+    if not text:
+        return None
+    if "context_overflow" in text or ("exceed" in text and "context" in text):
+        return "context_overflow"
+    if "connection refused" in text or "errno 111" in text:
+        return "connection_refused"
+    if "timeout" in text or "timed out" in text:
+        return "timeout"
+    if "queue" in text and ("full" in text or "exceed" in text):
+        return "queue_full"
+    if re.search(r"http\s+5\d\d", text):
+        return "http_5xx"
+    if "is not served" in text or "no_model_requested" in text:
+        return "model_not_served"
+    if "transport_error" in text or "badstatusline" in text:
+        return "transport_error"
+    return "parse_error" if ("unparseable" in text or "invalid_call" in text) else "backend_error"
+
+
 
 
 # --- receipt ------------------------------------------------------------
@@ -456,53 +419,66 @@ def shadow_receipt_path() -> Path:
     return paths.home() / "shadow" / RECEIPT_NAME
 
 
-def _unavailable(row: Mapping[str, Any]) -> bool:
-    """No answer from the backend: unresolved, raised, timed out (no decision) or a transport error."""
-    return row.get("backend") is None or str(row.get("parse_error") or "").startswith("transport_error")
-
-
-def _actual_tool(payload: Mapping[str, Any]) -> dict[str, str] | None:
-    """The tool OMP actually ran, as a name + risk class only (never its input)."""
-    raw = payload.get("actual_tool")
-    if not isinstance(raw, Mapping):
-        facts = payload.get("facts")
-        raw = {"name": facts.get("tool_name")} if isinstance(facts, Mapping) else {}
-    name, risk = raw.get("name"), raw.get("risk_class")
-    if not isinstance(name, str) or not _TOOL_NAME_RE.match(name):
-        return None
-    out = {"name": name}
-    if risk in _ALLOWED_RISKS:
-        out["risk_class"] = risk
-    return out
-
-
-def count_backend_unavailable(n: int) -> int:
-    """Add ``n`` to the persisted ``backend_unavailable`` counter (under ``Z0INT_HOME``); returns the total."""
-    path = shadow_receipt_path().with_name(COUNTERS_NAME)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a+", encoding="utf-8") as fh:
-        fcntl.flock(fh, fcntl.LOCK_EX)
-        fh.seek(0)
-        try:
-            counters = json.loads(fh.read() or "{}")
-        except ValueError:
-            counters = {}
-        counters["backend_unavailable"] = int(counters.get("backend_unavailable") or 0) + n
-        fh.seek(0)
-        fh.truncate()
-        fh.write(json.dumps(counters))
-    return counters["backend_unavailable"]
-
-
 def append_shadow_receipt(row: Mapping[str, Any]) -> Path:
     path = shadow_receipt_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(dict(row), ensure_ascii=False, default=str) + "\n")
+    models = list(row.get("shadow") or [])
+    failed = not models or any(m.get("parse_error") or m.get("error") or not m.get("backend") for m in models)
+    identity_missing = row.get("identity_contract") == "session-tool-call.v1" and not (
+        row.get("session_id") and row.get("tool_call_id"))
+    failed = bool(failed or identity_missing)
+    # Keep the legacy 72k journal untouched as backfill input. New failed
+    # observations have bounded retention and cannot masquerade as training wins.
+    with path.with_name("cognition-shadow-write.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        counter = path.with_name("cognition-shadow-health.json")
+        try:
+            health = json.loads(counter.read_text())
+        except (OSError, ValueError):
+            health = {"days": {}, "failed_calls": 0, "successful_calls": 0}
+        day = time.strftime("%Y-%m-%d", time.gmtime())
+        bucket = health["days"].setdefault(day, {"attempts": 0, "failures": 0})
+        bucket["attempts"] += 1
+        bucket["failures"] += int(failed)
+        bucket["identity_failures"] = bucket.get("identity_failures", 0) + int(identity_missing)
+        classes = bucket.setdefault("failure_classes", {})
+        for model in models:
+            kind = model.get("failure_class") or failure_class(model.get("parse_error") or model.get("error"))
+            if kind:
+                classes[kind] = classes.get(kind, 0) + 1
+        health["failed_calls" if failed else "successful_calls"] += 1
+        health["days"] = dict(sorted(health["days"].items())[-32:])
+        from .learning import atomic_json
+        atomic_json(counter, health)
+        if failed:
+            path = path.with_name("cognition-shadow-failures.jsonl")
+            if path.exists() and path.stat().st_size >= 1_048_576:
+                for index in (3, 2, 1):
+                    source = path.with_name(path.name + (f".{index-1}" if index > 1 else ""))
+                    if source.exists():
+                        source.replace(path.with_name(path.name + f".{index}"))
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(dict(row), ensure_ascii=False, default=str) + "\n")
+        os.chmod(path, 0o600)
     return path
 
 
 # --- the bridge op body -------------------------------------------------
+
+
+def _actual_tool(payload: Mapping[str, Any]) -> dict[str, str] | None:
+    """Copy label-side identity only; never retain observed arguments or text."""
+    actual = payload.get("actual_tool")
+    actual = actual if isinstance(actual, Mapping) else {}
+    facts = payload.get("facts")
+    facts = facts if isinstance(facts, Mapping) else {}
+    name = actual.get("name") or facts.get("tool_name")
+    if not isinstance(name, str) or not name:
+        return None
+    result = {"name": name}
+    if actual.get("risk_class") in _ALLOWED_RISKS:
+        result["risk_class"] = actual["risk_class"]
+    return result
 
 
 def run_shadow(
@@ -538,8 +514,19 @@ def run_shadow(
     tool_name = facts.get("tool_name") if isinstance(facts.get("tool_name"), str) else None
 
     try:
+        # Credit is loaded only inside this observe-only lane. Live cascades
+        # retain their explicit policy and cannot inherit shadow credit.
+        from .. import paths
+        from .escalation import EscalationPolicy, EscalationThresholds
+        status_path = paths.home() / "loop" / "shadow-learning-status.json"
+        try:
+            learning_state = json.loads(status_path.read_text())
+        except (OSError, ValueError):
+            learning_state = {}
+        credited = tuple(learning_state.get("credited_families") or ())
         # Compile first, and only then let any backend see the result.
-        outcome = CognitionCascade().run(context, trace_id=trace_id)
+        outcome = CognitionCascade(policy=EscalationPolicy(
+            EscalationThresholds(credited_families=credited))).run(context, trace_id=trace_id)
         legal = outcome.legal
         escalation = outcome.escalation.to_dict()
     except Exception as exc:  # noqa: BLE001
@@ -552,21 +539,37 @@ def run_shadow(
 
     legal_ids = frozenset(legal.ids())
     shadow_rows: list[dict[str, Any]] = []
-    asked = bool(specs) and not legal.is_empty
-    if asked:
-        request = ToolDecisionRequest(
-            state=context.state,
-            legal=legal,
-            objective=context.objective,
-            risk_class=context.risk_class,
-            constraints=context.constraints,
-            max_tokens=context.max_tokens,
-        )
+    active = learning_state.get('family_search', {}).get('families', {}).get('omp.tool', {})
+    projection_strategy = active.get('current_strategy', 'history-1')
+    projection_config = {**(active.get('strategy') or {}).get('config', {}),
+                         'candidate_k': 3, 'max_options': 3, 'decision_method': 'per_candidate_binary_logit'}
+    local = None
+    recent = payload.get("recent_tools")
+    if isinstance(recent, list) and all(isinstance(x, str) for x in recent):
+        try:
+            from .learning import shadow_portfolio
+            local = shadow_portfolio(paths.home(), recent, "omp.tool", legal_ids)
+        except Exception:
+            pass  # missing/locked learner must not block the operator
+    if specs and not legal.is_empty:
+        from .learning import projection_examples
+        try:
+            extra = projection_examples(paths.home(), dict(payload), projection_config)
+        except (OSError, ValueError):
+            extra = {}
+        shortlist = extra.get('shortlist') or ([local['selected_action']] if local and local.get('selected_action') else [])
+        binary_payload = dict(payload)
+        if extra.get('examples'):
+            binary_payload['goal_context'] = {**(payload.get('goal_context') or {}), 'examples': extra['examples']}
         resolved = _resolve_shadows(registry, specs)
         if resolved:
-            shadow_rows = _decision_rows(
-                resolved, legal_ids, request, timeout_s=_timeout_s(payload, timeout_s)
-            )
+            n_ctx = learning_state.get('experiments', {}).get('serving_scope', {}).get('n_ctx', 4096)
+            shadow_rows = _decision_rows(resolved, legal, binary_payload,
+                timeout_s=_timeout_s(payload, timeout_s), shortlist=shortlist, n_ctx=n_ctx,
+                policy_identity=learning_state.get('experiments', {}).get('identity'),
+                policy_home=paths.home())
+    if local is not None:
+        shadow_rows.append(local)
 
     result: dict[str, Any] = {
         "ok": True,
@@ -583,15 +586,8 @@ def run_shadow(
         "selected_action": None,
         "executed_action": None,
     }
-    answered = [row for row in shadow_rows if not _unavailable(row)]
-    result["backend_unavailable"] = len(specs) - len(answered) if asked else 0
 
-    if write and result["backend_unavailable"]:
-        try:
-            count_backend_unavailable(result["backend_unavailable"])
-        except Exception:  # noqa: BLE001 - a lost count must not fail the op
-            pass
-    if write and answered:
+    if write:
         receipt = {
             "schema": RECEIPT_SCHEMA,
             "ts": time.time(),
@@ -600,18 +596,22 @@ def run_shadow(
             # The harness's own identity for the observed call. A random trace
             # id cannot be joined back to a native session on its own.
             "tool_call_id": tool_call_id or None,
+            "identity_contract": "session-tool-call.v1",
+            "source_revision": SOURCE_REVISION,
             "tool_name": tool_name or None,
             "actual_tool": _actual_tool(payload),
             "graph_digest": legal.graph_digest,
             "candidate_action_count": legal.candidate_count,
             "legal_ids": list(legal.ids()),
+            "projection_config": projection_config,
+            "projection_strategy": projection_strategy,
             "eliminated": [e.to_dict() for e in legal.eliminated],
             "deterministic_solution": legal.deterministic_solution,
             "escalation": escalation,
             "authority": list(legal.authority),
             "budget_units": legal.budget_units,
             "spent_units": legal.spent_units,
-            "shadow": answered,
+            "shadow": shadow_rows,
             # Nothing in this lane is ever executed; keep both facts explicit.
             "selected_action": None,
             "executed_action": None,
@@ -756,12 +756,10 @@ __all__ = [
     "RECEIPT_NAME",
     "RECEIPT_SCHEMA",
     "SCHEMA",
-    "COUNTERS_NAME",
     "ShadowPayloadError",
     "ShadowSpec",
     "append_shadow_receipt",
     "build_shadow_plan",
-    "count_backend_unavailable",
     "run_shadow",
     "shadow_receipt_path",
     "summarize_shadow_receipts",

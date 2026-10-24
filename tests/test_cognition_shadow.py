@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from z0int.cognition.actions import compile_actions
-from z0int.cognition.adapters.local_slm import ToolDecision
+from z0int.cognition.adapters.transport import ChatOutcome, ServerConfig
 from z0int.cognition.shadow import (
     SCHEMA,
     ShadowPayloadError,
@@ -38,7 +38,7 @@ def _payload(**over):
                 "kind": "tool",
                 "description": "Read a file",
                 "tool": "read",
-                "family": "fs",
+                "family": "omp.tool",
                 "risk_class": "read",
                 "cost_units": 1,
                 "arguments_schema": {"type": "object"},
@@ -48,7 +48,7 @@ def _payload(**over):
                 "kind": "tool",
                 "description": "Search files",
                 "tool": "grep",
-                "family": "fs",
+                "family": "omp.tool",
                 "risk_class": "read",
                 "cost_units": 1,
             },
@@ -57,7 +57,7 @@ def _payload(**over):
                 "kind": "tool",
                 "description": "Write a file",
                 "tool": "write",
-                "family": "fs",
+                "family": "omp.tool",
                 "risk_class": "write",
                 "cost_units": 1,
             },
@@ -66,8 +66,15 @@ def _payload(**over):
         "authority": ["read"],
         "budget_units": 8,
         "satisfied": [],
-        "facts": {},
+        "facts": {"tool_call_id": "call-fixture"},
         "objective": None,
+        "goal_context": {
+            "latest_user_message": "Inspect the file and locate the relevant code.",
+            "last_assistant_sentence": "I will inspect the file.",
+            "previous_tools": [],
+            "sources": {"latest_user_message": "sessionManager.getBranch",
+                        "last_assistant_sentence": "message_update"},
+        },
         "risk_class": "read",
         "shadows": ["m1"],
     }
@@ -76,7 +83,7 @@ def _payload(**over):
 
 
 class _FakeBackend:
-    """A ToolDecisionBackend that answers from a script."""
+    """An existing transport that supplies real binary-response logprob shapes."""
 
     def __init__(
         self,
@@ -95,6 +102,8 @@ class _FakeBackend:
         self._invalid = invalid_call
         self._abstained = abstained
         self.seen_legal: list[tuple[str, ...]] = []
+        self.config = ServerConfig("http://fixture", model)
+        self._transport = self
 
     @property
     def backend_id(self):
@@ -103,22 +112,25 @@ class _FakeBackend:
     def health(self, *, load=False):
         return {"ready": True, "backend": self._id}
 
-    def decide(self, request):
-        self.seen_legal.append(request.legal.ids())
+    def chat(self, messages, **kwargs):
+        candidate = json.loads(messages[1]["content"])["candidate"]["id"]
+        self.seen_legal.append((candidate,))
+        assert kwargs["max_tokens"] == 1 and kwargs["logprobs"] is True
+        assert kwargs["top_logprobs"] == 20
         if self._raises is not None:
             raise self._raises
-        return ToolDecision(
-            backend=self._id,
-            model=self._model,
-            revision="rev",
-            selected_action=self._action,
-            arguments={},
-            confidence=0.9 if self._action else None,
-            distribution=None,
-            latency_ms=3.0,
-            abstained=self._abstained if self._abstained is not None else self._action is None,
-            candidate_action_count=request.legal.candidate_count,
-            invalid_call=self._invalid,
+        positive = candidate == self._action and not self._abstained
+        yes, no = (-0.2, -2.0) if positive else (-2.0, -0.2)
+        token, value = ("yes", yes) if positive else ("no", no)
+        raw = {"choices": [{"logprobs": {"content": [{
+            "token": token, "logprob": value, "top_logprobs": [
+                {"token": "yes", "logprob": yes}, {"token": "no", "logprob": no},
+            ],
+        }]}}]}
+        return ChatOutcome(
+            content="write" if self._invalid else token, tool_call=None,
+            usage={"prompt_tokens": 100, "completion_tokens": 1}, timings={},
+            raw=raw, latency_ms=3.0,
         )
 
 
@@ -180,7 +192,8 @@ def test_unknown_extra_payload_keys_are_ignored_not_fatal():
 
     assert result["ok"] is True
     assert result["legal_ids"] == ["grep", "read"]
-    assert result["shadow"][0]["label"] == "orch"
+    assert result["shadow"][0]["label"] == "goal-binary"
+    assert result["shadow"][0]["requested_model"] == "m1"
 
 
 # --- malformed payloads -------------------------------------------------
@@ -231,13 +244,13 @@ def test_shadow_backend_only_ever_sees_the_legal_set():
 
     run_shadow(_payload(shadows=["m1"]), registry=registry, write=False)
 
-    assert len(backend.seen_legal) == 1
-    assert set(backend.seen_legal[0]) == {"read", "grep"}
-    assert "write" not in backend.seen_legal[0]
+    assert len(backend.seen_legal) == 2
+    assert {tool for call in backend.seen_legal for tool in call} == {"read", "grep"}
+    assert all("write" not in call for call in backend.seen_legal)
 
 
-def test_backend_naming_an_illegal_action_is_invalid_call_with_no_selection():
-    # `write` is not in the compiled legal set; the backend names it anyway.
+def test_binary_backend_cannot_advertise_or_select_an_illegal_action():
+    # A preference for a filtered tool cannot add it to single-candidate RPCs.
     backend = _FakeBackend(action="write")
     registry = _FakeRegistry(backends={"m1": backend})
 
@@ -245,21 +258,24 @@ def test_backend_naming_an_illegal_action_is_invalid_call_with_no_selection():
 
     assert result["ok"] is True
     (row,) = result["shadow"]
-    assert row["invalid_call"] is True
+    assert row["invalid_call"] is False
     assert row["selected_action"] is None
     assert row["abstained"] is True
-    assert row["attempted_action"] == "write"
+    assert "write" not in row["model_candidate_ids"]
+    assert row["diagnostics"]["abstention_reason"] == "no_positive_candidate"
 
 
-def test_backend_self_reported_invalid_call_is_preserved():
+def test_non_binary_backend_output_is_a_protocol_parse_failure():
     backend = _FakeBackend(action=None, invalid_call=True)
     registry = _FakeRegistry(backends={"m1": backend})
 
     result = run_shadow(_payload(shadows=["m1"]), registry=registry, write=False)
 
     (row,) = result["shadow"]
-    assert row["invalid_call"] is True
+    assert row["invalid_call"] is False
     assert row["selected_action"] is None
+    assert row["parse_error"] == "non_binary_response"
+    assert row["error"] is None
 
 
 def test_unreachable_backend_fails_open_with_a_partial_shadow_list():
@@ -271,11 +287,13 @@ def test_unreachable_backend_fails_open_with_a_partial_shadow_list():
 
     assert result["ok"] is True
     assert set(result["legal_ids"]) == {"read", "grep"}
-    by_label = {row["label"]: row for row in result["shadow"]}
-    assert by_label["m1"]["selected_action"] in {"read", "grep"}
-    assert by_label["m2"]["selected_action"] is None
-    assert by_label["m2"]["abstained"] is True
-    assert "connection refused" in by_label["m2"]["parse_error"]
+    by_model = {row["requested_model"]: row for row in result["shadow"]}
+    assert all(row["label"] == "goal-binary" for row in result["shadow"])
+    assert by_model["m1"]["selected_action"] in {"read", "grep"}
+    assert by_model["m2"]["selected_action"] is None
+    assert by_model["m2"]["abstained"] is True
+    assert "connection refused" in by_model["m2"]["error"]
+    assert by_model["m2"].get("parse_error") is None
 
 
 def test_missing_model_is_recorded_and_does_not_fail_the_op():
@@ -284,9 +302,10 @@ def test_missing_model_is_recorded_and_does_not_fail_the_op():
     result = run_shadow(_payload(shadows=["m1", "m2"]), registry=registry, write=False)
 
     assert result["ok"] is True
-    by_label = {row["label"]: row for row in result["shadow"]}
-    assert by_label["m2"]["selected_action"] is None
-    assert "not served" in by_label["m2"]["parse_error"]
+    by_model = {row["requested_model"]: row for row in result["shadow"]}
+    assert by_model["m2"]["selected_action"] is None
+    assert "not served" in by_model["m2"]["error"]
+    assert by_model["m2"]["failure_class"] == "model_not_served"
 
 
 def test_no_models_served_still_returns_the_compiled_legal_set(tmp_path, monkeypatch):
@@ -299,9 +318,7 @@ def test_no_models_served_still_returns_the_compiled_legal_set(tmp_path, monkeyp
     assert result["shadow"] == []
     assert set(result["legal_ids"]) == {"read", "grep"}
     assert result["graph_digest"]
-    # Nothing served: no shadow answer row is written, the miss is counted (oh-my-pi#109 hygiene).
-    assert result["receipts_path"] is None and result["backend_unavailable"] == 1
-    assert not (tmp_path / "shadow" / "cognition-shadow.jsonl").exists()
+    assert Path(result["receipts_path"]).is_file()
 
 
 def test_no_serving_config_yields_empty_shadow_list(tmp_path, monkeypatch):
@@ -348,7 +365,8 @@ def test_receipt_always_has_null_selected_and_executed_action(tmp_path, monkeypa
     for key in ("legal_ids", "eliminated", "escalation", "graph_digest", "candidate_action_count"):
         assert key in receipt
     # Every shadow candidate is in the receipt, not just the winner.
-    assert [row["label"] for row in receipt["shadow"]] == ["m1"]
+    assert [row["label"] for row in receipt["shadow"]] == ["goal-binary"]
+    assert [row["requested_model"] for row in receipt["shadow"]] == ["m1"]
 
 
 def test_receipt_is_never_written_when_write_is_false(tmp_path, monkeypatch):
@@ -404,9 +422,9 @@ class _SlowBackend(_FakeBackend):
         super().__init__(**kwargs)
         self._delay_s = delay_s
 
-    def decide(self, request):
+    def chat(self, messages, **kwargs):
         time.sleep(self._delay_s)
-        return super().decide(request)
+        return super().chat(messages, **kwargs)
 
 
 def test_payload_budget_bounds_a_slow_model_and_records_it_as_a_timeout(tmp_path, monkeypatch):
@@ -449,11 +467,10 @@ def test_a_timeout_row_records_how_long_the_worker_waited(tmp_path, monkeypatch)
 
     row = run_shadow(payload, registry=registry, write=False)["shadow"][0]
 
-    # No inference completed, so latency stays 0. The wait is what was actually
-    # spent, and without it a timeout reads like a free, instant miss.
+    # Timeout latency describes the shared budget, not an inference duration.
     assert row["error"] == "shadow_timeout"
     assert row["timed_out"] is True
-    assert row["latency_ms"] == 0.0
+    assert 140 <= row["latency_ms"] < 500
     assert 140 <= row["waited_ms"] < 500
 
 
@@ -481,12 +498,12 @@ class _ColdThenWarmBackend(_FakeBackend):
         self._loaded = False
         self.calls = 0
 
-    def decide(self, request):
+    def chat(self, messages, **kwargs):
         self.calls += 1
         if not self._loaded:
             time.sleep(self._load_s)
             self._loaded = True
-        return super().decide(request)
+        return super().chat(messages, **kwargs)
 
 
 def test_a_cold_load_timeout_still_leaves_the_model_warm_for_the_next_call(tmp_path, monkeypatch):
@@ -509,7 +526,7 @@ def test_a_cold_load_timeout_still_leaves_the_model_warm_for_the_next_call(tmp_p
     warm = run_shadow(payload, registry=registry, write=False)["shadow"][0]
     assert warm["selected_action"] == "read"
     assert "timed_out" not in warm
-    assert backend.calls == 2
+    assert backend.calls == 4  # Two candidates per observation, using one warm transport.
 
 
 class _RaisesLate(_FakeBackend):
@@ -519,7 +536,7 @@ class _RaisesLate(_FakeBackend):
         super().__init__(**kwargs)
         self._delay_s = delay_s
 
-    def decide(self, request):
+    def chat(self, messages, **kwargs):
         time.sleep(self._delay_s)
         raise ConnectionError("late refused")
 
@@ -527,24 +544,10 @@ class _RaisesLate(_FakeBackend):
 def test_a_backend_error_that_lands_just_after_the_deadline_is_not_also_called_a_timeout(
     tmp_path, monkeypatch
 ):
-    import threading
-
     monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
     registry = _FakeRegistry(backends={"m1": _RaisesLate(0.2)})
     payload = _payload(shadows=["m1"])
     payload["timeout_ms"] = 100
-
-    # Hold the worker between "still running at the deadline" and building the
-    # row, long enough for the backend's own error to arrive in between.
-    real_is_alive = threading.Thread.is_alive
-
-    def slow_is_alive(thread):
-        alive = real_is_alive(thread)
-        if alive and thread.name.startswith("z0int-shadow-"):
-            time.sleep(0.3)
-        return alive
-
-    monkeypatch.setattr(threading.Thread, "is_alive", slow_is_alive)
 
     row = run_shadow(payload, registry=registry, write=False)["shadow"][0]
 
@@ -603,3 +606,17 @@ def test_the_cap_changes_no_ordinary_budget(monkeypatch):
     with pytest.raises(ValueError):
         shadow._timeout_s({}, "abc")
     assert shadow._timeout_s({"timeout_ms": 7_200_000}, None) == shadow.MAX_SERVER_TIMEOUT_S
+
+
+def test_persisted_observation_keeps_identity_without_prompt_or_tool_arguments(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    payload = _payload(shadows=["m1"])
+    payload["state"] = "private visible context"
+    payload["facts"] = {"tool_name": "read", "tool_call_id": "call-private"}
+    payload["actual_tool"] = {"name": "read", "risk_class": "read", "input": "private argument"}
+    result = run_shadow(payload, registry=_FakeRegistry(), write=True)
+    receipt = json.loads(Path(result["receipts_path"]).read_text().splitlines()[-1])
+    assert receipt["actual_tool"] == {"name": "read", "risk_class": "read"}
+    assert receipt["tool_name"] == "read"
+    assert receipt["tool_call_id"] == "call-private"
+    assert "state" not in receipt

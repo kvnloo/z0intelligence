@@ -118,6 +118,22 @@ def test_cognition_shadow_keeps_served_answers_only(tmp_path):
     le.assert_private(rows)
 
 
+@pytest.mark.parametrize('identity', [
+    {'actual_tool': {'name': 'edit', 'risk_class': 'write', 'input': 'secret'}},
+    {'tool_name': 'edit'},
+])
+def test_cognition_import_prefers_structured_identity_without_prompt_text(tmp_path, identity):
+    src = tmp_path / 'legacy' / 'shadow.jsonl'
+    receipt = shadow_receipt(1, served=True)
+    receipt.update(identity)
+    write(src, [receipt])
+    home = tmp_path / 'z0'
+    li.import_cognition_shadow(src, root=home)
+    rows = rows_of(hc.state_dir('omp', home) / 'shadow_decisions.jsonl')
+    assert rows[0]['actual_tool'] == {'name': 'edit', 'risk_class': 'write'}
+    le.assert_private(rows)
+
+
 # ----------------------------------------------------------------------------- 15. DSH jev receipts
 def dsh_rows():
     lineage = {'session_id': 'dsh-root-1', 'parent_session_id': None, 'root_session_id': 'dsh-root-1',

@@ -42,6 +42,15 @@ def _defer_automatic(payload: dict[str, Any]) -> dict[str, Any]:
 
     threading.Thread(target=run, name="z0int-automatic", daemon=True).start()
     return {"ok": True, "deferred": True, "spawn": False}
+_OUTPUT_LOCK = threading.Lock()
+_SHADOW_SLOT = threading.BoundedSemaphore(1)
+
+
+def _shadow_response(req_id: str | None, payload: dict[str, Any], rt: BridgeRuntime) -> None:
+    try:
+        _respond(req_id, rt.cognition_shadow(payload))
+    finally:
+        _SHADOW_SLOT.release()
 
 
 def _text(payload: dict[str, Any], key: str) -> str | None:
@@ -51,8 +60,9 @@ def _text(payload: dict[str, Any], key: str) -> str | None:
 
 def _respond(req_id: str | None, body: dict[str, Any]) -> None:
     out = {"id": req_id, **body}
-    sys.stdout.write(json.dumps(out, ensure_ascii=False, separators=(",", ":")) + "\n")
-    sys.stdout.flush()
+    with _OUTPUT_LOCK:
+        sys.stdout.write(json.dumps(out, ensure_ascii=False, separators=(",", ":")) + "\n")
+        sys.stdout.flush()
 
 
 def serve(generation: int | None = None) -> int:
@@ -125,7 +135,11 @@ def serve(generation: int | None = None) -> int:
                 payload = {k: v for k, v in req.items() if k not in ("id", "op")}
                 if isinstance(req.get("payload"), dict):
                     payload.update(req["payload"])
-                _respond(req_id, rt.cognition_shadow(payload))
+                if _SHADOW_SLOT.acquire(blocking=False):
+                    threading.Thread(target=_shadow_response, args=(req_id, payload, rt),
+                                     daemon=True, name="cognition-shadow").start()
+                else:
+                    _respond(req_id, {"ok": False, "reason": "shadow_busy", **rt.identity()})
                 continue
             if op == "automatic_event":
                 payload = req.get("payload") if isinstance(req.get("payload"), dict) else {}

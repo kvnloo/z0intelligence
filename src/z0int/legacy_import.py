@@ -223,8 +223,17 @@ def import_cognition_shadow(path: Path, *, root: str | Path | None = None) -> di
         if rec.get('schema') != 'z0int.cognition.shadow.receipt.v1':
             run.count('unsupported_schema')
             continue
-        m = ACTUAL_TOOL.match(rec.get('state') or '')
-        actual = {'name': m.group(1), 'risk_class': 'write' if m.group(1) in WRITE_TOOLS else 'read'} if m else None
+        observed = rec.get('actual_tool')
+        observed = observed if isinstance(observed, dict) else {}
+        name = observed.get('name') or rec.get('tool_name')
+        if not isinstance(name, str) or not name:
+            # Historical receipts predate structured label-side identity.
+            m = ACTUAL_TOOL.match(rec.get('state') or '')
+            name = m.group(1) if m else None
+        risk = observed.get('risk_class')
+        if risk not in ('read', 'write', 'destructive', 'publish', 'credential', 'payment'):
+            risk = 'write' if name in WRITE_TOOLS else 'read'
+        actual = {'name': name, 'risk_class': risk} if name else None
         for i, sh in enumerate(rec.get('shadow') or []):
             if not isinstance(sh, dict) or not sh.get('backend') or sh.get('error'):
                 run.count('backend_unavailable')
