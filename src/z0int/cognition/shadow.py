@@ -10,11 +10,7 @@ The bridge op ``cognition_shadow`` is a *safety boundary*, not a controller:
   disagreement between "what the compiler allows" and "what a local model
   wanted" is visible without ever being acted on;
 * it fails open. A bad payload, a missing model or a dead server produces a
-  result dict — never an exception into the host;
-* it records answers only (oh-my-pi#109): a backend that is not served, raised,
-  timed out or could not be reached gives no receipt row, only a persisted
-  ``backend_unavailable`` count; a receipt names the observed tool as a
-  structured ``actual_tool`` and never stores the state text or any tool input.
+  result dict — never an exception into the host.
 
 The pure part is :func:`build_shadow_plan`; :func:`run_shadow` is the small
 effectful shell the bridge worker calls. Both are unit-testable with fake
@@ -24,10 +20,9 @@ backends and no model server.
 from __future__ import annotations
 
 from dataclasses import dataclass
-import fcntl
 import json
 import os
-import re
+import fcntl
 import threading
 import time
 from pathlib import Path
@@ -42,8 +37,6 @@ from ..receipt import new_trace_id
 SCHEMA = "z0int.cognition.shadow.v1"
 RECEIPT_SCHEMA = "z0int.cognition.shadow.receipt.v1"
 RECEIPT_NAME = "cognition-shadow.jsonl"
-COUNTERS_NAME = "cognition-shadow-counters.json"
-_TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
 
 _ALLOWED_KINDS = ("tool", "model", "control")
 _ALLOWED_RISKS = ("read", "write", "destructive", "publish", "credential", "payment")
@@ -266,16 +259,34 @@ def build_shadow_plan(
 # --- backend resolution + execution (never raises) ----------------------
 
 
+# No shadow call is worth waiting longer than this; it also keeps the wait inside
+# what the platform's timers accept.
+MAX_SERVER_TIMEOUT_S = 3600.0
+
+
+def _capped_s(seconds: float) -> float:
+    """The wait actually used: at least 0.1 s (also for NaN), at most the cap."""
+    return min(MAX_SERVER_TIMEOUT_S, max(0.1, seconds))
+
+
 def _timeout_s(payload: Mapping[str, Any], timeout_s: float | None) -> float:
+    # Each channel resolves exactly as before the cap existed; only a value too
+    # large for the platform's timers now resolves to the cap instead of raising.
     if timeout_s is not None:
-        return max(0.1, float(timeout_s))
+        try:
+            return _capped_s(float(timeout_s))
+        except OverflowError:
+            return MAX_SERVER_TIMEOUT_S if timeout_s > 0 else 0.1
     raw = payload.get("timeout_ms")
     if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw > 0:
-        return max(0.1, float(raw) / 1000.0)
+        try:
+            return _capped_s(float(raw) / 1000.0)
+        except OverflowError:
+            return MAX_SERVER_TIMEOUT_S
     env = os.environ.get("Z0INT_COGNITION_SHADOW_SERVER_TIMEOUT_MS")
     if env:
         try:
-            return max(0.1, float(env) / 1000.0)
+            return _capped_s(float(env) / 1000.0)
         except ValueError:
             pass
     return DEFAULT_SERVER_TIMEOUT_MS / 1000.0
@@ -343,7 +354,9 @@ def _decision_rows(
         with lock:
             results[index] = (decision, None)
 
-    deadline = time.monotonic() + max(0.1, float(timeout_s))
+    started = time.monotonic()
+    deadline = started + max(0.1, float(timeout_s))
+    waited_ms: dict[int, float] = {}
     threads: list[tuple[int, threading.Thread]] = []
     for index, (_, backend, _) in enumerate(resolved):
         if backend is None:
@@ -359,11 +372,21 @@ def _decision_rows(
             with lock:
                 if results[index][0] is None and results[index][1] is None:
                     results[index] = (None, "shadow_timeout")
+            # The call is abandoned, not cancelled: a model that was still loading
+            # keeps loading. Record the wait so a timeout is not read as instant.
+            waited_ms[index] = round((time.monotonic() - started) * 1000.0, 1)
 
     rows: list[dict[str, Any]] = []
     for index, (spec, backend, error) in enumerate(resolved):
-        decision, failure = results[index]
-        rows.append(_row(spec, backend, decision, failure, error, legal_ids))
+        with lock:
+            decision, failure = results[index]
+        row = _row(spec, backend, decision, failure, error, legal_ids)
+        # A backend can fail on its own just after the deadline; that row keeps
+        # its own error and is not also reported as a timeout.
+        if decision is None and failure == "shadow_timeout" and index in waited_ms:
+            row["timed_out"] = True
+            row["waited_ms"] = waited_ms[index]
+        rows.append(row)
     return rows
 
 
@@ -426,49 +449,42 @@ def shadow_receipt_path() -> Path:
     return paths.home() / "shadow" / RECEIPT_NAME
 
 
-def _unavailable(row: Mapping[str, Any]) -> bool:
-    """No answer from the backend: unresolved, raised, timed out (no decision) or a transport error."""
-    return row.get("backend") is None or str(row.get("parse_error") or "").startswith("transport_error")
-
-
-def _actual_tool(payload: Mapping[str, Any]) -> dict[str, str] | None:
-    """The tool OMP actually ran, as a name + risk class only (never its input)."""
-    raw = payload.get("actual_tool")
-    if not isinstance(raw, Mapping):
-        facts = payload.get("facts")
-        raw = {"name": facts.get("tool_name")} if isinstance(facts, Mapping) else {}
-    name, risk = raw.get("name"), raw.get("risk_class")
-    if not isinstance(name, str) or not _TOOL_NAME_RE.match(name):
-        return None
-    out = {"name": name}
-    if risk in _ALLOWED_RISKS:
-        out["risk_class"] = risk
-    return out
-
-
-def count_backend_unavailable(n: int) -> int:
-    """Add ``n`` to the persisted ``backend_unavailable`` counter (under ``Z0INT_HOME``); returns the total."""
-    path = shadow_receipt_path().with_name(COUNTERS_NAME)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a+", encoding="utf-8") as fh:
-        fcntl.flock(fh, fcntl.LOCK_EX)
-        fh.seek(0)
-        try:
-            counters = json.loads(fh.read() or "{}")
-        except ValueError:
-            counters = {}
-        counters["backend_unavailable"] = int(counters.get("backend_unavailable") or 0) + n
-        fh.seek(0)
-        fh.truncate()
-        fh.write(json.dumps(counters))
-    return counters["backend_unavailable"]
-
-
 def append_shadow_receipt(row: Mapping[str, Any]) -> Path:
     path = shadow_receipt_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(dict(row), ensure_ascii=False, default=str) + "\n")
+    models = list(row.get("shadow") or [])
+    failed = not models or all(m.get("parse_error") or m.get("error") or not m.get("backend") for m in models)
+    identity_missing = row.get("identity_contract") == "session-tool-call.v1" and not (
+        row.get("session_id") and row.get("tool_call_id"))
+    failed = bool(failed or identity_missing)
+    # Keep the legacy 72k journal untouched as backfill input. New failed
+    # observations have bounded retention and cannot masquerade as training wins.
+    with path.with_name("cognition-shadow-write.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        counter = path.with_name("cognition-shadow-health.json")
+        try:
+            health = json.loads(counter.read_text())
+        except (OSError, ValueError):
+            health = {"days": {}, "failed_calls": 0, "successful_calls": 0}
+        day = time.strftime("%Y-%m-%d", time.gmtime())
+        bucket = health["days"].setdefault(day, {"attempts": 0, "failures": 0})
+        bucket["attempts"] += 1
+        bucket["failures"] += int(failed)
+        bucket["identity_failures"] = bucket.get("identity_failures", 0) + int(identity_missing)
+        health["failed_calls" if failed else "successful_calls"] += 1
+        health["days"] = dict(sorted(health["days"].items())[-32:])
+        from .learning import atomic_json
+        atomic_json(counter, health)
+        if failed:
+            path = path.with_name("cognition-shadow-failures.jsonl")
+            if path.exists() and path.stat().st_size >= 1_048_576:
+                for index in (3, 2, 1):
+                    source = path.with_name(path.name + (f".{index-1}" if index > 1 else ""))
+                    if source.exists():
+                        source.replace(path.with_name(path.name + f".{index}"))
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(dict(row), ensure_ascii=False, default=str) + "\n")
+        os.chmod(path, 0o600)
     return path
 
 
@@ -503,10 +519,24 @@ def run_shadow(
     session_id = payload.get("session_id")
     if not isinstance(session_id, str):
         session_id = None
+    facts = payload.get("facts") if isinstance(payload.get("facts"), Mapping) else {}
+    tool_call_id = facts.get("tool_call_id") if isinstance(facts.get("tool_call_id"), str) else None
+    tool_name = facts.get("tool_name") if isinstance(facts.get("tool_name"), str) else None
 
     try:
+        # Credit is loaded only inside this observe-only lane. Live cascades
+        # retain their explicit policy and cannot inherit shadow credit.
+        from .. import paths
+        from .escalation import EscalationPolicy, EscalationThresholds
+        status_path = paths.home() / "loop" / "shadow-learning-status.json"
+        try:
+            learning_state = json.loads(status_path.read_text())
+        except (OSError, ValueError):
+            learning_state = {}
+        credited = tuple(learning_state.get("credited_families") or ())
         # Compile first, and only then let any backend see the result.
-        outcome = CognitionCascade().run(context, trace_id=trace_id)
+        outcome = CognitionCascade(policy=EscalationPolicy(
+            EscalationThresholds(credited_families=credited))).run(context, trace_id=trace_id)
         legal = outcome.legal
         escalation = outcome.escalation.to_dict()
     except Exception as exc:  # noqa: BLE001
@@ -519,8 +549,7 @@ def run_shadow(
 
     legal_ids = frozenset(legal.ids())
     shadow_rows: list[dict[str, Any]] = []
-    asked = bool(specs) and not legal.is_empty
-    if asked:
+    if specs and not legal.is_empty:
         request = ToolDecisionRequest(
             state=context.state,
             legal=legal,
@@ -534,6 +563,15 @@ def run_shadow(
             shadow_rows = _decision_rows(
                 resolved, legal_ids, request, timeout_s=_timeout_s(payload, timeout_s)
             )
+    recent = payload.get("recent_tools")
+    if isinstance(recent, list) and all(isinstance(x, str) for x in recent):
+        try:
+            from .learning import shadow_portfolio
+            local = shadow_portfolio(paths.home(), recent, "omp.tool", legal_ids)
+            if local is not None:
+                shadow_rows.append(local)
+        except Exception:  # shadow must fail open on a busy SQLite snapshot too
+            pass  # missing/locked learner must not block the operator
 
     result: dict[str, Any] = {
         "ok": True,
@@ -550,21 +588,19 @@ def run_shadow(
         "selected_action": None,
         "executed_action": None,
     }
-    answered = [row for row in shadow_rows if not _unavailable(row)]
-    result["backend_unavailable"] = len(specs) - len(answered) if asked else 0
 
-    if write and result["backend_unavailable"]:
-        try:
-            count_backend_unavailable(result["backend_unavailable"])
-        except Exception:  # noqa: BLE001 - a lost count must not fail the op
-            pass
-    if write and answered:
+    if write:
         receipt = {
             "schema": RECEIPT_SCHEMA,
             "ts": time.time(),
             "trace_id": trace_id,
             "session_id": session_id,
-            "actual_tool": _actual_tool(payload),
+            # The harness's own identity for the observed call. A random trace
+            # id cannot be joined back to a native session on its own.
+            "tool_call_id": tool_call_id or None,
+            "identity_contract": "session-tool-call.v1",
+            "tool_name": tool_name or None,
+            "state": context.state[:400],
             "graph_digest": legal.graph_digest,
             "candidate_action_count": legal.candidate_count,
             "legal_ids": list(legal.ids()),
@@ -574,7 +610,7 @@ def run_shadow(
             "authority": list(legal.authority),
             "budget_units": legal.budget_units,
             "spent_units": legal.spent_units,
-            "shadow": answered,
+            "shadow": shadow_rows,
             # Nothing in this lane is ever executed; keep both facts explicit.
             "selected_action": None,
             "executed_action": None,
@@ -587,17 +623,147 @@ def run_shadow(
     return result
 
 
+# --- scorecard (read-only) ----------------------------------------------
+
+_OLD_STATE_PREFIX = "OMP tool_call: "
+
+
+def _observed_tool(receipt: Mapping[str, Any]) -> str | None:
+    """The tool the harness actually called, or ``None`` if the row does not say."""
+    name = receipt.get("tool_name")
+    if isinstance(name, str) and name:
+        return name
+    # Rows written before ``tool_name`` existed carry it on the first state line.
+    state = receipt.get("state")
+    if isinstance(state, str) and state.startswith(_OLD_STATE_PREFIX):
+        return state[len(_OLD_STATE_PREFIX) :].split("\n", 1)[0].strip() or None
+    return None
+
+
+def summarize_shadow_receipts(
+    path: str | os.PathLike[str], since_ts: float | None = None
+) -> dict[str, Any]:
+    """Count what the shadow receipts at ``path`` hold. Reads only; returns counts only.
+
+    A model row is ``unreachable`` or ``timed_out`` when no backend answered, and
+    otherwise ``answered``: one of ``selections``, ``invalid`` or ``abstained``.
+    """
+    totals = {
+        "receipts": 0,
+        "unreadable_lines": 0,
+        "observed_tool_known": 0,
+        "observed_in_legal": 0,
+        "selections": 0,
+        "agreements": 0,
+    }
+    models: dict[str, dict[str, int]] = {}
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            try:
+                receipt = json.loads(line)
+            except ValueError:
+                receipt = None
+            if not isinstance(receipt, Mapping):
+                totals["unreadable_lines"] += 1
+                continue
+            ts = receipt.get("ts")
+            if since_ts is not None and not (
+                isinstance(ts, (int, float)) and ts >= since_ts
+            ):
+                continue
+            totals["receipts"] += 1
+            observed = _observed_tool(receipt)
+            legal = receipt.get("legal_ids")
+            if observed is not None:
+                totals["observed_tool_known"] += 1
+                if isinstance(legal, list) and observed in legal:
+                    totals["observed_in_legal"] += 1
+            rows = receipt.get("shadow")
+            for row in rows if isinstance(rows, list) else ():
+                if not isinstance(row, Mapping):
+                    continue
+                counts = models.setdefault(
+                    str(row.get("label") or row.get("model") or "?"),
+                    dict.fromkeys(
+                        (
+                            "rows",
+                            "answered",
+                            "unreachable",
+                            "timed_out",
+                            "abstained",
+                            "invalid",
+                            "selections",
+                            "agreements",
+                        ),
+                        0,
+                    ),
+                )
+                counts["rows"] += 1
+                # A backend that could not reach its server still returns a row
+                # of its own, with the failure in ``parse_error``.
+                failure = row.get("error") or row.get("parse_error")
+                failure = failure if isinstance(failure, str) else ""
+                if not row.get("backend") or row.get("error") or failure.startswith(
+                    "transport_error"
+                ):
+                    timed_out = failure == "shadow_timeout" or "timed out" in failure
+                    counts["timed_out" if timed_out else "unreachable"] += 1
+                    continue
+                counts["answered"] += 1
+                selected = row.get("selected_action")
+                if row.get("invalid_call") is True:
+                    counts["invalid"] += 1
+                elif isinstance(selected, str) and selected:
+                    counts["selections"] += 1
+                    agrees = row.get("agrees_with_observed")
+                    if not isinstance(agrees, bool):
+                        agrees = observed is not None and selected == observed
+                    counts["agreements"] += int(agrees)
+                else:
+                    counts["abstained"] += 1
+    totals["selections"] = sum(m["selections"] for m in models.values())
+    totals["agreements"] = sum(m["agreements"] for m in models.values())
+    known = totals["observed_tool_known"]
+    return {
+        **totals,
+        "observed_in_legal_share": round(totals["observed_in_legal"] / known, 4)
+        if known
+        else None,
+        "models": dict(sorted(models.items())),
+    }
+
+
+def _main(argv: Sequence[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="python -m z0int.cognition.shadow",
+        description="Print counts over the shadow receipts. Reads only.",
+    )
+    parser.add_argument("path", nargs="?", default=None, help="default: the live receipt file")
+    parser.add_argument("--since", type=float, default=None, help="only receipts with ts >= this")
+    args = parser.parse_args(argv)
+    path = args.path or shadow_receipt_path()
+    print(json.dumps(summarize_shadow_receipts(path, args.since), indent=2))
+    return 0
+
+
 __all__ = [
     "DEFAULT_SERVER_TIMEOUT_MS",
     "RECEIPT_NAME",
     "RECEIPT_SCHEMA",
     "SCHEMA",
-    "COUNTERS_NAME",
     "ShadowPayloadError",
     "ShadowSpec",
     "append_shadow_receipt",
     "build_shadow_plan",
-    "count_backend_unavailable",
     "run_shadow",
     "shadow_receipt_path",
+    "summarize_shadow_receipts",
 ]
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())
