@@ -1,0 +1,33 @@
+{
+  "schema": "z0.state_inventory.v1",
+  "claims": [
+    {"id": "s25-queue-live", "kind": "unit", "unit": "tern-queue-loop@s25.service", "host": "groot", "expected": {"ActiveState": "active", "SubState": "running"}}
+  ],
+  "manifest": {
+    "manifest": "/mnt/zer0models/workspace/zer0/data/operations/repo-distill/one-live-copy-release.json",
+    "units": ["z0int-loop-tick.service", "z0intelligence.service"],
+    "hash_manifest": "/mnt/zer0models/workspace/zer0/data/operations/repo-distill/one-live-copy-source-hashes.json",
+    "entrypoints": ["~/.omp/agent/extensions/local-cognition", "~/.omp/agent/extensions/z0int-bridge", "/workspace/boat-fleet/scripts/fleet-avrea", "/workspace/boat-fleet/scripts/fleet-avrea-budget"]
+  },
+  "revocations": {
+    "policy_ledger": "/mnt/zer0models/z0-wt/state-laws/operations/state-laws/revocations.json",
+    "policy_epoch": 1812,
+    "inventory_complete": false,
+    "coverage_note": "Initial live audit includes all inventoried skill roots and explicit fleet consumers; archived DBs and every unmerged checkout are not exhaustively scanned, so global completeness must not pass.",
+    "roots": [
+      "/mnt/zer0models/worktrees/files-live/config/fleet/nodes.yaml",
+      "/mnt/zer0models/worktrees/files-live/scripts/fleet",
+      "/workspace/.files/config/fleet/nodes.yaml",
+      "/workspace/boat-fleet/config/fleet/nodes.yaml",
+      "/workspace/boat-fleet/scripts/fleet-build",
+      "/workspace/hermes-home/profiles/clean/skills",
+      "/workspace/hermes-home/skills",
+      "~/.agents/skills", "~/.claude/skills", "~/.codex/skills", "~/.config/opencode/skills", "~/.omp/agent/managed-skills",
+      "/workspace/hermes-home/memories", "/workspace/hermes-home/profiles/clean/memories", "/workspace/hermes-home/profiles/chiefstaff/memories"
+    ]
+  },
+  "outcomes": [{"id": "live-tick-success-claim", "path": "~/.z0int/loop/reports/2026-10-24/summary.json"}],
+  "constants": [
+    {"id": "dispatch-interval-measurement", "path": "/mnt/zer0models/workspace/zer0/data/operations/chatgpt-driver/tern-01/launch_queue.py", "name": "DISPATCH_INTERVAL", "value": 5, "scope": "tern-queue-per-device", "units": "seconds", "measurement": "/mnt/zer0models/workspace/zer0/data/operations/state-laws/dispatch-interval-measurement.json"}
+  ]
+}
