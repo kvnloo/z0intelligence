@@ -349,6 +349,7 @@ After this shim is loaded once, each worker respawn (including
 roots are fallbacks when no installed link exists. The child runs from the
 resolved release, whose `DEPLOYED_SHA` becomes each shadow receipt's
 `source_revision`. Changing TypeScript extension code still requires a restart.
+A broken installed link fails the spawn; it never falls back to an old checkout.
 
 
 ## Compilation is mechanism-neutral
