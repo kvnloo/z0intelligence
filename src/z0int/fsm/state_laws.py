@@ -133,6 +133,21 @@ def sensor_claim(spec):
         return check(ident, 'A', {}, str(exc))
 
 
+def runtime_subject(args):
+    """Identify runtime entrypoints, not arbitrary shell text mentioning the project."""
+    if not args:
+        return False
+    program = Path(args[0]).name
+    if program in ('z0int', 'z0int-bridge'):
+        return True
+    if not re.fullmatch(r'(?:python(?:\d+(?:\.\d+)*)?|pypy\d*)', program):
+        return False
+    if '-m' in args:
+        index = args.index('-m')
+        return index + 1 < len(args) and args[index + 1].startswith('z0int.')
+    return len(args) > 1 and args[1].endswith('.py') and '/z0int/' in args[1]
+
+
 def sensor_manifest(spec):
     """Observe installed entrypoints and live process identities against one release."""
     rows = []
@@ -206,8 +221,9 @@ def sensor_manifest(spec):
         argv = ''
         try:
             before = _proc(int(proc.name))
-            argv = (proc / 'cmdline').read_bytes().replace(b'\0', b' ').decode(errors='replace')
-            if not any(token in argv for token in ('z0int', 'z0int_bridge', 'z0int-bridge', 'shadow_learning')):
+            args = [item.decode(errors='replace') for item in (proc / 'cmdline').read_bytes().split(b'\0') if item]
+            argv = ' '.join(args)
+            if not runtime_subject(args):
                 continue
             # Exclude only this observer's PID; a worker's arbitrary arguments cannot hide it.
             if int(proc.name) == os.getpid():
@@ -232,9 +248,10 @@ def sensor_manifest(spec):
 
 REVOKED = {
     'phone-disk-floor': re.compile(r'min_disk_free_gb\s*[:=]\s*[1-9]|disk_free_gb\s*<\s*min_disk'),
-    'phone-memory-cap': re.compile(r'(?:512\s*(?:MiB|MB|M)\b|(?:MemoryMax|memory_max|memory_pct|mem_floor_mb|default_mem|mem_max|rss_limit)\s*[:=])', re.I),
-    'phone-cpu-cap': re.compile(r'(?:taskset\s+(?:-c\s+)?0-[0-6]|cpu(?:_mask|set|s)\s*[:=]\s*[\"\']?0-[0-6])', re.I),
+    'phone-memory-cap': re.compile(r'(?:512\s*(?:MiB|MB|M)\b|(?:MemoryMax|memory_max|memory_pct|min_mem_available_mb|mem_floor_mb|default_mem|mem_max|rss_limit)\s*[:=])', re.I),
+    'phone-cpu-cap': re.compile(r'(?:taskset\s+(?:-c\s+)?0-[0-6]|(?:CPUQuota|cpu(?:_mask|set|s))\s*[:=]\s*[\"\']?\d)', re.I),
     'phone-battery-cap': re.compile(r'(?:battery[^\n]{0,35}(?:50\s*%|[<:=]\s*50)|min_battery[^\n]{0,15}50)', re.I),
+    'phone-thermal-cap': re.compile(r'(?:max_android_thermal_status|max_temp_c|thermal_limit|temperature_limit)\s*[:=]\s*\d', re.I),
 }
 TEXT_SUFFIXES = {'.md', '.txt', '.yaml', '.yml', '.json', '.py', '.sh', '.toml', '.conf'}
 SKIP = {'.git', '.venv', 'venv', 'node_modules', '__pycache__', '.cache'}

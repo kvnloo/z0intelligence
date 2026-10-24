@@ -263,3 +263,15 @@ def test_generic_host_disk_example_does_not_become_phone_policy(tmp_path):
     path.write_text("# Host health\nForce-test with --set min_disk_free_gb=99999.\n")
     rows = S.sensor_revocations(revocation_spec(tmp_path, path))
     assert rows[-1]["status"] == "pass"
+
+
+@pytest.mark.parametrize("argv,expected", [
+    (["python", "-m", "z0int.bridge.worker"], True),
+    (["python3", "-m", "z0int.bridge.worker", "--label", "fleet-build-state_laws"], True),
+    (["bash", "-lc", "python -m z0int.bridge.worker"], False),
+    (["python3", "-c", "print('z0int')"], False),
+    (["socat", "exec:python -m z0int.memory_mcp"], False),
+    (["python", "/release/src/z0int/bridge/worker.py"], True),
+])
+def test_runtime_subject_uses_executable_identity_not_substring(argv, expected):
+    assert S.runtime_subject(argv) is expected
