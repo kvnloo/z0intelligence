@@ -19,6 +19,11 @@ Codex and other MCP callers use `python -m z0int.intelligence_mcp` with a config
 Integrate the service and shadow/loop lineages by normal merges on a Draft PR.
 Run the integration head's service, bridge, shadow, privacy and loop tests on MBP
 before changing live consumers. Do not use an untested moving worktree as a release.
+Run the reproducible gate with
+`fleet-build --node mbp --local-data --wait -1 -- bash scripts/verify-one-live-copy.sh`.
+It creates an isolated venv/state, restores tracked-file semantics for the fleet
+archive and selects pip's trusted CA bundle for Git dependency downloads without
+disabling certificate verification.
 
 `scripts/stage-z0int-runtime.py <approved-venv>` snapshots the existing interpreter
 and installed dependencies without installing packages. It disables editable
