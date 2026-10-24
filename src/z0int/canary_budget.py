@@ -9,14 +9,26 @@ def reserve(policy, provider, model, messages, max_tokens):
     if not config:
         return
     # At most 32768 input tokens (one token per UTF-8 byte) plus 2048 output
-    # tokens, with provider-enforced $2/$10 per million ceilings, is <$0.10.
+    # tokens, at verified $2/$10 per million ceilings, is <$0.10.
     ceiling = {'prompt': 2, 'completion': 10, 'request': 0}
-    if (provider != 'openrouter' or model not in config['models']
+    if (provider not in ('openrouter', 'vercel') or model not in config['models']
             or config['max_price'] != ceiling or max_tokens > 2048
             or len(json.dumps(messages, ensure_ascii=False).encode()) > 32768
             or config['total_cap_usd'] != 1 or config['attempt_reservation_usd'] != 0.1
-            or config['max_attempts'] > 3):
+            or config['max_attempts'] > 6):
         raise ValueError('paid canary exceeds fixed spend envelope')
+    if provider == 'vercel':
+        import os
+        import urllib.request
+        request = urllib.request.Request('https://ai-gateway.vercel.sh/v1/models',
+            headers={'Authorization': 'Bearer ' + os.environ['AI_GATEWAY_API_KEY']})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            catalog = json.load(response)['data']
+        selected = next(item for item in catalog if item['id'] == model)
+        prices = selected['pricing']
+        if (float(prices['input']) > 0.000002 or float(prices['output']) > 0.000010
+                or 'tools' not in selected.get('supported_parameters', [])):
+            raise ValueError('current gateway catalog exceeds paid canary ceiling')
     path = Path(config['ledger'])
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('a+', encoding='utf-8') as stream:

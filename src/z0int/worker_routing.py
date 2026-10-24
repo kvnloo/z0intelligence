@@ -74,8 +74,10 @@ def request_constraints(policy, provider, model, args=None):
         return entry.get('request_constraints', {})
     canary = policy.get('paid_canary')
     if canary:
-        if provider != 'openrouter' or model not in canary['models']:
+        if provider not in ('openrouter', 'vercel') or model not in canary['models']:
             raise ValueError('paid canary model is not pinned')
+        if provider == 'vercel':
+            return {'reasoning': {'enabled': False}}
         return {'provider': {'max_price': canary['max_price'], 'allow_fallbacks': False}}
     return {}
 
@@ -215,7 +217,7 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
             timeout_s=policy['timeout_s'], runtime='api', extra_headers={'User-Agent': 'z0int-api-eval/1.0 (+https://github.com/kvnloo/z0intelligence)'}))
         row.extra['physical_call_attempted'] = True
         row.extra['physical_started_at'] = time.time()
-        response = transport.chat(messages, max_tokens=args.get('max_tokens', 512), temperature=0, seed=None, extra_body=permit.get('request_constraints',request_constraints(policy,provider,model,args)))
+        response = transport.chat(messages, max_tokens=args.get('max_tokens', 512), temperature=None if config.get('temperature') is False else 0, seed=None, extra_body=permit.get('request_constraints',request_constraints(policy,provider,model,args)))
         transport_status=200
         output = response.content
         if not isinstance(output, str):

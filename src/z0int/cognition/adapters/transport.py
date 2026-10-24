@@ -110,7 +110,7 @@ class OpenAICompatTransport:
         tool_choice: Any = None,
         response_format: Mapping[str, Any] | None = None,
         max_tokens: int = 256,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         seed: int | None = 42,
         logprobs: bool = False,
         top_logprobs: int | None = None,
@@ -121,7 +121,7 @@ class OpenAICompatTransport:
             "model": self.config.model,
             "messages": messages,
             "max_tokens": max_tokens,
-            "temperature": temperature,
+            **({"temperature": temperature} if temperature is not None else {}),
         }
         if seed is not None:
             payload["seed"] = seed

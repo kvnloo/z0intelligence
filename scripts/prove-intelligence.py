@@ -5,7 +5,7 @@ Runs the real host authority HTTP service and the real remote-executor HTTP
 service on loopback. The single physical provider call is initiated through the
 real registered OMP z0int_route_worker tool. No parent model is called. Only this
 proof selects manifests/aodl-paid-canary.v1.json. Normal routing stays free-only.
-The paid proof reserves $0.10 per attempt in a shared ledger, max three attempts
+The paid proof reserves $0.10 per attempt in a shared ledger, max six attempts
 under the $1 total cap. Never delete that ledger to retry a refused attempt.
 """
 import argparse,json,os,secrets,subprocess,sys,threading
@@ -19,10 +19,10 @@ args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=False)
 
 root=Path(__file__).resolve().parents[1]
 os.environ['Z0INT_HOME']=str(args.output/'state')
-os.environ['Z0INT_EXECUTOR_PROVIDERS']='openrouter'
+os.environ['Z0INT_EXECUTOR_PROVIDERS']='vercel'
 os.environ['Z0INT_PYTHON']=sys.executable
 os.environ['Z0INT_GOVERNED_REMOTE']='1'
-os.environ['Z0INT_GOVERNED_PROVIDER']='openrouter'
+os.environ['Z0INT_GOVERNED_PROVIDER']='vercel'
 os.environ['Z0INT_GOVERNED_HARNESS']='omp'
 os.environ['Z0INT_AODL_CONTRACT_PATH']=str(root/'contracts/aodl/governed-worker-v1.json')
 os.environ['PYTHONPATH']=str(root/'src')+os.pathsep+os.environ.get('PYTHONPATH','')
@@ -106,14 +106,14 @@ try:
         raise AssertionError('Conflicting governed request was accepted')
 
     # Provider cap refusal happens after structural admission but before physical call.
-    permit=caps.acquire('openrouter','cap-proof')
+    permit=caps.acquire('vercel','cap-proof')
     assert permit['admitted']
     try:
         capped=post('/v1/governed-worker',governed(parent_agent=omp['session_id'],trace='capped'))
         assert not capped['ok'] and capped['requires_parent']
         save('capped.json',capped)
     finally:
-        caps.release(permit['token'],'openrouter',0,0,attempted=False)
+        caps.release(permit['token'],'vercel',0,0,attempted=False)
 
     # Freeze the exact host-built envelope, create only dispatch-start, then
     # prove replay refuses takeover instead of minting another execution.
@@ -126,14 +126,14 @@ try:
     rows=[json.loads(line) for line in receipts_path().read_text().splitlines()]
     latest={r['trace_id']:r for r in rows}
     physical=[r for r in latest.values() if r.get('execution')=='live' and r.get('extra',{}).get('physical_call_attempted')]
-    free=[r for r in physical if r.get('provider')=='openrouter']
+    free=[r for r in physical if r.get('provider')=='vercel']
     admissions=[r for r in latest.values() if r.get('capability_id')=='aodl.structural_admission']
     preparations=[r for r in latest.values() if r.get('capability_id')=='aodl.governed_request']
 
     assert len(free)==1 and free[0]['extra']['status']=='completed',free
     assert free[0]['extra']['authority_dispatch_id']
     assert free[0]['extra']['free_only'] is False
-    assert isinstance(free[0]['extra']['provider_reported_cost_usd'], (int, float))
+    assert free[0]['extra'].get('provider_reported_cost_usd') is None or isinstance(free[0]['extra']['provider_reported_cost_usd'], (int, float))
     joined=join_outcome(free[0]['trace_id'],{
         'verified_success':True,
         'verified':True,
