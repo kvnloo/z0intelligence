@@ -155,7 +155,8 @@ def test_narrow_scope_overrides_even_with_none_and_does_not_generalize():
 
 
 def test_serving_requires_measured_url_and_no_credentials():
-    arm = {"kind": "engine", "device": "s25", "model": "test@rev", "engine": "test@rev", "backend": "cpu"}
+    arm = {"kind": "engine", "device": "s25", "model": "test@rev", "engine": "test@rev",
+           "backend": "cpu", "quant": "Q4_0"}
     source = {"kind": "manual", "path": "/synthetic/result.json", "sha256": "a" * 64,
               "url": "http://127.0.0.1:9000/v1"}
     row = finding(arm=arm, source=source)
@@ -229,3 +230,22 @@ def test_scope_cannot_replace_an_arm_device():
 def test_future_findings_and_rejected_results_never_promote():
     assert stage(compile_rows([finding(ts="2026-10-25T00:00:00Z")])) == "none"
     assert stage(compile_rows([finding(metric={"promotion_eligible": False})])) == "none"
+
+
+def test_serving_preserves_quant_scope_and_missing_endpoint_annotation():
+    arm = {"kind": "slm", "model": "synthetic@rev", "quant": "Q4_0",
+           "device": "mbp", "engine": "synthetic@rev", "backend": "metal"}
+    source = {"kind": "manual", "path": "/synthetic/results.json",
+              "sha256": "d" * 64, "url": "http://127.0.0.1:9000/v1"}
+    rows = [finding(arm=arm, source=source, metric={"live_shadow": True}),
+            finding("replayed_L1", arm=arm, metric={"divergence": 0., "aa_noise_floor": .01})]
+    policy = compile_rows(rows, compile_rows(rows))
+    endpoint = policy["serving"][0]
+    assert endpoint["quant"] == "Q4_0"
+    assert {key: endpoint[key] for key in arm if key != "kind"} == next(iter(policy["families"].values()))["scope"]
+    assert next(iter(policy["families"].values()))["serving_missing"] is False
+    missing_rows = [finding(metric={"live_shadow": True}),
+                    finding("replayed_L1", metric={"divergence": 0., "aa_noise_floor": .01})]
+    missing = compile_rows(missing_rows, compile_rows(missing_rows))
+    assert next(iter(missing["families"].values()))["serving_missing"] is True
+    assert "Missing serving endpoints" in markdown_diff(None, missing, missing_rows)

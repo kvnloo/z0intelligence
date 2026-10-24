@@ -87,6 +87,11 @@ the latest older compiled version. Markdown emits one entry per stage change,
 including finding IDs and source paths. Publication must replace local evidence
 links with authorized immutable links. Measured findings can supply serving
 URLs through source metadata. Prose URLs and inference never create endpoints.
+Serving entries preserve the complete measured model, quant, engine, backend
+and device scope, plus arm kind. Missing quantization metadata never becomes
+an endpoint with guessed identity. Canary/live rules without an exact measured
+endpoint retain their evidence-derived stage and carry `serving_missing=true`.
+JSON and Markdown changelogs expose these missing endpoint annotations.
 
 ## Architecture
 
