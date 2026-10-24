@@ -310,7 +310,7 @@ def _resolve_shadows(
             if narrowed.stage(family) == "none":
                 continue
             endpoint = narrowed.endpoint_for(family)
-            if endpoint and policy_runtime.serving_health(endpoint["url"], endpoint, probe=True) is True:
+            if policy_runtime.serving_identity_complete(endpoint) and policy_runtime.serving_health(endpoint["url"], endpoint, probe=True) is True:
                 governed[spec.model_id] = (PolicyArmBackend(endpoint, rule["threshold"], shadow=True), None)
             else:
                 governed[spec.model_id] = (None, "no_serving_for_scope")
@@ -465,7 +465,7 @@ def _row(
         row["model_candidate_ids"] = decision.diagnostics["model_candidate_ids"]
     if decision.prompt_tokens is not None:
         row["prompt_tokens"] = decision.prompt_tokens
-    for key in ("selected_arm", "response_model", "response_revision"):
+    for key in ("selected_arm", "response_model", "response_revision", "observed_identity", "expected_identity", "props_model_id"):
         if key in decision.diagnostics:
             row[key] = decision.diagnostics[key]
     if "selected_arm" in row:
@@ -617,6 +617,7 @@ def run_shadow(
         legal = outcome.legal
         escalation = outcome.escalation.to_dict()
         family = legal.family_options()[0] if len(legal.family_options()) == 1 else "none"
+        escalation["synthetic"] = payload.get("synthetic") is True or escalation.get("synthetic") is True
         policy.stamp(escalation, family)
     except Exception as exc:  # noqa: BLE001
         return {
@@ -647,12 +648,14 @@ def run_shadow(
     if local is not None:
         shadow_rows.append(local)
     for row in shadow_rows:
+        row["synthetic"] = payload.get("synthetic") is True or row.get("synthetic") is True
         observed_scope = row.get("selected_arm")
         row_policy = policy.for_scope(observed_scope) if isinstance(observed_scope, dict) else policy
         row_policy.stamp(row, family)
 
     result: dict[str, Any] = {
         "ok": True,
+        "synthetic": payload.get("synthetic") is True,
         "schema": SCHEMA,
         "trace_id": trace_id,
         "graph_digest": legal.graph_digest,
@@ -670,6 +673,7 @@ def run_shadow(
 
     if write:
         receipt = {
+            "synthetic": payload.get("synthetic") is True,
             "schema": RECEIPT_SCHEMA,
             "ts": time.time(),
             "trace_id": trace_id,

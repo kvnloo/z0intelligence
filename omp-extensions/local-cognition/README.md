@@ -77,11 +77,26 @@ this binding automatically. An absent or unhealthy endpoint produces
 stage `none` and `policy_reason: no_serving_for_scope`. Unknown health after the
 bounded probe produces stage `none` and `policy_reason: serving_health_unknown`.
 
-The returned response supplies the model id and revision. Receipts record these
-with the serving entry's executed physical arm. An identity mismatch fails
-back to the frontier/Jev. A below-threshold answer records its actual confidence,
-the policy threshold and its abstain reason. The same arm is called at most once
-per decision, even if the cascade visits several semantic tiers.
+The endpoint returns its model id. For physical model calls, serving entries must
+also contain `expected_model_id`, `engine_build`, `model_path` and the GGUF's
+`model_sha256` from measured provenance. Each decision reads
+`/props?model=<URL-encoded expected_model_id>`, never the bare router `/props`.
+The receipt records `observed_identity` from the response model id plus the
+props `build_info` and `model_path`. `props_model_id` records `model_alias`.
+`expected_identity` carries the serving expectations and provenance hash.
+The consumer compares model id, build and path before it accepts the answer.
+It does not hash a model file on each turn. A revision is not required and
+`response_revision` remains null.
+
+An identity mismatch fails back to frontier/Jev. A below-threshold answer records
+its actual confidence, the policy threshold and its abstain reason. The same arm
+is called at most once per decision, even across several semantic tiers.
+
+Every receipt has a `synthetic` boolean. Synthetic policy/rule evidence or an
+incoming `synthetic: true` payload taints nested receipt, attempt, shadow and
+escalation rows. Payload false cannot clear policy taint. Unknown-family fallback
+rows retain policy-wide synthetic provenance. Compiled stage-none rules retain
+their `demoted_reason` as the receipt's `policy_reason`.
 
 `policy_scope` remains an optional narrowing filter, not a prerequisite for
 policy selection. The CLI records that filter when supplied. The OMP extension
