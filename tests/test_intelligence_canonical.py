@@ -39,7 +39,7 @@ def test_delegate_keeps_identity_and_replays(tmp_path,monkeypatch):
     monkeypatch.setenv('Z0INT_HOME',str(tmp_path))
     calls=[]
     monkeypatch.setattr(w,'execute_plan',lambda *a,**k:(calls.append(1) or {'ok':True,'output':'once'}))
-    req={'trace_id':'stable','task':'Public bounded task','parent_agent':'test','provider':'openrouter','model':'nvidia/nemotron-3-super-120b-a12b:free','reason':'test'}
+    req={'trace_id':'stable','task':'Public bounded task','parent_agent':'test','provider':'openrouter','model':'nvidia/nemotron-3.5-lightning:free','reason':'test'}
     first=w.delegate_worker(req);second=w.delegate_worker(req)
     assert calls==[1] and second['replayed']
     assert first['dispatch_receipt_id']==second['dispatch_receipt_id']

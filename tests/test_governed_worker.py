@@ -42,7 +42,7 @@ def test_checked_in_contract_is_valid_and_builds_protocol_v3_request():
     assert remote["trace_id"] == "governed-trace"
     assert remote["function"] == "cheap_bounded_worker"
     assert remote["provider"] == "openrouter"
-    assert remote["model"] == "nvidia/nemotron-3-super-120b-a12b:free"
+    assert remote["model"] == "nvidia/nemotron-3.5-lightning:free"
     assert remote["free_only"] is True
     assert remote["aodl"]["document"]["graphId"] == "z0int-governed-worker-canary"
     spawn = remote["aodl"]["spawn"]

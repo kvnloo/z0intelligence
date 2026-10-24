@@ -11,11 +11,11 @@ def req(**kw):
  policy,_=w.configuration()
  return dict(harness='codex',trace_id=secrets.token_hex(8),parent_agent='test',function='cheap_bounded_worker',task='Reply OK',provider='openrouter',model=policy['defaults']['openrouter'],reason='public acceptance',free_only=True,**kw)
 
-def test_actual_policy_only_measured_model():
+def test_actual_policy_only_catalog_validated_free_model():
  policy,providers=w.configuration()
  assert policy['free_only'] is True
  plan=w.plan_route('Anything',policy,providers,set(providers))
- assert plan['candidates']==[{'provider':'openrouter','model':'nvidia/nemotron-3-super-120b-a12b:free'}]
+ assert plan['candidates']==[{'provider':'openrouter','model':'nvidia/nemotron-3.5-lightning:free'}]
  assert w.free_route(policy,'vercel',policy['defaults']['vercel']) is None
  assert w.free_route(policy,'openrouter','qwen/qwen3.8-27b:free') is None
  assert policy['provider_caps']['openrouter']==1

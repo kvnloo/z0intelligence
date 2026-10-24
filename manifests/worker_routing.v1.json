@@ -17,7 +17,7 @@
     "groq": "openai/gpt-oss-20b",
     "cerebras": "qwen-3.8-27b",
     "deepseek": "deepseek-chat",
-    "openrouter": "nvidia/nemotron-3-super-120b-a12b:free",
+    "openrouter": "nvidia/nemotron-3.5-lightning:free",
     "nous": "inclusionai/ling-3.0-flash-sante:free",
     "vercel": "openai/gpt-oss-20b",
     "nvidia": "openai/gpt-oss-20b",
@@ -108,18 +108,18 @@
       "api_key_env": "OPENROUTER_API_KEY",
       "cohort": "existing-api",
       "auth": "environment",
-      "catalog_verified_at": "2026-09-26",
+      "catalog_verified_at": "2026-10-24",
       "models": [
         {
           "id": "qwen/qwen3.8-27b",
           "label": "qwen/qwen3.8-27b"
         },
         {
-          "id": "nvidia/nemotron-3-super-120b-a12b:free",
-          "label": "nvidia/nemotron-3-super-120b-a12b:free"
+          "id": "nvidia/nemotron-3.5-lightning:free",
+          "label": "nvidia/nemotron-3.5-lightning:free"
         }
       ],
-      "worker_default_model": "nvidia/nemotron-3-super-120b-a12b:free"
+      "worker_default_model": "nvidia/nemotron-3.5-lightning:free"
     },
     "nous": {
       "base_url": "https://inference-api.nousresearch.com",
@@ -289,13 +289,13 @@
   "validated_free_routes": [
     {
       "provider": "openrouter",
-      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "model": "nvidia/nemotron-3.5-lightning:free",
       "validated": true,
       "price_usd": 0,
-      "evidence_path": "preserved-local-evidence:dsh-evidence.json",
-      "evidence_sha256": "26e6bbbdef2ef9343c5440ec6b728e998eccb53b5cbd54e503142e9f1cb5a53d",
-      "source": "DSH session-e9a2142b-3884-4abb-b890-b646dd0860ab seq17817-17818",
-      "cap_basis": "conservative single-call validation, not measured saturation ceiling",
+      "evidence_path": "manifests/openrouter-canary-free-route.json",
+      "evidence_sha256": "3e17265a7258a8b3710f3586d4191b93ad0c3931ecf4b40d0c76c2e40b4a71d6",
+      "source": "OpenRouter /api/v1/models observed 2026-10-24",
+      "cap_basis": "single-call canary budget, not measured saturation ceiling",
       "request_constraints": {
         "provider": {
           "max_price": {
