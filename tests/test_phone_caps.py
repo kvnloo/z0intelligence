@@ -86,10 +86,12 @@ def test_discovery_includes_present_known_paths_and_root(tmp_path, monkeypatch):
     external.write_text('Phone battery >= 50 percent\n')
     (tmp_path / 'scripts').mkdir()
     (tmp_path / 'scripts/fleet-build').write_text('mode=phone\n')
+    (tmp_path / 'scripts/fleet_phone_controller.py').write_text('mem_mb = None\n')
     monkeypatch.setattr(C, 'KNOWN_PATHS', (external, tmp_path / 'not-present'))
     paths = C.phone_caps_paths(tmp_path)
     assert external in paths
     assert tmp_path / 'scripts/fleet-build' in paths
+    assert tmp_path / 'scripts/fleet_phone_controller.py' in paths
     assert all(p.is_file() for p in paths)
     assert C.phone_caps_findings(tmp_path)[0]['path'] == str(external)
 

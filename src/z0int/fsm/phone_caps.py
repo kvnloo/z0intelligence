@@ -39,6 +39,7 @@ def phone_caps_paths(root: Path, paths: list[Path] | None = None) -> list[Path]:
         return sorted({(p if p.is_absolute() else root / p).resolve() for p in map(Path, paths)})
     candidates = [*(root / 'scripts' / name for name in ('fleet', 'fleet-build', 'fleet-polite-run')),
                   *sorted((root / 'scripts').glob('fleet-phone*')),
+                  *sorted((root / 'scripts').glob('fleet_phone*.py')),
                   root / 'config/fleet/nodes.yaml',
                   *sorted((root / 'docs/fleet').glob('*.md')),
                   *KNOWN_PATHS]
