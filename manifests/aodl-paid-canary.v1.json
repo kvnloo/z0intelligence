@@ -17,7 +17,7 @@
     "groq": "openai/gpt-oss-20b",
     "cerebras": "qwen-3.8-27b",
     "deepseek": "deepseek-chat",
-    "openrouter": "anthropic/claude-haiku-5.5",
+    "openrouter": "openai/gpt-6-luna",
     "nous": "inclusionai/ling-3.0-flash-sante:free",
     "vercel": "openai/gpt-oss-20b",
     "nvidia": "openai/gpt-oss-20b",
@@ -111,11 +111,11 @@
       "catalog_verified_at": "2026-10-24",
       "models": [
         {
-          "id": "anthropic/claude-haiku-5.5",
-          "label": "Haiku 5.5"
+          "id": "openai/gpt-6-luna",
+          "label": "Luna"
         }
       ],
-      "worker_default_model": "anthropic/claude-haiku-5.5"
+      "worker_default_model": "openai/gpt-6-luna"
     },
     "nous": {
       "base_url": "https://inference-api.nousresearch.com",
