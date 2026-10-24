@@ -259,8 +259,8 @@ def shadow_payload(**over):
         "session_id": "omp-sess",
         "state": f'OMP tool_call: bash\ninput: {{"command": "cat {TOOL_INPUT_MARKER}"}}',
         "actions": [
-            {"action_id": "bash", "kind": "tool", "tool": "bash", "risk_class": "write"},
-            {"action_id": "read", "kind": "tool", "tool": "read", "risk_class": "read"},
+            {"action_id": "bash", "kind": "tool", "tool": "bash", "family": "omp.tool", "risk_class": "write"},
+            {"action_id": "read", "kind": "tool", "tool": "read", "family": "omp.tool", "risk_class": "read"},
         ],
         "granted_capabilities": ["bash", "read"],
         "authority": ["read", "write"],
@@ -274,6 +274,8 @@ def shadow_payload(**over):
 
 
 class _Backend:
+    backend_id = "fixture-local"
+
     def __init__(self, action=None, raises=None):
         self.action, self.raises = action, raises
         self.config = ServerConfig("http://fixture", "fake-model")
@@ -309,7 +311,7 @@ def test_dead_backend_records_failure_receipt_without_inventing_model_answer(hom
         {"model_id": "functiongemma_270m", "base_url": "http://127.0.0.1:11558/v1", "runtime": "llama.cpp"}]}))
     first = run_shadow(shadow_payload(), timeout_s=5)
     # And a backend that raises URLError itself.
-    second = run_shadow(shadow_payload(), registry=_Registry(_Backend(raises=urllib.error.URLError("refused"))))
+    second = run_shadow(shadow_payload(), registry=_Registry(_Backend(raises=urllib.error.URLError("connection refused"))))
     for result in (first, second):
         assert result["ok"] is True and result["selected_action"] is None and result["executed_action"] is None
         assert result["receipts_path"] is not None

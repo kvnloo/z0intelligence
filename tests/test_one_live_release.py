@@ -43,7 +43,14 @@ def staged(tmp_path):
     systemctl.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\n')
     systemctl.chmod(0o755)
     env.update(PATH=str(commands)+os.pathsep+env["PATH"], CALL_LOG=str(tmp_path/"calls"))
-    return base, runtime, first, second, env
+    try:
+        yield base, runtime, first, second, env
+    finally:
+        # Only these fixture-owned directories are unsealed. Production releases
+        # and the referenced runtime are never traversed or modified.
+        for directory, _, _ in os.walk(base, followlinks=False):
+            path = Path(directory)
+            path.chmod(path.stat().st_mode | 0o700)
 
 
 def test_archive_is_committed_read_only_and_idempotent(staged):
