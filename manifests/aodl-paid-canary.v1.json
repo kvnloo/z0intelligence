@@ -19,7 +19,7 @@
     "deepseek": "deepseek-chat",
     "openrouter": "openai/gpt-6-luna",
     "nous": "inclusionai/ling-3.0-flash-sante:free",
-    "vercel": "openai/gpt-6-luna",
+    "vercel": "openai/gpt-5.6-terra",
     "nvidia": "openai/gpt-oss-20b",
     "grok": "grok-4.20-0309-non-reasoning",
     "local": "qwen2.5:3b"
@@ -144,8 +144,8 @@
       "temperature": false,
       "models": [
         {
-          "id": "openai/gpt-6-luna",
-          "label": "Luna"
+          "id": "openai/gpt-5.6-terra",
+          "label": "Terra"
         }
       ],
       "worker_default_model": "openai/gpt-oss-20b"
@@ -342,7 +342,7 @@
     ],
     "max_price": {
       "prompt": 2,
-      "completion": 10,
+      "completion": 12,
       "request": 0
     },
     "ledger": "/tmp/aodl-golden-paid-budget-20261024.json"
