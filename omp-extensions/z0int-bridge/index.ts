@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface, type Interface } from "node:readline";
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
@@ -33,14 +33,16 @@ const BRIDGE_PROTOCOL = "z0int.bridge.v2";
 function z0Home(env: NodeJS.ProcessEnv = process.env): string {
 	return env.Z0INT_HOME || join(homedir(), ".z0int");
 }
-const Z0_ROOT =
-	process.env.Z0INT_ROOT ||
-	// Prefer the tree that owns this extension when possible.
-	process.env.Z0INT_BRIDGE_ROOT ||
-	fileURLToPath(new URL("../../", import.meta.url));
+/** Resolve at each spawn: a loaded shim follows an atomic install-link cutover on reload. */
+export function resolveRoot(env: NodeJS.ProcessEnv = process.env): string {
+	const install = env.Z0INT_INSTALL_ROOT || join(homedir(), ".local", "lib", "z0int-shadow", "current");
+	const root = existsSync(install) ? install
+		: env.Z0INT_ROOT || env.Z0INT_BRIDGE_ROOT || fileURLToPath(new URL("../../", import.meta.url));
+	return realpathSync(root);
+}
 
 /** Z0INT_PYTHON, else the owning checkout's .venv, else the z0int runtime, else python3 (salvaged, 815c680). */
-export function resolvePython(env: NodeJS.ProcessEnv = process.env, root = Z0_ROOT, z0 = z0Home(env)): string {
+export function resolvePython(env: NodeJS.ProcessEnv = process.env, root = resolveRoot(), z0 = z0Home(env)): string {
 	if (env.Z0INT_PYTHON) return env.Z0INT_PYTHON;
 	for (const candidate of [join(root, ".venv", "bin", "python"), join(z0, "bin", "python")]) {
 		if (existsSync(candidate)) return candidate;
@@ -173,16 +175,17 @@ function unrefChild(child: ChildProcess): void {
 
 function spawnWorker(nextGen: number): Promise<WorkerHandle> {
 	return new Promise((resolve, reject) => {
+		const root = resolveRoot();
 		const env = {
 			...process.env,
-			Z0INT_ROOT: Z0_ROOT,
-			PYTHONPATH: join(Z0_ROOT, "src") + (process.env.PYTHONPATH ? `:${process.env.PYTHONPATH}` : ""),
+			Z0INT_ROOT: root,
+			PYTHONPATH: join(root, "src") + (process.env.PYTHONPATH ? `:${process.env.PYTHONPATH}` : ""),
 			Z0INT_BRIDGE_GENERATION: String(nextGen),
 		};
 		let child: ChildProcess;
 		try {
-			child = spawn(resolvePython(), ["-u", "-m", "z0int.bridge.worker", "--generation", String(nextGen)], {
-				cwd: Z0_ROOT,
+			child = spawn(resolvePython(process.env, root), ["-u", "-m", "z0int.bridge.worker", "--generation", String(nextGen)], {
+				cwd: root,
 				env,
 				stdio: ["pipe", "pipe", "pipe"],
 			});

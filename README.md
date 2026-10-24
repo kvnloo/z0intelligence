@@ -343,6 +343,12 @@ Legacy receipts are classified without rewriting their source bytes.
 installs a committed content-stamped copy. Extension links must never point
 into a task worktree. Existing OMP processes cache extension modules: a fresh
 process is required; `/reload-plugins` is not an extension-code reload.
+After this shim is loaded once, each worker respawn (including
+`/z0int-bridge-reload`) resolves `~/.local/lib/z0int-shadow/current` again.
+`Z0INT_INSTALL_ROOT` selects another stable install link; explicit checkout
+roots are fallbacks when no installed link exists. The child runs from the
+resolved release, whose `DEPLOYED_SHA` becomes each shadow receipt's
+`source_revision`. Changing TypeScript extension code still requires a restart.
 
 
 ## Compilation is mechanism-neutral
