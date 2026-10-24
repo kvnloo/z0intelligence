@@ -152,6 +152,10 @@ def cases(seed: int = 0, n_rand: int = 120) -> list[tuple[str, str, str, str]]:
                 "report": lambda x, ses: "O.ReportRun{}"}
         ev = "[" + ", ".join(ctor[k](x, ses) for k, x, ses in tape) + "]"
         out.append(("O9 rstep", "O.RSt", f"rrun({ev}, O.RActive{{{n(g)}}})", rst_str(s)))
+    for bits in itertools.product(B2, repeat=5):
+        args = ", ".join(b(x) for x in bits)
+        out.append(("O10 phone_admits", "Bool", f"O.phone_admits({args})", b(P.phone_admits(*bits))))
+        out.append(("O10 phone_place", "O.Place", f"O.phone_place({args})", place_str(P.phone_place(*bits))))
     return out
 
 

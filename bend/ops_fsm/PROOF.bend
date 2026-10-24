@@ -515,3 +515,10 @@ def Laws.o9_interrupted_exits(g, e):
       resume_pick(session, g)
     case O.ReportRun{}:
       Unit{}
+
+# O10. Resource observations never become agent admission/placement limits.
+def Laws.o10_phone_no_agent_resource_caps(ready, memory, cpu, battery, thermal):
+  {==}
+
+def Laws.o10_phone_placement_no_agent_resource_caps(ready, memory, cpu, battery, thermal):
+  {==}

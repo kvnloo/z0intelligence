@@ -68,6 +68,15 @@ def place(c: Cls, mbp_room: bool, phone_room: bool) -> Lane | None:
     return None
 
 
+def phone_admits(ready: bool, memory: bool, cpu: bool, battery: bool, thermal: bool) -> bool:
+    """O10: resource observations do not change phone readiness."""
+    return ready
+
+
+def phone_place(ready: bool, memory: bool, cpu: bool, battery: bool, thermal: bool) -> Lane | None:
+    return Lane.PHONE if phone_admits(ready, memory, cpu, battery, thermal) else None
+
+
 # ------------------------------------------------------------------ O2
 
 

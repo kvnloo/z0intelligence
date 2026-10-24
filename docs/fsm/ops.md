@@ -19,6 +19,7 @@ flowchart LR
     O7[O7 route_ok]:::law
     O8[O8 nstep/neff]:::law
     O9[O9 rstep]:::law
+    O10[O10 phone_admits/phone_place]:::law
   end
   Twin["src/z0int/fsm/ops.py\n(parity: exhaustive + seeded vs Bend)"]
   Book ==> Twin
@@ -32,6 +33,7 @@ flowchart LR
   G -->|routing| RT["omp / Hermes / Dash role configs (timer)"]
   G -->|health_step| FH["fleet health -> one owner notification"]
   G -->|gateway-watch| GW["sol runs -> Interrupted + resume (timer)"]
+  G -->|phone-caps --root ROOT| PC[".files hooks + ServiceWatch deterministic invariant"]
   O1 -.-> FB
   O2 -.-> HK
   O3 -.-> RO
@@ -41,6 +43,7 @@ flowchart LR
   O7 -.-> RT
   O8 -.-> FH
   O9 -.-> GW
+  O10 -.-> PC
   classDef law fill:#1d2b3a,stroke:#6cb6ff,color:#e6edf3
 ```
 
@@ -61,6 +64,7 @@ command, git ref update, adb dump or config line becomes those inputs is classif
 | O7 | no role routes to a cancelled provider (xai/grok, cancelled 2026-10-21); visual/UX design roles never route to Sol | `z0-guard routing` (hourly timer, read-only, never prints key fields) | report |
 | O8 | a worker node unhealthy for >30 min emits exactly one owner notification per unhealthy episode | `fleet health` -> `guard.health_step` -> KDE Connect ping to the S25 (enforce) | report |
 | O9 | when the gateway hosting headless runs restarts (gateway invocation or Hermes checkout HEAD changes), every dependent run gone without a report becomes Interrupted, never Failed, with a resume command | `z0-guard gateway-watch` (1-min timer) -> `o9-interrupted.jsonl` (+ `worker-decisions.jsonl` in enforce) | report |
+| O10 | phone admission and placement are independent of agent-chosen memory, CPU, battery and thermal limits; Android manages resources. Explicit owner pause/call, reachability, capability, timeout and cleanup remain. Caller-explicit optional per-job memory is allowed; resource defaults and phone admission caps are not. | `z0-guard phone-caps --root ROOT` | enforce |
 
 Switch a gate: `Z0_GUARD_O<n>=off|report|enforce` in the environment, or
 `~/.config/z0-guard/modes.json` (`{"O3": "enforce"}`). `z0-guard modes` prints the effective modes.
@@ -83,6 +87,29 @@ if not d["allowed"]:
 `z0int.fsm.ops.phone_allows(PKind.TAP, intent=..., fg=..., chain=..., call=...)` is the bare
 decision (no IO). Pass `intent=` from the broker's own grammar so the two never disagree;
 `utterance=` uses the shared fallback `ops.owner_phone_intent`.
+
+## O10 scanner API
+
+`phone_caps_findings(root: Path, paths: list[Path] | None = None)` is available from
+`z0int.fsm.guard`. The root is mandatory: hooks must pass their own checkout,
+not the guard's cwd. It returns stable `{path, line, rule, detail}` findings.
+The CLI emits JSON with `gate`, `status`, `checked` and `findings`; enforce mode
+returns 3 for findings and 0 when clean. Missing or malformed explicit files fail
+closed as `scan-unavailable`. `--path FILE` is repeatable and replaces discovery,
+including external paths, for isolated fixtures.
+
+Discovery includes fleet scripts, the phone-mode registry, fleet docs, and the
+known phone skill/report/chat-driver paths when present. Python AST parsing
+distinguishes non-phone branches; YAML parsing checks phone mappings. Shell
+mode branches and agent-facing prose use lexical checks. These are bounded
+source checks, not a proof of arbitrary program semantics; Bend proves the
+abstract admission/placement decisions, not the source classifier.
+
+ServiceWatch's `phone_caps` deterministic invariant forces O10 enforce mode,
+records caps as severe `phone_resource_caps`, and treats failed/unavailable
+scans as `invariant_unavailable`. Its recurring check resolves the installed
+fleet checkout; an inventory entry can specify `health_invariant` with
+`{"kind": "phone_caps", "root": "/path/to/files"}`. No remediation is automatic.
 
 ## Evidence
 

@@ -414,3 +414,13 @@ def rfailed(s: RSt) -> Bool:
       True{}
     case _:
       False{}
+
+# ------------------------------------------------------------------ O10
+# Android owns phone resources. These four booleans represent arbitrary
+# agent-chosen resource checks; none may affect admission or placement.
+# Reachability, explicit owner pause/call and capability checks form ready.
+def phone_admits(ready: Bool, -memory: Bool, -cpu: Bool, -battery: Bool, -thermal: Bool) -> Bool:
+  ready
+
+def phone_place(ready: Bool, memory: Bool, cpu: Bool, battery: Bool, thermal: Bool) -> Place:
+  place_phone(phone_admits(ready, memory, cpu, battery, thermal))

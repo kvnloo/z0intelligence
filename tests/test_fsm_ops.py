@@ -1,4 +1,4 @@
-"""Ops plane (O1-O9): the gates' decision functions, their IO wrappers on scratch
+"""Ops plane (O1-O10): the gates' decision functions, their IO wrappers on scratch
 repos, the 2026-10-21 incident tapes, and Bend parity (groot only)."""
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ def repo(tmp_path, name="r"):
 # ------------------------------------------------------------------ modes
 
 def test_default_modes_enforce_only_pure_refusals():
-    assert {g for g, m in G.DEFAULT_MODES.items() if m == "enforce"} == {"O1", "O2", "O4", "O6"}
+    assert {g for g, m in G.DEFAULT_MODES.items() if m == "enforce"} == {"O1", "O2", "O4", "O6", "O10"}
     assert all(G.DEFAULT_MODES[g] == "report" for g in ("O3", "O5", "O7", "O8", "O9"))
 
 

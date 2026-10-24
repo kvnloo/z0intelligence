@@ -3,7 +3,7 @@
 (in a scratch copy), run `bend PROOF.bend`, and require SOME PROOFS FAIL.
 
 Each mutation is the bug a law exists to catch, written the way it would show
-up in the gate. Every law O1-O9 has at least one mutant. The reference
+up in the gate. Every law O1-O10 has at least one mutant. The reference
 ops.bend is never edited in place.
 
     python3 bend/ops_fsm/mutations.py [--verdict] [--out mutations.json]
@@ -22,6 +22,8 @@ HERE = Path(__file__).resolve().parent
 BEND = os.environ.get("BEND", str(Path.home() / ".bend/bin/bend"))
 
 # (law, description, old text, new text)
+PHONE_ADMITS = ("def phone_admits(ready: Bool, -memory: Bool, -cpu: Bool, "
+                "-battery: Bool, -thermal: Bool) -> Bool:\n  ready")
 MUTATIONS = [
     # O1 compute placement
     ("O1 o1_groot_admits_only", "groot admits every class",
@@ -114,6 +116,14 @@ MUTATIONS = [
      "    case ReportRun{}:\n      RReported{}\n    case _:\n      RInterrupted{g}", "    case ReportRun{}:\n      RReported{}\n    case RunError{}:\n      RFailed{}\n    case _:\n      RInterrupted{g}"),
     ("O9 o9_resume_needs_session", "resume without the run's session",
      "      rpick(session, RResumed{}, RInterrupted{g})", "      RResumed{}"),
+    # O10: each resource must independently remain irrelevant.
+    *[("O10 o10_phone_no_agent_resource_caps", f"phone admission gated by {resource}",
+       PHONE_ADMITS, PHONE_ADMITS.replace(f"-{resource}:", f"{resource}:").replace(
+           "\n  ready", f"\n  Bool.and(ready, {resource})"))
+      for resource in ("memory", "cpu", "battery", "thermal")],
+    ("O10 o10_phone_placement_no_agent_resource_caps", "phone placement gated by memory",
+     "  place_phone(phone_admits(ready, memory, cpu, battery, thermal))",
+     "  place_phone(Bool.and(ready, memory))"),
 ]
 
 

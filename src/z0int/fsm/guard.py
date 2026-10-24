@@ -15,10 +15,11 @@ the inputs (git, systemd, adb, broker.db, configs, gh) and acts on the verdict.
     z0-guard routing                    O7  provider routing checker (read-only, never prints keys)
     z0-guard health-step ...            O8  one node-health probe through the notify machine
     z0-guard gateway-watch              O9  gateway restart -> Interrupted runs with resume commands
+    z0-guard phone-caps --root ROOT [--path PATH ...] O10 source-policy scanner
     z0-guard replay TAPE...             replay incident tapes through the gates
     z0-guard modes                      show each gate's mode
 
-Modes: off | report | enforce. Default enforce for O1, O2, O4, O6 (pure refusals
+Modes: off | report | enforce. Default enforce for O1, O2, O4, O6, O10 (pure refusals
 of known-bad actions); report for O3, O5, O7, O8, O9. Override per gate with
 Z0_GUARD_O<n>=MODE or ~/.config/z0-guard/modes.json. A gate's verdict is never
 an authorization: a pass means only "this gate did not refuse".
@@ -45,6 +46,7 @@ import urllib.request
 from pathlib import Path
 
 from . import ops as P
+from .phone_caps import phone_caps_findings, phone_caps_paths
 
 HOME = Path.home()
 CONFIG = Path(os.environ.get("Z0_GUARD_CONFIG", HOME / ".config/z0-guard"))
@@ -58,7 +60,7 @@ HERMES_CHECKOUT = Path(os.environ.get("Z0_HERMES_CHECKOUT", "/workspace/hermes-h
 GROOT_NAMES = {"groot"}
 CALL_CHAIN_PACKAGES = {"app.lawnchair.play.debug"}
 DEFAULT_MODES = {"O1": "enforce", "O2": "enforce", "O3": "report", "O4": "enforce", "O5": "report",
-                 "O6": "enforce", "O7": "report", "O8": "report", "O9": "report"}
+                 "O6": "enforce", "O7": "report", "O8": "report", "O9": "report", "O10": "enforce"}
 EXIT_REFUSED = 3
 ZERO = "0" * 40
 
@@ -984,6 +986,16 @@ def cmd_gateway_watch(a) -> int:
     return 0
 
 
+# ------------------------------------------------------------------ O10 source policy
+
+def cmd_phone_caps(a) -> int:
+    root = Path(a.root)
+    paths = [Path(p) for p in a.path] if a.path is not None else None
+    findings = phone_caps_findings(root, paths)
+    return verdict("O10", bool(findings), {"root": str(root.resolve()), "findings": findings,
+                                         "checked": list(map(str, phone_caps_paths(root, paths)))})
+
+
 # ------------------------------------------------------------------ modes, main
 
 def cmd_modes(a) -> int:
@@ -1078,6 +1090,11 @@ def main(argv: list[str] | None = None) -> int:
     gw = sub.add_parser("gateway-watch", help="O9: detect gateway restarts, mark runs Interrupted")
     gw.add_argument("--state", default=str(STATE / "o9-state.json"))
     gw.set_defaults(fn=cmd_gateway_watch)
+
+    pc = sub.add_parser("phone-caps", help="O10: scan phone-capable sources and agent policy for resource caps")
+    pc.add_argument("--root", required=True, help=".files checkout root (never inferred from the process cwd)")
+    pc.add_argument("--path", action="append", help="explicit file, relative to root or absolute; replaces discovery")
+    pc.set_defaults(fn=cmd_phone_caps)
 
     rp = sub.add_parser("replay", help="replay incident tapes through the gates")
     rp.add_argument("tapes", nargs="+")

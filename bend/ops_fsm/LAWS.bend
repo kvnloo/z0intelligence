@@ -337,3 +337,21 @@ law o9_interrupted_exits:
   for +g: Nat
   for e: O.REv
   IntExit(O.rstep(O.RInterrupted{g}, e))
+
+# O10. Phone admission/placement cannot depend on agent resource limits.
+# Caller-explicit per-job memory is not a default or a phone admission gate.
+law o10_phone_no_agent_resource_caps:
+  for +ready: Bool
+  for memory: Bool
+  for cpu: Bool
+  for battery: Bool
+  for thermal: Bool
+  {O.phone_admits(ready, memory, cpu, battery, thermal) == ready : Bool}
+
+law o10_phone_placement_no_agent_resource_caps:
+  for +ready: Bool
+  for memory: Bool
+  for cpu: Bool
+  for battery: Bool
+  for thermal: Bool
+  {O.phone_place(ready, memory, cpu, battery, thermal) == O.place_phone(ready) : O.Place}
