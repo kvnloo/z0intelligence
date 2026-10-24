@@ -46,6 +46,10 @@ not observations. For each non-observed assumption a task depends on, include
 preconditions:[{claim:<exact assumption claim>,verifier:<fixed typed verifier>}]
 that OBSERVES the claimed state before work depends on it. Do not use an eventual
 result verifier as a substitute for a prerequisite observation.
+Global assumptions apply to EVERY task. Every task must repeat a precondition
+with the byte-identical claim for each global assumption with no observed
+citation. Put task-specific assumptions on that task only. A precondition
+verifier is an object with type and the required fields from the forms below.
 A task needs a real specific target, interpretation notes, executor self or a
 named delegate/device/MBP, assumptions [{claim,citations:[...]}], conflicts [],
 and verifier using ONLY one of these fixed typed forms:
