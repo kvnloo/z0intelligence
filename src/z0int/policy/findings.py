@@ -130,6 +130,8 @@ def _read(path: Path) -> list[dict]:
                     raise FindingsError(f"Truncated findings line {number}")
                 row = json.loads(line)
                 validate(row)
+                if line != canonical(row) + b"\n":
+                    raise FindingsError(f"Noncanonical findings line {number}")
                 if row.get("prev") != prev:
                     raise FindingsError(f"Broken findings chain at line {number}")
                 rows.append(row)
