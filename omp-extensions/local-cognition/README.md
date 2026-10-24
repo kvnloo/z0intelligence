@@ -180,3 +180,30 @@ bounded failure journal; daily identity failures force
 matching as gold. A legacy timestamp recovery census must remain a separate
 non-gold tier and be discarded when collisions are high.
 
+
+## Context-safe candidate projection
+
+The farm's `-c 8192 --parallel 2` provides 4096 tokens per slot, not 8192.
+Real OMP sessions expose about 120 tools; sending every description can exceed
+that slot. Shadow model inputs now use a deterministic projection: the kNN
+recommendation, preceding tools, tools previously used in the session, common
+tools, then the remaining names in lexical order. The current observed tool is
+never used to build or rank that projection. Descriptions/schemas are compacted.
+
+The compiler's full `legal_ids` remain unchanged for scoring, including the
+executed tool even when it misses the projection. Each model records its actual
+`model_candidate_ids` and server-reported `prompt_tokens`. The model-only request
+uses a conservative 3000-byte serialized prompt/schema budget, including a
+512-byte template/control reserve, and at most 128 completion tokens. UTF-8 bytes
+bound byte-tokenizer input tokens; non-shadow requests are not pruned.
+
+`projection_recall` measures how often an exact executed-action label is in the
+model's candidate set, per family and projection configuration. It is separate
+from prediction accuracy and exposes its denominator. With at least five
+observations and recall below 0.8, the evolver tries wider candidate caps (48,
+then 64) and raises the conservative input budget to 3500 before attributing the
+failure to model quality. Old configurations and their outcomes remain in the
+ledger. Real prompt overflow is a distinct `context_overflow` failure class and
+daily counter; an abstaining local arm cannot mask a failed SLM observation into
+the normal journal. No shared farm context/parallel settings are changed.
+

@@ -27,6 +27,33 @@ STRATEGIES = (
     ('transition-rule', 'Exact last-tool transition rules beat similarity', 1, 1, 'rules'),
     ('history-bigram', 'Ordered tool bigrams distinguish workflow phases', 5, 3, 'bigram'),
 )
+PROJECTION_STRATEGIES = (
+    ('projection-wide', 'Raise candidate width and budget before judging model accuracy', 8, 5, 'knn'),
+    ('projection-maximum', 'Use maximum bounded candidate width to recover projection recall', 8, 9, 'knn'),
+)
+
+
+def projection_key(config: dict) -> str:
+    return f"k{config.get('candidate_k', 24)}-b{config.get('prompt_bytes', 3000)}"
+
+
+def projection_metrics(db: sqlite3.Connection) -> dict:
+    metrics = {}
+    for row in db.execute('''SELECT l.family,l.action,r.body FROM labels l JOIN receipts r
+          ON l.session=r.session AND l.call=r.call'''):
+        receipt = json.loads(row['body'])
+        for model in receipt.get('shadow') or []:
+            candidates = model.get('model_candidate_ids')
+            if not isinstance(candidates, list):
+                continue
+            family = metrics.setdefault(row['family'], {'n': 0, 'hits': 0, 'by_config': {}})
+            group = family['by_config'].setdefault(projection_key(receipt.get('projection_config') or {}),
+                                                   {'n': 0, 'hits': 0})
+            for bucket in (family, group):
+                bucket['n'] += 1
+                bucket['hits'] += int(row['action'] in candidates)
+                bucket['recall'] = bucket['hits']/bucket['n']
+    return metrics
 
 
 def wilson(correct: int, n: int) -> float:
@@ -247,7 +274,8 @@ def shadow_portfolio(home: Path, history: list[str], family: str, legal: frozens
         return None
     status_path = home / 'loop' / 'shadow-learning-status.json'
     state = json.loads(status_path.read_text()) if status_path.exists() else {}
-    strategy = next((s for s in STRATEGIES if s[0] == state.get('current_strategy')), STRATEGIES[0])
+    strategy = next((s for s in (*STRATEGIES, *PROJECTION_STRATEGIES)
+                     if s[0] == state.get('current_strategy')), STRATEGIES[0])
     with sqlite3.connect(f'file:{path}?mode=ro', uri=True, timeout=.05) as db:
         rows = db.execute('SELECT action,features FROM examples WHERE family=? ORDER BY ts DESC LIMIT 512',
                           (family,)).fetchall()
@@ -275,12 +303,17 @@ def evolve(folder: Path, state: dict, reasons: list, now: float, window: float) 
     ledger = json.loads(path.read_text()) if path.exists() else {'trials': [], 'current': None}
     current = next((t for t in ledger['trials'] if t['id'] == ledger['current']), None)
     def lower(strategy_id):
+        if strategy_id.startswith('projection-'):
+            key = projection_key({'candidate_k': 64 if strategy_id == 'projection-maximum' else 48,
+                                  'prompt_bytes': 3500})
+            return max((m['by_config'].get(key, {}).get('recall', 0)
+                        for m in state.get('projection_recall', {}).values()), default=0)
         arm = 'rules' if strategy_id == 'transition-rule' else strategy_id
         return max((arms.get(arm, {}).get('wilson95_lower', 0)
                     for arms in state['families'].values()), default=0)
     # Give each trial its full window before judging it. Transport and label
     # failures invalidate the trial immediately rather than waiting another day.
-    invalid = any(r.startswith(('transport', 'labels')) for r in reasons)
+    invalid = any(r.startswith(('transport', 'labels', 'projection_recall')) for r in reasons)
     if current and current['result'] == 'running' and (invalid or now-current['started_at'] >= window):
         best = lower(current['id'])
         current.update(result='improved' if best > current['baseline'] and not invalid else 'failed',
@@ -288,12 +321,17 @@ def evolve(folder: Path, state: dict, reasons: list, now: float, window: float) 
     event = None
     if reasons and (not current or current['result'] != 'running'):
         used = {t['id'] for t in ledger['trials']}
-        candidate = next((s for s in STRATEGIES if s[0] not in used), None)
+        choices = (*PROJECTION_STRATEGIES, *STRATEGIES) if any(
+            r.startswith('projection_recall') for r in reasons) else (*STRATEGIES, *PROJECTION_STRATEGIES)
+        candidate = next((s for s in choices if s[0] not in used), None)
         if candidate:
             best = lower(candidate[0])
             event = {'id': candidate[0], 'hypothesis': candidate[1], 'started_at': now,
                      'baseline': best, 'result': 'running', 'trigger': reasons,
-                     'config': {'history_width': candidate[2], 'k': candidate[3], 'arm': candidate[4]}}
+                     'config': {'history_width': candidate[2], 'k': candidate[3], 'arm': candidate[4],
+                                'candidate_k': 64 if candidate[0] == 'projection-maximum' else
+                                               48 if candidate[0] == 'projection-wide' else 24,
+                                'prompt_bytes': 3500 if candidate[0].startswith('projection-') else 3000}}
             ledger['trials'].append(event)
             ledger['current'] = candidate[0]
         else:
@@ -302,6 +340,9 @@ def evolve(folder: Path, state: dict, reasons: list, now: float, window: float) 
     atomic_json(path, ledger)
     state['current_strategy'] = ledger['current'] or STRATEGIES[0][0]
     state['last_evolution'] = ledger.get('last_evolution')
+    active = next((t for t in ledger['trials'] if t['id'] == ledger['current']), None)
+    state['projection_config'] = {k: (active or {}).get('config', {}).get(k, default)
+                                  for k, default in (('candidate_k', 24), ('prompt_bytes', 3000))}
     return event
 
 
@@ -353,7 +394,11 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
                 counts = dict(db.execute('SELECT family,COUNT(*) FROM labels GROUP BY family').fetchall())
                 recent = db.execute('SELECT body FROM receipts WHERE ts>=?', (now-86400,)).fetchall()
                 trials = [s for row in recent for s in json.loads(row[0]).get('shadow', [])]
-                errors = sum(bool(s.get('parse_error') and ('transport_error' in s['parse_error'] or 'timeout' in s['parse_error'])) for s in trials)
+                from .shadow import failure_class
+                failure_counts = Counter(s.get('failure_class') or failure_class(
+                    s.get('parse_error') or s.get('error')) for s in trials)
+                context_errors = failure_counts['context_overflow']
+                errors = failure_counts['transport_error'] + failure_counts['timeout']
                 rate = errors/len(trials) if trials else None
                 health_path = home/'shadow'/'cognition-shadow-health.json'
                 health = json.loads(health_path.read_text()) if health_path.exists() else {}
@@ -367,6 +412,8 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
                          'transport_errors_day': errors, 'transport_error_rate': rate,
                          'unjoined_receipts': db.execute('SELECT COUNT(*) FROM receipts WHERE id NOT IN (SELECT id FROM labels)').fetchone()[0],
                          'complete': complete, 'learning_curve': {}}
+                state['context_overflows_day'] = context_errors
+                state['projection_recall'] = projection_metrics(db)
                 state['new_writer_health'] = {'attempts_day': bucket.get('attempts', 0),
                     'failures_day': bucket.get('failures', 0), 'failure_rate': failure_rate}
                 state['new_writer_health']['identity_failures_day'] = bucket.get('identity_failures', 0)
@@ -379,6 +426,13 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
                 prior = db.execute('SELECT body FROM ticks WHERE ts<=? ORDER BY ts DESC LIMIT 1', (now-window,)).fetchone()
                 previous = db.execute('SELECT body FROM ticks ORDER BY ts DESC LIMIT 1').fetchone()
                 reasons = []
+                active_projection = (json.loads(previous[0]) if previous else {}).get('projection_config') or {}
+                for family, metric in state['projection_recall'].items():
+                    active_metric = metric['by_config'].get(projection_key(active_projection), {})
+                    if active_metric.get('n', 0) >= 5 and active_metric.get('recall', 1) < .8:
+                        reasons.append('projection_recall_low:'+family)
+                if context_errors:
+                    reasons.append('context_overflow')
                 if bucket.get('identity_failures', 0):
                     reasons.append('labels_identity_invariant')
                 if failure_rate is not None and failure_rate > float(cfg.get('transport_error_threshold', .05)):
@@ -418,8 +472,11 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
 def status_line(state: dict) -> str:
     best = ','.join(f"{f}:{c['best_arm']}({c['best_lower']:.3f})" for f,c in state.get('learning_curve', {}).items()) or 'none'
     evolution = state.get('last_evolution') or {}
+    projection = ','.join(f"{f}:{m['recall']:.3f}(n={m['n']})"
+                          for f,m in state.get('projection_recall', {}).items()) or 'unmeasured'
     return (f"shadow {state.get('status', 'NOT_STARTED')} credited={len(state.get('credited_families', []))} "
             f"labels/day={state.get('labels_day', 0)} best={best} strategy={state.get('current_strategy', 'none')} "
+            f"projection_recall={projection} context_overflow/day={state.get('context_overflows_day', 0)} "
             f"last_evolution={evolution.get('id', evolution.get('result', 'none'))}")
 
 

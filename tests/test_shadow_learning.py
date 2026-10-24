@@ -154,3 +154,105 @@ def test_missing_new_identity_is_quarantined_and_degrades(tmp_path, monkeypatch)
     assert report['new_writer_health']['identity_failures_day'] == 1
     assert 'labels_identity_invariant' in report['degraded_by']
     assert report['labelled_per_family'] == {'omp.tool':3}
+
+
+def large_omp_payload():
+    names = ["read", "bash"] + [
+        f"mcp__t3_groot_long_collaborative_browser_and_thread_operation_{i:03}" for i in range(117)
+    ] + ["zz_observed_tool"]
+    return {'session_id':'real-sized-session', 'trace_id':'real-sized-trace',
+        'facts':{'tool_call_id':'actual-call', 'tool_name':'zz_observed_tool'},
+        'state':'OMP session. Previous tool calls, oldest first: read, bash, read',
+        'recent_tools':['read','bash','read'], 'session_tools':['read','bash'],
+        'actions':[{'action_id':name,'tool':name,'family':'omp.tool',
+                    'description':f'Call the OMP tool {name}',
+                    'arguments_schema':{'type':'object','description':'schema text '*100}}
+                   for name in names],
+        'authority':['read'], 'budget_units':len(names), 'shadows':['qwen3_06b']}
+
+
+def sized_backend(transport):
+    from z0int.cognition.adapters.local_slm import LocalSLMBackend
+    from z0int.cognition.adapters.transport import ServerConfig
+    from z0int.cognition.adapters.dialects import PLAIN_JSON_DIALECT
+    return LocalSLMBackend(backend_id='qwen3_06b',
+        config=ServerConfig('http://fixture','qwen3-0.6b-q8'),
+        dialect=PLAIN_JSON_DIALECT, transport=transport)
+
+
+def test_real_sized_omp_prompt_is_bounded_without_losing_scoring_actions(tmp_path, monkeypatch):
+    from z0int.cognition.adapters.transport import ChatOutcome
+    monkeypatch.setenv('Z0INT_HOME',str(tmp_path))
+    class Transport:
+        def __init__(self):
+            self.requests=[]
+        def chat(self,messages,**kw):
+            self.requests.append((messages,kw))
+            encoded=len(json.dumps({'messages':messages,'tools':kw['tools'],
+                                   'response_format':kw['response_format']}).encode())+512
+            assert encoded <= 3000
+            assert kw['max_tokens'] <= 128
+            return ChatOutcome('{"action_id":"read","confidence":0.9}',None,
+                               {'prompt_tokens':700},{},{},1)
+    transport=Transport()
+    backend=sized_backend(transport)
+    class Registry:
+        def served(self): return ('qwen3_06b',)
+        def backend_for(self,*a,**kw): return backend
+    payload=large_omp_payload()
+    result=run_shadow(payload,registry=Registry())
+    assert len(result['legal_ids']) == 120
+    assert 'zz_observed_tool' in result['legal_ids']
+    model=result['shadow'][0]
+    assert model['selected_action'] == 'read'
+    assert len(model['model_candidate_ids']) < 24
+    assert 'zz_observed_tool' not in model['model_candidate_ids']
+    assert model['prompt_tokens'] == 700
+    # Changing the observed action cannot alter model inputs or candidate rank.
+    payload['facts']['tool_name']='bash'
+    run_shadow(payload,registry=Registry(),write=False)
+    assert transport.requests[0] == transport.requests[1]
+
+
+def test_context_overflow_has_distinct_failure_counter(tmp_path, monkeypatch):
+    from z0int.cognition.adapters.transport import TransportError
+    monkeypatch.setenv('Z0INT_HOME',str(tmp_path))
+    class Transport:
+        def chat(self,*a,**kw):
+            raise TransportError('HTTP 400 request (4811 tokens) exceeds the available context size (4096 tokens)')
+    backend=sized_backend(Transport())
+    class Registry:
+        def served(self): return ('qwen3_06b',)
+        def backend_for(self,*a,**kw): return backend
+    result=run_shadow(large_omp_payload(),registry=Registry())
+    assert result['shadow'][0]['failure_class'] == 'context_overflow'
+    assert result['shadow'][0]['parse_error'].startswith('context_overflow:')
+    assert Path(result['receipts_path']).name == 'cognition-shadow-failures.jsonl'
+    health=json.loads((tmp_path/'shadow'/'cognition-shadow-health.json').read_text())
+    today=time.strftime('%Y-%m-%d',time.gmtime())
+    assert health['days'][today]['failure_classes']['context_overflow'] == 1
+
+
+def test_low_projection_recall_evolves_width_and_budget_separately_from_gold(tmp_path):
+    home,sessions,now=fixture(tmp_path,20)
+    path=home/'shadow'/'cognition-shadow.jsonl'
+    receipts=[json.loads(line) for line in path.read_text().splitlines()]
+    for row in receipts:
+        row['shadow'][0]['model_candidate_ids']=['bash']
+        row['projection_config']={'candidate_k':24,'prompt_bytes':3000}
+    path.write_text(''.join(json.dumps(r)+'\n' for r in receipts))
+    result=learn(home,sessions=sessions,now=now)
+    metric=result['projection_recall']['omp.tool']
+    assert metric['n'] == 20 and metric['hits'] == 0 and metric['recall'] == 0
+    assert result['labelled_per_family'] == {'omp.tool':20}
+    assert result['evolution']['id'] == 'projection-wide'
+    assert result['projection_config'] == {'candidate_k':48,'prompt_bytes':3500}
+
+
+def test_local_abstention_cannot_mask_slm_failure_retention(tmp_path, monkeypatch):
+    from z0int.cognition.shadow import append_shadow_receipt
+    monkeypatch.setenv('Z0INT_HOME',str(tmp_path))
+    path=append_shadow_receipt({'shadow':[
+        {'backend':'slm','parse_error':'context_overflow: oversized'},
+        {'backend':'shadow-portfolio','selected_action':None,'abstained':True}]})
+    assert path.name == 'cognition-shadow-failures.jsonl'

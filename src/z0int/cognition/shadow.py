@@ -19,7 +19,7 @@ backends and no model server.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import os
 import fcntl
@@ -436,7 +436,50 @@ def _row(
         row["confidence"] = decision.confidence
     if attempted is not None:
         row["attempted_action"] = attempted
+    row["failure_class"] = failure_class(row.get("parse_error"))
+    if "model_candidate_ids" in decision.diagnostics:
+        row["model_candidate_ids"] = decision.diagnostics["model_candidate_ids"]
+    if decision.prompt_tokens is not None:
+        row["prompt_tokens"] = decision.prompt_tokens
     return row
+
+
+def failure_class(error: Any) -> str | None:
+    text = str(error or "").lower()
+    if "context_overflow" in text or ("exceed" in text and "context" in text):
+        return "context_overflow"
+    if "timeout" in text or "timed out" in text:
+        return "timeout"
+    return "transport_error" if "transport_error" in text else ("backend_error" if text else None)
+
+
+def project_shadow_request(context: Any, legal: Any, payload: Mapping[str, Any],
+                           local: Mapping[str, Any] | None, config: Mapping[str, Any]) -> ToolDecisionRequest:
+    """Model-only projection. Never condition on the currently observed tool.
+
+    The full compiler set remains the scoring denominator, even when the actual
+    tool misses this projection. Candidate recall is measured separately.
+    """
+    available = {a.action_id: a for a in legal.legal}
+    priority: list[str] = []
+    if local and local.get("selected_action"):
+        priority.append(str(local["selected_action"]))
+    for field in ("recent_tools", "session_tools"):
+        values = payload.get(field)
+        if isinstance(values, list):
+            priority.extend(x for x in reversed(values) if isinstance(x, str))
+    priority.extend(("read", "find", "grep", "glob", "bash", "edit", "write",
+                     "eval", "task", "wait", "web_search", "hermes_memory"))
+    priority.extend(sorted(available))
+    ordered = list(dict.fromkeys(x for x in priority if x in available))
+    k = max(1, min(64, int(config.get("candidate_k", 24))))
+    actions = tuple(replace(available[x], description="", family=None,
+        arguments_schema={"type": "object"}) for x in ordered[:k])
+    state = context.state.encode("utf-8")[:512].decode("utf-8", "ignore")
+    return ToolDecisionRequest(state=state, legal=replace(legal, legal=actions),
+        objective=None, risk_class=context.risk_class, constraints={},
+        max_tokens=min(context.max_tokens, 128),
+        budget={"prompt_bytes": max(1024, min(3500, int(config.get("prompt_bytes", 3000))))})
 
 
 # --- receipt ------------------------------------------------------------
@@ -453,7 +496,7 @@ def append_shadow_receipt(row: Mapping[str, Any]) -> Path:
     path = shadow_receipt_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     models = list(row.get("shadow") or [])
-    failed = not models or all(m.get("parse_error") or m.get("error") or not m.get("backend") for m in models)
+    failed = not models or any(m.get("parse_error") or m.get("error") or not m.get("backend") for m in models)
     identity_missing = row.get("identity_contract") == "session-tool-call.v1" and not (
         row.get("session_id") and row.get("tool_call_id"))
     failed = bool(failed or identity_missing)
@@ -471,6 +514,11 @@ def append_shadow_receipt(row: Mapping[str, Any]) -> Path:
         bucket["attempts"] += 1
         bucket["failures"] += int(failed)
         bucket["identity_failures"] = bucket.get("identity_failures", 0) + int(identity_missing)
+        classes = bucket.setdefault("failure_classes", {})
+        for model in models:
+            kind = model.get("failure_class") or failure_class(model.get("parse_error") or model.get("error"))
+            if kind:
+                classes[kind] = classes.get(kind, 0) + 1
         health["failed_calls" if failed else "successful_calls"] += 1
         health["days"] = dict(sorted(health["days"].items())[-32:])
         from .learning import atomic_json
@@ -549,29 +597,24 @@ def run_shadow(
 
     legal_ids = frozenset(legal.ids())
     shadow_rows: list[dict[str, Any]] = []
-    if specs and not legal.is_empty:
-        request = ToolDecisionRequest(
-            state=context.state,
-            legal=legal,
-            objective=context.objective,
-            risk_class=context.risk_class,
-            constraints=context.constraints,
-            max_tokens=context.max_tokens,
-        )
-        resolved = _resolve_shadows(registry, specs)
-        if resolved:
-            shadow_rows = _decision_rows(
-                resolved, legal_ids, request, timeout_s=_timeout_s(payload, timeout_s)
-            )
+    projection_config = learning_state.get("projection_config") or {"candidate_k": 24, "prompt_bytes": 3000}
+    local = None
     recent = payload.get("recent_tools")
     if isinstance(recent, list) and all(isinstance(x, str) for x in recent):
         try:
             from .learning import shadow_portfolio
             local = shadow_portfolio(paths.home(), recent, "omp.tool", legal_ids)
-            if local is not None:
-                shadow_rows.append(local)
-        except Exception:  # shadow must fail open on a busy SQLite snapshot too
+        except Exception:
             pass  # missing/locked learner must not block the operator
+    if specs and not legal.is_empty:
+        request = project_shadow_request(context, legal, payload, local, projection_config)
+        resolved = _resolve_shadows(registry, specs)
+        if resolved:
+            shadow_rows = _decision_rows(
+                resolved, legal_ids, request, timeout_s=_timeout_s(payload, timeout_s)
+            )
+    if local is not None:
+        shadow_rows.append(local)
 
     result: dict[str, Any] = {
         "ok": True,
@@ -604,6 +647,7 @@ def run_shadow(
             "graph_digest": legal.graph_digest,
             "candidate_action_count": legal.candidate_count,
             "legal_ids": list(legal.ids()),
+            "projection_config": projection_config,
             "eliminated": [e.to_dict() for e in legal.eliminated],
             "deterministic_solution": legal.deterministic_solution,
             "escalation": escalation,

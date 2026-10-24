@@ -671,9 +671,11 @@ function formatReceiptRow(row: Jsonish): string {
 export default function localCognition(pi: ExtensionAPI): void {
 	pi.setLabel?.("z0int local cognition (shadow-only)");
 	const recentTools: string[] = [];
+	const sessionTools = new Set<string>();
 
 	pi.on?.("session_start", () => {
 		recentTools.length = 0;
+		sessionTools.clear();
 	});
 
 	pi.on?.("tool_call", (event, ctx) => {
@@ -689,6 +691,8 @@ export default function localCognition(pi: ExtensionAPI): void {
 			const sessionId = liveSessionId(ctx);
 			// Copied before this call is recorded, so the history never holds the answer.
 			const payload = buildShadowPayload(event as ToolCallLike, toolNames, sessionId, [...recentTools]);
+			payload.session_tools = [...sessionTools].sort();
+			sessionTools.add(observed);
 			recentTools.push(observed);
 			if (recentTools.length > RECENT_TOOLS) recentTools.shift();
 			const toolCallId = (event as ToolCallLike).toolCallId;
