@@ -4,6 +4,18 @@ from pathlib import Path
 import sqlite3
 import subprocess
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def restore_owned_fixture_permissions(tmp_path):
+    yield
+    # The installer intentionally seals release directories; restore only this
+    # test's owned tree so the fleet runner can remove its completed job stage.
+    for path in tmp_path.rglob("*"):
+        if path.is_dir() and not path.is_symlink():
+            path.chmod(path.stat().st_mode | 0o700)
+
 
 SCRIPT = Path(__file__).resolve().parents[1]/'operations'/'shadow-learner'/'deploy-proposed.sh'
 

@@ -339,6 +339,7 @@ Status retains rolling-day errors and separately exposes current-hour,
 post-deployment, per-tick, and atomic-RPC counts. Transport errors live in
 `error`, while `parse_error` means a model response could not be parsed.
 Legacy receipts are classified without rewriting their source bytes.
+Shadow receipts retain structured tool identity, never the raw tool-input state.
 `operations/shadow-learner/deploy-proposed.sh` backs up private state and
 installs a committed content-stamped copy. Extension links must never point
 into a task worktree. Existing OMP processes cache extension modules: a fresh

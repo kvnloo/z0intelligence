@@ -182,6 +182,15 @@ test("a host that exits when its event loop drains (senpi print mode) is never h
 	for (let i = 0; i < 50 && alive; i++) {
 		try {
 			process.kill(pid, 0);
+			// A container PID 1 may delay reaping an exited orphan. A zombie has
+			// already closed its pipes and exited; kill(pid, 0) alone cannot tell.
+			if (process.platform === "linux") {
+				const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+				if (stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z ")) {
+					alive = false;
+					break;
+				}
+			}
 			await Bun.sleep(100);
 		} catch {
 			alive = false;
