@@ -1,0 +1,238 @@
+"""Pure evidence-to-policy stage machine. Persistence is a separate operation."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+import json
+import os
+from pathlib import Path
+import tempfile
+from urllib.parse import urlsplit
+
+from .. import paths
+from .findings import FindingsError, canonical, digest, locked, timestamp, validate
+
+SCHEMA = "z0.decision_policy.v1"
+STAGES = ("none", "shadow", "canary", "live")
+SCOPE_FIELDS = ("device", "quant", "engine", "backend", "model")
+QUALITY = {"acc_at_conf", "accuracy", "correctness", "keep_recall_at_20pct", "task_success"}
+
+
+@dataclass(frozen=True)
+class CompilerConfig:
+    compiler_revision: str
+    bar_shadow: float = .80
+    bar: float = .95
+    n_shadow: int = 30
+    n_canary: int = 100
+    n_live: int = 50
+    expiry_days: float = 14
+    unhealthy_hours: float = 24
+    canary_share: float = .1
+    abstain_to: str = "jev"
+
+
+def iso(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def scope_of(finding: dict) -> dict:
+    explicit = finding["subject"].get("scope")
+    if explicit is not None:
+        if not isinstance(explicit, dict) or any(k not in SCOPE_FIELDS for k in explicit):
+            raise FindingsError("Unsupported subject.scope")
+        if any(finding["arm"].get(k) not in (None, "", v) for k, v in explicit.items()):
+            raise FindingsError("subject.scope conflicts with arm identity")
+        # An explicit scope may narrow an arm, but cannot erase its physical boundaries.
+        return {**{k: finding["arm"][k] for k in SCOPE_FIELDS if finding["arm"].get(k)}, **explicit}
+    return {k: finding["arm"][k] for k in SCOPE_FIELDS if finding["arm"].get(k)}
+
+
+def rule_key(family: str, scope: dict) -> str:
+    return family + "@" + digest(scope)[:12] if scope else family
+
+
+def resolve_family(policy: dict, family: str, scope: dict | None = None) -> dict | None:
+    """Select the narrowest matching rule, including a restrictive none rule."""
+    scope = scope or {}
+    matches = [(len(row.get("scope", {})), key, row)
+               for key, row in policy.get("families", {}).items()
+               if row.get("family", key) == family and
+               all(scope.get(k) == v for k, v in row.get("scope", {}).items())]
+    return max(matches, key=lambda x: (x[0], x[1]))[2] if matches else None
+
+
+def _expiry(row: dict, config: CompilerConfig) -> datetime:
+    return min(timestamp(row["expires_at"]), timestamp(row["ts"]) + timedelta(days=config.expiry_days))
+
+
+def _noninferior(row: dict) -> bool:
+    metric = row["metric"]
+    divergence, floor = metric.get("divergence"), metric.get("aa_noise_floor")
+    return (type(divergence) in (float, int) and type(floor) in (float, int)
+            and 0 <= divergence <= floor)
+
+
+def compile_policy(findings: list[dict], previous_policy: dict | None, now: datetime | str,
+                   config: CompilerConfig | dict) -> dict:
+    """No I/O, clock reads, environment reads or mutable global state."""
+    config = CompilerConfig(**config) if isinstance(config, dict) else config
+    now = timestamp(now) if isinstance(now, str) else now
+    if now.tzinfo is None:
+        raise ValueError("now requires a timezone")
+    groups: dict[str, list[dict]] = {}
+    metadata = {}
+    for row in findings:
+        validate(row)
+        scope = scope_of(row)
+        family = row["subject"]["family"]
+        key = rule_key(family, scope)
+        metadata[key] = (family, scope)
+        groups.setdefault(key, []).append(row)
+    old_families = (previous_policy or {}).get("families", {})
+    families, changes = {}, []
+    for key in sorted(set(groups) | set(old_families)):
+        prior = old_families.get(key, {})
+        family, scope = metadata.get(key, (prior.get("family", key), prior.get("scope", {})))
+        rows = sorted(groups.get(key, []), key=lambda r: (timestamp(r["ts"]), r["id"]))
+        quality = [r for r in rows if r["metric"]["name"] in QUALITY
+                   and r["metric"].get("higher_is_better") is True
+                   and r["evidence_class"] not in {"inference", "published"}
+                   and timestamp(r["ts"]) <= now]
+        before = prior.get("stage", "none")
+        if before not in STAGES:
+            raise ValueError("Unknown previous policy stage")
+        arm = prior.get("arm", {})
+        if before == "none":
+            candidates = [r for r in quality if r["evidence_class"] == "measured"
+                          and r["metric"].get("promotion_eligible", True)
+                          and _expiry(r, config) > now]
+            if candidates:
+                best = max(candidates, key=lambda r: (timestamp(r["ts"]), r["metric"]["ci_low"], r["id"]))
+                arm = best["arm"]
+        same = [r for r in quality if r["arm"] == arm]
+        fresh = [r for r in same if _expiry(r, config) > now]
+        latest = same[-1] if same else None
+        stage, reason = before, None
+        # Latest evidence dominates older successes. An expired or absent arm loses all credit.
+        if before != "none":
+            if not fresh or (latest and _expiry(latest, config) <= now):
+                stage, reason = "none", "evidence_expired"
+            elif latest["metric"]["ci_low"] < config.bar_shadow:
+                stage, reason = "none", "latest_ci_below_shadow_bar"
+            elif before in {"canary", "live"} and latest["metric"]["ci_low"] < config.bar:
+                stage, reason = "shadow", "latest_ci_below_bar"
+        health = [r for r in rows if r["arm"] == arm and r["evidence_class"] == "measured"
+                  and r["metric"]["name"] == "endpoint_health" and timestamp(r["ts"]) <= now]
+        if health:
+            last_health = health[-1]["metric"]
+            since = last_health.get("unhealthy_since")
+            if last_health["value"] == 0 and since and now - timestamp(since) > timedelta(hours=config.unhealthy_hours):
+                stage, reason = "none", "endpoint_unhealthy"
+        used = []
+        if reason is None and latest and latest["metric"].get("promotion_eligible", True):
+            eligible = [r for r in fresh if r["metric"].get("promotion_eligible", True)]
+            measured = [r for r in eligible if r["evidence_class"] == "measured"
+                        and r["metric"]["ci_low"] >= config.bar_shadow and r["metric"]["n"] >= config.n_shadow]
+            shadow = [r for r in eligible if r["evidence_class"] == "measured"
+                      and r["metric"].get("live_shadow") is True
+                      and r["metric"]["ci_low"] >= config.bar and r["metric"]["n"] >= config.n_canary]
+            replay = [r for r in eligible if r["evidence_class"] == "replayed_L1" and _noninferior(r)]
+            outcome = [r for r in eligible if r["evidence_class"] in {"canary", "replayed_L2"}
+                       and r["metric"]["name"] == "task_success"
+                       and r["metric"].get("outcome_ledger_verified") is True
+                       and r["metric"]["n"] >= config.n_live and _noninferior(r)]
+            supported = ("live" if measured and shadow and replay and outcome else
+                         "canary" if measured and shadow and replay else
+                         "shadow" if measured else "none")
+            if before != "none" and STAGES.index(supported) < STAGES.index(before):
+                stage, reason = supported, "stage_evidence_expired"
+            if reason is None and before == "none" and measured and latest["metric"]["ci_low"] >= config.bar_shadow:
+                stage, used = "shadow", [measured[-1]]
+            elif reason is None and before == "shadow" and shadow and replay and latest["metric"]["ci_low"] >= config.bar:
+                stage, used = "canary", [shadow[-1], replay[-1]]
+            elif reason is None and before == "canary" and outcome and latest["metric"]["ci_low"] >= config.bar:
+                stage, used = "live", [outcome[-1]]
+            if reason is None:
+                used = (measured[-1:] if stage == "shadow" else
+                        shadow[-1:] + replay[-1:] if stage == "canary" else
+                        shadow[-1:] + replay[-1:] + outcome[-1:] if stage == "live" else used)
+        # Carry only fresh evidence for this exact arm. A demotion cites its latest observation too.
+        evidence_rows = {r["id"]: r for r in fresh}
+        for row in used + ([latest] if reason and latest else []) + (health[-1:] if reason == "endpoint_unhealthy" else []):
+            evidence_rows[row["id"]] = row
+        evidence = sorted(evidence_rows)
+        expiry = min((_expiry(r, config) for r in used), default=max(
+            (_expiry(r, config) for r in fresh), default=now))
+        rule_id = prior.get("rule_id", "F-" + key + "-1")
+        families[key] = {"family": family, "scope": scope, "stage": stage, "arm": arm,
+                         "threshold": config.bar, "abstain_to": config.abstain_to,
+                         "canary_share": config.canary_share, "evidence": evidence,
+                         "rule_id": rule_id, "expires_at": iso(expiry), "demoted_reason": reason}
+        families[key]["synthetic"] = any(row.get("synthetic", False) for row in evidence_rows.values())
+        if stage != before:
+            changes.append({"rule_id": rule_id, "from": before, "to": stage, "because": evidence})
+    serving = {}
+    for row in sorted(findings, key=lambda r: (timestamp(r["ts"]), r["id"])):
+        url = row["source"].get("url")
+        if (row["evidence_class"] != "measured" or not url or _expiry(row, config) <= now
+                or timestamp(row["ts"]) > now):
+            continue
+        parsed = urlsplit(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+            continue
+        arm = row["arm"]
+        if not all(arm.get(k) for k in SCOPE_FIELDS):
+            continue
+        scope = scope_of(row)
+        identity = canonical(scope)
+        serving[identity] = {**scope, "kind": arm["kind"], "url": url, "evidence": [row["id"]]}
+        serving[identity]["synthetic"] = row.get("synthetic", False)
+        for field in ("expected_model_id", "engine_build", "model_path", "model_resolved_path", "model_sha256"):
+            if field in row["source"]:
+                serving[identity][field] = row["source"][field]
+    for rule in families.values():
+        if rule["stage"] in {"canary", "live"}:
+            rule["serving_missing"] = canonical(rule["scope"]) not in serving
+    policy = {"schema": SCHEMA, "compiled_at": iso(now),
+              "findings_head": findings[-1]["id"] if findings else "",
+              "compiler": "z0int.policy.compile@" + config.compiler_revision,
+              "families": families, "serving": [serving[k] for k in sorted(serving)], "changes": changes}
+    policy["synthetic"] = any(row.get("synthetic", False) for row in findings)
+    policy["version"] = digest(policy)
+    return policy
+
+
+def validate_policy(policy: dict) -> None:
+    if policy.get("schema") != SCHEMA or policy.get("version") != digest({k: v for k, v in policy.items() if k != "version"}):
+        raise ValueError("Policy content hash mismatch")
+
+
+def _atomic(path: Path, value: dict) -> None:
+    fd, name = tempfile.mkstemp(dir=path.parent, prefix=".policy-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(canonical(value) + b"\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def write_policy(policy: dict, home: Path | None = None) -> Path:
+    validate_policy(policy)
+    directory = (home or paths.home()) / "policy"
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / "decision-policy.json"
+    with locked(directory / "policy.lock"):
+        history = directory / "history"
+        history.mkdir(exist_ok=True)
+        if target.exists():
+            old = json.loads(target.read_text(encoding="utf-8"))
+            validate_policy(old)
+            _atomic(history / (old["version"] + ".json"), old)
+        _atomic(history / (policy["version"] + ".json"), policy)
+        _atomic(target, policy)
+    return target

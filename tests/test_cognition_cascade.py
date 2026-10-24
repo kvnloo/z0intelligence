@@ -349,10 +349,13 @@ def test_outcome_is_replayable_json():
     assert outcome.to_dict()["schema"] == "z0int.cognition.decision.v1"
 
 
-def test_escalation_receipt_carries_the_policy_version():
+def test_escalation_receipt_carries_the_policy_version(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
     ctx = _ctx(authority=("read", "write"))
     outcome = CognitionCascade(orchestrator=_Recorder("nemotron", action="a")).run(ctx)
-    assert outcome.escalation.policy_version == "escalation-v1"
+    assert outcome.escalation.escalation_version == "escalation-v1"
+    assert outcome.escalation.policy_version == "none"
+    assert outcome.escalation.policy_reason == "policy_missing"
     assert outcome.receipts[0]["extra"]["tier"] == outcome.tier
 
 

@@ -1,0 +1,114 @@
+{
+  "verdict_mode": true,
+  "rows": [
+    {
+      "law": "-",
+      "mutation": "reference (unmodified)",
+      "proofs_check": true,
+      "where": ""
+    },
+    {
+      "law": "1 lease_no_steal",
+      "mutation": "Acquire on a held lease hands it to the newcomer",
+      "proofs_check": false,
+      "where": "Laws.lease_no_steal"
+    },
+    {
+      "law": "1 lease_release_by_holder",
+      "mutation": "Anyone may release a lease",
+      "proofs_check": false,
+      "where": "Laws.lease_no_steal"
+    },
+    {
+      "law": "1 write_needs_lease",
+      "mutation": "Any worker may write to a leased worktree",
+      "proofs_check": false,
+      "where": "Laws.write_needs_lease"
+    },
+    {
+      "law": "2 interrupted_overdue",
+      "mutation": "The clock never makes an interrupted worker overdue",
+      "proofs_check": false,
+      "where": "Laws.interrupted_overdue"
+    },
+    {
+      "law": "2 interrupted_exits",
+      "mutation": "An interrupted worker silently counts as completed",
+      "proofs_check": false,
+      "where": "Laws.interrupted_exits"
+    },
+    {
+      "law": "2 overdue_exits",
+      "mutation": "A tick restarts an overdue worker's clock",
+      "proofs_check": false,
+      "where": "Laws.overdue_exits"
+    },
+    {
+      "law": "2 interrupted_can_resume",
+      "mutation": "Resume drops the dead worker's background processes",
+      "proofs_check": false,
+      "where": "Laws.interrupted_can_resume"
+    },
+    {
+      "law": "2 running_stalls",
+      "mutation": "A silent worker never stalls",
+      "proofs_check": false,
+      "where": "Laws.running_stalls"
+    },
+    {
+      "law": "2 stalled_interrupts",
+      "mutation": "A stalled worker is never declared interrupted",
+      "proofs_check": false,
+      "where": "Laws.stalled_interrupts"
+    },
+    {
+      "law": "3 end_needs_reaped",
+      "mutation": "Abandon an interrupted worker with processes still running",
+      "proofs_check": false,
+      "where": "Laws.interrupted_exits"
+    },
+    {
+      "law": "3 end_needs_reaped",
+      "mutation": "Integrate a completed worker with processes still running",
+      "proofs_check": false,
+      "where": "reap_completed"
+    },
+    {
+      "law": "4 running_is_placed",
+      "mutation": "Start anywhere, ignoring placement",
+      "proofs_check": false,
+      "where": "inv_dispatched"
+    },
+    {
+      "law": "4 running_is_placed",
+      "mutation": "No exception counts as an exception",
+      "proofs_check": false,
+      "where": "exc_ok"
+    },
+    {
+      "law": "5 install_needs_lock",
+      "mutation": "Install without holding the phone lock",
+      "proofs_check": false,
+      "where": "Laws.install_needs_lock"
+    },
+    {
+      "law": "5 install_lock_no_steal",
+      "mutation": "Lock grabs the phone lock from its holder",
+      "proofs_check": false,
+      "where": "Laws.install_lock_no_steal"
+    },
+    {
+      "law": "6 input_needs_foreground",
+      "mutation": "Type into the phone whatever is in the foreground",
+      "proofs_check": false,
+      "where": "Laws.install_needs_lock"
+    },
+    {
+      "law": "6 input_needs_fresh_look",
+      "mutation": "An input keeps the old foreground observation",
+      "proofs_check": false,
+      "where": "Laws.input_needs_fresh_look"
+    }
+  ],
+  "reference_restored": true
+}
