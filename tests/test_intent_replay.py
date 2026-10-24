@@ -49,8 +49,12 @@ def add_memory(reply, *, cite=True, claim="S22 worker mode replaces the old cap.
                            "text": "S22 worker mode replaces the old cap."}]
     if cite:
         compiler["assumptions"] = [{"claim": claim,
-                                    "citations": [{"source": "history", "id": "decision-17", "evidence_kind": "claimed"}],
-                                    "prerequisite_verifier": {"type": "human_review", "target": "current S22 worker mode"}}]
+                                    "citations": [{"source": "history", "id": "decision-17", "evidence_kind": "claimed"}]}]
+        bindings = reply["contract"]["plan"]["bindings"]
+        bindings["precondition.1"] = {"type": "human_review", "target": "current S22 worker mode", "claim": claim}
+        for task in bindings.values():
+            if isinstance(task, dict) and "entryId" in task:
+                task["preconditions"] = ["precondition.1"]
 
 
 def test_splitter_preserves_edge_whitespace_and_punctuation():
@@ -226,3 +230,25 @@ def test_driver_does_not_overwrite_existing_receipts(tmp_path, monkeypatch):
     monkeypatch.setattr(replay, "post_reconcile", lambda *_: pytest.fail("Unexpected network request"))
     with pytest.raises(ValueError, match="Output already exists"):
         replay.run([], {}, "http://example.invalid/reconcile", tmp_path, 1)
+
+
+def test_claimed_citations_are_counted_and_need_prerequisites():
+    row = case()
+    reply = response(row)
+    add_memory(reply)
+    result = replay.judge_response(row, expected(), reply, "entry")
+    assert result["citation_evidence_kinds"] == {"observed": 0, "claimed": 1, "unknown": 0}
+    assert result["assumption_prerequisites"][0]["has_prerequisite_verifier"]
+    reply["contract"]["plan"]["bindings"]["task.0"]["preconditions"] = []
+    result = replay.judge_response(row, expected(), reply, "entry")
+    assert "nonobserved assumption lacks a prerequisite verifier" in result["safety_errors"]
+
+
+def test_citation_cannot_upgrade_claimed_memory_to_observed():
+    row = case()
+    reply = response(row)
+    add_memory(reply)
+    reply["contract"]["plan"]["bindings"]["compiler"]["assumptions"][0]["citations"][0]["evidence_kind"] = "observed"
+    result = replay.judge_response(row, expected(), reply, "entry")
+    assert result["invalid_citations"]
+    assert result["facts_recalled"] == 0
