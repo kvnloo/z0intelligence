@@ -166,6 +166,23 @@ def test_only_exact_loader_files_exempt_and_tests_ignored(tmp_path):
     assert findings[0]['path'].endswith('pretend_loader.py')
 
 
+def test_typed_typescript_routing_overrides_are_not_exempt(tmp_path):
+    (tmp_path / 'worker.ts').write_text('const route: string = "general_slm";\n'
+                                      'const credited_families: string[] = ["omp.tool"];\n')
+    findings = P.static_findings(tmp_path)
+    assert {finding['rule'] for finding in findings} == {'hardcoded-route', 'hardcoded-credited-families'}
+
+
+def test_session_envelope_inherits_timestamp(tmp_path):
+    doc = policy('canary')
+    row = receipt(doc)
+    del row['ts']
+    report, _ = audit(tmp_path, doc, [{'timestamp': NOW.isoformat(), 'type': 'custom', 'data': row}])
+    assert report['available']
+    assert report['window']['receipts'] == 1
+    assert not any(report['counts'].values())
+
+
 def test_cli_persists_exact_report_schema_and_returns_unavailable(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
     assert G.main(['policy', '--policy', str(tmp_path / 'missing'), '--json']) == 4

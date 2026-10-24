@@ -280,7 +280,7 @@ def static_findings(root: Path):
                             if isinstance(key, ast.Constant):
                                 check(path, key.lineno, key.value, value)
             else:
-                pattern = re.compile(r'''["']?\b(credited_families|(?:default_)?route|tier|selected_arm)["']?\s*(?::[A-Za-z_][\w<>.,\[\] |]*\s*)?\s*[=:]\s*(\[[^\]]*\]|["'][^"']+["']|(?:remote_frontier|frontier|bounded_jev|tiny_specialist|orchestrator_slm|general_slm|slm)\b)''', re.M | re.I)
+                pattern = re.compile(r'''["']?\b(credited_families|(?:default_)?route|tier|selected_arm)["']?\s*(?::\s*[A-Za-z_][\w<>.,\[\] |]*\s*)?\s*[=:]\s*(\[[^\]]*\]|["'][^"']+["']|(?:remote_frontier|frontier|bounded_jev|tiny_specialist|orchestrator_slm|general_slm|slm)\b)''', re.M | re.I)
                 for match in pattern.finditer(text):
                     rule = 'hardcoded-credited-families' if match[1].lower() == 'credited_families' else 'hardcoded-route'
                     findings.append(_issue(path, text.count('\n', 0, match.start()) + 1, rule, 'literal routing override outside policy loader'))
