@@ -4,8 +4,8 @@
 Every required predicate (including available) has a bypass mutant. Every
 non-availability predicate also has a missing-evidence-check mutant. Unknown
 escalation and positive-completeness mutations exercise the tri-state boundary.
-Only Bend's explicit SOME PROOFS FAIL verdict counts as rejection. A tool crash,
-timeout, failed patch or absent verdict is an error, never a killed mutant.
+Only an explicit SOME PROOFS FAIL verdict naming an owned proof definition
+counts as rejection. Parser, setup, timeout and missing-verdict failures do not.
 
     python3 bend/state_fsm/mutations.py --verdict --out mutations.json
 """
@@ -89,10 +89,40 @@ def check(proj: Path, verdict: bool) -> dict:
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"proofs_check": None, "rejected": False, "where": str(exc), "output": str(exc)}
     out = (p.stdout + p.stderr).strip()
-    passed = "ALL PROOFS CHECK" in out and "SOME PROOFS FAIL" not in out and p.returncode == 0
-    rejected = "SOME PROOFS FAIL" in out and "ALL PROOFS CHECK" not in out
+    proof_names = {
+        line.removeprefix("def ").split("(", 1)[0]
+        for line in (proj / "PROOF.bend").read_text().splitlines()
+        if line.startswith("def ")
+    }
+    lines = [line.strip() for line in out.splitlines() if line.strip()]
+    target = ""
+    for line in lines:
+        if line.startswith("Location:"):
+            candidate = line.partition(":")[2].strip()
+        elif line.startswith("In ") and line.endswith(":"):
+            candidate = line[3:-1]
+        else:
+            continue
+        if candidate in proof_names:
+            target = candidate
+            break
+    # The frontend emits a same-line Location identifier for proof failures.
+    # Parser failures have only "Location:" followed by a source excerpt.
+    # The dependent kernel uses "In <definition>:" instead. Accept neither
+    # arbitrary source locations nor a bare failure marker as proof rejection.
+    lower = out.lower()
+    setup_error = any(text in lower for text in (
+        "out of fuel", "parse error", "syntax error", "unknown reference",
+        "unbound variable", "no such file", "command not found", "traceback",
+        "panic:", "fatal error:",
+    ))
+    passed = ("ALL PROOFS CHECK" in lines and "SOME PROOFS FAIL" not in lines
+              and p.returncode == 0 and not setup_error)
+    rejected = ("SOME PROOFS FAIL" in lines and "ALL PROOFS CHECK" not in lines
+                and p.returncode == 1 and bool(target) and not setup_error)
     return {"proofs_check": True if passed else False if rejected else None,
-            "rejected": rejected, "where": "" if passed else first_location(out),
+            "rejected": rejected, "where": "" if passed else target if rejected else first_location(out),
+            "failure_kind": "none" if passed else "proof" if rejected else "tool_or_setup",
             "returncode": p.returncode, "output": out}
 
 
