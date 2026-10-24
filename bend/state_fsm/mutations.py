@@ -114,7 +114,7 @@ def check(proj: Path, verdict: bool) -> dict:
     setup_error = any(text in lower for text in (
         "out of fuel", "parse error", "syntax error", "unknown reference",
         "unbound variable", "no such file", "command not found", "traceback",
-        "panic:", "fatal error:",
+        "panic:", "fatal error:", "consumed more than once", "affine live code",
     ))
     passed = ("ALL PROOFS CHECK" in lines and "SOME PROOFS FAIL" not in lines
               and p.returncode == 0 and not setup_error)
