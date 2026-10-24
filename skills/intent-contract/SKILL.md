@@ -20,6 +20,7 @@ Use the installed, content-stamped OMP intent extension and the local intent ser
 2. FAST records a durable receipt and does not call the service. CHECK calls `/check` and supplies a short memory-context note, never approval. CONTRACT calls `/reconcile` before action.
 3. Leading `/aodl` forces CONTRACT. Leading `quick:` forces FAST. Both overrides are logged; only the agent-facing prefix is removed. An override does not grant tool, account, host, or other authority.
 4. Open-contract asks are reconciled against the current contract ID as amendments and reviewed again. Do not silently substitute a new interpretation or treat a past approval as approval of changed scope.
+   Approved amendments use the latest gate-owned `runtime/<contract_id>.json` receipts and status. The immutable approved root remains authority: runtime approval metadata and its canonical contract hash must match it exactly. Only a missing runtime file permits root fallback. Corrupt or mismatched runtime state fails closed.
 
 ## Human review
 
