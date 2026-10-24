@@ -155,7 +155,9 @@ def _eval(data: dict, spec: dict, source: dict, ts: str) -> list[dict]:
     eligible = data.get("verdict") == "KEEP" and all(
         data.get("gates", {}).get(gate) == "pass"
         for gate in ("contract", "authority", "quality_noninferiority", "latency_tail"))
-    return [_finding(spec, source, _time(row.get("ts", ts)), row["subject"], row["arm"],
+    return [_finding(spec, {**source, **{key: value for key, value in (row.get("source") or {}).items()
+                     if key in {"url", "expected_model_id", "engine_build", "model_path", "model_resolved_path", "model_sha256"}}},
+                     _time(row.get("ts", ts)), row["subject"], row["arm"],
                      {**row["metric"], "promotion_eligible": eligible},
                      evidence_class=row["evidence_class"], scope_note=row["scope_note"],
                      expires_at=row.get("expires_at"), baseline=row.get("baseline")) for row in data["findings"]]
@@ -197,9 +199,10 @@ def ingest_sources(sources: list[dict], home: Path | None = None) -> dict:
             spec = {**spec, "synthetic": any(row.get("synthetic", False) for row in marked)}
             source = {"kind": spec["kind"], "path": str(path), "sha256": sha,
                       "run_id": spec.get("run_id", sha[:16])}
-            if spec.get("url"):
-                source["url"] = spec["url"]
-            for field in ("expected_model_id", "engine_build", "model_path", "model_resolved_path", "model_sha256"):
+            metadata = (data.get("source") or {}) if isinstance(data, dict) else {}
+            for field in ("url", "expected_model_id", "engine_build", "model_path", "model_resolved_path", "model_sha256"):
+                if field in metadata:
+                    source[field] = metadata[field]
                 if field in spec:
                     source[field] = spec[field]
             if isinstance(data, dict):
