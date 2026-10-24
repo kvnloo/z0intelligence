@@ -43,3 +43,34 @@ def test_corrupt_ledger_fails_closed(tmp_path):
     (tmp_path / 'budget.json').write_text('{broken')
     with pytest.raises(json.JSONDecodeError):
         reserve(p, 'openrouter', 'anthropic/claude-haiku-5.5', [], 2048)
+
+
+@pytest.mark.parametrize('price,allowed', [('0.0000005', True), ('0.000012', True), ('0.000013', False)])
+def test_vercel_live_catalog_price_admission(tmp_path, monkeypatch, price, allowed):
+    import io
+    import urllib.request
+    monkeypatch.setenv('AI_GATEWAY_API_KEY', 'synthetic-test-key')
+    catalog = {'data': [{'id': 'anthropic/claude-haiku-5.5',
+        'pricing': {'input': '0.000002', 'output': price},
+        'supported_parameters': ['tools']}]}
+    monkeypatch.setattr(urllib.request, 'urlopen', lambda request, timeout: io.StringIO(json.dumps(catalog)))
+    p = policy(tmp_path)
+    if allowed:
+        reserve(p, 'vercel', 'anthropic/claude-haiku-5.5', [], 2048)
+        assert json.loads((tmp_path / 'budget.json').read_text())['reserved_usd'] == 0.1
+    else:
+        with pytest.raises(ValueError, match='catalog exceeds'):
+            reserve(p, 'vercel', 'anthropic/claude-haiku-5.5', [], 2048)
+        assert not (tmp_path / 'budget.json').exists()
+
+
+def test_extended_authorization_retains_prior_reservations(tmp_path):
+    p = policy(tmp_path)
+    for _ in range(3):
+        reserve(p, 'openrouter', 'anthropic/claude-haiku-5.5', [], 2048)
+    p['paid_canary']['max_attempts'] = 6
+    for _ in range(3):
+        reserve(p, 'openrouter', 'anthropic/claude-haiku-5.5', [], 2048)
+    with pytest.raises(ValueError, match='cap reached'):
+        reserve(p, 'openrouter', 'anthropic/claude-haiku-5.5', [], 2048)
+    assert json.loads((tmp_path / 'budget.json').read_text())['reserved_usd'] == 0.6
