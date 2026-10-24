@@ -30,6 +30,37 @@ The current repository is much more than the original OpenJev prototype.
 
 The source of truth for the current architectural boundary is [zer0.repo.yaml](zer0.repo.yaml).
 
+## Startup orientation
+
+`scripts/state-packet/generate_packet.py` publishes an atomic, source-linked
+orientation packet at `~/.local/state/z0int/STATE-PACKET.md`. Its header records
+`generated_at`, the generator SHA-256, and the observed repository commit.
+The complete packet has at most 223 lines and 64 KiB. Every line names its source.
+The operations inputs remain under `/mnt/zer0models/workspace/zer0/data/operations`.
+No gold questions or experiment answers enter the generator.
+
+Install a committed feature with `python3 scripts/install-state-packet.py`.
+The installer archives exact Git content into `~/.local/lib/z0-state-packet/<SHA>/`,
+backs up replaced files, then links the OMP extension and Hermes clean-profile plugin.
+Enable Hermes with `hermes -p clean plugins enable hermes-state-packet`.
+The Claude Code user settings retain unrelated hooks.
+The `.files` `install-state-packet-timer.sh --activate` command installs the
+15-minute user timer and generates the first packet.
+
+OMP uses its real `before_agent_start` system-prompt-array contract.
+Hermes uses independent `pre_llm_call` context callbacks, not the routing adapter.
+Claude Code uses the documented `UserPromptSubmit` / `hookSpecificOutput` /
+`additionalContext` envelope. Hermes and Claude context chunks stay below 9,000
+characters to avoid hook-output spill limits. All chunks concatenate to the same
+packet. A packet older than two hours produces only `packet stale since …`.
+Unreadable or malformed packets fail open without facts. Hooks restore the current
+packet on later user turns as well as the first turn, including after compaction.
+Evidence is never an authority grant.
+
+Behavior checks: `PYTHONPATH=src python3 -m unittest discover -s tests -p test_orientation.py`
+and `bun test omp-extensions/z0-state-packet/index.test.ts`.
+Run these checks on the fleet, not on Groot.
+
 ## Architecture
 
 ~~~text
