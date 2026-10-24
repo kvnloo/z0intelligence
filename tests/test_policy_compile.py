@@ -279,3 +279,94 @@ def test_unused_synthetic_input_still_marks_whole_policy():
     policy = compile_rows([row])
     assert stage(policy) == "none"
     assert policy["synthetic"] is True
+
+
+def choice_finding(task, k, *, value=1., n=100, low=1., arm=None,
+                   ts="2026-10-24T10:00:00Z", expires_at="2026-11-07T10:00:00Z",
+                   evidence_class="measured", metric=None):
+    row = finding(evidence_class, synthetic=True, n=n, low=low, ts=ts, expires_at=expires_at,
+        arm=arm or {"kind": "slm", "model": "choice-model@rev", "quant": "Q8_0",
+                    "engine": "choice-engine@rev", "backend": "cpu", "device": "fixture"},
+        metric={"name": "choice_accuracy", "option_count": k, "value": value, **(metric or {})})
+    row["subject"] = {"family": "choice.option_capacity", "job": "ChoiceLadder", "task": task}
+    row["id"] = digest({key: value for key, value in row.items() if key not in {"id", "prev"}})
+    return row
+
+
+def capacity(policy, row):
+    from z0int.policy.compile import option_capacity_key
+    return policy["option_capacity"][option_capacity_key(scope_of(row))]
+
+
+def test_option_capacity_minimum_of_task_maxima_and_recomputed_wilson():
+    rows = [choice_finding("T1", 8), choice_finding("T1", 16, value=.9),
+            choice_finding("T2", 5), choice_finding("T3", 16), choice_finding("T4", 10)]
+    policy = compile_rows(rows)
+    entry = capacity(policy, rows[0])
+    assert entry["allowed_k"] == 5
+    assert entry["task"] == ["T1", "T2", "T3", "T4"]
+    assert len(entry["finding_ids"]) == 4
+    assert .96 < entry["wilson_lower"] < .97  # Stated 1.0 cannot inflate the Wilson bound.
+    assert entry["bar"] == .95
+    assert stage(policy) == "none"  # Choice capacity does not create routing credit.
+    assert canonical(policy) == canonical(compile_rows(rows))
+
+
+def test_option_capacity_missing_failed_expired_tasks_and_unknown_scope_default_two():
+    rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3")]
+    missing = capacity(compile_rows(rows), rows[0])
+    assert missing["allowed_k"] == 2
+    assert missing["finding_ids"] == [] and missing["wilson_lower"] is None
+    rows.append(choice_finding("T4", 10, value=.8))
+    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+    rows[-1] = choice_finding("T4", 10, expires_at=NOW)
+    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+    assert compile_rows([])["option_capacity"] == {}
+
+
+def test_option_capacity_never_crosses_any_physical_scope_dimension():
+    rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3", "T4")]
+    for dimension in ("model", "quant", "engine", "backend", "device"):
+        different = {**rows[0]["arm"], dimension: "different-" + dimension}
+        other = choice_finding("T1", 32, arm=different)
+        policy = compile_rows(rows + [other])
+        assert capacity(policy, rows[0])["allowed_k"] == 8
+        assert capacity(policy, other)["allowed_k"] == 2
+
+
+def test_option_capacity_latest_failure_supersedes_old_success():
+    rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3", "T4")]
+    rows.append(choice_finding("T2", 8, value=.5, ts="2026-10-24T11:00:00Z"))
+    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+
+
+@pytest.mark.parametrize("override", [
+    {"evidence_class": "inference"},
+    {"ts": "2026-10-25T00:00:00Z"},
+    {"metric": {"ci_method": "none"}},
+    {"metric": {"promotion_eligible": False}},
+    {"metric": {"correct": 50}},
+])
+def test_option_capacity_rejects_ineligible_or_inconsistent_evidence(override):
+    rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3")]
+    rows.append(choice_finding("T4", 8, **override))
+    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+
+
+def test_option_capacity_required_tasks_bar_and_support_expiry_are_configurable():
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_bar=.99,
+                            option_capacity_tasks=("custom-task",))
+    row = choice_finding("custom-task", 16)
+    assert capacity(compile_rows([row], config=config), row)["allowed_k"] == 2
+    stronger = choice_finding("custom-task", 16, n=2000, expires_at="2026-10-24T13:00:00Z")
+    entry = capacity(compile_rows([stronger], config=config), stronger)
+    assert entry["allowed_k"] == 16 and entry["expires_at"] == "2026-10-24T13:00:00Z"
+    assert capacity(compile_rows([stronger], now="2026-10-24T13:00:00Z", config=config), stronger)["allowed_k"] == 2
+
+
+def test_option_capacity_missing_evidence_known_scope_still_emits_default_two():
+    row = finding(arm={"kind": "slm", "model": "model", "quant": "Q4_0",
+                       "engine": "engine", "backend": "cpu", "device": "fixture"})
+    entry = capacity(compile_rows([row]), row)
+    assert entry["allowed_k"] == 2
+    assert not entry["finding_ids"] and entry["wilson_lower"] is None
