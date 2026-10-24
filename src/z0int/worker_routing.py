@@ -13,7 +13,7 @@ from .cognition.adapters.transport import OpenAICompatTransport, ServerConfig
 from .receipt import DecisionReceipt, receipts_path
 
 ROOT = Path(__file__).resolve().parents[2]
-POLICY_PATH = ROOT / 'manifests/worker_routing.v1.json'
+POLICY_PATH = Path(os.environ.get('Z0INT_WORKER_POLICY_PATH', ROOT / 'manifests/worker_routing.v1.json'))
 REGISTRY_PATH = POLICY_PATH
 HERMES_ROOT = os.environ.get('Z0INT_HERMES_ROOT', '')
 SYSTEM = 'Complete the bounded task using supplied context. Return your answer to the Codex parent. You have no filesystem, shell, or external tools.'
@@ -70,7 +70,14 @@ def require_free_route(policy, provider, model, args=None):
 
 def request_constraints(policy, provider, model, args=None):
     entry = require_free_route(policy, provider, model, args)
-    return entry.get('request_constraints', {}) if entry else {}
+    if entry:
+        return entry.get('request_constraints', {})
+    canary = policy.get('paid_canary')
+    if canary:
+        if provider != 'openrouter' or model not in canary['models']:
+            raise ValueError('paid canary model is not pinned')
+        return {'provider': {'max_price': canary['max_price'], 'allow_fallbacks': False}}
+    return {}
 
 
 def list_models():
@@ -201,6 +208,8 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
     output = ''
     transport = None
     try:
+        from .canary_budget import reserve
+        reserve(policy, provider, model, messages, args.get('max_tokens', 512))
         key, base = credentials(provider, config)
         transport = OpenAICompatTransport(ServerConfig(base_url=base, model=model, api_key=key,
             timeout_s=policy['timeout_s'], runtime='api', extra_headers={'User-Agent': 'z0int-api-eval/1.0 (+https://github.com/kvnloo/z0intelligence)'}))

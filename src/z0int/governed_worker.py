@@ -164,7 +164,7 @@ def _provider_model(policy: Mapping[str, Any], providers: Mapping[str, Any]) -> 
     if not isinstance(defaults, Mapping) or not isinstance(defaults.get(provider), str):
         raise ValueError("governed provider has no default model")
     model = str(defaults[provider])
-    if free_route(policy, provider, model) is None:
+    if policy.get("free_only", True) and free_route(policy, provider, model) is None:
         raise ValueError("governed provider/model lacks validated zero-cost evidence")
     return provider, model
 
@@ -203,7 +203,7 @@ def build_remote_request(args: object) -> dict[str, Any]:
         raise ValueError("governed remote execution requires explicit allow_remote=true")
 
     worker = {key: args[key] for key in ("task", "context", "parent_agent", "max_tokens", "free_only") if key in args}
-    worker["free_only"] = True
+    worker["free_only"] = configuration()[0].get("free_only", True)
     validate_request(worker)
 
     document = load_contract()
@@ -238,7 +238,7 @@ def build_remote_request(args: object) -> dict[str, Any]:
         "model": model,
         "reason": "host-governed AODL remote worker canary",
         "max_tokens": max_tokens,
-        "free_only": True,
+        "free_only": worker["free_only"],
         "aodl": {
             "document": document,
             "spawn": {
@@ -291,7 +291,7 @@ def prepare_remote_request(args: object) -> dict[str, Any]:
                 "model": frozen["model"],
                 "reason": frozen["reason"],
                 "max_tokens": int(args.get("max_tokens", 512)),
-                "free_only": True,
+                "free_only": frozen.get("free_only", True),
                 "aodl": json.loads(json.dumps(frozen["aodl"])),
             }
 
@@ -300,6 +300,7 @@ def prepare_remote_request(args: object) -> dict[str, Any]:
             "provider": remote["provider"],
             "model": remote["model"],
             "reason": remote["reason"],
+            "free_only": remote["free_only"],
             "aodl": remote["aodl"],
         }
         append_receipt({

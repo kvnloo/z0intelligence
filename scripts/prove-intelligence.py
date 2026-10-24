@@ -23,6 +23,7 @@ os.environ['Z0INT_GOVERNED_PROVIDER']='openrouter'
 os.environ['Z0INT_GOVERNED_HARNESS']='omp'
 os.environ['Z0INT_AODL_CONTRACT_PATH']=str(root/'contracts/aodl/governed-worker-v1.json')
 os.environ['PYTHONPATH']=str(root/'src')+os.pathsep+os.environ.get('PYTHONPATH','')
+os.environ['Z0INT_WORKER_POLICY_PATH']=str(root/'manifests/aodl-paid-canary.v1.json')
 
 from z0int.intelligence_service import Service as AuthorityService,Handler as AuthorityHandler
 from z0int.remote_executor import Server as ExecutorService,Handler as ExecutorHandler
@@ -127,7 +128,9 @@ try:
     preparations=[r for r in latest.values() if r.get('capability_id')=='aodl.governed_request']
 
     assert len(free)==1 and free[0]['extra']['status']=='completed',free
-    assert free[0]['extra']['free_tier_validated'] and free[0]['extra']['authority_dispatch_id']
+    assert free[0]['extra']['authority_dispatch_id']
+    assert free[0]['extra']['free_only'] is False
+    assert isinstance(free[0]['extra']['provider_reported_cost_usd'], (int, float))
     joined=join_outcome(free[0]['trace_id'],{
         'verified_success':True,
         'verified':True,
@@ -160,6 +163,8 @@ try:
         'uncertain_refused':True,
         'cap_refused':True,
         'free_receipt':free[0]['trace_id'],
+        'provider_reported_cost_usd':free[0]['extra']['provider_reported_cost_usd'],
+        'model':free[0]['model'],
         'authority_owned':True,
         'governance_snapshot_prompt_free':True,
         'synthetic_verified_outcome':True,

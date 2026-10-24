@@ -157,6 +157,7 @@ def main() -> int:
         "verification_scope": "exact public synthetic fixture only",
         "structural_execution_complete": proof["structural_execution_complete"],
         "verified_outcome_complete": proof["verified_outcome_complete"],
+        "provider_reported_cost_usd": json.loads((args.output / "summary.json").read_text())["provider_reported_cost_usd"],
         "golden_trace": "golden-trace.json",
         "raw_state": "raw/state",
     }
