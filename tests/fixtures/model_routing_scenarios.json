@@ -1,0 +1,9 @@
+{
+  "synthetic": true,
+  "scope_note": "Law tests only; never catalog measurements or live routing authority.",
+  "scenarios": [
+    {"id": "fast_small", "providers": ["cerebras", "groq", "openrouter"], "ttft_seconds": [0.1, 0.2, 2.0], "tokens_per_second": [200, 180, 30], "expected": "cerebras"},
+    {"id": "forbidden_fallback", "failure_status": 403, "first": "opencode", "next": "groq"},
+    {"id": "limited_fallback", "failure_status": 429, "first": "opencode", "next": "groq"}
+  ]
+}
