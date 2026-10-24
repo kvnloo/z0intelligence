@@ -50,8 +50,8 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
-    if not os.environ.get("OPENROUTER_API_KEY"):
-        parser.error("OPENROUTER_API_KEY must already be configured in the environment")
+    if not os.environ.get("AI_GATEWAY_API_KEY"):
+        parser.error("AI_GATEWAY_API_KEY must already be configured in the environment")
     if not args.omp_root.is_dir():
         parser.error("--omp-root must be an existing OMP checkout")
     if shutil.which("bun") is None:

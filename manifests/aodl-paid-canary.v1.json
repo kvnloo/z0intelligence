@@ -19,7 +19,7 @@
     "deepseek": "deepseek-chat",
     "openrouter": "openai/gpt-6-luna",
     "nous": "inclusionai/ling-3.0-flash-sante:free",
-    "vercel": "anthropic/claude-haiku-5.5",
+    "vercel": "openai/gpt-6-luna",
     "nvidia": "openai/gpt-oss-20b",
     "grok": "grok-4.20-0309-non-reasoning",
     "local": "qwen2.5:3b"
@@ -144,8 +144,8 @@
       "temperature": false,
       "models": [
         {
-          "id": "anthropic/claude-haiku-5.5",
-          "label": "Haiku 5.5"
+          "id": "openai/gpt-6-luna",
+          "label": "Luna"
         }
       ],
       "worker_default_model": "openai/gpt-oss-20b"
