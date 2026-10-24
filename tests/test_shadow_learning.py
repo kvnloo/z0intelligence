@@ -324,3 +324,23 @@ def test_argument_and_result_timestamp_join_is_exact(tmp_path):
     assert row['outcome_ts'] - row['ts'] == 2
     assert json.loads(row['features']) == []
     db.close()
+
+
+def test_binary_margin_coverage_does_not_reapply_multiclass_confidence_gate(tmp_path):
+    home, sessions, now = fixture(tmp_path, 2)
+    path = home/'shadow'/'cognition-shadow.jsonl'
+    receipts = [json.loads(line) for line in path.read_text().splitlines()]
+    for index, row in enumerate(receipts):
+        row['projection_strategy'] = 'history-1'
+        row['projection_config'] = {'candidate_k': 3}
+        row['shadow'] = [{'arm': 'goal-binary', 'model': 'actual-slm',
+            'backend': 'actual-backend', 'selected_action': 'read' if index == 0 else None,
+            'confidence': .6 if index == 0 else None, 'abstained': index == 1},
+            {'model': 'history-1', 'backend': 'shadow-portfolio', 'selected_action': 'read', 'confidence': 1}]
+    path.write_text(''.join(json.dumps(row)+'\n' for row in receipts))
+    report = learn(home, sessions=sessions, now=now)
+    arms = report['families']['omp.tool']
+    binary = next(value for name, value in arms.items() if name.startswith('slm:actual-slm:goal-binary:'))
+    assert binary['n'] == binary['correct'] == 1
+    assert binary['total'] == 2 and binary['coverage'] == .5 and binary['accuracy'] == 1
+    assert 'slm:history-1' not in arms

@@ -271,18 +271,25 @@ def score(db: sqlite3.Connection, threshold: float, deadline: float) -> bool:
         receipt = json.loads(row['body'])
         history = json.loads(row['features'])
         past = [e for e in memory[row['family']] if e['ts'] < row['ts']]
-        predictions = [('rules', *predict(history, past, STRATEGIES[3]))]
-        predictions += [(s[0], *predict(history, past, s)) for s in STRATEGIES if s[4] != 'rules']
+        predictions = [('rules', *predict(history, past, STRATEGIES[3]), True)]
+        predictions += [(s[0], *predict(history, past, s), True) for s in STRATEGIES if s[4] != 'rules']
         for shadow in receipt.get('shadow') or []:
+            if shadow.get('backend') == 'shadow-portfolio':
+                continue
             confidence = shadow.get('confidence')
-            predictions.append(('slm:' + str(shadow.get('model') or shadow.get('label')),
-                                shadow.get('selected_action'), float(confidence) if confidence is not None else 0.0))
+            arm = 'slm:' + str(shadow.get('model') or shadow.get('label'))
+            binary = shadow.get('arm') == 'goal-binary'
+            if binary:
+                scope = json.dumps(receipt.get('projection_config') or {}, sort_keys=True)
+                arm += ':goal-binary:' + receipt.get('projection_strategy', 'history-1') + '@' + hashlib.sha256(scope.encode()).hexdigest()[:12]
+            selected = shadow.get('selected_action') if not (shadow.get('error') or shadow.get('parse_error')) else None
+            predictions.append((arm, selected, float(confidence) if confidence is not None else 0.0, not binary))
         # A late join may be older than retained examples; it must abstain,
         # never train on later usage and call that a historical prediction.
-        for arm, action, confidence in predictions:
+        for arm, action, confidence, confidence_gated in predictions:
             if not db.execute('INSERT OR IGNORE INTO evaluated VALUES(?,?)', (row['id'], arm)).rowcount:
                 continue
-            covered = int(action is not None and confidence >= threshold)
+            covered = int(action is not None and (not confidence_gated or confidence >= threshold))
             correct = int(bool(covered and action == row['action']))
             db.execute('''INSERT INTO scores VALUES(?,?,1,?,?) ON CONFLICT(family,arm)
               DO UPDATE SET total=total+1,covered=covered+excluded.covered,correct=correct+excluded.correct''',
