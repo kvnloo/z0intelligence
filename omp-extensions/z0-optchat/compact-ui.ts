@@ -1,7 +1,6 @@
 /**
- * The dock row `/compact` shows: spinner, "Compacting context…", elapsed time,
- * indeterminate progress. Mounted through the extension widget slot because
- * extensions cannot reach statusContainer. Does not call session.compact().
+ * Wait row while the view still has a placeholder. Not OMP /compact.
+ * Does not call session.compact().
  */
 import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -56,33 +55,45 @@ async function loadTui(): Promise<{
 	};
 }
 
-export async function showCompactRow(ui: Ui | undefined, onStop?: () => void): Promise<Hide> {
-	if (!ui?.setWidget) return () => {};
+export async function showCompactRow(
+	ui: Ui | undefined,
+	onStop?: () => void,
+	label = "Summarizing the view…",
+	signal?: AbortSignal,
+): Promise<Hide> {
+	if (!ui?.setWidget || signal?.aborted) return () => {};
 	const { Loader, getSymbolTheme } = await loadTui();
+	if (signal?.aborted) return () => {};
 	const startedAt = Date.now();
 	let loader: { stop: () => void } | undefined;
+	let hidden = false;
+	const hide = () => {
+		if (hidden) return;
+		hidden = true;
+		signal?.removeEventListener("abort", hide);
+		loader?.stop();
+		ui.setWidget?.(KEY, undefined);
+	};
+	signal?.addEventListener("abort", hide, { once: true });
 	ui.setWidget(
 		KEY,
 		(tui, theme) => {
 			const accent = (text: string) => theme.fg?.("accent", text) ?? text;
 			const muted = (text: string) => theme.fg?.("muted", text) ?? text;
-			const row = new Loader(tui, accent, muted, "Compacting context…", getSymbolTheme().spinnerFrames);
+			const row = new Loader(tui, accent, muted, label, getSymbolTheme().spinnerFrames);
 			row.setWorkingRow(
 				() => ({
-					label: "Compacting context…",
+					label,
 					startedAt,
-					variant: { kind: "compaction" },
 					interruptKey: "escape",
 				}),
 				() => onStop?.(),
 			);
 			loader = row;
+			if (hidden || signal?.aborted) row.stop();
 			return row;
 		},
 		{ placement: "aboveEditor" },
 	);
-	return () => {
-		loader?.stop();
-		ui.setWidget?.(KEY, undefined);
-	};
+	return hide;
 }
