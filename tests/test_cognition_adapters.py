@@ -446,3 +446,44 @@ def test_a_local_slm_can_be_evaluated_by_the_existing_backend_contract():
     assert result.backend == "test_slm"
     assert result.answers[0].value is True
     assert result.diagnostics["candidate_action_count"] == 2
+
+
+@pytest.mark.parametrize("allowed", [2, 3])
+def test_scoped_jev_checks_capacity_before_evaluate(monkeypatch, allowed):
+    from z0int import policy_runtime
+
+    scope = dict(model="tiny", quant="q4", engine="llama.cpp", backend="cpu", device="mbp")
+    class Policy:
+        def allowed_k(self, actual):
+            assert actual == scope
+            return allowed
+    monkeypatch.setattr(policy_runtime, "current", lambda: Policy())
+    stub = _StubDecisionBackend("a")
+    stub.model_scope = scope
+    legal = compile_actions(
+        graph=ActionGraph(actions=tuple(
+            ActionCandidate(action_id=x, kind="control", description=x) for x in ("a", "b", "c")
+        )), granted_capabilities=(), authority=("read",), budget_units=5,
+    )
+    request = ToolDecisionRequest(state="choose", legal=legal)
+    row = JevBoundedToolBackend(stub).decide(request).to_dict()
+    assert row["scope"] == scope and row["allowed_k"] == allowed
+    assert row["model_id"] == "tiny" and row["quant"] == "q4"
+    assert row["attempted_option_count"] == 3
+    assert row["slm_requested"] is (allowed == 3)
+    assert row["option_count"] == (3 if allowed == 3 else 0)
+    assert len(stub.requests) == (1 if allowed == 3 else 0)
+    if allowed == 2:
+        assert row["parse_error"] == "option_capacity_exceeded"
+    else:
+        assert row["selected_action"] == "a"
+
+
+def test_unscoped_jev_receipt_identifies_non_model_scorer():
+    stub = _StubDecisionBackend("fs.read")
+    row = JevBoundedToolBackend(stub).decide(
+        ToolDecisionRequest(state="choose", legal=_legal())
+    ).to_dict()
+    assert row["option_capacity"] == "not_applicable"
+    assert row["backend_class"].endswith("._StubDecisionBackend")
+    assert len(stub.requests) == 1

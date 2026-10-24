@@ -50,6 +50,13 @@ class NanoJevBackend:
         return cls(checkpoint, device=device, precision=precision)
 
     @property
+    def model_scope(self):
+        from .base import ModelScope
+
+        return ModelScope(model=self.model_id, quant=self.precision, engine="nanojev",
+                          backend=self.ID, device=self.device)
+
+    @property
     def capabilities(self) -> BackendCapabilities:
         return BackendCapabilities(
             id=self.ID,

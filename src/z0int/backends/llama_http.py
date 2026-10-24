@@ -131,6 +131,16 @@ class LlamaHttpBackend:
         return cls(spec.get('url') or None, model=spec.get('model') or None, arm=arm, device=spec.get('device'))
 
     @property
+    def model_scope(self):
+        from .base import ModelScope
+
+        spec = (configured_arms().get(self.arm) or {}) if self.arm else {}
+        return ModelScope(model=self.model_name or "unknown",
+                          quant=spec.get("quant") or spec.get("quantization") or "unknown",
+                          engine="llama.cpp", backend="llama_http",
+                          device=self.device or "unknown")
+
+    @property
     def revision(self) -> str | None:
         if self.arm:
             return (configured_arms().get(self.arm) or {}).get('sha256')

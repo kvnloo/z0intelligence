@@ -175,9 +175,29 @@ def sized_backend(transport):
     from z0int.cognition.adapters.local_slm import LocalSLMBackend
     from z0int.cognition.adapters.transport import ServerConfig
     from z0int.cognition.adapters.dialects import PLAIN_JSON_DIALECT
+    import hashlib
+    import os
+    from z0int import policy_runtime
+    scope = {"model": "qwen3_06b", "quant": "Q8_0", "engine": "fixture",
+             "backend": "cpu", "device": "fixture"}
+    key = json.dumps(scope, sort_keys=True, separators=(",", ":"))
+    body = {
+        "schema": "z0.decision_policy.v1", "synthetic": True,
+        "compiled_at": "2026-10-24T00:00:00+00:00", "findings_head": "synthetic",
+        "compiler": "synthetic-context-fixture", "families": {}, "serving": [], "changes": [],
+        "option_capacity": {key: {
+            "allowed_k": 24, "finding_ids": ["synthetic-context-capacity"],
+            "wilson_lower": 1.0, "task": ["T1", "T2", "T3", "T4"], "bar": 0.95,
+            "expires_at": "2099-01-01T00:00:00+00:00",
+        }},
+    }
+    body["version"] = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    path = Path(os.environ["Z0INT_HOME"]) / "policy" / "decision-policy.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(body))
     return LocalSLMBackend(backend_id='qwen3_06b',
         config=ServerConfig('http://fixture','qwen3-0.6b-q8'),
-        dialect=PLAIN_JSON_DIALECT, transport=transport)
+        dialect=PLAIN_JSON_DIALECT, transport=transport, scope=scope, policy=policy_runtime.current())
 
 
 def test_real_sized_omp_prompt_is_bounded_without_losing_scoring_actions(tmp_path, monkeypatch):

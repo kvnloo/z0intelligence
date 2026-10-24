@@ -8,11 +8,15 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
+from .. import policy_runtime
+from ..receipt import new_trace_id
 from .actions import ActionCandidate, ActionGraph, Rule, compile_actions
 from .cascade import CascadeContext, CognitionCascade
+from .adapters.policy import PolicyArmBackend
 from .candidates import build_inventory, load_pi_ai_catalog
 from .escalation import EscalationPolicy, EscalationThresholds
 from .manifest import (
@@ -242,12 +246,84 @@ def _cmd_compile(args: argparse.Namespace) -> int:
     _print(legal.to_dict(), as_json=args.json)
     return 0
 
+def _stamp_decision(
+    body: dict[str, Any],
+    policy: policy_runtime.Policy,
+    families: tuple[str, ...],
+    overrides: tuple[str, ...],
+    action_families: dict[str, str],
+) -> None:
+    """Stamp every emitted row using the decision's single policy snapshot."""
+    family = action_families.get(str(body.get("selected_action") or body.get("prediction")), "")
+    family = family or (families[0] if len(families) == 1 else "none")
+    policy.stamp(body, family)
+    body.setdefault("ts", time.time())
+    arm = policy.rule_for(family).get("arm", {})
+    scope = body.setdefault("scope", {k: arm.get(k, "unknown") for k in
+                                    ("model", "quant", "engine", "backend", "device")})
+    body.setdefault("model_id", scope.get("model", "unknown"))
+    body.setdefault("quant", scope.get("quant", "unknown"))
+    body.setdefault("option_count", 0)
+    body.setdefault("slm_requested", False)
+    if len(families) > 1:
+        body["policy_families"] = {f: policy.stamp({}, f) for f in families}
+    if overrides:
+        body["payload_override"] = list(overrides)
+    if body.get("slm_requested") is True and "abstain" not in body and (body.get("tier") == "remote_frontier" or body.get("route") == "remote_frontier"):
+        attempts = body.get("attempts") or []
+        abstentions = [row for row in attempts if row.get("abstained") is True or row.get("escalated") is True]
+        if abstentions:
+            last = abstentions[-1]
+            confidence = last.get("confidence")
+            if confidence is None:
+                previous = next((row for row in reversed(attempts)
+                                 if row.get("tier") == last.get("tier") and row.get("confidence") is not None), {})
+                confidence = previous.get("confidence")
+            body["abstain"] = {
+                "confidence": confidence,
+                "threshold": policy.rule_for(family).get("threshold", 0.65),
+                "reason": last.get("reason", "local_scorer_abstained"),
+            }
+    for key in ("receipts", "attempts", "shadow"):
+        for row in body.get(key) or []:
+            if isinstance(row, dict):
+                _stamp_decision(row, policy, families, overrides, action_families)
+    for key in ("escalation", "surface"):
+        row = body.get(key)
+        if isinstance(row, dict):
+            _stamp_decision(row, policy, families, overrides, action_families)
+    if "abstain" in body:
+        for row in [body.get("escalation"), *(body.get("receipts") or [])]:
+            if isinstance(row, dict) and (row.get("tier") == "remote_frontier" or row.get("route") == "remote_frontier"):
+                row["abstain"] = dict(body["abstain"])
+
+
 
 def _cmd_decide(args: argparse.Namespace) -> int:
     payload = json.loads(Path(args.input).read_text(encoding="utf-8"))
-    registry = LocalModelRegistry.from_environment()
+    trace_id = str(payload.get("trace_id") or new_trace_id())
+    policy = policy_runtime.current().for_scope(payload.get("policy_scope") or {})
+    credited = set(policy.credited_families(trace_id))
+    payload_credited = {str(f) for f in payload.get("credited_families") or ()}
+    overrides = tuple(sorted(payload_credited - credited))
+    graph = _graph_from_payload(payload)
+    families = tuple(sorted({action.family for action in graph.actions if action.family}))
+    endpoints = [policy.endpoint_for(family) for family in families]
+    endpoint = endpoints[0] if endpoints and all(row == endpoints[0] for row in endpoints) else None
+    eligible = bool(families) and all(family in credited for family in families)
+    identity_ready = policy_runtime.serving_identity_complete(endpoint)
+    healthy = policy_runtime.serving_health(endpoint["url"], endpoint, probe=True) if identity_ready and eligible else None
+    ready = eligible and identity_ready and healthy is True
+    threshold = max((policy.rule_for(family).get("threshold", 0.65) for family in families), default=0.65)
+    bound = PolicyArmBackend(endpoint, threshold, policy=policy) if ready else None
+    fallback_reason = None
+    if eligible and not ready:
+        fallback_reason = "serving_health_unknown" if identity_ready and healthy is None else "no_serving_for_scope"
+    elif families and any(policy.stage(family) == "canary" for family in families) and not eligible:
+        fallback_reason = "canary_cohort_excluded"
     thresholds = EscalationThresholds(
-        credited_families=tuple(payload.get("credited_families") or ())
+        credited_families=tuple(sorted(credited | payload_credited)),
+        jev_min_confidence=threshold,
     )
     # Candidate surfaces are opt-in: without --catalog/--surface the cascade
     # behaves exactly as before (the escalation policy alone picks the tier).
@@ -261,15 +337,16 @@ def _cmd_decide(args: argparse.Namespace) -> int:
             thresholds=SurfaceThresholds(max_cost_class=args.max_cost_class),
         )
     cascade = CognitionCascade(
-        tiny=registry.role_backend("tiny_action_specialist") if args.use_models else None,
+        tiny=bound,
         jev=None,
-        orchestrator=registry.role_backend("semantic_orchestrator") if args.use_models else None,
-        general=registry.role_backend("general_local_fallback") if args.use_models else None,
+        orchestrator=bound,
+        general=bound,
         policy=EscalationPolicy(thresholds),
         surface=surface,
     )
     shadow: list[tuple[str, Any]] = []
     if args.shadow:
+        registry = LocalModelRegistry.from_environment()
         for model_id in args.shadow:
             try:
                 shadow.append((model_id, registry.backend_for(model_id)))
@@ -277,7 +354,7 @@ def _cmd_decide(args: argparse.Namespace) -> int:
                 print(f"# shadow {model_id} unavailable: {exc}", file=sys.stderr)
     context = CascadeContext(
         state=str(payload.get("state") or ""),
-        graph=_graph_from_payload(payload),
+        graph=graph,
         granted_capabilities=tuple(payload.get("granted_capabilities") or ()),
         authority=tuple(payload.get("authority") or ("read",)),
         budget_units=int(payload.get("budget_units") or 0),
@@ -294,8 +371,74 @@ def _cmd_decide(args: argparse.Namespace) -> int:
         state_novelty=payload.get("state_novelty"),
         capability_required=payload.get("capability_required"),
     )
-    outcome = cascade.run(context, shadow=tuple(shadow))
-    _print(outcome.to_dict(), as_json=args.json)
+    outcome = cascade.run(context, shadow=tuple(shadow), trace_id=trace_id)
+    body = outcome.to_dict()
+    action_families = {action.action_id: action.family for action in context.graph.actions if action.family}
+    # Policy credit binds its measured endpoint automatically, never a role default.
+    metadata = dict(bound.last.diagnostics.get("request_metadata") or {}) if bound is not None and bound.last is not None else {}
+    body.update(metadata)
+    body["escalation"].update(metadata)
+    if bound is not None and bound.last is not None and metadata.get("slm_requested") is True:
+        observed = bound.last.diagnostics
+        body.update(selected_arm=dict(observed["selected_arm"]),
+                    response_model=observed.get("response_model"),
+                    response_revision=observed.get("response_revision"),
+                    model=bound.last.model, confidence=bound.last.confidence)
+        body["scope"] = dict(observed["selected_arm"])
+        body["escalation"].update(selected_arm=dict(observed["selected_arm"]), scope=dict(observed["selected_arm"]))
+        identity = {key: observed.get(key) for key in ("observed_identity", "expected_identity", "props_model_id")}
+        body.update(identity)
+        body["escalation"].update(identity)
+        if observed.get("reason") in ("endpoint_model_mismatch", "endpoint_build_mismatch", "endpoint_path_mismatch",
+                                      "endpoint_identity_unknown", "endpoint_expected_identity_missing"):
+            fallback_reason = "no_serving_for_scope"
+        for row in [*body["attempts"], *body["receipts"]]:
+            if row.get("backend") == "decision-policy" or row.get("provider") == "decision-policy":
+                row.update(selected_arm=dict(observed["selected_arm"]),
+                           response_model=observed.get("response_model"),
+                           response_revision=observed.get("response_revision"))
+                row["scope"] = dict(observed["selected_arm"])
+                row.update(identity)
+    if bound is not None and bound.last is not None and bound.last.parse_error == "option_capacity_exceeded":
+        fallback_reason = "option_capacity_exceeded"
+        body["reason"] = fallback_reason
+    if outcome.abstained:
+        family = families[0] if len(families) == 1 else "none"
+        destination = policy.rule_for(family).get("abstain_to", "frontier")
+        body["route"] = "remote_frontier" if destination == "frontier" else "bounded_jev"
+        if bound is not None and bound.last is not None and metadata.get("slm_requested") is True:
+            body["abstain"] = {"confidence": bound.last.confidence, "threshold": threshold,
+                               "reason": bound.last.diagnostics.get("reason", "local_scorer_abstained")}
+        row = {key: body[key] for key in ("trace_id", "route", "reason", "abstain",
+               "selected_arm", "scope", "response_model", "response_revision",
+               "observed_identity", "expected_identity", "props_model_id", "option_count",
+               "attempted_option_count", "model_id", "quant", "allowed_k", "slm_requested") if key in body}
+        row.update(schema="z0int.cognition.fallback.v1", selected_action=None)
+        policy.stamp(row, family)
+        body["receipts"].append(row)
+        if fallback_reason == "option_capacity_exceeded":
+            body["escalation"].update(tier=body["route"], reason=fallback_reason)
+    def apply_binding(row: dict[str, Any], *, shadow: bool = False) -> None:
+        if payload.get("synthetic") is True:
+            row["synthetic"] = True
+        if payload.get("policy_scope"):
+            row["policy_scope"] = dict(payload["policy_scope"])
+            row.setdefault("scope", dict(payload["policy_scope"]))
+        if fallback_reason and not shadow and row.get("execution") != "shadow":
+            row["policy_stage"] = row.get("stage", "none")
+            row["stage"] = "none"
+            row["policy_reason"] = fallback_reason
+        for key in ("receipts", "attempts", "shadow"):
+            for child in row.get(key) or []:
+                if isinstance(child, dict):
+                    apply_binding(child, shadow=shadow or key == "shadow")
+        for key in ("escalation", "surface"):
+            child = row.get(key)
+            if isinstance(child, dict):
+                apply_binding(child)
+    _stamp_decision(body, policy, outcome.legal.family_options(), overrides, action_families)
+    apply_binding(body)
+    _print(body, as_json=args.json)
     return 0 if not outcome.abstained else 1
 
 
@@ -353,7 +496,6 @@ def add_cognition_parser(sub: argparse._SubParsersAction) -> None:  # type: igno
 
     cd = co_sub.add_parser("decide", help="Run the compiled cascade (deterministic -> learned)")
     cd.add_argument("--input", required=True)
-    cd.add_argument("--use-models", action="store_true", help="Allow learned tiers to run")
     cd.add_argument("--shadow", action="append", default=[],
                     help="model_id to run in shadow (recorded, never executed)")
     cd.add_argument("--surface", action="store_true",

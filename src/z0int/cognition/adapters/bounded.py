@@ -67,6 +67,38 @@ class JevBoundedToolBackend:
         }
 
     def decide(self, request: ToolDecisionRequest) -> ToolDecision:
+        from dataclasses import replace
+        from ... import policy_runtime
+        from .local_slm import _abstain
+
+        scope = getattr(self._delegate, "model_scope", None)
+        count = len(request.legal.ids())
+        metadata: dict[str, Any] = {
+            "backend_class": f"{type(self._delegate).__module__}.{type(self._delegate).__qualname__}",
+        }
+        if scope is None:
+            metadata["option_capacity"] = "not_applicable"
+        else:
+            allowed = policy_runtime.current().allowed_k(scope)
+            metadata.update(
+                option_count=0, attempted_option_count=count,
+                model_id=scope["model"], quant=scope["quant"], scope=dict(scope),
+                allowed_k=allowed, slm_requested=False,
+            )
+        request.metadata.clear()
+        request.metadata.update(metadata)
+        if scope is not None and count > allowed:
+            return _abstain(
+                backend=self._backend_id, model=scope["model"], revision=None,
+                candidate_count=count, latency_ms=0.0, reason="option_capacity_exceeded",
+                extra={"request_metadata": metadata},
+            )
+        decision = self._decide(request)
+        return replace(decision, diagnostics={
+            **dict(decision.diagnostics), "request_metadata": dict(request.metadata),
+        })
+
+    def _decide(self, request: ToolDecisionRequest) -> ToolDecision:
         legal = request.legal
         ids = legal.ids()
         caps = self._delegate.capabilities
@@ -147,6 +179,8 @@ class JevBoundedToolBackend:
         if request.objective:
             state = f"Objective: {request.objective}\n\n{state}"
         decision_request = DecisionRequest(state=state or " ", questions=(question,))
+        if "slm_requested" in request.metadata:
+            request.metadata.update(option_count=len(ids), slm_requested=True)
         result = self._delegate.evaluate(decision_request)
         answer = result.answers[0] if result.answers else None
         if answer is None:
@@ -206,6 +240,10 @@ class DecisionBackendToolAdapter:
     def __init__(self, delegate: ToolDecisionBackend, *, backend_id: str | None = None) -> None:
         self._delegate = delegate
         self._backend_id = backend_id or delegate.backend_id
+
+    @property
+    def model_scope(self):
+        return getattr(self._delegate, "model_scope", None)
 
     @property
     def delegate(self) -> ToolDecisionBackend:

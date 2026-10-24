@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
+from .. import policy_runtime
+
 EscalationTier = str  # one of TIERS
 
 TIERS: tuple[str, ...] = (
@@ -106,15 +108,47 @@ class EscalationDecision:
     tier: str
     reason: str
     signals: Mapping[str, Any] = field(default_factory=dict)
-    policy_version: str = "escalation-v1"
+    policy_version: str = "none"
+    policy_sha256: str = "none"
+    rule_id: str = "none"
+    stage: str = "none"
+    escalation_version: str = "escalation-v1"
+    policy_reason: str | None = None
+    abstain: Mapping[str, Any] | None = None
+    serving_healthy: bool | None = None
+    family: str = "none"
+    policy_family: str = "none"
+    synthetic: bool = False
+
+    def __post_init__(self) -> None:
+        # Threshold-table revisions and evidence-policy identities are separate.
+        if self.policy_version == "none":
+            families = self.signals.get("families") or ()
+            family = families[0] if len(families) == 1 else "none"
+            stamp = policy_runtime.stamp({}, family)
+            for key in ("policy_version", "policy_sha256", "rule_id", "stage", "policy_reason", "serving_healthy", "family", "policy_family", "synthetic"):
+                object.__setattr__(self, key, stamp.get(key))
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        body = {
             "tier": self.tier,
             "reason": self.reason,
+            "escalation_version": self.escalation_version,
             "policy_version": self.policy_version,
+            "policy_sha256": self.policy_sha256,
+            "rule_id": self.rule_id,
+            "stage": self.stage,
+            "serving_healthy": self.serving_healthy,
+            "family": self.family,
+            "policy_family": self.policy_family,
+            "synthetic": self.synthetic,
             "signals": dict(self.signals),
         }
+        if self.policy_reason:
+            body["policy_reason"] = self.policy_reason
+        if self.abstain is not None:
+            body["abstain"] = dict(self.abstain)
+        return body
 
 
 def at_least(tier: str, floor: str) -> str:
@@ -172,7 +206,7 @@ class EscalationPolicy:
                 tier="deterministic",
                 reason="no_legal_actions",
                 signals=base,
-                policy_version=t.version,
+                escalation_version=t.version,
             )
 
         # A single surviving action is not a decision at all.
@@ -181,7 +215,7 @@ class EscalationPolicy:
                 tier="deterministic",
                 reason="singleton_legal_set",
                 signals=base,
-                policy_version=t.version,
+                escalation_version=t.version,
             )
 
         tier = "tiny_specialist"
@@ -248,8 +282,19 @@ class EscalationPolicy:
             tier = "remote_frontier"
             reason = "local_latency_budget_exhausted"
 
+        abstain = None
+        if tier == "remote_frontier" and (
+            signals.specialist_abstained or signals.jev_uncertain
+            or (signals.backend_confidence is not None and signals.backend_confidence < t.jev_min_confidence)
+        ):
+            abstain = {
+                "confidence": signals.backend_confidence,
+                "threshold": t.jev_min_confidence,
+                "reason": "bounded_scorer_uncertain",
+            }
         return EscalationDecision(
-            tier=tier, reason=reason, signals=base, policy_version=t.version
+            tier=tier, reason=reason, signals=base, escalation_version=t.version,
+            abstain=abstain,
         )
 
 

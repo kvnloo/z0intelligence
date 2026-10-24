@@ -7,7 +7,7 @@ load torch, transformers, model weights, or network clients.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, TypedDict, runtime_checkable
 import json
 import math
 
@@ -169,8 +169,19 @@ class DecisionResult:
     diagnostics: dict[str, Any] = field(default_factory=dict)
 
 
+class ModelScope(TypedDict):
+    model: str
+    quant: str
+    engine: str
+    backend: str
+    device: str
+
+
 @runtime_checkable
 class DecisionBackend(Protocol):
+    # Optional at runtime: absent/None identifies a non-language-model scorer.
+    model_scope: ModelScope | None
+
     @property
     def capabilities(self) -> BackendCapabilities:
         ...

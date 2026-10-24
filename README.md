@@ -8,6 +8,14 @@ The Python import/CLI namespace remains `z0int`; the distribution metadata still
 
 > Core invariant: **evidence ≠ claim/state ≠ authority ≠ action ≠ outcome ≠ learned procedure.**
 
+Local language-model backends declare a five-field `model_scope` (`model`, `quant`,
+`engine`, `backend`, `device`). The bounded cognition adapter checks that exact
+scope against policy `option_capacity` before inference (default capacity: two).
+An over-cap request abstains with `option_capacity_exceeded`, without sending
+options. Receipts include the scope, attempted/sent option counts and allowed
+capacity. Scorers without a model scope are not capped and explicitly report
+`option_capacity: not_applicable` and their backend class.
+
 ## What exists on master
 
 The current repository is much more than the original OpenJev prototype.

@@ -42,17 +42,100 @@ otherwise no-ops.
 
 ## Configuration
 
-Environment (wins over the settings file):
+The decision policy at `$Z0INT_HOME/policy/decision-policy.json` supplies shadow
+models from each unexpired family's `arm.model` at stage shadow, canary or live.
+Both consumers verify `z0.decision_policy.v1` and its canonical-body SHA-256.
+Missing, malformed or tampered policies cannot interrupt a tool call: they
+stamp stage `none` and a `policy_reason`, and the observe-only lane falls back
+to the settings below. Valid policy models take priority over fallback settings.
+
+Every observation and Python shadow receipt records `policy_version`,
+`policy_sha256`, `policy_family`, `rule_id`, `stage`, `family` and `serving_healthy`. Health is
+`null` when the endpoint has not passed a current check. A shared cache at
+`$Z0INT_HOME/policy/serving-health.json` stores one entry per URL, with the exact
+five-field scope SHA, status, `checked_at`, returned model and revision.
+Python writers merge updates under a file lock and publish by atomic rename.
+Readers trust only the same scope and an observation no more than 60 s old.
+The standalone CLI refreshes a miss with one `/v1/models` GET, with a 1.5 s
+timeout. An unknown result produces `serving_health_unknown`, never an offload.
+The synchronous OMP tool handler does not wait for HTTP. Its asynchronous probe
+uses the same shared cache and a 1.5 s timeout. Python receipt-only paths can
+refresh in a daemon with a 1 s timeout.
+Session entries use the snapshot loaded when their request was constructed,
+even when the active policy changes before the response arrives.
+
+`z0int cognition decide` combines policy credit with explicit payload credit.
+Only payload additions appear in `payload_override` on every decision row.
+Canary membership is the first 64 bits of SHA-256(trace_id), compared against
+`canary_share * 2**64`. Reuse a trace id for deterministic replay. Threshold
+table revisions remain separately named `escalation_version`.
+
+The policy picks its own scoped arm. The CLI binds that exact
+model/quant/engine/backend/device to a matching policy serving entry. It never
+uses a role-registry fallback for an authorized decision. Policy credit enables
+this binding automatically. An absent or unhealthy endpoint produces
+stage `none` and `policy_reason: no_serving_for_scope`. Unknown health after the
+bounded probe produces stage `none` and `policy_reason: serving_health_unknown`.
+
+The endpoint returns its model id. For physical model calls, serving entries must
+also contain `expected_model_id`, `engine_build`, `model_path` and the GGUF's
+`model_sha256` from measured provenance. Each decision reads
+`/props?model=<URL-encoded expected_model_id>`, never the bare router `/props`.
+The receipt records `observed_identity` from the response model id plus the
+props `build_info` and `model_path`. `props_model_id` records `model_alias`.
+`expected_identity` carries the serving expectations and provenance hash.
+The consumer compares model id, build and path before it accepts the answer.
+It does not hash a model file on each turn. A revision is not required and
+`response_revision` remains null.
+
+An identity mismatch fails back to frontier/Jev. A below-threshold answer records
+its actual confidence, the policy threshold and its abstain reason. The same arm
+is called at most once per decision, even across several semantic tiers.
+
+Every receipt has a `synthetic` boolean. Synthetic policy/rule evidence or an
+incoming `synthetic: true` payload taints nested receipt, attempt, shadow and
+escalation rows. Payload false cannot clear policy taint. Unknown-family fallback
+rows retain policy-wide synthetic provenance. Compiled stage-none rules retain
+their `demoted_reason` as the receipt's `policy_reason`.
+
+`policy_scope` remains an optional narrowing filter, not a prerequisite for
+policy selection. The CLI records that filter when supplied. The OMP extension
+reads the same optional filter from cognition settings for receipt attribution.
+Neither consumer generalizes a measured arm to a different physical scope.
+
+O13 bounds each SLM request before provider IO. `option_capacity` is a map keyed
+by the sorted compact canonical JSON of `{model,quant,engine,backend,device}`.
+Each entry contains `allowed_k`, `finding_ids`, `wilson_lower`, `task` (a list),
+`bar` and `expires_at`. Only an unexpired exact-scope grant whose Wilson lower
+bound meets its bar can raise the default binary cap. Missing, invalid or expired
+capacity data means a cap of 2, not permission for a broad choice set.
+
+An over-cap proposal never reaches the model. It returns to frontier/Jev with
+`option_capacity_exceeded`, effective stage `none`, `slm_requested: false`,
+`option_count: 0` and its original `attempted_option_count`. No candidate is
+silently discarded to satisfy the law. Existing shadow projection widths remain
+explicit proposals: an unqualified wide projection is blocked, not shrunk.
+
+Each actual request records its rendered `option_count`, canonical `model_id`,
+exact `quant`, complete five-field `scope` and `allowed_k`. Provider wire metadata
+uses OpenAI metadata strings. Receipts and in-process request metadata retain
+typed counts. These are actual candidate counts, never the grant's maximum.
+Per-model metadata remains available on timeout and is preserved in OMP's nested
+model observations. Aggregate envelopes and pure Python portfolio strategies
+record `slm_requested: false` and do not masquerade as provider calls.
+
+
+Fallback environment (wins over the fallback settings file):
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `OMP_Z0INT_COGNITION_SHADOW` | on | `0`/`false`/`off` disables the lane |
 | `OMP_Z0INT_COGNITION_TIMEOUT_MS` | `4000` | Hard client-side timeout for one shadow send |
-| `OMP_Z0INT_COGNITION_MODELS` | `qwen3_06b` | Exact manifest model ids to shadow on the existing farm router; one small model by default |
+| `OMP_Z0INT_COGNITION_MODELS` | `qwen3_06b` | Fallback manifest model ids when the policy has no eligible shadow models |
 | `OMP_Z0INT_COGNITION_TOOLS` | discovered, else builtin | Comma-separated tool allow-list for the action set |
 | `OMP_Z0INT_COGNITION_AUTHORITY` | `read` | Risk classes the compiler may declare legal, in addition to those of the available tools (shadow-only: nothing is executed) |
 | `OMP_Z0INT_COGNITION_BRIDGE_FALLBACK` | on | `0` disables the sibling-extension import fallback |
-| `Z0INT_HOME` | `~/.z0int` | Receipt + settings root |
+| `Z0INT_HOME` | `~/.z0int` | Policy, receipt and settings root |
 
 Optional settings file `~/.z0int/config/cognition.json` (env still wins):
 
