@@ -53,7 +53,7 @@ export function createIntentClient(pi, options = {}) {
   const fetcher = options.fetch ?? globalThis.fetch;
   const base = new URL(options.url ?? process.env.Z0INT_INTENT_URL ?? "http://127.0.0.1:8431");
   if (base.protocol !== "http:" || !["127.0.0.1", "[::1]"].includes(base.hostname) || base.username || base.password || base.pathname !== "/" || base.search || base.hash) throw new Error("Intent service must use a literal loopback HTTP origin");
-  const timeoutMs = options.timeoutMs ?? 30_000;
+  const timeoutMs = options.timeoutMs ?? 90_000;
   const busy = new Set();
   let packetCache;
   function packet() {

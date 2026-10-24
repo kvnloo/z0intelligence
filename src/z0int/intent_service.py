@@ -35,9 +35,13 @@ Inspect all exact unclassified source sentences provided. Return each exactly
 once using entryId and sentenceId, classification add or not-an-ask, and reason.
 One task per actionable sentence, including questions that actually request work.
 Keep byte-exact source references. Never invent source sentences or citations.
+A correction or statement can be context only: classify it as question with no
+tasks when it requests no new work. Do not invent an actionable task.
 For an amendment, retain all existing tasks unless explicitly superseded. Return
 amendments [{op:'drop',taskId,reason}] only for explicitly superseded tasks and
 add the replacement task against the new exact sentence. Do not silently drop work.
+Never create a citation by guessing an ID, path, or source. If no returned
+record supports a fact, omit that memory assumption rather than invent support.
 Retrieve goals, prior decisions, known-wrong decisions and live-state relevance
 from the supplied evidence. Every nonliteral assumption needs citations copied
 exactly from the memory catalog as {source,id,path?,evidence_kind}, retaining its
@@ -60,6 +64,8 @@ human_review {target}. Each verifier also has type. Do not invent target paths,
 repo identities or commands. Use human_review on the specific requested artifact
 if the user/evidence does not provide a machine-checkable target. Approval of the
 plan is NOT human_review acceptance of its eventual result.
+The verifier.target string must be BYTE-IDENTICAL to its task.target string,
+including punctuation and whitespace. Repeat the same target, not a paraphrase.
 Return {classification,sentences:[{entryId,sentenceId,classification,reason}],
 tasks:[{entryId,sentenceId,target,interpretation,executor,assumptions,conflicts,verifier,preconditions}],
 amendments:[],assumptions:[{claim,citations}],conflicts:[],delegation_plan:[]}.
@@ -228,7 +234,7 @@ class IntentService:
         return await child_json(os.environ.get("Z0INT_INTENT_NODE", "node"), HERE / "intent_compile.mjs", request, 3)
 
     async def _model(self, request):
-        timeout = float(os.environ.get("Z0INT_INTENT_MODEL_TIMEOUT_MS", "11000")) / 1000 + 1
+        timeout = float(os.environ.get("Z0INT_INTENT_MODEL_TIMEOUT_MS", "60000")) / 1000 + 1
         return await child_json(os.environ.get("Z0INT_INTENT_BUN", "bun"), HERE / "intent_model.mjs", request, timeout)
 
     def _directory(self, session_id):

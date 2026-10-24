@@ -26,7 +26,7 @@ export async function compile(request, env = process.env) {
   const login = subscriptionLogin(env);
   const model = env.Z0INT_INTENT_MODEL || 'gpt-6-luna';
   const controller = new AbortController();
-  const deadline = setTimeout(() => controller.abort(), Number(env.Z0INT_INTENT_MODEL_TIMEOUT_MS || 11000));
+  const deadline = setTimeout(() => controller.abort(), Number(env.Z0INT_INTENT_MODEL_TIMEOUT_MS || 60000));
   try {
     const response = await fetch('https://chatgpt.com/backend-api/codex/responses', {
       method: 'POST', signal: controller.signal,
