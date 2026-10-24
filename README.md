@@ -324,6 +324,7 @@ visible assistant sentence, and five preceding tools with their intent strings.
 Current tool names and arguments never enter the model projection. Missing
 yes/no probabilities or a small top margin produce an abstention. Accuracy
 and Wilson bounds use covered predictions; coverage reports abstentions.
+Explicit binary abstentions are uncovered rows, not predictor errors.
 
 Each family's arms must all plateau over three ticks before search advances
 to an untried bounded history, recent-session, or few-shot strategy. Exhausted

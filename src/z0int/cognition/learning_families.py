@@ -256,8 +256,10 @@ def _answer(raw: Any, choices: list[str]) -> tuple[str | None, float, str | None
     if error:
         # Never store a transport exception string that can contain private URLs.
         return None, 0.0, "predictor_error"
+    if selected is None and raw.get("abstained") is True:
+        return None, 0.0, None
     if selected not in choices or selected == UNKNOWN:
-        return None, 0.0, "abstained_or_out_of_set"
+        return None, 0.0, "out_of_set"
     if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not math.isfinite(confidence) or not 0 <= confidence <= 1:
         return None, 0.0, "invalid_confidence"
     return selected, float(confidence), None

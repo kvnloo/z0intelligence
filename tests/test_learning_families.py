@@ -461,3 +461,20 @@ def test_recent_session_strategy_retrieves_only_preceding_selected_sessions():
     all_prior = _prior(db, row, limit=64)
     assert [example['label'] for example in all_prior] == ['old-skill', 'recent-skill']
     db.close()
+
+
+def test_explicit_binary_abstention_is_uncovered_not_predictor_error():
+    db = connection()
+    add(db, "one", ts=10)
+    derive_jobs(db, now=20)
+    report = run_jobs(db, lambda *_: {"selected_action": None, "confidence": None,
+        "abstained": True, "error": None}, now=20, max_jobs=10)
+    for family in report["families"].values():
+        for arm, classes in family["arms"].items():
+            if not arm.startswith("slm:"):
+                continue
+            for metric in classes.values():
+                assert metric["total"] > 0
+                assert metric["covered_n"] == 0
+                assert metric["coverage"] == 0
+                assert metric["errors"] == 0
