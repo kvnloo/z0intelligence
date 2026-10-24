@@ -3,6 +3,7 @@ import copy
 import datetime as dt
 import hashlib
 import json
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -284,6 +285,13 @@ def test_o11_rejects_partial_named_physical_arm(tmp_path, field):
     assert report['counts']['o11_evidence_bound_route'] == 1
 
 
+@pytest.fixture
+def real_tmp_path():
+    # Fleet sets TMPDIR=/work/tmp. The policy rule deliberately means /tmp.
+    with tempfile.TemporaryDirectory(prefix='policy-guard-', dir='/tmp') as value:
+        yield Path(value)
+
+
 def synthetic_home(home, *, rule_marker=True, receipt_marker=True):
     finding = {'schema': 'z0.finding.v1', 'prev': '0' * 64, 'ts': NOW.isoformat(),
                'source': {'kind': 'manual', 'path': '/synthetic/fixture.json',
@@ -316,8 +324,8 @@ def synthetic_home(home, *, rule_marker=True, receipt_marker=True):
     return path, receipts, finding['id']
 
 
-def test_synthetic_tmp_home_allowed_even_when_process_z0int_home_is_overridden(tmp_path, monkeypatch):
-    home = tmp_path / 'isolated'
+def test_synthetic_tmp_home_allowed_even_when_process_z0int_home_is_overridden(real_tmp_path, monkeypatch):
+    home = real_tmp_path / 'isolated'
     path, receipts, _ = synthetic_home(home)
     monkeypatch.setenv('Z0INT_HOME', str(home))
     report, findings = P.audit(str(receipts), path, '24h', now=NOW)
@@ -327,12 +335,12 @@ def test_synthetic_tmp_home_allowed_even_when_process_z0int_home_is_overridden(t
 
 
 @pytest.mark.parametrize('rule_marker', [False, True])
-def test_synthetic_live_home_and_tmp_symlink_are_rejected(tmp_path, monkeypatch, rule_marker):
-    owner = tmp_path / 'owner'
+def test_synthetic_live_home_and_tmp_symlink_are_rejected(real_tmp_path, monkeypatch, rule_marker):
+    owner = real_tmp_path / 'owner'
     live = owner / '.z0int'
     path, receipts, finding_id = synthetic_home(live, rule_marker=rule_marker, receipt_marker=False)
     monkeypatch.setattr(P.Path, 'home', staticmethod(lambda: owner))
-    link = tmp_path / 'looks-temporary'
+    link = real_tmp_path / 'looks-temporary'
     link.symlink_to(live, target_is_directory=True)
     report, findings = P.audit(str(receipts), link / 'policy/decision-policy.json', '24h', now=NOW)
     synthetic = [finding for finding in findings if finding['rule'] == 'synthetic-evidence-outside-tmp']
@@ -341,8 +349,8 @@ def test_synthetic_live_home_and_tmp_symlink_are_rejected(tmp_path, monkeypatch,
     assert path.resolve() == (link / 'policy/decision-policy.json').resolve()
 
 
-def test_explicit_live_home_is_protected_even_under_tmp(tmp_path, monkeypatch):
-    path, receipts, _ = synthetic_home(tmp_path / 'live')
+def test_explicit_live_home_is_protected_even_under_tmp(real_tmp_path, monkeypatch):
+    path, receipts, _ = synthetic_home(real_tmp_path / 'live')
     monkeypatch.setenv('Z0INT_LIVE_HOME', str(path.parent.parent))
     report, _ = P.audit(str(receipts), path, '24h', now=NOW)
     assert report['counts']['o11_evidence_bound_route'] == 3
@@ -369,3 +377,12 @@ def test_tmpfoo_is_not_tmp_and_cli_returns_three(tmp_path, monkeypatch, capsys):
     findings = json.loads(output.err)['findings']
     assert {finding.get('id') for finding in findings} >= {'F-omp.tool-1', 'tmpfoo-trace'}
     assert not P._synthetic_context(virtual)[1]
+
+
+def test_envelope_cannot_clear_synthetic_taint_in_child(tmp_path, monkeypatch):
+    doc = policy('canary')
+    row = receipt(doc, route='frontier', synthetic=False, trace_id='nested-synthetic')
+    monkeypatch.setenv('Z0INT_LIVE_HOME', str(tmp_path.parent))
+    report, findings = audit(tmp_path, doc, [{'synthetic': True, 'receipts': [row]}])
+    assert report['counts']['o11_evidence_bound_route'] == 1
+    assert any(finding.get('id') == 'nested-synthetic' for finding in findings)

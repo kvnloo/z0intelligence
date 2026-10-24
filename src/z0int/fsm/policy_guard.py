@@ -56,7 +56,10 @@ def _records(path: Path):
         if not isinstance(row, dict):
             yield row
             return
+        synthetic = inherited.get('synthetic') is True or row.get('synthetic') is True
         row = {**inherited, **row}
+        if synthetic:
+            row['synthetic'] = True
         # Session custom entries wrap the decision in data and put time outside.
         if isinstance(row.get('data'), dict) and any(
                 key in row['data'] for key in ('policy_version', 'route', 'tier', 'policy_families')):
