@@ -1,0 +1,56 @@
+{
+ "law": "O9",
+ "incident": "A Hermes update at ~11:58 cut off six headless sol runs ('Gateway disconnected'); nothing recorded them until the orchestrator wrote RESUME.txt files at 12:24:43, 26 min later.",
+ "source": "sol-runs/20261021-{tool-detail,lab-polish,dash-steer,motion-speed,orchestra-meaning,chip-complete}/RESUME.txt (mtime 12:24:43, text 'cut off at ~11:58 by a Hermes update'). REPORT.md did not exist at 11:58 for any of them.",
+ "kind": "gateway",
+ "restart_at": "11:58",
+ "noticed_at": "12:24:43",
+ "before": {
+  "gateway_invocation": "gw-A",
+  "hermes_head": "head-before-update",
+  "units": {
+   "sol-tool-detail.service": [
+    "hermes",
+    "chat",
+    "--query-file",
+    "/mnt/zer0models/workspace/zer0/data/operations/sol-runs/20261021-tool-detail/PROMPT.txt"
+   ],
+   "sol-lab-polish.service": [
+    "hermes",
+    "chat",
+    "--query-file",
+    "/mnt/zer0models/workspace/zer0/data/operations/sol-runs/20261021-lab-polish/PROMPT.txt"
+   ],
+   "sol-dash-steer.service": [
+    "hermes",
+    "chat",
+    "--query-file",
+    "/mnt/zer0models/workspace/zer0/data/operations/sol-runs/20261021-dash-steer/PROMPT.txt"
+   ],
+   "sol-motion-speed.service": [
+    "hermes",
+    "chat",
+    "--query-file",
+    "/mnt/zer0models/workspace/zer0/data/operations/sol-runs/20261021-motion-speed/PROMPT.txt"
+   ],
+   "sol-orchestra-meaning.service": [
+    "hermes",
+    "chat",
+    "--query-file",
+    "/mnt/zer0models/workspace/zer0/data/operations/sol-runs/20261021-orchestra-meaning/PROMPT.txt"
+   ],
+   "sol-chip-complete.service": [
+    "hermes",
+    "chat",
+    "--query-file",
+    "/mnt/zer0models/workspace/zer0/data/operations/sol-runs/20261021-chip-complete/PROMPT.txt"
+   ]
+  }
+ },
+ "after": {
+  "gateway_invocation": "gw-A",
+  "hermes_head": "head-after-update",
+  "units": {}
+ },
+ "expect": "interrupted"
+}

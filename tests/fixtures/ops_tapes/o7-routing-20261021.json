@@ -1,0 +1,63 @@
+{
+ "law": "O7",
+ "incident": "xai/grok was cancelled 2026-10-21 yet omp roles still routed to Grok; visual/UX design workers were dispatched to Sol ('quality has fallen').",
+ "source": "modelRoles, retry.fallbackChains and live.provider copied from ~/.omp/agent/config.yml.before-no-grok-20261021 (no other keys); sol-runs PROMPT.txt headers of lab-polish and orchestra-ux ('You are a Sol (gpt-6.1-sol) worker') with design scope.",
+ "kind": "routing",
+ "configs": [
+  {
+   "label": "omp config before the 2026-10-21 Grok removal",
+   "omp_excerpt": {
+    "modelRoles": {
+     "smol": "anthropic/claude-haiku-4-5",
+     "vision": "xai-oauth/grok-4.6:high",
+     "task": "xai-oauth/grok-4.6:auto",
+     "advisor": "xai-oauth/grok-4.6:xhigh",
+     "default": "openai-codex/gpt-6.1-sol",
+     "plan": "xai-oauth/grok-4.6:xhigh",
+     "slow": "xai-oauth/grok-4.6:xhigh",
+     "judge": "typesafe/jev-latest"
+    },
+    "retry": {
+     "fallbackChains": {
+      "judge": [
+       "@default"
+      ],
+      "smol": [
+       "openai-codex/gpt-6-luna"
+      ]
+     }
+    },
+    "live": {
+     "provider": "grok"
+    }
+   },
+   "expect": "flagged"
+  }
+ ],
+ "items": [
+  {
+   "label": "lab-polish (visual polish/design) dispatched to Sol",
+   "role": "visual design",
+   "model": "openai-codex/gpt-6.1-sol",
+   "expect": "refused"
+  },
+  {
+   "label": "orchestra-ux dispatched to Sol",
+   "role": "ux design",
+   "model": "openai-codex/gpt-6.1-sol",
+   "expect": "refused"
+  },
+  {
+   "label": "control: implementation task on Sol",
+   "role": "task",
+   "model": "openai-codex/gpt-6.1-sol",
+   "expect": "allowed"
+  },
+  {
+   "label": "control: design role on Opus",
+   "role": "visual design",
+   "model": "anthropic/claude-opus-5-5",
+   "expect": "allowed"
+  }
+ ]
+}

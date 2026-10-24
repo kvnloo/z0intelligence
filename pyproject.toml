@@ -21,9 +21,11 @@ dependencies = [
   "sentencepiece==0.2.1",
   "protobuf==7.36.1",
   "aodl-contract @ git+https://github.com/kvnloo/aodl.git@68231658f0ec0338464c0916a2329b9587444312",
+  "PyYAML>=6,<7",
 ]
 
 [project.scripts]
+z0-guard = "z0int.fsm.guard:main"
 openjev-score = "openjev_phase1.cli:main"
 openjev-data = "openjev_phase1.jevlike.data:main"
 openjev-train = "openjev_phase1.jevlike.train:main"

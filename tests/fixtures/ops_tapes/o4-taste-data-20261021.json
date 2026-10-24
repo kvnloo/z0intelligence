@@ -1,0 +1,36 @@
+{
+ "law": "O4",
+ "incident": "taste-data is private (kvnloo/taste-data); the taste-skill fork is public (kvnloo/taste-skill). Nothing enforced the boundary.",
+ "source": "gh repo view visibility (live, cached); scratch repos built by the replay, never pushed.",
+ "kind": "push",
+ "items": [
+  {
+   "label": "private corpus copied under taste-lab/ (dir marked .z0-private) pushed to the public fork",
+   "remote_url": "https://github.com/kvnloo/taste-skill.git",
+   "origin_url": "https://github.com/kvnloo/taste-skill.git",
+   "files": {
+    "taste-lab/corpus/.z0-private": "",
+    "taste-lab/corpus/profile.json": "{\"likes\": []}"
+   },
+   "expect": "refused"
+  },
+  {
+   "label": "a commit from the private taste-data repo pushed to the public fork",
+   "remote_url": "https://github.com/kvnloo/taste-skill.git",
+   "origin_url": "https://github.com/kvnloo/taste-data.git",
+   "files": {
+    "taxonomy.json": "{}"
+   },
+   "expect": "refused"
+  },
+  {
+   "label": "control: ordinary skill change to the public fork",
+   "remote_url": "https://github.com/kvnloo/taste-skill.git",
+   "origin_url": "https://github.com/kvnloo/taste-skill.git",
+   "files": {
+    "skills/README.md": "hello"
+   },
+   "expect": "allowed"
+  }
+ ]
+}

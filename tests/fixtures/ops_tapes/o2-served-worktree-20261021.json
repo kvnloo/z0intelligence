@@ -1,0 +1,184 @@
+{
+ "law": "O2",
+ "incident": "A rollout worker edited the served worktree in place (merge commits 11:26-11:30, reset 11:32) -> HTTP 500 on Kevin's phone at 11:31.",
+ "source": "git reflog of /mnt/zer0models/workspace/zer0/products/dash/.worktrees/dash-20261020 (served by dash-metro-8097), 2026-10-21 09:59-15:56 CDT. None of these ran inside a z0-guard rollout transaction (it did not exist).",
+ "kind": "reflog",
+ "served_unit": "dash-metro-8097.service",
+ "items": [
+  {
+   "at": "09:59:08",
+   "sha": "77c95cdbf506",
+   "action": "checkout: moving from fix/stage-phone-review to integrate/dash-20261020"
+  },
+  {
+   "at": "09:59:08",
+   "sha": "11c39359837c",
+   "action": "merge b14d94057d788f0c018aba03717d8adad9449f9f: Merge made by the 'ort' strategy."
+  },
+  {
+   "at": "09:59:49",
+   "sha": "1f153c2cd7c6",
+   "action": "merge e8fdfa328a954d3a7710aa93d5f3d4db9e648f4c: Merge made by the 'ort' strategy."
+  },
+  {
+   "at": "10:00:53",
+   "sha": "ae8bf15a806c",
+   "action": "commit (merge): merge: integrate Dash #84 thinking orbs and live status"
+  },
+  {
+   "at": "10:01:18",
+   "sha": "4e7311010ced",
+   "action": "commit (merge): merge: integrate Dash #85 composer navigation and cancellation timer"
+  },
+  {
+   "at": "10:01:33",
+   "sha": "748c06bf1a0b",
+   "action": "merge b0a3f50b36d8395c31395fe88e87f4226d32aa89: Merge made by the 'ort' strategy."
+  },
+  {
+   "at": "10:04:29",
+   "sha": "9d3f23cf55fd",
+   "action": "commit (merge): merge: integrate Dash #77 prompt rail and highlighted Markdown"
+  },
+  {
+   "at": "10:06:39",
+   "sha": "32f5ff2678e4",
+   "action": "commit: fix(integration): compose Markdown debug and identity phase authorization"
+  },
+  {
+   "at": "10:06:39",
+   "sha": "b85e2f14760c",
+   "action": "commit: fix(ci): install public gates without cloning private AODL renderer"
+  },
+  {
+   "at": "10:07:10",
+   "sha": "096eb851e933",
+   "action": "merge fde12f7: Merge made by the 'ort' strategy."
+  },
+  {
+   "at": "10:09:54",
+   "sha": "932e719d158b",
+   "action": "commit: fix(ci): preserve frozen public dependency resolutions when excluding renderer"
+  },
+  {
+   "at": "10:10:08",
+   "sha": "4e4896bf4af9",
+   "action": "merge 50d4916: Merge made by the 'ort' strategy."
+  },
+  {
+   "at": "10:16:08",
+   "sha": "cd12f2dd7049",
+   "action": "commit: ci: qualify the active Dash phone integration branch on push"
+  },
+  {
+   "at": "10:17:20",
+   "sha": "1e2cf3307185",
+   "action": "commit: fix(ci): use the Bun 1.4.3 frozen installer qualified on fleet"
+  },
+  {
+   "at": "10:17:51",
+   "sha": "9003c3032fcc",
+   "action": "merge 4adb6cd: Merge made by the 'ort' strategy."
+  },
+  {
+   "at": "11:02:20",
+   "sha": "6949e9146b9a",
+   "action": "merge cdb663f0b82d110a81d372450ac9167df556589d: Merge made by the 'ort' strategy."
+  },
+  {
+   "at": "11:04:06",
+   "sha": "3e243722216c",
+   "action": "commit (merge): merge: integrate #88 native trace and component lab"
+  },
+  {
+   "at": "11:04:27",
+   "sha": "b23b238cd1fc",
+   "action": "merge 12b949a63bc13bd70898816a40c981823a026fe9: Merge made by the 'ort' strategy."
+  },
+  {
+   "at": "11:07:27",
+   "sha": "9c179f290d56",
+   "action": "commit: fix(routes): make Orchestra reachable from native rollout link"
+  },
+  {
+   "at": "11:26:29",
+   "sha": "b9479fdb2f6e",
+   "action": "commit (merge): Merge PR #91 thinking and tool blocks into integration"
+  },
+  {
+   "at": "11:27:22",
+   "sha": "de32df8a8d5c",
+   "action": "commit: Complete interrupted and error reply integration"
+  },
+  {
+   "at": "11:27:57",
+   "sha": "6a7910b9f00f",
+   "action": "commit (merge): Merge PR #94 model roles and summaries into integration"
+  },
+  {
+   "at": "11:28:49",
+   "sha": "ae32f9749145",
+   "action": "commit (merge): Merge PR #90 shared tree and Bots tree into integration"
+  },
+  {
+   "at": "11:29:23",
+   "sha": "14797dd6f04f",
+   "action": "commit (merge): Merge PR #92 prompt rail performance and encodings into integration"
+  },
+  {
+   "at": "11:30:02",
+   "sha": "faf6183ac7c4",
+   "action": "commit (merge): Merge PR #93 left-handed mode into integration"
+  },
+  {
+   "at": "11:32:09",
+   "sha": "faf6183ac7c4",
+   "action": "reset: moving to HEAD"
+  },
+  {
+   "at": "11:39:57",
+   "sha": "b0e05e2e05d2",
+   "action": "merge origin/integrate/dash-20261020: Fast-forward"
+  },
+  {
+   "at": "12:19:16",
+   "sha": "bd98b67698f2",
+   "action": "merge origin/integrate/dash-20261020: Fast-forward"
+  },
+  {
+   "at": "12:28:16",
+   "sha": "7ef17e13559f",
+   "action": "merge origin/integrate/dash-20261020: Fast-forward"
+  },
+  {
+   "at": "12:28:37",
+   "sha": "8983317281a2",
+   "action": "merge origin/integrate/dash-20261020: Fast-forward"
+  },
+  {
+   "at": "12:57:51",
+   "sha": "a4c1f9aa0136",
+   "action": "merge origin/integrate/dash-20261020: Fast-forward"
+  },
+  {
+   "at": "13:19:02",
+   "sha": "bb6e7516ce40",
+   "action": "merge origin/integrate/dash-20261020: Fast-forward"
+  },
+  {
+   "at": "13:35:32",
+   "sha": "8229ba9ee76e",
+   "action": "merge origin/integrate/dash-20261020: Fast-forward"
+  },
+  {
+   "at": "14:02:01",
+   "sha": "3b3cb3843b79",
+   "action": "merge origin/integrate/dash-20261020: Fast-forward"
+  },
+  {
+   "at": "15:55:47",
+   "sha": "5a46aceb3f24",
+   "action": "merge 5a46aceb3f240cc1c50c9b52cc2348563bea49ef: Fast-forward"
+  }
+ ]
+}
