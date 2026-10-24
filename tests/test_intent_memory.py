@@ -15,8 +15,8 @@ import pytest
 from z0int.intent_memory import MemoryRetriever, SourceUnavailable, _read_local, validate_citations
 
 
-def record(source="test", identity="native-1", text="synthetic phone policy", path=None):
-    row = {"source": source, "id": identity, "text": text, "evidence_kind": "unknown"}
+def record(source="test", identity="native-1", text="synthetic phone policy", path=None, evidence_kind="unknown"):
+    row = {"source": source, "id": identity, "text": text, "evidence_kind": evidence_kind}
     if path is not None:
         row["path"] = str(path)
     return row
@@ -26,7 +26,7 @@ def record(source="test", identity="native-1", text="synthetic phone policy", pa
 def roots(tmp_path):
     return {name: tmp_path / name for name in (
         "memory_mcp", "events", "hermes", "chiefstaff", "agentsview", "recall",
-        "statepack", "state_packet", "unified_index", "qmd",
+        "statepack", "state_packet", "state_packet_fallback", "qmd",
     )}
 
 
@@ -43,7 +43,7 @@ def event_line(identity, payload, **extras):
     return json.dumps(row, ensure_ascii=False) + "\n"
 
 
-def test_concurrent_sources_share_one_deadline_and_cancel():
+def test_concurrent_sources_share_one_deadline_and_cancel(roots):
     async def scenario():
         entered = set()
         cancelled = set()
@@ -64,20 +64,21 @@ def test_concurrent_sources_share_one_deadline_and_cancel():
             await asyncio.sleep(0.01)
             return [record()]
 
-        retriever = MemoryRetriever(timeout_s=0.08, source_timeout_s=1,
+        retriever = MemoryRetriever(source_roots=roots, timeout_s=0.08, source_timeout_s=1,
             sources={"fast": fast, **{name: blocked(name) for name in ("a", "b", "c")}})
         start = time.monotonic()
         result = await retriever.retrieve("phone")
         assert time.monotonic() - start < 0.5
         assert entered == cancelled == {"a", "b", "c"}
         assert result["records"] == [record()]
-        assert [s["status"] for s in result["sources"]] == ["answered", "timeout", "timeout", "timeout"]
-        assert all(s["error"] == "total_deadline" for s in result["sources"][1:])
+        statuses = [s for s in result["sources"] if s["source"] != "state_packet"]
+        assert [s["status"] for s in statuses] == ["answered", "timeout", "timeout", "timeout"]
+        assert all(s["error"] == "total_deadline" for s in statuses[1:])
         assert all(s["latency_ms"] >= 0 for s in result["sources"])
     asyncio.run(scenario())
 
 
-def test_per_source_timeout_is_independent():
+def test_per_source_timeout_is_independent(roots):
     async def scenario():
         cancelled = asyncio.Event()
         async def slow(query):
@@ -88,17 +89,18 @@ def test_per_source_timeout_is_independent():
         async def useful(query):
             await asyncio.sleep(0.06)
             return [record()]
-        retriever = MemoryRetriever(timeout_s=1, source_timeout_s={"slow": 0.02, "useful": 0.2}, sources={"slow": slow, "useful": useful})
+        retriever = MemoryRetriever(source_roots=roots, timeout_s=1, source_timeout_s={"slow": 0.02, "useful": 0.2}, sources={"slow": slow, "useful": useful})
         result = await retriever.retrieve("phone")
         assert cancelled.is_set()
-        assert result["sources"][0]["status"] == "timeout"
-        assert result["sources"][0]["error"] == "source_deadline"
-        assert result["sources"][1]["status"] == "answered"
+        statuses = {s["source"]: s for s in result["sources"]}
+        assert statuses["slow"]["status"] == "timeout"
+        assert statuses["slow"]["error"] == "source_deadline"
+        assert statuses["useful"]["status"] == "answered"
         assert len(result["records"]) == 1
     asyncio.run(scenario())
 
 
-def test_outer_cancellation_drains_all_sources():
+def test_outer_cancellation_drains_all_sources(roots):
     async def scenario():
         entered = asyncio.Event()
         exited = asyncio.Event()
@@ -108,7 +110,7 @@ def test_outer_cancellation_drains_all_sources():
                 await asyncio.sleep(20)
             finally:
                 exited.set()
-        retriever = MemoryRetriever(sources={"slow": source})
+        retriever = MemoryRetriever(source_roots=roots, sources={"slow": source})
         task = asyncio.create_task(retriever.retrieve("phone"))
         await entered.wait()
         task.cancel()
@@ -118,27 +120,28 @@ def test_outer_cancellation_drains_all_sources():
     asyncio.run(scenario())
 
 
-def test_unavailable_is_not_an_answer_and_errors_do_not_leak_context():
+def test_unavailable_is_not_an_answer_and_errors_do_not_leak_context(roots):
     async def failure(query):
         raise RuntimeError("synthetic-private-context-do-not-return")
     async def empty(query):
         return []
-    result = asyncio.run(MemoryRetriever(sources={"failed": failure, "empty": empty}).retrieve("phone"))
+    result = asyncio.run(MemoryRetriever(source_roots=roots, sources={"failed": failure, "empty": empty}).retrieve("phone"))
     assert result["records"] == []
-    assert result["sources"][0]["status"] == "unavailable"
-    assert result["sources"][0]["error"] == "RuntimeError"
-    assert result["sources"][1]["status"] == "answered"
+    statuses = {s["source"]: s for s in result["sources"]}
+    assert statuses["failed"]["status"] == "unavailable"
+    assert statuses["failed"]["error"] == "RuntimeError"
+    assert statuses["empty"]["status"] == "answered"
     assert "synthetic-private" not in json.dumps(result)
 
 
-def test_stable_dedup_and_output_bounds(tmp_path):
+def test_stable_dedup_and_output_bounds(tmp_path, roots):
     path = tmp_path / "memory.md"
     path.write_text("phone")
     async def source(query):
         return [record(identity="same", text="phone " * 10, path=path),
                 record(identity="same", text="duplicate"), record(identity="second", text="phone " * 10),
                 record(identity="missing", path=tmp_path / "not-there")]
-    retriever = MemoryRetriever(sources={"one": source, "two": source}, record_chars=10, total_chars=17, max_records=3)
+    retriever = MemoryRetriever(source_roots=roots, sources={"one": source, "two": source}, record_chars=10, total_chars=17, max_records=3)
     first = asyncio.run(retriever.retrieve("phone"))
     second = asyncio.run(retriever.retrieve("phone"))
     assert first["records"] == second["records"]
@@ -146,16 +149,16 @@ def test_stable_dedup_and_output_bounds(tmp_path):
     assert sum(len(r["text"]) for r in first["records"]) == 17
 
 
-def test_query_and_recent_context_are_bounded():
+def test_query_and_recent_context_are_bounded(roots):
     seen = []
     async def source(query):
         seen.append(query)
         return []
-    retriever = MemoryRetriever(sources={"source": source})
-    asyncio.run(retriever.retrieve("phone", ["old ignored", "fleet", "policy", "recent"]))
-    assert seen == ["phone fleet policy recent"]
+    retriever = MemoryRetriever(source_roots=roots, sources={"source": source})
+    asyncio.run(retriever.retrieve("Please, I already told you: S22 phone policy!", ["old ignored", "fleet", "policy", "recent"]))
+    assert seen == ["s22 phone policy", "fleet policy recent"]
     asyncio.run(retriever.retrieve("界" * 1000))
-    assert len(seen[-1].encode()) <= 1000
+    assert len(seen[-1].encode()) <= 256
 
 
 @pytest.mark.parametrize("citation", [
@@ -199,9 +202,10 @@ def test_missing_and_invalid_paths_fail_closed():
     assert not validate_citations(["null-path"], rows)
 
 
-def test_source_roots_override_defaults_and_home(monkeypatch, tmp_path):
+def test_source_roots_override_defaults_and_home(monkeypatch, tmp_path, roots):
     monkeypatch.setenv("Z0INT_HOME", str(tmp_path / "home"))
-    retriever = MemoryRetriever(source_roots={"hermes": tmp_path / "notes"}, sources={})
+    retriever = MemoryRetriever(source_roots={"state_packet": roots["state_packet"],
+        "state_packet_fallback": roots["state_packet_fallback"], "hermes": tmp_path / "notes"}, sources={})
     assert retriever.roots["events"] == tmp_path / "home/memory/events.jsonl"
     assert retriever.roots["hermes"] == tmp_path / "notes"
     assert asyncio.run(retriever.retrieve("phone"))["records"] == []
@@ -219,13 +223,132 @@ def test_hermes_and_chiefstaff_are_retrieved_locally(roots):
     assert rows == _read_local(local_request(roots, "hermes"))
 
 
-def test_state_packet_headings_are_evidence_not_a_registry(roots):
-    roots["state_packet"].write_text("# Orientation\n\n## phone fleet\n\nThe phone worker is local.")
-    roots["unified_index"].write_text("phone → /synthetic/skill → read before operating")
-    rows = _read_local(local_request(roots, "state_packet"))
-    assert len(rows) == 3
-    assert all(row["source"] == "state_packet" for row in rows)
-    assert all("project" not in row for row in rows)
+def test_state_packet_is_complete_evidence_not_a_registry(roots):
+    text = "# Orientation\n\n## phone fleet\n\nThe phone worker is local."
+    roots["state_packet"].write_text(text)
+    rows = _read_local(local_request(roots, "state_packet", query="oranges", limit=1))
+    assert len(rows) == 1
+    assert rows[0]["source"] == "state_packet"
+    assert rows[0]["text"] == text
+    assert rows[0]["evidence_kind"] == "claimed"
+    assert rows[0]["id"] == f"{roots['state_packet']}:sha256:{hashlib.sha256(text.encode()).hexdigest()}"
+    assert "project" not in rows[0]
+
+
+def test_packet_defaults_prefer_canonical_installed_path():
+    retriever = MemoryRetriever(sources={})
+    assert retriever.roots["state_packet"] == Path.home() / ".local/state/z0int/STATE-PACKET.md"
+    assert retriever.roots["state_packet_fallback"] == Path("/mnt/zer0models/workspace/zer0/data/operations/repo-distill/STATE-PACKET.md")
+
+
+def test_packet_is_first_without_overlap_and_outside_search_budgets(roots):
+    text = "# Orientation\n\nOrchards and purple bicycles.\n" * 200
+    roots["state_packet"].write_text(text)
+    roots["state_packet_fallback"].write_text("Not the canonical packet")
+
+    async def search(query):
+        return [record(text="phone " * 200), record(identity="second")]
+
+    retriever = MemoryRetriever(source_roots=roots, sources={"search": search},
+        max_records=1, per_source_limit=1, record_chars=3, total_chars=2)
+    result = asyncio.run(retriever.retrieve("phone"))
+    packet, targeted = result["records"]
+    assert result["sources"][0]["source"] == packet["source"] == "state_packet"
+    assert result["sources"][0]["status"] == "answered"
+    assert packet["path"] == str(roots["state_packet"])
+    assert packet["text"] == text
+    assert packet["evidence_kind"] == "claimed"
+    assert targeted["text"] == "ph"
+    assert validate_citations([{"source": "state_packet", "id": packet["id"], "path": packet["path"],
+                               "evidence_kind": "claimed"}], result["records"])
+    assert not validate_citations([{"id": packet["id"], "evidence_kind": "observed"}], result["records"])
+
+
+def test_packet_falls_back_only_when_canonical_is_missing(roots):
+    roots["state_packet_fallback"].write_text("# Generated snapshot\n\nNo lexical overlap.")
+    result = asyncio.run(MemoryRetriever(source_roots=roots, sources={}).retrieve("phone"))
+    assert result["sources"][0]["status"] == "answered"
+    assert result["records"][0]["path"] == str(roots["state_packet_fallback"])
+    assert result["records"][0]["text"] == roots["state_packet_fallback"].read_text()
+    assert result["records"][0]["evidence_kind"] == "claimed"
+
+
+def test_missing_packet_is_explicit_not_answered_empty(roots):
+    result = asyncio.run(MemoryRetriever(source_roots=roots, sources={}).retrieve("phone"))
+    assert result["records"] == []
+    assert result["sources"][0]["source"] == "state_packet"
+    assert result["sources"][0]["status"] == "unavailable"
+    assert result["sources"][0]["error"] == "state_packet_missing"
+
+
+@pytest.mark.parametrize(("text", "error"), [("", "state_packet_empty"), ("x" * 65_537, "file_limit")])
+def test_invalid_canonical_packet_is_unavailable_not_silently_replaced(roots, text, error):
+    roots["state_packet"].write_text(text)
+    roots["state_packet_fallback"].write_text("Must not mask invalid canonical packet")
+    result = asyncio.run(MemoryRetriever(source_roots=roots, sources={}).retrieve("phone"))
+    assert result["records"] == []
+    assert result["sources"][0]["status"] == "unavailable"
+    assert result["sources"][0]["error"] == error
+
+
+def test_empty_lookup_still_loads_packet(roots):
+    roots["state_packet"].write_text("# Orientation\n\nOriginal packet.")
+    called = []
+
+    async def search(query):
+        called.append(query)
+        return []
+
+    result = asyncio.run(MemoryRetriever(source_roots=roots, sources={"search": search}).retrieve(""))
+    assert result["records"][0]["text"] == roots["state_packet"].read_text()
+    assert called == []
+    assert result["sources"][1]["status"] == "unavailable"
+    assert result["sources"][1]["error"] == "empty_query"
+
+
+def test_targeted_queries_bound_calls_terms_and_preserve_identifiers(roots):
+    queries = []
+
+    async def search(query):
+        queries.append(query)
+        return [record()]
+
+    retriever = MemoryRetriever(source_roots=roots, sources={"search": search}, per_source_limit=1)
+    result = asyncio.run(retriever.retrieve(
+        "Please, I already told you! " * 40 + "s22 policy memory_mcp phone worker fleet socket permissions history",
+        ["old ignored", "statepack registry", "qmd indexed sources", "chiefstaff decisions"]))
+    assert len(queries) == 2
+    assert all(len(query.encode()) <= 256 and len(query.split()) <= 8 for query in queries)
+    assert queries[0].split()[:2] == ["s22", "memory_mcp"]
+    assert "please" not in queries[0] and "already" not in queries[0]
+    assert queries[1] == "statepack registry qmd indexed sources chiefstaff decisions"
+    assert len(result["records"]) == 1
+
+
+def test_targeted_calls_share_deadline_and_keep_honest_partial_status(roots):
+    async def scenario():
+        calls = []
+        cancelled = asyncio.Event()
+
+        async def search(query):
+            calls.append(query)
+            if len(calls) == 1:
+                return [record()]
+            try:
+                await asyncio.sleep(20)
+            finally:
+                cancelled.set()
+
+        retriever = MemoryRetriever(source_roots=roots, sources={"search": search},
+            timeout_s=1, source_timeout_s={"search": 0.03})
+        result = await retriever.retrieve("phone", ["fleet"])
+        assert calls == ["phone", "fleet"]
+        assert cancelled.is_set()
+        assert result["records"] == [record()]
+        status = {s["source"]: s for s in result["sources"]}["search"]
+        assert status["status"] == "timeout"
+        assert status["error"] == "source_deadline"
+    asyncio.run(scenario())
 
 
 def test_events_preserve_native_id_checksum_and_partial_tail(roots):
@@ -276,15 +399,15 @@ def test_local_worker_runs_under_overridden_roots_only(roots):
     roots["hermes"].mkdir()
     (roots["hermes"] / "MEMORY.md").write_text("synthetic phone worker")
     retriever = MemoryRetriever(source_roots=roots, sources={})
-    retriever.sources = {"hermes": lambda query: retriever._local("hermes", query)}
+    retriever.sources["hermes"] = lambda query: retriever._local("hermes", query)
     result = asyncio.run(retriever.retrieve("phone"))
-    assert result["sources"][0]["status"] == "answered"
+    assert {s["source"]: s["status"] for s in result["sources"]} == {"state_packet": "unavailable", "hermes": "answered"}
     assert result["records"][0]["text"] == "synthetic phone worker"
 
 
-def test_command_collects_all_output_chunks_and_reaps_on_timeout(tmp_path):
+def test_command_collects_all_output_chunks_and_reaps_on_timeout(tmp_path, roots):
     async def scenario():
-        retriever = MemoryRetriever(sources={})
+        retriever = MemoryRetriever(source_roots=roots, sources={})
         output = await retriever._command([sys.executable, "-c", "import sys,time; print('first',flush=True); time.sleep(.02); print('second',flush=True)"])
         assert output == b"first\nsecond\n"
         pidfile = tmp_path / "owned.pid"
@@ -304,23 +427,23 @@ def test_command_collects_all_output_chunks_and_reaps_on_timeout(tmp_path):
     asyncio.run(scenario())
 
 
-def test_command_output_limit_kills_reader():
+def test_command_output_limit_kills_reader(roots):
     async def scenario():
-        retriever = MemoryRetriever(sources={})
+        retriever = MemoryRetriever(source_roots=roots, sources={})
         with pytest.raises(SourceUnavailable, match="output_limit"):
             await retriever._command([sys.executable, "-c", "import sys; sys.stdout.write('x'*1100000)"])
     asyncio.run(scenario())
 
 
-def test_tencentdb_native_protocol_and_no_invented_ids(monkeypatch):
-    retriever = MemoryRetriever(sources={})
+def test_tencentdb_native_protocol_and_no_invented_ids(monkeypatch, roots):
+    retriever = MemoryRetriever(source_roots=roots, sources={})
     calls = []
     async def http(port, path, **kwargs):
         calls.append((port, path, kwargs))
         return {"code": 0, "data": {"items": [{"id": "native-42", "content": "phone"}, {"content": "no native id"}]}}
     monkeypatch.setattr(retriever, "_http", http)
     rows = asyncio.run(retriever._tencentdb("phone"))
-    assert rows == [record(source="tencentdb", identity="native-42", text="phone")]
+    assert rows == [record(source="tencentdb", identity="native-42", text="phone", evidence_kind="claimed")]
     assert calls[0][0:2] == (8420, "/v3/atomic/search")
     assert calls[0][2]["body"]["query"] == "phone"
     assert calls[0][2]["body"]["limit"] == 5
@@ -330,11 +453,11 @@ def test_statepack_uses_untyped_existing_api(roots):
     roots["statepack"].write_text("def orient(query, *, typed=True):\n    assert typed is False\n    return {'evidence': [{'source_id':'synthetic','locator':'native-1','excerpt':query}]}\n")
     retriever = MemoryRetriever(source_roots=roots, sources={})
     rows = asyncio.run(retriever._statepack("phone"))
-    assert rows == [record(source="statepack", identity="synthetic:native-1", text="phone")]
+    assert rows == [record(source="statepack", identity="synthetic:native-1", text="phone", evidence_kind="claimed")]
 
 
-def test_qmd_reads_document_not_search_preview(monkeypatch):
-    retriever = MemoryRetriever(sources={})
+def test_qmd_reads_document_not_search_preview(monkeypatch, roots):
+    retriever = MemoryRetriever(source_roots=roots, sources={})
     calls = []
     async def command(argv, payload=None):
         calls.append(argv)
@@ -349,30 +472,31 @@ def test_qmd_reads_document_not_search_preview(monkeypatch):
     assert not any("query" in call or "vsearch" in call for call in calls)
 
 
-def test_unii_uses_readonly_export_no_model_act(monkeypatch):
+def test_unii_uses_readonly_export_no_model_act(monkeypatch, roots):
     monkeypatch.setenv("Z0INT_INTENT_UNII_TOKEN", "synthetic-token")
-    retriever = MemoryRetriever(sources={})
+    retriever = MemoryRetriever(source_roots=roots, sources={})
     calls = []
     async def http(port, path, **kwargs):
         calls.append((port, path, kwargs))
         return {"messages": [{"id": 7, "kind": "unii", "text": "phone fleet rule"}, {"id": 8, "kind": "mind", "text": "phone private reasoning"}, {"kind": "unii", "text": "phone missing identity"}]}
     monkeypatch.setattr(retriever, "_http", http)
-    assert asyncio.run(retriever._expert("phone")) == [record(source="unified_expert", identity="7", text="phone fleet rule")]
+    assert asyncio.run(retriever._expert("phone")) == [record(source="unified_expert", identity="7", text="phone fleet rule", evidence_kind="claimed")]
     assert calls[0][0:2] == (8798, "/export")
     assert "body" not in calls[0][2]
 
 
-def test_unii_missing_auth_reports_unavailable_without_call(monkeypatch):
+def test_unii_missing_auth_reports_unavailable_without_call(monkeypatch, roots):
     monkeypatch.delenv("Z0INT_INTENT_UNII_TOKEN", raising=False)
-    retriever = MemoryRetriever(sources={})
-    retriever.sources = {"unified_expert": retriever._expert}
+    retriever = MemoryRetriever(source_roots=roots, sources={})
+    retriever.sources["unified_expert"] = retriever._expert
     result = asyncio.run(retriever.retrieve("phone"))
     assert result["records"] == []
-    assert result["sources"][0]["status"] == "unavailable"
-    assert result["sources"][0]["error"] == "expert_read_auth_unavailable"
+    status = {s["source"]: s for s in result["sources"]}["unified_expert"]
+    assert status["status"] == "unavailable"
+    assert status["error"] == "expert_read_auth_unavailable"
 
 
-def test_mcp_search_fetch_same_connection_preserves_native_identity(tmp_path):
+def test_mcp_search_fetch_same_connection_preserves_native_identity(tmp_path, roots):
     async def scenario():
         path = tmp_path / "operator.sock"
         seen = []
@@ -393,7 +517,7 @@ def test_mcp_search_fetch_same_connection_preserves_native_identity(tmp_path):
         server = await asyncio.start_unix_server(serve, path=str(path))
         path.chmod(0o600)
         try:
-            retriever = MemoryRetriever(source_roots={"memory_mcp": path}, sources={})
+            retriever = MemoryRetriever(source_roots={**roots, "memory_mcp": path}, sources={})
             rows = await retriever._mcp("phone")
             assert rows == [record(source="agentsview", identity=original["locator"], text="phone original")]
             assert [message["params"]["name"] for message in seen] == ["search", "fetch"]
@@ -407,7 +531,7 @@ def test_mcp_search_fetch_same_connection_preserves_native_identity(tmp_path):
     asyncio.run(scenario())
 
 
-def test_loopback_http_decodes_chunked_json_and_never_redirects():
+def test_loopback_http_decodes_chunked_json_and_never_redirects(roots):
     async def scenario():
         seen = []
         async def serve(reader, writer):
@@ -419,7 +543,7 @@ def test_loopback_http_decodes_chunked_json_and_never_redirects():
         server = await asyncio.start_server(serve, "127.0.0.1", 0)
         try:
             port = server.sockets[0].getsockname()[1]
-            retriever = MemoryRetriever(sources={})
+            retriever = MemoryRetriever(source_roots=roots, sources={})
             assert await retriever._http(port, "/export") == {"ok": True}
             assert seen[0].startswith(b"GET /export HTTP/1.1")
             assert b"Host: 127.0.0.1:" in seen[0]

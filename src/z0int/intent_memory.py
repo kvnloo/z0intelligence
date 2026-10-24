@@ -1,9 +1,9 @@
 """Bounded private evidence retrieval; records are context, never authorization.
 
-Only loopback/read-only APIs are used. Blocking file/SQLite/CLI adapters run in
-owned process groups, not executor threads: cancellation kills and reaps them.
-The Unii expert has no read-only question API; its authenticated /export is the
-only HTTP memory read used here. No chat act, inference, write or install occurs.
+The canonical state packet is first, independent of lexical/search budgets.
+Targeted lookups follow through existing loopback/read-only adapters. Blocking
+file/SQLite/CLI readers run in owned process groups; cancellation reaps them.
+The Unii expert has no read-only question API, so only /export is used.
 """
 from __future__ import annotations
 
@@ -27,15 +27,30 @@ Record = dict[str, Any]
 Source = Callable[[str], Awaitable[list[Record]]]
 _MAX_BYTES = 1_048_576
 _MAX_FILE_BYTES = 262_144
+_MAX_PACKET_BYTES = 65_536
 _STOP = frozenset("a an and are as at be by do for from how i in is it me of on or our that the this to was we what when where which with you your".split())
+_QUERY_STOP = _STOP | frozenset("already again asked asking can could did dont get have hey just know like need please really remember said should still tell than them then there these they think those told want were why will would yes".split())
+
+
+def _lookup_queries(text: str, context: Iterable[str]) -> list[str]:
+    """At most two short lexical lookups, never a forwarded conversation."""
+    queries = []
+    for part in (text, " ".join(context)):
+        terms = [term for term in _terms(part[-4000:], limit=128) if term not in _QUERY_STOP]
+        # Identifiers survive conversational prefixes and the byte bound.
+        terms.sort(key=lambda term: not any(c.isdigit() or c in "._-/" for c in term))
+        query = " ".join(terms[:8]).encode("utf-8")[:256].decode("utf-8", "ignore").strip()
+        if query and query not in queries:
+            queries.append(query)
+    return queries
 
 
 class SourceUnavailable(RuntimeError):
     """Fixed-code failures only; never expose private upstream errors."""
 
 
-def _terms(text: str) -> list[str]:
-    return list(dict.fromkeys(w for w in re.findall(r"[\w.-]{2,}", text.casefold()) if w not in _STOP))[:24]
+def _terms(text: str, *, limit: int = 24) -> list[str]:
+    return list(dict.fromkeys(w for w in re.findall(r"[\w.-]{2,}", text.casefold()) if w not in _STOP))[:limit]
 
 
 def _digest(text: str) -> str:
@@ -89,12 +104,13 @@ def validate_citations(citations: Any, records: Iterable[Mapping[str, Any]]) -> 
 
 
 class MemoryRetriever:
-    """Retrieve all unified sources concurrently under one absolute deadline.
+    """Retrieve a mandatory packet plus targeted sources under one deadline.
 
     ``source_roots`` overrides named filesystem locations (see defaults below).
-    ``sources`` replaces the adapter map for isolated tests/embedding. Source
-    callables must be cancellation-cooperative; built-ins own all subprocesses
-    and sockets. A successful empty search is answered, not invented evidence.
+    ``sources`` replaces targeted adapters for isolated tests/embedding; the
+    state packet is always read first in the result catalog. Search budgets
+    exclude this one bounded file. Source callables must cooperate with
+    cancellation; built-ins own all subprocesses and sockets.
     """
 
     def __init__(self, *, root: Path | str | None = None, timeout_s: float = 4.0,
@@ -125,8 +141,8 @@ class MemoryRetriever:
             "agentsview": Path(os.environ.get("AGENTSVIEW_DATA_DIR", "/mnt/zer0models/sft-svlm/data/agentsview")),
             "recall": Path("/mnt/zer0models/workspace/zer0/oss/tools/recall.py"),
             "statepack": Path("/mnt/zer0models/workspace/zer0/oss/tools/statepack.py"),
-            "state_packet": operations / "repo-distill/STATE-PACKET.md",
-            "unified_index": operations / "unified-memory/INDEX.md",
+            "state_packet": home / ".local/state/z0int/STATE-PACKET.md",
+            "state_packet_fallback": operations / "repo-distill/STATE-PACKET.md",
             "qmd": Path(os.environ.get("Z0INT_INTENT_QMD", str(home / ".local/bin/qmd"))),
         }
         self.roots.update({k: Path(v).expanduser().absolute() for k, v in (source_roots or {}).items()})
@@ -138,7 +154,7 @@ class MemoryRetriever:
         self.total_chars = total_chars
         self.tencentdb_port = tencentdb_port
         self.expert_port = expert_port
-        self.sources: dict[str, Source] = dict(sources) if sources is not None else {
+        adapters: dict[str, Source] = dict(sources) if sources is not None else {
             "memory_mcp": self._mcp,
             "events": lambda q: self._local("events", q),
             "tencentdb": self._tencentdb,
@@ -148,17 +164,21 @@ class MemoryRetriever:
             "statepack": self._statepack,
             "qmd": self._qmd,
             "unified_expert": self._expert,
+        }
+        self.sources: dict[str, Source] = {
             "state_packet": lambda q: self._local("state_packet", q),
+            **{name: fn for name, fn in adapters.items() if name != "state_packet"},
         }
 
     async def retrieve(self, text: str, recent_user_msgs: Iterable[str] = ()) -> dict[str, Any]:
         started = time.monotonic()
         if not isinstance(text, str):
             raise TypeError("text must be a string")
-        # Current ask first. Context is bounded and only sent to local readers.
+        # Do not send full frustrated asks or conversation transcripts to brittle
+        # lexical APIs. Current intent and recent context get separate lookups.
         context = [m[-1000:] for m in list(recent_user_msgs)[-3:] if isinstance(m, str)]
-        query = " ".join([text, *context]).strip().encode("utf-8")[:1000].decode("utf-8", "ignore")
-        tasks = {name: asyncio.create_task(self._run(name, fn, query)) for name, fn in self.sources.items()}
+        queries = _lookup_queries(text, context)
+        tasks = {name: asyncio.create_task(self._run(name, fn, queries)) for name, fn in self.sources.items()}
         try:
             if tasks:
                 await asyncio.wait(tasks.values(), timeout=max(0, self.timeout_s - (time.monotonic() - started)))
@@ -171,6 +191,7 @@ class MemoryRetriever:
         statuses: list[dict[str, Any]] = []
         seen: set[tuple[str, str]] = set()
         used = 0
+        search_count = 0
         for name, task in tasks.items():
             if name in pending:
                 statuses.append({"source": name, "status": "timeout", "latency_ms": round((time.monotonic() - started) * 1000, 2), "error": "total_deadline"})
@@ -183,31 +204,41 @@ class MemoryRetriever:
                 if "path" in row and not _local_path_exists(row["path"]):
                     continue
                 key = (row["source"], row["id"])
-                if key in seen or len(records) >= self.max_records:
+                packet = name == "state_packet"
+                if key in seen or (not packet and search_count >= self.max_records):
                     continue
-                size = min(self.record_chars, self.total_chars - used)
+                size = len(row["text"]) if packet else min(self.record_chars, self.total_chars - used)
                 if size <= 0:
                     break
                 normalized = {k: row[k] for k in ("source", "id", "path") if k in row}
                 normalized["evidence_kind"] = row.get("evidence_kind", "unknown")
                 normalized["text"] = row["text"][:size]
                 records.append(normalized)
-                used += len(normalized["text"])
+                if not packet:
+                    used += len(normalized["text"])
+                    search_count += 1
                 seen.add(key)
         return {"records": records, "sources": statuses, "latency_ms": round((time.monotonic() - started) * 1000, 2)}
 
-    async def _run(self, name: str, fn: Source, query: str) -> tuple[list[Record], dict[str, Any]]:
+    async def _run(self, name: str, fn: Source, queries: list[str]) -> tuple[list[Record], dict[str, Any]]:
         started = time.monotonic()
         status: dict[str, Any] = {"source": name, "status": "answered"}
         rows: list[Record] = []
+
+        async def collect() -> None:
+            for query in ([""] if name == "state_packet" else queries):
+                result = await fn(query)
+                if not isinstance(result, list):
+                    raise SourceUnavailable("invalid_records")
+                rows.extend(result[:self.per_source_limit])
+
         try:
             timeout = self.source_timeout_s.get(name, self.timeout_s) if isinstance(self.source_timeout_s, Mapping) else self.source_timeout_s
-            if not query:
+            if not queries and name != "state_packet":
                 raise SourceUnavailable("empty_query")
-            rows = await asyncio.wait_for(fn(query), timeout=min(timeout, self.timeout_s))
-            if not isinstance(rows, list):
-                raise SourceUnavailable("invalid_records")
-            rows = rows[:self.per_source_limit]
+            # Both targeted calls share one source deadline, not one each.
+            await asyncio.wait_for(collect(), timeout=min(timeout, self.timeout_s))
+            rows = rows[:1 if name == "state_packet" else self.per_source_limit]
         except asyncio.TimeoutError:
             status.update(status="timeout", error="source_deadline")
         except Exception as exc:
@@ -428,16 +459,26 @@ def _read_local(request: Mapping[str, Any]) -> list[Record]:
     roots = {k: Path(v) for k, v in request["roots"].items()}
     limit, chars = request["limit"], request["record_chars"]
     rows: list[Record] = []
-    if source in ("hermes", "state_packet"):
-        files = ([p for root in (roots["hermes"], roots["chiefstaff"]) for p in sorted(root.glob("*.md"))[:64]]
-                 if source == "hermes" else [roots["state_packet"], roots["unified_index"]])
+    if source == "state_packet":
+        for path in (roots["state_packet"], roots["state_packet_fallback"]):
+            try:
+                text = _read_file(path, _MAX_PACKET_BYTES)
+            except FileNotFoundError:
+                continue
+            if not text.strip():
+                raise SourceUnavailable("state_packet_empty")
+            # Keep the original packet intact and first, never query-ranked or
+            # represented as a registry or verified operational observation.
+            return [_record(source, f"{path}:sha256:{_digest(text)}", text, path)]
+        raise SourceUnavailable("state_packet_missing")
+    if source == "hermes":
+        files = [p for root in (roots["hermes"], roots["chiefstaff"]) for p in sorted(root.glob("*.md"))[:64]]
         available = False
         for path in files:
             if not path.is_file():
                 continue
             text = _read_file(path)
             available = True
-            # STATE-PACKET headings are text evidence, never a project registry.
             for index, chunk in enumerate(re.split(r"\n\s*\n", text)):
                 if chunk.strip():
                     rows.append(_record(source, f"{path}:block:{index}:sha256:{_digest(chunk)}", chunk, path))

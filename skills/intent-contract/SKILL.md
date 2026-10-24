@@ -18,9 +18,12 @@ Use the installed, content-stamped OMP intent extension and the local intent ser
 
 1. Deterministic triage records each observed input as FAST, CHECK, or CONTRACT. Sentence/imperative counts, prior references, live risk, scope, delegation, named projects, corrections/frustration, length, and non-text ambiguity contribute. Uncertainty escalates.
 2. FAST records a durable receipt and does not call the service. CHECK calls `/check` and supplies a short memory-context note, never approval. CONTRACT calls `/reconcile` before action.
-3. Leading `/aodl` forces CONTRACT. Leading `quick:` forces FAST. Both overrides are logged; only the agent-facing prefix is removed. An override does not grant tool, account, host, or other authority.
+3. Leading `/aodl` forces CONTRACT. Leading `quick:` requests FAST except for destructive scope. Terms such as nuke, wipe, delete, reset, drop, force, rm, and all repos/commits deterministically force CONTRACT before a model call, even in questions or cancellations. Both overrides are logged; only the agent-facing prefix is removed. An override grants no authority.
 4. Open-contract asks are reconciled against the current contract ID as amendments and reviewed again. Do not silently substitute a new interpretation or treat a past approval as approval of changed scope.
    Approved amendments use the latest gate-owned `runtime/<contract_id>.json` receipts and status. The immutable approved root remains authority: runtime approval metadata and its canonical contract hash must match it exactly. Only a missing runtime file permits root fallback. Corrupt or mismatched runtime state fails closed.
+5. A standalone cancellation without an open proposal writes a private, exact-input-bound cancellation receipt and consumes the input without model inference, approval, or execution. Mixed cancellation/new-work messages remain subject to compilation. No missing proposal is fabricated.
+
+The canonical `~/.local/state/z0int/STATE-PACKET.md` is mandatory first memory context, with generator output as a missing-file fallback. It is claimed evidence, not current-state proof. Targeted bounded lookups follow. Missing packets have explicit unavailable status.
 
 ## Human review
 

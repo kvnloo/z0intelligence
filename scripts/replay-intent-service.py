@@ -11,6 +11,7 @@ import argparse
 from collections import Counter
 from datetime import datetime, timezone
 import json
+import hashlib
 import math
 from pathlib import Path
 import re
@@ -264,6 +265,9 @@ def summarize(rows: list[dict], run_id: str) -> dict:
                            "facts_expected": sum(r["expected_fact_count"] for r in subset)}
     return {"run_id": run_id, "attempted": len(rows), "responses": len(judged),
             "errors": sum("error" in r for r in rows), "cohorts": cohorts,
+            "refusals": sum(bool(r.get("refusal")) for r in rows),
+            "infrastructure_errors": sum("error" in r and not r.get("refusal") for r in rows),
+            "cancellation_receipts_valid": sum(bool(r.get("cancellation_receipt_valid")) for r in rows),
             "question_count": sum(r.get("question_only", False) for r in rows),
             "question_false_contracts": sum(r["judgment"]["question_false_contract"] for r in judged),
             "question_errors": sum(r.get("question_only", False) and "error" in r for r in rows),
@@ -334,17 +338,37 @@ def run(selection: list[dict], expected: dict[str, dict], url: str, output: Path
                 if case.get("follows_case"):
                     predecessor = previous.get(case["follows_case"], {})
                     contract_id = predecessor.get("response", {}).get("contract_id")
-                    if not contract_id:
-                        raise ValueError("Flow predecessor returned no contract_id")
-                    payload["open_contract"] = contract_id
+                    if contract_id:
+                        payload["open_contract"] = contract_id
+                    else:
+                        row["flow_predecessor_without_contract"] = True
                 status, response = post_reconcile(url, payload, timeout)
                 row.update({"http_status": status, "response": response})
+                cancellation = response.get("cancellation_receipt", {})
+                if response.get("classification") == "cancellation":
+                    row["cancellation_receipt_valid"] = (
+                        response.get("contract") is None and not payload.get("open_contract")
+                        and cancellation.get("session_id") == session_id
+                        and cancellation.get("entry_id") == entry_id
+                        and cancellation.get("text") == case["text"]
+                        and cancellation.get("sourceHash") == hashlib.sha256(case["text"].encode()).hexdigest()
+                        and cancellation.get("status") == "cancelled_no_open_proposal")
                 compiler = response.get("contract", {}).get("plan", {}).get("bindings", {}).get("compiler", {})
                 row["model_id"] = response.get("model_id", compiler.get("model_id", "unreported"))
                 row["judgment"] = judge_response(case, expected[case["case_id"]], response, entry_id)
             except HTTPError as error:
                 row.update({"http_status": error.code, "error": f"HTTPError: {error.reason}",
                             "error_response": error.read().decode("utf-8", errors="replace")})
+                try:
+                    detail = json.loads(row["error_response"])
+                    reason = detail.get("error", "")
+                    row["refusal"] = error.code == 400 and detail.get("fail_closed") is True and reason.startswith((
+                        "Unverified memory", "Acceptance target", "Actionable classification",
+                        "Assumption cites", "An actionable sentence", "Unknown amendment",
+                        "Destructive scope", "Every new source", "Missing or duplicate",
+                        "AODL validation rejected"))
+                except (ValueError, AttributeError):
+                    row["refusal"] = False
             except Exception as error:
                 row["error"] = f"{type(error).__name__}: {error}"
             row["latency_ms"] = (time.monotonic() - start) * 1000

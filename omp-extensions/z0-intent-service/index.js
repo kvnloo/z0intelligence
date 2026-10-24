@@ -102,6 +102,17 @@ export function createIntentClient(pi, options = {}) {
     let response = await post("/reconcile", { session_id: sessionId, entry_id: entryId, text: raw, recent_user_msgs: recent, open_contract: previous ? approvalIdentity(previous, sessionId).contract_id : null, mode: "CONTRACT" });
     currentSession(ctx, sessionId);
     for (;;) {
+      if (response.classification === "cancellation") {
+        const receipt = response.cancellation_receipt;
+        if (response.contract || previous || !receipt || receipt.session_id !== sessionId ||
+            receipt.entry_id !== entryId || receipt.text !== raw ||
+            receipt.sourceHash !== sourceHash(raw) || receipt.status !== "cancelled_no_open_proposal") {
+          throw new Error("Cancellation receipt did not bind the exact unproposed input");
+        }
+        saveState(ctx, sessionId, null);
+        ctx.ui?.notify?.("Cancellation recorded. No open proposal was approved or executed.", "info");
+        return { handled: true };
+      }
       if (!response.contract) {
         if (response.classification !== "question" || response.answerable !== true) throw new Error("Contract compilation returned no reviewable contract");
         return { text: promptText(stripOverride(raw).text, response.context_note) };

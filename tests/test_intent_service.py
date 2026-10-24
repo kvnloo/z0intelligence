@@ -143,3 +143,28 @@ def test_runtime_clone_preserves_receipts_and_fails_closed(tmp_path, damage):
             asyncio.run(srv._load("test", result["contract_id"]))
     else:
         assert asyncio.run(srv._load("test", result["contract_id"]))["events"] == runtime["events"]
+
+
+def test_cancellation_without_proposal_is_durable_and_never_calls_model(tmp_path):
+    srv = service(tmp_path)
+    async def forbidden(_):
+        pytest.fail("Cancellation must not call the model or compiler")
+    srv.model = srv.bridge = forbidden
+    raw = "dont actually delete anything btw"
+    result = asyncio.run(srv.reconcile({**request(), "text": raw}))
+    assert result["classification"] == "cancellation"
+    assert "contract" not in result
+    receipt = result["cancellation_receipt"]
+    assert receipt["text"] == raw and receipt["status"] == "cancelled_no_open_proposal"
+    path = tmp_path / "intent/test/cancellations/e1.json"
+    assert json.loads(path.read_text()) == receipt
+    assert not path.stat().st_mode & 0o077
+    assert not (tmp_path / "intent/test/.pending").exists()
+
+
+def test_destructive_question_requires_contract_not_question_bypass(tmp_path):
+    draft = proposal("question")
+    draft["tasks"] = []
+    srv = service(tmp_path, draft)
+    with pytest.raises(ValueError, match="Destructive scope requires"):
+        asyncio.run(srv.reconcile({**request(), "text": "Should I wipe all repos?"}))

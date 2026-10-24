@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { appendReceipt, projectsFromPacket, sessionDirectory, sourceHash, stripOverride, triage } from "./triage.js";
+import { appendReceipt, DEFAULT_THRESHOLDS, projectsFromPacket, sessionDirectory, sourceHash, stripOverride, triage } from "./triage.js";
 
 test("overrides preserve raw hash and strip only the leading agent prefix", () => {
   const raw = "  /aodl  push prod\n";
@@ -36,6 +36,46 @@ test("prior references, risk, scope, corrections and length are explicit", () =>
   assert.ok(triage("Read this.\nFix that.\nBuild it.\nShip it.").features.sentence_count >= 4);
   assert.ok(triage("Read this. Fix that. Build it.").features.imperative_count >= 3);
   assert.equal(triage("What is a closure?", { openContract: true }).tier, "CONTRACT");
+});
+
+test("destructive scope always requires a contract before any model call", () => {
+  const fixtures = [
+    "nuke", "wipe", "delete", "reset", "drop", "force", "rm",
+    "all repos", "all commits", "all repositories", "all repos/commits",
+    "NUKE", "rm -rf .", "git reset --hard", "git push --force",
+    "nuking", "wiping", "deleted", "resetting", "dropped", "forcing",
+    "What does reset mean?", "Why drop?", "Can you explain delete?",
+    "Show all commits?", "Read all repos", "Read the reset instructions",
+    "I just want to vent: nuke it all, this is exhausting",
+    "dont actually delete anything btw",
+    "don't actually delete anything btw",
+  ];
+  for (const text of fixtures) {
+    for (const prefix of ["", "quick: ", "/aodl "]) {
+      const raw = prefix + text;
+      const result = triage(raw);
+      assert.equal(result.tier, "CONTRACT", raw);
+      assert.equal(result.features.destructive_scope, true, raw);
+      assert.ok(result.rule_ids.includes("destructive-scope"), raw);
+      assert.ok(!result.rule_ids.includes("override-quick"), raw);
+      assert.equal(result.override, prefix ? prefix.trim() : null, raw);
+      assert.equal(result.sourceHash, sourceHash(raw), raw);
+      assert.equal(result.slm_used, false, raw);
+    }
+  }
+  assert.equal(triage("quick: reset", { thresholds: { ...DEFAULT_THRESHOLDS, contractScore: 100 } }).tier, "CONTRACT");
+});
+
+test("destructive scope keeps unrelated routing and word boundaries unchanged", () => {
+  for (const text of ["What is a preset?", "What is a droplet?", "What is a forceful argument?", "What is an arm?", "What is an alkali?"]) {
+    const result = triage(text);
+    assert.equal(result.tier, "FAST", text);
+    assert.equal(result.features.destructive_scope, false, text);
+    assert.ok(!result.rule_ids.includes("destructive-scope"), text);
+  }
+  assert.equal(triage("continue").tier, "CHECK");
+  assert.equal(triage("What are multiple repos?").tier, "CHECK");
+  assert.equal(triage("quick: deploy services on phones", { openContract: true }).tier, "FAST");
 });
 
 test("packet headings never become a guessed project registry", () => {

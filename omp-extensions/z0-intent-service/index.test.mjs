@@ -217,3 +217,18 @@ test("recent user context uses strings while exact input ids remain in custom re
   assert.deepEqual(f.calls[0].body.recent_user_msgs, ["prior ask"]);
   assert.equal(f.calls[0].body.entry_id, f.entries.find(entry => entry.customType === "z0-intent-input").id);
 });
+
+test("standalone cancellation without proposal consumes only an exact bound receipt", async t => {
+  const raw = "dont actually delete anything btw";
+  for (const tampered of [false, true]) {
+    const f = await fixture(t, [{}, { classification: "cancellation", cancellation_receipt: {
+      session_id: "session-1", entry_id: "custom-1", text: raw,
+      sourceHash: tampered ? hash : sourceHash(raw), status: "cancelled_no_open_proposal",
+    } }]);
+    const result = await f.client.input({ text: raw, source: "interactive" }, f.ctx);
+    assert.deepEqual(result, { handled: true });
+    assert.deepEqual(f.calls.map(call => call.path), ["/current", "/reconcile"]);
+    assert.equal(f.prompts.length, 0);
+    assert.equal(f.notices.some(notice => /did not bind/.test(notice.message)), tampered);
+  }
+});

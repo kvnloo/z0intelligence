@@ -25,6 +25,8 @@ const words = (text, pattern) => [...text.matchAll(pattern)].map(match => match[
 const unique = values => [...new Set(values)];
 const imperative = /\b(?:add|amend|analy[sz]e|apply|audit|build|change|check|configure|create|delete|deploy|disable|edit|enable|fix|implement|install|investigate|look|make|merge|migrate|move|nuke|push|read|refactor|remove|replace|restart|review|run|send|set|ship|show|start|stop|test|update|use|verify|write)\b/gi;
 const risky = /\b(?:live|prod(?:uction)?|deploy(?:ment|ed|ing)?|merg(?:e|ing)|delet(?:e|ion|ing)|nuk(?:e|ing)|push(?:ing)?|phones?|s22\+?|s25\+?|services?|systemd|configs?|configuration|keys?|credentials?|secrets?|permissions?)\b/gi;
+// Destructive scope requires a contract even in questions, vents, or cancellations.
+const destructive = /\b(?:nuk(?:e|es|ed|ing)|wip(?:e|es|ed|ing)|delet(?:e|es|ed|ing|ion)|reset(?:s|ting)?|drop(?:s|ped|ping)?|forc(?:e|es|ed|ing)|rm|all\s+(?:repos?(?:itories)?|commits?))\b/i;
 const prior = /\b(?:again|already|like before|we decided|last time|ln)\b/gi;
 const correction = /\b(?:not what|i (?:asked|said|told)|you (?:forgot|ignored|missed|broke)|doesn'?t work|still (?:wrong|broken)|stop (?:doing|guessing)|instead of|why (?:did|didn'?t|are) you|wrong|frustrat\w*|mad|angry|pissed|wtf|fuck\w*|damn)\b/gi;
 const systems = /\b(?:groot|mbp|macos|linux|android|ios|phones?|s22\+?|s25\+?|hermes|omp|k3s|kubernetes|servers?|hosts?)\b/gi;
@@ -36,6 +38,7 @@ export function triage(raw, { projects = [], packetAvailable = true, openContrac
   const normalized = text.trim();
   const imperatives = words(normalized, imperative);
   const risks = unique(words(normalized, risky));
+  const destructiveScope = destructive.test(normalized);
   const priors = unique(words(normalized, prior));
   const corrections = unique(words(normalized, correction));
   const namedProjects = projects.filter(name => new RegExp(`(^|[^a-z0-9_.-])${escape(name)}(?=$|[^a-z0-9_.-])`, "i").test(normalized));
@@ -46,12 +49,13 @@ export function triage(raw, { projects = [], packetAvailable = true, openContrac
   const multi = namedProjects.length > 1 || repositories.length > 1 || namedSystems.length > 1 || /\b(?:all|both|multiple|across|every)\b[^.!?\n]{0,60}\b(?:repos?(?:itories)?|systems?|projects?|services?|phones?)\b/i.test(normalized);
   const question = /^(?:what|why|where|when|who|how|which|is|are|does|do|can you explain|could you explain)\b/i.test(normalized) || /\?\s*$/.test(normalized);
   const readOnly = imperatives.every(verb => ["read", "show", "look", "check", "review", "analyze", "analyse", "investigate", "audit"].includes(verb));
-  const features = { chars: normalized.length, sentence_count: sentences, imperative_count: imperatives.length, prior_references: priors, live_risk_terms: risks, named_projects: namedProjects, named_systems: namedSystems, repository_mentions: repositories.length, multi_system: multi, delegation, corrections, question, read_only: readOnly, packet_available: packetAvailable, open_contract: Boolean(openContract), has_images: hasImages };
+  const features = { chars: normalized.length, sentence_count: sentences, imperative_count: imperatives.length, prior_references: priors, live_risk_terms: risks, destructive_scope: destructiveScope, named_projects: namedProjects, named_systems: namedSystems, repository_mentions: repositories.length, multi_system: multi, delegation, corrections, question, read_only: readOnly, packet_available: packetAvailable, open_contract: Boolean(openContract), has_images: hasImages };
   const rule_ids = [];
   let score = 0;
   const add = (condition, id, weight) => { if (condition) { rule_ids.push(id); score += weight; } };
   add(priors.length > 0, "prior-reference", 2);
   add(risks.length > 0, "live-risk", 3);
+  add(destructiveScope, "destructive-scope", 6);
   add(multi, "multi-system", 4);
   add(delegation, "delegation", 4);
   add(namedProjects.length > 0, "packet-project", 1);
@@ -63,14 +67,15 @@ export function triage(raw, { projects = [], packetAvailable = true, openContrac
   add(hasImages, "nontext-input", 3);
   add(!packetAvailable, "packet-unavailable", 1);
   let tier = "CHECK";
-  if (openContract || score >= thresholds.contractScore || (risks.length > 0 && !readOnly) || (multi && !readOnly) || (delegation && !readOnly)) {
+  if (destructiveScope || openContract || score >= thresholds.contractScore || (risks.length > 0 && !readOnly) || (multi && !readOnly) || (delegation && !readOnly)) {
     tier = "CONTRACT";
     if (openContract) rule_ids.push("open-contract-amendment");
   } else if (score === 0 && normalized && (question || imperatives.length === 1 || /^(?:thanks|thank you|hello|hi)[!. ]*$/i.test(normalized))) {
     tier = "FAST";
     rule_ids.push("bounded-simple-input");
   } else rule_ids.push("uncertain-escalate");
-  if (override) { tier = override === "/aodl" ? "CONTRACT" : "FAST"; rule_ids.push(override === "/aodl" ? "override-aodl" : "override-quick"); }
+  // A quick override cannot bypass the deterministic destructive-scope rule.
+  if (override && (override !== "quick:" || !destructiveScope)) { tier = override === "/aodl" ? "CONTRACT" : "FAST"; rule_ids.push(override === "/aodl" ? "override-aodl" : "override-quick"); }
   return { tier, override, features, rule_ids, score, text, sourceHash: sourceHash(raw), slm_used: false };
 }
 

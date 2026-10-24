@@ -252,3 +252,19 @@ def test_citation_cannot_upgrade_claimed_memory_to_observed():
     result = replay.judge_response(row, expected(), reply, "entry")
     assert result["invalid_citations"]
     assert result["facts_recalled"] == 0
+
+
+def test_missing_flow_proposal_does_not_drop_cancellation_request(tmp_path, monkeypatch):
+    first = case(flow_id="cancel-flow")
+    second = case(flow_id="cancel-flow", follows_case=first["case_id"])
+    second["case_id"] = "cancel-no-open"
+    calls = []
+    def post(url, payload, timeout):
+        calls.append(dict(payload))
+        return 200, {"classification": "question", "sources": {}, "compiler": {}}
+    monkeypatch.setattr(replay, "post_reconcile", post)
+    replay.run([first, second], {r["case_id"]: {"facts": []} for r in (first, second)},
+               "http://example.invalid/reconcile", tmp_path, 1)
+    assert len(calls) == 2
+    assert "open_contract" not in calls[1]
+    assert replay.load_jsonl(tmp_path / "results.jsonl")[1]["flow_predecessor_without_contract"]
