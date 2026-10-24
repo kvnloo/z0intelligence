@@ -1,0 +1,10 @@
+version: 1
+defaults:
+  health:
+    min_battery_pct_on_battery: 40
+nodes:
+  mbp:
+    kind: linux
+  spare-worker:
+    kind: phone
+    health: {}

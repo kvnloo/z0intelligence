@@ -16,6 +16,7 @@ the inputs (git, systemd, adb, broker.db, configs, gh) and acts on the verdict.
     z0-guard health-step ...            O8  one node-health probe through the notify machine
     z0-guard gateway-watch              O9  gateway restart -> Interrupted runs with resume commands
     z0-guard phone-caps --root ROOT [--path PATH ...] O10 source-policy scanner
+    z0-guard policy --receipts GLOB --policy PATH --since 24h [--static ROOT] [--json] O11/O12 audit
     z0-guard replay TAPE...             replay incident tapes through the gates
     z0-guard modes                      show each gate's mode
 
@@ -996,6 +997,45 @@ def cmd_phone_caps(a) -> int:
                                          "checked": list(map(str, phone_caps_paths(root, paths)))})
 
 
+# ------------------------------------------------------------------ O11/O12 policy evidence
+
+def cmd_policy(a) -> int:
+    from .policy_guard import audit, static_findings
+
+    try:
+        report, findings = audit(a.receipts, Path(a.policy).expanduser() if a.policy else None, a.since)
+    except ValueError as exc:
+        print(f"z0-guard policy: {exc}", file=sys.stderr)
+        return 2
+    if a.static:
+        findings.extend(static_findings(Path(a.static).expanduser()))
+    static_bad = any(f["rule"].startswith("hardcoded-") for f in findings)
+    if any(f["rule"] == "static-unavailable" for f in findings):
+        report["available"] = False
+        report["unavailable_reason"] = "; ".join(filter(None, (
+            report["unavailable_reason"], "static scan unavailable")))
+    destination = Path(os.environ.get("Z0INT_HOME", str(HOME / ".z0int"))).expanduser() / "policy/guard-report.json"
+    try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(f".guard-report.{os.getpid()}.{secrets.token_hex(4)}.json")
+        try:
+            temporary.write_text(json.dumps(report, sort_keys=True) + "\n")
+            temporary.replace(destination)
+        finally:
+            temporary.unlink(missing_ok=True)
+    except OSError as exc:
+        report["available"] = False
+        report["unavailable_reason"] = "; ".join(filter(None, (
+            report["unavailable_reason"], f"cannot persist guard report: {exc}")))
+    if findings:
+        print(json.dumps({"findings": findings, "static_findings": sum(
+            f["rule"].startswith("hardcoded-") for f in findings)}, sort_keys=True), file=sys.stderr)
+    emit(report)
+    if static_bad or any(report["counts"].values()):
+        return EXIT_REFUSED
+    return 0 if report["available"] else 4
+
+
 # ------------------------------------------------------------------ modes, main
 
 def cmd_modes(a) -> int:
@@ -1095,6 +1135,14 @@ def main(argv: list[str] | None = None) -> int:
     pc.add_argument("--root", required=True, help=".files checkout root (never inferred from the process cwd)")
     pc.add_argument("--path", action="append", help="explicit file, relative to root or absolute; replaces discovery")
     pc.set_defaults(fn=cmd_phone_caps)
+
+    pg = sub.add_parser("policy", help="O11/O12: audit decision receipts and literal routing overrides")
+    pg.add_argument("--receipts", help="JSON/JSONL receipt glob (quote it to avoid shell expansion)")
+    pg.add_argument("--policy", help="z0.decision_policy.v1 file")
+    pg.add_argument("--since", default="24h", help="audit window: seconds/minutes/hours/days, e.g. 24h")
+    pg.add_argument("--static", metavar="ROOT", help="also scan source outside policy loader files")
+    pg.add_argument("--json", action="store_true", help="emit z0.policy_guard.v1 JSON (also the default)")
+    pg.set_defaults(fn=cmd_policy)
 
     rp = sub.add_parser("replay", help="replay incident tapes through the gates")
     rp.add_argument("tapes", nargs="+")

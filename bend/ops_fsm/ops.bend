@@ -424,3 +424,44 @@ def phone_admits(ready: Bool, -memory: Bool, -cpu: Bool, -battery: Bool, -therma
 
 def phone_place(ready: Bool, memory: Bool, cpu: Bool, battery: Bool, thermal: Bool) -> Place:
   place_phone(phone_admits(ready, memory, cpu, battery, thermal))
+
+# ------------------------------------------------------------------ O11/O12
+# One policy cell is selected for the decision family. Natural identifiers name
+# families and complete arm identities (device/model/quant/engine/backend).
+type PolicyStage is Data:
+  StageNone{}
+  StageShadow{}
+  StageCanary{}
+  StageLive{}
+
+type PolicyRoute is Data:
+  FrontierRoute{}
+  OffloadRoute{arm: Nat}
+
+def policy_credited(stage: PolicyStage) -> Bool:
+  match stage:
+    case StageNone{}:
+      False{}
+    case StageShadow{}:
+      False{}
+    case StageCanary{}:
+      True{}
+    case StageLive{}:
+      True{}
+
+def policy_local(family: Nat, named_family: Nat, stage: PolicyStage, named_arm: Nat, arm: Nat) -> Bool:
+  Bool.and(Nat.is_eq(family, named_family), Bool.and(policy_credited(stage), Nat.is_eq(arm, named_arm)))
+
+def policy_frontier(stage: PolicyStage, healthy: Bool, abstain: Bool) -> Bool:
+  match stage:
+    case StageLive{}:
+      Bool.or(Bool.not(healthy), abstain)
+    case _:
+      True{}
+
+def policy_allows(+family: Nat, +named_family: Nat, stage: PolicyStage, named_arm: Nat, route: PolicyRoute, healthy: Bool, abstain: Bool) -> Bool:
+  match route:
+    case FrontierRoute{}:
+      Bool.or(Bool.not(Nat.is_eq(family, named_family)), policy_frontier(stage, healthy, abstain))
+    case OffloadRoute{arm}:
+      policy_local(family, named_family, stage, named_arm, arm)

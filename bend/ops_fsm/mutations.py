@@ -3,7 +3,7 @@
 (in a scratch copy), run `bend PROOF.bend`, and require SOME PROOFS FAIL.
 
 Each mutation is the bug a law exists to catch, written the way it would show
-up in the gate. Every law O1-O10 has at least one mutant. The reference
+up in the gate. Every law O1-O12 has at least one mutant. The reference
 ops.bend is never edited in place.
 
     python3 bend/ops_fsm/mutations.py [--verdict] [--out mutations.json]
@@ -124,6 +124,28 @@ MUTATIONS = [
     ("O10 o10_phone_placement_no_agent_resource_caps", "phone placement gated by memory",
      "  place_phone(phone_admits(ready, memory, cpu, battery, thermal))",
      "  place_phone(Bool.and(ready, memory))"),
+    # O11/O12: these change only Bool-valued expressions, not their types.
+    ("O11 o11_none_not_credited", "none stage receives offload credit",
+     "    case StageNone{}:\n      False{}", "    case StageNone{}:\n      True{}"),
+    ("O11 o11_shadow_not_credited", "shadow stage receives offload credit",
+     "    case StageShadow{}:\n      False{}", "    case StageShadow{}:\n      True{}"),
+    ("O11 o11_named_family", "a policy cell credits another family",
+     "  Bool.and(Nat.is_eq(family, named_family), Bool.and(policy_credited(stage), Nat.is_eq(arm, named_arm)))",
+     "  Bool.and(True{}, Bool.and(policy_credited(stage), Nat.is_eq(arm, named_arm)))"),
+    ("O11 o11_named_arm", "a credited family routes to an unnamed arm",
+     "  Bool.and(Nat.is_eq(family, named_family), Bool.and(policy_credited(stage), Nat.is_eq(arm, named_arm)))",
+     "  Bool.and(Nat.is_eq(family, named_family), Bool.and(policy_credited(stage), True{}))"),
+    ("O11 o11_evidence_bound_route", "offload bypasses evidence stage",
+     "  Bool.and(Nat.is_eq(family, named_family), Bool.and(policy_credited(stage), Nat.is_eq(arm, named_arm)))",
+     "  Bool.and(Nat.is_eq(family, named_family), Bool.and(True{}, Nat.is_eq(arm, named_arm)))"),
+    ("O12 o12_offload_obligation", "live frontier fallback ignores abstention",
+     "      Bool.or(Bool.not(healthy), abstain)", "      True{}"),
+    ("O12 o12_offload_obligation", "healthy endpoints permit silent frontier fallback",
+     "      Bool.or(Bool.not(healthy), abstain)", "      Bool.or(healthy, abstain)"),
+    ("O12 o12_abstain_can_fallback", "recorded abstentions cannot fall back",
+     "      Bool.or(Bool.not(healthy), abstain)", "      Bool.not(healthy)"),
+    ("O11 o11_named_family", "offload dispatcher bypasses the policy cell",
+     "      policy_local(family, named_family, stage, named_arm, arm)", "      True{}"),
 ]
 
 

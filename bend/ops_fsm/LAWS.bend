@@ -355,3 +355,72 @@ law o10_phone_placement_no_agent_resource_caps:
   for battery: Bool
   for thermal: Bool
   {O.phone_place(ready, memory, cpu, battery, thermal) == O.place_phone(ready) : O.Place}
+
+# O11. Evidence-bound routing. The policy names both the family and full arm.
+law o11_evidence_bound_route:
+  for +family: Nat
+  for +named_family: Nat
+  for +stage: O.PolicyStage
+  for +named_arm: Nat
+  for +arm: Nat
+  for healthy: Bool
+  for abstain: Bool
+  for w: T(O.policy_allows(family, named_family, stage, named_arm, O.OffloadRoute{arm}, healthy, abstain))
+  T(O.policy_credited(stage))
+
+law o11_named_family:
+  for +family: Nat
+  for +named_family: Nat
+  for +stage: O.PolicyStage
+  for +named_arm: Nat
+  for +arm: Nat
+  for healthy: Bool
+  for abstain: Bool
+  for w: T(O.policy_allows(family, named_family, stage, named_arm, O.OffloadRoute{arm}, healthy, abstain))
+  {family == named_family : Nat}
+
+law o11_named_arm:
+  for +family: Nat
+  for +named_family: Nat
+  for +stage: O.PolicyStage
+  for +named_arm: Nat
+  for +arm: Nat
+  for healthy: Bool
+  for abstain: Bool
+  for w: T(O.policy_allows(family, named_family, stage, named_arm, O.OffloadRoute{arm}, healthy, abstain))
+  {arm == named_arm : Nat}
+
+# These independent stage laws prevent "credit everything" implementations.
+law o11_none_not_credited:
+  {O.policy_credited(O.StageNone{}) == False{} : Bool}
+
+law o11_shadow_not_credited:
+  {O.policy_credited(O.StageShadow{}) == False{} : Bool}
+
+law o11_canary_routes:
+  for +family: Nat
+  for +arm: Nat
+  T(O.policy_allows(family, family, O.StageCanary{}, arm, O.OffloadRoute{arm}, True{}, False{}))
+
+law o11_live_routes:
+  for +family: Nat
+  for +arm: Nat
+  T(O.policy_allows(family, family, O.StageLive{}, arm, O.OffloadRoute{arm}, True{}, False{}))
+
+# O12. A healthy live family cannot silently fall back to frontier.
+law o12_offload_obligation:
+  for +family: Nat
+  for arm: Nat
+  for +abstain: Bool
+  for w: T(O.policy_allows(family, family, O.StageLive{}, arm, O.FrontierRoute{}, True{}, abstain))
+  T(abstain)
+
+law o12_unhealthy_can_fallback:
+  for +family: Nat
+  for arm: Nat
+  T(O.policy_allows(family, family, O.StageLive{}, arm, O.FrontierRoute{}, False{}, False{}))
+
+law o12_abstain_can_fallback:
+  for +family: Nat
+  for arm: Nat
+  T(O.policy_allows(family, family, O.StageLive{}, arm, O.FrontierRoute{}, True{}, True{}))

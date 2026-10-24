@@ -522,3 +522,54 @@ def Laws.o10_phone_no_agent_resource_caps(ready, memory, cpu, battery, thermal):
 
 def Laws.o10_phone_placement_no_agent_resource_caps(ready, memory, cpu, battery, thermal):
   {==}
+
+# O11/O12. Proofs project the independent constraints from the route gate.
+def Laws.o11_evidence_bound_route(family, named_family, stage, named_arm, arm, healthy, abstain, w):
+  and_l(O.policy_credited(stage), Nat.is_eq(arm, named_arm),
+    and_r(Nat.is_eq(family, named_family), Bool.and(O.policy_credited(stage), Nat.is_eq(arm, named_arm)), w))
+
+def Laws.o11_named_family(family, named_family, stage, named_arm, arm, healthy, abstain, w):
+  eq_sound(family, named_family,
+    and_l(Nat.is_eq(family, named_family), Bool.and(O.policy_credited(stage), Nat.is_eq(arm, named_arm)), w))
+
+def Laws.o11_named_arm(family, named_family, stage, named_arm, arm, healthy, abstain, w):
+  eq_sound(arm, named_arm,
+    and_r(O.policy_credited(stage), Nat.is_eq(arm, named_arm),
+      and_r(Nat.is_eq(family, named_family), Bool.and(O.policy_credited(stage), Nat.is_eq(arm, named_arm)), w)))
+
+def Laws.o11_none_not_credited:
+  {==}
+
+def Laws.o11_shadow_not_credited:
+  {==}
+
+def Laws.o11_canary_routes(family, arm):
+  and_i(Nat.is_eq(family, family), Bool.and(True{}, Nat.is_eq(arm, arm)),
+    eq_refl(family), eq_refl(arm))
+
+def Laws.o11_live_routes(family, arm):
+  and_i(Nat.is_eq(family, family), Bool.and(True{}, Nat.is_eq(arm, arm)),
+    eq_refl(family), eq_refl(arm))
+
+def policy_frontier_same(ok: Bool, +abstain: Bool, same: Laws.T(ok), w: Laws.T(Bool.or(Bool.not(ok), abstain))) -> Laws.T(abstain):
+  match ok:
+    case True{}:
+      w
+    case False{}:
+      Empty.absurd(Laws.T(abstain), same)
+
+def Laws.o12_offload_obligation(family, arm, abstain, w):
+  policy_frontier_same(Nat.is_eq(family, family), abstain, eq_refl(family), w)
+
+def policy_or_true(b: Bool) -> Laws.T(Bool.or(b, True{})):
+  match b:
+    case True{}:
+      Unit{}
+    case False{}:
+      Unit{}
+
+def Laws.o12_unhealthy_can_fallback(family, arm):
+  policy_or_true(Bool.not(Nat.is_eq(family, family)))
+
+def Laws.o12_abstain_can_fallback(family, arm):
+  policy_or_true(Bool.not(Nat.is_eq(family, family)))

@@ -20,6 +20,8 @@ flowchart LR
     O8[O8 nstep/neff]:::law
     O9[O9 rstep]:::law
     O10[O10 phone_admits/phone_place]:::law
+    O11[O11 policy_local]:::law
+    O12[O12 policy_frontier]:::law
   end
   Twin["src/z0int/fsm/ops.py\n(parity: exhaustive + seeded vs Bend)"]
   Book ==> Twin
@@ -34,6 +36,7 @@ flowchart LR
   G -->|health_step| FH["fleet health -> one owner notification"]
   G -->|gateway-watch| GW["sol runs -> Interrupted + resume (timer)"]
   G -->|phone-caps --root ROOT| PC[".files hooks + ServiceWatch deterministic invariant"]
+  G -->|policy --receipts GLOB --policy PATH| PG["receipt audit + ServiceWatch guard-report.json"]
   O1 -.-> FB
   O2 -.-> HK
   O3 -.-> RO
@@ -44,6 +47,8 @@ flowchart LR
   O8 -.-> FH
   O9 -.-> GW
   O10 -.-> PC
+  O11 -.-> PG
+  O12 -.-> PG
   classDef law fill:#1d2b3a,stroke:#6cb6ff,color:#e6edf3
 ```
 
@@ -64,7 +69,9 @@ command, git ref update, adb dump or config line becomes those inputs is classif
 | O7 | no role routes to a cancelled provider (xai/grok, cancelled 2026-10-21); visual/UX design roles never route to Sol | `z0-guard routing` (hourly timer, read-only, never prints key fields) | report |
 | O8 | a worker node unhealthy for >30 min emits exactly one owner notification per unhealthy episode | `fleet health` -> `guard.health_step` -> KDE Connect ping to the S25 (enforce) | report |
 | O9 | when the gateway hosting headless runs restarts (gateway invocation or Hermes checkout HEAD changes), every dependent run gone without a report becomes Interrupted, never Failed, with a resume command | `z0-guard gateway-watch` (1-min timer) -> `o9-interrupted.jsonl` (+ `worker-decisions.jsonl` in enforce) | report |
-| O10 | phone admission and placement are independent of agent-chosen memory, CPU, battery and thermal limits; Android manages resources. Explicit owner pause/call, reachability, capability, timeout and cleanup remain. Caller-explicit optional per-job memory is allowed; resource defaults and phone admission caps are not. | `z0-guard phone-caps --root ROOT` | enforce |
+| O10 | Phones receive all CPU/GPU and 100% RAM. Agent-selected phone resource caps are forbidden. Battery minima at or below 2% are allowed. Higher minima, including inherited health defaults, are forbidden. Explicit owner pause/call, reachability, capability, timeout and cleanup remain. | `z0-guard phone-caps --root ROOT` | enforce |
+| O11 | A non-frontier route must have current policy stage canary or live that names this family and the full selected arm. | `z0-guard policy` | audit, exit 3 on violations |
+| O12 | A healthy live arm requires offload. Frontier/Jev fallback requires a recorded confidence below the policy threshold. | `z0-guard policy` | audit, exit 3 on violations |
 
 Switch a gate: `Z0_GUARD_O<n>=off|report|enforce` in the environment, or
 `~/.config/z0-guard/modes.json` (`{"O3": "enforce"}`). `z0-guard modes` prints the effective modes.
@@ -100,9 +107,14 @@ including external paths, for isolated fixtures.
 
 Discovery includes fleet scripts, the phone-mode registry, fleet docs, and the
 known phone skill/report/chat-driver paths when present. Python AST parsing
-distinguishes non-phone branches; YAML parsing checks phone mappings. Shell
-mode branches and agent-facing prose use lexical checks. These are bounded
-source checks, not a proof of arbitrary program semantics; Bend proves the
+distinguishes non-phone branches. YAML checks phone mappings, inherited defaults
+and referenced worker profiles. A phone's explicit health override replaces the
+matching default. `min_battery_pct_on_battery: 2` passes, `40` fails. Phone CPU
+counts cannot establish all cores and are flagged. `cpus: all`, `memory_pct: 100`
+and equivalent uncapped markers pass. Discovery rejects a scripts directory
+passed as the checkout root, even if external known files exist. Shell mode
+branches and agent-facing prose use bounded lexical checks. These are bounded
+source checks, not a proof of arbitrary program semantics. Bend proves the
 abstract admission/placement decisions, not the source classifier.
 
 ServiceWatch's `phone_caps` deterministic invariant forces O10 enforce mode,
@@ -110,6 +122,76 @@ records caps as severe `phone_resource_caps`, and treats failed/unavailable
 scans as `invariant_unavailable`. Its recurring check resolves the installed
 fleet checkout; an inventory entry can specify `health_invariant` with
 `{"kind": "phone_caps", "root": "/path/to/files"}`. No remediation is automatic.
+
+## O11/O12 policy audit
+
+```sh
+z0-guard policy --receipts "$HOME/.z0int/receipts/*.jsonl" \
+  --policy "$HOME/.z0int/policy/decision-policy.json" --since 24h --json
+z0-guard policy --static /path/to/z0intelligence --json
+```
+
+`--since` accepts a nonnegative duration with `s`, `m`, `h` or `d`. JSON and JSONL
+receipts use `ts`, `at`, `timestamp` or `created_at` with a timezone. JSON arrays
+and `receipts`/`decisions` collections are supported. `policy_families` supplies
+family-specific stamps for multi-family decisions. The audit counts unstamped
+decisions and differences from the current content-addressed policy, including
+its version, SHA, rule and stage. It does not reconstruct historical policies.
+
+Receipts identify the route with `route` or `tier`. `frontier`, `remote_frontier`,
+`jev` and `bounded_jev` are frontier fallback arms. Other routes must include
+`selected_arm` or `arm` with every identity field from the family policy arm.
+A model string alone cannot prove the device/engine/quant/backend binding.
+Expired evidence does not authorize offload. O12 requires an explicit boolean
+`serving_healthy` observation. An abstention is an object with numeric
+`confidence` and `threshold`, where confidence is below the current policy's
+threshold and the recorded threshold matches it. A boolean or missing confidence
+does not establish abstention.
+
+The command writes the same JSON to stdout and
+`$Z0INT_HOME/policy/guard-report.json` (default `~/.z0int/policy/guard-report.json`):
+
+```json
+{
+  "schema": "z0.policy_guard.v1",
+  "ts": "2026-10-24T12:00:00+00:00",
+  "policy_version": null,
+  "window": {"since": "2026-10-23T12:00:00+00:00", "receipts": 0},
+  "counts": {
+    "unstamped": 0,
+    "stale_policy": 0,
+    "o11_evidence_bound_route": 0,
+    "o12_offload_obligation": 0
+  },
+  "offload_rate": {},
+  "available": false,
+  "unavailable_reason": "no policy or stamped receipts"
+}
+```
+
+Each live family's `offload_rate` entry contains integer `live_decisions`,
+`offloaded`, `abstained` and `frontier` counts. Divide offloaded by live_decisions
+to obtain the observed rate. A zero denominator means no observation, not 0%.
+The report is unavailable when policy or receipt evidence is absent or corrupt.
+If all live frontier decisions lack health observations, `unavailable_reason`
+states how many lack them. Unknown health never establishes an O12 violation.
+Exit codes are 0 for a clean available audit, 3 for violations, 4 for unavailable
+evidence, and 2 for invalid arguments. Violations take precedence over
+unavailability. Missing policy never prevents an operator's runtime turn.
+
+`--static ROOT` flags literal credited-family lists and route assignments outside
+`src/z0int/policy_runtime.py` and `omp-extensions/local-cognition/index.ts`, the
+policy loader files. Python uses AST checks. Other sources use bounded lexical
+assignment/property checks. Tests, fixtures, generated data and dependencies
+are excluded. Detailed findings and a static finding count go to stderr, so
+stdout retains the report schema. A static-only scan still reports receipt
+evidence as unavailable. Static violations return 3.
+
+The Bend model names full arm identities and families with natural identifiers.
+O11 proves stage and both identity constraints. O12 proves healthy live fallback
+requires abstention, with positive laws for unhealthy and abstained fallback.
+The new proofs, nine policy mutants and Python regressions require the parent
+verification run. No verification result is claimed by this documentation.
 
 ## Evidence
 

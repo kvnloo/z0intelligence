@@ -126,3 +126,60 @@ def test_concrete_host_node_binding_not_function_name(tmp_path, binding, clean):
     body = binding + "\nargv = ['fleet-kueue', '--mem', args.mem or worker['lane']['default_mem']]\n"
     path.write_text('def queued():\n' + ''.join('    ' + line + '\n' for line in body.splitlines()))
     assert bool(C.phone_caps_findings(tmp_path, [path])) is not clean
+
+
+def test_nodes_yaml_inherited_default_battery_regression(tmp_path):
+    source = Path(__file__).parent / 'fixtures/phone-caps/nodes.yaml'
+    target = tmp_path / 'nodes.yaml'
+    target.write_text(source.read_text())
+    findings = C.phone_caps_findings(tmp_path, [target])
+    assert len(findings) == 1
+    assert findings[0]['line'] == 4
+    assert 'inherited' in findings[0]['detail']
+    assert 'min_battery_pct_on_battery=40' in findings[0]['detail']
+
+
+@pytest.mark.parametrize('threshold,bad', [(0, False), (1, False), (2, False),
+                                         (2.01, True), (40, True)])
+@pytest.mark.parametrize('scope', ['defaults', 'phone'])
+def test_phone_battery_only_below_two_percent(tmp_path, threshold, bad, scope):
+    default = threshold if scope == 'defaults' else 40
+    override = '' if scope == 'defaults' else f'    health: {{min_battery_pct_on_battery: {threshold}}}\n'
+    path = tmp_path / 'nodes.yaml'
+    path.write_text(f'defaults:\n  health: {{min_battery_pct_on_battery: {default}}}\n'
+                    'nodes:\n  spare:\n    kind: phone\n' + override)
+    assert bool(C.phone_caps_findings(tmp_path, [path])) is bad
+
+
+@pytest.mark.parametrize('key,value,bad', [
+    ('cpus', '0-3', True), ('cpus', 4, True), ('cpus', 'all', False),
+    ('memory_pct', 50, True), ('memory_pct', 99, True), ('memory_pct', 100, False),
+    ('cpu_pct', 99, True), ('cpu_pct', 100, False), ('memory', '2G', True),
+])
+def test_phone_worker_profiles_cannot_cap_resources(tmp_path, key, value, bad):
+    path = tmp_path / 'nodes.yaml'
+    path.write_text(f'worker_profiles:\n  neutral: {{{key}: {value}}}\n'
+                    'nodes:\n  spare:\n    kind: phone\n    worker_profile: neutral\n')
+    assert bool(C.phone_caps_findings(tmp_path, [path])) is bad
+
+
+def test_defaults_with_no_phone_nodes_are_not_phone_caps(tmp_path):
+    path = tmp_path / 'nodes.yaml'
+    path.write_text('defaults:\n  health: {min_battery_pct_on_battery: 40}\n'
+                    'nodes:\n  mbp: {kind: linux}\n')
+    assert C.phone_caps_findings(tmp_path, [path]) == []
+
+
+def test_scripts_directory_is_not_a_checkout_root(tmp_path, monkeypatch, capsys):
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    (scripts / 'fleet').write_text('# clean source\n')
+    external = tmp_path / 'phone.md'
+    external.write_text('# Phones\nAndroid manages resources.\n')
+    monkeypatch.setattr(C, 'KNOWN_PATHS', (external,))
+    monkeypatch.setattr(G, 'STATE', tmp_path / 'state')
+    monkeypatch.setenv('Z0_GUARD_O10', 'enforce')
+    assert G.main(['phone-caps', '--root', str(scripts)]) == 3
+    report = json.loads(capsys.readouterr().out)
+    assert report['findings'][0]['rule'] == 'scan-unavailable'
+    assert 'checkout root' in report['findings'][0]['detail']

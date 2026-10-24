@@ -205,24 +205,99 @@ def _python(path: Path, text: str) -> list[dict]:
 
 
 def _yaml(path: Path, text: str) -> list[dict]:
-    # Compose preserves mapping structure, anchors, scalar types and line numbers.
+    # Retain source locations through inheritance and YAML merge aliases.
     tree = yaml.compose(text)
     found = []
     visited = set()
     if tree is None:
         return found
 
+    def mapping(node, active=None):
+        active = set() if active is None else active
+        if not isinstance(node, yaml.MappingNode) or id(node) in active:
+            return {}
+        active = active | {id(node)}
+        out = {}
+        for key, value in node.value:
+            if key.value == '<<':
+                sources = value.value if isinstance(value, yaml.SequenceNode) else [value]
+                for source in reversed(sources):
+                    out.update(mapping(source, active))
+        out.update({key.value: (key, value) for key, value in node.value if key.value != '<<'})
+        return out
+
+    def leaves(node, prefix=(), active=None):
+        active = set() if active is None else active
+        if id(node) in active:
+            return {}
+        active = active | {id(node)}
+        result = {}
+        for name, (key, value) in mapping(node).items():
+            if isinstance(value, yaml.MappingNode):
+                result.update(leaves(value, (*prefix, name), active))
+            else:
+                result[(*prefix, name)] = (key, value)
+        return result
+
+    def check(key, value, inherited=False):
+        name = key.value.lower()
+        raw = getattr(value, 'value', None)
+        if raw in ('', 'null', '~', None):
+            return
+        battery = re.search(r'min_(?:batt|battery)', name)
+        if battery:
+            try:
+                bad = float(raw.rstrip('%')) > 2
+            except (ValueError, AttributeError):
+                bad = True
+        else:
+            resource_cap = (_policy_key(name) or bool(re.search(
+                r'^(?:cpus|cpu_cores|cores|memory|mem|mem_mb|memory_pct|ram_pct|cpu_pct|gpu_pct|cpu_percent|memory_percent)$', name)))
+            # An explicit all/100% marker imposes no cap. A numeric CPU count
+            # cannot prove all cores across devices, so it remains a finding.
+            full = str(raw).lower() in ('all', 'all_cores', 'unlimited', '100%')
+            full = full or (name.endswith(('_pct', '_percent')) and str(raw) in ('100', '100.0'))
+            bad = resource_cap and not full
+        if bad:
+            origin = 'inherited ' if inherited else ''
+            found.append(_finding(path, key.start_mark.line + 1, 'registry-phone-cap',
+                                  f'{origin}phone resource policy {key.value}={raw}'))
+
+    top = mapping(tree)
+    defaults = leaves(top['defaults'][1]) if 'defaults' in top else {}
+    nodes = mapping(top['nodes'][1]) if 'nodes' in top else {}
+    for node_name, (_, node) in nodes.items():
+        entries = mapping(node)
+        phone = PHONE.search(node_name) or any(
+            getattr(entries.get(k, (None, None))[1], 'value', '') == 'phone' for k in ('kind', 'mode'))
+        if not phone:
+            continue
+        own = leaves(node)
+        effective = {**defaults, **own}
+        for location, (key, value) in effective.items():
+            check(key, value, location not in own)
+        # Profiles may have neutral names; inspect those selected by a phone.
+        for location, (_, selected) in effective.items():
+            if location[-1] not in ('profile', 'worker_profile'):
+                continue
+            for collection in ('profiles', 'worker_profiles'):
+                profiles = mapping(top.get(collection, (None, None))[1])
+                profile = profiles.get(getattr(selected, 'value', ''), (None, None))[1]
+                for key, value in leaves(profile).values():
+                    check(key, value)
+
     def walk(node, phone=False):
         if (id(node), phone) in visited:
             return
         visited.add((id(node), phone))
         if isinstance(node, yaml.MappingNode):
-            values = {k.value: v for k, v in node.value}
-            phone = phone or getattr(values.get('kind'), 'value', '') == 'phone' or getattr(values.get('mode'), 'value', '') == 'phone'
-            for key, value in node.value:
-                if phone and _policy_key(key.value) and getattr(value, 'value', None) not in ('', 'null', '~'):
-                    found.append(_finding(path, key.start_mark.line + 1, 'registry-phone-cap', f'phone resource policy {key.value}'))
-                walk(value, phone or key.value in ('phone', 's22', 's25', 'omarchy-phone', 'galaxy-s22plus'))
+            entries = mapping(node)
+            phone = phone or any(getattr(entries.get(k, (None, None))[1], 'value', '') == 'phone'
+                                 for k in ('kind', 'mode'))
+            for name, (key, value) in entries.items():
+                if phone:
+                    check(key, value)
+                walk(value, phone or name in ('phone', 's22', 's25', 'omarchy-phone', 'galaxy-s22plus'))
         elif isinstance(node, yaml.SequenceNode):
             for value in node.value:
                 walk(value, phone)
@@ -285,6 +360,9 @@ def phone_caps_findings(root: Path, paths: list[Path] | None = None) -> list[dic
     root = Path(root)
     if not root.is_dir():
         return [_finding(root, 0, 'scan-unavailable', 'root is not a directory')]
+    if (paths is None or root.resolve().name == 'scripts') and not (
+            (root / 'scripts').is_dir() or (root / 'config/fleet/nodes.yaml').is_file()):
+        return [_finding(root, 0, 'scan-unavailable', 'root must be a checkout root with scripts/ or config/fleet/nodes.yaml')]
     selected = phone_caps_paths(root, paths)
     if not selected:
         return [_finding(root, 0, 'scan-unavailable', 'no policy sources found')]
