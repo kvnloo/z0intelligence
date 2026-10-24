@@ -103,3 +103,37 @@ uses its lexical `search` command only after FFF misses. QMD's full `query`
 pipeline adds vector search/query expansion/reranking and can load local model
 resources, so enabling that hybrid path should be benchmarked and gated
 separately rather than silently inserting it into every code-search turn.
+
+## Deployment gate
+
+The live checkout is `/mnt/zer0models/z0-wt/z0intelligence`, on `master`; the
+user unit reads `%h/.config/z0intelligence/service.env`. The guard defaults
+already enforce the 200,000-file ceiling and 600-second lifetime, so no root
+configuration or live environment edit is required. Roots come from requests:
+OMP's `z0_file_search` sends `ctx.cwd`; the Hermes Python adapter requires
+`project_root`. The live, not-yet-committed Hermes HTTP/MCP adapters require an
+explicit `repository_root` rather than defaulting to the current directory.
+
+Do not deploy over the live checkout's uncommitted changes. Kevin must first
+decide how to preserve/reconcile them; do not auto-stash, reset, or overwrite
+them. After that decision and the PR's merge into `master`, these are the
+source-update commands (not executed by this change):
+
+```sh
+cd /mnt/zer0models/z0-wt/z0intelligence
+test -z "$(git status --porcelain)" || {
+  echo "STOP: reconcile the live checkout's edits first" >&2
+  exit 1
+}
+git fetch --no-tags origin master
+git merge-base --is-ancestor 33a57a44cf781dfbaeeb50865385f1002fcdd471 origin/master
+git merge --ff-only origin/master
+```
+
+The existing-unit restart command is `systemctl --user restart
+z0intelligence.service`; use it only after the host's server-admission policy
+has approved that service. In OMP, run `/reload-plugins` to swap the Python
+bridge generation (or restart OMP). A service-only restart does not replace a
+resident OMP bridge. No install/model synchronization is needed for this
+Python-only change. Health readback is
+`curl --fail http://127.0.0.1:11501/healthz`.
