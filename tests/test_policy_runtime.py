@@ -580,7 +580,7 @@ def test_qualified_request_stamps_actual_not_maximum_width(isolated_policy):
     scope, _ = capacity_rule(body, 8)
     publish(isolated_policy, body)
     legal = compile_actions(graph=cli._graph_from_payload({"actions": [
-        {"action_id": name, "kind": "tool"} for name in ("read", "glob", "grep"),
+        {"action_id": name, "kind": "tool"} for name in ("read", "glob", "grep")
     ]}), authority=("read",), budget_units=8)
     calls = []
     class Transport:
@@ -640,7 +640,7 @@ def test_timed_out_model_row_retains_actual_request_capacity_metadata(isolated_p
     scope = {k: policy_body()["families"]["omp.tool"]["arm"][k]
              for k in ("model", "quant", "engine", "backend", "device")}
     legal = compile_actions(graph=cli._graph_from_payload({"actions": [
-        {"action_id": name, "kind": "tool"} for name in ("read", "glob"),
+        {"action_id": name, "kind": "tool"} for name in ("read", "glob")
     ]}), authority=("read",), budget_units=8)
     class Slow:
         def chat(self, messages, **kwargs):
