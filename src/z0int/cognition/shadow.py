@@ -584,7 +584,7 @@ def run_shadow(
             "identity_contract": "session-tool-call.v1",
             "source_revision": SOURCE_REVISION,
             "tool_name": tool_name or None,
-            "state": context.state[:400],
+            "actual_tool": {"name": tool_name, "risk_class": payload.get("risk_class", "read")},
             "graph_digest": legal.graph_digest,
             "candidate_action_count": legal.candidate_count,
             "legal_ids": list(legal.ids()),
