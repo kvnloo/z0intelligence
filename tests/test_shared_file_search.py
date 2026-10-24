@@ -20,6 +20,7 @@ from z0int.memory.event_log import EventLog
 def repository(tmp_path):
     root = tmp_path / "repository"
     root.mkdir()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
     (root / "engine.py").write_text(
         "# Native content, deliberately absent from the file name.\n"
         "def quasar_shared_needle():\n    return 'bounded evidence'\n"
