@@ -506,3 +506,151 @@ def test_endpoint_observed_props_mismatch_abstains(isolated_policy, monkeypatch,
     assert decision.selected_action is None
     assert decision.diagnostics["reason"] == reason
     assert decision.diagnostics["response_revision"] is None
+
+
+def capacity_rule(body, allowed=4, scope=None):
+    scope = scope or {k: body["families"]["omp.tool"]["arm"][k]
+                      for k in ("model", "quant", "engine", "backend", "device")}
+    key = json.dumps(scope, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    body["option_capacity"] = {key: {
+        "allowed_k": allowed, "finding_ids": ["e" * 64], "wilson_lower": 0.99,
+        "task": ["T1", "T2", "T3", "T4"], "bar": 0.95, "expires_at": "2099-01-01T00:00:00+00:00",
+    }}
+    return scope, key
+
+
+def test_option_capacity_exact_scope_expiry_and_default(isolated_policy):
+    body = policy_body("shadow")
+    scope, key = capacity_rule(body, 4)
+    publish(isolated_policy, body)
+    assert runtime.current().allowed_k(scope) == 4
+    assert runtime.allowed_k({**scope, "quant": "Q8_0"}) == 2
+    assert runtime.allowed_k({**scope, "device": "other-device"}) == 2
+    assert runtime.allowed_k({"model": scope["model"]}) == 2
+    body["option_capacity"][key]["expires_at"] = "2000-01-01T00:00:00+00:00"
+    publish(isolated_policy, body)
+    assert runtime.allowed_k(scope) == 2
+
+
+@pytest.mark.parametrize("field,value", [
+    ("allowed_k", True), ("allowed_k", 0), ("finding_ids", []), ("task", []),
+    ("wilson_lower", 0.94), ("bar", "0.95"), ("expires_at", "broken"),
+])
+def test_invalid_capacity_grant_cannot_raise_binary_bound(isolated_policy, field, value):
+    body = policy_body()
+    scope, key = capacity_rule(body, 8)
+    body["option_capacity"][key][field] = value
+    publish(isolated_policy, body)
+    assert runtime.allowed_k(scope) == 2
+
+
+def test_missing_policy_blocks_wide_model_request_before_transport(isolated_policy):
+    from z0int.cognition.actions import compile_actions
+    from z0int.cognition.adapters.local_slm import LocalSLMBackend, ToolDecisionRequest
+    from z0int.cognition.adapters.transport import ServerConfig
+    scope = {k: policy_body()["families"]["omp.tool"]["arm"][k]
+             for k in ("model", "quant", "engine", "backend", "device")}
+    legal = compile_actions(graph=cli._graph_from_payload({"actions": [
+        {"action_id": name, "kind": "tool"} for name in ("read", "glob", "grep"),
+    ]}), authority=("read",), budget_units=8)
+    class NoSend:
+        def chat(self, *args, **kwargs):
+            pytest.fail("over-cap request must not reach model transport")
+    backend = LocalSLMBackend(backend_id="synthetic", config=ServerConfig("http://fixture", "served-alias"),
+                              scope=scope, transport=NoSend())
+    request = ToolDecisionRequest(state="synthetic", legal=legal, budget={"allowed_k": 999})
+    decision = backend.decide(request)
+    assert decision.abstained is True
+    assert decision.parse_error == "option_capacity_exceeded"
+    assert request.metadata == decision.diagnostics["request_metadata"]
+    row = decision.to_dict()
+    assert row["slm_requested"] is False
+    assert row["option_count"] == 0
+    assert row["attempted_option_count"] == 3
+    assert row["allowed_k"] == 2
+    assert row["model_id"] == scope["model"] and row["quant"] == scope["quant"]
+    assert row["scope"] == scope
+
+
+def test_qualified_request_stamps_actual_not_maximum_width(isolated_policy):
+    from z0int.cognition.actions import compile_actions
+    from z0int.cognition.adapters.local_slm import LocalSLMBackend, ToolDecisionRequest
+    from z0int.cognition.adapters.transport import ChatOutcome, ServerConfig
+    body = policy_body("shadow")
+    scope, _ = capacity_rule(body, 8)
+    publish(isolated_policy, body)
+    legal = compile_actions(graph=cli._graph_from_payload({"actions": [
+        {"action_id": name, "kind": "tool"} for name in ("read", "glob", "grep"),
+    ]}), authority=("read",), budget_units=8)
+    calls = []
+    class Transport:
+        def chat(self, messages, **kwargs):
+            calls.append(kwargs)
+            return ChatOutcome('{"action_id":"read","confidence":0.99}', None, {}, {}, {}, 1.0)
+    backend = LocalSLMBackend(backend_id="synthetic", config=ServerConfig("http://fixture", "served-alias"),
+                              scope=scope, transport=Transport(), policy=runtime.current())
+    request = ToolDecisionRequest(state="synthetic", legal=legal)
+    decision = backend.decide(request)
+    assert decision.selected_action == "read"
+    assert [tool["function"]["name"] for tool in calls[0]["tools"]] == list(legal.ids())
+    wire = calls[0]["extra_body"]["metadata"]
+    assert wire["option_count"] == "3" and wire["allowed_k"] == "8"
+    assert wire["model_id"] == scope["model"] and wire["quant"] == scope["quant"]
+    assert json.loads(wire["scope"]) == scope
+    assert request.metadata["option_count"] == decision.to_dict()["option_count"] == 3
+    assert decision.to_dict()["scope"] == scope
+
+
+def test_cli_capacity_refusal_is_frontier_receipt_not_fake_abstain(isolated_policy, capsys, monkeypatch):
+    body = policy_body("live")
+    arm = body["families"]["omp.tool"]["arm"]
+    endpoint = {**arm, "url": "http://127.0.0.1:12345/v1", "evidence": ["e" * 64],
+                "expected_model_id": "synthetic-06b", "engine_build": "synthetic-build",
+                "model_path": "/synthetic/model.gguf", "model_sha256": "a" * 64}
+    body["serving"] = [endpoint]
+    publish(isolated_policy, body)
+    runtime._write_health(endpoint["url"], {"scope_sha256": runtime._scope_hash(endpoint), "status": "healthy",
+        "checked_at": datetime.now(timezone.utc).isoformat(), "model": endpoint["expected_model_id"], "revision": None})
+    monkeypatch.setattr("z0int.cognition.adapters.transport.OpenAICompatTransport.chat",
+                        lambda *args, **kwargs: pytest.fail("must not send over-cap request"))
+    monkeypatch.setattr("z0int.cognition.adapters.policy.urlopen",
+                        lambda *args, **kwargs: pytest.fail("blocked decision needs no props request"))
+    request = {"trace_id": "synthetic-capacity-refusal", "authority": ["read"], "budget_units": 8,
+        "actions": [{"action_id": name, "family": "omp.tool"} for name in ("read", "glob", "grep")]}
+    path = isolated_policy / "request.json"
+    path.write_text(json.dumps(request))
+    args = argparse.Namespace(input=str(path), surface=False, catalog=None, max_cost_class=None, shadow=[], json=True)
+    assert cli._cmd_decide(args) == 1
+    row = json.loads(capsys.readouterr().out)
+    assert row["reason"] == row["policy_reason"] == "option_capacity_exceeded"
+    assert row["route"] == "remote_frontier" and row["stage"] == "none" and row["policy_stage"] == "live"
+    assert row["option_count"] == 0 and row["attempted_option_count"] == 3 and row["slm_requested"] is False
+    assert row["allowed_k"] == 2 and "abstain" not in row
+    assert row["model_id"] == arm["model"] and row["quant"] == arm["quant"]
+    assert row["scope"] == {k: arm[k] for k in ("model", "quant", "engine", "backend", "device")}
+    assert row["receipts"][-1]["reason"] == "option_capacity_exceeded"
+
+
+def test_timed_out_model_row_retains_actual_request_capacity_metadata(isolated_policy):
+    import time
+    from z0int.cognition.actions import compile_actions
+    from z0int.cognition.adapters.local_slm import LocalSLMBackend, ToolDecisionRequest
+    from z0int.cognition.adapters.transport import ChatOutcome, ServerConfig
+    from z0int.cognition.shadow import ShadowSpec, _decision_rows
+    scope = {k: policy_body()["families"]["omp.tool"]["arm"][k]
+             for k in ("model", "quant", "engine", "backend", "device")}
+    legal = compile_actions(graph=cli._graph_from_payload({"actions": [
+        {"action_id": name, "kind": "tool"} for name in ("read", "glob"),
+    ]}), authority=("read",), budget_units=8)
+    class Slow:
+        def chat(self, messages, **kwargs):
+            time.sleep(0.25)
+            return ChatOutcome('{"action_id":"read","confidence":0.99}', None, {}, {}, {}, 250.0)
+    backend = LocalSLMBackend(backend_id="synthetic", config=ServerConfig("http://fixture", "served-alias"),
+                              scope=scope, transport=Slow())
+    rows = _decision_rows([(ShadowSpec(label="synthetic", model_id=scope["model"]), backend, None)],
+                         frozenset(legal.ids()), ToolDecisionRequest(state="synthetic", legal=legal), timeout_s=0.1)
+    assert rows[0]["error"] == "shadow_timeout"
+    assert rows[0]["slm_requested"] is True and rows[0]["option_count"] == 2
+    assert rows[0]["model_id"] == scope["model"] and rows[0]["quant"] == scope["quant"]
+    assert rows[0]["scope"] == scope and rows[0]["allowed_k"] == 2

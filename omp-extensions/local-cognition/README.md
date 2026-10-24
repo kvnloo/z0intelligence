@@ -103,6 +103,28 @@ policy selection. The CLI records that filter when supplied. The OMP extension
 reads the same optional filter from cognition settings for receipt attribution.
 Neither consumer generalizes a measured arm to a different physical scope.
 
+O13 bounds each SLM request before provider IO. `option_capacity` is a map keyed
+by the sorted compact canonical JSON of `{model,quant,engine,backend,device}`.
+Each entry contains `allowed_k`, `finding_ids`, `wilson_lower`, `task` (a list),
+`bar` and `expires_at`. Only an unexpired exact-scope grant whose Wilson lower
+bound meets its bar can raise the default binary cap. Missing, invalid or expired
+capacity data means a cap of 2, not permission for a broad choice set.
+
+An over-cap proposal never reaches the model. It returns to frontier/Jev with
+`option_capacity_exceeded`, effective stage `none`, `slm_requested: false`,
+`option_count: 0` and its original `attempted_option_count`. No candidate is
+silently discarded to satisfy the law. Existing shadow projection widths remain
+explicit proposals: an unqualified wide projection is blocked, not shrunk.
+
+Each actual request records its rendered `option_count`, canonical `model_id`,
+exact `quant`, complete five-field `scope` and `allowed_k`. Provider wire metadata
+uses OpenAI metadata strings. Receipts and in-process request metadata retain
+typed counts. These are actual candidate counts, never the grant's maximum.
+Per-model metadata remains available on timeout and is preserved in OMP's nested
+model observations. Aggregate envelopes and pure Python portfolio strategies
+record `slm_requested: false` and do not masquerade as provider calls.
+
+
 Fallback environment (wins over the fallback settings file):
 
 | Variable | Default | Meaning |

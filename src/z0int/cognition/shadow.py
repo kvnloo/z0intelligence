@@ -303,6 +303,8 @@ def _resolve_shadows(
     for spec in specs:
         for key, rule in policy._body.get("families", {}).items():
             family = rule.get("family", key)
+            if any(rule.get("arm", {}).get(k) != v for k, v in policy._scope.items()):
+                continue
             if rule.get("arm", {}).get("model") != spec.model_id:
                 continue
             narrowed = policy.for_scope({k: v for k, v in rule["arm"].items()
@@ -311,7 +313,7 @@ def _resolve_shadows(
                 continue
             endpoint = narrowed.endpoint_for(family)
             if policy_runtime.serving_identity_complete(endpoint) and policy_runtime.serving_health(endpoint["url"], endpoint, probe=True) is True:
-                governed[spec.model_id] = (PolicyArmBackend(endpoint, rule["threshold"], shadow=True), None)
+                governed[spec.model_id] = (PolicyArmBackend(endpoint, rule["threshold"], shadow=True, policy=narrowed), None)
             else:
                 governed[spec.model_id] = (None, "no_serving_for_scope")
             break
@@ -366,11 +368,12 @@ def _decision_rows(
         (None, error if backend is None else "shadow_timeout")
         for _, backend, error in resolved
     ]
+    model_requests = [replace(request, metadata={}) for _ in resolved]
     lock = threading.Lock()
 
     def run(index: int, backend: Any) -> None:
         try:
-            decision = backend.decide(request)
+            decision = backend.decide(model_requests[index])
         except BaseException as exc:  # noqa: BLE001 - shadow must never raise
             with lock:
                 results[index] = (None, f"{type(exc).__name__}: {exc}")
@@ -404,7 +407,7 @@ def _decision_rows(
     for index, (spec, backend, error) in enumerate(resolved):
         with lock:
             decision, failure = results[index]
-        row = _row(spec, backend, decision, failure, error, legal_ids)
+        row = _row(spec, backend, decision, failure, error, legal_ids, model_requests[index].metadata)
         # A backend can fail on its own just after the deadline; that row keeps
         # its own error and is not also reported as a timeout.
         if decision is None and failure == "shadow_timeout" and index in waited_ms:
@@ -421,6 +424,7 @@ def _row(
     failure: str | None,
     resolve_error: str | None,
     legal_ids: frozenset[str],
+    request_metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if decision is None:
         return {
@@ -433,6 +437,10 @@ def _row(
             "latency_ms": 0.0,
             "parse_error": failure or resolve_error or "unavailable",
             "error": failure or resolve_error or "unavailable",
+            "option_count": 0, "slm_requested": False, "model_id": spec.model_id, "quant": "unknown",
+            "scope": {"model": spec.model_id, "quant": "unknown", "engine": "unknown",
+                      "backend": "unknown", "device": "unknown"},
+            **dict(request_metadata or {}),
         }
 
     selected = decision.selected_action
@@ -471,6 +479,12 @@ def _row(
     if "selected_arm" in row:
         row["scope"] = dict(row["selected_arm"])
     row["revision"] = decision.revision
+    metadata = decision.diagnostics.get("request_metadata")
+    if isinstance(metadata, Mapping):
+        row.update(metadata)
+        if metadata.get("slm_requested") is False:
+            row["backend"] = None
+            row["error"] = decision.parse_error or decision.diagnostics.get("reason")
     return row
 
 
@@ -602,7 +616,7 @@ def run_shadow(
     tool_name = facts.get("tool_name") if isinstance(facts.get("tool_name"), str) else None
 
     try:
-        policy = policy_runtime.current()
+        policy = policy_runtime.current().for_scope(payload.get("policy_scope") or {})
         from .. import paths
         from .escalation import EscalationPolicy, EscalationThresholds
         status_path = paths.home() / "loop" / "shadow-learning-status.json"
@@ -646,16 +660,21 @@ def run_shadow(
                 resolved, legal_ids, request, timeout_s=_timeout_s(payload, timeout_s)
             )
     if local is not None:
+        local.update(option_count=0, slm_requested=False, model_id=local.get("model"), quant=None)
         shadow_rows.append(local)
     for row in shadow_rows:
         row["synthetic"] = payload.get("synthetic") is True or row.get("synthetic") is True
         observed_scope = row.get("selected_arm")
         row_policy = policy.for_scope(observed_scope) if isinstance(observed_scope, dict) else policy
         row_policy.stamp(row, family)
+        if row.get("slm_requested") is False and row.get("parse_error") == "option_capacity_exceeded":
+            row.update(policy_stage=row["stage"], stage="none", policy_reason="option_capacity_exceeded",
+                       reason="option_capacity_exceeded", route="remote_frontier")
 
     result: dict[str, Any] = {
         "ok": True,
         "synthetic": payload.get("synthetic") is True,
+        "option_count": 0, "slm_requested": False,
         "schema": SCHEMA,
         "trace_id": trace_id,
         "graph_digest": legal.graph_digest,
@@ -670,10 +689,15 @@ def run_shadow(
         "executed_action": None,
     }
     policy.stamp(result, family)
+    if payload.get("reason") == "option_capacity_exceeded" and not any(row.get("slm_requested") is True for row in shadow_rows):
+        result.update(policy_stage=result["stage"], stage="none", policy_reason="option_capacity_exceeded",
+                      reason="option_capacity_exceeded")
+    result["shadow_requests"] = payload.get("shadow_requests") or []
 
     if write:
         receipt = {
             "synthetic": payload.get("synthetic") is True,
+            "option_count": 0, "slm_requested": False,
             "schema": RECEIPT_SCHEMA,
             "ts": time.time(),
             "trace_id": trace_id,
@@ -700,6 +724,9 @@ def run_shadow(
             "executed_action": None,
         }
         policy.stamp(receipt, family)
+        for key in ("policy_stage", "stage", "policy_reason", "reason", "shadow_requests"):
+            if key in result:
+                receipt[key] = result[key]
         try:
             result["receipts_path"] = str(append_shadow_receipt(receipt))
         except Exception:  # noqa: BLE001 - a write failure must not fail the op

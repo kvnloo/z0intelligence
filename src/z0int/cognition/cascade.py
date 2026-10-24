@@ -126,6 +126,13 @@ class CascadeOutcome:
             "shadow": [dict(s) for s in self.shadow],
             "receipts": [dict(r) for r in self.receipts],
         }
+        if self.decision is not None:
+            body.update(dict(self.decision.diagnostics.get("request_metadata") or {}))
+            body.update({k: self.decision.diagnostics[k] for k in
+                         ("selected_arm", "response_model", "response_revision", "observed_identity", "expected_identity", "props_model_id")
+                         if k in self.decision.diagnostics})
+        else:
+            body.update(option_count=0, slm_requested=False)
         families = self.legal.family_options()
         family = next((a.family for a in self.legal.legal if a.action_id == self.selected_action and a.family), None)
         family = family or (families[0] if len(families) == 1 else "none")
@@ -133,6 +140,15 @@ class CascadeOutcome:
         self._runtime_policy.stamp(body["escalation"], family)
         if body["surface"] is not None:
             self._runtime_policy.stamp(body["surface"], family)
+        if self.reason == "option_capacity_exceeded":
+            refused = next((row for row in reversed(self.attempts) if row.get("reason") == self.reason), {})
+            body.update({key: refused[key] for key in ("option_count", "attempted_option_count", "model_id",
+                         "quant", "scope", "allowed_k", "slm_requested") if key in refused})
+            destination = self._runtime_policy.rule_for(family).get("abstain_to", "frontier")
+            route = "remote_frontier" if destination == "frontier" else "bounded_jev"
+            body.update(policy_stage=body["stage"], stage="none", policy_reason=self.reason, route=route)
+            body["escalation"].update(policy_stage=body["escalation"]["stage"], stage="none",
+                                      policy_reason=self.reason, reason=self.reason, tier=route)
         return body
 
 
@@ -147,6 +163,11 @@ def _attempt_row(tier: str, decision: ToolDecision) -> dict[str, Any]:
         "abstained": decision.abstained,
         "invalid_call": decision.invalid_call,
         "latency_ms": decision.latency_ms,
+        "reason": decision.parse_error or decision.diagnostics.get("reason"),
+        **dict(decision.diagnostics.get("request_metadata") or {}),
+        **{k: decision.diagnostics[k] for k in
+           ("selected_arm", "response_model", "response_revision", "observed_identity", "expected_identity", "props_model_id")
+           if k in decision.diagnostics},
     }
 
 
@@ -378,7 +399,12 @@ class CognitionCascade:
                 "chosen_candidate_id": chosen_candidate_id,
             },
         )
-        return receipt.to_dict()
+        payload = receipt.to_dict()
+        payload.update(dict(diagnostics.get("request_metadata") or {}))
+        payload.update({k: diagnostics[k] for k in
+                        ("selected_arm", "response_model", "response_revision", "observed_identity", "expected_identity", "props_model_id")
+                        if k in diagnostics})
+        return payload
 
     def run(
         self,
@@ -388,6 +414,7 @@ class CognitionCascade:
         trace_id: str | None = None,
     ) -> CascadeOutcome:
         tid = trace_id or new_trace_id()
+        runtime_policy = policy_runtime.current()
         legal = self.compile(context)
         receipts: list[Mapping[str, Any]] = []
         attempts: list[Mapping[str, Any]] = []
@@ -487,6 +514,7 @@ class CognitionCascade:
                 reason=legal.deterministic_reason or "deterministic_solution",
                 receipts=tuple(receipts),
                 surface=surface_decision,
+                _runtime_policy=runtime_policy,
             )
 
         # --- nothing legal: do not bother a model --------------------
@@ -510,6 +538,7 @@ class CognitionCascade:
                 reason="no_legal_actions",
                 receipts=tuple(receipts),
                 surface=surface_decision,
+                _runtime_policy=runtime_policy,
             )
 
         # --- candidate surface: fail closed rather than lower the bar ----
@@ -538,6 +567,7 @@ class CognitionCascade:
                 reason="no_eligible_candidate",
                 receipts=tuple(receipts),
                 surface=surface_decision,
+                _runtime_policy=runtime_policy,
             )
 
         # --- learned tiers ------------------------------------------
@@ -612,11 +642,14 @@ class CognitionCascade:
                     reason=f"{tier}_selected",
                     receipts=tuple(receipts),
                     surface=surface_decision,
+                    _runtime_policy=runtime_policy,
                 )
             last = decision
 
         # --- nothing carried the decision ---------------------------
         attempts.append({"tier": "terminal", "abstained": True})
+        last_reason = next((row.get("reason") for row in reversed(attempts)
+                            if row.get("backend") and row.get("reason")), None)
         return CascadeOutcome(
             trace_id=tid,
             legal=legal,
@@ -628,9 +661,10 @@ class CognitionCascade:
             attempts=tuple(attempts),
             shadow=tuple(shadow_rows),
             abstained=True,
-            reason="all_tiers_abstained",
+            reason="option_capacity_exceeded" if last_reason == "option_capacity_exceeded" else "all_tiers_abstained",
             receipts=tuple(receipts),
             surface=surface_decision,
+            _runtime_policy=runtime_policy,
         )
 
     # Ordered learned tiers, cheapest first.

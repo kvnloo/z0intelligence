@@ -258,11 +258,18 @@ def _stamp_decision(
     family = family or (families[0] if len(families) == 1 else "none")
     policy.stamp(body, family)
     body.setdefault("ts", time.time())
+    arm = policy.rule_for(family).get("arm", {})
+    scope = body.setdefault("scope", {k: arm.get(k, "unknown") for k in
+                                    ("model", "quant", "engine", "backend", "device")})
+    body.setdefault("model_id", scope.get("model", "unknown"))
+    body.setdefault("quant", scope.get("quant", "unknown"))
+    body.setdefault("option_count", 0)
+    body.setdefault("slm_requested", False)
     if len(families) > 1:
         body["policy_families"] = {f: policy.stamp({}, f) for f in families}
     if overrides:
         body["payload_override"] = list(overrides)
-    if "abstain" not in body and (body.get("tier") == "remote_frontier" or body.get("route") == "remote_frontier"):
+    if body.get("slm_requested") is True and "abstain" not in body and (body.get("tier") == "remote_frontier" or body.get("route") == "remote_frontier"):
         attempts = body.get("attempts") or []
         abstentions = [row for row in attempts if row.get("abstained") is True or row.get("escalated") is True]
         if abstentions:
@@ -308,7 +315,7 @@ def _cmd_decide(args: argparse.Namespace) -> int:
     healthy = policy_runtime.serving_health(endpoint["url"], endpoint, probe=True) if identity_ready and eligible else None
     ready = eligible and identity_ready and healthy is True
     threshold = max((policy.rule_for(family).get("threshold", 0.65) for family in families), default=0.65)
-    bound = PolicyArmBackend(endpoint, threshold) if ready else None
+    bound = PolicyArmBackend(endpoint, threshold, policy=policy) if ready else None
     fallback_reason = None
     if eligible and not ready:
         fallback_reason = "serving_health_unknown" if identity_ready and healthy is None else "no_serving_for_scope"
@@ -368,7 +375,10 @@ def _cmd_decide(args: argparse.Namespace) -> int:
     body = outcome.to_dict()
     action_families = {action.action_id: action.family for action in context.graph.actions if action.family}
     # Policy credit binds its measured endpoint automatically, never a role default.
-    if bound is not None and bound.last is not None:
+    metadata = dict(bound.last.diagnostics.get("request_metadata") or {}) if bound is not None and bound.last is not None else {}
+    body.update(metadata)
+    body["escalation"].update(metadata)
+    if bound is not None and bound.last is not None and metadata.get("slm_requested") is True:
         observed = bound.last.diagnostics
         body.update(selected_arm=dict(observed["selected_arm"]),
                     response_model=observed.get("response_model"),
@@ -389,33 +399,39 @@ def _cmd_decide(args: argparse.Namespace) -> int:
                            response_revision=observed.get("response_revision"))
                 row["scope"] = dict(observed["selected_arm"])
                 row.update(identity)
+    if bound is not None and bound.last is not None and bound.last.parse_error == "option_capacity_exceeded":
+        fallback_reason = "option_capacity_exceeded"
+        body["reason"] = fallback_reason
     if outcome.abstained:
         family = families[0] if len(families) == 1 else "none"
         destination = policy.rule_for(family).get("abstain_to", "frontier")
         body["route"] = "remote_frontier" if destination == "frontier" else "bounded_jev"
-        if bound is not None and bound.last is not None:
+        if bound is not None and bound.last is not None and metadata.get("slm_requested") is True:
             body["abstain"] = {"confidence": bound.last.confidence, "threshold": threshold,
                                "reason": bound.last.diagnostics.get("reason", "local_scorer_abstained")}
         row = {key: body[key] for key in ("trace_id", "route", "reason", "abstain",
                "selected_arm", "scope", "response_model", "response_revision",
-               "observed_identity", "expected_identity", "props_model_id") if key in body}
+               "observed_identity", "expected_identity", "props_model_id", "option_count",
+               "attempted_option_count", "model_id", "quant", "allowed_k", "slm_requested") if key in body}
         row.update(schema="z0int.cognition.fallback.v1", selected_action=None)
         policy.stamp(row, family)
         body["receipts"].append(row)
-    def apply_binding(row: dict[str, Any]) -> None:
+        if fallback_reason == "option_capacity_exceeded":
+            body["escalation"].update(tier=body["route"], reason=fallback_reason)
+    def apply_binding(row: dict[str, Any], *, shadow: bool = False) -> None:
         if payload.get("synthetic") is True:
             row["synthetic"] = True
         if payload.get("policy_scope"):
             row["policy_scope"] = dict(payload["policy_scope"])
             row.setdefault("scope", dict(payload["policy_scope"]))
-        if fallback_reason:
+        if fallback_reason and not shadow and row.get("execution") != "shadow":
             row["policy_stage"] = row.get("stage", "none")
             row["stage"] = "none"
             row["policy_reason"] = fallback_reason
         for key in ("receipts", "attempts", "shadow"):
             for child in row.get(key) or []:
                 if isinstance(child, dict):
-                    apply_binding(child)
+                    apply_binding(child, shadow=shadow or key == "shadow")
         for key in ("escalation", "surface"):
             child = row.get(key)
             if isinstance(child, dict):

@@ -244,6 +244,33 @@ class Policy:
     def for_scope(self, scope: dict[str, str]) -> Policy:
         return replace(self, _scope=dict(scope))
 
+    def allowed_k(self, scope: dict[str, Any]) -> int:
+        """Only an unexpired exact-scope capacity grant may exceed binary."""
+        try:
+            fields = ("model", "quant", "engine", "backend", "device")
+            if not all(isinstance(scope.get(k), str) and scope[k] for k in fields):
+                return 2
+            key = _canonical({k: scope[k] for k in fields}).decode("utf-8")
+            entry = self._body.get("option_capacity", {}).get(key)
+            if not isinstance(entry, dict):
+                return 2
+            count = entry.get("allowed_k")
+            if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+                return 2
+            if _timestamp(entry.get("expires_at")) <= datetime.now(timezone.utc):
+                return 2
+            if not _strings(entry.get("finding_ids")) or not entry["finding_ids"]:
+                return 2
+            if not _strings(entry.get("task")) or not entry["task"]:
+                return 2
+            if not _number(entry.get("bar")) or not _number(entry.get("wilson_lower")):
+                return 2
+            if not 0 <= entry["bar"] <= entry["wilson_lower"] <= 1:
+                return 2
+            return count
+        except Exception:
+            return 2
+
     def rule_for(self, family: str) -> dict[str, Any]:
         matches = []
         for key, rule in self._body.get("families", {}).items():
@@ -355,3 +382,7 @@ def serving_for(device: str | None = None) -> list[dict[str, Any]]:
 
 def stamp(receipt_dict: dict[str, Any], family: str, rule: str | None = None) -> dict[str, Any]:
     return current().stamp(receipt_dict, family, rule)
+
+
+def allowed_k(scope: dict[str, Any]) -> int:
+    return current().allowed_k(scope)

@@ -94,6 +94,7 @@ type ModelObservation = {
 	selected_action: string | null;
 	agrees_with_observed: boolean | null;
 	latency_ms: number | null;
+	[key: string]: unknown;
 };
 
 type ShadowClassification = { outcome: ShadowOutcome; models: ModelObservation[]; legal_count: number | null };
@@ -134,6 +135,7 @@ type DecisionPolicy = {
 	families: Record<string, Jsonish>;
 	synthetic?: boolean;
 	serving: Jsonish[];
+	option_capacity?: unknown;
 };
 let policyCache: { path: string; mtime: number; sha: string; policy: DecisionPolicy } | null = null;
 const healthCache = new Map<string, { ts: number; healthy: boolean | null }>();
@@ -248,7 +250,7 @@ export function loadDecisionPolicy(): DecisionPolicy {
 		}
 		const digest = createHash("sha256").update(canonicalPolicyBody(raw)).digest("hex");
 		if (body.version !== digest) throw new Error("policy_hash_mismatch");
-		const policy = { version: digest, sha256: digest, synthetic: body.synthetic === true, families: body.families as Record<string, Jsonish>, serving: body.serving as Jsonish[] };
+		const policy = { version: digest, sha256: digest, synthetic: body.synthetic === true, families: body.families as Record<string, Jsonish>, serving: body.serving as Jsonish[], option_capacity: body.option_capacity };
 		policyCache = { path, mtime, sha, policy };
 		return policy;
 	} catch (error) {
@@ -256,6 +258,22 @@ export function loadDecisionPolicy(): DecisionPolicy {
 	}
 }
 
+
+export function optionCapacity(scope: Jsonish, policy = loadDecisionPolicy()): number {
+	if (!object(scope)) return 2;
+	const keys = ["backend", "device", "engine", "model", "quant"];
+	if (keys.some(key => typeof scope[key] !== "string" || !scope[key])) return 2;
+	const key = JSON.stringify(Object.fromEntries(keys.map(k => [k, scope[k]])));
+	const entry = object(policy.option_capacity) ? policy.option_capacity[key] : undefined;
+	if (!object(entry) || typeof entry.allowed_k !== "number" || !Number.isInteger(entry.allowed_k) || entry.allowed_k < 1
+		|| !timestamp(entry.expires_at) || Date.parse(String(entry.expires_at)) <= Date.now()
+		|| !strings(entry.finding_ids) || !(entry.finding_ids as unknown[]).length
+		|| !strings(entry.task) || !(entry.task as unknown[]).length
+		|| typeof entry.bar !== "number" || !Number.isFinite(entry.bar)
+		|| typeof entry.wilson_lower !== "number" || !Number.isFinite(entry.wilson_lower)
+		|| entry.bar < 0 || entry.wilson_lower < entry.bar || entry.wilson_lower > 1) return 2;
+	return entry.allowed_k;
+}
 function policyStage(rule: Jsonish | undefined): string {
 	return rule && Date.parse(String(rule.expires_at)) > Date.now() ? String(rule.stage) : "none";
 }
@@ -344,7 +362,7 @@ export function policyStamp(policy = loadDecisionPolicy(), family = "omp.tool"):
 
 function receiptPolicyFields(payload: Jsonish): Jsonish {
 	const fields: Jsonish = {};
-	for (const key of ["policy_version", "policy_sha256", "policy_family", "policy_scope", "rule_id", "stage", "family", "policy_reason", "serving_healthy", "synthetic"]) {
+	for (const key of ["policy_version", "policy_sha256", "policy_family", "policy_scope", "policy_stage", "rule_id", "stage", "family", "policy_reason", "serving_healthy", "synthetic"]) {
 		if (payload[key] !== undefined) fields[key] = payload[key];
 	}
 	return fields;
@@ -573,9 +591,15 @@ export function buildShadowPayload(
 	// by this; the worker fixes the selected and executed action to null.
 	const risks = new Set(toolNames.map(riskFor));
 	const policy = loadDecisionPolicy();
+	const plans = shadowRequestPlans(policy, shadowModels(policy), toolNames.length);
+	const stamp = policyStamp(policy);
+	const blocked = plans.length > 0 && plans.every(plan => plan.reason === "option_capacity_exceeded");
 	return {
-		...policyStamp(policy),
+		...stamp,
+		...(blocked ? { policy_stage: stamp.stage, stage: "none", policy_reason: "option_capacity_exceeded",
+			reason: "option_capacity_exceeded", route: "remote_frontier" } : {}),
 		op: "cognition_shadow",
+		option_count: 0, slm_requested: false, shadow_requests: plans,
 		trace_id: randomUUID().replaceAll("-", ""),
 		// An environment variable describes the process, not the session a
 		// tool call belongs to; it is only a fallback when OMP offers no id.
@@ -593,8 +617,22 @@ export function buildShadowPayload(
 		},
 		objective: null,
 		risk_class: risks.has("write") ? "write" : "read",
-		shadows: shadowModels(policy),
+		shadows: plans.filter(plan => plan.reason !== "option_capacity_exceeded").map(plan => plan.model_id),
 	};
+}
+
+function shadowRequestPlans(policy: DecisionPolicy, models: string[], count: number): Jsonish[] {
+	const narrowing = nested(loadCognitionSettings(), "policy_scope");
+	return models.map(model => {
+		const rule = Object.values(policy.families).find(row => POLICY_STAGES.indexOf(policyStage(row)) >= 1 && object(row.arm) && row.arm.model === model
+			&& (!object(narrowing) || Object.entries(narrowing).every(([k, v]) => (row.arm as Jsonish)[k] === v)));
+		const arm = object(rule?.arm) ? rule.arm : {};
+		const scope = Object.fromEntries(["model", "quant", "engine", "backend", "device"].map(k =>
+			[k, typeof arm[k] === "string" ? arm[k] : k === "model" ? model : "unknown"]));
+		const allowed = optionCapacity(scope, policy);
+		return { model_id: model, quant: scope.quant, scope, option_count: 0, attempted_option_count: count,
+			allowed_k: allowed, slm_requested: false, ...(count > allowed ? { reason: "option_capacity_exceeded" } : {}) };
+	});
 }
 
 // --- transport ----------------------------------------------------------
@@ -694,6 +732,9 @@ export function classifyShadowResponse(response: unknown, observedTool: string):
 				selected_action: status === "selected" ? selected : null,
 				agrees_with_observed: status === "selected" ? selected === observedTool : null,
 				latency_ms: ran && typeof row.latency_ms === "number" ? row.latency_ms : null,
+				...receiptPolicyFields(row),
+				...Object.fromEntries(["option_count", "attempted_option_count", "model_id", "quant", "scope", "allowed_k", "slm_requested",
+					"observed_identity", "expected_identity", "props_model_id"].filter(key => row[key] !== undefined).map(key => [key, row[key]])),
 			};
 		});
 	let outcome: ShadowOutcome;
@@ -738,9 +779,13 @@ function appendObservation(
 			tool: identity.tool,
 			trace_id: payload.trace_id,
 			outcome: classified.outcome,
-			models: classified.models.map(model => ({ ...model, ...receiptPolicyFields(payload) })),
+			models: classified.models.map(model => ({ ...receiptPolicyFields(payload), ...model,
+				synthetic: payload.synthetic === true || model.synthetic === true })),
 			legal_count: classified.legal_count,
 			requested_models: Array.isArray(payload.shadows) ? payload.shadows : [],
+			option_count: 0, slm_requested: false,
+			shadow_requests: payload.shadow_requests ?? [],
+			reason: payload.reason ?? null,
 			round_trip_ms: Math.round(elapsedMs),
 			via: row.via ?? null,
 			error: row.error ?? null,
@@ -771,6 +816,16 @@ export async function sendShadow(
 	const synthetic = payload.synthetic === true;
 	if (typeof payload.policy_version !== "string") Object.assign(payload, policyStamp());
 	payload.synthetic = synthetic || payload.synthetic === true;
+	if (Array.isArray(payload.actions) && Array.isArray(payload.shadows) && payload.shadows.length
+		&& payload.shadows.every(model => typeof model === "string")) {
+		const plans = shadowRequestPlans(loadDecisionPolicy(), payload.shadows as string[], payload.actions.length);
+		payload.shadow_requests = plans;
+		payload.shadows = plans.filter(plan => plan.reason !== "option_capacity_exceeded").map(plan => plan.model_id);
+		if (plans.every(plan => plan.reason === "option_capacity_exceeded")) {
+			payload.policy_stage = payload.policy_stage ?? payload.stage;
+			Object.assign(payload, { stage: "none", policy_reason: "option_capacity_exceeded", reason: "option_capacity_exceeded" });
+		}
+	}
 	// Give the worker a budget inside ours. Left to its own 30 s default it
 	// keeps waiting on a slow model after this side has recorded a timeout, and
 	// its receipt then says the model answered while the session entry says it

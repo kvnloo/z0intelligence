@@ -26,7 +26,8 @@ class _PolicyTransport(OpenAICompatTransport):
 class PolicyArmBackend:
     """Bind one decision to one measured serving arm, with no role fallback."""
 
-    def __init__(self, endpoint: dict[str, Any], threshold: float, *, shadow: bool = False) -> None:
+    def __init__(self, endpoint: dict[str, Any], threshold: float, *, shadow: bool = False,
+                 policy: policy_runtime.Policy | None = None) -> None:
         self.endpoint = endpoint
         self.threshold = threshold
         self.shadow = shadow
@@ -37,7 +38,9 @@ class PolicyArmBackend:
                               runtime=endpoint["engine"], quantization=endpoint["quant"],
                               timeout_s=30.0)
         self.transport = _PolicyTransport(config)
-        self.backend = LocalSLMBackend(backend_id="decision-policy", config=config, transport=self.transport)
+        scope = {k: endpoint[k] for k in ("model", "quant", "engine", "backend", "device")}
+        self.backend = LocalSLMBackend(backend_id="decision-policy", config=config, transport=self.transport,
+                                       scope=scope, policy=policy)
         self.last: ToolDecision | None = None
         self.request: ToolDecisionRequest | None = None
 
@@ -52,10 +55,15 @@ class PolicyArmBackend:
         # Several semantic tiers can visit this arm. Never repeat its request
         # or let a later tier accept the same below-threshold answer.
         if self.request == request and self.last is not None:
+            request.metadata.update(dict(self.last.diagnostics.get("request_metadata") or {}))
             return self.last
         self.request = request
         self.transport.response = None
         decision = self.backend.decide(request)
+        metadata = decision.diagnostics.get("request_metadata", {})
+        if metadata.get("slm_requested") is False:
+            self.last = decision
+            return self.last
         response = self.transport.response or {}
         model = response.get("model")
         expected = {

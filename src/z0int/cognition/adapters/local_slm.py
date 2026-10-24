@@ -21,6 +21,7 @@ from typing import Any, Mapping, Protocol, runtime_checkable
 import json
 import time
 
+from ... import policy_runtime
 from ..actions import LegalActionSet
 from ..manifest import ModelCapability
 from .dialects import DIALECTS, ToolDialect, dialect_for
@@ -49,6 +50,8 @@ class ToolDecisionRequest:
     constraints: Mapping[str, Any] = field(default_factory=dict)
     budget: Mapping[str, Any] = field(default_factory=dict)
     max_tokens: int = 256
+    # Provider audit metadata is filled before IO, including for timed-out calls.
+    metadata: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
 
 
 @dataclass(frozen=True)
@@ -106,6 +109,9 @@ class ToolDecision:
             out["reasoning_metadata"] = dict(self.reasoning_metadata)
         if self.diagnostics:
             out["diagnostics"] = dict(self.diagnostics)
+        request_metadata = self.diagnostics.get("request_metadata")
+        if isinstance(request_metadata, Mapping):
+            out.update(request_metadata)
         return out
 
 
@@ -182,6 +188,8 @@ class LocalSLMBackend:
         dialect: ToolDialect | None = None,
         capability: ModelCapability | None = None,
         transport: OpenAICompatTransport | None = None,
+        scope: Mapping[str, str] | None = None,
+        policy: policy_runtime.Policy | None = None,
     ) -> None:
         self._backend_id = backend_id
         self._config = config
@@ -191,6 +199,13 @@ class LocalSLMBackend:
             capability.tool_call_template if capability else None,
         )
         self._transport = transport or OpenAICompatTransport(config)
+        canonical_model = capability.model_id if capability else config.model
+        self._scope = {
+            "model": canonical_model, "quant": config.quantization or "unknown",
+            "engine": config.runtime or "unknown", "backend": "unknown", "device": "unknown",
+            **dict(scope or {}),
+        }
+        self._policy = policy
 
     @classmethod
     def for_capability(cls, capability: ModelCapability, *, base_url: str, model: str | None = None,
@@ -240,6 +255,21 @@ class LocalSLMBackend:
     def decide(self, request: ToolDecisionRequest) -> ToolDecision:
         legal = request.legal
         ids = legal.ids()
+        policy = self._policy or policy_runtime.current()
+        allowed = policy.allowed_k(self._scope)
+        metadata: dict[str, Any] = {
+            "option_count": 0, "attempted_option_count": len(ids),
+            "model_id": self._scope["model"], "quant": self._scope["quant"],
+            "scope": dict(self._scope), "allowed_k": allowed, "slm_requested": False,
+        }
+        request.metadata.clear()
+        request.metadata.update(metadata)
+        if len(ids) > allowed:
+            return _abstain(
+                backend=self._backend_id, model=self._config.model, revision=self._config.revision,
+                candidate_count=len(ids), latency_ms=0.0, reason="option_capacity_exceeded",
+                extra={"request_metadata": metadata},
+            )
         if not ids:
             return _abstain(
                 backend=self._backend_id,
@@ -248,6 +278,7 @@ class LocalSLMBackend:
                 candidate_count=0,
                 latency_ms=0.0,
                 reason="no legal actions",
+                extra={"request_metadata": metadata},
             )
 
         actions = legal.legal
@@ -278,9 +309,20 @@ class LocalSLMBackend:
             if len(actions) <= 1:
                 return _abstain(backend=self._backend_id, model=self._config.model,
                     revision=self._config.revision, candidate_count=len(ids),
-                    latency_ms=0.0, reason="context_overflow:prompt_budget_exhausted")
+                    latency_ms=0.0, reason="context_overflow:prompt_budget_exhausted",
+                    extra={"request_metadata": metadata})
             actions = actions[:-1]
         ids = tuple(a.action_id for a in actions)
+        metadata.update(option_count=len(ids), slm_requested=True)
+        request.metadata.update(metadata)
+        wire_metadata = {
+            "option_count": str(len(ids)), "model_id": self._scope["model"], "quant": self._scope["quant"],
+            "scope": json.dumps(self._scope, sort_keys=True, separators=(",", ":"), ensure_ascii=False),
+            "allowed_k": str(allowed), "policy_version": policy.version,
+        }
+        extra_body: dict[str, Any] = {"metadata": wire_metadata}
+        if self._config.model.startswith("qwen3-"):
+            extra_body["chat_template_kwargs"] = {"enable_thinking": False}
 
         started = time.perf_counter()
         try:
@@ -294,8 +336,7 @@ class LocalSLMBackend:
                 else request.max_tokens,
                 temperature=self._dialect.temperature,
                 stop=self._dialect.stop or None,
-                extra_body={"chat_template_kwargs": {"enable_thinking": False}}
-                if self._config.model.startswith("qwen3-") else None,
+                extra_body=extra_body,
             )
         except TransportError as exc:
             detail = str(exc).lower()
@@ -309,7 +350,7 @@ class LocalSLMBackend:
                 candidate_count=len(ids),
                 latency_ms=(time.perf_counter() - started) * 1000.0,
                 reason=f"{kind}: {exc}",
-                extra={"model_candidate_ids": list(ids)},
+                extra={"model_candidate_ids": list(ids), "request_metadata": metadata},
             )
 
         invocation = self._dialect.parse(
@@ -336,6 +377,7 @@ class LocalSLMBackend:
             if isinstance(usage.get("prompt_tokens_details"), dict)
             else usage.get("cached_tokens"),
             supervisor=_supervisor_facts(outcome.raw),
+            request_metadata=metadata,
         )
 
         if invocation is None:
@@ -419,10 +461,13 @@ class LocalSLMBackend:
         cached_tokens: int | None = None,
         diagnostics: Mapping[str, Any] | None = None,
         supervisor: Mapping[str, Any] | None = None,
+        request_metadata: Mapping[str, Any] | None = None,
     ) -> ToolDecision:
         merged: dict[str, Any] = dict(diagnostics or {})
         if supervisor:
             merged["supervisor"] = dict(supervisor)
+        if request_metadata is not None:
+            merged["request_metadata"] = dict(request_metadata)
         return ToolDecision(
             backend=backend,
             model=model,

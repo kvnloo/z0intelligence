@@ -18,6 +18,7 @@ import localCognition, {
 	loadCognitionSettings,
 	loadDecisionPolicy,
 	policyStamp,
+	optionCapacity,
 	shadowModels,
 	receiptPath,
 	resolveAvailableTools,
@@ -766,4 +767,72 @@ test("payload synthetic provenance survives empty policy and reaches model obser
 	expect(entries[0].synthetic).toBe(true);
 	expect((entries[0].models as Array<Record<string, unknown>>)[0].synthetic).toBe(true);
 	expect((statusRing[0] as unknown as Record<string, unknown>).synthetic).toBe(true);
+});
+
+function capacityFixture(allowed = 4) {
+	const body = policyFixture("shadow");
+	const arm = ((body.families as Record<string, Record<string, unknown>>)["omp.tool"].arm as Record<string, string>);
+	const scope = Object.fromEntries(["backend", "device", "engine", "model", "quant"].map(k => [k, arm[k]]));
+	const entry = { allowed_k: allowed, finding_ids: ["e".repeat(64)], wilson_lower: 0.99,
+		task: ["T1", "T2", "T3", "T4"], bar: 0.95, expires_at: "2099-01-01T00:00:00+00:00" };
+	body.option_capacity = { [JSON.stringify(scope)]: entry };
+	return { body, scope, entry };
+}
+
+test("capacity lookup defaults to binary and requires an unexpired exact scope", () => {
+	const { body, scope, entry } = capacityFixture(4);
+	expect(optionCapacity(scope)).toBe(2);
+	writePolicy(body);
+	expect(optionCapacity(scope)).toBe(4);
+	expect(optionCapacity({ ...scope, quant: "Q8_0" })).toBe(2);
+	expect(optionCapacity({ model: scope.model })).toBe(2);
+	entry.expires_at = "2000-01-01T00:00:00+00:00";
+	writePolicy(body);
+	expect(optionCapacity(scope)).toBe(2);
+});
+
+test("over-cap shadow proposal never reaches the worker as a model request", async () => {
+	const { body } = capacityFixture(2);
+	writePolicy(body);
+	const payload = buildShadowPayload(toolCall("read"), ["read", "glob", "grep"]);
+	expect(payload.shadows).toEqual([]);
+	expect(payload.reason).toBe("option_capacity_exceeded");
+	expect(payload.stage).toBe("none");
+	expect(payload.policy_stage).toBe("shadow");
+	const plans = payload.shadow_requests as Array<Record<string, unknown>>;
+	expect(plans[0]).toMatchObject({ model_id: "policy-model", quant: "Q4_0", option_count: 0,
+		attempted_option_count: 3, allowed_k: 2, slm_requested: false, reason: "option_capacity_exceeded" });
+	await sendShadow(payload, 1000);
+	expect(sent[0].shadows).toEqual([]);
+});
+
+test("qualified shadow request keeps all original options and its exact scope", async () => {
+	const { body, scope } = capacityFixture(4);
+	writePolicy(body);
+	const payload = buildShadowPayload(toolCall("read"), ["read", "glob", "grep"]);
+	expect(payload.shadows).toEqual(["policy-model"]);
+	expect((payload.actions as unknown[]).length).toBe(3);
+	expect((payload.shadow_requests as Array<Record<string, unknown>>)[0]).toMatchObject({
+		model_id: "policy-model", quant: "Q4_0", scope, attempted_option_count: 3, allowed_k: 4,
+	});
+	await sendShadow(payload, 1000);
+	expect(sent[0].shadows).toEqual(["policy-model"]);
+});
+
+test("actual worker option metadata survives the aggregate observation envelope", async () => {
+	const { body, scope } = capacityFixture(8);
+	writePolicy(body);
+	const { pi } = installed();
+	const entries: Array<Record<string, unknown>> = [];
+	Object.assign(pi, { appendEntry: (_type: string, data: Record<string, unknown>) => entries.push(data) });
+	globalHolder.__omp_z0int_bridge_transport__ = { request: async () => ({
+		ok: true, shadow: [{ label: "policy-model", backend: "decision-policy", model: "served-alias",
+			selected_action: "read", option_count: 3, model_id: "policy-model", quant: "Q4_0",
+			scope, allowed_k: 8, slm_requested: true, stage: "shadow" }],
+	}) };
+	await sendShadow(buildShadowPayload(toolCall("read"), ["read", "glob", "grep"]), 1000, pi);
+	const row = (entries[0].models as Array<Record<string, unknown>>)[0];
+	expect(row).toMatchObject({ option_count: 3, model_id: "policy-model", quant: "Q4_0",
+		scope, allowed_k: 8, slm_requested: true, stage: "shadow" });
+	expect(entries[0].slm_requested).toBe(false);
 });
