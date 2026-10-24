@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface, type Interface } from "node:readline";
-import { appendFileSync, existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, lstatSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
@@ -36,7 +36,7 @@ function z0Home(env: NodeJS.ProcessEnv = process.env): string {
 /** Resolve at each spawn: a loaded shim follows an atomic install-link cutover on reload. */
 export function resolveRoot(env: NodeJS.ProcessEnv = process.env): string {
 	const install = env.Z0INT_INSTALL_ROOT || join(homedir(), ".local", "lib", "z0int-shadow", "current");
-	const root = existsSync(install) ? install
+	const root = lstatSync(install, { throwIfNoEntry: false }) ? install
 		: env.Z0INT_ROOT || env.Z0INT_BRIDGE_ROOT || fileURLToPath(new URL("../../", import.meta.url));
 	return realpathSync(root);
 }

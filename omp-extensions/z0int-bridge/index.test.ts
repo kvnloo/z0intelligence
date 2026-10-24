@@ -354,3 +354,13 @@ test("reload and respawn resolve the current install link without reimporting th
 		process.env.Z0INT_PYTHON = join(home, "no-such-python");
 	}
 });
+
+test("a broken installed link fails instead of respawning an obsolete checkout", () => {
+	const link = join(home, "broken-current");
+	symlinkSync(join(home, "missing-release"), link);
+	try {
+		expect(() => m.resolveRoot({ Z0INT_INSTALL_ROOT: link, Z0INT_ROOT: home })).toThrow();
+	} finally {
+		rmSync(link);
+	}
+});
