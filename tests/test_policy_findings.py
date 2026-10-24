@@ -124,3 +124,66 @@ def test_z0eval_discard_cannot_promote(tmp_path):
         "verdict": "DISCARD", "gates": {"authority": "fail"}, "findings": [row]}))
     assert ingest_sources([{"kind": "z0eval_result", "path": str(source)}], tmp_path)["added"] == 1
     assert read_findings(ledger_path(tmp_path))[0]["metric"]["promotion_eligible"] is False
+
+
+def test_labelled_shadow_ingest_requires_exact_join_and_confident_predictions(tmp_path):
+    source = tmp_path / "labelled.jsonl"
+    rows = [{"schema": "z0int.shadow.labelled.v1", "ts": 1792800000,
+             "family": "omp.tool", "label_source": "exact_omp_session_tool_call_join",
+             "executed_action": "read", "shadow": [
+                 {"model": "synthetic@rev", "selected_action": "read", "confidence": .99},
+                 {"model": "abstainer@rev", "selected_action": None, "confidence": .99},
+                 {"model": "uncertain@rev", "selected_action": "write", "confidence": .1}]}]
+    source.write_bytes(b"".join(canonical(row) + b"\n" for row in rows))
+    spec = [{"kind": "shadow_learner", "path": str(source)}]
+    assert ingest_sources(spec, tmp_path)["added"] == 1
+    row = read_findings(ledger_path(tmp_path))[0]
+    assert row["metric"]["n"] == 1 and row["metric"]["value"] == 1.
+    assert row["arm"]["model"] == "synthetic@rev"
+    assert ingest_sources(spec, tmp_path)["added"] == 0
+
+
+def test_structured_engine_bench_and_offload_adapters(tmp_path):
+    bench = tmp_path / "gpu.json"
+    bench.write_text(json.dumps({"ts": "2026-10-24T00:00:00Z", "results": [
+        {"device": "mbp", "engine": "synthetic@rev", "backend": "metal", "model": "model@rev",
+         "quant": "Q4_0", "n": 3, "decode_tok_s": 20.}]}))
+    offload = tmp_path / "opportunities.json"
+    offload.write_text(json.dumps({"ts": "2026-10-24T00:00:00Z", "opportunities": [
+        {"subject": {"family": "tool.trim.read", "job": "read-context"},
+         "arm": {"kind": "rules", "model": "synthetic-rule@rev"}, "keep_recall": .99,
+         "n": 100, "ci_low": .96, "ci_high": 1., "retained_fraction": .2,
+         "evidence_class": "measured", "scope_note": "Synthetic read-context only."}]}))
+    specs = [{"kind": "engine_bench", "path": str(bench)},
+             {"kind": "shadow_offload", "path": str(offload)}]
+    assert ingest_sources(specs, tmp_path)["added"] == 2
+    assert ingest_sources(specs, tmp_path)["added"] == 0
+    rows = read_findings(ledger_path(tmp_path))
+    assert {row["metric"]["name"] for row in rows} == {"decode_tok_s", "keep_recall_at_20pct"}
+
+
+def test_root_cli_compile_show_explain_and_json_changelog(tmp_path, monkeypatch, capsys):
+    from z0int.cli import main as root_main
+
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    append_findings([finding()], ledger_path(tmp_path))
+    config = tmp_path / "compiler.json"
+    config.write_text(json.dumps({"compiler_revision": "a" * 40}))
+    assert root_main(["policy", "compile", "--json", "--now", "2026-10-24T12:00:00Z",
+                      "--config", str(config)]) == 0
+    policy = json.loads(capsys.readouterr().out)
+    assert policy["schema"] == "z0.decision_policy.v1"
+    assert root_main(["policy", "show", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["version"] == policy["version"]
+    assert root_main(["policy", "explain", "omp.tool", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["findings"]
+    assert root_main(["policy", "changelog", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["changes"][0]["to"] == "shadow"
+
+
+def test_noncanonical_whitespace_is_tampering(tmp_path):
+    path = tmp_path / "findings.jsonl"
+    rows = append_findings([finding()], path)
+    path.write_text(json.dumps(rows[0], indent=None) + "\n")
+    with pytest.raises(FindingsError, match="Noncanonical"):
+        read_findings(path)

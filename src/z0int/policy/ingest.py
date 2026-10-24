@@ -223,8 +223,13 @@ def discover_sources(home: Path | None = None, operations_root: Path | None = No
                for name in ("shadow-learning-status.json", "labelled-shadow.jsonl")
                if (home / "loop" / name).exists()]
     if operations_root:
-        for directory, kind in (("edge-probe", "edge_probe"), ("mbp-gpu", "engine_bench")):
-            sources.extend({"kind": kind, "path": str(path)} for path in sorted((operations_root / directory).rglob("results.json")))
+        sources.extend({"kind": "edge_probe", "path": str(path)}
+                       for path in sorted((operations_root / "edge-probe").rglob("results.json")))
+        engine_root = operations_root / "mbp-gpu"
+        engine_json = sorted(engine_root.rglob("*.json"))
+        sources.extend({"kind": "engine_bench", "path": str(path)} for path in engine_json)
+        if not engine_json and (engine_root / "REPORT.md").exists():
+            sources.append({"kind": "engine_bench", "path": str(engine_root / "REPORT.md")})
         opportunity = operations_root / "shadow-offload" / "opportunities.json"
         if opportunity.exists():
             sources.append({"kind": "shadow_offload", "path": str(opportunity)})
