@@ -181,11 +181,14 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
         if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
             continue
         arm = row["arm"]
-        if not all(arm.get(k) for k in ("device", "model", "engine", "backend")):
+        if not all(arm.get(k) for k in SCOPE_FIELDS):
             continue
-        identity = tuple(arm[k] for k in ("device", "model", "engine", "backend"))
-        serving[identity] = {**{k: arm[k] for k in ("device", "model", "engine", "backend")},
-                             "url": url, "evidence": [row["id"]]}
+        scope = scope_of(row)
+        identity = canonical(scope)
+        serving[identity] = {**scope, "kind": arm["kind"], "url": url, "evidence": [row["id"]]}
+    for rule in families.values():
+        if rule["stage"] in {"canary", "live"}:
+            rule["serving_missing"] = canonical(rule["scope"]) not in serving
     policy = {"schema": SCHEMA, "compiled_at": iso(now),
               "findings_head": findings[-1]["id"] if findings else "",
               "compiler": "z0int.policy.compile@" + config.compiler_revision,
