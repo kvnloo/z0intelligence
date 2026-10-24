@@ -17,6 +17,7 @@ from pathlib import Path
 
 STAGES = ('none', 'shadow', 'canary', 'live')
 FRONTIER = {'frontier', 'remote_frontier', 'jev', 'bounded_jev'}
+PHYSICAL_KEYS = ('model', 'quant', 'engine', 'backend', 'device')
 LOADER_FILES = {'src/z0int/policy_runtime.py', 'omp-extensions/local-cognition/index.ts'}
 SOURCE_SUFFIXES = {'.py', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.yaml', '.yml', '.json', '.sh'}
 SKIP_DIRS = {'.git', '.venv', 'venv', 'node_modules', 'dist', 'build', '__pycache__',
@@ -87,11 +88,55 @@ def _records(path: Path):
 def _arm_matches(actual, named):
     if not isinstance(actual, dict) or not isinstance(named, dict) or not named:
         return False
+    if named.get('kind') not in ('rules', 'knn') and not all(
+            isinstance(named.get(key), str) and named[key]
+            and isinstance(actual.get(key), str) and actual[key] for key in PHYSICAL_KEYS):
+        return False
     # kind classifies the finding (slm/rules/engine), not physical deployment.
     identity = {key: value for key, value in named.items() if key != 'kind'}
     if not identity:
         return actual.get('kind') == named.get('kind')
     return all(actual.get(key) == value for key, value in identity.items())
+
+
+def _deployment_matches(receipt, policy, arm, named):
+    if named.get('kind') in ('rules', 'knn'):
+        return True
+    if not isinstance(arm, dict) or not isinstance(policy.get('serving'), list):
+        return False
+    observed = receipt.get('observed_identity')
+    if not isinstance(observed, dict):
+        return False
+    for endpoint in policy['serving']:
+        if not isinstance(endpoint, dict) or not all(endpoint.get(key) == arm.get(key) for key in PHYSICAL_KEYS):
+            continue
+        expected = {'model_id': endpoint.get('expected_model_id'),
+                    'engine_build': endpoint.get('engine_build'), 'model_path': endpoint.get('model_path')}
+        sha = endpoint.get('model_sha256')
+        if not all(isinstance(value, str) and value for value in expected.values()):
+            continue
+        if not isinstance(sha, str) or not re.fullmatch(r'[0-9a-f]{64}', sha):
+            continue
+        if not all(observed.get(key) == value for key, value in expected.items()):
+            continue
+        if receipt.get('props_model_id') != expected['model_id']:
+            continue
+        declared = receipt.get('expected_identity')
+        if declared is not None and (not isinstance(declared, dict)
+                or any(declared.get(key) != value for key, value in {**expected, 'model_sha256': sha}.items())):
+            continue
+        return True
+    return False
+
+
+def _synthetic_context(policy_path):
+    if policy_path is None:
+        return None, False
+    home = policy_path.expanduser().resolve().parent.parent
+    protected = {(Path.home() / '.z0int').resolve()}
+    if os.environ.get('Z0INT_LIVE_HOME'):
+        protected.add(Path(os.environ['Z0INT_LIVE_HOME']).expanduser().resolve())
+    return home, home not in protected and Path('/tmp').resolve() in home.parents
 
 
 def _abstained(receipt, rule):
@@ -136,6 +181,8 @@ def audit(receipts: str | None, policy_path: Path | None, since: str,
             raise ValueError('policy content hash mismatch')
         if not isinstance(policy.get('families'), dict):
             raise ValueError('invalid policy families')
+        if not isinstance(policy.get('serving'), list):
+            raise ValueError('invalid policy serving entries')
         for family, rule in policy['families'].items():
             if not isinstance(rule, dict) or rule.get('stage') not in STAGES:
                 raise ValueError(f'invalid policy stage for {family}')
@@ -146,10 +193,54 @@ def audit(receipts: str | None, policy_path: Path | None, since: str,
                     not isinstance(rule.get('arm'), dict) or not rule['arm'].get('kind')):
                 raise ValueError(f'invalid policy arm for {family}')
         report['policy_version'] = digest
-    except (OSError, ValueError, TypeError) as exc:
+    except (OSError, UnicodeError, ValueError, TypeError, OverflowError, RuntimeError) as exc:
         unavailable.append(f'policy unavailable: {exc}')
         policy = None
     families = policy['families'] if policy else {}
+    try:
+        home, synthetic_allowed = _synthetic_context(policy_path)
+    except (OSError, RuntimeError) as exc:
+        home, synthetic_allowed = None, False
+        unavailable.append(f'policy home unavailable: {exc}')
+    synthetic_ids, synthetic_rules, synthetic_seen = set(), set(), set()
+
+    def synthetic_violation(path, line, kind, identifier):
+        key = (kind, str(identifier))
+        if synthetic_allowed or key in synthetic_seen:
+            return
+        synthetic_seen.add(key)
+        counts['o11_evidence_bound_route'] += 1
+        issues.append({**_issue(path, line, 'synthetic-evidence-outside-tmp',
+                               f'synthetic {kind} outside isolated temporary policy home'), 'id': str(identifier)})
+
+    if home is not None:
+        ledger_path = home / 'findings/findings.jsonl'
+        if ledger_path.exists():
+            try:
+                for line, raw in enumerate(ledger_path.read_text().splitlines(), 1):
+                    if not raw.strip():
+                        continue
+                    finding = json.loads(raw)
+                    if not isinstance(finding, dict):
+                        raise ValueError('finding must be an object')
+                    if finding.get('synthetic') is True:
+                        identifier = finding.get('id', f'line:{line}')
+                        synthetic_ids.add(str(identifier))
+                        synthetic_violation(ledger_path, line, 'finding', identifier)
+            except (OSError, UnicodeError, ValueError) as exc:
+                unavailable.append(f'findings ledger unavailable: {exc}')
+    if policy:
+        if policy.get('synthetic') is True:
+            synthetic_violation(policy_path, 1, 'policy', policy['version'])
+        for family, rule in families.items():
+            evidence = rule.get('evidence', [])
+            if rule.get('synthetic') is True or (
+                    isinstance(evidence, list) and any(str(identifier) in synthetic_ids for identifier in evidence)):
+                synthetic_rules.add(family)
+                synthetic_violation(policy_path, 1, 'rule', rule['rule_id'])
+        for index, endpoint in enumerate(policy.get('serving', [])):
+            if isinstance(endpoint, dict) and endpoint.get('synthetic') is True:
+                synthetic_violation(policy_path, 1, 'serving', endpoint.get('url', f'index:{index}'))
     for family, rule in families.items():
         if rule['stage'] == 'live':
             report['offload_rate'][family] = dict.fromkeys(('live_decisions', 'offloaded', 'abstained', 'frontier'), 0)
@@ -181,6 +272,9 @@ def audit(receipts: str | None, policy_path: Path | None, since: str,
                     family = rec.get('family')
                     policy_family = rec.get('policy_family', family)
                     rule = families.get(policy_family, {}) if isinstance(policy_family, str) else {}
+                    if rec.get('synthetic') is True or row.get('synthetic') is True or policy_family in synthetic_rules:
+                        identifier = rec.get('id', rec.get('trace_id', rec.get('request_id', f'{path}:{line}')))
+                        synthetic_violation(path, line, 'receipt', identifier)
                     route, arm = _route(rec)
                     frontier = isinstance(route, str) and route in FRONTIER
                     scope = rec.get('scope', arm if isinstance(arm, dict) else {})
@@ -211,7 +305,8 @@ def audit(receipts: str | None, policy_path: Path | None, since: str,
                         except (KeyError, ValueError, TypeError):
                             expired = True
                         if (not applicable or rule.get('stage') not in ('canary', 'live') or expired
-                                or not _arm_matches(arm, rule.get('arm'))):
+                                or not _arm_matches(arm, rule.get('arm'))
+                                or not _deployment_matches(rec, policy or {}, arm, rule.get('arm', {}))):
                             counts['o11_evidence_bound_route'] += 1
                             issues.append(_issue(path, line, 'o11_evidence_bound_route', 'offload lacks current evidence naming this full arm'))
                     if rule.get('stage') == 'live':

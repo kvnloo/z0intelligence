@@ -205,3 +205,41 @@ def test_native_adb_helper_is_in_default_source_scope(tmp_path, monkeypatch):
     monkeypatch.setattr(C, 'KNOWN_PATHS', ())
     assert helper in C.phone_caps_paths(tmp_path)
     assert C.phone_caps_findings(tmp_path) == []
+
+
+@pytest.mark.parametrize('source,bad', [
+    ('power = p["power"]\npct = power["batteries"][0]["pct"]\n', False),
+    ('power = p["power"]\nlevel = power["batteries"][0]["pct"]\npct = level\n', False),
+    ('pct = p["cpu_load"]\n', True),
+    ('pct = p["temperature"]\n', True),
+    ('pct = p["mem_available_mb"]\n', True),
+    ('pct = p["power"]["batteries"][0]["pct"]\npct = p["cpu_load"]\n', True),
+    ('pct = p["power"]["batteries"][0]["pct"]\nif other:\n    pct = p["temperature"]\n', True),
+])
+def test_two_percent_exception_tracks_battery_alias_not_generic_resources(tmp_path, source, bad):
+    path = tmp_path / 'fleet.py'
+    path.write_text(source + 'if pct < 2 and not power["on_ac"]:\n    reject()\n')
+    assert bool(C.phone_caps_findings(tmp_path, [path])) is bad
+
+
+@pytest.mark.parametrize('kind,direct_cap,bad', [('phone', False, False),
+                                               ('linux', False, True),
+                                               ('phone', True, True)])
+def test_registry_explicit_phone_empty_defaults_controls_yaml_inheritance(tmp_path, kind, direct_cap, bad):
+    (tmp_path / 'scripts').mkdir()
+    (tmp_path / 'config/fleet').mkdir(parents=True)
+    (tmp_path / 'scripts/fleet').write_text(
+        'def registry():\n'
+        '    reg = load()\n'
+        '    nodes = {}\n'
+        '    for name, n in reg["nodes"].items():\n'
+        f'        defaults = {{}} if n.get("kind") == "{kind}" else {{\n'
+        '            "health": reg["defaults"]["health"], "lane": reg["defaults"]["lane"]}\n'
+        '        n = merge(defaults, n)\n'
+        '        nodes[name] = n\n'
+        '    return nodes\n')
+    direct = ', memory_pct: 50' if direct_cap else ''
+    registry = tmp_path / 'config/fleet/nodes.yaml'
+    registry.write_text('defaults:\n  health: {min_battery_pct_on_battery: 40}\n'
+                        '  lane: {}\nnodes:\n  spare: {kind: phone' + direct + '}\n')
+    assert bool(C.phone_caps_findings(tmp_path, [registry])) is bad

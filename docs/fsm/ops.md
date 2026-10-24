@@ -113,6 +113,11 @@ and referenced worker profiles. A phone's explicit health override replaces the
 matching default. `min_battery_pct_on_battery: 2` passes, `40` fails.
 The native Python battery gate `pct < 2 and not on_ac` is allowed, including
 nested `power["batteries"][0]["pct"]` readings. Higher floors are findings.
+Battery aliases retain their specific source taint. CPU, memory and temperature
+aliases do not inherit the two-percent battery exception. Reassignment clears
+that battery identity. Registry defaults are excluded only when the root's
+`fleet.registry` explicitly merges empty defaults for phones and accesses shared
+defaults only in its non-phone branch. Standalone YAML assumes inheritance.
 Phone CPU counts cannot establish all cores and are flagged. `cpus: all`, `memory_pct: 100`
 and equivalent uncapped markers pass. Discovery rejects a scripts directory
 passed as the checkout root, even if external known files exist. Shell mode
@@ -154,6 +159,15 @@ Receipts identify the route with `route` or `tier`. `frontier`, `remote_frontier
 A model string alone cannot prove the device/engine/quant/backend binding.
 The finding's `kind` is not a physical identity field: an SLM finding can name
 an engine deployment. Kind-only rules/knn arms still require a matching kind.
+Physical arms require all five named and observed dimensions: model, quant,
+engine, backend and device. Their matching policy serving entry also records
+`expected_model_id`, `engine_build`, `model_path` and measured `model_sha256`.
+Receipts carry `observed_identity` with `model_id`, `engine_build` and
+`model_path`, plus `props_model_id`. Both observed model identifiers must match
+the expected model ID. Build and path must match exactly. A non-null
+`expected_identity` receipt snapshot must match the serving entry, including
+its SHA-256. The guard requires the measured hash, but does not claim to hash a
+remote model file itself. A missing model revision alone is not a violation.
 Expired evidence does not authorize offload. O12 requires an explicit boolean
 `serving_healthy` observation. An abstention is an object with numeric
 `confidence` and `threshold`, where confidence is below the current policy's
@@ -202,12 +216,29 @@ evidence as unavailable. Static violations return 3.
 The Bend model names full arm identities and families with natural identifiers.
 O11 proves stage and both identity constraints. O12 proves healthy live fallback
 requires abstention, with positive laws for unhealthy and abstained fallback.
-The new proofs, nine policy mutants and Python regressions require the parent
-verification run. No verification result is claimed by this documentation.
+See `bend/ops_fsm/README.md` for the MBP proof, 55-mutant and parity commands.
+
+### Synthetic evidence isolation
+
+Findings, policy rules and receipts marked `synthetic: true` belong only in an
+isolated temporary policy home. The guard also derives rule taint from its
+evidence IDs in `<policy-home>/findings/findings.jsonl`, so removing a rule's
+marker does not launder synthetic findings.
+
+The guard resolves symlinks before it checks the policy home. The real `/tmp`
+must be a proper ancestor. `/tmpfoo` does not qualify. The protected homes are
+`realpath(~/.z0int)` and, when set, `realpath($Z0INT_LIVE_HOME)`. Protected homes
+never qualify, even if they reside under `/tmp`. Live units set
+`Z0INT_LIVE_HOME` explicitly. An isolated process's `Z0INT_HOME` is not evidence
+of liveness. A symlink under `/tmp` into a protected home fails.
+
+Each offending finding ID, rule ID and receipt trace/ID appears in stderr
+findings with rule `synthetic-evidence-outside-tmp`. These findings increment
+`counts.o11_evidence_bound_route` and return exit 3.
 
 ## Evidence
 
 - Proof: `bend/ops_fsm` receipt (`hermes bend verify`), mutants `bend/ops_fsm/mutations.json`.
-- Parity: `python -m z0int.fsm.ops_parity` (needs Bend; groot).
+- Parity: `python -m z0int.fsm.ops_parity` (MBP with the supplied Bend toolchain).
 - Incident replay: `python -m z0int.fsm.ops_replay tests/fixtures/ops_tapes/*.json`.
 - Tests: `tests/test_fsm_ops.py` (MBP via fleet-build; the two parity tests need Bend).
