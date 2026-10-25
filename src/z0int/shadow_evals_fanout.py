@@ -27,6 +27,7 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .intent_memory import MemoryRetriever
+from .intent_service import HERE as INTENT_HERE, PROMPT as INTENT_PROMPT, child_json, validate_draft
 from . import shadow_evals_omp
 
 DEFAULT_ROOT = Path('/mnt/zer0models/workspace/zer0/data/operations/shadow-evals')
@@ -76,6 +77,13 @@ def _read_text(path, limit=1_048_576):
     return raw.decode('utf-8')
 
 
+def prepare_intent_source(job, ask, config):
+    request = {'op': 'prepare', 'session_id': job['session_id'],
+               'entry_id': job['entry_id'], 'text': ask, 'timestamp': job['ts'], 'open': None}
+    return asyncio.run(child_json(config.get('intent_node', 'node'),
+                                 INTENT_HERE / 'intent_compile.mjs', request, 3))
+
+
 def build_bundle(job, config):
     """Retrieve once, preserving every line supplied to every candidate/judge."""
     payload = job.get('payload', job)
@@ -86,6 +94,7 @@ def build_bundle(job, config):
     if not isinstance(recent, list) or any(not isinstance(x, str) for x in recent):
         raise ValueError('invalid_recent_messages')
     retrieved = asyncio.run(MemoryRetriever(**config.get('memory', {})).retrieve(ask, recent))
+    intent_source = prepare_intent_source(job, ask, config)
     groups = {'packet': [], 'memory': [], 'inventory': []}
     statuses = list(retrieved['sources'])
     facts = []
@@ -112,14 +121,18 @@ def build_bundle(job, config):
         path = Path(supplied).expanduser().absolute()
         try:
             text = _read_text(path)
-            add('inventory', 'inventory', str(path), text, path=str(path), evidence_kind='snapshot')
+            add('inventory', 'inventory', str(path), text, path=str(path), evidence_kind='claimed')
             statuses.append({'source': 'inventory', 'path': str(path), 'status': 'answered'})
         except (OSError, UnicodeError, ValueError) as exc:
             statuses.append({'source': 'inventory', 'path': str(path), 'status': 'unavailable',
                              'error': type(exc).__name__})
     result = {'schema': 'z0.shadow_bundle.v1', 'ask': ask, 'recent_user_msgs': recent,
               **groups, 'facts': facts, 'fact_catalog': {row['id']: row for row in facts}, 'sources': statuses,
-              'privacy': config.get('privacy', 'confidential')}
+              'privacy': config.get('privacy', 'confidential'), 'intent_source': intent_source,
+              'citation_catalog': [{key: record[key] for key in ('source', 'id', 'path', 'evidence_kind')
+                                    if key in record} for record in retrieved['records']]
+                                  + [{key: record[key] for key in ('source', 'id', 'path', 'evidence_kind')
+                                      if key in record} for record in groups['inventory']]}
     result['bundle_hash'] = _hash(_json(result))
     return result
 
@@ -128,6 +141,14 @@ def candidate_prompt(job, bundle):
     # Do not serialize outcome labels, corrections, or unrelated job metadata.
     context = {key: bundle[key] for key in ('ask', 'recent_user_msgs', 'sources', 'facts', 'bundle_hash')
                if key in bundle}
+    document = bundle.get('intent_source')
+    if document:
+        context['source_sentences'] = document['plan']['bindings']['sources']
+    context['intent_contract_schema'] = INTENT_PROMPT
+    context['intent_contract_schema_scope'] = (
+        'The canonical instructions govern the intent_contract VALUE, not the enclosing five-field response. '
+        'Use facts.source/source_id/path/evidence_kind for assumption citations; F identifiers are for facts_cited. '
+        'This is a proposal only: never approve or execute it.')
     return DRAFT_INSTRUCTIONS + '\n\nIDENTICAL NUMBERED CONTEXT\n' + _json(context)
 
 
@@ -709,6 +730,13 @@ def complete(offer, messages, config):
                     'cache_write_input_tokens', 'total_tokens', 'list_price_usd', 'cost_basis'):
             if key in value:
                 row['metrics'][key] = value[key]
+        total, output = row['metrics'].get('total_tokens'), row['metrics'].get('output_tokens')
+        row['metrics']['uncached_input_tokens'] = row['metrics']['input_tokens']
+        if type(total) is int and type(output) is int and total >= output:
+            row['metrics']['input_tokens'] = total - output
+            row['metrics']['input_tokens_basis'] = 'native_total_minus_native_output_includes_cache'
+        else:
+            row['metrics']['input_tokens_basis'] = 'native_input_component_cache_total_unknown'
         row.update(finish_reason=value.get('finish_reason'), reported_model=value.get('reported_model'))
         row.update({key: value[key] for key in ('reported_provider', 'response_id', 'receipt_path', 'exit_code')
                     if key in value})
@@ -773,4 +801,25 @@ def run_candidates(job, bundle, config):
                    score=offer['score'], pace=offer['pace'], phase=offer.get('phase', 'ranked'),
                    noO14credit=offer.get('noO14credit', False))
         row['arm_role'] = config['routes'][offer['id']].get('arm_role', 'candidate')
+        if row.get('error') is None:
+            try:
+                structured = json.loads(row['content'])
+                required = {'interpretation', 'intent_contract', 'plan', 'facts_cited', 'risk_flags'}
+                if (not isinstance(structured, dict) or not required <= structured.keys()
+                        or not isinstance(structured['interpretation'], str)
+                        or not isinstance(structured['intent_contract'], dict)
+                        or any(not isinstance(structured[key], list) for key in ('plan', 'facts_cited', 'risk_flags'))):
+                    raise ValueError('invalid_response_shape')
+                validate_draft(structured['intent_contract'], bundle.get('citation_catalog', []))
+                request = {'op': 'finish', 'doc': bundle['intent_source'],
+                           'draft': structured['intent_contract'],
+                           'model_id': row['provider'] + ':' + row['model'],
+                           'records': bundle.get('citation_catalog', []),
+                           'contract_id': 'shadow-' + _hash(call_config['call_job_id'] + offer['id'])[:24],
+                           'parent_contract_id': None, 'parent_contractHash': None}
+                row['intent_contract_document'] = asyncio.run(child_json(
+                    config.get('intent_node', 'node'), INTENT_HERE / 'intent_compile.mjs', request, 3))
+                row['structured'] = structured
+            except (ValueError, TypeError, KeyError, RuntimeError) as exc:
+                row['error'] = {'code': 'invalid_structured_intent_draft', 'exception_type': type(exc).__name__}
     return rows

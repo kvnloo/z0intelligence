@@ -60,6 +60,8 @@ def test_bundle_reuses_retriever_and_numbers_exact_lines(config, tmp_path, monke
                 {'source': 'hermes', 'id': 'stable', 'text': 'memory evidence', 'evidence_kind': 'claimed'}],
                 'sources': [{'source': 'hermes', 'status': 'answered'}]}
     monkeypatch.setattr(fanout, 'MemoryRetriever', Retriever)
+    monkeypatch.setattr(fanout, 'prepare_intent_source', lambda *args:
+                        {'plan': {'bindings': {'sources': {}}}})
     inventory = tmp_path / 'inventory.json'
     inventory.write_text('{"gpu":"owned"}\n')
     config.update(inventory_paths=[str(inventory), str(tmp_path / 'absent')], memory={'timeout_s': 1})
@@ -311,6 +313,39 @@ def test_transport_invariants_are_identifiable_without_private_error_text(bootst
     assert 'secret' not in json.dumps(result)
 
 
+def test_cached_prompt_tokens_are_not_reported_as_only_uncached_input(bootstrap, monkeypatch):
+    offer = fanout.select_offers(bootstrap, {})['offers'][1]
+    monkeypatch.setattr(fanout.shadow_evals_omp, 'credential_available', lambda *args, **kwargs: True)
+    monkeypatch.setattr(fanout.shadow_evals_omp, 'execute', lambda *args, **kwargs: {
+        'content': '{}', 'error': None, 'input_tokens': 4, 'output_tokens': 11,
+        'cached_input_tokens': 0, 'cache_write_input_tokens': 3379,
+        'total_tokens': 3394, 'list_price_usd': .123, 'cost': None,
+    })
+    monkeypatch.setattr(fanout, '_observation', lambda *args: None)
+    result = fanout.complete(offer, [{'role': 'user', 'content': 'synthetic'}],
+                             {**bootstrap, 'call_job_id': 'cache-creation'})
+    assert result['metrics']['input_tokens'] == 3383
+    assert result['metrics']['uncached_input_tokens'] == 4
+    assert result['metrics']['cost_usd'] is None
+    assert result['metrics']['list_price_usd'] == .123
+
+
+def test_source_prepare_reuses_exact_canonical_source_identity(monkeypatch):
+    requests = []
+    async def bridge(binary, script, request, timeout):
+        requests.append(request)
+        return {'canonical_source': request['entry_id']}
+    monkeypatch.setattr(fanout, 'child_json', bridge)
+    job = {'session_id': 'session-actual', 'entry_id': 'entry-actual',
+           'ts': '2026-10-24T23:00:00Z'}
+    assert fanout.prepare_intent_source(job, 'exact ask', {}) == {'canonical_source': 'entry-actual'}
+    assert requests == [{'op': 'prepare', 'session_id': 'session-actual',
+                         'entry_id': 'entry-actual', 'text': 'exact ask',
+                         'timestamp': job['ts'], 'open': None}]
+    with pytest.raises(KeyError):
+        fanout.prepare_intent_source({}, 'ask without identities', {})
+
+
 def test_candidate_fanout_reuses_identical_numbered_context(bootstrap, monkeypatch):
     calls = []
     def completion(offer, messages, config):
@@ -323,6 +358,7 @@ def test_candidate_fanout_reuses_identical_numbered_context(bootstrap, monkeypat
     assert len(rows) == 2
     assert calls[0] == calls[1]
     assert all(row['bundle_hash'] == 'synthetic-hash' and row['noO14credit'] for row in rows)
+    assert all(row['error']['code'] == 'invalid_structured_intent_draft' for row in rows)
 
 
 def test_expanded_bootstrap_envelope_and_exact_sol_pin(bootstrap):
