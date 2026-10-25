@@ -17,7 +17,7 @@ from typing import Any, Iterable, Literal, Mapping, Sequence
 import hashlib
 import json
 
-RiskClass = Literal["read", "write", "destructive", "publish", "credential", "payment"]
+RiskClass = Literal["read", "mutating_reversible", "write", "destructive", "publish", "credential", "payment", "unknown"]
 ActionKind = Literal["tool", "model", "control"]
 Stage = Literal["capability", "dependency", "permission", "budget", "shortcut"]
 
@@ -33,10 +33,12 @@ IRREVERSIBLE_RISKS: frozenset[str] = frozenset(
 RISK_CLASSES: tuple[str, ...] = (
     "read",
     "write",
+    "mutating_reversible",
     "destructive",
     "credential",
     "payment",
     "publish",
+    "unknown",
 )
 
 _RISK_RANK = {name: rank for rank, name in enumerate(RISK_CLASSES)}

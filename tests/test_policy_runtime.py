@@ -160,8 +160,8 @@ def test_scoped_rule_never_generalizes(isolated_policy):
 def run_cli(home, capsys, monkeypatch, credits=()):
     request = {
         "trace_id": "synthetic-cli-trace", "credited_families": list(credits),
-        "actions": [{"action_id": "read", "kind": "tool", "tool": "read", "family": "omp.tool"}],
-        "authority": ["read"], "budget_units": 8,
+        "actions": [{"action_id": "read", "kind": "tool", "tool": "read", "family": "omp.tool", "risk_class": "read"}],
+        "authority": ["read"], "budget_units": 8, "risk_class": "read",
     }
     path = home / "request.json"
     path.write_text(json.dumps(request))
@@ -297,6 +297,7 @@ def test_scoped_policy_binds_actual_endpoint_without_caller_scope(
     endpoint.update(expected_model_id=expected_alias, engine_build="synthetic-build",
                     model_path="/synthetic/model.gguf", model_sha256="a" * 64)
     body["serving"] = [endpoint]
+    capacity_rule(body, 2, {k: rule["arm"][k] for k in ("model", "quant", "engine", "backend", "device")})
     _, version = publish(isolated_policy, body)
     runtime._write_health(endpoint["url"], {
         "scope_sha256": runtime._scope_hash(endpoint), "status": "healthy",
@@ -483,8 +484,8 @@ def test_endpoint_observed_props_mismatch_abstains(isolated_policy, monkeypatch,
                 "engine_build": "synthetic-build", "model_path": "/synthetic/model.gguf",
                 "model_sha256": "a" * 64}
     legal = compile_actions(graph=cli._graph_from_payload({"actions": [
-        {"action_id": "read", "kind": "tool", "family": "omp.tool"},
-        {"action_id": "glob", "kind": "tool", "family": "omp.tool"},
+        {"action_id": "read", "kind": "tool", "family": "omp.tool", "risk_class": "read"},
+        {"action_id": "glob", "kind": "tool", "family": "omp.tool", "risk_class": "read"},
     ]}), granted_capabilities=(), authority=("read",), budget_units=8)
     monkeypatch.setattr("z0int.cognition.adapters.transport.OpenAICompatTransport.chat",
                         lambda *args, **kwargs: ChatOutcome(
@@ -512,10 +513,14 @@ def capacity_rule(body, allowed=4, scope=None):
     scope = scope or {k: body["families"]["omp.tool"]["arm"][k]
                       for k in ("model", "quant", "engine", "backend", "device")}
     key = json.dumps(scope, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    body["option_capacity"] = {key: {
+    body["option_capacity"] = {key: {"read": {
         "allowed_k": allowed, "finding_ids": ["e" * 64], "wilson_lower": 0.99,
-        "task": ["T1", "T2", "T3", "T4"], "bar": 0.95, "expires_at": "2099-01-01T00:00:00+00:00",
-    }}
+        "task": ["T1", "T2", "T3", "T4"], "bar_derived": 0.95,
+        "inputs": {"cost_call": 0, "cost_frontier": 1, "cost_error": 20,
+                   "abstain_rate": 0, "measured": True, "status": "measured",
+                   "finding_ids": ["e" * 64]},
+        "expires_at": "2099-01-01T00:00:00+00:00",
+    }}}
     return scope, key
 
 
@@ -523,25 +528,93 @@ def test_option_capacity_exact_scope_expiry_and_default(isolated_policy):
     body = policy_body("shadow")
     scope, key = capacity_rule(body, 4)
     publish(isolated_policy, body)
-    assert runtime.current().allowed_k(scope) == 4
-    assert runtime.allowed_k({**scope, "quant": "Q8_0"}) == 2
-    assert runtime.allowed_k({**scope, "device": "other-device"}) == 2
-    assert runtime.allowed_k({"model": scope["model"]}) == 2
-    body["option_capacity"][key]["expires_at"] = "2000-01-01T00:00:00+00:00"
+    assert runtime.current().allowed_k(scope, "read") == 4
+    assert runtime.allowed_k({**scope, "quant": "Q8_0"}, "read") == 0
+    assert runtime.allowed_k({**scope, "device": "other-device"}, "read") == 0
+    assert runtime.allowed_k({"model": scope["model"]}, "read") == 0
+    assert runtime.allowed_k(scope) == 0
+    body["option_capacity"][key]["read"]["expires_at"] = "2000-01-01T00:00:00+00:00"
     publish(isolated_policy, body)
-    assert runtime.allowed_k(scope) == 2
+    assert runtime.allowed_k(scope, "read") == 0
 
 
 @pytest.mark.parametrize("field,value", [
     ("allowed_k", True), ("allowed_k", 0), ("finding_ids", []), ("task", []),
-    ("wilson_lower", 0.94), ("bar", "0.95"), ("expires_at", "broken"),
+    ("wilson_lower", 0.94), ("bar_derived", "0.95"), ("expires_at", "broken"),
 ])
-def test_invalid_capacity_grant_cannot_raise_binary_bound(isolated_policy, field, value):
+def test_invalid_capacity_grant_blocks_request(isolated_policy, field, value):
     body = policy_body()
     scope, key = capacity_rule(body, 8)
-    body["option_capacity"][key][field] = value
+    body["option_capacity"][key]["read"][field] = value
     publish(isolated_policy, body)
-    assert runtime.allowed_k(scope) == 2
+    assert runtime.allowed_k(scope, "read") == 0
+
+
+@pytest.mark.parametrize("action_risk,context,expected", [
+    ("read", None, "read"),
+    ("mutating_reversible", "read", "mutating_reversible"),
+    ("read", "mutating_reversible", "mutating_reversible"),
+    ("write", "read", None), ("destructive", "read", None),
+    ("unknown", "read", None), ("read", "unknown", None),
+])
+def test_capacity_risk_never_downgrades_actions(action_risk, context, expected):
+    from z0int.cognition.actions import compile_actions
+    from z0int.cognition.adapters.local_slm import ToolDecisionRequest
+    legal = compile_actions(graph=cli._graph_from_payload({"actions": [
+        {"action_id": "candidate", "kind": "tool", "risk_class": action_risk},
+    ]}), authority=(action_risk,), budget_units=8)
+    assert ToolDecisionRequest(state="s", legal=legal, risk_class=context).capacity_risk() == expected
+
+
+@pytest.mark.parametrize("risk,expected", [
+    ("read", 4), ("mutating_reversible", 0), ("destructive", 0),
+    ("write", 0), ("unknown", 0), (None, 0),
+])
+def test_risk_specific_eighty_five_percent_capacity(isolated_policy, risk, expected):
+    import copy
+    body = policy_body()
+    scope, key = capacity_rule(body)
+    read = body["option_capacity"][key]["read"]
+    read.update(wilson_lower=0.85, bar_derived=0.5)
+    read["inputs"]["cost_error"] = 2
+    mutation = copy.deepcopy(read)
+    mutation["inputs"]["cost_error"] = 20
+    mutation["bar_derived"] = 0.95
+    body["option_capacity"][key]["mutating_reversible"] = mutation
+    body["option_capacity"][key]["destructive"] = copy.deepcopy(read)
+    publish(isolated_policy, body)
+    assert runtime.allowed_k(scope, risk) == expected
+
+
+@pytest.mark.parametrize("field,value", [
+    ("cost_call", -1), ("cost_frontier", 0), ("cost_error", 0),
+    ("abstain_rate", 1.1), ("measured", False), ("status", "unmeasured"),
+    ("finding_ids", []), ("blocked", True), ("cost_error", True),
+])
+def test_invalid_economic_inputs_fail_closed(isolated_policy, field, value):
+    body = policy_body()
+    scope, key = capacity_rule(body)
+    body["option_capacity"][key]["read"]["inputs"][field] = value
+    publish(isolated_policy, body)
+    assert runtime.allowed_k(scope, "read") == 0
+
+
+@pytest.mark.parametrize("p,bar,call,frontier,error,expected", [
+    (0.5, -1.0, 0, 2, 1, 4),
+    (1.0, 2.0, 2, 1, 1, 0),
+    (0.95, 0.95, 0, 1, 20, 0),
+    (0.99, 0.1, 0, 1, 20, 0),
+])
+def test_economic_gate_recomputes_bar_and_requires_strict_benefit(
+    isolated_policy, p, bar, call, frontier, error, expected,
+):
+    body = policy_body()
+    scope, key = capacity_rule(body)
+    entry = body["option_capacity"][key]["read"]
+    entry.update(wilson_lower=p, bar_derived=bar)
+    entry["inputs"].update(cost_call=call, cost_frontier=frontier, cost_error=error)
+    publish(isolated_policy, body)
+    assert runtime.allowed_k(scope, "read") == expected
 
 
 def test_missing_policy_blocks_wide_model_request_before_transport(isolated_policy):
@@ -551,7 +624,7 @@ def test_missing_policy_blocks_wide_model_request_before_transport(isolated_poli
     scope = {k: policy_body()["families"]["omp.tool"]["arm"][k]
              for k in ("model", "quant", "engine", "backend", "device")}
     legal = compile_actions(graph=cli._graph_from_payload({"actions": [
-        {"action_id": name, "kind": "tool"} for name in ("read", "glob", "grep")
+        {"action_id": name, "kind": "tool", "risk_class": "read"} for name in ("read", "glob", "grep")
     ]}), authority=("read",), budget_units=8)
     class NoSend:
         def chat(self, *args, **kwargs):
@@ -567,7 +640,7 @@ def test_missing_policy_blocks_wide_model_request_before_transport(isolated_poli
     assert row["slm_requested"] is False
     assert row["option_count"] == 0
     assert row["attempted_option_count"] == 3
-    assert row["allowed_k"] == 2
+    assert row["allowed_k"] == 0
     assert row["model_id"] == scope["model"] and row["quant"] == scope["quant"]
     assert row["scope"] == scope
 
@@ -580,7 +653,7 @@ def test_qualified_request_stamps_actual_not_maximum_width(isolated_policy):
     scope, _ = capacity_rule(body, 8)
     publish(isolated_policy, body)
     legal = compile_actions(graph=cli._graph_from_payload({"actions": [
-        {"action_id": name, "kind": "tool"} for name in ("read", "glob", "grep")
+        {"action_id": name, "kind": "tool", "risk_class": "read"} for name in ("read", "glob", "grep")
     ]}), authority=("read",), budget_units=8)
     calls = []
     class Transport:
@@ -615,8 +688,8 @@ def test_cli_capacity_refusal_is_frontier_receipt_not_fake_abstain(isolated_poli
                         lambda *args, **kwargs: pytest.fail("must not send over-cap request"))
     monkeypatch.setattr("z0int.cognition.adapters.policy.urlopen",
                         lambda *args, **kwargs: pytest.fail("blocked decision needs no props request"))
-    request = {"trace_id": "synthetic-capacity-refusal", "authority": ["read"], "budget_units": 8,
-        "actions": [{"action_id": name, "family": "omp.tool"} for name in ("read", "glob", "grep")]}
+    request = {"trace_id": "synthetic-capacity-refusal", "authority": ["read"], "budget_units": 8, "risk_class": "read",
+        "actions": [{"action_id": name, "family": "omp.tool", "risk_class": "read"} for name in ("read", "glob", "grep")]}
     path = isolated_policy / "request.json"
     path.write_text(json.dumps(request))
     args = argparse.Namespace(input=str(path), surface=False, catalog=None, max_cost_class=None, shadow=[], json=True)
@@ -625,7 +698,7 @@ def test_cli_capacity_refusal_is_frontier_receipt_not_fake_abstain(isolated_poli
     assert row["reason"] == row["policy_reason"] == "option_capacity_exceeded"
     assert row["route"] == "remote_frontier" and row["stage"] == "none" and row["policy_stage"] == "live"
     assert row["option_count"] == 0 and row["attempted_option_count"] == 3 and row["slm_requested"] is False
-    assert row["allowed_k"] == 2 and "abstain" not in row
+    assert row["allowed_k"] == 0 and "abstain" not in row
     assert row["model_id"] == arm["model"] and row["quant"] == arm["quant"]
     assert row["scope"] == {k: arm[k] for k in ("model", "quant", "engine", "backend", "device")}
     assert row["receipts"][-1]["reason"] == "option_capacity_exceeded"
@@ -639,8 +712,11 @@ def test_timed_out_model_row_retains_actual_request_capacity_metadata(isolated_p
     from z0int.cognition.shadow import ShadowSpec, _decision_rows
     scope = {k: policy_body()["families"]["omp.tool"]["arm"][k]
              for k in ("model", "quant", "engine", "backend", "device")}
+    body = policy_body("shadow")
+    capacity_rule(body, 2, scope)
+    publish(isolated_policy, body)
     legal = compile_actions(graph=cli._graph_from_payload({"actions": [
-        {"action_id": name, "kind": "tool"} for name in ("read", "glob")
+        {"action_id": name, "kind": "tool", "risk_class": "read"} for name in ("read", "glob")
     ]}), authority=("read",), budget_units=8)
     class Slow:
         def chat(self, messages, **kwargs):

@@ -41,7 +41,7 @@ RECEIPT_SCHEMA = "z0int.cognition.shadow.receipt.v1"
 RECEIPT_NAME = "cognition-shadow.jsonl"
 
 _ALLOWED_KINDS = ("tool", "model", "control")
-_ALLOWED_RISKS = ("read", "write", "destructive", "publish", "credential", "payment")
+_ALLOWED_RISKS = ("read", "mutating_reversible", "write", "destructive", "publish", "credential", "payment", "unknown")
 DEFAULT_SERVER_TIMEOUT_MS = 30_000
 
 
@@ -111,7 +111,7 @@ def _action_from_row(raw: Any, index: int) -> ActionCandidate:
     if tool is not None and not isinstance(tool, str):
         raise ShadowPayloadError(f"{where}.tool must be a string")
 
-    risk_class = raw.get("risk_class", "read")
+    risk_class = raw.get("risk_class", "unknown")
     if not isinstance(risk_class, str) or risk_class not in _ALLOWED_RISKS:
         raise ShadowPayloadError(
             f"{where}.risk_class must be one of {list(_ALLOWED_RISKS)}"
@@ -248,7 +248,7 @@ def build_shadow_plan(
         else None,
         risk_class=payload.get("risk_class")
         if isinstance(payload.get("risk_class"), str)
-        else "read",
+        else "unknown",
         constraints=_mapping(payload, "constraints"),
         latency_budget_ms=payload.get("latency_budget_ms")
         if isinstance(payload.get("latency_budget_ms"), (int, float))

@@ -36,17 +36,6 @@ const DEFAULT_TOOL_NAMES = ["bash", "read", "write", "edit", "grep", "glob"];
 const RECENT_TOOLS = 8;
 const STATUS_RING = 100;
 
-/** Tool names whose call has real filesystem/process side effects. */
-const WRITE_TOOLS = new Set([
-	"bash",
-	"write",
-	"edit",
-	"multiedit",
-	"apply_patch",
-	"notebook_edit",
-	"write_file",
-	"create_file",
-]);
 
 type Jsonish = Record<string, unknown>;
 
@@ -259,19 +248,31 @@ export function loadDecisionPolicy(): DecisionPolicy {
 }
 
 
-export function optionCapacity(scope: Jsonish, policy = loadDecisionPolicy()): number {
-	if (!object(scope)) return 2;
+export function optionCapacity(scope: Jsonish, risk: unknown, policy = loadDecisionPolicy()): number {
+	if (!object(scope) || !["read", "mutating_reversible"].includes(String(risk))) return 0;
 	const keys = ["backend", "device", "engine", "model", "quant"];
-	if (keys.some(key => typeof scope[key] !== "string" || !scope[key])) return 2;
+	if (Object.keys(scope).length !== keys.length || keys.some(key => typeof scope[key] !== "string" || !scope[key])) return 0;
 	const key = JSON.stringify(Object.fromEntries(keys.map(k => [k, scope[k]])));
-	const entry = object(policy.option_capacity) ? policy.option_capacity[key] : undefined;
-	if (!object(entry) || typeof entry.allowed_k !== "number" || !Number.isInteger(entry.allowed_k) || entry.allowed_k < 1
+	const risks = object(policy.option_capacity) ? policy.option_capacity[key] : undefined;
+	const entry = object(risks) ? risks[String(risk)] : undefined;
+	if (!object(entry) || typeof entry.allowed_k !== "number" || !Number.isSafeInteger(entry.allowed_k) || entry.allowed_k < 1
 		|| !timestamp(entry.expires_at) || Date.parse(String(entry.expires_at)) <= Date.now()
 		|| !strings(entry.finding_ids) || !(entry.finding_ids as unknown[]).length
 		|| !strings(entry.task) || !(entry.task as unknown[]).length
-		|| typeof entry.bar !== "number" || !Number.isFinite(entry.bar)
 		|| typeof entry.wilson_lower !== "number" || !Number.isFinite(entry.wilson_lower)
-		|| entry.bar < 0 || entry.wilson_lower < entry.bar || entry.wilson_lower > 1) return 2;
+		|| entry.wilson_lower < 0 || entry.wilson_lower > 1 || !object(entry.inputs)) return 0;
+	const inputs = entry.inputs;
+	const { cost_call: call, cost_frontier: frontier, cost_error: error, abstain_rate: abstain } = inputs;
+	if ([call, frontier, error, abstain].some(v => typeof v !== "number" || !Number.isFinite(v) || v < 0)
+		|| typeof call !== "number" || typeof frontier !== "number" || typeof error !== "number" || typeof abstain !== "number"
+		|| frontier <= 0 || error <= 0 || abstain > 1 || typeof inputs.measured !== "boolean"
+		|| inputs.status !== (inputs.measured ? "measured" : "unmeasured")
+		|| !strings(inputs.finding_ids) || (inputs.measured && !(inputs.finding_ids as unknown[]).length)) return 0;
+	const bar = 1 - (frontier - call - abstain * frontier) / error;
+	if (typeof entry.bar_derived !== "number" || !Number.isFinite(entry.bar_derived)
+		|| Math.abs(entry.bar_derived - bar) > 1e-12
+		|| !(entry.wilson_lower > bar)
+		|| !(call + (1 - entry.wilson_lower) * error + abstain * frontier < frontier)) return 0;
 	return entry.allowed_k;
 }
 function policyStage(rule: Jsonish | undefined): string {
@@ -483,7 +484,8 @@ export function authorityList(): string[] {
 // --- payload ------------------------------------------------------------
 
 function riskFor(toolName: string): string {
-	return WRITE_TOOLS.has(toolName) ? "write" : "read";
+	// A tool name alone cannot prove that a mutation is reversible.
+	return ["read", "grep", "glob", "find"].includes(toolName) ? "read" : "destructive";
 }
 
 function safeCall(target: unknown, method: string): unknown {
@@ -591,7 +593,8 @@ export function buildShadowPayload(
 	// by this; the worker fixes the selected and executed action to null.
 	const risks = new Set(toolNames.map(riskFor));
 	const policy = loadDecisionPolicy();
-	const plans = shadowRequestPlans(policy, shadowModels(policy), toolNames.length);
+	const risk = risks.has("destructive") ? "destructive" : "read";
+	const plans = shadowRequestPlans(policy, shadowModels(policy), toolNames.length, risk);
 	const stamp = policyStamp(policy);
 	const blocked = plans.length > 0 && plans.every(plan => plan.reason === "option_capacity_exceeded");
 	return {
@@ -616,12 +619,12 @@ export function buildShadowPayload(
 			tool_call_id: typeof event?.toolCallId === "string" ? event.toolCallId : "",
 		},
 		objective: null,
-		risk_class: risks.has("write") ? "write" : "read",
+		risk_class: risk,
 		shadows: plans.filter(plan => plan.reason !== "option_capacity_exceeded").map(plan => plan.model_id),
 	};
 }
 
-function shadowRequestPlans(policy: DecisionPolicy, models: string[], count: number): Jsonish[] {
+function shadowRequestPlans(policy: DecisionPolicy, models: string[], count: number, risk: unknown): Jsonish[] {
 	const narrowing = nested(loadCognitionSettings(), "policy_scope");
 	return models.map(model => {
 		const rule = Object.values(policy.families).find(row => POLICY_STAGES.indexOf(policyStage(row)) >= 1 && object(row.arm) && row.arm.model === model
@@ -629,9 +632,9 @@ function shadowRequestPlans(policy: DecisionPolicy, models: string[], count: num
 		const arm = object(rule?.arm) ? rule.arm : {};
 		const scope = Object.fromEntries(["model", "quant", "engine", "backend", "device"].map(k =>
 			[k, typeof arm[k] === "string" ? arm[k] : k === "model" ? model : "unknown"]));
-		const allowed = optionCapacity(scope, policy);
+		const allowed = optionCapacity(scope, risk, policy);
 		return { model_id: model, quant: scope.quant, scope, option_count: 0, attempted_option_count: count,
-			allowed_k: allowed, slm_requested: false, ...(count > allowed ? { reason: "option_capacity_exceeded" } : {}) };
+			risk_class: risk, allowed_k: allowed, slm_requested: false, ...(allowed === 0 || count > allowed ? { reason: "option_capacity_exceeded" } : {}) };
 	});
 }
 
@@ -733,7 +736,7 @@ export function classifyShadowResponse(response: unknown, observedTool: string):
 				agrees_with_observed: status === "selected" ? selected === observedTool : null,
 				latency_ms: ran && typeof row.latency_ms === "number" ? row.latency_ms : null,
 				...receiptPolicyFields(row),
-				...Object.fromEntries(["option_count", "attempted_option_count", "model_id", "quant", "scope", "allowed_k", "slm_requested",
+				...Object.fromEntries(["risk_class", "option_count", "attempted_option_count", "model_id", "quant", "scope", "allowed_k", "slm_requested",
 					"observed_identity", "expected_identity", "props_model_id"].filter(key => row[key] !== undefined).map(key => [key, row[key]])),
 			};
 		});
@@ -818,7 +821,10 @@ export async function sendShadow(
 	payload.synthetic = synthetic || payload.synthetic === true;
 	if (Array.isArray(payload.actions) && Array.isArray(payload.shadows) && payload.shadows.length
 		&& payload.shadows.every(model => typeof model === "string")) {
-		const plans = shadowRequestPlans(loadDecisionPolicy(), payload.shadows as string[], payload.actions.length);
+		const risk = payload.actions.every(action => object(action) && typeof action.tool === "string"
+			&& riskFor(action.tool) === "read" && action.risk_class === "read") ? "read" : "destructive";
+		payload.risk_class = risk;
+		const plans = shadowRequestPlans(loadDecisionPolicy(), payload.shadows as string[], payload.actions.length, risk);
 		payload.shadow_requests = plans;
 		payload.shadows = plans.filter(plan => plan.reason !== "option_capacity_exceeded").map(plan => plan.model_id);
 		if (plans.every(plan => plan.reason === "option_capacity_exceeded")) {

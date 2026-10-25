@@ -244,32 +244,52 @@ class Policy:
     def for_scope(self, scope: dict[str, str]) -> Policy:
         return replace(self, _scope=dict(scope))
 
-    def allowed_k(self, scope: dict[str, Any]) -> int:
-        """Only an unexpired exact-scope capacity grant may exceed binary."""
+    def allowed_k(self, scope: dict[str, Any], risk_class: str | None = None) -> int:
+        """Require exact-scope, risk-specific evidence and strict economic benefit."""
         try:
+            if risk_class not in ("read", "mutating_reversible"):
+                return 0
             fields = ("model", "quant", "engine", "backend", "device")
             if not all(isinstance(scope.get(k), str) and scope[k] for k in fields):
-                return 2
+                return 0
             key = _canonical({k: scope[k] for k in fields}).decode("utf-8")
-            entry = self._body.get("option_capacity", {}).get(key)
+            entry = self._body.get("option_capacity", {}).get(key, {}).get(risk_class)
             if not isinstance(entry, dict):
-                return 2
+                return 0
             count = entry.get("allowed_k")
             if not isinstance(count, int) or isinstance(count, bool) or count < 1:
-                return 2
+                return 0
             if _timestamp(entry.get("expires_at")) <= datetime.now(timezone.utc):
-                return 2
+                return 0
             if not _strings(entry.get("finding_ids")) or not entry["finding_ids"]:
-                return 2
+                return 0
             if not _strings(entry.get("task")) or not entry["task"]:
-                return 2
-            if not _number(entry.get("bar")) or not _number(entry.get("wilson_lower")):
-                return 2
-            if not 0 <= entry["bar"] <= entry["wilson_lower"] <= 1:
-                return 2
-            return count
+                return 0
+            p, bar = entry.get("wilson_lower"), entry.get("bar_derived")
+            inputs = entry.get("inputs")
+            if not _number(p) or not 0 <= p <= 1 or not _number(bar) or not isinstance(inputs, dict):
+                return 0
+            if inputs.get("blocked") or inputs.get("measured") is not True or inputs.get("status") != "measured":
+                return 0
+            if not _strings(inputs.get("finding_ids")) or not inputs["finding_ids"]:
+                return 0
+            if not set(inputs["finding_ids"]).issubset(entry["finding_ids"]):
+                return 0
+            call, frontier, error, abstain = (inputs.get(k) for k in
+                ("cost_call", "cost_frontier", "cost_error", "abstain_rate"))
+            if not all(_number(v) for v in (call, frontier, error, abstain)):
+                return 0
+            if call < 0 or frontier <= 0 or error <= 0 or not 0 <= abstain <= 1:
+                return 0
+            derived = 1 - (frontier * (1 - abstain) - call) / error
+            expected = call + (1 - p) * error + abstain * frontier
+            if not math.isfinite(derived) or not math.isfinite(expected):
+                return 0
+            if not math.isclose(bar, derived, rel_tol=1e-12, abs_tol=1e-12):
+                return 0
+            return count if p > derived and expected < frontier else 0
         except Exception:
-            return 2
+            return 0
 
     def rule_for(self, family: str) -> dict[str, Any]:
         matches = []
@@ -384,5 +404,5 @@ def stamp(receipt_dict: dict[str, Any], family: str, rule: str | None = None) ->
     return current().stamp(receipt_dict, family, rule)
 
 
-def allowed_k(scope: dict[str, Any]) -> int:
-    return current().allowed_k(scope)
+def allowed_k(scope: dict[str, Any], risk_class: str | None = None) -> int:
+    return current().allowed_k(scope, risk_class)

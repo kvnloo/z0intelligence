@@ -103,12 +103,23 @@ policy selection. The CLI records that filter when supplied. The OMP extension
 reads the same optional filter from cognition settings for receipt attribution.
 Neither consumer generalizes a measured arm to a different physical scope.
 
-O13 bounds each SLM request before provider IO. `option_capacity` is a map keyed
-by the sorted compact canonical JSON of `{model,quant,engine,backend,device}`.
-Each entry contains `allowed_k`, `finding_ids`, `wilson_lower`, `task` (a list),
-`bar` and `expires_at`. Only an unexpired exact-scope grant whose Wilson lower
-bound meets its bar can raise the default binary cap. Missing, invalid or expired
-capacity data means a cap of 2, not permission for a broad choice set.
+O13 bounds each SLM request before provider IO. `option_capacity` is keyed by
+the sorted compact canonical JSON of exactly `{model,quant,engine,backend,device}`,
+then by risk (`read`, `mutating_reversible`, `destructive`). Missing, invalid,
+expired, unknown-risk and destructive grants authorize zero options, never a
+binary fallback. Legacy `write` is not proof of reversibility. OMP's name-only
+tool catalog treats known read tools as `read` and all other tools as
+`destructive`; it does not invent reversible authority.
+
+Each risk entry contains `allowed_k`, `finding_ids`, `wilson_lower`, `task`,
+`bar_derived`, `expires_at` and `inputs` (`cost_call`, `cost_frontier`,
+`cost_error`, `abstain_rate`, `measured`, `status`, `finding_ids`). Costs share
+O14's pace-adjusted unit. Status must be `measured` or `unmeasured`, matching
+the boolean; measured inputs require provenance. The consumer recomputes
+`bar = 1 - (cost_frontier - cost_call - abstain_rate * cost_frontier) / cost_error`
+and checks the stored bar and strict `wilson_lower > bar`, plus the strict rule
+`cost_call + (1 - wilson_lower) * cost_error + abstain_rate * cost_frontier < cost_frontier`.
+A scalar grant alone cannot authorize a request.
 
 An over-cap proposal never reaches the model. It returns to frontier/Jev with
 `option_capacity_exceeded`, effective stage `none`, `slm_requested: false`,

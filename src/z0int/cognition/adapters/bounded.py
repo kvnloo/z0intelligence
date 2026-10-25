@@ -79,11 +79,12 @@ class JevBoundedToolBackend:
         if scope is None:
             metadata["option_capacity"] = "not_applicable"
         else:
-            allowed = policy_runtime.current().allowed_k(scope)
+            allowed = policy_runtime.current().allowed_k(scope, request.capacity_risk())
             metadata.update(
                 option_count=0, attempted_option_count=count,
                 model_id=scope["model"], quant=scope["quant"], scope=dict(scope),
                 allowed_k=allowed, slm_requested=False,
+                risk_class=request.capacity_risk() or "unknown",
             )
         request.metadata.clear()
         request.metadata.update(metadata)

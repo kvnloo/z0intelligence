@@ -8,6 +8,23 @@ Related: evolution-lab#23 (tournament) · tokenomics#4 (telemetry) · kerdoios#5
 (placement) · oh-my-pi#83 (OMP adapter lane) · frontier-kb#27 (evidence) · z0#5
 (registry view).
 
+### Risk-bound capacity authority (#213)
+
+Python model consumers read `option_capacity[canonical_scope][risk_class]`,
+where scope contains exactly model, quant, engine, backend and device.
+Missing, malformed or expired evidence grants zero options, never binary fallback.
+Only `read` and explicitly `mutating_reversible` actions can receive capacity;
+legacy `write`, unknown and destructive actions cannot. Request context cannot
+downgrade any action's risk. CLI and shadow payloads must identify each action's
+risk; omitted risk is unknown.
+
+Consumers require measured finite economic inputs and evidence IDs, recompute
+`bar_derived = 1 - (cost_frontier * (1 - abstain_rate) - cost_call) / cost_error`,
+and require both `wilson_lower > bar_derived` and
+`cost_call + (1 - wilson_lower) * cost_error + abstain_rate * cost_frontier < cost_frontier`.
+The derived bar is not clamped to a probability interval. Destructive actions
+remain blocked even when their economics appear favorable.
+
 ## The rule this implements
 
 > Ordinary computer science goes in the compiler, not the model.

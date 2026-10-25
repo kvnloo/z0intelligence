@@ -60,9 +60,11 @@ def test_dead_endpoint_degrades_and_evolves(tmp_path, monkeypatch):
     registry = LocalModelRegistry(load_local_cognition(), {'qwen3_06b': ServingEndpoint(
         'qwen3_06b','http://127.0.0.1:1','qwen3-0.6b-q8','llama.cpp',timeout_s=.1)})
     monkeypatch.setenv('Z0INT_HOME', str(home))
+    backend = registry.backend_for("qwen3_06b")
+    backend._policy = sized_backend(None, scope=backend._scope)._policy
     result = run_shadow({'session_id':'session','facts':{'tool_call_id':'0'},
-        'actions':[{'action_id':'read','tool':'read'}], 'authority':['read'],
-        'shadows':['qwen3_06b'], 'state':'previous tools: none'}, registry=registry)
+        'actions':[{'action_id':'read','tool':'read','risk_class':'read'}], 'authority':['read'],
+        'shadows':['qwen3_06b'], 'risk_class':'read', 'state':'previous tools: none'}, registry=registry)
     assert result['selected_action'] is None and result['executed_action'] is None
     assert 'transport_error' in result['shadow'][0]['parse_error']
     report = learn(home, sessions=sessions, now=now+1)
@@ -164,32 +166,36 @@ def large_omp_payload():
         'facts':{'tool_call_id':'actual-call', 'tool_name':'zz_observed_tool'},
         'state':'OMP session. Previous tool calls, oldest first: read, bash, read',
         'recent_tools':['read','bash','read'], 'session_tools':['read','bash'],
-        'actions':[{'action_id':name,'tool':name,'family':'omp.tool',
+        'risk_class':'read',
+        'actions':[{'action_id':name,'tool':name,'family':'omp.tool','risk_class':'read',
                     'description':f'Call the OMP tool {name}',
                     'arguments_schema':{'type':'object','description':'schema text '*100}}
                    for name in names],
         'authority':['read'], 'budget_units':len(names), 'shadows':['qwen3_06b']}
 
 
-def sized_backend(transport):
+def sized_backend(transport, scope=None):
     from z0int.cognition.adapters.local_slm import LocalSLMBackend
     from z0int.cognition.adapters.transport import ServerConfig
     from z0int.cognition.adapters.dialects import PLAIN_JSON_DIALECT
     import hashlib
     import os
     from z0int import policy_runtime
-    scope = {"model": "qwen3_06b", "quant": "Q8_0", "engine": "fixture",
-             "backend": "cpu", "device": "fixture"}
+    scope = scope or {"model": "qwen3_06b", "quant": "Q8_0", "engine": "fixture",
+                      "backend": "cpu", "device": "fixture"}
     key = json.dumps(scope, sort_keys=True, separators=(",", ":"))
     body = {
         "schema": "z0.decision_policy.v1", "synthetic": True,
         "compiled_at": "2026-10-24T00:00:00+00:00", "findings_head": "synthetic",
         "compiler": "synthetic-context-fixture", "families": {}, "serving": [], "changes": [],
-        "option_capacity": {key: {
+        "option_capacity": {key: {"read": {
             "allowed_k": 24, "finding_ids": ["synthetic-context-capacity"],
-            "wilson_lower": 1.0, "task": ["T1", "T2", "T3", "T4"], "bar": 0.95,
+            "wilson_lower": 1.0, "task": ["T1", "T2", "T3", "T4"], "bar_derived": 0.95,
+            "inputs": {"cost_call": 0, "cost_frontier": 1, "cost_error": 20,
+                       "abstain_rate": 0, "measured": True, "status": "measured",
+                       "finding_ids": ["synthetic-context-capacity"]},
             "expires_at": "2099-01-01T00:00:00+00:00",
-        }},
+        }}},
     }
     body["version"] = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     path = Path(os.environ["Z0INT_HOME"]) / "policy" / "decision-policy.json"

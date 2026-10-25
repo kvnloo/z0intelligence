@@ -189,20 +189,32 @@ def _legal():
         actions=(
             ActionCandidate(action_id="fs.read", kind="tool", description="read", tool="fs.read"),
             ActionCandidate(action_id="fs.write", kind="tool", description="write", tool="fs.write",
-                            risk_class="write"),
+                            risk_class="mutating_reversible"),
         )
     )
     return compile_actions(
-        graph=graph, granted_capabilities=(), authority=("read", "write"), budget_units=5
+        graph=graph, granted_capabilities=(), authority=("read", "mutating_reversible"), budget_units=5
     )
 
 
 def _backend(transport, dialect=None):
+    import json
+    from z0int.policy_runtime import Policy
+    scope = dict(model="m", quant="fixture", engine="fixture", backend="fixture", device="fixture")
+    entry = {"allowed_k": 8, "finding_ids": ["fixture"], "task": ["T1"],
+             "wilson_lower": 0.99, "bar_derived": 0.5, "expires_at": "2099-01-01T00:00:00Z",
+             "inputs": {"cost_call": 0, "cost_frontier": 1, "cost_error": 2,
+                        "abstain_rate": 0, "measured": True, "status": "measured",
+                        "finding_ids": ["fixture"]}}
+    policy = Policy(_body={"option_capacity": {
+        json.dumps(scope, sort_keys=True, separators=(",", ":")):
+            {"read": entry, "mutating_reversible": entry}}})
     return LocalSLMBackend(
         backend_id="test_slm",
         config=ServerConfig(base_url="http://127.0.0.1:1", model="m", revision="r1"),
         dialect=dialect,
         transport=transport,
+        scope=scope, policy=policy,
     )
 
 
@@ -448,14 +460,14 @@ def test_a_local_slm_can_be_evaluated_by_the_existing_backend_contract():
     assert result.diagnostics["candidate_action_count"] == 2
 
 
-@pytest.mark.parametrize("allowed", [2, 3])
+@pytest.mark.parametrize("allowed", [0, 3])
 def test_scoped_jev_checks_capacity_before_evaluate(monkeypatch, allowed):
     from z0int import policy_runtime
 
     scope = dict(model="tiny", quant="q4", engine="llama.cpp", backend="cpu", device="mbp")
     class Policy:
-        def allowed_k(self, actual):
-            assert actual == scope
+        def allowed_k(self, actual, risk_class):
+            assert actual == scope and risk_class == "read"
             return allowed
     monkeypatch.setattr(policy_runtime, "current", lambda: Policy())
     stub = _StubDecisionBackend("a")
@@ -473,7 +485,7 @@ def test_scoped_jev_checks_capacity_before_evaluate(monkeypatch, allowed):
     assert row["slm_requested"] is (allowed == 3)
     assert row["option_count"] == (3 if allowed == 3 else 0)
     assert len(stub.requests) == (1 if allowed == 3 else 0)
-    if allowed == 2:
+    if allowed == 0:
         assert row["parse_error"] == "option_capacity_exceeded"
     else:
         assert row["selected_action"] == "a"

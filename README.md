@@ -10,10 +10,12 @@ The Python import/CLI namespace remains `z0int`; the distribution metadata still
 
 Local language-model backends declare a five-field `model_scope` (`model`, `quant`,
 `engine`, `backend`, `device`). The bounded cognition adapter checks that exact
-scope against policy `option_capacity` before inference (default capacity: two).
+scope and the request's authoritative risk class against policy `option_capacity`
+before inference (default capacity: zero, no SLM request). Grants must pass the
+compiled expected-cost rule; destructive and unknown risk never receive grants.
 An over-cap request abstains with `option_capacity_exceeded`, without sending
-options. Receipts include the scope, attempted/sent option counts and allowed
-capacity. Scorers without a model scope are not capped and explicitly report
+options. Receipts include the scope, risk class, attempted/sent option counts and
+allowed capacity. Scorers without a model scope are not capped and explicitly report
 `option_capacity: not_applicable` and their backend class.
 
 ## What exists on master

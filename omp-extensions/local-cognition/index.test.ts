@@ -166,7 +166,7 @@ test("payload actions contain only the available tool names", async () => {
 	}
 	for (const action of actions) {
 		expect(action.kind).toBe("tool");
-		expect(["read", "write"]).toContain(String(action.risk_class));
+		expect(["read", "destructive"]).toContain(String(action.risk_class));
 	}
 });
 
@@ -176,7 +176,7 @@ test("authority and budget cover every available tool, whatever the observed cal
 	const asWrite = buildShadowPayload(toolCall("write", { path: "x" }), tools);
 
 	// Enough authority and budget that no tool is eliminated, so the observed one is always legal.
-	expect(asWrite.authority).toEqual(["read", "write"]);
+	expect(asWrite.authority).toEqual(["read", "destructive"]);
 	expect(asWrite.budget_units).toBe(tools.length);
 	// Nothing the model is shown differs between a read call and a write call.
 	for (const field of ["state", "actions", "granted_capabilities", "authority", "budget_units", "risk_class"]) {
@@ -190,17 +190,16 @@ test("authority and budget cover every available tool, whatever the observed cal
 	expect(readOnly.risk_class).toBe("read");
 });
 
-test("asks one model by default", async () => {
+test("default model is not requested without risk-specific capacity", async () => {
 	process.env.OMP_Z0INT_COGNITION_TOOLS = "read,write";
 	const { handler } = installed();
 	handler(toolCall("write", { path: "x" }), fakeCtx());
 	await flush();
 
-	// One small candidate uses the existing farm; no resident supervisor is required.
-	expect(sent[0].shadows).toEqual(["qwen3_06b"]);
+	expect(sent[0].shadows).toEqual([]);
 	const actions = sent[0].actions as Array<Record<string, unknown>>;
 	const writeAction = actions.find(action => action.tool === "write");
-	expect(writeAction?.risk_class).toBe("write");
+	expect(writeAction?.risk_class).toBe("destructive");
 });
 
 test("state shows only the tools called before, never the observed call", async () => {
@@ -317,8 +316,8 @@ test("with no tool list from OMP, the choices do not depend on the call or on ea
 	expect(sent).toHaveLength(calls.length + 1);
 	const ids = (sent[0].actions as Array<Record<string, unknown>>).map(action => action.action_id);
 	expect(ids).toEqual(["bash", "edit", "glob", "grep", "read", "write"]);
-	expect(sent[0].authority).toEqual(["read", "write"]);
-	expect(sent[0].risk_class).toBe("write");
+	expect(sent[0].authority).toEqual(["read", "destructive"]);
+	expect(sent[0].risk_class).toBe("destructive");
 	// One set of choices for every call: none of them can be read off it.
 	expect(new Set(sent.map(choiceFields)).size).toBe(1);
 });
@@ -774,21 +773,67 @@ function capacityFixture(allowed = 4) {
 	const arm = ((body.families as Record<string, Record<string, unknown>>)["omp.tool"].arm as Record<string, string>);
 	const scope = Object.fromEntries(["backend", "device", "engine", "model", "quant"].map(k => [k, arm[k]]));
 	const entry = { allowed_k: allowed, finding_ids: ["e".repeat(64)], wilson_lower: 0.99,
-		task: ["T1", "T2", "T3", "T4"], bar: 0.95, expires_at: "2099-01-01T00:00:00+00:00" };
-	body.option_capacity = { [JSON.stringify(scope)]: entry };
+		task: ["T1", "T2", "T3", "T4"], bar_derived: 0.95,
+		inputs: { cost_call: 0.5, cost_frontier: 1, cost_error: 10, abstain_rate: 0,
+			measured: true, status: "measured", finding_ids: ["e".repeat(64)] },
+		expires_at: "2099-01-01T00:00:00+00:00" };
+	body.option_capacity = { [JSON.stringify(scope)]: { read: entry } };
 	return { body, scope, entry };
 }
 
-test("capacity lookup defaults to binary and requires an unexpired exact scope", () => {
+test("capacity defaults to zero and requires an unexpired exact risk scope", () => {
 	const { body, scope, entry } = capacityFixture(4);
-	expect(optionCapacity(scope)).toBe(2);
+	expect(optionCapacity(scope, "read")).toBe(0);
 	writePolicy(body);
-	expect(optionCapacity(scope)).toBe(4);
-	expect(optionCapacity({ ...scope, quant: "Q8_0" })).toBe(2);
-	expect(optionCapacity({ model: scope.model })).toBe(2);
+	expect(optionCapacity(scope, "read")).toBe(4);
+	for (const risk of ["write", "destructive", "unknown", "mutating_reversible", undefined]) {
+		expect(optionCapacity(scope, risk)).toBe(0);
+	}
+	expect(optionCapacity({ ...scope, quant: "Q8_0" }, "read")).toBe(0);
+	expect(optionCapacity({ model: scope.model }, "read")).toBe(0);
 	entry.expires_at = "2000-01-01T00:00:00+00:00";
 	writePolicy(body);
-	expect(optionCapacity(scope)).toBe(2);
+	expect(optionCapacity(scope, "read")).toBe(0);
+});
+
+test("capacity recomputes economic evidence and rejects forged scalar grants", () => {
+	type EconomicEntry = {
+		bar_derived: number; wilson_lower: number;
+		inputs: { cost_call: number; cost_error: number; abstain_rate: number; status: string };
+	};
+	for (const mutate of [
+		(entry: EconomicEntry) => { entry.bar_derived = 0.1; },
+		(entry: EconomicEntry) => { entry.inputs.cost_call = 2; },
+		(entry: EconomicEntry) => { entry.inputs.abstain_rate = 1; },
+		(entry: EconomicEntry) => { entry.wilson_lower = 0.95; },
+		(entry: EconomicEntry) => { entry.inputs.cost_error = 0; },
+		(entry: EconomicEntry) => { entry.inputs.status = "unmeasured"; },
+	]) {
+		const { body, scope, entry } = capacityFixture();
+		mutate(entry);
+		writePolicy(body);
+		expect(optionCapacity(scope, "read")).toBe(0);
+	}
+});
+
+test("read capacity never authorizes unknown or mutating tool choices", () => {
+	const { body } = capacityFixture(8);
+	writePolicy(body);
+	for (const tool of ["write", "edit", "bash", "mcp__unknown"]) {
+		const payload = buildShadowPayload(toolCall("read"), ["read", tool]);
+		expect(payload.risk_class).toBe("destructive");
+		expect(payload.shadows).toEqual([]);
+		expect((payload.shadow_requests as Array<Record<string, unknown>>)[0].allowed_k).toBe(0);
+	}
+});
+
+test("reversible grants remain risk-specific and destructive grants stay blocked", () => {
+	const { body, scope, entry } = capacityFixture();
+	body.option_capacity = { [JSON.stringify(scope)]: { mutating_reversible: entry, destructive: entry } };
+	writePolicy(body);
+	expect(optionCapacity(scope, "mutating_reversible")).toBe(4);
+	expect(optionCapacity(scope, "read")).toBe(0);
+	expect(optionCapacity(scope, "destructive")).toBe(0);
 });
 
 test("over-cap shadow proposal never reaches the worker as a model request", async () => {

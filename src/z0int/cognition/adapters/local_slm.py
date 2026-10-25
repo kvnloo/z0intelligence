@@ -50,6 +50,15 @@ class ToolDecisionRequest:
     constraints: Mapping[str, Any] = field(default_factory=dict)
     budget: Mapping[str, Any] = field(default_factory=dict)
     max_tokens: int = 256
+
+    def capacity_risk(self) -> str | None:
+        """Every admitted action and explicit context must have known authority."""
+        risks = {action.risk_class for action in self.legal.legal}
+        if self.risk_class is not None:
+            risks.add(self.risk_class)
+        if not risks or not risks.issubset({"read", "mutating_reversible"}):
+            return None
+        return "mutating_reversible" if "mutating_reversible" in risks else "read"
     # Provider audit metadata is filled before IO, including for timed-out calls.
     metadata: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
 
@@ -262,11 +271,13 @@ class LocalSLMBackend:
         legal = request.legal
         ids = legal.ids()
         policy = self._policy or policy_runtime.current()
-        allowed = policy.allowed_k(self._scope)
+        risk = request.capacity_risk()
+        allowed = policy.allowed_k(self._scope, risk)
         metadata: dict[str, Any] = {
             "option_count": 0, "attempted_option_count": len(ids),
             "model_id": self._scope["model"], "quant": self._scope["quant"],
             "scope": dict(self._scope), "allowed_k": allowed, "slm_requested": False,
+            "risk_class": risk or "unknown",
         }
         request.metadata.clear()
         request.metadata.update(metadata)
@@ -325,6 +336,7 @@ class LocalSLMBackend:
             "option_count": str(len(ids)), "model_id": self._scope["model"], "quant": self._scope["quant"],
             "scope": json.dumps(self._scope, sort_keys=True, separators=(",", ":"), ensure_ascii=False),
             "allowed_k": str(allowed), "policy_version": policy.version,
+            "risk_class": risk or "unknown",
         }
         extra_body: dict[str, Any] = {"metadata": wire_metadata}
         if self._config.model.startswith("qwen3-"):
