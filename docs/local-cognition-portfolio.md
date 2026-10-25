@@ -392,6 +392,12 @@ runtime's `/apply-template`, with thinking disabled, rather than guessed ChatML.
 Missing template rendering or unstable label token boundaries fails the worker
 without emitting findings. Discovery scans both registry `model_path` entries
 and all GGUFs in `model_dirs`; exact `served_model` basenames resolve there.
+Digest and GGUF metadata discovery are cached under
+`$Z0INT_HOME/policy/model-identities/` by `(st_dev, st_ino, st_size, st_mtime_ns)`.
+Unchanged weights are not reopened on each timer tick. A new identity hashes
+through `ionice -c 3 nice -n 19`; stat changes during hashing fail closed.
+Cache writes are serialized and atomic. Model publishers must change the
+filesystem identity tuple when replacing bytes (normal writes update mtime).
 
 Missing task evidence or evidence within `refresh_hours` (default 48) of the
 compiler's effective expiry enqueues a worker. Live workers are not duplicated;

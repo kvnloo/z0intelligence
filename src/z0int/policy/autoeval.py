@@ -32,6 +32,37 @@ def file_sha(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def model_identity(path, home):
+    """Cache weight digest and metadata by filesystem identity, never by alias."""
+    directory = home / 'policy' / 'model-identities'
+    directory.mkdir(parents=True, exist_ok=True)
+    with locked(directory / 'cache.lock'):
+        before = path.stat()
+        identity = [before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns]
+        entry = directory / (digest(identity) + '.json')
+        if entry.exists():
+            cached = json.loads(entry.read_text())
+            if cached['identity'] == identity:
+                return cached['sha256'], cached['metadata']
+        # Cold identities read large weights only at idle I/O / minimum CPU priority.
+        sha = subprocess.check_output(
+            ['ionice', '-c', '3', 'nice', '-n', '19', sys.executable, '-c',
+             'import hashlib,sys; '
+             'f=open(sys.argv[1],"rb"); print(hashlib.file_digest(f,"sha256").hexdigest())',
+             str(path)], text=True).strip()
+        metadata = gguf_metadata(path)
+        after = path.stat()
+        if identity != [after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns]:
+            raise ValueError('Model changed while computing its identity')
+        if len(sha) != 64 or any(c not in '0123456789abcdef' for c in sha):
+            raise ValueError('Invalid model digest')
+        cached = {'identity': identity, 'sha256': sha, 'metadata': metadata}
+        temporary = entry.with_suffix('.tmp')
+        temporary.write_bytes(canonical(cached) + b'\n')
+        temporary.replace(entry)
+        return sha, metadata
+
+
 def gguf_metadata(path):
     """Read GGUF v2/v3 metadata only, without mapping model tensors."""
     with Path(path).open('rb') as stream:
@@ -81,7 +112,7 @@ QUANTS = {0:'F32', 1:'F16', 2:'Q4_0', 3:'Q4_1', 7:'Q8_0', 8:'Q5_0', 9:'Q5_1',
           15:'Q4_K_M', 16:'Q5_K_S', 17:'Q5_K_M', 18:'Q6_K', 32:'BF16'}
 
 
-def discover(config):
+def discover(config, home=None):
     """Aliases collapse by bytes; new weights always receive a new model scope."""
     candidates = set()
     registry = Path(config['registry']).expanduser()
@@ -99,8 +130,7 @@ def discover(config):
         candidates.update(p.resolve() for p in Path(directory).expanduser().glob('*.gguf'))
     models = {}
     for path in sorted(candidates):
-        metadata = gguf_metadata(path)
-        sha = file_sha(path)
+        sha, metadata = model_identity(path, home if home is not None else paths.home())
         quant = QUANTS.get(metadata.get('general.file_type'))
         if quant is None:
             raise ValueError(f'Unsupported GGUF quantization: {path}')
@@ -170,7 +200,7 @@ def tick(home, config, now=None, launch=subprocess.Popen):
     events = []
     with locked(directory / 'dispatch.lock'):
         findings = read_findings(ledger_path(home))
-        for model in discover(config):
+        for model in discover(config, home):
             # One configured lane is selected deterministically, never an LLM.
             lane = config['lane']
             key = digest(scope_for(model,lane))

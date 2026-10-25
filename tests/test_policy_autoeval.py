@@ -10,6 +10,52 @@ import pytest
 from z0int.policy.autoeval import discover, due, needs_more, scope_for, tick, wilson
 
 
+@pytest.fixture(autouse=True)
+def isolated_identity_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr('z0int.policy.autoeval.paths.home', lambda: tmp_path)
+
+
+def test_model_identity_cache_avoids_reads_and_invalidates_stat_changes(tmp_path, monkeypatch):
+    import os
+    import z0int.policy.autoeval as autoeval
+    config, path = setup(tmp_path)
+    real_hash = autoeval.subprocess.check_output
+    calls = []
+    def hash_model(command, **kwargs):
+        assert command[:6] == ['ionice', '-c', '3', 'nice', '-n', '19']
+        calls.append(command)
+        return real_hash(command, **kwargs)
+    monkeypatch.setattr(autoeval.subprocess, 'check_output', hash_model)
+    first = discover(config)
+    assert len(calls) == 1
+    real_metadata = autoeval.gguf_metadata
+    def unexpected_metadata(*_):
+        raise AssertionError('Unchanged GGUF was reopened for metadata')
+    monkeypatch.setattr(autoeval, 'gguf_metadata', unexpected_metadata)
+    assert discover(config) == first
+    assert len(calls) == 1
+    monkeypatch.setattr(autoeval, 'gguf_metadata', real_metadata)
+    stat = path.stat()
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000))
+    assert discover(config) == first
+    assert len(calls) == 2
+    gguf(path, b'new tensor bytes')
+    assert discover(config)[0]['sha256'] != first[0]['sha256']
+    assert len(calls) == 3
+
+
+def test_model_identity_rejects_change_during_hash(tmp_path, monkeypatch):
+    import z0int.policy.autoeval as autoeval
+    config, path = setup(tmp_path)
+    def changed_model(*args, **kwargs):
+        gguf(path, b'changed during hashing')
+        return '0' * 64
+    monkeypatch.setattr(autoeval.subprocess, 'check_output', changed_model)
+    with pytest.raises(ValueError, match='changed while computing'):
+        discover(config)
+    assert not list((tmp_path / 'policy' / 'model-identities').glob('*.json'))
+
+
 def gguf(path, extra=b''):
     def text(value):
         data = value.encode()
