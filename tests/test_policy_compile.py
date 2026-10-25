@@ -293,9 +293,9 @@ def choice_finding(task, k, *, value=1., n=100, low=1., arm=None,
     return row
 
 
-def capacity(policy, row):
+def capacity(policy, row, risk="read"):
     from z0int.policy.compile import option_capacity_key
-    return policy["option_capacity"][option_capacity_key(scope_of(row))]
+    return policy["option_capacity"][option_capacity_key(scope_of(row))][risk]
 
 
 def test_option_capacity_minimum_of_task_maxima_and_recomputed_wilson():
@@ -307,20 +307,20 @@ def test_option_capacity_minimum_of_task_maxima_and_recomputed_wilson():
     assert entry["task"] == ["T1", "T2", "T3", "T4"]
     assert len(entry["finding_ids"]) == 4
     assert .96 < entry["wilson_lower"] < .97  # Stated 1.0 cannot inflate the Wilson bound.
-    assert entry["bar"] == .95
+    assert entry["bar_derived"] == pytest.approx(.955)
     assert stage(policy) == "none"  # Choice capacity does not create routing credit.
     assert canonical(policy) == canonical(compile_rows(rows))
 
 
-def test_option_capacity_missing_failed_expired_tasks_and_unknown_scope_default_two():
+def test_option_capacity_missing_failed_expired_tasks_and_unknown_scope_disable_slm():
     rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3")]
     missing = capacity(compile_rows(rows), rows[0])
-    assert missing["allowed_k"] == 2
+    assert missing["allowed_k"] == 0
     assert missing["finding_ids"] == [] and missing["wilson_lower"] is None
     rows.append(choice_finding("T4", 10, value=.8))
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 0
     rows[-1] = choice_finding("T4", 10, expires_at=NOW)
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 0
     assert compile_rows([])["option_capacity"] == {}
 
 
@@ -331,13 +331,13 @@ def test_option_capacity_never_crosses_any_physical_scope_dimension():
         other = choice_finding("T1", 32, arm=different)
         policy = compile_rows(rows + [other])
         assert capacity(policy, rows[0])["allowed_k"] == 8
-        assert capacity(policy, other)["allowed_k"] == 2
+        assert capacity(policy, other)["allowed_k"] == 0
 
 
 def test_option_capacity_latest_failure_supersedes_old_success():
     rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3", "T4")]
     rows.append(choice_finding("T2", 8, value=.5, ts="2026-10-24T11:00:00Z"))
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 0
 
 
 @pytest.mark.parametrize("override", [
@@ -350,23 +350,71 @@ def test_option_capacity_latest_failure_supersedes_old_success():
 def test_option_capacity_rejects_ineligible_or_inconsistent_evidence(override):
     rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3")]
     rows.append(choice_finding("T4", 8, **override))
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 0
 
 
-def test_option_capacity_required_tasks_bar_and_support_expiry_are_configurable():
-    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_bar=.99,
-                            option_capacity_tasks=("custom-task",))
-    row = choice_finding("custom-task", 16)
-    assert capacity(compile_rows([row], config=config), row)["allowed_k"] == 2
-    stronger = choice_finding("custom-task", 16, n=2000, expires_at="2026-10-24T13:00:00Z")
-    entry = capacity(compile_rows([stronger], config=config), stronger)
-    assert entry["allowed_k"] == 16 and entry["expires_at"] == "2026-10-24T13:00:00Z"
-    assert capacity(compile_rows([stronger], now="2026-10-24T13:00:00Z", config=config), stronger)["allowed_k"] == 2
+def test_option_capacity_risk_expected_cost_and_expiry():
+    config = CompilerConfig(compiler_revision="a" * 40,
+        option_capacity_tasks=("custom-task",),
+        option_capacity_costs={
+            "read": {"cost_call": 1., "cost_frontier": 10., "cost_error": 2.,
+                     "abstain_rate": 0., "measured": False, "finding_ids": []},
+            "mutating_reversible": {"cost_call": 1., "cost_frontier": 10.,
+                     "cost_error": 100., "abstain_rate": 0., "measured": False, "finding_ids": []}})
+    row = choice_finding("custom-task", 8, value=.85, n=1000,
+                         expires_at="2026-10-24T13:00:00Z")
+    policy = compile_rows([row], config=config)
+    assert capacity(policy, row)["allowed_k"] == 8
+    assert capacity(policy, row, "mutating_reversible")["allowed_k"] == 0
+    assert capacity(policy, row, "destructive")["allowed_k"] == 0
+    assert capacity(policy, row)["inputs"]["status"] == "unmeasured"
+    assert capacity(compile_rows([row], now="2026-10-24T13:00:00Z", config=config), row)["allowed_k"] == 0
 
 
-def test_option_capacity_missing_evidence_known_scope_still_emits_default_two():
+def test_option_capacity_missing_evidence_known_scope_disables_slm():
     row = finding(arm={"kind": "slm", "model": "model", "quant": "Q4_0",
                        "engine": "engine", "backend": "cpu", "device": "fixture"})
     entry = capacity(compile_rows([row]), row)
-    assert entry["allowed_k"] == 2
+    assert entry["allowed_k"] == 0
     assert not entry["finding_ids"] and entry["wilson_lower"] is None
+
+
+def test_measured_capacity_costs_require_real_risk_bound_findings():
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_costs={
+        "read": {"cost_call": 1., "cost_frontier": 10., "cost_error": 2.,
+                 "abstain_rate": 0., "measured": True, "finding_ids": ["missing"]}})
+    with pytest.raises(ValueError, match="fresh risk-bound"):
+        compile_rows([choice_finding("T1", 8)], config=config)
+
+
+def test_capacity_cost_measurements_are_bound_to_finding_values_and_expiry():
+    costs = {"cost_call": 1., "cost_frontier": 10., "cost_error": 2., "abstain_rate": 0.}
+    sources = []
+    for field, value in costs.items():
+        row = finding(synthetic=True, expires_at="2026-10-24T13:00:00Z",
+            metric={"name": field, "value": value, "ci_low": value,
+                    "ci_high": value, "ci_method": "none", "higher_is_better": False})
+        row["subject"] = {"family": "choice.error_cost", "risk_class": "read",
+                          "job": "observed_frontier_recovery"}
+        row["id"] = digest({key: value for key, value in row.items() if key not in {"id", "prev"}})
+        sources.append(row)
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_tasks=("T1",),
+        option_capacity_costs={"read": {**costs, "measured": True,
+                                      "finding_ids": [row["id"] for row in sources]}})
+    choice = choice_finding("T1", 8, value=.85, n=1000)
+    entry = capacity(compile_rows(sources + [choice], config=config), choice)
+    assert entry["allowed_k"] == 8
+    assert entry["expires_at"] == "2026-10-24T13:00:00Z"
+    assert entry["inputs"]["status"] == "measured"
+    config.option_capacity_costs["read"]["cost_error"] = 3.
+    with pytest.raises(ValueError, match="matching finding"):
+        compile_rows(sources + [choice], config=config)
+
+
+def test_capacity_abstention_cost_can_remove_otherwise_profitable_route():
+    costs = {"cost_call": 1., "cost_frontier": 10., "cost_error": 2.,
+             "abstain_rate": 1., "measured": False, "finding_ids": []}
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_tasks=("T1",),
+                            option_capacity_costs={"read": costs})
+    row = choice_finding("T1", 8, n=1000)
+    assert capacity(compile_rows([row], config=config), row)["allowed_k"] == 0

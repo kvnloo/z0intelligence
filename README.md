@@ -143,12 +143,30 @@ the canonical JSON string of the exact model, quant, engine, backend and device
 scope. `option_capacity_key(scope)` creates this lossless key. No capacity
 credit transfers between different physical scopes.
 
-Each value contains `allowed_k`, `finding_ids`, `wilson_lower`, `task`, `bar`
-and `expires_at`. `task` is the sorted list of required task names. The default
-catalogue is T1, T2, T3 and T4. Configure it with `option_capacity_tasks`.
-Observed measured task names also remain required, including failed or expired
-tasks. Configure the independent accuracy threshold with `option_capacity_bar`
-(default 0.95). Routing promotion thresholds remain unchanged.
+Each scope contains risk entries `read`, `mutating_reversible`, and `destructive`.
+Each entry contains `allowed_k`, `finding_ids`, `wilson_lower`, `task`,
+`bar_derived`, `inputs` and `expires_at`. The required tasks default to T1–T4
+and are configured with `option_capacity_tasks`; observed tasks remain required.
+Routing promotion thresholds remain unchanged.
+
+Configure `option_capacity_costs[risk]` with nonnegative finite `cost_call`,
+`cost_frontier`, positive `cost_error`, and `abstain_rate` in [0,1], all using
+the same cost unit (for example O14 pace-adjusted latency, with token burn
+already included). A cell passes only when
+`cost_call + (1 - p_lower) * cost_error + abstain_rate * cost_frontier < cost_frontier`.
+Thus `bar_derived = 1 - (cost_frontier * (1 - abstain_rate) - cost_call) / cost_error`;
+equality does not route. `p_lower` describes the answered subset, not abstentions.
+Destructive decisions never route to an SLM, regardless of cost or accuracy.
+
+Absent measurements use explicitly `unmeasured` conservative normalized defaults:
+call 0.1, frontier 1, error 20 for reads and 100 for reversible mutations,
+abstention 0. These are assumptions, not observed timings. Measured inputs must
+include `measured=true` and canonical `finding_ids` for fresh measured
+`choice.error_cost` findings with matching `subject.risk_class` and metric
+names/values for all four inputs. Their earliest expiry also bounds the grant.
+Observed frontier recovery is a proxy for SLM error cost, not an executed shadow
+intervention; record that limitation in its source evidence. Shadow agreement
+alone cannot measure recovery cost.
 
 Capacity evidence requires `subject.family=choice.option_capacity`,
 `subject.job=ChoiceLadder`, `subject.task` (or `metric.task`), metric
@@ -161,7 +179,7 @@ The latest measured observation for a task and k supersedes older success.
 The compiler selects the largest passing k per task. The allowed capacity is
 the minimum across every required task. Missing, pending, expired, inference,
 ineligible or inconsistent evidence never counts as success. Any unsupported
-task limits capacity to the baseline of 2. An unknown scope also defaults to 2.
+task limits capacity to 0 (no SLM request); unknown scopes also default to 0.
 Proof IDs and the earliest selected proof expiry accompany positive credit.
 O13 readers consume this content-addressed projection, not a live findings scan.
 
