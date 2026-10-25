@@ -461,7 +461,7 @@ def execute_plan(args, policy, providers, plan, *, receipt_sink, receipt_locatio
         candidate = {"provider": chosen["provider"], "model": chosen["model"]}
         if chosen["provider"] is None:
             # Unknown metrics are usable, but never falsely called optimized.
-            identities = {(o.transport or o.provider, o.model) for o in chosen["eligible"]}
+            identities = {(o.provider, o.model) for o in chosen["eligible"]}
             candidate = next((c for c in plan["candidates"]
                               if (c["provider"], c["model"]) in identities), None)
             if candidate is None:

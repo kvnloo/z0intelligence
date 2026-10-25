@@ -20,7 +20,7 @@ def entry(provider, ttft=.1, tps=200):
         return {"value": value, "source": "synthetic/test", "timestamp": NOW, "task_class": "small"}
     return {"observed_at": NOW, "evidence": ["synthetic/test"],
             "opencode_access": {"program": "zen", "free": True, "source": "synthetic/free-catalog", "timestamp": NOW},
-            "offer": {"id": provider, "provider": provider, "transport": provider,
+            "offer": {"id": provider, "provider": provider,
                       "resource_type": "llm", "model": "synthetic", "local": False,
                       "capabilities": {"coding": .9, "reasoning": .9, "tool_use": .9, "vision": 0},
                       "capacity": {"concurrency": 1},

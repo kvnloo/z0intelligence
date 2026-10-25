@@ -24,7 +24,7 @@ def _number(value):
 
 
 def opencode_allowed(entry):
-    transport = entry.get("offer", {}).get("transport") or entry.get("offer", {}).get("provider", "")
+    transport = entry.get("offer", {}).get("provider", "")
     if transport not in ("opencode", "opencode-zen", "opencode-go"):
         return True
     access = entry.get("opencode_access", {})
@@ -52,7 +52,7 @@ def compile_routing(bundle: dict | None, now: datetime) -> dict:
     seen = set()
     for entry in result["offers"]:
         offer = entry["offer"]
-        identity = (offer.get("transport") or offer["provider"], offer["model"])
+        identity = (offer["provider"], offer["model"])
         if identity in seen or not all(isinstance(x, str) and x for x in identity):
             raise ValueError("O14 duplicate/incomplete transport/model identity")
         seen.add(identity)
@@ -116,7 +116,7 @@ def _kerdoios():
         from kerdoios.routing_objective import plan_routing
         from kerdoios.optimize import hard_filter
         from kerdoios.types import (ResourceOffer, CapabilityProfile, Capacity, Economics,
-                                    Telemetry, Access, AccessClass, AccessEvidence, WorkRequirement, Mode)
+                                    Telemetry, WorkRequirement, Mode)
     except ImportError as exc:
         raise RoutingDenied("O14 approved Kerdoios allocator unavailable; no substitute") from exc
     return locals()
@@ -153,17 +153,12 @@ def allocation(policy: dict, task_class: str, failed: list[dict], now: datetime 
     offers, metrics, entries = [], {}, {}
     for entry in rule["offers"]:
         raw = deepcopy(entry["offer"])
-        identity = (raw.get("transport") or raw["provider"], raw["model"])
+        identity = (raw["provider"], raw["model"])
         if identity in excluded or not quota_allows(entry, now):
             continue
         for field, kind in (("capabilities", "CapabilityProfile"), ("capacity", "Capacity"),
                             ("economics", "Economics"), ("telemetry", "Telemetry")):
             raw[field] = kd[kind](**raw[field])
-        if raw.get("access"):
-            access = raw["access"]
-            access["access_class"] = kd["AccessClass"](access["access_class"])
-            access["evidence"] = kd["AccessEvidence"](access["evidence"])
-            raw["access"] = kd["Access"](**access)
         offer = kd["ResourceOffer"](**raw)
         offers.append(offer)
         entries[offer.id] = entry
@@ -181,7 +176,7 @@ def allocation(policy: dict, task_class: str, failed: list[dict], now: datetime 
         raise RoutingDenied("O14 Kerdoios has no eligible offer")
     ranked = plan["ranked"]
     best = ranked[0].offer if ranked else None
-    return {"provider": (best.transport or best.provider) if best else None,
+    return {"provider": best.provider if best else None,
             "model": best.model if best else None, "ranked": ranked,
             "eligible": eligible, "unscored": plan["unscored"], "entries": entries, "rule": rule}
 
@@ -190,7 +185,7 @@ def enforce(policy: dict, task_class: str, provider: str, model: str, *, failed=
             now: datetime | str, reason: str | None = None, request_tokens: dict | None = None) -> dict:
     result = allocation(policy, task_class, failed or [], now, request_tokens=request_tokens)
     identity = (provider, model)
-    offer = next((o for o in result["eligible"] if (o.transport or o.provider, o.model) == identity), None)
+    offer = next((o for o in result["eligible"] if (o.provider, o.model) == identity), None)
     if offer is None:
         raise RoutingDenied("O14 selected offer is ineligible")
     selected = next((s for s in result["ranked"] if s.offer.id == offer.id), None)
@@ -224,7 +219,7 @@ def audit_stamp(stamp: dict) -> list[str]:
     offers = stamp.get("formula_inputs", {}).get("offers", [])
     entry = next((e for e in offers if e.get("offer", {}).get("id") == stamp.get("offer_id")), {})
     if stamp.get("provider") in ("opencode", "opencode-zen", "opencode-go") and not opencode_allowed(
-            {**entry, "offer": {**entry.get("offer", {}), "transport": stamp["provider"]}}):
+            {**entry, "offer": {**entry.get("offer", {}), "provider": stamp["provider"]}}):
         issues.append("O14 OpenCode non-Go/Zen-free model")
     if stamp.get("score_status") == "unscored" and stamp.get("o14_credit") is not False:
         issues.append("O14 unknown metrics falsely credited")

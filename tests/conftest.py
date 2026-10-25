@@ -30,7 +30,7 @@ def routing_policy_snapshot(tmp_path, monkeypatch):
                                     "timestamp": iso, "task_class": plan["category"]}
             provider, model = candidate["provider"], candidate["model"]
             entries.append({"observed_at": iso, "evidence": ["synthetic/transport-regression"],
-                "offer": {"id": provider + "/" + model, "provider": provider, "transport": provider,
+                "offer": {"id": provider + "/" + model, "provider": provider,
                     "resource_type": "llm", "model": model, "local": False,
                     "capabilities": {"coding": .9, "reasoning": .9, "tool_use": .9, "vision": 0},
                     "capacity": {"concurrency": 1},
