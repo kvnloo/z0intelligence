@@ -109,7 +109,7 @@ def discover(config):
         template = {'qwen2':'qwen25', 'qwen3':'qwen3'}.get(architecture,'runtime')
         models[sha] = {'id':'sha256:' + sha, 'sha256':sha, 'path':str(path),
                        'quantization':quant, 'template':template, 'architecture':architecture}
-    return list(models.values())
+    return sorted(models.values(),key=lambda model:(Path(model['path']).stat().st_size,model['sha256']))
 
 
 def runtime_prompt(benchmark,base,row):
@@ -222,7 +222,8 @@ def dispatch(request):
     staged = output / 'request.json'
     staged.write_bytes(canonical(payload) + b'\n')
     if lane['backend'] == 'cuda':
-        command = ['groot-admit','--need-mb',str(lane.get('need_mb',4096)),'--wait',str(lane.get('wait',3600)),
+        need_mb = max(lane.get('need_mb',4096),math.ceil(Path(payload['model']['path']).stat().st_size/1024**2)+2048)
+        command = ['groot-admit','--need-mb',str(need_mb),'--wait',str(lane.get('wait',3600)),
                    '--',sys.executable,'-m','z0int.policy.autoeval','measure','--request',str(staged),'--out',str(output)]
         subprocess.run(command,check=True)
     else:
@@ -461,8 +462,6 @@ def router_supplements(benchmark,config,initial):
     nodes = [node for node in json.loads(corpus_path.read_text())['nodes'] if node['id'] not in used]
     random.Random('choice-adaptive-T4-v1').shuffle(nodes)
     count = config.get('cap',400)-len(initial)
-    if len(nodes)<count:
-        raise ValueError('Not enough distinct router nodes for the configured adaptive cap')
     rows = []
     for i,node in enumerate(nodes[:count]):
         target,state = node['task_spec']['oracle'],node['snapshot']
@@ -499,7 +498,12 @@ def main(argv=None):
         state_path = args.request.with_name(args.request.name.removesuffix('.request.json')+'.json')
         status = 'failed'
         try:
-            dispatch(args.request)
+            payload = json.loads(args.request.read_text())
+            if payload['lane']['backend']=='cuda':
+                with locked(Path(payload['home'])/'policy'/'choice-ladder'/'cuda-worker.lock'):
+                    dispatch(args.request)
+            else:
+                dispatch(args.request)
             status = 'completed'
         finally:
             with locked(args.request.parent/'dispatch.lock'):
