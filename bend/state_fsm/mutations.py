@@ -27,6 +27,7 @@ FIELDS = {
     "C": ("available", "epoch_current", "no_active_hits", "coverage_complete"),
     "D": ("available", "typed_receipt", "output_verified", "work_positive", "transport_ok", "target_current"),
     "E": ("available", "measured", "scope_matches", "agrees"),
+    "I": ("available", "tracked_source", "scope_matches", "agrees"),
 }
 
 
@@ -154,7 +155,7 @@ def main() -> int:
     for row in rows:
         status = {True: "PASS", False: "FAIL", None: "N/A"}[row["proofs_check"]]
         print(f"{status:4}  {row['law']:40} {row['mutation']}  {row['where']}")
-    print(f"reference passes: {reference_ok}; mutations rejected: {caught}/{len(MUTATIONS)}; laws covered: A B C D E")
+    print(f"reference passes: {reference_ok}; mutations rejected: {caught}/{len(MUTATIONS)}; laws covered: A B C D E I")
     if args.out:
         args.out.write_text(json.dumps({"verdict_mode": args.verdict, "rows": rows,
                                         "reference_passes": reference_ok, "rejected": caught,

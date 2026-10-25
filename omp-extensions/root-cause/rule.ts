@@ -1,9 +1,32 @@
 /** Pure lexical audit, not a shell sandbox. No target access or effects. */
-export type Ownership = { ownedPids?: readonly string[]; ownedPatterns?: readonly string[] };
-export type Finding = { law: "R1"; mode: "report-only"; kind: string; message: string };
+export type Ownership = {
+ ownedPids?: readonly string[]; ownedPatterns?: readonly string[];
+ /** Trusted harness install context only; never populated from tool input/text. */
+ stampedInstallPaths?: readonly string[];
+ home?: string;
+};
+export type Finding = { law: "R1" | "I"; mode: "report-only"; kind: string; message: string };
 const message = "Raw mitigation observed: use z0-guard mitigate. Report-only: tool execution is unchanged.";
 const base = (word: string) => word.slice(word.lastIndexOf("/") + 1);
 const limitPath = (path: string) => /(?:^|\/)(?:io\.max|memory\.max)$/.test(path);
+const sourceMessage = "Live config must have a tracked source. Report-only: execution unchanged; use a tracked, content-stamped install.";
+const sourceFinding = (kind: string): Finding => ({ law: "I", mode: "report-only", kind, message: sourceMessage });
+function normalized(path: string, ownership: Ownership): string {
+ const home = ownership.home ?? process.env.HOME ?? "";
+ const expanded = path.replace(/^(?:~|\$\{HOME\}|\$HOME)(?=\/|$)/, home);
+ const parts: string[] = [];
+ for (const part of expanded.split("/")) {
+  if (part === "..") parts.pop(); else if (part && part !== ".") parts.push(part);
+ }
+ return (expanded.startsWith("/") ? "/" : "") + parts.join("/");
+}
+function userUnit(path: string, ownership: Ownership): boolean {
+ const root = normalized(`${ownership.home ?? process.env.HOME ?? ""}/.config/systemd/user`, ownership);
+ return normalized(path, ownership).startsWith(root + "/");
+}
+function unstamped(path: string, ownership: Ownership): boolean {
+ return userUnit(path, ownership) && !ownership.stampedInstallPaths?.some(item => normalized(item, ownership) === normalized(path, ownership));
+}
 
 // Quotes are retained as one argument; shell control operators delimit commands.
 // Unknown shell syntax is not interpreted or executed by this audit.
@@ -28,6 +51,7 @@ function tokens(command: string): string[][] {
 
 export function auditCommand(command: string, ownership: Ownership = {}, depth = 0): Finding[] {
  const kinds = new Set<string>();
+ const sourceKinds = new Set<string>();
  if (depth > 8) return [{ law: "R1", mode: "report-only", kind: "unparsed-nesting", message }];
  for (const original of tokens(command)) {
   const args = [...original];
@@ -44,6 +68,15 @@ export function auditCommand(command: string, ownership: Ownership = {}, depth =
   }
   const name = base(args[0] || "");
   if (name === "systemctl" && args.includes("set-property")) kinds.add("systemctl-set-property");
+  if (name === "systemctl" && args.includes("--user") && args.includes("set-property") && !args.includes("--runtime")) sourceKinds.add("persistent-user-property");
+  const writes = args.filter((arg, index) =>
+   (index > 0 && args[index - 1] === ">") ||
+   (["tee", "cp", "mv", "install", "touch", "rm", "truncate"].includes(name) && !arg.startsWith("-")));
+  for (const path of writes) if (unstamped(path, ownership)) sourceKinds.add("unstamped-user-unit-edit");
+  if (name === "dd") for (const arg of args) if (arg.startsWith("of=") && unstamped(arg.slice(3), ownership)) sourceKinds.add("unstamped-user-unit-edit");
+  if (["sed", "perl"].includes(name) && args.some(arg => /^-.*i/.test(arg) || arg.startsWith("--in-place"))) {
+   for (const path of args.slice(1)) if (unstamped(path, ownership)) sourceKinds.add("unstamped-user-unit-edit");
+  }
   if (args.some((arg, index) => limitPath(arg) && (args.slice(0, index).includes(">") || ["tee", "cp", "install", "dd"].includes(name)))) kinds.add("cgroup-limit-write");
   if (name === "dd" && args.some(arg => arg.startsWith("of=") && limitPath(arg.slice(3)))) kinds.add("cgroup-limit-write");
   if (["renice", "ionice"].includes(name)) kinds.add("service-priority-change");
@@ -55,10 +88,12 @@ export function auditCommand(command: string, ownership: Ownership = {}, depth =
   }
   if (["sh", "bash", "dash", "zsh"].includes(name)) {
    const flag = args.findIndex(arg => /^-[^-]*c/.test(arg));
-   if (flag >= 0 && args[flag + 1]) for (const finding of auditCommand(args[flag + 1], ownership, depth + 1)) kinds.add(finding.kind);
+   if (flag >= 0 && args[flag + 1]) for (const finding of auditCommand(args[flag + 1], ownership, depth + 1)) {
+    if (finding.law === "I") sourceKinds.add(finding.kind); else kinds.add(finding.kind);
+   }
   }
  }
- return [...kinds].map(kind => ({ law: "R1", mode: "report-only", kind, message }));
+ return [...[...kinds].map(kind => ({ law: "R1" as const, mode: "report-only" as const, kind, message })), ...[...sourceKinds].map(sourceFinding)];
 }
 
 export function auditTool(toolName: string, input: Record<string, unknown>, ownership: Ownership = {}): Finding[] {
@@ -66,6 +101,7 @@ export function auditTool(toolName: string, input: Record<string, unknown>, owne
  if (["write", "write_file", "edit", "patch"].includes(toolName)) {
   const path = input.path ?? input.file_path;
   if (typeof path === "string" && limitPath(path)) return [{ law: "R1", mode: "report-only", kind: "cgroup-limit-write", message }];
+  if (typeof path === "string" && unstamped(path, ownership)) return [sourceFinding("unstamped-user-unit-edit")];
  }
  return [];
 }

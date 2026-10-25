@@ -379,3 +379,49 @@ mutants were rejected by owned proof diagnostics. The Bun hook suite passed
 The finite R1–R4/R7 model proves supplied predicates and unknown precedence,
 not target ownership, successful remediation, unrestricted shell semantics,
 future health, or permission to execute a rollback. No enforcement was enabled.
+
+## Law I: live config must have a tracked source (report only)
+
+The Python twin `state_laws.evaluate("I", facts)` and `bend/state_fsm/state.bend`
+require exact Boolean `available`, `tracked_source`, `scope_matches`, and
+`agrees`. Missing/non-Boolean evidence or unavailable observation is **unknown**,
+even alongside known drift; complete negative evidence is a violation.
+This law grants no install or remediation authority.
+
+An optional state inventory `host_drift: {path: ".../latest.json", host: "groot"}`
+consumes the `.files` checker's `host-drift.v1` receipt. It requires an identified
+host, timezone-aware `observed_at`, age 0–2100 seconds, a stable file binding,
+typed `drift`/`unknown` rows, and a consistent status. Unknown evidence never
+becomes clean. Known drift is reported, not repaired. Receipt freshness is an
+observation limit, not proof of subsequent live state; the checker owns source
+tracking and byte comparison.
+Row `kind` and `path` are nonempty strings. `detail` is nonempty text or a
+nonempty object with nonempty string keys and finite JSON scalar values
+(including the checker's `expected`, `actual`, and optional `property` fields).
+Nested containers and nonfinite numbers are unavailable evidence, not clean.
+
+The existing opt-in R-law `tool_call` adapter also emits `law=I` advisory context
+for `systemctl --user set-property` without `--runtime`, and direct user-unit
+writes outside a trusted stamped-install scope. R1 mitigation findings remain
+independent: `--runtime` is allowed by I but does not disable R1.
+The audit is lexical, not a shell sandbox: dynamically computed paths, arbitrary
+interpreters, aliases, symlink indirection and opaque patch formats are outside
+its observation boundary. It never blocks, rewrites input, or executes targets.
+
+`rootCauseReport(api, installContext)` optionally accepts a **host-owned**
+callback returning exact `stampedInstallPaths` and `home`. The embedding harness
+must populate paths only for its active, verified content-stamped installer,
+not from model/tool input, environment markers, command comments or file text.
+The normal standalone extension supplies no exemptions. A textual “stamped”
+marker and input-supplied allowlist have no effect. This seam is not install
+authorization, and this change does not activate or configure the extension.
+
+MBP-only verification for this slice (not exercised on groot):
+`python -m pytest -q tests/test_state_laws.py tests/test_host_tracked_source.py`
+and `bun test omp-extensions/root-cause/rule.test.ts`. The existing
+`bend/state_fsm/PROOF.bend`, `mutations.py --verdict`, and `parity.py` now include I.
+Proofs cover arbitrary abstract evidence, not the checker, shell parser, trusted
+context producer, host identity or installation correctness. Mutants alter only
+the executable model and must fail owned proofs, never count parser/setup
+errors as rejections.
+
