@@ -99,3 +99,14 @@ def test_prompt_is_not_agent_identity(proc):
     (True, None, True, 'unknown')])
 def test_decision(available, agent, scoped, expected):
     assert decide(available, agent, scoped) == expected
+
+
+def test_guard_command_reports_without_refusal(proc, capsys):
+    from z0int.fsm.guard import main
+    import json
+    root, add = proc
+    add(10, 1, '/usr/bin/omp', DESKTOP)
+    assert main(['cgroup-placement', '--proc-root', str(root)]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report['status'] == 'violation'
+    assert report['enforcement_enabled'] is False
