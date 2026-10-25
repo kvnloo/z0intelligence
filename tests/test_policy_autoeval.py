@@ -192,3 +192,19 @@ def test_native_template_renderer_uses_exact_option_interface():
     assert path=='/apply-template'
     assert payload['messages'][1]['content']=='pick\n\nOptions:\nA: yes\nB: no'
     assert payload['chat_template_kwargs']=={'enable_thinking':False}
+
+
+def test_router_supplements_stop_at_distinct_corpus_bound(tmp_path):
+    from z0int.policy.autoeval import file_sha,router_supplements
+    corpus = tmp_path/'corpus.json'
+    oracle = tmp_path/'oracle.py'
+    oracle.write_text('def oracle(task,initial,state,unused):\n    return False\n')
+    nodes = [{'id':str(i),'user':'Open app '+str(i),'snapshot':{},'initial_snapshot':{},
+              'task_spec':{'oracle':{'kind':'app'}}} for i in range(3)]
+    corpus.write_text(json.dumps({'nodes':nodes}))
+    config = {'router_corpus':str(corpus),'router_harness':str(oracle),
+              'router_corpus_sha256':file_sha(corpus),'router_harness_sha256':file_sha(oracle),'cap':400}
+    benchmark = SimpleNamespace(DESCRIPTIONS=['OPEN','DONE'],ACTIONS=['OPEN','DONE'])
+    rows = router_supplements(benchmark,config,[{'source_node':'0'}])
+    assert {row['source_node'] for row in rows}=={'1','2'}
+    assert all(row['options'][row['answer']]=='OPEN' for row in rows)

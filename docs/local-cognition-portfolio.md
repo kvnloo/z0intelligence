@@ -401,11 +401,15 @@ canonical measured findings and recompile the policy, preserving previous state.
 Bench admission declares `--checkpoint-safe`: each cell atomically persists
 scored rows and resumes its exact model/runtime/corpus-bound prefix after
 preemption. A mismatching checkpoint fails closed rather than mixing runs.
+CUDA workers serialize through one lane lock; admission requests at least the
+weight-file size plus 2 GiB, or the configured floor, whichever is larger.
 
 Each cell starts with the frozen 100-item prefix. If point accuracy meets `bar`
 (default .95) but Wilson-lower does not, it draws more seeded items, stopping at
 the bound or `cap` (default/max 400). T4 extensions use additional distinct nodes
 from the digest-pinned router corpus, not copies of its original 100 nodes.
+T4 stops at its finite distinct-node bound (the current corpus contains 163
+nodes), even if the configured maximum is 400; the receipt records actual n.
 Every sample is answered; findings explicitly record zero abstentions.
 These adaptive fixed-n Wilson intervals are not sequential confidence bounds;
 benchmark accuracy is not authorization or live task success.
