@@ -480,7 +480,7 @@ def test_incident_tape_is_refused_or_flagged(tape, vis):
     assert r["summary"]["ok"], r["summary"]
 
 
-def test_all_nine_laws_have_a_tape():
+def test_all_incident_laws_have_a_tape():
     assert {json.loads(t.read_text())["law"] for t in TAPES} == {f"O{i}" for i in range(1, 10)} | {"O16"}
 
 
