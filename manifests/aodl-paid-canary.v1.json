@@ -1,7 +1,7 @@
 {
   "schema": "z0int.worker_routing.v1",
   "policy_revision": "authorized-paid-aodl-canary-20261024",
-  "canary_provider": "openai-codex",
+  "canary_provider": "anthropic",
   "baseline": {
     "model": "codex-parent",
     "method": "ceil_utf8_bytes_div_4_v1",
