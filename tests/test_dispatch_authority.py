@@ -96,12 +96,13 @@ def test_corrupt_ledger_fails_closed():
     with pytest.raises(ValueError):a.claim(req,secrets.token_hex(32))
 
 
-def test_receipt_failure_prevents_physical_call(monkeypatch):
+def test_receipt_failure_prevents_physical_call(monkeypatch, routing_policy_snapshot):
     from z0int import worker_routing as w
     policy,providers=w.configuration()
     req=request()
     worker={k:v for k,v in req.items() if k not in ('harness','trace_id','function')}
     plan=w.explicit_plan(worker,policy,providers)
+    routing_policy_snapshot(plan)
     def fail_receipt(row):raise OSError('authority unavailable')
     monkeypatch.setattr(w.OpenAICompatTransport,'chat',lambda *a,**k:pytest.fail('physical call before receipt acknowledgement'))
     with pytest.raises(OSError):w.execute_plan(worker,policy,providers,plan,receipt_sink=fail_receipt,receipt_location='authority')

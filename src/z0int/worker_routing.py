@@ -255,6 +255,12 @@ def error_status(exc):
 def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_index, *, receipt_sink, admission):
     provider, model = candidate['provider'], candidate['model']
     free = require_free_route(policy, provider, model, args)
+    from datetime import datetime, timezone
+    from .policy.model_routing import enforce
+    routing = enforce(plan["decision_policy"], plan["category"], provider, model,
+                      failed=plan.get("routing_failures", []), now=datetime.now(timezone.utc),
+                      reason=plan.get("reason") if plan["source"] == "codex_explicit_selection" else None,
+                      request_tokens=plan["routing_request_tokens"])
     call_id = uuid.uuid4().hex
     messages = messages_for(args)
     row = DecisionReceipt(trace_id=call_id, session_id=args['parent_agent'], capability_id='codex.delegated_text',
@@ -271,8 +277,12 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
     row.extra.update(free_only=free_required(policy,args),free_tier_validated=free is not None,
                      free_tier_evidence=free.get('evidence_sha256') if free else None,
                      validated_price_usd=free.get('price_usd') if free else None)
+    row.extra["model_routing"] = routing
     from .quota_budget import reservation
-    permit=admission.acquire(provider,call_id,{'harness':plan.get('harness','codex'),'caller_trace_id':plan.get('caller_trace_id'),'quota_model':model,'quota_reserved_tokens':reservation(args)})
+    from .policy.model_routing import reserve_admission
+    permit=reserve_admission(admission, provider, call_id,
+        {'harness':plan.get('harness','codex'),'caller_trace_id':plan.get('caller_trace_id'),
+         'quota_model':model,'quota_reserved_tokens':reservation(args)}, routing, datetime.now(timezone.utc))
     if permit.get('execution_policy'):
         row.extra.update(permit['execution_policy'])
     if permit.get('quota_budget'):row.extra['quota_budget']=permit['quota_budget']
@@ -338,6 +348,21 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         if row.extra.get('physical_call_attempted'):row.extra['physical_finished_at']=time.time()
         admission.release(permit,transport_status,(time.monotonic()-start)*1000,retry_after=retry_after,attempted=row.extra.get('physical_call_attempted',False))
     row.latency_ms = (time.monotonic() - start) * 1000
+    if row.extra.get("physical_call_attempted"):
+        from kerdoios.observed import record_routing_attempt, DEFAULT_LOG_PATH
+        selected = next(entry for entry in routing["formula_inputs"]["offers"]
+                        if entry["offer"]["id"] == routing["offer_id"])
+        groups = {window["group"] for window in selected.get("quota_windows", [])}
+        quota_headers = dict(row.extra.get("quota_headers", {}))
+        if retry_after is not None:
+            quota_headers["retry-after"] = str(retry_after)
+        observation = record_routing_attempt(provider=provider, model=model, trace_id=call_id,
+            http_status=transport_status, quota_headers=quota_headers,
+            input_tokens=row.input_tokens, output_tokens=row.output_tokens,
+            quota_group=next(iter(groups)) if len(groups) == 1 else None,
+            path=Path(os.environ.get("KERDOIOS_OBSERVED_LOG", str(DEFAULT_LOG_PATH))))
+        row.extra["kerdoios_quota_observation"] = {
+            "trace_id": call_id, "observed_at": observation["observed_at"], "http_status": transport_status}
     # Do not return success if canonical receipt persistence fails.
     receipt = receipt_sink(row)
     return {'ok': ok, 'output': output, 'receipt': receipt}
@@ -406,6 +431,19 @@ def delegate_worker(args):
 
 
 def execute_plan(args, policy, providers, plan, *, receipt_sink, receipt_location=None, admission=None):
+    from datetime import datetime, timezone
+    from . import paths
+    from .policy.model_routing import allocation, RoutingDenied
+    # Only the compiled content-addressed artifact is read here, never catalogs,
+    # benchmark files, logs, or provider-claimed defaults.
+    for candidate in plan["candidates"]:
+        require_free_route(policy, candidate["provider"], candidate["model"], args)
+    decision_policy = (json.loads((paths.home() / "policy" / "decision-policy.json").read_text())
+                       if plan["candidates"] else None)
+    plan = {**plan, "decision_policy": decision_policy, "routing_failures": []}
+    plan["routing_request_tokens"] = {
+        "estimated_input_tokens": estimate(json.dumps(messages_for(args), ensure_ascii=False)) if plan["candidates"] else 0,
+        "estimated_output_tokens": args.get("max_tokens", 512)}
     if admission is None:
         from .provider_saturation import LocalAdmission
         admission=LocalAdmission()
@@ -413,13 +451,36 @@ def execute_plan(args, policy, providers, plan, *, receipt_sink, receipt_locatio
     started = time.monotonic()
     attempts = []
     result = {'ok': False, 'output': ''}
-    for index, candidate in enumerate(plan['candidates']):
+    for index in range(policy["max_attempts"] if plan["candidates"] else 0):
+        try:
+            chosen = allocation(decision_policy, plan["category"], plan["routing_failures"],
+                                datetime.now(timezone.utc), request_tokens=plan["routing_request_tokens"])
+        except RoutingDenied as exc:
+            plan["routing_denial"] = str(exc)
+            break
+        candidate = {"provider": chosen["provider"], "model": chosen["model"]}
+        if chosen["provider"] is None:
+            # Unknown metrics are usable, but never falsely called optimized.
+            identities = {(o.provider, o.model) for o in chosen["eligible"]}
+            candidate = next((c for c in plan["candidates"]
+                              if (c["provider"], c["model"]) in identities), None)
+            if candidate is None:
+                plan["routing_denial"] = "O14 no configured eligible unscored fallback"
+                break
+        if plan["source"] == "codex_explicit_selection":
+            candidate = plan["candidates"][0]
+        if candidate["provider"] not in providers:
+            raise RoutingDenied("O14 compiled provider has no configured transport")
         # Recheck at execution: stale or forged plans cannot introduce paid fallback.
         require_free_route(policy,candidate['provider'],candidate['model'],args)
         result = execute_attempt(args, candidate, providers[candidate['provider']], policy, plan, route_id, index, receipt_sink=receipt_sink, admission=admission)
         attempts.append(result['receipt'])
         if result['ok']:
             break
+        plan["routing_failures"].append({
+            "provider": candidate["provider"], "model": candidate["model"], "status": "failed",
+            "reason": result["receipt"].get("extra", {}).get("status", "execution_failed"),
+            "http_status": result["receipt"].get("extra", {}).get("http_status")})
     return {'ok': result['ok'], 'subagent_id': route_id, 'route': plan, 'output': result['output'],
             'provider': attempts[-1]['provider'] if attempts else None,
             'model': attempts[-1]['model'] if attempts else None,

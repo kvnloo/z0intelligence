@@ -31,10 +31,12 @@ class RoutingTests(unittest.TestCase):
  def test_models_are_registry_valid(self):
   for p,m in self.policy['defaults'].items():self.assertIn(m,[x['id'] for x in self.providers[p]['models']])
  def test_unmetered_failed_attempt_does_not_break_successful_fallback(self):
-  plan={'candidates':[{'provider':'groq','model':'a'},{'provider':'cerebras','model':'b'}]}
+  plan={'candidates':[{'provider':'groq','model':'a'},{'provider':'cerebras','model':'b'}],
+        'source':'synthetic_transport_test','category':'small'}
+  self.routing_snapshot(plan)
   failed={'ok':False,'output':'','receipt':{'provider':'groq','model':'a','extra':{'status':'failed'}}}
   completed={'ok':True,'output':'42','receipt':{'provider':'cerebras','model':'b','input_tokens':10,'output_tokens':1,'estimated_frontier_tokens_avoided':15,'extra':{'status':'completed'}}}
   with patch.object(r,'execute_attempt',side_effect=[failed,completed]),patch.object(r,'receipts_path',return_value=pathlib.Path('/tmp/unused')):
-   result=r.execute_plan({'parent_agent':'p'},self.policy,self.providers,plan,receipt_sink=append_receipt)
+   result=r.execute_plan({'parent_agent':'p','task':'Reply42'},self.policy,self.providers,plan,receipt_sink=append_receipt)
   self.assertTrue(result['ok']);self.assertEqual(result['output'],'42');self.assertEqual(result['unmetered_attempts'],1);self.assertEqual(result['input_tokens'],10);self.assertEqual(len(result['attempts']),2)
 if __name__=='__main__':unittest.main()

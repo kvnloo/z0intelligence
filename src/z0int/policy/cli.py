@@ -35,7 +35,7 @@ def _revision() -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="z0int policy")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("ingest", "compile", "show", "explain", "changelog"):
+    for name in ("ingest", "compile", "show", "explain", "changelog", "audit-routing"):
         command = sub.add_parser(name)
         command.add_argument("--json", action="store_true")
         if name == "ingest":
@@ -47,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
             command.add_argument("--config", type=Path, help="CompilerConfig JSON overrides")
         elif name == "explain":
             command.add_argument("family")
+        elif name == "audit-routing":
+            command.add_argument("--receipts", type=Path, required=True)
         elif name == "changelog":
             command.add_argument("--from", dest="from_version")
             command.add_argument("--to", dest="to_version")
@@ -70,6 +72,30 @@ def main(argv: list[str] | None = None) -> int:
             write_policy(result, home)
         elif args.command == "show":
             result = _load(directory)
+        elif args.command == "audit-routing":
+            from .model_routing import audit_receipt
+            issues, checked = [], 0
+            with args.receipts.open(encoding="utf-8") as stream:
+                for line, raw in enumerate(stream, 1):
+                    if not raw.strip():
+                        continue
+                    row = json.loads(raw)
+                    if row.get("route") != "model" or row.get("execution") != "live":
+                        continue
+                    if row.get("extra", {}).get("physical_call_attempted") is not True:
+                        continue
+                    checked += 1
+                    version = row.get("extra", {}).get("model_routing", {}).get("policy_version")
+                    try:
+                        selected = _load(directory, version) if version else _load(directory)
+                        violations = audit_receipt(row, selected)
+                    except (OSError, ValueError) as exc:
+                        violations = ["O14 policy evidence unavailable: " + str(exc)]
+                    issues.extend({"line": line, "rule_id": "O14.model_routing", "detail": value}
+                                  for value in violations)
+            result = {"checked": checked, "issues": issues, "ok": checked > 0 and not issues}
+            print(json.dumps(result, indent=2))
+            return 0 if result["ok"] else 1
         elif args.command == "explain":
             policy = _load(directory)
             findings = read_findings(ledger_path(home))

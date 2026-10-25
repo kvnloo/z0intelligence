@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from .. import paths
 from .findings import FindingsError, canonical, digest, locked, timestamp, validate
 
+from .model_routing import compile_routing
 SCHEMA = "z0.decision_policy.v1"
 STAGES = ("none", "shadow", "canary", "live")
 SCOPE_FIELDS = ("device", "quant", "engine", "backend", "model")
@@ -33,6 +34,7 @@ class CompilerConfig:
     abstain_to: str = "jev"
     option_capacity_bar: float = .95
     option_capacity_tasks: tuple[str, ...] = ("T1", "T2", "T3", "T4")
+    model_routing: dict | None = None
 
 
 def iso(value: datetime) -> str:
@@ -293,6 +295,7 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
               "families": families, "serving": [serving[k] for k in sorted(serving)], "changes": changes}
     policy["synthetic"] = any(row.get("synthetic", False) for row in findings)
     policy["option_capacity"] = _compile_option_capacity(findings, now, config)
+    policy["model_routing"] = compile_routing(config.model_routing, now)
     policy["version"] = digest(policy)
     return policy
 
