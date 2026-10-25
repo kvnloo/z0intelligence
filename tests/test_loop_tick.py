@@ -27,6 +27,29 @@ STEPS = ['cognition', 'verify', 'import', 'shadow', 'export', 'sufficiency', 'le
 GIT_ENV = {'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_AUTHOR_NAME': 'f', 'GIT_AUTHOR_EMAIL': 'f@x',
            'GIT_COMMITTER_NAME': 'f', 'GIT_COMMITTER_EMAIL': 'f@x'}
 
+
+def test_last_tick_receipt_is_atomically_replaced(tmp_path):
+    from z0int.loop_tick import _write_summary, SUMMARY_SCHEMA
+    out = tmp_path/'loop'
+    for status, code in [('degraded', 3), ('failed', 1)]:
+        summary = {'schema': SUMMARY_SCHEMA, 'day': '2026-10-24',
+                   'tick_id': status, 'status': status, 'exit': code,
+                   'degraded_by': ['cognition:context_overflow']}
+        assert _write_summary(out, summary) == summary
+        assert json.loads((out/'last-tick.json').read_text()) == summary
+        assert not (out/'last-tick.json.tmp').exists()
+
+
+def test_step_exception_is_failure_not_success_exit3(world, learner, monkeypatch):
+    module = tick_mod()
+    def fail(*args, **kwargs):
+        raise RuntimeError('broken ingestion')
+    monkeypatch.setitem(module._STEP, 'cognition', fail)
+    result = tick(world)
+    assert result['status'] == 'failed'
+    assert result['exit'] == 1
+    assert 'step_error:cognition' in result['degraded_by']
+
 FAKE_LEARNER = '''"""Fake evolution_lab.verified_loop: records what it was given, decides FAKE_DECISION."""
 import argparse, json, os
 from pathlib import Path

@@ -304,8 +304,10 @@ def run_tick(z0int_home: str | Path, *, lock: str | Path = QUIET_LANE_LOCK, lock
                    strata=state['strata'], learner=state['learner'], results=state['results'],
                    promotion_requests=state['requests'])
     partial = any(s['status'] in ('skipped_budget', 'partial') for s in summary['steps'])
-    summary['status'] = 'partial_measurement' if partial else 'degraded' if summary['degraded_by'] else 'success'
-    summary['exit'] = 0 if summary['status'] == 'success' else EXIT_DEGRADED
+    failed = any(s['status'].startswith('error:') for s in summary['steps'])
+    failed = failed or 'experiment_runtime_error' in cognition.get('degraded_by', [])
+    summary['status'] = 'failed' if failed else 'partial_measurement' if partial else 'degraded' if summary['degraded_by'] else 'success'
+    summary['exit'] = 1 if failed else 0 if summary['status'] == 'success' else EXIT_DEGRADED
     summary['ended_at'] = _iso(time.time())
     ru1 = [resource.getrusage(w) for w in (resource.RUSAGE_SELF, resource.RUSAGE_CHILDREN)]
     event = {'schema': COST_SCHEMA, 'harness': 'z0int-loop', 'event_kind': 'loop_tick', 'tick_id': summary['tick_id'],
@@ -331,6 +333,9 @@ def _write_summary(out: Path, summary: dict[str, Any]) -> dict[str, Any]:
     (d / 'summary.json').write_text(body)
     with open(d / 'ticks.jsonl', 'a', encoding='utf-8') as fh:
         fh.write(json.dumps(summary, sort_keys=True) + '\n')
+    latest = out / 'last-tick.json.tmp'
+    latest.write_text(body)
+    latest.replace(out / 'last-tick.json')
     return json.loads(body)
 
 
@@ -497,6 +502,10 @@ def _main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         print(f'refused: {exc}')
         return EXIT_REFUSED
+    print('Z0INT_LOOP_TICK ' + json.dumps({
+        'schema': rep['schema'], 'tick_id': rep['tick_id'], 'status': rep['status'],
+        'exit': rep['exit'], 'degraded_by': rep['degraded_by'],
+        'ended_at': rep.get('ended_at')}, sort_keys=True), file=sys.stderr)
     if args.json:
         print(json.dumps(rep, indent=1, sort_keys=True))
     else:
