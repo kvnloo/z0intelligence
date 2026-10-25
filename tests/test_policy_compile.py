@@ -418,3 +418,25 @@ def test_capacity_abstention_cost_can_remove_otherwise_profitable_route():
                             option_capacity_costs={"read": costs})
     row = choice_finding("T1", 8, n=1000)
     assert capacity(compile_rows([row], config=config), row)["allowed_k"] == 0
+
+
+def test_fresh_scoped_cost_findings_are_adopted_without_configuration_flip():
+    choice = choice_finding("T1", 8, value=.85, n=1000)
+    rows = [choice]
+    for field, value in {"cost_call": 1., "cost_frontier": 10.,
+                         "cost_error": 2., "abstain_rate": 0.}.items():
+        row = finding(synthetic=True, arm=choice["arm"],
+            metric={"name": field, "value": value, "ci_low": value,
+                    "ci_high": value, "ci_method": "none", "higher_is_better": False,
+                    "cost_unit": "latency_ms_lambda0"})
+        row["subject"] = {"family": "choice.error_cost", "risk_class": "read",
+                          "job": "observed_frontier_recovery"}
+        row["id"] = digest({key: value for key, value in row.items() if key not in {"id", "prev"}})
+        rows.append(row)
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_tasks=("T1",))
+    entry = capacity(compile_rows(rows, config=config), choice)
+    assert entry["allowed_k"] == 8
+    assert entry["inputs"]["status"] == "measured"
+    other = choice_finding("T1", 8, value=.85, n=1000,
+                           arm={**choice["arm"], "device": "unmeasured-device"})
+    assert capacity(compile_rows(rows + [other], config=config), other)["allowed_k"] == 0

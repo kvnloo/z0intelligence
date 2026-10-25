@@ -114,12 +114,31 @@ def _choice_lower(row: dict) -> float | None:
     return min(metric["ci_low"], lower)
 
 
-def _capacity_costs(config: CompilerConfig, risk: str, findings: list[dict], now: datetime) -> dict:
+def _capacity_costs(config: CompilerConfig, risk: str, findings: list[dict], now: datetime,
+                    scope: dict) -> dict:
     """All costs use one common unit (e.g. O14 pace-adjusted milliseconds)."""
     supplied = (config.option_capacity_costs or {}).get(risk)
     defaults = {"read": 20., "mutating_reversible": 100.}
     if risk == "destructive":
         return {"measured": False, "blocked": True, "finding_ids": []}
+    if supplied is None:
+        costs = {}
+        for row in findings:
+            field = row["metric"]["name"]
+            if (field not in {"cost_call", "cost_frontier", "cost_error", "abstain_rate"}
+                    or row["subject"].get("family") != "choice.error_cost"
+                    or row["subject"].get("risk_class") != risk
+                    or row["evidence_class"] != "measured" or scope_of(row) != scope
+                    or timestamp(row["ts"]) > now or _expiry(row, config) <= now):
+                continue
+            prior = costs.get(field)
+            if prior is None or (timestamp(row["ts"]), row["id"]) > (timestamp(prior["ts"]), prior["id"]):
+                costs[field] = row
+        units = {row["metric"].get("cost_unit") for row in costs.values()}
+        if len(costs) == 4 and len(units) == 1 and units <= {"latency_ms_lambda0", "o14_score_ms"}:
+            supplied = {field: row["metric"]["value"] for field, row in costs.items()}
+            supplied.update(measured=True, finding_ids=sorted(row["id"] for row in costs.values()))
+            supplied["cost_unit"] = next(iter(units))
     inputs = dict(supplied or {"cost_call": .1, "cost_frontier": 1.,
                               "cost_error": defaults[risk], "abstain_rate": 0.,
                               "measured": False, "finding_ids": []})
@@ -183,7 +202,7 @@ def _compile_option_capacity(findings: list[dict], now: datetime, config: Compil
     for key in sorted(scopes):
         result[key] = {}
         for risk in ("read", "mutating_reversible", "destructive"):
-            inputs = _capacity_costs(config, risk, findings, now)
+            inputs = _capacity_costs(config, risk, findings, now, scopes[key])
             blocked = inputs.get("blocked", False)
             bar = None if blocked else 1 - (
                 inputs["cost_frontier"] * (1 - inputs["abstain_rate"]) -

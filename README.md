@@ -168,6 +168,16 @@ Observed frontier recovery is a proxy for SLM error cost, not an executed shadow
 intervention; record that limitation in its source evidence. Shadow agreement
 alone cannot measure recovery cost.
 
+With no explicit cost override, compilation automatically adopts the latest fresh
+measured finding for each of the four cost fields at the exact physical scope and
+risk class. All four must declare the same `metric.cost_unit`, either
+`latency_ms_lambda0` (the approved formula with zero pace weight) or `o14_score_ms`.
+Partial, expired or mismatched units do not replace the conservative defaults.
+Finding `subject.job` and source adapter identify `observed_frontier_recovery`,
+`observed_frontier_turn_timings`, or the measured scorer-call protocol. Proxy
+limitations belong in `scope_note`/`baseline`; they never become accuracy credit.
+No runtime switch is required when complete matching evidence arrives.
+
 Capacity evidence requires `subject.family=choice.option_capacity`,
 `subject.job=ChoiceLadder`, `subject.task` (or `metric.task`), metric
 `choice_accuracy`, integer `metric.option_count >= 2`, `ci_method=wilson95`,
