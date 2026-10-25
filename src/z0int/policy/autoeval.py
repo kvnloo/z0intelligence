@@ -203,6 +203,8 @@ def tick(home, config, now=None, launch=subprocess.Popen):
                     environment = ['--setenv=Z0INT_HOME='+str(home)]
                     if os.environ.get('PYTHONPATH'):
                         environment.append('--setenv=PYTHONPATH='+os.environ['PYTHONPATH'])
+                    if os.environ.get('Z0INT_POLICY_OUTPUT_HOME'):
+                        environment.append('--setenv=Z0INT_POLICY_OUTPUT_HOME='+os.environ['Z0INT_POLICY_OUTPUT_HOME'])
                     command = ['systemd-run','--user','--collect','--unit='+unit,
                                '--property=Nice=15',*environment,'--',*command]
                 process = launch(command,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
@@ -279,10 +281,11 @@ def dispatch(request):
                         'scope_note':'Adaptive protocol-v2 choice benchmark; fixed label encoding, no thinking. Repeated looks use a fixed-n final Wilson interval, not a sequential coverage guarantee. Not live task success.'})
     append_findings(findings,ledger_path(home))
     rows = read_findings(ledger_path(home))
-    previous_path = home/'policy'/'decision-policy.json'
+    output_home = Path(config.get('policy_output_home') or os.environ.get('Z0INT_POLICY_OUTPUT_HOME') or home).expanduser().resolve()
+    previous_path = output_home/'policy'/'decision-policy.json'
     previous = json.loads(previous_path.read_text()) if previous_path.exists() else None
     policy = compile_policy(rows,previous,datetime.now(timezone.utc),CompilerConfig(compiler_revision=config['compiler_revision']))
-    write_policy(policy,home)
+    write_policy(policy,output_home)
     print(json.dumps({'status':'compiled','scope':payload['scope'],'receipt':str(receipt),
                       'capacity':policy['option_capacity'].get(option_capacity_key(payload['scope']))}),flush=True)
 
