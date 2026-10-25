@@ -89,10 +89,19 @@ The default run uses cached GitHub metadata. `--refresh-remote` refreshes it.
 The generator includes scoped branches, issue and PR discussions, and both
 Hermes skill profiles. The coverage manifest names unavailable inputs.
 It sorts records on disk rather than retaining the full corpus in memory.
+Markdown extraction keeps complete paragraphs and fenced code blocks with
+their starting source line. Git blobs are read one at a time; index sorting
+and deduplication stay on disk. Run full builds on a fleet build worker, or
+outside the orchestrator in a separate scope with a 1 GiB memory limit.
 
 Search with `python3 -m z0int.look_first --index INDEX query "your question"`.
 Set `PYTHONPATH=src` when the package is not installed. SQLite FTS5 retrieval
 has a 180 ms execution deadline and returns at most twelve sourced lines.
+Queries discard conversational stop words and choose up to eight indexed
+terms by corpus frequency before ranking; retrieval hits are not proof that
+the required fact is present. The frozen repeat/audit replay checks literal
+facts in the actual injected lines. The IntentService causal replay reports
+source identity and exact normalized fact containment separately.
 The opt-in `omp-extensions/z0-look-first` adapter reads actual IntentService
 triage receipts. It records consultation before design, delegation and edits.
 Its first tool attempt returns the evidence before the model retries.

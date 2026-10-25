@@ -50,6 +50,21 @@ def make_repo(root):
     return root
 
 
+class TextBlocks(unittest.TestCase):
+    def test_paragraphs_and_fences_preserve_context_and_start(self):
+        text = "# Method\nFirst wrapped\nparagraph.\n\n```python\nx = 1\n\n# not a heading\n```\n\nLast fact.\n"
+        rows = list(GEN.text_records(text, Path("doc.md"), method="fixture", status="merged"))
+        self.assertEqual([row["source"] for row in rows], ["doc.md:2", "doc.md:5", "doc.md:11"])
+        self.assertEqual(rows[0]["text"], "First wrapped paragraph.")
+        self.assertIn("# not a heading", rows[1]["text"])
+        self.assertTrue(all(row["method"] == "fixture / Method" for row in rows))
+
+    def test_unclosed_fence_is_not_dropped(self):
+        rows = list(GEN.text_records("~~~\nretained\n", Path("doc.md"), method="fixture", status="merged"))
+        self.assertEqual(len(rows), 1)
+        self.assertIn("retained", rows[0]["text"])
+
+
 class Pagination(unittest.TestCase):
     def test_pagination_exhausts_all_pages(self):
         first = [{"id": number} for number in range(100)]

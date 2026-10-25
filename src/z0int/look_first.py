@@ -13,13 +13,14 @@ from pathlib import Path
 DEFAULT_INDEX = Path.home() / '.local/state/z0int/capability-index.sqlite3'
 QUERY_BUDGET_MS = 180
 STOP = frozenset('a an and are as at be before by can do every for from how i in is it me of on or our please that the this to use we what when which with you your'.split())
+STOP = STOP | frozenset('about actually again already also any back because been before being bro but could did didnt does doesnt doing dont down each else even ever everything fucking fuck frickin get gets give given got had has have havent having here hey into its just know last least literally look make may more much need needs never no not now once one only other out over really said same say see set should since so some still such tell telling than their them then there these they things those though through thru too told two until very wait wanna want wasnt way well were whatever where why will would yeah yes yet youre youve'.split())
 
 
 def query(index: Path, text: str, limit: int = 12) -> list[dict]:
     """Search FTS only. The SQLite progress handler bounds database execution."""
     if not isinstance(text, str) or not text.strip():
         return []
-    tokens = list(dict.fromkeys(word.lower() for word in re.findall(r'[\w-]+', text) if len(word) > 1 and word.lower() not in STOP))[:64]
+    tokens = list(dict.fromkeys(word.lower() for word in re.findall(r'[^\W_]+', text) if len(word) > 1 and word.lower() not in STOP))[:64]
     if not tokens:
         return []
     started = time.monotonic()
@@ -27,7 +28,18 @@ def query(index: Path, text: str, limit: int = 12) -> list[dict]:
     with closing(sqlite3.connect(Path(index).expanduser().resolve().as_uri() + '?mode=ro', uri=True, timeout=0.01)) as db:
         db.row_factory = sqlite3.Row
         db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 100)
-        expression = ' OR '.join('"' + token.replace('"', '""') + '"' for token in tokens)
+        # FTS vocabulary lookup supplies corpus frequency without a tree scan.
+        # Common conversational words must not expand a query to every record.
+        db.execute('CREATE VIRTUAL TABLE temp.lookup_vocab USING fts5vocab(main, entries_fts, row)')
+        frequencies = []
+        for position, token in enumerate(tokens):
+            row = db.execute('SELECT doc FROM temp.lookup_vocab WHERE term=?', (token,)).fetchone()
+            if row:
+                frequencies.append((row[0], position, token))
+        terms = [item[2] for item in sorted(frequencies)[:8]]
+        if not terms:
+            return []
+        expression = ' OR '.join('"' + term.replace('"', '""') + '"' for term in terms)
         # FTS5 can stop ranked retrieval early. Sorting bm25() plus arbitrary
         # columns directly forces a full match-set sort before LIMIT.
         rows = db.execute('SELECT method,source,status,wired,kind,text FROM (SELECT method,source,status,wired,kind,text,rank FROM entries_fts WHERE entries_fts MATCH ? ORDER BY rank LIMIT 96) ORDER BY rank,source,method LIMIT ?', (expression, max(0, min(12, limit)))).fetchall()

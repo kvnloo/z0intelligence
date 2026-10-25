@@ -182,15 +182,37 @@ def selected(path: str) -> bool:
 
 
 def text_records(text: str, path: Path, *, method: str, status: str, wired: str = "unverified", kind: str = "doc", context: str = "") -> Iterator[dict[str, str]]:
-    """Preserve each nonempty source line, with heading context, without truncation."""
+    """Extract paragraphs and fenced blocks, retaining their source start line."""
     section = ""
-    for number, line in enumerate(text.splitlines(), 1):
-        line = compact(line)
-        if not line:
+    block: list[str] = []
+    start = 1
+    fence = ""
+    for number, line in enumerate(text.splitlines() + [""], 1):
+        stripped = line.strip()
+        marker = re.match(r"^(`{3,}|~{3,})", stripped)
+        heading = re.match(r"^#{1,6}\s+(.+)", stripped) if not fence else None
+        boundary = not fence and (not stripped or heading or marker)
+        if boundary and block:
+            yield record(" / ".join(filter(None, (method, section))), f"{path}:{start}", status, wired, kind, " ".join(filter(None, (context, "\n".join(block)))))
+            block = []
+        if heading:
+            section = heading.group(1)
             continue
-        if line.startswith("#"):
-            section = line.lstrip("# ")
-        yield record(" / ".join(filter(None, (method, section))), f"{path}:{number}", status, wired, kind, " ".join(filter(None, (context, line))))
+        if not stripped and not fence:
+            continue
+        if not block:
+            start = number
+        block.append(line)
+        if marker:
+            token = marker.group(1)
+            if not fence:
+                fence = token
+            elif token[0] == fence[0] and len(token) >= len(fence):
+                fence = ""
+                yield record(" / ".join(filter(None, (method, section))), f"{path}:{start}", status, wired, kind, " ".join(filter(None, (context, "\n".join(block)))))
+                block = []
+    if block:
+        yield record(" / ".join(filter(None, (method, section))), f"{path}:{start}", status, wired, kind, " ".join(filter(None, (context, "\n".join(block)))))
 
 
 def file_records(text: str, path: Path, *, name: str, status: str, wired: str, context: str = "") -> Iterator[dict[str, str]]:
@@ -364,11 +386,11 @@ def collect_local(spec: dict[str, Any], cache_dir: Path, evidence: list[tuple[Pa
         return
     seen: set[tuple[str, str, str]] = set()
     seen_commons: set[str] = set()
+    seen_committed: set[tuple[str, str, str]] = set()
     for root in spec["paths"]:
         try:
             base = merged_base(root)
             base_files = tree_files(root, base) if base else {}
-            blobs: dict[str, str | None] = {}
             common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir").strip()
             refs = [] if common in seen_commons else git(root, "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads", "refs/remotes/origin").splitlines()
             seen_commons.add(common)
@@ -390,11 +412,16 @@ def collect_local(spec: dict[str, Any], cache_dir: Path, evidence: list[tuple[Pa
                 if commit in processed:
                     continue
                 processed.add(commit)
-                blobs.update(read_blobs(root, set(paths.values()) - blobs.keys()))
                 for relative, oid in sorted(paths.items()):
                     try:
                         current = root / relative
-                        committed = blobs[oid]
+                        committed_key = (relative, oid, "merged" if base_files.get(relative) == oid else branch_status)
+                        working_copy = ref == "HEAD" and current.is_file()
+                        if not working_copy and committed_key in seen_committed:
+                            continue
+                        # Do not retain every branch's blob contents in memory.
+                        # The index writer already streams records to disk.
+                        committed = read_blobs(root, {oid})[oid]
                         if committed is None:
                             raise UnicodeError("Selected Git blob is not UTF-8 text")
                         status = "merged" if base_files.get(relative) == oid else branch_status
@@ -422,6 +449,8 @@ def collect_local(spec: dict[str, Any], cache_dir: Path, evidence: list[tuple[Pa
                         context = f"repository {spec['name']} path {relative}"
                         yield from file_records(text, source, name=spec["name"], status=status, wired=wired, context=context)
                         coverage["files_indexed"] += 1
+                        if not working_copy:
+                            seen_committed.add(committed_key)
                     except (OSError, UnicodeError, RuntimeError, subprocess.TimeoutExpired) as exc:
                         coverage["complete"] = False
                         error(manifest, f"local:{root}:{commit}:{relative}", exc)
@@ -596,10 +625,10 @@ def remote_records(spec: dict[str, Any], cache_dir: Path, manifest: dict[str, An
                 continue
             title = parent.get("title", item.get("title", name))
             method = f"{repo}#{number}: {title}"
-            body = "\n".join(filter(None, (item.get("title", ""), item.get("body") or "")))
-            for line in body.splitlines():
-                if compact(line):
-                    yield record(method, url, status, "unverified", "pr" if name == "pulls" else "issue" if name == "issues" else "comment", line)
+            body = "\n\n".join(filter(None, (item.get("title", ""), item.get("body") or "")))
+            for row in text_records(body, Path("remote"), method=method, status=status, kind="pr" if name == "pulls" else "issue" if name == "issues" else "comment"):
+                row["source"] = url
+                yield row
 
 
 def write_index(records: Iterator[dict[str, str]], output_dir: Path) -> dict[str, Any]:
