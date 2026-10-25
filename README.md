@@ -143,6 +143,18 @@ the canonical JSON string of the exact model, quant, engine, backend and device
 scope. `option_capacity_key(scope)` creates this lossless key. No capacity
 credit transfers between different physical scopes.
 
+The single canonical contract is `schemas/decision-policy.scope.v1.schema.json`:
+`{model: "sha256:<lowercase GGUF file digest>", quant, engine: "<actual build_info>", backend, device}`.
+For example, `engine` can be `b1-748d422`, not the product label `llama.cpp`.
+Friendly model aliases are transport names, never scope identities. Producers
+put this same identity in `arm` and any explicit `subject.scope`; task/item
+metadata belongs in `subject.benchmark_scope`.
+Consumers resolve the serving alias through `/props?model=<alias>` and hash the
+observed GGUF `model_path`, caching by file identity/mtime. Alias changes with
+identical bytes preserve capacity; new bytes or a new runtime build do not.
+An inaccessible remote filesystem cannot be authenticated by interpreting its
+path as a local path: the consumer must abstain, not fall back to an alias.
+
 Each scope contains risk entries `read`, `mutating_reversible`, and `destructive`.
 Each entry contains `allowed_k`, `finding_ids`, `wilson_lower`, `task`,
 `bar_derived`, `inputs` and `expires_at`. The required tasks default to T1–T4

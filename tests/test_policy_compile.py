@@ -285,7 +285,7 @@ def choice_finding(task, k, *, value=1., n=100, low=1., arm=None,
                    ts="2026-10-24T10:00:00Z", expires_at="2026-11-07T10:00:00Z",
                    evidence_class="measured", metric=None):
     row = finding(evidence_class, synthetic=True, n=n, low=low, ts=ts, expires_at=expires_at,
-        arm=arm or {"kind": "slm", "model": "choice-model@rev", "quant": "Q8_0",
+        arm=arm or {"kind": "slm", "model": "sha256:" + "a" * 64, "quant": "Q8_0",
                     "engine": "choice-engine@rev", "backend": "cpu", "device": "fixture"},
         metric={"name": "choice_accuracy", "option_count": k, "value": value, **(metric or {})})
     row["subject"] = {"family": "choice.option_capacity", "job": "ChoiceLadder", "task": task}
@@ -327,7 +327,8 @@ def test_option_capacity_missing_failed_expired_tasks_and_unknown_scope_disable_
 def test_option_capacity_never_crosses_any_physical_scope_dimension():
     rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3", "T4")]
     for dimension in ("model", "quant", "engine", "backend", "device"):
-        different = {**rows[0]["arm"], dimension: "different-" + dimension}
+        different = {**rows[0]["arm"], dimension: ("sha256:" + "b" * 64 if dimension == "model"
+                                                else "different-" + dimension)}
         other = choice_finding("T1", 32, arm=different)
         policy = compile_rows(rows + [other])
         assert capacity(policy, rows[0])["allowed_k"] == 8
@@ -372,7 +373,7 @@ def test_option_capacity_risk_expected_cost_and_expiry():
 
 
 def test_option_capacity_missing_evidence_known_scope_disables_slm():
-    row = finding(arm={"kind": "slm", "model": "model", "quant": "Q4_0",
+    row = finding(arm={"kind": "slm", "model": "sha256:" + "c" * 64, "quant": "Q4_0",
                        "engine": "engine", "backend": "cpu", "device": "fixture"})
     entry = capacity(compile_rows([row]), row)
     assert entry["allowed_k"] == 0
@@ -440,3 +441,13 @@ def test_fresh_scoped_cost_findings_are_adopted_without_configuration_flip():
     other = choice_finding("T1", 8, value=.85, n=1000,
                            arm={**choice["arm"], "device": "unmeasured-device"})
     assert capacity(compile_rows(rows + [other], config=config), other)["allowed_k"] == 0
+
+
+def test_capacity_identity_rejects_aliases_and_uses_content_addressed_scope():
+    from z0int.policy.compile import option_capacity_key
+    row = choice_finding("T1", 8)
+    scope = scope_of(row)
+    assert option_capacity_key(scope) == option_capacity_key(dict(reversed(list(scope.items()))))
+    with pytest.raises(ValueError, match="GGUF bytes"):
+        option_capacity_key({**scope, "model": "friendly-alias"})
+    assert option_capacity_key({**scope, "model": "sha256:" + "b" * 64}) != option_capacity_key(scope)

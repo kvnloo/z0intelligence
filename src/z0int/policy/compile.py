@@ -88,6 +88,10 @@ def option_capacity_key(scope: dict) -> str:
     """Lossless key for an exact physical model scope, shared with O13 readers."""
     if set(scope) != set(SCOPE_FIELDS) or any(not isinstance(v, str) or not v for v in scope.values()):
         raise ValueError("Option capacity requires exact model/quant/engine/backend/device")
+    model = scope["model"]
+    if (not model.startswith("sha256:") or len(model) != 71
+            or any(char not in "0123456789abcdef" for char in model[7:])):
+        raise ValueError("Option capacity model must identify GGUF bytes as sha256:<digest>")
     return canonical(scope).decode("utf-8")
 
 
@@ -182,7 +186,10 @@ def _compile_option_capacity(findings: list[dict], now: datetime, config: Compil
         scope = scope_of(row)
         if set(scope) != set(SCOPE_FIELDS) or any(not isinstance(v, str) or not v for v in scope.values()):
             continue
-        key = option_capacity_key(scope)
+        try:
+            key = option_capacity_key(scope)
+        except ValueError:
+            continue
         scopes[key] = scope
         if (row["subject"].get("family") != "choice.option_capacity"
                 or row["subject"].get("job") != "ChoiceLadder"
