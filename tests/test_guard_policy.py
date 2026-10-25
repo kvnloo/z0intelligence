@@ -18,12 +18,12 @@ IDENTITY = {'model_id': 'synthetic-alias', 'engine_build': 'synthetic-build',
             'model_path': '/synthetic/models/test.gguf', 'model_sha256': 'f' * 64}
 
 
-def policy(stage='live'):
+def policy(stage='live', *, credited=True):
     body = {'schema': 'z0.decision_policy.v1', 'compiled_at': NOW.isoformat(),
             'findings_head': 'synthetic-finding', 'compiler': 'test@r1',
             'families': {'omp.tool': {'stage': stage, 'arm': ARM, 'threshold': 0.95,
                          'rule_id': 'F-omp.tool-1', 'expires_at': '2026-10-25T12:00:00Z',
-                         'abstain_to': 'frontier', 'canary_share': 0.1,
+                         'abstain_to': 'frontier', 'canary_share': 0.1, 'risk_class': 'read',
                          'evidence': ['synthetic-finding'], 'demoted_reason': None}},
             'serving': [{**ARM, 'kind': 'engine', 'url': 'http://127.0.0.1:9999/v1',
                          'expected_model_id': IDENTITY['model_id'],
@@ -31,7 +31,7 @@ def policy(stage='live'):
             'changes': []}
     body['version'] = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(',', ':'),
                                                ensure_ascii=False, allow_nan=False).encode()).hexdigest()
-    return body
+    return capacity(body) if credited else body
 
 
 def receipt(doc, **changes):
@@ -39,7 +39,7 @@ def receipt(doc, **changes):
             'policy_sha256': doc['version'], 'rule_id': 'F-omp.tool-1',
             'stage': next(iter(doc['families'].values()))['stage'], 'route': 'general_slm',
             'selected_arm': copy.deepcopy(ARM), 'serving_healthy': True,
-            'option_count': 2, 'model_id': ARM['model'], 'quant': ARM['quant'],
+            'option_count': 2, 'model_id': ARM['model'], 'quant': ARM['quant'], 'risk_class': 'read',
             'observed_identity': {key: value for key, value in IDENTITY.items() if key != 'model_sha256'},
             'props_model_id': IDENTITY['model_id'], 'expected_identity': copy.deepcopy(IDENTITY), **changes}
 
@@ -411,7 +411,7 @@ def capacity(doc, allowed_k=24, **changes):
 @pytest.mark.parametrize('stage', ['shadow', 'canary', 'live'])
 @pytest.mark.parametrize('k,expected', [(119, 1), (24, 1), (2, 1)])
 def test_o13_all_request_stages_use_default_zero(tmp_path, stage, k, expected):
-    doc = policy(stage)
+    doc = policy(stage, credited=False)
     report, findings = audit(tmp_path, doc, [receipt(doc, id='request-1', option_count=k)])
     assert report['counts']['o13_option_capacity'] == expected
     bad = [f for f in findings if f['rule'] == 'o13_option_capacity']
@@ -559,7 +559,7 @@ def test_o13_projection_config_pairs_each_serving_endpoint(tmp_path):
 
 @pytest.mark.parametrize('stage', ['shadow', 'canary', 'live'])
 def test_o13_configured_policy_families_bind_compiled_capacity(tmp_path, stage):
-    doc = policy(stage)
+    doc = policy(stage, credited=False)
     doc['families']['omp.tool']['option_count'] = 24
     rehash(doc)
     report, findings = audit(tmp_path, doc, [])
