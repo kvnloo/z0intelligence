@@ -338,16 +338,23 @@ def _decision_rows(
     legal: Any, payload: Mapping[str, Any], *, timeout_s: float,
     shortlist: Sequence[str] = (), n_ctx: int = 4096,
     policy_identity: dict | None = None, policy_home: Path | None = None,
+    decision_config: Mapping[str, Any] | None = None, requested_tool: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Run only binary-logit arms, under one shared caller deadline."""
+    """Run scoped counterfactual arms under one shared caller deadline."""
     from .shadow_binary import run_goal_binary
     results: dict[int, dict] = {}
     lock = threading.Lock()
     deadline = time.monotonic() + max(.1, timeout_s)
 
     def run(index: int, backend: Any) -> None:
-        row = run_goal_binary(payload, legal, backend, shortlist=shortlist, n_ctx=n_ctx,
-                             policy_identity=policy_identity, policy_home=policy_home)
+        if decision_config and decision_config.get('decision_method') != 'per_candidate_binary_logit':
+            from .slm_scoped import run_scoped
+            row = run_scoped(payload, legal, backend, dict(decision_config),
+                requested_tool=requested_tool, shortlist=shortlist, n_ctx=n_ctx,
+                policy_identity=policy_identity, policy_home=policy_home)
+        else:
+            row = run_goal_binary(payload, legal, backend, shortlist=shortlist, n_ctx=n_ctx,
+                                  policy_identity=policy_identity, policy_home=policy_home)
         row['failure_class'] = failure_class(row.get('error') or row.get('parse_error'))
         with lock:
             results[index] = row
@@ -371,6 +378,11 @@ def _decision_rows(
                 'backend': None, 'model': spec.model_id, 'selected_action': None,
                 'abstained': True, 'invalid_call': False, 'error': error,
                 'failure_class': failure_class(error), 'latency_ms': timeout_s*1000 if backend else 0}
+            if decision_config and decision_config.get('decision_method') != 'per_candidate_binary_logit':
+                from .slm_scoped import scope_digest
+                digest = scope_digest(dict(decision_config))
+                row.update(label='slm-method', arm='slm-method:'+digest, arm_scope=digest,
+                           method_config=dict(decision_config))
             if backend is not None:
                 row['timed_out'] = True
                 row['waited_ms'] = timeout_s*1000
@@ -526,8 +538,9 @@ def run_shadow(
     shadow_rows: list[dict[str, Any]] = []
     active = learning_state.get('family_search', {}).get('families', {}).get('omp.tool', {})
     projection_strategy = active.get('current_strategy', 'history-1')
-    projection_config = {**(active.get('strategy') or {}).get('config', {}),
-                         'candidate_k': 3, 'max_options': 3, 'decision_method': 'per_candidate_binary_logit'}
+    projection_config = {'candidate_k': 3, 'max_options': 3,
+                         'decision_method': 'per_candidate_binary_logit',
+                         **(active.get('strategy') or {}).get('config', {})}
     local = None
     recent = payload.get("recent_tools")
     if isinstance(recent, list) and all(isinstance(x, str) for x in recent):
@@ -552,7 +565,8 @@ def run_shadow(
             shadow_rows = _decision_rows(resolved, legal, binary_payload,
                 timeout_s=_timeout_s(payload, timeout_s), shortlist=shortlist, n_ctx=n_ctx,
                 policy_identity=learning_state.get('experiments', {}).get('identity'),
-                policy_home=paths.home())
+                policy_home=paths.home(), decision_config=projection_config,
+                requested_tool=tool_name)
     if local is not None:
         shadow_rows.append(local)
 
@@ -573,6 +587,8 @@ def run_shadow(
     }
 
     if write:
+        from .shadow_binary import _context
+        receipt_goal_context, receipt_context_diagnostics = _context(payload)
         receipt = {
             "schema": RECEIPT_SCHEMA,
             "ts": time.time(),
@@ -588,6 +604,8 @@ def run_shadow(
             "graph_digest": legal.graph_digest,
             "candidate_action_count": legal.candidate_count,
             "legal_ids": list(legal.ids()),
+            "goal_context": receipt_goal_context,
+            "goal_context_diagnostics": receipt_context_diagnostics,
             "projection_config": projection_config,
             "projection_strategy": projection_strategy,
             "eliminated": [e.to_dict() for e in legal.eliminated],

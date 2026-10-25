@@ -47,6 +47,7 @@ def choice_predictor(db, endpoint, identity: dict, scope: dict, *, home: Path | 
         id INTEGER PRIMARY KEY,ts REAL,family TEXT,strategy TEXT,body TEXT)''')
 
     def predict(prompt: str, choices: list[str], strategy: dict) -> dict:
+        rpc_records = []
         def chat(messages, **kwargs):
             from .shadow import failure_class
             started = time.time()
@@ -63,10 +64,27 @@ def choice_predictor(db, endpoint, identity: dict, scope: dict, *, home: Path | 
                 row.update(error=error, failure_class=failure_class(error))
                 raise
             finally:
-                db.execute('INSERT INTO learning_rpc(ts,family,strategy,body) VALUES(?,?,?,?)',
-                    (started, strategy.get('family'), strategy.get('strategy_id'), json.dumps(row)))
-        return score_choices(prompt, [{'id': choice, 'description': choice} for choice in choices],
-            chat, n_ctx=scope['n_ctx'], min_margin=.25, policy_identity=identity, policy_home=home)
+                rpc_records.append((started, strategy.get('family'),
+                                    strategy.get('strategy_id'), json.dumps(row)))
+        try:
+            methods = {'methods-hierarchy-v1':'hierarchical',
+                       'methods-threeway-v1':'tournament3'}
+            method = methods.get(strategy.get('strategy_id'))
+            if method:
+                from .slm_methods import predict_method
+                if home is not None:
+                    from .choice_capacity import effective_cap
+                    if effective_cap(.6, identity, home) < 3:
+                        return {'selected_action':None,'abstained':True,
+                                'error':'option_capacity_insufficient'}
+                return predict_method(prompt, choices, chat, method=method,
+                                      n_ctx=scope['n_ctx'])
+            return score_choices(prompt, [{'id': choice, 'description': choice} for choice in choices],
+                chat, n_ctx=scope['n_ctx'], min_margin=.25, policy_identity=identity, policy_home=home)
+        finally:
+            # Batched RPCs complete on worker threads; SQLite belongs to caller.
+            db.executemany('INSERT INTO learning_rpc(ts,family,strategy,body) VALUES(?,?,?,?)',
+                           rpc_records)
     return predict
 
 
@@ -77,8 +95,8 @@ def _current(db) -> dict:
     return {r[0]: r[1] for r in db.execute('SELECT family,current_strategy FROM learning_search_families')}
 
 
-def _configs(current: dict) -> dict:
-    catalogue = {s['id']: s['config'] for s in DEFAULT_STRATEGIES}
+def _configs(current: dict, catalogue_rows=DEFAULT_STRATEGIES) -> dict:
+    catalogue = {s['id']: s['config'] for s in catalogue_rows}
     result = {}
     for family, strategy in current.items():
         config = catalogue.get(strategy, catalogue['history-1'])
@@ -118,7 +136,8 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
                            WHERE l.family='omp.tool' ORDER BY l.ts,l.id'''):
         receipt = json.loads(row['body'])
         shadows = [s for s in receipt.get('shadow', [])
-                   if s.get('model') == identity['model'] and s.get('arm') == 'goal-binary']
+                   if s.get('model') == identity['model'] and
+                   (s.get('arm') == 'goal-binary' or str(s.get('arm','')).startswith('slm-method:'))]
         if not shadows:
             continue
         strategy = receipt.get('projection_strategy', 'history-1')
@@ -130,7 +149,8 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
         decisions = [('history_bigram', action if confidence >= .8 else None, {
             'kind': 'knn', 'model': 'history-bigram-v1', 'quant': 'none',
             'engine': 'python-stdlib', 'backend': 'cpu', 'device': 'groot'})]
-        decisions += [('goal_binary', s.get('selected_action') if not s.get('error') else None, identity) for s in shadows]
+        decisions += [('goal_binary' if s.get('arm') == 'goal-binary' else s['arm'],
+                       s.get('selected_action') if not s.get('error') else None, identity) for s in shadows]
         for arm, selected, arm_identity in decisions:
             key = strategy, arm, json.dumps(projection, sort_keys=True)
             value = groups.setdefault(key, {'family': 'omp.tool', 'arm': arm + '@' +
@@ -143,7 +163,7 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
             value['n'] += int(covered)
             value['total'] += 1
             value['correct'] += correct
-            matched[arm].update(total=1, covered=int(covered), correct=correct)
+            matched.setdefault(arm, Counter()).update(total=1, covered=int(covered), correct=correct)
     comparison = {}
     for arm, counts in matched.items():
         n, total, correct = counts['covered'], counts['total'], counts['correct']
@@ -190,7 +210,9 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
         return result
     identity, scope = serving_identity(endpoint)
     current = _current(db)
-    strategies = _configs(current)
+    from .slm_candidates import candidate_catalogue
+    catalogue = candidate_catalogue(home, DEFAULT_STRATEGIES)
+    strategies = _configs(current, catalogue)
     metrics = run_jobs(db, choice_predictor(db, endpoint, identity, scope, home=home), now=now,
         max_jobs=int(config.get('jobs_per_tick', 48)), deadline=deadline,
         strategy_id='history-1', history_width=1, strategies=strategies,
@@ -219,7 +241,8 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
     census = census_queue(home, config)
     result['census_queue'] = census
     result['search'] = search_tick(db, tick_id=tick_id, now=now,
-        observations=combined.values(), census_queue=census, config=search_config)
+        observations=combined.values(), census_queue=census, config=search_config,
+        strategies=catalogue)
     artifact = home/'loop'/'findings-sources'/('shadow-' + hashlib.sha256(tick_id.encode()).hexdigest() + '.json')
     artifact.parent.mkdir(parents=True, exist_ok=True)
     atomic_json(artifact, {'ts': now, 'identity': identity, 'scope': scope,
