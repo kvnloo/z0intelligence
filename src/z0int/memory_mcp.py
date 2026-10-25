@@ -459,7 +459,10 @@ def serve() -> None:
         sys.stderr.write("memory MCP dependency/configuration unavailable; refusing to start\n")
         raise SystemExit(1)
     while True:
-        line = sys.stdin.buffer.readline(MAX_REQUEST_BYTES + 1)
+        try:
+            line = sys.stdin.buffer.readline(MAX_REQUEST_BYTES + 1)
+        except ConnectionResetError:
+            return
         if not line:
             break
         if len(line) > MAX_REQUEST_BYTES:
@@ -475,8 +478,16 @@ def serve() -> None:
             except (ValueError, UnicodeError, TypeError, RecursionError):
                 response = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Invalid JSON"}}
         if response is not None:
-            sys.stdout.buffer.write(encoded(response) + b"\n")
-            sys.stdout.buffer.flush()
+            try:
+                sys.stdout.buffer.write(encoded(response) + b"\n")
+                sys.stdout.buffer.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                # A connection owns this stdio server; peer disconnect is EOF.
+                # Discard buffered output so interpreter shutdown cannot flush
+                # the closed socket again and replace success with status 120.
+                with open(os.devnull, "wb") as sink:
+                    os.dup2(sink.fileno(), sys.stdout.fileno())
+                return
 
 
 if __name__ == "__main__":
