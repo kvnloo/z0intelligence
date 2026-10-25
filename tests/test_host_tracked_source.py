@@ -34,6 +34,26 @@ def test_known_untracked_source_is_violation(tmp_path):
     assert result['evidence']['drift'] == [finding()]
 
 
+@pytest.mark.parametrize('detail', [
+    {'expected': '100', 'actual': '200'},
+    {'property': 'MemoryMax', 'expected': 100, 'actual': 200},
+])
+def test_checker_structured_drift_detail_is_violation(tmp_path, detail):
+    item = {**finding(), 'detail': detail}
+    result = sensor_host_drift(receipt(tmp_path, status='drift', drift=[item]))
+    assert result['status'] == 'violation'
+    assert result['evidence']['drift'][0]['detail'] == detail
+
+
+@pytest.mark.parametrize('detail', [
+    {}, '', {'expected': []}, {'expected': {}}, {'expected': float('inf')},
+    {'expected': float('nan')}, {'': 'bad-key'},
+])
+def test_malformed_or_nonfinite_detail_is_unknown(tmp_path, detail):
+    item = {**finding(), 'detail': detail}
+    assert sensor_host_drift(receipt(tmp_path, status='drift', drift=[item]))['status'] == 'unknown'
+
+
 @pytest.mark.parametrize('changes', [
     {'status': 'unknown'},
     {'status': 'drift', 'drift': [finding()], 'unknown': [finding()]},

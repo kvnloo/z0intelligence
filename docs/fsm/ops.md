@@ -395,6 +395,10 @@ typed `drift`/`unknown` rows, and a consistent status. Unknown evidence never
 becomes clean. Known drift is reported, not repaired. Receipt freshness is an
 observation limit, not proof of subsequent live state; the checker owns source
 tracking and byte comparison.
+Row `kind` and `path` are nonempty strings. `detail` is nonempty text or a
+nonempty object with nonempty string keys and finite JSON scalar values
+(including the checker's `expected`, `actual`, and optional `property` fields).
+Nested containers and nonfinite numbers are unavailable evidence, not clean.
 
 The existing opt-in R-law `tool_call` adapter also emits `law=I` advisory context
 for `systemctl --user set-property` without `--runtime`, and direct user-unit

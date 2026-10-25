@@ -9,6 +9,7 @@ import ast
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 import re
 import socket
@@ -451,8 +452,17 @@ def sensor_host_drift(spec):
             raise ValueError('host-drift.v1 report required')
         for item in row['drift'] + row['unknown']:
             if not isinstance(item, dict) or not all(isinstance(item.get(k), str) and item[k]
-                                                    for k in ('kind', 'path', 'detail')):
+                                                    for k in ('kind', 'path')):
                 raise ValueError('typed drift/unknown rows required')
+            detail = item.get('detail')
+            if isinstance(detail, str) and detail:
+                continue
+            if (not isinstance(detail, dict) or not detail
+                    or any(not isinstance(key, str) or not key for key in detail)
+                    or any(type(value) not in (str, bool, int, float, type(None))
+                           or (type(value) is float and not math.isfinite(value))
+                           for value in detail.values())):
+                raise ValueError('nonempty text or finite scalar detail object required')
         if row['status'] == 'clean' and (row['drift'] or row['unknown']):
             raise ValueError('clean report contains adverse evidence')
         if row['status'] == 'drift' and not row['drift']:
