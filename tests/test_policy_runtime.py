@@ -370,8 +370,8 @@ def test_scoped_policy_binds_actual_endpoint_without_caller_scope(
     request = {
         "trace_id": "synthetic-bound-trace", "state": "pick a legal tool",
         "actions": [
-            {"action_id": "read", "kind": "tool", "tool": "read", "family": "omp.tool"},
-            {"action_id": "glob", "kind": "tool", "tool": "glob", "family": "omp.tool"},
+            {"action_id": "read", "kind": "tool", "tool": "read", "family": "omp.tool", "risk_class": "read"},
+            {"action_id": "glob", "kind": "tool", "tool": "glob", "family": "omp.tool", "risk_class": "read"},
         ],
         "authority": ["read"], "budget_units": 8,
     }
@@ -519,6 +519,9 @@ def test_endpoint_observed_props_mismatch_abstains(isolated_policy, monkeypatch,
                 "url": "http://127.0.0.1:12345/v1", "expected_model_id": "synthetic-06b",
                 "engine_build": "synthetic-build", "model_path": "/synthetic/model.gguf",
                 "model_sha256": "a" * 64}
+    body = policy_body("live")
+    capacity_rule(body, 2, {k: endpoint[k] for k in ("model", "quant", "engine", "backend", "device")})
+    publish(isolated_policy, body)
     legal = compile_actions(graph=cli._graph_from_payload({"actions": [
         {"action_id": "read", "kind": "tool", "family": "omp.tool", "risk_class": "read"},
         {"action_id": "glob", "kind": "tool", "family": "omp.tool", "risk_class": "read"},

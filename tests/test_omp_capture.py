@@ -296,29 +296,47 @@ class _Registry:
         return self.backend
 
 
-def test_dead_backend_writes_no_shadow_row_and_counts_backend_unavailable(home):
-    # The real transport against a closed loopback port: urllib raises URLError (connection refused).
+def test_dead_backend_writes_failure_receipt_and_counts_failed_calls(home):
+    result = run_shadow(
+        shadow_payload(), registry=_Registry(_Backend(raises=urllib.error.URLError("refused"))))
+    assert result["ok"] is True and result["selected_action"] is None and result["executed_action"] is None
+    assert Path(result["receipts_path"]).name == "cognition-shadow-failures.jsonl"
+    row = json.loads(Path(result["receipts_path"]).read_text())
+    assert row["shadow"][0]["error"]
+    assert not (home / "shadow" / "cognition-shadow.jsonl").exists()
+    health = json.loads((home / "shadow" / "cognition-shadow-health.json").read_text())
+    assert health["failed_calls"] == 1
+    assert health["successful_calls"] == 0
+
+
+def test_unmeasured_backend_fails_closed_without_transport(home, monkeypatch):
+    from z0int import policy_runtime
+    monkeypatch.setattr(policy_runtime, "observed_model_scope", lambda *args: None)
+    def unexpected_chat(*args, **kwargs):
+        pytest.fail("unmeasured physical identity must not reach model transport")
+    monkeypatch.setattr("z0int.cognition.adapters.transport.OpenAICompatTransport.chat", unexpected_chat)
     (home / "config").mkdir(parents=True)
     (home / "config" / "serving.json").write_text(json.dumps({"endpoints": [
         {"model_id": "functiongemma_270m", "base_url": "http://127.0.0.1:11558/v1", "runtime": "llama.cpp"}]}))
-    first = run_shadow(shadow_payload(), timeout_s=5)
-    # And a backend that raises URLError itself.
-    second = run_shadow(shadow_payload(), registry=_Registry(_Backend(raises=urllib.error.URLError("refused"))))
-    for result in (first, second):
-        assert result["ok"] is True and result["selected_action"] is None and result["executed_action"] is None
-        assert result["receipts_path"] is None
-        assert result["backend_unavailable"] == 1
-    assert not (home / "shadow" / "cognition-shadow.jsonl").exists()
-    counters = json.loads((home / "shadow" / "cognition-shadow-counters.json").read_text())
-    assert counters["backend_unavailable"] == 2
+    result = run_shadow(shadow_payload(), timeout_s=5)
+    assert result["selected_action"] is None and result["executed_action"] is None
+    (row,) = result["shadow"]
+    assert row["slm_requested"] is False
+    assert row["parse_error"] == "option_capacity_exceeded"
+    assert Path(result["receipts_path"]).name == "cognition-shadow-failures.jsonl"
 
 
 def test_served_backend_writes_a_row_with_a_structured_actual_tool_and_no_tool_input(home):
     result = run_shadow(shadow_payload(), registry=_Registry(_Backend(action="read")))
-    assert result["ok"] is True and result["backend_unavailable"] == 0
+    assert result["ok"] is True
     text = Path(result["receipts_path"]).read_text()
     (row,) = [json.loads(line) for line in text.splitlines()]
-    assert row["actual_tool"] == {"name": "bash", "risk_class": "write"}
+    assert row["tool_name"] == "bash"
+    assert row["session_id"] == "omp-sess" and row["tool_call_id"] == "call-1"
+    assert "actual_tool" not in row
+    assert Path(result["receipts_path"]).name == "cognition-shadow.jsonl"
+    health = json.loads((home / "shadow" / "cognition-shadow-health.json").read_text())
+    assert health["successful_calls"] == 1 and health["failed_calls"] == 0
     assert [r["selected_action"] for r in row["shadow"]] == ["read"]
     assert TOOL_INPUT_MARKER not in text and "input:" not in text
     for path in home.rglob("*"):
