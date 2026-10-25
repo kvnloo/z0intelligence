@@ -105,15 +105,28 @@ def discover(config):
         if quant is None:
             raise ValueError(f'Unsupported GGUF quantization: {path}')
         architecture = metadata.get('general.architecture')
-        # Protocol-v2 templates are deliberately not guessed for other families.
-        template = {'qwen2':'qwen25', 'qwen3':'qwen3'}.get(architecture)
+        # Other families use the runtime's own GGUF template, never guessed ChatML.
+        template = {'qwen2':'qwen25', 'qwen3':'qwen3'}.get(architecture,'runtime')
         models[sha] = {'id':'sha256:' + sha, 'sha256':sha, 'path':str(path),
                        'quantization':quant, 'template':template, 'architecture':architecture}
     return list(models.values())
 
 
+def runtime_prompt(benchmark,base,row):
+    options = '\n'.join(f'{benchmark.SLOTS[i]}: {option}' for i,option in enumerate(row['options']))
+    result = benchmark.post(base,'/apply-template',{
+        'messages':[
+            {'role':'system','content':'Choose exactly one listed option that answers the question. Reply with only its single-character label. Labels are case-sensitive. No explanation.'},
+            {'role':'user','content':row['question']+'\n\nOptions:\n'+options}],
+        'add_generation_prompt':True,'chat_template_kwargs':{'enable_thinking':False}})
+    prompt = result.get('prompt')
+    if not isinstance(prompt,str) or not prompt:
+        raise ValueError('Runtime did not render a nonempty model-native prompt')
+    return prompt
+
+
 def scope_for(model, lane):
-    return {'model':model['id'], 'quant':model['quantization'], 'engine':'llama.cpp',
+    return {'model':model['id'], 'quant':model['quantization'], 'engine':lane['engine'],
             'backend':lane['backend'], 'device':lane['device']}
 
 
@@ -158,9 +171,6 @@ def tick(home, config, now=None, launch=subprocess.Popen):
     with locked(directory / 'dispatch.lock'):
         findings = read_findings(ledger_path(home))
         for model in discover(config):
-            if model['template'] is None:
-                events.append({'status':'unsupported_template', 'model':model})
-                continue
             # One configured lane is selected deterministically, never an LLM.
             lane = config['lane']
             key = digest(scope_for(model,lane))
@@ -258,7 +268,8 @@ def dispatch(request):
         findings.append({'schema':'z0.finding.v1','ts':measurement['started_at'],
                         'expires_at':measurement['expires_at'],'source':{'kind':'z0eval_result','path':str(receipt.resolve()),'sha256':file_sha(receipt)},
                         'subject':{'family':'choice.option_capacity','job':'ChoiceLadder','task':cell['task']},
-                        'arm':{'kind':'slm',**payload['scope'],'model_sha256':payload['model']['sha256']},
+                        'arm':{'kind':'slm',**payload['scope'],'model_sha256':payload['model']['sha256'],
+                               'runtime_sha256':lane['server_sha256']},
                         'metric':{'name':'choice_accuracy','value':cell['correct']/cell['n'],'n':cell['n'],
                                   'answered':cell['n'],'abstained':0,'denominator':cell['n'],
                                   'correct':cell['correct'],'option_count':cell['k'],'ci_low':cell['ci_low'],'ci_high':cell['ci_high'],
@@ -339,7 +350,7 @@ def measure(request, out):
         port = sock.getsockname()[1]
     base = f'http://127.0.0.1:{port}'
     command = [lane['server'],'-m',model['path'],'-t','4','-tb','4','-b','128','-ub','128','-c','4096',
-               '-ngl','99' if lane['backend']=='cuda' else '0','-lm','mmap','--host','127.0.0.1','--port',str(port),'--parallel','1','--no-webui']
+               '-ngl','99' if lane['backend']=='cuda' else '0','-lm','mmap','--host','127.0.0.1','--port',str(port),'--parallel','1','--no-webui','--alias',model['id']]
     cells = []
     with (out/'server.log').open('w') as log:
         process = subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT)
@@ -357,6 +368,15 @@ def measure(request, out):
                 if time.monotonic()>deadline:
                     raise TimeoutError('Model server readiness')
                 time.sleep(.25)
+            with urllib.request.urlopen(base+'/props',timeout=5) as response:
+                props = json.load(response)
+            if (not isinstance(props.get('build_info'),str) or not props['build_info'] or
+                    props['build_info'] != lane['engine'] or props.get('model_alias') != model['id'] or
+                    file_sha(props['model_path']) != model['sha256']):
+                raise ValueError('Observed /props model or engine identity mismatch')
+            atomic_json(out/'observed-props.json',props)
+            if model['template']=='runtime':
+                benchmark.prompt = lambda row,_model: runtime_prompt(benchmark,base,row)
             slots = {}
             for label in benchmark.SLOTS:
                 tokens = benchmark.post(base,'/tokenize',{'content':label,'add_special':False})['tokens']
