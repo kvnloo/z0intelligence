@@ -56,6 +56,29 @@ def test_model_identity_rejects_change_during_hash(tmp_path, monkeypatch):
     assert not list((tmp_path / 'policy' / 'model-identities').glob('*.json'))
 
 
+
+def test_tick_never_reads_uncached_weights_and_resolves_after_hasher(tmp_path, monkeypatch):
+    import z0int.policy.autoeval as autoeval
+    from z0int.policy.compile import CompilerConfig, compile_policy
+    config, path = setup(tmp_path)
+    real_metadata = autoeval.gguf_metadata
+    real_hash = autoeval.subprocess.check_output
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Tick attempted to read GGUF bytes')
+    monkeypatch.setattr(autoeval, 'gguf_metadata', forbidden)
+    monkeypatch.setattr(autoeval.subprocess, 'check_output', forbidden)
+    events = tick(tmp_path, config)
+    assert events == [{'status': 'identity_pending', 'path': str(path), 'allowed_k': 0}]
+    policy = compile_policy([], None, datetime.now(timezone.utc), CompilerConfig(compiler_revision='test'))
+    assert policy['option_capacity'] == {}
+    monkeypatch.setattr(autoeval, 'gguf_metadata', real_metadata)
+    monkeypatch.setattr(autoeval.subprocess, 'check_output', real_hash)
+    discover(config)
+    monkeypatch.setattr(autoeval, 'gguf_metadata', forbidden)
+    monkeypatch.setattr(autoeval.subprocess, 'check_output', forbidden)
+    events = tick(tmp_path, config, launch=lambda *args, **kwargs: SimpleNamespace(pid=123456))
+    assert len(events) == 1 and events[0]['status'] == 'enqueued'
+
 def gguf(path, extra=b''):
     def text(value):
         data = value.encode()
@@ -117,6 +140,7 @@ def test_due_requires_all_tasks_and_refreshes_before_expiry(tmp_path):
 
 def test_tick_enqueues_once_and_retries_after_dead_worker(tmp_path,monkeypatch):
     config,_ = setup(tmp_path)
+    discover(config)
     calls = []
     def launch(command,**kwargs):
         calls.append(command)
@@ -145,6 +169,7 @@ def test_invalid_gguf_fails_closed(tmp_path):
 
 def test_systemd_dispatch_survives_oneshot_and_deduplicates_active_unit(tmp_path,monkeypatch):
     config,_ = setup(tmp_path)
+    discover(config)
     config['dispatcher'] = 'systemd'
     commands = []
     def launch(command,**kwargs):

@@ -32,10 +32,18 @@ def file_sha(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def model_identity(path, home):
+def model_identity(path, home, cache_only=False):
     """Cache weight digest and metadata by filesystem identity, never by alias."""
     directory = home / 'policy' / 'model-identities'
     directory.mkdir(parents=True, exist_ok=True)
+    if cache_only:
+        stat = path.stat()
+        identity = [stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns]
+        entry = directory / (digest(identity) + '.json')
+        if not entry.exists():
+            return None
+        cached = json.loads(entry.read_text())
+        return (cached['sha256'], cached['metadata']) if cached['identity'] == identity else None
     with locked(directory / 'cache.lock'):
         before = path.stat()
         identity = [before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns]
@@ -112,7 +120,7 @@ QUANTS = {0:'F32', 1:'F16', 2:'Q4_0', 3:'Q4_1', 7:'Q8_0', 8:'Q5_0', 9:'Q5_1',
           15:'Q4_K_M', 16:'Q5_K_S', 17:'Q5_K_M', 18:'Q6_K', 32:'BF16'}
 
 
-def discover(config, home=None):
+def discover(config, home=None, cache_only=False, pending=None):
     """Aliases collapse by bytes; new weights always receive a new model scope."""
     candidates = set()
     registry = Path(config['registry']).expanduser()
@@ -130,7 +138,12 @@ def discover(config, home=None):
         candidates.update(p.resolve() for p in Path(directory).expanduser().glob('*.gguf'))
     models = {}
     for path in sorted(candidates):
-        sha, metadata = model_identity(path, home if home is not None else paths.home())
+        identity = model_identity(path, home if home is not None else paths.home(), cache_only)
+        if identity is None:
+            if pending is not None:
+                pending.append({'status': 'identity_pending', 'path': str(path), 'allowed_k': 0})
+            continue
+        sha, metadata = identity
         quant = QUANTS.get(metadata.get('general.file_type'))
         if quant is None:
             raise ValueError(f'Unsupported GGUF quantization: {path}')
@@ -200,7 +213,7 @@ def tick(home, config, now=None, launch=subprocess.Popen):
     events = []
     with locked(directory / 'dispatch.lock'):
         findings = read_findings(ledger_path(home))
-        for model in discover(config, home):
+        for model in discover(config, home, cache_only=True, pending=events):
             # One configured lane is selected deterministically, never an LLM.
             lane = config['lane']
             key = digest(scope_for(model,lane))
@@ -518,15 +531,19 @@ def router_supplements(benchmark,config,initial):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command',choices=['tick','dispatch','measure'])
+    parser.add_argument('command',choices=['tick','identities','dispatch','measure'])
     parser.add_argument('--config',type=Path)
     parser.add_argument('--request',type=Path)
     parser.add_argument('--out',type=Path)
     args = parser.parse_args(argv)
-    if args.command == 'tick':
+    if args.command in ('tick', 'identities'):
         home = paths.home()
         path = args.config or home/'config'/'choice-ladder.json'
-        print(json.dumps(tick(home,json.loads(path.read_text()))) if path.exists() else '[]')
+        if not path.exists():
+            print('[]')
+        else:
+            config = json.loads(path.read_text())
+            print(json.dumps(tick(home, config) if args.command == 'tick' else discover(config, home)))
     elif args.command == 'dispatch':
         state_path = args.request.with_name(args.request.name.removesuffix('.request.json')+'.json')
         status = 'failed'
