@@ -11,8 +11,9 @@ const sha = text => createHash("sha256").update(text, "utf8").digest("hex");
 const user = (id, text, timestamp = new Date(Date.now() - 1000).toISOString()) => ({ type: "message", id, timestamp, message: { role: "user", content: text, timestamp } });
 const schema = { optional() { return this; } };
 function fakePi() {
-  const hooks = new Map(), lifecycle = new Map(), tools = new Map(), messages = [], flags = new Map();
-  return { hooks, lifecycle, tools, messages, flags,
+  const hooks = new Map(), lifecycle = new Map(), tools = new Map(), messages = [], flags = new Map(), warnings = [];
+  return { hooks, lifecycle, tools, messages, flags, warnings,
+    logger: { warn(message, details) { warnings.push({ message, details }); } },
     zod: { object: () => schema, enum: () => schema, string: () => schema },
     registerFlag(name, value) { flags.set(name, value.default); },
     registerTool(tool) { tools.set(tool.name, tool); },
@@ -132,6 +133,9 @@ test("ordinary successful tool cannot complete approved task; receipts bind pend
   env.result("bash", "bash:unmatched");
   await assert.rejects(env.runtime(), error => error.code === "ENOENT");
   env.result("read", "bash:known");
+  assert.deepEqual(env.pi.warnings, [{
+    message: "AODL result tool name mismatch", details: { toolCallId: "bash:known" },
+  }]);
   let persisted;
   try { persisted = await env.runtime(); } catch (error) { if (error.code !== "ENOENT") throw error; }
   assert.equal(Boolean(persisted?.eventLog.some(e => e.payload.toolCallId === "bash:known")), false);
