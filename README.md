@@ -137,6 +137,43 @@ task limits capacity to the baseline of 2. An unknown scope also defaults to 2.
 Proof IDs and the earliest selected proof expiry accompany positive credit.
 O13 readers consume this content-addressed projection, not a live findings scan.
 
+## Startup orientation
+
+`scripts/state-packet/generate_packet.py` publishes an atomic, source-linked
+orientation packet at `~/.local/state/z0int/STATE-PACKET.md`. Its header records
+`generated_at`, the generator SHA-256, and the observed repository commit.
+The complete packet has at most 223 lines and 64 KiB. Every line names its source.
+The operations inputs remain under `/mnt/zer0models/workspace/zer0/data/operations`.
+No gold questions or experiment answers enter the generator.
+The packet retains the O13 default of two options and the preserved, explicitly
+nonfinal pooled pilot. Model-routing formula, lambda provenance, catalog coverage,
+unknown metrics and shared-quota limits come from the O14 report/catalog directory.
+Set `Z0INT_POLICY_ROOT`, `Z0INT_ROUTING_ROOT` or `Z0INT_LIVE_REPO` to select other
+observed source roots. Runtime identity prefers a validated `DEPLOYED_SHA` in an
+exact-SHA deployment directory and otherwise reads a real Git checkout.
+
+Install a committed feature with `python3 scripts/install-state-packet.py`.
+The installer archives exact Git content into `~/.local/lib/z0-state-packet/<SHA>/`,
+backs up replaced files, then links the OMP extension and Hermes clean-profile plugin.
+Enable Hermes with `hermes -p clean plugins enable hermes-state-packet`.
+The Claude Code user settings retain unrelated hooks.
+The `.files` `install-state-packet-timer.sh --activate` command installs the
+15-minute user timer and generates the first packet.
+
+OMP uses its real `before_agent_start` system-prompt-array contract.
+Hermes uses independent `pre_llm_call` context callbacks, not the routing adapter.
+Claude Code uses the documented `UserPromptSubmit` / `hookSpecificOutput` /
+`additionalContext` envelope. Hermes and Claude context chunks stay below 9,000
+characters to avoid hook-output spill limits. All chunks concatenate to the same
+packet. A packet older than two hours produces only `packet stale since …`.
+Unreadable or malformed packets fail open without facts. Hooks restore the current
+packet on later user turns as well as the first turn, including after compaction.
+Evidence is never an authority grant.
+
+Behavior checks: `PYTHONPATH=src python3 -m unittest discover -s tests -p test_orientation.py`
+and `bun test omp-extensions/z0-state-packet/index.test.ts`.
+Run these checks on the fleet, not on Groot.
+
 ## Architecture
 
 ~~~text
@@ -263,6 +300,11 @@ The old README described “bring your history” as if the main missing step we
 **raw history is evidence, not current truth; retrieval is not belief; memory is not instruction authority.**
 
 Master contains the provenance-backed resolver, source-revision-keyed State Packet reducer and question-scoped DecisionOpportunity builder. The current memory program is being built additively without replacing the existing stores.
+
+The startup packet reads exact deployment stamps before Git metadata. It only
+asks Git about paths with a `.git` ancestor; bounded command timeouts are
+reported on stderr and leave that observation unavailable, not a fabricated
+repository identity or a partially published packet.
 
 ### Memory foundations and remaining design work
 
