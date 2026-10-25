@@ -30,6 +30,38 @@ def fixture(tmp_path, n=60):
     return home, sessions, now
 
 
+def test_wal_reader_and_bounded_watermarks(tmp_path):
+    import sqlite3
+    from z0int.cognition.learning import lines_since
+    home = tmp_path/'home'
+    db = connect(home)
+    assert db.execute('PRAGMA journal_mode').fetchone()[0] == 'wal'
+    assert db.execute('PRAGMA synchronous').fetchone()[0] == 1
+    path = tmp_path/'events.jsonl'
+    path.write_text(''.join(json.dumps({'n': i})+'\n' for i in range(600)))
+    reader = sqlite3.connect(home/'loop'/'shadow-learning.sqlite', timeout=.01)
+    stream = lines_since(db, path)
+    for _ in range(257):
+        next(stream)
+    offset = reader.execute('SELECT offset FROM files WHERE path=?', (str(path),)).fetchone()[0]
+    assert offset == len(''.join(json.dumps({'n': i})+'\n' for i in range(256)))
+    db.execute("INSERT INTO ticks VALUES(1,'{}')")
+    assert reader.execute('SELECT COUNT(*) FROM ticks').fetchone()[0] == 0
+    stream.close()
+    db.rollback()
+    reader.close()
+    db.close()
+
+
+def test_tick_truncates_wal(tmp_path):
+    home, sessions, now = fixture(tmp_path)
+    reader = connect(home)
+    learn(home, sessions=sessions, now=now)
+    wal = home/'loop'/'shadow-learning.sqlite-wal'
+    assert not wal.exists() or wal.stat().st_size == 0
+    reader.close()
+
+
 def test_prequential_join_credit_and_incremental_stall(tmp_path):
     home, sessions, now = fixture(tmp_path)
     first = learn(home, sessions=sessions, now=now)
