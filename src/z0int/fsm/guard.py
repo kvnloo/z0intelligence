@@ -1151,6 +1151,10 @@ def main(argv: list[str] | None = None) -> int:
     state_input.add_argument("--config", default=str(CONFIG / "state.json"), help="live sensor inventory JSON")
     st.set_defaults(fn=lambda a: __import__("z0int.fsm.state_laws", fromlist=["command"]).command(a))
 
+    cf = sub.add_parser("consultation", help="F: report-only same-turn consultation receipt audit")
+    cf.add_argument("--events", required=True, help="consultation/action JSONL journal")
+    cf.set_defaults(fn=lambda a: __import__("z0int.fsm.consultation_law", fromlist=["command"]).command(a))
+
     rp = sub.add_parser("replay", help="replay incident tapes through the gates")
     rp.add_argument("tapes", nargs="+")
     rp.set_defaults(fn=lambda a: __import__("z0int.fsm.ops_replay", fromlist=["main"]).main(a.tapes))

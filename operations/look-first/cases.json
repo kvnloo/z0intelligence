@@ -1,0 +1,420 @@
+{
+  "schema": "z0.look-first.cases.v1",
+  "selection": {
+    "requested_audit_cases": 20,
+    "qualified_audit_messages": 12,
+    "unique_audit_incidents": 11,
+    "shortfall_messages": 8,
+    "shortfall_unique_incidents": 9,
+    "counts_source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/REPORT.md:54-62",
+    "labels_source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl",
+    "rule": "Original cause exactly prior-knowledge-not-retrieved or architecture-assumption-without-source-check (audit actual spelling). All qualifying records retained; no fabricated or relabelled rows.",
+    "duplicate_incidents": [
+      {
+        "cases": [
+          "ask-audit-82",
+          "ask-audit-185"
+        ],
+        "reason": "Same original ask7c817f57 and same contrary agentff24d362; distinct correction messages, one incident."
+      }
+    ],
+    "additional_review": "Remaining295-label corpus reason/text reviewed for same-category cases; insufficient evidence for eight additional independent incidents. Other causes were not relabelled to pad count.",
+    "cohort_overlap": "Today phone-skills and unified-skills-kit intentionally repeat audit33/34; report separately, never claim26 distinct incidents.",
+    "matching": "Expected alternatives frozen before first replay; case-sensitive literal substring in a single injected evidence line.",
+    "provenance_caveat": "Today's corrections have original session path/line/entry provenance. Routing formula literal remains backed by the operational lesson and parent-reported prior session ordinals4408–4410; no new inference run.",
+    "approved_cohort": "Parent instruction: twelve genuine AskAudit messages plus today real repeat incidents. No padding to twenty.",
+    "raw_history": "Not included. Original entry identifiers and local source paths allow read-only verification."
+  },
+  "cases": [
+    {
+      "id": "ask-audit-17",
+      "cohort": "ask-audit",
+      "query": "Where does the global agent toolkit belong relative to z0intelligence memory stores and harness runtimes?",
+      "expected_fact": "z0intelligence resolves context and bounded decisions; it does not own source memory databases or harness runtimes.",
+      "expected_substrings": [
+        "source memory database",
+        "Memory stores, harness runtimes"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:18",
+      "provenance": {
+        "review_id": 17,
+        "harness": "omp",
+        "session": "01a16527-824c-7714-8205-9a2d0d5eff38",
+        "entry_id": "3ba2d2b4",
+        "timestamp": "2026-10-22T22:45:25.592000+00:00",
+        "original_cause": "architecture-assumption-without-source-check",
+        "reason": "Proposed turning z0intelligence into a broad toolkit before checking its explicit non-ownership boundary.",
+        "duplicate_incident_of": null
+      },
+      "incident_id": "audit-17"
+    },
+    {
+      "id": "ask-audit-33",
+      "cohort": "ask-audit",
+      "query": "Where are our codified phone k3s adb uiautomator2 procedures before declaring a phone offline?",
+      "expected_fact": "Phone procedures already live in Hermes clean-profile skills, including home-k3s-fleet.",
+      "expected_substrings": [
+        "home-k3s-fleet"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:34",
+      "provenance": {
+        "review_id": 33,
+        "harness": "omp",
+        "session": "01a16f47-f4a8-7753-9976-a51a85b8b697",
+        "entry_id": "cf86a802",
+        "timestamp": "2026-10-24T19:16:53.540000+00:00",
+        "original_cause": "prior-knowledge-not-retrieved",
+        "reason": "Agent re-derived phone operations despite codified Hermes skills, then admitted OMP did not load them.",
+        "duplicate_incident_of": null
+      },
+      "incident_id": "audit-33"
+    },
+    {
+      "id": "ask-audit-34",
+      "cohort": "ask-audit",
+      "query": "Where is the unified skill store already created in z0intelligence?",
+      "expected_fact": "The existing skills-home kit is install.py plus stack.toml, a cross-harness installer and curated manifest on held feat/skills-home.",
+      "expected_substrings": [
+        "cross-harness installer and curated manifest"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:35",
+      "provenance": {
+        "review_id": 34,
+        "harness": "omp",
+        "session": "01a16f47-f4a8-7753-9976-a51a85b8b697",
+        "entry_id": "c93323e2",
+        "timestamp": "2026-10-24T19:17:41.663000+00:00",
+        "original_cause": "prior-knowledge-not-retrieved",
+        "reason": "Recommended loading a new skill directory before checking existing unified skill/memory architecture.",
+        "duplicate_incident_of": null
+      },
+      "incident_id": "audit-34",
+      "canonical_fact_source": "https://github.com/kvnloo/kvnloo-skills/issues/2"
+    },
+    {
+      "id": "ask-audit-42",
+      "cohort": "ask-audit",
+      "query": "Do we need a new exact words message log with IDs for relay checking?",
+      "expected_fact": "OMP session history already stores messages word for word with entry IDs.",
+      "expected_substrings": [
+        "word for word",
+        "session file saves every message"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:43",
+      "provenance": {
+        "review_id": 42,
+        "harness": "omp",
+        "session": "01a16f47-f4a8-7753-9976-a51a85b8b697",
+        "entry_id": "b2dc6953",
+        "timestamp": "2026-10-24T21:59:34.769000+00:00",
+        "original_cause": "prior-knowledge-not-retrieved",
+        "reason": "Proposed a new exact-words log although existing session IDs and traces already provided it.",
+        "duplicate_incident_of": null
+      },
+      "incident_id": "audit-42"
+    },
+    {
+      "id": "ask-audit-88",
+      "cohort": "ask-audit",
+      "query": "Which Homebase repository is the correct donor for the Rally House digital twin?",
+      "expected_fact": "Homebase is the local Rally House Pickleball Digital Twin repository, not an unrelated donor.",
+      "expected_substrings": [
+        "Rally House Pickleball Digital Twin"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:47",
+      "provenance": {
+        "review_id": 88,
+        "harness": "hermes-chiefstaff",
+        "session": "20260801_215456_f48aab77",
+        "entry_id": "191766",
+        "timestamp": "2026-08-15T23:24:12.838799+00:00",
+        "original_cause": "architecture-assumption-without-source-check",
+        "reason": "Agent used wrong Homebase donor despite local-repository correction.",
+        "duplicate_incident_of": null
+      },
+      "incident_id": "audit-88"
+    },
+    {
+      "id": "ask-audit-82",
+      "cohort": "ask-audit",
+      "query": "Do we need to rediscover Can Hermes branch before creating baseline and preview?",
+      "expected_fact": "The critical-path branch from Can Hermes was already established in the session.",
+      "expected_substrings": [
+        "branch we got from can",
+        "baseline was already established"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:62",
+      "provenance": {
+        "review_id": 82,
+        "harness": "omp",
+        "session": "01a10dde-4e0c-7000-95f2-dedd6944dbdb",
+        "entry_id": "f6b20ef8",
+        "timestamp": "2026-10-06T18:50:18.764000+00:00",
+        "original_cause": "prior-knowledge-not-retrieved",
+        "reason": "Agent repeated branch discovery instead of using branch already established in session.",
+        "duplicate_incident_of": null
+      },
+      "incident_id": "can-hermes-baseline"
+    },
+    {
+      "id": "ask-audit-46",
+      "cohort": "ask-audit",
+      "query": "How should established ComfyUI regional character tile workflow preserve anatomy?",
+      "expected_fact": "Use a coherent full-body base with geometry-locked masked regional edits, not literal panorama strip stitching.",
+      "expected_substrings": [
+        "geometry-locked",
+        "masked Flux edit/inpaint"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:67",
+      "provenance": {
+        "review_id": 46,
+        "harness": "hermes-chiefstaff",
+        "session": "20260801_215456_f48aab77",
+        "entry_id": "177799",
+        "timestamp": "2026-08-15T04:52:29.668987+00:00",
+        "original_cause": "prior-knowledge-not-retrieved",
+        "reason": "Used incompatible literal strip stitching instead of established ComfyUI geometry-locked workflow.",
+        "duplicate_incident_of": null
+      },
+      "incident_id": "audit-46"
+    },
+    {
+      "id": "ask-audit-185",
+      "cohort": "ask-audit",
+      "query": "Why are we finding Can Hermes branch again after baseline was already established?",
+      "expected_fact": "Reuse the established baseline branch rather than repeat branch discovery.",
+      "expected_substrings": [
+        "branch we got from can",
+        "baseline was already established"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:123",
+      "provenance": {
+        "review_id": 185,
+        "harness": "omp",
+        "session": "01a10dde-4e0c-7000-95f2-dedd6944dbdb",
+        "entry_id": "863a096f",
+        "timestamp": "2026-10-06T18:50:24.623000+00:00",
+        "original_cause": "prior-knowledge-not-retrieved",
+        "reason": "Agent kept rediscovering known branch after explicit reminder that baseline was already established.",
+        "duplicate_incident_of": "ask-audit-82"
+      },
+      "incident_id": "can-hermes-baseline"
+    },
+    {
+      "id": "ask-audit-155",
+      "cohort": "ask-audit",
+      "query": "Which exact GPT model ID works when generic gpt-5.6 alias fails in Codex?",
+      "expected_fact": "The exact gpt-5.6-sol ID works where the generic alias was rejected.",
+      "expected_substrings": [
+        "gpt-5.6-sol"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:193",
+      "provenance": {
+        "review_id": 155,
+        "harness": "hermes-chiefstaff",
+        "session": "20260801_215456_f48aab77",
+        "entry_id": "178349",
+        "timestamp": "2026-08-15T05:25:45.290127+00:00",
+        "original_cause": "architecture-assumption-without-source-check",
+        "reason": "Agent had concluded current model unsupported from wrong generic ID and settled for older model. Later exact ID worked.",
+        "duplicate_incident_of": null
+      },
+      "incident_id": "audit-155"
+    },
+    {
+      "id": "ask-audit-115",
+      "cohort": "ask-audit",
+      "query": "What existing OMP Hermes branch pairing implements the thin JSON RPC runtime bridge?",
+      "expected_fact": "OMP exp/hermes-backend pairs with Hermes exp/omp-tui-backend.",
+      "expected_substrings": [
+        "exp/hermes-backend",
+        "exp/omp-tui-backend"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:194",
+      "provenance": {
+        "review_id": 115,
+        "harness": "omp",
+        "session": "01a10dde-4e0c-7000-95f2-dedd6944dbdb",
+        "entry_id": "5bcdb9bc",
+        "timestamp": "2026-10-06T04:17:11.291000+00:00",
+        "original_cause": "prior-knowledge-not-retrieved",
+        "reason": "Agent acknowledges reading wrong OMP/Hermes branch pairing. User supplies exact existing implementation.",
+        "duplicate_incident_of": null
+      },
+      "incident_id": "audit-115"
+    },
+    {
+      "id": "ask-audit-252",
+      "cohort": "ask-audit",
+      "query": "Is the MacBook running macOS or CachyOS for Tailscale SSH setup?",
+      "expected_fact": "This MacBook runs CachyOS Linux, not macOS.",
+      "expected_substrings": [
+        "CachyOS Linux",
+        "im on cachyos on my mac"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:198",
+      "provenance": {
+        "review_id": 252,
+        "harness": "hermes-chiefstaff",
+        "session": "20260815_184109_cb6489",
+        "entry_id": "196634",
+        "timestamp": "2026-08-17T01:50:10+00:00",
+        "original_cause": "architecture-assumption-without-source-check",
+        "reason": "Agent prescribed macOS setup despite Tailscale reporting Linux. Prior answer admits machine is CachyOS.",
+        "duplicate_incident_of": null
+      },
+      "incident_id": "audit-252"
+    },
+    {
+      "id": "ask-audit-213",
+      "cohort": "ask-audit",
+      "query": "Recover last night local OMP session working on z0int; what does ln mean?",
+      "expected_fact": "ln means last night; recover local OMP history, not Linear.",
+      "expected_substrings": [
+        "ln is an acronym for last night",
+        "local session history from omp"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:229",
+      "provenance": {
+        "review_id": 213,
+        "harness": "omp",
+        "session": "01a0b52d-3c70-7312-b91b-fda10d8d53f1",
+        "entry_id": "73529a98",
+        "timestamp": "2026-09-18T15:45:13.837000+00:00",
+        "original_cause": "architecture-assumption-without-source-check",
+        "reason": "Interpreted ln as Linear and searched unrelated service instead of local last-night OMP history, even after expansion.",
+        "duplicate_incident_of": null
+      },
+      "incident_id": "audit-213"
+    },
+    {
+      "id": "today-option-count",
+      "cohort": "today-repeat",
+      "query": "How many options may a sub-billion-parameter SLM receive without measured capacity evidence?",
+      "expected_fact": "Default option capacity is two; do not send a tiny SLM a long option list.",
+      "expected_substrings": [
+        "defaults to **2**",
+        "allowed_k (default 2)",
+        "default 2"
+      ],
+      "source": "/mnt/zer0models/z0-wt/look-first/docs/fsm/ops.md:179-183",
+      "provenance": {
+        "date": "2026-10-24",
+        "basis": "Task-required repeat-miss topic; factual expectation frozen from documented operational lesson, not a newly invented audit label",
+        "correction_source": "/home/kvn/.omp/agent/sessions/--mnt-zer0models--/2026-10-24T18-59-09-096Z_01a16f47-f4a8-7753-9976-a51a85b8b697.jsonl:2290",
+        "entry_id": "1299746f",
+        "secondary_source": "memory://root/memory_summary.md"
+      },
+      "incident_id": "today-option-count"
+    },
+    {
+      "id": "today-routing-formula",
+      "cohort": "today-repeat",
+      "query": "What is our agreed routing formula using TTFT throughput quota pace and acceptance probability?",
+      "expected_fact": "Minimize latency × (1 + λ·pace) / p_accept; latency = TTFT + out_tokens/tps and pace = burn × tokens / (remaining / time_to_reset).",
+      "expected_substrings": [
+        "latency × (1 + λ·pace) / p_accept",
+        "latency * (1 + lambda * pace) / p_accept",
+        "score_u = latency_u * (1 + λ * pace_u) / p_accept"
+      ],
+      "source": "memory://root/memory_summary.md",
+      "provenance": {
+        "date": "2026-10-24",
+        "basis": "Task-required repeat-miss topic; factual expectation frozen from documented operational lesson, not a newly invented audit label",
+        "correction_source": "/home/kvn/.omp/agent/sessions/--mnt-zer0models--/2026-10-24T18-59-09-096Z_01a16f47-f4a8-7753-9976-a51a85b8b697.jsonl:3229",
+        "entry_id": "c11f79c9",
+        "prior_formula_reference": "Parent reports OMP session01a16527-824c-7714-8205-9a2d0d5eff38 ordinals4408–4410; not independently read here",
+        "secondary_source": "memory://root/memory_summary.md"
+      },
+      "incident_id": "today-routing-formula",
+      "canonical_fact_source": "/mnt/zer0models/z0-wt/model-routing-o14/operations/model-routing/REPORT.md:8-10"
+    },
+    {
+      "id": "today-provider-limits",
+      "cohort": "today-repeat",
+      "query": "Where are documented free fast LLM provider RPM RPD TPM TPD limits and free-tier caveats?",
+      "expected_fact": "Consult offline-rate-limit-catalog references/free-tier-providers.md before provider decisions.",
+      "expected_substrings": [
+        "offline-rate-limit-catalog",
+        "free-tier-providers.md"
+      ],
+      "source": "memory://root/memory_summary.md",
+      "provenance": {
+        "date": "2026-10-24",
+        "basis": "Task-required repeat-miss topic; factual expectation frozen from documented operational lesson, not a newly invented audit label",
+        "correction_source": "/home/kvn/.omp/agent/sessions/--mnt-zer0models--/2026-10-24T18-59-09-096Z_01a16f47-f4a8-7753-9976-a51a85b8b697.jsonl:3331",
+        "entry_id": "6b273035",
+        "secondary_source": "memory://root/memory_summary.md"
+      },
+      "incident_id": "today-provider-limits"
+    },
+    {
+      "id": "today-opencode-go-zen-only",
+      "cohort": "today-repeat",
+      "query": "May paid frontier luna terra haiku sol models run through OpenCode?",
+      "expected_fact": "OpenCode is only for Go / Zen free models; paid frontier uses subscription logins, not OpenCode.",
+      "expected_substrings": [
+        "opencode go or zen",
+        "OpenCode is used ONLY",
+        "Go / Zen free models",
+        "Never route paid models",
+        "Only sourced OpenCode Go/Zen free models are allowed"
+      ],
+      "source": "memory://root/memory_summary.md",
+      "provenance": {
+        "date": "2026-10-24",
+        "basis": "Task-required repeat-miss topic; factual expectation frozen from documented operational lesson, not a newly invented audit label",
+        "correction_source": "/home/kvn/.omp/agent/sessions/--mnt-zer0models--/2026-10-24T18-59-09-096Z_01a16f47-f4a8-7753-9976-a51a85b8b697.jsonl:3311",
+        "entry_id": "04be9ab9",
+        "secondary_source": "memory://root/memory_summary.md"
+      },
+      "incident_id": "today-opencode-go-zen-only",
+      "canonical_fact_source": "/mnt/zer0models/z0-wt/model-routing-o14/operations/model-routing/REPORT.md:51"
+    },
+    {
+      "id": "today-phone-skills",
+      "cohort": "today-repeat",
+      "query": "Where are the phone skills for S22 S25 k3s adb uiautomator2 before deriving procedures again?",
+      "expected_fact": "Hermes clean-profile skills already codify phone operations; consult home-k3s-fleet and kevin-phones.",
+      "expected_substrings": [
+        "home-k3s-fleet",
+        "kevin-phones"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:34",
+      "provenance": {
+        "date": "2026-10-24",
+        "basis": "Task-required repeat-miss topic; factual expectation frozen from documented operational lesson, not a newly invented audit label",
+        "correction_source": "/home/kvn/.omp/agent/sessions/--mnt-zer0models--/2026-10-24T18-59-09-096Z_01a16f47-f4a8-7753-9976-a51a85b8b697.jsonl:244",
+        "correction_entry_id": "0d183dae",
+        "secondary_source": "memory://root/memory_summary.md",
+        "audit_case": "ask-audit-33",
+        "session": "01a16f47-f4a8-7753-9976-a51a85b8b697",
+        "entry_id": "cf86a802",
+        "overlaps_audit_cohort": true
+      },
+      "incident_id": "audit-33"
+    },
+    {
+      "id": "today-unified-skills-kit",
+      "cohort": "today-repeat",
+      "query": "What unified skill store already exists before proposing a second skills directory?",
+      "expected_fact": "The existing skills-home kit is install.py plus stack.toml, a cross-harness installer and curated manifest on held feat/skills-home.",
+      "expected_substrings": [
+        "cross-harness installer and curated manifest"
+      ],
+      "source": "/mnt/zer0models/workspace/zer0/data/operations/ask-audit/labels.jsonl:35",
+      "provenance": {
+        "date": "2026-10-24",
+        "basis": "Task-required repeat-miss topic; factual expectation frozen from documented operational lesson, not a newly invented audit label",
+        "correction_source": "/home/kvn/.omp/agent/sessions/--mnt-zer0models--/2026-10-24T18-59-09-096Z_01a16f47-f4a8-7753-9976-a51a85b8b697.jsonl:339",
+        "secondary_source": "memory://root/memory_summary.md",
+        "audit_case": "ask-audit-34",
+        "session": "01a16f47-f4a8-7753-9976-a51a85b8b697",
+        "entry_id": "c93323e2",
+        "overlaps_audit_cohort": true
+      },
+      "incident_id": "audit-34",
+      "canonical_fact_source": "https://github.com/kvnloo/kvnloo-skills/issues/2"
+    }
+  ]
+}
