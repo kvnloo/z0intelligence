@@ -17,10 +17,11 @@ the inputs (git, systemd, adb, broker.db, configs, gh) and acts on the verdict.
     z0-guard gateway-watch              O9  gateway restart -> Interrupted runs with resume commands
     z0-guard phone-caps --root ROOT [--path PATH ...] O10 source-policy scanner
     z0-guard policy --receipts GLOB --policy PATH --since 24h [--static ROOT] [--json] O11/O12/O13 audit
+    z0-guard sqlite-ghosts --db DB [--last-receipt JSON] O16 read-only SQLite census
     z0-guard replay TAPE...             replay incident tapes through the gates
     z0-guard modes                      show each gate's mode
 
-Modes: off | report | enforce. Default enforce for O1, O2, O4, O6, O10 (pure refusals
+Modes: off | report | enforce. Default enforce for O1, O2, O4, O6, O10, O16 (pure refusals
 of known-bad actions); report for O3, O5, O7, O8, O9. Override per gate with
 Z0_GUARD_O<n>=MODE or ~/.config/z0-guard/modes.json. A gate's verdict is never
 an authorization: a pass means only "this gate did not refuse".
@@ -61,7 +62,7 @@ HERMES_CHECKOUT = Path(os.environ.get("Z0_HERMES_CHECKOUT", "/workspace/hermes-h
 GROOT_NAMES = {"groot"}
 CALL_CHAIN_PACKAGES = {"app.lawnchair.play.debug"}
 DEFAULT_MODES = {"O1": "enforce", "O2": "enforce", "O3": "report", "O4": "enforce", "O5": "report",
-                 "O6": "enforce", "O7": "report", "O8": "report", "O9": "report", "O10": "enforce"}
+                 "O6": "enforce", "O7": "report", "O8": "report", "O9": "report", "O10": "enforce", "O16": "enforce"}
 EXIT_REFUSED = 3
 ZERO = "0" * 40
 
@@ -1036,6 +1037,24 @@ def cmd_policy(a) -> int:
     return 0 if report["available"] else 4
 
 
+# ------------------------------------------------------------------ O16 read-only SQLite lifecycle
+
+def cmd_sqlite_ghosts(a) -> int:
+    from .sqlite_guard import sqlite_receipt, receipt_key
+
+    db = Path(a.db).expanduser().resolve()
+    previous = Path(a.last_receipt).expanduser() if a.last_receipt else STATE / (
+        "sqlite-" + receipt_key(db) + ".json")
+    rec = sqlite_receipt(db, previous, operation=a.operation, actor_pid=a.actor_pid)
+    m = mode("O16")
+    rec.update(mode=m, status=("violated" if rec["violations"] else "unavailable" if not rec["available"] else "ok"))
+    # Unlike verdict(), no ledger write: stdout is the only receipt destination.
+    emit(rec)
+    if rec["violations"] and m == "enforce":
+        return EXIT_REFUSED
+    return 0 if rec["available"] else 4
+
+
 # ------------------------------------------------------------------ modes, main
 
 def cmd_modes(a) -> int:
@@ -1143,6 +1162,14 @@ def main(argv: list[str] | None = None) -> int:
     pg.add_argument("--static", metavar="ROOT", help="also scan source outside policy loader files")
     pg.add_argument("--json", action="store_true", help="emit z0.policy_guard.v1 JSON (also the default)")
     pg.set_defaults(fn=cmd_policy)
+
+    sq = sub.add_parser("sqlite-ghosts", help="O16: read-only DB/WAL/SHM inode and auth-count audit")
+    sq.add_argument("--db", required=True)
+    sq.add_argument("--last-receipt", help="previous count-only receipt for this exact store; never overwritten")
+    sq.add_argument("--operation", choices=["inspect", "replace", "unlink", "recreate", "remove-sidecars"], default="inspect",
+                    help="proposed action to check; NEVER executed")
+    sq.add_argument("--actor-pid", type=int, help="proposed sidecar-removal actor (must hold current DB inode)")
+    sq.set_defaults(fn=cmd_sqlite_ghosts)
 
     rp = sub.add_parser("replay", help="replay incident tapes through the gates")
     rp.add_argument("tapes", nargs="+")

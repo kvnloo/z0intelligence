@@ -169,6 +169,17 @@ MUTATIONS = [
      "  Nat.is_gt(2n, risk)", "  Nat.is_gt(3n, risk)"),
     ("O13 o13_unknown_never", "unknown risk acquires SLM authority",
      "  Nat.is_gt(2n, risk)", "  True{}"),
+    ('O16 o16_sqlite_replace_no_holders', 'ignore holders', '  Bool.and(complete, empty)', '  complete'),
+    ('O16 o16_sqlite_replace_scan_complete', 'ignore scan completeness', '  Bool.and(complete, empty)', '  empty'),
+    ('O16 o16_sqlite_no_ghost_holders', 'ignore ghosts', '  Bool.and(complete, Bool.not(ghosts))', '  complete'),
+    ('O16 o16_sqlite_auth_non_decreasing', 'lose credentials', '  Bool.and(known, Bool.not(Nat.is_gt(before, after)))', '  known'),
+    ('O16 o16_sqlite_auth_known', 'unknown baseline earns credit', '  Bool.and(known, Bool.not(Nat.is_gt(before, after)))', '  Bool.not(Nat.is_gt(before, after))'),
+    ('O16 o16_sqlite_sidecar_current_inode', 'stale inode removes sidecars', 'def sqlite_sidecar_allows(current: Bool) -> Bool:\n  current', 'def sqlite_sidecar_allows(current: Bool) -> Bool:\n  True{}'),
+    ('O16 o16_sqlite_quiescent_replace', 'always refuse replacement', '  Bool.and(complete, empty)', '  False{}'),
+    ('O16 o16_sqlite_healthy_holders', 'always refuse health', '  Bool.and(complete, Bool.not(ghosts))', '  False{}'),
+    ('O16 o16_sqlite_auth_retained', 'always refuse auth', '  Bool.and(known, Bool.not(Nat.is_gt(before, after)))', '  False{}'),
+    ('O16 o16_sqlite_current_sidecar', 'always refuse sidecars', 'def sqlite_sidecar_allows(current: Bool) -> Bool:\n  current', 'def sqlite_sidecar_allows(current: Bool) -> Bool:\n  False{}'),
+    ('O16 o16_sqlite_unknown_holders', 'unknown scan declared healthy', '  Bool.and(complete, Bool.not(ghosts))', '  Bool.not(ghosts)'),
 ]
 
 

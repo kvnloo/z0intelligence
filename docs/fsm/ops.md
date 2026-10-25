@@ -22,6 +22,7 @@ flowchart LR
     O10[O10 phone_admits/phone_place]:::law
     O11[O11 policy_local]:::law
     O12[O12 policy_frontier]:::law
+    O16[O16 SQLite lifecycle]:::law
   end
   Twin["src/z0int/fsm/ops.py\n(parity: exhaustive + seeded vs Bend)"]
   Book ==> Twin
@@ -49,6 +50,8 @@ flowchart LR
   O10 -.-> PC
   O11 -.-> PG
   O12 -.-> PG
+  G -->|sqlite-ghosts --db DB| SQ["read-only proc census and private-copy auth count"]
+  O16 -.-> SQ
   classDef law fill:#1d2b3a,stroke:#6cb6ff,color:#e6edf3
 ```
 
@@ -74,9 +77,11 @@ command, git ref update, adb dump or config line becomes those inputs is classif
 | O12 | A healthy live arm requires offload. Frontier/Jev fallback requires a recorded confidence below the policy threshold. | `z0-guard policy` | audit, exit 3 on violations |
 | O13 | Shadow/canary/live requests and configured arms/families require exact-scope, risk-specific option capacity. Default zero; destructive never SLM. | `z0-guard policy` | audit, exit 3 with offending IDs |
 
+| O16 | A guarded SQLite store may be replaced/unlinked/recreated only with a complete empty-holder census; no ghost FD holders; auth count non-decreasing with a known baseline; sidecar remover holds the current DB inode. | `z0-guard sqlite-ghosts --db DB` | enforce for proposed-action refusals; read-only audit |
+
 Switch a gate: `Z0_GUARD_O<n>=off|report|enforce` in the environment, or
 `~/.config/z0-guard/modes.json` (`{"O3": "enforce"}`). `z0-guard modes` prints the effective modes.
-Every decision is appended to `~/.local/state/z0-guard/decisions.jsonl`.
+O16 emits only to stdout and does not persist receipts automatically. Other decisions are appended to `~/.local/state/z0-guard/decisions.jsonl`.
 
 ## O5 call site for the z0live broker (kvnloo/z0live#42)
 
@@ -278,3 +283,70 @@ findings with rule `synthetic-evidence-outside-tmp`. These findings increment
 - Parity: `python -m z0int.fsm.ops_parity` (MBP with the supplied Bend toolchain).
 - Incident replay: `python -m z0int.fsm.ops_replay tests/fixtures/ops_tapes/*.json`.
 - Tests: `tests/test_fsm_ops.py` (MBP via fleet-build; the two parity tests need Bend).
+
+
+## O16 SQLite lifecycle guard
+
+Incident: OMP recovered the shared `agent.db` by unlinking/recreating its path
+while a long-lived OMP instance still held the old DB/WAL/SHM inodes. SQLite's
+path-named sidecars then no longer shared the main DB's lock identity. Details,
+evidence boundaries and the unexecuted repair procedure are in
+[sqlite-store-root-cause.md](sqlite-store-root-cause.md).
+
+```sh
+PYTHONPATH=src python3 -m z0int.fsm.guard sqlite-ghosts --db ~/.omp/agent/agent.db \
+  --last-receipt /private/path/previous-count-receipt.json
+# Check a proposed action; it never performs the action:
+PYTHONPATH=src python3 -m z0int.fsm.guard sqlite-ghosts --db ~/.omp/agent/agent.db \
+  --last-receipt /private/path/previous-count-receipt.json --operation replace
+```
+
+`sqlite_guard.sqlite_decision` is the pure runtime table and
+`sqlite_guard.sqlite_receipt` gathers facts. Consumers must hold a separate
+cross-process lifecycle lock that ALL normal openers honor, then reobserve
+holders; a successful census is not a lock, authorization or permission to
+perform the proposed operation. The guard does not interpose on OMP or shell
+commands, and no service/hook has been installed. Do not treat this work as a
+live fix to upstream recovery.
+
+`/proc/*/fd` is scanned for deleted DB/WAL/SHM links, mismatched device/inode
+identities, and hard-link aliases of current inodes. Reports include PID/FD
+identities but never process environment, command arguments, schema or
+credential rows. Unknown/inaccessible process entries and identity changes
+fail closed. A missing or unreadable proc tree is unknown, not an empty set.
+The scan is namespace-local and does not cover mmap-only handles or arbitrary
+renamed old inodes whose guarded identity is no longer known.
+
+To avoid live SQLite's SHM bookkeeping and close-time sidecar cleanup, the
+count query executes only against a private, temporary DB+WAL copy. Source
+files are read through ordinary read-only descriptors; only the private copy
+can acquire SQLite locks/create SHM. Source metadata must stay identical
+through copy and query or the count is unknown. This is not a transactional
+backup or proof of database integrity; it is bounded observational evidence.
+Temporary copies (which may contain secrets) are mode 0600 inside a mode 0700
+directory and removed on normal/error exit. SIGKILL of the guard itself can
+leave a private temporary directory; respect the host's scratch cleanup.
+
+The previous receipt must have schema `z0.sqlite_guard.v1`, this exact resolved
+`db`, a nonnegative integer `auth_credentials_count`, and a nonfuture timestamp
+with a timezone. Only the count is compared. A missing/malformed receipt is
+unavailable, never a zero baseline. Without `--last-receipt` the read-only
+command looks for `STATE/sqlite-<sha256(resolved-db-path)>.json`; it never creates
+or overwrites that file. An operator can save stdout to a *different* file
+and explicitly select it for the next run, keeping historical higher counts
+rather than resetting the baseline after a loss. Counts alone cannot prove
+identity, validity, or per-provider preservation of credentials.
+
+Exit 3 means an observed invariant violation (default O16 enforce mode), 4
+means unavailable evidence, and 0 means no violation with available evidence.
+Violations take precedence over unavailability. Off/report modes do not grant
+authorization; `authorization` is always false. A proposed recreation with
+unknown auth is refused, not merely unavailable. `remove-sidecars` requires
+`--actor-pid` and a current main-DB FD for that PID; a WAL-only or ghost holder
+does not qualify. These are necessary conditions, not proof that manual
+sidecar deletion is safe or permitted; use SQLite's normal lifecycle instead.
+
+Until a stamped backend containing O16 is deployed, use the explicit checkout
+`PYTHONPATH=src` invocation above; the existing installed command may not know
+`sqlite-ghosts`. No deployment, checkpoint, restart or process signal belongs
+to this read-only audit.

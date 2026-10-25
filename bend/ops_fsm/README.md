@@ -1,13 +1,13 @@
 # Ops plane in Bend
 
-The owner's operating rules O1-O13 as decision
+The owner's operating rules O1-O13 and O16 as decision
 functions with proven laws. The gates that use them are documented in `docs/fsm/ops.md`.
 
 ```
 ops.bend       decision functions and the O8/O9 machines (constructors are prefixed: names are global)
-LAWS.bend      57 claims under O1-O13 (the owner's spec; do not weaken to pass)
+LAWS.bend      68 claims under O1-O13 and O16 (the owner's spec; do not weaken to pass)
 PROOF.bend     proofs (hand-written; no generator)
-mutations.py   65 broken variants of ops.bend; each must make PROOF.bend fail
+mutations.py   76 broken variants of ops.bend; each must make PROOF.bend fail
 receipt.json   `hermes bend verify` receipt
 ```
 
@@ -22,7 +22,7 @@ python3 bend/ops_fsm/mutations.py --verdict --out /tmp/ops-mutations.json
 PYTHONPATH=src python3 -m pytest -q tests/test_fsm_ops.py -k parity
 ```
 
-Require `ALL PROOFS CHECK`, a passing unmodified reference, **65/65 mutants
+Require `ALL PROOFS CHECK`, a passing unmodified reference, **76/76 mutants
 rejected**, and both parity tests passed (not skipped). Five mutants cover O10,
 nine cover O11/O12. The risk-capacity revision adds two O13 risk mutants
 and changes absent evidence from binary capacity to zero capacity.
@@ -45,6 +45,29 @@ not because a mutant fails to parse.
 | O12 | `o12_offload_obligation`, `o12_unhealthy_can_fallback`, `o12_abstain_can_fallback` |
 | O13 | `o13_option_capacity`, `o13_default_zero`, `o13_exact_scope`, `o13_credited_limit`, `o13_k2_rejected`, `o13_k24_rejected`, `o13_k119_rejected`, `o13_credited_excess_rejected`, `o13_destructive_never`, `o13_unknown_never`, `o13_read_authority`, `o13_reversible_authority` |
 
+| O16 | `o16_sqlite_replace_no_holders`, `o16_sqlite_replace_scan_complete`, `o16_sqlite_no_ghost_holders`, `o16_sqlite_auth_non_decreasing`, `o16_sqlite_auth_known`, `o16_sqlite_sidecar_current_inode`, `o16_sqlite_quiescent_replace`, `o16_sqlite_healthy_holders`, `o16_sqlite_auth_retained`, `o16_sqlite_current_sidecar`, `o16_sqlite_unknown_holders` |
+
 Bend notes from this plane: a law hypothesis of a `Data` type used twice needs a `+` rebind in
 the proof (`+ok2 = ok`); a decision function may not `match` a computed value (give it a
 helper like `npick`); after matching one parameter, match a sibling only inside a helper def.
+
+
+## SQLite lifecycle verification (O16)
+
+`sqlite-receipt.json` and `receipt.json` cover the same 68-claim book (Bend
+2.0.34, `source_semantics_attested: false`). `sqlite-mutations.json` and
+`mutations.json` record 76/76 rejections, including 11 O16 variants. The MBP
+fleet run passed 203 tests (ops, SQLite guard, policy guard), with parity not
+skipped. `sqlite-parity.json` records 1007 equal cases; the O16 Boolean domains
+are exhaustive and credential counts use the bounded set {0,1,9,10}.
+
+```sh
+PYTHONPATH=src python3 -m z0int.fsm.guard sqlite-ghosts --db ~/.omp/agent/agent.db
+PYTHONPATH=src python3 -m pytest -q tests/test_fsm_sqlite_guard.py
+PYTHONPATH=src python3 -m z0int.fsm.ops_replay tests/fixtures/ops_tapes/o16-sqlite-store.json
+```
+
+The command only observes; use `--operation replace|unlink|recreate|remove-sidecars`
+to refuse a *proposed* action, never execute it. No timer, service or OMP hook
+was deployed. Use this checkout's `PYTHONPATH=src` until a stamped backend
+containing O16 is deployed; an older installed `z0-guard` may lack the command.

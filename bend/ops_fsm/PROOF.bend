@@ -627,3 +627,39 @@ def Laws.o13_reversible_authority():
 
 def Laws.o13_destructive_request_never(credited, actual, named, measured, count):
   {==}
+
+
+# O16. Project the independent lifecycle requirements; positive rows prevent
+# vacuous always-refuse implementations.
+def Laws.o16_sqlite_replace_no_holders(complete, empty, w):
+  and_r(complete, empty, w)
+
+def Laws.o16_sqlite_replace_scan_complete(complete, empty, w):
+  and_l(complete, empty, w)
+
+def Laws.o16_sqlite_no_ghost_holders(complete, ghosts, w):
+  and_r(complete, Bool.not(ghosts), w)
+
+def Laws.o16_sqlite_auth_non_decreasing(known, before, after, w):
+  and_r(known, Bool.not(Nat.is_gt(before, after)), w)
+
+def Laws.o16_sqlite_auth_known(known, before, after, w):
+  and_l(known, Bool.not(Nat.is_gt(before, after)), w)
+
+def Laws.o16_sqlite_sidecar_current_inode(current, w):
+  w
+
+def Laws.o16_sqlite_quiescent_replace():
+  {==}
+
+def Laws.o16_sqlite_healthy_holders():
+  {==}
+
+def Laws.o16_sqlite_auth_retained():
+  {==}
+
+def Laws.o16_sqlite_current_sidecar():
+  {==}
+
+def Laws.o16_sqlite_unknown_holders(ghosts):
+  {==}

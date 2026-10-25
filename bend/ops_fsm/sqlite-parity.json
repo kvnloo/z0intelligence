@@ -1,0 +1,84 @@
+{
+  "seed": 0,
+  "random_per_group": 120,
+  "equal": true,
+  "total_cases": 1007,
+  "groups": {
+    "O1 admits": {
+      "cases": 39,
+      "equal": true
+    },
+    "O1 place": {
+      "cases": 52,
+      "equal": true
+    },
+    "O2 wt_allows": {
+      "cases": 28,
+      "equal": true
+    },
+    "O3 rollout": {
+      "cases": 128,
+      "equal": true
+    },
+    "O4 push_allows": {
+      "cases": 6,
+      "equal": true
+    },
+    "O5 tap": {
+      "cases": 8,
+      "equal": true
+    },
+    "O5 install/restart": {
+      "cases": 8,
+      "equal": true
+    },
+    "O6 a11y_ok": {
+      "cases": 120,
+      "equal": true
+    },
+    "O7 route_ok": {
+      "cases": 8,
+      "equal": true
+    },
+    "O8 nstep": {
+      "cases": 120,
+      "equal": true
+    },
+    "O8 emissions": {
+      "cases": 120,
+      "equal": true
+    },
+    "O9 rstep": {
+      "cases": 120,
+      "equal": true
+    },
+    "O10 phone_admits": {
+      "cases": 32,
+      "equal": true
+    },
+    "O10 phone_place": {
+      "cases": 32,
+      "equal": true
+    },
+    "O13 option_capacity_allows": {
+      "cases": 144,
+      "equal": true
+    },
+    "O16 replace": {
+      "cases": 4,
+      "equal": true
+    },
+    "O16 holders": {
+      "cases": 4,
+      "equal": true
+    },
+    "O16 auth": {
+      "cases": 32,
+      "equal": true
+    },
+    "O16 sidecars": {
+      "cases": 2,
+      "equal": true
+    }
+  }
+}

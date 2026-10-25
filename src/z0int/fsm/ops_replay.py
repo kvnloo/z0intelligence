@@ -181,8 +181,19 @@ def _o9(t):
                   "ok": len(recs) == len(t["before"]["units"]) and all(r["action"] == "interrupted" for r in recs)}
 
 
+def _o16(t):
+    from .sqlite_guard import sqlite_decision
+    rows, ok = [], True
+    for item in t["items"]:
+        d = sqlite_decision(**item["inputs"])
+        laws = [v["law"] for v in d["violations"]]
+        rows.append({"label": item["label"], "outcome": "flagged" if laws else "allowed", "laws": laws})
+        ok &= laws == item["expect"]
+    return rows, {"items": len(rows), "ok": ok}
+
+
 KINDS = {"commands": _o1, "reflog": _o2, "rollout": _o3, "push": _o4, "phone": _o5, "a11y": _o6,
-         "routing": _o7, "health": _o8, "gateway": _o9}
+         "routing": _o7, "health": _o8, "gateway": _o9, "sqlite-store": _o16}
 
 
 def replay(path: str) -> dict:
