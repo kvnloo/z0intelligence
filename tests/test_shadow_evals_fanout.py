@@ -7,8 +7,7 @@ import os
 from pathlib import Path
 import sqlite3
 import time
-from types import SimpleNamespace
-from urllib.error import HTTPError
+import threading
 
 import pytest
 
@@ -153,7 +152,6 @@ def make_usage_db(path, providers=('anthropic', 'openai-codex')):
 @pytest.fixture
 def bootstrap(config, tmp_path):
     config.update(phase='bootstrap', usage_db=str(make_usage_db(tmp_path / 'usage.sqlite')),
-                  subscription_adapter_sha256='not-used-by-offline-selection',
                   bootstrap_candidate_limit=30, bootstrap_judge_limit=153,
                   subscription_model_pins={'anthropic': ['claude-synthetic-2']})
     now = time.time()
@@ -244,17 +242,6 @@ def test_atomic_bootstrap_candidate_and_judge_caps_share_private_ledger(bootstra
     assert len(ledger['__calls__']['jobs']) == 10
 
 
-def test_native_adapter_digest_is_checked_before_executing(tmp_path):
-    source = tmp_path / 'adapter.py'
-    source.write_text('PIN = "synthetic"\n')
-    with pytest.raises(ImportError, match='digest_mismatch'):
-        fanout._module('test_adapter', source, 'wrong')
-    digest = hashlib.sha256(source.read_bytes()).hexdigest()
-    assert fanout._module('test_adapter', source, digest).PIN == 'synthetic'
-    source.write_text('PIN = "replacement"\n')
-    with pytest.raises(ImportError, match='digest_mismatch'):
-        fanout._module('test_adapter', source, digest)
-    assert not list(tmp_path.glob('__pycache__/*'))
 
 
 @pytest.mark.parametrize('change,code', [('disabled', 'live_authorization_missing_or_expired'),
@@ -280,46 +267,17 @@ def test_judge_also_rechecks_privacy_and_input_bound(bootstrap):
     assert not fanout.eligible_offer(bootstrap, offer)['eligible']
 
 
-class Response:
-    headers = {'content-type': 'text/event-stream'}
-    def __enter__(self):
-        return self
-    def __exit__(self, *args):
-        self.closed = True
-
-
-def test_luna_stream_stop_measures_first_delta_not_wall_duration(monkeypatch):
-    response = Response()
-    monkeypatch.setattr(fanout, 'build_opener', lambda *args: SimpleNamespace(open=lambda *a, **k: response))
-    def consume(events):
-        list(events)
-        raise AssertionError('client stop should interrupt native parser')
-    adapter = SimpleNamespace(_request=lambda *args: (object(), False),
-        _events=lambda *args: iter([{'type': 'response.created'},
-                                   {'type': 'response.output_text.delta', 'delta': 'abcdef'}]),
-        _responses=consume)
-    value = fanout._subscription_complete(adapter, {'provider': 'openai-codex', 'model': 'gpt-6-luna'},
-                                           [{'role': 'user', 'content': 'ask'}], {'max_tokens': 4})
-    assert value['content'] == 'abcdef'
-    assert value['finish_reason'] == 'client_byte_bound_stop'
-    assert value['ttft_ms'] is not None
-    assert value['output_tokens'] is None
-    assert value['server_overrun_tokens'] is None
-    assert value['client_limit_overrun_bytes'] == 2
-    assert value['output_limit_enforced'] is False
-    assert response.closed
 
 
 @pytest.mark.parametrize('status', [403, 429])
 def test_http_errors_are_honest_sanitized_and_never_retried(bootstrap, monkeypatch, status):
     offer = fanout.select_offers(bootstrap, {})['offers'][1]
-    monkeypatch.setattr(fanout, '_module', lambda *args: SimpleNamespace(
-        MODELS={'anthropic': ('claude-haiku-5-5',)}, credential_available=lambda p: True))
+    monkeypatch.setattr(fanout.shadow_evals_omp, 'credential_available', lambda *args, **kwargs: True)
     calls = []
-    def fail(*args):
+    def fail(*args, **kwargs):
         calls.append(1)
-        raise HTTPError('https://private.invalid/?token=secret', status, 'private body', {}, None)
-    monkeypatch.setattr(fanout, '_subscription_complete', fail)
+        raise fanout.shadow_evals_omp.OmpError('omp_provider_error', code=status)
+    monkeypatch.setattr(fanout.shadow_evals_omp, 'execute', fail)
     monkeypatch.setattr(fanout, '_observation', lambda *args: None)
     result = fanout.complete(offer, [{'role': 'user', 'content': 'synthetic'}],
                              {**bootstrap, 'call_job_id': 'first'})
@@ -336,17 +294,16 @@ def test_http_errors_are_honest_sanitized_and_never_retried(bootstrap, monkeypat
 
 
 @pytest.mark.parametrize('reason,expected', [
-    ('expected_event_stream', 'expected_event_stream'),
+    ('bootstrap_call_cap', 'bootstrap_call_cap'),
     ('credential_account_changed', 'credential_account_changed'),
     ('private-response-with-secret', 'completion_failed'),
 ])
 def test_transport_invariants_are_identifiable_without_private_error_text(bootstrap, monkeypatch, reason, expected):
     offer = fanout.select_offers(bootstrap, {})['offers'][1]
-    monkeypatch.setattr(fanout, '_module', lambda *args: SimpleNamespace(
-        MODELS={'anthropic': ('claude-haiku-5-5',)}, credential_available=lambda p: True))
-    def fail(*args):
+    monkeypatch.setattr(fanout.shadow_evals_omp, 'credential_available', lambda *args, **kwargs: True)
+    def fail(*args, **kwargs):
         raise ValueError(reason)
-    monkeypatch.setattr(fanout, '_subscription_complete', fail)
+    monkeypatch.setattr(fanout.shadow_evals_omp, 'execute', fail)
     monkeypatch.setattr(fanout, '_observation', lambda *args: None)
     result = fanout.complete(offer, [{'role': 'user', 'content': 'synthetic'}],
                              {**bootstrap, 'call_job_id': 'invariant'})
@@ -419,3 +376,22 @@ def test_bootstrap_output_bound_does_not_silently_relax(bootstrap):
     result = fanout.select_offers(bootstrap, {})
     assert result['offers'] == []
     assert result['exclusions'][0]['reason'] == 'invalid_bootstrap_output_or_call_limit'
+
+
+def test_candidate_requests_actually_overlap_and_preserve_offer_order(bootstrap, monkeypatch):
+    offers = fanout.select_offers(bootstrap, {})['offers']
+    entered = set()
+    lock = threading.Lock()
+    barrier = threading.Barrier(len(offers))
+    def completion(offer, messages, config):
+        with lock:
+            entered.add(offer['id'])
+        barrier.wait(timeout=5)
+        assert len(entered) == len(offers)
+        return {'provider': offer['provider'], 'model': offer['model'], 'content': '{}',
+                'metrics': {}, 'error': None}
+    monkeypatch.setattr(fanout, 'complete', completion)
+    bundle = {'ask': 'parallel synthetic ask', 'facts': [], 'sources': [],
+              'recent_user_msgs': [], 'bundle_hash': 'parallel-bundle'}
+    rows = fanout.run_candidates({'job_id': 'parallel-job'}, bundle, bootstrap)
+    assert [row['offer_id'] for row in rows] == [offer['id'] for offer in offers]

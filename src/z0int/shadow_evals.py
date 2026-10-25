@@ -139,14 +139,15 @@ def calibrate(config, audit_root):
                     if case.get('status') == 'missing_gold' else judge_candidate(job, bundle, candidate, config))
         rows.append({**case, 'judgment': judgment})
         save(root / 'calibration-rows.json', rows)
-        # A shared authorization/quota error stops the cohort; never retry it per case.
-        if judgment.get('error') and judgment.get('error') != 'missing_gold':
+        # Provider admission/transport errors are shared prerequisites. Malformed
+        # judge answers instead count as unknowns and do not erase the cohort.
+        if isinstance(judgment.get('error'), dict):
             break
     metrics = calibration_metrics(rows, expected_positive=positive, expected_negative=negative)
     evaluated = sum(not row['judgment'].get('error') for row in rows)
     failures = sum(row.get('gold_miss') is True for row in rows if not row['judgment'].get('error'))
     negatives = sum(row.get('gold_miss') is False for row in rows if not row['judgment'].get('error'))
-    state = {**metrics, 'ts': now(), 'selected': len(cases), 'inventory_size': len(inventory), 'selection_scope': 'first deterministic ready cases in each reviewed-label stratum; missing gold excluded explicitly', 'evaluated': evaluated, 'failures': failures, 'nonfailures': negatives, 'complete': bool(metrics.get('scores_enabled')) and evaluated == positive + negative and failures == positive and negatives == negative, 'judge': config.get('judge'), 'rubric_sha256': digest(RUBRIC)}
+    state = {**metrics, 'ts': now(), 'selected': len(cases), 'inventory_size': len(inventory), 'selection_scope': 'first deterministic ready cases in each reviewed-label stratum; missing gold excluded explicitly', 'evaluated': evaluated, 'scored_failures': failures, 'scored_nonfailures': negatives, 'complete': bool(metrics.get('scores_enabled')) and evaluated == positive + negative and failures == positive and negatives == negative, 'judge': config.get('judge'), 'rubric_sha256': digest(RUBRIC)}
     state['scores_enabled'] = state['complete']
     save(root / 'calibration-summary.json', state)
     return state
@@ -245,7 +246,7 @@ def report(config):
     for (provider, model), candidates in sorted(grouped.items()):
         values = []
         for dimension in RUBRIC:
-            scores = [r['judgment']['dimensions'][dimension]['score'] for r in candidates if dimension in r.get('judgment', {}).get('dimensions', {})]
+            scores = [r['judgment']['dimensions'][dimension]['score'] for r in candidates if type(r.get('judgment', {}).get('dimensions', {}).get(dimension, {}).get('score')) is int]
             values.append(f'{sum(scores)/len(scores):.2f} (n={len(scores)})' if scores else 'unmeasured')
         lines.append(f"| {provider}/{model} | " + ' | '.join(values) + ' |')
     if not grouped:
@@ -253,6 +254,18 @@ def report(config):
     lines += ['', '## Cheaper arms versus Sol by task class', '', '| Task class | Candidate | Dimension | Paired n | Unknown n | Candidate mean | Sol mean | Delta |', '|---|---|---|---:|---:|---:|---:|---:|']
     for item in comparison['summary']:
         lines.append(f"| {item['task_class']} | {item['candidate_model']} | {item['dimension']} | {item['paired_n']} | {item['unknown_n']} | {item['candidate_mean_score']} | {item['reference_mean_score']} | {item['mean_delta']} |")
+    matches = defaultdict(lambda: {'paired': 0, 'matched': 0, 'unknown': 0})
+    for pair in comparison['comparisons']:
+        tally = matches[(pair['task_class'], pair['candidate_model'])]
+        if pair['status'] != 'paired':
+            tally['unknown'] += 1
+            continue
+        tally['paired'] += 1
+        tally['matched'] += int(all(item['delta'] >= 0 for item in pair['dimensions'].values()))
+    lines += ['', '### Relative offload matches', '', '| Task class | Candidate | Not worse than Sol in every dimension | Paired | Unknown |', '|---|---|---:|---:|---:|']
+    for (task_class, candidate), tally in sorted(matches.items()):
+        lines.append(f"| {task_class} | {candidate} | {tally['matched']} | {tally['paired']} | {tally['unknown']} |")
+    lines += ['', 'A relative match is not an absolute quality gate or permission to offload. Sol can also fail the rubric.']
     lines += ['', 'These are paired rubric comparisons, not execution success. Context-failed arms remain unknown.', '', 'Calibration cohort and precision/recall Wilson intervals, including interval widths:', '', '```json', json.dumps({key: value for key, value in state.items() if key not in ('judge', 'rubric_sha256')}, indent=2), '```', '']
     lines += ['', '## Enablement', '', 'Not enabled unless calibration, remote tests, ten real-message replay and eligible offers are proven.', '', 'Unit: `systemd/z0-shadow-evals.service`.', '', 'Enable command (only after those gates pass): `systemctl --user enable --now z0-shadow-evals.service`.', '', 'Read `delivery.json` for exact Draft PR, commit and remote job evidence; absent fields are unverified.', '', 'Privacy exclusions and missing routing measurements are retained per job in `results/`.', 'No laws are auto-applied. Review `LAW-CANDIDATES.md` with Kevin.', '']
     delivery = root / 'delivery.json'

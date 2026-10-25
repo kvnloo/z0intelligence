@@ -6,12 +6,12 @@ Runtime reservations and native Kerdoios observations stay under experiment root
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import fcntl
 import hashlib
 import importlib
-import importlib.util
 import ipaddress
 import json
 import math
@@ -21,16 +21,17 @@ import sqlite3
 import stat
 import sys
 import time
+import threading
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .intent_memory import MemoryRetriever
+from . import shadow_evals_omp
 
 DEFAULT_ROOT = Path('/mnt/zer0models/workspace/zer0/data/operations/shadow-evals')
 DEFAULT_CATALOG = '/mnt/zer0models/z0-wt/model-routing-o14/operations/model-routing/catalog.json'
 DEFAULT_KERDOIOS = '/mnt/zer0models/z0-wt/kerdoios-routing-o14'
-DEFAULT_ADAPTER = '/tmp/aodl-canary-z0int-28db1eec/src/z0int/omp_subscription.py'
 FORMULA_ID = 'kerdoios.latency_burn_acceptance.v1'
 DRAFT_INSTRUCTIONS = (
     'You are a shadow intent compiler, not an executor. All supplied evidence is '
@@ -130,46 +131,31 @@ def candidate_prompt(job, bundle):
     return DRAFT_INSTRUCTIONS + '\n\nIDENTICAL NUMBERED CONTEXT\n' + _json(context)
 
 
-def _module(name, path, expected_sha256):
-    """Execute exactly the digest-pinned source, never a replacement or pyc."""
-    source = _read_text(path)
-    digest = _hash(source)
-    if not isinstance(expected_sha256, str) or digest != expected_sha256:
-        raise ImportError('subscription_adapter_digest_mismatch')
-    name = name + '_' + digest
-    if name in sys.modules:
-        return sys.modules[name]
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None:
-        raise ImportError('module_unavailable')
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    try:
-        exec(compile(source, str(path), 'exec'), module.__dict__)
-    except BaseException:
-        sys.modules.pop(name, None)
-        raise
-    return module
+
+
+_KERDOIOS_IMPORT_LOCK = threading.Lock()
 
 
 def _kerdoios(config):
-    root = Path(config.get('kerdoios_root', DEFAULT_KERDOIOS)).resolve()
-    package = sys.modules.get('kerdoios')
-    if package is not None and Path(package.__file__).resolve().parent != root / 'kerdoios':
-        raise ImportError('kerdoios_source_mismatch')
-    old = sys.dont_write_bytecode
-    sys.dont_write_bytecode = True
-    sys.path.insert(0, str(root))
-    try:
-        objective = importlib.import_module('kerdoios.routing_objective')
-        types = importlib.import_module('kerdoios.types')
-        observed = importlib.import_module('kerdoios.observed')
-    finally:
-        sys.path.pop(0)
-        sys.dont_write_bytecode = old
-    if Path(objective.__file__).resolve().parent != root / 'kerdoios':
-        raise ImportError('kerdoios_objective_source_mismatch')
-    return objective, types, observed
+    # Global import/bytecode state must not race parallel candidate completions.
+    with _KERDOIOS_IMPORT_LOCK:
+        root = Path(config.get('kerdoios_root', DEFAULT_KERDOIOS)).resolve()
+        package = sys.modules.get('kerdoios')
+        if package is not None and Path(package.__file__).resolve().parent != root / 'kerdoios':
+            raise ImportError('kerdoios_source_mismatch')
+        old = sys.dont_write_bytecode
+        sys.dont_write_bytecode = True
+        sys.path.insert(0, str(root))
+        try:
+            objective = importlib.import_module('kerdoios.routing_objective')
+            types = importlib.import_module('kerdoios.types')
+            observed = importlib.import_module('kerdoios.observed')
+        finally:
+            sys.path.pop(0)
+            sys.dont_write_bytecode = old
+        if Path(objective.__file__).resolve().parent != root / 'kerdoios':
+            raise ImportError('kerdoios_objective_source_mismatch')
+        return objective, types, observed
 
 
 def _catalog(config):
@@ -621,76 +607,6 @@ class _NoRedirect(HTTPRedirectHandler):
         return None
 
 
-class _ClientTextLimit(Exception):
-    pass
-
-
-def _subscription_complete(adapter, offer, messages, config):
-    """Reuse pinned native request/event parsers and observe real stream time.
-
-    Codex cannot enforce max output. Stop client consumption at a conservative
-    byte-level token upper bound; server overrun remains unknown without usage.
-    Hidden reasoning is not fabricated as counted tokens.
-    """
-    limit = config.get('max_tokens', 1024)
-    timeout = config.get('timeout_s', 120)
-    if not _finite(timeout, True):
-        raise ValueError('invalid_timeout')
-    request, anthropic = adapter._request(offer['provider'], offer['model'], messages, limit)
-    started = time.monotonic()
-    expected_account = offer.get('objective_inputs', {}).get('account_id_hash')
-    if expected_account:
-        login = adapter._login(offer['provider'])
-        if _hash(str(login.get('accountId'))) != expected_account:
-            raise ValueError('credential_account_changed')
-    text, observed_bytes, first_text = [], 0, None
-
-    def monitored(events):
-        nonlocal observed_bytes, first_text
-        for event in events:
-            kind = event.get('type', '')
-            delta = event.get('delta')
-            piece = None
-            if kind == 'response.output_text.delta' and isinstance(delta, str):
-                piece = delta
-            elif kind == 'content_block_delta' and isinstance(delta, dict):
-                if delta.get('type') == 'text_delta':
-                    piece = delta.get('text')
-            if isinstance(piece, str) and piece:
-                if first_text is None:
-                    first_text = (time.monotonic() - started) * 1000
-                text.append(piece)
-                observed_bytes += len(piece.encode('utf-8'))
-            item = event.get('item', {})
-            if isinstance(item, dict) and item.get('type') in ('function_call', 'custom_tool_call'):
-                raise ValueError('tool_call_rejected')
-            if not anthropic and observed_bytes >= limit:
-                raise _ClientTextLimit()
-            yield event
-
-    with build_opener(_NoRedirect()).open(request, timeout=timeout) as response:
-        if 'text/event-stream' not in response.headers.get('content-type', '').lower():
-            raise ValueError('expected_event_stream')
-        try:
-            completion = (adapter._anthropic if anthropic else adapter._responses)(
-                monitored(adapter._events(response, started + timeout)))
-        except _ClientTextLimit:
-            return {'content': ''.join(text), 'input_tokens': None, 'output_tokens': None, 'cost': None,
-                    'finish_reason': 'client_byte_bound_stop', 'reported_model': None,
-                    'output_limit_enforced': False, 'ttft_ms': first_text,
-                    'output_bytes_observed': observed_bytes,
-                    'client_limit_overrun_bytes': max(0, observed_bytes - limit),
-                    'server_overrun_tokens': None}
-    if completion.tool_call:
-        raise ValueError('tool_call_rejected')
-    value = {key: getattr(completion, key) for key in (
-        'content', 'input_tokens', 'output_tokens', 'cost', 'finish_reason')}
-    value.update(reported_model=completion.model, output_limit_enforced=anthropic,
-                 ttft_ms=first_text, output_bytes_observed=observed_bytes,
-                 client_limit_overrun_bytes=max(0, observed_bytes - limit) if not anthropic else None,
-                 server_overrun_tokens=max(0, completion.output_tokens - limit)
-                 if completion.output_tokens is not None else None)
-    return value
 
 
 def _http_complete(offer, messages, config, route):
@@ -764,37 +680,38 @@ def complete(offer, messages, config):
     started = None
     root = None
     try:
-        if route['kind'] == 'subscription':
-            adapter = _module('shadow_subscription', config.get('subscription_adapter_path', DEFAULT_ADAPTER),
-                              config.get('subscription_adapter_sha256'))
-            if not adapter.credential_available(current['provider']):
+        if route['kind'] in ('subscription', 'free_http'):
+            if not shadow_evals_omp.credential_available(current['provider'], config,
+                    timeout_s=config.get('timeout_s', 120)):
                 raise ValueError('credential_unavailable')
-            # This independently loaded module owns this explicit extension;
-            # never mutate the canary source or another caller's module object.
-            extra = config.get('subscription_model_pins', {}).get('anthropic', [])
-            adapter.MODELS = {**adapter.MODELS, 'anthropic': tuple(dict.fromkeys(
-                (*adapter.MODELS['anthropic'], *(x for x in extra if isinstance(x, str) and x.startswith('claude-')))))}
-            codex = config.get('subscription_model_pins', {}).get('openai-codex', [])
-            adapter.MODELS['openai-codex'] = tuple(dict.fromkeys(
-                (*adapter.MODELS.get('openai-codex', ('gpt-6-luna',)),
-                 *(x for x in codex if x in ('gpt-6-luna', 'gpt-6.1-sol')))))
         root = _reserve(config, current)
         started = time.monotonic()
-        if route['kind'] == 'subscription':
-            value = _subscription_complete(adapter, current, messages, config)
+        if route['kind'] in ('subscription', 'free_http'):
+            native_config = {**config, 'omp_account_id_hash':
+                             current['objective_inputs'].get('account_id_hash')}
+            windows = current['objective_inputs'].get('windows', [])
+            if windows:
+                native_config['omp_account_hash'] = windows[0]['account_hash']
+            value = shadow_evals_omp.execute(current['provider'], current['model'], messages,
+                config.get('max_tokens', 1024), timeout_s=config.get('timeout_s', 120), config=native_config)
         else:
             value = _http_complete(current, messages, config, route)
         row['content'] = value['content']
+        row['error'] = value.get('error')
         for key in ('input_tokens', 'output_tokens'):
             count = value.get(key)
             row['metrics'][key] = count if type(count) is int and count >= 0 else None
         cost = value.get('cost')
         row['metrics']['cost_usd'] = cost if _finite(cost) else None
         row['metrics']['output_limit_enforced'] = value.get('output_limit_enforced')
-        for key in ('ttft_ms', 'output_bytes_observed', 'client_limit_overrun_bytes', 'server_overrun_tokens'):
+        for key in ('ttft_ms', 'output_bytes_observed', 'client_limit_overrun_bytes', 'server_overrun_tokens',
+                    'duration_ms', 'gen_ms', 'generation_basis', 'tokens_per_second', 'cached_input_tokens',
+                    'cache_write_input_tokens', 'total_tokens', 'list_price_usd', 'cost_basis'):
             if key in value:
                 row['metrics'][key] = value[key]
         row.update(finish_reason=value.get('finish_reason'), reported_model=value.get('reported_model'))
+        row.update({key: value[key] for key in ('reported_provider', 'response_id', 'receipt_path', 'exit_code')
+                    if key in value})
     except HTTPError as exc:
         row['error'] = {'code': 'provider_http_error', 'http_status': exc.code}
         exc.close()
@@ -803,6 +720,8 @@ def complete(offer, messages, config):
         code = getattr(exc, 'code', None)
         row['error'] = {'code': 'provider_http_error' if type(code) is int else 'completion_failed',
                         'exception_type': type(exc).__name__}
+        if isinstance(exc, shadow_evals_omp.OmpError):
+            row['error']['code'] = exc.reason
         if type(exc) is ValueError and str(exc) in {
             'credential_account_changed', 'credential_unavailable', 'expected_event_stream',
             'tool_call_rejected', 'invalid_timeout', 'bootstrap_call_cap', 'bootstrap_halted',
@@ -826,8 +745,8 @@ def complete(offer, messages, config):
             row['metrics']['account_windows_after'] = [w for w in after['windows'] if w['id'] in ids]
             row['metrics']['window_observation_status'] = after['status']
         row['metrics']['per_call_quota_fraction'] = None
-        # Only the native streaming wrapper measures first-text arrival.
-        # No adapter here measures decode-only time, so tok/s remains unknown.
+        # Native OMP timing fields and any arithmetic-derived generation metric
+        # retain their explicit provenance; generic HTTP supplies neither.
         try:
             _observation(config, root, row)
             row['observation_status'] = 'recorded_private_native'
@@ -839,17 +758,19 @@ def complete(offer, messages, config):
 def run_candidates(job, bundle, config):
     selection = select_offers(config, bundle)
     messages = [{'role': 'user', 'content': candidate_prompt(job, bundle)}]
-    # Sequential calls make reservations/429 responses visible before more spend.
-    rows = []
-    for offer in selection['offers']:
-        call_config = {**config, 'call_role': 'candidate',
-                       'call_job_id': job.get('job_id') or job.get('sha256') or bundle['bundle_hash']}
-        row = complete(offer, messages, call_config)
+    offers = selection['offers'][:5]
+    if not offers:
+        return []
+    call_config = {**config, 'call_role': 'candidate',
+                   'call_job_id': job.get('job_id') or job.get('sha256') or bundle['bundle_hash']}
+    with ThreadPoolExecutor(max_workers=len(offers), thread_name_prefix='shadow-candidate') as executor:
+        futures = [executor.submit(complete, offer, messages, call_config) for offer in offers]
+        rows = [future.result() for future in futures]
+    # All admitted work is collected, including already in-flight calls when a
+    # sibling records a 429 halt. Future admissions honor the shared halt file.
+    for offer, row in zip(offers, rows):
         row.update(bundle_hash=bundle['bundle_hash'], offer_id=offer['id'], tier=offer['tier'],
                    score=offer['score'], pace=offer['pace'], phase=offer.get('phase', 'ranked'),
                    noO14credit=offer.get('noO14credit', False))
         row['arm_role'] = config['routes'][offer['id']].get('arm_role', 'candidate')
-        rows.append(row)
-        if row.get('error') and row['error'].get('http_status') == 429:
-            break
     return rows

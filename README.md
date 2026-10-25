@@ -508,6 +508,15 @@ evidence; OpenCode is limited to Go/Zen free models. Private subscription and
 owned local GPU routes still need explicit entitlement, context-fit and
 budget checks. Oversized context is excluded, never silently truncated.
 
+Subscription calls use the installed OMP provider stack in headless JSON mode,
+with tools, extensions, rules, skills, retries and fallback disabled. Each call
+gets a private agent directory and a read-only-source OAuth/model-cache
+snapshot; it does not mutate the operator's live credential or session store.
+The parser is bound to a redacted, real OMP 18.12.6 receipt fixture. It counts
+terminal assistant receipts once and separates modeled list price from actual
+billed spend. A client stop records unknown provider overrun rather than
+claiming the server honored a native output cap.
+
 `systemd/z0-shadow-evals.service` is a user-unit template, not an instruction
 to enable an unproven experiment. Enable only after the private report records
 remote test evidence, complete admitted judge calibration (103/50 full audit
