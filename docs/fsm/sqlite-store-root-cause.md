@@ -319,3 +319,11 @@ from this subagent's own read-only Hermes session records. The source was
 reconstructed and committed immediately, then focused checks and proof were
 re-exercised. No other worktree was reset or cleaned by this task. Preserve
 commits/checkpoints before running concurrent cleanup.
+
+
+Final post-recovery verification: MBP job `fleet-mbp-e2d1f652b821467e`
+checked committed source `bfae843` and passed all 203 targeted tests, with
+parity enabled; its independent parity result is again 1007 equal cases.
+Receipts are in the external `fleet-final/sqlite-final-tests.log` and
+`fleet-final/sqlite-final-parity.json` under the report directory. Subsequent
+edits only annotate this evidence and the guard module's mode documentation.

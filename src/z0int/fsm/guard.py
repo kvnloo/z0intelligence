@@ -21,7 +21,7 @@ the inputs (git, systemd, adb, broker.db, configs, gh) and acts on the verdict.
     z0-guard replay TAPE...             replay incident tapes through the gates
     z0-guard modes                      show each gate's mode
 
-Modes: off | report | enforce. Default enforce for O1, O2, O4, O6, O10 (pure refusals
+Modes: off | report | enforce. Default enforce for O1, O2, O4, O6, O10, O16 (pure refusals
 of known-bad actions); report for O3, O5, O7, O8, O9. Override per gate with
 Z0_GUARD_O<n>=MODE or ~/.config/z0-guard/modes.json. A gate's verdict is never
 an authorization: a pass means only "this gate did not refuse".
