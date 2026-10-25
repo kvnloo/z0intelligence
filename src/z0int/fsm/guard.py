@@ -11,6 +11,8 @@ the inputs (git, systemd, adb, broker.db, configs, gh) and acts on the verdict.
     z0-guard rollout ...                O2+O3 merge --ff-only, idle check, restart, launch check, rollback
     z0-guard prepush REMOTE URL         O4  (stdin: git pre-push lines)
     z0-guard phone --kind tap ...       O5  decision for the owner's phone
+    z0-guard desktop --kind see|open|input [--interactive] [--utterance S] [--resolve]
+                                        O15 live Hyprland desktop vs owned headless Sway
     z0-guard a11y --pre S --post S      O6
     z0-guard routing                    O7  provider routing checker (read-only, never prints keys)
     z0-guard health-step ...            O8  one node-health probe through the notify machine
@@ -20,7 +22,7 @@ the inputs (git, systemd, adb, broker.db, configs, gh) and acts on the verdict.
     z0-guard replay TAPE...             replay incident tapes through the gates
     z0-guard modes                      show each gate's mode
 
-Modes: off | report | enforce. Default enforce for O1, O2, O4, O6, O10 (pure refusals
+Modes: off | report | enforce. Default enforce for O1, O2, O4, O6, O10, O15 (pure refusals
 of known-bad actions); report for O3, O5, O7, O8, O9. Override per gate with
 Z0_GUARD_O<n>=MODE or ~/.config/z0-guard/modes.json. A gate's verdict is never
 an authorization: a pass means only "this gate did not refuse".
@@ -61,7 +63,8 @@ HERMES_CHECKOUT = Path(os.environ.get("Z0_HERMES_CHECKOUT", "/workspace/hermes-h
 GROOT_NAMES = {"groot"}
 CALL_CHAIN_PACKAGES = {"app.lawnchair.play.debug"}
 DEFAULT_MODES = {"O1": "enforce", "O2": "enforce", "O3": "report", "O4": "enforce", "O5": "report",
-                 "O6": "enforce", "O7": "report", "O8": "report", "O9": "report", "O10": "enforce"}
+                 "O6": "enforce", "O7": "report", "O8": "report", "O9": "report", "O10": "enforce",
+                 "O15": "enforce"}
 EXIT_REFUSED = 3
 ZERO = "0" * 40
 
@@ -778,6 +781,96 @@ def cmd_phone(a) -> int:
     return verdict("O5", not d["allowed"], {"decision": d, "utterance": (a.utterance or "")[:160]})
 
 
+# ------------------------------------------------------------------ O15 owner desktop
+
+def live_desktop(uid: int | None = None) -> dict | None:
+    """Locate the owner's running Hyprland session without touching it: the instance whose
+    socket answers, its Wayland socket and outputs. None when no instance answers."""
+    import socket as _socket
+    uid = os.getuid() if uid is None else uid
+    run = Path(f"/run/user/{uid}")
+    hyp = run / "hypr"
+    try:
+        sigs = sorted(hyp.iterdir(), key=lambda d: d.stat().st_mtime, reverse=True)
+    except OSError:
+        return None
+    for d in sigs:
+        sock = d / ".socket.sock"
+        try:
+            with _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM) as c:
+                c.settimeout(2)
+                c.connect(str(sock))
+                c.sendall(b"j/monitors")
+                data = b""
+                while chunk := c.recv(65536):
+                    data += chunk
+        except OSError:
+            continue
+        try:
+            mons = json.loads(data.decode(errors="replace"))
+        except ValueError:
+            mons = []
+        wl = sorted(p.name for p in run.glob("wayland-*") if not p.name.endswith(".lock"))
+        return {"HYPRLAND_INSTANCE_SIGNATURE": d.name, "XDG_RUNTIME_DIR": str(run),
+                "WAYLAND_DISPLAY": wl[0] if wl else None,
+                "outputs": [{"name": m.get("name"), "focused": m.get("focused"),
+                             "workspace": (m.get("activeWorkspace") or {}).get("name")} for m in mons]}
+    return None
+
+
+LOOK_RECIPES = [
+    "tern ls; tern capture BLOCK --scrollback    # read Tern panes, no focus change",
+    "hyprctl -j clients / -j monitors            # list windows and outputs (with the env above)",
+    "grim -o OUTPUT FILE.png                      # capture one output, no focus change",
+]
+
+
+def desktop_decision(kind: str, *, interactive: bool, utterance: str | None = None,
+                     live_ask: bool | None = None, input_ask: bool | None = None,
+                     moves: bool = False, target: str = "auto") -> dict:
+    """The O15 decision for agents about to look at, open on, or drive a desktop.
+    target "auto" answers where to do it; "live"/"sway" asks whether that surface is allowed."""
+    k = P.DKind(kind)
+    c_live, c_input = P.owner_desktop_intent(utterance or "")
+    live_ask = c_live if live_ask is None else live_ask
+    input_ask = c_input if input_ask is None else input_ask
+    flags = dict(interactive=interactive, live_ask=live_ask, input_ask=input_ask, moves=moves)
+    live_ok = P.desk_allows(P.DSurf.LIVE, k, **flags)
+    route = P.desk_surface(interactive, live_ask)
+    if k is P.DKind.SEE and live_ok:
+        route = P.DSurf.LIVE           # looking without moving is open to every agent
+    elif route is P.DSurf.LIVE and not live_ok:
+        route = P.DSurf.SWAY
+    surface = route if target == "auto" else P.DSurf(target)
+    ok = P.desk_allows(surface, k, **flags)
+    reasons = []
+    if not live_ok:
+        if not interactive:
+            reasons.append("unattended: use owned headless Sway")
+        elif not live_ask:
+            reasons.append("ask does not point at the owner's screen: use owned headless Sway")
+        else:
+            reasons.append("owner did not ask for keyboard/mouse input")
+    return {"allowed": ok, "live_allowed": live_ok, "kind": k.value, "surface": surface.value,
+            "route": route.value, "collab": P.desk_collab(interactive, live_ask), "interactive": interactive,
+            "live_ask": live_ask, "input_ask": input_ask, "moves": moves,
+            "on_unreachable": P.desk_unreachable(interactive, live_ask), "reasons": reasons}
+
+
+def cmd_desktop(a) -> int:
+    live = None if a.live_ask is None else a.live_ask == "yes"
+    inp = None if a.input_ask is None else a.input_ask == "yes"
+    d = desktop_decision(a.kind, interactive=a.interactive, utterance=a.utterance, live_ask=live,
+                         input_ask=inp, moves=a.moves, target=a.surface)
+    rec = {"decision": d, "utterance": (a.utterance or "")[:160]}
+    if a.resolve and d["surface"] == "live":
+        rec["live_desktop"] = live_desktop()
+        rec["look"] = LOOK_RECIPES
+        if rec["live_desktop"] is None and d["on_unreachable"] == "resolve":
+            rec["next"] = "no Hyprland socket answered: check `ls /run/user/$UID/hypr`, `pgrep -a Hyprland`, then retry"
+    return verdict("O15", not d["allowed"], rec)
+
+
 # ------------------------------------------------------------------ O6 accessibility
 
 def cmd_a11y(a) -> int:
@@ -1106,6 +1199,19 @@ def main(argv: list[str] | None = None) -> int:
     ph.add_argument("--chain", action="store_true")
     ph.add_argument("--call", choices=["auto", "live", "idle"], default="auto")
     ph.set_defaults(fn=cmd_phone)
+
+    dk = sub.add_parser("desktop", help="O15: live desktop vs owned headless Sway")
+    dk.add_argument("--kind", choices=[k.value for k in P.DKind], required=True)
+    dk.add_argument("--interactive", action="store_true",
+                    help="the owner is live in this chat (never for cron, subagents or unattended runs)")
+    dk.add_argument("--utterance", help="the owner's current message")
+    dk.add_argument("--live-ask", choices=["yes", "no"], help="override the classifier: ask points at the owner's screen")
+    dk.add_argument("--input-ask", choices=["yes", "no"], help="override the classifier: owner asked for kbm input")
+    dk.add_argument("--moves", action="store_true", help="a look that changes focus, cursor or workspace")
+    dk.add_argument("--surface", choices=["auto", "live", "sway"], default="auto",
+                    help="auto: say where to do it; live/sway: refuse if that surface is not allowed")
+    dk.add_argument("--resolve", action="store_true", help="also locate the live Hyprland session (read-only)")
+    dk.set_defaults(fn=cmd_desktop)
 
     ay = sub.add_parser("a11y", help="O6: accessibility preservation")
     ay.add_argument("--pre", required=True)

@@ -484,3 +484,88 @@ law o13_destructive_request_never:
   for measured: Nat
   for count: Nat
   {O.risk_option_capacity_allows(2n, credited, actual, named, measured, count) == False{} : Bool}
+
+# O15. Owner desktop: Sway by default, the live desktop only to look or to collaborate
+# -------------------------------------------------------------------------------------
+# the owned headless Sway surface is always allowed
+law o15_sway_always:
+  for a: O.DAct
+  for i: Bool
+  for l: Bool
+  for k: Bool
+  {O.desk_allows(O.DSway{}, a, i, l, k) == True{} : Bool}
+
+# any agent may look at the live desktop without moving anything
+law o15_look_without_moving:
+  for i: Bool
+  for l: Bool
+  for k: Bool
+  {O.desk_allows(O.DLive{}, O.DSee{False{}}, i, l, k) == True{} : Bool}
+
+# opening a window on the live desktop needs collaboration
+law o15_open_needs_collab:
+  for i: Bool
+  for l: Bool
+  for k: Bool
+  for w: T(O.desk_allows(O.DLive{}, O.DOpen{}, i, l, k))
+  T(Bool.and(i, l))
+
+# keyboard/mouse input on the live desktop needs collaboration ...
+law o15_input_needs_collab:
+  for i: Bool
+  for l: Bool
+  for k: Bool
+  for w: T(O.desk_allows(O.DLive{}, O.DInput{}, i, l, k))
+  T(Bool.and(i, l))
+
+# ... and the owner asking for input
+law o15_input_needs_ask:
+  for i: Bool
+  for l: Bool
+  for k: Bool
+  for w: T(O.desk_allows(O.DLive{}, O.DInput{}, i, l, k))
+  T(k)
+
+# a look that moves focus, cursor or workspace counts as input
+law o15_moving_look_is_input:
+  for i: Bool
+  for l: Bool
+  for k: Bool
+  for w: T(O.desk_allows(O.DLive{}, O.DSee{True{}}, i, l, k))
+  T(Bool.and(Bool.and(i, l), k))
+
+# collaboration opens windows without a further approval prompt
+law o15_collab_opens:
+  for k: Bool
+  {O.desk_allows(O.DLive{}, O.DOpen{}, True{}, True{}, k) == True{} : Bool}
+
+# collaboration with an input ask drives keyboard and mouse
+law o15_collab_drives:
+  {O.desk_allows(O.DLive{}, O.DInput{}, True{}, True{}, True{}) == True{} : Bool}
+
+# collaboration routes to the live desktop
+law o15_collab_routes_live:
+  {O.desk_surface(True{}, True{}) == O.DLive{} : O.DSurf}
+
+# unattended work routes to Sway whatever it was asked
+law o15_unattended_routes_sway:
+  for l: Bool
+  {O.desk_surface(False{}, l) == O.DSway{} : O.DSurf}
+
+# a request that does not point at the owner's screen routes to Sway
+law o15_no_live_ask_routes_sway:
+  for i: Bool
+  {O.desk_surface(i, False{}) == O.DSway{} : O.DSurf}
+
+# collaboration never gives up on an unreachable desktop: it locates it
+law o15_collab_resolves:
+  {O.desk_unreachable(True{}, True{}) == O.DResolve{} : O.DNext}
+
+# solo work reports its gap and never falls back to the live desktop
+law o15_solo_reports:
+  for l: Bool
+  {O.desk_unreachable(False{}, l) == O.DReport{} : O.DNext}
+
+law o15_no_ask_reports:
+  for i: Bool
+  {O.desk_unreachable(i, False{}) == O.DReport{} : O.DNext}

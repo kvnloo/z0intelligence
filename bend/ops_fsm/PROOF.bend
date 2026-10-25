@@ -627,3 +627,62 @@ def Laws.o13_reversible_authority():
 
 def Laws.o13_destructive_request_never(credited, actual, named, measured, count):
   {==}
+
+# O15. Owner desktop
+# ------------------
+
+def Laws.o15_sway_always(a, i, l, k):
+  {==}
+
+def Laws.o15_look_without_moving(i, l, k):
+  {==}
+
+def Laws.o15_open_needs_collab(i, l, k, w):
+  w
+
+def Laws.o15_input_needs_collab(i, l, k, w):
+  and_l(Bool.and(i, l), k, w)
+
+def Laws.o15_input_needs_ask(i, l, k, w):
+  and_r(Bool.and(i, l), k, w)
+
+def Laws.o15_moving_look_is_input(i, l, k, w):
+  w
+
+def Laws.o15_collab_opens(k):
+  {==}
+
+def Laws.o15_collab_drives():
+  {==}
+
+def Laws.o15_collab_routes_live():
+  {==}
+
+def Laws.o15_unattended_routes_sway(l):
+  {==}
+
+def no_ask_surface(i: Bool) -> {O.surface_by(Bool.and(i, False{})) == O.DSway{} : O.DSurf}:
+  match i:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def Laws.o15_no_live_ask_routes_sway(i):
+  no_ask_surface(i)
+
+def Laws.o15_collab_resolves():
+  {==}
+
+def Laws.o15_solo_reports(l):
+  {==}
+
+def no_ask_next(i: Bool) -> {O.next_by(Bool.and(i, False{})) == O.DReport{} : O.DNext}:
+  match i:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def Laws.o15_no_ask_reports(i):
+  no_ask_next(i)

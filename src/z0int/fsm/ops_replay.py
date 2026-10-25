@@ -1,4 +1,4 @@
-"""Replay the 2026-10-21 incident tapes (tests/fixtures/ops_tapes) through the ops gates.
+"""Replay the incident tapes (2026-10-21; O15 2026-10-25) (tests/fixtures/ops_tapes) through the ops gates.
 
 Each tape is real evidence from that day (or says which part is reconstructed).
 The replay calls the same decision code the live gates call and prints, per
@@ -181,8 +181,23 @@ def _o9(t):
                   "ok": len(recs) == len(t["before"]["units"]) and all(r["action"] == "interrupted" for r in recs)}
 
 
+def _o15(t):
+    rows, ok = [], True
+    for it in t["items"]:
+        d = G.desktop_decision(it["kind"], interactive=it["interactive"], utterance=it.get("utterance"))
+        out = "allowed" if d["live_allowed"] else "refused"     # on the owner's live desktop
+        good = out == it["expect"]
+        good &= it.get("expect_surface", d["surface"]) == d["surface"]
+        good &= it.get("expect_on_unreachable", d["on_unreachable"]) == d["on_unreachable"]
+        rows.append({"event": it["event"], "outcome": out, "surface": d["surface"],
+                     "on_unreachable": d["on_unreachable"], "reasons": d["reasons"], "actual": it["actual"]})
+        ok &= good
+    return rows, {"ok": ok}
+
+
 KINDS = {"commands": _o1, "reflog": _o2, "rollout": _o3, "push": _o4, "phone": _o5, "a11y": _o6,
-         "routing": _o7, "health": _o8, "gateway": _o9}
+         "routing": _o7, "health": _o8, "gateway": _o9,
+         "desktop": _o15}
 
 
 def replay(path: str) -> dict:

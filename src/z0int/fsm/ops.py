@@ -296,6 +296,45 @@ def risk_option_capacity_allows(risk: int, credited: bool, actual_scope: int,
             and option_capacity_allows(credited, actual_scope, named_scope, measured, count))
 
 
+# O15: owner desktop. LIVE = the owner's Hyprland desktop; SWAY = the agent's owned
+# headless Sway. SEE never moves focus/cursor/workspace unless `moves` is set.
+class DKind(Enum):
+    SEE = "see"          # tern ls/capture, grim -o OUTPUT, AT-SPI reads
+    OPEN = "open"        # open a window or URL on the desktop
+    INPUT = "input"      # keyboard, mouse, focus, workspace switches
+
+
+class DSurf(Enum):
+    LIVE = "live"
+    SWAY = "sway"
+
+
+def desk_collab(interactive: bool, live_ask: bool) -> bool:
+    return interactive and live_ask
+
+
+def desk_allows(surface: DSurf, kind: DKind, *, interactive: bool = False, live_ask: bool = False,
+                input_ask: bool = False, moves: bool = False) -> bool:
+    if surface is DSurf.SWAY:
+        return True
+    collab = desk_collab(interactive, live_ask)
+    if kind is DKind.SEE:
+        return (not moves) or (collab and input_ask)
+    if kind is DKind.OPEN:
+        return collab
+    return collab and input_ask
+
+
+def desk_surface(interactive: bool, live_ask: bool) -> DSurf:
+    return DSurf.LIVE if desk_collab(interactive, live_ask) else DSurf.SWAY
+
+
+def desk_unreachable(interactive: bool, live_ask: bool) -> str:
+    """'resolve' = locate the live desktop (hyprctl instances, grim -o, tern capture) and retry;
+    'report' = state the gap, never fall back to the live desktop."""
+    return "resolve" if desk_collab(interactive, live_ask) else "report"
+
+
 # =================================================================== classifiers
 # Heuristics that map real inputs to the abstract ones above. Not proven.
 
@@ -396,3 +435,25 @@ def provider_flags(provider: str | None, model: str | None) -> tuple[bool, bool]
 
 def design_role(role: str) -> bool:
     return bool(_DESIGN_ROLE.search(role or ""))
+
+
+# O15: does the owner's ask point at his own screen (live_ask), and does it ask the agent to
+# drive keyboard/mouse there (input_ask)? Heuristic, not proven. `interactive` is not inferred
+# from text: the harness supplies it (owner live in this chat vs cron/subagent/unattended).
+_DESK_SCREEN = re.compile(r"\b(my|this|the other|other|left|right|second|main) (monitor|screen|display|desktop|workspace|ws)\b"
+                          r"|\bon my (end|side|machine|computer|pc)\b|\bsee (what i see|my|it on)\b"
+                          r"|\b(open|show|pull up|bring up|put)\b.{0,24}\b(here|in (zen|chrome|firefox|the browser|my browser|my ws|my workspace))\b"
+                          r"|\b(together|with me|pair|screen ?share)\b|\blook at (my|this) (screen|monitor|window)\b", re.I)
+_DESK_INPUT = re.compile(r"\b(click|type|press|scroll|drag|fill( it| in| out)?|log ?in|sign ?in|navigate|toggle|check the box|"
+                         r"move (the|my) (mouse|cursor)|use (my )?(mouse|keyboard|kbm)|drive (it|my)|take (over|control)|"
+                         r"do it (for me|yourself)|just (fix|do) it|you do it)\b", re.I)
+_DESK_NEG = re.compile(r"\b(don'?t|do not|never|without) (touch|move|use|take)\b.*\b(mouse|cursor|keyboard|kbm|screen|monitor|desktop)\b"
+                       r"|\b(in|on) (sway|headless|the background)\b|\bby yourself\b|\bon your own\b", re.I)
+
+
+def owner_desktop_intent(utterance: str) -> tuple[bool, bool]:
+    """(live_ask, input_ask) for the owner's current message."""
+    u = utterance or ""
+    if _DESK_NEG.search(u):
+        return False, False
+    return bool(_DESK_SCREEN.search(u)), bool(_DESK_INPUT.search(u))

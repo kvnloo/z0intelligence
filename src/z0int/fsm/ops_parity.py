@@ -161,6 +161,18 @@ def cases(seed: int = 0, n_rand: int = 120) -> list[tuple[str, str, str, str]]:
         args = f"{b(credited)}, {n(actual)}, {n(named)}, {n(measured)}, {n(count)}"
         out.append(("O13 option_capacity_allows", "Bool", f"O.option_capacity_allows({args})",
                     b(P.option_capacity_allows(credited, actual, named, measured, count))))
+    for kind, i, l, k, mv, surf in itertools.product(P.DKind, B2, B2, B2, B2, P.DSurf):
+        if kind is not P.DKind.SEE and mv:
+            continue
+        act = {P.DKind.SEE: f"O.DSee{{{b(mv)}}}", P.DKind.OPEN: "O.DOpen{}", P.DKind.INPUT: "O.DInput{}"}[kind]
+        srf = "O.DLive{}" if surf is P.DSurf.LIVE else "O.DSway{}"
+        out.append(("O15 desk_allows", "Bool", f"O.desk_allows({srf}, {act}, {b(i)}, {b(l)}, {b(k)})",
+                    b(P.desk_allows(surf, kind, interactive=i, live_ask=l, input_ask=k, moves=mv))))
+    for i, l in itertools.product(B2, B2):
+        out.append(("O15 desk_surface", "O.DSurf", f"O.desk_surface({b(i)}, {b(l)})",
+                    "ops.DLive{}" if P.desk_surface(i, l) is P.DSurf.LIVE else "ops.DSway{}"))
+        out.append(("O15 desk_unreachable", "O.DNext", f"O.desk_unreachable({b(i)}, {b(l)})",
+                    "ops.DResolve{}" if P.desk_unreachable(i, l) == "resolve" else "ops.DReport{}"))
     return out
 
 

@@ -489,3 +489,69 @@ def option_risk_allows(risk: Nat) -> Bool:
 
 def risk_option_capacity_allows(risk: Nat, credited: Bool, actual_scope: Nat, named_scope: Nat, measured: Nat, count: Nat) -> Bool:
   Bool.and(option_risk_allows(risk), option_capacity_allows(credited, actual_scope, named_scope, measured, count))
+
+# ------------------------------------------------------------------ O15
+# Owner desktop. Two surfaces: the owner's live Hyprland desktop and the
+# agent's owned headless Sway. Agent work defaults to Sway. Collaboration =
+# the owner is live in this chat (`interactive`; not cron, a subagent or an
+# unattended run) AND the current ask points at the owner's own screen
+# (`live_ask`: "my monitor", "open it in zen", "see my screen"). Any agent may
+# look at the live desktop without moving anything (tern ls/capture, grim -o,
+# AT-SPI reads) to gather context. Opening a window there needs collaboration;
+# keyboard/mouse input there, or a look that moves focus, also needs the owner
+# to ask for input (`input_ask`). Sway is always allowed. When the live desktop
+# looks unreachable during collaboration the next step is to locate it, never
+# to report "I can't see your monitor"; outside collaboration a failed Sway
+# run reports its gap and never falls back to the live desktop.
+
+type DAct is Data:
+  DSee{moves: Bool}
+  DOpen{}
+  DInput{}
+
+type DSurf is Data:
+  DLive{}
+  DSway{}
+
+type DNext is Data:
+  DResolve{}
+  DReport{}
+
+def desk_collab(interactive: Bool, live_ask: Bool) -> Bool:
+  Bool.and(interactive, live_ask)
+
+def live_allows(a: DAct, collab: Bool, input_ask: Bool) -> Bool:
+  match a:
+    case DSee{moves}:
+      Bool.or(Bool.not(moves), Bool.and(collab, input_ask))
+    case DOpen{}:
+      collab
+    case DInput{}:
+      Bool.and(collab, input_ask)
+
+def desk_allows(s: DSurf, a: DAct, interactive: Bool, live_ask: Bool, input_ask: Bool) -> Bool:
+  match s:
+    case DSway{}:
+      True{}
+    case DLive{}:
+      live_allows(a, desk_collab(interactive, live_ask), input_ask)
+
+def surface_by(c: Bool) -> DSurf:
+  match c:
+    case True{}:
+      DLive{}
+    case False{}:
+      DSway{}
+
+def desk_surface(interactive: Bool, live_ask: Bool) -> DSurf:
+  surface_by(desk_collab(interactive, live_ask))
+
+def next_by(c: Bool) -> DNext:
+  match c:
+    case True{}:
+      DResolve{}
+    case False{}:
+      DReport{}
+
+def desk_unreachable(interactive: Bool, live_ask: Bool) -> DNext:
+  next_by(desk_collab(interactive, live_ask))
