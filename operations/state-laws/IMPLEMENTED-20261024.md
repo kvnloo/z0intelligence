@@ -82,3 +82,47 @@ Command: `PYTHONPATH=src python3 -m z0int.fsm.guard state --config operations/st
 Law A's live S25 queue claim passed: its twice-observed scoped systemd state is active/running with current invocation/process identity. This does not authorize phone actions.
 
 The installed shared hooks have separately moved to ServiceWatch's content-stamped `files-hooks` release, according to its owner; this audit does not turn that peer report into an independently observed B pass. OneLiveCopy owns actual source cutover. PhoneTestLane owns removal of the live disk floor. This task only observes and reports.
+
+## Law G: artifact lease audit
+
+`src/z0int/fsm/artifact_leases.py` exposes `audit(spec)` and a standalone
+`PYTHONPATH=src python3 -m z0int.fsm.artifact_leases --input FILE` command.
+`register(subparsers)` is available for subsequent shared CLI integration.
+The input has a `source` locator and an `artifacts` list. Each candidate supplies
+`path`, `node`, `observed_at` (UTC epoch seconds), `lease`, canonical absolute
+`allowlist` roots, `live` (`LIVE`, `NONLIVE`, or `UNKNOWN`), `symlink_free`
+(including ancestors), `git_worktree`, and `git_archive_verified`.
+Its `sources` object must explicitly identify the `lease`, `clock`, `allowlist`,
+`live`, `symlink`, and `archive` observations. These are caller-supplied source
+locators, not authenticated observations or proof of freshness.
+
+The lease schema is `z0.artifact-lease.v1`, with `owner`, `path`, `node`, `kind`,
+`created_at` (UTC epoch seconds), positive `ttl` (seconds), and `keep_receipts`
+(relative paths without parent traversal). A pass requires expiry, strict
+descendant containment in an allowlisted root, known NONLIVE status, no symlink
+traversal, and a verified archive for a git worktree. The archive observation
+must bind the exact worktree snapshot; a non-worktree does not need a git
+archive. Missing or malformed evidence remains unknown and blocked. Unknown
+LIVE status never becomes permission. An allowlist root itself is not eligible.
+
+This module does not create leases, retrolease unknown artifacts, inspect the
+filesystem, authenticate archive receipts, delete files, or grant authority.
+The actor must independently re-observe source identity, liveness, containment,
+and archive validity immediately before acting. Unknown artifacts need a new
+seven-day lease from the current time in the reaper, not an inferred historical
+expiry. Receipt preservation and the archive-before-git-delete sequence remain
+the actor's obligations.
+
+`bend/artifact_lease_fsm` proves each finite Boolean obligation is necessary,
+plus positive completeness. It does not prove filesystem or clock observations.
+The mutation harness reuses the existing strict state-law verdict parser and
+requires actual dependent-proof rejection of unexpired, outside-allowlist, LIVE,
+symlink, and unarchived-worktree bypasses; setup errors never count.
+
+Verification commands for the MBP checkout (not run by this worker):
+
+```sh
+PYTHONPATH=src python3 -m pytest -q tests/test_artifact_lease_law.py
+(cd bend/artifact_lease_fsm && PATH="/usr/bin:$PATH:$HOME/.elan/bin" "$HOME/.bend/bin/bend" PROOF.bend --verdict)
+python3 bend/artifact_lease_fsm/mutations.py --verdict --out /tmp/artifact-lease-mutants.json
+```
