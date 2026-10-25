@@ -82,6 +82,28 @@ Raw personal data should stay private and local by default.
 This carries forward the core idea from the earlier private `sft-svlm` project: **learn how the user thinks; retrieve what is currently true.**
 
 
+## LookFirst: offline capability consultation
+
+`python3 scripts/look-first/generate.py` builds the local capability index.
+The default run uses cached GitHub metadata. `--refresh-remote` refreshes it.
+The generator includes scoped branches, issue and PR discussions, and both
+Hermes skill profiles. The coverage manifest names unavailable inputs.
+It sorts records on disk rather than retaining the full corpus in memory.
+
+Search with `python3 -m z0int.look_first --index INDEX query "your question"`.
+Set `PYTHONPATH=src` when the package is not installed. SQLite FTS5 retrieval
+has a 180 ms execution deadline and returns at most twelve sourced lines.
+The opt-in `omp-extensions/z0-look-first` adapter reads actual IntentService
+triage receipts. It records consultation before design, delegation and edits.
+Its first tool attempt returns the evidence before the model retries.
+Missing evidence is not approval. Law F audits the same-turn receipt:
+`z0-guard consultation --events PATH_TO_CONSULTATIONS_JSONL`.
+
+Install only a reviewed release with `scripts/install-look-first.py`.
+The `.files` refresh hook shares the existing state-packet timer.
+Neither integration is enabled by adding these source files.
+Raw caches, personal session queries, and replay output stay local.
+
 ## From `sft-svlm` to z0int
 
 The earlier `sft-svlm` idea was a personalized SLM/SVLM that could learn stable user behavior from personal history and help compile messy requests into better instructions for powerful workers.

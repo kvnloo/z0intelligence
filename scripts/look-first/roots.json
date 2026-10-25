@@ -1,0 +1,48 @@
+{
+  "schema": "look-first.roots.v1",
+  "scope": ["z0intelligence", "z0evals", "aodl", "kerdoios", ".files", "kvnloo-skills"],
+  "registry_paths": [
+    "${HOME}/.config/z0int/repositories.json",
+    "${WORKSPACE}/oss/oss-factory/factory/projects.json",
+    "${WORKSPACE_PARENT}/../mobile-lane-factory/factory/projects.json",
+    "${MOUNT}/mobile-lane-factory/factory/projects.json",
+    "${MOUNT}/z0-wt/salvage/skills-home/repository-inventory.json"
+  ],
+  "search_roots": [
+    "${COMMON_PARENT}", "${WORKSPACE}", "${WORKSPACE}/oss", "${WORKSPACE}/products",
+    "${HOME}", "${HOME}/tmp", "${HOME}/.hermes/profiles/chiefstaff/plugins", "${MOUNT}/z0-wt"
+  ],
+  "repositories": [
+    {"name": "z0intelligence", "github": "kvnloo/z0intelligence", "paths": ["${CHECKOUT}"]},
+    {"name": "z0evals", "github": "kvnloo/z0evals"},
+    {"name": "aodl", "github": "kvnloo/aodl"},
+    {"name": "kerdoios", "github": "kvnloo/kerdoios", "paths": ["${HOME}/.hermes/profiles/chiefstaff/plugins/kerdoios"]},
+    {"name": ".files", "github": "kvnloo/.files", "paths": ["${WORKSPACE_PARENT}/.files"]},
+    {"name": "kvnloo-skills", "github": "kvnloo/kvnloo-skills", "paths": ["${WORKSPACE_PARENT}/kvnloo-skills"]}
+  ],
+  "skill_roots": [
+    "${HOME}/.hermes/profiles/clean/skills",
+    "${HOME}/.hermes/profiles/chiefstaff/skills"
+  ],
+  "skill_metadata_paths": [
+    "${MOUNT}/z0-wt/salvage/skills-home/skills-inventory.snapshot.json"
+  ],
+  "link_roots": [
+    "${HOME}/.omp/agent/extensions",
+    "${HOME}/.agents/skills",
+    "${HOME}/.claude-home/skills",
+    "${HOME}/.codex/skills",
+    "${HOME}/.config/opencode/skills"
+  ],
+  "units": ["z0intelligence.service", "z0int-look-first.service"],
+  "wiring": [],
+  "installation": {
+    "required": [
+      "Python 3.10+ with SQLite FTS5 and git for local collection",
+      "Authenticated GitHub CLI only for --refresh-remote",
+      "Parent LookFirst integration must be installed separately before consultation is automatic"
+    ],
+    "applied": false,
+    "policy": "Collection writes the configured cache and index only. It never installs extensions, enables units, or changes harness configuration."
+  }
+}
