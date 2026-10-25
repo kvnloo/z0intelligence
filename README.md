@@ -194,6 +194,11 @@ The old README described “bring your history” as if the main missing step we
 
 Master contains the provenance-backed resolver, source-revision-keyed State Packet reducer and question-scoped DecisionOpportunity builder. The current memory program is being built additively without replacing the existing stores.
 
+The startup packet reads exact deployment stamps before Git metadata. It only
+asks Git about paths with a `.git` ancestor; bounded command timeouts are
+reported on stderr and leave that observation unavailable, not a fabricated
+repository identity or a partially published packet.
+
 ### Memory foundations and remaining design work
 
 | Work | Status | Purpose |
