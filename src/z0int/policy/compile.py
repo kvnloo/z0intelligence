@@ -218,7 +218,8 @@ def _compile_option_capacity(findings: list[dict], now: datetime, config: Compil
             for task in sorted(tasks):
                 passing = []
                 for (cell_key, cell_task, k), row in cells.items():
-                    if cell_key != key or cell_task != task or _expiry(row, config) <= now or blocked:
+                    if (cell_key != key or cell_task != task or _expiry(row, config) <= now
+                            or blocked or not inputs.get("measured")):
                         continue
                     lower = _choice_lower(row)
                     if lower is not None and lower > bar:

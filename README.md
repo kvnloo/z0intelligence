@@ -170,12 +170,14 @@ Thus `bar_derived = 1 - (cost_frontier * (1 - abstain_rate) - cost_call) / cost_
 equality does not route. `p_lower` describes the answered subset, not abstentions.
 Destructive decisions never route to an SLM, regardless of cost or accuracy.
 
-Absent measurements use explicitly `unmeasured` conservative normalized defaults:
+Absent measurements retain explicitly `unmeasured` normalized diagnostic defaults:
 call 0.1, frontier 1, error 20 for reads and 100 for reversible mutations,
-abstention 0. These are assumptions, not observed timings. Measured inputs must
-include `measured=true` and canonical `finding_ids` for fresh measured
-`choice.error_cost` findings with matching `subject.risk_class` and metric
-names/values for all four inputs. Their earliest expiry also bounds the grant.
+abstention 0. These assumptions produce a diagnostic `bar_derived` only:
+unmeasured economics always yield `allowed_k=0`, routing to frontier/Jev.
+This deliberately supersedes the earlier default-cost routing contract.
+Measured inputs must include `measured=true` and canonical `finding_ids` for
+fresh measured `choice.error_cost` findings with matching `subject.risk_class`
+and metric names/values for all four inputs. Their earliest expiry bounds the grant.
 Observed frontier recovery is a proxy for SLM error cost, not an executed shadow
 intervention; record that limitation in its source evidence. Shadow agreement
 alone cannot measure recovery cost.
