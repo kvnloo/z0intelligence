@@ -5,6 +5,7 @@ import math
 import time
 import uuid
 import fcntl
+import os
 from .dispatch_authority import locked
 from .receipt import append_receipt, receipts_path
 
@@ -20,12 +21,26 @@ def policy():
 def name(provider):return 'jev' if provider=='typesafe' else provider
 
 
+_ROWS_CACHE=(None,[])
+
+
 def _rows():
+    global _ROWS_CACHE
     path=receipts_path()
     if not path.exists():return []
     with path.open() as stream:
         fcntl.flock(stream,fcntl.LOCK_SH)
-        return [row for line in stream if (row:=json.loads(line)).get('capability_id')==CAPABILITY]
+        # The shared receipt stream holds every capability. Parsing all of it once per
+        # provider made /v1/providers take ~2s and flap executor readiness. Reuse the
+        # last parse while the file is unchanged (checked under the lock), and skip
+        # lines that cannot match before json.loads; the exact check still applies.
+        info=os.fstat(stream.fileno())
+        key=(str(path),info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns)
+        if _ROWS_CACHE[0]==key:return list(_ROWS_CACHE[1])
+        rows=[row for line in stream if CAPABILITY in line
+              and (row:=json.loads(line)).get('capability_id')==CAPABILITY]
+        _ROWS_CACHE=(key,rows)
+        return list(rows)
 
 
 def _state(provider,rows,config,now):
