@@ -45,6 +45,15 @@ Idempotent steps (state: `~/.z0int/state/onboard.json`):
 | `privacy` | Fail if personalized weights sit inside the git repo |
 | `env_hints` | Write suggested `EVOLUTION_LAB_*` / `Z0INT_HOME` for harnesses |
 
+The `hermes-memory` extension is tracked in `omp-extensions/hermes-memory/`.
+It provides read-only Hermes history access; private history stays outside the
+repository. Its initial import preserves the live R-001 search-ranking fix and
+regression test byte-for-byte. Deploy it from a commit-stamped release under
+`~/.local/lib/z0int-shadow/<commit>/omp-extensions/hermes-memory`, then symlink
+`~/.omp/agent/extensions/hermes-memory` to that release. Back up an existing
+plain extension directory before replacing it. Existing OMP processes need not
+be restarted; a fresh process loads the new release.
+
 Personal artifacts **never** default into the repo. Only `~/.z0int/`.
 
 ## Hard boundaries
