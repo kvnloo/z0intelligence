@@ -36,7 +36,10 @@ def main():
     contexts=reconstruct('/home/kvn/.omp/agent/sessions',[(r['session'],r['call']) for r in rows])
     cutoff=min(row['ts'] for row in rows)
     all_rows=list(db.execute("SELECT id,ts,action,features FROM labels WHERE family='omp.tool' AND ts<? ORDER BY ts,id",(cutoff,)))
-    training=[{'label':r['action'],'features':json.loads(r['features'])} for r in all_rows]
+    supported_tools={row['label'] for row in rows}
+    unsupported_tools=sorted({r['action'] for r in all_rows}-supported_tools)
+    training=[{'label':r['action'],'features':json.loads(r['features'])}
+              for r in all_rows if r['action'] in supported_tools]
     import hashlib
     training_digest=hashlib.sha256('\n'.join(r['id'] for r in all_rows).encode()).hexdigest()
     groups={count:cluster_tools(training,count) for count in (3,5,8)}
@@ -59,7 +62,8 @@ def main():
         return {'status':status,'evidence_class':'replayed_L1','models':models,'manifest':args.manifest,
                 'winner_qualified':False,'multiple_comparison_note':'54 or more exploratory variants; Wilson/bootstrap intervals are not simultaneous and selection is dev-only',
                 'training':{'cutoff_exclusive':cutoff,'digest':training_digest,'rows':len(all_rows),
-                            'frozen_categories':groups},
+                            'frozen_categories':groups,'unsupported_tools':unsupported_tools,
+                            'supported_tools':sorted(supported_tools)},
                 'cost_proxy':{'read_recovery_ms':6034,'frontier_ms':7999,'causal_error_cost':False},'leaderboard':leaderboard}
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         for category_count,first,final,margin,last_model in variants:
