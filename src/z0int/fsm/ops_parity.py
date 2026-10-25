@@ -161,6 +161,18 @@ def cases(seed: int = 0, n_rand: int = 120) -> list[tuple[str, str, str, str]]:
         args = f"{b(credited)}, {n(actual)}, {n(named)}, {n(measured)}, {n(count)}"
         out.append(("O13 option_capacity_allows", "Bool", f"O.option_capacity_allows({args})",
                     b(P.option_capacity_allows(credited, actual, named, measured, count))))
+    for complete, empty in itertools.product(B2, B2):
+        args = f"{b(complete)}, {b(empty)}"
+        out.append(("O16 replace", "Bool", f"O.sqlite_replace_allows({args})",
+                    b(P.sqlite_replace_allows(complete, empty))))
+        out.append(("O16 holders", "Bool", f"O.sqlite_holders_ok({args})",
+                    b(P.sqlite_holders_ok(complete, empty))))
+    for known, before, after in itertools.product(B2, (0, 1, 9, 10), (0, 1, 9, 10)):
+        out.append(("O16 auth", "Bool", f"O.sqlite_auth_ok({b(known)}, {n(before)}, {n(after)})",
+                    b(P.sqlite_auth_ok(known, before, after))))
+    for current in B2:
+        out.append(("O16 sidecars", "Bool", f"O.sqlite_sidecar_allows({b(current)})",
+                    b(P.sqlite_sidecar_allows(current))))
     return out
 
 

@@ -484,3 +484,59 @@ law o13_destructive_request_never:
   for measured: Nat
   for count: Nat
   {O.risk_option_capacity_allows(2n, credited, actual, named, measured, count) == False{} : Bool}
+
+
+# O16: never replace a held SQLite store, tolerate ghosts, lose auth, or let
+# a stale inode owner unlink the current path's WAL/SHM.
+law o16_sqlite_replace_no_holders:
+  for +complete: Bool
+  for +empty: Bool
+  for w: T(O.sqlite_replace_allows(complete, empty))
+  T(empty)
+
+law o16_sqlite_replace_scan_complete:
+  for +complete: Bool
+  for +empty: Bool
+  for w: T(O.sqlite_replace_allows(complete, empty))
+  T(complete)
+
+law o16_sqlite_no_ghost_holders:
+  for +complete: Bool
+  for +ghosts: Bool
+  for w: T(O.sqlite_holders_ok(complete, ghosts))
+  T(Bool.not(ghosts))
+
+law o16_sqlite_auth_non_decreasing:
+  for +known: Bool
+  for +before: Nat
+  for +after: Nat
+  for w: T(O.sqlite_auth_ok(known, before, after))
+  T(Bool.not(Nat.is_gt(before, after)))
+
+law o16_sqlite_auth_known:
+  for +known: Bool
+  for +before: Nat
+  for +after: Nat
+  for w: T(O.sqlite_auth_ok(known, before, after))
+  T(known)
+
+law o16_sqlite_sidecar_current_inode:
+  for +current: Bool
+  for w: T(O.sqlite_sidecar_allows(current))
+  T(current)
+
+law o16_sqlite_quiescent_replace:
+  {O.sqlite_replace_allows(True{}, True{}) == True{} : Bool}
+
+law o16_sqlite_healthy_holders:
+  {O.sqlite_holders_ok(True{}, False{}) == True{} : Bool}
+
+law o16_sqlite_auth_retained:
+  {O.sqlite_auth_ok(True{}, 9n, 9n) == True{} : Bool}
+
+law o16_sqlite_current_sidecar:
+  {O.sqlite_sidecar_allows(True{}) == True{} : Bool}
+
+law o16_sqlite_unknown_holders:
+  for ghosts: Bool
+  {O.sqlite_holders_ok(False{}, ghosts) == False{} : Bool}

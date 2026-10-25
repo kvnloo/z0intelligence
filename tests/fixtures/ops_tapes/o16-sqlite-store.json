@@ -1,0 +1,132 @@
+{
+  "law": "O16",
+  "kind": "sqlite-store",
+  "incident": "2026-10-24 recurring OMP corruption; parent-reported historical ghost, re-observed absent at 2026-10-25T07:40Z",
+  "owner_message": "Turn the root cause of recurring ~/.omp/agent/agent.db corruption into Bend laws plus a runtime guard. Write a root-cause report. Do not restart or kill any OMP process.",
+  "actual": "First subagent live census: current DB inode 304170503, PID 1826151 absent, readable holder PID 2266022; never replayed as current ghost state.",
+  "items": [
+    {
+      "label": "parent-reported deleted inode 302843056 vs current 304170503",
+      "inputs": {
+        "complete": true,
+        "holders": [
+          {
+            "pid": 1826151,
+            "path": "/home/kvn/.omp/agent/agent.db",
+            "ghost": true
+          }
+        ],
+        "before": 9,
+        "after": 9,
+        "db": "/home/kvn/.omp/agent/agent.db",
+        "operation": "inspect",
+        "actor_pid": null
+      },
+      "expect": [
+        "o16_sqlite_no_ghost_holders"
+      ]
+    },
+    {
+      "label": "hypothetical repeat repair while ghost holder survives",
+      "inputs": {
+        "complete": true,
+        "holders": [
+          {
+            "pid": 1826151,
+            "path": "/home/kvn/.omp/agent/agent.db",
+            "ghost": true
+          }
+        ],
+        "before": 9,
+        "after": 9,
+        "db": "/home/kvn/.omp/agent/agent.db",
+        "operation": "replace",
+        "actor_pid": null
+      },
+      "expect": [
+        "o16_sqlite_no_ghost_holders",
+        "o16_sqlite_replace_no_holders"
+      ]
+    },
+    {
+      "label": "historical recreation auth loss, reconstructed from parent evidence",
+      "inputs": {
+        "complete": true,
+        "holders": [],
+        "before": 9,
+        "after": 0,
+        "db": "/home/kvn/.omp/agent/agent.db",
+        "operation": "recreate",
+        "actor_pid": null
+      },
+      "expect": [
+        "o16_sqlite_auth_non_decreasing"
+      ]
+    },
+    {
+      "label": "hypothetical unknown holder census",
+      "inputs": {
+        "complete": false,
+        "holders": [],
+        "before": 9,
+        "after": 9,
+        "db": "/home/kvn/.omp/agent/agent.db",
+        "operation": "replace",
+        "actor_pid": null
+      },
+      "expect": [
+        "o16_sqlite_replace_scan_complete"
+      ]
+    },
+    {
+      "label": "hypothetical unknown auth baseline",
+      "inputs": {
+        "complete": true,
+        "holders": [],
+        "before": null,
+        "after": 9,
+        "db": "/home/kvn/.omp/agent/agent.db",
+        "operation": "recreate",
+        "actor_pid": null
+      },
+      "expect": [
+        "o16_sqlite_auth_known"
+      ]
+    },
+    {
+      "label": "hypothetical stale sidecar actor",
+      "inputs": {
+        "complete": true,
+        "holders": [
+          {
+            "pid": 1826151,
+            "path": "/home/kvn/.omp/agent/agent.db",
+            "ghost": true
+          }
+        ],
+        "before": 9,
+        "after": 9,
+        "db": "/home/kvn/.omp/agent/agent.db",
+        "operation": "remove-sidecars",
+        "actor_pid": 1826151
+      },
+      "expect": [
+        "o16_sqlite_no_ghost_holders",
+        "o16_sqlite_sidecar_current_inode"
+      ]
+    },
+    {
+      "label": "hypothetical fully quiescent count-preserving replacement",
+      "inputs": {
+        "complete": true,
+        "holders": [],
+        "before": 9,
+        "after": 9,
+        "db": "/home/kvn/.omp/agent/agent.db",
+        "operation": "replace",
+        "actor_pid": null
+      },
+      "expect": []
+    }
+  ]
+}

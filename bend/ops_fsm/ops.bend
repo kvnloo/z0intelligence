@@ -489,3 +489,19 @@ def option_risk_allows(risk: Nat) -> Bool:
 
 def risk_option_capacity_allows(risk: Nat, credited: Bool, actual_scope: Nat, named_scope: Nat, measured: Nat, count: Nat) -> Bool:
   Bool.and(option_risk_allows(risk), option_capacity_allows(credited, actual_scope, named_scope, measured, count))
+
+
+# ------------------------------------------------------------------ O16
+# Guarded SQLite lifecycle. Facts come from a complete /proc fd census; a
+# point-in-time census is NOT a cross-process lock or mutation authorization.
+def sqlite_replace_allows(complete: Bool, empty: Bool) -> Bool:
+  Bool.and(complete, empty)
+
+def sqlite_holders_ok(complete: Bool, ghosts: Bool) -> Bool:
+  Bool.and(complete, Bool.not(ghosts))
+
+def sqlite_auth_ok(known: Bool, before: Nat, after: Nat) -> Bool:
+  Bool.and(known, Bool.not(Nat.is_gt(before, after)))
+
+def sqlite_sidecar_allows(current: Bool) -> Bool:
+  current

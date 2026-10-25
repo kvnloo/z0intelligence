@@ -51,7 +51,7 @@ def repo(tmp_path, name="r"):
 # ------------------------------------------------------------------ modes
 
 def test_default_modes_enforce_only_pure_refusals():
-    assert {g for g, m in G.DEFAULT_MODES.items() if m == "enforce"} == {"O1", "O2", "O4", "O6", "O10"}
+    assert {g for g, m in G.DEFAULT_MODES.items() if m == "enforce"} == {"O1", "O2", "O4", "O6", "O10", "O16"}
     assert all(G.DEFAULT_MODES[g] == "report" for g in ("O3", "O5", "O7", "O8", "O9"))
 
 
@@ -481,7 +481,7 @@ def test_incident_tape_is_refused_or_flagged(tape, vis):
 
 
 def test_all_nine_laws_have_a_tape():
-    assert {json.loads(t.read_text())["law"] for t in TAPES} == {f"O{i}" for i in range(1, 10)}
+    assert {json.loads(t.read_text())["law"] for t in TAPES} == {f"O{i}" for i in range(1, 10)} | {"O16"}
 
 
 # ------------------------------------------------------------------ Bend parity (groot)

@@ -396,3 +396,20 @@ def provider_flags(provider: str | None, model: str | None) -> tuple[bool, bool]
 
 def design_role(role: str) -> bool:
     return bool(_DESIGN_ROLE.search(role or ""))
+
+
+# O16: SQLite lifecycle. This table checks observed facts, never authorizes IO.
+def sqlite_replace_allows(complete: bool, empty: bool) -> bool:
+    return complete and empty
+
+
+def sqlite_holders_ok(complete: bool, ghosts: bool) -> bool:
+    return complete and not ghosts
+
+
+def sqlite_auth_ok(known: bool, before: int, after: int) -> bool:
+    return known and before <= after
+
+
+def sqlite_sidecar_allows(current: bool) -> bool:
+    return current
