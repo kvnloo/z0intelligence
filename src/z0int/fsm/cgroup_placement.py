@@ -62,8 +62,6 @@ def audit(root=Path('/proc')):
         except (OSError, ValueError, IndexError) as exc:
             unknown.append(dict(pid=pid, reason=type(exc).__name__))
     for row in rows.values():
-        if not (row['direct'] or row['interpreter']):
-            continue
         chain, seen, candidate, agent, error = [], set(), row, row['direct'], None
         while candidate is not None:
             if candidate['pid'] in seen:
@@ -81,7 +79,7 @@ def audit(root=Path('/proc')):
                 break
         # Reparenting destroys provenance. Do not call an unidentifiable interpreter safe.
         if not agent:
-            if error or row['ppid'] == 1 or (len(chain) > 1 and chain[1]['name'] == 'systemd'):
+            if row['interpreter'] and (error or row['ppid'] == 1 or (len(chain) > 1 and chain[1]['name'] == 'systemd')):
                 unknown.append(dict(pid=row['pid'], exe=row['exe'], cgroup=row['cgroup'], reason=error or 'orphan-workload-identity-unknown', ancestry=chain))
             continue
         try:

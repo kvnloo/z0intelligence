@@ -271,3 +271,17 @@ findings with rule `synthetic-evidence-outside-tmp`. These findings increment
 - Parity: `python -m z0int.fsm.ops_parity` (MBP with the supplied Bend toolchain).
 - Incident replay: `python -m z0int.fsm.ops_replay tests/fixtures/ops_tapes/*.json`.
 - Tests: `tests/test_fsm_ops.py` (MBP via fleet-build; the two parity tests need Bend).
+
+## Law H: agent process placement (report only)
+
+Run `z0-guard cgroup-placement` or `python -m z0int.fsm.cgroup_placement`.
+The read-only Linux proc census identifies agent executables and their descendants
+by process ancestry, including shell and native-tool children. It reports a
+violation when their cgroup is outside `agent.slice` and
+`z0-farm-llama.service` (exact path components). It never moves, signals, or kills
+processes and always exits zero after reporting. Unreadable or changing process
+identities and unidentifiable orphan interpreters are unknown, not compliance.
+The JSON includes observed executable, cgroup, ancestry and timestamp; it is a
+point-in-time report, not an authorization or continuous enforcement claim.
+Synthetic proc tests are in `tests/test_cgroup_placement.py`; the decision laws
+and four proof-rejected semantic mutants are in `bend/placement_fsm`.

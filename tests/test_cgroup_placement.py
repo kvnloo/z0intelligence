@@ -33,6 +33,16 @@ def test_tonights_desktop_child(proc):
     assert report['mode'] == 'report-only' and report['enforcement_enabled'] is False
 
 
+def test_non_interpreter_descendant(proc):
+    root, add = proc
+    add(10, 1, '/usr/bin/omp', SCOPED)
+    add(11, 10, '/usr/bin/bash', DESKTOP)
+    add(12, 11, '/usr/bin/curl', DESKTOP)
+    report = audit(root)
+    assert {row['pid'] for row in report['violations']} == {11, 12}
+    assert [row['pid'] for row in report['violations'][1]['ancestry']] == [12, 11, 10, 1]
+
+
 def test_correct_scope(proc):
     root, add = proc
     add(10, 1, '/usr/bin/omp', SCOPED)
