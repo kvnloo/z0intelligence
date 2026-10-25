@@ -376,16 +376,21 @@ discovery step. It reads `$Z0INT_HOME/config/choice-ladder.json`; absent config
 does not enable inference. Configure `registry`, `model_dirs`, `toolkit`,
 `benchmark_sha256`, `compiler_revision`, `router_corpus`, `router_harness`,
 their `*_sha256` digests, and `lane`. A lane specifies `device`, `backend`,
-`server`, and `server_sha256`; CUDA also accepts `need_mb` and `wait`.
+`server`, `server_sha256`, and `engine` (the exact nonempty string observed at
+the runtime's `/props.build_info`, never a normalized or guessed label). The
+worker verifies engine, model alias, and loaded model bytes against live props.
+CUDA also accepts `need_mb` and `wait`.
 CPU lanes dispatch through `fleet-build --node mbp --class bench`; the explicitly
 configured CUDA fallback lane dispatches through `groot-admit`. Changing lanes
 changes the physical evidence scope: CPU evidence never certifies CUDA.
 
 GGUF metadata supplies architecture and quantization; weight SHA-256 supplies
 the model scope (`sha256:<digest>`). Renaming or aliasing identical bytes does
-not create new capacity evidence. The current protocol supports Qwen2/Qwen3;
-other architectures are reported as unsupported, not silently assigned a
-different model's template. Discovery scans both registry `model_path` entries
+not create new capacity evidence. Qwen2/Qwen3 retain their frozen protocol-v2
+templates; other architectures render their native GGUF template through the
+runtime's `/apply-template`, with thinking disabled, rather than guessed ChatML.
+Missing template rendering or unstable label token boundaries fails the worker
+without emitting findings. Discovery scans both registry `model_path` entries
 and all GGUFs in `model_dirs`; exact `served_model` basenames resolve there.
 
 Missing task evidence or evidence within `refresh_hours` (default 48) of the
@@ -393,6 +398,9 @@ compiler's effective expiry enqueues a worker. Live workers are not duplicated;
 dead workers retry after `retry_hours` (default 6). Requests, logs, measurement
 receipts and state live under `policy/choice-ladder/`. Successful workers append
 canonical measured findings and recompile the policy, preserving previous state.
+Bench admission declares `--checkpoint-safe`: each cell atomically persists
+scored rows and resumes its exact model/runtime/corpus-bound prefix after
+preemption. A mismatching checkpoint fails closed rather than mixing runs.
 
 Each cell starts with the frozen 100-item prefix. If point accuracy meets `bar`
 (default .95) but Wilson-lower does not, it draws more seeded items, stopping at

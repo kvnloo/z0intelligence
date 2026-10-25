@@ -24,7 +24,7 @@ def setup(tmp_path):
     registry = tmp_path/'serving.json'
     registry.write_text(json.dumps({'endpoints':[{'model_id':'alias1','model_path':str(model)}]}))
     config = {'registry':str(registry),'model_dirs':[],'dispatcher':'process',
-              'lane':{'backend':'cuda','device':'groot'},'toolkit':'/synthetic/toolkit'}
+              'lane':{'backend':'cuda','device':'groot','engine':'test-build','server_sha256':'0'*64},'toolkit':'/synthetic/toolkit'}
     return config,model
 
 
@@ -125,7 +125,7 @@ def test_mbp_dispatch_stages_importable_package_and_compiles_receipt(tmp_path,mo
         (toolkit/name).write_text('{}')
     config.update(toolkit=str(toolkit),router_corpus=str(toolkit/'router.json'),
                   router_harness=str(toolkit/'oracle.py'),compiler_revision='test')
-    config['lane'] = {'backend':'cpu','device':'mbp'}
+    config['lane'].update(backend='cpu',device='mbp')
     model = discover(config)[0]
     scope = scope_for(model,config['lane'])
     request = tmp_path/'run.request.json'
@@ -178,3 +178,17 @@ def test_adaptive_cell_resumes_atomic_checkpoint_without_rescoring(tmp_path):
     assert wilson(sum(row['correct'] for row in result),len(result))[0]>=.95
     with pytest.raises(ValueError,match='identity'):
         sample_cell(items,resume,checkpoint,'different weights')
+
+
+def test_native_template_renderer_uses_exact_option_interface():
+    from z0int.policy.autoeval import runtime_prompt
+    calls = []
+    def post(base,path,payload):
+        calls.append((base,path,payload))
+        return {'prompt':'model-native-rendered-prompt'}
+    benchmark = SimpleNamespace(SLOTS='ABC',post=post)
+    assert runtime_prompt(benchmark,'http://localhost',{'question':'pick','options':['yes','no']})=='model-native-rendered-prompt'
+    base,path,payload = calls[0]
+    assert path=='/apply-template'
+    assert payload['messages'][1]['content']=='pick\n\nOptions:\nA: yes\nB: no'
+    assert payload['chat_template_kwargs']=={'enable_thinking':False}
