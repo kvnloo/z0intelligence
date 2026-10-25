@@ -110,3 +110,41 @@ def test_guard_command_reports_without_refusal(proc, capsys):
     report = json.loads(capsys.readouterr().out)
     assert report['status'] == 'violation'
     assert report['enforcement_enabled'] is False
+
+
+@pytest.mark.parametrize('policy,expected', [('stop', 'violation'), ('kill', 'violation'),
+                                           ('continue', 'pass'), (None, 'unknown')])
+def test_scope_oom_policy(proc, policy, expected):
+    root, _ = proc
+    report = audit(root, [dict(Id='agent-omp-1826151.scope', OOMPolicy=policy)])
+    assert report['status'] == expected
+    assert report['counts']['violation'] == (expected == 'violation')
+
+
+@pytest.mark.parametrize('group,expected', [
+    ('/user.slice/user@1000.service/app.slice/hermes-gateway.service', 'violation'),
+    ('/user.slice/user@1000.service/agent.slice/hermes-gateway.service', 'pass'),
+    ('', 'unknown')])
+def test_gateway_configured_vs_running_slice(proc, group, expected):
+    root, _ = proc
+    report = audit(root, [dict(Id='hermes-gateway.service', ActiveState='active',
+                               Slice='agent.slice', ControlGroup=group)])
+    assert report['status'] == expected
+
+
+def test_inactive_gateway_has_no_running_placement(proc):
+    root, _ = proc
+    assert audit(root, [dict(Id='hermes-gateway.service', ActiveState='inactive',
+                             Slice='agent.slice', ControlGroup='')])['status'] == 'pass'
+
+
+def test_systemd_query_is_read_only(monkeypatch):
+    from z0int.fsm.cgroup_placement import systemd_units
+    import subprocess
+    def run(argv, **kwargs):
+        assert argv[:3] == ['systemctl', '--user', 'show']
+        assert kwargs['timeout'] == 15 and kwargs['check']
+        return subprocess.CompletedProcess(argv, 0,
+            'Id=agent-omp.scope\nOOMPolicy=stop\n\nId=hermes-gateway.service\nSlice=agent.slice\n')
+    monkeypatch.setattr(subprocess, 'run', run)
+    assert len(systemd_units()) == 2

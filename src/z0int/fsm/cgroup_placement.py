@@ -6,6 +6,7 @@ import datetime as dt
 import json
 from pathlib import Path
 import re
+import subprocess
 
 AGENTS = frozenset(('omp', 'hermes', 'claude', 'codex', 'opencode', 'pi', 'unii', 'llama-server'))
 
@@ -47,7 +48,38 @@ def _process(root, pid):
                 interpreter=_interpreter(name), cgroup=groups[0], starttime=start)
 
 
-def audit(root=Path('/proc')):
+def systemd_units():
+    """Read manager configuration and runtime cgroups without changing units."""
+    result = subprocess.run(
+        ['systemctl', '--user', 'show', 'agent-*.scope', 'hermes-gateway.service',
+         '-p', 'Id', '-p', 'LoadState', '-p', 'ActiveState', '-p', 'Slice',
+         '-p', 'ControlGroup', '-p', 'OOMPolicy'],
+        capture_output=True, text=True, timeout=15, check=True)
+    return [dict(line.split('=', 1) for line in block.splitlines() if '=' in line)
+            for block in result.stdout.strip().split('\n\n') if block.strip()]
+
+
+def unit_findings(units):
+    findings = []
+    for unit in units:
+        name = unit.get('Id', '')
+        if name.startswith('agent-') and name.endswith('.scope'):
+            policy = unit.get('OOMPolicy')
+            if policy != 'continue':
+                findings.append(dict(unit=name, status='violation' if policy else 'unknown',
+                                     reason='agent scope OOMPolicy is not continue' if policy else 'OOMPolicy unavailable',
+                                     configured_oom_policy=policy, cgroup=unit.get('ControlGroup')))
+        if name == 'hermes-gateway.service' and unit.get('ActiveState') == 'active':
+            configured, group = unit.get('Slice'), unit.get('ControlGroup')
+            if configured == 'agent.slice' and group and 'agent.slice' not in group.split('/'):
+                findings.append(dict(unit=name, status='violation',
+                                     reason='configured Slice differs from running cgroup; restart not applied',
+                                     configured_slice=configured, cgroup=group))
+            elif configured == 'agent.slice' and not group:
+                findings.append(dict(unit=name, status='unknown', reason='running cgroup unavailable'))
+    return findings
+
+def audit(root=Path('/proc'), units=()):
     root = Path(root)
     rows, unknown, violations, compliant = {}, [], [], []
     observed = dt.datetime.now(dt.timezone.utc).isoformat()
@@ -96,14 +128,29 @@ def audit(root=Path('/proc')):
         finding = dict(pid=row['pid'], exe=row['exe'], cgroup=row['cgroup'], ancestry=chain,
                        status=decide(True, True, scoped), reason=reason)
         (compliant if scoped else violations).append(finding)
+    unit_rows = unit_findings(units)
+    violations.extend(row for row in unit_rows if row['status'] == 'violation')
+    unknown.extend(row for row in unit_rows if row['status'] == 'unknown')
     return dict(schema='z0.cgroup_placement.v1', law='H', mode='report-only', enforcement_enabled=False,
                 observed_at=observed, status='violation' if violations else 'unknown' if unknown else 'pass',
-                violations=violations, unknown=unknown, compliant=compliant,
+                violations=violations, unknown=unknown, compliant=compliant, unit_findings=unit_rows,
                 counts=dict(violation=len(violations), unknown=len(unknown), compliant=len(compliant), observed=len(rows)))
 
 
 def command(args):
-    print(json.dumps(audit(args.proc_root), sort_keys=True))
+    report = audit(args.proc_root)
+    if args.proc_root == Path('/proc'):
+        try:
+            findings = unit_findings(systemd_units())
+            report['unit_findings'] = findings
+            for row in findings:
+                report['violations' if row['status'] == 'violation' else 'unknown'].append(row)
+        except (OSError, subprocess.SubprocessError) as exc:
+            report['unknown'].append(dict(reason='systemd census unavailable', error=type(exc).__name__))
+        report['counts']['violation'] = len(report['violations'])
+        report['counts']['unknown'] = len(report['unknown'])
+        report['status'] = 'violation' if report['violations'] else 'unknown' if report['unknown'] else 'pass'
+    print(json.dumps(report, sort_keys=True))
     return 0
 
 

@@ -285,3 +285,10 @@ The JSON includes observed executable, cgroup, ancestry and timestamp; it is a
 point-in-time report, not an authorization or continuous enforcement claim.
 Synthetic proc tests are in `tests/test_cgroup_placement.py`; the decision laws
 and four proof-rejected semantic mutants are in `bend/placement_fsm`.
+For the live `/proc` census, read-only `systemctl --user show` also reports agent
+scopes whose `OOMPolicy` is not `continue`, and active `hermes-gateway.service`
+whose configured `Slice=agent.slice` differs from its running cgroup. A new
+drop-in does not move an already-running service. Missing systemd evidence is
+unknown; fixture proc roots do not query the live manager. These systemd sensors
+are tested in Python; the finite Bend proof covers only the placement predicate,
+not systemd settings, process discovery, or runtime restart application.
