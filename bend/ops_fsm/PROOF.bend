@@ -522,3 +522,108 @@ def Laws.o10_phone_no_agent_resource_caps(ready, memory, cpu, battery, thermal):
 
 def Laws.o10_phone_placement_no_agent_resource_caps(ready, memory, cpu, battery, thermal):
   {==}
+
+# O11/O12. Proofs project the independent constraints from the route gate.
+def Laws.o11_evidence_bound_route(family, named_family, stage, named_arm, arm, healthy, abstain, w):
+  and_l(O.policy_credited(stage), Nat.is_eq(arm, named_arm),
+    and_r(Nat.is_eq(family, named_family), Bool.and(O.policy_credited(stage), Nat.is_eq(arm, named_arm)), w))
+
+def Laws.o11_named_family(family, named_family, stage, named_arm, arm, healthy, abstain, w):
+  eq_sound(family, named_family,
+    and_l(Nat.is_eq(family, named_family), Bool.and(O.policy_credited(stage), Nat.is_eq(arm, named_arm)), w))
+
+def Laws.o11_named_arm(family, named_family, stage, named_arm, arm, healthy, abstain, w):
+  eq_sound(arm, named_arm,
+    and_r(O.policy_credited(stage), Nat.is_eq(arm, named_arm),
+      and_r(Nat.is_eq(family, named_family), Bool.and(O.policy_credited(stage), Nat.is_eq(arm, named_arm)), w)))
+
+def Laws.o11_none_not_credited():
+  {==}
+
+def Laws.o11_shadow_not_credited():
+  {==}
+
+def Laws.o11_canary_routes(family, arm):
+  and_i(Nat.is_eq(family, family), Bool.and(True{}, Nat.is_eq(arm, arm)),
+    eq_refl(family), eq_refl(arm))
+
+def Laws.o11_live_routes(family, arm):
+  and_i(Nat.is_eq(family, family), Bool.and(True{}, Nat.is_eq(arm, arm)),
+    eq_refl(family), eq_refl(arm))
+
+def policy_frontier_same(ok: Bool, +abstain: Bool, same: Laws.T(ok), w: Laws.T(Bool.or(Bool.not(ok), abstain))) -> Laws.T(abstain):
+  match ok:
+    case True{}:
+      w
+    case False{}:
+      Empty.absurd(Laws.T(abstain), same)
+
+def Laws.o12_offload_obligation(family, arm, abstain, w):
+  policy_frontier_same(Nat.is_eq(family, family), abstain, eq_refl(family), w)
+
+def policy_or_true(b: Bool) -> Laws.T(Bool.or(b, True{})):
+  match b:
+    case True{}:
+      Unit{}
+    case False{}:
+      Unit{}
+
+def Laws.o12_unhealthy_can_fallback(family, arm):
+  policy_or_true(Bool.not(Nat.is_eq(family, family)))
+
+def Laws.o12_abstain_can_fallback(family, arm):
+  policy_or_true(Bool.not(Nat.is_eq(family, family)))
+
+# O13. Capacity is a hard bound, with credit limited to the exact scope.
+def Laws.o13_option_capacity(credited, actual, named, measured, count, w):
+  w
+
+def Laws.o13_default_zero(actual, named, measured):
+  {==}
+
+def option_mismatch(eq: Bool, measured: Nat, w: Laws.T(Bool.not(eq))) -> {O.option_limit_by(eq, measured) == 0n : Nat}:
+  match eq:
+    case True{}:
+      Empty.absurd({measured == 0n : Nat}, w)
+    case False{}:
+      {==}
+
+def Laws.o13_exact_scope(actual, named, measured, w):
+  option_mismatch(Nat.is_eq(actual, named), measured, w)
+
+def option_same(eq: Bool, +measured: Nat, w: Laws.T(eq)) -> {O.option_limit_by(eq, measured) == measured : Nat}:
+  match eq:
+    case True{}:
+      {==}
+    case False{}:
+      Empty.absurd({0n == measured : Nat}, w)
+
+def Laws.o13_credited_limit(scope, measured):
+  option_same(Nat.is_eq(scope, scope), measured, eq_refl(scope))
+
+def Laws.o13_k2_rejected():
+  {==}
+
+def Laws.o13_k24_rejected():
+  {==}
+
+def Laws.o13_k119_rejected():
+  {==}
+
+def Laws.o13_credited_excess_rejected():
+  {==}
+
+def Laws.o13_destructive_never():
+  {==}
+
+def Laws.o13_unknown_never():
+  {==}
+
+def Laws.o13_read_authority():
+  {==}
+
+def Laws.o13_reversible_authority():
+  {==}
+
+def Laws.o13_destructive_request_never(credited, actual, named, measured, count):
+  {==}

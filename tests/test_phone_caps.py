@@ -126,3 +126,123 @@ def test_concrete_host_node_binding_not_function_name(tmp_path, binding, clean):
     body = binding + "\nargv = ['fleet-kueue', '--mem', args.mem or worker['lane']['default_mem']]\n"
     path.write_text('def queued():\n' + ''.join('    ' + line + '\n' for line in body.splitlines()))
     assert bool(C.phone_caps_findings(tmp_path, [path])) is not clean
+
+
+def test_nodes_yaml_inherited_default_battery_regression(tmp_path):
+    source = Path(__file__).parent / 'fixtures/phone-caps/nodes.yaml'
+    target = tmp_path / 'nodes.yaml'
+    target.write_text(source.read_text())
+    findings = C.phone_caps_findings(tmp_path, [target])
+    assert len(findings) == 1
+    assert findings[0]['line'] == 4
+    assert 'inherited' in findings[0]['detail']
+    assert 'min_battery_pct_on_battery=40' in findings[0]['detail']
+
+
+@pytest.mark.parametrize('threshold,bad', [(0, False), (1, False), (2, False),
+                                         (2.01, True), (40, True)])
+@pytest.mark.parametrize('scope', ['defaults', 'phone'])
+def test_phone_battery_only_below_two_percent(tmp_path, threshold, bad, scope):
+    default = threshold if scope == 'defaults' else 40
+    override = '' if scope == 'defaults' else f'    health: {{min_battery_pct_on_battery: {threshold}}}\n'
+    path = tmp_path / 'nodes.yaml'
+    path.write_text(f'defaults:\n  health: {{min_battery_pct_on_battery: {default}}}\n'
+                    'nodes:\n  spare:\n    kind: phone\n' + override)
+    assert bool(C.phone_caps_findings(tmp_path, [path])) is bad
+
+
+@pytest.mark.parametrize('key,value,bad', [
+    ('cpus', '0-3', True), ('cpus', 4, True), ('cpus', 'all', False),
+    ('memory_pct', 50, True), ('memory_pct', 99, True), ('memory_pct', 100, False),
+    ('cpu_pct', 99, True), ('cpu_pct', 100, False), ('memory', '2G', True),
+])
+def test_phone_worker_profiles_cannot_cap_resources(tmp_path, key, value, bad):
+    path = tmp_path / 'nodes.yaml'
+    path.write_text(f'worker_profiles:\n  neutral: {{{key}: {value}}}\n'
+                    'nodes:\n  spare:\n    kind: phone\n    worker_profile: neutral\n')
+    assert bool(C.phone_caps_findings(tmp_path, [path])) is bad
+
+
+def test_defaults_with_no_phone_nodes_are_not_phone_caps(tmp_path):
+    path = tmp_path / 'nodes.yaml'
+    path.write_text('defaults:\n  health: {min_battery_pct_on_battery: 40}\n'
+                    'nodes:\n  mbp: {kind: linux}\n')
+    assert C.phone_caps_findings(tmp_path, [path]) == []
+
+
+def test_scripts_directory_is_not_a_checkout_root(tmp_path, monkeypatch, capsys):
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    (scripts / 'fleet').write_text('# clean source\n')
+    external = tmp_path / 'phone.md'
+    external.write_text('# Phones\nAndroid manages resources.\n')
+    monkeypatch.setattr(C, 'KNOWN_PATHS', (external,))
+    monkeypatch.setattr(G, 'STATE', tmp_path / 'state')
+    monkeypatch.setenv('Z0_GUARD_O10', 'enforce')
+    assert G.main(['phone-caps', '--root', str(scripts)]) == 3
+    report = json.loads(capsys.readouterr().out)
+    assert report['findings'][0]['rule'] == 'scan-unavailable'
+    assert 'checkout root' in report['findings'][0]['detail']
+
+
+@pytest.mark.parametrize('expression', ["battery_pct", "power['batteries'][0]['pct']"])
+@pytest.mark.parametrize('threshold,bad', [(1, False), (2, False), (2.01, True), (40, True)])
+def test_native_phone_battery_floor_at_most_two(tmp_path, expression, threshold, bad):
+    path = tmp_path / 'fleet-adb'
+    path.write_text('#!/usr/bin/env python3\n'
+                    f'if {expression} < {threshold} and not power["on_ac"]:\n'
+                    '    raise RuntimeError("below owner battery floor")\n')
+    assert bool(C.phone_caps_findings(tmp_path, [path])) is bad
+
+
+def test_native_adb_helper_is_in_default_source_scope(tmp_path, monkeypatch):
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    helper = scripts / 'fleet-adb'
+    helper.write_text('#!/usr/bin/env python3\n'
+                      'if power["batteries"][0]["pct"] < 2 and not power["on_ac"]:\n'
+                      '    raise RuntimeError("battery below 2% and not charging")\n')
+    monkeypatch.setattr(C, 'KNOWN_PATHS', ())
+    assert helper in C.phone_caps_paths(tmp_path)
+    assert C.phone_caps_findings(tmp_path) == []
+
+
+@pytest.mark.parametrize('source,bad', [
+    ('power = p["power"]\npct = power["batteries"][0]["pct"]\n', False),
+    ('power = p["power"]\nlevel = power["batteries"][0]["pct"]\npct = level\n', False),
+    ('pct = p["cpu_load"]\n', True),
+    ('pct = p["temperature"]\n', True),
+    ('pct = p["mem_available_mb"]\n', True),
+    ('pct = p["battery_temp_c"]\n', True),
+    ('pct = p["power"]["batteries"][0]["temperature"]\n', True),
+    ('battery_pct = p["cpu_load"]\npct = battery_pct\n', True),
+    ('pct = p["power"]["batteries"][0]["pct"]\npct = p["cpu_load"]\n', True),
+    ('pct = p["power"]["batteries"][0]["pct"]\nif other:\n    pct = p["temperature"]\n', True),
+])
+def test_two_percent_exception_tracks_battery_alias_not_generic_resources(tmp_path, source, bad):
+    path = tmp_path / 'fleet.py'
+    path.write_text(source + 'if pct < 2 and not power["on_ac"]:\n    reject()\n')
+    assert bool(C.phone_caps_findings(tmp_path, [path])) is bad
+
+
+@pytest.mark.parametrize('kind,direct_cap,bad', [('phone', False, False),
+                                               ('linux', False, True),
+                                               ('phone', True, True)])
+def test_registry_explicit_phone_empty_defaults_controls_yaml_inheritance(tmp_path, kind, direct_cap, bad):
+    (tmp_path / 'scripts').mkdir()
+    (tmp_path / 'config/fleet').mkdir(parents=True)
+    (tmp_path / 'scripts/fleet').write_text(
+        'def registry():\n'
+        '    reg = load()\n'
+        '    nodes = {}\n'
+        '    for name, n in reg["nodes"].items():\n'
+        f'        defaults = {{}} if n.get("kind") == "{kind}" else {{\n'
+        '            "health": reg["defaults"]["health"], "lane": reg["defaults"]["lane"]}\n'
+        '        n = merge(defaults, n)\n'
+        '        nodes[name] = n\n'
+        '    return nodes\n')
+    direct = ', memory_pct: 50' if direct_cap else ''
+    registry = tmp_path / 'config/fleet/nodes.yaml'
+    registry.write_text('defaults:\n  health: {min_battery_pct_on_battery: 40}\n'
+                        '  lane: {}\nnodes:\n  spare: {kind: phone' + direct + '}\n')
+    assert bool(C.phone_caps_findings(tmp_path, [registry])) is bad

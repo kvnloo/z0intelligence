@@ -275,6 +275,27 @@ def rstep(s: RSt, ev: str, x: int = 0, session: bool = False) -> RSt:
     return s
 
 
+# O13: the caller validates compiled evidence and encodes full physical scopes.
+def option_limit(credited: bool, actual_scope: int, named_scope: int, measured: int) -> int:
+    return measured if credited and actual_scope == named_scope else 0
+
+
+def option_capacity_allows(credited: bool, actual_scope: int, named_scope: int,
+                           measured: int, count: int) -> bool:
+    return count <= option_limit(credited, actual_scope, named_scope, measured)
+
+
+def option_risk_allows(risk: int) -> bool:
+    """Only read (0) and explicitly reversible mutation (1) have SLM authority."""
+    return type(risk) is int and risk in (0, 1)
+
+
+def risk_option_capacity_allows(risk: int, credited: bool, actual_scope: int,
+                               named_scope: int, measured: int, count: int) -> bool:
+    return (option_risk_allows(risk)
+            and option_capacity_allows(credited, actual_scope, named_scope, measured, count))
+
+
 # =================================================================== classifiers
 # Heuristics that map real inputs to the abstract ones above. Not proven.
 

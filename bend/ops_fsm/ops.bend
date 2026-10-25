@@ -424,3 +424,68 @@ def phone_admits(ready: Bool, -memory: Bool, -cpu: Bool, -battery: Bool, -therma
 
 def phone_place(ready: Bool, memory: Bool, cpu: Bool, battery: Bool, thermal: Bool) -> Place:
   place_phone(phone_admits(ready, memory, cpu, battery, thermal))
+
+# ------------------------------------------------------------------ O11/O12
+# One policy cell is selected for the decision family. Natural identifiers name
+# families and complete arm identities (device/model/quant/engine/backend).
+type PolicyStage is Data:
+  StageNone{}
+  StageShadow{}
+  StageCanary{}
+  StageLive{}
+
+type PolicyRoute is Data:
+  FrontierRoute{}
+  OffloadRoute{arm: Nat}
+
+def policy_credited(stage: PolicyStage) -> Bool:
+  match stage:
+    case StageNone{}:
+      False{}
+    case StageShadow{}:
+      False{}
+    case StageCanary{}:
+      True{}
+    case StageLive{}:
+      True{}
+
+def policy_local(family: Nat, named_family: Nat, stage: PolicyStage, named_arm: Nat, arm: Nat) -> Bool:
+  Bool.and(Nat.is_eq(family, named_family), Bool.and(policy_credited(stage), Nat.is_eq(arm, named_arm)))
+
+def policy_frontier(stage: PolicyStage, healthy: Bool, abstain: Bool) -> Bool:
+  match stage:
+    case StageLive{}:
+      Bool.or(Bool.not(healthy), abstain)
+    case _:
+      True{}
+
+def policy_allows(+family: Nat, +named_family: Nat, stage: PolicyStage, named_arm: Nat, route: PolicyRoute, healthy: Bool, abstain: Bool) -> Bool:
+  match route:
+    case FrontierRoute{}:
+      Bool.or(Bool.not(Nat.is_eq(family, named_family)), policy_frontier(stage, healthy, abstain))
+    case OffloadRoute{arm}:
+      policy_local(family, named_family, stage, named_arm, arm)
+
+# ------------------------------------------------------------------ O13
+# Scope identifiers encode the exact model/quant/engine/backend/device tuple.
+# `credited` means valid, unexpired compiled ChoiceLadder evidence; never ledger
+# rows or a model's self-report. Absent credit, no request is authorized.
+def option_limit_by(ok: Bool, measured: Nat) -> Nat:
+  match ok:
+    case True{}:
+      measured
+    case False{}:
+      0n
+
+def option_limit(credited: Bool, actual_scope: Nat, named_scope: Nat, measured: Nat) -> Nat:
+  option_limit_by(Bool.and(credited, Nat.is_eq(actual_scope, named_scope)), measured)
+
+def option_capacity_allows(credited: Bool, actual_scope: Nat, named_scope: Nat, measured: Nat, count: Nat) -> Bool:
+  Bool.not(Nat.is_gt(count, option_limit(credited, actual_scope, named_scope, measured)))
+
+# Risk IDs: read=0, mutating_reversible=1; destructive and unknown fail closed.
+def option_risk_allows(risk: Nat) -> Bool:
+  Nat.is_gt(2n, risk)
+
+def risk_option_capacity_allows(risk: Nat, credited: Bool, actual_scope: Nat, named_scope: Nat, measured: Nat, count: Nat) -> Bool:
+  Bool.and(option_risk_allows(risk), option_capacity_allows(credited, actual_scope, named_scope, measured, count))

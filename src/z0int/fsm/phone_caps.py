@@ -37,7 +37,7 @@ def phone_caps_paths(root: Path, paths: list[Path] | None = None) -> list[Path]:
     root = Path(root).resolve()
     if paths is not None:
         return sorted({(p if p.is_absolute() else root / p).resolve() for p in map(Path, paths)})
-    candidates = [*(root / 'scripts' / name for name in ('fleet', 'fleet-build', 'fleet-polite-run')),
+    candidates = [*(root / 'scripts' / name for name in ('fleet', 'fleet-build', 'fleet-polite-run', 'fleet-adb')),
                   *sorted((root / 'scripts').glob('fleet-phone*')),
                   *sorted((root / 'scripts').glob('fleet_phone*.py')),
                   root / 'config/fleet/nodes.yaml',
@@ -97,7 +97,8 @@ def _python(path: Path, text: str) -> list[dict]:
         # A dictionary named memory can be prompt memory, not RAM: use
         # accessed field semantics instead of tainting all its metadata.
         if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant):
-            return bool(RESOURCE.search(str(node.slice.value)))
+            return bool(RESOURCE.search(str(node.slice.value)) or (
+                node.slice.value in ('pct', 'level') and re.search(r'batter(?:y|ies)', _source(node), re.I)))
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == 'get' and node.args and isinstance(node.args[0], ast.Constant):
             return bool(RESOURCE.search(str(node.args[0].value)))
         if isinstance(node, ast.Name):
@@ -105,6 +106,38 @@ def _python(path: Path, text: str) -> list[dict]:
         if isinstance(node, ast.Attribute):
             return bool(RESOURCE.search(node.attr))
         return any(resource(child, tainted) for child in ast.iter_child_nodes(node))
+
+    def battery_hint(value):
+        return bool(re.search(r'batt(?:ery|eries)?', str(value), re.I)) and not re.search(
+            r'temp|thermal|cpu|mem', str(value), re.I)
+
+    def battery_source(node, tainted):
+        if isinstance(node, ast.Name):
+            return 'battery:' + node.id in tainted or (node.id not in tainted and battery_hint(node.id))
+        if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant):
+            key = node.slice.value
+            return battery_hint(key) or (
+                (key in ('pct', 'level') or type(key) is int) and battery_source(node.value, tainted))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == 'get' and node.args:
+            key = node.args[0]
+            return isinstance(key, ast.Constant) and (battery_hint(key.value) or (
+                key.value in ('pct', 'level') and battery_source(node.func.value, tainted)))
+        if isinstance(node, ast.Attribute):
+            return battery_hint(node.attr) or (
+                node.attr in ('pct', 'level') and battery_source(node.value, tainted))
+        return any(battery_source(child, tainted) for child in ast.iter_child_nodes(node))
+
+    def low_battery(node, tainted):
+        if not isinstance(node, ast.Compare) or len(node.ops) != 1:
+            return False
+        left, right, op = node.left, node.comparators[0], node.ops[0]
+        if isinstance(op, (ast.Gt, ast.GtE)):
+            left, right = right, left
+        elif not isinstance(op, (ast.Lt, ast.LtE)):
+            return False
+        return (isinstance(right, ast.Constant) and type(right.value) in (int, float)
+                and 0 <= right.value <= 2
+                and battery_source(left, tainted))
 
     def expr(node, safe, tainted, bound):
         # Concrete registry identity, not the wrapper's name: worker = nodes["mbp"]
@@ -140,7 +173,7 @@ def _python(path: Path, text: str) -> list[dict]:
                         add(node, 'python-resource-default', 'resource CLI argument has an agent-chosen default')
             optional = isinstance(node, ast.Compare) and any(isinstance(v, ast.Constant) and v.value is None for v in [node.left, *node.comparators]) and all(isinstance(op, (ast.Is, ast.IsNot)) for op in node.ops)
             ranking = isinstance(node, ast.Compare) and any(isinstance(v, ast.Subscript) and isinstance(v.slice, ast.Constant) and isinstance(v.slice.value, int) for v in [node.left, *node.comparators])
-            if isinstance(node, ast.Compare) and resource(node, tainted) and not optional and not ranking:
+            if isinstance(node, ast.Compare) and resource(node, tainted) and not optional and not ranking and not low_battery(node, tainted):
                 add(node, 'python-resource-comparison', 'resource comparison outside a non-phone-only scope')
             if isinstance(node, ast.Constant) and isinstance(node.value, str) and re.search(r'\b(?:taskset|ulimit|CPUQuota|MemoryMax)\b', node.value):
                 add(node, 'python-resource-enforcement', 'phone-visible resource enforcement command')
@@ -167,12 +200,16 @@ def _python(path: Path, text: str) -> list[dict]:
                 # do not assume the branch that preserves MBP was selected.
                 bound.difference_update(n.id for branch in (*node.body, *node.orelse)
                                         for n in ast.walk(branch) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store))
+                tainted.difference_update('battery:' + n.id for branch in (*node.body, *node.orelse)
+                                          for n in ast.walk(branch) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store))
                 if fact is False and any(isinstance(n, (ast.Return, ast.Raise, ast.Continue)) for n in node.body):
                     safe = True
                 continue
             if isinstance(node, (ast.For, ast.While, ast.With, ast.Try)):
                 bound.difference_update(n.id for n in ast.walk(node)
                                         if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store))
+                tainted.difference_update('battery:' + n.id for n in ast.walk(node)
+                                          if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store))
                 if isinstance(node, ast.While):
                     expr(node.test, safe, tainted, bound)
                 block(node.body, safe, tainted, bound)
@@ -188,6 +225,10 @@ def _python(path: Path, text: str) -> list[dict]:
                     bound.clear()
                 if not safe and isinstance(node.value, ast.Constant) and node.value.value not in (None, '') and any(RESOURCE.search(name) for name in names):
                     add(node, 'python-resource-default', 'resource variable has an agent-chosen default')
+                battery_alias = battery_source(node.value, tainted)
+                tainted.difference_update('battery:' + name for name in names)
+                if battery_alias:
+                    tainted.update('battery:' + name for name in names)
                 if resource(node.value, tainted):
                     tainted.update(names)
                 else:
@@ -204,25 +245,138 @@ def _python(path: Path, text: str) -> list[dict]:
     return found
 
 
-def _yaml(path: Path, text: str) -> list[dict]:
-    # Compose preserves mapping structure, anchors, scalar types and line numbers.
+def _phone_defaults_excluded(root: Path) -> bool:
+    """Recognize the registry's explicit phone-empty-defaults merge, fail shut."""
+    try:
+        tree = ast.parse((root / 'scripts/fleet').read_text())
+    except (OSError, UnicodeError, SyntaxError):
+        return False
+    for registry in tree.body:
+        if not isinstance(registry, ast.FunctionDef) or registry.name != 'registry':
+            continue
+        merges = [n for n in ast.walk(registry) if isinstance(n, ast.Call)
+                  and isinstance(n.func, ast.Name) and n.func.id == 'merge']
+        writes = [n for n in ast.walk(registry) if isinstance(n, ast.Name)
+                  and n.id == 'defaults' and isinstance(n.ctx, ast.Store)]
+        if len(merges) != 1 or len(writes) != 1:
+            return False
+        for loop in registry.body:
+            if not isinstance(loop, ast.For):
+                continue
+            for first, second in zip(loop.body, loop.body[1:]):
+                if not (isinstance(first, ast.Assign) and len(first.targets) == 1
+                        and isinstance(first.targets[0], ast.Name) and first.targets[0].id == 'defaults'
+                        and isinstance(first.value, ast.IfExp) and _nonphone(first.value.test) is False
+                        and isinstance(first.value.body, ast.Dict) and not first.value.body.keys
+                        and isinstance(second, ast.Assign) and len(second.targets) == 1
+                        and isinstance(second.targets[0], ast.Name) and second.value is merges[0]):
+                    continue
+                call = second.value
+                if len(call.args) != 2 or call.keywords or not (
+                        isinstance(call.args[0], ast.Name) and call.args[0].id == 'defaults'
+                        and isinstance(call.args[1], ast.Name) and call.args[1].id == second.targets[0].id):
+                    continue
+                host_only = {id(n) for n in ast.walk(first.value.orelse)}
+                reads = [n for n in ast.walk(registry) if isinstance(n, ast.Subscript)
+                         and isinstance(n.slice, ast.Constant) and n.slice.value == 'defaults']
+                return bool(reads) and all(id(n) in host_only for n in reads)
+    return False
+
+
+def _yaml(path: Path, text: str, *, inherit_defaults: bool = True) -> list[dict]:
+    # Retain source locations through inheritance and YAML merge aliases.
     tree = yaml.compose(text)
     found = []
     visited = set()
     if tree is None:
         return found
 
+    def mapping(node, active=None):
+        active = set() if active is None else active
+        if not isinstance(node, yaml.MappingNode) or id(node) in active:
+            return {}
+        active = active | {id(node)}
+        out = {}
+        for key, value in node.value:
+            if key.value == '<<':
+                sources = value.value if isinstance(value, yaml.SequenceNode) else [value]
+                for source in reversed(sources):
+                    out.update(mapping(source, active))
+        out.update({key.value: (key, value) for key, value in node.value if key.value != '<<'})
+        return out
+
+    def leaves(node, prefix=(), active=None):
+        active = set() if active is None else active
+        if id(node) in active:
+            return {}
+        active = active | {id(node)}
+        result = {}
+        for name, (key, value) in mapping(node).items():
+            if isinstance(value, yaml.MappingNode):
+                result.update(leaves(value, (*prefix, name), active))
+            else:
+                result[(*prefix, name)] = (key, value)
+        return result
+
+    def check(key, value, inherited=False):
+        name = key.value.lower()
+        raw = getattr(value, 'value', None)
+        if raw in ('', 'null', '~', None):
+            return
+        battery = re.search(r'min_(?:batt|battery)', name)
+        if battery:
+            try:
+                bad = float(raw.rstrip('%')) > 2
+            except (ValueError, AttributeError):
+                bad = True
+        else:
+            resource_cap = (_policy_key(name) or bool(re.search(
+                r'^(?:cpus|cpu_cores|cores|memory|mem|mem_mb|memory_pct|ram_pct|cpu_pct|gpu_pct|cpu_percent|memory_percent)$', name)))
+            # An explicit all/100% marker imposes no cap. A numeric CPU count
+            # cannot prove all cores across devices, so it remains a finding.
+            full = str(raw).lower() in ('all', 'all_cores', 'unlimited', '100%')
+            full = full or (name.endswith(('_pct', '_percent')) and str(raw) in ('100', '100.0'))
+            bad = resource_cap and not full
+        if bad:
+            origin = 'inherited ' if inherited else ''
+            found.append(_finding(path, key.start_mark.line + 1, 'registry-phone-cap',
+                                  f'{origin}phone resource policy {key.value}={raw}'))
+
+    top = mapping(tree)
+    defaults = leaves(top['defaults'][1]) if inherit_defaults and 'defaults' in top else {}
+    nodes = mapping(top['nodes'][1]) if 'nodes' in top else {}
+    for node_name, (_, node) in nodes.items():
+        entries = mapping(node)
+        phone = PHONE.search(node_name) or any(
+            getattr(entries.get(k, (None, None))[1], 'value', '') == 'phone' for k in ('kind', 'mode'))
+        if not phone:
+            continue
+        own = leaves(node)
+        effective = {**defaults, **own}
+        for location, (key, value) in effective.items():
+            check(key, value, location not in own)
+        # Profiles may have neutral names; inspect those selected by a phone.
+        for location, (_, selected) in effective.items():
+            if location[-1] not in ('profile', 'worker_profile'):
+                continue
+            for collection in ('profiles', 'worker_profiles'):
+                profiles = mapping(top.get(collection, (None, None))[1])
+                profile = profiles.get(getattr(selected, 'value', ''), (None, None))[1]
+                for key, value in leaves(profile).values():
+                    check(key, value)
+
     def walk(node, phone=False):
         if (id(node), phone) in visited:
             return
         visited.add((id(node), phone))
         if isinstance(node, yaml.MappingNode):
-            values = {k.value: v for k, v in node.value}
-            phone = phone or getattr(values.get('kind'), 'value', '') == 'phone' or getattr(values.get('mode'), 'value', '') == 'phone'
-            for key, value in node.value:
-                if phone and _policy_key(key.value) and getattr(value, 'value', None) not in ('', 'null', '~'):
-                    found.append(_finding(path, key.start_mark.line + 1, 'registry-phone-cap', f'phone resource policy {key.value}'))
-                walk(value, phone or key.value in ('phone', 's22', 's25', 'omarchy-phone', 'galaxy-s22plus'))
+            entries = mapping(node)
+            phone = phone or any(getattr(entries.get(k, (None, None))[1], 'value', '') == 'phone'
+                                 for k in ('kind', 'mode'))
+            for name, (key, value) in entries.items():
+                if phone:
+                    check(key, value)
+                walk(value, phone or name in ('phone', 's22', 's25', 'omarchy-phone', 'galaxy-s22plus'))
         elif isinstance(node, yaml.SequenceNode):
             for value in node.value:
                 walk(value, phone)
@@ -285,15 +439,20 @@ def phone_caps_findings(root: Path, paths: list[Path] | None = None) -> list[dic
     root = Path(root)
     if not root.is_dir():
         return [_finding(root, 0, 'scan-unavailable', 'root is not a directory')]
+    if (paths is None or root.resolve().name == 'scripts') and not (
+            (root / 'scripts').is_dir() or (root / 'config/fleet/nodes.yaml').is_file()):
+        return [_finding(root, 0, 'scan-unavailable', 'root must be a checkout root with scripts/ or config/fleet/nodes.yaml')]
     selected = phone_caps_paths(root, paths)
     if not selected:
         return [_finding(root, 0, 'scan-unavailable', 'no policy sources found')]
+    registry_path = (root / 'config/fleet/nodes.yaml').resolve()
+    excluded = registry_path in selected and _phone_defaults_excluded(root)
     found = []
     for path in selected:
         try:
             text = path.read_text()
             if path.suffix in ('.yaml', '.yml', '.json'):
-                found.extend(_yaml(path, text))
+                found.extend(_yaml(path, text, inherit_defaults=not (excluded and path == registry_path)))
             elif path.suffix == '.py' or text.startswith('#!/usr/bin/env python') or text.startswith('#!/usr/bin/python'):
                 found.extend(_python(path, text))
             elif path.suffix == '.md':
