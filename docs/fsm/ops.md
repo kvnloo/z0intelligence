@@ -22,6 +22,7 @@ flowchart LR
     O10[O10 phone_admits/phone_place]:::law
     O11[O11 policy_local]:::law
     O12[O12 policy_frontier]:::law
+    O15[O15 desk_allows/desk_surface]:::law
   end
   Twin["src/z0int/fsm/ops.py\n(parity: exhaustive + seeded vs Bend)"]
   Book ==> Twin
@@ -31,6 +32,7 @@ flowchart LR
   G -->|rollout| RO["merge --ff-only -> idle restart -> launch check -> rollback"]
   G -->|prepush| PP["z0-hooks pre-push (core.hooksPath, opt-in)"]
   G -->|phone| ZL["z0live broker / phone tools"]
+  G -->|desktop| DK["agent desktop tools: Sway vs live Hyprland"]
   G -->|a11y| LC["lawnchair install-z0live-apk.sh"]
   G -->|routing| RT["omp / Hermes / Dash role configs (timer)"]
   G -->|health_step| FH["fleet health -> one owner notification"]
@@ -73,6 +75,7 @@ command, git ref update, adb dump or config line becomes those inputs is classif
 | O11 | A non-frontier route must have current policy stage canary or live that names this family and the full selected arm. | `z0-guard policy` | audit, exit 3 on violations |
 | O12 | A healthy live arm requires offload. Frontier/Jev fallback requires a recorded confidence below the policy threshold. | `z0-guard policy` | audit, exit 3 on violations |
 | O13 | Shadow/canary/live requests and configured arms/families require exact-scope, risk-specific option capacity. Default zero; destructive never SLM. | `z0-guard policy` | audit, exit 3 with offending IDs |
+| O15 | Owner desktop. Solo work (cron, subagents, unattended runs, self-directed tests) launches and drives GUIs only in an owned headless Sway; any agent may look at the owner's live Hyprland desktop without moving focus, cursor or workspace. Collaboration = the owner is live in the chat AND the current ask points at his screen; it opens windows on the live desktop without a further approval prompt and drives keyboard/mouse when he asks for input. During collaboration an unreachable desktop is located, never reported as "can't see your monitor"; a failed solo Sway run reports its gap and never falls back to the live desktop. | `z0-guard desktop --kind see\|open\|input [--interactive] --utterance S [--resolve]`; skills `sway-only-desktop-automation`, `focus-safe-desktop-automation` | enforce |
 
 Switch a gate: `Z0_GUARD_O<n>=off|report|enforce` in the environment, or
 `~/.config/z0-guard/modes.json` (`{"O3": "enforce"}`). `z0-guard modes` prints the effective modes.
@@ -95,6 +98,27 @@ if not d["allowed"]:
 `z0int.fsm.ops.phone_allows(PKind.TAP, intent=..., fg=..., chain=..., call=...)` is the bare
 decision (no IO). Pass `intent=` from the broker's own grammar so the two never disagree;
 `utterance=` uses the shared fallback `ops.owner_phone_intent`.
+
+## O15 owner desktop (incident 2026-10-25)
+
+OMP session `01a17090` (gpt-6.1-sol): Kevin asked the agent to open his router settings
+"in my monitor here & we can try to find the issue". The Sway-only skill forbade the live
+desktop and the desktop driver was bound away from his Hyprland session, so the agent
+waited on an approval prompt that timed out, then answered "I can't currently see your
+monitor". Tape: `tests/fixtures/ops_tapes/o15-desktop-collab-20261025.json`.
+
+```python
+from z0int.fsm.guard import desktop_decision, live_desktop
+d = desktop_decision("open", interactive=owner_live_in_chat, utterance=latest_owner_message)
+# d["surface"] is "live" or "sway"; d["on_unreachable"] is "resolve" or "report"
+env = live_desktop()   # HYPRLAND_INSTANCE_SIGNATURE, WAYLAND_DISPLAY, XDG_RUNTIME_DIR, outputs; read-only
+```
+
+`interactive` is never inferred from text: the harness supplies it. `live_ask`/`input_ask`
+default to the heuristic `ops.owner_desktop_intent`; pass them explicitly when the
+conversation, not the current message, set up collaboration. Proven scope: the decision
+table only. Whether a real desktop driver is bound to the display the decision names is
+the caller's job (`--resolve` locates the live session).
 
 ## O10 scanner API
 

@@ -51,7 +51,7 @@ def repo(tmp_path, name="r"):
 # ------------------------------------------------------------------ modes
 
 def test_default_modes_enforce_only_pure_refusals():
-    assert {g for g, m in G.DEFAULT_MODES.items() if m == "enforce"} == {"O1", "O2", "O4", "O6", "O10"}
+    assert {g for g, m in G.DEFAULT_MODES.items() if m == "enforce"} == {"O1", "O2", "O4", "O6", "O10", "O15"}
     assert all(G.DEFAULT_MODES[g] == "report" for g in ("O3", "O5", "O7", "O8", "O9"))
 
 
@@ -472,6 +472,64 @@ def test_o9_restart_marks_interrupted_never_failed(tmp_path):
     assert P.rstep(P.RSt("interrupted", 1), "error").kind == "interrupted"
 
 
+# ------------------------------------------------------------------ O15
+
+@pytest.mark.parametrize("utterance,live,inp", [
+    ("open it in my monitor here & we can try to find the issue", True, False),
+    ("just open it rn in the other monitor", True, False),
+    ("ok i opened it how do i turn on ssh see my monitor", True, False),
+    ("click the advanced tab on my monitor", True, True),
+    ("open it in zen", True, False),
+    ("run the tern ui test in sway, don't touch my mouse", False, False),
+    ("fix the flaky test", False, False),
+])
+def test_o15_intent(utterance, live, inp):
+    assert P.owner_desktop_intent(utterance) == (live, inp)
+
+
+def test_o15_table():
+    S, L = P.DSurf.SWAY, P.DSurf.LIVE
+    for kind in P.DKind:
+        assert P.desk_allows(S, kind)                                     # Sway always
+    assert P.desk_allows(L, P.DKind.SEE)                                  # still look: anyone
+    assert not P.desk_allows(L, P.DKind.SEE, moves=True, interactive=True, live_ask=True)
+    assert not P.desk_allows(L, P.DKind.OPEN, live_ask=True)              # unattended
+    assert not P.desk_allows(L, P.DKind.OPEN, interactive=True)           # no screen ask
+    assert P.desk_allows(L, P.DKind.OPEN, interactive=True, live_ask=True)
+    assert not P.desk_allows(L, P.DKind.INPUT, interactive=True, live_ask=True)
+    assert P.desk_allows(L, P.DKind.INPUT, interactive=True, live_ask=True, input_ask=True)
+    assert P.desk_surface(True, True) is L and P.desk_surface(False, True) is S and P.desk_surface(True, False) is S
+    assert P.desk_unreachable(True, True) == "resolve" and P.desk_unreachable(False, True) == "report"
+
+
+def test_o15_decision_routes_and_explains():
+    d = G.desktop_decision("open", interactive=False, utterance="open it in my monitor")
+    assert d["allowed"] and not d["live_allowed"] and d["surface"] == "sway"
+    assert d["reasons"] == ["unattended: use owned headless Sway"]
+    assert not G.desktop_decision("open", interactive=False, target="live")["allowed"]
+    d = G.desktop_decision("input", interactive=True, utterance="look at my screen")
+    assert not d["live_allowed"] and d["surface"] == "sway"
+    d = G.desktop_decision("see", interactive=False)
+    assert d["allowed"] and d["surface"] == "live"
+    d = G.desktop_decision("input", interactive=True, utterance="anything", live_ask=True, input_ask=True)
+    assert d["allowed"] and d["surface"] == "live" and d["on_unreachable"] == "resolve"
+
+
+def test_o15_cli_refuses_unattended_input(capsys, monkeypatch, tmp_path):
+    monkeypatch.setattr(G, "STATE", tmp_path)
+    assert G.main(["desktop", "--kind", "input", "--surface", "live",
+                   "--utterance", "click it on my monitor"]) == G.EXIT_REFUSED
+    out = json.loads(capsys.readouterr().out)
+    assert out["gate"] == "O15" and out["status"] == "refused"
+    capsys.readouterr()
+    assert G.main(["desktop", "--kind", "input", "--surface", "live", "--interactive",
+                   "--utterance", "click it on my monitor"]) == 0
+
+
+def test_o15_live_desktop_absent(tmp_path):
+    assert G.live_desktop(uid=10**9) is None
+
+
 # ------------------------------------------------------------------ incident tapes
 
 @pytest.mark.parametrize("tape", TAPES, ids=[t.name for t in TAPES])
@@ -481,7 +539,7 @@ def test_incident_tape_is_refused_or_flagged(tape, vis):
 
 
 def test_all_nine_laws_have_a_tape():
-    assert {json.loads(t.read_text())["law"] for t in TAPES} == {f"O{i}" for i in range(1, 10)}
+    assert {json.loads(t.read_text())["law"] for t in TAPES} == {f"O{i}" for i in range(1, 10)} | {"O15"}
 
 
 # ------------------------------------------------------------------ Bend parity (groot)
