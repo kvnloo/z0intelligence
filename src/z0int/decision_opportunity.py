@@ -184,6 +184,8 @@ def build_decision_opportunity(repo: str | Path, request: str, *, effects: Itera
     return {
         **semantic,
         "semantic_id": semantic_id,
+        # the memory view the opportunity was observed against; outside the semantics, like the trace
+        "memory_snapshot_id": packet.get("memory_snapshot_id"),
         # identity of *this* observation of the opportunity; never part of the semantics
         "trace": {"harness": harness, "trace_id": trace_id, "attempt": attempt,
                   "opportunity_id": _sha({"semantic_id": semantic_id, "trace_id": trace_id, "attempt": attempt}, 20)},

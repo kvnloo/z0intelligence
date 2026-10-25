@@ -1,0 +1,11 @@
+# The memory-only z0 MCP server for a DSH profile (activation A8a appends this to each
+# ~/.dsh/profiles/*/cordis.patch.yml after a backup). DSH owns the generic MCP client; z0int owns the surface.
+# Tools: memory_search, orient, inspect, history, unknowns, verify (no route_worker).
+- insert:
+    - id: memory-z0
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: z0-memory
+        transport: stdio
+        command: sh
+        args: ['-c', 'exec "${Z0INT_PYTHON:-$HOME/.z0int/bin/python}" -m z0int.intelligence_mcp --profile memory']

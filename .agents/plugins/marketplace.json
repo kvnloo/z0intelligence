@@ -1,0 +1,20 @@
+{
+  "name": "z0intelligence",
+  "interface": {
+    "displayName": "z0intelligence"
+  },
+  "plugins": [
+    {
+      "name": "codex-z0intelligence",
+      "source": {
+        "source": "local",
+        "path": "./harness-adapters/codex-z0intelligence"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,7 +1,9 @@
 """Resident JSONL bridge worker: python -u -m z0int.bridge.worker
 
 Protocol: one JSON object per line on stdin; one JSON response per line on stdout.
-Request ids are required for concurrent ops.
+Request ids are required for concurrent ops. turn_open/turn_close payloads may carry the capture fields
+``harness`` (omp|omo), ``cwd``, ``parent_id``, ``agent_kind`` and ``model``; a frame without them (the a9cbbed
+shim) is still served, and captured with unknown task facts.
 """
 
 from __future__ import annotations
@@ -40,12 +42,27 @@ def _defer_automatic(payload: dict[str, Any]) -> dict[str, Any]:
 
     threading.Thread(target=run, name="z0int-automatic", daemon=True).start()
     return {"ok": True, "deferred": True, "spawn": False}
+_OUTPUT_LOCK = threading.Lock()
+_SHADOW_SLOT = threading.BoundedSemaphore(1)
+
+
+def _shadow_response(req_id: str | None, payload: dict[str, Any], rt: BridgeRuntime) -> None:
+    try:
+        _respond(req_id, rt.cognition_shadow(payload))
+    finally:
+        _SHADOW_SLOT.release()
+
+
+def _text(payload: dict[str, Any], key: str) -> str | None:
+    value = payload.get(key)
+    return value if isinstance(value, str) and value else None
 
 
 def _respond(req_id: str | None, body: dict[str, Any]) -> None:
     out = {"id": req_id, **body}
-    sys.stdout.write(json.dumps(out, ensure_ascii=False, separators=(",", ":")) + "\n")
-    sys.stdout.flush()
+    with _OUTPUT_LOCK:
+        sys.stdout.write(json.dumps(out, ensure_ascii=False, separators=(",", ":")) + "\n")
+        sys.stdout.flush()
 
 
 def serve(generation: int | None = None) -> int:
@@ -118,7 +135,11 @@ def serve(generation: int | None = None) -> int:
                 payload = {k: v for k, v in req.items() if k not in ("id", "op")}
                 if isinstance(req.get("payload"), dict):
                     payload.update(req["payload"])
-                _respond(req_id, rt.cognition_shadow(payload))
+                if _SHADOW_SLOT.acquire(blocking=False):
+                    threading.Thread(target=_shadow_response, args=(req_id, payload, rt),
+                                     daemon=True, name="cognition-shadow").start()
+                else:
+                    _respond(req_id, {"ok": False, "reason": "shadow_busy", **rt.identity()})
                 continue
             if op == "automatic_event":
                 payload = req.get("payload") if isinstance(req.get("payload"), dict) else {}
@@ -138,6 +159,11 @@ def serve(generation: int | None = None) -> int:
                     writer_generation=req.get("bridge_generation")
                     if isinstance(req.get("bridge_generation"), int)
                     else rt.generation,
+                    cwd=_text(payload, "cwd"),
+                    harness=_text(payload, "harness") or "omp",
+                    parent_id=_text(payload, "parent_id"),
+                    agent_kind=_text(payload, "agent_kind"),
+                    model=_text(payload, "model"),
                 )
                 _respond(req_id, result)
                 continue
@@ -161,6 +187,7 @@ def serve(generation: int | None = None) -> int:
                     writer_generation=req.get("bridge_generation")
                     if isinstance(req.get("bridge_generation"), int)
                     else rt.generation,
+                    harness=_text(payload, "harness") or "omp",
                 )
                 _respond(req_id, result)
                 continue

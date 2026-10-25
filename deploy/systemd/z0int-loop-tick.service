@@ -1,0 +1,16 @@
+# z0int continuous shadow-learning tick (SPEC section 11). User unit: copy to ~/.config/systemd/user/ with the timer.
+# The tick takes flock(2) LOCK_SH on the quiet-lane lock itself (no flock wrapper here): an exclusive window longer
+# than --lock-wait-s gives a skipped_exclusive_window receipt and exit 0. It never promotes, never writes harness
+# config and never contacts a service; it writes only under $Z0INT_HOME/state and $Z0INT_HOME/loop. No GPU.
+[Unit]
+Description=z0int continuous shadow-learning tick (never promotes)
+After=agentsview-sync.service
+
+[Service]
+Type=oneshot
+Environment=CLAUDE_CONFIG_DIR=%h/.claude-home
+Environment=Z0INT_HOME=%h/.z0int
+Environment=AGENTSVIEW_DATA_DIR=/mnt/zer0models/sft-svlm/data/agentsview
+ExecStart=/mnt/zer0models/z0-wt/venv-wiring/bin/z0int loop tick --lock /mnt/zer0models/cua-lane-tmp/locks/quiet-lane.lock --lock-wait-s 1800 --budget-s 600 --ledger /mnt/zer0models/cua-lane-tmp/locks/quiet-lane-ledger.jsonl
+Nice=19
+IOSchedulingClass=idle

@@ -186,8 +186,8 @@ test("asks one model by default", async () => {
 	handler(toolCall("write", { path: "x" }), fakeCtx());
 	await flush();
 
-	// One resident model is what the local supervisor holds; asking two at once never answers.
-	expect(sent[0].shadows).toEqual(["functiongemma_270m"]);
+	// One small candidate uses the existing farm; no resident supervisor is required.
+	expect(sent[0].shadows).toEqual(["qwen3_06b"]);
 	const actions = sent[0].actions as Array<Record<string, unknown>>;
 	const writeAction = actions.find(action => action.tool === "write");
 	expect(writeAction?.risk_class).toBe("write");
@@ -196,7 +196,7 @@ test("asks one model by default", async () => {
 test("state shows only the tools called before, never the observed call", async () => {
 	process.env.OMP_Z0INT_COGNITION_TOOLS = "read,grep,glob,edit,bash,write,task";
 	const { handler } = installed();
-	const calls = ["read", "grep", "glob", "edit", "bash", "write", "task"];
+	const calls = ["read", "grep", "glob", "edit", "bash", "write", "task", "find", "eval", "wait"];
 	calls.forEach((tool, index) => handler(toolCall(tool, { secret: `needle-${index}` }), fakeCtx()));
 	await flush();
 
@@ -212,9 +212,10 @@ test("state shows only the tools called before, never the observed call", async 
 	});
 	expect(sent[0].state).toContain("none");
 	expect(sent[3].state).toContain("read, grep, glob");
-	// A ring of five: the seventh call no longer sees the first.
-	expect(sent[6].state).toContain("grep, glob, edit, bash, write");
-	expect(sent[6].state).not.toContain("read");
+	// A ring of eight: the tenth call no longer sees the first.
+	expect(sent[9].state).toContain("glob, edit, bash, write, task, find, eval");
+	expect(sent[9].state).not.toContain("read");
+	expect(sent[9].recent_tools).toHaveLength(8);
 });
 
 test("a new session starts with an empty history", async () => {
@@ -576,4 +577,141 @@ test("a model that answers inside the budget is unaffected", async () => {
 	pi.handlers.get("tool_call")?.({ type: "tool_call", toolCallId: "warm", toolName: "read", input: {} }, sessionCtx());
 	await flush(150);
 	expect(entries[0].data.outcome).toBe("slm_executed");
+});
+
+test("goal context reads branch text and registration descriptions without current arguments", async () => {
+	process.env.OMP_Z0INT_COGNITION_TOOLS = "read,custom,edit";
+	const { pi, handler } = installed();
+	const ctx = fakeCtx({
+		tools: new Map([["custom", { definition: { name: "custom", description: "Inspect the repository dependency graph.\nReturn matching nodes." } }]]),
+		sessionManager: {
+			getSessionId: () => "goal-a",
+			getBranch: () => [
+				{ type: "message", message: { role: "user", content: [{ type: "text", text: "Repair the dependency graph." }] } },
+				{ type: "message", message: { role: "assistant", content: [
+					{ type: "thinking", thinking: "INVISIBLE_REASONING" },
+					{ type: "text", text: "I will inspect the graph. Then I will locate the broken edge." },
+					{ type: "toolCall", name: "edit", arguments: { i: "CURRENT_TARGET_SECRET" } },
+				] } },
+			],
+		},
+	});
+	handler(toolCall("read", { i: "Inspect dependency metadata", path: "PRIVATE_PATH" }), ctx);
+	handler(toolCall("edit", { i: "CURRENT_TARGET_SECRET", path: "CURRENT_PATH" }), ctx);
+	await flush();
+	const goal = sent[1].goal_context as Record<string, unknown>;
+	expect(goal.latest_user_message).toBe("Repair the dependency graph.");
+	expect(goal.last_assistant_sentence).toBe("Then I will locate the broken edge.");
+	expect(goal.previous_tools).toEqual([{ tool: "read", intent: "Inspect dependency metadata" }]);
+	expect(goal.sources).toEqual({
+		latest_user_message: "sessionManager.getBranch",
+		last_assistant_sentence: "sessionManager.getBranch",
+	});
+	expect(goal.missing_fields).toEqual([]);
+	expect(JSON.stringify(goal)).not.toMatch(/INVISIBLE_REASONING|CURRENT_TARGET_SECRET|CURRENT_PATH|PRIVATE_PATH/);
+	const actions = sent[1].actions as Array<Record<string, unknown>>;
+	expect(actions.find(row => row.tool === "custom")?.description).toBe("Inspect the repository dependency graph. Return matching nodes.");
+	expect(actions.find(row => row.tool === "custom")?.description_source).toBe("registration");
+	expect(actions.find(row => row.tool === "read")?.description).toContain("Read files");
+	expect(sent[1].state).toBe("OMP session. Previous tool calls, oldest first: read");
+	expect(pi.handlers.has("message_update")).toBe(true);
+});
+
+test("streaming context uses visible text only and keeps five preceding intents", async () => {
+	const { pi, handler } = installed();
+	const ctx = fakeCtx({ sessionManager: { getSessionId: () => "stream-session" } });
+	pi.handlers.get("message_start")?.({ message: { role: "user", content: "界".repeat(400) } }, ctx);
+	pi.handlers.get("message_update")?.({ message: { role: "assistant", content: [
+		{ type: "thinking", thinking: "HIDDEN" },
+		{ type: "text", text: "First sentence. Inspect the next file." },
+		{ type: "toolCall", name: "write", arguments: { i: "NOT_VISIBLE" } },
+	] } }, ctx);
+	for (let index = 0; index < 7; index++) {
+		handler(toolCall("read", { i: `Earlier intent ${index}`, path: `secret-${index}` }), ctx);
+	}
+	await flush();
+	const goal = sent[6].goal_context as Record<string, unknown>;
+	expect(Buffer.byteLength(String(goal.latest_user_message), "utf8")).toBeLessThanOrEqual(600);
+	expect(String(goal.latest_user_message)).not.toContain("\uFFFD");
+	expect(goal.last_assistant_sentence).toBe("Inspect the next file.");
+	expect(goal.previous_tools).toEqual([1, 2, 3, 4, 5].map(index => ({ tool: "read", intent: `Earlier intent ${index}` })));
+	expect(JSON.stringify(goal)).not.toMatch(/HIDDEN|NOT_VISIBLE|Earlier intent 6|secret-/);
+});
+
+test("session identity changes reset goal and prior intents even without session_start", async () => {
+	const { pi, handler } = installed();
+	let id = "session-a";
+	const ctx = fakeCtx({ sessionManager: { getSessionId: () => id } });
+	pi.handlers.get("message_start")?.({ message: { role: "user", content: "SESSION_A_GOAL" } }, ctx);
+	handler(toolCall("read", { i: "SESSION_A_INTENT" }), ctx);
+	id = "session-b";
+	handler(toolCall("write", { i: "SESSION_B_CURRENT" }), ctx);
+	id = "session-a";
+	handler(toolCall("edit"), ctx);
+	await flush();
+	for (const request of sent.slice(1)) {
+		const goal = request.goal_context as Record<string, unknown>;
+		expect(goal.latest_user_message).toBeNull();
+		expect(goal.last_assistant_sentence).toBeNull();
+		expect(goal.previous_tools).toEqual([]);
+		expect(goal.missing_fields).toEqual(["latest_user_message", "last_assistant_sentence"]);
+		expect(JSON.stringify(goal)).not.toMatch(/SESSION_A|SESSION_B/);
+		expect(request.recent_tools).toEqual([]);
+	}
+});
+
+test("current-target changes cannot change any goal model inputs", () => {
+	const visible = {
+		latest_user_message: "Find the parsing bug.",
+		last_assistant_sentence: "I will inspect the parser.",
+		sources: { latest_user_message: "message_start", last_assistant_sentence: "message_update" },
+	};
+	const args = [["read", "write"], "same-session", ["grep"], visible,
+		[{ tool: "grep", intent: "Locate parser" }], {}] as const;
+	const first = buildShadowPayload(toolCall("read", { i: "SECRET_A" }), [...args[0]], args[1], args[2], args[3], args[4], args[5]);
+	const second = buildShadowPayload(toolCall("write", { i: "SECRET_B" }), [...args[0]], args[1], args[2], args[3], args[4], args[5]);
+	for (const field of ["goal_context", "actions", "state", "objective", "recent_tools"]) {
+		expect(first[field]).toEqual(second[field]);
+		expect(JSON.stringify(first[field])).not.toMatch(/SECRET_A|SECRET_B/);
+	}
+});
+
+test("branch history restores prior intents and stops before the current call and later siblings", async () => {
+	const { handler } = installed();
+	const ctx = fakeCtx({ sessionManager: {
+		getSessionId: () => "restored",
+		getBranch: () => [{ type: "message", message: { role: "assistant", content: [
+			{ type: "thinking", thinking: "HIDDEN" },
+			{ type: "toolCall", id: "prior-1", name: "grep", arguments: { i: "Locate parsing code", pattern: "PRIVATE_PATTERN" } },
+			{ type: "toolCall", id: "prior-2", name: "read", arguments: { i: "Read the parser", path: "PRIVATE_PATH" } },
+			{ type: "toolCall", id: "current", name: "edit", arguments: { i: "CURRENT_INTENT" } },
+			{ type: "toolCall", id: "later", name: "bash", arguments: { i: "LATER_INTENT" } },
+		] } }],
+	} });
+	handler({ ...toolCall("edit", { i: "CURRENT_INTENT" }), toolCallId: "current" }, ctx);
+	await flush();
+	const goal = sent[0].goal_context as Record<string, unknown>;
+	expect(goal.previous_tools).toEqual([
+		{ tool: "grep", intent: "Locate parsing code" },
+		{ tool: "read", intent: "Read the parser" },
+	]);
+	expect(JSON.stringify(goal)).not.toMatch(/HIDDEN|PRIVATE_|CURRENT_INTENT|LATER_INTENT/);
+	expect(goal.latest_user_message).toBeNull();
+	expect(goal.last_assistant_sentence).toBeNull();
+});
+
+test("payload evidence sources are snapshots, not mutable event state", async () => {
+	const { pi, handler } = installed();
+	const ctx = fakeCtx();
+	pi.handlers.get("message_start")?.({ message: { role: "user", content: "First goal" } }, ctx);
+	handler(toolCall("read"), ctx);
+	pi.handlers.get("message_end")?.({ message: { role: "user", content: "Second goal" } }, ctx);
+	handler(toolCall("grep"), ctx);
+	await flush();
+	expect((sent[0].goal_context as Record<string, unknown>).sources).toEqual({
+		latest_user_message: "message_start", last_assistant_sentence: null,
+	});
+	expect((sent[1].goal_context as Record<string, unknown>).sources).toEqual({
+		latest_user_message: "message_end", last_assistant_sentence: null,
+	});
 });

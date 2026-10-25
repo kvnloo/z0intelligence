@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "rule": "This file is the canonical id list. Unknown ids fail closed. A catalog row is not proof a runtime, adapter, or scheduler exists.",
+  "supported": [
+    "hermes",
+    "omp",
+    "o8",
+    "grok",
+    "codex",
+    "claude",
+    "pi",
+    "fx"
+  ],
+  "harnesses": {
+    "hermes": {
+      "name": "Hermes Agent",
+      "kind": "executor",
+      "bin": "hermes",
+      "repo": "https://github.com/NousResearch/hermes-agent",
+      "docs": "https://hermes-agent.nousresearch.com/docs",
+      "dash": "wired",
+      "firstmate": "none",
+      "role": "Kanban + gateway/peer A2A. AODL compiles to a Hermes profile; it does not replace Kanban. Upstream IR issue: NousResearch/hermes-agent#88589."
+    },
+    "omp": {
+      "name": "Oh My Pi",
+      "kind": "executor",
+      "bin": "omp",
+      "repo": "https://github.com/can1357/oh-my-pi",
+      "docs": "https://omp.sh/",
+      "dash": "wired",
+      "firstmate": "primary",
+      "role": "Pi fork. Dash adapter: omp -p --mode json. Firstmate verified primary with a blocking session_stop hook."
+    },
+    "o8": {
+      "name": "o8",
+      "kind": "control-room",
+      "bin": "o8",
+      "repo": "https://github.com/hurttlocker/o8",
+      "docs": "https://o8.run",
+      "dash": "none",
+      "firstmate": "none",
+      "role": "Desktop control room over other CLIs. Not an AODL executor by itself."
+    },
+    "grok": {
+      "name": "Grok Build",
+      "kind": "executor",
+      "bin": "grok",
+      "repo": "https://github.com/xai-org/grok-build",
+      "docs": "https://docs.x.ai/build/overview",
+      "dash": "wired",
+      "firstmate": "primary",
+      "role": "SpaceXAI coding agent TUI."
+    },
+    "codex": {
+      "name": "Codex",
+      "kind": "executor",
+      "bin": "codex",
+      "repo": "https://github.com/openai/codex",
+      "dash": "wired",
+      "firstmate": "primary",
+      "role": "OpenAI terminal coding agent. Dash: codex exec --json."
+    },
+    "claude": {
+      "name": "Claude Code",
+      "kind": "executor",
+      "bin": "claude",
+      "repo": "https://github.com/anthropics/claude-code",
+      "docs": "https://code.claude.com/docs/en/overview",
+      "dash": "wired",
+      "firstmate": "primary",
+      "role": "Anthropic terminal coding agent."
+    },
+    "pi": {
+      "name": "Pi",
+      "kind": "executor",
+      "bin": "pi",
+      "repo": "https://github.com/earendil-works/pi",
+      "docs": "https://pi.dev",
+      "dash": "wired",
+      "firstmate": "primary",
+      "role": "Earendil terminal harness. Dash adapter: pi --mode json --approve. Firstmate co-primary."
+    },
+    "fx": {
+      "name": "fx",
+      "kind": "executor",
+      "bin": "fx",
+      "repo": "https://github.com/vercel-labs/fx",
+      "docs": "https://fx.sh",
+      "dash": "wired",
+      "firstmate": "none",
+      "role": "Vercel Labs unix-like coding agent. Dash adapter: fx ask --json --full-access. Not antonmedv/fx."
+    }
+  },
+  "distros": {
+    "firstmate": {
+      "name": "firstmate",
+      "kind": "distro",
+      "repo": "https://github.com/kunchenguid/firstmate",
+      "fork": "https://github.com/kvnloo/firstmate",
+      "dash": "none",
+      "role": "Agent distro, not a harness. Captain talks to one liaison; crewmates ship from disposable worktrees. Keel L9 names it as an optional subordinate executor."
+    }
+  },
+  "network": {
+    "aodl": {
+      "repo": "https://github.com/kvnloo/aodl",
+      "owns": "IR, schema, fail-closed validator, visual encodings, this catalog"
+    },
+    "dash": {
+      "repo": "https://github.com/kvnloo/dash",
+      "owns": "phone UI + Tailscale bridge that spawns executor CLIs"
+    },
+    "frontier-kb": {
+      "repo": "https://github.com/kvnloo/frontier-kb",
+      "owns": "cross-harness research notes; points at this catalog"
+    },
+    "hermes-keel": {
+      "repo": "https://github.com/kvnloo/hermes-keel",
+      "owns": "Hermes-only governance. Level 0 only. Not a scheduler. Not Firstmate."
+    },
+    "hermes-agent": {
+      "repo": "https://github.com/NousResearch/hermes-agent",
+      "owns": "Kanban, profiles, gateway, Telegram router"
+    },
+    "blueprint": {
+      "repo": "https://github.com/kvnloo/blueprint",
+      "owns": "product goal. First slice: autonomous product management expressed as C(RAID)."
+    },
+    "evolve": {
+      "repo": "https://github.com/kvnloo/evolve",
+      "owns": "legacy C(RAID)/Claude Flow orchestration. Distilled into AODL; not a second IR."
+    }
+  }
+}

@@ -16,12 +16,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from z0int.optchat.__main__ import Resident
+from z0int.optchat.__main__ import Resident, serve
 from z0int.optchat.compact import (
     CompactorMessages, Scheduler, SonnetBridge, commit_line, compactor_messages,
     cut_utf8, due, enforce, ollama_complete, pump,
 )
-from z0int.optchat.log import NODE, PLACEHOLDER, ChatLog, Part, cap_echo, utf8_len
+from z0int.optchat.log import NODE, PLACEHOLDER, ChatLog, Part, cap_echo, load_chat, utf8_len
 from z0int.optchat.turn import Queue, begin, cache_pieces, record, wait_ready
 
 
@@ -181,6 +181,36 @@ class LogTests(unittest.TestCase):
             self.assertIn("bytes", page)
             self.assertIn("visible &lt;content&gt;", page)
 
+    def test_configured_root_overrides_home_but_not_an_explicit_root(self) -> None:
+        with TemporaryDirectory() as tmp:
+            home = Path(tmp) / "home"
+            configured = Path(tmp) / "hermes" / "chat"
+            explicit = Path(tmp) / "explicit"
+            with patch.dict(os.environ, {"Z0INT_HOME": str(home), "Z0INT_OPTCHAT_ROOT": str(configured)}):
+                self.assertEqual(load_chat().root, configured)
+                self.assertEqual(load_chat(explicit).root, explicit)
+            with patch.dict(os.environ, {"Z0INT_HOME": str(home), "Z0INT_OPTCHAT_ROOT": ""}):
+                self.assertEqual(load_chat().root, home / "optchat" / "chat")
+            with patch.dict(os.environ, {"Z0INT_OPTCHAT_ROOT": "~/hermes/chat", "HOME": str(home)}):
+                self.assertEqual(load_chat().root, home / "hermes" / "chat")
+
+    def test_echo_cap_keeps_head_and_tail_at_a_custom_limit(self) -> None:
+        capped = cap_echo("H" * 20000 + "M" * 20000 + "T" * 20000, 100)
+        self.assertLessEqual(len(capped), 100)
+        self.assertTrue(capped.startswith("H"))
+        self.assertTrue(capped.endswith("T"))
+        self.assertIn("cut", capped)
+
+    def test_note_fsync_roundtrip_preserves_the_source_row(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = ChatLog(root)
+            first.append("note", "from continuity, not a replacement")
+            second = load_chat(root)
+            self.assertEqual(second.messages[0].kind, "note")
+            row = json.loads(next((root / "main").glob("*.jsonl")).read_text().strip())
+            self.assertEqual(row["text"], "from continuity, not a replacement")
+
 
 class CompactorTests(unittest.TestCase):
     def test_complete_source_and_summarized_context_are_never_truncated(self) -> None:
@@ -261,6 +291,16 @@ class CompactorTests(unittest.TestCase):
             pump(chat, lambda _: "user: summarized A", limit=1)
             self.assertEqual(due(chat), [(0, 1)])
 
+    def test_pump_replaces_a_placeholder_with_the_built_line(self) -> None:
+        with TemporaryDirectory() as tmp:
+            chat = ChatLog(Path(tmp))
+            chat.append("echo", "x" * (NODE + 80))
+            self.assertIn(PLACEHOLDER, chat.render())
+            built = pump(chat, lambda _: "echo: a long tool result was capped and not copied", limit=2)
+            self.assertEqual(built, 1)
+            self.assertNotIn(PLACEHOLDER, chat.render())
+            self.assertIn("echo: a long tool result", chat.render())
+
 
 class TurnTests(unittest.TestCase):
     def test_fresh_begin_renders_before_logging_and_drops_reasoning(self) -> None:
@@ -337,6 +377,21 @@ class RetainedBehaviorTests(unittest.TestCase):
             self.assertTrue(enabled())
             set_enabled(False)
             self.assertFalse(enabled())
+
+    def test_process_local_modes_lock_the_configured_root_without_changing_the_switch(self) -> None:
+        with TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            configured = home / "hermes" / "chat"
+            with patch.dict(os.environ, {"Z0INT_HOME": str(home), "Z0INT_OPTCHAT_ROOT": str(configured)}):
+                for mode in (None, "on", "shadow"):
+                    with self.subTest(mode=mode), patch("z0int.optchat.__main__.take_lock") as lock, patch(
+                        "z0int.optchat.__main__.Scheduler",
+                    ) as scheduler, patch("z0int.optchat.__main__.sys.stdin", io.StringIO()):
+                        self.assertEqual(serve(mode), 0)
+                        lock.assert_called_once_with(configured / "lock")
+                        self.assertEqual(scheduler.call_args.args[0].root, configured)
+                        self.assertEqual(scheduler.call_args.kwargs["on"], mode == "on")
+                self.assertFalse((home / "optchat" / "enabled").exists())
 
     def test_subagent_report_is_logged_as_the_users_named_work(self) -> None:
         from z0int.optchat.turn import subagent_text

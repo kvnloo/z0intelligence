@@ -10,9 +10,9 @@ from pathlib import Path
 import re
 import sys
 import time
-import urllib.request
 from . import paths
-from .receipt import append_receipt, find_receipt, receipts_path
+# urllib.request and receipt are imported where used: the Claude Code prompt hook imports this module on
+# every turn and, with automatic routing off (the default), needs neither.
 
 HARNESSES = {'omp', 'hermes', 'dsh', 'agentweb', 'claude-code'}
 
@@ -69,6 +69,7 @@ def dispatch_event(event):
 
 
 def consume(args):
+    from .receipt import append_receipt, find_receipt
     if not isinstance(args,dict):raise ValueError('Invalid consumption')
     row=find_receipt(args.get('receipt_id'))
     if not row or row.get('extra',{}).get('status')!='completed':raise ValueError('No completed dispatch')
@@ -85,6 +86,7 @@ def consume(args):
 
 
 def health(harness, instance_id):
+    from .receipt import receipts_path
     if harness not in HARNESSES or not instance_id:raise ValueError('Invalid health identity')
     completed=delivered=0
     latest=0
@@ -106,6 +108,7 @@ def health(harness, instance_id):
 
 
 def post(path, value):
+    import urllib.request
     url=os.environ.get('Z0INT_SERVICE_URL','http://127.0.0.1:11501')+path
     req=urllib.request.Request(url,data=json.dumps(value).encode(),headers={'Content-Type':'application/json'})
     with urllib.request.urlopen(req,timeout=25) as response:return json.load(response)
