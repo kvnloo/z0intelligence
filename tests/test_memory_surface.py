@@ -21,6 +21,8 @@ from z0int.memory.event_log import EventLog
 from z0int.memory_contract import BitemporalClaim, EventIdentity, MemoryScope, derive_event_uid
 
 Z0 = MemoryScope(user='local', project='z0')
+# ingest_reference requires a fully bound workstream (#66): unbound or global scope fails before any write.
+WS = MemoryScope(user='local', project='z0', repo='z0', task='memory-tests')
 TOKEN = 'fake-tdb-bearer-value-123'
 
 
@@ -62,7 +64,8 @@ def test_fts_hits_carry_the_canonical_event_uid_the_ledger_assigns(env):
     hit = next(e for e in lexical('quokka bench')['evidence'] if e['session_id'] == 'x1')
     assert hit['event_uid'] == derive_event_uid(source_system='codex', source_session='x1',
                                                 source_event_id=hit['message_id'])
-    event = ms.ingest_reference(EventIdentity(**{k: v for k, v in hit['identity'].items()}), hit['locator'])
+    event = ms.ingest_reference(EventIdentity(**{k: v for k, v in hit['identity'].items()}), hit['locator'],
+                               scope=WS, authorized_scope=WS)
     assert event.event_identity().event_uid == hit['event_uid']
 
 
@@ -221,7 +224,7 @@ def test_hermes_query_with_cross_harness_policy_recalls_claude_codex_and_omp(env
 # ----------------------------------------------------------------------------- 9. one query across all layers
 def test_one_query_resolves_temporal_lexical_and_semantic_without_duplicates(env):
     lex = next(e for e in lexical('quokka cache')['evidence'] if e['session_id'] == 'c1')
-    ms.ingest_reference(EventIdentity(**lex['identity']), lex['locator'])
+    ms.ingest_reference(EventIdentity(**lex['identity']), lex['locator'], scope=WS, authorized_scope=WS)
     EventLog().append('memory.note', {'text': 'quokka cache was moved last week'}, source='z0')
     items = [{'id': 'dup', 'content': 'quokka cache', 'source_event_ids': [lex['event_uid']]},
              {'id': 'own', 'content': 'quokka cache semantic summary',
@@ -411,12 +414,12 @@ def test_bulk_reference_ingest_reads_each_ledger_line_once_and_duplicates_need_n
     idents = [EventIdentity.from_source(source_system='codex', source_session='bulk', source_event_id=str(i),
                                         payload_hash=f'sha256:{i:064x}') for i in range(60)]
     for i, ident in enumerate(idents):
-        ms.ingest_reference(ident, f'agentsview:bulk#{i}')
+        ms.ingest_reference(ident, f'agentsview:bulk#{i}', scope=WS, authorized_scope=WS)
     assert len(decoded) < 3 * len(idents), len(decoded)
 
     def no_scan(*a, **k):
         raise AssertionError('duplicate ingest scanned the whole ledger')
 
     monkeypatch.setattr(EventLog, '_scan_locked', no_scan)
-    again = ms.ingest_reference(idents[7], 'agentsview:bulk#7')
+    again = ms.ingest_reference(idents[7], 'agentsview:bulk#7', scope=WS, authorized_scope=WS)
     assert again.event_identity().event_uid == idents[7].event_uid and again.payload['locator'] == 'agentsview:bulk#7'

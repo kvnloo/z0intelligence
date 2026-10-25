@@ -156,37 +156,35 @@ def test_http_exact_paths_cannot_escape_repository(service, repository):
 
 
 def test_http_exact_path_read_and_excerpt_are_bounded(service, repository, monkeypatch):
-    import io
+    """The hot path versions a file by hashing its exact bytes (#66), so the read is bounded by a size cap:
+    a file under the cap yields a <=400-char excerpt with a content version; a file over it is never read
+    (unavailable is not current), instead of being read whole on every resolve."""
+    import os as _os
+    from z0int import context_resolve
+
     target = repository / "large.md"
     target.write_text("\n" * 10000)
-    reads = []
-    real_open = io.open
-
-    class ObservedReader:
-        def __init__(self, stream):
-            self.stream = stream
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            self.stream.close()
-
-        def read(self, size=-1):
-            reads.append(size)
-            return self.stream.read(size)
-
-    def observed_open(path, *args, **kwargs):
-        stream = real_open(path, *args, **kwargs)
-        if path == target:
-            return ObservedReader(stream)
-        return stream
-
-    monkeypatch.setattr(io, "open", observed_open)
     status, body = post(service, request_for(repository, kind="exact_path", query="large.md"))
     assert status == 200
-    assert reads and all(0 < size <= 400 for size in reads), reads
-    assert len(body["packet"]["evidence"][0]["excerpt"]) <= 400
+    evidence = body["packet"]["evidence"]
+    assert evidence and len(evidence[0]["excerpt"]) <= 400
+    assert evidence[0]["source_version"].startswith("sha256:")
+
+    reads = []
+    real_fdopen = _os.fdopen
+
+    def observed_fdopen(fd, *args, **kwargs):
+        stream = real_fdopen(fd, *args, **kwargs)
+        real_read = stream.read
+        stream.read = lambda size=-1: reads.append(size) or real_read(size)
+        return stream
+
+    monkeypatch.setattr(context_resolve, "MAX_VERIFIED_BYTES", 4096)
+    monkeypatch.setattr(_os, "fdopen", observed_fdopen)
+    status, body = post(service, request_for(repository, kind="exact_path", query="large.md"))
+    assert status == 200
+    assert reads == [], reads
+    assert body["packet"]["evidence"] == []
 
 
 def test_http_propagates_result_and_time_budgets_to_native_fff(service, repository, monkeypatch):

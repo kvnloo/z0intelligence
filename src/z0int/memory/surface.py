@@ -38,7 +38,7 @@ from .. import agentsview_ro, paths
 from ..context_resolve import EvidenceRef
 from ..memory_contract import (BitemporalClaim, EventIdentity, MemoryScope, MemorySnapshot, MemoryUseReceipt,
                                derive_event_uid)
-from .event_log import EventLog, MemoryEvent
+from .event_log import EventLog, MemoryEvent, SourceIngestDisabled, source_ingest_enabled
 from .scrub import redact_spans, scrub_obj, scrub_text
 
 SCHEMA = 'z0int.memory.search.v0'
@@ -591,12 +591,36 @@ def _writer(root: str | Path | None) -> EventLog:
     return log
 
 
-def ingest_reference(identity: EventIdentity, locator: str, *, scope: MemoryScope | None = None,
+def _workstream(scope: MemoryScope) -> MemoryScope:
+    """A fully bound user/project/repo/task scope; unbound, global or unknown scope fails before any write (#66)."""
+    if not isinstance(scope, MemoryScope) or any(
+        not isinstance(value, str) or not value.strip()
+        for value in (scope.user, scope.project, scope.repo, scope.task)
+    ):
+        raise ValueError("a fully bound user/project/repo/task scope is required")
+    return scope
+
+
+def ingest_reference(identity: EventIdentity, locator: str, *, scope: MemoryScope, authorized_scope: MemoryScope,
                      ledger_root: str | Path | None = None) -> MemoryEvent:
-    """Record a source event in the ledger as a reference (EventIdentity + locator; never a body)."""
-    payload = {'locator': locator, **({'scope': scope.to_dict()} if scope else {})}
-    source = locator.split(':', 1)[0] if ':' in locator else identity.source_system
-    return _writer(ledger_root).append('source.reference', payload, source=source, identity=identity)
+    """Write a scoped, non-attesting original-source pointer (EventIdentity + locator; never a body).
+
+    The trusted caller supplies its independently bound workstream. This generic reference is *not* the
+    explicit-user decision admission path; use the native adapter and ``claims.admit_user_claim`` for that.
+    """
+    bound = _workstream(authorized_scope)
+    if scope != bound:
+        raise ValueError("source scope does not match authorized workstream")
+    if not source_ingest_enabled():
+        raise SourceIngestDisabled("source reference capture is disabled")
+    if not isinstance(identity, EventIdentity):
+        raise TypeError("native identity must be an EventIdentity")
+    if not isinstance(locator, str) or not locator.strip() or len(locator) > 1024:
+        raise ValueError("native locator must be nonempty and bounded")
+    payload: dict[str, Any] = {"locator": locator, "scope": bound.to_dict()}
+    source = locator.split(":", 1)[0] if ":" in locator else identity.source_system
+    return _writer(ledger_root).append("source.reference", payload, source=source, project=bound.project,
+                                       session_id=identity.source_session, identity=identity)
 
 
 def record_claim(claim: BitemporalClaim, *, ledger_root: str | Path | None = None) -> MemoryEvent:
@@ -605,8 +629,20 @@ def record_claim(claim: BitemporalClaim, *, ledger_root: str | Path | None = Non
 
 
 def claim_history(subject: str, predicate: str | None = None, policy: ScopePolicy | None = None, *,
-                  ledger_root: str | Path | None = None) -> list[dict[str, Any]]:
-    """Every recorded version of a claim, oldest first, with ``current`` and ``superseded_by``."""
+                  scope: MemoryScope | None = None, ledger_root: str | Path | None = None) -> list[dict[str, Any]]:
+    """Every recorded version of a claim, oldest first, with ``current`` and ``superseded_by``.
+
+    With ``scope`` the bound-workstream claim projection answers (``claims.project_claims``; never hydrates native
+    bodies). Without it the ranked-read ScopePolicy filter applies.
+    """
+    if scope is not None:
+        bound = _workstream(scope)
+        if not isinstance(subject, str) or not subject.strip():
+            raise ValueError("a claim subject is required")
+        from .claims import project_claims
+
+        packet = project_claims(bound, subject=subject, predicate=predicate, ledger_root=ledger_root)
+        return list(packet.measurements.get("claim_history", []))
     policy = policy or ScopePolicy()
     log = EventLog(ledger_root, read_only=True)
     events = list(log.iter_events()) if log.events_path.is_file() else []

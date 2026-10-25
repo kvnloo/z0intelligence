@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "principals": {
+    "operator": [
+      {
+        "source": "agentsview",
+        "collection": "history",
+        "scope": "z0intelligence",
+        "privacy": [
+          "private"
+        ]
+      }
+    ],
+    "chatgpt": []
+  },
+  "limits": {
+    "result_bytes": 4096,
+    "total_bytes": 32768,
+    "calls_per_minute": 30
+  },
+  "timeout_seconds": 3
+}
