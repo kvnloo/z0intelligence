@@ -17,6 +17,12 @@ the inputs (git, systemd, adb, broker.db, configs, gh) and acts on the verdict.
     z0-guard gateway-watch              O9  gateway restart -> Interrupted runs with resume commands
     z0-guard phone-caps --root ROOT [--path PATH ...] O10 source-policy scanner
     z0-guard policy --receipts GLOB --policy PATH --since 24h [--static ROOT] [--json] O11/O12/O13 audit
+    z0-guard state [--config PATH | --input PATH] A–E read-only state audit; never activates blocking
+    z0-guard mitigate ...               R1/R3 report-only mitigation lease lifecycle
+    z0-guard incident ...               R2 two-observation incident closure
+    z0-guard attribute ...              R4 same-window pressure attribution
+    z0-guard canary ...                 ctx/AgentsView read-only health observations
+    z0-guard report-expiry              R7 expired report-only findings and incidents
     z0-guard replay TAPE...             replay incident tapes through the gates
     z0-guard modes                      show each gate's mode
 
@@ -1143,6 +1149,18 @@ def main(argv: list[str] | None = None) -> int:
     pg.add_argument("--static", metavar="ROOT", help="also scan source outside policy loader files")
     pg.add_argument("--json", action="store_true", help="emit z0.policy_guard.v1 JSON (also the default)")
     pg.set_defaults(fn=cmd_policy)
+
+    st = sub.add_parser("state", help="A–E: read-only claim, manifest, revocation, outcome and measurement audit")
+    state_input = st.add_mutually_exclusive_group()
+    state_input.add_argument("--input", help="finite replay JSON; not a live sensor")
+    state_input.add_argument("--config", default=str(CONFIG / "state.json"), help="live sensor inventory JSON")
+    st.set_defaults(fn=lambda a: __import__("z0int.fsm.state_laws", fromlist=["command"]).command(a))
+
+    from .cgroup_placement import register as register_placement
+    register_placement(sub)
+    from . import root_cause, root_canaries
+    root_cause.register(sub)
+    root_canaries.register(sub)
 
     rp = sub.add_parser("replay", help="replay incident tapes through the gates")
     rp.add_argument("tapes", nargs="+")

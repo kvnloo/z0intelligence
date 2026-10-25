@@ -1,0 +1,13 @@
+{
+  "schema": "z0.revocations.v1",
+  "policy_epoch": 1812,
+  "owner": "Kevin",
+  "source": "operations/state-laws/20261024/LATEST-STATE.md D007-D008; owner ord1642 and1812; phone-disk-floor correction confirmed by Main/PhoneTestLane on2026-10-24",
+  "revocations": [
+    {"id": "phone-memory-cap", "scope": "phone-agent-policy", "superseded": "512MiB resource caps", "existing_law": "O10"},
+    {"id": "phone-cpu-cap", "scope": "phone-agent-policy", "superseded": "agent-chosen0-3 cpu masks; native ADB uses all8 cores", "existing_law": "O10", "exception": "Observed Android guest platform cpuset is evidence, not policy"},
+    {"id": "phone-battery-cap", "scope": "phone-agent-policy", "superseded": "50percent battery floor", "existing_law": "O10", "exception": "Owner below2percent not-charging condition"},
+    {"id": "phone-thermal-cap", "scope": "phone-agent-policy", "superseded": "agent-selected thermal or temperature admission ceilings", "existing_law": "O10"},
+    {"id": "phone-disk-floor", "scope": "phone-agent-policy", "superseded": "min_disk_free_gb:5 and other agent-chosen disk admission floors", "existing_law": "O10 correction", "exception": "Actual ENOSPC remains an honest execution failure"}
+  ]
+}
