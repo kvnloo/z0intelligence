@@ -140,7 +140,12 @@ def _source_version_from_bytes(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
-def _read_verified_bytes(path: Path) -> bytes | None:
+#: Hot-path bound: a source is versioned by hashing its exact bytes, so larger files are refused
+#: (unavailable is not current) instead of being read whole on every resolve.
+MAX_VERIFIED_BYTES = 8 * 1024 * 1024
+
+
+def _read_verified_bytes(path: Path, max_bytes: int | None = None) -> bytes | None:
     """Read only the admitted canonical path, not a later symlink redirect.
 
     Callers resolve/authorize the canonical absolute path before this read.
@@ -189,6 +194,8 @@ def _read_verified_bytes(path: Path) -> bytes | None:
         before = os.fstat(file_fd)
         live = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
         if not stat.S_ISREG(live.st_mode) or identity(before) != identity(live):
+            return None
+        if before.st_size > (MAX_VERIFIED_BYTES if max_bytes is None else max_bytes):
             return None
 
         # Keep the anchored fd alive for the final lstat checks even when
@@ -381,6 +388,8 @@ def _fff_evidence_refs(
     refs: list[EvidenceRef] = []
     seen: set[str] = set()
     root = project_root.resolve()
+    # Content version first (#66: the hash of these exact bytes), then the index provenance consumers key on.
+    index = f";fff={result.get('package_version') or 'unknown'};epoch={int(result.get('index_epoch') or 0)}"
 
     def safe_path(raw: Any) -> Path | None:
         if not isinstance(raw, str) or not raw:
@@ -416,7 +425,7 @@ def _fff_evidence_refs(
         excerpt = "\n".join(lines[max(0, line - 2):min(len(lines), line + 1)])[:400]
         refs.append(EvidenceRef(
             source_id=f"file:{path}",
-            source_version=_source_version_from_bytes(data),
+            source_version=_source_version_from_bytes(data) + index,
             locator=locator,
             trust_class="index_hit",
             observed_at=_now_iso(),
@@ -439,7 +448,7 @@ def _fff_evidence_refs(
         seen.add(locator)
         refs.append(EvidenceRef(
             source_id=f"file:{path}",
-            source_version=_source_version_from_bytes(data),
+            source_version=_source_version_from_bytes(data) + index,
             locator=locator,
             trust_class="index_hit",
             observed_at=_now_iso(),
@@ -461,7 +470,7 @@ def _fetch_exact_path(path_str: str, project_root: Path | None) -> EvidenceRef |
     data = _read_verified_bytes(path)
     if data is None:
         return None
-    excerpt = data.decode("utf-8", errors="replace")[:400].replace("\n", "\\n")
+    excerpt = data.decode("utf-8", errors="replace")[:400].replace("\n", "\\n")[:400]
     return EvidenceRef(
         source_id=f"file:{path}",
         source_version=_source_version_from_bytes(data),
