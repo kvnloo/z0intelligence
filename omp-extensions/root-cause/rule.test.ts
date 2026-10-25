@@ -20,7 +20,7 @@ describe("R1 report-only raw mitigation rule", () => {
  ]) test(command, () => {
   const findings = auditCommand(command);
   expect(findings.length).toBeGreaterThan(0);
-  expect(findings.every(item => item.mode === "report-only" && item.message.includes("use z0-guard mitigate"))).toBe(true);
+  expect(findings.filter(item => item.law === "R1").every(item => item.mode === "report-only" && item.message.includes("use z0-guard mitigate"))).toBe(true);
  });
  for (const command of [
   "systemctl --user show ctx.service", "cat /sys/fs/cgroup/x/io.max",
@@ -49,5 +49,43 @@ describe("R1 report-only raw mitigation rule", () => {
   expect(input).toEqual({ command: "kill -STOP 123" });
   expect(await handler({ toolName: "bash", input: { command: "true" } })).toBeUndefined();
   expect(Object.keys((await handler({ toolName: "bash", get input() { throw new Error("bad event"); } })) ?? {})).toEqual(["additionalContext"]);
+ });
+});
+
+describe("I tracked live-config source audit", () => {
+ const home = "/home/test";
+ const path = `${home}/.config/systemd/user/x.service.d/override.conf`;
+ const onlyI = (command: string) => auditCommand(command, { home }).filter(item => item.law === "I");
+ test("persistent user properties report; runtime is allowed by I", () => {
+  expect(onlyI("systemctl --user set-property x.service CPUQuota=20%")).toHaveLength(1);
+  expect(onlyI("sudo -u test systemctl --user --runtime set-property x.service CPUQuota=20%")).toEqual([]);
+  expect(onlyI("systemctl set-property x.service CPUQuota=20%")).toEqual([]);
+  expect(onlyI("echo 'systemctl --user set-property x.service CPUQuota=20%'")).toEqual([]);
+  expect(onlyI("systemctl --user set-property x.service CPUQuota=20% # --runtime")).toHaveLength(1);
+ });
+ test("file edits require host-owned exact install scope, not markers", () => {
+  expect(auditTool("write", { path, content: "# content-stamped install", stampedInstallPaths: [path] }, { home })).toHaveLength(1);
+  expect(auditTool("write", { path }, { home, stampedInstallPaths: [path] })).toEqual([]);
+  expect(auditTool("edit", { path: path + ".other" }, { home, stampedInstallPaths: [path] })).toHaveLength(1);
+  expect(auditTool("read", { path }, { home })).toEqual([]);
+  expect(auditTool("write", { path: "~/dotfiles/x.service" }, { home })).toEqual([]);
+  expect(auditTool("edit", { path: "~/.config/systemd/user/x.service" }, { home })).toHaveLength(1);
+ });
+ test("shell writes and nested commands audit without effects", () => {
+  for (const command of [`printf x > ${path}`, `tee ${path}`, `cp source ${path}`, `dd of=${path}`,
+                         `bash -lc 'printf x > ${path}'`]) expect(onlyI(command)).toHaveLength(1);
+  expect(onlyI(`cat ${path}`)).toEqual([]);
+  expect(auditCommand(`printf x > ${path}`, { home, stampedInstallPaths: [path] })).toEqual([]);
+ });
+ test("adapter accepts only host-supplied scoped install context", async () => {
+  let handler: (event: { toolName: string; input: Record<string, unknown> }) => Promise<{ additionalContext: string } | undefined> = async () => undefined;
+  const api = { on: (_name: string, callback: typeof handler) => { handler = callback; } } as unknown as ExtensionAPI;
+  rootCauseReport(api, () => ({ home, stampedInstallPaths: [path] }));
+  expect(await handler({ toolName: "write", input: { path } })).toBeUndefined();
+  const input = { path: path + ".other", content: "# stamped", stampedInstallPaths: [path + ".other"] };
+  const result = await handler({ toolName: "write", input });
+  expect(Object.keys(result ?? {})).toEqual(["additionalContext"]);
+  expect(result?.additionalContext).toContain("[I report-only:");
+  expect(input.content).toBe("# stamped");
  });
 });

@@ -25,6 +25,7 @@ FIELDS = {
     'C': ('epoch_current', 'no_active_hits', 'coverage_complete'),
     'D': ('typed_receipt', 'output_verified', 'work_positive', 'transport_ok', 'target_current'),
     'E': ('measured', 'scope_matches', 'agrees'),
+    'I': ('tracked_source', 'scope_matches', 'agrees'),
 }
 SCHEMA = 'z0.state_guard.v1'
 
@@ -431,6 +432,44 @@ def sensor_constant(spec):
         return check(spec['id'], 'E', {}, str(exc))
 
 
+def sensor_host_drift(spec):
+    """Consume a stable report-only host-drift.v1 observation, never repair it."""
+    try:
+        row, binding = _json(spec['path'])
+        if not isinstance(row, dict):
+            raise ValueError('host drift report must be an object')
+        observed = dt.datetime.fromisoformat(row['observed_at'].replace('Z', '+00:00'))
+        if observed.tzinfo is None:
+            raise ValueError('timezone-aware host observation required')
+        age = (dt.datetime.now(dt.timezone.utc) - observed).total_seconds()
+        if not 0 <= age <= 2100 or not isinstance(row.get('host'), str) or not row['host']:
+            raise ValueError('current identified host observation required')
+        if (row.get('schema') != 'host-drift.v1'
+                or row.get('status') not in ('clean', 'drift', 'unknown')
+                or not isinstance(row.get('drift'), list)
+                or not isinstance(row.get('unknown'), list)):
+            raise ValueError('host-drift.v1 report required')
+        for item in row['drift'] + row['unknown']:
+            if not isinstance(item, dict) or not all(isinstance(item.get(k), str) and item[k]
+                                                    for k in ('kind', 'path', 'detail')):
+                raise ValueError('typed drift/unknown rows required')
+        if row['status'] == 'clean' and (row['drift'] or row['unknown']):
+            raise ValueError('clean report contains adverse evidence')
+        if row['status'] == 'drift' and not row['drift']:
+            raise ValueError('drift report has no drift evidence')
+        if row['status'] == 'unknown' or row['unknown']:
+            return check('host-tracked-source', 'I', {}, 'Host evidence incomplete', report=binding)
+        stable = _read(spec['path'])[1] == binding
+        return check('host-tracked-source', 'I',
+                     {'available': stable, 'tracked_source': not row['drift'],
+                      'scope_matches': row.get('host') == spec['host'],
+                      'agrees': not row['drift']},
+                     'Live config must have a tracked source; checker report is evidence, not authority',
+                     report=binding, drift=row['drift'])
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        return check('host-tracked-source', 'I', {}, str(exc))
+
+
 def audit(config):
     checks = []
     for spec in config.get('claims', []):
@@ -447,6 +486,8 @@ def audit(config):
         checks.append(sensor_constant(spec))
     if not config.get('constants'):
         checks.append(check('constants-inventory', 'E', {}, 'No same-scope measurement receipts declared'))
+    if config.get('host_drift'):
+        checks.append(sensor_host_drift(config['host_drift']))
     return checks
 
 

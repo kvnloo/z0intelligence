@@ -521,3 +521,89 @@ law e_unavailable_unknown:
   for agrees: S.Evidence
   T(S.unknown(S.e(S.SBool{False{}}, measured, scope_matches, agrees)))
 
+
+# I. Live config must have a tracked source. No installation authority.
+law i_pass_needs_available:
+  for available: S.Evidence
+  for tracked_source: S.Evidence
+  for scope_matches: S.Evidence
+  for agrees: S.Evidence
+  for w: T(S.passed(S.i(available, tracked_source, scope_matches, agrees)))
+  Truth(available)
+
+law i_pass_needs_tracked_source:
+  for available: S.Evidence
+  for tracked_source: S.Evidence
+  for scope_matches: S.Evidence
+  for agrees: S.Evidence
+  for w: T(S.passed(S.i(available, tracked_source, scope_matches, agrees)))
+  Truth(tracked_source)
+
+law i_pass_needs_scope_matches:
+  for available: S.Evidence
+  for tracked_source: S.Evidence
+  for scope_matches: S.Evidence
+  for agrees: S.Evidence
+  for w: T(S.passed(S.i(available, tracked_source, scope_matches, agrees)))
+  Truth(scope_matches)
+
+law i_pass_needs_agrees:
+  for available: S.Evidence
+  for tracked_source: S.Evidence
+  for scope_matches: S.Evidence
+  for agrees: S.Evidence
+  for w: T(S.passed(S.i(available, tracked_source, scope_matches, agrees)))
+  Truth(agrees)
+
+law i_positive_complete:
+  for available: S.Evidence
+  for tracked_source: S.Evidence
+  for scope_matches: S.Evidence
+  for agrees: S.Evidence
+  for h_available: Truth(available)
+  for h_tracked_source: Truth(tracked_source)
+  for h_scope_matches: Truth(scope_matches)
+  for h_agrees: Truth(agrees)
+  T(S.passed(S.i(available, tracked_source, scope_matches, agrees)))
+
+law i_known_negative_complete:
+  for available: S.Evidence
+  for tracked_source: S.Evidence
+  for scope_matches: S.Evidence
+  for agrees: S.Evidence
+  for h_available: Truth(available)
+  for k_tracked_source: Known(tracked_source)
+  for k_scope_matches: Known(scope_matches)
+  for k_agrees: Known(agrees)
+  for negative: T(Bool.not(Bool.and(S.affirmed(tracked_source), Bool.and(S.affirmed(scope_matches), S.affirmed(agrees)))))
+  T(S.violated(S.i(available, tracked_source, scope_matches, agrees)))
+
+law i_missing_available_unknown:
+  for tracked_source: S.Evidence
+  for scope_matches: S.Evidence
+  for agrees: S.Evidence
+  T(S.unknown(S.i(S.SAbsent{}, tracked_source, scope_matches, agrees)))
+
+law i_missing_tracked_source_unknown:
+  for available: S.Evidence
+  for scope_matches: S.Evidence
+  for agrees: S.Evidence
+  T(S.unknown(S.i(available, S.SAbsent{}, scope_matches, agrees)))
+
+law i_missing_scope_matches_unknown:
+  for available: S.Evidence
+  for tracked_source: S.Evidence
+  for agrees: S.Evidence
+  T(S.unknown(S.i(available, tracked_source, S.SAbsent{}, agrees)))
+
+law i_missing_agrees_unknown:
+  for available: S.Evidence
+  for tracked_source: S.Evidence
+  for scope_matches: S.Evidence
+  T(S.unknown(S.i(available, tracked_source, scope_matches, S.SAbsent{})))
+
+law i_unavailable_unknown:
+  for tracked_source: S.Evidence
+  for scope_matches: S.Evidence
+  for agrees: S.Evidence
+  T(S.unknown(S.i(S.SBool{False{}}, tracked_source, scope_matches, agrees)))

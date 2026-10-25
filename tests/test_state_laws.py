@@ -19,6 +19,7 @@ REQUIRED = {
     "C": ("epoch_current", "no_active_hits", "coverage_complete"),
     "D": ("typed_receipt", "output_verified", "work_positive", "transport_ok", "target_current"),
     "E": ("measured", "scope_matches", "agrees"),
+    "I": ("tracked_source", "scope_matches", "agrees"),
 }
 BITS = [(law, bit) for law, bits in REQUIRED.items() for bit in bits]
 INVALID = [None, 0, 1, "true", "false", [], {}]

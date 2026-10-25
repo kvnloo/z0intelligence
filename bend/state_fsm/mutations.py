@@ -27,6 +27,7 @@ FIELDS = {
     "C": ("available", "epoch_current", "no_active_hits", "coverage_complete"),
     "D": ("available", "typed_receipt", "output_verified", "work_positive", "transport_ok", "target_current"),
     "E": ("available", "measured", "scope_matches", "agrees"),
+    "I": ("available", "tracked_source", "scope_matches", "agrees"),
 }
 
 

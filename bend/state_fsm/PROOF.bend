@@ -519,3 +519,38 @@ def Laws.e_missing_agrees_unknown(available, measured, scope_matches):
 def Laws.e_unavailable_unknown(measured, scope_matches, agrees):
   Unit{}
 
+
+# I has the same strict tri-state shape as A. Reuse constructive proof terms,
+# not assumptions: conversion must still reduce the independent S.i body.
+def Laws.i_pass_needs_available(available, tracked_source, scope_matches, agrees, w):
+  Laws.a_pass_needs_available(available, tracked_source, scope_matches, agrees, w)
+
+def Laws.i_pass_needs_tracked_source(available, tracked_source, scope_matches, agrees, w):
+  Laws.a_pass_needs_current(available, tracked_source, scope_matches, agrees, w)
+
+def Laws.i_pass_needs_scope_matches(available, tracked_source, scope_matches, agrees, w):
+  Laws.a_pass_needs_scope_matches(available, tracked_source, scope_matches, agrees, w)
+
+def Laws.i_pass_needs_agrees(available, tracked_source, scope_matches, agrees, w):
+  Laws.a_pass_needs_agrees(available, tracked_source, scope_matches, agrees, w)
+
+def Laws.i_positive_complete(available, tracked_source, scope_matches, agrees, h_available, h_tracked_source, h_scope_matches, h_agrees):
+  Laws.a_positive_complete(available, tracked_source, scope_matches, agrees, h_available, h_tracked_source, h_scope_matches, h_agrees)
+
+def Laws.i_known_negative_complete(available, tracked_source, scope_matches, agrees, h_available, k_tracked_source, k_scope_matches, k_agrees, negative):
+  Laws.a_known_negative_complete(available, tracked_source, scope_matches, agrees, h_available, k_tracked_source, k_scope_matches, k_agrees, negative)
+
+def Laws.i_missing_available_unknown(tracked_source, scope_matches, agrees):
+  Unit{}
+
+def Laws.i_missing_tracked_source_unknown(available, scope_matches, agrees):
+  Laws.a_missing_current_unknown(available, scope_matches, agrees)
+
+def Laws.i_missing_scope_matches_unknown(available, tracked_source, agrees):
+  Laws.a_missing_scope_matches_unknown(available, tracked_source, agrees)
+
+def Laws.i_missing_agrees_unknown(available, tracked_source, scope_matches):
+  Laws.a_missing_agrees_unknown(available, tracked_source, scope_matches)
+
+def Laws.i_unavailable_unknown(tracked_source, scope_matches, agrees):
+  Unit{}

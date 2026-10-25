@@ -98,3 +98,7 @@ def d(+available: Evidence, +typed_receipt: Evidence, +output_verified: Evidence
 def e(+available: Evidence, +measured: Evidence, +scope_matches: Evidence, +agrees: Evidence) -> Verdict:
   decide(available, Bool.and(known(measured), Bool.and(known(scope_matches), known(agrees))), Bool.and(affirmed(measured), Bool.and(affirmed(scope_matches), affirmed(agrees))))
 
+
+# I. Live config has a tracked, same-scope source agreeing with live bytes.
+def i(+available: Evidence, +tracked_source: Evidence, +scope_matches: Evidence, +agrees: Evidence) -> Verdict:
+  decide(available, Bool.and(known(tracked_source), Bool.and(known(scope_matches), known(agrees))), Bool.and(affirmed(tracked_source), Bool.and(affirmed(scope_matches), affirmed(agrees))))
