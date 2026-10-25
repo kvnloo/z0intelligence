@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 from datetime import datetime, timezone
 
@@ -25,7 +26,11 @@ EXCLUDE = {'repo-distill'}
 
 
 def cmd(args: list[str], cwd: Path | None = None) -> str:
-    proc = subprocess.run(args, cwd=cwd, text=True, capture_output=True, timeout=25)
+    try:
+        proc = subprocess.run(args, cwd=cwd, text=True, capture_output=True, timeout=25)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"state-packet: unavailable command {args!r} cwd={str(cwd)!r}: {exc}", file=sys.stderr)
+        return ''
     return proc.stdout.strip() if proc.returncode == 0 else ''
 
 
@@ -49,6 +54,10 @@ def deployment_identity(path: Path) -> tuple[str, str, str, str]:
             continue
         if re.fullmatch(r'[0-9a-f]{40}', sha) and ancestor.name == sha:
             return str(ancestor), sha, 'content-stamped', str(stamp)
+    # Do not ask Git to discover a repository above arbitrary runtime paths.
+    # Those paths include mounted model stores and non-repository deployments.
+    if not any((ancestor / '.git').exists() for ancestor in (resolved, *resolved.parents)):
+        return '', '', '', ''
     root = cmd(['git', 'rev-parse', '--show-toplevel'], resolved)
     if root:
         return root, cmd(['git', 'rev-parse', 'HEAD'], resolved), cmd(['git', 'branch', '--show-current'], resolved), ''
