@@ -369,6 +369,7 @@ def test_scoped_policy_binds_actual_endpoint_without_caller_scope(
                         lambda: pytest.fail("policy arm must not use default registry routes"))
     request = {
         "trace_id": "synthetic-bound-trace", "state": "pick a legal tool",
+        "risk_class": "read",
         "actions": [
             {"action_id": "read", "kind": "tool", "tool": "read", "family": "omp.tool", "risk_class": "read"},
             {"action_id": "glob", "kind": "tool", "tool": "glob", "family": "omp.tool", "risk_class": "read"},
