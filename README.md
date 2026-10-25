@@ -251,6 +251,36 @@ whole-task success nor an AODL admission grant.
 - **DSH / other harnesses**: harness-neutral identity/activity/context seams are present; cross-harness DecisionOpportunity/credit standardization is tracked in #62.
 - **Kubernetes hermes-lab**: host z0int authority stays outside the cluster while a hardened executor runs behind the service boundary.
 
+### SQLite tool safety stopgap
+
+`omp-extensions/sqlite-tool-guard/index.ts` refuses `read`, `grep`, `find`, and
+`glob` on the agent.db family, ancestor walks, direct symlink aliases, and
+direct hardlink aliases of the live database/sidecars. Safe subtrees such as
+`~/.omp/agent/sessions/` remain available. The protected directory follows
+`PI_CODING_AGENT_DIR`, defaulting to `~/.omp/agent`; relative paths use the
+tool-call context's working directory. Install through the normal extension
+discovery path or explicit `-e`; already-running sessions do not gain the hook
+merely because a symlink was installed. No OMP restart is performed by it.
+
+This is an explicit temporary mitigation for
+[OMP #15586](https://github.com/can1357/oh-my-pi/issues/15586), not a full
+SQLite integrity guarantee. POSIX record locks are process-owned: closing a raw
+descriptor for a held SQLite `-shm` inode can release a live writer's lock.
+Multiple SQLite processes alone are supported and are not evidence of corruption.
+For database facts use an external `sqlite3 -readonly` subprocess with `mode=ro`.
+
+Residual risk: raw shell/native paths, disabled extensions, indirect descendant
+aliases, and filesystem changes after checking can bypass this path hook.
+The durable upstream solution is process isolation for raw file I/O or for the
+SQLite owner, not a racy descriptor scan. Never interpret this hook as permission
+to copy, replace, or repair a live database.
+
+Remote MBP evidence on 2026-10-25: 82 synthetic unit tests passed; real OMP
+18.11.0 loaded the extension headlessly against an isolated agent directory and a
+loopback deterministic model fixture. Three attempted unsafe read/grep/glob
+calls were blocked, and a safe sessions-file read succeeded. The `find` policy
+is unit-covered; that installed runtime did not expose the newer `find` tool.
+
 ### Integrated experimental surfaces — explicit gates remain
 
 - **AgentWeb / Emma**: bounded context packets, pure planning, opt-in Choice/Noul experiments,
