@@ -1,6 +1,7 @@
 """Synthetic evidence only. Do not read operational traces."""
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 
@@ -141,6 +142,59 @@ def test_labelled_shadow_ingest_requires_exact_join_and_confident_predictions(tm
     assert row["metric"]["n"] == 1 and row["metric"]["value"] == 1.
     assert row["arm"]["model"] == "synthetic@rev"
     assert ingest_sources(spec, tmp_path)["added"] == 0
+
+
+def test_labelled_ingestion_never_bulk_reads_source(tmp_path, monkeypatch):
+    source = tmp_path / "labelled.jsonl"
+    row = {"schema": "z0int.shadow.labelled.v1", "ts": 1792800000,
+           "family": "omp.tool", "label_source": "exact_omp_session_tool_call_join",
+           "executed_action": "read", "shadow": [
+               {"model": "synthetic@rev", "selected_action": "read", "confidence": .99}]}
+    source.write_bytes(canonical(row) + b"\n")
+    original = Path.read_bytes
+    def no_bulk_read(path):
+        if path == source:
+            raise AssertionError("Labelled history must stream")
+        return original(path)
+    monkeypatch.setattr(Path, "read_bytes", no_bulk_read)
+    spec = [{"kind": "shadow_learner", "path": str(source)}]
+    assert ingest_sources(spec, tmp_path)["added"] == 1
+    assert ingest_sources(spec, tmp_path)["added"] == 0
+
+
+def test_labelled_parser_memory_is_independent_of_history_length(tmp_path):
+    import tracemalloc
+    from z0int.policy.ingest import _load_labelled
+    source = tmp_path / "labelled.jsonl"
+    row = {"schema": "z0int.shadow.labelled.v1", "ts": 1792800000,
+           "family": "omp.tool", "label_source": "exact_omp_session_tool_call_join",
+           "executed_action": "read", "payload": "x" * 8192, "shadow": [
+               {"model": "synthetic@rev", "selected_action": "read", "confidence": .99}]}
+    line = canonical(row) + b"\n"
+    peaks = []
+    for count in (10, 2000):
+        with source.open("wb") as stream:
+            for _ in range(count):
+                stream.write(line)
+        tracemalloc.start()
+        result = _load_labelled(source, .8)
+        peaks.append(tracemalloc.get_traced_memory()[1])
+        tracemalloc.stop()
+        assert result["families"]["omp.tool"]["slm:synthetic@rev"]["n"] == count
+    assert peaks[1] < peaks[0] + 256 * 1024
+
+
+def test_ingestion_rejects_source_changed_after_hash(tmp_path, monkeypatch):
+    import z0int.policy.ingest as ingest
+    source = tmp_path / "labelled.jsonl"
+    source.write_text("{}\n")
+    def changed(*args, **kwargs):
+        source.write_text("{}\n{}\n")
+        return {"ts": 1792800000}
+    monkeypatch.setattr(ingest, "_load_source", changed)
+    report = ingest_sources([{"kind": "shadow_learner", "path": str(source)}], tmp_path)
+    assert report["added"] == 0
+    assert "changed while parsing" in report["sources"][0]["reason"]
 
 
 def test_structured_engine_bench_and_offload_adapters(tmp_path):

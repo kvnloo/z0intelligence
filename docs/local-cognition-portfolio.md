@@ -403,6 +403,10 @@ nice 19 / idle I/O priority, triggered by a model/registry path watch and daily
 backstop timer. Cache writes are serialized and atomic. Model publishers must
 change the filesystem identity tuple when replacing bytes (normal writes update
 mtime). Missing identity is not permission to reuse a previous model digest.
+Ingestion hashes sources incrementally before deduplication and reduces labelled
+shadow JSONL row by row, retaining only per-family/arm score counts rather than
+the complete labelled history. A source changed between hashing and parsing is
+skipped for retry, never credited under a mismatched digest.
 
 Missing task evidence or evidence within `refresh_hours` (default 48) of the
 compiler's effective expiry enqueues a worker. Live workers are not duplicated;

@@ -69,9 +69,8 @@ def _shadow(data: dict, spec: dict, source: dict, ts: str) -> list[dict]:
     return result
 
 
-def _labelled(rows: list[dict], spec: dict, source: dict, ts: str) -> list[dict]:
+def _labelled_scores(rows, threshold):
     scores = {}
-    threshold = spec.get("confidence_threshold", .8)
     for row in rows:
         if row.get("schema") != "z0int.shadow.labelled.v1" or row.get("label_source") != "exact_omp_session_tool_call_join":
             raise FindingsError("Unknown labelled shadow schema or label join")
@@ -86,7 +85,31 @@ def _labelled(rows: list[dict], spec: dict, source: dict, ts: str) -> list[dict]
             score = scores.setdefault(row["family"], {}).setdefault("slm:" + label, {"n": 0, "correct": 0})
             score["n"] += 1
             score["correct"] += int(trial["selected_action"] == row["executed_action"])
+    return scores
+
+
+def _labelled(rows: list[dict], spec: dict, source: dict, ts: str) -> list[dict]:
+    scores = _labelled_scores(rows, spec.get("confidence_threshold", .8))
     return _shadow({"schema": "z0int.shadow.learning.v1", "families": scores}, spec, source, ts)
+
+
+def _load_labelled(path: Path, threshold: float) -> dict:
+    """Reduce JSONL one row at a time; memory scales with families/arms, not history."""
+    synthetic = False
+    latest = None
+    def rows():
+        nonlocal synthetic, latest
+        with path.open("rb") as stream:
+            for line in stream:
+                row = json.loads(line)
+                if type(row.get("synthetic", False)) is not bool:
+                    raise FindingsError("Source synthetic must be boolean")
+                synthetic |= row.get("synthetic", False)
+                latest = max(latest, row["ts"]) if latest is not None else row["ts"]
+                yield row
+    scores = _labelled_scores(rows(), threshold)
+    return {"schema": "z0int.shadow.learning.v1", "families": scores,
+            "synthetic": synthetic, "ts": latest}
 
 
 def _bench(data: dict, spec: dict, source: dict, ts: str) -> list[dict]:
@@ -283,7 +306,11 @@ def _eval(data: dict, spec: dict, source: dict, ts: str) -> list[dict]:
     return result
 
 
-def _load_source(path: Path, raw: bytes, kind: str) -> dict | list:
+def _load_source(path: Path, raw: bytes | None, kind: str, confidence_threshold: float = .8) -> dict | list:
+    if kind == "shadow_learner" and path.suffix == ".jsonl":
+        return _load_labelled(path, confidence_threshold)
+    if raw is None:
+        raw = path.read_bytes()
     if kind == "agent_outcomes" and path.suffix in {".sqlite", ".db"}:
         wal = Path(str(path) + "-wal")
         if wal.exists() and wal.stat().st_size:
@@ -313,14 +340,22 @@ def ingest_sources(sources: list[dict], home: Path | None = None) -> dict:
         try:
             if spec.get("kind") not in KINDS:
                 raise FindingsError("Unknown source kind")
-            raw = path.read_bytes()
-            sha = hashlib.sha256(raw).hexdigest()
+            before = path.stat()
+            identity = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+            with path.open("rb") as stream:
+                sha = hashlib.file_digest(stream, "sha256").hexdigest()
+            after = path.stat()
+            if identity != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
+                raise FindingsError("Source changed while hashing; retry ingestion")
             status["sha256"] = sha
             if sha in seen:
                 status.update(status="skipped", reason="source_sha256_already_ingested")
                 report["sources"].append(status)
                 continue
-            data = _load_source(path, raw, spec["kind"])
+            data = _load_source(path, None, spec["kind"], spec.get("confidence_threshold", .8))
+            after = path.stat()
+            if identity != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
+                raise FindingsError("Source changed while parsing; retry ingestion")
             marked = [spec]
             if isinstance(data, dict):
                 marked.append(data)
