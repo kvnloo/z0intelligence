@@ -102,6 +102,10 @@ def main() -> None:
     def section(name: str, rows: list[str]) -> None:
         sections[name] = rows
 
+    # First so truncation never drops it: the owner's established workflows, quoted
+    # with sources. Agents kept re-deriving these (2026-10-25 Codex Cloud incident).
+    section("Owner canon — Kevin's established workflows (verbatim, sourced); follow before acting",
+        extract(OPS / 'unified-memory/OWNER-CANON.md', r'^- CANON ', 16, 520))
     section('North-star goals — repository quotations',
         extract(args.repo / 'README.md', r'^\*\*A provenance|^z0intelligence turns', 2) +
         extract(args.repo / 'ROADMAP.md', r'^>.*Optimize for|^Success means|^z0int is not trying', 3))
@@ -310,7 +314,10 @@ def main() -> None:
         f'{provenance} → Re-observe live state before action. No gold questions or experiment answers are inputs.',
     ]
     # Reserve space for every section. Headers and facts all carry source paths.
-    caps = [5,17,12,6,30,38,35,22,10,30]
+    # Owner canon first (10 rows); measured findings give up 11 rows to keep 223 lines.
+    caps = [10,5,17,12,6,30,27,35,22,10,30]
+    if len(caps) != len(sections):
+        raise RuntimeError(f'caps/sections mismatch: {len(caps)} != {len(sections)}')
     for (name, rows), cap in zip(sections.items(), caps):
         lines += [f'{provenance} → ## {name}', *rows[:cap]]
     if len(lines) > 223:
