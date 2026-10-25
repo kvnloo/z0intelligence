@@ -1,0 +1,16 @@
+{
+  "status": "negative_result_no_qualifying_candidate",
+  "raw_leaderboard": "leaderboard-power.json",
+  "raw_numeric_gate_passed": true,
+  "deployment_qualified": false,
+  "candidate_id": "methods-pipeline-0d4474b68b15b39dfc11c6935e274fb943ca84464103ad5f6df6b669dde29f33",
+  "private_candidate_catalogue_record": "removed_by_measurement_owner",
+  "reason": "Completed search loaded the earlier runner and retained manage_skill in frozen categories despite no post-training evaluation labels for this tool. Later source exclusion is not measured evidence for the completed run. Raw numerical winner_qualified is historical numerical-gate output, not deployment authorization.",
+  "scope_gap": {"tool": "manage_skill", "training_labels": 1, "post_training_labels": 0, "metric_credit": false, "dispatch_credit": false},
+  "activation": "not_activated_no_qualifying_candidate",
+  "live_routing": "prohibited_without_shadow_only_output_quality_ABAB",
+  "baseline_result": "All three trivial baselines beat the development-selected SLM under the same read proxy; no finalist run is authorized or needed.",
+  "economics_status": "proxy-unvalidated; recommendation only, not applied to RiskBar or compiler",
+  "mutating_reversible": "k=0_frontier",
+  "destructive": "k=0_frontier"
+}

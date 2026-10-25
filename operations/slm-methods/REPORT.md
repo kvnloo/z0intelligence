@@ -2,9 +2,29 @@
 
 ## Conclusion
 
-**Pairwise BT is not the best measured SLM process, but lower accuracy does not automatically make it uneconomic.** With exact reconstructed native context and batched comparisons, tool BT costs231.5ms/decision and has expected recovery-proxy cost5511ms, below binary6065ms despite only3/24 correct. A real three-choice tournament is better here:10/24 correct,126.7ms,425tokens/decision, expected proxy3647ms. Path-kind BT loses. These are small, noisy counterfactual samples, not authorization or generalization to every SLM.
+**Negative result: no qualifying candidate; not activated.** The completed
+400-development/400-holdout comparison covers all six arms and all54 pipeline
+variants. The development-selected pipeline gets70/400=17.5% holdout agreement
+(Wilson14.09–21.53%) and costs0.794s/call; its read-recovery expected proxy is
+5.772s (cluster95%5.559–5.987). All three trivial controls beat it: training
+majority119/400=29.75%, expected4.239s (3.917–4.568); narrowing-top127%;
+previous-repeat29.25%. Best holdout accuracy among all54 pipelines is20%.
+The SLM adds no demonstrated value at this task framing. See
+[the full powered leaderboard](LEADERBOARD.md) for all arms/variants and CIs.
 
-No candidate is promoted. Main subsequently authorized measured recovery **proxy** E=6034 ms and Sol frontier F=7999 ms; these are used in the updated pipeline leaderboard, not a claim of measured causal recovery cost. No active release was modified.
+**The proxy itself is too lenient for routing:** always guessing the majority
+tool is70.25% wrong yet scores4.239s, below Sol7.999s. A fixed6.034s read
+recovery charge misses frontier redo work and output degradation. Mark
+economics inputs `proxy-unvalidated` as a recommendation, not an applied
+RiskBar/compiler setting. Real-session per-wrong-pick recovery and ABAB
+output-quality judgment must precede any routing decision. Mutation and
+destructive classes remaink=0/frontier. No finalist or activation was run.
+
+The raw search passed its old numerical gate against binary but retained
+unevaluated `manage_skill` in its actual frozen categories. Its private
+candidate was withdrawn; `disposition.json` overrides raw
+`winner_qualified:true` as deployment status. The historical24-label studies
+below are retained for provenance and do not supersede the powered result.
 
 ## Matched real-label experiment
 
@@ -134,11 +154,13 @@ protocol avoids this reduced-vocabulary surrogate and future-label leakage.
 Only 18 tool labels recur after the all-19-tools prefix. The missing stratum
 is **`manage_skill`**, with one observed label in the training prefix and
 none afterward. It cannot supply new development/holdout labels and is not
-synthetically filled. It receives no metric or dispatch credit. Search
-excludes unmeasured tools from frozen category membership, so a requested
-`manage_skill` routes fail-closed to the frontier under the existing
-`tool_not_in_observed_vocab` rule. The report's `training.unsupported_tools`
-records this explicit exclusion.
+synthetically filled. It receives no metric or dispatch credit. The completed
+search had already loaded the earlier runner before the exclusion patch
+landed and therefore **still included `manage_skill` in its measured frozen
+categories**. Do not relabel that run as18-tool. The source-only later
+exclusion and existing unknown-vocabulary frontier rule are not measured
+evidence for a new18-tool candidate. Its19-tool candidate was withdrawn;
+no replacement or live dispatch is authorized.
 
 The powered output paths are `measured-power.json` and
 `leaderboard-power.json`. The latter explores 54 category/stage/margin
