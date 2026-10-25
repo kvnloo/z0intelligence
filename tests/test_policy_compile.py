@@ -298,29 +298,63 @@ def capacity(policy, row, risk="read"):
     return policy["option_capacity"][option_capacity_key(scope_of(row))][risk]
 
 
+def compile_capacity(rows):
+    """Supply explicit synthetic measured economics for capacity-only fixtures."""
+    costs = []
+    seen = set()
+    for choice in rows:
+        identity = canonical(scope_of(choice))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        for field, value in {"cost_call": .1, "cost_frontier": 1.,
+                             "cost_error": 20., "abstain_rate": 0.}.items():
+            row = finding(synthetic=True, arm=choice["arm"],
+                metric={"name": field, "value": value, "ci_low": value,
+                        "ci_high": value, "ci_method": "none",
+                        "higher_is_better": False, "cost_unit": "latency_ms_lambda0"})
+            row["subject"] = {"family": "choice.error_cost", "risk_class": "read",
+                              "job": "observed_frontier_recovery"}
+            row["id"] = digest({k: v for k, v in row.items() if k not in {"id", "prev"}})
+            costs.append(row)
+    return compile_rows(rows + costs)
+
+
 def test_option_capacity_minimum_of_task_maxima_and_recomputed_wilson():
     rows = [choice_finding("T1", 8), choice_finding("T1", 16, value=.9),
             choice_finding("T2", 5), choice_finding("T3", 16), choice_finding("T4", 10)]
-    policy = compile_rows(rows)
+    policy = compile_capacity(rows)
     entry = capacity(policy, rows[0])
     assert entry["allowed_k"] == 5
     assert entry["task"] == ["T1", "T2", "T3", "T4"]
-    assert len(entry["finding_ids"]) == 4
+    assert len(entry["finding_ids"]) == 8
     assert .96 < entry["wilson_lower"] < .97  # Stated 1.0 cannot inflate the Wilson bound.
     assert entry["bar_derived"] == pytest.approx(.955)
     assert stage(policy) == "none"  # Choice capacity does not create routing credit.
-    assert canonical(policy) == canonical(compile_rows(rows))
+    assert canonical(policy) == canonical(compile_capacity(rows))
+
+
+def test_unmeasured_default_economics_never_authorize_routing():
+    rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3", "T4")]
+    policy = compile_rows(rows)
+    for risk, bar in (("read", .955), ("mutating_reversible", .991)):
+        entry = capacity(policy, rows[0], risk)
+        assert entry["allowed_k"] == 0
+        assert entry["bar_derived"] == pytest.approx(bar)
+        assert entry["inputs"]["status"] == "unmeasured"
+        assert entry["wilson_lower"] is None
+        assert entry["finding_ids"] == []
 
 
 def test_option_capacity_missing_failed_expired_tasks_and_unknown_scope_disable_slm():
     rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3")]
-    missing = capacity(compile_rows(rows), rows[0])
+    missing = capacity(compile_capacity(rows), rows[0])
     assert missing["allowed_k"] == 0
-    assert missing["finding_ids"] == [] and missing["wilson_lower"] is None
+    assert len(missing["finding_ids"]) == 4 and missing["wilson_lower"] is None
     rows.append(choice_finding("T4", 10, value=.8))
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 0
+    assert capacity(compile_capacity(rows), rows[0])["allowed_k"] == 0
     rows[-1] = choice_finding("T4", 10, expires_at=NOW)
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 0
+    assert capacity(compile_capacity(rows), rows[0])["allowed_k"] == 0
     assert compile_rows([])["option_capacity"] == {}
 
 
@@ -330,7 +364,7 @@ def test_option_capacity_never_crosses_any_physical_scope_dimension():
         different = {**rows[0]["arm"], dimension: ("sha256:" + "b" * 64 if dimension == "model"
                                                 else "different-" + dimension)}
         other = choice_finding("T1", 32, arm=different)
-        policy = compile_rows(rows + [other])
+        policy = compile_capacity(rows + [other])
         assert capacity(policy, rows[0])["allowed_k"] == 8
         assert capacity(policy, other)["allowed_k"] == 0
 
@@ -338,7 +372,7 @@ def test_option_capacity_never_crosses_any_physical_scope_dimension():
 def test_option_capacity_latest_failure_supersedes_old_success():
     rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3", "T4")]
     rows.append(choice_finding("T2", 8, value=.5, ts="2026-10-24T11:00:00Z"))
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 0
+    assert capacity(compile_capacity(rows), rows[0])["allowed_k"] == 0
 
 
 @pytest.mark.parametrize("override", [
@@ -351,7 +385,7 @@ def test_option_capacity_latest_failure_supersedes_old_success():
 def test_option_capacity_rejects_ineligible_or_inconsistent_evidence(override):
     rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3")]
     rows.append(choice_finding("T4", 8, **override))
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 0
+    assert capacity(compile_capacity(rows), rows[0])["allowed_k"] == 0
 
 
 def test_option_capacity_risk_expected_cost_and_expiry():
@@ -365,10 +399,12 @@ def test_option_capacity_risk_expected_cost_and_expiry():
     row = choice_finding("custom-task", 8, value=.85, n=1000,
                          expires_at="2026-10-24T13:00:00Z")
     policy = compile_rows([row], config=config)
-    assert capacity(policy, row)["allowed_k"] == 8
+    assert capacity(policy, row)["allowed_k"] == 0
     assert capacity(policy, row, "mutating_reversible")["allowed_k"] == 0
     assert capacity(policy, row, "destructive")["allowed_k"] == 0
     assert capacity(policy, row)["inputs"]["status"] == "unmeasured"
+    assert capacity(policy, row)["bar_derived"] == pytest.approx(-3.5)
+    assert capacity(policy, row)["wilson_lower"] is None
     assert capacity(compile_rows([row], now="2026-10-24T13:00:00Z", config=config), row)["allowed_k"] == 0
 
 
