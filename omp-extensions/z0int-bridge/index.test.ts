@@ -22,10 +22,12 @@ type AnyFn = (...args: unknown[]) => unknown;
 function fakePi() {
 	const handlers = new Map<string, AnyFn[]>();
 	const tools: string[] = [];
+	const definitions = new Map<string, { name?: string; parameters?: unknown }>();
 	const commands: string[] = [];
 	return {
 		handlers,
 		tools,
+		definitions,
 		commands,
 		events: {},
 		on: (event: string, handler: AnyFn) => {
@@ -35,8 +37,9 @@ function fakePi() {
 		registerCommand: (name: string) => {
 			commands.push(name);
 		},
-		registerTool: (tool: { name?: string }) => {
+		registerTool: (tool: { name?: string; parameters?: unknown }) => {
 			tools.push(String(tool?.name));
+			definitions.set(String(tool?.name), tool);
 		},
 	};
 }
@@ -92,12 +95,21 @@ test("the extension loads and registers with a missing interpreter", async () =>
 	expect(errors).toEqual([]);
 });
 
-test("the default export is capture plus the bridge commands only: no routing handler, no route_worker tool", () => {
+test("the default export keeps evidence search separate from routing", () => {
 	// Routing stays with the separate z0int-intelligence link (its own tree), so retargeting the bridge to the
 	// pinned checkout never moves live routing with it.
 	const pi = fakePi();
 	m.default(pi as never);
-	expect(pi.tools).toEqual([]);
+	expect(pi.tools).toEqual(["z0_file_search"]);
+	expect(pi.definitions.get("z0_file_search")?.parameters).toMatchObject({
+		type: "object",
+		required: ["query"],
+		properties: {
+			query: { type: "string" },
+			kind: { type: "string" },
+			allowQmd: { type: "boolean" },
+		},
+	});
 	expect(pi.handlers.get("before_agent_start")?.length).toBe(1);
 	expect(Reflect.get(pi.events, Symbol.for("z0intelligence.omp.registration"))).toBeUndefined();
 	expect(pi.commands.sort()).toEqual(["z0int-bridge-status", "z0int-bridge-reload", "z0int-close"].sort());
@@ -109,7 +121,7 @@ test("routing loaded from its own z0int-intelligence link registers exactly once
 	m.default(pi as never);
 	intelligence(pi);
 	intelligence(pi); // a second copy on the same bus is a no-op (the Symbol guard)
-	expect(pi.tools).toEqual(["z0int_route_worker"]);
+	expect(pi.tools).toEqual(["z0_file_search", "z0int_route_worker"]);
 	expect(pi.handlers.get("before_agent_start")?.length).toBe(2); // one capture, one routing
 });
 

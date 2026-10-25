@@ -916,24 +916,21 @@ export function registerBridgeCapture(
 export default function z0intBridge(pi: ExtensionAPI) {
 	pi.setLabel("z0int bridge v2 (capture)");
 	registerBridgeCapture(pi, { harness: "omp" });
-	const z = pi.zod;
 	pi.registerTool({
 		name: "z0_file_search",
 		label: "z0 file search",
 		loadMode: "essential",
 		description:
 			"Fast repository path/content search through z0's resident FFF index. Returns source-backed evidence only; it does not authorize actions.",
-		parameters: z.object({
-			query: z.string().describe("Filename, symbol, or content to find"),
-			kind: z
-				.string()
-				.optional()
-				.describe("natural_language (default), exact_symbol, or exact_path"),
-			allowQmd: z
-				.boolean()
-				.optional()
-				.describe("Allow QMD docs/notes fallback after FFF misses (default true)"),
-		}),
+		parameters: {
+			type: "object",
+			required: ["query"],
+			properties: {
+				query: { type: "string", description: "Filename, symbol, or content to find" },
+				kind: { type: "string", description: "natural_language (default), exact_symbol, or exact_path" },
+				allowQmd: { type: "boolean", description: "Allow QMD docs/notes fallback after FFF misses (default true)" },
+			},
+		},
 		async execute(_toolCallId, params, _onUpdate, ctx, _signal) {
 			try {
 				const h = await ensureWorker();

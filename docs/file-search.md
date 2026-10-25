@@ -59,7 +59,9 @@ adapters record the packet as a `context.resolve` EventLog observation with
   exposes it as the essential `z0_file_search` tool. The Rust index therefore
   lives across turns in the same bridge generation. Its **actual bridge Python**
   must have `fff-search==0.11.0`; installing the wheel in some other Python is
-  insufficient. This change does not edit the immutable OMP shim or its startup.
+  insufficient. Tool registration uses the native JSON-schema contract without
+  requiring a host-provided `pi.zod`. Evidence search does not register live
+  routing; that remains with the separate intelligence extension.
 - **Codex / Claude Code / DSH:** `python -m z0int.intelligence_mcp` exposes
   `file_search`. The trusted launcher sets `Z0INT_HARNESS` to `codex`,
   `claude-code`, or `dsh`. Tool arguments cannot override it. `Z0INT_SHARED_ONLY=1`
