@@ -28,6 +28,63 @@ GIT_ENV = {'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_AUT
            'GIT_COMMITTER_NAME': 'f', 'GIT_COMMITTER_EMAIL': 'f@x'}
 
 
+def test_cli_tick_runs_warm_experiment_catalogue_end_to_end(world, learner, monkeypatch):
+    """A persisted active strategy must survive the real CLI/runtime boundary."""
+    import http.server
+    import threading
+    from z0int.cognition.learning import connect
+    from z0int.cognition.learning_search import initialize
+
+    class Serving(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path.startswith('/slots'):
+                body = [{'n_ctx': 4096}]
+            elif self.path == '/models':
+                body = {'data': [{'id': 'fixture', 'status': {'args': ['--device', 'CPU']}}]}
+            else:
+                body = {'build_info': 'fixture-build', 'model_ftype': 'Q8_0',
+                        'model_alias': 'fixture'}
+            data = json.dumps(body).encode()
+            self.send_response(200)
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *args):
+            pass
+
+    db = connect(world.home)
+    initialize(db)
+    db.execute('INSERT INTO learning_search_families VALUES(?,?,?)',
+               ('omp.path_kind', 'history-1', 'active'))
+    db.commit()
+    db.close()
+    set_config(world.home, shadow_learning={'experiments_enabled': True, 'jobs_per_tick': 0})
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Serving)
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    (world.home/'config/serving.json').write_text(json.dumps({'endpoints': [{
+        'model_id': 'qwen3_06b', 'served_model': 'fixture',
+        'base_url': f'http://127.0.0.1:{server.server_port}', 'runtime': 'fixture'}]}))
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join((str(REPO/'src'), str(learner.dir))),
+               Z0INT_OMP_SESSIONS=str(world.root/'sessions'))
+    try:
+        result = subprocess.run([sys.executable, '-m', 'z0int.cli', 'loop', 'tick',
+                                 '--lock', str(world.lock), '--budget-s', '60'],
+                                env=env, capture_output=True, text=True, timeout=90)
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join()
+    summary = json.loads((world.home/'loop/last-tick.json').read_text())
+    assert result.returncode in (0, 3), result.stderr
+    assert summary['exit'] == result.returncode
+    assert summary['status'] in ('success', 'degraded', 'partial_measurement')
+    assert [step['name'] for step in summary['steps']] == STEPS
+    assert all(step['status'] == 'done' for step in summary['steps'])
+    assert 'error' not in summary['cognition']['experiments']
+    assert 'omp.path_kind' in summary['cognition']['experiments']['search']['families']
+
 def test_last_tick_receipt_is_atomically_replaced(tmp_path):
     from z0int.loop_tick import _write_summary, SUMMARY_SCHEMA
     out = tmp_path/'loop'

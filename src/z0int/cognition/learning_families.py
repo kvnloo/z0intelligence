@@ -267,17 +267,23 @@ def _answer(raw: Any, choices: list[str]) -> tuple[str | None, float, str | None
 
 def _strategy(strategy_id: str, prompt_bytes: int, candidate_k: int,
               retrieval_k: int, history_width: int, model_cap: int = 3,
-              candidate_source: str = 'history', recent_sessions_n: int = 5) -> dict:
+              candidate_source: str = 'history', recent_sessions_n: int = 5,
+              decision_method: str = 'per_candidate_binary_logit', method_config: dict | None = None) -> dict:
     if not _name(strategy_id) or not 1 <= retrieval_k <= 512 or not 1 <= history_width <= 8:
         raise ValueError("invalid strategy identity or retrieval/history bound")
     if prompt_bytes < 384 or model_cap not in (3, 5) or not 1 <= candidate_k <= model_cap:
         raise ValueError("invalid strategy prompt/candidate model cap")
     if candidate_source not in ('history', 'recent_sessions') or not 1 <= recent_sessions_n <= 64:
         raise ValueError("invalid candidate-source session scope")
-    return {"strategy_id": strategy_id, "prompt_bytes": prompt_bytes,
+    result = {"strategy_id": strategy_id, "prompt_bytes": prompt_bytes,
             "candidate_k": candidate_k, "retrieval_k": retrieval_k,
             "history_width": history_width, "model_cap": model_cap,
             "candidate_source": candidate_source, "recent_sessions_n": recent_sessions_n}
+    if decision_method != 'per_candidate_binary_logit':
+        result['decision_method'] = decision_method
+    if method_config is not None:
+        result['method_config'] = dict(method_config)
+    return result
 
 
 def _arm_key(db: sqlite3.Connection, base_arm: str, strategy: dict) -> str:

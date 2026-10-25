@@ -70,7 +70,7 @@ def choice_predictor(db, endpoint, identity: dict, scope: dict, *, home: Path | 
             if strategy.get('decision_method')=='slm_pipeline_v1':
                 from types import SimpleNamespace
                 from .slm_scoped import run_scoped
-                groups=strategy.get('frozen_categories',[])
+                groups=strategy['method_config'].get('frozen_categories',[])
                 legal=SimpleNamespace(ids=lambda:tuple(value for group in groups for value in group))
                 backend=SimpleNamespace(_transport=SimpleNamespace(chat=chat),
                     config=SimpleNamespace(model=endpoint.served_model),
@@ -110,11 +110,12 @@ def _configs(current: dict, catalogue_rows=DEFAULT_STRATEGIES) -> dict:
     result = {}
     for family, strategy in current.items():
         config = catalogue.get(strategy, catalogue['history-1'])
-        result[family] = {**config, 'strategy_id': strategy, 'history_width': min(8, config['history_width']),
+        result[family] = {'strategy_id': strategy, 'history_width': min(8, config['history_width']),
             'candidate_k': min(3, config['candidate_k']), 'prompt_bytes': min(3000, config['prompt_bytes']),
             'retrieval_k': config.get('retrieval_k', 64),
             'candidate_source': config.get('candidate_source', 'history'),
-            'recent_sessions_n': config.get('recent_sessions_n', 5)}
+            'recent_sessions_n': config.get('recent_sessions_n', 5),
+            'decision_method': config.get('decision_method', 'per_candidate_binary_logit')}
         if config.get('decision_method')=='slm_pipeline_v1':
             result[family]['method_config']=dict(config)
     return result
