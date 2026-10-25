@@ -51,11 +51,11 @@ def main() -> int:
     spec.loader.exec_module(module)
     results = []
     for case in cases:
+        query_text = original_query(case)
         started = time.perf_counter()
         error = None
         hits = []
         injection = ''
-        query_text = original_query(case)
         try:
             hits = module.query(args.index, query_text, limit=12)
             injection = module.block(hits)

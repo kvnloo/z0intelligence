@@ -28,7 +28,9 @@ def query(index: Path, text: str, limit: int = 12) -> list[dict]:
         db.row_factory = sqlite3.Row
         db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 100)
         expression = ' OR '.join('"' + token.replace('"', '""') + '"' for token in tokens)
-        rows = db.execute('SELECT method,source,status,wired,kind,text FROM entries_fts WHERE entries_fts MATCH ? ORDER BY bm25(entries_fts),source,method LIMIT ?', (expression, max(0, min(12, limit)))).fetchall()
+        # FTS5 can stop ranked retrieval early. Sorting bm25() plus arbitrary
+        # columns directly forces a full match-set sort before LIMIT.
+        rows = db.execute('SELECT method,source,status,wired,kind,text FROM (SELECT method,source,status,wired,kind,text,rank FROM entries_fts WHERE entries_fts MATCH ? ORDER BY rank LIMIT 96) ORDER BY rank,source,method LIMIT ?', (expression, max(0, min(12, limit)))).fetchall()
     if time.monotonic() >= deadline:
         raise TimeoutError('Capability query exceeded 180 ms')
     return [dict(row) for row in rows]

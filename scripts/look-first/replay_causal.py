@@ -22,6 +22,8 @@ def replay(index, source_map, selection):
     rows = []
     for case in cases:
         user = inputs[case['case_id']]
+        if user['cohort'] != 'confirmed_failure':
+            continue
         started = time.monotonic()
         try:
             hits = query(index, user['text'])
@@ -47,6 +49,7 @@ def replay(index, source_map, selection):
     return {'schema': 'z0.look-first.causal-replay.v1', 'index': str(index),
             'map_sha256': hashlib.sha256(source_map.read_bytes()).hexdigest(),
             'selection_sha256': hashlib.sha256(selection.read_bytes()).hexdigest(), 'cases': len(rows),
+            'cohort': 'confirmed_failure',
             'causal_source_hit_at_12': sum(row['causal_source_hit'] for row in rows),
             'exact_fact_hit_at_12': sum(row['exact_fact_hit'] for row in rows),
             'query_errors': sum(row['error'] is not None for row in rows),
