@@ -401,11 +401,20 @@ def _bootstrap_selection(config, bundle):
                       'quota_group': 'bootstrap:' + model['provider'], 'windows': windows,
                       'burn': None, 'remaining': None, 'time_to_reset_hours': None, 'p_accept': None}
             values['account_id_hash'] = binding.get('account_id_hash')
+        pace_exempt = (
+            model['provider'] == 'openai-codex'
+            and model['provider'] in config.get('bootstrap_pace_exempt_providers', [])
+            and Path(config['root']).resolve() == DEFAULT_ROOT / 'omp-study'
+            and (_timestamp(config.get('authorization', {}).get('expires_at')) or 0)
+                <= datetime(2026, 10, 25, 6, 50, tzinfo=timezone.utc).timestamp()
+        )
+        if pace_exempt:
+            values['bootstrap_pace_override'] = config.get('authorization', {})
         reason = _route_reason(model, route, values, config)
         missing = []
         for window in windows:
             if (not _finite(window['remaining'], True) or window['time_to_reset_hours'] <= 0
-                    or not _finite(window['pace']) or window['pace'] > config['max_pace']):
+                    or not _finite(window['pace']) or (window['pace'] > config['max_pace'] and not pace_exempt)):
                 missing.append('non_exhausted_measured_window_pace')
         if route.get('kind') == 'local_http' and route.get('compute') != 'gpu':
             reason = 'bootstrap_requires_gpu_not_cpu'

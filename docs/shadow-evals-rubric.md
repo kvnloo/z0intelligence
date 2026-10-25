@@ -127,6 +127,13 @@ The admitted cohorts are:
 
 Other cohort sizes do not weaken the score gate. A 40-case measurement never represents a full 153-case measurement. The receipt and exported finding metric name the cohort and its sample count. Report the interval widths, including the larger uncertainty of the subset.
 
+The Oct 24 Codex pace exception is restricted to the private `omp-study` root,
+ten real messages and the 27/13 calibration subset. It expires at 01:50 CDT
+Oct 25 (06:50 UTC). It does not waive exhausted windows, privacy, model identity,
+or context limits and earns no O14 credit. Retain exclusions rather than silently
+replacing unavailable arms. Atomic JSON persistence streams large audit artifacts
+instead of making another full serialized copy in memory.
+
 Scores stay disabled until all these conditions hold:
 
 1. The exact admitted number of unique cases is present.

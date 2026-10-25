@@ -37,7 +37,11 @@ def save(path, value):
     fd = os.open(temporary, flags, 0o600)
     try:
         with os.fdopen(fd, 'w') as stream:
-            stream.write(value if isinstance(value, str) else json.dumps(value, indent=2, ensure_ascii=False, allow_nan=False) + '\n')
+            if isinstance(value, str):
+                stream.write(value)
+            else:
+                json.dump(value, stream, indent=2, ensure_ascii=False, allow_nan=False)
+                stream.write('\n')
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
@@ -163,7 +167,9 @@ def replay(config, session, count=10):
     receipt = {'ts': now(), 'session_path': str(session), 'requested': count, 'selected': len(jobs), 'jobs': []}
     for job in jobs:
         queue.enqueue(job)
-        result = previous.get(job['job_id']) or process_job(job, config)
+        prior = previous.get(job['job_id'])
+        result = (prior if prior and prior.get('status') != 'blocked'
+                  else process_job(job, config))
         identity = result['job_id']
         queue.finish(identity, result)
         receipt['jobs'].append({'job_id': identity, 'entry_id': job['entry_id'], 'sha256': job['sha256'], 'tier': job['tier'], 'status': result['status'], 'reason': result.get('reason')})
