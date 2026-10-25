@@ -398,6 +398,14 @@ compiler's effective expiry enqueues a worker. Live workers are not duplicated;
 dead workers retry after `retry_hours` (default 6). Requests, logs, measurement
 receipts and state live under `policy/choice-ladder/`. Successful workers append
 canonical measured findings and recompile the policy, preserving previous state.
+The compiler uses the shared per-risk #211 contract:
+`option_capacity[exact_scope_key][read|mutating_reversible|destructive]`.
+Missing measured recovery costs cannot promote capacity; destructive remains zero.
+For compute-only deployment, set `Z0INT_POLICY_OUTPUT_HOME` to a separate
+candidate root in both the timer and its workers. Findings remain in the real
+home, while compilation and history stay under that root's `policy/`.
+After the per-risk compiler is installed and tested, remove that override to
+publish to `~/.z0int/policy/decision-policy.json`.
 Bench admission declares `--checkpoint-safe`: each cell atomically persists
 scored rows and resumes its exact model/runtime/corpus-bound prefix after
 preemption. A mismatching checkpoint fails closed rather than mixing runs.
@@ -413,6 +421,16 @@ nodes), even if the configured maximum is 400; the receipt records actual n.
 Every sample is answered; findings explicitly record zero abstentions.
 These adaptive fixed-n Wilson intervals are not sequential confidence bounds;
 benchmark accuracy is not authorization or live task success.
+
+The 2026-10-24 19:37:12 service interruption was an explicit operator-agent
+`systemctl --user stop z0int-policy.timer z0int-policy.service` to prevent
+publication before the shared schema landed, not an established OOM kill.
+The journal reports SIGTERM (`Result=signal`, status 15), matching that command;
+the 256 MiB peak alone does not establish OOM. Keep the timer stopped during
+schema cutover. Deploy the schema-compatible immutable policy release, run
+`systemctl --user start z0int-policy.service` once, and inspect its exit status
+and published policy before starting the timer. A failed gate must leave the
+timer stopped; enabling a timer does not mean that it is running.
 
 ## Not yet done
 

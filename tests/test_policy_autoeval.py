@@ -151,7 +151,10 @@ def test_mbp_dispatch_stages_importable_package_and_compiles_receipt(tmp_path,mo
     monkeypatch.setattr('z0int.policy.autoeval.subprocess.run',worker)
     dispatch(request)
     policy = json.loads((tmp_path/'home/policy/decision-policy.json').read_text())
-    assert policy['option_capacity'][option_capacity_key(scope)]['allowed_k']==10
+    capacities = policy['option_capacity'][option_capacity_key(scope)]
+    assert set(capacities) == {'read','mutating_reversible','destructive'}
+    assert capacities['destructive']['allowed_k'] == 0
+    assert all(row['allowed_k'] == 0 for row in capacities.values())
 
 
 def test_adaptive_cell_resumes_atomic_checkpoint_without_rescoring(tmp_path):
