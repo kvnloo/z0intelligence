@@ -803,6 +803,12 @@ def complete(offer, messages, config):
         code = getattr(exc, 'code', None)
         row['error'] = {'code': 'provider_http_error' if type(code) is int else 'completion_failed',
                         'exception_type': type(exc).__name__}
+        if type(exc) is ValueError and str(exc) in {
+            'credential_account_changed', 'credential_unavailable', 'expected_event_stream',
+            'tool_call_rejected', 'invalid_timeout', 'bootstrap_call_cap', 'bootstrap_halted',
+            'input_token_bound_exceeded', 'response_limit', 'invalid_content',
+        }:
+            row['error']['code'] = str(exc)
         if type(code) is int:
             row['error']['http_status'] = code
     if (root is not None and config.get('phase') == 'bootstrap' and row.get('error')

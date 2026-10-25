@@ -335,6 +335,25 @@ def test_http_errors_are_honest_sanitized_and_never_retried(bootstrap, monkeypat
         assert len(calls) == 1
 
 
+@pytest.mark.parametrize('reason,expected', [
+    ('expected_event_stream', 'expected_event_stream'),
+    ('credential_account_changed', 'credential_account_changed'),
+    ('private-response-with-secret', 'completion_failed'),
+])
+def test_transport_invariants_are_identifiable_without_private_error_text(bootstrap, monkeypatch, reason, expected):
+    offer = fanout.select_offers(bootstrap, {})['offers'][1]
+    monkeypatch.setattr(fanout, '_module', lambda *args: SimpleNamespace(
+        MODELS={'anthropic': ('claude-haiku-5-5',)}, credential_available=lambda p: True))
+    def fail(*args):
+        raise ValueError(reason)
+    monkeypatch.setattr(fanout, '_subscription_complete', fail)
+    monkeypatch.setattr(fanout, '_observation', lambda *args: None)
+    result = fanout.complete(offer, [{'role': 'user', 'content': 'synthetic'}],
+                             {**bootstrap, 'call_job_id': 'invariant'})
+    assert result['error']['code'] == expected
+    assert 'secret' not in json.dumps(result)
+
+
 def test_candidate_fanout_reuses_identical_numbered_context(bootstrap, monkeypatch):
     calls = []
     def completion(offer, messages, config):
