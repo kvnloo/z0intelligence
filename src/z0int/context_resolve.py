@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import time
 from dataclasses import asdict, dataclass, field
@@ -21,6 +22,9 @@ from typing import Any, Literal
 
 from . import paths
 from .file_search import search_repository as _fff_search_repository
+
+# Scope and snapshot are the shared #68/#109 memory contracts.
+from .memory_contract import MemoryScope, MemorySnapshot
 
 SCHEMA = "z0int.context_resolve.v1"
 RECIPE_SCHEMA = "z0int.resolution_recipe.v1"
@@ -63,6 +67,7 @@ class InformationNeed:
     path: str | None = None
     symbol: str | None = None
     required: bool = True
+    scope: MemoryScope | None = None
 
 
 @dataclass(frozen=True)
@@ -105,6 +110,7 @@ class ContextPacket:
     recipe: ResolutionRecipe | None = None
     measurements: dict[str, Any] = field(default_factory=dict)
     aodl_projection: dict[str, Any] = field(default_factory=dict)
+    memory_snapshot: MemorySnapshot | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -117,6 +123,7 @@ class ContextPacket:
             "recipe": self.recipe.to_dict() if self.recipe else None,
             "measurements": dict(self.measurements),
             "aodl_projection": dict(self.aodl_projection),
+            "memory_snapshot": self.memory_snapshot.to_dict() if self.memory_snapshot else None,
         }
 
 
@@ -128,12 +135,168 @@ def _sha16(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
-def _file_version(path: Path) -> str:
+def _source_version_from_bytes(data: bytes) -> str:
+    """Content identity, never an mtime/size approximation."""
+    return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def _read_verified_bytes(path: Path) -> bytes | None:
+    """Read only the admitted canonical path, not a later symlink redirect.
+
+    Callers resolve/authorize the canonical absolute path before this read.
+    Open each component relative to the preceding directory descriptor with
+    O_NOFOLLOW, then lstat those same names to detect replaced parents/leaf.
+    The bytes, metadata, and source version therefore belong to one file.
+    A subsequent change still needs independent consumer re-observation.
+    """
+    # Never resolve here: following a replaced link would discard the
+    # caller's earlier root/scope admission. Unsupported hosts fail closed.
+    if (
+        not path.is_absolute()
+        or not hasattr(os, "O_NOFOLLOW")
+        or not hasattr(os, "O_DIRECTORY")
+    ):
+        return None
+    parts = path.parts[1:]
+    if not parts or any(part in ("", ".", "..") for part in parts):
+        return None
+
+    def identity(st: os.stat_result) -> tuple[int, ...]:
+        return (st.st_dev, st.st_ino, st.st_mode, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+
+    def directory_identity(st: os.stat_result) -> tuple[int, ...]:
+        return (st.st_dev, st.st_ino, st.st_mode)
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0)
+    opened: list[int] = []
+    parents: list[tuple[int, str, int]] = []
     try:
-        st = path.stat()
-        return f"mtime={int(st.st_mtime)}:size={st.st_size}"
-    except OSError:
-        return "missing"
+        parent_fd = os.open(path.anchor, directory_flags)
+        opened.append(parent_fd)
+        for component in parts[:-1]:
+            child_fd = os.open(component, directory_flags, dir_fd=parent_fd)
+            opened.append(child_fd)
+            live = os.stat(component, dir_fd=parent_fd, follow_symlinks=False)
+            actual = os.fstat(child_fd)
+            if not stat.S_ISDIR(live.st_mode) or directory_identity(live) != directory_identity(actual):
+                return None
+            parents.append((parent_fd, component, child_fd))
+            parent_fd = child_fd
+
+        file_fd = os.open(parts[-1], file_flags, dir_fd=parent_fd)
+        opened.append(file_fd)
+        before = os.fstat(file_fd)
+        live = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISREG(live.st_mode) or identity(before) != identity(live):
+            return None
+
+        # Keep the anchored fd alive for the final lstat checks even when
+        # the buffered reader closes its duplicate.
+        with os.fdopen(os.dup(file_fd), "rb") as stream:
+            data = stream.read()
+            after = os.fstat(file_fd)
+        if identity(before) != identity(after) or len(data) != after.st_size:
+            return None
+
+        # Each directory must still be at the admitted canonical name.
+        # Checking only the leaf via path.stat would follow a swapped parent.
+        for ancestor_fd, component, child_fd in parents:
+            live = os.stat(component, dir_fd=ancestor_fd, follow_symlinks=False)
+            if (
+                not stat.S_ISDIR(live.st_mode)
+                or directory_identity(live) != directory_identity(os.fstat(child_fd))
+            ):
+                return None
+        live = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISREG(live.st_mode) or identity(live) != identity(after):
+            return None
+        return data
+    except (OSError, ValueError, NotImplementedError):
+        return None
+    finally:
+        for fd in reversed(opened):
+            os.close(fd)
+
+
+def _file_version(path: Path) -> str:
+    """Independently observe the current source; unavailable is not current."""
+    data = _read_verified_bytes(path)
+    return _source_version_from_bytes(data) if data is not None else "unavailable"
+
+
+def _git_worktree_revision(root: Path) -> str | None:
+    """Bind Git HEAD plus changed/untracked file bytes to a worktree revision.
+
+    Porcelain v1 -z records start with XY<space>pathname. A rename/copy has
+    a *second raw pathname* (without an XY prefix); process both paths once.
+    Unknown records and unreadable live files make the revision unverifiable.
+    """
+    root = root.resolve()
+    try:
+        head = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--verify", "HEAD"],
+            capture_output=True, timeout=5, check=False,
+        )
+        status = subprocess.run(
+            ["git", "-C", str(root), "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            capture_output=True, timeout=5, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if head.returncode or status.returncode:
+        return None
+    raw = status.stdout
+    if raw and not raw.endswith(b"\0"):
+        return None
+    entries = raw.split(b"\0")[:-1] if raw else []
+    digest = hashlib.sha256(raw)
+    i = 0
+    while i < len(entries):
+        item = entries[i]
+        i += 1
+        if len(item) < 4 or item[2:3] != b" ":
+            return None
+        xy = item[:2]
+        names = [item[3:]]
+        if b"R" in xy or b"C" in xy:
+            if i >= len(entries):
+                return None
+            names.append(entries[i])  # raw old/source pathname, no XY prefix
+            i += 1
+        for raw_name in names:
+            if not raw_name:
+                return None
+            relative = Path(os.fsdecode(raw_name))
+            if relative.is_absolute() or ".." in relative.parts:
+                return None
+            candidate = root / relative
+            try:
+                # Refuse a symlink in a parent directory that escapes root.
+                candidate.parent.resolve().relative_to(root)
+                info = candidate.lstat()
+            except FileNotFoundError:
+                version = "missing"
+            except (OSError, ValueError):
+                return None
+            else:
+                if stat.S_ISLNK(info.st_mode):
+                    try:
+                        target = os.fsencode(os.readlink(candidate))
+                    except OSError:
+                        return None
+                    version = "symlink:" + _source_version_from_bytes(target)
+                elif stat.S_ISREG(info.st_mode):
+                    data = _read_verified_bytes(candidate)
+                    if data is None:
+                        return None
+                    version = "file:" + _source_version_from_bytes(data)
+                else:
+                    # A submodule/directory with unknown contents is not
+                    # silently treated as a versioned regular file.
+                    return None
+            digest.update(b"\0path\0" + raw_name + b"\0" + version.encode("ascii"))
+    return "head:" + head.stdout.decode("ascii", errors="replace").strip() + ":worktree:" + digest.hexdigest()
 
 
 def _scope_fingerprint(project_root: Path | None, collections: tuple[str, ...]) -> str:
@@ -211,18 +374,20 @@ def _fff_evidence_refs(
     *,
     limit: int = 5,
 ) -> list[EvidenceRef]:
-    """Normalize FFF index hits into bounded, non-authoritative EvidenceRefs."""
+    """Only hydrate exact, still-matching FFF hits from the source bytes.
+
+    Never attach a fresh live-file digest to stale index-supplied text.
+    """
     refs: list[EvidenceRef] = []
     seen: set[str] = set()
-    version = str(result.get("package_version") or "unknown")
-    epoch = int(result.get("index_epoch") or 0)
+    root = project_root.resolve()
 
     def safe_path(raw: Any) -> Path | None:
         if not isinstance(raw, str) or not raw:
             return None
         try:
-            path = (project_root / raw).resolve()
-            path.relative_to(project_root)
+            path = (root / raw).resolve()
+            path.relative_to(root)
             return path
         except (OSError, ValueError):
             return None
@@ -233,26 +398,31 @@ def _fff_evidence_refs(
         path = safe_path(hit.get("path"))
         if path is None:
             continue
-        line = int(hit.get("line") or 0)
-        locator = f"{path}:{line}" if line > 0 else str(path)
+        try:
+            line = int(hit.get("line") or 0)
+        except (ValueError, TypeError):
+            continue
+        data = _read_verified_bytes(path)
+        if data is None:
+            continue
+        lines = data.decode("utf-8", errors="replace").splitlines()
+        # If the indexed line moved or changed, refuse this stale snippet.
+        if not 1 <= line <= len(lines) or lines[line - 1] != hit.get("text"):
+            continue
+        locator = f"{path}:{line}"
         if locator in seen:
             continue
         seen.add(locator)
-        before = [str(x) for x in (hit.get("context_before") or [])]
-        after = [str(x) for x in (hit.get("context_after") or [])]
-        body = [*before[-1:], str(hit.get("text") or ""), *after[:1]]
-        excerpt = "\\n".join(x for x in body if x)[:400] or None
-        refs.append(
-            EvidenceRef(
-                source_id=f"file:{path}",
-                source_version=f"{_file_version(path)};fff={version};epoch={epoch}",
-                locator=locator,
-                trust_class="index_hit",
-                observed_at=_now_iso(),
-                excerpt=excerpt,
-                note="resident FFF index hit; retrieval is evidence, not execution authority",
-            )
-        )
+        excerpt = "\n".join(lines[max(0, line - 2):min(len(lines), line + 1)])[:400]
+        refs.append(EvidenceRef(
+            source_id=f"file:{path}",
+            source_version=_source_version_from_bytes(data),
+            locator=locator,
+            trust_class="index_hit",
+            observed_at=_now_iso(),
+            excerpt=excerpt or None,
+            note="FFF locator rehydrated and matched against these source bytes",
+        ))
 
     for hit in list(result.get("path_hits") or [])[:limit]:
         if len(refs) >= limit or not isinstance(hit, dict):
@@ -263,43 +433,40 @@ def _fff_evidence_refs(
         locator = str(path)
         if locator in seen:
             continue
+        data = _read_verified_bytes(path)
+        if data is None:
+            continue
         seen.add(locator)
-        refs.append(
-            EvidenceRef(
-                source_id=f"file:{path}",
-                source_version=f"{_file_version(path)};fff={version};epoch={epoch}",
-                locator=locator,
-                trust_class="index_hit",
-                observed_at=_now_iso(),
-                note="resident FFF filename hit; retrieval is evidence, not execution authority",
-            )
-        )
+        refs.append(EvidenceRef(
+            source_id=f"file:{path}",
+            source_version=_source_version_from_bytes(data),
+            locator=locator,
+            trust_class="index_hit",
+            observed_at=_now_iso(),
+            note="FFF path hit revalidated from current source bytes",
+        ))
     return refs
 
 
 def _fetch_exact_path(path_str: str, project_root: Path | None) -> EvidenceRef | None:
-    p = Path(path_str).expanduser()
-    if not p.is_absolute() and project_root is not None:
-        p = (project_root / p).resolve()
-    else:
-        try:
-            p = p.resolve()
-        except OSError:
-            return None
-    if not p.is_file():
+    if project_root is None:
         return None
-    # Bound excerpt — no full private dump
     try:
-        with p.open(encoding="utf-8", errors="replace") as stream:
-            text = stream.read(400)
-    except OSError:
+        root = project_root.resolve()
+        path = Path(path_str).expanduser()
+        path = (root / path).resolve()
+        path.relative_to(root)
+    except (OSError, ValueError):
         return None
-    excerpt = text.replace("\n", "\\n")[:400]
+    data = _read_verified_bytes(path)
+    if data is None:
+        return None
+    excerpt = data.decode("utf-8", errors="replace")[:400].replace("\n", "\\n")
     return EvidenceRef(
-        source_id=f"file:{p}",
-        source_version=_file_version(p),
-        locator=str(p),
-        trust_class="code" if p.suffix in {".py", ".ts", ".tsx", ".js", ".rs", ".go"} else "project_constraint",
+        source_id=f"file:{path}",
+        source_version=_source_version_from_bytes(data),
+        locator=str(path),
+        trust_class="code" if path.suffix in {".py", ".ts", ".tsx", ".js", ".rs", ".go"} else "project_constraint",
         observed_at=_now_iso(),
         excerpt=excerpt,
     )
@@ -343,6 +510,7 @@ def project_to_aodl_fields(packet: ContextPacket) -> dict[str, Any]:
             "task_id": packet.task_id,
             "recipe_signature": packet.recipe.request_signature if packet.recipe else None,
             "source_epochs": dict(packet.recipe.source_epochs) if packet.recipe else {},
+            "memory_snapshot": packet.memory_snapshot.to_dict() if packet.memory_snapshot else None,
         },
         "evidence": [e.to_dict() for e in packet.evidence],
         "constraints": {
@@ -371,6 +539,10 @@ def resolve_context(
     repository_time_budget_ms: int = 120,
     turn_key: str | None = None,
     memory_policy: Any = None,
+    request_scope: MemoryScope | None = None,
+    workstream_revision: str | None = None,
+    compiler_revision: str | None = None,
+    require_git_revision: bool = False,
 ) -> ContextPacket:
     """Resolve information needs into a provenance-preserving packet.
 
@@ -382,6 +554,11 @@ def resolve_context(
     Repository-scoped FFF is the first discovery tier: its process-resident Rust
     index + watcher amortizes repeated codebase searches. QMD remains the later
     lexical/docs tier. Neither retrieval layer grants action authority.
+
+    With ``request_scope`` (#66), scope admission runs before cache lookup, ranking, discovery and hydration:
+    needs without a visible scope are excluded, and the packet carries a ``MemorySnapshot`` when workstream,
+    compiler and policy revisions are supplied. Without it the call is unscoped (existing callers) and the
+    packet says so in ``measurements["scope_admitted"] == "unscoped"``.
     """
     t0 = time.perf_counter()
     root = Path(project_root).expanduser().resolve() if project_root else None
@@ -393,13 +570,56 @@ def resolve_context(
     if not need_list:
         raise ValueError("resolve_context requires needs or query")
 
+    # Scope admission is deliberately before cache lookup, ranking, file
+    # discovery, hydration and even metadata-bearing operation logs.
+    # Scope labels are caller claims, not an authentication credential.
+    excluded = False
+    # Fail closed: a scoped need without a scoped request is excluded. Only a fully unscoped call (no request
+    # scope and no need scope, i.e. the existing harness callers) takes the legacy unscoped path.
+    if request_scope is not None or any(n.scope is not None for n in need_list):
+        admitted: list[InformationNeed] = []
+        for need in need_list:
+            if (
+                not isinstance(request_scope, MemoryScope)
+                or not isinstance(need.scope, MemoryScope)
+                or not request_scope.path()
+                or not need.scope.path()
+                or not need.scope.is_visible_to(request_scope)
+            ):
+                excluded = True
+            else:
+                admitted.append(need)
+        if not admitted:
+            return ContextPacket(
+                task_id=task_id, unresolved_gaps=["scope: unavailable or excluded"],
+                measurements={"scope_admitted": False, "gpu_loaded": False, "network_model_calls": 0},
+            )
+        need_list = admitted
+
     sig = _request_signature(need_list, task_id)
     scope_fp = _scope_fingerprint(root, collections)
+    if isinstance(request_scope, MemoryScope):
+        scope_fp = _sha16(scope_fp + "|" + request_scope.fingerprint())
     ops: list[dict[str, Any]] = []
     evidence: list[EvidenceRef] = []
-    gaps: list[str] = []
+    gaps: list[str] = ["scope: unavailable or excluded"] if excluded else []
     contradictions: list[str] = []
     epochs: dict[str, str] = {"policy": policy_revision}
+    if request_scope is not None:
+        epochs.update({
+            "scope": request_scope.fingerprint(),
+            "workstream": workstream_revision or "unverifiable",
+            "compiler": compiler_revision or "unverifiable",
+        })
+        if root is not None:
+            git_rev = _git_worktree_revision(root)
+            if git_rev is None:
+                if require_git_revision:
+                    gaps.append("git: required worktree revision unavailable")
+            else:
+                epochs["git"] = git_rev
+        if not workstream_revision or not compiler_revision or not policy_revision:
+            gaps.append("snapshot: required workstream/compiler/policy revision unavailable")
     measurements_extra: dict[str, Any] = {}
 
     if use_cache:
@@ -534,24 +754,38 @@ def resolve_context(
                         "qmd_status": qmd_status,
                     }
                 )
-                for i, hit in enumerate(hits):
-                    if not isinstance(hit, dict):
+                for hit in hits:
+                    # QMD scores, preview text, and index timestamps are not
+                    # source revisions. A locally scoped, exact original must
+                    # be available and confirm the quoted hit.
+                    if not isinstance(hit, dict) or root is None:
                         continue
-                    loc = str(hit.get("path") or hit.get("file") or hit.get("id") or f"hit:{i}")
-                    ver = str(hit.get("version") or hit.get("score") or "unknown")
-                    evidence.append(
-                        EvidenceRef(
-                            source_id=f"qmd:{loc}",
-                            source_version=ver,
-                            locator=loc,
-                            trust_class="index_hit",
-                            observed_at=_now_iso(),
-                            excerpt=str(hit.get("snippet") or hit.get("text") or hit.get("raw_preview") or "")[:400]
-                            or None,
-                            note="QMD lexical/docs retrieval; evidence is not execution authority",
-                        )
-                    )
+                    loc = hit.get("path") or hit.get("file")
+                    if not isinstance(loc, str) or not loc:
+                        continue
+                    try:
+                        source = (root / loc).resolve()
+                        source.relative_to(root)
+                    except (OSError, ValueError):
+                        continue
+                    data = _read_verified_bytes(source)
+                    if data is None:
+                        continue
+                    source_text = data.decode("utf-8", errors="replace")
+                    indexed = hit.get("snippet") or hit.get("text")
+                    if not isinstance(indexed, str) or not indexed or indexed not in source_text:
+                        continue
+                    evidence.append(EvidenceRef(
+                        source_id=f"file:{source}",
+                        source_version=_source_version_from_bytes(data),
+                        locator=str(source),
+                        trust_class="index_hit",
+                        observed_at=_now_iso(),
+                        excerpt=indexed[:400],
+                        note="QMD hit verified against same source bytes; no score-as-version",
+                    ))
                     satisfied = True
+
             if not satisfied and need.required:
                 gaps.append(
                     f"{need.id}: no retrieval hits for {need.description!r} "
@@ -599,6 +833,19 @@ def resolve_context(
         hardware_profile=os.environ.get("Z0INT_HW_PROFILE", "local"),
     )
 
+    snapshot = None
+    if request_scope is not None and workstream_revision and compiler_revision and policy_revision:
+        snapshot_sources = dict(epochs)
+        for ref in evidence:
+            snapshot_sources["evidence:" + _sha16(f"{ref.source_id}|{ref.locator}")] = ref.source_version
+        snapshot = MemorySnapshot.build(
+            scope=request_scope,
+            state_revision=workstream_revision,
+            source_revisions=snapshot_sources,
+            policy_revision=policy_revision,
+            ontology_revision=compiler_revision,
+        )
+
     packet = ContextPacket(
         task_id=task_id,
         needs=need_list,
@@ -606,8 +853,10 @@ def resolve_context(
         contradictions=contradictions,
         unresolved_gaps=gaps,
         recipe=recipe,
+        memory_snapshot=snapshot,
         measurements={
             "wall_ms": (time.perf_counter() - t0) * 1000.0,
+            "scope_admitted": "unscoped" if request_scope is None else not excluded,
             "fff_status": fff_status,
             "fff_hits": fff_hits,
             "fff_wall_ms": fff_wall_ms,

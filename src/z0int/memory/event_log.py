@@ -7,14 +7,6 @@ The index may be rebuilt freely. The event file is never rewritten by this
 module. A malformed committed line fails closed. An incomplete trailing write
 is ignored by readers but blocks further append until an operator repairs or
 copies the log, avoiding silent history mutation.
-
-Source-derived events enter through ``append(identity=EventIdentity)``, the one
-canonical ingestion path (z0int#23): idempotent on ``event_uid`` (an exact
-duplicate is a no-op, a changed ``payload_hash`` is a conflict), references and
-locators only for harness transcript sources, and off until the owner confirms
-(``Z0INT_MEMORY_SOURCE_INGEST=references`` or ``eventlog_source_ingest`` in
-``$Z0INT_HOME/config/memory.json``). A read-only log (the worker-facing view)
-refuses every write.
 """
 
 from __future__ import annotations
@@ -43,8 +35,21 @@ HARNESS_TRANSCRIPT_SOURCES = frozenset({
     "claude", "claude-code", "codex", "grok", "hermes", "omp", "omo", "dsh", "deepseek-harness", "chatgpt",
     "kimi", "gemini", "cursor", "opencode", "antigravity-cli",
 })
-BODY_FIELDS = frozenset({"body", "content", "text", "message", "prompt", "response", "thinking", "thinking_text",
-                         "output", "transcript", "command"})
+BODY_FIELDS = frozenset(
+    {
+        "body",
+        "content",
+        "text",
+        "message",
+        "prompt",
+        "response",
+        "thinking",
+        "thinking_text",
+        "output",
+        "transcript",
+        "command",
+    }
+)
 
 
 class EventLogCorruption(RuntimeError):
@@ -52,31 +57,35 @@ class EventLogCorruption(RuntimeError):
 
 
 class EventIdentityConflict(ValueError):
-    """The same source event (event_uid) arrived with a different payload_hash."""
+    """A source identity was replayed with a different hash or event payload."""
 
 
 class SourceIngestDisabled(PermissionError):
-    """Source-derived ingestion is off until the owner confirms references-only scope."""
+    """Identity-aware source ingestion is off until references-only is enabled."""
 
 
 def source_ingest_enabled() -> bool:
+    """Read the existing owner opt-in; never enable source ingestion implicitly."""
     if os.environ.get("Z0INT_MEMORY_SOURCE_INGEST") == "references":
         return True
     try:
-        cfg = json.loads((paths.home() / "config" / "memory.json").read_text(encoding="utf-8"))
+        config = json.loads((paths.home() / "config" / "memory.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
-    return isinstance(cfg, dict) and cfg.get("eventlog_source_ingest") == "references"
+    return isinstance(config, dict) and config.get("eventlog_source_ingest") == "references"
 
 
 def _body_keys(value: Any) -> set[str]:
     if isinstance(value, Mapping):
-        found = {str(k) for k in value if str(k).lower() in BODY_FIELDS}
-        for v in value.values():
-            found |= _body_keys(v)
+        found = {str(key) for key in value if str(key).lower() in BODY_FIELDS}
+        for child in value.values():
+            found |= _body_keys(child)
         return found
     if isinstance(value, (list, tuple)):
-        return set().union(*(_body_keys(v) for v in value)) if value else set()
+        found: set[str] = set()
+        for child in value:
+            found |= _body_keys(child)
+        return found
     return set()
 
 
@@ -96,8 +105,10 @@ class MemoryEvent:
     schema: str = SCHEMA
 
     def event_identity(self) -> EventIdentity | None:
-        """The source identity with this ledger's position as ``ledger_seq`` (never part of ``event_uid``)."""
-        return None if self.identity is None else EventIdentity(**self.identity, ledger_seq=self.event_id)
+        """Return stable source identity annotated with this ledger position."""
+        if self.identity is None:
+            return None
+        return EventIdentity(**self.identity, ledger_seq=self.event_id)
 
     def to_dict(self) -> dict[str, Any]:
         row: dict[str, Any] = {
@@ -183,17 +194,36 @@ def validate_event_dict(row: dict[str, Any]) -> None:
             raise EventLogCorruption("invalid blob checksum")
         if type(blob.get("bytes")) is not int or blob["bytes"] < 0:
             raise EventLogCorruption("invalid blob length")
-    ident = row.get("identity")
-    if ident is not None and (not isinstance(ident, dict) or not isinstance(ident.get("event_uid"), str)):
-        raise EventLogCorruption("invalid event identity")
+    identity = row.get("identity")
+    if identity is not None:
+        if not isinstance(identity, dict):
+            raise EventLogCorruption("invalid event identity")
+        try:
+            parsed_identity = EventIdentity(**identity)
+            derived_identity = EventIdentity.from_source(
+                source_system=parsed_identity.source_system,
+                source_session=parsed_identity.source_session,
+                source_event_id=parsed_identity.source_event_id,
+                source_seq=parsed_identity.source_seq,
+                payload_hash=parsed_identity.payload_hash,
+            )
+        except (TypeError, ValueError) as exc:
+            raise EventLogCorruption("invalid event identity") from exc
+        if parsed_identity.event_uid != derived_identity.event_uid:
+            raise EventLogCorruption("invalid event identity")
     expected = _checksum(_event_without_checksum(row))
     if row.get("checksum") != expected:
         raise EventLogCorruption("event checksum mismatch")
 
 
 class EventLog:
-    def __init__(self, root: Path | None = None, *, blob_threshold: int = BLOB_THRESHOLD_BYTES,
-                 read_only: bool = False):
+    def __init__(
+        self,
+        root: Path | None = None,
+        *,
+        blob_threshold: int = BLOB_THRESHOLD_BYTES,
+        read_only: bool = False,
+    ):
         base = Path(root) if root is not None else paths.home() / "memory"
         self.root = base
         self.events_path = base / "events.jsonl"
@@ -202,9 +232,10 @@ class EventLog:
         self.blobs_dir = base / "blobs"
         self.blob_threshold = max(1, int(blob_threshold))
         self.read_only = bool(read_only)
-        # event_uid -> (event_id, payload_hash, offset, length), in-process; reuse one EventLog to keep it warm
+        # event_uid -> (event_id, payload_hash, offset, byte length), warmed from
+        # the canonical event file and invalidated when its inode changes.
         self._uids: dict[str, tuple[int, str, int, int]] = {}
-        self._uids_at = (None, 0)  # (events.jsonl inode, offset) the uid map reflects
+        self._uids_at: tuple[int | None, int] = (None, 0)
         if not self.read_only:
             self._ensure_layout()
 
@@ -213,18 +244,22 @@ class EventLog:
             raise PermissionError("read-only view of the canonical ledger: workers cannot write it")
 
     def _identity_index_locked(self, events, committed_end: int) -> dict[str, tuple[int, str, int, int]]:
-        """Bring the uid map up to ``committed_end`` by reading only the bytes appended since last time."""
+        """Index source identities by reading only rows since the cached offset."""
         inode = os.fstat(events.fileno()).st_ino
         if self._uids_at[0] != inode or self._uids_at[1] > committed_end:
-            self._uids, self._uids_at = {}, (inode, 0)
+            self._uids = {}
+            self._uids_at = (inode, 0)
         events.seek(self._uids_at[1])
-        while (offset := events.tell()) < committed_end:
+        while events.tell() < committed_end:
+            offset = events.tell()
             raw = events.readline()
             row = self._decode_committed_line(raw)
-            ident = row.get("identity")
-            if ident:
-                self._uids.setdefault(ident["event_uid"],
-                                      (row["event_id"], str(ident.get("payload_hash")), offset, len(raw)))
+            identity = row.get("identity")
+            if identity:
+                self._uids.setdefault(
+                    identity["event_uid"],
+                    (row["event_id"], str(identity.get("payload_hash")), offset, len(raw)),
+                )
         self._uids_at = (inode, committed_end)
         return self._uids
 
@@ -450,32 +485,129 @@ class EventLog:
         ts: float | None = None,
         identity: EventIdentity | None = None,
     ) -> MemoryEvent:
+        """Append an ordinary event; native admission markers use claims API."""
+        self._writable()
+        if isinstance(payload, Mapping) and (
+            (event_type == "source.reference" and payload.get("native_source_validated") is True)
+            or (
+                event_type == "memory.claim"
+                and (payload.get("origin_trust") == "explicit_user" or "admission_method" in payload)
+            )
+        ):
+            raise ValueError("native user admission must go through admit_user_claim")
+        return self._append_event(
+            event_type,
+            payload,
+            source=source,
+            project=project,
+            session_id=session_id,
+            parent_event_ids=parent_event_ids,
+            ts=ts,
+            identity=identity,
+        )
+
+    def _append_admitted_user_event(
+        self,
+        event_type: str,
+        payload: Any,
+        *,
+        source: str,
+        project: str | None = None,
+        session_id: str | None = None,
+        parent_event_ids: tuple[int, ...] | list[int] = (),
+        ts: float | None = None,
+        identity: EventIdentity | None = None,
+    ) -> MemoryEvent:
+        """Internal writer used by admit_user_claim after native hydration validation."""
+        return self._append_event(
+            event_type,
+            payload,
+            source=source,
+            project=project,
+            session_id=session_id,
+            parent_event_ids=parent_event_ids,
+            ts=ts,
+            identity=identity,
+        )
+
+    def _append_event(
+        self,
+        event_type: str,
+        payload: Any,
+        *,
+        source: str,
+        project: str | None = None,
+        session_id: str | None = None,
+        parent_event_ids: tuple[int, ...] | list[int] = (),
+        ts: float | None = None,
+        identity: EventIdentity | None = None,
+    ) -> MemoryEvent:
+        """Shared write primitive. Callers enforce any domain admission policy."""
         self._writable()
         if not isinstance(event_type, str) or not _EVENT_TYPE.fullmatch(event_type):
             raise ValueError("invalid event_type")
         if not isinstance(source, str) or not source.strip() or len(source) > 512:
             raise ValueError("source must be nonempty text")
-        ident_row = None
+        identity_row = None
         if identity is not None:
+            derived_identity = EventIdentity.from_source(
+                source_system=identity.source_system,
+                source_session=identity.source_session,
+                source_event_id=identity.source_event_id,
+                source_seq=identity.source_seq,
+                payload_hash=identity.payload_hash,
+            )
+            if identity.event_uid != derived_identity.event_uid:
+                raise ValueError("event_uid does not match the source identity fields")
             if not source_ingest_enabled():
-                raise SourceIngestDisabled("source-derived ingestion is off until the owner confirms references-only")
+                raise SourceIngestDisabled(
+                    "source-derived ingestion is off until the owner confirms references-only"
+                )
+            if event_type == "source.reference" and (body := _body_keys(payload)):
+                raise ValueError(
+                    f"identity-bearing source references store references only: body field(s) {sorted(body)}"
+                )
             if identity.source_system in HARNESS_TRANSCRIPT_SOURCES and (body := _body_keys(payload)):
                 raise ValueError(f"references only for {identity.source_system}: body field(s) {sorted(body)}")
-            ident_row = {k: v for k, v in identity.to_dict().items() if k not in ("ledger_seq", "schema")}
+            identity_row = {
+                key: value
+                for key, value in identity.to_dict().items()
+                if key not in ("ledger_seq", "schema")
+            }
         payload_bytes = _canonical(payload)
 
         self.events_path.touch(mode=0o600, exist_ok=True)
         with self.events_path.open("r+b") as events:
             fcntl.flock(events, fcntl.LOCK_EX)
             event_id, committed_end = self._append_state_locked(events)
-            if ident_row is not None:
-                seen = self._identity_index_locked(events, committed_end).get(ident_row["event_uid"])
+            if identity_row is not None:
+                seen = self._identity_index_locked(events, committed_end).get(identity_row["event_uid"])
                 if seen is not None:
-                    if seen[1] != ident_row["payload_hash"]:
-                        raise EventIdentityConflict(f"{ident_row['event_uid']} already ingested with another payload_hash")
-                    events.seek(seen[2])  # the offset it was recorded at: no ledger scan
+                    if seen[1] != identity_row["payload_hash"]:
+                        raise EventIdentityConflict(
+                            f"{identity_row['event_uid']} already has another payload_hash"
+                        )
+                    events.seek(seen[2])
                     raw = events.read(seen[3])
-                    return MemoryEvent.from_dict(self._decode_committed_line(raw, expected_id=seen[0]))
+                    prior_row = self._decode_committed_line(raw, expected_id=seen[0])
+                    prior_event = MemoryEvent.from_dict(prior_row)
+                    prior_payload = (
+                        self.read_blob(prior_event.blob)
+                        if prior_event.blob is not None
+                        else prior_event.payload
+                    )
+                    if (
+                        prior_event.event_type != event_type
+                        or prior_event.source != source
+                        or prior_event.project != (str(project) if project is not None else None)
+                        or prior_event.session_id != (str(session_id) if session_id is not None else None)
+                        or prior_event.parent_event_ids != tuple(int(x) for x in parent_event_ids)
+                        or _canonical(prior_payload) != payload_bytes
+                    ):
+                        raise EventIdentityConflict(
+                            f"{identity_row['event_uid']} already has a different event payload"
+                        )
+                    return prior_event
             parents = tuple(int(x) for x in parent_event_ids)
             if any(x < 0 or x >= event_id for x in parents):
                 raise ValueError("parent_event_ids must reference earlier events")
@@ -501,8 +633,8 @@ class EventLog:
                 base["project"] = str(project)
             if session_id is not None:
                 base["session_id"] = str(session_id)
-            if ident_row is not None:
-                base["identity"] = ident_row
+            if identity_row is not None:
+                base["identity"] = identity_row
             base["checksum"] = _checksum(base)
             line = _canonical(base) + b"\n"
 
@@ -530,8 +662,13 @@ class EventLog:
                 last_offset=offset,
                 last_length=len(line),
             )
-            if ident_row is not None and self._uids_at[1] == offset:
-                self._uids[ident_row["event_uid"]] = (event_id, ident_row["payload_hash"], offset, len(line))
+            if identity_row is not None and self._uids_at[1] == offset:
+                self._uids[identity_row["event_uid"]] = (
+                    event_id,
+                    identity_row["payload_hash"],
+                    offset,
+                    len(line),
+                )
                 self._uids_at = (self._uids_at[0], offset + len(line))
             return MemoryEvent.from_dict(base)
 
@@ -542,21 +679,101 @@ class EventLog:
             idx.flush()
             os.fsync(idx.fileno())
 
-    def iter_events(self) -> Iterator[MemoryEvent]:
+    def _validate_complete_snapshot_state(
+        self,
+        events,
+        *,
+        event_count: int,
+        last_row: Mapping[str, Any] | None,
+        last_offset: int,
+        last_length: int,
+    ) -> None:
+        """Check the committed endpoint/count while the event file lock is held."""
+        try:
+            state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise EventLogCorruption("event state is missing, unreadable, or malformed") from exc
+        if not isinstance(state, dict) or state.get("schema") != STATE_SCHEMA:
+            raise EventLogCorruption("event state has an unsupported schema")
+        if (
+            type(state.get("next_event_id")) is not int
+            or type(state.get("end_offset")) is not int
+            or state["next_event_id"] < 0
+            or state["end_offset"] < 0
+        ):
+            raise EventLogCorruption("event state has invalid committed bounds")
+
+        actual_end = os.fstat(events.fileno()).st_size
+        if events.tell() != actual_end:
+            raise EventLogCorruption("event file changed during complete snapshot")
+        if state["next_event_id"] != event_count or state["end_offset"] != actual_end:
+            raise EventLogCorruption("event state does not match committed event count or endpoint")
+
+        last_fields = ("last_event_id", "last_offset", "last_length", "last_checksum")
+        if event_count == 0:
+            if any(field in state for field in last_fields):
+                raise EventLogCorruption("empty event state has a last-event record")
+            return
+        if last_row is None or any(field not in state for field in last_fields):
+            raise EventLogCorruption("event state is missing its last-event record")
+        if (
+            type(state.get("last_event_id")) is not int
+            or type(state.get("last_offset")) is not int
+            or type(state.get("last_length")) is not int
+            or state["last_event_id"] != event_count - 1
+            or state["last_offset"] != last_offset
+            or state["last_length"] != last_length
+            or state.get("last_checksum") != last_row.get("checksum")
+        ):
+            raise EventLogCorruption("event state last-event record does not match committed history")
+
+    def iter_events(self, *, require_complete: bool = False) -> Iterator[MemoryEvent]:
+        """Iterate committed events, optionally requiring a complete snapshot.
+
+        The default preserves recovery behavior for callers that intentionally
+        read the valid prefix after an interrupted append. Snapshot consumers
+        must set ``require_complete`` so an unterminated tail cannot be mistaken
+        for the whole canonical history.
+        """
         if not self.events_path.is_file():
+            if require_complete:
+                raise EventLogCorruption("event log is unavailable")
             return
         with self.events_path.open("rb") as fh:
             fcntl.flock(fh, fcntl.LOCK_SH)
             expected = 0
+            complete_events: list[MemoryEvent] = []
+            last_row: dict[str, Any] | None = None
+            last_offset = 0
+            last_length = 0
             while True:
+                offset = fh.tell()
                 raw = fh.readline()
                 if not raw:
                     break
                 if not raw.endswith(b"\n"):
+                    if require_complete:
+                        raise EventLogCorruption("incomplete trailing event")
                     break
                 row = self._decode_committed_line(raw, expected_id=expected)
+                event = MemoryEvent.from_dict(row)
+                last_row = row
+                last_offset = offset
+                last_length = len(raw)
                 expected += 1
-                yield MemoryEvent.from_dict(row)
+                if require_complete:
+                    complete_events.append(event)
+                else:
+                    yield event
+            if require_complete:
+                self._validate_complete_snapshot_state(
+                    fh,
+                    event_count=expected,
+                    last_row=last_row,
+                    last_offset=last_offset,
+                    last_length=last_length,
+                )
+                yield from complete_events
 
     def rebuild_index(self) -> int:
         """Rebuild derived offset/state files without mutating events.jsonl."""
@@ -582,6 +799,28 @@ class EventLog:
 
     def _index_rows(self) -> list[dict[str, Any]]:
         if not self.index_path.is_file():
+            if self.read_only:
+                if not self.events_path.is_file():
+                    return []
+                with self.events_path.open("rb") as events:
+                    rows: list[dict[str, Any]] = []
+                    expected = 0
+                    while True:
+                        raw = events.readline()
+                        if not raw:
+                            break
+                        if not raw.endswith(b"\n"):
+                            break
+                        row = self._decode_committed_line(raw, expected_id=expected)
+                        rows.append({
+                            "schema": INDEX_SCHEMA,
+                            "event_id": expected,
+                            "offset": events.tell() - len(raw),
+                            "length": len(raw),
+                            "checksum": row["checksum"],
+                        })
+                        expected += 1
+                return rows
             self.rebuild_index()
         try:
             rows = [
@@ -590,6 +829,8 @@ class EventLog:
                 if line.strip()
             ]
         except (OSError, json.JSONDecodeError):
+            if self.read_only:
+                raise EventLogCorruption("read-only event index is malformed or unavailable")
             self.rebuild_index()
             return self._index_rows()
         if any(
@@ -598,6 +839,8 @@ class EventLog:
             or row.get("event_id") != i
             for i, row in enumerate(rows)
         ):
+            if self.read_only:
+                raise EventLogCorruption("read-only event index is stale")
             self.rebuild_index()
             return self._index_rows()
         return rows
@@ -605,16 +848,11 @@ class EventLog:
     def get(self, event_id: int, *, resolve_blob: bool = False) -> MemoryEvent:
         if type(event_id) is not int or event_id < 0:
             raise KeyError(event_id)
-        if self.read_only:  # a read-only view never repairs derived files; scan the canonical log instead
-            event = next((e for e in self.iter_events() if e.event_id == event_id), None)
-            if event is None:
-                raise KeyError(event_id)
-            if not resolve_blob or event.blob is None:
-                return event
-            return MemoryEvent(**{**event.__dict__, "payload": self.read_blob(event.blob)})
         rows = self._index_rows()
         if event_id >= len(rows):
             # Index may be stale after a crash between event fsync and index fsync.
+            if self.read_only:
+                raise KeyError(event_id)
             self.rebuild_index()
             rows = self._index_rows()
         if event_id >= len(rows):
@@ -625,6 +863,8 @@ class EventLog:
             raw = events.read(int(ref["length"]))
         row = self._decode_committed_line(raw, expected_id=event_id)
         if row["checksum"] != ref.get("checksum"):
+            if self.read_only:
+                raise EventLogCorruption("read-only event index checksum mismatch")
             self.rebuild_index()
             return self.get(event_id, resolve_blob=resolve_blob)
         event = MemoryEvent.from_dict(row)
@@ -656,7 +896,9 @@ class EventLog:
         return json.loads(raw)
 
     def verify(self) -> dict[str, Any]:
-        events = list(self.iter_events())
+        # Verification certifies the complete committed ledger, not merely the
+        # prefix that recovery readers intentionally expose after a truncation.
+        events = list(self.iter_events(require_complete=True))
         blobs = 0
         bytes_total = 0
         for event in events:
