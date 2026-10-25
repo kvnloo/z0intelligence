@@ -277,12 +277,17 @@ def rstep(s: RSt, ev: str, x: int = 0, session: bool = False) -> RSt:
 
 # O13: the caller validates compiled evidence and encodes full physical scopes.
 def option_limit(credited: bool, actual_scope: int, named_scope: int, measured: int) -> int:
-    return measured if credited and actual_scope == named_scope else 2
+    return measured if credited and actual_scope == named_scope else 0
 
 
 def option_capacity_allows(credited: bool, actual_scope: int, named_scope: int,
                            measured: int, count: int) -> bool:
     return count <= option_limit(credited, actual_scope, named_scope, measured)
+
+
+def option_risk_allows(risk: int) -> bool:
+    """Only read (0) and explicitly reversible mutation (1) have SLM authority."""
+    return type(risk) is int and risk in (0, 1)
 
 
 # =================================================================== classifiers

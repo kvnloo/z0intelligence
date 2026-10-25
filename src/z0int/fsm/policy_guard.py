@@ -176,29 +176,48 @@ def _capacity_scope(row):
     return scope
 
 
-def _allowed_k(policy, scope, now):
+def _allowed_k(policy, scope, now, risk=None):
+    if risk not in ('read', 'mutating_reversible'):
+        return 0
     if not all(isinstance(scope.get(key), str) and scope[key] for key in PHYSICAL_KEYS):
-        return 2
+        return 0
     key = json.dumps({key: scope[key] for key in PHYSICAL_KEYS}, sort_keys=True,
                      separators=(',', ':'), ensure_ascii=False)
     entries = (policy or {}).get('option_capacity', {})
-    entry = entries.get(key) if isinstance(entries, dict) else None
+    risks = entries.get(key) if isinstance(entries, dict) else None
+    entry = risks.get(risk) if isinstance(risks, dict) else None
     if not isinstance(entry, dict):
-        return 2
-    k, lower, bar = entry.get('allowed_k'), entry.get('wilson_lower'), entry.get('bar')
+        return 0
+    k, lower, bar = entry.get('allowed_k'), entry.get('wilson_lower'), entry.get('bar_derived')
+    inputs = entry.get('inputs')
     if (type(k) is not int or k < 2 or not isinstance(lower, (int, float))
-            or isinstance(lower, bool) or not math.isfinite(lower)
+            or isinstance(lower, bool) or not math.isfinite(lower) or not 0 <= lower <= 1
             or not isinstance(bar, (int, float)) or isinstance(bar, bool)
-            or not math.isfinite(bar) or not 0 <= bar <= lower <= 1
+            or not math.isfinite(bar) or lower <= bar
+            or not isinstance(inputs, dict) or inputs.get('blocked') is True
+            or inputs.get('status') not in ('measured', 'unmeasured')
+            or type(inputs.get('measured')) is not bool
+            or inputs['measured'] != (inputs['status'] == 'measured')
             or not isinstance(entry.get('finding_ids'), list) or not entry['finding_ids']
             or not all(isinstance(x, str) and x for x in entry['finding_ids'])
             or not isinstance(entry.get('task'), list) or not entry['task']
             or not all(isinstance(x, str) and x for x in entry['task'])):
-        return 2
+        return 0
+    costs = [inputs.get(name) for name in
+             ('cost_call', 'cost_frontier', 'cost_error', 'abstain_rate')]
+    if any(isinstance(value, bool) or not isinstance(value, (int, float))
+           or not math.isfinite(value) for value in costs):
+        return 0
+    call, frontier, error, abstain = costs
+    if call < 0 or frontier <= 0 or error <= 0 or not 0 <= abstain <= 1:
+        return 0
+    expected = 1 - ((1 - abstain) * frontier - call) / error
+    if not math.isfinite(expected) or not math.isclose(bar, expected, rel_tol=1e-12, abs_tol=1e-12):
+        return 0
     try:
-        return k if timestamp(entry.get('expires_at')) > now else 2
+        return k if timestamp(entry.get('expires_at')) > now else 0
     except (ValueError, TypeError, OverflowError):
-        return 2
+        return 0
 
 
 def _bound_refusal(row):
@@ -303,7 +322,8 @@ def audit(receipts: str | None, policy_path: Path | None, since: str,
         if _bound_refusal(row):
             return
         scope = _capacity_scope(row)
-        allowed = _allowed_k(policy, scope, now)
+        risk = row.get('risk_class')
+        allowed = _allowed_k(policy, scope, now, risk)
         k = row.get('option_count')
         invalid = type(k) is not int or k < 0
         if not invalid and option_capacity_allows(True, 0, 0, allowed, k):

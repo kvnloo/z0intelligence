@@ -435,26 +435,26 @@ law o13_option_capacity:
   for w: T(O.option_capacity_allows(credited, actual, named, measured, count))
   T(Bool.not(Nat.is_gt(count, O.option_limit(credited, actual, named, measured))))
 
-law o13_default_two:
+law o13_default_zero:
   for actual: Nat
   for named: Nat
   for measured: Nat
-  {O.option_limit(False{}, actual, named, measured) == 2n : Nat}
+  {O.option_limit(False{}, actual, named, measured) == 0n : Nat}
 
 law o13_exact_scope:
   for +actual: Nat
   for +named: Nat
   for measured: Nat
   for w: T(Bool.not(Nat.is_eq(actual, named)))
-  {O.option_limit(True{}, actual, named, measured) == 2n : Nat}
+  {O.option_limit(True{}, actual, named, measured) == 0n : Nat}
 
 law o13_credited_limit:
   for +scope: Nat
   for +measured: Nat
   {O.option_limit(True{}, scope, scope, measured) == measured : Nat}
 
-law o13_k2_passes:
-  {O.option_capacity_allows(False{}, 0n, 0n, 119n, 2n) == True{} : Bool}
+law o13_k2_rejected:
+  {O.option_capacity_allows(False{}, 0n, 0n, 119n, 2n) == False{} : Bool}
 
 law o13_k24_rejected:
   {O.option_capacity_allows(False{}, 0n, 0n, 24n, 24n) == False{} : Bool}
@@ -464,3 +464,15 @@ law o13_k119_rejected:
 
 law o13_credited_excess_rejected:
   {O.option_capacity_allows(True{}, 0n, 0n, 3n, 4n) == False{} : Bool}
+
+law o13_destructive_never:
+  {O.option_risk_allows(2n) == False{} : Bool}
+
+law o13_unknown_never:
+  {O.option_risk_allows(3n) == False{} : Bool}
+
+law o13_read_authority:
+  {O.option_risk_allows(0n) == True{} : Bool}
+
+law o13_reversible_authority:
+  {O.option_risk_allows(1n) == True{} : Bool}

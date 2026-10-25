@@ -72,7 +72,7 @@ command, git ref update, adb dump or config line becomes those inputs is classif
 | O10 | Phones receive all CPU/GPU and 100% RAM. Agent-selected phone resource caps are forbidden. Battery minima at or below 2% are allowed. Higher minima, including inherited health defaults, are forbidden. Explicit owner pause/call, reachability, capability, timeout and cleanup remain. | `z0-guard phone-caps --root ROOT` | enforce |
 | O11 | A non-frontier route must have current policy stage canary or live that names this family and the full selected arm. | `z0-guard policy` | audit, exit 3 on violations |
 | O12 | A healthy live arm requires offload. Frontier/Jev fallback requires a recorded confidence below the policy threshold. | `z0-guard policy` | audit, exit 3 on violations |
-| O13 | Shadow/canary/live requests and configured arms/families cannot exceed their exact-scope measured option capacity. No valid compiled capacity means two options. | `z0-guard policy` | audit, exit 3 with offending IDs |
+| O13 | Shadow/canary/live requests and configured arms/families require exact-scope, risk-specific option capacity. Default zero; destructive never SLM. | `z0-guard policy` | audit, exit 3 with offending IDs |
 
 Switch a gate: `Z0_GUARD_O<n>=off|report|enforce` in the environment, or
 `~/.config/z0-guard/modes.json` (`{"O3": "enforce"}`). `z0-guard modes` prints the effective modes.
@@ -177,10 +177,16 @@ does not establish abstention.
 
 O13 reads only the compiled policy's `option_capacity` map. Keys are canonical
 sorted compact UTF-8 JSON of exactly `model`, `quant`, `engine`, `backend`,
-`device`. A value grants `allowed_k` only when it has nonempty `finding_ids`
-and measured `task` names, finite `wilson_lower >= bar`, and a future
-`expires_at`. Missing, invalid, expired or differently scoped capacity defaults
-to **2**. The findings ledger cannot grant capacity to the guard.
+`device`. Each scope maps risk classes to entries: `read` and
+`mutating_reversible` may earn capacity; `destructive`, missing and unknown
+`risk_class` never authorize SLM requests. Entries require nonempty `finding_ids`
+and measured `task` names, finite `wilson_lower > bar_derived`, valid cost inputs,
+and a future `expires_at`. The guard recomputes the strict expected-cost threshold
+`1 - ((1 - abstain_rate) * cost_frontier - cost_call) / cost_error`;
+the threshold can be negative or greater than one. Explicit conservative
+`unmeasured` defaults are permitted; blocked inputs are not.
+Missing, invalid, expired or differently scoped/risk capacity defaults to **0**.
+The findings ledger cannot grant capacity to the guard.
 
 The audit checks actual `option_count` in shadow/canary/live receipts, including
 each model inside today's `shadow[]` envelopes (not the root's full legal
@@ -243,9 +249,10 @@ evidence as unavailable. Static violations return 3.
 The Bend model names full arm identities and families with natural identifiers.
 O11 proves stage and both identity constraints. O12 proves healthy live fallback
 requires abstention, with positive laws for unhealthy and abstained fallback.
-O13 proves the hard capacity bound, default two, exact-scope credit, valid
-boundary admission, and rejection of the observed 24/119-option shapes.
-See `bend/ops_fsm/README.md` for the MBP proof, 63-mutant and parity commands.
+O13 proves the hard capacity bound, default zero, exact-scope credit, and
+rejection of binary/24/119-option requests without credit. Separate risk laws
+deny destructive and unknown authority and admit read/reversible classifications.
+See `bend/ops_fsm/README.md` for MBP proof, mutation and parity commands.
 
 ### Synthetic evidence isolation
 

@@ -399,22 +399,25 @@ def rehash(doc):
 def capacity(doc, allowed_k=24, **changes):
     scope = {key: ARM[key] for key in P.PHYSICAL_KEYS}
     key = json.dumps(scope, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
-    doc['option_capacity'] = {key: {'allowed_k': allowed_k, 'finding_ids': ['capacity-cell'],
-        'wilson_lower': .97, 'task': ['T1', 'T2'], 'bar': .95,
-        'expires_at': '2026-10-25T12:00:00Z', **changes}}
+    doc['option_capacity'] = {key: {'read': {'allowed_k': allowed_k, 'finding_ids': ['capacity-cell'],
+        'wilson_lower': .97, 'task': ['T1', 'T2'], 'bar_derived': .95,
+        'inputs': {'measured': False, 'status': 'unmeasured', 'cost_call': 0,
+                   'cost_frontier': 1, 'cost_error': 20, 'abstain_rate': 0,
+                   'finding_ids': []},
+        'expires_at': '2026-10-25T12:00:00Z', **changes}}}
     return rehash(doc)
 
 
 @pytest.mark.parametrize('stage', ['shadow', 'canary', 'live'])
-@pytest.mark.parametrize('k,expected', [(119, 1), (24, 1), (2, 0)])
-def test_o13_all_request_stages_use_default_two(tmp_path, stage, k, expected):
+@pytest.mark.parametrize('k,expected', [(119, 1), (24, 1), (2, 1)])
+def test_o13_all_request_stages_use_default_zero(tmp_path, stage, k, expected):
     doc = policy(stage)
     report, findings = audit(tmp_path, doc, [receipt(doc, id='request-1', option_count=k)])
     assert report['counts']['o13_option_capacity'] == expected
     bad = [f for f in findings if f['rule'] == 'o13_option_capacity']
     assert [f['id'] for f in bad] == (['request-1'] if expected else [])
     if bad:
-        assert bad[0]['allowed_k'] == 2
+        assert bad[0]['allowed_k'] == 0
         assert bad[0]['option_count'] == k
 
 
@@ -423,14 +426,14 @@ def test_o13_todays_nested_shadow_receipt_shapes(tmp_path):
             (Path(__file__).parent / 'fixtures/policy-guard/o13-shadow.jsonl').read_text().splitlines()]
     report, findings = audit(tmp_path, policy(), rows)
     assert report['available']
-    assert report['counts']['o13_option_capacity'] == 2
-    assert [f['option_count'] for f in findings] == [119, 24]
-    assert all(f['id'].startswith(('synthetic-full-catalogue-119:', 'synthetic-projection-24:'))
+    assert report['counts']['o13_option_capacity'] == 3
+    assert [f['option_count'] for f in findings] == [119, 24, 2]
+    assert all(f['id'].startswith(('synthetic-full-catalogue-119:', 'synthetic-projection-24:', 'synthetic-binary-2:'))
                for f in findings)
     clean, findings = audit(tmp_path, policy(), rows[-1:])
     assert clean['available']
-    assert not any(clean['counts'].values())
-    assert not findings
+    assert clean['counts']['o13_option_capacity'] == 1
+    assert len(findings) == 1
 
 
 @pytest.mark.parametrize('field', P.PHYSICAL_KEYS)
@@ -440,22 +443,53 @@ def test_o13_capacity_credit_cannot_generalize_any_scope_dimension(tmp_path, fie
     row['selected_arm'][field] = 'different'
     report, findings = audit(tmp_path, doc, [row])
     assert report['counts']['o13_option_capacity'] == 1
-    assert next(f for f in findings if f['rule'] == 'o13_option_capacity')['allowed_k'] == 2
+    assert next(f for f in findings if f['rule'] == 'o13_option_capacity')['allowed_k'] == 0
 
 
 @pytest.mark.parametrize('changes', [
     {}, {'allowed_k': 24.0}, {'allowed_k': True}, {'finding_ids': []},
     {'finding_ids': [None]}, {'task': []}, {'task': ['']}, {'wilson_lower': .94},
-    {'wilson_lower': True}, {'bar': None}, {'bar': False},
+    {'wilson_lower': True}, {'bar_derived': None}, {'bar_derived': False},
     {'expires_at': '2026-10-24T11:59:59Z'}, {'expires_at': 'invalid'},
 ])
 def test_o13_only_valid_unexpired_compiled_capacity_credits(tmp_path, changes):
     doc = capacity(policy('canary'), **changes)
-    report, findings = audit(tmp_path, doc, [receipt(doc, option_count=24)])
+    report, findings = audit(tmp_path, doc, [receipt(doc, option_count=24, risk_class='read')])
     assert report['counts']['o13_option_capacity'] == int(bool(changes))
     assert report['available']
     if not changes:
         assert not findings
+
+
+@pytest.mark.parametrize('risk', [None, 'write', 'destructive', 'unknown', 'mutating_reversible'])
+def test_o13_read_credit_never_transfers_risk(tmp_path, risk):
+    doc = capacity(policy('canary'))
+    report, _ = audit(tmp_path, doc, [receipt(doc, option_count=2, risk_class=risk)])
+    assert report['counts']['o13_option_capacity'] == 1
+
+
+@pytest.mark.parametrize('bar,lower,expected', [(-1, .01, 24), (1.1, 1, 0), (.95, .95, 0)])
+def test_o13_strict_unclamped_cost_threshold(bar, lower, expected):
+    inputs = {'cost_call': 0, 'cost_frontier': 1 - bar if bar < 1 else 1,
+              'cost_error': 1, 'abstain_rate': 0,
+              'status': 'unmeasured', 'measured': False, 'finding_ids': []}
+    if bar > 1:
+        inputs['cost_call'] = bar
+    doc = capacity(policy('canary'), bar_derived=bar, wilson_lower=lower, inputs=inputs)
+    scope = {key: ARM[key] for key in P.PHYSICAL_KEYS}
+    assert P._allowed_k(doc, scope, NOW, 'read') == expected
+
+
+@pytest.mark.parametrize('inputs', [
+    {'blocked': True},
+    {'measured': True, 'status': 'unmeasured'},
+    {'cost_call': 0, 'cost_frontier': 1, 'cost_error': 0, 'abstain_rate': 0,
+     'measured': False, 'status': 'unmeasured'},
+])
+def test_o13_invalid_cost_authority_fails_closed(inputs):
+    doc = capacity(policy('canary'), inputs=inputs)
+    scope = {key: ARM[key] for key in P.PHYSICAL_KEYS}
+    assert P._allowed_k(doc, scope, NOW, 'read') == 0
 
 
 @pytest.mark.parametrize('value', [None, True, '24', 2.5, -1])
@@ -504,7 +538,7 @@ def test_o13_configured_arms_are_audited_even_without_receipts(tmp_path, relativ
     assert report['counts']['o13_option_capacity'] == 1
     assert findings[0]['id']
     assert findings[0]['path'] == str(target)
-    assert findings[0]['allowed_k'] == 2
+    assert findings[0]['allowed_k'] == 0
 
 
 def test_o13_projection_config_pairs_each_serving_endpoint(tmp_path):

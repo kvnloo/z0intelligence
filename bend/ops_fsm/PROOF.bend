@@ -578,13 +578,13 @@ def Laws.o12_abstain_can_fallback(family, arm):
 def Laws.o13_option_capacity(credited, actual, named, measured, count, w):
   w
 
-def Laws.o13_default_two(actual, named, measured):
+def Laws.o13_default_zero(actual, named, measured):
   {==}
 
-def option_mismatch(eq: Bool, measured: Nat, w: Laws.T(Bool.not(eq))) -> {O.option_limit_by(eq, measured) == 2n : Nat}:
+def option_mismatch(eq: Bool, measured: Nat, w: Laws.T(Bool.not(eq))) -> {O.option_limit_by(eq, measured) == 0n : Nat}:
   match eq:
     case True{}:
-      Empty.absurd({measured == 2n : Nat}, w)
+      Empty.absurd({measured == 0n : Nat}, w)
     case False{}:
       {==}
 
@@ -596,12 +596,12 @@ def option_same(eq: Bool, +measured: Nat, w: Laws.T(eq)) -> {O.option_limit_by(e
     case True{}:
       {==}
     case False{}:
-      Empty.absurd({2n == measured : Nat}, w)
+      Empty.absurd({0n == measured : Nat}, w)
 
 def Laws.o13_credited_limit(scope, measured):
   option_same(Nat.is_eq(scope, scope), measured, eq_refl(scope))
 
-def Laws.o13_k2_passes():
+def Laws.o13_k2_rejected():
   {==}
 
 def Laws.o13_k24_rejected():
@@ -611,4 +611,16 @@ def Laws.o13_k119_rejected():
   {==}
 
 def Laws.o13_credited_excess_rejected():
+  {==}
+
+def Laws.o13_destructive_never():
+  {==}
+
+def Laws.o13_unknown_never():
+  {==}
+
+def Laws.o13_read_authority():
+  {==}
+
+def Laws.o13_reversible_authority():
   {==}

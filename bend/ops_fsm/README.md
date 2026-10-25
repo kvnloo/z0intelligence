@@ -5,9 +5,9 @@ functions with proven laws. The gates that use them are documented in `docs/fsm/
 
 ```
 ops.bend       decision functions and the O8/O9 machines (constructors are prefixed: names are global)
-LAWS.bend      52 claims under O1-O13 (the owner's spec; do not weaken to pass)
+LAWS.bend      56 claims under O1-O13 (the owner's spec; do not weaken to pass)
 PROOF.bend     proofs (hand-written; no generator)
-mutations.py   63 broken variants of ops.bend; each must make PROOF.bend fail
+mutations.py   65 broken variants of ops.bend; each must make PROOF.bend fail
 receipt.json   `hermes bend verify` receipt
 ```
 
@@ -22,10 +22,12 @@ python3 bend/ops_fsm/mutations.py --verdict --out /tmp/ops-mutations.json
 PYTHONPATH=src python3 -m pytest -q tests/test_fsm_ops.py -k parity
 ```
 
-Require `ALL PROOFS CHECK`, a passing unmodified reference, **63/63 mutants
+Require `ALL PROOFS CHECK`, a passing unmodified reference, **65/65 mutants
 rejected**, and both parity tests passed (not skipped). Five mutants cover O10,
-nine cover O11/O12 and eight cover O13. Policy mutants preserve expression
-types; rejection must occur in a proof, not because a mutant fails to parse.
+nine cover O11/O12. The risk-capacity revision adds two O13 risk mutants
+and changes absent evidence from binary capacity to zero capacity.
+Policy mutants preserve expression types; rejection must occur in a proof,
+not because a mutant fails to parse.
 
 | law | claims (Bend names) |
 | --- | --- |
@@ -41,7 +43,7 @@ types; rejection must occur in a proof, not because a mutant fails to parse.
 | O10 | `o10_phone_no_agent_resource_caps`, `o10_phone_placement_no_agent_resource_caps` |
 | O11 | `o11_evidence_bound_route`, `o11_named_family`, `o11_named_arm`, `o11_none_not_credited`, `o11_shadow_not_credited`, `o11_canary_routes`, `o11_live_routes` |
 | O12 | `o12_offload_obligation`, `o12_unhealthy_can_fallback`, `o12_abstain_can_fallback` |
-| O13 | `o13_option_capacity`, `o13_default_two`, `o13_exact_scope`, `o13_credited_limit`, `o13_k2_passes`, `o13_k24_rejected`, `o13_k119_rejected`, `o13_credited_excess_rejected` |
+| O13 | `o13_option_capacity`, `o13_default_zero`, `o13_exact_scope`, `o13_credited_limit`, `o13_k2_rejected`, `o13_k24_rejected`, `o13_k119_rejected`, `o13_credited_excess_rejected`, `o13_destructive_never`, `o13_unknown_never`, `o13_read_authority`, `o13_reversible_authority` |
 
 Bend notes from this plane: a law hypothesis of a `Data` type used twice needs a `+` rebind in
 the proof (`+ok2 = ok`); a decision function may not `match` a computed value (give it a
