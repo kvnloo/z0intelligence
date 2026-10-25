@@ -1,0 +1,1 @@
+{"schema":"z0.incident.v1","id":"ctx-latency","status":"open","metric":"ctx.p95","units":"seconds","lower":0,"upper":5,"opened_at":0,"mitigations":["lease-1"],"observations":[{"metric":"ctx.p95","units":"seconds","at":1,"value":4},{"metric":"ctx.p95","units":"seconds","at":86401,"value":4}]}
