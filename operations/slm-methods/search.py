@@ -34,8 +34,6 @@ def main():
     db=sqlite3.connect('file:'+args.db+'?mode=ro',uri=True);db.row_factory=sqlite3.Row
     rows=[r for r in frozen_sample(db,args.manifest,args.n) if r['family']=='omp.tool']
     contexts=reconstruct('/home/kvn/.omp/agent/sessions',[(r['session'],r['call']) for r in rows])
-    if len(contexts)!=len(rows):
-        raise RuntimeError('missing exact native contexts; refusing history-only substitution')
     cutoff=min(row['ts'] for row in rows)
     all_rows=list(db.execute("SELECT id,ts,action,features FROM labels WHERE family='omp.tool' AND ts<? ORDER BY ts,id",(cutoff,)))
     training=[{'label':r['action'],'features':json.loads(r['features'])} for r in all_rows]
@@ -44,8 +42,9 @@ def main():
     groups={count:cluster_tools(training,count) for count in (3,5,8)}
     prepared=[]
     for row in rows:
-        context=dict(contexts[(row['session'],row['call'])]);context['task']='Predict next tool'
-        prepared.append((row,groups,json.dumps(context)))
+        native_context=contexts.get((row['session'],row['call']))
+        context=dict(native_context,task='Predict next tool') if native_context is not None else None
+        prepared.append((row,groups,json.dumps(context) if context is not None else None))
     models=['qwen3-0.6b-q8']
     with urllib.request.urlopen('http://100.113.138.100:11530/models') as response:
         served=json.load(response)
@@ -79,6 +78,8 @@ def main():
                     return chat
                 started=time.monotonic()
                 try:
+                    if prompt is None:
+                        raise ValueError('exact_native_context_unavailable')
                     answer=pipeline(prompt,groups,chat_for(models[0]),chat_for(last_model),first=first,final=final,margin=margin,
                                     seed=random.Random(row['id']).randrange(2**31))
                     error=None
