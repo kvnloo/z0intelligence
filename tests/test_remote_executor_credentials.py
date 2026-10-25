@@ -38,3 +38,21 @@ def test_subscription_execute_checks_credentials_not_null_env(monkeypatch):
     monkeypatch.setattr(remote, 'execute_plan', lambda *a, **k: {'ok': True})
     assert remote.execute(args)['ok'] is True
     credential.assert_called_once_with('openai-codex', config)
+
+
+@pytest.mark.parametrize('authorized', [True, False])
+def test_authority_requires_explicit_subscription_route(monkeypatch, authorized):
+    from z0int import dispatch_authority
+    config = {'auth': 'omp-oauth', 'api_key_env': None}
+    policy = {'paid_canary': {'routes': [
+        {'provider': 'openai-codex', 'model': 'gpt-6-luna'}] if authorized else []}}
+    monkeypatch.setattr(worker_routing, 'configuration', lambda: (policy, {'openai-codex': config}))
+    monkeypatch.setattr(worker_routing, 'explicit_plan', lambda *a: {})
+    request = dict(harness='omp', trace_id='fixture', function='cheap_bounded_worker',
+                   parent_agent='fixture', task='Public fixture', provider='openai-codex',
+                   model='gpt-6-luna', reason='fixture', max_tokens=20)
+    if authorized:
+        assert dispatch_authority.validate_remote(request)[1] is policy
+    else:
+        with pytest.raises(ValueError, match='explicitly authorized'):
+            dispatch_authority.validate_remote(request)

@@ -105,8 +105,15 @@ def validate_remote(request, *, enforce_free=False):
     policy,providers=configuration()
     plan=explicit_plan(worker,policy,providers)
     config=providers[request['provider']]
-    if config.get('auth','environment')!='environment' or not isinstance(config.get('api_key_env'),str) or not config['base_url'].startswith('https://'):
-        raise ValueError('Only remote environment-credential providers are supported')
+    subscription = (config.get('auth') == 'omp-oauth'
+                    and request['provider'] in ('openai-codex', 'anthropic')
+                    and any(route.get('provider') == request['provider'] and route.get('model') == request['model']
+                            for route in policy.get('paid_canary', {}).get('routes', [])))
+    environment = (config.get('auth', 'environment') == 'environment'
+                   and isinstance(config.get('api_key_env'), str)
+                   and config.get('base_url', '').startswith('https://'))
+    if not (subscription or environment):
+        raise ValueError('Only HTTPS environment credentials or explicitly authorized OMP subscription routes are supported')
     if enforce_free:
         from .worker_routing import require_free_route
         require_free_route(policy,request['provider'],request['model'],request)
