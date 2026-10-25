@@ -271,3 +271,90 @@ findings with rule `synthetic-evidence-outside-tmp`. These findings increment
 - Parity: `python -m z0int.fsm.ops_parity` (MBP with the supplied Bend toolchain).
 - Incident replay: `python -m z0int.fsm.ops_replay tests/fixtures/ops_tapes/*.json`.
 - Tests: `tests/test_fsm_ops.py` (MBP via fleet-build; the two parity tests need Bend).
+
+## R1 raw-mitigation pre-tool audit (opt-in, report-only)
+
+`omp-extensions/root-cause/index.ts` registers OMP `tool_call`, not a
+`pre_tool_call` event. It returns only `additionalContext` for findings containing
+“use z0-guard mitigate”; it never returns `block`, rewrites input, executes a
+command, applies a lease, or touches a target. No extension/config activation is
+part of this change. Run its behavioral suite on MBP:
+`bun test omp-extensions/root-cause/rule.test.ts`.
+
+API discovery on 2026-10-24: the installed executable resolved to
+`/home/kvn/.local/share/tern/omp/bin/omp`; its embedded user-agent identifies
+18.12.6. Inspection of its embedded `async emitToolCall` implementation shows
+handlers registered under `tool_call`, early return on truthy `block`, accumulation
+of `additionalContext` and `input`, and conversion of handler errors/timeouts into
+`block: true`. Therefore this report-only handler catches its own synchronous
+audit failures and performs no awaited I/O. This is source inspection, not a live
+hook execution test. The checkout comparator
+`/home/kvn/tmp/oh-my-pi/packages/coding-agent/src/extensibility/extensions/types.ts`
+likewise declares `type: "tool_call"`, `toolName`, `toolCallId`, and `input`
+(lines 919–967). Do not substitute a Codex permission JSON contract.
+
+The pure `auditTool(toolName, input, ownership?)` API reports `systemctl
+set-property`, resource-file redirection/tee/copy/dd, direct file-tool writes to
+`io.max`/`memory.max`, priority changes, and kill/pkill/killall with foreign or
+unverified ownership. Priority changes are conservatively reported even when
+service ownership is unknown. Host-supplied exact `ownedPids`/`ownedPatterns`
+may identify an owned cleanup; caller-supplied tool arguments never establish
+ownership. OMP currently supplies no ownership registry, so unknown targets
+report rather than being silently treated as owned. Read-only probes are not
+findings. The lexical scanner handles ordinary command lists, wrappers and
+shell `-c` arguments, but is not a shell interpreter or security sandbox:
+dynamic expansion, scripts, interpreter code and indirect paths require their
+own audit boundary. Report mode must not be cited as prevention.
+
+### Hermes `hooks.pre_tool_call` integration contract
+
+This is the adapter contract to implement against the deployed Hermes version,
+not a claim that a Hermes hook has been installed or its native callback
+signature verified. Normalize the native event to `{toolName, input}` (mapping
+Hermes `terminal` to the accepted terminal tool name); call the same pure rule
+before executing the tool. Deliver each finding as **advisory context** with
+`law=R1`, `mode=report-only`, `kind`, and `message`. Preserve all native input and
+the normal execution result; do not set deny/block, return a refusal exit code,
+or invoke `z0-guard mitigate` automatically. Errors must remain advisory in
+report-only mode. Ownership must come from a trusted harness process registry,
+never from the model's tool payload. A future Hermes adapter must test these
+semantics against its native `hooks.pre_tool_call` callback contract before
+activation. Switching either harness to enforcement requires separate approval.
+
+
+### Read-only root-cause operational evidence (2026-10-25 UTC)
+
+The private operations receipts are under
+`/mnt/zer0models/workspace/zer0/data/operations/state-laws/`.
+`root-cause-live-20261025.json` records the bounded ctx search/status timeouts,
+failed refresh freshness, unavailable raw-inventory deadline, and failed
+AgentsView sync. A timeout is unavailable evidence, not proof of an absent index.
+`agentsview-search-live-20261025.json` records the separate bounded search.
+No indexer or full raw-history census was restarted for this continuation.
+
+`user-control-20261025.json` inventories eight remaining legacy resource drop-ins
+as UN-LEASED. In particular, the Oct-19 ctx memory controls remain at High 4 GiB,
+Max 5 GiB and SwapMax 2 GiB. The current systemd sample reports 4,699,049,984
+bytes charged, above High; cgroup memory PSI full averages are 59.30/59.40/59.94
+percent over 10/60/300 seconds. These observations support escalation of sustained
+MemoryHigh pressure, not authority to alter limits. No ctx limit was changed.
+
+The Hermes manual ctx repair receipt was imported into
+`~/.local/state/z0-guard/root-cause/mitigations/ctx-repair-20261024.json`.
+The original censored string baseline is retained in the derived sibling
+`operations/unified-memory/ctx-repair-20261024/lease-typed.json`, alongside its
+original receipt SHA and explicit `>=`, censored=true metadata; 200 seconds is a
+lower bound, not an exact latency. Artifact hashes were checked by the importer.
+Import returned `imported:true`, `guard_applied:false`, `executed:false`,
+`decision:escalate`: the immediate functional probe failed and the manual change
+does not create guard-owned rollback authority. Approval remains the cited
+Hermes user receipt, not a new approval inferred from import.
+
+Root acceptance job `fleet-mbp-00ab31c294a740b6` ran on MBP with 2 GiB,
+one CPU: 480 pytest passed, one optional Bend pytest skipped; the separate
+native Bend proof passed, Python/Bend parity matched 344/344 cases, and 40/40
+mutants were rejected by owned proof diagnostics. The Bun hook suite passed
+24/24. Receipts and log are under `~/.local/state/fleet/runs/` for that job.
+The finite R1–R4/R7 model proves supplied predicates and unknown precedence,
+not target ownership, successful remediation, unrestricted shell semantics,
+future health, or permission to execute a rollback. No enforcement was enabled.
