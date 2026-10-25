@@ -5,7 +5,7 @@
  * fake JSONL worker. No OMP runtime, no z0int Python, no model server, no network.
  */
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,6 +13,7 @@ const home = mkdtempSync(join(process.env.TMPDIR || tmpdir(), "z0int-bridge-test
 process.env.Z0INT_HOME = home;
 process.env.Z0INT_PYTHON = join(home, "no-such-python");
 process.env.OMP_SESSION_ID = "";
+process.env.Z0INT_INSTALL_ROOT = join(home, "current");
 
 const m = await import("./index.ts");
 
@@ -307,5 +308,59 @@ test("a new turn in a session whose last turn never closed is counted, not silen
 		await m.stopWorker();
 	} finally {
 		process.env.Z0INT_PYTHON = join(home, "no-such-python");
+	}
+});
+
+test("reload and respawn resolve the current install link without reimporting the shim", async () => {
+	const link = process.env.Z0INT_INSTALL_ROOT!;
+	const log = join(home, "spawn-roots.jsonl");
+	const worker = join(home, "root-worker.py");
+	writeFileSync(worker, [
+		"#!/usr/bin/env python3",
+		"import json, os, pathlib, sys",
+		`with open(${JSON.stringify(log)}, 'a') as f:`,
+		"    f.write(json.dumps({'root': os.environ['Z0INT_ROOT'], 'cwd': os.getcwd(), 'revision': pathlib.Path('DEPLOYED_SHA').read_text().strip()}) + '\\n')",
+		"for line in sys.stdin:",
+		"    req = json.loads(line)",
+		"    print(json.dumps({'id': req.get('id'), 'ok': True, 'protocol': 'z0int.bridge.v2', 'generation': 1, 'instance_id': 'fake', 'build_id': 'fake'}), flush=True)",
+		"    if req.get('op') == 'shutdown': break",
+	].join("\n"));
+	chmodSync(worker, 0o755);
+	const a = join(home, "release-a");
+	const b = join(home, "release-b");
+	for (const root of [a, b]) {
+		mkdirSync(root);
+		writeFileSync(join(root, "DEPLOYED_SHA"), root === a ? "sha-a\n" : "sha-b\n");
+	}
+	await m.stopWorker();
+	process.env.Z0INT_PYTHON = worker;
+	try {
+		symlinkSync(a, link);
+		expect((await m.reload("first-release")).ok).toBe(true);
+		rmSync(link);
+		symlinkSync(b, link);
+		expect((await m.reload("next-release")).ok).toBe(true);
+		await m.stopWorker();
+		expect((await m.reload("respawn")).ok).toBe(true);
+		const rows = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line));
+		expect(rows).toEqual([
+			{ root: a, cwd: a, revision: "sha-a" },
+			{ root: b, cwd: b, revision: "sha-b" },
+			{ root: b, cwd: b, revision: "sha-b" },
+		]);
+	} finally {
+		await m.stopWorker();
+		rmSync(link, { force: true });
+		process.env.Z0INT_PYTHON = join(home, "no-such-python");
+	}
+});
+
+test("a broken installed link fails instead of respawning an obsolete checkout", () => {
+	const link = join(home, "broken-current");
+	symlinkSync(join(home, "missing-release"), link);
+	try {
+		expect(() => m.resolveRoot({ Z0INT_INSTALL_ROOT: link, Z0INT_ROOT: home })).toThrow();
+	} finally {
+		rmSync(link);
 	}
 });

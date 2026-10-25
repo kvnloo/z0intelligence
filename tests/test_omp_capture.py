@@ -3,7 +3,7 @@
 The resident bridge worker (``z0int.bridge.runtime``) emits the C1 record family for every OMP/OMO user turn:
 ``turn_open`` writes ``z0int.omp.opportunity_record.v0`` through the detached capture core and ``turn_close``
 writes ``z0int.omp.turn_outcome.v0`` joined on the canonical turn key. Also covered here: no prompt text in
-``bridge.jsonl``, the cognition-shadow hygiene (no rows for a dead backend, a structured ``actual_tool`` and no
+``bridge.jsonl``, the cognition-shadow hygiene (failure receipts for a dead backend, a structured ``actual_tool`` and no
 tool input in anything persisted), protocol parity with the canonical a9cbbed tree that the other OMP
 extensions keep running, and the pinned-checkout install script.
 
@@ -31,7 +31,7 @@ from z0int import harness_capture as hc
 from z0int.bridge import runtime as rtmod
 from z0int.bridge.protocol import BRIDGE_PROTOCOL
 from z0int.bridge.runtime import BridgeRuntime
-from z0int.cognition.adapters.local_slm import ToolDecision
+from z0int.cognition.adapters.transport import ChatOutcome, ServerConfig
 from z0int.cognition.shadow import run_shadow
 from z0int.harness_id import turn_key, turn_key_from_alias
 
@@ -276,13 +276,19 @@ def shadow_payload(**over):
 class _Backend:
     def __init__(self, action=None, raises=None):
         self.action, self.raises = action, raises
+        self.config = ServerConfig("http://fixture", "fake-model")
+        self._transport = self
 
-    def decide(self, request):
+    def chat(self, messages, **kwargs):
         if self.raises is not None:
             raise self.raises
-        return ToolDecision(backend="fake", model="fake-model", revision="r", selected_action=self.action,
-                            arguments={}, confidence=0.8, distribution=None, latency_ms=2.0, abstained=False,
-                            candidate_action_count=request.legal.candidate_count)
+        candidate = json.loads(messages[1]["content"])["candidate"]["id"]
+        yes, no = (-.2, -2.) if candidate == self.action else (-2., -.2)
+        token = "yes" if yes > no else "no"
+        raw = {"choices": [{"logprobs": {"content": [{"token": token,
+            "logprob": max(yes, no), "top_logprobs": [
+                {"token": "yes", "logprob": yes}, {"token": "no", "logprob": no}]}]}}]}
+        return ChatOutcome(content=token, tool_call=None, usage={}, timings={}, raw=raw, latency_ms=2.)
 
 
 class _Registry:
@@ -296,7 +302,7 @@ class _Registry:
         return self.backend
 
 
-def test_dead_backend_writes_no_shadow_row_and_counts_backend_unavailable(home):
+def test_dead_backend_records_failure_receipt_without_inventing_model_answer(home):
     # The real transport against a closed loopback port: urllib raises URLError (connection refused).
     (home / "config").mkdir(parents=True)
     (home / "config" / "serving.json").write_text(json.dumps({"endpoints": [
@@ -306,16 +312,20 @@ def test_dead_backend_writes_no_shadow_row_and_counts_backend_unavailable(home):
     second = run_shadow(shadow_payload(), registry=_Registry(_Backend(raises=urllib.error.URLError("refused"))))
     for result in (first, second):
         assert result["ok"] is True and result["selected_action"] is None and result["executed_action"] is None
-        assert result["receipts_path"] is None
-        assert result["backend_unavailable"] == 1
+        assert result["receipts_path"] is not None
+        trial = result["shadow"][0]
+        assert trial["selected_action"] is None and trial["error"]
+        assert trial["parse_error"] is None
+        assert trial["failure_class"] == "connection_refused"
+    failure_rows = [json.loads(line) for line in
+        (home / "shadow" / "cognition-shadow-failures.jsonl").read_text().splitlines()]
+    assert len(failure_rows) == 2
     assert not (home / "shadow" / "cognition-shadow.jsonl").exists()
-    counters = json.loads((home / "shadow" / "cognition-shadow-counters.json").read_text())
-    assert counters["backend_unavailable"] == 2
 
 
 def test_served_backend_writes_a_row_with_a_structured_actual_tool_and_no_tool_input(home):
     result = run_shadow(shadow_payload(), registry=_Registry(_Backend(action="read")))
-    assert result["ok"] is True and result["backend_unavailable"] == 0
+    assert result["ok"] is True and result["shadow"][0]["error"] is None
     text = Path(result["receipts_path"]).read_text()
     (row,) = [json.loads(line) for line in text.splitlines()]
     assert row["actual_tool"] == {"name": "bash", "risk_class": "write"}

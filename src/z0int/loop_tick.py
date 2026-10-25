@@ -45,7 +45,7 @@ from . import harness_capture as hc
 from . import loop_export as le
 from . import shadow_slot
 
-STEPS = ('verify', 'import', 'shadow', 'export', 'sufficiency', 'learn', 'promote')
+STEPS = ('cognition', 'verify', 'import', 'shadow', 'export', 'sufficiency', 'learn', 'promote')
 SUMMARY_SCHEMA = 'z0int.loop.tick_summary.v0'
 REQUEST_SCHEMA = 'z0int.loop.promotion_request.v0'
 COST_SCHEMA = 'z0int.loop_tick.cost.v0'
@@ -288,6 +288,9 @@ def run_tick(z0int_home: str | Path, *, lock: str | Path = QUIET_LANE_LOCK, lock
         summary['degraded_by'] += sorted({f['kind'] for f in rep['failures'] if f['kind'] in _degrading()})
     if state['learner']['status'] == 'learner_missing':
         summary['degraded_by'].append('learner_missing')
+    cognition = state.get('cognition', {})
+    summary['cognition'] = cognition
+    summary['degraded_by'] += ['cognition:' + r for r in cognition.get('degraded_by', [])]
     summary['degraded_by'] = sorted(set(summary['degraded_by']))
     summary['rows_added'] = {'verified': sum(r['appended'] for r in state['verify'].values()),
                              'imported': sum(m.get('rows_added', 0) for m in state['imports'].values()),
@@ -350,6 +353,11 @@ def _spent(st: dict, step: str, deadline: float) -> bool:
         return False
     st[f'{step}_partial'] = True
     return True
+
+
+def _cognition(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, **_: Any) -> None:
+    from .cognition.learning import learn
+    st['cognition'] = learn(home, deadline=deadline, config=cfg.get('shadow_learning') or {})
 
 
 def _verify(home: Path, out: Path, cfg: Mapping, st: dict, *, deadline: float, agentsview: Any, projects: Any,
@@ -464,8 +472,8 @@ def _promote(home: Path, out: Path, cfg: Mapping, st: dict, **_: Any) -> None:
         st['requests'].append(os.path.relpath(path, home))
 
 
-_STEP = {'verify': _verify, 'import': _import, 'shadow': _shadow, 'export': _export, 'sufficiency': _sufficiency,
-         'learn': _learn, 'promote': _promote}
+_STEP = {'cognition': _cognition, 'verify': _verify, 'import': _import, 'shadow': _shadow, 'export': _export,
+         'sufficiency': _sufficiency, 'learn': _learn, 'promote': _promote}
 
 
 # ----------------------------------------------------------------------------- CLI

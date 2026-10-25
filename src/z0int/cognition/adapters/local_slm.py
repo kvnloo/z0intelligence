@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, runtime_checkable
+import json
 import time
 
 from ..actions import LegalActionSet
@@ -195,7 +196,7 @@ class LocalSLMBackend:
     def for_capability(cls, capability: ModelCapability, *, base_url: str, model: str | None = None,
                        api_key: str | None = None, runtime: str | None = None,
                        quantization: str | None = None, backend_id: str | None = None,
-                       dialect: ToolDialect | None = None) -> LocalSLMBackend:
+                       dialect: ToolDialect | None = None, timeout_s: float = 120.0) -> LocalSLMBackend:
         return cls(
             backend_id=backend_id or capability.model_id,
             config=ServerConfig(
@@ -205,6 +206,7 @@ class LocalSLMBackend:
                 runtime=runtime or (capability.supported_runtimes[0] if capability.supported_runtimes else "unknown"),
                 quantization=quantization or capability.tested_quantization,
                 revision=capability.revision,
+                timeout_s=timeout_s,
             ),
             dialect=dialect,
             capability=capability,
@@ -248,25 +250,37 @@ class LocalSLMBackend:
                 reason="no legal actions",
             )
 
-        prompt = self._dialect.render(
-            state=request.state,
-            actions=legal.legal,
-            objective=request.objective,
-            risk_class=request.risk_class,
-            constraints=request.constraints,
-        )
-        tools = self._dialect.tools_payload(legal.legal)
-        response_format = self._dialect.response_format(DECISION_SCHEMA)
-        messages = [
-            {
-                "role": "system",
-                "content": (
+        actions = legal.legal
+        prompt_budget = request.budget.get("prompt_bytes")
+        while True:
+            prompt = self._dialect.render(
+                state=request.state, actions=actions, objective=request.objective,
+                risk_class=request.risk_class, constraints=request.constraints,
+            )
+            tools = self._dialect.tools_payload(actions)
+            response_format = self._dialect.response_format(DECISION_SCHEMA)
+            messages = [
+                {"role": "system", "content": (
                     "You are a bounded decision component. Choose exactly one action "
                     "from the provided list. Never invent an action."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ]
+                )},
+                {"role": "user", "content": prompt},
+            ]
+            if prompt_budget is None:
+                break
+            # UTF-8 bytes conservatively bound byte-tokenizer input tokens.
+            # Reserve 512 bytes for template/control fields and special tokens;
+            # together with 128 completion tokens this fits a 4096-token slot.
+            encoded = len(json.dumps({"messages": messages, "tools": tools,
+                "response_format": response_format}).encode("utf-8")) + 512
+            if encoded <= int(prompt_budget):
+                break
+            if len(actions) <= 1:
+                return _abstain(backend=self._backend_id, model=self._config.model,
+                    revision=self._config.revision, candidate_count=len(ids),
+                    latency_ms=0.0, reason="context_overflow:prompt_budget_exhausted")
+            actions = actions[:-1]
+        ids = tuple(a.action_id for a in actions)
 
         started = time.perf_counter()
         try:
@@ -280,15 +294,22 @@ class LocalSLMBackend:
                 else request.max_tokens,
                 temperature=self._dialect.temperature,
                 stop=self._dialect.stop or None,
+                extra_body={"chat_template_kwargs": {"enable_thinking": False}}
+                if self._config.model.startswith("qwen3-") else None,
             )
         except TransportError as exc:
+            detail = str(exc).lower()
+            kind = "context_overflow" if (
+                ("exceed" in detail and "context" in detail) or
+                "context_length_exceeded" in detail) else "transport_error"
             return _abstain(
                 backend=self._backend_id,
                 model=self._config.model,
                 revision=self._config.revision,
                 candidate_count=len(ids),
                 latency_ms=(time.perf_counter() - started) * 1000.0,
-                reason=f"transport_error: {exc}",
+                reason=f"{kind}: {exc}",
+                extra={"model_candidate_ids": list(ids)},
             )
 
         invocation = self._dialect.parse(
@@ -326,7 +347,7 @@ class LocalSLMBackend:
                 latency_ms=outcome.latency_ms,
                 abstained=True,
                 parse_error="unparseable_response",
-                diagnostics={"content_head": (outcome.content or "")[:400]},
+                diagnostics={"content_head": (outcome.content or "")[:400], "model_candidate_ids": list(ids)},
                 **common,
             )
 
@@ -354,6 +375,7 @@ class LocalSLMBackend:
         diagnostics: dict[str, Any] = {
             "parse_source": invocation.source,
             "content_head": (outcome.content or "")[:400],
+            "model_candidate_ids": list(ids),
         }
         if invocation.extra_calls:
             # A bounded single-choice decision should produce one call. Extra
