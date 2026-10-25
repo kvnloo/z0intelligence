@@ -166,9 +166,9 @@ MUTATIONS = [
      "  Bool.not(Nat.is_gt(count, option_limit(credited, actual_scope, named_scope, measured)))",
      "  Bool.not(Nat.is_gt(count, Nat.add(1n, option_limit(credited, actual_scope, named_scope, measured))))"),
     ("O13 o13_destructive_never", "destructive acquires SLM authority",
-     "  Nat.is_lt(risk, 2n)", "  Nat.is_lt(risk, 3n)"),
+     "  Nat.is_gt(2n, risk)", "  Nat.is_gt(3n, risk)"),
     ("O13 o13_unknown_never", "unknown risk acquires SLM authority",
-     "  Nat.is_lt(risk, 2n)", "  True{}"),
+     "  Nat.is_gt(2n, risk)", "  True{}"),
 ]
 
 

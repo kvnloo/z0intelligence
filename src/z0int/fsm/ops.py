@@ -290,6 +290,12 @@ def option_risk_allows(risk: int) -> bool:
     return type(risk) is int and risk in (0, 1)
 
 
+def risk_option_capacity_allows(risk: int, credited: bool, actual_scope: int,
+                               named_scope: int, measured: int, count: int) -> bool:
+    return (option_risk_allows(risk)
+            and option_capacity_allows(credited, actual_scope, named_scope, measured, count))
+
+
 # =================================================================== classifiers
 # Heuristics that map real inputs to the abstract ones above. Not proven.
 

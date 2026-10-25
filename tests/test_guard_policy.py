@@ -12,8 +12,8 @@ from z0int.fsm import guard as G
 from z0int.fsm import policy_guard as P
 
 NOW = dt.datetime(2026, 10, 24, 12, tzinfo=dt.timezone.utc)
-ARM = {'kind': 'slm', 'model': 'synthetic-0.6b@r1', 'quant': 'Q4_0',
-       'engine': 'synthetic@r1', 'backend': 'cpu', 'device': 'test-worker'}
+ARM = {'kind': 'slm', 'model': 'sha256:' + 'f' * 64, 'quant': 'Q4_0',
+       'engine': 'b1-748d422', 'backend': 'cpu', 'device': 'test-worker'}
 IDENTITY = {'model_id': 'synthetic-alias', 'engine_build': 'synthetic-build',
             'model_path': '/synthetic/models/test.gguf', 'model_sha256': 'f' * 64}
 

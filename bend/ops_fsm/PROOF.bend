@@ -624,3 +624,6 @@ def Laws.o13_read_authority():
 
 def Laws.o13_reversible_authority():
   {==}
+
+def Laws.o13_destructive_request_never(credited, actual, named, measured, count):
+  {==}

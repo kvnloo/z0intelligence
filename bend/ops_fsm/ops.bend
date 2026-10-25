@@ -485,4 +485,7 @@ def option_capacity_allows(credited: Bool, actual_scope: Nat, named_scope: Nat, 
 
 # Risk IDs: read=0, mutating_reversible=1; destructive and unknown fail closed.
 def option_risk_allows(risk: Nat) -> Bool:
-  Nat.is_lt(risk, 2n)
+  Nat.is_gt(2n, risk)
+
+def risk_option_capacity_allows(risk: Nat, credited: Bool, actual_scope: Nat, named_scope: Nat, measured: Nat, count: Nat) -> Bool:
+  Bool.and(option_risk_allows(risk), option_capacity_allows(credited, actual_scope, named_scope, measured, count))

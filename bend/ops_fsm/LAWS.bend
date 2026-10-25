@@ -476,3 +476,11 @@ law o13_read_authority:
 
 law o13_reversible_authority:
   {O.option_risk_allows(1n) == True{} : Bool}
+
+law o13_destructive_request_never:
+  for credited: Bool
+  for actual: Nat
+  for named: Nat
+  for measured: Nat
+  for count: Nat
+  {O.risk_option_capacity_allows(2n, credited, actual, named, measured, count) == False{} : Bool}

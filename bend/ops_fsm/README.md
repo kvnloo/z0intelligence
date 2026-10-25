@@ -5,7 +5,7 @@ functions with proven laws. The gates that use them are documented in `docs/fsm/
 
 ```
 ops.bend       decision functions and the O8/O9 machines (constructors are prefixed: names are global)
-LAWS.bend      56 claims under O1-O13 (the owner's spec; do not weaken to pass)
+LAWS.bend      57 claims under O1-O13 (the owner's spec; do not weaken to pass)
 PROOF.bend     proofs (hand-written; no generator)
 mutations.py   65 broken variants of ops.bend; each must make PROOF.bend fail
 receipt.json   `hermes bend verify` receipt

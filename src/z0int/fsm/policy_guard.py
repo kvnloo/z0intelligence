@@ -15,7 +15,7 @@ import os
 import re
 from pathlib import Path
 
-from .ops import option_capacity_allows
+from .ops import risk_option_capacity_allows
 
 STAGES = ('none', 'shadow', 'canary', 'live')
 FRONTIER = {'frontier', 'remote_frontier', 'jev', 'bounded_jev'}
@@ -181,6 +181,8 @@ def _allowed_k(policy, scope, now, risk=None):
         return 0
     if not all(isinstance(scope.get(key), str) and scope[key] for key in PHYSICAL_KEYS):
         return 0
+    if not re.fullmatch(r'sha256:[0-9a-f]{64}', scope['model']):
+        return 0
     key = json.dumps({key: scope[key] for key in PHYSICAL_KEYS}, sort_keys=True,
                      separators=(',', ':'), ensure_ascii=False)
     entries = (policy or {}).get('option_capacity', {})
@@ -326,7 +328,9 @@ def audit(receipts: str | None, policy_path: Path | None, since: str,
         allowed = _allowed_k(policy, scope, now, risk)
         k = row.get('option_count')
         invalid = type(k) is not int or k < 0
-        if not invalid and option_capacity_allows(True, 0, 0, allowed, k):
+        if not invalid and risk_option_capacity_allows(
+                0 if risk == 'read' else 1 if risk == 'mutating_reversible' else 2,
+                True, 0, 0, allowed, k):
             return
         if invalid and not required and 'option_count' not in row:
             return
