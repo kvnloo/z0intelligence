@@ -91,7 +91,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: kvnloo/kerdoios
-          ref: cdb43b05a328a50649d5120bffcdecea09492219
+          ref: ba1c0b14777cd83a83ca51d18638c58e67fa8209
           path: .test-deps/kerdoios
           persist-credentials: false
       - name: Install pinned CPU test environment

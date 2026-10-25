@@ -281,6 +281,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--json", action="store_true", dest="as_json", help="Machine-readable JSON output")
     sub = p.add_subparsers(dest="cmd", required=True)
+    from .turbo.cli import register as register_turbo
+    register_turbo(sub)
 
     def _json_flag(sp: argparse.ArgumentParser) -> None:
         sp.add_argument("--json", action="store_true", dest="as_json", help="Machine-readable JSON output")
@@ -920,6 +922,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     as_json = bool(getattr(args, "as_json", False))
 
+    if args.cmd in {"turbo", "mode", "run"}:
+        from .turbo.cli import main as turbo_main
+        return turbo_main(args)
     if args.cmd == "doctor":
         return cmd_doctor(as_json=as_json)
     if args.cmd == "status":
