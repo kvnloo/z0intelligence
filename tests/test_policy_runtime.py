@@ -13,6 +13,9 @@ from z0int.cognition import cli
 from z0int.cognition.escalation import EscalationPolicy, EscalationSignals
 
 
+_observed_model_scope = runtime.observed_model_scope
+
+
 @pytest.fixture(autouse=True)
 def isolated_policy(tmp_path, monkeypatch):
     monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
@@ -20,7 +23,40 @@ def isolated_policy(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime, "_cache_policy", None)
     monkeypatch.setattr(runtime, "_health", {})
     monkeypatch.setattr(runtime, "_health_pending", set())
+    monkeypatch.setattr(runtime, "observed_model_scope", lambda url, alias, scope: dict(scope))
     return tmp_path
+
+
+def test_observed_scope_binds_bytes_not_alias_and_invalidates_changed_file(tmp_path, monkeypatch):
+    model = tmp_path / "model.gguf"
+    model.write_bytes(b"first-model")
+    scope = dict(model="friendly", quant="Q4_0", engine="llama.cpp", backend="cpu", device="fixture")
+    alias = ["first-alias"]
+    class Response:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return None
+        def read(self):
+            return json.dumps({"model_alias": alias[0], "model_path": str(model),
+                               "build_info": "b1-748d422"}).encode()
+    monkeypatch.setattr(runtime, "urlopen", lambda *args, **kwargs: Response())
+    first = _observed_model_scope("http://127.0.0.1:8080/v1", alias[0], scope)
+    assert first == {**scope, "model": "sha256:" + hashlib.sha256(b"first-model").hexdigest(),
+                     "engine": "b1-748d422"}
+    alias[0] = "second-alias"
+    body = policy_body()
+    capacity_rule(body, 4, first)
+    publish(tmp_path, body)
+    assert runtime.allowed_k(first, "read") == 4
+    assert _observed_model_scope("http://localhost:8080", alias[0], scope) == first
+    model.write_bytes(b"second-model")
+    changed = _observed_model_scope("http://localhost:8080", alias[0], scope)
+    assert changed["model"] != first["model"]
+    assert _observed_model_scope("http://remote.example:8080", alias[0], scope) is None
+    assert runtime.allowed_k(changed, "read") == 0
+    model.unlink()
+    assert _observed_model_scope("http://localhost:8080", alias[0], scope) is None
 
 
 def policy_body(stage="canary", share=0.5):
@@ -31,7 +67,7 @@ def policy_body(stage="canary", share=0.5):
         "compiler": "z0int.policy.compile@synthetic",
         "families": {"omp.tool": {
             "stage": stage,
-            "arm": {"kind": "slm", "model": "synthetic-06b", "quant": "Q4_0",
+            "arm": {"kind": "slm", "model": "sha256:" + "e" * 64, "quant": "Q4_0",
                     "engine": "synthetic-engine", "backend": "cpu", "device": "synthetic-device"},
             "threshold": 0.95, "abstain_to": "frontier", "canary_share": share,
             "evidence": ["e" * 64], "rule_id": "F-omp.tool-1",
@@ -223,7 +259,7 @@ def test_escalation_revision_and_frontier_abstain_confidence(isolated_policy):
 
 def test_health_probe_nonblocking_and_cached(isolated_policy, monkeypatch):
     body = policy_body("live")
-    body["serving"] = [{"device": "synthetic-device", "model": "synthetic-06b",
+    body["serving"] = [{"device": "synthetic-device", "model": "sha256:" + "e" * 64,
                         "engine": "synthetic-engine", "backend": "cpu", "quant": "Q4_0",
                         "url": "http://127.0.0.1:12345/v1", "evidence": ["e" * 64]}]
     publish(isolated_policy, body)
@@ -242,7 +278,7 @@ def test_health_probe_nonblocking_and_cached(isolated_policy, monkeypatch):
         def __exit__(self, *args):
             return None
         def read(self):
-            return b'{"data":[{"id":"synthetic-06b","revision":"synthetic-revision"}]}'
+            return json.dumps({"data": [{"id": "sha256:" + "e" * 64, "revision": "synthetic-revision"}]}).encode()
 
     calls = []
     def open_health(url, timeout):
@@ -386,7 +422,7 @@ def test_shared_health_survives_process_cache_and_refreshes_stale_scope(isolated
         def __exit__(self, *args):
             return None
         def read(self):
-            return b'{"data":[{"id":"synthetic-06b","revision":"synthetic-revision"}]}'
+            return json.dumps({"data": [{"id": "sha256:" + "e" * 64, "revision": "synthetic-revision"}]}).encode()
 
     def answer(url, timeout):
         calls.append((url, timeout))

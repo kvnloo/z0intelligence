@@ -197,10 +197,16 @@ def _legal():
     )
 
 
+@pytest.fixture(autouse=True)
+def synthetic_serving_identity(monkeypatch):
+    from z0int import policy_runtime
+    monkeypatch.setattr(policy_runtime, "observed_model_scope", lambda url, alias, scope: dict(scope))
+
+
 def _backend(transport, dialect=None):
     import json
     from z0int.policy_runtime import Policy
-    scope = dict(model="m", quant="fixture", engine="fixture", backend="fixture", device="fixture")
+    scope = dict(model="sha256:" + "a" * 64, quant="fixture", engine="fixture", backend="fixture", device="fixture")
     entry = {"allowed_k": 8, "finding_ids": ["fixture"], "task": ["T1"],
              "wilson_lower": 0.99, "bar_derived": 0.5, "expires_at": "2099-01-01T00:00:00Z",
              "inputs": {"cost_call": 0, "cost_frontier": 1, "cost_error": 2,

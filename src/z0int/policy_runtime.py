@@ -154,6 +154,48 @@ def serving_identity_complete(endpoint: dict[str, Any] | None) -> bool:
     return len(digest) == 64 and all(c in "0123456789abcdef" for c in digest)
 
 
+_model_hashes: dict[tuple[str, int, int, int, int], str] = {}
+
+
+def observed_model_scope(url: str, alias: str, scope: dict[str, Any]) -> dict[str, Any] | None:
+    """Resolve local serving bytes before consulting capacity; aliases confer no authority."""
+    from urllib.parse import quote, urlparse
+    try:
+        parsed_url = urlparse(url)
+        if parsed_url.hostname not in ("localhost", "127.0.0.1", "::1"):
+            return None  # a remote filesystem path is not local evidence
+        base = url.rstrip("/")
+        if base.endswith("/v1"):
+            base = base[:-3]
+        with urlopen(base + "/props?model=" + quote(alias, safe=""), timeout=1.5) as reply:
+            props = json.loads(reply.read().decode("utf-8"))
+        if not isinstance(props, dict) or props.get("model_alias") != alias:
+            return None
+        path, build = props.get("model_path"), props.get("build_info")
+        if not isinstance(path, str) or not Path(path).is_absolute() or not isinstance(build, str) or not build:
+            return None
+        with Path(path).open("rb") as stream:
+            before = os.fstat(stream.fileno())
+            key = (str(Path(path).resolve()), before.st_mtime_ns, before.st_size,
+                   before.st_ino, before.st_ctime_ns)
+            digest = _model_hashes.get(key)
+            if digest is None:
+                hasher = hashlib.sha256()
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    hasher.update(chunk)
+                after = os.fstat(stream.fileno())
+                if (before.st_mtime_ns, before.st_size, before.st_ino, before.st_ctime_ns) != (
+                        after.st_mtime_ns, after.st_size, after.st_ino, after.st_ctime_ns):
+                    return None
+                digest = hasher.hexdigest()
+                if len(_model_hashes) >= 32:
+                    _model_hashes.clear()
+                _model_hashes[key] = digest
+        return {**scope, "model": "sha256:" + digest, "engine": build}
+    except Exception:
+        return None
+
+
 def _canonical(body: dict[str, Any]) -> bytes:
     return json.dumps(body, sort_keys=True, separators=(",", ":"),
                       ensure_ascii=False, allow_nan=False).encode("utf-8")
@@ -251,6 +293,9 @@ class Policy:
                 return 0
             fields = ("model", "quant", "engine", "backend", "device")
             if not all(isinstance(scope.get(k), str) and scope[k] for k in fields):
+                return 0
+            model = scope["model"]
+            if not model.startswith("sha256:") or len(model) != 71 or any(c not in "0123456789abcdef" for c in model[7:]):
                 return 0
             key = _canonical({k: scope[k] for k in fields}).decode("utf-8")
             entry = self._body.get("option_capacity", {}).get(key, {}).get(risk_class)

@@ -272,6 +272,9 @@ class LocalSLMBackend:
         ids = legal.ids()
         policy = self._policy or policy_runtime.current()
         risk = request.capacity_risk()
+        observed_scope = policy_runtime.observed_model_scope(
+            self._config.base_url, self._config.model, self._scope)
+        self._scope = observed_scope or {**self._scope, "model": "unknown", "engine": "unknown"}
         allowed = policy.allowed_k(self._scope, risk)
         metadata: dict[str, Any] = {
             "option_count": 0, "attempted_option_count": len(ids),

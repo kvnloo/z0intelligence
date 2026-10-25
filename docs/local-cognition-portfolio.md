@@ -12,6 +12,13 @@ Related: evolution-lab#23 (tournament) · tokenomics#4 (telemetry) · kerdoios#5
 
 Python model consumers read `option_capacity[canonical_scope][risk_class]`,
 where scope contains exactly model, quant, engine, backend and device.
+`model` is `sha256:<GGUF file digest>` and `engine` is observed `/props`
+`build_info`, not the serving alias or a generic runtime label. Before model IO,
+loopback consumers resolve `/props?model=<alias>` and hash the actual absolute
+`model_path`, caching by resolved path, mtime, size, inode and ctime. Renaming an
+alias preserves authority for identical bytes; replacing bytes needs new evidence.
+Non-loopback model paths and inaccessible files fail closed: a remote filesystem
+path does not prove ownership of a same-named local file.
 Missing, malformed or expired evidence grants zero options, never binary fallback.
 Only `read` and explicitly `mutating_reversible` actions can receive capacity;
 legacy `write`, unknown and destructive actions cannot. Request context cannot

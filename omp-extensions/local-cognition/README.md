@@ -121,6 +121,14 @@ and checks the stored bar and strict `wilson_lower > bar`, plus the strict rule
 `cost_call + (1 - wilson_lower) * cost_error + abstain_rate * cost_frontier < cost_frontier`.
 A scalar grant alone cannot authorize a request.
 
+Model identity is `sha256:<GGUF bytes digest>`, not a serving alias. Before
+dispatch, the consumer requests loopback `/props?model=<alias>`, verifies
+`model_alias`, reads the absolute local `model_path`, hashes the opened file,
+and uses actual `build_info` as `engine`. Digest caching uses real path,
+nanosecond mtime/ctime, size and inode, with before/after file checks.
+An inaccessible remote path or missing identity fact authorizes zero options.
+Aliases for identical bytes share capacity; replacement bytes do not.
+
 An over-cap proposal never reaches the model. It returns to frontier/Jev with
 `option_capacity_exceeded`, effective stage `none`, `slm_requested: false`,
 `option_count: 0` and its original `attempted_option_count`. No candidate is

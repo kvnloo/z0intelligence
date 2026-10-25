@@ -1,6 +1,13 @@
 import json
 from pathlib import Path
 import time
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def synthetic_serving_identity(monkeypatch):
+    from z0int import policy_runtime
+    monkeypatch.setattr(policy_runtime, "observed_model_scope", lambda url, alias, scope: dict(scope))
 
 from z0int.cognition.learning import learn, wilson, connect, STRATEGIES, predict
 from z0int.cognition.shadow import run_shadow
@@ -61,6 +68,7 @@ def test_dead_endpoint_degrades_and_evolves(tmp_path, monkeypatch):
         'qwen3_06b','http://127.0.0.1:1','qwen3-0.6b-q8','llama.cpp',timeout_s=.1)})
     monkeypatch.setenv('Z0INT_HOME', str(home))
     backend = registry.backend_for("qwen3_06b")
+    backend._scope["model"] = "sha256:" + "a" * 64
     backend._policy = sized_backend(None, scope=backend._scope)._policy
     result = run_shadow({'session_id':'session','facts':{'tool_call_id':'0'},
         'actions':[{'action_id':'read','tool':'read','risk_class':'read'}], 'authority':['read'],
@@ -181,7 +189,7 @@ def sized_backend(transport, scope=None):
     import hashlib
     import os
     from z0int import policy_runtime
-    scope = scope or {"model": "qwen3_06b", "quant": "Q8_0", "engine": "fixture",
+    scope = scope or {"model": "sha256:" + "a" * 64, "quant": "Q8_0", "engine": "fixture",
                       "backend": "cpu", "device": "fixture"}
     key = json.dumps(scope, sort_keys=True, separators=(",", ":"))
     body = {

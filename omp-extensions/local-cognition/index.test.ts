@@ -22,6 +22,7 @@ import localCognition, {
 	shadowModels,
 	receiptPath,
 	resolveAvailableTools,
+	resolveCapacityScope,
 	shadowEnabled,
 	sendShadow,
 	statusRing,
@@ -63,6 +64,8 @@ const globalHolder = globalThis as { __omp_z0int_bridge_transport__?: unknown };
 const originalTransport = globalHolder.__omp_z0int_bridge_transport__;
 let sent: Array<Record<string, unknown>> = [];
 let testHome: string;
+const originalFetch = globalThis.fetch;
+afterEach(() => { globalThis.fetch = originalFetch; });
 
 const ENV_KEYS = [
 	"OMP_Z0INT_COGNITION_SHADOW",
@@ -80,6 +83,7 @@ function flush(ms = 30): Promise<void> {
 
 beforeEach(() => {
 	__resetLocalCognitionForTest();
+	globalThis.fetch = originalFetch;
 	sent = [];
 	for (const key of ENV_KEYS) delete process.env[key];
 	testHome = mkdtempSync(join(tmpdir(), "z0int-policy-test-"));
@@ -771,7 +775,15 @@ test("payload synthetic provenance survives empty policy and reaches model obser
 function capacityFixture(allowed = 4) {
 	const body = policyFixture("shadow");
 	const arm = ((body.families as Record<string, Record<string, unknown>>)["omp.tool"].arm as Record<string, string>);
+	const modelPath = join(testHome, "fixture.gguf");
+	writeFileSync(modelPath, "fixture GGUF bytes");
+	const digest = createHash("sha256").update("fixture GGUF bytes").digest("hex");
+	body.serving = [{ ...arm, url: "http://127.0.0.1:9999", evidence: ["e".repeat(64)] }];
+	globalThis.fetch = (async () => Response.json({
+		model_alias: "policy-model", model_path: modelPath, build_info: "synthetic",
+	})) as typeof fetch;
 	const scope = Object.fromEntries(["backend", "device", "engine", "model", "quant"].map(k => [k, arm[k]]));
+	scope.model = `sha256:${digest}`;
 	const entry = { allowed_k: allowed, finding_ids: ["e".repeat(64)], wilson_lower: 0.99,
 		task: ["T1", "T2", "T3", "T4"], bar_derived: 0.95,
 		inputs: { cost_call: 0.5, cost_frontier: 1, cost_error: 10, abstain_rate: 0,
@@ -846,7 +858,7 @@ test("over-cap shadow proposal never reaches the worker as a model request", asy
 	expect(payload.policy_stage).toBe("shadow");
 	const plans = payload.shadow_requests as Array<Record<string, unknown>>;
 	expect(plans[0]).toMatchObject({ model_id: "policy-model", quant: "Q4_0", option_count: 0,
-		attempted_option_count: 3, allowed_k: 2, slm_requested: false, reason: "option_capacity_exceeded" });
+		attempted_option_count: 3, allowed_k: 0, slm_requested: false, reason: "option_capacity_exceeded" });
 	await sendShadow(payload, 1000);
 	expect(sent[0].shadows).toEqual([]);
 });
@@ -855,13 +867,35 @@ test("qualified shadow request keeps all original options and its exact scope", 
 	const { body, scope } = capacityFixture(4);
 	writePolicy(body);
 	const payload = buildShadowPayload(toolCall("read"), ["read", "glob", "grep"]);
-	expect(payload.shadows).toEqual(["policy-model"]);
+	expect(payload.shadows).toEqual([]);
 	expect((payload.actions as unknown[]).length).toBe(3);
 	expect((payload.shadow_requests as Array<Record<string, unknown>>)[0]).toMatchObject({
-		model_id: "policy-model", quant: "Q4_0", scope, attempted_option_count: 3, allowed_k: 4,
+		model_id: "policy-model", quant: "Q4_0", attempted_option_count: 3, allowed_k: 0,
 	});
 	await sendShadow(payload, 1000);
 	expect(sent[0].shadows).toEqual(["policy-model"]);
+});
+
+test("observed file identity survives aliases but not changed bytes or remote paths", async () => {
+	const { body, scope } = capacityFixture();
+	const endpoint = (body.serving as Array<Record<string, unknown>>)[0];
+	expect(await resolveCapacityScope(endpoint)).toEqual(scope);
+	const path = join(testHome, "fixture.gguf");
+	globalThis.fetch = (async () => Response.json({
+		model_alias: "renamed", model_path: path, build_info: "synthetic",
+	})) as typeof fetch;
+	const renamed = { ...endpoint, model: "renamed" };
+	expect(await resolveCapacityScope(renamed)).toEqual(scope);
+	writeFileSync(path, "replacement GGUF bytes");
+	const changed = await resolveCapacityScope(renamed);
+	expect(changed?.model).not.toBe(scope.model);
+	writePolicy(body);
+	expect(optionCapacity(changed!, "read")).toBe(0);
+	expect(await resolveCapacityScope({ ...renamed, url: "http://remote.invalid" })).toBeNull();
+	globalThis.fetch = (async () => Response.json({
+		model_alias: "renamed", model_path: "/missing/remote/model.gguf", build_info: "synthetic",
+	})) as typeof fetch;
+	expect(await resolveCapacityScope(renamed)).toBeNull();
 });
 
 test("actual worker option metadata survives the aggregate observation envelope", async () => {

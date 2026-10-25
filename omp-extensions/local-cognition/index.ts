@@ -22,10 +22,10 @@
  * exercised with plain `bun test`.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, openSync, readFileSync, readSync, closeSync, statSync } from "node:fs";
+import { existsSync, openSync, readFileSync, readSync, closeSync, statSync, realpathSync, fstatSync } from "node:fs";
 import { promises as fs } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, isAbsolute } from "node:path";
 
 const DEFAULT_TIMEOUT_MS = 4000;
 // A single small candidate on the existing farm router; no second runtime.
@@ -252,6 +252,7 @@ export function optionCapacity(scope: Jsonish, risk: unknown, policy = loadDecis
 	if (!object(scope) || !["read", "mutating_reversible"].includes(String(risk))) return 0;
 	const keys = ["backend", "device", "engine", "model", "quant"];
 	if (Object.keys(scope).length !== keys.length || keys.some(key => typeof scope[key] !== "string" || !scope[key])) return 0;
+	if (!/^sha256:[a-f0-9]{64}$/.test(String(scope.model))) return 0;
 	const key = JSON.stringify(Object.fromEntries(keys.map(k => [k, scope[k]])));
 	const risks = object(policy.option_capacity) ? policy.option_capacity[key] : undefined;
 	const entry = object(risks) ? risks[String(risk)] : undefined;
@@ -624,15 +625,53 @@ export function buildShadowPayload(
 	};
 }
 
-function shadowRequestPlans(policy: DecisionPolicy, models: string[], count: number, risk: unknown): Jsonish[] {
+const modelDigestCache = new Map<string, { identity: string; digest: string }>();
+
+/** Resolve identity from serving facts, never from the requested model alias. */
+export async function resolveCapacityScope(endpoint: Jsonish, timeoutMs = 1500): Promise<Jsonish | null> {
+	try {
+		if (typeof endpoint.url !== "string" || typeof endpoint.model !== "string") return null;
+		if (!["localhost", "127.0.0.1", "[::1]"].includes(new URL(endpoint.url).hostname)) return null;
+		const base = endpoint.url.replace(/\/$/, "").replace(/\/v1$/, "");
+		const alias = endpoint.expected_model_id ?? endpoint.model;
+		const response = await fetch(`${base}/props?model=${encodeURIComponent(String(alias))}`, { signal: AbortSignal.timeout(timeoutMs) });
+		if (!response.ok) return null;
+		const props: unknown = await response.json();
+		if (!object(props) || props.model_alias !== alias || typeof props.model_path !== "string"
+			|| !isAbsolute(props.model_path) || typeof props.build_info !== "string" || !props.build_info) return null;
+		const path = realpathSync(props.model_path);
+		const handle = openSync(path, "r");
+		let cached;
+		try {
+			const stat = fstatSync(handle, { bigint: true });
+			if (!stat.isFile()) return null;
+			const identity = `${stat.mtimeNs}:${stat.ctimeNs}:${stat.size}:${stat.ino}`;
+			cached = modelDigestCache.get(path);
+			if (!cached || cached.identity !== identity) {
+				const hash = createHash("sha256");
+				const buffer = Buffer.allocUnsafe(1024 * 1024);
+				let size: number;
+				while ((size = readSync(handle, buffer, 0, buffer.length, null)) > 0) hash.update(buffer.subarray(0, size));
+				const after = fstatSync(handle, { bigint: true });
+				if (`${after.mtimeNs}:${after.ctimeNs}:${after.size}:${after.ino}` !== identity) return null;
+				cached = { identity, digest: hash.digest("hex") };
+				modelDigestCache.set(path, cached);
+			}
+		} finally { closeSync(handle); }
+		if (["quant", "backend", "device"].some(key => typeof endpoint[key] !== "string" || !endpoint[key])) return null;
+		return { model: `sha256:${cached.digest}`, quant: endpoint.quant, engine: props.build_info, backend: endpoint.backend, device: endpoint.device };
+	} catch { return null; }
+}
+
+function shadowRequestPlans(policy: DecisionPolicy, models: string[], count: number, risk: unknown, resolved?: Map<string, Jsonish | null>): Jsonish[] {
 	const narrowing = nested(loadCognitionSettings(), "policy_scope");
 	return models.map(model => {
 		const rule = Object.values(policy.families).find(row => POLICY_STAGES.indexOf(policyStage(row)) >= 1 && object(row.arm) && row.arm.model === model
 			&& (!object(narrowing) || Object.entries(narrowing).every(([k, v]) => (row.arm as Jsonish)[k] === v)));
 		const arm = object(rule?.arm) ? rule.arm : {};
-		const scope = Object.fromEntries(["model", "quant", "engine", "backend", "device"].map(k =>
+		const scope = resolved?.get(model) ?? Object.fromEntries(["model", "quant", "engine", "backend", "device"].map(k =>
 			[k, typeof arm[k] === "string" ? arm[k] : k === "model" ? model : "unknown"]));
-		const allowed = optionCapacity(scope, risk, policy);
+		const allowed = resolved === undefined || resolved.get(model) ? optionCapacity(scope, risk, policy) : 0;
 		return { model_id: model, quant: scope.quant, scope, option_count: 0, attempted_option_count: count,
 			risk_class: risk, allowed_k: allowed, slm_requested: false, ...(allowed === 0 || count > allowed ? { reason: "option_capacity_exceeded" } : {}) };
 	});
@@ -819,17 +858,31 @@ export async function sendShadow(
 	const synthetic = payload.synthetic === true;
 	if (typeof payload.policy_version !== "string") Object.assign(payload, policyStamp());
 	payload.synthetic = synthetic || payload.synthetic === true;
-	if (Array.isArray(payload.actions) && Array.isArray(payload.shadows) && payload.shadows.length
-		&& payload.shadows.every(model => typeof model === "string")) {
+	const proposed = Array.isArray(payload.shadow_requests)
+		? payload.shadow_requests.filter(object).map(plan => plan.model_id)
+		: payload.shadows;
+	if (Array.isArray(payload.actions) && Array.isArray(proposed) && proposed.length
+		&& proposed.every(model => typeof model === "string")) {
 		const risk = payload.actions.every(action => object(action) && typeof action.tool === "string"
 			&& riskFor(action.tool) === "read" && action.risk_class === "read") ? "read" : "destructive";
 		payload.risk_class = risk;
-		const plans = shadowRequestPlans(loadDecisionPolicy(), payload.shadows as string[], payload.actions.length, risk);
+		const policy = loadDecisionPolicy();
+		const resolved = new Map<string, Jsonish | null>();
+		await Promise.all((proposed as string[]).map(async model => {
+			const endpoint = policy.serving.find(row => row.model === model || row.expected_model_id === model);
+			resolved.set(model, endpoint ? await resolveCapacityScope(endpoint, Math.max(1, Math.min(timeoutMs, 1500))) : null);
+		}));
+		const plans = shadowRequestPlans(policy, proposed as string[], payload.actions.length, risk, resolved);
 		payload.shadow_requests = plans;
 		payload.shadows = plans.filter(plan => plan.reason !== "option_capacity_exceeded").map(plan => plan.model_id);
 		if (plans.every(plan => plan.reason === "option_capacity_exceeded")) {
 			payload.policy_stage = payload.policy_stage ?? payload.stage;
 			Object.assign(payload, { stage: "none", policy_reason: "option_capacity_exceeded", reason: "option_capacity_exceeded" });
+		}
+		else if (payload.policy_reason === "option_capacity_exceeded") {
+			payload.stage = payload.policy_stage ?? payload.stage;
+			delete payload.policy_reason;
+			delete payload.reason;
 		}
 	}
 	// Give the worker a budget inside ours. Left to its own 30 s default it
