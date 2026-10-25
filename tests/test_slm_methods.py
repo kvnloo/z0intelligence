@@ -104,3 +104,30 @@ def test_candidate_keeps_evaluated_categories(tmp_path):
     candidate=publish_candidate(leaderboard,tmp_path,incumbent_path=incumbent)
     assert candidate['config']['frozen_categories']==categories
     assert candidate['config']['training_digest']=='fixed-training'
+
+
+def test_pipeline_portfolio_retains_scope_and_dispatches(monkeypatch):
+    import sqlite3
+    from types import SimpleNamespace
+    from z0int.cognition import learning_runtime,slm_scoped
+    config={'history_width':1,'candidate_k':3,'prompt_bytes':3000,
+            'decision_method':'slm_pipeline_v1','frozen_categories':[['read'],['edit']],
+            'training_digest':'fixed','first_model':'fixed','final_model':'fixed'}
+    catalogue=[{'id':'history-1','config':config},{'id':'methods-pipeline-test','config':config}]
+    strategy=learning_runtime._configs({'omp.tool':'methods-pipeline-test'},catalogue)['omp.tool']
+    assert strategy['method_config']==config
+    captured=[]
+    def scoped(payload,legal,backend,method_config,**kwargs):
+        captured.append((payload,legal.ids(),method_config))
+        return {'selected_action':'edit','arm_scope':slm_scoped.scope_digest(method_config)}
+    monkeypatch.setattr(slm_scoped,'run_scoped',scoped)
+    monkeypatch.setattr(learning_runtime,'OpenAICompatTransport',lambda *args,**kwargs:SimpleNamespace())
+    endpoint=SimpleNamespace(base_url='http://localhost',served_model='fixed',
+        timeout_s=1,runtime=None,quantization=None)
+    db=sqlite3.connect(':memory:')
+    predict=learning_runtime.choice_predictor(db,endpoint,{}, {'n_ctx':4096})
+    answer=predict(json.dumps({'latest_user_message':'inspect then change'}),['read'],strategy)
+    assert answer['selected_action']=='edit'
+    assert answer['arm_scope']==slm_scoped.scope_digest(config)
+    assert captured==[({'goal_context':{'latest_user_message':'inspect then change'}},
+                       ('read','edit'),config)]

@@ -67,6 +67,16 @@ def choice_predictor(db, endpoint, identity: dict, scope: dict, *, home: Path | 
                 rpc_records.append((started, strategy.get('family'),
                                     strategy.get('strategy_id'), json.dumps(row)))
         try:
+            if strategy.get('decision_method')=='slm_pipeline_v1':
+                from types import SimpleNamespace
+                from .slm_scoped import run_scoped
+                groups=strategy.get('frozen_categories',[])
+                legal=SimpleNamespace(ids=lambda:tuple(value for group in groups for value in group))
+                backend=SimpleNamespace(_transport=SimpleNamespace(chat=chat),
+                    config=SimpleNamespace(model=endpoint.served_model),
+                    backend_id=identity.get('backend'))
+                return run_scoped({'goal_context':json.loads(prompt)},legal,backend,strategy['method_config'],
+                    n_ctx=scope['n_ctx'],policy_identity=identity,policy_home=home)
             methods = {'methods-hierarchy-v1':'hierarchical',
                        'methods-threeway-v1':'tournament3'}
             method = methods.get(strategy.get('strategy_id'))
@@ -100,11 +110,13 @@ def _configs(current: dict, catalogue_rows=DEFAULT_STRATEGIES) -> dict:
     result = {}
     for family, strategy in current.items():
         config = catalogue.get(strategy, catalogue['history-1'])
-        result[family] = {'strategy_id': strategy, 'history_width': min(8, config['history_width']),
+        result[family] = {**config, 'strategy_id': strategy, 'history_width': min(8, config['history_width']),
             'candidate_k': min(3, config['candidate_k']), 'prompt_bytes': min(3000, config['prompt_bytes']),
             'retrieval_k': config.get('retrieval_k', 64),
             'candidate_source': config.get('candidate_source', 'history'),
             'recent_sessions_n': config.get('recent_sessions_n', 5)}
+        if config.get('decision_method')=='slm_pipeline_v1':
+            result[family]['method_config']=dict(config)
     return result
 
 
