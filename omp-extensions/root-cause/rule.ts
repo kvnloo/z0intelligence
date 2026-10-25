@@ -74,6 +74,9 @@ export function auditCommand(command: string, ownership: Ownership = {}, depth =
    (["tee", "cp", "mv", "install", "touch", "rm", "truncate"].includes(name) && !arg.startsWith("-")));
   for (const path of writes) if (unstamped(path, ownership)) sourceKinds.add("unstamped-user-unit-edit");
   if (name === "dd") for (const arg of args) if (arg.startsWith("of=") && unstamped(arg.slice(3), ownership)) sourceKinds.add("unstamped-user-unit-edit");
+  if (["sed", "perl"].includes(name) && args.some(arg => /^-.*i/.test(arg) || arg.startsWith("--in-place"))) {
+   for (const path of args.slice(1)) if (unstamped(path, ownership)) sourceKinds.add("unstamped-user-unit-edit");
+  }
   if (args.some((arg, index) => limitPath(arg) && (args.slice(0, index).includes(">") || ["tee", "cp", "install", "dd"].includes(name)))) kinds.add("cgroup-limit-write");
   if (name === "dd" && args.some(arg => arg.startsWith("of=") && limitPath(arg.slice(3)))) kinds.add("cgroup-limit-write");
   if (["renice", "ionice"].includes(name)) kinds.add("service-priority-change");

@@ -1,4 +1,4 @@
-"""A–E state claim audit. Observation and refusal only; never remediation.
+"""A–E and I state claim audit. Observation and refusal only; never remediation.
 
 The finite predicates mirror bend/state_fsm. Sensors recheck event identities,
 not a wall-clock TTL. A pass is neither authorization nor proof of future state.

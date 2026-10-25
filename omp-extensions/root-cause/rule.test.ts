@@ -72,7 +72,7 @@ describe("I tracked live-config source audit", () => {
   expect(auditTool("edit", { path: "~/.config/systemd/user/x.service" }, { home })).toHaveLength(1);
  });
  test("shell writes and nested commands audit without effects", () => {
-  for (const command of [`printf x > ${path}`, `tee ${path}`, `cp source ${path}`, `dd of=${path}`,
+  for (const command of [`printf x > ${path}`, `tee ${path}`, `cp source ${path}`, `dd of=${path}`, `sed -i 's/x/y/' ${path}`,
                          `bash -lc 'printf x > ${path}'`]) expect(onlyI(command)).toHaveLength(1);
   expect(onlyI(`cat ${path}`)).toEqual([]);
   expect(auditCommand(`printf x > ${path}`, { home, stampedInstallPaths: [path] })).toEqual([]);

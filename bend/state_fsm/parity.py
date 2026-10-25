@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Executable differential parity: Python evaluate versus the Bend state model.
 
-Covers the complete {missing, False, True} product for every A–E signature,
+Covers the complete {missing, False, True} product for every A–E/I signature,
 plus non-bool values in each position with positive and false sibling facts.
 A non-bool normalizes to SAbsent; Python itself still receives the raw value.
 This measures abstract-input agreement, not sensor/parser correctness or live
