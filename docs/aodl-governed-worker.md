@@ -115,8 +115,8 @@ demonstrates value.
 
 ## One-command full golden canary
 
-Use clean checkouts of this PR stack and z0evals #81, with the existing
-OpenRouter credential already exported:
+Use clean checkouts of this PR stack and z0evals #81, with the credential
+for the provider pinned in `manifests/aodl-paid-canary.v1.json` already available:
 
 ```bash
 python scripts/run-aodl-golden-canary.py \
@@ -127,7 +127,8 @@ python scripts/run-aodl-golden-canary.py \
 
 Before any provider call the wrapper requires:
 
-- `OPENROUTER_API_KEY` is already present;
+- the selected provider's existing credential is available (subscription
+  readiness uses `credential_available`, not a nullable API-key environment name);
 - both repositories are clean;
 - z0evals' golden manifest pins the exact z0intelligence HEAD;
 - `aodl_contract` exposes `aodl-canon-1`;
@@ -138,6 +139,14 @@ It then runs the live public proof, runs the frozen collector with
 `golden-trace.json`. Raw receipts remain under `raw/state` for audit and are
 not implicitly committed.
 
+Subscription routes use the shared `z0int.shadow_evals_omp` headless OMP
+transport, not a separate Responses or Messages wire client. Each call has an
+isolated agent directory and tools, extensions, skills, and rules disabled.
+OMP's catalog-derived price is recorded separately from actual billed cost;
+an unreported billed cost remains unknown. The existing shared $1 ledger and
+explicit model authorization still apply. Output limits are not claimed as
+provider-enforced when the headless CLI cannot enforce them.
+
 ## Proof
 
 `scripts/prove-intelligence.py` now starts the actual authority and remote
@@ -145,7 +154,7 @@ executor HTTP servers on loopback and exercises:
 
 - protocol-v3 readiness;
 - two concurrent identical requests;
-- one physical free-provider call;
+- one physical call to the explicitly authorized provider;
 - completed replay;
 - trace conflict;
 - provider-cap refusal;

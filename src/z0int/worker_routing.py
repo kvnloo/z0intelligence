@@ -34,7 +34,7 @@ def oauth_module():
 
 def credential_available(provider, config):
     if config.get('auth') == 'omp-oauth':
-        from .omp_subscription import credential_available
+        from .shadow_evals_omp import credential_available
         return credential_available(provider)
     if config.get('auth') == 'hermes-oauth':
         try:
@@ -223,10 +223,30 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         row.extra['physical_call_attempted'] = True
         row.extra['physical_started_at'] = time.time()
         if config.get('auth') == 'omp-oauth':
-            from .omp_subscription import execute
-            response = execute(provider, model, messages, args.get('max_tokens', 512), timeout_s=policy['timeout_s'])
-            row.extra['output_limit_enforced'] = response.output_limit_enforced
-            row.extra['quota_headers'] = response.quota_headers
+            from types import SimpleNamespace
+            from .shadow_evals_omp import execute, OmpError
+            response_root = str(Path(os.environ['Z0INT_HOME']) / 'subscription-transport')
+            result = execute(provider, model, messages, args.get('max_tokens', 512),
+                             timeout_s=policy['timeout_s'], config={'root': response_root})
+            response = SimpleNamespace(
+                content=result['content'],
+                usage={'prompt_tokens': result['input_tokens'], 'completion_tokens': result['output_tokens'],
+                       'prompt_tokens_details': {'cached_tokens': result['cached_input_tokens']}, 'cost': result['cost']},
+                raw={'model': result['reported_model'], 'id': result['response_id'],
+                     'choices': [{'finish_reason': result['finish_reason']}]},
+                tool_call=result['tool_call'])
+            row.extra['output_limit_enforced'] = result['output_limit_enforced']
+            row.extra['quota_headers'] = result['quota_headers']
+            row.extra['catalog_estimated_cost_usd'] = result['list_price_usd']
+            row.extra['subscription_transport'] = 'omp-headless'
+            row.extra['subscription_receipt_path'] = result['receipt_path']
+            if result['error']:
+                usage_present = any(result[key] is not None for key in ('input_tokens', 'output_tokens'))
+                actual_cost = result['cost']
+                row.input_tokens = result['input_tokens']
+                row.output_tokens = result['output_tokens']
+                row.cached_input_tokens = result['cached_input_tokens']
+                raise OmpError(result['error']['code'], code=result['error'].get('http_status'))
         else:
             key, base = credentials(provider, config)
             transport = OpenAICompatTransport(ServerConfig(base_url=base, model=model, api_key=key,
@@ -271,6 +291,8 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         ok = False
         row.outcome = {'execution_completed': False, 'source': 'codex_plugin'}
         row.extra.update(status='failed', error_type=type(exc).__name__, http_status=error_status(exc))
+        if config.get('auth') == 'omp-oauth':
+            row.extra['subscription_failure_reason'] = getattr(exc, 'reason', type(exc).__name__)
     finally:
         if transport is not None:row.extra['quota_headers']=getattr(transport,'quota_headers',{})
         if row.extra.get('physical_call_attempted'):row.extra['physical_finished_at']=time.time()

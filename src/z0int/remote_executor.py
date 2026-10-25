@@ -11,7 +11,7 @@ import random
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
 from .dispatch_authority import validate_remote
-from .worker_routing import execute_plan
+from .worker_routing import execute_plan, credential_available
 
 
 def request(operation, payload):
@@ -43,7 +43,7 @@ def execute(args):
     worker,policy,providers,plan=validate_remote(args)
     if args['provider'] not in os.environ.get('Z0INT_EXECUTOR_PROVIDERS','openrouter').split(','):
         raise ValueError('Provider not enabled on this executor')
-    if not os.environ.get(providers[args['provider']]['api_key_env']):
+    if not credential_available(args['provider'], providers[args['provider']]):
         raise ValueError('Existing provider credential unavailable')
     class RemoteAdmission:
         def acquire(self,provider,call_id,context):
@@ -100,7 +100,7 @@ class Handler(BaseHTTPRequestHandler):
                 state=json.load(r)
             if state.get('authority_protocol_version')!=3 or state.get('aodl_admission_ready') is not True:
                 raise ValueError('authority protocol/AODL admission mismatch')
-            ready=any(os.environ.get(providers[p]['api_key_env']) and state['providers'][p]['available']
+            ready=any(credential_available(p, providers[p]) and state['providers'][p]['available']
                       and (not free_required(policy) or free_route(policy,p,policy['defaults'].get(p)))
                       and (not state.get('free_only') or policy['defaults'].get(p) in state.get('validated_free_models',{}).get(p,[])) for p in enabled)
             self.reply(200 if ready else 503,{'ok':bool(ready),'scope':'credential and authority capacity; inference not asserted'})

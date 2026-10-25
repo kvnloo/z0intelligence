@@ -31,7 +31,7 @@
     "openai-codex": {
       "auth": "omp-oauth",
       "api_key_env": null,
-      "models": [{"id": "gpt-6-luna", "label": "Luna subscription"}]
+      "models": [{"id": "gpt-6-luna", "label": "Luna subscription"}, {"id": "gpt-5.6-terra", "label": "Terra subscription"}]
     },
     "anthropic": {
       "auth": "omp-oauth",
@@ -350,9 +350,10 @@
     "total_cap_usd": 1,
     "attempt_reservation_usd": 0.1,
     "max_attempts": 6,
-    "models": ["gpt-6-luna", "claude-haiku-5-5"],
+    "models": ["gpt-6-luna", "gpt-5.6-terra", "claude-haiku-5-5"],
     "routes": [
       {"provider": "openai-codex", "model": "gpt-6-luna"},
+      {"provider": "openai-codex", "model": "gpt-5.6-terra"},
       {"provider": "anthropic", "model": "claude-haiku-5-5"}
     ],
     "max_price": {
