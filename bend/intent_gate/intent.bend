@@ -42,7 +42,7 @@ def proof_allows(updated: Bool, marked: Bool, passed: Bool, tool_ok: Bool) -> Bo
   Bool.and(updated, Bool.and(marked, Bool.and(passed, tool_ok)))
 
 # Execution starts strictly after the ask. Other timestamp boundaries allow equality.
-def window_allows(asked: Nat, changed: Nat, start: Nat, finish: Nat, recorded: Nat) -> Bool:
+def window_allows(asked: Nat, changed: Nat, +start: Nat, +finish: Nat, recorded: Nat) -> Bool:
   Bool.and(Nat.is_gt(start, asked), Bool.and(Bool.not(Nat.is_gt(changed, start)), Bool.and(Bool.not(Nat.is_gt(start, finish)), Bool.not(Nat.is_gt(finish, recorded)))))
 
 # A delegated result must arrive before execution, not merely before the claim.
@@ -54,7 +54,7 @@ def delegate_allows(delegated: Bool, received: Bool, result: Nat, start: Nat) ->
       True{}
 
 # I3: task, acceptance verifier and actual result use the same exact identity.
-def identity_allows(task: Nat, verifier: Nat, result: Nat, acceptance: Nat, used: Nat) -> Bool:
+def identity_allows(+task: Nat, verifier: Nat, result: Nat, acceptance: Nat, used: Nat) -> Bool:
   Bool.and(Nat.is_eq(task, verifier), Bool.and(Nat.is_eq(task, result), Nat.is_eq(acceptance, used)))
 
 # The four arguments are the four independent receipt checks above.

@@ -33,13 +33,13 @@ def eq_sound(a: Nat, b: Nat, w: Laws.T(Nat.is_eq(a, b))) -> {a == b : Nat}:
 def first(a: Bool, b: Bool, c: Bool, d: Bool, w: Laws.T(Bool.and(a, Bool.and(b, Bool.and(c, d))))) -> Laws.T(a):
   and_l(a, Bool.and(b, Bool.and(c, d)), w)
 
-def second(a: Bool, b: Bool, c: Bool, d: Bool, w: Laws.T(Bool.and(a, Bool.and(b, Bool.and(c, d))))) -> Laws.T(b):
+def second(a: Bool, +b: Bool, +c: Bool, +d: Bool, w: Laws.T(Bool.and(a, Bool.and(b, Bool.and(c, d))))) -> Laws.T(b):
   and_l(b, Bool.and(c, d), and_r(a, Bool.and(b, Bool.and(c, d)), w))
 
-def third(a: Bool, b: Bool, c: Bool, d: Bool, w: Laws.T(Bool.and(a, Bool.and(b, Bool.and(c, d))))) -> Laws.T(c):
+def third(a: Bool, +b: Bool, +c: Bool, +d: Bool, w: Laws.T(Bool.and(a, Bool.and(b, Bool.and(c, d))))) -> Laws.T(c):
   and_l(c, d, and_r(b, Bool.and(c, d), and_r(a, Bool.and(b, Bool.and(c, d)), w)))
 
-def fourth(a: Bool, b: Bool, c: Bool, d: Bool, w: Laws.T(Bool.and(a, Bool.and(b, Bool.and(c, d))))) -> Laws.T(d):
+def fourth(a: Bool, +b: Bool, +c: Bool, +d: Bool, w: Laws.T(Bool.and(a, Bool.and(b, Bool.and(c, d))))) -> Laws.T(d):
   and_r(c, d, and_r(b, Bool.and(c, d), and_r(a, Bool.and(b, Bool.and(c, d)), w)))
 
 def Laws.i0_mutation_requires_approval(approved, w):
@@ -78,16 +78,16 @@ def Laws.i2_verifier_actually_passed(updated, marked, passed, tool, w):
 def Laws.i2_tool_run_succeeded(updated, marked, passed, tool, w):
   fourth(updated, marked, passed, tool, w)
 
-def Laws.i2_verifier_after_ask(asked, changed, start, finish, recorded, w):
+def Laws.i2_verifier_after_ask(asked, changed, +start, +finish, recorded, w):
   first(Nat.is_gt(start, asked), Bool.not(Nat.is_gt(changed, start)), Bool.not(Nat.is_gt(start, finish)), Bool.not(Nat.is_gt(finish, recorded)), w)
 
-def Laws.i2_verifier_after_update(asked, changed, start, finish, recorded, w):
+def Laws.i2_verifier_after_update(asked, changed, +start, +finish, recorded, w):
   second(Nat.is_gt(start, asked), Bool.not(Nat.is_gt(changed, start)), Bool.not(Nat.is_gt(start, finish)), Bool.not(Nat.is_gt(finish, recorded)), w)
 
-def Laws.i2_verifier_finishes_after_start(asked, changed, start, finish, recorded, w):
+def Laws.i2_verifier_finishes_after_start(asked, changed, +start, +finish, recorded, w):
   third(Nat.is_gt(start, asked), Bool.not(Nat.is_gt(changed, start)), Bool.not(Nat.is_gt(start, finish)), Bool.not(Nat.is_gt(finish, recorded)), w)
 
-def Laws.i2_update_after_verifier(asked, changed, start, finish, recorded, w):
+def Laws.i2_update_after_verifier(asked, changed, +start, +finish, recorded, w):
   fourth(Nat.is_gt(start, asked), Bool.not(Nat.is_gt(changed, start)), Bool.not(Nat.is_gt(start, finish)), Bool.not(Nat.is_gt(finish, recorded)), w)
 
 def Laws.i2_delegate_result_received(received, result, start, w):
@@ -105,13 +105,13 @@ def Laws.i2_claim_requires_freshness(proof, fresh, delegate, identity, w):
 def Laws.i2_claim_requires_delegate_result(proof, fresh, delegate, identity, w):
   third(proof, fresh, delegate, identity, w)
 
-def Laws.i3_verifier_target_exact(task, verifier, result, acceptance, used, w):
+def Laws.i3_verifier_target_exact(+task, +verifier, result, acceptance, used, w):
   eq_sound(task, verifier, and_l(Nat.is_eq(task, verifier), Bool.and(Nat.is_eq(task, result), Nat.is_eq(acceptance, used)), w))
 
-def Laws.i3_result_target_exact(task, verifier, result, acceptance, used, w):
+def Laws.i3_result_target_exact(+task, verifier, +result, +acceptance, +used, w):
   eq_sound(task, result, and_l(Nat.is_eq(task, result), Nat.is_eq(acceptance, used), and_r(Nat.is_eq(task, verifier), Bool.and(Nat.is_eq(task, result), Nat.is_eq(acceptance, used)), w)))
 
-def Laws.i3_acceptance_verifier_exact(task, verifier, result, acceptance, used, w):
+def Laws.i3_acceptance_verifier_exact(+task, verifier, +result, +acceptance, +used, w):
   eq_sound(acceptance, used, and_r(Nat.is_eq(task, result), Nat.is_eq(acceptance, used), and_r(Nat.is_eq(task, verifier), Bool.and(Nat.is_eq(task, result), Nat.is_eq(acceptance, used)), w)))
 
 def Laws.i3_claim_requires_identity(proof, fresh, delegate, identity, w):
@@ -125,7 +125,7 @@ def carry_x(c: Bool, +h: Nat, -t: List<&2, Nat>, +carried: List<&2, Nat>, +x: Na
     case False{}:
       rest(m)
 
-def Laws.i4_forwarded_ids_are_carried(forwarded, carried, x, w, m):
+def Laws.i4_forwarded_ids_are_carried(forwarded, +carried, +x, w, m):
   match forwarded:
     case Nil{}:
       Empty.absurd(Laws.T(I.mem(x, carried)), m)
