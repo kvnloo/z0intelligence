@@ -602,38 +602,52 @@ def remote_records(spec: dict[str, Any], cache_dir: Path, manifest: dict[str, An
                     yield record(method, url, status, "unverified", "pr" if name == "pulls" else "issue" if name == "issues" else "comment", line)
 
 
-def write_index(records: list[dict[str, str]], output_dir: Path) -> dict[str, Any]:
-    """Replace deterministic JSONL and SQLite files after successful construction."""
+def write_index(records: Iterator[dict[str, str]], output_dir: Path) -> dict[str, Any]:
+    """Sort and deduplicate on disk, with bounded Python memory."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    unique = {tuple(row[field] for field in FIELDS) for row in records}
-    ordered = sorted(unique)
-    payload = "".join(json.dumps(dict(zip(FIELDS, row)), ensure_ascii=False, sort_keys=True) + "\n" for row in ordered)
     fd, temporary = tempfile.mkstemp(prefix=".capability-index-", dir=output_dir)
     os.close(fd)
     path = Path(temporary)
+    fd, json_temp = tempfile.mkstemp(prefix=".capability-jsonl-", dir=output_dir)
+    digest = hashlib.sha256()
+    statuses, kinds, count = Counter(), Counter(), 0
+    columns = ",".join(FIELDS)
     try:
-        with closing(sqlite3.connect(path)) as db, db:
-            db.execute("PRAGMA journal_mode=DELETE")
-            db.execute("CREATE TABLE entries (id INTEGER PRIMARY KEY, method TEXT NOT NULL, source TEXT NOT NULL, status TEXT NOT NULL, wired TEXT NOT NULL, kind TEXT NOT NULL, text TEXT NOT NULL)")
-            db.execute("CREATE VIRTUAL TABLE entries_fts USING fts5(method, source, status, wired, kind, text, content='entries', content_rowid='id')")
-            db.executemany("INSERT INTO entries(method,source,status,wired,kind,text) VALUES (?,?,?,?,?,?)", ordered)
-            db.execute("INSERT INTO entries_fts(entries_fts) VALUES ('rebuild')")
-            db.execute("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
-            db.execute("INSERT INTO metadata VALUES ('schema', 'look-first.index.v1')")
-            db.execute("INSERT INTO metadata VALUES ('jsonl_sha256', ?)", (hashlib.sha256(payload.encode()).hexdigest(),))
-        jsonl = output_dir / "capability-index.jsonl"
-        fd, json_temp = tempfile.mkstemp(prefix=".capability-jsonl-", dir=output_dir)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as stream:
-                stream.write(payload)
-            os.replace(json_temp, jsonl)
-        finally:
-            if os.path.exists(json_temp):
-                os.unlink(json_temp)
+        with tempfile.TemporaryDirectory(prefix=".capability-sort-", dir=output_dir) as directory:
+            with closing(sqlite3.connect(Path(directory) / "sort.sqlite3")) as staging:
+                staging.execute("PRAGMA temp_store=FILE")
+                staging.execute("PRAGMA cache_size=-2048")
+                staging.execute("CREATE TABLE input (method TEXT NOT NULL, source TEXT NOT NULL, status TEXT NOT NULL, wired TEXT NOT NULL, kind TEXT NOT NULL, text TEXT NOT NULL, UNIQUE(method,source,status,wired,kind,text))")
+                for record_row in records:
+                    staging.execute("INSERT OR IGNORE INTO input VALUES (?,?,?,?,?,?)", tuple(record_row[field] for field in FIELDS))
+                staging.commit()
+                with closing(sqlite3.connect(path)) as db, db, os.fdopen(fd, "wb") as stream:
+                    fd = None
+                    db.execute("PRAGMA journal_mode=DELETE")
+                    db.execute("CREATE TABLE entries (id INTEGER PRIMARY KEY, method TEXT NOT NULL, source TEXT NOT NULL, status TEXT NOT NULL, wired TEXT NOT NULL, kind TEXT NOT NULL, text TEXT NOT NULL)")
+                    db.execute("CREATE VIRTUAL TABLE entries_fts USING fts5(method, source, status, wired, kind, text, content='entries', content_rowid='id')")
+                    cursor = staging.execute(f"SELECT {columns} FROM input ORDER BY {columns}")
+                    while batch := cursor.fetchmany(512):
+                        db.executemany("INSERT INTO entries(method,source,status,wired,kind,text) VALUES (?,?,?,?,?,?)", batch)
+                        for row in batch:
+                            line = (json.dumps(dict(zip(FIELDS, row)), ensure_ascii=False, sort_keys=True) + "\n").encode()
+                            stream.write(line)
+                            digest.update(line)
+                            statuses[row[2]] += 1
+                            kinds[row[4]] += 1
+                            count += 1
+                    db.execute("INSERT INTO entries_fts(entries_fts) VALUES ('rebuild')")
+                    db.execute("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+                    db.execute("INSERT INTO metadata VALUES ('schema', 'look-first.index.v1')")
+                    db.execute("INSERT INTO metadata VALUES ('jsonl_sha256', ?)", (digest.hexdigest(),))
+        os.replace(json_temp, output_dir / "capability-index.jsonl")
         os.replace(path, output_dir / "capability-index.sqlite3")
     finally:
+        if fd is not None:
+            os.close(fd)
         path.unlink(missing_ok=True)
-    return {"entries": len(ordered), "jsonl_sha256": hashlib.sha256(payload.encode()).hexdigest(), "status_counts": dict(sorted(Counter(row[2] for row in ordered).items())), "kind_counts": dict(sorted(Counter(row[4] for row in ordered).items()))}
+        Path(json_temp).unlink(missing_ok=True)
+    return {"entries": count, "jsonl_sha256": digest.hexdigest(), "status_counts": dict(sorted(statuses.items())), "kind_counts": dict(sorted(kinds.items()))}
 
 
 def generate(*, config_path: Path | str | None = None, output_dir: Path | str = DEFAULT_OUTPUT, cache_dir: Path | str = DEFAULT_CACHE, checkout: Path | str | None = None, refresh_remote: bool = False, timeout: float = 60) -> dict[str, Any]:
@@ -648,13 +662,13 @@ def generate(*, config_path: Path | str | None = None, output_dir: Path | str = 
             if spec.get("github"):
                 _collect.collect_repo(spec["github"], cache_dir, timeout=timeout)
     evidence = wiring_evidence(config, manifest)
-    records = []
-    for spec in config["repositories"]:
-        records.extend(collect_local(spec, cache_dir, evidence, manifest))
-        records.extend(remote_records(spec, cache_dir, manifest))
-    metadata = skill_metadata(config["skill_metadata_paths"], manifest)
-    records.extend(collect_skills(config["skill_roots"], evidence, manifest, metadata, cache_dir))
-    manifest["index"] = write_index(records, output_dir)
+    def records():
+        for spec in config["repositories"]:
+            yield from collect_local(spec, cache_dir, evidence, manifest)
+            yield from remote_records(spec, cache_dir, manifest)
+        metadata = skill_metadata(config["skill_metadata_paths"], manifest)
+        yield from collect_skills(config["skill_roots"], evidence, manifest, metadata, cache_dir)
+    manifest["index"] = write_index(records(), output_dir)
     manifest["errors"] = sorted(manifest["errors"], key=lambda item: (item["scope"], item["error"]))
     manifest["complete"] = not manifest["errors"] and all(item["complete"] for category in ("local", "github", "skills") for item in manifest[category])
     dump_json(output_dir / "capability-index.manifest.json", manifest)
