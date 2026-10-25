@@ -131,8 +131,14 @@ and exclusive cutoff; publication copies this tested scope without refitting.
 The initial old-manifest run was stopped before completion: its earliest
 sample allowed only 14 preceding labels and nine tools. The new train-prefix
 protocol avoids this reduced-vocabulary surrogate and future-label leakage.
-Only 18 tool labels recur after the all-19-tools prefix; the exhausted stratum
-cannot supply new development/holdout labels and is not synthetically filled.
+Only 18 tool labels recur after the all-19-tools prefix. The missing stratum
+is **`manage_skill`**, with one observed label in the training prefix and
+none afterward. It cannot supply new development/holdout labels and is not
+synthetically filled. It receives no metric or dispatch credit. Search
+excludes unmeasured tools from frozen category membership, so a requested
+`manage_skill` routes fail-closed to the frontier under the existing
+`tool_not_in_observed_vocab` rule. The report's `training.unsupported_tools`
+records this explicit exclusion.
 
 The powered output paths are `measured-power.json` and
 `leaderboard-power.json`. The latter explores 54 category/stage/margin
