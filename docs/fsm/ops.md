@@ -272,6 +272,27 @@ findings with rule `synthetic-evidence-outside-tmp`. These findings increment
 - Incident replay: `python -m z0int.fsm.ops_replay tests/fixtures/ops_tapes/*.json`.
 - Tests: `tests/test_fsm_ops.py` (MBP via fleet-build; the two parity tests need Bend).
 
+## Law H: agent process placement (report only)
+
+Run `z0-guard cgroup-placement` or `python -m z0int.fsm.cgroup_placement`.
+The read-only Linux proc census identifies agent executables and their descendants
+by process ancestry, including shell and native-tool children. It reports a
+violation when their cgroup is outside `agent.slice` and
+`z0-farm-llama.service` (exact path components). It never moves, signals, or kills
+processes and always exits zero after reporting. Unreadable or changing process
+identities and unidentifiable orphan interpreters are unknown, not compliance.
+The JSON includes observed executable, cgroup, ancestry and timestamp; it is a
+point-in-time report, not an authorization or continuous enforcement claim.
+Synthetic proc tests are in `tests/test_cgroup_placement.py`; the decision laws
+and four proof-rejected semantic mutants are in `bend/placement_fsm`.
+For the live `/proc` census, read-only `systemctl --user show` also reports agent
+scopes whose `OOMPolicy` is not `continue`, and active `hermes-gateway.service`
+whose configured `Slice=agent.slice` differs from its running cgroup. A new
+drop-in does not move an already-running service. Missing systemd evidence is
+unknown; fixture proc roots do not query the live manager. These systemd sensors
+are tested in Python; the finite Bend proof covers only the placement predicate,
+not systemd settings, process discovery, or runtime restart application.
+
 ## R1 raw-mitigation pre-tool audit (opt-in, report-only)
 
 `omp-extensions/root-cause/index.ts` registers OMP `tool_call`, not a

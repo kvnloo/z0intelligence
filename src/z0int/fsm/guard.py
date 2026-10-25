@@ -1156,6 +1156,8 @@ def main(argv: list[str] | None = None) -> int:
     state_input.add_argument("--config", default=str(CONFIG / "state.json"), help="live sensor inventory JSON")
     st.set_defaults(fn=lambda a: __import__("z0int.fsm.state_laws", fromlist=["command"]).command(a))
 
+    from .cgroup_placement import register as register_placement
+    register_placement(sub)
     from . import root_cause, root_canaries
     root_cause.register(sub)
     root_canaries.register(sub)
