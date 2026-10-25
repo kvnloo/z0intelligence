@@ -26,6 +26,6 @@ python -m pytest -q \
   tests/test_cognition*.py tests/test_shadow*.py tests/test_learning*.py \
   tests/test_choice_capacity.py tests/test_loop_tick.py tests/test_legacy_import.py \
   tests/test_optchat.py tests/test_hermes_optchat.py tests/test_omp_capture.py \
-  tests/test_slm_methods.py
+  tests/test_slm_methods.py tests/test_network_cutover_phase_a.py
 bun test omp-extensions/local-cognition/index.test.ts \
   omp-extensions/z0int-bridge/index.test.ts omp-extensions/z0-usage/index.test.ts
