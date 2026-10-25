@@ -91,15 +91,15 @@
           "runtime": "llama.cpp-supervisor",
           "quantization": "Q4_K_M",
           "context": 4096,
-          "measured_vram_mib": 6251.0,
-          "vram_idle_mib": 5240.0,
-          "vram_peak_mib": 6251.0,
+          "measured_vram_mib": 6251,
+          "vram_idle_mib": 5240,
+          "vram_peak_mib": 6251,
           "cold_start_ms": 15348.781665000388,
           "warm_ttft_ms": 10.144,
           "decode_tok_s": 108.03511141120866,
           "short_decision_ms": 741.4457969998693,
           "long_decision_ms": 887.5959609995334,
-          "gpu_util_pct": 100.0,
+          "gpu_util_pct": 100,
           "measured_at": "2026-09-21T18:26:45Z"
         }
       ],
@@ -220,15 +220,15 @@
           "runtime": "llama.cpp-supervisor",
           "quantization": "Q4_K_M",
           "context": 4096,
-          "measured_vram_mib": 6646.0,
-          "vram_idle_mib": 6251.0,
-          "vram_peak_mib": 6646.0,
+          "measured_vram_mib": 6646,
+          "vram_idle_mib": 6251,
+          "vram_peak_mib": 6646,
           "cold_start_ms": 17721.9307940004,
           "warm_ttft_ms": 49.951,
           "decode_tok_s": 87.93237999978017,
           "short_decision_ms": 1083.2227880000573,
           "long_decision_ms": 1149.7388190000493,
-          "gpu_util_pct": 97.0,
+          "gpu_util_pct": 97,
           "measured_at": "2026-09-21T18:27:05Z"
         }
       ],
@@ -336,15 +336,15 @@
           "runtime": "llama.cpp-supervisor",
           "quantization": "Q4_K_M",
           "context": 4096,
-          "measured_vram_mib": 6646.0,
-          "vram_idle_mib": 6646.0,
-          "vram_peak_mib": 6646.0,
+          "measured_vram_mib": 6646,
+          "vram_idle_mib": 6646,
+          "vram_peak_mib": 6646,
           "cold_start_ms": 11479.440523999983,
           "warm_ttft_ms": 57.955,
           "decode_tok_s": 117.14745936447503,
           "short_decision_ms": 778.5844720001478,
           "long_decision_ms": 829.0741299997535,
-          "gpu_util_pct": 98.0,
+          "gpu_util_pct": 98,
           "measured_at": "2026-09-21T18:27:19Z"
         }
       ],
@@ -449,15 +449,15 @@
           "runtime": "llama.cpp-supervisor",
           "quantization": "Q4_K_M",
           "context": 4096,
-          "measured_vram_mib": 3178.0,
-          "vram_idle_mib": 1486.0,
-          "vram_peak_mib": 3178.0,
+          "measured_vram_mib": 3178,
+          "vram_idle_mib": 1486,
+          "vram_peak_mib": 3178,
           "cold_start_ms": 5222.007534999648,
           "warm_ttft_ms": 5.801,
           "decode_tok_s": 289.5473409902519,
           "short_decision_ms": 138.23248300013802,
           "long_decision_ms": 208.92001799984428,
-          "gpu_util_pct": 69.0,
+          "gpu_util_pct": 69,
           "measured_at": "2026-09-21T18:26:14Z"
         }
       ],
@@ -511,15 +511,15 @@
           "runtime": "llama.cpp-supervisor",
           "quantization": "Q4_K_M",
           "context": 4096,
-          "measured_vram_mib": 5293.0,
-          "vram_idle_mib": 3178.0,
-          "vram_peak_mib": 5293.0,
+          "measured_vram_mib": 5293,
+          "vram_idle_mib": 3178,
+          "vram_peak_mib": 5293,
           "cold_start_ms": 13284.277826999642,
           "warm_ttft_ms": 13.229,
           "decode_tok_s": 124.74271814382834,
           "short_decision_ms": 244.49857699983113,
           "long_decision_ms": 356.5524949999599,
-          "gpu_util_pct": 100.0,
+          "gpu_util_pct": 100,
           "measured_at": "2026-09-21T18:26:28Z"
         }
       ],
@@ -574,15 +574,15 @@
           "runtime": "llama.cpp-supervisor",
           "quantization": "Q8_0",
           "context": 4096,
-          "measured_vram_mib": 1482.0,
-          "vram_idle_mib": 3187.0,
-          "vram_peak_mib": 1482.0,
+          "measured_vram_mib": 1482,
+          "vram_idle_mib": 3187,
+          "vram_peak_mib": 1482,
           "cold_start_ms": 5319.287746000555,
           "warm_ttft_ms": 8.595,
           "decode_tok_s": 351.12359550561797,
           "short_decision_ms": 139.41085799979192,
           "long_decision_ms": 83.17142000032618,
-          "gpu_util_pct": 51.0,
+          "gpu_util_pct": 51,
           "measured_at": "2026-09-21T18:26:08Z"
         }
       ],
@@ -749,6 +749,243 @@
       "deployment_constraints": [],
       "mechanism": "Bounded scorer: returns calibrated probabilities over a caller-supplied candidate set and cannot invent a trajectory. Not a generative orchestrator.",
       "notes": "Reference entry. The canonical record is the decision_roster in manifests/models.z0int.json; this entry exists so the cascade can name it as a role default without duplicating fields."
+    },
+    "bonsai2_2b": {
+      "model_id": "bonsai2_2b",
+      "hf": "prism-ml/Ternary-Bonsai-2-2B-gguf",
+      "revision": "683f7be2629342a50987627b40881e54761a2430",
+      "role_tags": [
+        "tiny_action_specialist",
+        "general_function_caller"
+      ],
+      "parameter_count": "2B",
+      "license": "apache-2.0",
+      "gated_access": false,
+      "commercial_use": true,
+      "supported_runtimes": [
+        "llama.cpp (PrismML CUDA fork)"
+      ],
+      "available_quantizations": [
+        "PQ2_0",
+        "PTQ1_0"
+      ],
+      "tool_call_template": "qwen35",
+      "tool_parser": "qwen",
+      "structured_output_support": "Qwen3.5-family native tool calls via PrismML llama.cpp fork; not yet evaluated locally.",
+      "capabilities": {
+        "single_tool_call": true,
+        "parallel_tool_calls": false,
+        "multi_step_calls": false,
+        "multi_turn_calls": false,
+        "irrelevant_tool_rejection": false,
+        "model_as_tool_orchestration": false
+      },
+      "tested_context": null,
+      "tested_quantization": null,
+      "supports_confidence": false,
+      "supports_abstention": null,
+      "measurements": [],
+      "source_reported_benchmarks": [
+        {
+          "name": "PTQ1_0 packed model file size",
+          "value": "0.43 GB",
+          "source_url": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-2B-gguf",
+          "unverified": true
+        },
+        {
+          "name": "PQ2_0 packed model file size",
+          "value": "0.52 GB",
+          "source_url": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-2B-gguf",
+          "unverified": true
+        }
+      ],
+      "local_benchmark_receipt_ids": [],
+      "promotion_state": "candidate",
+      "deployment_constraints": [
+        "Requires a PrismML-compatible llama.cpp CUDA build; stock llama.cpp may reject ternary GGUF or produce invalid output.",
+        "12 GiB RTX 3080 Ti: model file size excludes runtime, KV cache, and optional vision mmproj; start at context=4096, one GGUF resident at a time.",
+        "Must pass local serving probe and legal-action/quality evaluation before promotion or default-route assignment."
+      ],
+      "mechanism": "Ternary-weight GGUF quantization of Qwen-family vision-language model; compact local agent candidate, not a calibrated Jev decision backend.",
+      "notes": "Unmeasured candidate. Default staged file Ternary-Bonsai-2-2B-PQ2_0.gguf; 2B/4B/9B based on Qwen3.5. Preserve PrismML author attribution."
+    },
+    "bonsai2_4b": {
+      "model_id": "bonsai2_4b",
+      "hf": "prism-ml/Ternary-Bonsai-2-4B-gguf",
+      "revision": "8d6557168168f91ea6697a4a49ed2ef622b53adb",
+      "role_tags": [
+        "general_function_caller",
+        "semantic_orchestrator"
+      ],
+      "parameter_count": "4B",
+      "license": "apache-2.0",
+      "gated_access": false,
+      "commercial_use": true,
+      "supported_runtimes": [
+        "llama.cpp (PrismML CUDA fork)"
+      ],
+      "available_quantizations": [
+        "PQ2_0",
+        "PTQ1_0"
+      ],
+      "tool_call_template": "qwen35",
+      "tool_parser": "qwen",
+      "structured_output_support": "Qwen3.5-family native tool calls via PrismML llama.cpp fork; not yet evaluated locally.",
+      "capabilities": {
+        "single_tool_call": true,
+        "parallel_tool_calls": false,
+        "multi_step_calls": false,
+        "multi_turn_calls": false,
+        "irrelevant_tool_rejection": false,
+        "model_as_tool_orchestration": false
+      },
+      "tested_context": null,
+      "tested_quantization": null,
+      "supports_confidence": false,
+      "supports_abstention": null,
+      "measurements": [],
+      "source_reported_benchmarks": [
+        {
+          "name": "PTQ1_0 packed model file size",
+          "value": "0.95 GB",
+          "source_url": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-4B-gguf",
+          "unverified": true
+        },
+        {
+          "name": "PQ2_0 packed model file size",
+          "value": "1.15 GB",
+          "source_url": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-4B-gguf",
+          "unverified": true
+        }
+      ],
+      "local_benchmark_receipt_ids": [],
+      "promotion_state": "candidate",
+      "deployment_constraints": [
+        "Requires a PrismML-compatible llama.cpp CUDA build; stock llama.cpp may reject ternary GGUF or produce invalid output.",
+        "12 GiB RTX 3080 Ti: model file size excludes runtime, KV cache, and optional vision mmproj; start at context=4096, one GGUF resident at a time.",
+        "Must pass local serving probe and legal-action/quality evaluation before promotion or default-route assignment."
+      ],
+      "mechanism": "Ternary-weight GGUF quantization of Qwen-family vision-language model; compact local agent candidate, not a calibrated Jev decision backend.",
+      "notes": "Unmeasured candidate. Default staged file Ternary-Bonsai-2-4B-PQ2_0.gguf; 2B/4B/9B based on Qwen3.5. Preserve PrismML author attribution."
+    },
+    "bonsai2_9b": {
+      "model_id": "bonsai2_9b",
+      "hf": "prism-ml/Ternary-Bonsai-2-9B-gguf",
+      "revision": "5b2abb02362efbed46bbe204014b02837778b2c2",
+      "role_tags": [
+        "semantic_orchestrator",
+        "general_local_fallback",
+        "general_function_caller"
+      ],
+      "parameter_count": "9B",
+      "license": "apache-2.0",
+      "gated_access": false,
+      "commercial_use": true,
+      "supported_runtimes": [
+        "llama.cpp (PrismML CUDA fork)"
+      ],
+      "available_quantizations": [
+        "PQ2_0",
+        "PTQ1_0"
+      ],
+      "tool_call_template": "qwen35",
+      "tool_parser": "qwen",
+      "structured_output_support": "Qwen3.5-family native tool calls via PrismML llama.cpp fork; not yet evaluated locally.",
+      "capabilities": {
+        "single_tool_call": true,
+        "parallel_tool_calls": false,
+        "multi_step_calls": false,
+        "multi_turn_calls": false,
+        "irrelevant_tool_rejection": false,
+        "model_as_tool_orchestration": false
+      },
+      "tested_context": null,
+      "tested_quantization": null,
+      "supports_confidence": false,
+      "supports_abstention": null,
+      "measurements": [],
+      "source_reported_benchmarks": [
+        {
+          "name": "PTQ1_0 packed model file size",
+          "value": "2.00 GB",
+          "source_url": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-9B-gguf",
+          "unverified": true
+        },
+        {
+          "name": "PQ2_0 packed model file size",
+          "value": "2.42 GB",
+          "source_url": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-9B-gguf",
+          "unverified": true
+        }
+      ],
+      "local_benchmark_receipt_ids": [],
+      "promotion_state": "candidate",
+      "deployment_constraints": [
+        "Requires a PrismML-compatible llama.cpp CUDA build; stock llama.cpp may reject ternary GGUF or produce invalid output.",
+        "12 GiB RTX 3080 Ti: model file size excludes runtime, KV cache, and optional vision mmproj; start at context=4096, one GGUF resident at a time.",
+        "Must pass local serving probe and legal-action/quality evaluation before promotion or default-route assignment."
+      ],
+      "mechanism": "Ternary-weight GGUF quantization of Qwen-family vision-language model; compact local agent candidate, not a calibrated Jev decision backend.",
+      "notes": "Unmeasured candidate. Default staged file Ternary-Bonsai-2-9B-PQ2_0.gguf; 2B/4B/9B based on Qwen3.5. Preserve PrismML author attribution."
+    },
+    "bonsai2_27b": {
+      "model_id": "bonsai2_27b",
+      "hf": "prism-ml/Ternary-Bonsai-2-27B-gguf",
+      "revision": "b072e1d3b35a0a630cece372c2127528e0994386",
+      "role_tags": [
+        "semantic_orchestrator",
+        "general_local_fallback"
+      ],
+      "parameter_count": "27B",
+      "license": "apache-2.0",
+      "gated_access": false,
+      "commercial_use": true,
+      "supported_runtimes": [
+        "llama.cpp (PrismML CUDA fork)"
+      ],
+      "available_quantizations": [
+        "PQ2_0",
+        "PTQ1_0"
+      ],
+      "tool_call_template": "qwen35",
+      "tool_parser": "qwen",
+      "structured_output_support": "Qwen3.5-family native tool calls via PrismML llama.cpp fork; not yet evaluated locally.",
+      "capabilities": {
+        "single_tool_call": true,
+        "parallel_tool_calls": false,
+        "multi_step_calls": false,
+        "multi_turn_calls": false,
+        "irrelevant_tool_rejection": false,
+        "model_as_tool_orchestration": false
+      },
+      "tested_context": null,
+      "tested_quantization": null,
+      "supports_confidence": false,
+      "supports_abstention": null,
+      "measurements": [],
+      "source_reported_benchmarks": [
+        {
+          "name": "PTQ1_0 packed model file size",
+          "value": "5.95 GB",
+          "source_url": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf",
+          "unverified": true
+        },
+        {
+          "name": "PQ2_0 packed model file size",
+          "value": "7.21 GB",
+          "source_url": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf",
+          "unverified": true
+        }
+      ],
+      "local_benchmark_receipt_ids": [],
+      "promotion_state": "candidate",
+      "deployment_constraints": [
+        "Requires a PrismML-compatible llama.cpp CUDA build; stock llama.cpp may reject ternary GGUF or produce invalid output.",
+        "12 GiB RTX 3080 Ti: model file size excludes runtime, KV cache, and optional vision mmproj; start at context=4096, one GGUF resident at a time.",
+        "Must pass local serving probe and legal-action/quality evaluation before promotion or default-route assignment."
+      ],
+      "mechanism": "Ternary-weight GGUF quantization of Qwen-family vision-language model; compact local agent candidate, not a calibrated Jev decision backend.",
+      "notes": "Unmeasured candidate. Default staged file Ternary-Bonsai-2-27B-PQ2_0.gguf; 27B derived from Qwen3.8-27B. Preserve PrismML author attribution."
     }
   },
   "sources": {
