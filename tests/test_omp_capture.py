@@ -334,6 +334,7 @@ def test_served_backend_writes_a_row_with_a_structured_actual_tool_and_no_tool_i
     assert row["tool_name"] == "bash"
     assert row["session_id"] == "omp-sess" and row["tool_call_id"] == "call-1"
     assert "actual_tool" not in row
+    assert "state" not in row  # State can contain raw tool arguments.
     assert Path(result["receipts_path"]).name == "cognition-shadow.jsonl"
     health = json.loads((home / "shadow" / "cognition-shadow-health.json").read_text())
     assert health["successful_calls"] == 1 and health["failed_calls"] == 0

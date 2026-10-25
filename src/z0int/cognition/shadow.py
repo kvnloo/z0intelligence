@@ -707,7 +707,6 @@ def run_shadow(
             "tool_call_id": tool_call_id or None,
             "identity_contract": "session-tool-call.v1",
             "tool_name": tool_name or None,
-            "state": context.state[:400],
             "graph_digest": legal.graph_digest,
             "candidate_action_count": legal.candidate_count,
             "legal_ids": list(legal.ids()),

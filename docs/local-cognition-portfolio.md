@@ -390,6 +390,8 @@ limit token bucket or reset timer in the cognition plane
   fail open; an empty legal set never contacts a model at all.
 * Shadow runs record side by side and never execute; receipts keep
   `selected_action` and `executed_action` separate.
+  OMP `cognition-shadow.jsonl` keeps call identity and graph metadata, not raw
+  context state or tool arguments; truncating state is not a privacy boundary.
 * `execution_completed` is never `verified_success`, and an ambient close cannot
   mint gold.
 
