@@ -123,7 +123,7 @@ silently become an empty contract.
 
 ## Formal scope and checks
 
-`bend/intent_gate` models I0–I4 with 37 theorem statements and 20 mutations.
+`bend/intent_gate` models I0–I4 and R6 lifecycle obligations with 26 mutations.
 Verifier execution starts strictly after the ask. Delegate results precede it.
 The mutant harness first requires a well-typed mutant. Parse, tool and type
 errors do not count as rejected behavioral mutants.
@@ -153,3 +153,29 @@ and atomically points the OMP extension link at that immutable snapshot. The
 installed. IntentService has its own stamped client/service bundle installer.
 The operational report gives exact reviewed commit commands. This change does
 not install either package into the live home.
+
+## R6 publication failure lifecycle
+
+Kevin-visible publication failure never closes the approved ask. The I1/I2
+lifecycle retains its unresolved identity through restart; a failed native
+publication receipt cannot stand in for verified output. The native test
+harness supplies the logger required by the production lifecycle adapter.
+The MBP run `fleet-mbp-7faf4591ff274eff` passed all 49 JavaScript lifecycle
+tests and three Python tests, including failed-publication restart coverage.
+That run's later Bend failure was real and did not invalidate or prove the
+separate lifecycle tests. Timestamp proof bindings use inferred law signatures
+with reusable local `start`/`finish` values, matching the existing state-law
+proof convention; parser failures never count as rejected mutants.
+
+Final native proof job `fleet-mbp-62ae2ae8cb8e4f7e` returned
+`ALL PROOFS CHECK` on MBP. The relay induction is a typed helper, with the
+inferred theorem definition delegating to it; this avoids treating inferred
+dependent binders as reusable match inputs. Earlier parse/affine failures are
+superseded by this positive proof, not counted as mutation evidence.
+
+Final mutation job `fleet-mbp-6d5410a1379e44f6` passed the reference and
+rejected all 26/26 type-correct mutants. The initial 25/26 run exposed a
+duplicate open-task anchor after the R6 model addition; the anchor now includes
+the adjacent reason-only dropped branch, selecting the original I1 predicate
+exactly once without weakening proof or diagnostic requirements. Receipt:
+`~/.local/state/fleet/runs/fleet-mbp-6d5410a1379e44f6/src/intent-mutations.json`.

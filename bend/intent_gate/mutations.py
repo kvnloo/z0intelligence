@@ -21,7 +21,7 @@ MUTATIONS = [
     ("I0", "mutation ignores Kevin approval", "    case True{}:\n      approved", "    case True{}:\n      True{}"),
     ("I0", "all mutation is refused even after approval", "    case True{}:\n      approved", "    case True{}:\n      False{}"),
     ("I0", "Q&A requires approval", "    case False{}:\n      True{}\n\ntype Status", "    case False{}:\n      approved\n\ntype Status"),
-    ("I1", "open task closes the turn", "    case IOpen{}:\n      False{}", "    case IOpen{}:\n      True{}"),
+    ("I1", "open task closes the turn", "    case IOpen{}:\n      False{}\n    case IDropped{}:\n      reason", "    case IOpen{}:\n      True{}\n    case IDropped{}:\n      reason"),
     ("I1", "drop omits its reason", "    case IDropped{}:\n      reason", "    case IDropped{}:\n      True{}"),
     ("I1", "dead delegation closes the turn", "    case IDelegated{}:\n      live", "    case IDelegated{}:\n      True{}"),
     ("I1", "verified status substitutes for a receipt", "    case IVerified{}:\n      verified", "    case IVerified{}:\n      True{}"),
