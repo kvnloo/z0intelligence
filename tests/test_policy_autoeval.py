@@ -152,3 +152,29 @@ def test_mbp_dispatch_stages_importable_package_and_compiles_receipt(tmp_path,mo
     dispatch(request)
     policy = json.loads((tmp_path/'home/policy/decision-policy.json').read_text())
     assert policy['option_capacity'][option_capacity_key(scope)]['allowed_k']==10
+
+
+def test_adaptive_cell_resumes_atomic_checkpoint_without_rescoring(tmp_path):
+    from z0int.policy.autoeval import sample_cell
+    items = [{'id':str(i),'task':'T1','k':2,'answer':0} for i in range(400)]
+    scored = []
+    def interrupted(item):
+        index = int(item['id'])
+        if index==101:
+            raise RuntimeError('preempted')
+        scored.append(index)
+        return {'correct':index not in (0,1)}
+    checkpoint = tmp_path/'cell.json'
+    with pytest.raises(RuntimeError,match='preempted'):
+        sample_cell(items,interrupted,checkpoint,'identity')
+    assert len(json.loads(checkpoint.read_text())['rows'])==101
+    def resume(item):
+        index = int(item['id'])
+        scored.append(index)
+        return {'correct':True}
+    result = sample_cell(items,resume,checkpoint,'identity')
+    assert len(result)>101
+    assert len(scored)==len(set(scored))==len(result)
+    assert wilson(sum(row['correct'] for row in result),len(result))[0]>=.95
+    with pytest.raises(ValueError,match='identity'):
+        sample_cell(items,resume,checkpoint,'different weights')

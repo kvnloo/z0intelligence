@@ -232,7 +232,7 @@ def dispatch(request):
         remote['model']['path'] = 'weights.gguf'
         staged.write_bytes(canonical(remote) + b'\n')
         command = ['fleet-build','--node','mbp','--class','bench','--mem',lane.get('mem','4G'),
-                   '--cpus','4','--wait','-1','--timeout','14400','--src',str(output),
+                   '--checkpoint-safe','--cpus','4','--wait','-1','--timeout','14400','--src',str(output),
                    '--input',payload['model']['path']+':weights.gguf','--fetch','measurement.json','--out',str(output/'fetched'),
                    '--','python3','-m','z0int.policy.autoeval','measure','--request','request.json','--out','.']
         subprocess.run(command,check=True)
@@ -275,6 +275,40 @@ def dispatch(request):
                       'capacity':policy['option_capacity'].get(option_capacity_key(payload['scope']))}),flush=True)
 
 
+def atomic_json(path, value):
+    import tempfile
+    fd,name = tempfile.mkstemp(prefix='.checkpoint-',dir=path.parent)
+    try:
+        with os.fdopen(fd,'wb') as stream:
+            stream.write(canonical(value)+b'\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name,path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def sample_cell(items, score, checkpoint, identity, *, bar=.95, cap=400):
+    saved = json.loads(checkpoint.read_text()) if checkpoint.exists() else {'identity':identity,'rows':[]}
+    if saved['identity'] != identity:
+        raise ValueError('Checkpoint identity mismatch')
+    rows = saved['rows']
+    correct = sum(row['correct'] for row in rows)
+    for index,item in enumerate(items):
+        if index<len(rows):
+            if rows[index]['id']!=item['id']:
+                raise ValueError('Checkpoint item prefix mismatch')
+            continue
+        if rows and not needs_more(correct,len(rows),bar,cap=cap):
+            break
+        result = {**score(item),'id':item['id'],'task':item['task'],'k':item['k'],'answer':item['answer']}
+        rows.append(result)
+        correct += result['correct']
+        atomic_json(checkpoint,saved)
+    return rows
+
+
 def measure(request, out):
     payload = json.loads(request.read_text())
     config,model,lane = payload['config'],payload['model'],payload['lane']
@@ -289,7 +323,17 @@ def measure(request, out):
     if os.uname().nodename != lane['device']:
         raise ValueError('Worker device mismatch')
     out.mkdir(parents=True,exist_ok=True)
-    started = datetime.now(timezone.utc)
+    identity = digest({'model':model['sha256'],'scope':payload['scope'],'config':config,
+                       'items':file_sha(root/'items.jsonl'),'runner':file_sha(__file__)})
+    header = out/'checkpoint-header.json'
+    if header.exists():
+        saved = json.loads(header.read_text())
+        if saved['identity']!=identity:
+            raise ValueError('Checkpoint run identity mismatch')
+        started = timestamp(saved['started_at'])
+    else:
+        started = datetime.now(timezone.utc)
+        atomic_json(header,{'identity':identity,'started_at':started.isoformat()})
     with socket.socket() as sock:
         sock.bind(('127.0.0.1',0))
         port = sock.getsockname()[1]
@@ -331,15 +375,13 @@ def measure(request, out):
             supplements = router_supplements(benchmark,config,groups['T4',10])
             with (out/'rows.jsonl').open('w') as ledger:
                 for (task,k), initial in sorted(groups.items()):
-                    n = correct = 0
-                    for item in adaptive_items(benchmark,task,k,initial,config.get('cap',400),supplements):
-                        result = benchmark.score(base,item,model,slots)
-                        ledger.write(json.dumps({**result,'id':item['id'],'task':task,'k':k,'answer':item['answer']})+'\n')
-                        ledger.flush()
-                        n += 1
-                        correct += result['correct']
-                        if not needs_more(correct,n,config.get('bar',.95),cap=config.get('cap',400)):
-                            break
+                    scored = sample_cell(
+                        adaptive_items(benchmark,task,k,initial,config.get('cap',400),supplements),
+                        lambda item: benchmark.score(base,item,model,slots),
+                        out/f'checkpoint-{task}-{k}.json',identity,bar=config.get('bar',.95),cap=config.get('cap',400))
+                    n,correct = len(scored),sum(row['correct'] for row in scored)
+                    for row in scored:
+                        ledger.write(json.dumps(row)+'\n')
                     lower,upper = wilson(correct,n)
                     cells.append({'task':task,'k':k,'n':n,'correct':correct,'ci_low':lower,'ci_high':upper})
                     print(json.dumps(cells[-1]),flush=True)
