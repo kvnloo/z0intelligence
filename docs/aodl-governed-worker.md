@@ -146,6 +146,12 @@ OMP's catalog-derived price is recorded separately from actual billed cost;
 an unreported billed cost remains unknown. The existing shared $1 ledger and
 explicit model authorization still apply. Output limits are not claimed as
 provider-enforced when the headless CLI cannot enforce them.
+Prompt-token accounting includes native input, cache creation, and cache read
+tokens; raw components remain in the receipt. Cache creation is not free
+token-budget capacity.
+The synthetic fixture declares a 512-token output reservation in both its real
+OMP tool request and Python replay probes. This corrects the earlier oversized
+2048-token reservation; the contract's 4096-token total is unchanged.
 
 ## Proof
 

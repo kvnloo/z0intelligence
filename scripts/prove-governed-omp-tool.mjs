@@ -33,7 +33,7 @@ const params={
   trace_id:'remote-public-proof',
   function:'cheap_bounded_worker',
   allow_remote:true,
-  max_tokens:2048,
+  max_tokens:512,
 };
 
 const result=await registered.definition.execute(

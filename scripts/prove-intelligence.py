@@ -61,7 +61,7 @@ def governed(*,parent_agent,trace='remote-public-proof',task='Public synthetic d
         'parent_agent':parent_agent,
         'task':task,
         'context':'Public synthetic diagnostic only.',
-        'max_tokens':2048,
+        'max_tokens':512,
         'allow_remote':True,
     }
 
@@ -173,6 +173,7 @@ try:
         'input_tokens':free[0]['input_tokens'],
         'output_tokens':free[0]['output_tokens'],
         'cached_input_tokens':free[0].get('cached_input_tokens'),
+        'subscription_usage_components':free[0]['extra'].get('subscription_usage_components'),
         'catalog_estimated_cost_usd':free[0]['extra'].get('catalog_estimated_cost_usd'),
         'output_limit_enforced':free[0]['extra'].get('output_limit_enforced'),
         'authority_owned':True,

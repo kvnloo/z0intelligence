@@ -228,9 +228,14 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
             response_root = str(Path(os.environ['Z0INT_HOME']) / 'subscription-transport')
             result = execute(provider, model, messages, args.get('max_tokens', 512),
                              timeout_s=policy['timeout_s'], config={'root': response_root})
+            prompt_components = [result[key] for key in ('input_tokens', 'cached_input_tokens', 'cache_write_input_tokens')]
+            prompt_tokens = (sum(prompt_components) if all(type(value) is int and value >= 0
+                                                          for value in prompt_components) else None)
+            row.extra['subscription_usage_components'] = {
+                key: result[key] for key in ('input_tokens', 'cached_input_tokens', 'cache_write_input_tokens', 'total_tokens')}
             response = SimpleNamespace(
                 content=result['content'],
-                usage={'prompt_tokens': result['input_tokens'], 'completion_tokens': result['output_tokens'],
+                usage={'prompt_tokens': prompt_tokens, 'completion_tokens': result['output_tokens'],
                        'prompt_tokens_details': {'cached_tokens': result['cached_input_tokens']}, 'cost': result['cost']},
                 raw={'model': result['reported_model'], 'id': result['response_id'],
                      'choices': [{'finish_reason': result['finish_reason']}]},
@@ -243,7 +248,7 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
             if result['error']:
                 usage_present = any(result[key] is not None for key in ('input_tokens', 'output_tokens'))
                 actual_cost = result['cost']
-                row.input_tokens = result['input_tokens']
+                row.input_tokens = prompt_tokens
                 row.output_tokens = result['output_tokens']
                 row.cached_input_tokens = result['cached_input_tokens']
                 raise OmpError(result['error']['code'], code=result['error'].get('http_status'))
