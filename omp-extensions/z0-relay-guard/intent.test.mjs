@@ -247,6 +247,18 @@ test("drop requires reason, delegate tool cannot invent native lifecycle authori
   assert.equal(env.stop("DONE: task.1").decision, "block");
 });
 
+test("R6 failed Kevin-visible publication preserves approved ask across restart", async t => {
+  const env = await setup(t); await env.publish();
+  await env.invoke({ op: "view" });
+  env.pi.sendMessage = async () => { throw new Error("publication unavailable"); };
+  await assert.rejects(env.invoke({ op: "drop", taskId: "task.1", reason: "Kevin replaced this artifact request" }), /publication unavailable/);
+  assert.equal((await env.runtime()).plan.bindings["task.1"].status, "open");
+  env.restart();
+  const view = JSON.parse((await env.invoke({ op: "view" })).content[0].text);
+  assert.equal(view[0].plan.bindings["task.1"].status, "open");
+  assert.equal(env.stop("No action remains.").decision, "block");
+});
+
 test("stamped custom input requires matching raw digest and following authenticated user bytes", async t => {
   const digest = await setup(t, { stamped: true }); await digest.publish();
   digest.entries[0].data.sha256 = "0".repeat(64);

@@ -75,3 +75,19 @@ def relay_allows(forwarded: List<&2, Nat>, +carried: List<&2, Nat>) -> Bool:
       True{}
     case +h <> t:
       Bool.and(mem(h, carried), relay_allows(t, carried))
+
+# R6 extends I1/I2: a live child permits waiting, never resolution.
+# visible is an adapter-authenticated publication of the exact drop reason.
+def resolved(status: Status, reason: Bool, visible: Bool, returned: Bool, parent_verified: Bool) -> Bool:
+  match status:
+    case IOpen{}:
+      False{}
+    case IDropped{}:
+      Bool.and(reason, visible)
+    case IDelegated{}:
+      Bool.and(returned, parent_verified)
+    case IVerified{}:
+      parent_verified
+
+def overdue(approved: Bool, unresolved: Bool, age: Nat) -> Bool:
+  Bool.and(approved, Bool.and(unresolved, Nat.is_gt(age, 86400n)))

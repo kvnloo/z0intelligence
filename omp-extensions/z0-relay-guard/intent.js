@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { appendEvent, check, contractHash, registerDelegate, registerDelegateResult, registerHumanApproval, updateIntent, verifyTask, verifyPrecondition } from "./checker.js";
+import { appendEvent, check, contractHash, registerDelegate, registerDelegateResult, registerHumanApproval, registerVisibleDrop, updateIntent, verifyTask, verifyPrecondition } from "./checker.js";
 import { createRunner } from "./verifiers.js";
 
 const fail = message => { throw new Error(message); };
@@ -133,12 +133,19 @@ export function registerIntentGate(pi, helpers, options = {}) {
     parameters: z.object({ op: z.enum(["view", "verify", "verify-precondition", "drop", "delegate"]), taskId: z.string().optional(), verifierId: z.string().optional(), reason: z.string().optional(), delegateId: z.string().optional() }),
     async execute(toolCallId, input, signal, onUpdate, ctx) {
       const loaded = load(ctx);
-      if (input.op === "view") return { content: [{ type: "text", text: JSON.stringify(loaded.slots.map(s => s.doc)) }] };
+      if (input.op === "view") return { content: [{ type: "text", text: JSON.stringify(loaded.slots.map(s => ({ ...s.doc, overdueTasks: check(s.doc).overdueTasks }))) }] };
       if (!authority(loaded)) fail("Current CONTRACT message lacks Kevin-approved intent");
       const slot = loaded.slots.find(s => taskIds(s.doc).includes(input.taskId));
       if (!slot) fail("Unknown approved task id");
       let result;
-      if (input.op === "drop") { result = updateIntent(slot.doc, { op: "drop", taskId: input.taskId, reason: input.reason }); }
+      if (input.op === "drop") {
+        updateIntent(slot.doc, { op: "drop", taskId: input.taskId, reason: input.reason });
+        const request = slot.doc.eventLog.at(-1);
+        save(slot);
+        await show(`Kevin: dropping approved task ${input.taskId} from contract ${slot.doc.plan.bindings.approval.contract_id}.\nReason: ${input.reason}`);
+        registerVisibleDrop(slot.doc, input.taskId, input.reason, request.eventId);
+        result = slot.doc.plan.bindings[input.taskId];
+      }
       else if (input.op === "delegate") {
         const live = delegates.get(input.delegateId);
         if (!live || live.session !== loaded.source.session || live.status !== "started") fail("Delegate has no live native lifecycle receipt");

@@ -147,13 +147,25 @@ export function updateIntent(doc, input) {
   const task = findTask(doc, input.taskId);
   ensure(!Object.hasOwn(input, "target") && !Object.hasOwn(input, "acceptance") && !Object.hasOwn(input, "preconditions"), "Task target, acceptance and preconditions are immutable after add");
   if (input.op === "drop") {
-    ensure(task.status !== "verified" && nonempty(input.reason), "Dropping requires unresolved task and reason");
-    task.status = "dropped"; task.reason = input.reason;
-    appendEvent(doc, "stateUpdate", { kind: "drop", taskId: input.taskId, reason: input.reason });
+    ensure(task.status !== "verified" && task.status !== "dropped" && nonempty(input.reason), "Dropping requires unresolved task and reason");
+    // A proposed drop remains open until the native UI publishes its exact reason.
+    appendEvent(doc, "stateUpdate", { kind: "drop_requested", taskId: input.taskId, reason: input.reason });
     return task;
   }
   if (input.op === "delegate") return registerDelegate(doc, input.taskId, input.delegateId, { live: false });
   throw new Error("Unknown intent operation; verification and delegate results require trusted runtime APIs");
+}
+
+/** Trusted native adapter calls this only after awaiting Kevin-visible publication. */
+export function registerVisibleDrop(doc, taskId, reason, requestId) {
+  const task = findTask(doc, taskId);
+  const request = doc.eventLog.find(event => event.eventId === requestId);
+  ensure(["open", "delegated"].includes(task.status) && nonempty(reason)
+    && request?.type === "stateUpdate" && request.payload?.kind === "drop_requested"
+    && request.payload.taskId === taskId && request.payload.reason === reason,
+  "Visible drop must bind the exact pending task and reason");
+  task.status = "dropped"; task.reason = reason;
+  return appendEvent(doc, "stateUpdate", { kind: "drop", taskId, reason, publication: "native-kevin-visible" }, [requestId]);
 }
 
 export function registerDelegate(doc, taskId, delegateId, { live = true } = {}) {
@@ -277,8 +289,8 @@ export async function verifyPrecondition(doc, taskId, verifierId, runner = creat
   return verifyBinding(doc, taskId, verifierId, runner, true);
 }
 
-export function check(doc, { claims = [], relayTaskIds = [], forwardedTaskIds = [], turnEnd = false, mutating = false, requiresContract = true, verifyPrecondition: checkingPrecondition = false, sessionId } = {}) {
-  const violations = [], openTasks = [];
+export function check(doc, { claims = [], relayTaskIds = [], forwardedTaskIds = [], turnEnd = false, mutating = false, requiresContract = true, verifyPrecondition: checkingPrecondition = false, sessionId, now = Date.now() } = {}) {
+  const violations = [], openTasks = [], overdueTasks = [];
   const add = (law, reason, taskId) => violations.push({ law, ...(taskId ? { taskId } : {}), reason });
   try {
     const b = bindings(doc), entries = tasks(doc), known = new Map(entries);
@@ -335,9 +347,19 @@ export function check(doc, { claims = [], relayTaskIds = [], forwardedTaskIds = 
         const verified = doc.eventLog.filter(event => event.payload?.kind === "verified" && event.payload.taskId === taskId).at(-1);
         violations.push(...receiptIssues(doc, taskId, task, verified));
       } else if (task.status === "dropped") {
-        if (!nonempty(task.reason) || !doc.eventLog.some(event => event.type === "stateUpdate" && event.payload?.kind === "drop" && event.payload.taskId === taskId && event.payload.reason === task.reason)) add("I1", "Dropped task lacks reasoned runtime update", taskId);
+        const drop = doc.eventLog.filter(event => event.type === "stateUpdate" && event.payload?.kind === "drop" && event.payload.taskId === taskId).at(-1);
+        const request = doc.eventLog.find(event => drop?.causalParents?.includes(event.eventId) && event.type === "stateUpdate" && event.payload?.kind === "drop_requested" && event.payload.taskId === taskId && event.payload.reason === task.reason);
+        if (!nonempty(task.reason) || drop?.payload.reason !== task.reason || drop?.payload.publication !== "native-kevin-visible" || !request || doc.eventLog.indexOf(request) >= doc.eventLog.indexOf(drop)) add("I1", "Dropped task lacks exact Kevin-visible reason receipt", taskId);
       } else {
         openTasks.push(taskId);
+        const approval = b.approval;
+        if (approval?.status === "approved" && approval.approved_by === "kevin"
+          && approval.contractHash === contractHash(doc) && approval.sourceHash === doc.provenance.sourceHash
+          && approval.session_id === b.sessionId && nonempty(approval.contract_id)
+          && validTime(approval.approved_at) && time(approval.approved_at) <= time(now)
+          && validTime(now) && time(now) - time(task.askedAt) > 24 * 60 * 60 * 1000) {
+          overdueTasks.push({ taskId, contractId: approval.contract_id, sessionId: b.sessionId, text: task.text, askedAt: task.askedAt, ageMs: time(now) - time(task.askedAt), status: task.status });
+        }
         const latestDelegate = doc.eventLog.filter(event => event.type === "stateUpdate" && ["delegate", "delegate_result"].includes(event.payload?.kind) && event.payload.taskId === taskId).at(-1);
         const live = task.status === "delegated" && task.delegate?.live === true && task.delegate?.resultReceived === false && latestDelegate?.payload.kind === "delegate" && latestDelegate.payload.delegateId === task.delegate.id && latestDelegate.payload.live === true;
         if (turnEnd && !live) add("I1", "Turn ends with unresolved task and no live delegation", taskId);
@@ -350,5 +372,5 @@ export function check(doc, { claims = [], relayTaskIds = [], forwardedTaskIds = 
     for (const id of relayTaskIds) if (!known.has(id)) add("I4", "Relay carries unknown task id", id);
     for (const id of forwardedTaskIds) if (!known.has(id) || !relayTaskIds.includes(id)) add("I4", "Forwarded task missing carried identity", id);
   } catch (error) { add("I1", `Malformed intent contract: ${error.message}`); }
-  return { ok: violations.length === 0, violations, openTasks };
+  return { ok: violations.length === 0, violations, openTasks, overdueTasks };
 }

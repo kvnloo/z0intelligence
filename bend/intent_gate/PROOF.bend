@@ -167,3 +167,30 @@ def Laws.i4_carried_superset_allowed():
 
 def Laws.i2_execution_at_ask_rejected():
   {==}
+
+def Laws.i1_r6_unpublished_drop_open():
+  {==}
+
+def Laws.i1_r6_visible_drop_resolves():
+  {==}
+
+def Laws.i2_r6_child_completion_not_resolution():
+  {==}
+
+def Laws.i2_r6_parent_requires_return():
+  {==}
+
+def Laws.i2_r6_verified_return_resolves():
+  {==}
+
+def Laws.i1_r6_exact_day_not_overdue():
+  {==}
+
+def Laws.i1_r6_old_open_reported():
+  {==}
+
+def Laws.i1_r6_closed_not_overdue():
+  {==}
+
+def Laws.i1_r6_unapproved_not_overdue():
+  {==}

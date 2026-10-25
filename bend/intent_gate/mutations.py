@@ -38,6 +38,12 @@ MUTATIONS = [
     ("I3", "another acceptance verifier is substituted", "  Bool.and(Nat.is_eq(task, verifier), Bool.and(Nat.is_eq(task, result), Nat.is_eq(acceptance, used)))", "  Bool.and(Nat.is_eq(task, verifier), Bool.and(Nat.is_eq(task, result), True{}))"),
     ("I4", "forwarded head ID is not carried", "      Bool.and(mem(h, carried), relay_allows(t, carried))", "      Bool.and(True{}, relay_allows(t, carried))"),
     ("I4", "forwarded tail IDs are discarded", "      Bool.and(mem(h, carried), relay_allows(t, carried))", "      mem(h, carried)"),
+    ("I1", "R6 drop reason never shown", "      Bool.and(reason, visible)", "      reason"),
+    ("I2", "R6 child completion substitutes for parent verifier", "      Bool.and(returned, parent_verified)", "      returned"),
+    ("I2", "R6 parent verification without child return", "      Bool.and(returned, parent_verified)", "      parent_verified"),
+    ("I1", "R6 overdue boundary includes exactly 24 hours", "Nat.is_gt(age, 86400n)", "Bool.not(Nat.is_gt(86400n, age))"),
+    ("I1", "R6 closed asks remain overdue", "Bool.and(approved, Bool.and(unresolved, Nat.is_gt(age, 86400n)))", "Bool.and(approved, Nat.is_gt(age, 86400n))"),
+    ("I1", "R6 unapproved asks enter dashboard", "Bool.and(approved, Bool.and(unresolved, Nat.is_gt(age, 86400n)))", "Bool.and(unresolved, Nat.is_gt(age, 86400n))"),
 ]
 
 

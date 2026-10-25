@@ -238,3 +238,30 @@ law i4_carried_superset_allowed:
 
 law i2_execution_at_ask_rejected:
   {I.window_allows(3n, 3n, 3n, 3n, 3n) == False{} : Bool}
+
+law i1_r6_unpublished_drop_open:
+  {I.resolved(I.IDropped{}, True{}, False{}, False{}, False{}) == False{} : Bool}
+
+law i1_r6_visible_drop_resolves:
+  {I.resolved(I.IDropped{}, True{}, True{}, False{}, False{}) == True{} : Bool}
+
+law i2_r6_child_completion_not_resolution:
+  {I.resolved(I.IDelegated{}, False{}, False{}, True{}, False{}) == False{} : Bool}
+
+law i2_r6_parent_requires_return:
+  {I.resolved(I.IDelegated{}, False{}, False{}, False{}, True{}) == False{} : Bool}
+
+law i2_r6_verified_return_resolves:
+  {I.resolved(I.IDelegated{}, False{}, False{}, True{}, True{}) == True{} : Bool}
+
+law i1_r6_exact_day_not_overdue:
+  {I.overdue(True{}, True{}, 86400n) == False{} : Bool}
+
+law i1_r6_old_open_reported:
+  {I.overdue(True{}, True{}, 86401n) == True{} : Bool}
+
+law i1_r6_closed_not_overdue:
+  {I.overdue(True{}, False{}, 86401n) == False{} : Bool}
+
+law i1_r6_unapproved_not_overdue:
+  {I.overdue(False{}, True{}, 86401n) == False{} : Bool}

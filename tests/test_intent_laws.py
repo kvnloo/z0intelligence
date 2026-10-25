@@ -84,7 +84,10 @@ def python_check(doc, options):
         if not additions or additions[0]["target"] != task["target"] or additions[0]["verifierId"] != task["acceptance"] or additions[0]["verifier"] != verifier or verifier["target"] != task["target"]:
             laws.add("I3")
         if task["status"] == "dropped":
-            if not task.get("reason", "").strip() or not any(item["type"] == "stateUpdate" and item["payload"].get("kind") == "drop" and item["payload"].get("taskId") == task_id and item["payload"].get("reason") == task.get("reason") for item in events):
+            drops = [item for item in events if item["type"] == "stateUpdate" and item["payload"].get("kind") == "drop" and item["payload"].get("taskId") == task_id]
+            drop = drops[-1] if drops else {}
+            request = next((item for item in events if item["eventId"] in drop.get("causalParents", []) and item["type"] == "stateUpdate" and item["payload"].get("kind") == "drop_requested" and item["payload"].get("taskId") == task_id and item["payload"].get("reason") == task.get("reason")), None)
+            if not task.get("reason", "").strip() or drop.get("payload", {}).get("reason") != task.get("reason") or drop.get("payload", {}).get("publication") != "native-kevin-visible" or request is None or events.index(request) >= events.index(drop):
                 laws.add("I1")
         elif task["status"] != "verified":
             opened.append(task_id)
@@ -176,7 +179,8 @@ add('unverified completion claim',base,null,{claims:['task:1']},['I2']);
 add('unknown completion claim',base,null,{claims:['task:absent']},['I2']);
 add('live delegation permits turn',base,d=>C.registerDelegate(d,'task:1','worker:1'),{turnEnd:true});
 add('dead delegation blocks turn',base,d=>C.registerDelegate(d,'task:1','worker:1',{live:false}),{turnEnd:true},['I1']);
-add('reasoned drop permits turn',base,d=>C.updateIntent(d,{op:'drop',taskId:'task:1',reason:'Kevin removed this ask'}),{turnEnd:true});
+add('reasoned visible drop permits turn',base,d=>{C.updateIntent(d,{op:'drop',taskId:'task:1',reason:'Kevin removed this ask'});C.registerVisibleDrop(d,'task:1','Kevin removed this ask',d.eventLog.at(-1).eventId);},{turnEnd:true});
+add('incident R6 unpublished drop stays open',base,d=>C.updateIntent(d,{op:'drop',taskId:'task:1',reason:'Kevin removed this ask'}),{turnEnd:true},['I1']);
 add('empty drop reason blocks turn',base,d=>{task(d).status='dropped';task(d).reason='';},{turnEnd:true},['I1']);
 add('passing verified claim',()=>verify(base()),null,{claims:['task:1'],turnEnd:true});
 add('verified state without update',base,d=>{task(d).status='verified';},{claims:['task:1']},['I2']);
@@ -223,6 +227,18 @@ add('approval for another session',base,approve,{mutating:true,sessionId:'other-
 add('approval for another source',base,d=>{approve(d);d.plan.bindings.approval.sourceHash='f'.repeat(64);},{mutating:true},['I0']);
 add('approval for another contract',base,d=>{approve(d);d.plan.bindings.approval.contractHash='f'.repeat(64);},{mutating:true},['I0']);
 add('future approval',base,d=>{approve(d);d.plan.bindings.approval.approved_at='9999-01-01T00:00:00.000Z';},{mutating:true},['I0']);
+for (const [name, age, approved, delegated] of [
+  ['incident R6 approved ask forgotten for days', 172800001, true, false],
+  ['incident R6 awaiting live child remains overdue', 86400001, true, true],
+  ['incident R6 exact 24h boundary', 86400000, true, false],
+  ['incident R6 unapproved draft excluded', 172800001, false, false],
+]) {
+  const d = base();
+  if (delegated) C.registerDelegate(d, 'task:1', 'worker:1');
+  if (approved) approve(d);
+  const now = Date.parse(task(d).askedAt) + age;
+  add(name, () => d, null, {now});
+}
 console.log(JSON.stringify(rows));
 '''
 
@@ -251,3 +267,23 @@ def test_boundary_corpus_covers_every_law_and_success(parity_rows):
     for law in ("I0", "I1", "I2", "I3", "I4"):
         assert sum(law in row["expected"] for row in parity_rows) >= 2
     assert any(not row["expected"] and row["options"].get("claims") for row in parity_rows)
+
+
+def test_r6_dashboard_reports_existing_approved_open_tasks(parity_rows):
+    incidents = [row for row in parity_rows if row["name"].startswith("incident R6 ") and "now" in row["options"]]
+    assert len(incidents) == 4
+    for row in incidents:
+        doc, now = row["doc"], row["options"]["now"]
+        bindings = doc["plan"]["bindings"]
+        task = bindings["task:1"]
+        expected = bindings.get("approval", {}).get("status") == "approved" and now - _time(task["askedAt"]) * 1000 > 86400000
+        reported = row["result"]["overdueTasks"]
+        assert bool(reported) == expected, row["name"]
+        if expected:
+            assert reported == [{
+                "taskId": "task:1", "contractId": bindings["approval"]["contract_id"],
+                "sessionId": bindings["sessionId"], "text": task["text"],
+                "askedAt": task["askedAt"], "ageMs": now - _time(task["askedAt"]) * 1000,
+                "status": task["status"],
+            }]
+            assert "task:1" in row["result"]["openTasks"]

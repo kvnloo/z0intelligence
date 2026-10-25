@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, rm, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
-import { createDocument, ingestUser, updateIntent, appendEvent, verifyTask, check, contractHash, registerDelegate, registerDelegateResult, registerHumanApproval } from "./checker.js";
+import { createDocument, ingestUser, updateIntent, appendEvent, verifyTask, check, contractHash, registerDelegate, registerDelegateResult, registerHumanApproval, registerVisibleDrop } from "./checker.js";
 import { runVerifier, createRunner, validateVerifier, normalizeVerifier, VERIFIER_TYPES } from "./verifiers.js";
 
 const entry = (id, content, timestamp = new Date(Date.now() - 1000).toISOString(), role = "user") => ({ id, timestamp, message: { role, content, timestamp } });
@@ -84,6 +84,8 @@ test("I1 does not permit arbitrary successful tools, dead delegates, or reasonle
   doc.plan.bindings["task.one"].delegate.live = false;
   assert.ok(laws(doc, { turnEnd: true }).includes("I1"));
   updateIntent(doc, { op: "drop", taskId: "task.one", reason: "User replaced this target" });
+  assert.ok(laws(doc, { turnEnd: true }).includes("I1"));
+  registerVisibleDrop(doc, "task.one", "User replaced this target", doc.eventLog.at(-1).eventId);
   assert.equal(check(doc, { turnEnd: true }).ok, true);
   doc.plan.bindings["task.one"].reason = "";
   assert.ok(laws(doc, { turnEnd: true }).includes("I1"));
