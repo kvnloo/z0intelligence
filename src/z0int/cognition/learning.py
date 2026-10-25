@@ -67,6 +67,8 @@ def connect(home: Path) -> sqlite3.Connection:
     os.chmod(folder, 0o700)
     db = sqlite3.connect(folder / 'shadow-learning.sqlite')
     db.row_factory = sqlite3.Row
+    db.execute('PRAGMA journal_mode=WAL')
+    db.execute('PRAGMA synchronous=NORMAL')
     db.executescript('''
       CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, inode INTEGER, offset INTEGER);
       CREATE TABLE IF NOT EXISTS calls(session TEXT, call TEXT, tool TEXT, features TEXT,
@@ -97,12 +99,13 @@ def connect(home: Path) -> sqlite3.Connection:
 
 
 def lines_since(db: sqlite3.Connection, path: Path):
-    """Commit watermarks in the caller's transaction, and never consume a partial line."""
+    """Commit bounded batches with their watermarks; never consume a partial line."""
     st = path.stat()
     old = db.execute('SELECT inode,offset FROM files WHERE path=?', (str(path),)).fetchone()
     offset = old['offset'] if old and old['inode'] == st.st_ino and old['offset'] <= st.st_size else 0
     with path.open('rb') as stream:
         stream.seek(offset)
+        batch = 0
         while True:
             line = stream.readline()
             if not line or not line.endswith(b'\n'):
@@ -114,8 +117,15 @@ def lines_since(db: sqlite3.Connection, path: Path):
                 continue
             if isinstance(row, dict):
                 yield row
+            batch += 1
+            if batch >= 256:
+                db.execute('INSERT OR REPLACE INTO files VALUES(?,?,?)',
+                           (str(path), st.st_ino, offset))
+                db.commit()
+                batch = 0
     db.execute('INSERT OR REPLACE INTO files VALUES(?,?,?)', (str(path), st.st_ino, offset))
 
+    db.commit()
 
 def _result(message: dict) -> dict:
     details = message.get('details') or {}
@@ -221,12 +231,28 @@ def ingest_receipts(db: sqlite3.Connection, path: Path, deadline: float) -> bool
 
 def join_labels(db: sqlite3.Connection, now: float) -> int:
     before = db.execute('SELECT COUNT(*) FROM labels').fetchone()[0]
-    db.execute('''INSERT OR IGNORE INTO labels SELECT r.id,r.session,r.call,r.family,r.ts,
-      c.tool,c.features,c.outcome,? FROM receipts r JOIN calls c
-      ON r.session=c.session AND r.call=c.call WHERE r.session IS NOT NULL AND r.call IS NOT NULL''', (now,))
-    db.execute('''UPDATE labels SET outcome=(SELECT c.outcome FROM calls c
-      WHERE c.session=labels.session AND c.call=labels.call) WHERE EXISTS
-      (SELECT 1 FROM calls c WHERE c.session=labels.session AND c.call=labels.call AND c.outcome IS NOT NULL)''')
+    # Bound each write transaction even when importing the initial backlog.
+    for table in ('receipts', 'labels'):
+        cursor = 0
+        while True:
+            rows = db.execute(f'SELECT rowid FROM {table} WHERE rowid>? ORDER BY rowid LIMIT 256',
+                              (cursor,)).fetchall()
+            if not rows:
+                break
+            end = rows[-1][0]
+            if table == 'receipts':
+                db.execute('''INSERT OR IGNORE INTO labels SELECT r.id,r.session,r.call,r.family,r.ts,
+                  c.tool,c.features,c.outcome,? FROM receipts r JOIN calls c
+                  ON r.session=c.session AND r.call=c.call
+                  WHERE r.rowid>? AND r.rowid<=?''', (now, cursor, end))
+            else:
+                db.execute('''UPDATE labels SET outcome=(SELECT c.outcome FROM calls c
+                  WHERE c.session=labels.session AND c.call=labels.call)
+                  WHERE rowid>? AND rowid<=? AND EXISTS
+                  (SELECT 1 FROM calls c WHERE c.session=labels.session
+                   AND c.call=labels.call AND c.outcome IS NOT NULL)''', (cursor, end))
+            db.commit()
+            cursor = end
     return db.execute('SELECT COUNT(*) FROM labels').fetchone()[0] - before
 
 
@@ -265,7 +291,7 @@ def score(db: sqlite3.Connection, threshold: float, deadline: float) -> bool:
         memory[ex['family']].append({'action': ex['action'], 'history': json.loads(ex['features']), 'ts': ex['ts']})
     todo = db.execute('''SELECT l.*,r.body FROM labels l JOIN receipts r USING(id)
       WHERE NOT EXISTS(SELECT 1 FROM examples e WHERE e.id=l.id) ORDER BY l.ts,l.id''').fetchall()
-    for row in todo:
+    for index, row in enumerate(todo, 1):
         if time.monotonic() >= deadline:
             return False
         receipt = json.loads(row['body'])
@@ -297,6 +323,8 @@ def score(db: sqlite3.Connection, threshold: float, deadline: float) -> bool:
         db.execute('INSERT INTO examples VALUES(?,?,?,?,?)',
                    (row['id'], row['family'], row['action'], row['features'], row['ts']))
         memory[row['family']].append({'action': row['action'], 'history': history, 'ts': row['ts']})
+        if index % 256 == 0:
+            db.commit()
     return True
 
 
@@ -445,6 +473,7 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
                     complete = ingest_receipts(db, failed_path, deadline) and complete
                 added = join_labels(db, now)
                 complete = score(db, float(cfg.get('confidence_threshold', .8)), deadline) and complete
+                db.commit()
                 families = arm_scores(db)
                 counts = dict(db.execute('SELECT family,COUNT(*) FROM labels GROUP BY family').fetchall())
                 transport_day = transport_metrics(db, now-86400)
@@ -527,6 +556,7 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
                     state['evolution'] = evolve(folder, state, reasons, now, window)
                 if experiments_enabled:
                     from .learning_runtime import runtime_tick
+                    db.commit()
                     try:
                         experiments = runtime_tick(db, home, now=now, deadline=deadline, config=cfg)
                         state['experiments'] = experiments
@@ -558,7 +588,12 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
             atomic_json(folder/'shadow-learning-status.json', state)
             return state
         finally:
-            db.close()
+            try:
+                db.rollback()
+                # A retained reader snapshot reports busy; the next tick retries.
+                db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+            finally:
+                db.close()
 
 
 def status_line(state: dict) -> str:

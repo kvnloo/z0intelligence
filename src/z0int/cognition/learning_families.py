@@ -351,6 +351,7 @@ def run_jobs(db: sqlite3.Connection, predict: Predict, *, now: float | None = No
             AND NOT EXISTS(SELECT 1 FROM family_evaluations e WHERE e.id=j.id AND e.arm=?)
             ORDER BY ts,id LIMIT ?""", (family, arm, max(0, max_jobs))).fetchall()
         queues.append((queue, strategy))
+    db.commit()
     processed = 0
     for index in range(max(0, max_jobs)):
         for queue, strategy in queues:
@@ -362,6 +363,7 @@ def run_jobs(db: sqlite3.Connection, predict: Predict, *, now: float | None = No
             prospective = row["label"] is None and row["family"] == "omp.wrapper_result" and 0 < row["ts"] <= now
             _evaluate(db, row, predict, now=now + time.monotonic() - started, slm_arm=slm_arm,
                       strategy=strategy, prospective=prospective)
+            db.commit()
             processed += 1
     return {"jobs_evaluated": processed, "families": family_metrics(db, now=now), "synthetic": False}
 

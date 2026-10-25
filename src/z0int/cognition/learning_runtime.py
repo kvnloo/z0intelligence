@@ -210,6 +210,7 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
         part = derive_jobs(db, now=now, max_calls=10000)
         for key in derived:
             derived[key] += part[key]
+        db.commit()
         if part['calls_scanned'] < 10000:
             break
     endpoints = load_serving(home/'config'/'serving.json')
@@ -229,6 +230,7 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
         max_jobs=int(config.get('jobs_per_tick', 48)), deadline=deadline,
         strategy_id='history-1', history_width=1, strategies=strategies,
         slm_arm='slm:' + endpoint.served_model)
+    db.commit()
     result.update(metrics, identity=identity, serving_scope=scope)
     observations = _atomic_observations(metrics['families'], identity, scope)
     tool_rows, matched = tool_observations(db, identity, scope)
@@ -255,6 +257,7 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
     result['search'] = search_tick(db, tick_id=tick_id, now=now,
         observations=combined.values(), census_queue=census, config=search_config,
         strategies=catalogue)
+    db.commit()
     artifact = home/'loop'/'findings-sources'/('shadow-' + hashlib.sha256(tick_id.encode()).hexdigest() + '.json')
     artifact.parent.mkdir(parents=True, exist_ok=True)
     atomic_json(artifact, {'ts': now, 'identity': identity, 'scope': scope,
@@ -262,6 +265,7 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
     result['findings'] = emit_findings(db, tick_id=tick_id, now=now,
         observations=observations, source_path=artifact, run_id='shadow-' + tick_id,
         home=home, config=search_config)
+    db.commit()
     result['findings_source'] = str(artifact)
     rpc = [json.loads(r[0]) for r in db.execute('SELECT body FROM learning_rpc WHERE ts>=?', (now,))]
     errors = sum(bool(r.get('error')) for r in rpc)
