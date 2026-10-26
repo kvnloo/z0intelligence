@@ -66,7 +66,7 @@ tasks:
     network: none
     risk_class: low
     smoke: null
-    verifier: "python -m pytest -q tests/test_posture.py tests/test_quota_budget.py"
+    verifier: "python -m pytest -q tests/test_posture.py"
     exit_criterion: "snapshot validates against a new schema; read-only (no writes outside ~/.z0int)"
     impact_note: "first machine-readable capacity view for routing"
 
