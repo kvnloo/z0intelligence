@@ -144,3 +144,13 @@ def test_a_required_harness_agentsview_never_saw_is_found_on_disk(world, tmp_pat
                     {'provider': 'pi', 'path': str(world['omp']), 'status': 'available'}])
     out = run(world, fake)
     assert any(p.startswith('deepseek-harness') and 'not in AgentsView' in p for p in out['problems'])
+
+
+def test_a_provider_home_listed_as_its_expanded_children_counts_as_indexed(world):
+    """ctx reports a Claude home root as <home>/projects and a codex home as sessions/, archived_sessions/ ..."""
+    fake = FakeCtx([{'provider': 'claude', 'path': str(world['claude'] / 'projects'), 'status': 'available'},
+                    {'provider': 'claude', 'path': str(world['claude'] / 'archived'), 'status': 'missing'},
+                    {'provider': 'pi', 'path': str(world['omp']), 'status': 'available'}])
+    out = run(world, fake, apply=True)
+    assert out['ok'], out['unresolved']
+    assert not [c for c in fake.calls if c[1:3] == ['sources', 'add']]
