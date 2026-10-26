@@ -15,8 +15,23 @@ def callback(index):
     return before_turn
 
 
-def corrections_hook(user_message=None, **_):
-    text = _orientation.corrections(user_message if isinstance(user_message, str) else '')
+def _text(value):
+    """User message text from a str, a content-part list ({'type': 'text', 'text': ...}) or a message dict."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return _text(value.get('content') if 'content' in value else value.get('text'))
+    if isinstance(value, (list, tuple)):
+        return ' '.join(_text(part) for part in value)
+    return ''
+
+
+def corrections_hook(user_message=None, conversation_history=None, **_):
+    prompt = _text(user_message)
+    if not prompt.strip() and conversation_history:
+        last = [m for m in conversation_history if isinstance(m, dict) and m.get('role') == 'user']
+        prompt = _text(last[-1]) if last else ''
+    text = _orientation.corrections(prompt)
     return {'context': text} if text else None
 
 

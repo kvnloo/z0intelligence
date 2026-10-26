@@ -248,3 +248,19 @@ class CorrectionsTests(unittest.TestCase):
         raw = self._cli(['--corrections', '--raw'], 'run the bend benchmark with cuda on the gpu')
         self.assertIn('CUDA', raw)
         self.assertEqual(self._cli(['--corrections'], 'not json bend cuda gpu'), '')
+
+
+class HermesCorrectionsHookTests(unittest.TestCase):
+    def test_hook_reads_str_content_parts_or_history(self):
+        module = load('hermes_state_packet_corr', ROOT / 'harness-adapters/hermes-state-packet/__init__.py')
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / 'c.jsonl'
+            store.write_text(json.dumps({'fact': 'Bend runs on the GPU with CUDA only.', 'source': 's1'}) + '\n'
+                             + ''.join(json.dumps({'fact': f'filler {i} soil'}) + '\n' for i in range(20)))
+            with patch.dict(os.environ, {'Z0INT_CORRECTIONS': str(store)}):
+                q = 'run the bend benchmark on cuda gpu'
+                for shape in (q, [{'type': 'text', 'text': q}], {'role': 'user', 'content': q}):
+                    self.assertIn('CUDA', module.corrections_hook(user_message=shape)['context'])
+                self.assertIn('CUDA', module.corrections_hook(
+                    user_message=None, conversation_history=[{'role': 'user', 'content': q}])['context'])
+                self.assertIsNone(module.corrections_hook(user_message='write a haiku about the moon'))
