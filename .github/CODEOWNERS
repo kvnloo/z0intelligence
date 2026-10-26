@@ -1,3 +1,7 @@
 # z0int CODEOWNERS
 # Maintainers own merge. Path owners review; they are not a merge bot.
 * @kvnloo
+
+# Contributor priority source: only the owner edits order, eligibility and credits.
+/.z0/ @kvnloo
+/schemas/priorities.schema.json @kvnloo

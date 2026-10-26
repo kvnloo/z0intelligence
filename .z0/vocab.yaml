@@ -1,0 +1,35 @@
+# Closed vocabulary for .z0/priorities.yaml `skills`/`toolchains` and for
+# contributor profile tags (spec docs/contrib/CONTRIBUTOR-LAYER.md §2.3).
+# Every tag the alignment engine uses must be listed here. No free-text inference.
+schema: z0.vocab.v1
+languages: [python, typescript, javascript, rust, go, c, cpp, swift, shell, julia]
+domains:   [ml-eval, benchmarking, inference, training, retrieval, schemas, protocol,
+            plugin-hooks, latency, systems, frontend, ui, docs, ci, data-tooling, security-review]
+toolchains: [python, node, bun, cargo, go, cuda, llama-cpp]
+
+# Toolchain present -> language tags. Used when no T2 language histogram is consented.
+toolchain_languages:
+  python: [python]
+  node: [typescript, javascript]
+  bun: [typescript, javascript]
+  cargo: [rust]
+  go: [go]
+  cuda: []
+  llama-cpp: [cpp]
+
+# Owner decision O-2 (2026-10-26): until a Rust starter task exists, a systems
+# profile maps to Python/C++ performance and latency tasks. This closed table turns
+# detected languages/toolchains into domain tags. It is deterministic and editable
+# only by the owner (CODEOWNERS /.z0/).
+affinity:
+  rust: [systems, latency]
+  go: [systems]
+  c: [systems]
+  cpp: [systems, latency]
+  typescript: [frontend]
+  javascript: [frontend]
+  cuda: [inference, training]
+
+# Toolchains a contributor can install at consent level C1. A task that needs a
+# missing toolchain outside this list is removed, not penalized.
+installable_toolchains: [python, node, bun, cargo, go, llama-cpp]
