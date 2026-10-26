@@ -197,9 +197,17 @@ def _ctx_covers(ctx_rows: Iterable[Mapping[str, Any]], provider: str, root: str)
         if r.get('provider') != provider or r.get('status') == 'missing':
             continue
         path = _real(r['path'])
-        if root == path or root.startswith(path.rstrip('/') + '/'):
+        # ctx lists a provider home as its expanded children (claude -> projects/, codex -> sessions/ ...).
+        if root == path or root.startswith(path.rstrip('/') + '/') or path.startswith(root.rstrip('/') + '/'):
             return True
     return False
+
+
+def _benign_missing(row: Mapping[str, Any], rows: Iterable[Mapping[str, Any]]) -> bool:
+    """A missing optional child of an expanded provider home (e.g. codex archived_sessions) is not a gap."""
+    parent = os.path.dirname(_real(row['path']))
+    return any(r is not row and r.get('provider') == row.get('provider') and r.get('status') == 'available'
+               and os.path.dirname(_real(r['path'])) == parent for r in rows)
 
 
 def ungranted_projects(conn: sqlite3.Connection, policy_path: str | Path, *, principal: str = 'operator',
@@ -290,7 +298,8 @@ def reconcile(*, av_dir: str | Path | None = None, ctx_bin: str | None = None,
         report_roots.append(entry)
     removed = {_real(a['root']) for a in applied if a.get('removed') and a['ok']}
     for r in ctx_rows or []:
-        if r.get('status') == 'missing' and not any(_real(r['path']).startswith(x) for x in removed):
+        if (r.get('status') == 'missing' and not any(_real(r['path']).startswith(x) for x in removed)
+                and not _benign_missing(r, ctx_rows or [])):
             problems.append(f'ctx root {r["provider"]} {r["path"]}: registered but missing (wrong path shape?)')
     warnings = []
     if grants_gap:
