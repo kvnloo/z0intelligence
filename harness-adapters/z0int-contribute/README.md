@@ -1,4 +1,4 @@
-# z0int-contribute (Claude Code and Codex plugin)
+# z0int-contribute (Claude Code plugin)
 
 Ships one skill, `z0int-contribute`, the thin wrapper around `z0int contribute --json`
 (spec: `docs/contrib/CONTRIBUTOR-LAYER.md` §1.5). The canonical text is
@@ -6,4 +6,5 @@ Ships one skill, `z0int-contribute`, the thin wrapper around `z0int contribute -
 here is a byte-for-byte copy that `tests/test_contribute_docs.py` keeps in sync.
 
 Codex, opencode and OMP read `AGENTS.md` directly, so they need no plugin for the
-start-here text. Hermes gets the same `AGENTS.md` text through its adapter.
+start-here text (the Codex local marketplace stays the hooks shim only). Hermes gets
+the same `AGENTS.md` text through its adapter.

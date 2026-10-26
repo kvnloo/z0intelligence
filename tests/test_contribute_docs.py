@@ -38,9 +38,10 @@ def test_skill_is_a_thin_cli_wrapper_and_plugin_copy_is_in_sync():
     assert skill.startswith("---\nname: z0int-contribute\n")
     assert "z0int contribute --json" in skill
     assert _read("harness-adapters/z0int-contribute/skills/z0int-contribute/SKILL.md") == skill
-    for mp, key in ((".claude-plugin/marketplace.json", "source"), (".agents/plugins/marketplace.json", "source")):
-        names = [p["name"] for p in json.loads(_read(mp))["plugins"]]
-        assert "z0int-contribute" in names, mp
+    names = [p["name"] for p in json.loads(_read(".claude-plugin/marketplace.json"))["plugins"]]
+    assert "z0int-contribute" in names
+    # Codex reads AGENTS.md directly; its local marketplace stays the hooks shim only
+    # (tests/test_capture_shims.py), so no Codex plugin entry is added.
 
 
 def test_contributing_states_cla_credit_and_default_branch():
