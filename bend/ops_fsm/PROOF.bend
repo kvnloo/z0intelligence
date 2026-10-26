@@ -644,6 +644,12 @@ def Laws.o13_destructive_request_never(credited, actual, named, measured, count)
   {==}
 
 
+def Laws.o13_unrecognized_risk_never(extra):
+  {==}
+
+def Laws.o13_unrecognized_request_never(extra, credited, actual, named, measured, count):
+  {==}
+
 # O16. Project the independent lifecycle requirements; positive rows prevent
 # vacuous always-refuse implementations.
 def Laws.o16_sqlite_replace_no_holders(complete, empty, w):

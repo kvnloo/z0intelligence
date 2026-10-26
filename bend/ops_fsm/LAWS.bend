@@ -486,6 +486,21 @@ law o13_destructive_request_never:
   {O.risk_option_capacity_allows(2n, credited, actual, named, measured, count) == False{} : Bool}
 
 
+# F1: IDs outside the declared 0..3 domain cannot gain authority.
+# The offset enumerates every natural ID >= 4, not just one witness.
+law o13_unrecognized_risk_never:
+  for extra: Nat
+  {O.option_risk_allows(Nat.add(4n, extra)) == False{} : Bool}
+
+law o13_unrecognized_request_never:
+  for extra: Nat
+  for credited: Bool
+  for actual: Nat
+  for named: Nat
+  for measured: Nat
+  for count: Nat
+  {O.risk_option_capacity_allows(Nat.add(4n, extra), credited, actual, named, measured, count) == False{} : Bool}
+
 law o8_failed_delivery_preserves_state:
   for +before: O.NSt
   for proposed: O.NSt

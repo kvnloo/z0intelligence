@@ -5,7 +5,7 @@ functions with proven laws. The gates that use them are documented in `docs/fsm/
 
 ```
 ops.bend       decision functions and the O8/O9 machines (constructors are prefixed: names are global)
-LAWS.bend      68 claims under O1-O13 and O16 (the owner's spec; do not weaken to pass)
+LAWS.bend      75 claims under O1-O13 and O16 (the owner's spec; do not weaken to pass)
 PROOF.bend     proofs (hand-written; no generator)
 mutations.py   76 broken variants of ops.bend; each must make PROOF.bend fail
 receipt.json   `hermes bend verify` receipt
@@ -51,6 +51,16 @@ Bend notes from this plane: a law hypothesis of a `Data` type used twice needs a
 the proof (`+ok2 = ok`); a decision function may not `match` a computed value (give it a
 helper like `npick`); after matching one parameter, match a sibling only inside a helper def.
 
+
+## Critic regression completion laws
+
+[Guard critic regressions](../../docs/fsm/guard-gdp-regressions.md) records
+F3 physical rollback confirmation (two laws), F4 delivery acknowledgment
+(three laws), and F1 universal rejection of risk IDs >=4 (two laws). F1 is a
+coverage gap: the unchanged reference already rejects those IDs. The 75-law
+book and 221 relevant Python tests pass on MBP, and the existing 76-mutant
+battery still rejects every mutant. Historical receipts below describe the
+68-law pre-regression book, not the new seven claims.
 
 ## SQLite lifecycle verification (O16)
 

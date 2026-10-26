@@ -529,6 +529,21 @@ def test_o8_delivery_commit_twin():
         assert P.neff(P.ncommit(False, before, proposed), False, 10, 1) == P.neff(before, False, 10, 1)
 
 
+# F1 is a law gap: the reference already rejects these IDs. The adjudicated
+# risk=4-only mutant must fail this regression without widening authority at 2/3.
+@pytest.mark.parametrize("risk", [4, 5, 16, 255, 2**32, 2**63 - 1])
+def test_o13_unrecognized_risk_rejected(risk):
+    assert not P.option_risk_allows(risk)
+    for credited in (False, True):
+        for actual, named in ((0, 0), (0, 1)):
+            for measured, count in ((0, 0), (1, 1), (119, 24)):
+                assert not P.risk_option_capacity_allows(risk, credited, actual, named, measured, count)
+
+
+def test_o13_risk_authority_domain_unchanged():
+    assert [P.option_risk_allows(risk) for risk in range(4)] == [True, True, False, False]
+
+
 # ------------------------------------------------------------------ O9
 
 def test_o9_restart_marks_interrupted_never_failed(tmp_path):
