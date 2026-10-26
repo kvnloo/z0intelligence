@@ -9,7 +9,9 @@ area:docs:
 
 area:loop:
   - changed-files:
-    - any-glob-to-any-file: '.github/**/*'
+    - any-glob-to-any-file:
+      - '.github/**/*'
+      - '.z0/**/*'
 
 area:verify:
   - changed-files:

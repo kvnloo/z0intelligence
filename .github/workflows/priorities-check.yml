@@ -1,0 +1,36 @@
+name: Priorities check
+
+# .z0/priorities.yaml is the contributor priority source (docs/contrib/CONTRIBUTOR-LAYER.md §2).
+# Offline: schema, closed vocabulary, newcomer laws, verifier paths, credits.
+# Live (read-only): an open newcomer task must not sit on a closed/blocked/parked/hcl:backlog
+# issue, and every `claimable` issue must have a file entry. Labels win for claim state;
+# the file wins for order and eligibility.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+    paths: [".z0/**", "schemas/**", "src/z0int/contribute/**", ".github/workflows/priorities-check.yml"]
+  schedule:
+    - cron: '41 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  priorities-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install PyYAML
+        run: python -m pip install PyYAML==6.0.3
+      - name: Check .z0/ (offline + live labels, read-only)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONPATH: src
+        run: python -m z0int.contribute.priorities --check --live --repo "${{ github.repository }}"

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kvnloo/z0intelligence/schemas/contrib.receipt.schema.json",
+  "title": "z0.contrib.receipt.v1 — one contributor-layer state transition, bound to an exact sha",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "state", "sha", "z0_sha", "host_class", "harness", "command", "exit", "output_sha256", "ts", "result"
+  ],
+  "properties": {
+    "schema": {"const": "z0.contrib.receipt.v1"},
+    "state": {
+      "enum": [
+        "S0_bootstrap", "S1_onboarded", "S2_smoke_passed", "S3_suggested", "S4_claimed",
+        "S5_working", "S6_evidenced", "S7_pr_ready", "baseline", "released"
+      ]
+    },
+    "task": {"type": ["string", "null"]},
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "z0_sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+    "host_class": {"type": "string", "pattern": "^(cpu|[a-z]+-[0-9]+g)$"},
+    "harness": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
+    "command": {"type": "string", "minLength": 1},
+    "exit": {"type": "integer"},
+    "output_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "ts": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+    "result": {"enum": ["pass", "fail", "skip"]},
+    "onboard_mode": {"enum": ["full", "repo_only", "unknown"]},
+    "parts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "command", "exit", "output_sha256"],
+        "properties": {
+          "name": {"type": "string"},
+          "command": {"type": "string"},
+          "exit": {"type": "integer"},
+          "output_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "golden_sha256": {"type": ["string", "null"]},
+          "golden_match": {"type": ["boolean", "null"]}
+        }
+      }
+    },
+    "data": {"type": "object"}
+  }
+}
