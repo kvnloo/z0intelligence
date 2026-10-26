@@ -22,7 +22,7 @@ LANGUAGE_SHARE_MIN = 0.10
 ALT_KIND_WINDOW = 0.25
 FORBIDDEN_LLM_PROVIDERS = ("grok", "xai", "cursor")  # kernel law P1: never LLM providers
 BLOCKING_LABELS = ("blocked", "parked", "hcl:backlog")
-FALLBACK_LABELS = ("good first issue", "claimable")
+FALLBACK_LABELS = ("good first issue", "good-first-issue", "claimable")
 
 # Closed reason codes (spec §3.3). Anything else is rejected by reasons_consistent().
 _REASON_RE = re.compile(
@@ -293,7 +293,7 @@ def fallback_from_labels(issues: list[dict[str, Any]], weights: dict[str, float]
         labels = set(it.get("labels") or [])
         if not labels & set(FALLBACK_LABELS) or labels & set(BLOCKING_LABELS):
             continue
-        diff = "S" if "good first issue" in labels else "M"
+        diff = "S" if labels & {"good first issue", "good-first-issue"} else "M"
         ranked.append({
             "task": f"gh-{int(it['number'])}", "issue": int(it["number"]), "title": str(it.get("title", ""))[:200],
             "kind": "issue", "tier": "P3", "rank": int(it["number"]), "difficulty": diff, "impact_note": "",
