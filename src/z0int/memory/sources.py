@@ -194,11 +194,107 @@ def ctx_config_roots(data_root: str | Path | None = None) -> dict[str, dict[str,
             if isinstance(v, dict)}
 
 
+def is_pi_session(path: str | Path) -> bool:
+    """A pi/OMP transcript: a `session` header within its first two records (OMP writes `title` first).
+
+    OMP also keeps non-transcript JSONL artefacts under `<session>/local/`; ctx's pi provider rejects the
+    *whole* root when it meets one ("no valid session header"), so they must never reach ctx.
+    """
+    try:
+        with open(path, 'rb') as fh:
+            for _ in range(2):
+                line = fh.readline(1 << 16)
+                if not line:
+                    return False
+                try:
+                    if json.loads(line).get('type') == 'session':
+                        return True
+                except (ValueError, AttributeError):
+                    return False
+    except OSError:
+        return False
+    return False
+
+
+def pi_mirror_path(root: str | Path) -> Path:
+    """Session-only mirror beside the agent dir (same filesystem, so hard links work): ~/.omp/.z0int-ctx-mirror/sessions."""
+    root = Path(_real(root))
+    return root.parent.parent / '.z0int-ctx-mirror' / root.name
+
+
+def sync_pi_mirror(root: str | Path, mirror: str | Path | None = None) -> dict[str, Any]:
+    """Hard-link every pi transcript under root into mirror; drop links whose source is gone.
+
+    Hard links share the inode, so in-place appends are visible to ctx without copying; a rewritten file
+    (new inode) is relinked on the next sync. Idempotent.
+    """
+    root = Path(_real(root))
+    mirror = Path(mirror) if mirror else pi_mirror_path(root)
+    want: dict[Path, os.stat_result] = {}
+    skipped = 0
+    for dirpath, _dirs, files in os.walk(root):
+        for name in files:
+            if not name.endswith('.jsonl'):
+                continue
+            src = Path(dirpath) / name
+            if is_pi_session(src):
+                try:
+                    want[src.relative_to(root)] = src.stat()
+                except OSError:
+                    continue
+            else:
+                skipped += 1
+    linked = removed = 0
+    for rel, st in want.items():
+        dst = mirror / rel
+        try:
+            if dst.stat().st_ino == st.st_ino:
+                continue
+            dst.unlink()
+        except FileNotFoundError:
+            pass
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.link(root / rel, dst)
+            linked += 1
+        except OSError:
+            continue
+    if mirror.exists():
+        for dirpath, dirs, files in os.walk(mirror, topdown=False):
+            for name in files:
+                p = Path(dirpath) / name
+                if p.relative_to(mirror) not in want:
+                    p.unlink(missing_ok=True)
+                    removed += 1
+            if not os.listdir(dirpath) and Path(dirpath) != mirror:
+                os.rmdir(dirpath)
+    return {'root': str(root), 'mirror': str(mirror), 'sessions': len(want), 'linked': linked,
+            'removed': removed, 'skipped_non_sessions': skipped}
+
+
+def ctx_failures(ctx_bin: str | None = None, *, timeout: float = 120) -> list[dict[str, str]] | None:
+    """Per-source import failures from ctx's last refresh. Registered is not indexed: this is the indexed check."""
+    cmd = ctx_bin or shutil.which('ctx')
+    if not cmd:
+        return None
+    try:
+        proc = subprocess.run([cmd, 'status', '--format', 'json', '--quiet'], capture_output=True, text=True,
+                              timeout=timeout, check=False)
+        payload = json.loads(proc.stdout)
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        return None
+    rows = ((payload.get('refresh') or {}).get('diagnostics') or {}).get('source_failures') or []
+    return [{'provider': str(r.get('provider')), 'selector': str(r.get('source_selector')),
+             'detail': str(r.get('detail') or r.get('class'))} for r in rows if isinstance(r, dict)]
+
+
 def _ctx_covers(ctx_rows: Iterable[Mapping[str, Any]], provider: str, root: str) -> bool:
     for r in ctx_rows:
         if r.get('provider') != provider or r.get('status') == 'missing':
             continue
         path = _real(r['path'])
+        if provider == 'pi' and path == _real(pi_mirror_path(root)):
+            return True
         # ctx lists a provider home as its expanded children (claude -> projects/, codex -> sessions/ ...).
         if root == path or root.startswith(path.rstrip('/') + '/') or path.startswith(root.rstrip('/') + '/'):
             return True
@@ -259,7 +355,10 @@ def reconcile(*, av_dir: str | Path | None = None, ctx_bin: str | None = None,
                 roots[(agent, _real(p))] = {'agent': agent, 'root': _real(p), 'provider': CTX_RULES[agent][0],
                                             'sessions': 0, 'av_newest': None}
     ctx_rows = ctx_sources(ctx_bin)
+    failures = ctx_failures(ctx_bin) if ctx_rows is not None else None
     report_roots, problems, applied = [], [], []
+    ctx_cmd = ctx_bin or shutil.which('ctx') or 'ctx'
+    config = ctx_config_roots()
     for (agent, root), row in sorted(roots.items()):
         disk = newest_source(row['provider'], root)
         active = disk is not None and now - disk <= active_days * 86400
@@ -297,6 +396,29 @@ def reconcile(*, av_dir: str | Path | None = None, ctx_bin: str | None = None,
                                             'ok': rm.returncode == 0,
                                             'detail': ((rm.stdout or rm.stderr or '').strip().splitlines()
                                                        or [''])[-1]})
+        if row['provider'] == 'pi':
+            mirror = _real(pi_mirror_path(root))
+            mirrored = [n for n, c in config.items() if c['provider'] == 'pi' and _real(c['path']) == mirror]
+            failing = [f for f in failures or [] if f['provider'] == 'pi'
+                       and _real(f['selector']) in (root, mirror)]
+            if failing:
+                problems.append(f"{agent} {root}: ctx import fails ({failing[0]['detail']})")
+            if apply and (mirrored or (failing and 'session header' in failing[0]['detail'])):
+                sync = sync_pi_mirror(root, mirror)
+                entry['mirror'] = sync
+                if not mirrored:
+                    direct = [n for n, c in config.items() if c['provider'] == 'pi' and _real(c['path']) == root]
+                    name = direct[0] if direct else f'auto-{agent}-{hashlib.sha256(root.encode()).hexdigest()[:8]}'
+                    cmd = [ctx_cmd, 'sources', 'add', '--provider', 'pi', '--root', mirror, '--quiet']
+                    cmd += ['--replace', name] if direct else [name]
+                    proc = runner(cmd, capture_output=True, text=True, timeout=120, check=False)
+                    applied.append({'agent': agent, 'root': mirror, 'name': name, 'ok': proc.returncode == 0,
+                                    'mirror_for': root, 'fixes': f'{root}: ctx import fails',
+                                    'detail': ((proc.stdout or proc.stderr or '').strip().splitlines() or [''])[-1]})
+                elif failing:
+                    applied.append({'agent': agent, 'root': mirror, 'name': mirrored[0], 'ok': True,
+                                    'mirror_for': root, 'fixes': f'{root}: ctx import fails',
+                                    'detail': f"resynced {sync['sessions']} sessions"})
         report_roots.append(entry)
     removed = {_real(a['root']) for a in applied if a.get('removed') and a['ok']}
     for r in ctx_rows or []:
@@ -309,7 +431,8 @@ def reconcile(*, av_dir: str | Path | None = None, ctx_bin: str | None = None,
         warnings.append(f'memory MCP grants: {len(grants_gap)} projects with recent sessions are not granted to '
                         f'operator, so search cannot see them: {top}')
     unresolved = [p for p in problems
-                  if not any(a['ok'] and not a.get('removed') and a['root'] in p and 'ctx (' in p for a in applied)]
+                  if not any(a['ok'] and not a.get('removed') and (a['root'] in p and 'ctx (' in p
+                                                                  or a.get('fixes', '\0') in p) for a in applied)]
     return {'schema': SCHEMA, 'ok': not unresolved, 'problems': problems, 'unresolved': unresolved, 'warnings': warnings,
             'applied': applied, 'roots': report_roots, 'ungranted_projects': grants_gap,
             'ctx': 'unavailable' if ctx_rows is None else f'{len(ctx_rows)} roots'}
