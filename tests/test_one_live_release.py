@@ -85,3 +85,29 @@ def test_unstaged_switch_preserves_current_and_does_not_restart(staged):
     assert result.returncode != 0
     assert (base/"current").resolve() == base/first
     assert not Path(env["CALL_LOG"]).exists()
+
+
+def test_staged_source_ships_bytecode(tmp_path):
+    """A read-only release with no bytecode recompiles on every hook; staging compiles src once."""
+    import sys
+    repo = tmp_path/"repo"
+    (repo/"src/pkg").mkdir(parents=True)
+    (repo/"src/pkg/mod.py").write_text("VALUE = 1\n")
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "GIT_AUTHOR_NAME": "fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid", "GIT_COMMITTER_NAME": "fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid"}
+    run("git", "-C", str(repo), "init", "-q", env=env)
+    run("git", "-C", str(repo), "add", ".", env=env)
+    run("git", "-C", str(repo), "commit", "-qm", "src", env=env)
+    sha = run("git", "-C", str(repo), "rev-parse", "HEAD", env=env).stdout.strip()
+    runtime = tmp_path/"runtime"
+    (runtime/".venv/bin").mkdir(parents=True)
+    (runtime/".venv/bin/python").symlink_to(sys.executable)
+    (runtime/"RUNTIME.json").write_text("{}\n")
+    base = tmp_path/"releases"
+    env.update(Z0INT_RELEASE_SOURCE=str(repo), Z0INT_RELEASE_BASE=str(base))
+    run("bash", str(SCRIPTS/"stage-z0int-release.sh"), sha, str(runtime), env=env)
+    try:
+        cached = list((base/sha/"src/pkg/__pycache__").glob("mod.*.pyc"))
+        assert cached and all(path.stat().st_mode & 0o222 == 0 for path in cached)
+    finally:
+        for directory, _, _ in os.walk(base, followlinks=False):
+            Path(directory).chmod(Path(directory).stat().st_mode | 0o700)
