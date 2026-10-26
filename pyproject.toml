@@ -56,4 +56,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "webgpu-demo"]
-markers = ["live: requires configured external or local model services"]
+markers = [
+  "live: requires configured external or local model services",
+  "contrib_smoke: offline contributor smoke subset (z0int contribute smoke; target <= 60 s)",
+]

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kvnloo/z0intelligence/schemas/contribute.state.schema.json",
+  "title": "z0.contribute.state.v1 — the one --json shape every `z0int contribute` subcommand prints",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "state", "sha", "receipts", "next_action", "needs_human", "warnings"],
+  "properties": {
+    "schema": {"const": "z0.contribute.state.v1"},
+    "state": {
+      "enum": [
+        "none", "S0_bootstrap", "S1_onboarded", "S2_smoke_passed", "S3_suggested",
+        "S4_claimed", "S5_working", "S6_evidenced", "S7_pr_ready"
+      ]
+    },
+    "sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{7,40}$"},
+    "task": {"type": ["string", "null"]},
+    "onboard_mode": {"enum": ["full", "repo_only", "unknown"]},
+    "receipts": {"type": "array", "items": {"type": "string"}},
+    "next_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "command", "why"],
+      "properties": {
+        "kind": {"enum": ["ask_human", "run", "done", "blocked"]},
+        "command": {"type": ["string", "null"]},
+        "why": {"type": "string"}
+      }
+    },
+    "needs_human": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "data": {"type": "object"}
+  }
+}
