@@ -917,6 +917,14 @@ def _cmd_task(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "contribute":
+        # Dispatch before the top-level parse: argparse.REMAINDER drops a leading
+        # option, so `z0int contribute --json` (the AGENTS.md start-here command)
+        # failed with "unrecognized arguments: --json".
+        from .contribute.cli import main as _contribute_main
+
+        rest = argv[1:]
+        return int(_contribute_main(rest[1:] if rest[:1] == ["--"] else rest))
     parser = build_parser()
     args = parser.parse_args(argv)
     as_json = bool(getattr(args, "as_json", False))

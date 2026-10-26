@@ -255,3 +255,21 @@ def test_llm_flag_never_accepts_grok_or_cursor():
     for bad in ("grok", "cursor"):
         with pytest.raises(SystemExit):
             K.build_parser().parse_args(["--llm", bad])
+
+
+def test_top_level_cli_passes_a_leading_json_flag(monkeypatch):
+    """`z0int contribute --json` (the AGENTS.md start-here command) reaches the contribute CLI.
+
+    argparse.REMAINDER drops a leading option, so the top-level parser used to fail
+    with "unrecognized arguments: --json" (found by the clean-container run).
+    """
+    from z0int import cli as top
+
+    seen: list[list[str]] = []
+    monkeypatch.setattr(K, "main", lambda argv=None, env=None: seen.append(list(argv)) or 0)
+    for argv, want in ((["contribute", "--json"], ["--json"]),
+                       (["contribute", "--json", "status"], ["--json", "status"]),
+                       (["contribute", "suggest", "--json"], ["suggest", "--json"]),
+                       (["contribute", "--", "--json"], ["--json"])):
+        assert top.main(argv) == 0
+        assert seen[-1] == want, argv
