@@ -154,3 +154,15 @@ def test_a_provider_home_listed_as_its_expanded_children_counts_as_indexed(world
     out = run(world, fake, apply=True)
     assert out['ok'], out['unresolved']
     assert not [c for c in fake.calls if c[1:3] == ['sources', 'add']]
+
+
+def test_hermes_lag_ignores_empty_and_automated_sessions(tmp_path):
+    db = tmp_path / 'state.db'
+    c = sqlite3.connect(db)
+    c.execute('create table sessions (id text, source text, started_at real)')
+    c.execute('create table messages (id integer primary key, session_id text)')
+    c.executemany('insert into sessions values (?,?,?)', [('a', 'tui', 100.0), ('b', 'acp', 500.0), ('c', 'cron', 900.0)])
+    c.executemany('insert into messages (session_id) values (?)', [('a',), ('c',)])
+    c.commit()
+    c.close()
+    assert sources.newest_source('hermes', db) == 100.0  # b is empty, c is cron
