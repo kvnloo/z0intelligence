@@ -126,12 +126,13 @@ class OrientationTests(unittest.TestCase):
         self.assertNotIn(str(ROOT), str(extension.resolve()))
         groups = json.loads(settings.read_text())['hooks']['UserPromptSubmit']
         self.assertEqual(groups[0]['hooks'][0]['command'], 'unrelated-hook')
-        self.assertEqual(len(groups), 11)
+        self.assertEqual(len(groups), 12)
+        self.assertTrue(groups[-1]['hooks'][0]['command'].endswith('state-packet-hook" --corrections'))
         backup = Path(receipt['backup']) / str(settings).lstrip('/')
         self.assertEqual(len(json.loads(backup.read_text())['hooks']['UserPromptSubmit']), 1)
         subprocess.run([sys.executable, str(repo / 'scripts/install-state-packet.py'), '--home', str(home)],
             text=True, capture_output=True, check=True)
-        self.assertEqual(len(json.loads(settings.read_text())['hooks']['UserPromptSubmit']), 11)
+        self.assertEqual(len(json.loads(settings.read_text())['hooks']['UserPromptSubmit']), 12)
 
     def test_hermes_registered_context_and_stale(self):
         module = load('hermes_state_packet', ROOT / 'harness-adapters/hermes-state-packet/__init__.py')
@@ -204,3 +205,46 @@ class OrientationTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class CorrectionsTests(unittest.TestCase):
+    """Owner-corrections seam: the one per-prompt injection shared by Claude Code, Hermes and omp."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.store = Path(self.tmp.name) / 'CORRECTIONS.jsonl'
+        rows = [
+            {'fact': 'Android UI on the S25 is driven with uiautomator2, never raw adb taps.', 'ts': '2026-10-22',
+             'harness': 'omp', 'source': 'omp:abc:12', 'terms': ['uiautomator2', 'adb']},
+            {'fact': 'Bend experiments must run on the GPU with CUDA; CPU runs are useless.', 'ts': '2026-10-20',
+             'harness': 'hermes-clean', 'source': 'hermes:1:2'},
+        ] + [{'fact': f'Unrelated filler fact number {i} about gardening soil.'} for i in range(30)]
+        self.store.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+
+    def test_matching_prompt_gets_the_correction_with_its_source(self):
+        text = orientation.corrections('tap the settings button on the S25 with adb', self.store, min_score=1.0)
+        self.assertIn('uiautomator2', text)
+        self.assertIn('omp:abc:12', text)
+        self.assertIn('<owner-corrections>', text)
+        self.assertNotIn('gardening', text.split('<owner-corrections>')[1].splitlines()[1])
+
+    def test_unrelated_prompt_or_missing_store_injects_nothing(self):
+        self.assertEqual(orientation.corrections('write a haiku about the moon', self.store), '')
+        self.assertEqual(orientation.corrections('uiautomator2 adb', Path(self.tmp.name) / 'missing.jsonl'), '')
+        self.store.write_text('not json\n')
+        self.assertEqual(orientation.corrections('uiautomator2 adb', self.store), '')
+
+    def _cli(self, args, stdin):
+        env = {**os.environ, 'Z0INT_CORRECTIONS': str(self.store)}
+        return subprocess.run([sys.executable, str(ROOT / 'src/z0int/orientation.py'), *args], input=stdin,
+                              capture_output=True, text=True, env=env, timeout=20).stdout
+
+    def test_claude_hook_reads_the_prompt_json_and_omp_reads_raw(self):
+        out = self._cli(['--claude-hook', '--corrections'],
+                        json.dumps({'prompt': 'run the bend benchmark with cuda on the gpu'}))
+        ctx = json.loads(out)['hookSpecificOutput']['additionalContext']
+        self.assertIn('CUDA', ctx)
+        raw = self._cli(['--corrections', '--raw'], 'run the bend benchmark with cuda on the gpu')
+        self.assertIn('CUDA', raw)
+        self.assertEqual(self._cli(['--corrections'], 'not json bend cuda gpu'), '')

@@ -15,6 +15,12 @@ def callback(index):
     return before_turn
 
 
+def corrections_hook(user_message=None, **_):
+    text = _orientation.corrections(user_message if isinstance(user_message, str) else '')
+    return {'context': text} if text else None
+
+
 def register(ctx):
     for index in range(10):
         ctx.register_hook('pre_llm_call', callback(index))
+    ctx.register_hook('pre_llm_call', corrections_hook)
