@@ -5,3 +5,5 @@
 # Contributor priority source: only the owner edits order, eligibility and credits.
 /.z0/ @kvnloo
 /schemas/priorities.schema.json @kvnloo
+/.github/workflows/claim.yml @kvnloo
+/.github/scripts/claim-bot.py @kvnloo

@@ -25,6 +25,9 @@ fi
 export VOL_NOW_EPOCH
 VOL_NOW_EPOCH="$(date -u +%s)"
 export VOL_MAX_AGE_SECS=$((MAX_HOURS * 3600))
+# Lease markers (<!-- z0-claim {...} -->, written by claim.yml) count only from the
+# claim bot or the repo owner; a marker pasted by anyone else is ignored.
+export VOL_TRUSTED="github-actions[bot],${GITHUB_REPOSITORY_OWNER:-${VOL_REPO_OWNER:-}}"
 
 # JSON comment page arrays on stdin → two lines: yes|no and reason.
 # The script is passed with -c so stdin stays the piped comments; with
@@ -34,6 +37,25 @@ import datetime, json, os, re, sys
 now = int(os.environ["VOL_NOW_EPOCH"])
 max_age = int(os.environ["VOL_MAX_AGE_SECS"])
 comments = [comment for page in json.load(sys.stdin) for comment in page]
+trusted = {t for t in os.environ.get("VOL_TRUSTED", "").split(",") if t}
+marker_re = re.compile(r"<!--\s*z0-claim\s+(\{.*?\})\s*-->", re.S)
+leases = {}
+for c in comments:
+    if ((c.get("user") or {}).get("login") or "") not in trusted:
+        continue
+    for m in marker_re.finditer(c.get("body") or ""):
+        try:
+            d = json.loads(m.group(1))
+            exp = int(datetime.datetime.strptime(d["expires"], "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=datetime.timezone.utc).timestamp())
+        except Exception:
+            continue
+        leases[str(d.get("login", "")).lower()] = (d.get("status", "active"), exp)  # latest per login wins
+if leases:
+    live = [k for k, (st, exp) in leases.items() if st == "active" and exp > now]
+    print("no" if live else "yes")
+    print(f"{len(live)} active z0-claim lease(s)" if live else "no active z0-claim lease")
+    sys.exit(0)
 iso = re.compile(
     r"(?:expires_at|expires)\s*:\s*([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:Z|[+-][0-9]{2}:[0-9]{2})?)",
     re.I,
