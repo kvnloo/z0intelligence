@@ -41,6 +41,10 @@ def check_llm_choice(choice: str) -> str:
 
 # ---------------------------------------------------------------- facts
 
+# Probed RAM below the nominal size by up to this factor still meets a task's ram_gib.
+RAM_SLACK = 0.9
+
+
 def host_class(profile: dict[str, Any]) -> str:
     gpu = (profile.get("hw") or {}).get("gpu") or {}
     cls, vram = gpu.get("class") or "none", gpu.get("vram_gib") or 0
@@ -126,7 +130,10 @@ def _hard_filter(task: dict[str, Any], ctx: dict[str, Any]) -> str | None:
         return "hardware"
     ram = hw.get("ram_gib")
     disk = hw.get("disk_free_gib")
-    if (ram is not None and ram < hw_need["ram_gib"]) or (disk is not None and disk < hw_need["disk_gib"]):
+    # The probe reads physical pages: a "16 GB" machine reports about 15.5 GiB, so
+    # compare against the nominal size with RAM_SLACK (the clean-container run lost
+    # its only fitting ML task to this).
+    if (ram is not None and ram < hw_need["ram_gib"] * RAM_SLACK) or (disk is not None and disk < hw_need["disk_gib"]):
         return "hardware"
     if hw.get("os", "unknown") not in ("unknown", *hw_need["os"]):
         return "hardware"

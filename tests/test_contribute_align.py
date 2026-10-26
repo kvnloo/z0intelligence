@@ -79,6 +79,42 @@ def test_oracle_profiles(doc, vocab, name):
     assert len(out["alternatives"]) == 2
 
 
+@pytest.mark.contrib_smoke
+@pytest.mark.parametrize("name", ["frontend", "ml-research", "systems-rust"])
+def test_oracle_profiles_at_t1_with_github_unreadable(doc, vocab, name):
+    """The clean-container agent run: `--profile minimal` gives T1 (no language
+    histogram, no recency) and gh is logged out (claims and issue states unknown).
+    The oracle must still hold. The ml-research cell picked t-139: 15.5 GiB failed
+    t-231's ram_gib 16, and a CUDA host did not map to ml-eval/benchmarking."""
+    case = _load_case(name)
+    prof = {k: v for k, v in case["profile"].items() if k not in ("languages", "recency", "interests")}
+    prof["tier"] = "T1"
+    prof["hw"] = {**prof["hw"], "ram_gib": 15.5}   # what the probe reads on a "16 GB" machine
+    out = A.align(doc, vocab, prof, case["prefs"], live_claims=None, issue_states=None,
+                  onboard_mode="repo_only")
+    by_id = {t["id"]: t for t in doc["tasks"]}
+    oracle = case["oracle"]
+    pick = by_id[out["pick"]["task"]]
+    if "allowed_picks" in oracle:
+        assert pick["id"] in oracle["allowed_picks"], out["pick"]
+    else:
+        assert set(pick["skills"]) & set(oracle["allowed_pick_skills_any"]), out["pick"]
+    for card in [out["pick"], *out["alternatives"]]:
+        assert not _forbidden(by_id[card["task"]], oracle), card
+    for code in oracle["reasons"]:
+        assert code in out["pick"]["reasons"], (code, out["pick"])
+
+
+def test_probed_ram_meets_the_nominal_size(doc, vocab):
+    t = next(t for t in doc["tasks"] if t["id"] == "t-231-local-inference-profile")
+    assert t["hardware"]["ram_gib"] == 16
+    ok = _profile(gpu_class="nvidia", vram=12, ram=15.5, toolchains=("python", "cuda"))
+    low = _profile(gpu_class="nvidia", vram=12, ram=12, toolchains=("python", "cuda"))
+    base = dict(live_claims={}, issue_states={})
+    assert t["id"] in {r["task"] for r in A.align({**doc, "tasks": [t]}, vocab, ok, **base)["ranked"]}
+    assert A.align({**doc, "tasks": [t]}, vocab, low, **base)["excluded_counts"] == {"hardware": 1}
+
+
 @pytest.mark.parametrize("name", ["frontend", "ml-research", "systems-rust"])
 def test_oracle_profiles_have_an_allowed_newcomer_task(doc, vocab, name):  # P2
     case = _load_case(name)

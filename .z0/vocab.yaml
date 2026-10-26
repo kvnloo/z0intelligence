@@ -28,7 +28,7 @@ affinity:
   cpp: [systems, latency]
   typescript: [frontend]
   javascript: [frontend]
-  cuda: [inference, training]
+  cuda: [inference, training, ml-eval, benchmarking]   # a CUDA GPU host is an ML eval/bench contributor (T1 has no language histogram)
 
 # Toolchains a contributor can install at consent level C1. A task that needs a
 # missing toolchain outside this list is removed, not penalized.
