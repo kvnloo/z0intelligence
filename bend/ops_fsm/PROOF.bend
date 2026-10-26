@@ -7,6 +7,12 @@ import ./LAWS.bend as Laws
 # Proof kit
 # ---------
 
+def Laws.o3_rollback_completion_requires_restoration(reset_ok, head_matches, restart_ok, health_up, w):
+  w
+
+def Laws.o3_restored_rollback_completes():
+  {==}
+
 def and_l(+a: Bool, -b: Bool, w: Laws.T(Bool.and(a, b))) -> Laws.T(a):
   match a:
     case True{}:

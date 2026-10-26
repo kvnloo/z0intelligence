@@ -212,6 +212,10 @@ def touched(x: Out) -> Bool:
     case _:
       False{}
 
+# Completion observation, separate from the atomic rollout decision.
+def rollback_confirmed(reset_ok: Bool, head_matches: Bool, restart_ok: Bool, health_up: Bool) -> Bool:
+  Bool.and(reset_ok, Bool.and(head_matches, Bool.and(restart_ok, health_up)))
+
 # ------------------------------------------------------------------ O4
 # Privacy boundary. A private-marked artifact is pushed only to a remote known
 # to be private; an unknown visibility fails closed.

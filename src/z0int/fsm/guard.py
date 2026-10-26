@@ -631,6 +631,10 @@ def cmd_rollout(a) -> int:
                               "health_up": rb_up, "head": git(wt, "rev-parse", "HEAD")}
         status = out.value if out else ("merged-check-pending" if check is None else
                                         "merged-check-passed" if check else "merged-check-failed")
+        if out is P.Out.ROLLED_BACK:
+            rb = ev["rollback"]
+            if not P.rollback_confirmed(rb["reset_ok"], rb["head"] == prev, rb["restart_ok"], rb["health_up"]):
+                status = "rollback-failed"
         if check is None:
             pending({**base, "out": "check-pending", "reasons": would, "retry_check":
                      f"z0-guard rollout --worktree {shlex.quote(wt)} --ref {sha} --candidate {shlex.quote(a.candidate)} --check {a.check}"})

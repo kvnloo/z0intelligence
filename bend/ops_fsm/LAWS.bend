@@ -486,6 +486,18 @@ law o13_destructive_request_never:
   {O.risk_option_capacity_allows(2n, credited, actual, named, measured, count) == False{} : Bool}
 
 
+# IO completion facts are supplied by the wrapper, not proven by admission.
+law o3_rollback_completion_requires_restoration:
+  for +reset_ok: Bool
+  for +head_matches: Bool
+  for +restart_ok: Bool
+  for +health_up: Bool
+  for w: T(O.rollback_confirmed(reset_ok, head_matches, restart_ok, health_up))
+  T(Bool.and(reset_ok, Bool.and(head_matches, Bool.and(restart_ok, health_up))))
+
+law o3_restored_rollback_completes:
+  {O.rollback_confirmed(True{}, True{}, True{}, True{}) == True{} : Bool}
+
 # O16: never replace a held SQLite store, tolerate ghosts, lose auth, or let
 # a stale inode owner unlink the current path's WAL/SHM.
 law o16_sqlite_replace_no_holders:

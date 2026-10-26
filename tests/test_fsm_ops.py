@@ -254,6 +254,43 @@ def test_o3_rollout_rolls_back_failed_check(served, fake_service, monkeypatch):
     assert fake_service["restarts"] == 2
 
 
+@pytest.mark.parametrize("failure", ["reset", "head", "restart", "health", None])
+def test_o3_rollback_claim_requires_confirmed_restoration(served, fake_service, monkeypatch, capsys, failure):
+    _, wt, cand = served
+    prev = git(wt, "rev-parse", "HEAD").stdout.strip()
+    candidate = git(cand, "rev-parse", "HEAD").stdout.strip()
+    original_sh = G.sh
+
+    def shell(*args, **kw):
+        if args[:5] == ("git", "-C", str(wt), "reset", "--keep"):
+            if failure in ("reset", "head"):
+                return subprocess.CompletedProcess(args, int(failure == "reset"), "", "reset refused")
+        return original_sh(*args, **kw)
+
+    monkeypatch.setattr(G, "sh", shell)
+    monkeypatch.setattr(G, "device_launch_check", lambda *a: (False, {}))
+    monkeypatch.setattr(G, "restart_unit", lambda u: fake_service.__setitem__(
+        "restarts", fake_service["restarts"] + 1) or not (failure == "restart" and fake_service["restarts"] == 2))
+    probes = []
+    monkeypatch.setattr(G, "wait_http", lambda *a: (probes.append(a) or not (
+        failure == "health" and len(probes) == 2), "test"))
+    capsys.readouterr()
+    assert _rollout(wt, cand) == 1
+    rec = json.loads(capsys.readouterr().out)
+    expected = "rollback-failed" if failure else "rolled-back"
+    assert rec["status"] == rec["out"] == expected
+    assert json.loads((G.STATE / "rollouts.jsonl").read_text().splitlines()[-1])["out"] == expected
+    assert git(wt, "rev-parse", "HEAD").stdout.strip() == (candidate if failure in ("reset", "head") else prev)
+    assert not (G.git_dir(str(wt)) / "z0-rollout.lock").exists()
+
+
+def test_o3_rollback_outcome_twin():
+    from itertools import product
+
+    for facts in product((False, True), repeat=4):
+        assert P.rollback_confirmed(*facts) == all(facts)
+
+
 def test_o3_rollout_defers_during_owner_call(served, fake_service, monkeypatch):
     main, wt, cand = served
     prev = git(wt, "rev-parse", "HEAD").stdout

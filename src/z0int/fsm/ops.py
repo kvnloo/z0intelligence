@@ -165,6 +165,11 @@ def why_deferred(q: Req) -> list[str]:
     return out
 
 
+def rollback_confirmed(reset_ok: bool, head_matches: bool, restart_ok: bool, health_up: bool) -> bool:
+    """A rollback decision is not completion until restoration is observed."""
+    return reset_ok and head_matches and restart_ok and health_up
+
+
 # ------------------------------------------------------------------ O4
 
 
