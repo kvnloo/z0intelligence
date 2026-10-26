@@ -252,6 +252,11 @@ def neff(s: NSt, ok: bool, now: int, lim: int = NODE_LIMIT_S) -> bool:
     return s.kind == "bad" and (not ok) and late(now, s.since, lim)
 
 
+def ncommit(delivered: bool, before: NSt, proposed: NSt) -> NSt:
+    """Commit an emitting transition only after delivery acknowledgment."""
+    return proposed if delivered else before
+
+
 # ------------------------------------------------------------------ O9
 
 

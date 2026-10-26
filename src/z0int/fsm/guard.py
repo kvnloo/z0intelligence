@@ -890,13 +890,21 @@ def health_step(state: dict, node: str, ok: bool, now: int, lim: int = P.NODE_LI
     s = P.NSt(cur.get("kind", "healthy"), int(cur.get("since", 0)))
     fire = P.neff(s, ok, now, lim)
     s2 = P.nstep(s, ok, now, lim)
-    state[node] = {"kind": s2.kind, "since": s2.since}
     if not fire:
+        state[node] = {"kind": s2.kind, "since": s2.since}
         return state, None
     m = gate_mode or mode("O8")
     text = f"fleet: {node} unhealthy for {(now - s.since) // 60} min (since {dt.datetime.fromtimestamp(s.since):%H:%M})"
     ev = {"gate": "O8", "node": node, "since": s.since, "at_ts": now, "mode": m, "text": text}
-    ev["delivery"] = deliver(text) if m == "enforce" else {"delivered": False, "via": "report-only"}
+    if m == "enforce":
+        try:
+            ev["delivery"] = deliver(text)
+        except (OSError, subprocess.SubprocessError) as exc:
+            ev["delivery"] = {"delivered": False, "error": str(exc)[:200]}
+        s2 = P.ncommit(ev["delivery"].get("delivered") is True, s, s2)
+    else:
+        ev["delivery"] = {"delivered": False, "via": "report-only"}
+    state[node] = {"kind": s2.kind, "since": s2.since}
     ledger(ev, "o8-notifications.jsonl")
     return state, ev
 

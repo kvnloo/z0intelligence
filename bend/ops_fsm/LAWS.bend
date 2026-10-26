@@ -486,6 +486,23 @@ law o13_destructive_request_never:
   {O.risk_option_capacity_allows(2n, credited, actual, named, measured, count) == False{} : Bool}
 
 
+law o8_failed_delivery_preserves_state:
+  for +before: O.NSt
+  for proposed: O.NSt
+  {O.ncommit(False{}, before, proposed) == before : O.NSt}
+
+law o8_delivered_commits_transition:
+  for before: O.NSt
+  for +proposed: O.NSt
+  {O.ncommit(True{}, before, proposed) == proposed : O.NSt}
+
+law o8_failed_delivery_preserves_retry:
+  for +before: O.NSt
+  for proposed: O.NSt
+  for +e: O.NEv
+  for +lim: Nat
+  {O.neff(O.ncommit(False{}, before, proposed), e, lim) == O.neff(before, e, lim) : Bool}
+
 # IO completion facts are supplied by the wrapper, not proven by admission.
 law o3_rollback_completion_requires_restoration:
   for +reset_ok: Bool

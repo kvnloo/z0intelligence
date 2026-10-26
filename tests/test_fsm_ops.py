@@ -490,6 +490,45 @@ def test_o8_notifies_exactly_once_per_episode():
     assert ev and ev["delivery"]["via"] == "report-only"
 
 
+@pytest.mark.parametrize("failure", ["refused", "missing", "os-error", "timeout"])
+def test_o8_failed_delivery_retries_until_acknowledged(failure):
+    attempts = []
+
+    def deliver(text):
+        attempts.append(text)
+        if len(attempts) == 1:
+            if failure == "os-error":
+                raise OSError("notifier unavailable")
+            if failure == "timeout":
+                raise subprocess.TimeoutExpired("notifier", 1)
+            return {"delivered": False} if failure == "refused" else {}
+        return {"delivered": True}
+
+    st, _ = G.health_step({}, "n", False, 0, 1, deliver=deliver, gate_mode="enforce")
+    st, ev = G.health_step(st, "n", False, 2, 1, deliver=deliver, gate_mode="enforce")
+    assert ev is not None and not ev["delivery"].get("delivered", False)
+    assert st["n"] == {"kind": "bad", "since": 0}
+    # Model the CLI persisting state between probes, not an in-memory retry loop.
+    st = json.loads(json.dumps(st))
+    st, ev = G.health_step(st, "n", False, 3, 1, deliver=deliver, gate_mode="enforce")
+    assert ev["delivery"]["delivered"] and st["n"] == {"kind": "notified", "since": 0}
+    st, ev = G.health_step(st, "n", False, 4, 1, deliver=deliver, gate_mode="enforce")
+    assert ev is None and len(attempts) == 2
+    st, _ = G.health_step(st, "n", True, 5, 1, deliver=deliver, gate_mode="enforce")
+    st, _ = G.health_step(st, "n", False, 6, 1, deliver=deliver, gate_mode="enforce")
+    st, ev = G.health_step(st, "n", False, 8, 1, deliver=deliver, gate_mode="enforce")
+    assert ev["delivery"]["delivered"] and len(attempts) == 3
+    assert st["n"] == {"kind": "notified", "since": 6}
+
+
+def test_o8_delivery_commit_twin():
+    for before in (P.NSt(), P.NSt("bad", 0), P.NSt("notified", 7)):
+        proposed = P.nstep(before, False, 10, 1)
+        assert P.ncommit(False, before, proposed) == before
+        assert P.ncommit(True, before, proposed) == proposed
+        assert P.neff(P.ncommit(False, before, proposed), False, 10, 1) == P.neff(before, False, 10, 1)
+
+
 # ------------------------------------------------------------------ O9
 
 def test_o9_restart_marks_interrupted_never_failed(tmp_path):

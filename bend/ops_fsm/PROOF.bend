@@ -13,6 +13,15 @@ def Laws.o3_rollback_completion_requires_restoration(reset_ok, head_matches, res
 def Laws.o3_restored_rollback_completes():
   {==}
 
+def Laws.o8_failed_delivery_preserves_state(before, proposed):
+  {==}
+
+def Laws.o8_delivered_commits_transition(before, proposed):
+  {==}
+
+def Laws.o8_failed_delivery_preserves_retry(before, proposed, e, lim):
+  {==}
+
 def and_l(+a: Bool, -b: Bool, w: Laws.T(Bool.and(a, b))) -> Laws.T(a):
   match a:
     case True{}:

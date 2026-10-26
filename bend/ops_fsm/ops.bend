@@ -343,6 +343,11 @@ def neff(s: NSt, e: NEv, lim: Nat) -> Bool:
     case _:
       False{}
 
+# Delivery acknowledgment applies only to emitting enforce-mode transitions.
+# nstep/neff remain the notification decision, not an assertion about IO.
+def ncommit(delivered: Bool, before: NSt, proposed: NSt) -> NSt:
+  npick(delivered, proposed, before)
+
 def notified(s: NSt) -> Bool:
   match s:
     case NNotified{since}:
