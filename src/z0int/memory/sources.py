@@ -98,8 +98,10 @@ def _hermes_newest(db: str) -> float | None:
         try:
             # Automated sessions (cron, subagents, tools) are not owner history; their churn is not a lag signal.
             cols = {r[1] for r in conn.execute('pragma table_info(sessions)')}
-            where = (" where coalesce(source, '') not in ('cron', 'subagent', 'tool', 'fx-worker')"
-                     if 'source' in cols else '')
+            # Empty sessions (an ACP/cron open that never got a message) are never indexed; not a lag signal.
+            where = " where exists (select 1 from messages m where m.session_id = sessions.id)"
+            if 'source' in cols:
+                where += " and coalesce(source, '') not in ('cron', 'subagent', 'tool', 'fx-worker')"
             value = conn.execute('select max(started_at) from sessions' + where).fetchone()[0]
         finally:
             conn.close()
