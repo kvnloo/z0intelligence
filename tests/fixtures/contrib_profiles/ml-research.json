@@ -1,0 +1,16 @@
+{
+  "profile": {
+    "schema": "z0.contribute.profile.v1", "tier": "T2", "source": "fixture",
+    "hw": {"os": "linux", "arch": "x86_64", "ram_gib": 32, "disk_free_gib": 200, "gpu": {"class": "nvidia", "vram_gib": 12}},
+    "network": true,
+    "toolchains": ["python", "cuda"], "harnesses": ["claude", "codex"],
+    "languages": {"python": 0.85, "shell": 0.15}, "recency": "active_30d"
+  },
+  "prefs": {},
+  "oracle": {
+    "allowed_picks": ["t-231-local-inference-profile", "t-24-rlcd-alignbench", "t-14-observer-eval-receipts", "t-25-alignbench-bakeoff"],
+    "forbidden_issues": [234, 94, 95],
+    "forbidden": {"newcomer_false": true},
+    "reasons": ["skill_match:python"]
+  }
+}
