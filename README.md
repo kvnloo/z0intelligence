@@ -389,6 +389,19 @@ restatement chronology. Foreign scopes, missing provenance, and conflicting
 joins fail closed. Keyed hashes support equality joins, not authentication of
 an externally modified audit file.
 
+**Private-only replay / no public outcome exporter:** Both replay APIs
+(`MemoryServer.replay_outcomes` and `z0int.memory_outcomes.replay_outcomes`)
+return private trusted-caller audit metadata, including full `native_join`,
+correlation HMACs, native ordinals and timestamps. The only supported replay
+`audience` is `"private"` (the default). A `"public"` or other audience
+fails with a fixed error before reading private audit rows or interpreting
+supplied rows. `join_native_outcome` is likewise a private trusted-caller API.
+Do not serialize these results into public logs, reports, artifacts or APIs.
+There is **no** public outcome exporter or reviewed public aggregate schema in
+this Draft; any future export requires a separately reviewed strict allowlist
+projection rather than filtering keys out of private joins. The standard MCP
+server exposes only `search` and `fetch`.
+
 **Scope limits:** This proves evidenced use in persisted output, not final
 provider-input inclusion, answer correctness, or reduced re-explanation.
 Uncited use and free-form user restatements remain unclassified. The explicit

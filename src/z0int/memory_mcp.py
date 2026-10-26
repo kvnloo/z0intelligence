@@ -26,7 +26,7 @@ from .memory_mcp_backends import (
     BackendIdentityDenied, BackendStale, agentsview_locator,
 )
 from .memory_contract import MemoryScope
-from .memory_outcomes import replay_outcomes
+from .memory_outcomes import _require_private_audience, replay_outcomes
 
 SOURCES = ("agentsview", "ctx", "qmd", "tencentdb")
 PRIVACY = {"public", "personal", "private"}
@@ -576,11 +576,15 @@ class MemoryServer:
                 raise ValueError("private audit file required")
             return [json.loads(line) for line in stream]
 
-    def replay_outcomes(self, scope: MemoryScope, *, rows: list[dict] | None = None) -> list[dict]:
+    def replay_outcomes(self, scope: MemoryScope, *, rows: list[dict] | None = None,
+                        audience: str = "private") -> list[dict]:
+        """Trusted private replay; public mode is refused before audit reads."""
+        _require_private_audience(audience)
         if self.workstream is None or scope != self.workstream:
             raise ValueError("replay scope mismatch")
         return replay_outcomes(self._audit_rows() if rows is None else rows,
-                               scope_hmac=self._scope_hmac(), principal=self.principal)
+                               scope_hmac=self._scope_hmac(), principal=self.principal,
+                               audience=audience)
 
     def _invalid_call(self) -> dict:
         _, failure = self._begin("invalid", "")

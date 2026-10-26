@@ -345,3 +345,82 @@ def test_offline_replay_enforces_native_causality_and_task_window(factory, chang
         rows[0]["through_ordinal"] = joined["decision"]["ordinal"] - 1
     with pytest.raises(ValueError):
         offline_replay(rows, scope_hmac=joined["scope_hmac"], principal="operator")
+
+
+def test_public_outcome_replay_refuses_unknown_private_fields_and_errors(factory, monkeypatch):
+    """A private replay is not an externally serializable result or report."""
+    evidence = record(role="user", ordinal=1, text="SYNTHETIC_PRIVATE_SOURCE_TEXT")
+    server, _, backend, _ = scoped(factory, [evidence])
+    query = server.search("SYNTHETIC_RAW_PRIVATE_QUERY")
+    decision = record(
+        role="assistant", ordinal=2,
+        text=f'Use [{evidence["locator"]}@{evidence["source_version"]}]',
+    )
+    backend.records = [decision]
+    answer = server.search("answer")["results"][0]["id"]
+    joined = server.join_native_outcome(query["receipt_id"], answer, scope=SCOPE)
+    assert joined["outcome"] == "hit_used"
+
+    rows = server._audit_rows()
+    secrets = (
+        "SYNTHETIC_PRIVATE_SOURCE_TEXT",
+        "SYNTHETIC_RAW_PRIVATE_QUERY",
+        "SYNTHETIC_NATIVE_USER_BODY",
+        "/synthetic/private/source-path",
+        "SYNTHETIC_UNEXPECTED_NESTED_SECRET",
+        "SYNTHETIC_SOURCE_ERROR_DETAIL",
+        evidence["locator"],
+        answer,
+    )
+    rows[-1]["unknown_native_join_payload"] = {
+        "nested": {"arbitrary": secrets[4], "source_path": secrets[3],
+                   "user_body": secrets[2], "raw_query": secrets[1]},
+    }
+    query_row = next(r for r in rows
+                     if r.get("receipt_id") == query["receipt_id"]
+                     and r.get("tool") == "search")
+    query_row["unknown_source_extension"] = {"body": secrets[0]}
+    private = offline_replay(rows, scope_hmac=joined["scope_hmac"],
+                             principal="operator")
+    assert private[0]["outcome"] == "hit_used"
+    assert private[0]["native_join"] == rows[-1]
+    assert private[0]["native_join"]["decision"] == joined["decision"]
+    assert server.replay_outcomes(SCOPE)[0]["outcome"] == "hit_used"
+    assert server.replay_outcomes(SCOPE, audience="private")[0]["native_join"]["decision"] == joined["decision"]
+
+    for audience in ("public", "report", "external", "", None,
+                     {"unknown": secrets[4]}):
+        with pytest.raises(ValueError, match="private-only") as exc:
+            offline_replay(rows, scope_hmac=joined["scope_hmac"],
+                           principal="operator", audience=audience)
+        serialized_error = json.dumps({"error": str(exc.value)})
+        assert all(secret not in serialized_error for secret in secrets)
+
+    # A public call must fail before touching the private state file.
+    def forbidden_private_read():
+        pytest.fail("public replay attempted a private audit read")
+
+    monkeypatch.setattr(server, "_audit_rows", forbidden_private_read)
+    with pytest.raises(ValueError, match="private-only") as exc:
+        server.replay_outcomes(SCOPE, audience="public")
+    assert all(secret not in str(exc.value) for secret in secrets)
+
+    # Malformed/unknown schemas are not silently interpreted as outcome rows.
+    with pytest.raises(ValueError, match="unsupported outcome audit schema") as exc:
+        offline_replay([*rows, {"schema": "z0int.memory_use_outcome.v2",
+                                "private_error": secrets[5]}],
+                       scope_hmac=joined["scope_hmac"], principal="operator")
+    assert secrets[5] not in str(exc.value)
+
+
+def test_public_outcome_replay_refuses_misses_and_backend_errors(factory):
+    server, _, backend, _ = scoped(factory, [])
+    assert server.search("SYNTHETIC_MISS_PRIVATE_QUERY")["status"] == "empty"
+    backend.down = True
+    assert server.search("SYNTHETIC_SOURCE_ERROR_DETAIL")["status"] == "unavailable"
+    # A negative result or source failure cannot authorize public serialization.
+    for audience in ("public", "report"):
+        with pytest.raises(ValueError, match="private-only") as exc:
+            server.replay_outcomes(SCOPE, audience=audience)
+        assert "SYNTHETIC_SOURCE_ERROR_DETAIL" not in str(exc.value)
+    assert server.replay_outcomes(SCOPE)[0]["outcome"] is None

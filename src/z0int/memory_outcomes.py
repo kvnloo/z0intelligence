@@ -30,12 +30,21 @@ def _native(value: Any) -> bool:
             _timestamp(value["observed_at"]))
 
 
-def replay_outcomes(rows: Iterable[dict], *, scope_hmac: str, principal: str) -> list[dict]:
+def _require_private_audience(audience: object) -> None:
+    """Refuse public/report serialization of source-derived private audit data."""
+    if type(audience) is not str or audience != "private":
+        raise ValueError("outcome replay is private-only; public export unsupported")
+
+
+def replay_outcomes(rows: Iterable[dict], *, scope_hmac: str, principal: str,
+                    audience: str = "private") -> list[dict]:
     """Replay saved scoped receipts without a live server, key, or native history.
 
     The caller retains the opaque scope token from its reviewed receipt. Hashes
     are equality joins, not authentication of an externally edited audit file.
+    The result includes the complete private native join; it is never a public DTO.
     """
+    _require_private_audience(audience)
     if not _digest(scope_hmac) or principal not in ("operator", "chatgpt"):
         raise ValueError("explicit replay scope and principal required")
     queries: dict[str, dict] = {}
