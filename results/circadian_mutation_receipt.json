@@ -1,0 +1,8 @@
+{
+ "target": "src/z0int/human_posture.py",
+ "mutants": 313,
+ "killed": 313,
+ "score": 100.0,
+ "threshold": 85,
+ "survivors": []
+}

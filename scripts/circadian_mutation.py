@@ -129,6 +129,9 @@ def main() -> int:
         for f in ("tests/test_human_posture.py", "tests/test_circadian_service.py"):
             shutil.copy(ROOT / f, w / f)
         works.append(w)
+    if run_one(works[0], src):
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise SystemExit("baseline fails in the scratch copy: every mutant would count as killed")
     results: dict[str, bool] = {}
 
     def worker(k: int) -> None:
