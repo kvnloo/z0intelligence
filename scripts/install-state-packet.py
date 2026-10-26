@@ -65,6 +65,7 @@ def main():
     groups[:] = [group for group in groups if not any('z0-state-packet/' in hook.get('command', '') for hook in group.get('hooks', []))]
     for index in range(10):
         groups.append({'hooks': [{'type': 'command', 'command': f'"{base}/current/bin/state-packet-hook" --chunk {index}', 'timeout': 5}]})
+    groups.append({'hooks': [{'type': 'command', 'command': f'"{base}/current/bin/state-packet-hook" --corrections', 'timeout': 5}]})
     settings.parent.mkdir(parents=True, exist_ok=True)
     temporary = settings.with_name('settings.state-packet-new.json')
     temporary.write_text(json.dumps(value, indent=2) + '\n')
