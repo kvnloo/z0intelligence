@@ -21,7 +21,9 @@ from pathlib import Path
 import re
 import select
 import socket
+import sqlite3
 import time
+from concurrent.futures import ThreadPoolExecutor, wait
 try:
     import tomllib
 except ImportError:  # pragma: no cover - Python 3.10
@@ -249,6 +251,134 @@ def _original(grant: dict[str, Any], native: dict[str, Any],
     }
 
 
+# --- Read-only SQLite path -------------------------------------------------------------------------
+# The AgentsView HTTP server shares one process with sync and gets swapped out and IO-starved on a
+# busy host: on 2026-10-25 176 one-minute probes saw 117 `unavailable`, and the server answered 0/8
+# searches while read-only SQLite on the same sessions.db answered 8/8 in 0.04-0.25 s. Discovery and
+# original reads therefore use the archive directly (mode=ro, scope in the WHERE clause, the same
+# message-class checks, one read transaction per original). HTTP stays as the fallback.
+SQLITE_USER_VERSIONS = (74, 113)
+_FTS_TOKEN = re.compile(r"[^\W_][\w.+-]*", re.UNICODE)
+
+
+def _sqlite_path() -> Path:
+    return Path.home() / ".agentsview" / "sessions.db"
+
+
+def _sqlite_connect(deadline: float) -> sqlite3.Connection:
+    path = _sqlite_path()
+    if not path.is_file():
+        raise BackendUnavailable("sqlite_unavailable")
+    try:
+        conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True, timeout=min(2.0, _remaining(deadline)),
+                               check_same_thread=False)
+    except sqlite3.Error:
+        raise BackendUnavailable("sqlite_unavailable") from None
+    try:
+        if conn.execute("pragma user_version").fetchone()[0] not in SQLITE_USER_VERSIONS:
+            raise BackendUnavailable("sqlite_schema")
+        conn.set_progress_handler(lambda: int(time.monotonic() > deadline), 10_000)
+    except sqlite3.Error:
+        conn.close()
+        raise BackendUnavailable("sqlite_unavailable") from None
+    except BackendUnavailable:
+        conn.close()
+        raise
+    return conn
+
+
+def _fts_query(query: str) -> str:
+    tokens = _FTS_TOKEN.findall(query)[:32]
+    if not tokens:
+        raise BackendUnavailable("invalid_arguments")
+    return " ".join('"' + t.replace('"', "") + '"' for t in tokens)
+
+
+def _sqlite_candidates(conn: sqlite3.Connection, grant: dict[str, Any], query: str,
+                       limit: int) -> list[dict[str, Any]]:
+    try:
+        rows = conn.execute(
+            "select m.session_id, m.ordinal from messages_fts f join messages m on m.id = f.rowid "
+            "join sessions s on s.id = m.session_id where messages_fts match ? and s.project = ? "
+            "and m.is_system = 0 and m.role in ('user', 'assistant') order by f.rank limit ?",
+            (_fts_query(query), grant["scope"], limit)).fetchall()
+    except sqlite3.Error:
+        raise BackendUnavailable("sqlite_unavailable") from None
+    out = []
+    for session_id, ordinal in rows:
+        try:
+            out.append(_native_id(session_id, ordinal))
+        except BackendUnavailable:
+            continue
+    return out
+
+
+def _original_sqlite(grant: dict[str, Any], native: dict[str, Any], conn: sqlite3.Connection) -> dict[str, Any]:
+    """Same contract as `_original`, from one consistent read-only snapshot."""
+    _supported_grant(grant)
+    if not isinstance(native, dict):
+        raise BackendIdentityDenied("native_identity_denied")
+    expected_id = _message_id(native["id"]) if "id" in native else None
+    address = _native_id(native.get("session_id"), native.get("ordinal"))
+    session_id, ordinal = address["session_id"], address["ordinal"]
+    try:
+        conn.execute("begin")
+        try:
+            session = conn.execute("select id, project, machine from sessions where id = ?",
+                                   (session_id,)).fetchone()
+            if session is None or session[0] != session_id or session[1] != grant["scope"]:
+                raise BackendDenied("scope_denied")
+            rows = conn.execute(
+                "select id, session_id, ordinal, role, content, timestamp, is_system, has_thinking, "
+                "has_tool_use, coalesce(thinking_text, '') from messages where session_id = ? and ordinal = ?",
+                (session_id, ordinal)).fetchall()
+        finally:
+            conn.execute("rollback")
+    except sqlite3.Error:
+        raise BackendUnavailable("sqlite_unavailable") from None
+    if len(rows) != 1:
+        raise BackendStale("message_missing")
+    mid, msid, mord, role, content, stamp, is_system, has_thinking, has_tool_use, thinking = rows[0]
+    message_id = _message_id(mid)
+    if msid != session_id or mord != ordinal or (expected_id is not None and message_id != expected_id):
+        raise BackendIdentityDenied("native_identity_denied")
+    proven_native = {**address, "id": message_id}
+    locator = agentsview_locator(proven_native)
+    if (role not in ("user", "assistant") or is_system or has_thinking or has_tool_use or thinking != "" or
+            not isinstance(content, str) or not content or "[Thinking]" in content or "[/Thinking]" in content):
+        raise BackendDenied("message_class_denied")
+    return {
+        "source": "agentsview", "collection": "history",
+        "scope": grant["scope"], "privacy": "private",
+        "host": session[2] if isinstance(session[2], str) else "unknown",
+        "date": stamp if isinstance(stamp, str) else "unknown",
+        "text": content, "locator": locator, "native": proven_native,
+        "source_version": "sha256:" + hashlib.sha256(content.encode("utf-8")).hexdigest(),
+    }
+
+
+def _search_sqlite(query: str, grants: list[dict[str, Any]], limit: int, deadline: float) -> list[dict[str, Any]]:
+    conn = _sqlite_connect(deadline)
+    try:
+        output: list[dict[str, Any]] = []
+        for grant in grants:
+            for native in _sqlite_candidates(conn, grant, query, limit):
+                try:
+                    original = _original_sqlite(grant, native, conn)
+                except BackendIdentityDenied:
+                    raise
+                except BackendDenied:
+                    continue
+                except BackendStale:
+                    continue
+                output.append(original)
+                if len(output) >= limit:
+                    return output
+        return output
+    finally:
+        conn.close()
+
+
 def search_backend(source: str, query: str, grants: list[dict[str, Any]], limit: int,
                    timeout_s: float) -> list[dict[str, Any]]:
     """Search and prove originals under ONE absolute deadline per source."""
@@ -261,12 +391,20 @@ def search_backend(source: str, query: str, grants: list[dict[str, Any]], limit:
             not math.isfinite(timeout_s) or not 0 < timeout_s <= 10):
         raise BackendUnavailable("invalid_arguments")
     deadline = time.monotonic() + timeout_s
-    port, headers = _agentsview_config()
-    output: list[dict[str, Any]] = []
     if not isinstance(grants, list) or len(grants) > 32:
         raise BackendUnavailable("invalid_grants")
     for grant in grants:
         _supported_grant(grant)
+    try:
+        return _search_sqlite(query, grants, limit, deadline)
+    except BackendIdentityDenied:
+        raise
+    except BackendUnavailable:
+        if time.monotonic() >= deadline:
+            raise
+    port, headers = _agentsview_config()
+
+    def one(grant: dict[str, Any]) -> list[dict[str, Any]]:
         path = "/api/v1/search/content?" + urlencode({
             "pattern": query, "mode": "fts", "in": "messages",
             "exclude_system": "true", "project": grant["scope"],
@@ -275,6 +413,7 @@ def search_backend(source: str, query: str, grants: list[dict[str, Any]], limit:
         page = _loopback_json(port, path, deadline, headers=headers)
         if not isinstance(page, dict) or not isinstance(page.get("matches"), list):
             raise BackendUnavailable("invalid_matches")
+        found: list[dict[str, Any]] = []
         for row in page["matches"][:limit]:
             if not isinstance(row, dict) or row.get("project") != grant["scope"] or row.get("location") != "message":
                 continue
@@ -289,6 +428,36 @@ def search_backend(source: str, query: str, grants: list[dict[str, Any]], limit:
                 if str(exc) == "unsupported_native_identity":
                     continue
                 raise
+            found.append(original)
+            if len(found) >= limit:
+                break
+        return found
+
+    # Grants are searched concurrently under the ONE deadline. A grant that is slow or down (one cold
+    # project can take the whole budget) no longer makes every other grant unavailable; the source is
+    # unavailable only when no grant answered. Results keep grant order.
+    results: list[list[dict[str, Any]] | None] = [None] * len(grants)
+    identity_denied = False
+    pool = ThreadPoolExecutor(max_workers=max(1, min(8, len(grants))))
+    try:
+        futures = {pool.submit(one, g): i for i, g in enumerate(grants)}
+        done, _pending = wait(futures, timeout=max(0.0, deadline - time.monotonic()))
+        for future in done:
+            try:
+                results[futures[future]] = future.result()
+            except BackendIdentityDenied:
+                identity_denied = True
+            except BackendUnavailable:
+                continue
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+    if identity_denied:
+        raise BackendIdentityDenied("identity")
+    if grants and all(r is None for r in results):
+        raise BackendUnavailable("deadline")
+    output: list[dict[str, Any]] = []
+    for rows in results:
+        for original in rows or []:
             output.append(original)
             if len(output) >= limit:
                 return output
@@ -306,5 +475,20 @@ def fetch_backend(source: str, identity: dict[str, Any], grant: dict[str, Any],
     if type(timeout_s) not in (int, float) or not math.isfinite(timeout_s) or not 0 < timeout_s <= 10:
         raise BackendUnavailable("invalid_timeout")
     deadline = time.monotonic() + timeout_s
+    try:
+        conn = _sqlite_connect(deadline)
+    except BackendUnavailable:
+        conn = None
+    if conn is not None:
+        try:
+            return _original_sqlite(grant, identity["native"], conn)
+        except BackendStale:
+            raise
+        except BackendDenied:
+            raise
+        except BackendUnavailable:
+            pass  # fall through to HTTP
+        finally:
+            conn.close()
     port, headers = _agentsview_config()
     return _original(grant, identity["native"], port, headers, deadline)

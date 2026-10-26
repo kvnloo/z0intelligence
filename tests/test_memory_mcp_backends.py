@@ -320,3 +320,105 @@ def test_backend_direct_fetch_requires_full_native_locator(native):
     ):
         with pytest.raises(backend.BackendIdentityDenied):
             backend.fetch_backend("agentsview", broken, grant(), 2)
+
+
+def _per_project(native, monkeypatch, *, slow=(), down=()):
+    """Wrap the native fixture: some projects time out (consume the deadline) or are down."""
+    inner = backend._loopback_json
+
+    def http(port, path, deadline, **kwargs):
+        if path.startswith("/api/v1/search/content?"):
+            project = parse_qs(urlsplit(path).query)["project"][0]
+            if project in down:
+                raise backend.BackendUnavailable("synthetic outage")
+            if project in slow:
+                import time as _t
+                _t.sleep(max(0.0, deadline - _t.monotonic()) + 0.05)
+                raise backend.BackendUnavailable("deadline")
+        return inner(port, path, deadline, **kwargs)
+
+    monkeypatch.setattr(backend, "_loopback_json", http)
+
+
+def test_one_slow_grant_does_not_hide_the_others(native, monkeypatch):
+    """Live failure: a cold first project used the whole 10 s budget, so every search was unavailable."""
+    _per_project(native, monkeypatch, slow={"cold-project"})
+    import time as _t
+    start = _t.monotonic()
+    rows = backend.search_backend("agentsview", "verified", [grant(scope="cold-project"), grant()], 1, 1)
+    assert [r["scope"] for r in rows] == [PROJECT]
+    assert _t.monotonic() - start < 1.5
+
+
+def test_all_grants_down_is_still_unavailable(native, monkeypatch):
+    _per_project(native, monkeypatch, down={PROJECT, "other"})
+    with pytest.raises(backend.BackendUnavailable):
+        backend.search_backend("agentsview", "verified", [grant(), grant(scope="other")], 1, 1)
+
+
+def test_identity_violation_in_any_grant_denies_the_whole_search(native, monkeypatch):
+    _per_project(native, monkeypatch, down={"other"})
+    native["original"]["session_id"] = "codex:sibling-session"
+    with pytest.raises(backend.BackendIdentityDenied):
+        backend.search_backend("agentsview", "verified", [grant(scope="other"), grant()], 1, 1)
+
+
+
+def _sqlite_archive(tmp_path, rows, *, user_version=113):
+    """Minimal AgentsView-shaped sessions.db: sessions, messages, external-content FTS5."""
+    import sqlite3
+    path = tmp_path / ".agentsview" / "sessions.db"
+    conn = sqlite3.connect(path)
+    conn.executescript("""
+        create table sessions (id text primary key, project text, machine text);
+        create table messages (id integer primary key, session_id text, ordinal integer, role text, content text,
+          timestamp text, is_system integer default 0, has_thinking integer default 0,
+          has_tool_use integer default 0, thinking_text text default '');
+        create virtual table messages_fts using fts5(content, content='messages', content_rowid='id');
+    """)
+    for sid, project, ordinal, role, content, extra in rows:
+        conn.execute("insert or ignore into sessions values (?,?,?)", (sid, project, "fixture-host"))
+        cur = conn.execute("insert into messages (session_id, ordinal, role, content, timestamp, has_thinking) "
+                           "values (?,?,?,?,?,?)", (sid, ordinal, role, content, "2026-10-22T17:00:00Z",
+                                                    int(extra == "thinking")))
+        conn.execute("insert into messages_fts (rowid, content) values (?, ?)", (cur.lastrowid, content))
+    conn.execute(f"pragma user_version = {user_version}")
+    conn.commit()
+    conn.close()
+    return path
+
+
+def test_sqlite_path_is_scoped_in_sql_and_never_touches_the_http_server(native, tmp_path):
+    _sqlite_archive(tmp_path, [
+        (SESSION, PROJECT, 7, "assistant", "use uiautomator2 for android", None),
+        ("codex:other-1", "other", 1, "user", "uiautomator2 in another project", None),
+        (SESSION, PROJECT, 8, "assistant", "uiautomator2 hidden reasoning", "thinking"),
+    ])
+    rows = backend.search_backend("agentsview", "uiautomator2", [grant()], 5, 2)
+    assert [r["text"] for r in rows] == ["use uiautomator2 for android"]
+    assert rows[0]["scope"] == PROJECT and rows[0]["host"] == "fixture-host"
+    assert native["calls"] == []
+    identity = {k: rows[0][k] for k in ("source", "collection", "scope", "privacy", "locator", "native",
+                                        "source_version")}
+    again = backend.fetch_backend("agentsview", identity, grant(), 2)
+    assert again["text"] == rows[0]["text"] and native["calls"] == []
+
+
+def test_sqlite_fetch_denies_a_session_moved_out_of_scope(native, tmp_path):
+    import sqlite3
+    path = _sqlite_archive(tmp_path, [(SESSION, PROJECT, 7, "assistant", "scoped answer", None)])
+    row = backend.search_backend("agentsview", "scoped", [grant()], 1, 2)[0]
+    conn = sqlite3.connect(path)
+    conn.execute("update sessions set project = 'elsewhere'")
+    conn.commit()
+    conn.close()
+    identity = {k: row[k] for k in ("source", "collection", "scope", "privacy", "locator", "native",
+                                    "source_version")}
+    with pytest.raises(backend.BackendDenied):
+        backend.fetch_backend("agentsview", identity, grant(), 2)
+
+
+def test_unknown_archive_schema_falls_back_to_http(native, tmp_path):
+    _sqlite_archive(tmp_path, [(SESSION, PROJECT, 7, "assistant", "verified", None)], user_version=1)
+    rows = backend.search_backend("agentsview", "verified", [grant()], 1, 2)
+    assert rows and native["calls"]  # served by the HTTP contract path
