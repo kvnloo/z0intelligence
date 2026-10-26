@@ -1,4 +1,4 @@
-"""`z0int memory {doctor,bench,eval,rules}`."""
+"""`z0int memory {doctor,sources,bench,eval,rules}`."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import acceptance, doctor, surface
+from . import acceptance, doctor, sources, surface
 
 
 def _print(out: dict, as_json: bool) -> None:
@@ -35,6 +35,11 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument('--claude-home', help='Claude home (default: CLAUDE_CONFIG_DIR or ~/.claude-home)')
     d.add_argument('--stale-hours', type=float, default=doctor.STALE_HOURS)
     d.add_argument('--json', action='store_true')
+    s = sub.add_parser('sources', help='Check every harness history root reaches AgentsView, ctx and the MCP grants')
+    s.add_argument('--apply', action='store_true', help='register missing ctx roots (additive)')
+    s.add_argument('--av-dir')
+    s.add_argument('--policy', default='~/.config/z0int/memory-mcp-policy.json')
+    s.add_argument('--json', action='store_true')
     b = sub.add_parser('bench', help='Per-query cold/warm latency, raw reads, tokens and hit rate (z0int#22)')
     b.add_argument('--queries', required=True, help='JSON list of {query, project?, harness?, expect?}')
     b.add_argument('--json', action='store_true')
@@ -86,6 +91,10 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         print(acceptance.write_grok_rules(args.project_dir, args.query))
         return 0
+    if args.cmd == 'sources':
+        argv2 = (['--apply'] if args.apply else []) + (['--av-dir', args.av_dir] if args.av_dir else []) + \
+            ['--policy', args.policy] + (['--json'] if args.json else [])
+        return sources.main(argv2)
     if args.cmd == 'doctor':
         out = doctor.run(av_dir=args.av_dir, agentsview_bin=args.agentsview_bin, claude_home=args.claude_home,
                          stale_hours=args.stale_hours)
