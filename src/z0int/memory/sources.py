@@ -194,26 +194,33 @@ def ctx_config_roots(data_root: str | Path | None = None) -> dict[str, dict[str,
             if isinstance(v, dict)}
 
 
-def is_pi_session(path: str | Path) -> bool:
-    """A pi/OMP transcript: a `session` header within its first two records (OMP writes `title` first).
+def pi_session_id(path: str | Path) -> str | None:
+    """Session id of a pi/OMP transcript (a `session` header within the first two records; OMP writes `title`
+    first), or None for anything else.
 
-    OMP also keeps non-transcript JSONL artefacts under `<session>/local/`; ctx's pi provider rejects the
-    *whole* root when it meets one ("no valid session header"), so they must never reach ctx.
+    ctx's pi provider rejects the *whole* root on one bad file, so the mirror must hold only transcripts
+    (OMP keeps non-transcript JSONL artefacts under `<session>/local/`) and each session id once (a forked
+    OMP session copies its subagent transcripts: 598 repeated ids on groot, 2026-10-25).
     """
     try:
         with open(path, 'rb') as fh:
             for _ in range(2):
                 line = fh.readline(1 << 16)
                 if not line:
-                    return False
+                    return None
                 try:
-                    if json.loads(line).get('type') == 'session':
-                        return True
-                except (ValueError, AttributeError):
-                    return False
+                    record = json.loads(line)
+                except ValueError:
+                    return None
+                if isinstance(record, dict) and record.get('type') == 'session':
+                    return str(record.get('id') or '') or None
     except OSError:
-        return False
-    return False
+        return None
+    return None
+
+
+def is_pi_session(path: str | Path) -> bool:
+    return pi_session_id(path) is not None
 
 
 def pi_mirror_path(root: str | Path) -> Path:
@@ -230,20 +237,28 @@ def sync_pi_mirror(root: str | Path, mirror: str | Path | None = None) -> dict[s
     """
     root = Path(_real(root))
     mirror = Path(mirror) if mirror else pi_mirror_path(root)
-    want: dict[Path, os.stat_result] = {}
-    skipped = 0
+    best: dict[str, tuple[tuple[int, float], Path, os.stat_result]] = {}
+    skipped = duplicates = 0
     for dirpath, _dirs, files in os.walk(root):
         for name in files:
             if not name.endswith('.jsonl'):
                 continue
             src = Path(dirpath) / name
-            if is_pi_session(src):
-                try:
-                    want[src.relative_to(root)] = src.stat()
-                except OSError:
-                    continue
-            else:
+            sid = pi_session_id(src)
+            if sid is None:
                 skipped += 1
+                continue
+            try:
+                st = src.stat()
+            except OSError:
+                continue
+            rank = (st.st_size, st.st_mtime)  # the fullest copy of a repeated session wins
+            if sid in best:
+                duplicates += 1
+                if rank <= best[sid][0]:
+                    continue
+            best[sid] = (rank, src.relative_to(root), st)
+    want: dict[Path, os.stat_result] = {rel: st for _rank, rel, st in best.values()}
     linked = removed = 0
     for rel, st in want.items():
         dst = mirror / rel
@@ -269,7 +284,7 @@ def sync_pi_mirror(root: str | Path, mirror: str | Path | None = None) -> dict[s
             if not os.listdir(dirpath) and Path(dirpath) != mirror:
                 os.rmdir(dirpath)
     return {'root': str(root), 'mirror': str(mirror), 'sessions': len(want), 'linked': linked,
-            'removed': removed, 'skipped_non_sessions': skipped}
+            'removed': removed, 'skipped_non_sessions': skipped, 'duplicate_ids': duplicates}
 
 
 def ctx_failures(ctx_bin: str | None = None, *, timeout: float = 120) -> list[dict[str, str]] | None:

@@ -197,7 +197,13 @@ def test_registered_omp_root_that_ctx_cannot_import_fails_and_apply_mirrors_only
     assert ['ctx', 'sources', 'add', '--provider', 'pi', '--root', str(mirror), '--quiet', '--replace',
             'auto-omp'] in fake.calls
     files = sorted(str(p.relative_to(mirror)) for p in mirror.rglob('*.jsonl'))
-    assert files == ['--proj--/a.jsonl', '--proj--/a/Worker.jsonl']
+    # Worker.jsonl repeats session id s1 (OMP copies subagent transcripts into forks): ctx gets one copy.
+    assert len(files) == 1 and files[0] in ('--proj--/a.jsonl', '--proj--/a/Worker.jsonl')
+    sub.write_text(sub.read_text() + '{"type":"message","longer":true}\n')
+    sources.sync_pi_mirror(root, mirror)
+    assert sorted(str(p.relative_to(mirror)) for p in mirror.rglob('*.jsonl')) == ['--proj--/a/Worker.jsonl']
+    sub.unlink()
+    sources.sync_pi_mirror(root, mirror)
     assert (mirror / '--proj--/a.jsonl').stat().st_ino == session.stat().st_ino  # hard link: appends visible
     session.unlink()
     assert sources.sync_pi_mirror(root, mirror)['removed'] == 1
