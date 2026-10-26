@@ -45,6 +45,7 @@ class FakeCtx:
 
     def __init__(self, roots):
         self.roots = list(roots)  # [{provider, path, status}]
+        self.failures = []  # `ctx status` refresh.diagnostics.source_failures
         self.calls = []
 
     def run(self, cmd, **kw):
@@ -74,13 +75,14 @@ def world(tmp_path, monkeypatch):
 
 
 def run(world, fake, apply=False):
-    original = sources.ctx_sources
+    original, original_f = sources.ctx_sources, sources.ctx_failures
     sources.ctx_sources = lambda *_a, **_k: list(fake.roots)
+    sources.ctx_failures = lambda *_a, **_k: list(fake.failures)
     try:
         return sources.reconcile(av_dir=world['av'], ctx_bin='ctx', policy_path=world['policy'], apply=apply,
                                  now=NOW, runner=fake.run)
     finally:
-        sources.ctx_sources = original
+        sources.ctx_sources, sources.ctx_failures = original, original_f
 
 
 def test_an_active_harness_root_missing_from_ctx_fails_and_apply_registers_its_real_root(world):
@@ -166,3 +168,43 @@ def test_hermes_lag_ignores_empty_and_automated_sessions(tmp_path):
     c.commit()
     c.close()
     assert sources.newest_source('hermes', db) == 100.0  # b is empty, c is cron
+
+
+def test_registered_omp_root_that_ctx_cannot_import_fails_and_apply_mirrors_only_transcripts(world):
+    omp = world['omp']
+    session = omp / '--proj--' / 'a.jsonl'
+    session.write_text('{"type":"title","title":""}\n{"type":"session","id":"s1"}\n{"type":"message"}\n')
+    t = NOW - 3600
+    os.utime(session, (t, t))
+    sub = omp / '--proj--' / 'a' / 'Worker.jsonl'
+    sub.parent.mkdir(parents=True)
+    sub.write_text(session.read_text())
+    os.utime(sub, (t, t))
+    artefact = omp / '--proj--' / 'a' / 'local' / 'findings.jsonl'
+    artefact.parent.mkdir(parents=True)
+    artefact.write_text('{"arm":{"backend":"cpu"}}\n')
+    root = os.path.realpath(omp)
+    (world['ctx_root'] / 'config.toml').write_text(f'[sources.roots.auto-omp]\nprovider = "pi"\npath = "{root}"\n')
+    fake = FakeCtx([{'provider': 'claude', 'path': str(world['claude']), 'status': 'available'},
+                    {'provider': 'pi', 'path': root, 'status': 'available'}])
+    fake.failures = [{'provider': 'pi', 'selector': root,
+                      'detail': 'invalid capture payload: Pi source has no valid session header'}]
+    before = run(world, fake)
+    assert not before['ok'] and any('ctx import fails' in p for p in before['problems'])
+    after = run(world, fake, apply=True)
+    assert after['ok'], after['unresolved']
+    mirror = sources.pi_mirror_path(root)
+    assert ['ctx', 'sources', 'add', '--provider', 'pi', '--root', str(mirror), '--quiet', '--replace',
+            'auto-omp'] in fake.calls
+    files = sorted(str(p.relative_to(mirror)) for p in mirror.rglob('*.jsonl'))
+    # Worker.jsonl repeats session id s1 (OMP copies subagent transcripts into forks): ctx gets one copy.
+    assert len(files) == 1 and files[0] in ('--proj--/a.jsonl', '--proj--/a/Worker.jsonl')
+    sub.write_text(sub.read_text() + '{"type":"message","longer":true}\n')
+    sources.sync_pi_mirror(root, mirror)
+    assert sorted(str(p.relative_to(mirror)) for p in mirror.rglob('*.jsonl')) == ['--proj--/a/Worker.jsonl']
+    sub.unlink()
+    sources.sync_pi_mirror(root, mirror)
+    assert (mirror / '--proj--/a.jsonl').stat().st_ino == session.stat().st_ino  # hard link: appends visible
+    session.unlink()
+    assert sources.sync_pi_mirror(root, mirror)['removed'] == 1
+    assert not (mirror / '--proj--/a.jsonl').exists()
