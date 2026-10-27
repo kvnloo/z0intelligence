@@ -364,7 +364,7 @@ def test_identity_violation_in_any_grant_denies_the_whole_search(native, monkeyp
 
 
 
-def _sqlite_archive(tmp_path, rows, *, user_version=113):
+def _sqlite_archive(tmp_path, rows, *, user_version=113, stamps=None):
     """Minimal AgentsView-shaped sessions.db: sessions, messages, external-content FTS5."""
     import sqlite3
     path = tmp_path / ".agentsview" / "sessions.db"
@@ -379,7 +379,8 @@ def _sqlite_archive(tmp_path, rows, *, user_version=113):
     for sid, project, ordinal, role, content, extra in rows:
         conn.execute("insert or ignore into sessions values (?,?,?)", (sid, project, "fixture-host"))
         cur = conn.execute("insert into messages (session_id, ordinal, role, content, timestamp, has_thinking) "
-                           "values (?,?,?,?,?,?)", (sid, ordinal, role, content, "2026-10-22T17:00:00Z",
+                           "values (?,?,?,?,?,?)", (sid, ordinal, role, content,
+                                                    (stamps or {}).get((sid, ordinal), "2026-10-22T17:00:00Z"),
                                                     int(extra == "thinking")))
         conn.execute("insert into messages_fts (rowid, content) values (?, ?)", (cur.lastrowid, content))
     conn.execute(f"pragma user_version = {user_version}")
@@ -443,3 +444,36 @@ def test_sqlite_caps_hits_per_session_and_keeps_scope_filter(native, tmp_path):
     sessions = [r["native"]["session_id"] for r in found]
     assert sessions.count(SESSION) == 2 and "codex:other-2" in sessions
     assert all(r["scope"] == PROJECT for r in found)
+
+
+def test_sqlite_exact_phrase_beats_old_high_term_frequency_rows(native, tmp_path):
+    # Old rows repeat the terms many times; only the owner's message has the exact phrase.
+    filler = " ".join(["why is this automatable not"] * 30)
+    rows = [(f"codex:old-{i}", "automation", 1, "assistant", f"{filler} report {i}", None) for i in range(12)]
+    rows.append((SESSION, PROJECT, 7, "user", "ok but why is this not automatable? check memory first", None))
+    _sqlite_archive(tmp_path, rows)
+    found = backend.search_backend("agentsview", "why is this not automatable",
+                                   [grant(scope="automation"), grant()], 5, 2)
+    assert found[0]["native"]["session_id"] == SESSION
+    assert "why is this not automatable" in found[0]["text"]
+    assert len(found) == 5 and native["calls"] == []  # token pass still fills the remaining slots
+
+
+def test_sqlite_phrase_and_token_passes_share_the_per_session_cap(native, tmp_path):
+    rows = [(SESSION, PROJECT, i, "assistant", f"run the quiet lane now {i}", None) for i in range(1, 6)]
+    rows += [(SESSION, PROJECT, 10 + i, "assistant", f"lane quiet run {i}", None) for i in range(1, 4)]
+    rows.append(("codex:other-9", PROJECT, 1, "user", "quiet lane", None))
+    _sqlite_archive(tmp_path, rows)
+    found = backend.search_backend("agentsview", "quiet lane", [grant()], 5, 2)
+    sessions = [r["native"]["session_id"] for r in found]
+    assert sessions.count(SESSION) == 2 and "codex:other-9" in sessions
+    assert len({(r["native"]["session_id"], r["native"]["ordinal"]) for r in found}) == len(found)
+
+
+def test_sqlite_equal_rank_prefers_the_newer_message(native, tmp_path):
+    rows = [("codex:older-1", PROJECT, 1, "user", "zanzibar plan", None),
+            ("codex:newer-2", PROJECT, 1, "user", "zanzibar plan", None)]
+    _sqlite_archive(tmp_path, rows, stamps={("codex:older-1", 1): "2026-09-01T00:00:00Z",
+                                            ("codex:newer-2", 1): "2026-10-26T00:00:00Z"})
+    found = backend.search_backend("agentsview", "zanzibar", [grant()], 2, 2)
+    assert [r["native"]["session_id"] for r in found] == ["codex:newer-2", "codex:older-1"]
