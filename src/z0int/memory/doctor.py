@@ -83,15 +83,24 @@ def _ctx_lexical(command: str | None = None, timeout: float = CTX_TIMEOUT) -> di
     cmd = resolve_bin('ctx', command)
     if not cmd:
         return _check('ctx_lexical', True, 'not installed (opt-in lexical pull)', status='not_installed')
+    argv = [cmd]
+    root = ctx_data_root()
+    if root:
+        argv += ['--data-root', root]
     try:
-        proc = subprocess.run([cmd, 'status', '--format', 'json', '--quiet'], capture_output=True, text=True,
+        proc = subprocess.run([*argv, 'status', '--format', 'json', '--quiet'], capture_output=True, text=True,
                               timeout=timeout, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return _check('ctx_lexical', False, f'installed but status failed ({type(exc).__name__} after '
                       f'{timeout:g} s)', status='unavailable', path=cmd)
-    try:
-        payload = json.loads(proc.stdout)
-    except (json.JSONDecodeError, TypeError):
+    payload = None
+    for stream in (proc.stdout, proc.stderr):  # a failing ctx prints its status JSON on stderr
+        try:
+            payload = json.loads(stream)
+            break
+        except (json.JSONDecodeError, TypeError):
+            continue
+    if not isinstance(payload, dict):
         detail = (proc.stderr or proc.stdout or 'status not json').strip().splitlines()
         return _check('ctx_lexical', False, 'installed but unavailable (' + (detail[-1][:200] if detail else
                       'no status') + ')', status='unavailable', path=cmd)
@@ -101,14 +110,27 @@ def _ctx_lexical(command: str | None = None, timeout: float = CTX_TIMEOUT) -> di
     reason = lexical.get('reason') if isinstance(lexical, dict) else None
     generation = epoch.get('generation_path') if isinstance(epoch, dict) else None
     if lexical_status == 'ready':
-        return _check('ctx_lexical', True, f'ready generation {generation or "unnamed"}', status='ready',
-                      generation=generation, path=cmd)
+        refresh = payload.get('refresh') if isinstance(payload.get('refresh'), dict) else {}
+        mode = (payload.get('indexing') or {}).get('mode') if isinstance(payload.get('indexing'), dict) else None
+        return _check('ctx_lexical', True, f'ready generation {(generation or "unnamed")}, index mode {mode or "?"}, '
+                      f'refresh {refresh.get("physical_attempt_state") or "none"}', status='ready',
+                      generation=generation, path=cmd, mode=mode)
     history = payload.get('history') if isinstance(payload, dict) else None
     hstatus = history.get('status') if isinstance(history, dict) else None
     return _check('ctx_lexical', False,
                   f'installed but not ready (lexical {lexical_status or "missing"}'
                   f'{": " + str(reason)[:200] if reason else ""}; history {hstatus or "missing"})',
                   status='unavailable', generation=generation, path=cmd)
+
+
+def ctx_data_root() -> str | None:
+    """ctx's data root as the importer uses it: CTX_DATA_ROOT, else the real path behind a symlinked ~/.ctx
+    (ctx refuses a symlinked data root and then reports history unavailable)."""
+    root = os.environ.get('CTX_DATA_ROOT')
+    if root:
+        return root
+    home = Path.home() / '.ctx'
+    return os.path.realpath(home) if home.is_symlink() else None
 
 
 def _local_machines(conn: sqlite3.Connection) -> set[str]:

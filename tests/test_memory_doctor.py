@@ -192,3 +192,20 @@ def test_remote_host_staleness_is_per_host_and_uses_labels(env, tmp_path):
 def test_recall_layer_absent_is_expected(env):
     c = checks(doctor.run(**env))['recall_layer']
     assert c['ok'] is True and 'by design' in c['detail']
+
+
+def test_ctx_status_on_stderr_with_exit_1_is_read_and_fails(env, tmp_path):
+    body = "echo '" + json.dumps({'history': {'status': 'unavailable'}}) + "' >&2\nexit 1\n"
+    c = checks(doctor.run(**{**env, 'ctx_bin': fake_ctx(tmp_path / 'ctx-err', body)}))['ctx_lexical']
+    assert c['ok'] is False and 'history unavailable' in c['detail']
+
+
+def test_ctx_data_root_follows_a_symlinked_home(tmp_path, monkeypatch):
+    real = tmp_path / 'real-ctx'
+    real.mkdir()
+    (tmp_path / '.ctx').symlink_to(real)
+    monkeypatch.setenv('HOME', str(tmp_path))
+    monkeypatch.delenv('CTX_DATA_ROOT', raising=False)
+    assert doctor.ctx_data_root() == str(real)
+    monkeypatch.setenv('CTX_DATA_ROOT', '/explicit')
+    assert doctor.ctx_data_root() == '/explicit'
