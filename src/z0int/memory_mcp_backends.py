@@ -265,13 +265,43 @@ def _sqlite_path() -> Path:
     return Path.home() / ".agentsview" / "sessions.db"
 
 
+class _ArchiveConnection(sqlite3.Connection):
+    """Read-only archive connection that caches machine display labels for its own lifetime."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.machine_labels: dict[str, str] = {}
+
+
+def _machine_label(conn: sqlite3.Connection, machine: Any) -> str:
+    """AgentsView v0.44 stores new sessions under the installation id (e.g. b163c2db...) and keeps the
+    display name in pg_sync_state 'machine_label:<id>'. Map id -> label when that key exists; otherwise
+    the raw value. Read-only; a missing table or row falls back to the raw value."""
+    if not isinstance(machine, str) or not machine:
+        return "unknown"
+    cache = getattr(conn, "machine_labels", None)
+    if cache is not None and machine in cache:
+        return cache[machine]
+    label = machine
+    try:
+        row = conn.execute("select value from pg_sync_state where key = ?",
+                           ("machine_label:" + machine,)).fetchone()
+        if row and isinstance(row[0], str) and row[0].strip():
+            label = row[0].strip()
+    except sqlite3.Error:
+        pass
+    if cache is not None:
+        cache[machine] = label
+    return label
+
+
 def _sqlite_connect(deadline: float) -> sqlite3.Connection:
     path = _sqlite_path()
     if not path.is_file():
         raise BackendUnavailable("sqlite_unavailable")
     try:
         conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True, timeout=min(2.0, _remaining(deadline)),
-                               check_same_thread=False)
+                               check_same_thread=False, factory=_ArchiveConnection)
     except sqlite3.Error:
         raise BackendUnavailable("sqlite_unavailable") from None
     try:
@@ -292,25 +322,6 @@ def _fts_query(query: str) -> str:
     if not tokens:
         raise BackendUnavailable("invalid_arguments")
     return " ".join('"' + t.replace('"', "") + '"' for t in tokens)
-
-
-def _sqlite_candidates(conn: sqlite3.Connection, grant: dict[str, Any], query: str,
-                       limit: int) -> list[dict[str, Any]]:
-    try:
-        rows = conn.execute(
-            "select m.session_id, m.ordinal from messages_fts f join messages m on m.id = f.rowid "
-            "join sessions s on s.id = m.session_id where messages_fts match ? and s.project = ? "
-            "and m.is_system = 0 and m.role in ('user', 'assistant') order by f.rank limit ?",
-            (_fts_query(query), grant["scope"], limit)).fetchall()
-    except sqlite3.Error:
-        raise BackendUnavailable("sqlite_unavailable") from None
-    out = []
-    for session_id, ordinal in rows:
-        try:
-            out.append(_native_id(session_id, ordinal))
-        except BackendUnavailable:
-            continue
-    return out
 
 
 def _original_sqlite(grant: dict[str, Any], native: dict[str, Any], conn: sqlite3.Connection) -> dict[str, Any]:
@@ -350,28 +361,87 @@ def _original_sqlite(grant: dict[str, Any], native: dict[str, Any], conn: sqlite
     return {
         "source": "agentsview", "collection": "history",
         "scope": grant["scope"], "privacy": "private",
-        "host": session[2] if isinstance(session[2], str) else "unknown",
+        "host": _machine_label(conn, session[2]),
         "date": stamp if isinstance(stamp, str) else "unknown",
         "text": content, "locator": locator, "native": proven_native,
         "source_version": "sha256:" + hashlib.sha256(content.encode("utf-8")).hexdigest(),
     }
 
 
+# At most this many hits per session, so one long transcript cannot fill every slot.
+_PER_SESSION = 2
+
+
+def _fts_phrase(query: str) -> str | None:
+    """The whole query as one FTS5 phrase, or None when it has fewer than two tokens
+    (a one-token phrase is the token pass)."""
+    tokens = [t.replace('"', "") for t in _FTS_TOKEN.findall(query)[:32]]
+    tokens = [t for t in tokens if t]
+    if len(tokens) < 2:
+        return None
+    return '"' + " ".join(tokens) + '"'
+
+
+def _ranked_candidates(conn: sqlite3.Connection, scopes: list[str], match: str,
+                       limit: int) -> list[tuple[str, dict[str, Any]]]:
+    """One FTS query across every granted scope, ordered by BM25 rank (scope filter stays in SQL).
+    Equal ranks go to the newer message first."""
+    marks = ",".join("?" * len(scopes))
+    try:
+        rows = conn.execute(
+            "select m.session_id, m.ordinal, s.project from messages_fts f join messages m on m.id = f.rowid "
+            f"join sessions s on s.id = m.session_id where messages_fts match ? and s.project in ({marks}) "
+            "and m.is_system = 0 and m.role in ('user', 'assistant') "
+            "order by f.rank, m.timestamp desc, m.id desc limit ?",
+            (match, *scopes, limit)).fetchall()
+    except sqlite3.Error:
+        raise BackendUnavailable("sqlite_unavailable") from None
+    out = []
+    for session_id, ordinal, project in rows:
+        try:
+            out.append((project, _native_id(session_id, ordinal)))
+        except BackendUnavailable:
+            continue
+    return out
+
+
 def _search_sqlite(query: str, grants: list[dict[str, Any]], limit: int, deadline: float) -> list[dict[str, Any]]:
+    """Rank across grants, not grant-by-grant: concatenating per-grant results let the first
+    (often largest, automation-heavy) project fill every slot, so owner sessions in later grants
+    were never returned. Each hit is still re-proven against a grant for its own scope.
+
+    Two passes share one per-session cap and one dedup set: first the query as an exact FTS5
+    phrase (so the owner's own words are not crowded out by old rows that merely repeat the
+    terms), then the token BM25 pass fills the remaining slots."""
+    token_match = _fts_query(query)
+    phrase_match = _fts_phrase(query)
     conn = _sqlite_connect(deadline)
     try:
-        output: list[dict[str, Any]] = []
+        by_scope: dict[str, list[dict[str, Any]]] = {}
         for grant in grants:
-            for native in _sqlite_candidates(conn, grant, query, limit):
-                try:
-                    original = _original_sqlite(grant, native, conn)
-                except BackendIdentityDenied:
-                    raise
-                except BackendDenied:
+            by_scope.setdefault(grant["scope"], []).append(grant)
+        output: list[dict[str, Any]] = []
+        per_session: dict[str, int] = {}
+        seen: set[tuple[str, int]] = set()
+        passes = [m for m in (phrase_match, token_match) if m is not None]
+        for match in passes:
+            for project, native in _ranked_candidates(conn, list(by_scope), match, limit * 8):
+                key = (native["session_id"], native["ordinal"])
+                if key in seen:
                     continue
-                except BackendStale:
+                seen.add(key)
+                if per_session.get(native["session_id"], 0) >= _PER_SESSION:
                     continue
-                output.append(original)
+                for grant in by_scope.get(project, []):
+                    try:
+                        original = _original_sqlite(grant, native, conn)
+                    except BackendIdentityDenied:
+                        raise
+                    except (BackendDenied, BackendStale):
+                        continue
+                    output.append(original)
+                    per_session[native["session_id"]] = per_session.get(native["session_id"], 0) + 1
+                    break
                 if len(output) >= limit:
                     return output
         return output
