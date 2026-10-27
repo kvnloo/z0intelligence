@@ -1111,7 +1111,7 @@ def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Pat
                        progress: Counter | None = None) -> list[dict[str, Any]]:
     from . import turn_readers as tr
     rule = tr.JOIN_RULES[harness]
-    reader = tr.AgentsViewReader(agentsview, now=now)
+    reader = None
     rows: list[dict[str, Any]] = []
     fails: list[dict[str, Any]] = []  # this run's rows and failures land only when every query succeeded
     counts: Counter = Counter()
@@ -1124,6 +1124,7 @@ def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Pat
         if order and deadline is not None and time.monotonic() >= deadline:
             progress['partial'] = 1
             return rows
+        reader = tr.AgentsViewReader(agentsview, now=now)
         if not reader.available:
             failures.append(_failure(harness, 'reader_unavailable', {'reason': reader.unavailable.reason}))
             return rows
@@ -1167,7 +1168,8 @@ def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Pat
         failures.append(_failure(harness, 'reader_unavailable', tr.reader_error(exc)))
         return []
     finally:
-        reader.close()
+        if reader is not None:
+            reader.close()
     failures.extend(fails)
     join.update(counts)
     return rows
@@ -1186,6 +1188,8 @@ def verify_harness(harness: str, *, root: Path | None = None, agentsview: str | 
     same signal semantics; ``since`` applies to every captured turn by its capture time (``all_turns`` is
     claude-code only: the other harnesses verify every captured turn). A label source that cannot answer makes the
     status ``degraded``, never ``success``. With ``write`` the rows and failure rows are appended (both idempotent: a re-run appends nothing new).
+    ``deadline`` is monotonic: finish the current session, then stop before the next one. A bounded
+    sweep visits unwritten turns first and reports ``partial`` with visited/deferred session counts.
     """
     from . import turn_readers as tr
     now = time.time() if now is None else now

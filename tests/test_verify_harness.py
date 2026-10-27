@@ -121,6 +121,7 @@ def test_expired_deadline_visits_no_session(tmp_path, monkeypatch, harness):
         observed(home, 's1', 'p1')
     else:
         ctx = hc.begin_turn(harness, {'session_id': 's1', 'turn_id': 'p1', 'prompt': 'x'}, env={}, root=home)
+        assert ctx is not None
         hc.record_outcome(harness, ctx, hc.payload_behaviour({}), root=home)
 
     def forbidden(*a, **kw):
@@ -171,3 +172,39 @@ def test_bounded_sweeps_resume_unwritten_sessions_and_preserve_append_order(tmp_
     final = ov.verify_harness('claude-code', gh=ov.GitHub(runner=fake_gh), **kw)
     assert final['status'] == 'success' and final['appended'] == 0
     assert path.read_bytes() == prefix
+
+
+def test_agentsview_deadline_preserves_completed_sessions_and_resumes(tmp_path, monkeypatch):
+    from z0int import turn_readers as tr
+    home = tmp_path / 'z0home'
+    fx = AVFixture(tmp_path / 'sessions.db')
+    for sid in ('a', 'b'):
+        av_sid = fx.session('codex', sid, started=T0)
+        fx.user(av_sid, 'test', T0)
+        fx.bash(av_sid, 'pytest', T0 + 5, exit=1)
+        ctx = hc.begin_turn('codex', {'session_id': sid, 'turn_id': 'p1', 'prompt': 'test'}, env={}, root=home)
+        assert ctx is not None
+        hc.record_outcome('codex', ctx, hc.payload_behaviour({}), root=home)
+    db = fx.close()
+    clock, visited = [0.0], []
+    real_join = tr.join_session
+
+    def join_session(rule, reader, turns, **kw):
+        visited.append(turns[0]['session_id'])
+        result = real_join(rule, reader, turns, **kw)
+        clock[0] += 5.0
+        return result
+
+    monkeypatch.setattr(tr, 'join_session', join_session)
+    monkeypatch.setattr(ov.time, 'monotonic', lambda: clock[0])
+    kw = dict(root=home, agentsview=db, now=T0 + 3600, gh=ov.GitHub(enabled=False), write=True)
+    first = ov.verify_harness('codex', deadline=5.0, **kw)
+    assert first['status'] == 'partial' and first['appended'] == 1
+    assert first['sessions'] == {'total': 2, 'visited': 1, 'not_visited': 1}
+    path = hc.state_dir('codex', home) / 'outcomes_verified.jsonl'
+    prefix = path.read_bytes()
+    second = ov.verify_harness('codex', deadline=10.0, **kw)
+    assert second['status'] == 'partial' and second['appended'] == 1
+    assert visited == ['a', 'b'] and path.read_bytes().startswith(prefix)
+    final = ov.verify_harness('codex', **kw)
+    assert final['status'] == 'success' and final['appended'] == 0
