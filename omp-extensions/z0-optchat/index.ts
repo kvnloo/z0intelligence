@@ -17,6 +17,7 @@ type ToolResult = { content: { type: "text"; text: string }[]; isError: boolean 
 type Tool = {
 	name: string;
 	label: string;
+	loadMode: "essential";
 	description: string;
 	parameters: Json;
 	execute: (id: string, args: { id?: number; n?: number }, signal?: AbortSignal) => Promise<ToolResult>;
@@ -177,6 +178,7 @@ export default function optchat(pi: Pi): void {
 			pi.registerTool({
 				name: `optchat_${name}`,
 				label: `OptChat ${name}`,
+				loadMode: "essential",
 				description: name === "zoom"
 					? "Open the line id+n of the view into the two lines of n/2 under it; n = 1 gives the message whole."
 					: "The date and time of message id.",

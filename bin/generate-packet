@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$(readlink -f -- "$0")")/.." && pwd)
+exec /usr/bin/python3 "$ROOT/scripts/state-packet/generate_packet.py" "$@"

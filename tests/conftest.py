@@ -50,3 +50,11 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_live)
         if "kerdoios" in item.keywords and not has_kerdoios:
             item.add_marker(skip_kerd)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_agentsview(tmp_path_factory, monkeypatch):
+    """No test may reach the developer's real AgentsView database (~/.agentsview) or extra
+    Claude transcript trees ($Z0INT_CLAUDE_PROJECTS_DIRS)."""
+    monkeypatch.setenv('AGENTSVIEW_DATA_DIR', str(tmp_path_factory.mktemp('agentsview')))
+    monkeypatch.delenv('Z0INT_CLAUDE_PROJECTS_DIRS', raising=False)  # nor extra Claude transcript trees

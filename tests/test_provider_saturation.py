@@ -174,3 +174,16 @@ def legacy_paid_policy(monkeypatch):
     policy['provider_caps']['vercel']=0
     monkeypatch.setattr(routing,'configuration',lambda:(policy,providers))
     monkeypatch.setattr(intelligence,'configuration',lambda:(policy,providers))
+
+
+def test_rows_reuse_parse_only_while_stream_is_unchanged():
+    path=receipts_path();path.parent.mkdir(parents=True,exist_ok=True)
+    other={'trace_id':'x','capability_id':'other.capability','extra':{'note':'intelligence.provider_admission'}}
+    admit={'trace_id':'a1','capability_id':p.CAPABILITY,'provider':'cerebras','extra':{'status':'acquired'}}
+    path.write_text(json.dumps(other)+'\n'+json.dumps(admit)+'\n')
+    first=p._rows()
+    assert [r['trace_id'] for r in first]==['a1']
+    first.append('caller mutation')
+    assert [r['trace_id'] for r in p._rows()]==['a1']
+    with path.open('a') as stream:stream.write(json.dumps({**admit,'trace_id':'a2'})+'\n')
+    assert [r['trace_id'] for r in p._rows()]==['a1','a2']

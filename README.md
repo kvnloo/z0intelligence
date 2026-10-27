@@ -30,6 +30,150 @@ The current repository is much more than the original OpenJev prototype.
 
 The source of truth for the current architectural boundary is [zer0.repo.yaml](zer0.repo.yaml).
 
+## Evidence-bound decision policy
+
+`z0int policy ingest` converts supported JSON measurements into an append-only,
+locked hash chain at `$Z0INT_HOME/findings/findings.jsonl`. It records skipped
+sources and their reasons in `findings/ingest-status.json`. Unknown layouts,
+prose reports, missing observation timestamps, missing source hashes and missing
+sample counts never become evidence. Repeated source hashes do not add findings.
+Configure discovery with `--operations-root` / `Z0INT_OPERATIONS_ROOT` and
+`--z0evals-root` / `Z0INT_Z0EVALS_ROOT`. Use `--sources sources.json` for a JSON
+array of `{kind,path,arm?,ts?,scope_note?,url?}` when a source omits runtime identity.
+No device, engine, backend, quantization, timestamp or sample count is guessed.
+
+`z0int policy compile [--now ISO8601] [--config config.json]` writes
+`policy/decision-policy.json` atomically and retains content-addressed versions
+under `policy/history/`. A corrupt findings chain stops compilation without
+overwriting the previous policy. Compilation is pure for fixed findings,
+previous policy, timestamp and compiler configuration. The CLI supplies the
+compiler Git revision. Library callers supply `CompilerConfig.compiler_revision`.
+Bars, minimum counts, expiry, endpoint outage duration and canary share are
+configuration fields. Promotion advances one stage per compile.
+
+Contract interpretations:
+- `prev` hashes the complete canonical previous line, excluding its newline.
+  Finding IDs exclude `id` and `prev`. Policy versions exclude only `version`.
+  Canonical JSON uses sorted keys, compact separators, UTF-8 and finite numbers.
+- Shadow uses the 0.80 retention bar. Canary/live use 0.95. A latest lower bound
+  below 0.80 removes credit. A bound below 0.95 demotes canary/live to shadow.
+  No fresh evidence or an outage longer than 24 hours removes all credit.
+  Expired promotion prerequisites demote immediately to the highest stage
+  whose prerequisites remain fresh. An expired outcome can reduce live to canary.
+- Observation expiry is the earlier of `expires_at` and `ts + expiry_days`.
+  Equality with the current timestamp means expired. Future observations cannot
+  promote an arm. Runtime outage evidence uses metric `endpoint_health` and
+  an explicit timezone-aware `unhealthy_since`.
+- Live shadow labels require `metric.live_shadow=true`. Replay non-inferiority
+  requires explicit `divergence <= aa_noise_floor`. Outcome promotion additionally
+  requires metric `task_success` and `outcome_ledger_verified=true`.
+  z0eval receipts need `verdict=KEEP` and all four architecture gates `pass`
+  for promotion. Negative receipts remain evidence, not promotion authority.
+- Scope is structural, never inferred from prose. Each explicit arm dimension
+  constrains the rule. `subject.scope` can add constraints but cannot erase arm
+  boundaries. Scoped rules use `family@<scope hash prefix>` keys, with base
+  `family` and `scope` fields. The narrowest matching rule wins, even at `none`.
+  Missing scope dimensions do not match narrower rules. No cross-device,
+  quantization or engine relaxation is inferred from `scope_note`.
+- Bench JSON uses `results` or `models` arrays, explicit arm identity and counts.
+  Offload JSON uses `opportunities` rows with subject/arm, evidence class,
+  recall confidence bounds and `retained_fraction=0.2`. z0eval receipts supply
+  an explicit `findings` array. Unsupported layouts are skipped with reasons.
+
+`z0int policy show`, `explain <family>` and
+`changelog [--from VERSION --to VERSION]` expose policy and evidence provenance.
+All commands support `--json`. The changelog defaults to the latest policy and
+the latest older compiled version. Markdown emits one entry per stage change,
+including finding IDs and source paths. Publication must replace local evidence
+links with authorized immutable links. Measured findings can supply serving
+URLs through source metadata. Prose URLs and inference never create endpoints.
+Serving entries preserve the complete measured model, quant, engine, backend
+and device scope, plus arm kind. Missing quantization metadata never becomes
+an endpoint with guessed identity. Canary/live rules without an exact measured
+endpoint retain their evidence-derived stage and carry `serving_missing=true`.
+JSON and Markdown changelogs expose these missing endpoint annotations.
+
+Optional finding `synthetic=true` is part of the content hash and hash chain.
+The compiler propagates synthetic provenance to affected rules and endpoints.
+Any synthetic input marks the whole policy and its changelog synthetic.
+Synthetic fixtures use the same promotion bars and stages as measured evidence.
+They do not prove a real experiment promotion. Runtime and guard owners must
+reject synthetic authorization outside an explicitly owned temporary smoke context.
+
+Measured source metadata can include `expected_model_id`, `engine_build`,
+`model_path`, `model_resolved_path` and `model_sha256`. Source specifications,
+receipt `source` metadata and individual result finding `source` metadata
+preserve these fields and explicit URLs. Finding provenance always uses the
+actual receipt file path and hash. The compiler preserves endpoint metadata.
+The pure compiler never reads or hashes external model files. Identity metadata
+must come from the measurement owner, not from a guessed engine-path revision.
+
+### ChoiceLadder option capacity
+
+The pure compiler emits an evidence-bound `option_capacity` map. Each key is
+the canonical JSON string of the exact model, quant, engine, backend and device
+scope. `option_capacity_key(scope)` creates this lossless key. No capacity
+credit transfers between different physical scopes.
+
+Each value contains `allowed_k`, `finding_ids`, `wilson_lower`, `task`, `bar`
+and `expires_at`. `task` is the sorted list of required task names. The default
+catalogue is T1, T2, T3 and T4. Configure it with `option_capacity_tasks`.
+Observed measured task names also remain required, including failed or expired
+tasks. Configure the independent accuracy threshold with `option_capacity_bar`
+(default 0.95). Routing promotion thresholds remain unchanged.
+
+Capacity evidence requires `subject.family=choice.option_capacity`,
+`subject.job=ChoiceLadder`, `subject.task` (or `metric.task`), metric
+`choice_accuracy`, integer `metric.option_count >= 2`, `ci_method=wilson95`,
+positive `n`, and measured, unexpired observations. The compiler compares the
+smaller of the stated lower bound and a recomputed Wilson lower bound against
+the bar. An explicit correct count must agree with accuracy and sample count.
+The latest measured observation for a task and k supersedes older success.
+
+The compiler selects the largest passing k per task. The allowed capacity is
+the minimum across every required task. Missing, pending, expired, inference,
+ineligible or inconsistent evidence never counts as success. Any unsupported
+task limits capacity to the baseline of 2. An unknown scope also defaults to 2.
+Proof IDs and the earliest selected proof expiry accompany positive credit.
+O13 readers consume this content-addressed projection, not a live findings scan.
+
+## Startup orientation
+
+`scripts/state-packet/generate_packet.py` publishes an atomic, source-linked
+orientation packet at `~/.local/state/z0int/STATE-PACKET.md`. Its header records
+`generated_at`, the generator SHA-256, and the observed repository commit.
+The complete packet has at most 223 lines and 64 KiB. Every line names its source.
+The operations inputs remain under `/mnt/zer0models/workspace/zer0/data/operations`.
+No gold questions or experiment answers enter the generator.
+The packet retains the O13 default of two options and the preserved, explicitly
+nonfinal pooled pilot. Model-routing formula, lambda provenance, catalog coverage,
+unknown metrics and shared-quota limits come from the O14 report/catalog directory.
+Set `Z0INT_POLICY_ROOT`, `Z0INT_ROUTING_ROOT` or `Z0INT_LIVE_REPO` to select other
+observed source roots. Runtime identity prefers a validated `DEPLOYED_SHA` in an
+exact-SHA deployment directory and otherwise reads a real Git checkout.
+
+Install a committed feature with `python3 scripts/install-state-packet.py`.
+The installer archives exact Git content into `~/.local/lib/z0-state-packet/<SHA>/`,
+backs up replaced files, then links the OMP extension and Hermes clean-profile plugin.
+Enable Hermes with `hermes -p clean plugins enable hermes-state-packet`.
+The Claude Code user settings retain unrelated hooks.
+The `.files` `install-state-packet-timer.sh --activate` command installs the
+15-minute user timer and generates the first packet.
+
+OMP uses its real `before_agent_start` system-prompt-array contract.
+Hermes uses independent `pre_llm_call` context callbacks, not the routing adapter.
+Claude Code uses the documented `UserPromptSubmit` / `hookSpecificOutput` /
+`additionalContext` envelope. Hermes and Claude context chunks stay below 9,000
+characters to avoid hook-output spill limits. All chunks concatenate to the same
+packet. A packet older than two hours produces only `packet stale since …`.
+Unreadable or malformed packets fail open without facts. Hooks restore the current
+packet on later user turns as well as the first turn, including after compaction.
+Evidence is never an authority grant.
+
+Behavior checks: `PYTHONPATH=src python3 -m unittest discover -s tests -p test_orientation.py`
+and `bun test omp-extensions/z0-state-packet/index.test.ts`.
+Run these checks on the fleet, not on Groot.
+
 ## Architecture
 
 ~~~text
@@ -157,6 +301,11 @@ The old README described “bring your history” as if the main missing step we
 
 Master contains the provenance-backed resolver, source-revision-keyed State Packet reducer and question-scoped DecisionOpportunity builder. The current memory program is being built additively without replacing the existing stores.
 
+The startup packet reads exact deployment stamps before Git metadata. It only
+asks Git about paths with a `.git` ancestor; bounded command timeouts are
+reported on stderr and leave that observation unavailable, not a fabricated
+repository identity or a partially published packet.
+
 ### Memory foundations and remaining design work
 
 | Work | Status | Purpose |
@@ -180,6 +329,122 @@ PROCEDURAL   existing routine compiler after verified repeated outcomes
 These are different projections over evidence. No second “universal memory database” is being introduced.
 
 ## Deterministic compiler before learned policy
+### Private read-only memory MCP (#22 / #194)
+
+`python -m z0int.memory_mcp` exposes only `search` and `fetch` via a private **stdio**
+process. Memory is source evidence, never permission or a command. No HTTP
+listener, tool execution, source mutation, import, setup, refresh, arbitrary
+path/URL, or automatic context injection is added.
+
+**Exact recovery qualified for one source only.** The [AgentsView public
+Session API](https://www.agentsview.io/docs/session-api/) documents
+`GET /api/v1/search/content`, `GET /api/v1/sessions/{id}` and
+`GET /api/v1/sessions/{id}/messages?around=N&before=0&after=0`.
+Search is FTS on dialogue messages with `reveal=false`, constrained to
+an exactly granted project. A message match's native `session_id` and `ordinal` are used only
+to locate an original. Before reading any message content or metadata, the
+adapter verifies that the returned message's own `session_id` equals the
+requested session and that `db.Message.id` is a valid positive int64.
+It retains that stable native message ID separately from the ordinal and
+includes both in the full, untruncated source locator. Fetch requires the same
+native ID; sibling/missing identities and identical-text ordinal replacements
+are denied even when their SHA-256 content hashes match. The backend also
+checks the session's native project **before and after** the original read.
+Thinking, tool-use, system and unknown-class messages fail closed.
+
+`source_version` is SHA-256 of the **complete normalized AgentsView
+message `content` UTF-8 bytes**, read from the message endpoint (not
+a display date and **not** a digest of the underlying provider's raw JSONL).
+Search exposes a small, labeled `preview` from that original plus an
+opaque HMAC handle. `fetch` checks the current principal grant, re-reads
+the original under a bounded deadline, rechecks its scope, compares
+`source_version`, and returns a labeled `original_read` with the same
+native locator. A changed same-date/same-size message is **stale**; source
+outage is **unavailable**; revoked or wrong scope is **denied**; missing results
+are **empty**. The fetch output remains bounded and may be marked
+`text_truncated=true`; it is never a cached search snippet. Source
+identity/revision, not date, enters the provenance-only ContextPacket.
+The handle retains a detached snapshot of the native identity, so later backend
+record mutation cannot rewrite the identity covered by its signature.
+
+**Explicit principal grants (policy schema v2).** The reviewed operator and
+least-privileged ChatGPT profiles must be separately granted; no scope or
+credential from one is inherited by the other. The checked-in
+`manifests/memory-mcp-readonly.json` grants the operator only the
+AgentsView `history` collection at exact project `z0intelligence`,
+with `private` classification; ChatGPT's allowlist is **empty**.
+Review the archive's suitability and copy that file into private operator-owned
+configuration before any connection. Missing/invalid/v1 policy, wildcard,
+unknown scope and unreviewed secrets never grant access. AgentsView's
+`project` is an archive metadata label, not an independent source
+ACL. Its `auth_token` bearer is **broad access to the local AgentsView API**,
+not scoped to a provider, session, project or MCP principal. The operator and
+ChatGPT grants are separate **facade-side** allowlists enforced only by this
+MCP process, through exact project and native message checks. They do not
+reduce the privileges of the underlying AgentsView bearer or isolate a
+different process with direct API access. Keep that token private, use an
+operator-controlled archive/corpus classified for the granted scope, and
+validate tunnel identity and consent before exposing stdio. Redaction of
+credentials occurs **before** UTF-8 clipping, not in lieu of curation
+or provider consent.
+
+`Z0INT_MEMORY_MCP_PRINCIPAL` is required **at process startup** and
+must be set by the operator's stdio/tunnel configuration, never by the model or
+tool arguments:
+
+```bash
+export Z0INT_MEMORY_MCP_POLICY="$PWD/manifests/memory-mcp-readonly.json"
+export Z0INT_MEMORY_MCP_PRINCIPAL=operator
+PYTHONPATH=src python -m z0int.memory_mcp
+```
+
+For a ChatGPT tunnel, use a **separate, explicitly reviewed `chatgpt` grant**
+and start a dedicated process with `Z0INT_MEMORY_MCP_PRINCIPAL=chatgpt`.
+The server has no OAuth or ChatGPT workspace authentication of its own:
+the operator controls stdio exposure and validates the tunnel's identity
+and consent independently. Never assume the example grants ChatGPT access.
+
+The backend reads AgentsView's `port` and `auth_token` by reference
+from `~/.agentsview/config.toml` and connects only to its loopback port.
+It never follows a redirect or arbitrary URL. **ctx, QMD and TencentDB
+return `unavailable`** from this facade until their native exact-source
+rehydration and authorization interfaces are qualified. ctx remains a
+separate, explicit pull via the existing integration path; this server never
+runs ctx refresh, import or the latency-sensitive automatic 300ms path.
+Do not mistake a lexical match or zero-hit smoke test for model-visible use.
+
+Output is capped by policy (default 4096 bytes per record, 32768 bytes per
+payload), with a 10-minute, process-bound, 256-handle metadata-only cache
+and 30 calls/minute shared across tools. The private 0700 state directory
+and 0600 audit log contain only fixed decisions, counts, sizes and keyed
+query/handle hashes, never raw prompts or originals. Audit failure blocks
+disclosure. Output text is untrusted evidence even when successfully read.
+
+Each successfully appended row in that **same** private audit.jsonl has
+schema `z0int.memory_query_outcome.v1`, tool (`search`, `fetch`, or `invalid`),
+and outcome (`hit`, `miss`, `denied`, `unavailable`, `stale`,
+`rate_limited`, `invalid`, or `error`). A nonempty successful search or
+original fetch is a hit; an empty authorized search is a miss, not an outage.
+An entirely policy-filtered search is a denial, not a miss. Unknown error
+codes map to `error` without changing the tool response. Existing
+`timestamp`, keyed `query_hmac`, `count`, `bytes`, `denied_count`,
+`unavailable_count`, and `decision` remain in the row. Neither raw
+queries/handles nor source bodies, paths, or credentials are logged. These
+are retrieval dispositions only: they do **not** measure answer quality,
+injection, downstream usefulness, or independent verification. No outcome
+mutation tool, secondary ledger, or permission is created.
+
+Run the focused suites on the MBP. Revision regressions replace the original
+and its content digest together, then independently exercise stale handles and
+fresh searches; synthetic tests do not claim live-source validation:
+
+```bash
+PYTHONPATH=src python -m pytest -q tests/test_memory_mcp.py
+PYTHONPATH=src python -m pytest -q tests/test_memory_mcp_backends.py
+PYTHONPATH=src python -m pytest -q tests/test_memory_mcp.py tests/test_memory_mcp_backends.py
+```
+
+## Current foundation: OpenJev runtime
 
 The local-cognition stack follows a simple rule:
 
@@ -200,6 +465,51 @@ The in-tree cognition stack includes:
 - a serving/probe layer for what is actually resident on the machine.
 
 See [docs/local-cognition-portfolio.md](docs/local-cognition-portfolio.md).
+
+### Private continuous shadow experiments
+
+The hourly cognition tick exact-joins OMP session and native tool-call IDs.
+Alongside `omp.tool`, it extracts literal skill choice, path kind, and the
+wrapper's error flag. The wrapper flag is **not** task success. Explicit model
+arguments form a separate family only when actually observed. Labels/day use
+native event timestamps, not the date old traces were ingested.
+
+Small-model decisions use deterministic narrowing followed by one yes/no
+logit query per candidate. Models up to 1B have a hard three-candidate cap;
+the explicit 1.7B lane has a five-candidate cap. Wide 24/64-option projections
+are retired. Tool prompts include the latest visible user goal, the last
+visible assistant sentence, and five preceding tools with their intent strings.
+Current tool names and arguments never enter the model projection. Missing
+yes/no probabilities or a small top margin produce an abstention. Accuracy
+and Wilson bounds use covered predictions; coverage reports abstentions.
+Explicit binary abstentions are uncovered rows, not predictor errors.
+
+Each family's arms must all plateau over three ticks before search advances
+to an untried bounded history, recent-session, or few-shot strategy. Exhausted
+below-bar families propose the next exact-label census family. Selection is
+not execution: a trial starts only after an observation with that strategy.
+Every positive-covered arm emits a scoped, `synthetic:false` finding into the
+canonical findings ledger each tick. Historical inference remains
+`replayed_L1`; only a prediction stored before its exact label may be live
+shadow. Zero-covered arms record a publication blocker, never invented evidence.
+
+Status retains rolling-day errors and separately exposes current-hour,
+post-deployment, per-tick, and atomic-RPC counts. Transport errors live in
+`error`, while `parse_error` means a model response could not be parsed.
+Legacy receipts are classified without rewriting their source bytes.
+Shadow receipts retain structured tool identity, never the raw tool-input state.
+`operations/shadow-learner/deploy-proposed.sh` backs up private state and
+installs a committed content-stamped copy. Extension links must never point
+into a task worktree. Existing OMP processes cache extension modules: a fresh
+process is required; `/reload-plugins` is not an extension-code reload.
+After this shim is loaded once, each worker respawn (including
+`/z0int-bridge-reload`) resolves `~/.local/lib/z0int-shadow/current` again.
+`Z0INT_INSTALL_ROOT` selects another stable install link; explicit checkout
+roots are fallbacks when no installed link exists. The child runs from the
+resolved release, whose `DEPLOYED_SHA` becomes each shadow receipt's
+`source_revision`. Changing TypeScript extension code still requires a restart.
+A broken installed link fails the spawn; it never falls back to an old checkout.
+
 
 ## Compilation is mechanism-neutral
 

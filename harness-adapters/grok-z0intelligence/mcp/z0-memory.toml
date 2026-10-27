@@ -1,0 +1,5 @@
+# Grok: the memory-only z0 MCP server (pull-only; Grok has no push seam). Activation A8a merges this table into
+# ~/.grok/config.toml after a backup. Tools: memory_search, orient, inspect, history, unknowns, verify.
+[mcp_servers.z0-memory]
+command = "sh"
+args = ["-c", "exec \"${Z0INT_PYTHON:-$HOME/.z0int/bin/python}\" -m z0int.intelligence_mcp --profile memory"]

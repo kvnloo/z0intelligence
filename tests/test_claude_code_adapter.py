@@ -158,7 +158,12 @@ def test_opportunity_record_written_for_a_repo(monkeypatch, tmp_path):
     assert rec['gate'] == 'ACT' and rec['opportunity']['trace']['harness'] == 'claude-code'
     rows = (tmp_path / 'home' / 'state' / 'claude-code' / 'opportunities.jsonl').read_text().splitlines()
     assert len(rows) == 1 and json.loads(rows[0])['opportunity']['scope']['families'] == ['git.branch']
-    assert claude_code.on_opportunity({'prompt': 'q', 'cwd': str(tmp_path)}, root=tmp_path / 'home') is None  # not a repo
+    # Outside a repo the turn is still a decision opportunity: recorded with empty state, like Hermes.
+    rec = claude_code.on_opportunity({'session_id': 's', 'prompt': 'q', 'cwd': str(tmp_path), 'prompt_id': 'p2'},
+                                     root=tmp_path / 'home')
+    assert rec is not None and rec['repo'] is None and rec['opportunity']['trace']['harness'] == 'claude-code'
+    rows = (tmp_path / 'home' / 'state' / 'claude-code' / 'opportunities.jsonl').read_text().splitlines()
+    assert len(rows) == 2 and json.loads(rows[1])['repo'] is None
 
 
 def test_stop_writes_observed_turn_behaviour(tmp_path):

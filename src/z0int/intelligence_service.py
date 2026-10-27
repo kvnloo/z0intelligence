@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
 import signal
 import time
+import sys
 from collections import Counter
 from .intelligence import dispatch, route, routing_snapshot, REGISTRY
 from .automatic import dispatch_event, consume
@@ -33,6 +34,10 @@ METRIC_TYPES={
 }
 METRICS=Counter({name:0 for name in METRIC_TYPES})
 DRAINING=threading.Event()
+PROVIDERS_TTL_SECONDS=30
+PROVIDERS_LOCK=threading.Lock()
+PROVIDERS_RESPONSE=None
+PROVIDERS_EXPIRES=0.0
 
 
 def aodl_admission_state():
@@ -68,6 +73,32 @@ def governed_worker_state():
         }
 
 
+def providers_response():
+    """Cache the encoded discovery response for 30s, sharing concurrent misses."""
+    global PROVIDERS_RESPONSE, PROVIDERS_EXPIRES
+    with PROVIDERS_LOCK:
+        if PROVIDERS_RESPONSE is not None and time.monotonic()<PROVIDERS_EXPIRES:
+            return PROVIDERS_RESPONSE
+        from .provider_saturation import policy,snapshot
+        config=policy()
+        states={p:{k:v for k,v in snapshot(p,config).items() if k!='held_tokens'} for p in config['provider_caps']}
+        value={
+            'authority_protocol_version':3,
+            'supported_authority_protocol_versions':[2,3],
+            **aodl_admission_state(),**governed_worker_state(),
+            'providers':states,
+            'free_only':config.get('free_only',False),
+            'validated_free_models':{
+                p:[e['model'] for e in config.get('validated_free_routes',[])
+                   if e['provider']==p and e.get('validated') and e.get('price_usd')==0]
+                for p in states},
+        }
+        data=json.dumps(value,allow_nan=False).encode()
+        PROVIDERS_RESPONSE=data
+        PROVIDERS_EXPIRES=time.monotonic()+PROVIDERS_TTL_SECONDS
+        return data
+
+
 def metric(name, amount=1):
     with METRIC_LOCK: METRICS[name] += amount
 
@@ -93,6 +124,7 @@ class Service(ThreadingHTTPServer):
                 b'Content-Length: 0\r\n'
                 b'Connection: close\r\n\r\n'
             )
+            except (BrokenPipeError,ConnectionResetError):pass
             finally:self.shutdown_request(request)
             return
         metric("admitted_connections_total")
@@ -104,11 +136,100 @@ class Service(ThreadingHTTPServer):
         try:super().process_request_thread(request,address)
         finally:SLOTS.release()
 
+    def handle_error(self, request, address):
+        if not isinstance(sys.exc_info()[1],(BrokenPipeError,ConnectionResetError)):
+            super().handle_error(request,address)
+
 
 def plan_intelligence(args):
     """Pure shadow wrapper: route against a snapshot without dispatch or receipt writes."""
     selected=route(args,routing_snapshot(args))
     return {'ok':True,'mode':'shadow','executed':False,'route':selected}
+
+
+def resolve_file_search(args):
+    """Repository evidence through the shared resolver, never worker dispatch."""
+    from pathlib import Path
+    from .context_resolve import InformationNeed, append_context_packet_event, resolve_context
+
+    fields = {'repository_root', 'query', 'kind', 'harness', 'trace_id', 'session_id',
+              'limit', 'time_budget_ms'}
+    if not isinstance(args, dict) or set(args) - fields:
+        raise ValueError('invalid file-search fields')
+
+    def text(name, maximum):
+        value = args.get(name)
+        if (not isinstance(value, str) or not value.strip() or len(value) > maximum
+                or any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF for c in value)):
+            raise ValueError(f'invalid {name}')
+        return value
+
+    root_raw = text('repository_root', 4096)
+    query = text('query', 2048)
+    harness = text('harness', 32)
+    if harness not in {'omp', 'hermes', 'codex', 'claude-code', 'dsh'}:
+        raise ValueError('unsupported harness')
+    trace_id = text('trace_id', 256) if args.get('trace_id') is not None else None
+    session_id = text('session_id', 256) if args.get('session_id') is not None else None
+    kind = args.get('kind', 'natural_language')
+    if kind not in ('exact_path', 'exact_symbol', 'natural_language'):
+        raise ValueError('unsupported kind')
+    for name, default, minimum, maximum in (
+        ('limit', 5, 1, 20), ('time_budget_ms', 120, 10, 1000),
+    ):
+        value = args.get(name, default)
+        if type(value) is not int or not minimum <= value <= maximum:
+            raise ValueError(f'invalid {name}')
+    try:
+        root = Path(root_raw)
+        if not root.is_absolute():
+            raise ValueError('repository_root must be absolute')
+        root = root.resolve(strict=True)
+        if not root.is_dir() or root == Path(root.anchor):
+            raise ValueError('repository_root must be a bounded directory')
+    except (OSError, RuntimeError) as exc:
+        raise ValueError('invalid repository_root') from exc
+    if kind == 'exact_path':
+        try:
+            target = (root / query).resolve()
+            target.relative_to(root)
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise ValueError('exact_path must stay within repository_root') from exc
+        query = str(target)
+    need = InformationNeed(
+        id='file-search', description=query, kind=kind,
+        path=query if kind == 'exact_path' else None,
+        symbol=query if kind == 'exact_symbol' else None,
+    )
+    packet = resolve_context(
+        needs=[need], task_id=trace_id, project_root=root,
+        allow_fff=True, allow_qmd=False, allow_memory=False, use_cache=False,
+        repository_limit=args.get('limit', 5),
+        repository_time_budget_ms=args.get('time_budget_ms', 120),
+    )
+    event_id = None
+    event_error = None
+    try:
+        event = append_context_packet_event(
+            packet, source=f"harness:{harness}", project=str(root), session_id=session_id,
+        )
+        event_id = event.event_id
+    except Exception as exc:  # Preserve evidence but never claim it was recorded.
+        event_error = type(exc).__name__
+    unavailable = kind != 'exact_path' and packet.measurements['fff_status'] not in {'ready', 'warming'}
+    out = {
+        'ok': not unavailable, 'schema': 'z0int.harness_context.v1',
+        'harness_id': harness, 'event_id': event_id,
+        'packet': packet.to_dict(),
+    }
+    if event_error:
+        out['event_log_error'] = event_error
+    if unavailable:
+        out.update(error='file_search_unavailable', instruction=(
+            'Repository search unavailable; report the gap and use an explicit '
+            'bounded local search fallback. Retrieval is not authorization.'
+        ))
+    return out
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -118,25 +239,26 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args):pass
 
     def reply(self,status,value):
-        data=json.dumps(value,allow_nan=False).encode()
-        self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+        return self.reply_bytes(status,json.dumps(value,allow_nan=False).encode())
+
+    def reply_bytes(self,status,data,content_type='application/json'):
+        try:
+            self.send_response(status)
+            self.send_header('Content-Type',content_type)
+            self.send_header('Content-Length',str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except (BrokenPipeError,ConnectionResetError):
+            self.close_connection=True
 
     def do_GET(self):
         if self.path=='/healthz':return self.reply(200,{'ok':True})
         if self.path=='/v1/bridge/capabilities':return self.reply(200,agentweb_bridge_capabilities())
         if self.path=='/v1/observe/outcome/coverage':return self.reply(200,summarize_outcome_coverage())
         if self.path=='/v1/observe/outcome/randomized-evidence':return self.reply(200,summarize_randomized_outcome_evidence())
-        if self.path=='/v1/providers':
-            from .provider_saturation import policy,snapshot
-            config=policy()
-            states={p:{k:v for k,v in snapshot(p).items() if k!='held_tokens'} for p in policy()['provider_caps']}
-            aodl=aodl_admission_state();governed=governed_worker_state()
-            return self.reply(200,{'authority_protocol_version':3,'supported_authority_protocol_versions':[2,3],**aodl,**governed,'providers':states,
-                'free_only':config.get('free_only',False),
-                'validated_free_models':{p:[e['model'] for e in config.get('validated_free_routes',[]) if e['provider']==p and e.get('validated') and e.get('price_usd')==0] for p in states}})
+        if self.path=='/v1/providers':return self.reply_bytes(200,providers_response())
         if self.path=='/metrics':
-            data=metrics_text().encode()
-            self.send_response(200);self.send_header('Content-Type','text/plain; version=0.0.4');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
+            return self.reply_bytes(200,metrics_text().encode(),'text/plain; version=0.0.4')
         if self.path=='/readyz':
             if DRAINING.is_set():return self.reply(503,{'ok':False,'draining':True})
             try:
@@ -150,12 +272,13 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404,{'error':'not_found'})
 
     def do_POST(self):
-        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/intelligence', '/v1/worker', '/v1/automatic', '/v1/automatic/consumed', '/v1/integrations/agent-orchestrator/spawn-decision', '/v1/integrations/agent-orchestrator/outcome', '/v1/plan', '/v1/experimental/choice', '/v1/experimental/noul', '/v1/observe/reliability', '/v1/observe/outcome', '/v1/observe/outcome/expectation', '/v1/observe/outcome/assignment', '/v1/observe/event-batch', '/v1/context/pack', '/v1/governed-worker', '/v1/agentweb', '/v1/agentweb/observation'):return self.reply(404,{'error':'not_found'})
+        if not self.path.startswith('/v1/authority/') and self.path not in ('/v1/file-search', '/v1/intelligence', '/v1/worker', '/v1/automatic', '/v1/automatic/consumed', '/v1/integrations/agent-orchestrator/spawn-decision', '/v1/integrations/agent-orchestrator/outcome', '/v1/plan', '/v1/experimental/choice', '/v1/experimental/noul', '/v1/observe/reliability', '/v1/observe/outcome', '/v1/observe/outcome/expectation', '/v1/observe/outcome/assignment', '/v1/observe/event-batch', '/v1/context/pack', '/v1/governed-worker', '/v1/agentweb', '/v1/agentweb/observation'):return self.reply(404,{'error':'not_found'})
         try:
             size=int(self.headers.get('Content-Length','0'))
             max_size = 262144 if self.path.startswith('/v1/authority/') else (48000 if self.path=='/v1/agentweb' else (8000 if self.path=='/v1/agentweb/observation' else 40000))
             if not 0<size<=max_size:return self.reply(413,{'error':'request_size'})
             args=json.loads(self.rfile.read(size))
+            if self.path=='/v1/file-search':return self.reply(200,resolve_file_search(args))
             bridge_envelope=None
             if self.path in ('/v1/intelligence','/v1/plan','/v1/experimental/choice','/v1/experimental/noul'):
                 bridge_envelope,args=unwrap_agentweb_bridge_request(self.path,args)
@@ -203,6 +326,7 @@ class Handler(BaseHTTPRequestHandler):
                 metric('dispatch_seconds_sum',time.monotonic()-started)
                 metric('dispatch_finished_total')
             self.reply(200,wrap_agentweb_bridge_response(bridge_envelope,result))
+        except (BrokenPipeError,ConnectionResetError):self.close_connection=True
         except (ValueError,TypeError):self.reply(400,{'error':'invalid_request_or_trace_conflict'})
         except Exception:self.reply(500,{'error':'dispatch_failed'})
 

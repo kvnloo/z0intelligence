@@ -351,7 +351,6 @@ def record_reported_cost(row, body, free_only):
         row.extra['free_only_violation'] = 'provider_reported_nonzero_cost'
     return violation
 
-
 def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_index, *, receipt_sink, admission, sidestep=False):
     provider, model = candidate['provider'], candidate['model']
     if blocked_provider(provider):
@@ -412,6 +411,7 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         row.cached_input_tokens = token(response.usage.get('prompt_tokens_details') or {}, 'cached_tokens')
         metered = row.input_tokens is not None and row.output_tokens is not None
         identified = bool(response.raw.get('model'))
+
         ok = complete and metered and identified and not cost_violation
         row.outcome = {'execution_completed': complete, 'source': 'codex_plugin'}
         row.extra.update(status='completed' if ok else ('failed' if cost_violation else 'completed_unmetered_or_unidentified' if complete else 'incomplete'),
