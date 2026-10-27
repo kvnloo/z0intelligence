@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from z0int.contribute import align as A, cli as K, priorities as P, state as St
+from z0int.contribute import align as A, cli as K, priorities as P, state as St, schemas
 from z0int.contribute import first_task_provider as transport
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -151,6 +151,7 @@ def test_first_task_pick_cli_receipt_and_modes(first_task_case, tmp_path, monkey
     monkeypatch.setattr(K, "_done_count", lambda: 0)
     assert K.main(["suggest", "--llm=" + mode, "--json"], env=env) == 0
     sug = St.read_json(St.home() / "suggestion.json")
+    assert schemas.validate(sug, "suggestion") == []
     assert sug["pick"]["task"] == ("task-0" if mode == "none" else "task-1")
     assert len(fake.calls) == (0 if mode == "none" else 1)
     receipt = St.read_json(next((St.home() / "receipts").glob("*.json")))

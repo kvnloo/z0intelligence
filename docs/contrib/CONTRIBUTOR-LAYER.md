@@ -340,6 +340,18 @@ The LLM is used only when 2 or more tasks are within `tie_epsilon` of the top sc
 - Law L-LLM applies: the LLM cannot add a task, remove a filter, raise a consent tier or write text that the user sees.
 - When the LLM is not available, or fails a check, the result is the deterministic top, and the receipt holds the reason.
 
+CW6 implementation: `z0int contribute suggest --llm=none|local|auto` defaults to
+`none`. The stdlib contributor provider seam takes one closed payload. Configure
+`Z0INT_FIRST_TASK_PROVIDER` to an executable local classifier that reads JSON on
+stdin and returns only the answer JSON on stdout; no shell arguments or inherited
+credentials are passed. `local` and `auto` currently use that same local-first
+path, with no automatic remote escalation. No configured classifier means
+`no_provider` and the deterministic top. T3 profiles fail closed before any send.
+The suggestion engine and S3 receipt record the fixed outcome code and call count;
+user-facing cards and reasons remain deterministic templates, not model text.
+The z0 resolver separately reuses its existing provider/redaction/freeze/replay
+path with the new structured schema.
+
 ### 3.5 Output: `~/.z0int/contribute/suggestion.json`
 
 ```json

@@ -58,11 +58,20 @@ def local_provider(payload):
     if not executable:
         raise LookupError("no_provider")
     # No shell, model selection, inherited proxy, network endpoint or credentials.
-    proc = subprocess.run([executable], input=json.dumps(payload), text=True, capture_output=True,
-                          timeout=TIMEOUT, env={"PATH": os.defpath}, check=False)
-    if proc.returncode:
-        raise RuntimeError("provider_failed")
-    return proc.stdout
+    import tempfile
+    # Bound retained output and keep classifier cwd away from repository instructions.
+    with tempfile.TemporaryDirectory(prefix="first-task-") as directory:
+        with tempfile.TemporaryFile() as output:
+            proc = subprocess.run([executable], input=json.dumps(payload), text=True,
+                                  stdout=output, stderr=subprocess.DEVNULL, cwd=directory,
+                                  timeout=TIMEOUT, env={"PATH": os.defpath}, check=False)
+            if proc.returncode:
+                raise RuntimeError("provider_failed")
+            output.seek(0)
+            raw = output.read(MAX_BYTES + 1)
+            if len(raw) > MAX_BYTES:
+                raise ValueError("response_schema")
+            return raw.decode("utf-8")
 
 
 def parse(raw):

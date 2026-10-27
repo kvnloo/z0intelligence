@@ -1,7 +1,7 @@
 """Deterministic alignment engine (spec §3.3, §3.6), with opt-in closed tie-break.
 
 Facts in (priorities doc, vocab, profile, prefs, history, optional live claim and
-issue state), ranking out. The same inputs always give the same output, whatever
+issue state), ranking out. With llm=none the same inputs give the same output, whatever
 the task order in the file. Hard filters run first; the score only orders the
 survivors. The order is ``(score desc, tier asc, rank asc, id asc)``.
 
@@ -244,7 +244,7 @@ def align(
     llm: str = "none",
     provider=None,
 ) -> dict[str, Any]:
-    """Rank the priority file for one contributor. Pure function.
+    """Rank the priority file; pure/offline unless the caller opts into a tie-break.
 
     ``live_claims``/``issue_states`` are ``None`` when GitHub could not be read; the
     claim filter is then skipped (warning "claim state unknown") and issue gates stay
