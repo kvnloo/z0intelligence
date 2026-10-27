@@ -19,6 +19,13 @@ def fake_bin(path, version='0.39.0'):
     return path
 
 
+def fake_ctx(path, body=None):
+    ready = json.dumps({'lexical': {'status': 'ready'}, 'history_epoch': {'generation_path': 'g1'}})
+    path.write_text('#!/bin/sh\n' + (body if body is not None else f"echo '{ready}'\n"))
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+    return path
+
+
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     av = tmp_path / 'av'
@@ -30,7 +37,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv('Z0INT_HOME', str(tmp_path / 'z0'))
     monkeypatch.setenv('Z0_FAKE_TDB_ENV', ENV_VALUE)
     return {'av_dir': av, 'agentsview_bin': fake_bin(tmp_path / 'agentsview'), 'claude_home': claude_home,
-            'config': {}}
+            'config': {}, 'ctx_bin': fake_ctx(tmp_path / 'ctx')}
 
 
 def checks(report):
@@ -100,3 +107,105 @@ def test_output_never_contains_config_secret_values(env, capsys, monkeypatch):
     for blob in (json.dumps(report), out.out, out.err):
         assert AUTH_VALUE not in blob and ENV_VALUE not in blob
     assert json.loads(out.out)['ok'] is True
+
+
+def test_ctx_timeout_fails_instead_of_passing(env, tmp_path):
+    slow = fake_ctx(tmp_path / 'ctx-slow', 'sleep 5\n')
+    report = doctor.run(**{**env, 'ctx_bin': slow, 'ctx_timeout': 0.5})
+    c = checks(report)['ctx_lexical']
+    assert report['ok'] is False and c['ok'] is False and 'TimeoutExpired' in c['detail']
+
+
+def test_ctx_not_ready_fails(env, tmp_path):
+    body = "echo '" + json.dumps({'lexical': {'status': 'stale', 'reason': 'stale_lock'}, 'history': {'status': 'unavailable'}}) + "'\n"
+    report = doctor.run(**{**env, 'ctx_bin': fake_ctx(tmp_path / 'ctx-stale', body)})
+    c = checks(report)['ctx_lexical']
+    assert c['ok'] is False and 'stale_lock' in c['detail']
+
+
+def test_ctx_not_installed_is_fine(env, tmp_path, monkeypatch):
+    monkeypatch.setattr(doctor, 'resolve_bin', lambda name, explicit=None: None if name == 'ctx' else str(env['agentsview_bin']))
+    report = doctor.run(**{**env, 'ctx_bin': None})
+    assert checks(report)['ctx_lexical'] == {**checks(report)['ctx_lexical'], 'ok': True, 'status': 'not_installed'}
+
+
+def test_binaries_resolve_without_path(env, tmp_path, monkeypatch):
+    home = tmp_path / 'h'
+    (home / '.local/bin').mkdir(parents=True)
+    fake_bin(home / '.local/bin' / 'agentsview', '0.39.0')
+    fake_ctx(home / '.local/bin' / 'ctx')
+    monkeypatch.setenv('HOME', str(home))
+    monkeypatch.setenv('PATH', '/nonexistent')
+    monkeypatch.delenv('Z0INT_AGENTSVIEW_BIN', raising=False)
+    monkeypatch.delenv('Z0INT_CTX_BIN', raising=False)
+    report = doctor.run(**{**env, 'agentsview_bin': None, 'ctx_bin': None})
+    c = checks(report)
+    assert c['data_version']['ok'] is True, c['data_version']
+    assert c['ctx_lexical']['status'] == 'ready' and c['ctx_lexical']['path'] == str(home / '.local/bin' / 'ctx')
+
+
+def _with_sources(env, tmp_path, rows, labels=()):
+    import sqlite3
+    db = env['av_dir'] / 'sessions.db'
+    conn = sqlite3.connect(db)
+    conn.execute('create table if not exists pg_sync_state (key text primary key, value text)')
+    conn.execute("insert or replace into pg_sync_state values ('artifact_local_installation_id', 'inst1')")
+    for k, v in labels:
+        conn.execute('insert or replace into pg_sync_state values (?, ?)', (k, v))
+    for sid, agent, machine, started, path in rows:
+        conn.execute('insert into sessions (id, project, agent, machine, started_at, file_path) values (?,?,?,?,?,?)',
+                     (sid, 'z0', agent, machine, started, path))
+    conn.commit()
+    conn.close()
+
+
+def test_a_local_source_behind_disk_fails_even_when_newest_session_is_fresh(env, tmp_path):
+    import os, time
+    from memory_fixture import iso
+    now = time.time()
+    proj = tmp_path / 'cl' / 'projects' / 'p'
+    proj.mkdir(parents=True)
+    f = proj / 's.jsonl'
+    f.write_text('{}\n')
+    os.utime(f, (now - 60, now - 60))
+    _with_sources(env, tmp_path, [('s-old', 'claude', 'inst1', iso(now - 30 * 3600), str(f))])
+    report = doctor.run(**env, now=now)
+    c = checks(report)
+    assert c['freshness']['ok'] is True          # the newest session overall is fresh
+    assert c['source_freshness']['ok'] is False  # but this source is 30 h behind its disk
+    assert report['ok'] is False
+
+
+def test_remote_host_staleness_is_per_host_and_uses_labels(env, tmp_path):
+    import time
+    from memory_fixture import iso
+    now = time.time()
+    _with_sources(env, tmp_path, [('m1', 'claude', 'far-laptop', iso(now - 72 * 3600), '/x/m1.jsonl'),
+                                  ('m2', 'claude', 'peer', iso(now - 2 * 3600), '/x/m2.jsonl'),
+                                  ('g1', 'claude', 'inst1', iso(now - 3600), '/nonexistent/g1.jsonl')],
+                  labels=[('machine_label:inst1', 'groot')])
+    c = checks(doctor.run(**env, now=now))
+    assert c['remote_host_freshness']['ok'] is False
+    assert c['remote_host_freshness']['stale'] == ['far-laptop: newest session 72 h old']
+
+
+def test_recall_layer_absent_is_expected(env):
+    c = checks(doctor.run(**env))['recall_layer']
+    assert c['ok'] is True and 'by design' in c['detail']
+
+
+def test_ctx_status_on_stderr_with_exit_1_is_read_and_fails(env, tmp_path):
+    body = "echo '" + json.dumps({'history': {'status': 'unavailable'}}) + "' >&2\nexit 1\n"
+    c = checks(doctor.run(**{**env, 'ctx_bin': fake_ctx(tmp_path / 'ctx-err', body)}))['ctx_lexical']
+    assert c['ok'] is False and 'history unavailable' in c['detail']
+
+
+def test_ctx_data_root_follows_a_symlinked_home(tmp_path, monkeypatch):
+    real = tmp_path / 'real-ctx'
+    real.mkdir()
+    (tmp_path / '.ctx').symlink_to(real)
+    monkeypatch.setenv('HOME', str(tmp_path))
+    monkeypatch.delenv('CTX_DATA_ROOT', raising=False)
+    assert doctor.ctx_data_root() == str(real)
+    monkeypatch.setenv('CTX_DATA_ROOT', '/explicit')
+    assert doctor.ctx_data_root() == '/explicit'
