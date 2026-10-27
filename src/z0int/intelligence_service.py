@@ -134,7 +134,7 @@ class Handler(BaseHTTPRequestHandler):
             aodl=aodl_admission_state();governed=governed_worker_state()
             return self.reply(200,{'authority_protocol_version':3,'supported_authority_protocol_versions':[2,3],**aodl,**governed,'providers':states,
                 'free_only':config.get('free_only',False),
-                'validated_free_models':{p:[e['model'] for e in config.get('validated_free_routes',[]) if e['provider']==p and free_route(config,p,e.get('model')) is not None] for p in states}})
+                'validated_free_models':{p:[e['model'] for e in config.get('validated_free_routes',[]) if e['provider']==p and free_route({**config,'validated_free_routes':[e]},p,e.get('model')) is not None] for p in states}})
         if self.path=='/metrics':
             data=metrics_text().encode()
             self.send_response(200);self.send_header('Content-Type','text/plain; version=0.0.4');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
