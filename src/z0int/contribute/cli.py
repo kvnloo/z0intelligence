@@ -118,6 +118,7 @@ class Env:
     profile_probe: Callable[[], dict[str, Any]] | None = None
     poll_seconds: float = POLL_SECONDS
     warnings: list[str] = field(default_factory=list)
+    first_task_provider: Callable | None = None
 
     @property
     def sha(self) -> str | None:
@@ -308,7 +309,8 @@ def cmd_suggest(env: Env, *, llm: str = "none", profile_mode: str = "minimal") -
         except Exception:  # noqa: BLE001
             env.warnings.append("receipts-index.yaml unreadable; uniq_hw assumes no receipts")
         result = A.align(doc, vocab, prof, prefs, done_count=_done_count(), onboard_mode=onboard_mode,
-                         live_claims=live, issue_states=issue_states, receipts_index=idx)
+                         live_claims=live, issue_states=issue_states, receipts_index=idx,
+                         llm=llm, provider=env.first_task_provider)
         psha = P.file_sha256(P.priorities_path(env.root))
     else:
         env.warnings.append("no valid .z0/priorities.yaml: " + "; ".join(errors[:3]))
@@ -322,19 +324,16 @@ def cmd_suggest(env: Env, *, llm: str = "none", profile_mode: str = "minimal") -
         result = A.fallback_from_labels(list({i["number"]: i for i in issues}.values()))
         psha = None
     env.warnings += result["warnings"]
-    llm_reason = None
-    if llm != "none":
-        llm_reason = "LLM tie-break is not available yet (CW6); deterministic result used"
-        if len(result.get("tie_candidates") or []) > 1:
-            env.warnings.append(llm_reason)
-    sug = A.to_suggestion(result, sha=sha, priorities_sha256=psha, profile_tier=tier, llm="none",
+    llm_reason = result.get("first_task_pick", {}).get("reason", "no_tie")
+    sug = A.to_suggestion(result, sha=sha, priorities_sha256=psha, profile_tier=tier, llm=llm,
                           llm_reason=llm_reason)
     root = St.home()
     St.write_json(root / "profile.json", prof)
     St.write_json(root / "suggestion.json", sug)
     text = json.dumps(sug, sort_keys=True)
     rec = _write(env, state="S3_suggested", command=f"z0int contribute suggest --llm={llm} --profile={profile_mode}",
-                 code=0, output=text, result="pass", data={"pick": sug["pick"]["task"]})
+                 code=0, output=text, result="pass", data={"pick": sug["pick"]["task"],
+                     "first_task_pick": result.get("first_task_pick", {"reason": "no_tie", "calls": 0})})
     pick = sug["pick"]
     alts = ", ".join(a["task"] for a in sug["alternatives"]) or "none"
     question = f"Claim {pick['task']}, choose an alternative ({alts}), or stop?"
