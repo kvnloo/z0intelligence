@@ -28,6 +28,7 @@ def _percentile(values: list[float], pct: float) -> float | None:
 
 
 def build_decision_analytics(events: Iterable[TokenomicsEvent]) -> dict[str, Any]:
+    events = list(events)
     rows = [r for r in materialize_rows(events) if r.get("status") == "ok"]
     by_cap: dict[str, list[dict[str, Any]]] = defaultdict(list)
     by_backend: dict[str, list[dict[str, Any]]] = defaultdict(list)
