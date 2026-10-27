@@ -1,7 +1,7 @@
-"""Deterministic alignment engine (spec §3.3, §3.6). No LLM, no I/O.
+"""Deterministic alignment engine (spec §3.3, §3.6), with opt-in closed tie-break.
 
 Facts in (priorities doc, vocab, profile, prefs, history, optional live claim and
-issue state), ranking out. The same inputs always give the same output, whatever
+issue state), ranking out. With llm=none the same inputs give the same output, whatever
 the task order in the file. Hard filters run first; the score only orders the
 survivors. The order is ``(score desc, tier asc, rank asc, id asc)``.
 
@@ -241,13 +241,17 @@ def align(
     issue_states: dict[int, str] | None = None,
     satisfied_conditions: Iterable[str] = (),
     receipts_index: Iterable[dict[str, Any]] = (),
+    llm: str = "none",
+    provider=None,
 ) -> dict[str, Any]:
-    """Rank the priority file for one contributor. Pure function.
+    """Rank the priority file; pure/offline unless the caller opts into a tie-break.
 
     ``live_claims``/``issue_states`` are ``None`` when GitHub could not be read; the
     claim filter is then skipped (warning "claim state unknown") and issue gates stay
     closed. ``receipts_index`` rows are ``{task, host_class}`` from .z0/receipts-index.yaml.
     """
+    if llm not in ("none", "local", "auto"):
+        raise ValueError("invalid LLM mode")
     prefs = dict(prefs or {})
     tasks = sorted(doc["tasks"], key=lambda t: t["id"])  # input order never matters
     n_tier: dict[str, int] = {k: 0 for k in TIER_WEIGHT}
@@ -273,8 +277,11 @@ def align(
             continue
         ranked.append(_score(t, ctx))
     ranked.sort(key=lambda r: (-r["score"], TIER_ORDER[r["tier"]], r["rank"], r["task"]))
+    candidates = [r["task"] for r in ranked if ranked[0]["score"] - r["score"] <= al["tie_epsilon"]][:5]
+    chosen, llm_receipt = _first_task_pick(candidates, tasks, ctx, llm, provider)
     feedback_task = next((t for t in tasks if t["id"] == FEEDBACK_TASK), None)
-    pick, alts = _pick_three(ranked, feedback_task)
+    selection = sorted(ranked, key=lambda r: r["task"] != chosen) if chosen else ranked
+    pick, alts = _pick_three(selection, feedback_task)
     warnings = []
     if live_claims is None:
         warnings.append("claim state unknown")
@@ -288,8 +295,66 @@ def align(
         "alternatives": alts,
         "excluded_counts": dict(sorted(excluded.items())),
         "warnings": warnings,
-        "tie_candidates": [r["task"] for r in ranked if ranked[0]["score"] - r["score"] <= al["tie_epsilon"]][:5],
+        "tie_candidates": candidates,
+        "first_task_pick": llm_receipt,
     }
+
+
+def _first_task_pick(candidates, tasks, ctx, llm, provider):
+    """One call, only post-filter candidates; never let provider data mutate authority."""
+    import copy
+    import subprocess
+    from . import first_task_contract as contract
+    from . import first_task_provider as transport
+
+    receipt = {"kind": "first_task_pick", "mode": llm, "accepted": False,
+               "reason": "disabled" if llm == "none" else "no_tie", "calls": 0}
+    if llm == "none" or len(candidates) < 2:
+        return None, receipt
+    top = candidates[0]
+    try:
+        # T3-derived domains/interests must never be copied into the prompt.
+        if ctx["profile"].get("tier") == "T3":
+            raise ValueError("unsafe_facts")
+        facts = contract.close_facts({
+            "profile": {"skills": sorted(ctx["have"]), "interests": sorted(ctx["interests"]),
+                        "contrib_done": ctx["done"], "tier": ctx["profile"].get("tier", "T0")},
+            "tasks": [{k: t[k] for k in contract.TASK_KEYS} for t in tasks if t["id"] in candidates],
+        }, candidates)
+        payload = {"kind": "first_task_pick", "facts": facts, "candidates": list(candidates),
+                   "safe_default": {"pick": top, "reason_codes": []},
+                   "answer_schema": contract.schema(facts, candidates)}
+        if not transport.safe_payload(payload):
+            raise ValueError("unsafe_facts")
+    except (ValueError, TypeError, KeyError):
+        receipt["reason"] = "unsafe_facts"
+        return top, receipt
+    try:
+        with transport.deadline():
+            receipt["calls"] = 1
+            raw = (provider or transport.local_provider)(copy.deepcopy(payload))
+        answer = transport.parse(raw)
+        if type(answer) is not dict or answer.get("pick") not in candidates:
+            receipt["reason"] = "out_of_set"
+        elif not contract.verify(facts, answer):
+            receipt["reason"] = "verifier_failed"
+        else:
+            chosen = answer["pick"]
+            task = next(t for t in tasks if t["id"] == chosen)
+            if _hard_filter(task, ctx) is not None:
+                receipt["reason"] = "filter_failed"
+            else:
+                receipt.update(accepted=True, reason="verified", answer=copy.deepcopy(answer))
+                return chosen, receipt
+    except (TimeoutError, subprocess.TimeoutExpired):
+        receipt["reason"] = "timeout"
+    except LookupError:
+        receipt["reason"] = "no_provider"
+    except (ValueError, TypeError):
+        receipt["reason"] = "response_schema"
+    except Exception:
+        receipt["reason"] = "provider_failed"
+    return top, receipt
 
 
 def fallback_from_labels(issues: list[dict[str, Any]], weights: dict[str, float] | None = None) -> dict[str, Any]:
@@ -338,6 +403,8 @@ def to_suggestion(result: dict[str, Any], *, sha: str | None, priorities_sha256:
     engine = {"version": ENGINE_VERSION, "llm": check_llm_choice(llm), "answers_ref": None}
     if llm_reason:
         engine["llm_reason"] = llm_reason
+    if "first_task_pick" in result:
+        engine["first_task_pick"] = result["first_task_pick"]
     return {
         "schema": "z0.contribute.suggestion.v1",
         "sha": sha,
