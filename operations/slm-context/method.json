@@ -1,0 +1,37 @@
+{
+  "schema": "z0int.slm_context_replay.v1",
+  "scope": "offline teacher-imitation replay, not closed-loop task success or routing authorization",
+  "seed": 1729,
+  "families": {
+    "router_model_choice": {"teacher": "recorded native typesafe/jev-1.14.0 choices", "pool_rows": 118, "dev_rows": 102, "test_rows": 106, "test_clusters": 10},
+    "tool_family_choice": {"teacher": "historical agent first-tool-family majority, backend unknown, weak behavioral proxy", "pool_rows": 195, "dev_rows": 73, "test_rows": 114, "test_clusters": 114}
+  },
+  "split": "Original task groups, with identical decision-input groups unioned before seed-stable 50/20/30 pool/dev/test assignment. Few-shot labels come only from pool.",
+  "variants": [
+    {"name":"none", "components":[], "context_budget":0},
+    {"name":"memory", "components":["memory"], "context_budget":512},
+    {"name":"few_shot", "components":["few_shot"], "context_budget":2048},
+    {"name":"summary", "components":["summary"], "context_budget":1024},
+    {"name":"skill_relevance", "components":["skill_relevance"], "context_budget":512},
+    {"name":"combination", "components":["summary","skill_relevance","memory","few_shot"], "context_budget":4096}
+  ],
+  "budget_unit": "UTF8 evidence bytes, a conservative token ceiling for byte-level Qwen tokenizers. Wrapper and original task tokens are outside the evidence budget. Actual full prompt tokens come from llama.cpp /tokenize.",
+  "few_shot_selection": "Two same-family lexical Jaccard neighbors from the pool, stable row-ID tie break. Examples contain compact predecision summary, available option IDs and pool teacher choice.",
+  "selection": "Pick maximum dev agreement, then lower dev p50 latency. Never select a variant using test labels.",
+  "agreement_gate": {"accuracy_min":0.95, "task_cluster_bootstrap_ci95_lower_min":0.90, "production_authorization":false},
+  "uncertainty": "2000 paired task-cluster bootstrap samples, seed1729. Exploratory intervals have no multiple-comparison correction. Zero-error nonparametric intervals can be degenerate.",
+  "calibration": "Ten-bin ECE on chosen-option probability and multiclass Brier score against teacher. Grammar-conditional option probabilities are not calibrated correctness estimates.",
+  "additional_parent_requested_policies": {
+    "timing": "Requested after frozen model replay began. No new labels, prompts, or model calls.",
+    "knn_only": "Same retriever, majority vote for k in 1,3,5. Select k by maximum dev accuracy, ties smaller k. Tied label vote counts choose nearest supporting neighbor, similarity ties use stable row IDs.",
+    "option_scoring": "Already the frozen model readout: argmax actual single-token slot probabilities. No free-text parsing arm or fresh inference is necessary.",
+    "cascade": "Thresholds are dev margin quantiles plus zero and explicit all-escalate. Select maximum dev coverage with at least ten answers and at least95% answered accuracy. Otherwise escalate all.",
+    "cascade_claim": "Test answered accuracy and escalation curve only. Escalation uses counterfactual recorded-teacher answers, not measured fresh Jev calls.",
+    "majority_comparison": "Compare all arms to training-majority choices within each exact available-option vocabulary."
+  },
+  "missing_injection_evidence": {"memory":"Two explicitly granted z0int-memory searches returned empty packets", "skill_relevance":"No replayable historical skill prompt and roster pairs"},
+  "dataset_file_sha256":"315ccdecfceeadd3a81bd6f05a0aefd24aab1853d349351dbd6bdbd47d5df2e2",
+  "requests_file_sha256":"b8cb4c936a8c594044c4aa4d0a04d9c46dcaf72ecaa6cb5647756d1fa08a050a",
+  "frozen_manifest_file_sha256":"9c8289b447294c816735d2b0e2dc08ab124fccf37fb420db1491f83f2faa0cc0",
+  "private_data_policy":"Do not commit raw session requests, frozen prompts, few-shot passages or raw model responses. Retain these under the operations evidence directory. Public report contains aggregates and digests only."
+}
