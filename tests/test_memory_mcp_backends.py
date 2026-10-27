@@ -477,3 +477,25 @@ def test_sqlite_equal_rank_prefers_the_newer_message(native, tmp_path):
                                             ("codex:newer-2", 1): "2026-10-26T00:00:00Z"})
     found = backend.search_backend("agentsview", "zanzibar", [grant()], 2, 2)
     assert [r["native"]["session_id"] for r in found] == ["codex:newer-2", "codex:older-1"]
+
+
+def test_sqlite_host_uses_agentsview_machine_label_when_present(native, tmp_path):
+    import sqlite3
+    path = _sqlite_archive(tmp_path, [(SESSION, PROJECT, 7, "assistant", "labelled host answer", None),
+                                      ("codex:other-5", PROJECT, 1, "user", "labelled raw host", None)])
+    conn = sqlite3.connect(path)
+    conn.execute("update sessions set machine = 'b163c2db159f66e6' where id = ?", (SESSION,))
+    conn.execute("update sessions set machine = 'mbp' where id = 'codex:other-5'")
+    conn.execute("create table pg_sync_state (key text primary key, value text not null)")
+    conn.execute("insert into pg_sync_state values ('machine_label:b163c2db159f66e6', 'groot')")
+    conn.commit()
+    conn.close()
+    hosts = {r["native"]["session_id"]: r["host"]
+             for r in backend.search_backend("agentsview", "labelled", [grant()], 5, 2)}
+    assert hosts == {SESSION: "groot", "codex:other-5": "mbp"}
+
+
+def test_sqlite_host_falls_back_to_raw_machine_without_label_table(native, tmp_path):
+    _sqlite_archive(tmp_path, [(SESSION, PROJECT, 7, "assistant", "unlabelled host answer", None)])
+    rows = backend.search_backend("agentsview", "unlabelled", [grant()], 1, 2)
+    assert rows[0]["host"] == "fixture-host"

@@ -265,13 +265,43 @@ def _sqlite_path() -> Path:
     return Path.home() / ".agentsview" / "sessions.db"
 
 
+class _ArchiveConnection(sqlite3.Connection):
+    """Read-only archive connection that caches machine display labels for its own lifetime."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.machine_labels: dict[str, str] = {}
+
+
+def _machine_label(conn: sqlite3.Connection, machine: Any) -> str:
+    """AgentsView v0.44 stores new sessions under the installation id (e.g. b163c2db...) and keeps the
+    display name in pg_sync_state 'machine_label:<id>'. Map id -> label when that key exists; otherwise
+    the raw value. Read-only; a missing table or row falls back to the raw value."""
+    if not isinstance(machine, str) or not machine:
+        return "unknown"
+    cache = getattr(conn, "machine_labels", None)
+    if cache is not None and machine in cache:
+        return cache[machine]
+    label = machine
+    try:
+        row = conn.execute("select value from pg_sync_state where key = ?",
+                           ("machine_label:" + machine,)).fetchone()
+        if row and isinstance(row[0], str) and row[0].strip():
+            label = row[0].strip()
+    except sqlite3.Error:
+        pass
+    if cache is not None:
+        cache[machine] = label
+    return label
+
+
 def _sqlite_connect(deadline: float) -> sqlite3.Connection:
     path = _sqlite_path()
     if not path.is_file():
         raise BackendUnavailable("sqlite_unavailable")
     try:
         conn = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True, timeout=min(2.0, _remaining(deadline)),
-                               check_same_thread=False)
+                               check_same_thread=False, factory=_ArchiveConnection)
     except sqlite3.Error:
         raise BackendUnavailable("sqlite_unavailable") from None
     try:
@@ -331,7 +361,7 @@ def _original_sqlite(grant: dict[str, Any], native: dict[str, Any], conn: sqlite
     return {
         "source": "agentsview", "collection": "history",
         "scope": grant["scope"], "privacy": "private",
-        "host": session[2] if isinstance(session[2], str) else "unknown",
+        "host": _machine_label(conn, session[2]),
         "date": stamp if isinstance(stamp, str) else "unknown",
         "text": content, "locator": locator, "native": proven_native,
         "source_version": "sha256:" + hashlib.sha256(content.encode("utf-8")).hexdigest(),
