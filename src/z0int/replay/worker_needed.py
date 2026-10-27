@@ -34,11 +34,14 @@ def ingest_worker_needed_results(
 
     lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
     rows = []
-    for ln in lines[-limit:]:
+    for ln in (lines[-limit:] if limit > 0 else []):
         try:
-            rows.append(json.loads(ln))
+            row = json.loads(ln)
         except json.JSONDecodeError:
             continue
+        if not isinstance(row, dict):
+            continue
+        rows.append(row)
 
     emitted = 0
     by_gold: dict[str, int] = {}
