@@ -1,0 +1,52 @@
+{
+  "_comment": "COHORT = the set of cases your eval runs. Keys starting with _ are documentation only; the runner ignores them. Delete the _comment keys to get a clean eval.",
+  "schema": "z0eval.unified_memory_cohort.v0",
+  "_comment_schema": "Leave this exactly as-is. It tells the runner this is a unified-memory cohort.",
+  "source": "describe where this cohort came from; MUST be synthetic / public-safe, never private transcript text",
+
+  "_comment_evidence": "evidence[] = the world the harness is allowed to know. seed_cohort writes each item into a throwaway synthetic AgentsView DB + ledger. A claim written as 'name=value' that repeats across items becomes a superseded bitemporal claim (newest wins, old stays inspectable); any other claim text is stored as a recallable source line.",
+  "evidence": [
+    {
+      "source_id": "my:fact-1",
+      "_comment_source_id": "unique id for this piece of evidence",
+      "source_version": "1",
+      "_comment_source_version": "version/revision string; appears in the receipt's evidence_refs",
+      "trust_class": "code",
+      "_comment_trust_class": "provenance class, e.g. code | authoritative_task | derived_memory | conversation | unknown. It is carried, never used to invent authority.",
+      "locator": "owner/repo:path/to/file:symbol",
+      "_comment_locator": "where this fact really lives; hashed into the receipt (locator_hash)",
+      "observed_at": "2026-09-20T00:00:00Z",
+      "_comment_observed_at": "ISO-8601 time the fact was observed; drives temporal ordering / supersession",
+      "claim": "my-service uses setting foo",
+      "_comment_claim": "the actual fact text. Must be recallable by the question prompt's keywords. For supersession use 'name=value' (e.g. cap=8192).",
+      "required_need": "the-need-id",
+      "_comment_required_need": "ties this evidence to a question need (see needs[].id below). A need with NO matching evidence forces abstention."
+    }
+  ],
+
+  "_comment_questions": "questions[] = what you ask and the outcome contract each answer must satisfy.",
+  "questions": [
+    {
+      "id": "my-question-1",
+      "_comment_id": "unique question id; becomes receipt question_id",
+      "kind": "exact",
+      "_comment_kind": "label only: exact | temporal | cross-harness | contradiction | abstention | efficiency",
+      "prompt": "Ask something whose answer is supported by the evidence above.",
+      "_comment_prompt": "must share keywords with the target claim so lexical recall finds it",
+      "needs": [
+        {"id": "the-need-id", "required": true}
+      ],
+      "_comment_needs": "the need ids this question depends on; match required_need on the evidence",
+      "expected_action": "answer",
+      "_comment_expected_action": "answer (must be supported) | abstain (no evidence -> must refuse) | observe (report conflicting sources, pick no winner)",
+      "expected_support": [
+        "my-service uses setting foo"
+      ],
+      "_comment_expected_support": "substrings that MUST appear in the recalled context for a pass. Empty for an abstain question.",
+      "forbidden": [],
+      "_comment_forbidden": "substrings that must NOT appear (e.g. a fabricated answer, or a wrongly-picked winner in a contradiction)",
+      "evidence_ids": ["my:fact-1"],
+      "_comment_evidence_ids": "the source_id(s) this question is about; for bookkeeping/temporal checks"
+    }
+  ]
+}

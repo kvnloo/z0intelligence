@@ -323,6 +323,8 @@ Current evaluation surfaces include:
 - OMP Decision Dataset v2;
 - routine/cascade/repair synthetic/unit harnesses.
 
+**Want to contribute an eval?** Start with [docs/CONTRIBUTING-EVALS.md](docs/CONTRIBUTING-EVALS.md): a dead-simple, no-install path for outside contributors to clone the repo and produce a passing unified-memory eval (cohort + question-contract + receipt), with a copy-paste template (`evals/templates/my-first-eval/`) and a worked example (`evals/examples/deploy-config-recall/`).
+
 ## Quick start
 
 Python 3.10–3.13.

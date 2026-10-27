@@ -1,0 +1,8 @@
+{
+  "schema": "z0eval.unified_memory_questions.v0",
+  "questions": [
+    {"id": "port-supported", "kind": "exact", "expected": "supported"},
+    {"id": "token-abstain", "kind": "abstention", "expected": "abstain"},
+    {"id": "canary-conflict", "kind": "contradiction", "expected": "explicit-conflict"}
+  ]
+}

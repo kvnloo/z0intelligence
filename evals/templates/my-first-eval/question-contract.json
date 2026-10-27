@@ -1,0 +1,15 @@
+{
+  "_comment": "QUESTION-CONTRACT = the outcome contract being verified, one row per question. This is the promise each answer is held to; the receipt is checked against it. Keys starting with _ are documentation only and are ignored by the runner.",
+  "schema": "z0eval.unified_memory_questions.v0",
+  "_comment_schema": "Leave this exactly as-is.",
+  "questions": [
+    {
+      "id": "my-question-1",
+      "_comment_id": "must match a question id in cohort.json",
+      "kind": "exact",
+      "_comment_kind": "same kind label as in the cohort",
+      "expected": "supported",
+      "_comment_expected": "the contracted outcome: supported | abstain | explicit-conflict | newest-supported. This is the core invariant in one word: completion is NOT truth; an answer must be supported by evidence or the harness must abstain."
+    }
+  ]
+}

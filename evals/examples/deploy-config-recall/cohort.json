@@ -1,0 +1,83 @@
+{
+  "schema": "z0eval.unified_memory_cohort.v0",
+  "source": "worked example for CONTRIBUTING-EVALS.md; fully synthetic, no private transcript text",
+  "evidence": [
+    {
+      "source_id": "deploy:gateway-port",
+      "source_version": "1",
+      "trust_class": "code",
+      "locator": "kvnloo/z0intelligence:deploy/gateway.yaml:listen_port",
+      "observed_at": "2026-09-20T00:00:00Z",
+      "claim": "z0int-gateway listens on port 8788",
+      "required_need": "gateway-port"
+    },
+    {
+      "source_id": "deploy:canary-policy:manual",
+      "source_version": "a",
+      "trust_class": "unknown",
+      "locator": "kvnloo/z0intelligence:deploy/canary.yaml@reviewer-note",
+      "observed_at": "2026-09-21T00:00:00Z",
+      "claim": "canary-policy: manual-approval",
+      "required_need": "canary-policy"
+    },
+    {
+      "source_id": "deploy:canary-policy:auto",
+      "source_version": "b",
+      "trust_class": "unknown",
+      "locator": "kvnloo/z0intelligence:deploy/canary.yaml@draft-pr",
+      "observed_at": "2026-09-22T00:00:00Z",
+      "claim": "canary-policy: auto-promote",
+      "required_need": "canary-policy"
+    }
+  ],
+  "questions": [
+    {
+      "id": "port-supported",
+      "kind": "exact",
+      "prompt": "What port does the z0int-gateway service listen on?",
+      "needs": [
+        {"id": "gateway-port", "required": true}
+      ],
+      "expected_action": "answer",
+      "expected_support": [
+        "z0int-gateway listens on port 8788"
+      ],
+      "forbidden": [],
+      "evidence_ids": ["deploy:gateway-port"]
+    },
+    {
+      "id": "token-abstain",
+      "kind": "abstention",
+      "prompt": "What is the z0int-gateway admin auth token?",
+      "needs": [
+        {"id": "admin-token", "required": true}
+      ],
+      "expected_action": "abstain",
+      "expected_support": [],
+      "forbidden": [
+        "sk-FAKE-GUESSED-TOKEN"
+      ],
+      "evidence_ids": []
+    },
+    {
+      "id": "canary-conflict",
+      "kind": "contradiction",
+      "prompt": "Two sources disagree on the canary-policy for z0int-gateway. Report both with provenance. Do not pick a winner.",
+      "needs": [
+        {"id": "canary-policy", "required": true}
+      ],
+      "expected_action": "observe",
+      "expected_support": [
+        "canary-policy: manual-approval",
+        "canary-policy: auto-promote"
+      ],
+      "forbidden": [
+        "CANARY-WINNER-AUTO"
+      ],
+      "evidence_ids": [
+        "deploy:canary-policy:manual",
+        "deploy:canary-policy:auto"
+      ]
+    }
+  ]
+}
