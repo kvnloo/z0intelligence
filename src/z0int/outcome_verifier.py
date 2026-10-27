@@ -929,18 +929,35 @@ def _rows_for_session(turns: list[dict[str, Any]], session_id: str, *, index: Re
     return out
 
 
+def _budget_sessions(sessions: Mapping[str, Any], expected: Iterable[tuple], *, root: Path | None,
+                     harness: str, deadline: float | None) -> list[str]:
+    """Keep source order, but in bounded sweeps visit unwritten turns before refreshes."""
+    order = list(sessions)
+    if deadline is None:
+        return order
+    written = {(r.get('session_id'), r.get('trace_id'))
+               for r in read_jsonl(state_dir(root, harness) / 'outcomes_verified.jsonl')}
+    pending = {sid for sid, trace in expected if (sid, trace) not in written}
+    pending.update(set(order) - {sid for sid, _ in written})
+    return [sid for sid in order if sid in pending] + [sid for sid in order if sid not in pending]
+
+
 def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = False, gh: GitHub | None = None,
            fix_days: int = 7, projects: Path | None = None, now: float | None = None,
            extra_repo_roots: Iterable[Path] = (), density: bool = True,
+           deadline: float | None = None, _progress: Counter | None = None,
            _index: RepoIndex | None = None) -> list[dict[str, Any]]:
     """Build verified rows for observed turns (and, with ``all_turns``, every transcript turn since ``since``).
 
     With GitHub enabled and a lookup cache, a planning pass records the lookups the sweep needs, resolves
-    the uncached ones concurrently, then the real pass reads them from memory."""
+    the uncached ones concurrently, then the real pass reads them from memory. Bounded sweeps skip
+    that global planning pass and finish each started session before checking the monotonic deadline.
+    ``_progress`` carries counts to verify_harness without changing this function's list return API."""
     now = time.time() if now is None else now
     gh = gh or GitHub()
     index = _index or RepoIndex(extra_repo_roots)
-    if gh.enabled and gh.cache_path is not None and gh.recording is None:
+    progress = _progress if _progress is not None else Counter()
+    if deadline is None and gh.enabled and gh.cache_path is not None and gh.recording is None:
         gh.recording = []
         try:
             verify(root=root, since=since, all_turns=all_turns, gh=gh, fix_days=fix_days, projects=projects, now=now,
@@ -955,7 +972,12 @@ def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = Fa
     sessions: dict[str, Path | None] = {}
     for sid, _ in obs_by_key:
         if sid:
-            sessions[sid] = find_transcript(sid, projects)
+            sessions[sid] = None
+    if deadline is not None:
+        # Include capture-only sessions in bounded transcript diagnostics, under the same guard.
+        for r in read_jsonl(sdir / 'opportunities.jsonl'):
+            if r.get('session_id'):
+                sessions.setdefault(r['session_id'], None)
     if all_turns:
         base = projects or projects_dir()
         for path in sorted(base.glob('*/*.jsonl')):
@@ -965,7 +987,18 @@ def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = Fa
             except OSError:
                 continue
     rows = []
-    for sid, path in sorted(sessions.items()):
+    order = _budget_sessions(dict(sorted(sessions.items())), obs_by_key, root=root, harness=HARNESS,
+                             deadline=deadline)
+    progress['sessions_total'] = len(order)
+    progress['sessions_visited'] = 0
+    progress['sessions_not_visited'] = len(order)
+    for sid in order:
+        if deadline is not None and time.monotonic() >= deadline:
+            progress['partial'] = 1
+            break
+        path, source = locate_transcript(sid, projects)
+        path = path or sessions[sid]
+        progress[source or ('projects_dir' if path else 'missing')] += 1
         if path is not None and str(path) not in index.sessions:
             index.sessions[str(path)] = session_turns(path)
         cores = _rows_for_session(index.sessions[str(path)], sid, index=index, gh=gh, fix_days=fix_days,
@@ -985,6 +1018,8 @@ def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = Fa
             core.pop('_started', None)
             obs = obs_by_key.get(key)
             rows.append(make_row(sid, key[1], core, obs, fix_days=fix_days, gh=gh, now=now, density=density))
+        progress['sessions_visited'] += 1
+        progress['sessions_not_visited'] -= 1
     gh.flush()
     return rows
 
@@ -1072,14 +1107,23 @@ def _harness_row(harness: str, turn: Mapping[str, Any], core: Mapping[str, Any],
 
 def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Path | None, since: float, gh: GitHub,
                        fix_days: int, now: float, stale_hours: float, density: bool, extra_repo_roots: Iterable[Path],
-                       failures: list[dict[str, Any]], join: Counter) -> list[dict[str, Any]]:
+                       failures: list[dict[str, Any]], join: Counter, deadline: float | None = None,
+                       progress: Counter | None = None) -> list[dict[str, Any]]:
     from . import turn_readers as tr
     rule = tr.JOIN_RULES[harness]
     reader = tr.AgentsViewReader(agentsview, now=now)
     rows: list[dict[str, Any]] = []
     fails: list[dict[str, Any]] = []  # this run's rows and failures land only when every query succeeded
     counts: Counter = Counter()
+    progress = progress if progress is not None else Counter()
+    sessions = tr.captured_turns(harness, root)
+    order = _budget_sessions(sessions, ((sid, t['trace_id']) for sid, turns in sessions.items() for t in turns),
+                             root=root, harness=harness, deadline=deadline)
+    progress.update(sessions_total=len(order), sessions_visited=0, sessions_not_visited=len(order))
     try:
+        if order and deadline is not None and time.monotonic() >= deadline:
+            progress['partial'] = 1
+            return rows
         if not reader.available:
             failures.append(_failure(harness, 'reader_unavailable', {'reason': reader.unavailable.reason}))
             return rows
@@ -1088,7 +1132,11 @@ def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Pat
             return rows
         stale = reader.staleness is None or reader.staleness > stale_hours
         index = RepoIndex(extra_repo_roots)
-        for sid, turns in tr.captured_turns(harness, root).items():
+        for sid in order:
+            if deadline is not None and time.monotonic() >= deadline:
+                progress['partial'] = 1
+                break
+            turns = sessions[sid]
             joins, meta, av_turns = tr.join_session(rule, reader, turns, stale=stale)
             cores = _rows_for_session(av_turns, sid, index=index, gh=gh, fix_days=fix_days, now=now,
                                       density=density) if av_turns else {}
@@ -1113,6 +1161,8 @@ def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Pat
                                                                 'candidates': j['candidates']}, dict(turn, cohort=cohort)))
                 rows.append(_harness_row(harness, turn, core, cohort, j, fix_days=fix_days, gh=gh, now=now,
                                          density=density))
+            progress['sessions_visited'] += 1
+            progress['sessions_not_visited'] -= 1
     except sqlite3.Error as exc:  # a schema the reader cannot read: a counted failure, never an exception
         failures.append(_failure(harness, 'reader_unavailable', tr.reader_error(exc)))
         return []
@@ -1126,7 +1176,8 @@ def _verify_agentsview(harness: str, *, root: Path | None, agentsview: str | Pat
 def verify_harness(harness: str, *, root: Path | None = None, agentsview: str | Path | None = None,
                    projects: Path | None = None, since: float = 0.0, all_turns: bool = False, gh: GitHub | None = None,
                    fix_days: int = 7, now: float | None = None, stale_hours: float | None = None, density: bool = True,
-                   extra_repo_roots: Iterable[Path] = (), write: bool = False) -> dict[str, Any]:
+                   extra_repo_roots: Iterable[Path] = (), write: bool = False,
+                   deadline: float | None = None) -> dict[str, Any]:
     """Verified rows for one harness plus a counts-only report (status, failures, join counts, manifest).
 
     claude-code: ``verify`` over Claude transcripts (rows unchanged), plus a ``label_source_empty`` failure when
@@ -1140,14 +1191,17 @@ def verify_harness(harness: str, *, root: Path | None = None, agentsview: str | 
     now = time.time() if now is None else now
     gh = gh or GitHub()
     failures: list[dict[str, Any]] = []
+    progress: Counter = Counter()
     join: Counter = Counter({'joined': 0, 'unjoined': 0, 'pending_index': 0})
     if harness == HARNESS:
         rows = verify(root=root, since=since, all_turns=all_turns, gh=gh, fix_days=fix_days, projects=projects,
-                      now=now, extra_repo_roots=extra_repo_roots, density=density)
+                      now=now, extra_repo_roots=extra_repo_roots, density=density, deadline=deadline,
+                      _progress=progress)
         sids = {r.get('session_id') for name in ('opportunities.jsonl', 'outcomes.jsonl')
                 for r in read_jsonl(state_dir(root) / name)} - {None}
-        found = Counter(locate_transcript(sid, projects)[1] or 'missing' for sid in sids)
-        if sids and found['missing'] == len(sids):
+        found = (Counter(locate_transcript(sid, projects)[1] or 'missing' for sid in sids)
+                 if deadline is None else progress)
+        if sids and not progress['sessions_not_visited'] and found['missing'] == len(sids):
             failures.append(_failure(harness, 'label_source_empty', {
                 'resolved_dir': str(projects or projects_dir()), 'searched_dirs': 1 if projects else len(projects_dirs()),
                 'agentsview_index': projects is None, 'sessions': len(sids)}))
@@ -1156,7 +1210,8 @@ def verify_harness(harness: str, *, root: Path | None = None, agentsview: str | 
     elif harness in tr.JOIN_RULES:
         rows = _verify_agentsview(harness, root=root, agentsview=agentsview, since=since, gh=gh, fix_days=fix_days,
                                   now=now, stale_hours=tr.STALE_HOURS if stale_hours is None else stale_hours,
-                                  density=density, extra_repo_roots=extra_repo_roots, failures=failures, join=join)
+                                  density=density, extra_repo_roots=extra_repo_roots, failures=failures, join=join,
+                                  deadline=deadline, progress=progress)
     else:
         raise ValueError(f'no label source for harness {harness!r}')
     appended = 0
@@ -1174,6 +1229,10 @@ def verify_harness(harness: str, *, root: Path | None = None, agentsview: str | 
     manifest['manifest_sha256'] = _sha(manifest, 64)
     report = {'harness': harness, 'status': 'degraded' if any(f['kind'] in DEGRADING for f in failures) else 'success',
               'rows': rows, 'failures': failures, 'join': dict(join), 'appended': appended, 'manifest': manifest}
+    report['partial'] = bool(progress['partial'])
+    report['sessions'] = {k: progress['sessions_' + k] for k in ('total', 'visited', 'not_visited')}
+    if report['partial']:
+        report['status'] = 'partial'
     if harness == HARNESS:
         report['transcripts'] = transcripts  # captured sessions by where their transcript was found (counts only)
     if harness in tr.JOIN_RULES:

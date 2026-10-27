@@ -1,5 +1,6 @@
 """Harness-generic verifier report: label_source_empty and idempotent re-runs (synthetic state only)."""
 import json
+import pytest
 
 from agentsview_fixture import AVFixture
 from test_outcome_verifier import DAY, T0, Transcript, observed
@@ -106,3 +107,67 @@ def test_cli_verify_json_names_the_test_label_polarity(tmp_path, monkeypatch, ca
     empty.mkdir()
     main(['outcomes', 'verify', '--no-gh', '--no-gh-cache', '--dry-run', '--json', '--projects-dir', str(empty)])
     assert 'test_label_polarity' not in json.loads(capsys.readouterr().out)
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+def test_expired_deadline_visits_no_session(tmp_path, monkeypatch, harness):
+    from z0int import turn_readers as tr
+    home = tmp_path / 'z0home'
+    fx = AVFixture(tmp_path / 'sessions.db')
+    fx.session('codex', 's1', started=T0)
+    db = fx.close()
+    if harness == 'claude-code':
+        cc_opportunity(home, 's1', 'p1')
+        observed(home, 's1', 'p1')
+    else:
+        ctx = hc.begin_turn(harness, {'session_id': 's1', 'turn_id': 'p1', 'prompt': 'x'}, env={}, root=home)
+        hc.record_outcome(harness, ctx, hc.payload_behaviour({}), root=home)
+
+    def forbidden(*a, **kw):
+        pytest.fail('expired verification must not visit a session or GitHub')
+
+    monkeypatch.setattr(ov.time, 'monotonic', lambda: 10.0)
+    monkeypatch.setattr(ov, 'locate_transcript', forbidden)
+    monkeypatch.setattr(tr, 'join_session', forbidden)
+    report = ov.verify_harness(harness, root=home, agentsview=db, deadline=9.0,
+                               gh=ov.GitHub(runner=forbidden, cache_path=tmp_path / 'gh.json'), write=True)
+    assert report['partial'] is True and report['status'] == 'partial'
+    assert report['sessions'] == {'total': 1, 'visited': 0, 'not_visited': 1}
+    assert report['rows'] == [] and report['appended'] == 0 and report['failures'] == []
+
+
+def test_bounded_sweeps_resume_unwritten_sessions_and_preserve_append_order(tmp_path, monkeypatch):
+    home, projects = tmp_path / 'z0home', tmp_path / 'projects'
+    hc.state_dir('claude-code', home).mkdir(parents=True, exist_ok=True)
+    clock = [0.0]
+    calls = []
+
+    def fake_gh(args):
+        calls.append(args)
+        clock[0] += 5.0
+        return {'state': 'MERGED'}
+
+    monkeypatch.setattr(ov.time, 'monotonic', lambda: clock[0])
+    for sid in ('a', 'b', 'c'):
+        t = Transcript(session=sid)
+        t.prompt('p1', 'test', T0)
+        t.pr_link('fixture/repo', ord(sid), T0 + 1)
+        t.write(projects)
+        observed(home, sid, 'p1')
+    kw = dict(root=home, projects=projects, now=T0 + DAY, write=True, density=False)
+    path = hc.state_dir('claude-code', home) / 'outcomes_verified.jsonl'
+    prefix = b''
+    for n in range(3):
+        report = ov.verify_harness('claude-code', deadline=clock[0] + 5,
+                                   gh=ov.GitHub(runner=fake_gh, cache_path=tmp_path / 'gh.json'), **kw)
+        assert report['appended'] == 1
+        assert report['rows'][0]['session_id'] == 'abc'[n]
+        assert report['sessions'] == {'total': 3, 'visited': 1, 'not_visited': 2}
+        assert report['partial'] is True
+        assert path.read_bytes().startswith(prefix)
+        prefix = path.read_bytes()
+    assert len(calls) == 3
+    assert [r['session_id'] for r in ov.read_jsonl(path)] == ['a', 'b', 'c']
+    final = ov.verify_harness('claude-code', gh=ov.GitHub(runner=fake_gh), **kw)
+    assert final['status'] == 'success' and final['appended'] == 0
+    assert path.read_bytes() == prefix
