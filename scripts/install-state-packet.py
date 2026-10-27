@@ -36,7 +36,14 @@ def link(path, target, root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--home', type=Path, default=Path.home())
+    parser.add_argument('--targets', default='claude,omp,hermes',
+                        help='comma list of harness hooks to install (default all). A host without the Hermes '
+                             '`clean` profile (e.g. mbp) passes claude,omp so no stray profile directory is created.')
     args = parser.parse_args()
+    targets = {t.strip() for t in args.targets.split(',') if t.strip()}
+    unknown = targets - {'claude', 'omp', 'hermes'}
+    if unknown:
+        parser.error(f'unknown targets: {sorted(unknown)}')
     repo = Path(__file__).resolve().parents[1]
     sha = subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'], text=True).strip()
     home = args.home
@@ -56,8 +63,20 @@ def main():
             (Path(tmp) / 'DEPLOYED_SHA').write_text(sha + '\n')
             os.rename(tmp, dest)
     link(base / 'current', dest, backups)
-    link(home / '.omp/agent/extensions/z0-state-packet', dest / 'omp-extensions/z0-state-packet', backups)
-    link(home / '.hermes/profiles/clean/plugins/hermes-state-packet', dest / 'harness-adapters/hermes-state-packet', backups)
+    if 'omp' in targets:
+        link(home / '.omp/agent/extensions/z0-state-packet', dest / 'omp-extensions/z0-state-packet', backups)
+    if 'hermes' in targets:
+        link(home / '.hermes/profiles/clean/plugins/hermes-state-packet', dest / 'harness-adapters/hermes-state-packet',
+             backups)
+    if 'claude' in targets:
+        install_claude(home, base, backups)
+    if 'hermes' in targets:
+        backup(home / '.hermes/profiles/clean/config.yaml', backups)
+    print(json.dumps({'sha': sha, 'install': str(dest), 'backup': str(backups), 'targets': sorted(targets),
+        **({'hermes_enable': 'hermes -p clean plugins enable hermes-state-packet'} if 'hermes' in targets else {})}))
+
+
+def install_claude(home, base, backups):
     settings = home / '.claude/settings.json'
     backup(settings, backups)
     value = json.loads(settings.read_text()) if settings.exists() else {}
@@ -70,10 +89,6 @@ def main():
     temporary = settings.with_name('settings.state-packet-new.json')
     temporary.write_text(json.dumps(value, indent=2) + '\n')
     os.replace(temporary, settings)
-    config = home / '.hermes/profiles/clean/config.yaml'
-    backup(config, backups)
-    print(json.dumps({'sha': sha, 'install': str(dest), 'backup': str(backups),
-        'hermes_enable': 'hermes -p clean plugins enable hermes-state-packet'}))
 
 
 if __name__ == '__main__':

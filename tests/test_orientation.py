@@ -134,6 +134,31 @@ class OrientationTests(unittest.TestCase):
             text=True, capture_output=True, check=True)
         self.assertEqual(len(json.loads(settings.read_text())['hooks']['UserPromptSubmit']), 12)
 
+    def test_installer_targets_skip_hermes_on_a_host_without_the_profile(self):
+        home = Path(self.tmp.name) / 'home2'
+        repo = Path(self.tmp.name) / 'committed-source2'
+        for relative in ('src/z0int/orientation.py', 'scripts/state-packet/generate_packet.py',
+                         'omp-extensions/z0-state-packet/index.ts', 'harness-adapters/hermes-state-packet/__init__.py',
+                         'harness-adapters/hermes-state-packet/plugin.yaml', 'bin/generate-packet',
+                         'bin/state-packet-hook', 'scripts/install-state-packet.py'):
+            target = repo / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative, target)
+        subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+        subprocess.run(['git', '-C', str(repo), 'add', '.'], check=True)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                        'commit', '-qm', 'fixture'], check=True)
+        result = subprocess.run([sys.executable, str(repo / 'scripts/install-state-packet.py'), '--home', str(home),
+                                 '--targets', 'claude,omp'], text=True, capture_output=True, check=True)
+        self.assertEqual(json.loads(result.stdout)['targets'], ['claude', 'omp'])
+        self.assertFalse((home / '.hermes').exists())
+        self.assertTrue((home / '.omp/agent/extensions/z0-state-packet').is_symlink())
+        groups = json.loads((home / '.claude/settings.json').read_text())['hooks']['UserPromptSubmit']
+        self.assertEqual(len(groups), 11)
+        bad = subprocess.run([sys.executable, str(repo / 'scripts/install-state-packet.py'), '--home', str(home),
+                              '--targets', 'claude,bogus'], text=True, capture_output=True)
+        self.assertNotEqual(bad.returncode, 0)
+
     def test_hermes_registered_context_and_stale(self):
         module = load('hermes_state_packet', ROOT / 'harness-adapters/hermes-state-packet/__init__.py')
         callbacks = []
