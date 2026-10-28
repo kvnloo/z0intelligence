@@ -215,6 +215,21 @@ def _flat(db: sqlite3.Connection, family: str, strategy: str, config: SearchConf
     # A missing arm, including one that disappeared, is not evidence of a plateau.
     if any(set(tick) != arms for tick in window):
         return False
+    # A retired, under-sampled diagnostic cohort cannot freeze unrelated
+    # research forever. Only explicitly non-promotable proxies with unchanged
+    # counts across the entire window may be deferred. Measured or growing
+    # cohorts still require the normal floor; no evidence is removed or credited.
+    deferred = {
+        arm for arm in arms
+        if all(tick[arm].get('evidence_kind') == 'proxy'
+               and tick[arm].get('promotion_eligible') is False
+               and tick[arm]['total'] < config.min_observations for tick in window)
+        and len({(tick[arm]['correct'], tick[arm]['n'], tick[arm]['total'])
+                 for tick in window}) == 1
+    }
+    arms -= deferred
+    if not arms:
+        return False
     # Abstaining on evaluated labels is still a real experiment: use total
     # evaluations, not only covered predictions, for the observation floor.
     return all(all(tick[arm]['total'] >= config.min_observations for tick in window)
@@ -298,11 +313,11 @@ def search_tick(db: sqlite3.Connection, *, tick_id: str, now: float,
         plateau = bool(observed) and _flat(db, family, current, cfg)
         trial = _trial(db, family, current) if current else None
         if plateau and trial.get('status') != 'plateau':
-            trial.update(status='plateau', ended_at=now, trigger='every_arm_wilson_flat',
+            trial.update(status='plateau', ended_at=now, trigger='eligible_arms_wilson_flat',
                          ended_tick=tick_id, plateau_ticks=cfg.plateau_ticks)
             _save_trial(db, family, trial)
             result['events'].append(_event(db, family, tick_id, {
-                'type': 'plateau', 'strategy': current, 'trigger': 'every_arm_wilson_flat',
+                'type': 'plateau', 'strategy': current, 'trigger': 'eligible_arms_wilson_flat',
                 'arms': {r['arm']: r['ci_low'] for r in observed},
                 'plateau_ticks': cfg.plateau_ticks}))
         # Failed availability is not a trial. An endpoint may become healthy later.
@@ -334,7 +349,7 @@ def search_tick(db: sqlite3.Connection, *, tick_id: str, now: float,
                 status = 'selected'
                 trial = {'strategy': current, 'config': selected, 'status': 'selected',
                          'selected_at': now, 'selected_tick': tick_id,
-                         'trigger': 'every_arm_wilson_flat' if plateau else 'available_untried_strategy'}
+                         'trigger': 'eligible_arms_wilson_flat' if plateau else 'available_untried_strategy'}
                 _save_trial(db, family, trial)
                 result['events'].append(_event(db, family, tick_id, {
                     'type': 'strategy_selected', 'from': before, 'to': current,
