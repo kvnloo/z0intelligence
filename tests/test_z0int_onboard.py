@@ -101,6 +101,80 @@ class OnboardDryRun(unittest.TestCase):
         self.assertIn("models.plan", report["results"])
 
 
+class OnboardOmpOptIn(unittest.TestCase):
+    def test_default_preserves_reset_and_previous_links(self):
+        from z0int.onboard import run_onboard
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            "os.environ", {"HOME": tmp, "Z0INT_HOME": str(Path(tmp) / "state")}
+        ):
+            ext = Path(tmp) / ".omp" / "agent" / "extensions"
+            ext.mkdir(parents=True)
+            foreign = Path(tmp) / "foreign"
+            foreign.mkdir()
+            (ext / "openjev").symlink_to(foreign)
+            # A previous run marked the plugin step done; reset must still stay reset.
+            state = Path(tmp) / "state" / "state" / "onboard.json"
+            state.parent.mkdir(parents=True)
+            state.write_text('{"steps":{"omp_plugins":{"status":"done"}}}')
+            for force in (False, True):
+                report = run_onboard(only=["omp_plugins"], force=force)
+                self.assertTrue(report["ok"])
+                self.assertEqual(report["results"]["omp_plugins"]["reason"], "opt_in")
+                self.assertIn("--omp-extension NAME", report["results"]["omp_plugins"]["opt_in"])
+                self.assertEqual(list(ext.iterdir()), [ext / "openjev"])
+                self.assertEqual((ext / "openjev").resolve(), foreign)
+
+    def test_selection_idempotence_and_conflicts(self):
+        from z0int.onboard import run_onboard, _repo_root
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            "os.environ", {"HOME": tmp, "Z0INT_HOME": str(Path(tmp) / "state")}
+        ):
+            ext = Path(tmp) / ".omp" / "agent" / "extensions"
+            ext.mkdir(parents=True)
+            foreign = Path(tmp) / "foreign"
+            foreign.mkdir()
+            (ext / "openjev").symlink_to(foreign)
+            for _ in range(2):
+                report = run_onboard(only=["omp_plugins"], omp_extensions=["z0int-bridge"])
+                self.assertTrue(report["ok"], report)
+                self.assertEqual((ext / "z0int-bridge").resolve(), _repo_root() / "omp-extensions" / "z0int-bridge")
+            self.assertEqual((ext / "openjev").resolve(), foreign)
+            (ext / "openjev-06b").mkdir()
+            report = run_onboard(only=["omp_plugins"], omp_extensions=["flyforge-recovery", "openjev", "openjev-06b"])
+            self.assertFalse(report["ok"])
+            self.assertEqual(set(report["results"]["omp_plugins"]["conflicts"]), {"openjev", "openjev-06b"})
+            self.assertFalse((ext / "flyforge-recovery").exists())
+            self.assertEqual((ext / "openjev").resolve(), foreign)
+            self.assertTrue((ext / "openjev-06b").is_dir())
+
+    def test_invalid_name_fails_before_any_mutation(self):
+        from z0int.onboard import run_onboard
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            "os.environ", {"HOME": tmp, "Z0INT_HOME": str(Path(tmp) / "state")}
+        ):
+            for name in ("../openjev", "/tmp/openjev", "missing"):
+                report = run_onboard(omp_extensions=["z0int-bridge", name], skip_evolution_lab=True)
+                self.assertFalse(report["ok"])
+                self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_dry_run_does_not_write_anything(self):
+        from z0int.onboard import run_onboard
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            "os.environ", {"HOME": tmp, "Z0INT_HOME": str(Path(tmp) / "state")}
+        ):
+            omp = Path(tmp) / ".omp"
+            omp.mkdir()
+            report = run_onboard(dry_run=True, skip_evolution_lab=True, sync_models=True,
+                                 omp_extensions=["z0int-bridge"])
+            self.assertTrue(report["ok"], report)
+            self.assertEqual(report["results"]["omp_plugins"]["selected"], ["z0int-bridge"])
+            self.assertEqual(list(omp.iterdir()), [])
+            self.assertFalse((Path(tmp) / "state").exists())
+
 class CliSmoke(unittest.TestCase):
     def test_module_main_doctor(self):
         from z0int.cli import main

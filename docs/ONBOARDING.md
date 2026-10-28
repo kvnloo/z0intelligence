@@ -40,10 +40,14 @@ Idempotent steps (state: `~/.z0int/state/onboard.json`):
 | `models.plan` | VRAM-aware resident vs on-demand plan → `~/.z0int/config/` |
 | `models.sync` | Optional (`--sync-models`): download pinned HF revisions |
 | `evolution_lab` | Clone/update [evolution-lab](https://github.com/kvnloo/evolution-lab) `@ nightly`, editable install |
-| `omp_plugins` | Symlink `omp-extensions/*` → `~/.omp/agent/extensions/` if OMP exists |
+| `omp_plugins` | Skipped by default; `--omp-extension NAME` links only the named extension into `~/.omp/agent/extensions/` |
 | `data.discover` | Find Hermes `state.db`, OMP history, Codex home, export zips |
 | `privacy` | Fail if personalized weights sit inside the git repo |
 | `env_hints` | Write suggested `EVOLUTION_LAB_*` / `Z0INT_HOME` for harnesses |
+
+Repeat `--omp-extension NAME` to select multiple extensions. Existing correct
+links are left in place; conflicting links and directories are reported, not
+replaced. Default onboarding leaves all OMP extension paths unchanged.
 
 Personal artifacts **never** default into the repo. Only `~/.z0int/`.
 
