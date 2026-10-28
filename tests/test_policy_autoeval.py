@@ -274,6 +274,23 @@ def test_mbp_dispatch_stages_importable_package_and_compiles_receipt(tmp_path,mo
     assert all(row['allowed_k'] == 0 for row in capacities.values())
 
 
+def test_fresh_run_never_reuses_prior_cell_checkpoint(tmp_path):
+    from z0int.policy.autoeval import sample_cell
+    items = [{'id': str(i), 'task': 'T1', 'k': 2, 'answer': 0} for i in range(100)]
+    first, fresh = tmp_path/'old.json', tmp_path/'fresh.json'
+    calls = []
+    def score(item):
+        calls.append(item['id'])
+        return {'correct': False}
+    sample_cell(items, score, first, 'old-run')
+    sample_cell(items, score, first, 'old-run')
+    assert len(calls) == 100
+    sample_cell(items, score, fresh, 'new-run')
+    assert len(calls) == 200
+    with pytest.raises(ValueError, match='identity'):
+        sample_cell(items, score, first, 'new-run')
+
+
 def test_adaptive_cell_resumes_atomic_checkpoint_without_rescoring(tmp_path):
     from z0int.policy.autoeval import sample_cell
     items = [{'id':str(i),'task':'T1','k':2,'answer':0} for i in range(400)]
