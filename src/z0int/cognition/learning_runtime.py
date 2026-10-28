@@ -166,39 +166,70 @@ def _atomic_observations(metrics: dict, identity: dict, scope: dict) -> list[dic
 
 
 def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict]:
-    """Report all matched attempts diagnostically; no receipt has attested identity."""
+    """Build non-promotable research curves and paired, unattested diagnostics.
+
+    Neither the currently served identity nor a receipt's configured request
+    scope attests the bytes that produced a shadow response.
+    """
     from .learning import predict, STRATEGIES, wilson
-    matched = {arm: Counter() for arm in ('goal_binary', 'history_bigram')}
+    groups = {}
     for row in db.execute('''SELECT l.*,r.body FROM labels l JOIN receipts r USING(id)
                            WHERE l.family='omp.tool' ORDER BY l.ts,l.id'''):
         receipt = json.loads(row['body'])
         shadows = [s for s in receipt.get('shadow', [])
-                   if s.get('arm') == 'goal-binary' or str(s.get('arm','')).startswith('slm-method:')]
+                   if s.get('arm') == 'goal-binary' or str(s.get('arm', '')).startswith('slm-method:')]
         if not shadows:
             continue
         previous = db.execute('''SELECT action,features,ts FROM examples WHERE family='omp.tool'
-            AND ts<? ORDER BY ts DESC LIMIT 512''', (row['ts'],)).fetchall()
+            AND ts<? ORDER BY ts DESC,id DESC LIMIT 512''', (row['ts'],)).fetchall()
         examples = [{'action': e['action'], 'history': json.loads(e['features']), 'ts': e['ts']} for e in previous]
         action, confidence = predict(json.loads(row['features']), examples, STRATEGIES[4])
-        decisions = [('history_bigram', action if confidence >= .8 else None)]
-        decisions += [('goal_binary' if s.get('arm') == 'goal-binary' else s['arm'],
-                       s.get('selected_action') if not (s.get('error') or s.get('parse_error') or
-                           (str(s.get('arm','')).startswith('slm-method:') and not s.get('rpc_count'))) else None)
-                      for s in shadows]
-        for arm, selected in decisions:
-            covered = selected is not None
-            matched.setdefault(arm, Counter()).update(total=1, covered=int(covered),
-                                                       correct=int(covered and selected == row['action']))
-    comparison = {}
-    for arm, counts in matched.items():
+        baseline = action if confidence >= .8 else None
+        for shadow in shadows:
+            provenance = {
+                'request_scope': shadow.get('request_scope'),
+                'model': shadow.get('model'),
+                'requested_model': shadow.get('requested_model'),
+                'method': shadow.get('arm'),
+                'method_config': shadow.get('method_config'),
+                'strategy': receipt.get('projection_strategy') or 'history-1',
+                'projection': receipt.get('projection_config') or {},
+            }
+            key = json.dumps(provenance, sort_keys=True, separators=(',', ':'))
+            group = groups.setdefault(key, {'provenance': provenance, 'model': Counter(), 'baseline': Counter()})
+            failed = (shadow.get('error') or shadow.get('parse_error') or shadow.get('timed_out')
+                      or shadow.get('abstained') or
+                      ('rpc_count' in shadow and not shadow['rpc_count']) or
+                      (str(shadow.get('arm', '')).startswith('slm-method:') and not shadow.get('rpc_count')))
+            selected = None if failed else shadow.get('selected_action')
+            for name, decision in (('model', selected), ('baseline', baseline)):
+                covered = decision is not None
+                group[name].update(total=1, covered=int(covered),
+                                   correct=int(covered and decision == row['action']))
+
+    def summary(counts):
         n, total, correct = counts['covered'], counts['total'], counts['correct']
-        comparison[arm] = {'total': total, 'n': n, 'correct': correct,
-            'accuracy': correct/n if n else None, 'coverage': n/total if total else 0,
-            'wilson95_lower': wilson(correct, n)}
-    comparison['binding'] = {'classification': 'unattested_diagnostic_only',
-                             'attempts': sum(counts['total'] for arm, counts in matched.items() if arm != 'history_bigram'),
-                             'attested_attempts': 0, 'model_credit': False}
-    return [], comparison
+        return {'total': total, 'n': n, 'correct': correct,
+                'accuracy': correct/n if n else None, 'coverage': n/total if total else 0,
+                'wilson95_lower': wilson(correct, n)}
+
+    observations, arms = [], {}
+    for key, group in sorted(groups.items()):
+        digest = hashlib.sha256(key.encode()).hexdigest()
+        provenance = group['provenance']
+        arms[digest] = {'provenance': provenance, 'classification': 'unattested_diagnostic_only',
+                        'model': summary(group['model']), 'baseline': summary(group['baseline'])}
+        for name in ('model', 'baseline'):
+            counts = group[name]
+            observations.append({'family': 'omp.tool', 'strategy': provenance['strategy'],
+                'arm': 'unattested:' + name + ':' + digest,
+                'correct': counts['correct'], 'n': counts['covered'], 'total': counts['total'],
+                'evidence_kind': 'proxy', 'promotion_eligible': False,
+                'binding': 'unattested_diagnostic_only', 'request_provenance': provenance})
+    comparison = {'arms': arms, 'binding': {'classification': 'unattested_diagnostic_only',
+        'attempts': sum(group['model']['total'] for group in groups.values()),
+        'attested_attempts': 0, 'model_credit': False}}
+    return observations, comparison
 
 
 def census_queue(home: Path, config: dict) -> list[dict]:
@@ -250,12 +281,12 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
     result.update(metrics, identity=identity, serving_scope=scope)
     observations = _atomic_observations(metrics['families'], identity, scope)
     tool_rows, matched = tool_observations(db, identity, scope)
-    observations.extend(tool_rows)
+    research_observations = observations + tool_rows
     result['matched_tool_comparison'] = matched
     tick_id = str(now)
     # Scheduling receives only the active strategy, while publication retains all
     # historical strategy scopes. Never rename accumulated scores after a switch.
-    active = [r for r in observations if r['strategy'] == current.get(r['family'], 'history-1')]
+    active = [r for r in research_observations if r['strategy'] == current.get(r['family'], 'history-1')]
     # Live and replay evidence are independently published. Scheduling combines
     # their disjoint observations without conflating their evidence classes.
     combined = {}
