@@ -856,7 +856,7 @@ class EventLog:
             return self._index_rows()
         return rows
 
-    def get(self, event_id: int, *, resolve_blob: bool = False) -> MemoryEvent:
+    def get(self, event_id: int) -> MemoryEvent:
         if type(event_id) is not int or event_id < 0:
             raise KeyError(event_id)
         rows = self._index_rows()
@@ -877,24 +877,12 @@ class EventLog:
             if self.read_only:
                 raise EventLogCorruption("read-only event index checksum mismatch")
             self.rebuild_index()
-            return self.get(event_id, resolve_blob=resolve_blob)
-        event = MemoryEvent.from_dict(row)
-        if not resolve_blob or event.blob is None:
-            return event
-        payload = self.read_blob(event.blob)
-        return MemoryEvent(
-            event_id=event.event_id,
-            event_type=event.event_type,
-            ts=event.ts,
-            source=event.source,
-            payload=payload,
-            blob=event.blob,
-            project=event.project,
-            session_id=event.session_id,
-            parent_event_ids=event.parent_event_ids,
-            checksum=event.checksum,
-            identity=event.identity,
-        )
+            return self.get(event_id)
+        return MemoryEvent.from_dict(row)
+
+    def resolve_payload(self, event: MemoryEvent) -> Any:
+        """Resolve payload separately without altering the canonical event envelope."""
+        return self.read_blob(event.blob) if event.blob is not None else event.payload
 
     def read_blob(self, ref: Mapping[str, Any]) -> Any:
         sha = str(ref.get("sha256") or "")

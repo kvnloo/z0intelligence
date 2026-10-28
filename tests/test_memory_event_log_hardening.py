@@ -37,7 +37,7 @@ class EventLogTests(unittest.TestCase):
         event = self.log.append("tool.result", payload, source="omp")
         self.assertIsNone(event.payload)
         self.assertIsNotNone(event.blob)
-        self.assertEqual(self.log.get(0, resolve_blob=True).payload, payload)
+        self.assertEqual(self.log.resolve_payload(self.log.get(0)), payload)
         self.assertEqual(self.log.verify()["blobs"], 1)
 
     def test_rebuild_index_does_not_mutate_event_log(self):

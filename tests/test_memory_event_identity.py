@@ -110,4 +110,4 @@ def test_held_out_facts_recoverable_after_a_1024_event_nap_cascade(tmp_path, mon
         found = ms.search(token, layers=('temporal',), ledger_root=tmp_path / 'm', config={})
         hits = [e for e in found['evidence'] if e['locator'] == f'eventlog:{event_id}']
         assert hits, f'{token} not recovered'
-        assert tree.zoom(event_id, event_id + 1)['events'][0]['payload'] == originals[event_id]
+        assert tree.zoom(event_id, event_id + 1)['events'][0]['resolved_payload'] == originals[event_id]

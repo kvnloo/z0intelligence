@@ -143,3 +143,16 @@ def test_inspect_scrubs_before_it_truncates_an_eventlog_payload(env):
     out = ms.inspect('eventlog:0', chars=raw.index(SECRETS['aws']) + 12)
     assert out['ok'] is True
     assert SECRETS['aws'][:12] not in json.dumps(out)
+
+
+def test_inspect_resolves_blob_and_scrubs_before_truncation(env):
+    log = EventLog(env / 'blob-ledger', blob_threshold=32)
+    payload = {'text': 'quokka ' + 'y' * 380 + ' ' + SECRETS['aws']}
+    event = log.append('memory.note', payload, source='z0')
+    assert event.blob is not None
+    raw = json.dumps(payload, ensure_ascii=False)
+    out = ms.inspect('eventlog:0', ledger_root=log.root, chars=raw.index(SECRETS['aws']) + 12)
+    assert out['ok'] is True
+    assert out['event_type'] == 'memory.note'
+    assert 'quokka' in out['payload']
+    assert SECRETS['aws'][:12] not in json.dumps(out)

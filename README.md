@@ -390,6 +390,17 @@ PROCEDURAL   existing routine compiler after verified repeated outcomes
 
 These are different projections over evidence. No second “universal memory database” is being introduced.
 
+`EventLog.get(id)` returns the canonical envelope unchanged. Use
+`resolve_payload(event)` for inline data or verified blob contents separately.
+OptMem cover/zoom v2 entries carry `event` plus `resolved_payload`; a hydrated
+payload is never inserted into a blob-backed canonical envelope. The v2 TREE
+manifest points to one complete generation. Shared reader/exclusive publisher
+locks protect publication and cleanup, and loaded summaries are checked against
+the canonical ledger. Failed publication preserves the prior cover. Old v1 TREE
+caches require explicit `nap()` or `rebuild()`; canonical event history is not
+migrated or deleted. Structural tests and a cross-process publication smoke
+qualify these boundaries, not semantic retrieval quality or live harness use.
+
 ## Deterministic compiler before learned policy
 ### Private read-only memory MCP (#22 / #194)
 

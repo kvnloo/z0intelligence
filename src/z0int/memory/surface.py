@@ -829,12 +829,13 @@ def inspect(locator: str, *, chars: int = 400, context: int = 1, av_db: str | Pa
     if m:
         log = worker_ledger(ledger_root)
         try:
-            event = log.get(int(m.group(1)), resolve_blob=True)
+            event = log.get(int(m.group(1)))
+            payload = log.resolve_payload(event)
         except (KeyError, OSError):
             return {'ok': False, 'error': f'no such event {locator}'}
         return scrub_obj({'ok': True, 'locator': locator, 'event_type': event.event_type, 'source': event.source,
                           'identity': event.identity,
-                          'payload': scrub_text(json.dumps(event.payload, ensure_ascii=False))[0][:chars]})[0]
+                          'payload': scrub_text(json.dumps(payload, ensure_ascii=False))[0][:chars]})[0]
     return {'ok': False, 'error': f'unsupported locator {locator!r}: expected agentsview:<sid>#<mid> or eventlog:<id>'}
 
 
