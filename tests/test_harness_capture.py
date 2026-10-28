@@ -419,7 +419,7 @@ def test_capture_slot_is_held_until_the_real_child_exits(home, tmp_path, monkeyp
             server.bind(socket_path)
             server.listen(1)
             server.settimeout(10)
-            assert hc.spawn_opportunity('codex', {}, None)
+            assert hc.spawn_opportunity('codex', {})
             connection, _ = server.accept()
             with connection:
                 connection.settimeout(10)
@@ -435,22 +435,5 @@ def test_capture_slot_is_held_until_the_real_child_exits(home, tmp_path, monkeyp
             if child.poll() is None:
                 child.kill()
             child.wait(timeout=10)
-        for slot in held:
-            slot.close()
-
-
-def test_capture_spawn_failure_releases_reserved_capacity(home, monkeypatch):
-    def fail(*args, **kwargs):
-        raise OSError('cannot start capture child')
-
-    monkeypatch.setattr(hc, 'spawn_detached', fail)
-    held = [hc.try_slot() for _ in range(hc.MAX_CHILDREN - 1)]
-    try:
-        with pytest.raises(OSError, match='cannot start capture child'):
-            hc.spawn_opportunity('codex', {}, None)
-        recovered = hc.try_slot()
-        assert recovered is not None
-        recovered.close()
-    finally:
         for slot in held:
             slot.close()

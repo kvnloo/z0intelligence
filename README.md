@@ -692,8 +692,8 @@ child. The child inherits the locked descriptor and holds it until capture
 finishes. When all slots are occupied, the hook records a `fanout_cap` drop
 without starting a waiting process. Claude Code, Codex, Grok, and OMP share this
 admission path; memory-seam capture uses the same slot pool.
-Hook-time identity helpers stay in `harness_id`; structured bridge records live
-in `harness_identity` so cold hooks do not load dataclasses and inspection code.
+Hook-time identity helpers stay in `harness_id`; the Hermes adapter constructs
+its bridge record directly, without loading dataclasses and inspection code.
 
 For exact source PRs, integrated/retained status, verification and reproducible test setup,
 see [the current reconciliation audit](docs/pr-reconciliation-2026-10-02.md).

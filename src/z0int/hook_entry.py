@@ -9,7 +9,7 @@ routing call and the opt-in SessionStart packet (``z0int.claude_code``, imported
 is capture-only and prints nothing.
 
 At import this module loads stdlib + ``harness_capture`` / ``harness_id`` only. The DecisionOpportunity
-build runs in a detached child (internal event ``opportunity``) that holds one of a bounded set of slots.
+build runs in a detached child (internal event ``opportunity``) admitted before launch to a bounded slot.
 """
 
 import argparse
@@ -62,7 +62,7 @@ def _claude_code(event, raw, payload, capture, env):
 
 def _opportunity_child(raw, harness):
     job = json.loads(raw)
-    with os.fdopen(job['slot_fd']):
+    with os.fdopen(job['slot_fd'], 'r'):
         hc.record_opportunity(harness, job['payload'], job['ctx'])
     return None
 
@@ -92,11 +92,11 @@ def handle(event, raw, harness=None, *, env=None):
     if event == 'prompt':
         if hc.prompt_of(payload).strip():
             ctx = hc.begin_turn(harness, payload, env=env)
-            hc.spawn_opportunity(harness, payload, ctx)
+            hc.spawn_opportunity(harness, {'payload': payload, 'ctx': ctx})
     elif event == 'subagent-start':
         ctx = hc.subagent_turn(harness, payload, env=env)
         if ctx:
-            hc.spawn_opportunity(harness, payload, ctx)
+            hc.spawn_opportunity(harness, {'payload': payload, 'ctx': ctx})
     elif event == 'subagent-stop':
         ctx = hc.subagent_turn(harness, payload, env=env)
         if ctx:

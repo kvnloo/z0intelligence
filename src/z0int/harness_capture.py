@@ -598,26 +598,40 @@ def child_argv(harness: str) -> list[str]:
     return [sys.executable, '-m', 'z0int.hook_adapter', '--harness', harness, 'opportunity']
 
 
-def spawn_opportunity(harness: str, payload: Mapping[str, Any], ctx: Mapping[str, Any] | None) -> bool:
+def spawn_detached(argv: list[str], payload: Mapping[str, Any], *, pass_fds: tuple[int, ...] = ()) -> None:
+    """Launch with anonymous seekable input, never wait for a child to drain a pipe.
+
+    Inherited slot descriptors remain locked until the child exits. Linux uses memory-backed input;
+    other platforms use a private anonymous temporary file, closed by both processes after use.
+    """
+    import subprocess
+
+    if hasattr(os, 'memfd_create'):
+        source = os.fdopen(os.memfd_create('z0int-job', os.MFD_CLOEXEC), 'w+b')
+    else:
+        from tempfile import TemporaryFile
+        source = TemporaryFile()
+    with source:
+        source.write(json.dumps(payload, default=str).encode())
+        source.seek(0)
+        subprocess.Popen(argv, stdin=source, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True, pass_fds=pass_fds)
+
+
+def spawn_opportunity(harness: str, job: Mapping[str, Any], *, spawn=None) -> bool:
+    """Admit before launch; a rejected opportunity retains its already-persisted turn identity."""
     slot = try_slot()
     if slot is None:
         record_drop(harness, 'opportunity_record', 'fanout_cap')
         return False
     with slot:
-        spawn_detached(child_argv(harness), {'payload': payload, 'ctx': ctx, 'slot_fd': slot.fileno()},
-                       pass_fds=(slot.fileno(),))
+        try:
+            (spawn or spawn_detached)(child_argv(harness), dict(job, slot_fd=slot.fileno()),
+                                      pass_fds=(slot.fileno(),))
+        except Exception:
+            record_drop(harness, 'opportunity_record', 'spawn_failed')
+            return False
     return True
-
-
-def spawn_detached(argv: list[str], payload: Mapping[str, Any], *, pass_fds: tuple[int, ...] = ()) -> None:
-    """Hand one job to a detached child (own session, no stdio): the hook returns while the child builds.
-    ``pass_fds``: e.g. a locked slot file the child holds until it exits."""
-    import subprocess
-
-    child = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             start_new_session=True, pass_fds=pass_fds)
-    child.stdin.write(json.dumps(payload, default=str).encode())
-    child.stdin.close()
 
 
 def slot_path(i: int, root: str | Path | None = None, pool: str = 'capture-slots') -> Path:
