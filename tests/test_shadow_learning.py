@@ -50,6 +50,32 @@ def test_scoped_arms_remain_distinct_and_zero_rpc_cannot_receive_credit(tmp_path
     db.close()
 
 
+def test_preupgrade_pooled_scoped_scores_rebuild_from_receipts_idempotently(tmp_path):
+    from z0int.cognition.learning import score, arm_scores
+    db=connect(tmp_path)
+    for i, method in enumerate(('alpha','beta','alpha')):
+        shadow={'model':'m','arm':'slm-method:'+method,'rpc_count':1,
+                'selected_action':'read' if method=='alpha' else 'edit'}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(i),'s',str(i),100+i,'omp.tool',json.dumps({'shadow':[shadow]})))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(i),'s',str(i),'omp.tool',100+i,'read','[]',None,120))
+        db.execute('INSERT INTO examples VALUES(?,?,?,?,?)',
+                   (str(i),'omp.tool','read','[]',100+i))
+        db.execute('INSERT INTO evaluated VALUES(?,?)',(str(i),'slm:m'))
+    db.execute('INSERT INTO scores VALUES(?,?,?,?,?)',('omp.tool','slm:m',3,3,3))
+    db.execute('INSERT INTO scores VALUES(?,?,?,?,?)',('omp.tool','slm:other',4,4,4))
+    assert score(db,.8,time.monotonic()+30)
+    arms=arm_scores(db)['omp.tool']
+    assert 'slm:m' not in arms
+    assert (arms['slm:m:slm-method:alpha']['total'],arms['slm:m:slm-method:alpha']['correct'])==(2,2)
+    assert (arms['slm:m:slm-method:beta']['total'],arms['slm:m:slm-method:beta']['correct'])==(1,0)
+    assert arms['slm:other']['correct']==4
+    assert score(db,.8,time.monotonic()+30)
+    assert arm_scores(db)['omp.tool']==arms
+    db.close()
+
+
 def test_prequential_join_credit_and_incremental_stall(tmp_path):
     home, sessions, now = fixture(tmp_path)
     first = learn(home, sessions=sessions, now=now)
