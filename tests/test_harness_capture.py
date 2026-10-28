@@ -406,7 +406,7 @@ def test_capture_slot_is_held_until_the_real_child_exits(home, tmp_path, monkeyp
         children.append(child)
         return child
 
-    monkeypatch.setattr(hc.subprocess, 'Popen', start)
+    monkeypatch.setattr(subprocess, 'Popen', start)
     monkeypatch.setattr(hc, 'child_argv', lambda harness: [
         sys.executable, '-c',
         'import json,socket,sys; json.load(sys.stdin); '

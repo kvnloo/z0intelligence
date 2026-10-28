@@ -9,7 +9,7 @@ import os
 import time
 from typing import Any
 
-from z0int.harness_id import HarnessIdentity, identity_from_bridge
+from z0int.harness_identity import identity_from_bridge
 
 
 def normalize_envelope(raw: dict[str, Any], *, build_id: str | None = None) -> dict[str, Any]:
