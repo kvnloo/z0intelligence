@@ -154,6 +154,15 @@ prefix as current history. A reachable unversioned TencentDB gateway
 likewise bypasses caching. These rules do not change the separate exact-source
 memory MCP's grant checks and fetch revalidation.
 
+State Packet document evidence uses a separate consumed-byte binding. Both the
+document adapter's evidence references and its stored source revisions hash the
+first 128 KiB of raw bytes actually read. A probe of version A cannot label
+evidence from version B as A, even if the file returns to A before authorization.
+The final cache key uses the consumed revisions. Incomplete document reads and
+legacy packets without this binding must be refreshed before authorization.
+The bound prefix is explicit: changes beyond it are outside this check. This
+does not turn other adapters' revision hints into exact-content proofs.
+
 ## Outcome linkage
 
 `MemoryUseReceipt` does not create another receipt system. It projects into

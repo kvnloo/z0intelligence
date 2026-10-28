@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
@@ -11,6 +12,7 @@ import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from unittest import mock
 from pathlib import Path
 
 from z0int import state_packet as sp
@@ -126,6 +128,133 @@ class StatePacketTests(_Base):
         p3 = self.build()
         self.assertFalse(p3["measurements"]["cache_hit"])
         self.assertNotEqual(p3["packet_id"], p1["packet_id"])
+
+    def test_docs_evidence_aba_is_stale_and_cannot_authorize_or_poison_cache(self):
+        roadmap = self.repo / "ROADMAP.md"
+        original = roadmap.read_bytes()
+        changed = original.replace(b"ship widget parser", b"ship widget writer")
+        self.assertNotEqual(original, changed)
+        real_adapter = sp.adapter_docs
+
+        def adapter_with_aba(repo, reader):
+            # Probe sees A, the actual adapter reads B, and the live file is A
+            # again before the build returns. No scheduling or sleep is needed.
+            roadmap.write_bytes(changed)
+            try:
+                return real_adapter(repo, reader)
+            finally:
+                roadmap.write_bytes(original)
+
+        with mock.patch.object(sp, "adapter_docs", side_effect=adapter_with_aba):
+            packet = self.build(intent="plan", require=("docs.priority",), adapters=("docs",))
+
+        priority = next(c for c in packet["current_claims"] if c["key"] == "docs.priority")
+        self.assertIn("ship widget writer", priority["value"]["heading"])
+        evidence = packet["evidence"][priority["evidence"][0]]
+        consumed = "sha256:" + hashlib.sha256(changed[:sp.DOC_MAX_BYTES]).hexdigest()[:12]
+        self.assertEqual(evidence["source_version"], consumed)
+        check = sp.check_packet(packet, self.projects)
+        self.assertFalse(check["valid"])
+        self.assertIn("docs", check["changed_sources"])
+        authorization = sp.authorize_transition(packet, "refresh_packet", projects_root=self.projects)
+        self.assertFalse(authorization["allowed"])
+        self.assertEqual(authorization["mode"], "OBSERVE")
+        self.assertIn("stale", authorization["reason"])
+        self.assertEqual(packet["source_revisions"]["docs"]["ROADMAP.md"], consumed)
+
+        # A cache lookup at A must not serve the packet whose evidence was B.
+        current = self.build(intent="plan", require=("docs.priority",), adapters=("docs",))
+        self.assertFalse(current["measurements"]["cache_hit"])
+        self.assertNotEqual(current["packet_id"], packet["packet_id"])
+        priority = next(c for c in current["current_claims"] if c["key"] == "docs.priority")
+        self.assertIn("ship widget parser", priority["value"]["heading"])
+        self.assertTrue(sp.check_packet(current, self.projects)["valid"])
+
+    def test_docs_stable_evidence_is_fresh_authorized_and_cached(self):
+        packet = self.build(intent="plan", require=("docs.priority",), adapters=("docs",))
+        priority = next(c for c in packet["current_claims"] if c["key"] == "docs.priority")
+        evidence = packet["evidence"][priority["evidence"][0]]
+        self.assertEqual(evidence["source_version"], packet["source_revisions"]["docs"]["ROADMAP.md"])
+        self.assertTrue(sp.check_packet(packet, self.projects)["valid"])
+        self.assertTrue(sp.authorize_transition(packet, "refresh_packet", projects_root=self.projects)["allowed"])
+        cached = self.build(intent="plan", require=("docs.priority",), adapters=("docs",))
+        self.assertTrue(cached["measurements"]["cache_hit"])
+        self.assertEqual(cached["packet_id"], packet["packet_id"])
+
+    def test_legacy_packet_without_docs_binding_is_stale_and_not_reused(self):
+        packet = self.build(intent="plan", require=("docs.priority",), adapters=("docs",))
+        packet.pop("docs_revision_binding")
+        check = sp.check_packet(packet, self.projects)
+        self.assertFalse(check["valid"])
+        self.assertIn("docs", check["changed_sources"])
+        self.assertFalse(sp.authorize_transition(packet, "refresh_packet", projects_root=self.projects)["allowed"])
+        latest = sp._state_dir(self.repo) / "latest.json"
+        latest.write_text(json.dumps(packet), encoding="utf-8")
+        rebuilt = self.build(intent="plan", require=("docs.priority",), adapters=("docs",))
+        self.assertFalse(rebuilt["measurements"]["cache_hit"])
+        self.assertTrue(sp.check_packet(rebuilt, self.projects)["valid"])
+
+    def test_docs_adapter_failure_cannot_authorize_or_enter_cache(self):
+        with mock.patch.object(sp, "adapter_docs", side_effect=RuntimeError("synthetic")):
+            packet = self.build(intent="plan", require=("docs.priority",), adapters=("docs",))
+        check = sp.check_packet(packet, self.projects)
+        self.assertFalse(check["valid"])
+        self.assertIn("docs", check["changed_sources"])
+        self.assertFalse(sp.authorize_transition(packet, "refresh_packet", projects_root=self.projects)["allowed"])
+        rebuilt = self.build(intent="plan", require=("docs.priority",), adapters=("docs",))
+        self.assertFalse(rebuilt["measurements"]["cache_hit"])
+        self.assertTrue(sp.check_packet(rebuilt, self.projects)["valid"])
+
+    def test_unreadable_doc_during_adapter_cannot_authorize(self):
+        real_adapter = sp.adapter_docs
+        real_read = sp.Reader._read_bytes
+
+        def failing_adapter(repo, reader):
+            def read_with_failure(instance, path, **kwargs):
+                if path.name == "ROADMAP.md":
+                    return None
+                return real_read(instance, path, **kwargs)
+
+            with mock.patch.object(sp.Reader, "_read_bytes", read_with_failure):
+                return real_adapter(repo, reader)
+
+        with mock.patch.object(sp, "adapter_docs", side_effect=failing_adapter):
+            packet = self.build(intent="status", adapters=("docs",))
+        self.assertFalse(sp.check_packet(packet, self.projects)["valid"])
+        self.assertFalse(sp.authorize_transition(packet, "refresh_packet", projects_root=self.projects)["allowed"])
+
+    def test_no_docs_is_a_complete_empty_revision(self):
+        (self.repo / "README.md").unlink()
+        (self.repo / "ROADMAP.md").unlink()
+        packet = self.build(intent="plan", require=("docs.priority",), adapters=("docs",))
+        self.assertEqual(packet["source_revisions"]["docs"], {})
+        self.assertEqual(packet["coverage"]["docs"], "none")
+        self.assertTrue(sp.check_packet(packet, self.projects)["valid"])
+        self.assertTrue(sp.authorize_transition(packet, "refresh_packet", projects_root=self.projects)["allowed"])
+        self.assertTrue(self.build(intent="plan", require=("docs.priority",), adapters=("docs",))
+                        ["measurements"]["cache_hit"])
+
+    def test_docs_revision_hashes_exact_consumed_bytes_at_size_limit(self):
+        roadmap = self.repo / "ROADMAP.md"
+        prefix = b"## P0 - bytes\n"
+        data = prefix + b"x" * (sp.DOC_MAX_BYTES - len(prefix) - 1) + b"\xc3\xa9tail"
+        roadmap.write_bytes(data)
+        packet = self.build(intent="plan", require=("docs.priority",), adapters=("docs",),
+                            use_cache=False, store=False)
+        priority = next(c for c in packet["current_claims"] if c["key"] == "docs.priority")
+        evidence = packet["evidence"][priority["evidence"][0]]
+        version = "sha256:" + hashlib.sha256(data[:sp.DOC_MAX_BYTES]).hexdigest()[:12]
+        self.assertEqual(packet["source_revisions"]["docs"]["ROADMAP.md"], version)
+        self.assertEqual(evidence["source_version"], version)
+        self.assertTrue(sp.check_packet(packet, self.projects)["valid"])
+        self.assertTrue(sp.authorize_transition(packet, "refresh_packet", projects_root=self.projects)["allowed"])
+        # Changes outside the consumed prefix are outside this revision's coverage.
+        roadmap.write_bytes(data + b"more")
+        self.assertTrue(sp.check_packet(packet, self.projects)["valid"])
+        roadmap.write_bytes(data.replace(b"bytes", b"Bytes", 1))
+        check = sp.check_packet(packet, self.projects)
+        self.assertFalse(check["valid"])
+        self.assertIn("docs", check["changed_sources"])
 
     def test_transcript_append_invalidates_and_scans_incrementally(self):
         f = self.add_transcript()
