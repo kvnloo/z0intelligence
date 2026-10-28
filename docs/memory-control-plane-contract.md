@@ -99,7 +99,7 @@ policy authority it belongs in the existing policy/AODL surface, not memory.
 
 ## Decision-time snapshots
 
-`MemorySnapshot` content-addresses the memory/state inputs to a decision:
+`MemorySnapshot` content-addresses the supplied memory/state metadata:
 
 - scope
 - state revision
@@ -108,11 +108,24 @@ policy authority it belongs in the existing policy/AODL surface, not memory.
 - evidence event IDs
 - optional policy/ontology revisions
 
-The snapshot ID intentionally excludes `created_at`; identical state produces
-an identical ID. Any relevant source revision change produces a different ID.
+The snapshot ID excludes `created_at`: identical supplied metadata produces
+the same ID, and a change to a supplied source revision changes it. Its
+freshness is no stronger than those revisions; it does not by itself prove
+which source bytes a decision saw.
 
-This gives replay/evals a stable answer to: **what memory state did this
-decision actually see?**
+The native brief surface currently uses an AgentsView schema version and
+maximum message ID as a cheap revision **hint**. That hint can stay unchanged
+when content, scope or secret findings change, when rows are deleted, or when
+the database is replaced. `memory_snapshot_id` and the StatePacket field are
+therefore not exact-content freshness proofs or authorization checks.
+The brief bypasses the persistent cache whenever the lexical layer is
+requested, including when AgentsView is unavailable, and performs a fresh
+scope-filtered retrieval. This also bypasses old cache entries. The tradeoff
+is a source read on each lexical brief rather than a warm cache hit. A
+reachable unversioned TencentDB gateway likewise bypasses caching; a
+temporal-only brief can still use the existing cache. These rules do not
+change the separate exact-source memory MCP's grant checks and fetch
+revalidation.
 
 ## Outcome linkage
 

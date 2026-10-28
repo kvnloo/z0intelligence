@@ -9,12 +9,13 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
 import pytest
 
-from memory_fixture import SECRETS, FakeTencentDB, add_message, build_av_db
+from memory_fixture import SECRETS, FakeTencentDB, build_av_db
 from z0int import intelligence_mcp
 from z0int.harness_id import turn_key
 from z0int.memory import seam
@@ -120,35 +121,6 @@ def test_the_deadline_counts_from_the_job_start_the_shim_stamped(env, monkeypatc
     monkeypatch.setattr(seam, 'resolve', lambda job: time.sleep(0.2) or {'text': 'late'})
     out = on(key='d2', started_at=time.time() - 0.2)  # the shim spent 200 ms starting the interpreter
     assert out['outcome'] == 'timeout'
-
-
-# ----------------------------------------------------------------------------- 3. persistent cache
-CHILD = """
-import json, sys
-from z0int.memory import seam, surface
-calls = []
-real = surface.search
-surface.search = lambda *a, **k: calls.append(1) or real(*a, **k)
-out = seam.turn('claude-code', turn_key=sys.argv[1], query=sys.argv[2], mode='on', endpoint='http://127.0.0.1:9/v1',
-                cwd='/w/z0')
-print(json.dumps({'context': out['context'], 'searches': len(calls), 'cache': out.get('cache')}))
-"""
-
-
-def child(key, query=QUERY):
-    proc = subprocess.run([sys.executable, '-c', CHILD, key, query], capture_output=True, text=True, timeout=60)
-    assert proc.returncode == 0, proc.stderr
-    return json.loads(proc.stdout)
-
-
-def test_a_second_process_serves_the_brief_from_the_snapshot_cache_until_a_source_changes(env):
-    first = child('p1')
-    assert first['context'] and first['searches'] == 1 and first['cache'] == 'miss'
-    second = child('p2')
-    assert second['context'] == first['context'] and second['searches'] == 0 and second['cache'] == 'hit'
-    add_message(env / 'av' / 'sessions.db', 'h1', 'the quokka gateway moved to a socket unit')
-    third = child('p3')
-    assert third['searches'] == 1 and third['cache'] == 'miss' and third['context'] != first['context']
 
 
 # ----------------------------------------------------------------------------- 4. idempotency (#56-E)
@@ -276,11 +248,34 @@ PAYLOAD = {'session_id': 'sess-cc', 'prompt_id': 'p-1', 'prompt': QUERY, 'cwd': 
            'hook_event_name': 'UserPromptSubmit'}
 
 
-def test_claude_code_hook_shadow_prints_nothing_and_returns_fast(env):
-    t0 = time.perf_counter()
-    assert hook('prompt', PAYLOAD) is None
-    assert time.perf_counter() - t0 < 0.02
-    assert wait_rows('claude-code')[0]['outcome'] == 'shadow'
+def test_claude_code_hook_shadow_returns_without_waiting_for_worker(env, monkeypatch):
+    started, release = threading.Event(), threading.Event()
+    workers = []
+
+    def spawn(job, slot):
+        def worker():
+            started.set()
+            release.wait()
+            seam.run_shadow(job)
+        thread = threading.Thread(target=worker, daemon=True)
+        workers.append(thread)
+        thread.start()
+
+    monkeypatch.setattr(seam, '_spawn_shadow', spawn)
+    result = []
+    caller = threading.Thread(target=lambda: result.append(hook('prompt', PAYLOAD)), daemon=True)
+    caller.start()
+    try:
+        assert started.wait(5), 'shadow worker did not start'
+        caller.join(5)  # watchdog only: the worker is still blocked
+        assert not caller.is_alive(), 'hook waited for the shadow worker'
+        assert result == [None] and not rows()
+    finally:
+        release.set()
+        caller.join(5)
+        for worker in workers:
+            worker.join(5)
+    assert rows('claude-code')[0]['outcome'] == 'shadow'
 
 
 @pytest.mark.parametrize('harness,var', [('claude-code', 'ANTHROPIC_BASE_URL'), ('codex', 'OPENAI_BASE_URL')])

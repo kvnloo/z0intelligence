@@ -3,7 +3,7 @@
 * ``off``     nothing runs, nothing is written.
 * ``shadow``  the brief is computed in a DETACHED child (the hook never waits, nothing reaches the model); the
               child writes a ``z0int.memory_seam.v0`` row with ``would_inject`` and the MemoryUseReceipt.
-* ``canary`` / ``on``  the brief (C7 ``memory_brief``: bounded, scrubbed, snapshot-cached) is returned as
+* ``canary`` / ``on``  the brief (C7 ``memory_brief``: bounded, scrubbed, lexical retrieval uncached) is returned as
               model-visible context within a hard deadline (300 ms, counted from the job start the shim stamps);
               past it, or on any error, the turn keeps its native context and the row says why.
 
