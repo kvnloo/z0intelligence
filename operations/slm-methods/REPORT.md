@@ -19,4 +19,18 @@ metadata probes on its deadline. Unattested attempts remain research diagnostics
 including failures and abstentions, and cannot provide canonical model credit.
 Neither alias equality nor a current endpoint probe may relabel old predictions.
 
+Research observations remain separate from canonical findings. Logical request
+cohorts retain successes, timeouts and unavailable attempts together; each has a
+baseline over the same calls, using only earlier native calls and receipts.
+Result endpoints and model aliases are metadata, not physical identity. A
+stationary, under-sampled proxy cohort may be deferred by plateau detection only
+after a full unchanged observation window; measured or growing cohorts still
+block, and at least one adequately sampled cohort is required. All historical
+curves remain stored. This advances research, not routing authority.
+
+The compiler also excludes the affected historical unattested `shadow_learner`
+SLM findings for `omp.tool` or the raw `next-action` aggregate. This cutover
+removes unsupported credit on recompilation without rewriting the ledger.
+Eligible rule evidence is retained separately from higher-scoring SLM proxies.
+
 Runner database, session directory, endpoint and candidate home are explicit inputs. Session-level manifests and outputs remain private; do not commit raw traces or personal data. No model loading, hook activation or deployment is implied by this source. Measured inference, independent holdout and promotion gates remain separate prerequisites.
