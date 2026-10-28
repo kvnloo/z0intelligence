@@ -47,9 +47,9 @@ def test_gold_tool_does_not_change_scoped_prediction(monkeypatch):
     from types import SimpleNamespace
     from z0int.cognition import slm_scoped
     calls=[]
-    def pipeline(prompt, groups, first, final, **kwargs):
+    def pipeline(prompt, groups, first_chat, final_chat, **kwargs):
         calls.append((prompt, groups))
-        first([{'role':'user','content':prompt}])
+        first_chat([{'role':'user','content':prompt}])
         return {'selected_action':'read','abstained':False}
     monkeypatch.setattr(slm_scoped,'pipeline',pipeline)
     backend=SimpleNamespace(_transport=SimpleNamespace(chat=lambda *a,**kw:

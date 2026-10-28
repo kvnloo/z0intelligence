@@ -208,14 +208,16 @@ def test_tencentdb_items_are_excluded_when_hermes_uses_the_tencentdb_memory_prov
     assert 'semantic' not in caps[turn_key('hermes', 's1', 'p1')] and 'semantic' in caps[turn_key('hermes', 's1', 'p2')]
 
 
-def test_post_llm_call_writes_the_memory_use_receipt_of_the_injected_turn(env, monkeypatch):
+def test_completed_call_does_not_claim_the_model_used_memory(env, monkeypatch):
     mod = load_plugin()
     ctx = start(mod, {'memory_inject': 'on', 'z0int_python': sys.executable}, monkeypatch)
     request(ctx, turn='u1')
     ctx.call('post_llm_call', session_id='s1', turn_id='u1', assistant_response='ok', conversation_history=[],
              model='stub-model', platform='cli')
     used = [r for r in seam_rows(env / 'z0') if r.get('event') == 'post_llm_call']
-    assert len(used) == 1 and used[0]['turn_key'] == turn_key('hermes', 's1', 'u1') and used[0]['injected'] is True
+    assert len(used) == 1 and used[0]['turn_key'] == turn_key('hermes', 's1', 'u1')
+    assert used[0]['context_returned'] is True and used[0]['outcome'] == 'call_completed'
+    assert used[0]['model_use_observed'] is False
     assert used[0]['memory']['snapshot_id'] == used[0]['memory_snapshot_id']
 
 

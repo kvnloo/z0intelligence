@@ -43,14 +43,11 @@ def main(argv: list[str] | None = None) -> int:
     b = sub.add_parser('bench', help='Per-query cold/warm latency, raw reads, tokens and hit rate (z0int#22)')
     b.add_argument('--queries', required=True, help='JSON list of {query, project?, harness?, expect?}')
     b.add_argument('--json', action='store_true')
-    e = sub.add_parser('eval', help='Memory acceptance rows (z0evals#56 A-F) for one harness over the frozen cohort')
-    e.add_argument('--harness', required=True, choices=[*acceptance.STUDY_HARNESSES, *acceptance.Z0_HARNESSES])
-    e.add_argument('--cohort', required=True, help='cohort.json (z0evals studies/unified-memory-v0 at fb14919)')
-    e.add_argument('--revision', required=True, help='harness/plugin revision (git sha) recorded in every row')
+    e = sub.add_parser('eval', help='Common memory seam diagnostics; no native harness or model is invoked')
+    e.add_argument('--harness', required=True, choices=acceptance.HARNESSES)
+    e.add_argument('--cohort', required=True, help='frozen memory cohort JSON')
+    e.add_argument('--revision', required=True, help='z0int revision (git sha) under test; not a harness revision')
     e.add_argument('--out', required=True, help='rows are appended here (jsonl)')
-    e.add_argument('--schema', help='row schema (default: the study schema for dsh/hermes/omo/omp, else '
-                                    f'{acceptance.ACCEPTANCE_SCHEMA}); the study label is refused for other harnesses')
-    e.add_argument('--observed', help='JSON {question_id: bool}: the brief was seen in the recorded model request')
     e.add_argument('--endpoint', default=acceptance.EVAL_ENDPOINT, help='the model endpoint the seam gate sees')
     e.add_argument('--cwd', default=os.getcwd(), help='task directory whose project scopes recall (default: here)')
     e.add_argument('--seed-av-db', help='first write the cohort evidence into this NEW synthetic AgentsView DB '
@@ -73,8 +70,7 @@ def main(argv: list[str] | None = None) -> int:
             except FileExistsError as exc:
                 p.error(str(exc))
         status = _push_status().get(args.harness) or {}
-        rows = acceptance.run(args.harness, cohort, revision=args.revision, schema=args.schema,
-                              observed=acceptance.load_json(args.observed) if args.observed else None,
+        rows = acceptance.run(args.harness, cohort, revision=args.revision,
                               push_supported=False if status.get('status') == 'UNSUPPORTED' else None,
                               endpoint=args.endpoint, cwd=args.cwd)
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)

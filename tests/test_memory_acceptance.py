@@ -1,14 +1,7 @@
-"""C8: memory acceptance rows (z0evals#56 A-F) per harness, and the Grok project-rules command.
-
-dsh/hermes/omo/omp rows are z0eval.unified_memory_receipt.v0 and must validate against receipt.schema.json at
-z0evals fb14919 (vendored byte-identical under tests/fixtures/z0evals-fb14919, blob ids checked below).
-claude-code/codex/grok are not in that study's harness enum, so their rows are z0int.memory_acceptance.v0
-("z0 memory acceptance"), never the study schema, until the study is amended (C12).
-"""
+"""Memory seam diagnostics must not claim native model visibility or answer quality."""
 from __future__ import annotations
 
 import json
-import hashlib
 import os
 import subprocess
 import sys
@@ -21,10 +14,6 @@ from z0int.memory import acceptance, seam
 
 ROOT = Path(__file__).resolve().parents[1]
 PINNED = ROOT / 'tests' / 'fixtures' / 'z0evals-fb14919'
-# git blob ids of studies/unified-memory-v0/{receipt.schema,cohort}.json at kvnloo/z0evals fb14919
-BLOBS = {'receipt.schema.json': 'b43eaf3eba88e31142d5f0f2af01b0729eb221ba',
-         'cohort.json': '284c3e8cef695d0be7a90f782627f9fdaa65e3b4'}
-SCHEMA = json.loads((PINNED / 'receipt.schema.json').read_text())
 COHORT = json.loads((PINNED / 'cohort.json').read_text())
 CWD = '/w/z0'  # the eval's task cwd: the seeded cohort is project z0
 
@@ -40,83 +29,27 @@ def env(tmp_path, monkeypatch):
     return tmp_path
 
 
-def blob_id(path):
-    raw = path.read_bytes()
-    return hashlib.sha1(b'blob %d\0' % len(raw) + raw).hexdigest()
-
-
-def test_the_vendored_study_files_are_the_pinned_fb14919_blobs():
-    for name, blob in BLOBS.items():
-        assert blob_id(PINNED / name) == blob
-
-
-def test_the_pinned_study_enum_is_exactly_dsh_hermes_omo_omp():
-    assert tuple(SCHEMA['properties']['harness']['enum']) == acceptance.STUDY_HARNESSES == ('dsh', 'hermes', 'omo', 'omp')
-
-
-@pytest.mark.parametrize('harness', ['dsh', 'hermes', 'omo', 'omp'])
-def test_study_harness_rows_validate_against_the_pinned_receipt_schema(env, harness):
-    rows = acceptance.run(harness, COHORT, revision='0123abcd', cwd=CWD)
-    assert [r['question_id'] for r in rows] == [q['id'] for q in COHORT['questions']]
-    for row in rows:
-        assert row['schema'] == 'z0eval.unified_memory_receipt.v0'
-        assert acceptance.validate(row, SCHEMA) == [], row
-
-
-def test_cohort_cases_on_the_synthetic_fixture(env):
+def test_cohort_retrieval_and_supersession_are_seam_diagnostics(env):
     rows = {r['question_id']: r for r in acceptance.run('hermes', COHORT, revision='0123abcd', cwd=CWD)}
     for qid in ('exact-identifier', 'cross-harness', 'minimal-context', 'supersession', 'contradiction'):
-        r = rows[qid]
-        assert r['retrieval_ok'] and r['answer_supported'] and r['verified'], r  # A, C
-        assert r['evidence_refs'] and all(ref['source_id'] for ref in r['evidence_refs'])
-    assert rows['supersession']['superseded_answer'] is True  # F: the newer cap is current
+        row = rows[qid]
+        assert row['retrieval_ok'] and row['context_supports_expectation'] and row['surface_verified']
+        assert row['evidence_refs'] and all(ref['source_id'] for ref in row['evidence_refs'])
+    assert rows['supersession']['superseded_evidence_absent'] is True
     miss = rows['missing-evidence']
-    assert miss['abstained'] is True and miss['answer_supported'] is True  # D: abstains, nothing forbidden
-    assert all(r['duplicate_injection'] is False for r in rows.values())  # E: a replay never injects twice
-    # B: a seam result alone is not an injection into a model request: unverified rows never claim injected
-    assert all('B=UNVERIFIED' in ' '.join(r['notes']) and r['injected'] is False for r in rows.values())
-    assert all('seam outcome injected' in r['notes'] for r in rows.values())
+    assert miss['retrieval_abstained'] is True and miss['context_supports_expectation'] is True
+    assert all(row['duplicate_context'] is False for row in rows.values())
+    assert all(row['model_request_observed'] is False and row['model_answer_observed'] is False
+               for row in rows.values())
+    assert all('harness_revision' not in row and 'answer_supported' not in row for row in rows.values())
 
 
-def test_an_observed_model_request_upgrades_b(env):
-    observed = {q['id']: True for q in COHORT['questions']}
-    rows = acceptance.run('omp', COHORT, revision='0123abcd', cwd=CWD, observed=observed)
-    assert all('B=VERIFIED' in ' '.join(r['notes']) and r['injected'] is True for r in rows)
-    missed = acceptance.run('omp', COHORT, revision='0123abcd', cwd=CWD, observed={}, session_id='missed')
-    assert all('B=FAILED' in ' '.join(r['notes']) and r['injected'] is False for r in missed)
-
-
-@pytest.mark.parametrize('harness', ['claude-code', 'codex', 'grok'])
-def test_z0_only_harnesses_emit_memory_acceptance_rows_and_never_the_study_label(env, harness):
-    rows = acceptance.run(harness, COHORT, revision='0123abcd', cwd=CWD)
-    assert {r['schema'] for r in rows} == {acceptance.ACCEPTANCE_SCHEMA} == {'z0int.memory_acceptance.v0'}
-    assert all(r['label'] == 'z0 memory acceptance' and r['harness'] == harness for r in rows)
-    with pytest.raises(ValueError, match='not in the z0evals fb14919 harness enum'):
-        acceptance.run(harness, COHORT, revision='0123abcd', cwd=CWD, schema='z0eval.unified_memory_receipt.v0')
-    study = dict(rows[0], schema='z0eval.unified_memory_receipt.v0')
-    study.pop('label')
-    assert any('harness' in e for e in acceptance.validate(study, SCHEMA))
-
-
-def test_grok_case_b_is_unsupported_pull_only(env):
-    rows = acceptance.run('grok', COHORT, revision='0123abcd', cwd=CWD, observed={q['id']: True for q in COHORT['questions']})
-    assert all(r['injected'] is False and 'B=UNSUPPORTED' in ' '.join(r['notes']) for r in rows)
-
-
-def test_omo_case_b_is_unsupported_when_the_senpi_api_lacks_a_context_hook(env):
-    rows = acceptance.run('omo', COHORT, revision='0123abcd', cwd=CWD, push_supported=False)
-    assert all(r['injected'] is False and 'B=UNSUPPORTED' in ' '.join(r['notes']) for r in rows)
-    assert all(acceptance.validate(r, SCHEMA) == [] for r in rows)
-
-
-def test_eval_cli_writes_validated_rows_under_the_given_out(env):
-    out = env / 'rows.jsonl'
-    proc = subprocess.run([sys.executable, '-m', 'z0int.memory.cli', 'eval', '--harness', 'dsh', '--cohort',
-                           str(PINNED / 'cohort.json'), '--revision', '0123abcd', '--out', str(out), '--cwd', CWD],
-                          capture_output=True, text=True, timeout=120)
-    assert proc.returncode == 0, proc.stderr
-    rows = [json.loads(line) for line in out.read_text().splitlines()]
-    assert len(rows) == 6 and all(acceptance.validate(r, SCHEMA) == [] for r in rows)
+@pytest.mark.parametrize(('harness', 'push_supported'), [('grok', None), ('omo', False)])
+def test_unsupported_push_cannot_be_misread_as_provider_visibility(env, harness, push_supported):
+    rows = acceptance.run(harness, COHORT, revision='0123abcd', cwd=CWD, push_supported=push_supported)
+    assert all(row['model_request_observed'] is False and row['model_answer_observed'] is False
+               for row in rows)
+    assert all('B=UNSUPPORTED' in ' '.join(row['notes']) for row in rows)
 
 
 # ----------------------------------------------------------------------------- Grok: no rules file by default
@@ -174,3 +107,12 @@ def test_seeding_refuses_an_existing_db_and_needs_an_explicit_ledger(tmp_path, m
                           env=dict(os.environ, PYTHONPATH=os.pathsep.join([str(ROOT / 'src'), os.environ.get('PYTHONPATH', '')])))
     assert proc.returncode != 0 and live.read_bytes() == before and not (tmp_path / 'ledger2').exists()
     assert not (tmp_path / 'rows.jsonl').exists()
+
+
+def test_retrieved_support_is_not_an_observed_model_answer(env):
+    rows = acceptance.run('hermes', COHORT, revision='0123abcd', cwd=CWD)
+    supported = next(row for row in rows if row['question_id'] == 'cross-harness')
+    assert supported['retrieval_ok']
+    assert supported.get('answer_supported') is not True
+    assert supported.get('verified') is not True
+    assert supported['schema'] != 'z0eval.unified_memory_receipt.v0'

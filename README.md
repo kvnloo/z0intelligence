@@ -65,8 +65,9 @@ Contract interpretations:
   promote an arm. Runtime outage evidence uses metric `endpoint_health` and
   an explicit timezone-aware `unhealthy_since`.
 - Live shadow labels require `metric.live_shadow=true`. Replay non-inferiority
-  requires explicit `divergence <= aa_noise_floor`. Outcome promotion additionally
-  requires metric `task_success` and `outcome_ledger_verified=true`.
+  requires explicit `divergence <= aa_noise_floor`. Product-outcome promotion
+  requires complete paired cohorts of independently bound product checks,
+  not a caller-asserted aggregate `n` or `outcome_ledger_verified` flag.
   z0eval receipts need `verdict=KEEP` and all four architecture gates `pass`
   for promotion. Negative receipts remain evidence, not promotion authority.
 - Scope is structural, never inferred from prose. Each explicit arm dimension
@@ -108,34 +109,70 @@ actual receipt file path and hash. The compiler preserves endpoint metadata.
 The pure compiler never reads or hashes external model files. Identity metadata
 must come from the measurement owner, not from a guessed engine-path revision.
 
+Product checks observe one run each. Ingest verifies the referenced receipt's
+hash, run identity, boolean result and observed product target. A successful
+single run is not a low-confidence aggregate that automatically removes prior
+credit; a latest verified product failure still removes credit.
+
+For outcome promotion, each receipt also binds its role, pair, task snapshot,
+experiment, subject and arm to a canonical JSON
+`z0.policy.paired_outcome_protocol.v1` document. The protocol declares candidate
+and reference arms, both required roles, every expected pair and distinct task
+snapshot, observation window and non-inferiority margin. The compiler rechecks
+its hash and requires the complete membership: unknown, missing, conflicting or
+duplicated members cannot become a selected successful subset. It recomputes
+the candidate-success Wilson lower bound and candidate-loss Wilson upper bound
+against the reference, retaining all contributing finding IDs. Imported
+aggregate counts and noise floors do not supply this outcome gate.
+
+The hash chain and protocol hash prove content consistency, not trusted
+preregistration or verifier authorship. `frozen_at` and receipt observation times
+are assertions from the measurement owner. Keep ledger writes under that
+owner's control; independent provenance and native product verification remain
+required before treating a real cohort as promotion authority.
+
 ### ChoiceLadder option capacity
 
 The pure compiler emits an evidence-bound `option_capacity` map. Each key is
-the canonical JSON string of the exact model, quant, engine, backend and device
-scope. `option_capacity_key(scope)` creates this lossless key. No capacity
-credit transfers between different physical scopes.
+the canonical JSON string of the exact model SHA-256, quant, engine, backend
+and device scope. `option_capacity_key(scope)` rejects model aliases. No
+capacity credit transfers between different physical scopes.
 
-Each value contains `allowed_k`, `finding_ids`, `wilson_lower`, `task`, `bar`
-and `expires_at`. `task` is the sorted list of required task names. The default
-catalogue is T1, T2, T3 and T4. Configure it with `option_capacity_tasks`.
-Observed measured task names also remain required, including failed or expired
-tasks. Configure the independent accuracy threshold with `option_capacity_bar`
-(default 0.95). Routing promotion thresholds remain unchanged.
+Each scope contains `read`, `mutating_reversible` and `destructive` entries.
+Each entry records `allowed_k`, `finding_ids`, `wilson_lower`, `task`,
+`bar_derived`, cost `inputs` and `expires_at`. The default required tasks are
+T1, T2, T3 and T4; configure them with `option_capacity_tasks`. Observed
+measured task names also remain required, including failed or expired tasks.
+The accuracy bar is derived from fresh, measured, exact-scope and risk-bound
+call, frontier, error and abstention costs in one supported unit:
+`1 - (cost_frontier * (1 - abstain_rate) - cost_call) / cost_error`.
+Unmeasured default costs are diagnostic only. Destructive capacity remains
+blocked; routing promotion thresholds are unchanged.
 
 Capacity evidence requires `subject.family=choice.option_capacity`,
 `subject.job=ChoiceLadder`, `subject.task` (or `metric.task`), metric
 `choice_accuracy`, integer `metric.option_count >= 2`, `ci_method=wilson95`,
 positive `n`, and measured, unexpired observations. The compiler compares the
 smaller of the stated lower bound and a recomputed Wilson lower bound against
-the bar. An explicit correct count must agree with accuracy and sample count.
-The latest measured observation for a task and k supersedes older success.
+the derived bar; the lower bound must strictly exceed it. An explicit correct
+count must agree with accuracy and sample count. The latest eligible measured
+observation for a task and k supersedes older success.
 
 The compiler selects the largest passing k per task. The allowed capacity is
 the minimum across every required task. Missing, pending, expired, inference,
-ineligible or inconsistent evidence never counts as success. Any unsupported
-task limits capacity to the baseline of 2. An unknown scope also defaults to 2.
-Proof IDs and the earliest selected proof expiry accompany positive credit.
-O13 readers consume this content-addressed projection, not a live findings scan.
+ineligible or inconsistent evidence never counts as success: incomplete
+coverage yields zero, not a default capacity credit. Proof IDs and the earliest
+selected proof or cost expiry accompany positive credit.
+
+The exploratory scorer has no trusted action-risk classification. Its reader
+therefore requires a fresh, digest-verified policy with measured entries for
+all three risks at the exact physical scope, and uses their minimum capacity.
+A valid zero capacity abstains before an RPC. Missing or invalid evidence
+retains the existing exploratory candidate cap; this fallback is not routing
+credit or action authorization. The current serving endpoint supplies a model
+alias, not a verified model digest, and the compiler blocks destructive credit.
+Thus current live callers cannot receive policy-backed capacity uplift.
+The reader neither hashes model files on the hot path nor substitutes aliases.
 
 ## Startup orientation
 
@@ -419,6 +456,15 @@ rehydration and authorization interfaces are qualified. ctx remains a
 separate, explicit pull via the existing integration path; this server never
 runs ctx refresh, import or the latency-sensitive automatic 300ms path.
 Do not mistake a lexical match or zero-hit smoke test for model-visible use.
+
+`z0int memory eval` runs the common seam against a cohort, not a native
+harness or model. It emits `z0int.memory_seam_diagnostic.v1`, with retrieval,
+context support and replay results. It never emits a native-study receipt or
+claims provider-input visibility or answer quality. The former `--observed`
+boolean override and schema-selection option are removed: caller assertions
+are not transport evidence. `--revision` identifies z0int only. Native memory
+acceptance still requires a captured provider request, the actual answer and
+independent verification against the frozen sources.
 
 Output is capped by policy (default 4096 bytes per record, 32768 bytes per
 payload), with a 10-minute, process-bound, 256-handle metadata-only cache

@@ -1,16 +1,9 @@
-"""Memory acceptance rows (z0evals#56 cases A-F) for one harness over the frozen 6-question cohort.
+"""Seam diagnostics over a frozen memory cohort, not native-agent acceptance.
 
-A retrieval (``retrieval_ok``), B injection into the model-visible request (``injected``), C answer support from
-the injected evidence (``answer_supported``, ``verified``), D abstention (``abstained``), E idempotency
-(``duplicate_injection``: the same turn replayed), F supersession (``superseded_answer``).
-
-dsh, hermes, omo and omp emit ``z0eval.unified_memory_receipt.v0`` rows (the harness enum of z0evals fb14919
-receipt.schema.json is exactly those four). claude-code, codex and grok emit ``z0int.memory_acceptance.v0``
-("z0 memory acceptance", the same fields) and are refused the study label until the study is amended (C12).
-
-B is honest about what was observed: the seam result alone is ``B=UNVERIFIED`` and ``injected`` stays false (no
-model request seen); a recorded model request carrying the brief (``observed``) makes it ``B=VERIFIED``; a harness without a push seam
-(Grok, OMO without a senpi ``context`` hook) is ``B=UNSUPPORTED`` and never counts as injected.
+This runner observes retrieval, returned context, abstention and replay.
+It invokes neither a native harness nor a model. A retrieved supporting claim
+does not establish provider-input visibility or a source-supported answer.
+Native study receipts require separate transport and answer observations.
 """
 
 from __future__ import annotations
@@ -25,11 +18,8 @@ from typing import Any, Iterable, Mapping
 from ..memory_contract import BitemporalClaim, MemoryScope
 from . import seam, surface
 
-STUDY_HARNESSES = ('dsh', 'hermes', 'omo', 'omp')  # z0evals fb14919 receipt.schema.json properties.harness.enum
-Z0_HARNESSES = ('claude-code', 'codex', 'grok')
-STUDY_SCHEMA = 'z0eval.unified_memory_receipt.v0'
-ACCEPTANCE_SCHEMA = 'z0int.memory_acceptance.v0'
-LABEL = 'z0 memory acceptance'
+HARNESSES = ('dsh', 'hermes', 'omo', 'omp', 'claude-code', 'codex', 'grok')
+DIAGNOSTIC_SCHEMA = 'z0int.memory_seam_diagnostic.v1'
 PULL_ONLY = {'grok': 'pull-only (no push seam)'}
 EVAL_ENDPOINT = 'http://127.0.0.1/eval-fixture'  # no model is called; the gate sees a local endpoint
 # The cohort's synthetic sources as AgentsView sessions, one harness each (cross-harness recall).
@@ -100,27 +90,24 @@ def _ref(ref: Mapping[str, Any]) -> dict[str, Any]:
             'locator_hash': 'sha256:' + hashlib.sha256(str(ref.get('locator') or '').encode()).hexdigest()[:16]}
 
 
-def _b_note(harness: str, push_supported: bool | None, observed: bool | None, injected: bool) -> tuple[bool, str]:
+def _b_note(harness: str, push_supported: bool | None) -> str:
     if harness in PULL_ONLY:
-        return False, f'B=UNSUPPORTED: {PULL_ONLY[harness]}'
+        return f'B=UNSUPPORTED: {PULL_ONLY[harness]}'
     if push_supported is False:
-        return False, 'B=UNSUPPORTED: the host API has no model-visible context hook (stop condition)'
-    if observed is None:  # the seam returned a brief, but no model request was seen: not claimed as injected
-        return False, 'B=UNVERIFIED: seam result only, no model request observed (fixture run, not counted)'
-    if observed and injected:
-        return True, 'B=VERIFIED: the brief was in the recorded model request'
-    return False, 'B=FAILED: the brief was not in the recorded model request'
+        return 'B=UNSUPPORTED: the host API has no model-visible context hook (stop condition)'
+    return 'B=UNVERIFIED: seam result only, no model request observed'
 
 
-def run(harness: str, cohort: Mapping[str, Any], *, revision: str, schema: str | None = None,
-        observed: Mapping[str, bool] | None = None, push_supported: bool | None = None,
-        endpoint: str = EVAL_ENDPOINT, session_id: str | None = None, cwd: str | None = None) -> list[dict[str, Any]]:
-    """One row per cohort question, through the harness's real seam path (gates, scope, cache, replay). ``cwd`` is
-    the task directory whose project scopes recall (none: every turn is no_scope)."""
-    schema = schema or (STUDY_SCHEMA if harness in STUDY_HARNESSES else ACCEPTANCE_SCHEMA)
-    if schema == STUDY_SCHEMA and harness not in STUDY_HARNESSES:
-        raise ValueError(f'{harness} is not in the z0evals fb14919 harness enum {list(STUDY_HARNESSES)}: its rows are '
-                         f'{ACCEPTANCE_SCHEMA} ("{LABEL}") until the study is amended (C12)')
+def run(harness: str, cohort: Mapping[str, Any], *, revision: str,
+        push_supported: bool | None = None, endpoint: str = EVAL_ENDPOINT,
+        session_id: str | None = None, cwd: str | None = None) -> list[dict[str, Any]]:
+    """Exercise the common seam; the named harness selects its gates, not a client.
+
+    ``revision`` identifies the z0int code under test, not a native harness.
+    ``cwd`` scopes recall; no task directory means no project scope.
+    """
+    if harness not in HARNESSES:
+        raise ValueError(f'Unknown memory seam harness: {harness}')
     session = session_id or f'eval-{int(time.time())}'
     out = []
     for q in cohort['questions']:
@@ -147,66 +134,34 @@ def run(harness: str, cohort: Mapping[str, Any], *, revision: str, schema: str |
         else:
             supported = bool(expected) and len(hits) == len(expected) and clean
             verified = supported and surface.verify(q['prompt'], requires=[s for s in expected if s in context])['verdict'] == 'USE'
-        injected, note = _b_note(harness, push_supported, None if observed is None else bool(observed.get(q['id'])),
-                                 res.get('outcome') == 'injected')
+        note = _b_note(harness, push_supported)
         layers = [k for k in ('temporal', 'lexical', 'semantic') if k in ((brief.get('receipt') or {}).get('capability_ids') or [])]
         row = {
-            'schema': schema, 'harness': harness, 'question_id': q['id'], 'session_id': session, 'trace_id': key,
-            'harness_revision': revision, 'z0int_revision': revision,
+            'schema': DIAGNOSTIC_SCHEMA, 'harness': harness, 'question_id': q['id'],
+            'session_id': session, 'trace_id': key, 'z0int_revision': revision,
+            'evidence_scope': 'common_seam_only',
+            'model_request_observed': False, 'model_answer_observed': False,
             'retrieval_capability': 'z0-memory:' + '+'.join(layers or ['none']),
             'retrieval_ok': bool(brief) and not brief.get('abstained') and (need_hit or q.get('expected_action') == 'abstain'),
-            'injected': injected, 'answer_supported': supported, 'verified': bool(verified), 'abstained': abstained,
-            'duplicate_injection': replay.get('outcome') == 'injected',
+            'context_supports_expectation': supported, 'surface_verified': bool(verified),
+            'retrieval_abstained': abstained, 'seam_emitted_context': bool(context),
+            'duplicate_context': replay.get('outcome') == 'injected',
             'evidence_refs': [_ref(r) for r in brief.get('evidence_refs') or []],
             'latency_ms': latency, 'retrieval_latency_ms': float((brief.get('receipt') or {}).get('retrieval_latency_ms') or 0),
-            'context_bytes': len(context.encode('utf-8')) if injected else 0,
+            'context_bytes': len(context.encode('utf-8')),
             'raw_source_reads': int((brief.get('receipt') or {}).get('raw_source_reads') or 0),
             'evidence_count': len(brief.get('evidence') or []),
-            'notes': [note, f'seam outcome {res.get("outcome")}', f'replay outcome {replay.get("outcome")}'],
+            'notes': [note, 'C=UNVERIFIED: no model answer observed',
+                      f'seam outcome {res.get("outcome")}', f'replay outcome {replay.get("outcome")}'],
         }
         if q.get('kind') == 'temporal':
-            row['superseded_answer'] = supported and not any(
+            row['superseded_evidence_absent'] = supported and not any(
                 _supported(context, claims, e['claim']) for e in cohort.get('evidence') or []
                 if e['source_id'] in q.get('evidence_ids', []) and e['claim'] not in expected)
-        if schema == ACCEPTANCE_SCHEMA:
-            row['label'] = LABEL
         out.append(row)
     return out
 
 
-# ----------------------------------------------------------------------------- validation (no jsonschema dependency)
-_TYPES = {'string': str, 'boolean': bool, 'number': (int, float), 'integer': int, 'array': list, 'object': dict}
-
-
-def validate(value: Any, schema: Mapping[str, Any], path: str = '$') -> list[str]:
-    """The JSON-Schema subset receipt.schema.json uses: type, required, const, enum, pattern, minimum, items,
-    properties, additionalProperties=false. Returns the errors (empty = valid)."""
-    errs: list[str] = []
-    t = schema.get('type')
-    if t:
-        ok = isinstance(value, _TYPES[t]) and not (t in ('number', 'integer') and isinstance(value, bool))
-        if not ok:
-            return [f'{path}: expected {t}']
-    if 'const' in schema and value != schema['const']:
-        errs.append(f'{path}: expected const {schema["const"]!r}')
-    if 'enum' in schema and value not in schema['enum']:
-        errs.append(f'{path}: {value!r} not in enum {schema["enum"]}')
-    if 'pattern' in schema and isinstance(value, str) and not re.search(schema['pattern'], value):
-        errs.append(f'{path}: does not match {schema["pattern"]}')
-    if 'minimum' in schema and isinstance(value, (int, float)) and value < schema['minimum']:
-        errs.append(f'{path}: below minimum {schema["minimum"]}')
-    if isinstance(value, dict):
-        props = schema.get('properties') or {}
-        errs += [f'{path}.{k}: required' for k in schema.get('required') or [] if k not in value]
-        if schema.get('additionalProperties') is False:
-            errs += [f'{path}.{k}: not allowed' for k in value if k not in props]
-        for k, v in value.items():
-            if k in props:
-                errs += validate(v, props[k], f'{path}.{k}')
-    if isinstance(value, list) and 'items' in schema:
-        for i, v in enumerate(value):
-            errs += validate(v, schema['items'], f'{path}[{i}]')
-    return errs
 
 
 # ----------------------------------------------------------------------------- Grok project rules (opt-in only)
