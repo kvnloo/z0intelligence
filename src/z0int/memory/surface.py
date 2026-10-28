@@ -11,9 +11,9 @@ silent empty):
   they are not canonical provenance (z0int#63 stays UNMET while the gateway is unavailable).
 
 Scope is filtered before ranking (the ranker never sees a sibling project/repo/task item), evidence is merged
-on ``event_uid`` across layers, and every output passes the secret scrub. ``memory_brief`` is bounded,
-abstains on a missing required source and is cached on disk by snapshot with the MemoryPacketCache key rules
-(policy version, canonical scope JSON, normalized query; an empty or abstained brief is never cached).
+on ``event_uid`` across layers, and every output passes the secret scrub. ``memory_brief`` is bounded and
+abstains on a missing required source. Cache keys include policy, scope, query and source revision hints.
+AgentsView has no reliable content revision, so briefs requesting its lexical layer bypass the cache.
 Memory is evidence, never instructions.
 """
 
@@ -43,7 +43,7 @@ from .scrub import redact_spans, scrub_obj, scrub_text
 
 SCHEMA = 'z0int.memory.search.v0'
 BRIEF_SCHEMA = 'z0int.memory.brief.v0'
-POLICY_VERSION = 'z0-memory-1'  # part of every cache key and snapshot: bump when a brief's meaning changes
+POLICY_VERSION = 'z0-memory-2'  # part of every cache key and snapshot: bump when a brief's meaning changes
 LAYERS = ('temporal', 'lexical', 'semantic')
 HARNESS_OF_AGENT = {'claude': 'claude-code', 'deepseek-harness': 'dsh'}
 DEFAULT_USER = 'local'
@@ -157,6 +157,7 @@ def _without_brief(content: str | None) -> str:
 
 
 def agentsview_generation(conn: sqlite3.Connection) -> str:
+    """Cheap schema/high-water hint, not a content, scope, source identity or deletion revision."""
     uv = conn.execute('pragma user_version').fetchone()[0]
     return f"uv{uv}:m{conn.execute('select max(id) from messages').fetchone()[0] or 0}"
 
@@ -488,8 +489,9 @@ def _snapshot_of(scope: MemoryScope | None, revisions: Mapping[str, str]) -> str
 
 
 def memory_snapshot_id(scope: MemoryScope | None = None, **kw: Any) -> str:
-    """Content-addressed id of the memory view: changes iff a source revision (or the policy version) changes.
-    An ``unversioned`` TencentDB gateway contributes no content revision (see ``UNVERSIONED``)."""
+    """Content-addressed identifier of source revision hints, not a proof of an unchanged memory view.
+    AgentsView's high-water hint misses edits, deletions, scope changes and source replacement; an
+    ``unversioned`` TencentDB gateway contributes no content revision."""
     return _snapshot_of(scope, source_revisions(**kw))
 
 
@@ -699,9 +701,9 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
                  required: Iterable[str] = ('lexical',), use_cache: bool = True, limit: int = 8,
                  config: Mapping[str, Any] | None = None, av_db: str | Path | None = None,
                  ledger_root: str | Path | None = None, layers: Iterable[str] = LAYERS) -> dict[str, Any]:
-    """A bounded, scrubbed, provenance-carrying brief. ``use_cache=False`` skips the lookup but still stores.
-    With the TencentDB gateway reachable (``unversioned``) the cache is bypassed: no lookup, no store.
-    ``layers`` narrows the sources (a host that already injects TencentDB memory passes the other two)."""
+    """A bounded, scrubbed, provenance-carrying brief. ``use_cache=False`` skips lookup but still stores if safe.
+    AgentsView has no reliable content revision, so requesting lexical bypasses the cache even if unavailable.
+    A reachable unversioned TencentDB gateway also bypasses it. ``layers`` narrows the sources."""
     t0 = time.perf_counter()
     policy = policy or ScopePolicy()
     cfg = load_config() if config is None else config
@@ -711,7 +713,9 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
     revisions = source_revisions(av_db=av_db, config=cfg, ledger_root=ledger_root, gateway=gateway,
                                  probe_gateway='semantic' in layers)
     snap = _snapshot_of(policy.scope, revisions)
-    cacheable = 'semantic' not in layers or revisions['tencentdb'] != UNVERSIONED
+    bypass = ('agentsview_unversioned' if 'lexical' in layers else
+              'tencentdb_unversioned' if 'semantic' in layers and revisions['tencentdb'] == UNVERSIONED else None)
+    cacheable = bypass is None
     key = _sha('\x1f'.join((POLICY_VERSION, policy.key(), _normalize(query), str(max_tokens), ','.join(required),
                             ','.join(layers), snap)))
     if use_cache and cacheable:
@@ -756,7 +760,7 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
     brief = {
         'schema': BRIEF_SCHEMA, 'query': query, 'text': text, 'tokens': estimate_tokens(text), 'max_tokens': max_tokens,
         'abstained': abstained, 'gaps': gaps, 'memory_snapshot_id': snap,
-        'cache': 'miss' if cacheable else 'bypass:tencentdb_unversioned',
+        'cache': f'bypass:{bypass}' if bypass else 'miss',
         'current_claims': [{k: c.get(k) for k in ('claim_id', 'subject', 'predicate', 'value')} for c in used
                            if c.get('claim_id')],
         'evidence': [e['locator'] for e in used], 'evidence_refs': [e['evidence_ref'] for e in used],
@@ -839,7 +843,7 @@ def verify(query: str, requires: Iterable[str] = (), policy: ScopePolicy | None 
 # ----------------------------------------------------------------------------- bench (z0int#22 measurement)
 def bench(queries: Iterable[Mapping[str, Any]], *, config: Mapping[str, Any] | None = None,
           av_db: str | Path | None = None, ledger_root: str | Path | None = None) -> dict[str, Any]:
-    """Per query: cold (resolver) and warm (snapshot cache) latency, raw source reads, brief tokens, hit."""
+    """Per query: first and repeat latency, raw source reads, brief tokens and hit; repeats may bypass cache."""
     queries, rows = list(queries), []
     for q in queries:
         scope = MemoryScope(user=DEFAULT_USER, project=q['project']) if q.get('project') else None

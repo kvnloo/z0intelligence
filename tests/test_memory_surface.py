@@ -383,24 +383,69 @@ def test_supersession_shows_the_newer_claim_while_history_returns_both(env):
     assert hist[0]['superseded_by'] == 'new' and hist[1]['current'] is True
 
 
-def test_second_process_with_the_same_snapshot_hits_the_persistent_cache(env):
-    first = ms.memory_brief('quokka routing', ms.ScopePolicy(scope=Z0), config={})
-    assert first['cache'] == 'miss' and first['abstained'] is False
+def _lexical_brief(query, **kwargs):
+    return ms.memory_brief(query, ms.ScopePolicy(scope=Z0), layers=('lexical',), config={}, **kwargs)
+
+
+def test_brief_observes_same_row_content_mutation_across_processes(env):
+    db = env / 'av' / 'sessions.db'
+    add_message(db, 'h1', 'quokka decision old-value')
+    first = _lexical_brief('quokka decision')
+    assert 'old-value' in first['text']
+    before = db.stat()
+    with sqlite3.connect(db) as conn:
+        conn.execute("update messages set content = ? where session_id = 'h1' and content = ?",
+                     ('quokka decision new-value', 'quokka decision old-value'))
+        conn.execute("insert into messages_fts(messages_fts) values('rebuild')")
+    os.utime(db, ns=(before.st_atime_ns, before.st_mtime_ns))
+    after = db.stat()
+    assert (after.st_size, after.st_mtime_ns) == (before.st_size, before.st_mtime_ns)
     code = (
         'import json\n'
         'from z0int.memory import surface as ms\n'
         'from z0int.memory_contract import MemoryScope\n'
-        'def boom(*a, **k):\n'
-        '    raise AssertionError("resolver called")\n'
-        'ms.search = boom\n'
-        'b = ms.memory_brief("quokka routing", ms.ScopePolicy(scope=MemoryScope(user="local", project="z0")), config={})\n'
-        'print(json.dumps({"cache": b["cache"], "text": b["text"], "sid": b["memory_snapshot_id"]}))\n'
+        'b = ms.memory_brief("quokka decision", ms.ScopePolicy(scope=MemoryScope(user="local", project="z0")), '
+        'layers=("lexical",), config={})\n'
+        'print(json.dumps(b))\n'
     )
     proc = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, timeout=60,
                           env={**os.environ, 'PYTHONPATH': os.pathsep.join(p for p in sys.path if p)})
     assert proc.returncode == 0, proc.stderr
-    out = json.loads(proc.stdout)
-    assert out == {'cache': 'hit', 'text': first['text'], 'sid': first['memory_snapshot_id']}
+    second = json.loads(proc.stdout)
+    assert 'new-value' in second['text'] and 'old-value' not in second['text']
+
+
+@pytest.mark.parametrize('change', ['scope', 'delete'])
+def test_brief_excludes_revoked_or_deleted_lexical_evidence(env, change):
+    db = env / 'av' / 'sessions.db'
+    add_message(db, 'h1', 'quokka decision restricted-value')
+    revoked_locator = f"agentsview:h1#{message_id(db, 'h1', 2)}"
+    add_message(db, 'o1', 'unrelated marker to preserve the maximum message id')
+    first = _lexical_brief('quokka decision')
+    assert 'restricted-value' in first['text']
+    with sqlite3.connect(db) as conn:
+        if change == 'scope':
+            conn.execute("update sessions set project = 'sibling' where id = 'h1'")
+        else:
+            conn.execute("delete from messages where session_id = 'h1' and content = ?",
+                         ('quokka decision restricted-value',))
+            conn.execute("insert into messages_fts(messages_fts) values('rebuild')")
+    second = _lexical_brief('quokka decision')
+    assert 'restricted-value' not in second['text']
+    assert revoked_locator not in second['evidence']
+
+
+def test_brief_reads_selected_source_even_when_revision_hints_match(env, tmp_path):
+    db1 = tmp_path / 'first' / 'sessions.db'
+    db2 = tmp_path / 'second' / 'sessions.db'
+    build_av_db(db1, sessions=[('same', 'hermes', 'z0', '/w/z0',
+                                [('assistant', 'quokka decision first-source')])])
+    build_av_db(db2, sessions=[('same', 'hermes', 'z0', '/w/z0',
+                                [('assistant', 'quokka decision other-source')])])
+    first = _lexical_brief('quokka decision', av_db=db1)
+    second = _lexical_brief('quokka decision', av_db=db2)
+    assert 'first-source' in first['text']
+    assert 'other-source' in second['text'] and 'first-source' not in second['text']
 
 
 # ----------------------------------------------------------------------------- canonical ingest cost (#23)

@@ -1143,9 +1143,9 @@ def source_revisions(repo: Path, projects_root: Path | None = None, reader: Read
 
 
 def _memory_snapshot_id(revisions: dict[str, Any]) -> str | None:
-    """The memory view this packet was built against (AgentsView generation, TencentDB rev, ledger tail, HEAD).
+    """Identifier of memory revision hints (AgentsView high-water mark, TencentDB rev, ledger tail, HEAD).
 
-    Recomputed on a cache hit too: the packet's own sources may be unchanged while memory moved on. This runs
+    Recomputed on a cache hit too, but unchanged hints do not prove unchanged memory content or scope. This runs
     inside synchronous harness hooks, so it is local only: a short AgentsView busy timeout and the gateway
     revision last observed by a real memory query, never a network call.
     """
