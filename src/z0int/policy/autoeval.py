@@ -21,9 +21,11 @@ import subprocess
 import sys
 import time
 import urllib.request
+import uuid
 
 from .. import paths
-from .compile import CompilerConfig, compile_policy, option_capacity_key, write_policy
+from .compile import (CompilerConfig, _choice_lower, _promotion_evidence, compile_policy,
+                      option_capacity_key, scope_of, write_policy)
 from .findings import append_findings, canonical, digest, ledger_path, locked, read_findings, timestamp
 
 
@@ -32,25 +34,29 @@ def file_sha(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def stat_identity(stat):
+    return [stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns]
+
 def model_identity(path, home, cache_only=False):
     """Cache weight digest and metadata by filesystem identity, never by alias."""
     directory = home / 'policy' / 'model-identities'
     directory.mkdir(parents=True, exist_ok=True)
     if cache_only:
         stat = path.stat()
-        identity = [stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns]
+        identity = stat_identity(stat)
         entry = directory / (digest(identity) + '.json')
         if not entry.exists():
             return None
         cached = json.loads(entry.read_text())
-        return (cached['sha256'], cached['metadata']) if cached['identity'] == identity else None
+        return ((cached['sha256'], cached['metadata'])
+                if cached['identity'] == identity and stat_identity(path.stat()) == identity else None)
     with locked(directory / 'cache.lock'):
         before = path.stat()
-        identity = [before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns]
+        identity = stat_identity(before)
         entry = directory / (digest(identity) + '.json')
         if entry.exists():
             cached = json.loads(entry.read_text())
-            if cached['identity'] == identity:
+            if cached['identity'] == identity and stat_identity(path.stat()) == identity:
                 return cached['sha256'], cached['metadata']
         # Cold identities read large weights only at idle I/O / minimum CPU priority.
         sha = subprocess.check_output(
@@ -60,7 +66,7 @@ def model_identity(path, home, cache_only=False):
              str(path)], text=True).strip()
         metadata = gguf_metadata(path)
         after = path.stat()
-        if identity != [after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns]:
+        if identity != stat_identity(after):
             raise ValueError('Model changed while computing its identity')
         if len(sha) != 64 or any(c not in '0123456789abcdef' for c in sha):
             raise ValueError('Invalid model digest')
@@ -175,15 +181,31 @@ def scope_for(model, lane):
 
 def due(model, lane, findings, now, refresh_hours):
     scope = scope_for(model, lane)
-    expiry = {}
+    cells = {}
     for row in findings:
-        if (row['subject']['family'] != 'choice.option_capacity' or
-                row['metric']['name'] != 'choice_accuracy' or row['evidence_class'] != 'measured' or
-                row.get('synthetic', False) or row['arm'].get('model_sha256') != model['sha256'] or
-                any(row['arm'].get(k) != v for k, v in scope.items()) or timestamp(row['ts']) > now):
+        metric = row['metric']
+        if (row['subject'].get('family') != 'choice.option_capacity' or
+                row['subject'].get('job') != 'ChoiceLadder' or
+                metric.get('name') != 'choice_accuracy' or row['evidence_class'] != 'measured' or
+                row.get('synthetic', False) or not _promotion_evidence(row) or
+                row['arm'].get('model_sha256') != model['sha256'] or
+                scope_of(row) != scope or timestamp(row['ts']) > now):
             continue
-        task = row['subject'].get('task')
-        # Match compiler's maximum evidence age, not just the producer's expiry.
+        task = row['subject'].get('task', metric.get('task'))
+        k = metric.get('option_count')
+        if task not in ('T1', 'T2', 'T3', 'T4') or type(k) is not int or k < 2:
+            continue
+        key = (task, k)
+        old = cells.get(key)
+        if old is None or (timestamp(row['ts']), row.get('id', '')) > (timestamp(old['ts']), old.get('id', '')):
+            cells[key] = row
+    expiry = {}
+    for (task, _), row in cells.items():
+        try:
+            if _choice_lower(row) is None:
+                continue
+        except (KeyError, TypeError, ValueError, ZeroDivisionError):
+            continue
         expires = min(timestamp(row['expires_at']), timestamp(row['ts']) + timedelta(days=14))
         expiry[task] = max(expiry.get(task, expires), expires)
     return any(expiry.get(task, now) <= now + timedelta(hours=refresh_hours) for task in ('T1','T2','T3','T4'))
@@ -234,9 +256,15 @@ def tick(home, config, now=None, launch=subprocess.Popen):
             if retry and timestamp(retry) > now:
                 continue
             request = directory / (key + '.request.json')
-            payload = {'model':model, 'lane':lane, 'config':config, 'home':str(home),
-                       'scope':scope_for(model,lane), 'requested_at':now.isoformat()}
-            request.write_bytes(canonical(payload) + b'\n')
+            if state.get('status') != 'completed' and request.exists():
+                payload = json.loads(request.read_text())
+                if payload.get('scope') != scope_for(model, lane) or not payload.get('run_id'):
+                    raise ValueError('Saved dispatch request identity mismatch')
+            else:
+                payload = {'model':model, 'lane':lane, 'config':config, 'home':str(home),
+                           'scope':scope_for(model,lane), 'requested_at':now.isoformat(),
+                           'run_id':uuid.uuid4().hex}
+                atomic_json(request, payload)
             log_path = directory / (key + '.log')
             with log_path.open('ab') as log:
                 command = [sys.executable,'-m','z0int.policy.autoeval','dispatch','--request',str(request)]
@@ -262,7 +290,10 @@ def dispatch(request):
     payload = json.loads(request.read_text())
     config, lane = payload['config'],payload['lane']
     root = Path(config['toolkit']).expanduser().resolve()
-    output = request.parent / (request.stem + '.result')
+    run_id = payload['run_id']
+    if not isinstance(run_id, str) or len(run_id) != 32 or any(c not in '0123456789abcdef' for c in run_id):
+        raise ValueError('Invalid run identity')
+    output = request.parent / (request.stem + '.' + run_id + '.result')
     output.mkdir(exist_ok=True)
     staged = output / 'request.json'
     staged.write_bytes(canonical(payload) + b'\n')
@@ -289,14 +320,27 @@ def dispatch(request):
         staged.write_bytes(canonical(remote) + b'\n')
         command = ['fleet-build','--node','mbp','--class','bench','--mem',lane.get('mem','4G'),
                    '--checkpoint-safe','--cpus','4','--wait','-1','--timeout','14400','--src',str(output),
-                   '--input',payload['model']['path']+':weights.gguf','--fetch','measurement.json','--out',str(output/'fetched'),
+                   '--input',payload['model']['path']+':weights.gguf','--fetch','measurement.json',
+                   '--fetch','rows.jsonl','--fetch','checkpoint-header.json','--out',str(output/'fetched'),
                    '--','python3','-m','z0int.policy.autoeval','measure','--request','request.json','--out','.']
         subprocess.run(command,check=True)
-        shutil.copyfile(output/'fetched'/'measurement.json',output/'measurement.json')
+        for name in ('measurement.json', 'rows.jsonl', 'checkpoint-header.json'):
+            shutil.copyfile(output/'fetched'/name, output/name)
     receipt = output/'measurement.json'
     measurement = json.loads(receipt.read_text())
-    if measurement['scope'] != payload['scope'] or measurement['model_sha256'] != payload['model']['sha256']:
+    if (measurement.get('scope') != payload['scope'] or
+            measurement.get('model_sha256') != payload['model']['sha256'] or
+            measurement.get('runtime_sha256') != lane['server_sha256'] or
+            measurement.get('run_id') != run_id or
+            measurement.get('items_sha256') != file_sha(root/'items.jsonl') or
+            measurement.get('rows_sha256') != file_sha(output/'rows.jsonl')):
         raise ValueError('Worker result identity mismatch')
+    header = json.loads((output/'checkpoint-header.json').read_text())
+    started = timestamp(measurement['started_at'])
+    if (header.get('run_id') != run_id or header.get('started_at') != measurement['started_at'] or
+            started < timestamp(payload['requested_at']) or started > datetime.now(timezone.utc) or
+            timestamp(measurement['expires_at']) != started + timedelta(days=14)):
+        raise ValueError('Worker observation time or run identity mismatch')
     expected = {(task,k) for task in ('T1','T2') for k in (2,3,5,8,12,16,24,32,64)}
     expected.update(('T3',k) for k in (2,3,5,8,12,16))
     expected.add(('T4',10))
@@ -308,6 +352,16 @@ def dispatch(request):
                 type(cell['correct']) is not int or not 0 <= cell['correct'] <= cell['n']):
             raise ValueError('Invalid worker sample counts')
         cell['ci_low'],cell['ci_high'] = wilson(cell['correct'],cell['n'])
+    observed = defaultdict(lambda: [0, 0])
+    for line in (output/'rows.jsonl').read_text().splitlines():
+        row = json.loads(line)
+        key = (row['task'], row['k'])
+        if key not in expected or type(row.get('correct')) not in (bool, int) or row['correct'] not in (0, 1):
+            raise ValueError('Invalid worker row')
+        observed[key][0] += 1
+        observed[key][1] += row['correct']
+    if any(observed[(cell['task'], cell['k'])] != [cell['n'], cell['correct']] for cell in cells):
+        raise ValueError('Worker rows do not match cell counts')
     home = Path(payload['home'])
     findings = []
     for cell in measurement['cells']:
@@ -381,7 +435,7 @@ def measure(request, out):
     if os.uname().nodename != lane['device']:
         raise ValueError('Worker device mismatch')
     out.mkdir(parents=True,exist_ok=True)
-    identity = digest({'model':model['sha256'],'scope':payload['scope'],'config':config,
+    identity = digest({'run_id':payload['run_id'], 'model':model['sha256'],'scope':payload['scope'],'config':config,
                        'items':file_sha(root/'items.jsonl'),'runner':file_sha(__file__)})
     header = out/'checkpoint-header.json'
     if header.exists():
@@ -391,7 +445,7 @@ def measure(request, out):
         started = timestamp(saved['started_at'])
     else:
         started = datetime.now(timezone.utc)
-        atomic_json(header,{'identity':identity,'started_at':started.isoformat()})
+        atomic_json(header,{'identity':identity,'run_id':payload['run_id'],'started_at':started.isoformat()})
     with socket.socket() as sock:
         sock.bind(('127.0.0.1',0))
         port = sock.getsockname()[1]
@@ -459,7 +513,7 @@ def measure(request, out):
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait()
-    receipt = {'scope':payload['scope'],'model_sha256':model['sha256'],'runtime_sha256':lane['server_sha256'],
+    receipt = {'run_id':payload['run_id'],'scope':payload['scope'],'model_sha256':model['sha256'],'runtime_sha256':lane['server_sha256'],
                'started_at':started.isoformat(),'expires_at':(started+timedelta(days=14)).isoformat(),
                'cells':cells,'rows_sha256':file_sha(out/'rows.jsonl'),'items_sha256':file_sha(root/'items.jsonl')}
     (out/'measurement.json').write_bytes(canonical(receipt)+b'\n')

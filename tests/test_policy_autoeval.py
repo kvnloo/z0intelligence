@@ -44,6 +44,17 @@ def test_model_identity_cache_avoids_reads_and_invalidates_stat_changes(tmp_path
     assert len(calls) == 3
 
 
+def test_model_identity_rehashes_same_size_restored_mtime(tmp_path):
+    import os
+    config, path = setup(tmp_path)
+    gguf(path, b'aaaa')
+    first = discover(config)[0]['sha256']
+    stat = path.stat()
+    gguf(path, b'bbbb')
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    assert discover(config)[0]['sha256'] != first
+
+
 def test_model_identity_rejects_change_during_hash(tmp_path, monkeypatch):
     import z0int.policy.autoeval as autoeval
     config, path = setup(tmp_path)
@@ -127,8 +138,10 @@ def test_due_requires_all_tasks_and_refreshes_before_expiry(tmp_path):
     now = datetime(2026,10,24,tzinfo=timezone.utc)
     rows = []
     for task in ('T1','T2','T3','T4'):
-        rows.append({'subject':{'family':'choice.option_capacity','task':task},
-                     'metric':{'name':'choice_accuracy'},'evidence_class':'measured',
+        rows.append({'subject':{'family':'choice.option_capacity','job':'ChoiceLadder','task':task},
+                     'metric':{'name':'choice_accuracy','option_count':2, 'value':1., 'n':100,
+                               'ci_low':.95, 'ci_method':'wilson95', 'higher_is_better':True},
+                     'source':{}, 'evidence_class':'measured',
                      'arm':{**scope_for(model,config['lane']),'model_sha256':model['sha256']},
                      'ts':now.isoformat(),'expires_at':(now+timedelta(days=14)).isoformat()})
     assert not due(model,config['lane'],rows,now,48)
@@ -136,6 +149,14 @@ def test_due_requires_all_tasks_and_refreshes_before_expiry(tmp_path):
     assert due(model,config['lane'],rows,now+timedelta(days=13),48)
     changed = {**model,'sha256':'f'*64}
     assert due(changed,config['lane'],rows,now,48)
+    for change in ({'job': 'other'}, {'job': None}):
+        invalid = [dict(row) for row in rows]
+        invalid[-1] = {**invalid[-1], 'subject': {**invalid[-1]['subject'], **change}}
+        assert due(model, config['lane'], invalid, now, 48)
+    for change in ({'option_count': None}, {'ci_method': 'none'}, {'promotion_eligible': False}):
+        invalid = [dict(row) for row in rows]
+        invalid[-1] = {**invalid[-1], 'metric': {**invalid[-1]['metric'], **change}}
+        assert due(model, config['lane'], invalid, now, 48)
 
 
 def test_tick_enqueues_once_and_retries_after_dead_worker(tmp_path,monkeypatch):
@@ -158,6 +179,14 @@ def test_tick_enqueues_once_and_retries_after_dead_worker(tmp_path,monkeypatch):
     assert tick(tmp_path,config,now+timedelta(hours=1),launch)==[]
     assert len(tick(tmp_path,config,now+timedelta(hours=7),launch))==1
     assert len(calls)==2
+    resumed = json.loads(Path(first[0]['request']).read_text())
+    assert resumed['run_id'] == request['run_id']
+    state_path = Path(first[0]['request'].removesuffix('.request.json') + '.json')
+    state = json.loads(state_path.read_text())
+    state.update(status='completed', pid=None, retry_after=now.isoformat())
+    state_path.write_text(json.dumps(state))
+    fresh = tick(tmp_path,config,now+timedelta(hours=8),launch)[0]
+    assert json.loads(Path(fresh['request']).read_text())['run_id'] != request['run_id']
 
 
 def test_invalid_gguf_fails_closed(tmp_path):
@@ -184,8 +213,9 @@ def test_systemd_dispatch_survives_oneshot_and_deduplicates_active_unit(tmp_path
     assert len(commands)==1
 
 
-def test_mbp_dispatch_stages_importable_package_and_compiles_receipt(tmp_path,monkeypatch):
-    from z0int.policy.autoeval import dispatch
+@pytest.mark.parametrize('tamper', [None, 'runtime_sha256', 'rows_sha256', 'items_sha256', 'run_id', 'counts'])
+def test_mbp_dispatch_stages_importable_package_and_compiles_receipt(tmp_path,monkeypatch,tamper):
+    from z0int.policy.autoeval import dispatch, file_sha
     from z0int.policy.compile import option_capacity_key
     import subprocess
     import sys
@@ -201,7 +231,8 @@ def test_mbp_dispatch_stages_importable_package_and_compiles_receipt(tmp_path,mo
     scope = scope_for(model,config['lane'])
     request = tmp_path/'run.request.json'
     request.write_text(json.dumps({'config':config,'model':model,'lane':config['lane'],
-                                   'scope':scope,'home':str(tmp_path/'home')}))
+                                   'scope':scope,'home':str(tmp_path/'home'),
+                                   'run_id':'a'*32,'requested_at':(datetime.now(timezone.utc)-timedelta(seconds=5)).isoformat()}))
     real_run = subprocess.run
     def worker(command,**kwargs):
         assert command[:7]==['fleet-build','--node','mbp','--class','bench','--mem','4G']
@@ -215,11 +246,26 @@ def test_mbp_dispatch_stages_importable_package_and_compiles_receipt(tmp_path,mo
         destination = stage/'fetched'
         destination.mkdir()
         now = datetime.now(timezone.utc)
-        (destination/'measurement.json').write_text(json.dumps({'scope':scope,
+        rows = destination/'rows.jsonl'
+        rows.write_text(''.join(json.dumps({'task':cell['task'],'k':cell['k'],'correct':True})+'\n'
+                                for cell in cells for _ in range(cell['n'])))
+        (destination/'checkpoint-header.json').write_text(json.dumps({'run_id':'a'*32,'started_at':now.isoformat()}))
+        result = {'scope':scope, 'run_id':'a'*32, 'runtime_sha256':config['lane']['server_sha256'],
+            'rows_sha256':file_sha(rows), 'items_sha256':file_sha(toolkit/'items.jsonl'),
             'model_sha256':model['sha256'],'started_at':now.isoformat(),
-            'expires_at':(now+timedelta(days=14)).isoformat(),'cells':cells}))
+            'expires_at':(now+timedelta(days=14)).isoformat(),'cells':cells}
+        if tamper == 'counts':
+            cells[0]['correct'] = 99
+        elif tamper:
+            result[tamper] = 'bad'
+        (destination/'measurement.json').write_text(json.dumps(result))
         return SimpleNamespace(returncode=0)
     monkeypatch.setattr('z0int.policy.autoeval.subprocess.run',worker)
+    if tamper:
+        with pytest.raises(ValueError):
+            dispatch(request)
+        assert not (tmp_path/'home/policy/findings.jsonl').exists()
+        return
     dispatch(request)
     policy = json.loads((tmp_path/'home/policy/decision-policy.json').read_text())
     capacities = policy['option_capacity'][option_capacity_key(scope)]

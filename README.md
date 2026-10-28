@@ -176,8 +176,9 @@ abstention 0. These assumptions produce a diagnostic `bar_derived` only:
 unmeasured economics always yield `allowed_k=0`, routing to frontier/Jev.
 This deliberately supersedes the earlier default-cost routing contract.
 Measured inputs must include `measured=true` and canonical `finding_ids` for
-fresh measured `choice.error_cost` findings with matching `subject.risk_class`
-and metric names/values for all four inputs. Their earliest expiry bounds the grant.
+fresh measured `choice.error_cost` findings at the exact five-field physical scope,
+with matching `subject.risk_class`, metric names/values for all four inputs, and
+the same permitted `cost_unit` as the override. Their earliest expiry bounds the grant.
 Observed frontier recovery is a proxy for SLM error cost, not an executed shadow
 intervention; record that limitation in its source evidence. Shadow agreement
 alone cannot measure recovery cost.
@@ -199,6 +200,9 @@ positive `n`, and measured, unexpired observations. The compiler compares the
 smaller of the stated lower bound and a recomputed Wilson lower bound against
 the bar. An explicit correct count must agree with accuracy and sample count.
 The latest measured observation for a task and k supersedes older success.
+Scheduled refreshes use a new durable run ID; retries resume that same run.
+The dispatcher checks the runtime, corpus and row digests, run header, and row
+counts before appending findings. These checks do not prove a real worker run.
 
 The compiler selects the largest passing k per task. The allowed capacity is
 the minimum across every required task. Missing, pending, expired, inference,

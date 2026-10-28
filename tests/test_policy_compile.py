@@ -420,25 +420,27 @@ def test_measured_capacity_costs_require_real_risk_bound_findings():
     config = CompilerConfig(compiler_revision="a" * 40, option_capacity_costs={
         "read": {"cost_call": 1., "cost_frontier": 10., "cost_error": 2.,
                  "abstain_rate": 0., "measured": True, "finding_ids": ["missing"]}})
-    with pytest.raises(ValueError, match="fresh risk-bound"):
+    with pytest.raises(ValueError, match="fresh exact-scope"):
         compile_rows([choice_finding("T1", 8)], config=config)
 
 
 def test_capacity_cost_measurements_are_bound_to_finding_values_and_expiry():
     costs = {"cost_call": 1., "cost_frontier": 10., "cost_error": 2., "abstain_rate": 0.}
+    choice = choice_finding("T1", 8, value=.85, n=1000)
     sources = []
     for field, value in costs.items():
-        row = finding(synthetic=True, expires_at="2026-10-24T13:00:00Z",
+        row = finding(synthetic=True, arm=choice["arm"], expires_at="2026-10-24T13:00:00Z",
             metric={"name": field, "value": value, "ci_low": value,
-                    "ci_high": value, "ci_method": "none", "higher_is_better": False})
+                    "ci_high": value, "ci_method": "none", "higher_is_better": False,
+                    "cost_unit": "latency_ms_lambda0"})
         row["subject"] = {"family": "choice.error_cost", "risk_class": "read",
                           "job": "observed_frontier_recovery"}
         row["id"] = digest({key: value for key, value in row.items() if key not in {"id", "prev"}})
         sources.append(row)
     config = CompilerConfig(compiler_revision="a" * 40, option_capacity_tasks=("T1",),
         option_capacity_costs={"read": {**costs, "measured": True,
+                                      "cost_unit": "latency_ms_lambda0",
                                       "finding_ids": [row["id"] for row in sources]}})
-    choice = choice_finding("T1", 8, value=.85, n=1000)
     entry = capacity(compile_rows(sources + [choice], config=config), choice)
     assert entry["allowed_k"] == 8
     assert entry["expires_at"] == "2026-10-24T13:00:00Z"
@@ -446,6 +448,24 @@ def test_capacity_cost_measurements_are_bound_to_finding_values_and_expiry():
     config.option_capacity_costs["read"]["cost_error"] = 3.
     with pytest.raises(ValueError, match="matching finding"):
         compile_rows(sources + [choice], config=config)
+
+
+@pytest.mark.parametrize("dimension", ["model", "quant", "engine", "backend", "device"])
+def test_option_capacity_configured_costs_reject_cross_scope_findings(dimension):
+    choice = choice_finding("T1", 8, n=1000)
+    other = {**choice["arm"], dimension: ("sha256:" + "b" * 64 if dimension == "model" else "other")}
+    costs = {"cost_call": .1, "cost_frontier": 1., "cost_error": 20., "abstain_rate": 0.}
+    sources = []
+    for name, value in costs.items():
+        row = finding(arm=other, metric={"name": name, "value": value, "cost_unit": "latency_ms_lambda0"})
+        row["subject"] = {"family": "choice.error_cost", "risk_class": "read"}
+        row["id"] = digest({k: v for k, v in row.items() if k not in {"id", "prev"}})
+        sources.append(row)
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_costs={"read": {
+        **costs, "measured": True, "cost_unit": "latency_ms_lambda0",
+        "finding_ids": [row["id"] for row in sources]}})
+    with pytest.raises(ValueError, match="exact-scope"):
+        compile_rows([choice] + sources, config=config)
 
 
 def test_capacity_abstention_cost_can_remove_otherwise_profitable_route():

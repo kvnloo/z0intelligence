@@ -160,13 +160,19 @@ def _capacity_costs(config: CompilerConfig, risk: str, findings: list[dict], now
     if inputs.get("measured"):
         ids = inputs.get("finding_ids")
         sources = [row for row in findings if row["id"] in (ids or [])]
-        if (not ids or len(sources) != len(set(ids)) or any(
+        units = {row["metric"].get("cost_unit") for row in sources}
+        if (not ids or len(ids) != len(set(ids)) or len(sources) != len(ids) or any(
                 row["evidence_class"] != "measured"
+                or not _promotion_evidence(row)
                 or row["subject"].get("family") != "choice.error_cost"
-                or row["subject"].get("risk_class") != risk
+                or row["subject"].get("risk_class") != risk or scope_of(row) != scope
                 or timestamp(row["ts"]) > now or _expiry(row, config) <= now
-                for row in sources)):
-            raise ValueError("Measured costs require fresh risk-bound recovery findings")
+                for row in sources)
+                or units not in ({"latency_ms_lambda0"}, {"o14_score_ms"})
+                or inputs.get("cost_unit") != next(iter(units), None)
+                or {row["metric"]["name"] for row in sources} !=
+                   {"cost_call", "cost_frontier", "cost_error", "abstain_rate"}):
+            raise ValueError("Measured costs require fresh exact-scope, risk-bound findings with one permitted unit")
         for field in ("cost_call", "cost_frontier", "cost_error", "abstain_rate"):
             if not any(row["metric"]["name"] == field and row["metric"]["value"] == inputs[field]
                        for row in sources):
