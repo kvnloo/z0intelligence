@@ -64,24 +64,36 @@ def test_missing_provenance_is_refused(changes):
         finding(**changes)
 
 
-def test_shadow_ingest_is_idempotent_and_keeps_best_arm(tmp_path):
+def test_shadow_ingest_preserves_rules_alongside_best_unbound_slm(tmp_path):
+    from z0int.policy.compile import CompilerConfig, compile_policy
+
     source = tmp_path / "status.json"
-    source.write_text(json.dumps({"schema": "z0int.shadow.learning.v1", "ts": 1792800000,
-        "families": {"omp.tool": {"rules": {"n": 100, "correct": 90},
+    source.write_text(json.dumps({"schema": "z0int.shadow.learning.v1", "ts": "2026-10-24T10:00:00Z",
+        "families": {"omp.tool": {"rules": {"n": 100, "correct": 95},
                                   "slm:synthetic@rev": {"n": 100, "correct": 100}}}}))
     spec = [{"kind": "shadow_learner", "path": str(source)}]
-    assert ingest_sources(spec, tmp_path)["added"] == 1
+    assert ingest_sources(spec, tmp_path)["added"] == 2
     before = ledger_path(tmp_path).read_bytes()
     result = ingest_sources(spec, tmp_path)
     assert result["added"] == 0
     assert result["sources"][0]["reason"] == "source_sha256_already_ingested"
     assert ledger_path(tmp_path).read_bytes() == before
-    row = read_findings(ledger_path(tmp_path))[0]
+    rows = read_findings(ledger_path(tmp_path))
+    row = next(row for row in rows if row["arm"]["kind"] == "slm")
     assert row["arm"]["model"] == "synthetic@rev"
     assert .96 < row["metric"]["ci_low"] < 1
     assert row["metric"]["live_shadow"] is True
     assert row["evidence_kind"] == "proxy"
     assert row["metric"]["promotion_eligible"] is False
+    rules = next(row for row in rows if row["arm"]["kind"] == "rules")
+    assert rules["metric"]["n"] == 100
+    assert rules.get("evidence_kind") != "proxy"
+    policy = compile_policy(rows, None, "2026-10-24T12:00:00Z",
+                            CompilerConfig(compiler_revision="a" * 40))
+    assert any(family["stage"] == "shadow" and family["arm"] == rules["arm"]
+               for family in policy["families"].values())
+    assert not any(family["stage"] != "none" and family["arm"] == row["arm"]
+                   for family in policy["families"].values())
 
 
 def test_unknown_and_prose_sources_record_reason(tmp_path):
