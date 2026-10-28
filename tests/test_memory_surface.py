@@ -367,20 +367,6 @@ def test_brief_abstains_with_an_explicit_gap_when_a_required_source_is_removed(e
     assert 'systemd' not in brief['text'] and brief['receipt']['evidence_event_uids'] == []
 
 
-def test_supersession_shows_the_newer_claim_while_history_returns_both(env):
-    def claim(cid, value, at):
-        return BitemporalClaim(claim_id=cid, scope=Z0, subject='quokka gateway', predicate='port', value=value,
-                               status='observed', observed_at=at, recorded_at=at)
-
-    ms.record_claim(claim('old', 8420, '2026-09-01T00:00:00Z'))
-    ms.record_claim(claim('new', 8421, '2026-10-01T00:00:00Z'))
-    brief = ms.memory_brief('quokka gateway port', ms.ScopePolicy(scope=Z0), config={})
-    current = [c for c in brief['current_claims'] if c['subject'] == 'quokka gateway']
-    assert [c['value'] for c in current] == [8421]
-    assert '8421' in brief['text'] and '8420' not in brief['text']
-    hist = ms.claim_history('quokka gateway', 'port', ms.ScopePolicy(scope=Z0))
-    assert [h['claim_id'] for h in hist] == ['old', 'new']
-    assert hist[0]['superseded_by'] == 'new' and hist[1]['current'] is True
 
 
 def _lexical_brief(query, **kwargs):

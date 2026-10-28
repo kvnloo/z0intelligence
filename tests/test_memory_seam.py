@@ -21,7 +21,6 @@ from z0int.harness_id import turn_key
 from z0int.memory import seam
 from z0int.memory import surface as ms
 from z0int.memory_contract import SCHEMA as RECEIPT_SCHEMA
-from z0int.memory_contract import BitemporalClaim, MemoryScope
 
 ROOT = Path(__file__).resolve().parents[1]
 LOOPBACK = 'http://127.0.0.1:9/v1'
@@ -194,18 +193,6 @@ def test_with_the_required_source_removed_the_brief_states_the_gap_and_invents_n
                                                            for line in out['context'].splitlines())
 
 
-def test_supersession_shows_the_newer_fact_as_current_and_history_shows_both(env):
-    z0 = MemoryScope(user='local', project='z0')
-    ms.record_claim(BitemporalClaim(claim_id='cap-v1', subject='quokka-cap', predicate='value', value=8192, status='observed',
-                                    observed_at='2026-01-01T00:00:00Z', recorded_at='2026-01-01T00:00:00Z', scope=z0))
-    ms.record_claim(BitemporalClaim(claim_id='cap-v2', subject='quokka-cap', predicate='value', value=20480, status='observed',
-                                    observed_at='2026-09-18T00:00:00Z', recorded_at='2026-09-18T00:00:00Z', scope=z0))
-    out = on(key='h1', query='which quokka-cap value is current')
-    assert 'current: quokka-cap value = 20480 (cap-v2)' in out['context'] and '8192' not in out['context']
-    resp = intelligence_mcp.handle({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call',
-                                    'params': {'name': 'history', 'arguments': {'subject': 'quokka-cap'}}}, 'memory')
-    history = json.loads(resp['result']['content'][0]['text'])['history']
-    assert [(h['claim_id'], h['current']) for h in history] == [('cap-v1', False), ('cap-v2', True)]
 
 
 # ----------------------------------------------------------------------------- 8. secret scrub at the seam

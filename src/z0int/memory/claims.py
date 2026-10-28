@@ -539,40 +539,35 @@ def record_claim(claim: BitemporalClaim, *, ledger_root: str | Path | None = Non
     return EventLog(ledger_root).append("memory.claim", payload, source="z0-memory")
 
 
-def project_claims(
-    request_scope: MemoryScope,
+@dataclass(frozen=True)
+class _ClaimProjection:
+    event_by_id: dict[int, MemoryEvent]
+    visible: list[dict[str, Any]]
+    winners: list[dict[str, Any]]
+    history: list[dict[str, Any]]
+    contradictions: list[str]
+    resolved_conflicts: list[str]
+    conflicts_by_event: dict[int, list[str]]
+
+
+def _project_claim_rows(
+    events: list[MemoryEvent],
+    request_scope: MemoryScope | None,
     *,
     subject: str | None = None,
     predicate: str | None = None,
-    ledger_root: str | Path | None = None,
-) -> ContextPacket:
-    """Build a ContextPacket-compatible view from scope-visible ledger claims.
+) -> _ClaimProjection:
+    """One trust/correction reducer over an already complete ledger snapshot.
 
-    Visibility filtering happens before claim reduction. The packet carries
-    current claim IDs, source references, history/supersession links, conflicts,
-    a content-addressed snapshot and the existing memory-use receipt contract.
+    None retains the ordinary surface's explicitly unscoped read mode. The
+    public source-backed packet API still requires a MemoryScope.
     """
-    if not isinstance(request_scope, MemoryScope):
-        raise TypeError("request_scope must be a MemoryScope")
-    started = time.perf_counter()
-    log = EventLog(ledger_root, read_only=True)
-    try:
-        # Claim selection is a snapshot operation: a recoverable event-log
-        # prefix is not sufficient evidence that the visible claims are current.
-        events = list(log.iter_events(require_complete=True))
-        ledger_status = "complete"
-        gap: list[str] = []
-    except Exception as exc:  # noqa: BLE001 - malformed canonical history is an explicit packet gap
-        events = []
-        ledger_status = "unavailable"
-        gap = [f"memory EventLog unavailable ({type(exc).__name__})"]
-
     event_by_id = {event.event_id: event for event in events}
     visible: list[dict[str, Any]] = []
     for event, payload, claim_scope in _claim_event_rows(events):
         # Scope is deliberately tested before grouping, trust reduction or
         # contradiction generation. Out-of-scope rows leave no packet trace.
-        if not claim_scope.is_visible_to(request_scope):
+        if request_scope is not None and not claim_scope.is_visible_to(request_scope):
             continue
         if subject is not None and payload.get("subject") != subject:
             continue
@@ -601,11 +596,14 @@ def project_claims(
     winners: list[dict[str, Any]] = []
     contradiction_text: list[str] = []
     resolved_conflict_text: list[str] = []
+    conflicts_by_event: dict[int, list[str]] = {}
     for rows in groups.values():
         winner, conflicts, resolved_conflicts = _reduce_scope_group(rows)
         winners.append(winner)
         contradiction_text.extend(conflicts)
         resolved_conflict_text.extend(resolved_conflicts)
+        if conflicts:
+            conflicts_by_event.update((row["event_id"], conflicts) for row in rows)
 
     winner_event_ids = {row["event_id"] for row in winners}
     visible_by_claim_id = {row["claim_id"]: row for row in visible}
@@ -644,6 +642,35 @@ def project_claims(
                 "evidence_event_uids": [uid for uid, _ in row["visible_source_events"]],
             }
         )
+    return _ClaimProjection(
+        event_by_id, visible, winners, history,
+        sorted(set(contradiction_text)), sorted(set(resolved_conflict_text)), conflicts_by_event)
+
+
+def project_claims(
+    request_scope: MemoryScope,
+    *,
+    subject: str | None = None,
+    predicate: str | None = None,
+    ledger_root: str | Path | None = None,
+) -> ContextPacket:
+    """Build a scope-visible, source-backed packet from complete ledger history."""
+    if not isinstance(request_scope, MemoryScope):
+        raise TypeError("request_scope must be a MemoryScope")
+    started = time.perf_counter()
+    log = EventLog(ledger_root, read_only=True)
+    try:
+        events = list(log.iter_events(require_complete=True))
+        ledger_status = "complete"
+        gap: list[str] = []
+    except Exception as exc:  # noqa: BLE001 - malformed history is an explicit packet gap
+        events = []
+        ledger_status = "unavailable"
+        gap = [f"memory EventLog unavailable ({type(exc).__name__})"]
+    projection = _project_claim_rows(events, request_scope, subject=subject, predicate=predicate)
+    event_by_id, visible = projection.event_by_id, projection.visible
+    winners, history = projection.winners, projection.history
+    contradiction_text, resolved_conflict_text = projection.contradictions, projection.resolved_conflicts
 
     selected = sorted(winners, key=lambda row: (row["scope_object"].path(), row["subject"], row["predicate"]))
     included_claim_ids = tuple(row["claim_id"] for row in history)

@@ -82,6 +82,22 @@ Newer evidence must not destroy historical claims. Supersession is explicit via
 
 `verified` claims require source event IDs. Confidence is metadata only.
 
+The ordinary temporal search/brief/history surface and `project_claims` use
+one trust-and-correction reducer over a complete EventLog snapshot. Scope
+filtering precedes reduction. A later model assertion cannot replace an
+admitted explicit-user correction; only the validated same-scope correction
+link creates `superseded_by`. Unlinked equal-trust disagreement stays visible
+as a contradiction rather than fabricated supersession.
+
+Matching unresolved claim conflicts make the brief abstain, `unknowns`
+non-answerable, and `verify` return `FALLBACK` even when a requested word is
+present in a candidate. Unrelated claim groups do not block the query.
+Incomplete ledger history offers no current temporal claims. These are
+retrieval semantics, not human-authorship or model-use proof. The old frozen
+diagnostic cohort's derived, timestamp-only supersession case therefore
+remains unsupported; its expected answer is not used to manufacture a user
+correction or change the frozen evidence.
+
 ## Memory is never instruction authority
 
 Persisted or retrieved memory is data even if it originated from a tool result,
@@ -121,11 +137,14 @@ therefore not exact-content freshness proofs or authorization checks.
 The brief bypasses the persistent cache whenever the lexical layer is
 requested, including when AgentsView is unavailable, and performs a fresh
 scope-filtered retrieval. This also bypasses old cache entries. The tradeoff
-is a source read on each lexical brief rather than a warm cache hit. A
-reachable unversioned TencentDB gateway likewise bypasses caching; a
-temporal-only brief can still use the existing cache. These rules do not
-change the separate exact-source memory MCP's grant checks and fetch
-revalidation.
+is a source read on each lexical brief rather than a warm cache hit.
+Temporal briefs also bypass caching: EventLog's derived `last_checksum`
+state file can remain unchanged after a damaged append and does not prove
+that the complete ledger is readable. The temporal path validates the
+complete snapshot before reducing claims; it does not accept a recoverable
+prefix as current history. A reachable unversioned TencentDB gateway
+likewise bypasses caching. These rules do not change the separate exact-source
+memory MCP's grant checks and fetch revalidation.
 
 ## Outcome linkage
 

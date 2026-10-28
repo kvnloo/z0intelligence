@@ -29,11 +29,13 @@ _CLAIM_RE = re.compile(r'^([\w.-]+)=(\S+)$')
 
 # ----------------------------------------------------------------------------- the synthetic substrate
 def seed_cohort(cohort: Mapping[str, Any], *, av_db: str | Path, ledger_root: str | Path, project: str = 'z0') -> None:
-    """Write the cohort's evidence into a NEW synthetic AgentsView DB and the given z0 ledger: ``name=value`` claims
-    that share a name become scoped BitemporalClaims (recorded at their observed_at, so the newest is current); every
-    other claim is one message (the claim, then its cohort locator) of a session of its own harness. No real
-    transcript text. An existing DB file is refused and there is no default ledger, so a live AgentsView DB or the
-    live ledger under Z0INT_HOME is never written."""
+    """Write the cohort's evidence into a NEW synthetic AgentsView DB and an explicit z0 ledger.
+
+    Repeated ``name=value`` facts become untrusted BitemporalClaims, not attested user corrections.
+    Recency cannot establish supersession: a frozen cohort expecting that behavior remains a failed
+    diagnostic. Other evidence becomes synthetic messages. No real transcript text is imported.
+    Existing DB files are refused and there is no default ledger.
+    """
     import sqlite3
     av_db = Path(av_db)
     if av_db.exists():

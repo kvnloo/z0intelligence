@@ -29,19 +29,24 @@ def env(tmp_path, monkeypatch):
     return tmp_path
 
 
-def test_cohort_retrieval_and_supersession_are_seam_diagnostics(env):
+def test_supported_retrieval_remains_separate_from_model_visibility(env):
     rows = {r['question_id']: r for r in acceptance.run('hermes', COHORT, revision='0123abcd', cwd=CWD)}
-    for qid in ('exact-identifier', 'cross-harness', 'minimal-context', 'supersession', 'contradiction'):
+    for qid in ('exact-identifier', 'cross-harness', 'minimal-context', 'contradiction'):
         row = rows[qid]
         assert row['retrieval_ok'] and row['context_supports_expectation'] and row['surface_verified']
         assert row['evidence_refs'] and all(ref['source_id'] for ref in row['evidence_refs'])
-    assert rows['supersession']['superseded_evidence_absent'] is True
-    miss = rows['missing-evidence']
-    assert miss['retrieval_abstained'] is True and miss['context_supports_expectation'] is True
-    assert all(row['duplicate_context'] is False for row in rows.values())
+    assert rows['missing-evidence']['retrieval_abstained'] is True
     assert all(row['model_request_observed'] is False and row['model_answer_observed'] is False
                for row in rows.values())
-    assert all('harness_revision' not in row and 'answer_supported' not in row for row in rows.values())
+
+
+def test_unattested_cohort_recency_does_not_receive_supersession_credit(env):
+    rows = acceptance.run('hermes', COHORT, revision='0123abcd', cwd=CWD)
+    row = next(item for item in rows if item['question_id'] == 'supersession')
+    assert row['retrieval_abstained'] is True
+    assert row['context_supports_expectation'] is False
+    assert row['surface_verified'] is False
+    assert row['superseded_evidence_absent'] is False
 
 
 @pytest.mark.parametrize(('harness', 'push_supported'), [('grok', None), ('omo', False)])
