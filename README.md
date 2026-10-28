@@ -659,6 +659,9 @@ z0int models plan
 z0int backends list --json
 ~~~
 
+Onboarding leaves OMP plugins unchanged by default. To install a specific
+plugin, use `z0int onboard --omp-extension NAME` (repeat for each selection).
+
 ### Resolve context
 
 ~~~bash
