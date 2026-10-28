@@ -307,8 +307,15 @@ class CognitionCascade:
                 observed_ms=decision.latency_ms,
                 ttft_ms=decision.ttft_ms,
                 decode_tok_s=decision.decode_tok_s,
-                queue_wait_ms=_maybe_float(supervisor.get("queue_wait_ms")),
-                observed_by="model_response" if not supervisor else "supervisor",
+                queue_wait_ms=_maybe_float(
+                    diagnostics.get("rung_queue_wait_ms")
+                    if diagnostics.get("measurement_scope") == "candidate_rung"
+                    else supervisor.get("queue_wait_ms")
+                ),
+                observed_by=(
+                    "candidate_rung" if diagnostics.get("measurement_scope") == "candidate_rung"
+                    else "supervisor" if supervisor else "model_response"
+                ),
             ),
             prediction=decision.selected_action,
             confidence=decision.confidence,
@@ -357,6 +364,8 @@ class CognitionCascade:
                 "graph_digest": legal.graph_digest,
                 "chosen_candidate_id": chosen_candidate_id,
                 "supervisor": dict(supervisor),
+                "candidate_attempts": diagnostics.get("candidate_attempts", []),
+                "measurement_scope": diagnostics.get("measurement_scope", "model_response"),
             },
         )
         return receipt.to_dict()
@@ -594,7 +603,7 @@ class CognitionCascade:
                     receipts=tuple(receipts),
                     surface=surface_decision,
                 )
-            last = decision
+            record(decision, tier, "log_only")
 
         # --- nothing carried the decision ---------------------------
         attempts.append({"tier": "terminal", "abstained": True})

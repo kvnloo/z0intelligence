@@ -376,6 +376,75 @@ def test_candidate_rung_preserves_abstaining_failure(failure):
     assert decision.diagnostics["reason"] == "all_candidates_abstained"
 
 
+@pytest.mark.parametrize("first_mode,expected_input,expected_output", [
+    ("metered", 15, 5),
+    ("partial", None, 5),
+    ("exception", None, None),
+    ("nan", 15, 5),
+    ("inf", 15, 5),
+])
+@pytest.mark.parametrize("final_abstains", [False, True])
+def test_candidate_retry_accounting_covers_all_attempts(
+    monkeypatch, first_mode, expected_input, expected_output, final_abstains
+):
+    from dataclasses import replace
+    import time
+    from z0int.cognition.cascade import CascadeContext, CognitionCascade
+
+    clock = [100.0]
+    monkeypatch.setattr(time, "perf_counter", lambda: clock[0])
+
+    class Backend(_FakeBackend):
+        def decide(self, request):
+            first = self._id == "first"
+            clock[0] += .04 if first else .02
+            if first and first_mode == "exception":
+                raise RuntimeError("unmetered interruption")
+            return replace(
+                super().decide(request),
+                prompt_tokens=(None if first_mode == "partial" else 10) if first else 5,
+                completion_tokens=3 if first else 2,
+                cached_tokens=0,
+                diagnostics={
+                    "provider_cost_usd": .003 if first else .002,
+                    "reasoning_tokens": float(first_mode)
+                    if first and first_mode in ("nan", "inf") else 1,
+                },
+            )
+
+    router = CandidateRungBackend(
+        tier="orchestrator_slm",
+        candidates=candidates_from_pi_ai_catalog(CATALOG, hints=HINTS),
+        backends={
+            "cerebras/gpt-oss-120b": Backend("first", None, abstain=True),
+            "groq/llama-3.3-70b-versatile": Backend("last", "b", abstain=final_abstains),
+        },
+    )
+    graph = ActionGraph(actions=tuple(
+        ActionCandidate(action_id=a, kind="tool", tool=a, description=a) for a in ("a", "b")
+    ))
+    outcome = CognitionCascade(orchestrator=router).run(
+        CascadeContext(state="accounting", graph=graph, authority=("read",))
+    )
+    receipt = next(r for r in outcome.receipts if r["tier"] == "orchestrator_slm")
+    assert receipt.get("input_tokens") == expected_input
+    assert receipt.get("output_tokens") == expected_output
+    assert receipt["latency_ms"] == pytest.approx(60)
+    expected_cost = None if first_mode == "exception" else .005
+    assert receipt["cost"].get("provider_cost_usd") == expected_cost
+    expected_reasoning = None if first_mode in ("exception", "nan", "inf") else 2
+    assert receipt["tokens"].get("reasoning_tokens") == expected_reasoning
+    json.dumps(receipt, allow_nan=False)
+    attempts = receipt["extra"]["candidate_attempts"]
+    assert [a["candidate_id"] for a in attempts] == [
+        "cerebras/gpt-oss-120b", "groq/llama-3.3-70b-versatile"
+    ]
+    assert attempts[-1]["prompt_tokens"] == 5
+    if first_mode != "exception":
+        assert attempts[0]["completion_tokens"] == 3
+    assert outcome.selected_action == (None if final_abstains else "b")
+
+
 def test_candidate_rung_abstains_when_no_eligible_backend_is_configured():
     candidates = candidates_from_pi_ai_catalog(CATALOG, hints=HINTS)
     router = CandidateRungBackend(tier="orchestrator_slm", candidates=candidates, backends={})

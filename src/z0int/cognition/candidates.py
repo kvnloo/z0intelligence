@@ -32,7 +32,9 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 import json
+import math
 import os
+import time
 
 from .actions import RISK_CLASSES, risk_rank
 from .escalation import TIERS
@@ -828,14 +830,80 @@ class CandidateRungBackend:
         last: ToolDecision | None = None
         attempts: list[dict[str, Any]] = []
         by_id = {c.candidate_id: c for c in eligible}
+        started = time.perf_counter()
+
+        def finish(decision: ToolDecision, chosen: str | None) -> ToolDecision:
+            # Optional telemetry cannot poison a later usable decision or its
+            # JSON receipt. Preserve which measurements were invalid, not NaN/Inf.
+            for attempt in attempts:
+                invalid = [
+                    key for key in (
+                        "prompt_tokens", "completion_tokens", "cached_tokens",
+                        "reasoning_tokens", "provider_cost_usd", "provider_cost_units",
+                        "ttft_ms", "decode_tok_s", "queue_wait_ms",
+                    )
+                    if isinstance(attempt.get(key), float) and not math.isfinite(attempt[key])
+                ]
+                if invalid:
+                    attempt["invalid_measurements"] = invalid
+                    for key in invalid:
+                        attempt[key] = None
+
+            def total(key: str):
+                values = [attempt.get(key) for attempt in attempts]
+                if not all(type(value) in (int, float) for value in values):
+                    return None
+                value = sum(values)
+                return None if isinstance(value, float) and not math.isfinite(value) else value
+
+            merged = {**dict(decision.diagnostics or {}), **diagnostics}
+            merged.update(
+                candidate_attempts=attempts,
+                retries=retries,
+                measurement_scope="candidate_rung",
+                provider_cost_usd=total("provider_cost_usd"),
+                reasoning_tokens=total("reasoning_tokens"),
+                rung_queue_wait_ms=total("queue_wait_ms"),
+            )
+            # Provider-specific units need not be commensurable across retries.
+            if len(attempts) > 1:
+                merged["provider_cost_units"] = None
+            if chosen is not None:
+                merged["chosen_candidate_id"] = chosen
+                merged["cost_class"] = by_id[chosen].cost_class
+            else:
+                merged["reason"] = "all_candidates_abstained"
+            return replace(
+                decision,
+                backend=self._backend_id,
+                abstained=chosen is None,
+                selected_action=decision.selected_action if chosen is not None else None,
+                arguments=decision.arguments if chosen is not None else {},
+                latency_ms=(time.perf_counter() - started) * 1000.0,
+                ttft_ms=decision.ttft_ms if len(attempts) == 1 else None,
+                decode_tok_s=decision.decode_tok_s if len(attempts) == 1 else None,
+                prompt_tokens=total("prompt_tokens"),
+                completion_tokens=total("completion_tokens"),
+                cached_tokens=total("cached_tokens"),
+                diagnostics=merged,
+            )
+
         for candidate_id in resolved:
             backend = self._backends[candidate_id]
+            attempt_started = time.perf_counter()
             try:
                 decision = backend.decide(request)
             except Exception as exc:  # noqa: BLE001 - try the next candidate
-                attempts.append({"candidate_id": candidate_id, "error": f"{type(exc).__name__}: {exc}"})
+                attempts.append({
+                    "candidate_id": candidate_id,
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "latency_ms": (time.perf_counter() - attempt_started) * 1000.0,
+                })
                 retries += 1
                 continue
+            measured = decision.diagnostics or {}
+            supervisor = measured.get("supervisor")
+            supervisor = supervisor if isinstance(supervisor, Mapping) else {}
             attempts.append(
                 {
                     "candidate_id": candidate_id,
@@ -846,66 +914,35 @@ class CandidateRungBackend:
                     "error_kind": decision.error_kind,
                     "parse_error": decision.parse_error,
                     "invalid_call": decision.invalid_call,
+                    "backend": decision.backend,
+                    "model": decision.model,
+                    "revision": decision.revision,
+                    "prompt_tokens": decision.prompt_tokens,
+                    "completion_tokens": decision.completion_tokens,
+                    "cached_tokens": decision.cached_tokens,
+                    "ttft_ms": decision.ttft_ms,
+                    "decode_tok_s": decision.decode_tok_s,
+                    "reasoning_tokens": measured.get("reasoning_tokens"),
+                    "provider_cost_usd": measured.get("provider_cost_usd"),
+                    "provider_cost_units": measured.get("provider_cost_units"),
+                    "supervisor": dict(supervisor),
+                    "queue_wait_ms": supervisor.get("queue_wait_ms"),
                 }
             )
             if not decision.abstained and decision.selected_action is not None:
-                merged = dict(decision.diagnostics or {})
-                merged.update(diagnostics)
-                merged["chosen_candidate_id"] = candidate_id
-                merged["candidate_attempts"] = attempts
-                merged["retries"] = retries
-                merged["cost_class"] = by_id[candidate_id].cost_class
-                return ToolDecision(
-                    backend=self._backend_id,
-                    model=decision.model,
-                    revision=decision.revision,
-                    selected_action=decision.selected_action,
-                    arguments=decision.arguments,
-                    confidence=decision.confidence,
-                    distribution=decision.distribution,
-                    latency_ms=decision.latency_ms,
-                    abstained=False,
-                    ttft_ms=decision.ttft_ms,
-                    decode_tok_s=decision.decode_tok_s,
-                    prompt_tokens=decision.prompt_tokens,
-                    completion_tokens=decision.completion_tokens,
-                    cached_tokens=decision.cached_tokens,
-                    candidate_action_count=decision.candidate_action_count,
-                    invalid_call=decision.invalid_call,
-                    irrelevant_call=decision.irrelevant_call,
-                    unnecessary_call=decision.unnecessary_call,
-                    parse_error=decision.parse_error,
-                    error=decision.error,
-                    error_kind=decision.error_kind,
-                    reasoning_metadata=decision.reasoning_metadata,
-                    diagnostics=merged,
-                )
+                return finish(decision, candidate_id)
             retries += 1
             last = decision
         if last is not None:
-            return replace(
-                last,
-                backend=self._backend_id,
-                abstained=True,
-                selected_action=None,
-                arguments={},
-                diagnostics={
-                    **dict(last.diagnostics or {}),
-                    **diagnostics,
-                    "reason": "all_candidates_abstained",
-                    "candidate_attempts": attempts,
-                    "retries": retries,
-                },
-            )
-        return abstain(
+            return finish(last, None)
+        return finish(abstain(
             backend=self._backend_id,
             model=None,
             revision=None,
             candidate_count=request.legal.candidate_count,
             latency_ms=0.0,
             reason="all_candidates_abstained",
-            extra={**diagnostics, "candidate_attempts": attempts, "retries": retries},
-        )
+        ), None)
 
 
 def requirement_for_legal_set(legal: Any) -> CapabilityRequirement:

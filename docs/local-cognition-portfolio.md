@@ -367,6 +367,21 @@ earlier failures. Raised exceptions remain separate attempt records. An outage,
 timeout or invalid call therefore does not become an unclassified abstention
 when routed through `CandidateRungBackend`.
 
+Rung measurements include all attempted candidates, not only the final selection.
+Elapsed latency spans the complete fallback loop. Token counts, reasoning tokens,
+queue wait and reported USD cost are summed only when every attempt reports that
+field; otherwise the total stays unknown. An exception cannot count as zero cost.
+Per-attempt model, usage, timing, cost and failure facts remain in
+`extra.candidate_attempts`, including known partial measurements. Provider-specific
+cost units, TTFT and decode rate are not combined across multiple candidates.
+The selected/last-returned model still identifies the decision, not every billed
+model; `measurement_scope=candidate_rung` identifies the aggregate measurement.
+An abstaining learned rung emits a `log_only` receipt so its work is not omitted
+from the returned cascade evidence.
+Non-finite optional measurements stay unknown and are named in each attempt's
+`invalid_measurements`; they cannot crash receipt creation or serialize as
+nonstandard NaN/Infinity values in the aggregate measurements.
+
 ### Ownership boundary
 
 | Concern | Owner |
