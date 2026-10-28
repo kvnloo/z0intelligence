@@ -61,9 +61,10 @@ def main():
     parser.add_argument('--workers',type=int,default=4)
     args=parser.parse_args();out=Path(args.output)
     db=sqlite3.connect('file:'+args.db+'?mode=ro',uri=True);db.row_factory=sqlite3.Row
-    rows=[r for r in frozen_sample(db,args.manifest,args.n) if r['family']=='omp.tool']
+    sample=frozen_sample(db,args.manifest,args.n)
+    rows=[r for r in sample if r['family']=='omp.tool']
     contexts=reconstruct(args.sessions,[(r['session'],r['call']) for r in rows])
-    cutoff,training,training_digest,groups=training_scope(db,rows)
+    cutoff,training,training_digest,groups=training_scope(db,sample)
     supported_tools={r['label'] for r in training}
     prepared=[]
     for row in rows:
