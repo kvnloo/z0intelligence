@@ -187,6 +187,87 @@ def test_upstream_failure_is_reported_not_raised(supervisor, monkeypatch):
     assert "unreachable" in out["error"]["type"]
 
 
+@pytest.mark.parametrize("operation", ["swap", "release", "shutdown", "idle"])
+def test_residency_survives_until_response_is_consumed(supervisor, monkeypatch, operation):
+    import z0int.cognition.server as server_mod
+
+    resident = supervisor.ensure("hammer2.1_3b")
+    started = threading.Event()
+    finished = threading.Event()
+    workers = []
+    observed = {}
+
+    def evict():
+        started.set()
+        try:
+            if operation == "swap":
+                supervisor.ensure("functiongemma_270m")
+            elif operation == "idle":
+                supervisor.maybe_idle_unload()
+            elif operation == "release":
+                supervisor.release()
+            else:
+                supervisor.shutdown()
+        finally:
+            finished.set()
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            # Force the idle path to be eligible while the response is in flight.
+            if operation == "idle":
+                supervisor._last_use = 0
+            worker = threading.Thread(target=evict, daemon=True)
+            workers.append(worker)
+            worker.start()
+            assert started.wait(2)
+            observed["evicted_before_read"] = finished.wait(.1) and resident.stopped
+            return b'{"choices":[{"message":{"content":"complete"}}]}'
+
+    monkeypatch.setattr(server_mod, "urlopen", lambda *a, **kw: Response())
+    try:
+        code, out = supervisor.forward("hammer2.1_3b", {"messages": []})
+    finally:
+        for worker in workers:
+            worker.join(2)
+    assert finished.is_set()
+    assert not observed["evicted_before_read"]
+    assert code == 200
+    assert out["choices"][0]["message"]["content"] == "complete"
+    assert out["z0int_supervisor"]["resident_model"] == "hammer2.1_3b"
+    assert resident.stopped is (operation != "idle")
+
+
+def test_idle_window_starts_after_response_completion(supervisor, monkeypatch):
+    import z0int.cognition.server as server_mod
+
+    clock = [1000.0]
+    monkeypatch.setattr(server_mod.time, "time", lambda: clock[0])
+    supervisor.ensure("hammer2.1_3b")
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            clock[0] += supervisor.idle_unload_s + 1
+            return b'{"choices":[{"message":{"content":"complete"}}]}'
+
+    monkeypatch.setattr(server_mod, "urlopen", lambda *a, **kw: Response())
+    assert supervisor.forward("hammer2.1_3b", {"messages": []})[0] == 200
+    assert supervisor.maybe_idle_unload() is False
+    clock[0] += supervisor.idle_unload_s
+    assert supervisor.maybe_idle_unload() is True
+
+
 def test_max_tokens_is_capped(supervisor, monkeypatch):
     seen = {}
 

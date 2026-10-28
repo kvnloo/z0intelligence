@@ -79,6 +79,15 @@ All five fit at 4096 context; none were co-resident.
 model, swap on request, unload when idle. Everything that produces a training
 label goes through it.
 
+The supervisor serializes requests through complete upstream response consumption.
+Model swaps, release, shutdown and idle eviction wait for that response; the idle
+window begins after the request completes, including transport failures. This
+prevents a second caller from killing the first caller's resident model. It does
+not provide cancellation or concurrent model execution. The transport timeout
+remains unchanged. Regression coverage includes delayed reads and eviction paths;
+a two-model loopback HTTP smoke verifies response/residency attribution without
+loading weights. That smoke is not new model-performance evidence.
+
 | model | quant | cold load ms | TTFT ms | decode tok/s | short decision ms | long decision ms |
 |---|---|---|---|---|---|---|
 | functiongemma_270m | Q8_0 | 5319 | 8.6 | 351.1 | 139 | 83 |
