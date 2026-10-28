@@ -49,27 +49,29 @@ def _shadow(data: dict, spec: dict, source: dict, ts: str) -> list[dict]:
         raise FindingsError("Unknown shadow learner schema")
     result = []
     for family, arms in sorted(data["families"].items()):
-        candidates = []
+        candidates = {False: [], True: []}
         for label, score in arms.items():
             n, correct = score.get("n"), score.get("correct")
             if type(n) is not int or n <= 0 or type(correct) is not int:
                 continue
             low, high = wilson(correct, n)
-            candidates.append((low, label, high, correct, n))
-        if not candidates:
-            continue
-        low, label, high, correct, n = max(candidates)
-        kind = "slm" if label.startswith("slm:") else "rules" if label == "rules" else "knn"
-        arm = {"kind": kind, "model": label.removeprefix("slm:"), **spec.get("arm", {})}
-        # Exact action joins do not attest which physical model produced a trial.
-        metric = {"name": "acc_at_conf", "value": correct/n, "n": n, "ci_low": low,
-                  "ci_high": high, "ci_method": "wilson95", "higher_is_better": True,
-                  "live_shadow": True}
-        unbound_slm = kind == "slm" or arm["kind"] == "slm"
-        if unbound_slm:
-            metric["promotion_eligible"] = False
-        result.append(_finding(spec, source, ts, {"family": family, "job": "next-action"}, arm, metric,
-                               evidence_kind="proxy" if unbound_slm else None))
+            unbound_slm = label.startswith("slm:") or spec.get("arm", {}).get("kind") == "slm"
+            candidates[unbound_slm].append((low, label, high, correct, n))
+        # An unbound model's score must not suppress the eligible rules/knn arm.
+        for unbound_slm, group in candidates.items():
+            if not group:
+                continue
+            low, label, high, correct, n = max(group)
+            kind = "slm" if label.startswith("slm:") else "rules" if label == "rules" else "knn"
+            arm = {"kind": kind, "model": label.removeprefix("slm:"), **spec.get("arm", {})}
+            # Exact action joins do not attest which physical model produced a trial.
+            metric = {"name": "acc_at_conf", "value": correct/n, "n": n, "ci_low": low,
+                      "ci_high": high, "ci_method": "wilson95", "higher_is_better": True,
+                      "live_shadow": True}
+            if unbound_slm:
+                metric["promotion_eligible"] = False
+            result.append(_finding(spec, source, ts, {"family": family, "job": "next-action"}, arm, metric,
+                                   evidence_kind="proxy" if unbound_slm else None))
     return result
 
 
