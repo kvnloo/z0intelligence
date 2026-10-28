@@ -548,6 +548,7 @@ class _ClaimProjection:
     contradictions: list[str]
     resolved_conflicts: list[str]
     conflicts_by_event: dict[int, list[str]]
+    current_by_event: dict[int, int]
 
 
 def _project_claim_rows(
@@ -597,9 +598,11 @@ def _project_claim_rows(
     contradiction_text: list[str] = []
     resolved_conflict_text: list[str] = []
     conflicts_by_event: dict[int, list[str]] = {}
+    current_by_event: dict[int, int] = {}
     for rows in groups.values():
         winner, conflicts, resolved_conflicts = _reduce_scope_group(rows)
         winners.append(winner)
+        current_by_event.update((row["event_id"], winner["event_id"]) for row in rows)
         contradiction_text.extend(conflicts)
         resolved_conflict_text.extend(resolved_conflicts)
         if conflicts:
@@ -644,7 +647,8 @@ def _project_claim_rows(
         )
     return _ClaimProjection(
         event_by_id, visible, winners, history,
-        sorted(set(contradiction_text)), sorted(set(resolved_conflict_text)), conflicts_by_event)
+        sorted(set(contradiction_text)), sorted(set(resolved_conflict_text)), conflicts_by_event,
+        current_by_event)
 
 
 def project_claims(

@@ -128,6 +128,44 @@ def test_required_memory_outage_cannot_be_hidden_by_temporal_evidence(env, monke
     assert any('lexical' in gap for gap in packet.unresolved_gaps)
 
 
+def test_unreadable_temporal_authority_blocks_matching_lexical_evidence(env):
+    from z0int.memory.event_log import EventLog
+
+    log = EventLog(env / 'z0' / 'memory')
+    log.append('note', {'text': 'quokka gateway'}, source='fixture')
+    with log.events_path.open('ab') as stream:
+        stream.write(b'{"incomplete":')
+    packet = resolve(allow_memory=True, turn_key='corrupt-temporal')
+    assert not packet.evidence
+    assert packet.unresolved_gaps
+    assert ms.verify('quokka gateway', requires=['quokka'], config={})['verdict'] == 'FALLBACK'
+
+
+@pytest.mark.parametrize('limit', [1, 8])
+def test_old_value_query_keeps_current_correction_ahead_of_lexical_history(env, monkeypatch, limit):
+    from memory_fixture import add_message
+    from test_memory_claims import _admit
+    from z0int.memory_contract import MemoryScope
+
+    add_message(env / 'av' / 'sessions.db', 'h1', 'deployment blue-green strategy')
+    scope = MemoryScope(user=ms.DEFAULT_USER, project='z0')
+    first = _admit(env / 'z0', monkeypatch, event_id='1', value='blue-green',
+                   scope=scope, observed_at='2026-10-01T00:00:00Z')
+    _admit(env / 'z0', monkeypatch, event_id='2', value='canary',
+           scope=scope, observed_at='2026-10-02T00:00:00Z',
+           correction_of=first.payload['claim_id'])
+    policy = ms.ScopePolicy(scope=scope)
+    brief = ms.memory_brief('blue-green', policy, limit=limit, config={}, use_cache=False)
+    assert not brief['abstained']
+    assert [row['value'] for row in brief['current_claims']] == ['canary']
+    packet = resolve_context(
+        needs=[InformationNeed(id='decision', description='blue-green', kind='memory')],
+        memory_policy=policy, turn_key=f'old-value-{limit}',
+        allow_memory=True, allow_fff=False, allow_qmd=False, use_cache=False,
+    )
+    assert any('canary' in evidence.excerpt for evidence in packet.evidence)
+
+
 @pytest.mark.parametrize('narrow_policy', [True, False])
 def test_request_and_policy_intersection_never_widens_either_scope(env, monkeypatch, narrow_policy):
     from test_memory_claims import _admit

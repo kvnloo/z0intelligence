@@ -392,6 +392,7 @@ def _temporal_candidates(query: str, policy: ScopePolicy, *, ledger_root: str | 
     contradictions: list[str] = []
     terms, out, scrubbed = _terms(query), [], 0
     claims = {c['event_id']: c for c in projection.history}
+    emitted_claims: dict[int, dict[str, Any]] = {}
     for e in events:
         ident = e.event_identity()
         payload = e.payload if isinstance(e.payload, dict) else {}
@@ -409,8 +410,20 @@ def _temporal_candidates(query: str, policy: ScopePolicy, *, ledger_root: str | 
         if not score and not joined:
             continue
         contradictions.extend(projection.conflicts_by_event.get(e.event_id, ()))
-        if claim is not None and not claim['current']:
-            continue  # superseded claims stay in history(), never in current evidence
+        if claim is not None:
+            # Match the whole claim history, but emit only its canonical current value.
+            current_id = projection.current_by_event[e.event_id]
+            if current_id in emitted_claims:
+                emitted_claims[current_id]['score'] = max(emitted_claims[current_id]['score'], float(score))
+                continue
+            e = projection.event_by_id[current_id]
+            claim = claims[current_id]
+            payload = e.payload
+            ident = e.event_identity()
+            harness = HARNESS_OF_AGENT.get(ident.source_system, ident.source_system) if ident else None
+            if not policy.admits(_scope_of(payload.get('scope')), harness):
+                continue
+            raw = f"{claim.get('subject')} {claim.get('predicate')} = {json.dumps(claim.get('value'))}"
         if claim is not None:
             uid = derive_event_uid(source_system='z0-memory', source_session='claims', source_event_id=claim['claim_id'])
         else:
@@ -434,6 +447,8 @@ def _temporal_candidates(query: str, policy: ScopePolicy, *, ledger_root: str | 
                                             '%Y-%m-%dT%H:%M:%SZ', time.gmtime(e.ts)),
                                         excerpt=_excerpt(clean, terms)).to_dict(),
         })
+        if claim is not None:
+            emitted_claims[e.event_id] = out[-1]
     contradictions, n = scrub_obj(sorted(set(contradictions)))
     scrubbed += n
     return _layer('ok', revision=events[-1].checksum[:16] if events else 'empty', events=len(events),
@@ -551,12 +566,16 @@ def search(query: str, policy: ScopePolicy | None = None, *, layers: Iterable[st
         merged[c['event_uid']] = c
         if c.get('payload_hash'):
             by_hash.setdefault(c['payload_hash'], c['event_uid'])
-    ranked = (ranker or _default_rank)(list(merged.values()))[:max(1, int(limit))]
+    ranked = sorted(
+        (ranker or _default_rank)(list(merged.values())),
+        key=lambda evidence: not bool(evidence.get('claim_id')),
+    )[:max(1, int(limit))]  # Current decisions must not lose their slot to matching historical prose.
     for layer, st in status.items():
         st['hits'] = sum(1 for e in ranked if layer in e['layers'])
     req = [r for r in required if r in layers]
     ok = (any(s['status'] == 'ok' for s in status.values())
           and all(status[r]['status'] == 'ok' for r in req)
+          and ('temporal' not in status or status['temporal']['status'] == 'ok')
           and not status.get('temporal', {}).get('contradictions'))
     snap = snapshot_id or memory_snapshot_id(policy.scope, av_db=av_db, config=cfg, ledger_root=ledger_root,
                                              gateway=gateway, probe_gateway='semantic' in layers)

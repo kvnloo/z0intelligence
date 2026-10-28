@@ -92,11 +92,19 @@ as a contradiction rather than fabricated supersession.
 Matching unresolved claim conflicts make the brief abstain, `unknowns`
 non-answerable, and `verify` return `FALLBACK` even when a requested word is
 present in a candidate. Unrelated claim groups do not block the query.
-Incomplete ledger history offers no current temporal claims. These are
-retrieval semantics, not human-authorship or model-use proof. The old frozen
-diagnostic cohort's derived, timestamp-only supersession case therefore
-remains unsupported; its expected answer is not used to manufacture a user
-correction or change the frozen evidence.
+An unreadable requested temporal layer blocks a successful search verdict,
+even when lexical evidence is available. Otherwise the missing ledger could
+hide a correction or conflict.
+
+A query that matches an older claim value returns the group's canonical
+current value. Current claims take precedence over historical prose when
+the result limit is applied. The historical value remains available through
+history, not as a current decision.
+
+These are retrieval semantics, not human-authorship or model-use proof.
+The old frozen diagnostic cohort's derived, timestamp-only supersession case
+therefore remains unsupported. Its expected answer is not used to manufacture
+a user correction or change the frozen evidence.
 
 ## Memory is never instruction authority
 
