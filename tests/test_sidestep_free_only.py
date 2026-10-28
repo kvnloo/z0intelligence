@@ -597,3 +597,38 @@ def test_a_blocked_provider_in_a_free_only_plan_refuses_the_whole_plan(monkeypat
         run(monkeypatch, behaviour,
             candidates=[{"provider": blocked, "model": "some/model", **flag}, {"provider": "groq", "model": GROQ}])
     assert seen == []
+
+
+@pytest.mark.parametrize("shape", ["no_choices", "bad_choice", "non_text"])
+def test_failed_response_usage_is_counted_before_successful_fallback(monkeypatch, shape):
+    def malformed(request):
+        body = {"model": request["model"], "id": "failed-response",
+                "usage": {"prompt_tokens": 13, "completion_tokens": 7,
+                          "prompt_tokens_details": {"cached_tokens": 5}, "cost": 0}}
+        body["choices"] = ([] if shape == "no_choices" else [None] if shape == "bad_choice"
+                           else [{"message": {"content": {"unexpected": "object"}}, "finish_reason": "stop"}])
+        return body
+
+    result, calls, _ = run(monkeypatch, first_then_free(malformed), candidates=TWO)
+    failed, completed = result["attempts"]
+    assert result["ok"] and calls == ["openrouter", "groq"]
+    assert failed["extra"]["status"] == "failed"
+    assert failed["outcome"]["execution_completed"] is False
+    assert (failed["input_tokens"], failed["output_tokens"], failed["cached_input_tokens"]) == (13, 7, 5)
+    assert failed["extra"]["usage_source"] == "provider_response"
+    assert failed.get("estimated_frontier_tokens_avoided") is None
+    assert (result["input_tokens"], result["output_tokens"], result["unmetered_attempts"]) == (15, 8, 0)
+    assert completed["extra"]["status"] == "completed"
+
+
+@pytest.mark.parametrize("invalid", [True, -1, "13", None])
+def test_failed_response_partial_usage_keeps_unknown_counts_unknown(monkeypatch, invalid):
+    body = {"model": OPENROUTER, "choices": [],
+            "usage": {"prompt_tokens": invalid, "completion_tokens": 7,
+                      "prompt_tokens_details": {"cached_tokens": invalid}, "cost": 0}}
+    result, _, _ = run(monkeypatch, first_then_free(body), candidates=TWO)
+    failed = result["attempts"][0]
+    assert failed.get("input_tokens") is None and failed.get("cached_input_tokens") is None
+    assert failed["output_tokens"] == 7
+    assert result["input_tokens"] == 2 and result["output_tokens"] == 8
+    assert result["unmetered_attempts"] == 1

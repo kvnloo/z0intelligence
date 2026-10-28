@@ -322,6 +322,18 @@ def token(usage, name):
     return value if type(value) is int and value >= 0 else None
 
 
+def _record_usage(row, usage):
+    """Retain valid physical-call counts independently of response acceptance."""
+    usage = usage if isinstance(usage, dict) else {}
+    details = usage.get('prompt_tokens_details')
+    row.input_tokens = token(usage, 'prompt_tokens')
+    row.output_tokens = token(usage, 'completion_tokens')
+    row.cached_input_tokens = token(details if isinstance(details, dict) else {}, 'cached_tokens')
+    metered = row.input_tokens is not None and row.output_tokens is not None
+    row.extra['usage_source'] = 'provider_response' if metered else 'missing'
+    return metered
+
+
 def error_status(exc):
     current = exc
     while current:
@@ -401,15 +413,12 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         response = transport.chat(messages, max_tokens=args.get('max_tokens', 512), temperature=0, seed=None, extra_body=permit.get('request_constraints', constraints))
         transport_status=200
         cost_violation = record_reported_cost(row, {'usage': response.usage}, free_required(policy,args) or row.extra.get('free_only'))
+        metered = _record_usage(row, response.usage)
         output = response.content
         if not isinstance(output, str):
             raise ValueError('Provider returned non-text content')
         finish = (response.raw.get('choices') or [{}])[0].get('finish_reason')
         complete = bool(output.strip()) and finish == 'stop' and not response.tool_call
-        row.input_tokens = token(response.usage, 'prompt_tokens')
-        row.output_tokens = token(response.usage, 'completion_tokens')
-        row.cached_input_tokens = token(response.usage.get('prompt_tokens_details') or {}, 'cached_tokens')
-        metered = row.input_tokens is not None and row.output_tokens is not None
         identified = bool(response.raw.get('model'))
 
         ok = complete and metered and identified and not cost_violation
@@ -435,10 +444,17 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         ok = False
         row.outcome = {'execution_completed': False, 'source': 'codex_plugin'}
         row.extra.update(status='failed', error_type=type(exc).__name__, http_status=error_status(exc))
-        # A 200 body the transport parsed and then rejected for its shape still reports its cost.
+        # Parsed HTTP 200 usage is a physical cost even when its answer shape failed.
         body = getattr(transport, 'last_body', None)
-        if body is not None and 'provider_reported_cost_usd' not in row.extra:
-            record_reported_cost(row, body, free_required(policy,args) or row.extra.get('free_only'))
+        if isinstance(body, dict):
+            transport_status = 200
+            row.extra['http_status'] = 200
+            _record_usage(row, body.get('usage'))
+            for key in ('model', 'id'):
+                if isinstance(body.get(key), str):
+                    row.extra['response_' + key] = body[key]
+            if 'provider_reported_cost_usd' not in row.extra:
+                record_reported_cost(row, body, free_required(policy,args) or row.extra.get('free_only'))
     finally:
         if transport is not None:row.extra['quota_headers']=getattr(transport,'quota_headers',{})
         if row.extra.get('physical_call_attempted'):row.extra['physical_finished_at']=time.time()
