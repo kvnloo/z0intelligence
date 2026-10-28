@@ -101,6 +101,14 @@ def test_prequential_join_credit_and_incremental_stall(tmp_path):
     assert len({t['id'] for t in ledger['trials']}) == len(ledger['trials'])
 
 
+def test_unattested_shadow_accuracy_does_not_credit_family(tmp_path):
+    home, sessions, now = fixture(tmp_path, 1)
+    report=learn(home,sessions=sessions,now=now,
+                 config={'min_observations':1,'credit_bar':0})
+    assert report['families']['omp.tool']['slm:test']['correct']==1
+    assert report['credited_families']==[]
+
+
 def test_dead_endpoint_degrades_and_evolves(tmp_path, monkeypatch):
     home, sessions, now = fixture(tmp_path, 1)
     registry = LocalModelRegistry(load_local_cognition(), {'qwen3_06b': ServingEndpoint(

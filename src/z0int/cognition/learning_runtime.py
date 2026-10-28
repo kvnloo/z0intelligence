@@ -5,8 +5,10 @@ from collections import Counter
 import hashlib
 import json
 from pathlib import Path
+import socket
+import ipaddress
 import time
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from .adapters.transport import OpenAICompatTransport, ServerConfig
 from .learning_families import derive_jobs, run_jobs, family_metrics
@@ -35,8 +37,14 @@ def measured_serving_identity(transport, served_model) -> tuple[dict, dict]:
     if not build or backend == 'unreported' or not props.get('model_ftype'):
         raise ValueError('serving endpoint lacks measured build/backend/quant identity')
     n_ctx = min([s['n_ctx'] for s in slots] or [props['default_generation_settings']['n_ctx']])
+    host = urlsplit(transport.config.base_url).hostname
+    try:
+        local = host == 'localhost' or ipaddress.ip_address(host).is_loopback
+    except (ValueError, TypeError):
+        local = False
     identity = {'kind': 'slm', 'model': props['model_alias'], 'quant': props['model_ftype'],
-                'engine': 'llama.cpp@' + build, 'backend': backend, 'device': 'groot'}
+                'engine': 'llama.cpp@' + build, 'backend': backend,
+                'device': socket.gethostname() if local else 'unverified-endpoint:' + str(host)}
     scope = {'base_url': transport.config.base_url, 'served_model': served_model,
              'n_ctx': n_ctx, 'slots': len(slots), 'revision': 'not_reported_by_endpoint'}
     return identity, scope
@@ -158,58 +166,39 @@ def _atomic_observations(metrics: dict, identity: dict, scope: dict) -> list[dic
 
 
 def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict]:
-    """Accuracy is conditional on coverage; compare on identical joined calls."""
+    """Report all matched attempts diagnostically; no receipt has attested identity."""
     from .learning import predict, STRATEGIES, wilson
-    groups = {}
     matched = {arm: Counter() for arm in ('goal_binary', 'history_bigram')}
     for row in db.execute('''SELECT l.*,r.body FROM labels l JOIN receipts r USING(id)
                            WHERE l.family='omp.tool' ORDER BY l.ts,l.id'''):
         receipt = json.loads(row['body'])
-        # Old receipts contain an alias, not a measured physical serving
-        # identity. Never relabel them with the identity measured today.
         shadows = [s for s in receipt.get('shadow', [])
-                   if s.get('physical_identity') == identity and
-                   s.get('model') == identity['model'] and
-                   (s.get('arm') == 'goal-binary' or str(s.get('arm','')).startswith('slm-method:'))]
+                   if s.get('arm') == 'goal-binary' or str(s.get('arm','')).startswith('slm-method:')]
         if not shadows:
             continue
-        strategy = receipt.get('projection_strategy', 'history-1')
-        projection = receipt.get('projection_config', {})
         previous = db.execute('''SELECT action,features,ts FROM examples WHERE family='omp.tool'
             AND ts<? ORDER BY ts DESC LIMIT 512''', (row['ts'],)).fetchall()
         examples = [{'action': e['action'], 'history': json.loads(e['features']), 'ts': e['ts']} for e in previous]
         action, confidence = predict(json.loads(row['features']), examples, STRATEGIES[4])
-        decisions = [('history_bigram', action if confidence >= .8 else None, {
-            'kind': 'knn', 'model': 'history-bigram-v1', 'quant': 'none',
-            'engine': 'python-stdlib', 'backend': 'cpu', 'device': 'groot'})]
+        decisions = [('history_bigram', action if confidence >= .8 else None)]
         decisions += [('goal_binary' if s.get('arm') == 'goal-binary' else s['arm'],
                        s.get('selected_action') if not (s.get('error') or s.get('parse_error') or
-                           (str(s.get('arm','')).startswith('slm-method:') and not s.get('rpc_count'))) else None,
-                       identity) for s in shadows]
-        for arm, selected, arm_identity in decisions:
-            method = next((s for s in shadows if s.get('arm') == arm), None)
-            arm_projection = method.get('method_config', projection) if method else projection
-            key = strategy, arm, json.dumps(arm_projection, sort_keys=True)
-            published_arm = ('slm:' + identity['model'] + ':' + arm
-                             if arm.startswith('slm-method:') else
-                             arm + '@' + hashlib.sha256(key[2].encode()).hexdigest()[:12])
-            value = groups.setdefault(key, {'family': 'omp.tool', 'arm': published_arm, 'strategy': strategy,
-                'correct': 0, 'n': 0, 'total': 0, 'identity': arm_identity, 'projection': arm_projection,
-                'scope': scope, 'scope_note': 'Matched exact native OMP tool-call joins; accuracy conditional on coverage; no execution authority or cross-model/device/projection generalization',
-                'evidence_class': 'live_shadow', 'prospective': True})
+                           (str(s.get('arm','')).startswith('slm-method:') and not s.get('rpc_count'))) else None)
+                      for s in shadows]
+        for arm, selected in decisions:
             covered = selected is not None
-            correct = int(covered and selected == row['action'])
-            value['n'] += int(covered)
-            value['total'] += 1
-            value['correct'] += correct
-            matched.setdefault(arm, Counter()).update(total=1, covered=int(covered), correct=correct)
+            matched.setdefault(arm, Counter()).update(total=1, covered=int(covered),
+                                                       correct=int(covered and selected == row['action']))
     comparison = {}
     for arm, counts in matched.items():
         n, total, correct = counts['covered'], counts['total'], counts['correct']
         comparison[arm] = {'total': total, 'n': n, 'correct': correct,
             'accuracy': correct/n if n else None, 'coverage': n/total if total else 0,
             'wilson95_lower': wilson(correct, n)}
-    return list(groups.values()), comparison
+    comparison['binding'] = {'classification': 'unattested_diagnostic_only',
+                             'attempts': sum(counts['total'] for arm, counts in matched.items() if arm != 'history_bigram'),
+                             'attested_attempts': 0, 'model_credit': False}
+    return [], comparison
 
 
 def census_queue(home: Path, config: dict) -> list[dict]:
