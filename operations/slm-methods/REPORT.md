@@ -58,15 +58,15 @@ Hierarchy gains one tool answer while losing six path-kind answers. Vote3 adds a
 |---|---|---|
 | Binary per-candidate yes/no logit scoring and deterministic narrowing | Current live tool arm: 414/1763 correct (23.5%), reported by owning learner; cap3. This replay gives 7/24 tool and 15/24 path-kind. | `src/z0int/cognition/shadow_binary.py`; `operations/shadow-learner/repair-live-hour.json` in owning integration |
 | Choice-capacity ladder | Prior retained finding: Qwen2.5-0.5B k2 29/29, k3 27/28, k5 20/25, k8 16/27, k12 4/19, k32 1/23, k64 1/16; synthetic tasks, not present exact-label replay. Original report unavailable in this checkout; numbers remain historical, not reverified here. | prior `operations/choice-ladder`; active ChoiceLadderV2 experiment |
-| Context injection: none, memory, few-shot, summary, skill relevance, combination | Frozen replay protocol verified; memory and skill arms had empty retrieved packets and cannot demonstrate injection efficacy. Numeric outcome report absent from this checkout. | `/mnt/zer0models/z0-wt/slm-context/operations/slm-context/method.json` |
+| Context injection: none, memory, few-shot, summary, skill relevance, combination | Frozen replay protocol verified; memory and skill arms had empty retrieved packets and cannot demonstrate injection efficacy. Numeric outcome report absent from this checkout. | Historical context experiment `method.json`, unavailable here |
 | Retrieval-only kNN (k1/3/5), margin cascade, training-majority comparator | Included in the context experiment protocol; development chooses k and cascade threshold, test only evaluates; fresh frontier latency was not measured. Numeric outcomes unavailable here. | same `method.json`, `additional_parent_requested_policies` |
 | History transitions / bigram | Measured here; highly abstaining tool heuristic, useful path-kind agreement. Not a semantic task-success judge. | `learning_families._baseline`, `learning.predict`, this replay |
 | History-width / recent-session projections / few-shot retrieval | Automatic portfolio has history-1/history-3/recent-sessions/few-shot-3 strategies; scope-preserving evaluation and automatic search exist. No per-strategy causal improvement claimed here. | `learning_search.DEFAULT_STRATEGIES`, `learning_runtime._configs` |
 | Bradley–Terry pairwise SLM ranking | New measured arm loses to binary on both families; no payoff established. | `slm_methods.py`, `measured.json` |
 | Hierarchical semantic categories | New measured arm: +1 correct tool decision, -6 path-kind decisions; not a general winner. | same |
 | Self-consistency majority (three samples) | Identical accuracy to binary in both families at roughly triple tokens. | same |
-| Jev evidence-grounded pairwise BT | Historical positive ranking control, not an SLM result. Pairwise used 482432 input +7194 output tokens across218 calls; absolute fit-evidence used36360+1163 across27 calls. Partial349/350 run; ranking must not become an accept gate. | `/mnt/zer0models/z0-wt/salvage/agentrun-trial/pairwise/RESULTS.md` |
-| Phone-goal BT / knockout / flat hybrids | **Additional located prior trial:** 46 decisions,26 recorded S22 plus20 synthetic, three repeats. Jev flat112/138 correct vs flat+BT122/138, but wrong answers rise6→9; median149→160.5ms; calls1→3.1. Not SLM evidence. | `/mnt/zer0models/hermes-phone-goal/tests/eval/RESULTS.md`, `goalkit/pairwise.py` |
+| Jev evidence-grounded pairwise BT | Historical positive ranking control, not an SLM result. Pairwise used 482432 input +7194 output tokens across218 calls; absolute fit-evidence used36360+1163 across27 calls. Partial349/350 run; ranking must not become an accept gate. | Historical pairwise results, unavailable here |
+| Phone-goal BT / knockout / flat hybrids | **Additional located prior trial:** 46 decisions,26 recorded S22 plus20 synthetic, three repeats. Jev flat112/138 correct vs flat+BT122/138, but wrong answers rise6→9; median149→160.5ms; calls1→3.1. Not SLM evidence. | Historical phone-goal results, unavailable here |
 | Shadow-offload families, slm-opt, slm-router | Named historical experiment families, not proven improvements by their names. Results artifacts unavailable in inspected worktrees; must not assign invented numerical outcomes. | historical `operations/shadow-offload`, `operations/slm-opt`, `operations/slm-router` |
 | Semantic family skill selector | Historical reported `decider_2b family scores`, not promoted; current result artifact unavailable. | branch `exp/semantic-skill-select` (historical reference) |
 | SFT replay reconstruction | Historical branch exists by prior reference; reconstruction is not proof that training improved deployed decisions. No verified accuracy result available here. | `feat/sft-replay-reconstruct` (historical reference) |
@@ -123,16 +123,18 @@ as a historical manifest. The six-arm runner uses the new same manifest for
 binary, pairwise BT, hierarchy, vote3, three-way tournament, and history bigram.
 Missing exact ancestor chains are scored as failed abstentions for every arm;
 they are never dropped or replaced with history-only prompts. The old manifest
-contained two path-kind joins with unavailable native ancestor `ec5af60f`.
+contained two path-kind joins with unavailable native ancestry.
 
-The pipeline search freezes categories once before the earliest evaluated
-tool label. Its report stores the exact categories, training digest, row count,
-and exclusive cutoff; publication copies this tested scope without refitting.
-The initial old-manifest run was stopped before completion: its earliest
-sample allowed only 14 preceding labels and nine tools. The new train-prefix
-protocol avoids this reduced-vocabulary surrogate and future-label leakage.
-Only 18 tool labels recur after the all-19-tools prefix; the exhausted stratum
-cannot supply new development/holdout labels and is not synthetically filled.
+The original powered search filtered its training vocabulary using labels from
+the evaluation cohort. Its negative result remains a historical observation,
+not a valid training-only evaluation or a promotion claim. The corrected runner
+builds categories solely from the earlier training prefix; unseen evaluation
+labels remain in the denominator and count toward fallback. A fresh matched
+measurement is required to establish outcomes under that corrected protocol.
+The runner stores a training digest, row count, exclusive cutoff and categories.
+Runner database, session directory, endpoint and candidate home are explicit
+inputs; output files and manifests should remain private when they contain
+session-level records.
 
 The powered output paths are `measured-power.json` and
 `leaderboard-power.json`. The latter explores 54 category/stage/margin

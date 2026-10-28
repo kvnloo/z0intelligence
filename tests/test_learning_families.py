@@ -478,3 +478,48 @@ def test_explicit_binary_abstention_is_uncovered_not_predictor_error():
                 assert metric["covered_n"] == 0
                 assert metric["coverage"] == 0
                 assert metric["errors"] == 0
+
+
+def test_scoped_pipeline_validates_pinned_graph_set_not_history(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from z0int.cognition import learning_runtime
+    from z0int.cognition.adapters.transport import ChatOutcome
+
+    class Transport:
+        def __init__(self, config):
+            pass
+        def chat(self, messages, **kwargs):
+            raw = {'choices': [{'message': {'content': 'yes'}, 'logprobs': {'content': [{
+                'token': 'yes', 'logprob': -.1, 'top_logprobs': [
+                    {'token': 'yes', 'logprob': -.1}, {'token': 'no', 'logprob': -3}]}]}}]}
+            return ChatOutcome('yes', None, {'total_tokens': 1}, {}, raw, 1)
+
+    monkeypatch.setattr(learning_runtime, 'OpenAICompatTransport', Transport)
+    db=connection()
+    for i, label in enumerate(('a','a','b','b','c','c','d')):
+        add(db, str(i), ts=i+1, arguments={'model':label})
+    derive_jobs(db, now=20)
+    endpoint=SimpleNamespace(base_url='http://fixture',served_model='fixed',timeout_s=1,
+                             runtime=None,quantization=None)
+    predict=learning_runtime.choice_predictor(db, endpoint, {}, {'n_ctx':4096})
+    config={'history_width':1,'candidate_k':3,'max_options':3,'prompt_bytes':3000,
+            'decision_method':'slm_pipeline_v1','frozen_categories':[['d','illegal']],
+            'training_digest':'training','first':'binary','final':'binary','margin':0}
+    catalogue=[{'id':'history-1','kind':'bounded_projection','config':config}]
+    strategy=learning_runtime._configs({'omp.model_choice':'history-1'},catalogue)
+    target=job_id('session','6','omp.model_choice')
+    run_jobs(db,predict,now=20,max_jobs=20,families=('omp.model_choice',),
+             strategies=strategy,legal_candidates={target:['d']})
+    result=db.execute("SELECT prediction,choices,error FROM family_evaluations WHERE id=? AND arm LIKE 'slm:%'",(target,)).fetchone()
+    assert result['prediction']=='d' and result['error'] is None
+    assert json.loads(result['choices'])==['d']
+    prompt=db.execute("SELECT prompt FROM family_evaluations WHERE id=? AND arm LIKE 'slm:%'",(target,)).fetchone()['prompt']
+    assert 'd' not in json.loads(prompt)['choices']
+
+    # Even a faulty predictor cannot select a frozen but graph-illegal action.
+    changed={**strategy['omp.model_choice'],'strategy_id':'second'}
+    run_jobs(db,lambda *args: {'selected_action':'illegal','confidence':.9},
+             now=21,max_jobs=20,families=('omp.model_choice',),
+             strategies={'omp.model_choice':changed},legal_candidates={target:['d']})
+    result=db.execute("SELECT prediction,error FROM family_evaluations WHERE id=? AND arm LIKE 'slm:%@second:%'",(target,)).fetchone()
+    assert result['prediction'] is None and result['error']=='out_of_set'

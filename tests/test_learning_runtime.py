@@ -76,6 +76,16 @@ def test_runtime_derives_three_families_emits_canonical_findings_and_scoped_sear
     assert all(row['metric']['n'] > 0 and row['metric']['total'] >= row['metric']['n'] for row in ledger)
     assert all(row['metric']['projection']['candidate_k'] <= 3 for row in ledger)
     assert report['transport_tick']['errors'] == 0
+    # The first tick persists the selected strategy; the next must consume it.
+    db.execute('''INSERT INTO calls(session,call,tool,features,outcome,ts,arguments,outcome_ts)
+               VALUES(?,?,?,?,?,?,?,?)''', ('s', 'new', 'read', '["read"]',
+               '{"tool_error":false}', 121, '{"path":"skill://ctx"}', 122))
+    second = runtime.runtime_tick(db, tmp_path, now=130, deadline=time.monotonic()+5,
+                                  config={'jobs_per_tick': 12})
+    assert second['jobs_evaluated'] > 0
+    stored = [json.loads(r[0]) for r in db.execute(
+        "SELECT config FROM family_strategies WHERE strategy_id='history-1'")]
+    assert any(row.get('decision_method') == 'per_candidate_binary_logit' for row in stored)
     db.close()
 
 

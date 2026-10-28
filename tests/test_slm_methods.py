@@ -113,7 +113,8 @@ def test_pipeline_portfolio_retains_scope_and_dispatches(monkeypatch):
     config={'history_width':1,'candidate_k':3,'prompt_bytes':3000,
             'decision_method':'slm_pipeline_v1','frozen_categories':[['read'],['edit']],
             'training_digest':'fixed','first_model':'fixed','final_model':'fixed'}
-    catalogue=[{'id':'history-1','config':config},{'id':'methods-pipeline-test','config':config}]
+    catalogue=[{'id':'history-1','kind':'bounded_projection','config':config},
+               {'id':'methods-pipeline-test','kind':'bounded_projection','config':config}]
     strategy=learning_runtime._configs({'omp.tool':'methods-pipeline-test'},catalogue)['omp.tool']
     assert strategy['method_config']==config
     captured=[]
@@ -126,8 +127,37 @@ def test_pipeline_portfolio_retains_scope_and_dispatches(monkeypatch):
         timeout_s=1,runtime=None,quantization=None)
     db=sqlite3.connect(':memory:')
     predict=learning_runtime.choice_predictor(db,endpoint,{}, {'n_ctx':4096})
-    answer=predict(json.dumps({'latest_user_message':'inspect then change'}),['read'],strategy)
+    answer=predict(json.dumps({'latest_user_message':'inspect then change'}),['read','edit'],strategy)
     assert answer['selected_action']=='edit'
     assert answer['arm_scope']==slm_scoped.scope_digest(config)
     assert captured==[({'goal_context':{'latest_user_message':'inspect then change'}},
                        ('read','edit'),config)]
+
+
+def test_reconstruct_mixed_parent_id_fails_closed(tmp_path):
+    rows=[{'type':'session','id':'s'},
+          {'id':'u','parentId':None,'message':{'role':'user','content':'goal'}},
+          {'id':'sibling','parentId':'u','message':{'role':'user','content':'sibling'}},
+          {'id':'unlinked','message':{'role':'assistant','content':[
+              {'type':'toolCall','id':'target','name':'read','arguments':{}}]}}]
+    (tmp_path/'trace.jsonl').write_text('\n'.join(json.dumps(r) for r in rows))
+    assert reconstruct(tmp_path,[('s','target')]) == {}
+
+
+def test_search_training_vocabulary_ignores_holdout_labels():
+    import importlib.util
+    from pathlib import Path
+    path=Path(__file__).resolve().parents[1]/'operations'/'slm-methods'/'search.py'
+    spec=importlib.util.spec_from_file_location('slm_search',path)
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    import sqlite3
+    db=sqlite3.connect(':memory:')
+    db.row_factory=sqlite3.Row
+    db.execute('CREATE TABLE labels(id TEXT,ts REAL,action TEXT,features TEXT,family TEXT)')
+    db.executemany('INSERT INTO labels VALUES(?,?,?,?,?)', [
+        ('1',1,'read','[]','omp.tool'), ('2',2,'edit','["read"]','omp.tool')])
+    first=module.training_scope(db,[{'ts':3,'label':'read'}])
+    second=module.training_scope(db,[{'ts':3,'label':'unseen'}])
+    assert first==second
+    assert 'unseen' not in {item for group in first[3][3] for item in group}

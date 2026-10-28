@@ -1,5 +1,6 @@
 """Private exact-join replay with frozen stratified labels and cost intervals."""
 import argparse
+import hashlib
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -18,7 +19,10 @@ from z0int.cognition.learning_search import wilson_interval
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('--db',default='/home/kvn/.z0int/loop/shadow-learning.sqlite')
+    parser.add_argument('--db',required=True)
+    parser.add_argument('--sessions',required=True)
+    parser.add_argument('--endpoint',required=True)
+    parser.add_argument('--model',default='qwen3-0.6b-q8')
     parser.add_argument('--output',required=True)
     parser.add_argument('--n',type=int,default=24)
     parser.add_argument('--manifest')
@@ -33,7 +37,7 @@ def main():
         for family,table in (('omp.tool','labels'),('omp.path_kind','family_jobs')):
             rows=list(db.execute(f'SELECT * FROM {table} WHERE family=? '+('AND label IS NOT NULL ' if table=='family_jobs' else '')+'ORDER BY ts,id',(family,)))
             selected.extend(dict(r,**({'label':r['action']} if family=='omp.tool' else {})) for r in random.Random(20261025).sample(rows,min(args.n,len(rows))))
-    contexts=reconstruct('/home/kvn/.omp/agent/sessions',[(r['session'],r['call']) for r in selected])
+    contexts=reconstruct(args.sessions,[(r['session'],r['call']) for r in selected])
     prepared=[]
     for row in selected:
         if row['family']=='omp.tool':
@@ -52,7 +56,7 @@ def main():
             body=None
         prepared.append((row,examples,json.dumps(body) if body is not None else None,choices))
     methods=args.methods.split(',')
-    transport=OpenAICompatTransport(ServerConfig('http://100.113.138.100:11530','qwen3-0.6b-q8',timeout_s=30))
+    transport=OpenAICompatTransport(ServerConfig(args.endpoint,args.model,timeout_s=30))
     def evaluate(item):
         row,examples,prompt,choices=item; order=list(methods);random.Random(row['id']).shuffle(order);out=[]
         for method in order:
@@ -101,7 +105,7 @@ def main():
                                     abstain_rate=sum(r['abstain'] for r in rows)/n,tokens=sum(r['tokens'] for r in rows),wall_ms=sum(r['wall_ms'] for r in rows),
                                     expected_proxy_ms=expected_cost(rows),expected_proxy_ci95_ms=expected_cost_interval(rows),
                                     errors=sum(r['error'] is not None for r in rows),failed_rpcs=sum(r['failed_rpc_count'] for r in rows)))
-    Path(args.output).write_text(json.dumps({'status':'complete','model':'qwen3-0.6b-q8','evidence_class':'replayed_L1','manifest':args.manifest,
+    Path(args.output).write_text(json.dumps({'status':'complete','model':args.model,'evidence_class':'replayed_L1','manifest':'sha256:'+hashlib.sha256(Path(args.manifest).read_bytes()).hexdigest() if args.manifest else None,
                                            'context':'exact_native_ancestor_chain','rows':results,'summary':summary},indent=2))
 
 if __name__=='__main__':main()

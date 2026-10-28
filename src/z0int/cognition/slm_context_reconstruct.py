@@ -74,6 +74,7 @@ def reconstruct(root, targets):
                 except ValueError:
                     pass
         by_id={r['id']:r for r in rows if r.get('id')}
+        linear=not any('parentId' in r for r in rows)
         for index,row in enumerate(rows):
             for cid,tool,args in events(row):
                 key=(sid,cid)
@@ -84,11 +85,13 @@ def reconstruct(root, targets):
                     if parent in visited or parent not in by_id:
                         chain=[]; break
                     visited.add(parent); ancestor=by_id[parent]
-                    chain.append(ancestor); parent=ancestor.get('parentId')
-                # Older linear formats lack parentId entirely; never silently
-                # fall back to linear order for a broken tree reference.
+                    chain.append(ancestor)
+                    if 'parentId' not in ancestor and ancestor.get('type') != 'session':
+                        chain=[]; break
+                    parent=ancestor.get('parentId')
+                # Only a wholly parentless file is a linear format.
                 if 'parentId' not in row:
-                    chain=rows[:index+1]
+                    chain=rows[:index+1] if linear else []
                 else:
                     chain.reverse()
                 value=context_before(chain,cid)

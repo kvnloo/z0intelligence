@@ -12,6 +12,22 @@ def scope_digest(config):
     return hashlib.sha256(json.dumps(config,sort_keys=True,separators=(',',':'),allow_nan=False).encode()).hexdigest()
 
 
+def validate_pipeline_config(config):
+    if config.get('decision_method') != 'slm_pipeline_v1':
+        raise ValueError('invalid_pipeline_method')
+    if config.get('first','binary') not in ('binary','bt') or config.get('final','bt') not in ('binary','bt','threeway'):
+        raise ValueError('invalid_pipeline_stage')
+    groups=config.get('frozen_categories')
+    if not isinstance(groups,list) or not 1<=len(groups)<=8 or any(not isinstance(g,list) or not g for g in groups):
+        raise ValueError('invalid_frozen_categories')
+    names=[v for group in groups for v in group]
+    if any(not isinstance(v,str) or not v for v in names) or len(names)!=len(set(names)):
+        raise ValueError('invalid_frozen_vocabulary')
+    if not isinstance(config.get('training_digest'),str) or not config['training_digest']:
+        raise ValueError('missing_training_identity')
+    return names
+
+
 def run_scoped(payload, legal, backend, config, *, requested_tool=None, shortlist=(),
                n_ctx=4096, policy_identity=None, policy_home=None):
     started=time.monotonic()
@@ -51,16 +67,8 @@ def run_scoped(payload, legal, backend, config, *, requested_tool=None, shortlis
             if config.get(stage) and config[stage] != actual_model:
                 raise ValueError('stage_model_not_bound_to_backend')
         if method=='slm_pipeline_v1':
-            if config.get('first','binary') not in ('binary','bt') or config.get('final','bt') not in ('binary','bt','threeway'):
-                raise ValueError('invalid_pipeline_stage')
-            groups=config.get('frozen_categories')
-            if not isinstance(groups,list) or not 1<=len(groups)<=8 or any(not isinstance(g,list) or not g for g in groups):
-                raise ValueError('invalid_frozen_categories')
-            names=[v for group in groups for v in group]
-            if any(not isinstance(v,str) or not v for v in names) or len(names)!=len(set(names)):
-                raise ValueError('invalid_frozen_vocabulary')
-            if not config.get('training_digest'):
-                raise ValueError('missing_training_identity')
+            names=validate_pipeline_config(config)
+            groups=config['frozen_categories']
             if requested_tool and requested_tool not in names:
                 row.update(frontier_reason='tool_not_in_observed_vocab')
                 return row

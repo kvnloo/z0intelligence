@@ -293,13 +293,24 @@ def _arm_key(db: sqlite3.Connection, base_arm: str, strategy: dict) -> str:
 
 
 def _evaluate(db: sqlite3.Connection, row: Mapping, predict: Predict, *, now: float,
-              slm_arm: str, strategy: dict, prospective: bool) -> None:
+              slm_arm: str, strategy: dict, prospective: bool,
+              legal_candidates: Mapping[str, list[str]] | None = None) -> None:
     started = time.monotonic()
     examples = _prior(db, row, strategy["retrieval_k"],
         strategy["recent_sessions_n"] if strategy["candidate_source"] == "recent_sessions" else 0)
     prompt, choices = project_prompt(row["family"], row["features"], examples,
         prompt_bytes=strategy["prompt_bytes"], candidate_k=strategy["candidate_k"],
         history_width=strategy["history_width"], model_cap=strategy["model_cap"])
+    scoped_choices = choices
+    if strategy.get("decision_method") == "slm_pipeline_v1":
+        # Only a graph-derived set pinned to this job may authorize a scoped
+        # candidate; absence is an abstention, not a historical-label fallback.
+        pinned = (legal_candidates or {}).get(row["id"], ())
+        if not isinstance(pinned, (list, tuple)) or any(not _name(value) for value in pinned):
+            pinned = ()
+        groups = strategy["method_config"]["frozen_categories"]
+        vocabulary = {value for group in groups for value in group}
+        scoped_choices = list(dict.fromkeys(value for value in pinned if value in vocabulary))
     for base_arm in (BASELINE, slm_arm):
         arm = _arm_key(db, base_arm, strategy)
         if db.execute("SELECT 1 FROM family_evaluations WHERE id=? AND arm=?", (row["id"], arm)).fetchone():
@@ -309,14 +320,15 @@ def _evaluate(db: sqlite3.Connection, row: Mapping, predict: Predict, *, now: fl
             error = None
         else:
             try:
-                raw = predict(prompt, choices, {**strategy, "id": arm,
-                              "base_arm": base_arm, "family": row["family"]})
-                selected, confidence, error = _answer(raw, choices)
+                raw = predict(prompt, scoped_choices, {**strategy, "id": arm,
+                              "base_arm": base_arm, "family": row["family"]}) if scoped_choices else {
+                                  "selected_action": None, "abstained": True}
+                selected, confidence, error = _answer(raw, scoped_choices)
             except Exception:
                 selected, confidence, error = None, 0.0, "predictor_exception"
         db.execute("INSERT OR IGNORE INTO family_evaluations VALUES(?,?,?,?,?,?,?,?,?)",
                    (row["id"], arm, selected, confidence, now + time.monotonic() - started,
-                    int(prospective), prompt, _json(choices), error))
+                    int(prospective), prompt, _json(scoped_choices if base_arm == slm_arm else choices), error))
 
 
 def run_jobs(db: sqlite3.Connection, predict: Predict, *, now: float | None = None,
@@ -325,7 +337,8 @@ def run_jobs(db: sqlite3.Connection, predict: Predict, *, now: float | None = No
              slm_arm: str = "slm:qwen3-0.6b-q8",
              strategy_id: str = "atomic-history-v1", retrieval_k: int = 64,
              history_width: int = 8, families: tuple[str, ...] = FAMILIES,
-             strategies: Mapping[str, dict] | None = None, model_cap: int = 3) -> dict:
+             strategies: Mapping[str, dict] | None = None, model_cap: int = 3,
+             legal_candidates: Mapping[str, list[str]] | None = None) -> dict:
     """Evaluate at most max_jobs SLM jobs, fairly across atomic families.
 
     Each family can override strategy_id, retrieval_k, history_width,
@@ -345,7 +358,20 @@ def run_jobs(db: sqlite3.Connection, predict: Predict, *, now: float | None = No
                   "candidate_k": candidate_k, "retrieval_k": retrieval_k,
                   "history_width": history_width, "model_cap": model_cap}
         config.update((strategies or {}).get(family, {}))
+        method = config.pop("decision_method", None)
+        method_config = config.pop("method_config", None)
         strategy = _strategy(**config)
+        if method is not None:
+            if method not in ("per_candidate_binary_logit", "slm_threeway_v1",
+                              "semantic_hierarchy_binary_v1", "slm_pipeline_v1"):
+                raise ValueError("invalid decision method")
+            if not isinstance(method_config, dict) or method_config.get("decision_method", "per_candidate_binary_logit") != method:
+                raise ValueError("invalid method metadata")
+            if method == "slm_pipeline_v1":
+                from .slm_scoped import validate_pipeline_config
+                validate_pipeline_config(method_config)
+            _json(method_config)
+            strategy.update(decision_method=method, method_config=method_config)
         arm = _arm_key(db, slm_arm, strategy)
         queue = db.execute("""SELECT j.* FROM family_jobs j WHERE family=?
             AND NOT EXISTS(SELECT 1 FROM family_evaluations e WHERE e.id=j.id AND e.arm=?)
@@ -362,7 +388,7 @@ def run_jobs(db: sqlite3.Connection, predict: Predict, *, now: float | None = No
             row = queue[index]
             prospective = row["label"] is None and row["family"] == "omp.wrapper_result" and 0 < row["ts"] <= now
             _evaluate(db, row, predict, now=now + time.monotonic() - started, slm_arm=slm_arm,
-                      strategy=strategy, prospective=prospective)
+                      strategy=strategy, prospective=prospective, legal_candidates=legal_candidates)
             db.commit()
             processed += 1
     return {"jobs_evaluated": processed, "families": family_metrics(db, now=now), "synthetic": False}

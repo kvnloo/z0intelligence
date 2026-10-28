@@ -5,6 +5,7 @@ Selection uses development only. Export additionally needs separated holdout
 expected-cost intervals against the incumbent, never manual promotion.
 """
 import argparse
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 import itertools
 import json
@@ -22,47 +23,54 @@ from z0int.cognition.learning_search import wilson_interval
 from z0int.cognition.slm_candidates import publish_candidate
 
 
+def training_scope(db, evaluation_rows):
+    """Build categories exclusively from records preceding the frozen sample."""
+    cutoff=min(row['ts'] for row in evaluation_rows)
+    rows=list(db.execute("SELECT id,ts,action,features FROM labels WHERE family='omp.tool' AND ts<? ORDER BY ts,id",(cutoff,)))
+    training=[{'label':r['action'],'features':json.loads(r['features'])} for r in rows]
+    digest=hashlib.sha256(json.dumps(
+        [{'id':r['id'], **example} for r,example in zip(rows,training)],
+        sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    return cutoff,training,digest,{count:cluster_tools(training,count) for count in (3,5,8)}
+
+
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('--db',default='/home/kvn/.z0int/loop/shadow-learning.sqlite')
-    parser.add_argument('--manifest',default='operations/slm-methods/sample-800-training19.json')
-    parser.add_argument('--output',default='operations/slm-methods/leaderboard-power.json')
-    parser.add_argument('--incumbent',default='operations/slm-methods/measured-power.json')
+    parser.add_argument('--db',required=True)
+    parser.add_argument('--sessions',required=True)
+    parser.add_argument('--endpoint',required=True)
+    parser.add_argument('--candidate-home',required=True)
+    parser.add_argument('--manifest',required=True)
+    parser.add_argument('--output',required=True)
+    parser.add_argument('--incumbent',required=True)
     parser.add_argument('--n',type=int,default=800)
     parser.add_argument('--workers',type=int,default=4)
     args=parser.parse_args();out=Path(args.output)
     db=sqlite3.connect('file:'+args.db+'?mode=ro',uri=True);db.row_factory=sqlite3.Row
     rows=[r for r in frozen_sample(db,args.manifest,args.n) if r['family']=='omp.tool']
-    contexts=reconstruct('/home/kvn/.omp/agent/sessions',[(r['session'],r['call']) for r in rows])
-    cutoff=min(row['ts'] for row in rows)
-    all_rows=list(db.execute("SELECT id,ts,action,features FROM labels WHERE family='omp.tool' AND ts<? ORDER BY ts,id",(cutoff,)))
-    supported_tools={row['label'] for row in rows}
-    unsupported_tools=sorted({r['action'] for r in all_rows}-supported_tools)
-    training=[{'label':r['action'],'features':json.loads(r['features'])}
-              for r in all_rows if r['action'] in supported_tools]
-    import hashlib
-    training_digest=hashlib.sha256('\n'.join(r['id'] for r in all_rows).encode()).hexdigest()
-    groups={count:cluster_tools(training,count) for count in (3,5,8)}
+    contexts=reconstruct(args.sessions,[(r['session'],r['call']) for r in rows])
+    cutoff,training,training_digest,groups=training_scope(db,rows)
+    supported_tools={r['label'] for r in training}
     prepared=[]
     for row in rows:
         native_context=contexts.get((row['session'],row['call']))
         context=dict(native_context,task='Predict next tool') if native_context is not None else None
         prepared.append((row,groups,json.dumps(context) if context is not None else None))
     models=['qwen3-0.6b-q8']
-    with urllib.request.urlopen('http://100.113.138.100:11530/models') as response:
+    with urllib.request.urlopen(args.endpoint.rstrip('/')+'/models') as response:
         served=json.load(response)
     for item in served.get('data',[]):
         if item['id']=='qwen3-1.7b-q4km' and item.get('status',{}).get('value')=='loaded':
             models.append(item['id'])
-    transports={model:OpenAICompatTransport(ServerConfig('http://100.113.138.100:11530',model,timeout_s=30)) for model in models}
+    transports={model:OpenAICompatTransport(ServerConfig(args.endpoint,model,timeout_s=30)) for model in models}
     variants=list(itertools.product((3,5,8),('binary','bt'),('binary','bt','threeway'),(0,.25,.75),models))
     random.Random(20261025).shuffle(variants)
     leaderboard=[]
     def document(status):
-        return {'status':status,'evidence_class':'replayed_L1','models':models,'manifest':args.manifest,
+        return {'status':status,'evidence_class':'replayed_L1','models':models,'manifest':'sha256:'+hashlib.sha256(Path(args.manifest).read_bytes()).hexdigest(),
                 'winner_qualified':False,'multiple_comparison_note':'54 or more exploratory variants; Wilson/bootstrap intervals are not simultaneous and selection is dev-only',
-                'training':{'cutoff_exclusive':cutoff,'digest':training_digest,'rows':len(all_rows),
-                            'frozen_categories':groups,'unsupported_tools':unsupported_tools,
+                'training':{'cutoff_exclusive':cutoff,'digest':training_digest,'rows':len(training),
+                            'frozen_categories':groups,
                             'supported_tools':sorted(supported_tools)},
                 'cost_proxy':{'read_recovery_ms':6034,'frontier_ms':7999,'causal_error_cost':False},'leaderboard':leaderboard}
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
@@ -90,8 +98,11 @@ def main():
                 except Exception as exc:
                     answer={'selected_action':None,'category':None};error=type(exc).__name__
                 category=answer.get('category');recall=any(row['label'] in group for group in groups)
-                return {'id':row['id'],'session':row['session'],'split':row['_split'],'correct':answer.get('selected_action')==row['label'],
-                        'abstain':answer.get('selected_action') is None,'category_correct':category is not None and row['label'] in groups[category],
+                # Unseen labels cannot be covered by the frozen vocabulary;
+                # retain them in the denominator and charge fallback.
+                selected=answer.get('selected_action') if recall else None
+                return {'id':row['id'],'session':row['session'],'split':row['_split'],'correct':selected==row['label'],
+                        'abstain':selected is None,'category_correct':category is not None and row['label'] in groups[category],
                         'candidate_recall':recall,'tools':sum(map(len,groups)),
                         'frontier_reason_if_requested_tool_unseen':None if recall else 'tool_not_in_observed_vocab',
                         'wall_ms':1000*(time.monotonic()-started),'tokens':sum(r['tokens'] for r in account),
@@ -116,7 +127,7 @@ def main():
         row['dev_ci_separated_from_next']=i+1<len(leaderboard) and row['metrics']['dev']['expected_proxy_ci95_ms'][1]<leaderboard[i+1]['metrics']['dev']['expected_proxy_ci95_ms'][0]
     report=document('complete');out.write_text(json.dumps(report,indent=2))
     try:
-        candidate=publish_candidate(out,Path('/home/kvn/.z0int'),incumbent_path=args.incumbent)
+        candidate=publish_candidate(out,Path(args.candidate_home),incumbent_path=args.incumbent)
         report.update(winner_qualified=True,candidate_id=candidate['id'])
         (out.parent/'candidate.json').write_text(json.dumps(candidate,indent=2,sort_keys=True))
     except ValueError as exc:
