@@ -514,8 +514,11 @@ def test_scoped_pipeline_validates_pinned_graph_set_not_history(tmp_path, monkey
                      strategies=strategy)
     assert pending['jobs_evaluated']==0
     assert db.execute('SELECT COUNT(*) FROM family_evaluations').fetchone()[0]==0
-    run_jobs(db,predict,now=20,max_jobs=1,families=('omp.model_choice',),
-             strategies=strategy,legal_candidates={target:['d']})
+    ready=run_jobs(db,predict,now=20,max_jobs=1,families=('omp.model_choice',),
+                   strategies=strategy,legal_candidates={target:['d']})
+    assert ready['jobs_evaluated']==1
+    oldest=job_id('session','0','omp.model_choice')
+    assert db.execute('SELECT COUNT(*) FROM family_evaluations WHERE id=?',(oldest,)).fetchone()[0]==0
     result=db.execute("SELECT prediction,choices,error FROM family_evaluations WHERE id=? AND arm LIKE 'slm:%'",(target,)).fetchone()
     assert result['prediction']=='d' and result['error'] is None
     assert json.loads(result['choices'])==['d']

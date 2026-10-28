@@ -294,7 +294,7 @@ def _arm_key(db: sqlite3.Connection, base_arm: str, strategy: dict) -> str:
 
 def _evaluate(db: sqlite3.Connection, row: Mapping, predict: Predict, *, now: float,
               slm_arm: str, strategy: dict, prospective: bool,
-              legal_candidates: Mapping[str, list[str]] | None = None) -> None:
+              legal_candidates: Mapping[str, list[str]] | None = None) -> bool:
     started = time.monotonic()
     examples = _prior(db, row, strategy["retrieval_k"],
         strategy["recent_sessions_n"] if strategy["candidate_source"] == "recent_sessions" else 0)
@@ -307,10 +307,11 @@ def _evaluate(db: sqlite3.Connection, row: Mapping, predict: Predict, *, now: fl
         # graph is different and is a genuine, recordable abstention.
         pinned = (legal_candidates or {}).get(row["id"])
         if not isinstance(pinned, (list, tuple)) or any(not _name(value) for value in pinned):
-            return
+            return False
         groups = strategy["method_config"]["frozen_categories"]
         vocabulary = {value for group in groups for value in group}
         scoped_choices = list(dict.fromkeys(value for value in pinned if value in vocabulary))
+    evaluated = False
     for base_arm in (BASELINE, slm_arm):
         arm = _arm_key(db, base_arm, strategy)
         if db.execute("SELECT 1 FROM family_evaluations WHERE id=? AND arm=?", (row["id"], arm)).fetchone():
@@ -326,9 +327,12 @@ def _evaluate(db: sqlite3.Connection, row: Mapping, predict: Predict, *, now: fl
                 selected, confidence, error = _answer(raw, scoped_choices)
             except Exception:
                 selected, confidence, error = None, 0.0, "predictor_exception"
-        db.execute("INSERT OR IGNORE INTO family_evaluations VALUES(?,?,?,?,?,?,?,?,?)",
+        inserted = db.execute("INSERT OR IGNORE INTO family_evaluations VALUES(?,?,?,?,?,?,?,?,?)",
                    (row["id"], arm, selected, confidence, now + time.monotonic() - started,
-                    int(prospective), prompt, _json(scoped_choices), error))
+                    int(prospective), prompt, _json(scoped_choices), error)).rowcount
+        if base_arm == slm_arm and inserted:
+            evaluated = True
+    return evaluated
 
 
 def run_jobs(db: sqlite3.Connection, predict: Predict, *, now: float | None = None,
@@ -400,10 +404,10 @@ def run_jobs(db: sqlite3.Connection, predict: Predict, *, now: float | None = No
                 continue
             row = queue[index]
             prospective = row["label"] is None and row["family"] == "omp.wrapper_result" and 0 < row["ts"] <= now
-            _evaluate(db, row, predict, now=now + time.monotonic() - started, slm_arm=slm_arm,
-                      strategy=strategy, prospective=prospective, legal_candidates=legal_candidates)
+            evaluated = _evaluate(db, row, predict, now=now + time.monotonic() - started, slm_arm=slm_arm,
+                                  strategy=strategy, prospective=prospective, legal_candidates=legal_candidates)
             db.commit()
-            processed += 1
+            processed += int(evaluated)
     return {"jobs_evaluated": processed, "families": family_metrics(db, now=now), "synthetic": False}
 
 
