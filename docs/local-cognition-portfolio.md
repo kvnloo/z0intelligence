@@ -382,6 +382,24 @@ Non-finite optional measurements stay unknown and are named in each attempt's
 `invalid_measurements`; they cannot crash receipt creation or serialize as
 nonstandard NaN/Infinity values in the aggregate measurements.
 
+### Bounded opportunity collection
+
+Hook and bridge producers persist turn identity before attempting capture admission.
+They acquire a shared slot **before** starting an opportunity process. A full pool
+records `fanout_cap` immediately without creating a waiting interpreter; failed
+serialization or launch records `spawn_failed` and releases the slot. The admitted
+child inherits the lock and releases it at exit, including abnormal exit.
+
+Detached jobs use anonymous seekable stdin rather than a blocking pipe. Linux uses
+memory-backed descriptors; other platforms use private temporary files. The parent
+does not wait for the child to read the job. Serialization, process creation,
+session-state locks and receipt writes still cost time: this is not a hard
+nonblocking guarantee or a claim that shadow hooks have zero overhead.
+The existing 5 ms in-process and bare-Python + 40 ms subprocess checks remain
+unchanged. Held-slot measurements now refuse children rather than accumulating
+60-second waiters; real child delivery and inherited-lock lifetime require separate
+runtime checks.
+
 ### Ownership boundary
 
 | Concern | Owner |

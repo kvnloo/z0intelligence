@@ -39,10 +39,11 @@ def inline(monkeypatch):
     """Run the detached opportunity child in-process through the same argv + job contract."""
     calls = []
 
-    def run(argv, job):
+    def run(argv, job, *, pass_fds=()):
         calls.append(argv)
         assert argv[-1] == 'opportunity' and '--harness' in argv
-        he.handle('opportunity', json.dumps(job), argv[argv.index('--harness') + 1])
+        he.handle('opportunity', json.dumps(dict(job, slot_fd=os.dup(job['slot_fd']))),
+                  argv[argv.index('--harness') + 1])
 
     monkeypatch.setattr(hc, 'spawn_detached', run)
     return calls
@@ -126,7 +127,7 @@ def run_turn(h, tmp_path, harness=None, **kw):
 # ----------------------------------------------------------------------------- hot path
 def test_prompt_handler_returns_under_5ms_p99_with_the_build_detached(home, monkeypatch, tmp_path):
     spawned = []
-    monkeypatch.setattr(hc, 'spawn_detached', lambda argv, job: spawned.append(argv))
+    monkeypatch.setattr(hc, 'spawn_detached', lambda argv, job, **kwargs: spawned.append(argv))
     monkeypatch.setattr(automatic, 'handle_event', lambda e: {'action': 'native', 'disabled': True})
     for h in HOOK_FAMILY:
         raws = [json.dumps(payload(h, i, cwd=tmp_path, prompt=f'do thing {i}')) for i in range(200)]
@@ -153,9 +154,9 @@ def test_importing_the_hook_entry_loads_only_stdlib_and_the_capture_core():
 def test_hook_subprocess_wall_time_is_within_bare_python_plus_40ms(tmp_path):
     """p95 hook wall time <= p95 bare-python wall time + 40 ms, both measured in this run, interleaved.
 
-    The detached builds wait on held build slots while timing runs, so the test does not load the host
-    itself; on a shared host a burst from another tenant can still inflate one round, so the bound must hold
-    in at least one of three rounds, each against its own baseline.
+    Held build slots refuse opportunity launches before they create child processes, so the benchmark
+    cannot accumulate waiting interpreters. Shared-host scheduling can still inflate one round;
+    the bound must hold in at least one of three rounds, each against its own baseline.
     """
     env = {k: v for k, v in os.environ.items() if k not in CLEAN}
     env['Z0INT_HOME'] = str(tmp_path / 'z0')
@@ -359,8 +360,30 @@ def test_only_claude_code_reaches_the_automatic_path(home, inline, monkeypatch, 
 
 
 # ----------------------------------------------------------------------------- detached build fan-out (MAX_CHILDREN)
-def test_detached_builds_share_a_bounded_set_of_slots(home, monkeypatch, tmp_path):
-    monkeypatch.setattr(hc, 'SLOT_WAIT_S', 0.3)
+@pytest.mark.parametrize('harness', HOOK_FAMILY)
+def test_full_capture_pool_refuses_before_process_creation(home, monkeypatch, tmp_path, harness):
+    held = [hc.try_slot() for _ in range(hc.MAX_CHILDREN)]
+    monkeypatch.setattr(automatic, 'handle_event', lambda e: {'action': 'native'})
+    launches = []
+    def unexpected_launch(*args, **kwargs):
+        launches.append(args)
+        raise AssertionError('full capture pool started a process')
+    monkeypatch.setattr(hc.subprocess, 'Popen', unexpected_launch)
+    p = payload(harness, cwd=tmp_path)
+    try:
+        assert hook('prompt', p, harness) is None
+        assert launches == []
+        assert [r['reason'] for r in rows(home, harness, 'drops.jsonl')] == ['fanout_cap']
+        # Refusing the opportunity must not lose the identity needed by Stop.
+        ctx = hc.outcome_context(harness, p)
+        assert ctx['trace_id'] == hc.turn_id(p)
+        assert ctx['work_item_id'] is not None
+    finally:
+        for fh in held:
+            fh.close()
+
+
+def test_detached_builds_share_a_bounded_set_of_slots(home, inline, tmp_path):
     p = payload('codex', cwd=tmp_path)
     job = {'payload': p, 'ctx': hc.begin_turn('codex', p)}
     held = []
@@ -370,13 +393,34 @@ def test_detached_builds_share_a_bounded_set_of_slots(home, monkeypatch, tmp_pat
         fh = open(path, 'a')
         fcntl.flock(fh, fcntl.LOCK_EX)
         held.append(fh)
-    he.handle('opportunity', json.dumps(job), 'codex')
+    assert hc.spawn_opportunity('codex', job) is False
     assert rows(home, 'codex', 'opportunities.jsonl') == []
     assert [r['reason'] for r in rows(home, 'codex', 'drops.jsonl')] == ['fanout_cap']
     for fh in held:
         fh.close()
-    he.handle('opportunity', json.dumps(job), 'codex')
+    assert hc.spawn_opportunity('codex', job) is True
     assert len(rows(home, 'codex', 'opportunities.jsonl')) == 1
+
+
+@pytest.mark.parametrize('failure', ('serialize', 'launch'))
+def test_failed_handoff_releases_slot_and_counts_one_drop(home, monkeypatch, failure):
+    job = {}
+    if failure == 'serialize':
+        job['cycle'] = job
+    else:
+        def fail(*args, **kwargs):
+            raise OSError('synthetic launch failure')
+        monkeypatch.setattr(hc.subprocess, 'Popen', fail)
+    assert hc.spawn_opportunity('codex', job) is False
+    assert [r['reason'] for r in rows(home, 'codex', 'drops.jsonl')] == ['spawn_failed']
+    held = [hc.try_slot() for _ in range(hc.MAX_CHILDREN)]
+    try:
+        assert all(held)
+        assert hc.try_slot() is None
+    finally:
+        for fh in held:
+            if fh is not None:
+                fh.close()
 
 
 # ----------------------------------------------------------------------------- Claude Code Stop: measured per prompt
