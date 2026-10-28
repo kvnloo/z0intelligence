@@ -200,9 +200,11 @@ positive `n`, and measured, unexpired observations. The compiler compares the
 smaller of the stated lower bound and a recomputed Wilson lower bound against
 the bar. An explicit correct count must agree with accuracy and sample count.
 The latest measured observation for a task and k supersedes older success.
-Scheduled refreshes use a new durable run ID; retries resume that same run.
-The dispatcher checks the runtime, corpus and row digests, run header, and row
-counts before appending findings. These checks do not prove a real worker run.
+Scheduled refreshes use a new durable run ID; retries resume that same run only
+while its model, lane, configuration, corpus and runner identities match.
+The dispatcher checks runtime, corpus and row digests, run header, and each row
+against the unique frozen/adaptive item sequence before appending findings.
+These checks do not prove a real worker run.
 
 The compiler selects the largest passing k per task. The allowed capacity is
 the minimum across every required task. Missing, pending, expired, inference,

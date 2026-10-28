@@ -189,6 +189,41 @@ def test_tick_enqueues_once_and_retries_after_dead_worker(tmp_path,monkeypatch):
     assert json.loads(Path(fresh['request']).read_text())['run_id'] != request['run_id']
 
 
+@pytest.mark.parametrize('changed', ['legacy', 'lane', 'model_path', 'corpus', 'runner'])
+def test_retry_resumes_only_unchanged_complete_inputs(tmp_path, monkeypatch, changed):
+    import z0int.policy.autoeval as autoeval
+    config, path = setup(tmp_path)
+    toolkit = tmp_path/'toolkit'
+    toolkit.mkdir()
+    (toolkit/'items.jsonl').write_text('first')
+    config['toolkit'] = str(toolkit)
+    discover(config)
+    now = datetime(2026,10,24,tzinfo=timezone.utc)
+    launch = lambda *args, **kwargs: SimpleNamespace(pid=123456)
+    first = tick(tmp_path, config, now, launch)[0]
+    request_path = Path(first['request'])
+    original = json.loads(request_path.read_text())
+    monkeypatch.setattr(autoeval.os, 'kill', lambda *_: (_ for _ in ()).throw(ProcessLookupError()))
+    if changed == 'legacy':
+        del original['run_id']
+        request_path.write_text(json.dumps(original))
+    elif changed == 'lane':
+        config['lane']['server_sha256'] = 'b'*64
+    elif changed == 'model_path':
+        other = gguf(tmp_path/'different.gguf')
+        Path(config['registry']).write_text(json.dumps({'endpoints':[{'model_path':str(other)}]}))
+        discover(config)
+    elif changed == 'corpus':
+        (toolkit/'items.jsonl').write_text('second')
+    else:
+        real = autoeval.run_inputs
+        monkeypatch.setattr(autoeval, 'run_inputs', lambda cfg: {**real(cfg), 'runner':'b'*64})
+    tick(tmp_path, config, now+timedelta(hours=7), launch)
+    assert json.loads(request_path.read_text())['run_id'] != original.get('run_id')
+    if changed == 'lane':
+        assert json.loads(request_path.read_text())['lane']['server_sha256'] == 'b'*64
+
+
 def test_invalid_gguf_fails_closed(tmp_path):
     config,path = setup(tmp_path)
     path.write_bytes(b'not GGUF')
@@ -213,25 +248,34 @@ def test_systemd_dispatch_survives_oneshot_and_deduplicates_active_unit(tmp_path
     assert len(commands)==1
 
 
-@pytest.mark.parametrize('tamper', [None, 'runtime_sha256', 'rows_sha256', 'items_sha256', 'run_id', 'counts'])
+@pytest.mark.parametrize('tamper', [None, 'runtime_sha256', 'rows_sha256', 'items_sha256', 'run_id', 'counts', 'duplicate', 'missing_id'])
 def test_mbp_dispatch_stages_importable_package_and_compiles_receipt(tmp_path,monkeypatch,tamper):
-    from z0int.policy.autoeval import dispatch, file_sha
+    from z0int.policy.autoeval import dispatch, file_sha, run_inputs
     from z0int.policy.compile import option_capacity_key
     import subprocess
     import sys
     config,_ = setup(tmp_path)
     toolkit = tmp_path/'toolkit'
     toolkit.mkdir()
-    for name in ('benchmark.py','items.jsonl','router.json','oracle.py'):
+    (toolkit/'benchmark.py').write_text('KS = (2,3,5,8,12,16,24,32,64)\n')
+    cells = [(task,k) for task in ('T1','T2') for k in (2,3,5,8,12,16,24,32,64)]
+    cells += [('T3',k) for k in (2,3,5,8,12,16)] + [('T4',10)]
+    items = [{'id':f'{task}-{k}-{i}', 'task':task, 'k':k, 'answer':0}
+             for task,k in cells for i in range(100)]
+    (toolkit/'items.jsonl').write_text(''.join(json.dumps(item)+'\n' for item in items))
+    for name in ('router.json','oracle.py'):
         (toolkit/name).write_text('{}')
     config.update(toolkit=str(toolkit),router_corpus=str(toolkit/'router.json'),
-                  router_harness=str(toolkit/'oracle.py'),compiler_revision='test')
+                  router_harness=str(toolkit/'oracle.py'),compiler_revision='test',
+                  benchmark_sha256=file_sha(toolkit/'benchmark.py'),cap=100)
+    monkeypatch.setattr('z0int.policy.autoeval.router_supplements', lambda *_: [])
     config['lane'].update(backend='cpu',device='mbp')
     model = discover(config)[0]
     scope = scope_for(model,config['lane'])
     request = tmp_path/'run.request.json'
     request.write_text(json.dumps({'config':config,'model':model,'lane':config['lane'],
                                    'scope':scope,'home':str(tmp_path/'home'),
+                                   'input_sha256':run_inputs(config),
                                    'run_id':'a'*32,'requested_at':(datetime.now(timezone.utc)-timedelta(seconds=5)).isoformat()}))
     real_run = subprocess.run
     def worker(command,**kwargs):
@@ -247,8 +291,12 @@ def test_mbp_dispatch_stages_importable_package_and_compiles_receipt(tmp_path,mo
         destination.mkdir()
         now = datetime.now(timezone.utc)
         rows = destination/'rows.jsonl'
-        rows.write_text(''.join(json.dumps({'task':cell['task'],'k':cell['k'],'correct':True})+'\n'
-                                for cell in cells for _ in range(cell['n'])))
+        observations = [{**item, 'correct': True} for item in items]
+        if tamper == 'duplicate':
+            observations[1] = dict(observations[0])
+        elif tamper == 'missing_id':
+            del observations[1]['id']
+        rows.write_text(''.join(json.dumps(row)+'\n' for row in observations))
         (destination/'checkpoint-header.json').write_text(json.dumps({'run_id':'a'*32,'started_at':now.isoformat()}))
         result = {'scope':scope, 'run_id':'a'*32, 'runtime_sha256':config['lane']['server_sha256'],
             'rows_sha256':file_sha(rows), 'items_sha256':file_sha(toolkit/'items.jsonl'),
@@ -256,7 +304,7 @@ def test_mbp_dispatch_stages_importable_package_and_compiles_receipt(tmp_path,mo
             'expires_at':(now+timedelta(days=14)).isoformat(),'cells':cells}
         if tamper == 'counts':
             cells[0]['correct'] = 99
-        elif tamper:
+        elif tamper and tamper not in ('duplicate', 'missing_id'):
             result[tamper] = 'bad'
         (destination/'measurement.json').write_text(json.dumps(result))
         return SimpleNamespace(returncode=0)

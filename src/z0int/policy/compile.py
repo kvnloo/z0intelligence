@@ -1,7 +1,7 @@
 """Pure evidence-to-policy stage machine. Persistence is a separate operation."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 import json
 import os
@@ -132,7 +132,8 @@ def _capacity_costs(config: CompilerConfig, risk: str, findings: list[dict], now
             if (field not in {"cost_call", "cost_frontier", "cost_error", "abstain_rate"}
                     or row["subject"].get("family") != "choice.error_cost"
                     or row["subject"].get("risk_class") != risk
-                    or row["evidence_class"] != "measured" or scope_of(row) != scope
+                    or row["evidence_class"] != "measured" or not _promotion_evidence(row)
+                    or scope_of(row) != scope
                     or timestamp(row["ts"]) > now or _expiry(row, config) <= now):
                 continue
             prior = costs.get(field)
@@ -165,7 +166,7 @@ def _capacity_costs(config: CompilerConfig, risk: str, findings: list[dict], now
                 row["evidence_class"] != "measured"
                 or not _promotion_evidence(row)
                 or row["subject"].get("family") != "choice.error_cost"
-                or row["subject"].get("risk_class") != risk or scope_of(row) != scope
+                or row["subject"].get("risk_class") != risk
                 or timestamp(row["ts"]) > now or _expiry(row, config) <= now
                 for row in sources)
                 or units not in ({"latency_ms_lambda0"}, {"o14_score_ms"})
@@ -173,10 +174,22 @@ def _capacity_costs(config: CompilerConfig, risk: str, findings: list[dict], now
                 or {row["metric"]["name"] for row in sources} !=
                    {"cost_call", "cost_frontier", "cost_error", "abstain_rate"}):
             raise ValueError("Measured costs require fresh exact-scope, risk-bound findings with one permitted unit")
+        source_scopes = [scope_of(row) for row in sources]
+        try:
+            for source_scope in source_scopes:
+                option_capacity_key(source_scope)
+        except ValueError as exc:
+            raise ValueError("Measured costs require exact physical scope") from exc
+        if any(source_scope != source_scopes[0] for source_scope in source_scopes):
+            raise ValueError("Measured costs require one exact-scope")
         for field in ("cost_call", "cost_frontier", "cost_error", "abstain_rate"):
             if not any(row["metric"]["name"] == field and row["metric"]["value"] == inputs[field]
                        for row in sources):
                 raise ValueError(f"Measured cost has no matching finding: {field}")
+        if source_scopes[0] != scope:
+            overrides = dict(config.option_capacity_costs or {})
+            overrides.pop(risk, None)
+            return _capacity_costs(replace(config, option_capacity_costs=overrides), risk, findings, now, scope)
         inputs["expires_at"] = iso(min(_expiry(row, config) for row in sources))
     inputs["status"] = "measured" if inputs.get("measured") else "unmeasured"
     return inputs

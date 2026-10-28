@@ -224,6 +224,40 @@ def needs_more(correct, n, bar=.95, initial=100, cap=400):
     return n < initial or (n < cap and correct/n >= bar and wilson(correct,n)[0] < bar)
 
 
+def expected_observations(config):
+    """Reconstruct the exact frozen and adaptive item sequence for each cell."""
+    root = Path(config['toolkit']).expanduser().resolve()
+    if file_sha(root/'benchmark.py') != config['benchmark_sha256']:
+        raise ValueError('ChoiceLadder scorer revision mismatch')
+    spec = importlib.util.spec_from_file_location('choice_ladder_verify', root/'benchmark.py')
+    benchmark = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(benchmark)
+    groups = defaultdict(list)
+    for line in (root/'items.jsonl').read_text().splitlines():
+        item = json.loads(line)
+        groups[item['task'], item['k']].append(item)
+    expected = {(task, k) for task in ('T1', 'T2') for k in benchmark.KS}
+    expected.update(('T3', k) for k in benchmark.KS if k <= 16)
+    expected.add(('T4', 10))
+    if set(groups) != expected or any(len(items) != 100 for items in groups.values()):
+        raise ValueError('Expected the complete frozen 25-cell protocol-v2 corpus')
+    supplements = router_supplements(benchmark, config, groups['T4', 10])
+    return {key: iter(adaptive_items(benchmark, *key, items, config.get('cap', 400), supplements))
+            for key, items in groups.items()}
+
+
+
+def run_inputs(config):
+    """Identify the small source artifacts without reading model weights on a tick."""
+    root = Path(config['toolkit']).expanduser()
+    files = {'runner': Path(__file__), 'benchmark': root/'benchmark.py', 'items': root/'items.jsonl'}
+    for key in ('router_corpus', 'router_harness'):
+        if config.get(key):
+            files[key] = Path(config[key]).expanduser()
+    return {name: file_sha(path) if path.is_file() else None for name, path in files.items()}
+
+
+
 def tick(home, config, now=None, launch=subprocess.Popen):
     if not 100 <= config.get('cap',400) <= 400:
         raise ValueError('Adaptive cap must be in [100,400]')
@@ -256,14 +290,15 @@ def tick(home, config, now=None, launch=subprocess.Popen):
             if retry and timestamp(retry) > now:
                 continue
             request = directory / (key + '.request.json')
-            if state.get('status') != 'completed' and request.exists():
-                payload = json.loads(request.read_text())
-                if payload.get('scope') != scope_for(model, lane) or not payload.get('run_id'):
-                    raise ValueError('Saved dispatch request identity mismatch')
+            current = {'model':model, 'lane':lane, 'config':config, 'home':str(home),
+                       'scope':scope_for(model,lane), 'input_sha256':run_inputs(config)}
+            saved = (json.loads(request.read_text())
+                     if state.get('status') != 'completed' and request.exists() else {})
+            if (saved.get('run_id') and saved.get('requested_at') and
+                    all(saved.get(key) == value for key, value in current.items())):
+                payload = saved
             else:
-                payload = {'model':model, 'lane':lane, 'config':config, 'home':str(home),
-                           'scope':scope_for(model,lane), 'requested_at':now.isoformat(),
-                           'run_id':uuid.uuid4().hex}
+                payload = {**current, 'requested_at':now.isoformat(), 'run_id':uuid.uuid4().hex}
                 atomic_json(request, payload)
             log_path = directory / (key + '.log')
             with log_path.open('ab') as log:
@@ -290,6 +325,8 @@ def dispatch(request):
     payload = json.loads(request.read_text())
     config, lane = payload['config'],payload['lane']
     root = Path(config['toolkit']).expanduser().resolve()
+    if payload.get('input_sha256') != run_inputs(config):
+        raise ValueError('Dispatch input identity mismatch')
     run_id = payload['run_id']
     if not isinstance(run_id, str) or len(run_id) != 32 or any(c not in '0123456789abcdef' for c in run_id):
         raise ValueError('Invalid run identity')
@@ -335,6 +372,8 @@ def dispatch(request):
             measurement.get('items_sha256') != file_sha(root/'items.jsonl') or
             measurement.get('rows_sha256') != file_sha(output/'rows.jsonl')):
         raise ValueError('Worker result identity mismatch')
+    if payload['input_sha256'] != run_inputs(config):
+        raise ValueError('Dispatch inputs changed during measurement')
     header = json.loads((output/'checkpoint-header.json').read_text())
     started = timestamp(measurement['started_at'])
     if (header.get('run_id') != run_id or header.get('started_at') != measurement['started_at'] or
@@ -352,12 +391,20 @@ def dispatch(request):
                 type(cell['correct']) is not int or not 0 <= cell['correct'] <= cell['n']):
             raise ValueError('Invalid worker sample counts')
         cell['ci_low'],cell['ci_high'] = wilson(cell['correct'],cell['n'])
+    sequences = expected_observations(config)
+    seen = defaultdict(set)
     observed = defaultdict(lambda: [0, 0])
     for line in (output/'rows.jsonl').read_text().splitlines():
         row = json.loads(line)
         key = (row['task'], row['k'])
         if key not in expected or type(row.get('correct')) not in (bool, int) or row['correct'] not in (0, 1):
             raise ValueError('Invalid worker row')
+        item = next(sequences[key], None)
+        if (item is None or not isinstance(row.get('id'), str) or not row['id'] or
+                row['id'] in seen[key] or row['id'] != item['id'] or
+                row.get('answer') != item['answer']):
+            raise ValueError('Worker row does not match unique expected observation')
+        seen[key].add(row['id'])
         observed[key][0] += 1
         observed[key][1] += row['correct']
     if any(observed[(cell['task'], cell['k'])] != [cell['n'], cell['correct']] for cell in cells):
@@ -424,6 +471,8 @@ def sample_cell(items, score, checkpoint, identity, *, bar=.95, cap=400):
 def measure(request, out):
     payload = json.loads(request.read_text())
     config,model,lane = payload['config'],payload['model'],payload['lane']
+    if payload.get('input_sha256') != run_inputs(config):
+        raise ValueError('Worker input identity mismatch')
     root = Path(config['toolkit']).expanduser().resolve()
     if file_sha(root/'benchmark.py') != config['benchmark_sha256']:
         raise ValueError('ChoiceLadder scorer revision mismatch')

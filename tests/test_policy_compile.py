@@ -451,7 +451,7 @@ def test_capacity_cost_measurements_are_bound_to_finding_values_and_expiry():
 
 
 @pytest.mark.parametrize("dimension", ["model", "quant", "engine", "backend", "device"])
-def test_option_capacity_configured_costs_reject_cross_scope_findings(dimension):
+def test_option_capacity_configured_costs_do_not_cross_scope(dimension):
     choice = choice_finding("T1", 8, n=1000)
     other = {**choice["arm"], dimension: ("sha256:" + "b" * 64 if dimension == "model" else "other")}
     costs = {"cost_call": .1, "cost_frontier": 1., "cost_error": 20., "abstain_rate": 0.}
@@ -461,11 +461,20 @@ def test_option_capacity_configured_costs_reject_cross_scope_findings(dimension)
         row["subject"] = {"family": "choice.error_cost", "risk_class": "read"}
         row["id"] = digest({k: v for k, v in row.items() if k not in {"id", "prev"}})
         sources.append(row)
-    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_costs={"read": {
+    other_choice = choice_finding("T1", 8, n=1000, arm=other)
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_tasks=("T1",), option_capacity_costs={"read": {
         **costs, "measured": True, "cost_unit": "latency_ms_lambda0",
         "finding_ids": [row["id"] for row in sources]}})
-    with pytest.raises(ValueError, match="exact-scope"):
-        compile_rows([choice] + sources, config=config)
+    policy = compile_rows([choice, other_choice] + sources, config=config)
+    assert capacity(policy, choice)["allowed_k"] == 0
+    assert capacity(policy, choice)["inputs"]["status"] == "unmeasured"
+    assert capacity(policy, other_choice)["allowed_k"] == 8
+    mixed = deepcopy(sources[0])
+    mixed["arm"] = choice["arm"]
+    mixed["id"] = digest({k: v for k, v in mixed.items() if k not in {"id", "prev"}})
+    config.option_capacity_costs["read"]["finding_ids"][0] = mixed["id"]
+    with pytest.raises(ValueError, match="one exact-scope"):
+        compile_rows([choice, other_choice, mixed] + sources[1:], config=config)
 
 
 def test_capacity_abstention_cost_can_remove_otherwise_profitable_route():
@@ -497,6 +506,13 @@ def test_fresh_scoped_cost_findings_are_adopted_without_configuration_flip():
     other = choice_finding("T1", 8, value=.85, n=1000,
                            arm={**choice["arm"], "device": "unmeasured-device"})
     assert capacity(compile_rows(rows + [other], config=config), other)["allowed_k"] == 0
+    proxy = deepcopy(rows[1])
+    proxy["ts"] = "2026-10-24T11:00:00Z"
+    proxy["evidence_kind"] = "proxy"
+    proxy["id"] = digest({k: v for k, v in proxy.items() if k not in {"id", "prev"}})
+    with_proxy = capacity(compile_rows(rows + [proxy], config=config), choice)
+    assert with_proxy["allowed_k"] == 8
+    assert proxy["id"] not in with_proxy["inputs"]["finding_ids"]
 
 
 def test_capacity_identity_rejects_aliases_and_uses_content_addressed_scope():
