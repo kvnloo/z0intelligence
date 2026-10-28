@@ -268,6 +268,44 @@ def test_idle_window_starts_after_response_completion(supervisor, monkeypatch):
     assert supervisor.maybe_idle_unload() is True
 
 
+def test_queue_wait_is_separate_from_active_request_time(supervisor, monkeypatch):
+    import z0int.cognition.server as server_mod
+
+    clock = [100.0]
+    monkeypatch.setattr(server_mod.time, "monotonic", lambda: clock[0])
+    supervisor.ensure("hammer2.1_3b")
+    lock = supervisor._lock
+
+    class QueuedLock:
+        def __enter__(self):
+            clock[0] += 3
+            lock.acquire()
+
+        def __exit__(self, *exc):
+            lock.release()
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            clock[0] += 2
+            return b'{"choices":[{"message":{"content":"complete"}}]}'
+
+    monkeypatch.setattr(supervisor, "_lock", QueuedLock())
+    monkeypatch.setattr(supervisor, "ensure", lambda _: supervisor._server)
+    monkeypatch.setattr(server_mod, "urlopen", lambda *a, **kw: Response())
+    code, out = supervisor.forward("hammer2.1_3b", {"messages": []})
+    assert code == 200
+    meta = out["z0int_supervisor"]
+    assert meta["queue_wait_ms"] == 3000
+    assert meta["active_ms"] == 2000
+    assert meta["wall_ms"] == 5000
+
+
 def test_max_tokens_is_capped(supervisor, monkeypatch):
     seen = {}
 

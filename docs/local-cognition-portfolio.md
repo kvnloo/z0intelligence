@@ -88,6 +88,14 @@ remains unchanged. Regression coverage includes delayed reads and eviction paths
 a two-model loopback HTTP smoke verifies response/residency attribution without
 loading weights. That smoke is not new model-performance evidence.
 
+Request timing uses a monotonic clock: `wall_ms` includes queue wait;
+`queue_wait_ms` ends when the residency lock is acquired; `active_ms` covers the
+locked load/swap/transport interval. Active time is not measured GPU utilization.
+Cascade receipts retain these facts in `extra.supervisor`, expose queue wait in
+`latency.queue_wait_ms`, and leave `cost.gpu_ms` unknown instead of charging
+another request's queue time as GPU cost. Older wall-only metadata is not treated
+as GPU measurement either.
+
 | model | quant | cold load ms | TTFT ms | decode tok/s | short decision ms | long decision ms |
 |---|---|---|---|---|---|---|
 | functiongemma_270m | Q8_0 | 5319 | 8.6 | 351.1 | 139 | 83 |
@@ -350,6 +358,14 @@ execution outcome, verified outcome, tokens, GPU/provider cost, and retries. The
 receipt round-trips through JSON and `receipt_from_dict()` reconstructs it for
 replay without a model server; `mark_execution()` and `mark_verification()` join
 the runtime and verifier facts later without collapsing them.
+
+Candidate fallback retains each returned attempt's typed error, parser error and
+invalid-call flag. If all returned decisions abstain, the final result preserves
+the last decision's failure and model identity, with
+`diagnostics.reason=all_candidates_abstained`; `candidate_attempts` retains the
+earlier failures. Raised exceptions remain separate attempt records. An outage,
+timeout or invalid call therefore does not become an unclassified abstention
+when routed through `CandidateRungBackend`.
 
 ### Ownership boundary
 

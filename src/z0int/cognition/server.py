@@ -210,11 +210,12 @@ class ModelSupervisor:
     # ---- proxying ---------------------------------------------------
     def forward(self, model_id: str, payload: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
         """Send one chat completion to the resident model and return its reply."""
-        t_start = time.time()
+        t_start = time.monotonic()
         # A resident child belongs to this request until the complete response
         # has been consumed. Swaps, explicit release and idle eviction share
         # this lock; none may stop the child during upstream I/O.
         with self._lock:
+            t_active = time.monotonic()
             try:
                 server = self.ensure(model_id)
             except (SupervisorError, RuntimeError) as exc:
@@ -249,6 +250,7 @@ class ModelSupervisor:
                                        "type": "upstream_error"}}
             finally:
                 self._last_use = time.time()
+                t_end = time.monotonic()
 
         # Attach supervisor-level facts so a router can see residency cost.
         out.setdefault("z0int_supervisor", {})
@@ -259,7 +261,9 @@ class ModelSupervisor:
                 "resident_model": model_id,
                 "load_ms": load_ms,
                 "cold": load_ms > 0,
-                "wall_ms": (time.time() - t_start) * 1000.0,
+                "wall_ms": (t_end - t_start) * 1000.0,
+                "queue_wait_ms": (t_active - t_start) * 1000.0,
+                "active_ms": (t_end - t_active) * 1000.0,
             }
         )
         return 200, out

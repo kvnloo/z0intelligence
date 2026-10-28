@@ -28,7 +28,7 @@ no API keys and no credentials of any kind.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 import json
@@ -842,6 +842,10 @@ class CandidateRungBackend:
                     "selected_action": decision.selected_action,
                     "abstained": decision.abstained,
                     "latency_ms": decision.latency_ms,
+                    "error": decision.error,
+                    "error_kind": decision.error_kind,
+                    "parse_error": decision.parse_error,
+                    "invalid_call": decision.invalid_call,
                 }
             )
             if not decision.abstained and decision.selected_action is not None:
@@ -878,12 +882,27 @@ class CandidateRungBackend:
                 )
             retries += 1
             last = decision
+        if last is not None:
+            return replace(
+                last,
+                backend=self._backend_id,
+                abstained=True,
+                selected_action=None,
+                arguments={},
+                diagnostics={
+                    **dict(last.diagnostics or {}),
+                    **diagnostics,
+                    "reason": "all_candidates_abstained",
+                    "candidate_attempts": attempts,
+                    "retries": retries,
+                },
+            )
         return abstain(
             backend=self._backend_id,
             model=None,
             revision=None,
             candidate_count=request.legal.candidate_count,
-            latency_ms=last.latency_ms if last is not None else 0.0,
+            latency_ms=0.0,
             reason="all_candidates_abstained",
             extra={**diagnostics, "candidate_attempts": attempts, "retries": retries},
         )

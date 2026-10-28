@@ -285,7 +285,6 @@ class CognitionCascade:
         if not isinstance(allowed, (list, tuple)):
             allowed = surface.allowed_candidates if surface else ()
         chosen = by_id.get(str(chosen_candidate_id)) if chosen_candidate_id else None
-        gpu_ms = supervisor.get("wall_ms")
         receipt = CognitionReceipt(
             trace_id=trace_id,
             tier=tier,
@@ -308,6 +307,7 @@ class CognitionCascade:
                 observed_ms=decision.latency_ms,
                 ttft_ms=decision.ttft_ms,
                 decode_tok_s=decision.decode_tok_s,
+                queue_wait_ms=_maybe_float(supervisor.get("queue_wait_ms")),
                 observed_by="model_response" if not supervisor else "supervisor",
             ),
             prediction=decision.selected_action,
@@ -328,7 +328,9 @@ class CognitionCascade:
                 reasoning_tokens=_maybe_int(diagnostics.get("reasoning_tokens")),
             ),
             cost=CostState(
-                gpu_ms=_maybe_float(gpu_ms),
+                # Supervisor elapsed time includes loading and transport, not
+                # measured GPU utilization. Keep it as diagnostic timing only.
+                gpu_ms=None,
                 gpu_vram_mib=None,
                 provider_cost_usd=_maybe_float(diagnostics.get("provider_cost_usd")),
                 provider_cost_units=_maybe_float(diagnostics.get("provider_cost_units")),
@@ -354,6 +356,7 @@ class CognitionCascade:
                 "decode_tok_s": decision.decode_tok_s,
                 "graph_digest": legal.graph_digest,
                 "chosen_candidate_id": chosen_candidate_id,
+                "supervisor": dict(supervisor),
             },
         )
         return receipt.to_dict()

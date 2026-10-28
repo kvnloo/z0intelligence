@@ -349,6 +349,33 @@ def test_candidate_rung_routes_to_the_best_eligible_and_counts_retries():
     ]
 
 
+@pytest.mark.parametrize("failure", [
+    {"error": "read timed out", "error_kind": "timeout"},
+    {"error": "connection refused", "error_kind": "transport"},
+    {"parse_error": "malformed_json", "error_kind": "parse"},
+    {"error": "invalid_call: unknown action", "invalid_call": True},
+])
+def test_candidate_rung_preserves_abstaining_failure(failure):
+    from dataclasses import replace
+
+    class Backend(_FakeBackend):
+        def decide(self, request):
+            return replace(super().decide(request), **failure)
+
+    router = CandidateRungBackend(
+        tier="orchestrator_slm",
+        candidates=candidates_from_pi_ai_catalog(CATALOG, hints=HINTS),
+        backends={"groq/llama-3.3-70b-versatile": Backend("groq", None, abstain=True)},
+    )
+    decision = router.decide(_router_request())
+    assert decision.abstained
+    assert decision.model == "groq"
+    for key, value in failure.items():
+        assert getattr(decision, key) == value
+        assert decision.diagnostics["candidate_attempts"][0][key] == value
+    assert decision.diagnostics["reason"] == "all_candidates_abstained"
+
+
 def test_candidate_rung_abstains_when_no_eligible_backend_is_configured():
     candidates = candidates_from_pi_ai_catalog(CATALOG, hints=HINTS)
     router = CandidateRungBackend(tier="orchestrator_slm", candidates=candidates, backends={})
