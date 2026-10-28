@@ -45,7 +45,8 @@ duplicate destination basename, or reserved `manifest.json` destination.
 Import copies into private staging, verifies the copied bytes, then publishes
 one identity directory atomically. An interrupted copy publishes nothing.
 Exact reimport preserves the existing artifact and any independent local
-promotion. Different metadata or damaged installed bytes cause a conflict.
+promotion. Different metadata, a missing installed identity, or damaged
+installed bytes cause a conflict. Reimport does not silently repair them.
 The former `--force` overwrite option is removed.
 
 Artifact discovery reads published identity directories, not staging or the

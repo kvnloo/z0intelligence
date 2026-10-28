@@ -217,7 +217,8 @@ def import_manifest(path: Path | str) -> dict[str, Any]:
                 installed = load_manifest(dest_root / "manifest.json")
                 # A local promotion is not a producer claim and must survive exact reimport.
                 errors = validate_manifest(dict(installed, promotion={"status": "candidate"}), base_dir=dest_root)
-                if errors or not isinstance(installed.get("promotion"), dict) or _metadata(installed) != metadata:
+                if (errors or installed.get("artifact_id") != artifact_id
+                        or not isinstance(installed.get("promotion"), dict) or _metadata(installed) != metadata):
                     return {"ok": False, "errors": ["installed artifact identity conflicts or is corrupt"]}
                 return {"ok": True, "already_installed": True, "artifact_id": artifact_id,
                         "path": str(dest_root), "promotion": installed["promotion"]}

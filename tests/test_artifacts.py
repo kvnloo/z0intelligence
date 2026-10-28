@@ -98,6 +98,23 @@ def test_reimport_does_not_silently_accept_corrupted_installed_bytes(tmp_path):
     assert installed.read_bytes() == b'corrupted'  # no implicit overwrite or repair
 
 
+@pytest.mark.parametrize('stored_identity', [None, ''])
+def test_reimport_rejects_installed_manifest_without_consumer_identity(tmp_path, stored_identity):
+    path = bundle(tmp_path / 'bundle', {'weights.bin': b'candidate'})
+    first = import_manifest(path)
+    installed = Path(first['path']) / 'manifest.json'
+    manifest = json.loads(installed.read_text())
+    if stored_identity is None:
+        manifest.pop('artifact_id')
+    else:
+        manifest['artifact_id'] = stored_identity
+    installed.write_text(json.dumps(manifest))
+    before = installed.read_bytes()
+    assert get_artifact(first['artifact_id']) is None
+    assert not import_manifest(path)['ok']
+    assert installed.read_bytes() == before
+
+
 def test_exact_reimport_preserves_existing_artifact(tmp_path):
     path = bundle(tmp_path / 'bundle', {'weights.bin': b'candidate'})
     first = import_manifest(path)
