@@ -128,6 +128,41 @@ def test_exactly_one_promotion_step_per_compile():
     assert stage(compile_rows(rows, live)) == "live"
 
 
+@pytest.mark.parametrize("job,family", [
+    ("next-action", "other.family"),
+    ("select-tool", "omp.tool"),
+])
+@pytest.mark.parametrize("previous_stage", ["shadow", "canary", "live"])
+def test_historical_unattested_shadow_learner_loses_credit(tmp_path, job, family, previous_stage):
+    from z0int.policy.findings import append_findings, read_findings
+
+    old = finding(source={"kind": "shadow_learner", "path": "/synthetic/status.json",
+                          "sha256": "b" * 64, "run_id": "shadow-old"},
+                  metric={"live_shadow": True, "promotion_eligible": True})
+    old["subject"] = {"family": family, "job": job}
+    old["id"] = digest({k: v for k, v in old.items() if k not in {"id", "prev"}})
+    path = tmp_path / "findings.jsonl"
+    append_findings([old], path)
+    rows = read_findings(path)
+    key = rule_key(family, scope_of(old))
+    prior = {"families": {key: {"family": family, "scope": scope_of(old),
+                                "stage": previous_stage, "arm": old["arm"]}}}
+    policy = compile_rows(rows, prior)
+    assert policy["families"][key]["stage"] == "none"
+    assert rows[0]["metric"]["n"] == 200
+
+
+def test_shadow_learner_rules_and_independent_evaluation_remain_eligible():
+    source = {"kind": "shadow_learner", "path": "/synthetic/status.json",
+              "sha256": "b" * 64, "run_id": "shadow-old"}
+    rules = finding(source=source, arm={"kind": "rules", "model": "rules"})
+    assert stage(compile_rows([rules])) == "shadow"
+    direct = finding(metric={"live_shadow": True})
+    replay = finding("replayed_L1", metric={"divergence": 0., "aa_noise_floor": .01})
+    rows = [direct, replay]
+    assert stage(compile_rows(rows, compile_rows(rows))) == "canary"
+
+
 @pytest.mark.parametrize("kind", ["inference", "published", "replayed_L1", "replayed_L2", "canary"])
 def test_initial_shadow_requires_measured(kind):
     assert stage(compile_rows([finding(kind)])) == "none"

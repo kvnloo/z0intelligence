@@ -79,6 +79,13 @@ def _noninferior(row: dict) -> bool:
 def _promotion_evidence(row: dict) -> bool:
     if row.get("evidence_kind") == "proxy":
         return False
+    # Historical shadow aggregates and OMP learner observations did not bind
+    # a trial to loaded model bytes. Flags on those records cannot add proof.
+    if (row["source"].get("kind") == "shadow_learner"
+            and row["arm"].get("kind") == "slm"
+            and (row["subject"].get("job") == "next-action"
+                 or row["subject"].get("family") == "omp.tool")):
+        return False
     if row["source"].get("adapter") == "agent_outcomes":
         return row.get("evidence_kind") == "product_outcome" and isinstance(row.get("verifier_receipt"), dict)
     return True

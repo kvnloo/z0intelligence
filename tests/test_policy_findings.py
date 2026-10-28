@@ -80,6 +80,8 @@ def test_shadow_ingest_is_idempotent_and_keeps_best_arm(tmp_path):
     assert row["arm"]["model"] == "synthetic@rev"
     assert .96 < row["metric"]["ci_low"] < 1
     assert row["metric"]["live_shadow"] is True
+    assert row["evidence_kind"] == "proxy"
+    assert row["metric"]["promotion_eligible"] is False
 
 
 def test_unknown_and_prose_sources_record_reason(tmp_path):
@@ -141,7 +143,34 @@ def test_labelled_shadow_ingest_requires_exact_join_and_confident_predictions(tm
     row = read_findings(ledger_path(tmp_path))[0]
     assert row["metric"]["n"] == 1 and row["metric"]["value"] == 1.
     assert row["arm"]["model"] == "synthetic@rev"
+    assert row["evidence_kind"] == "proxy"
+    assert row["metric"]["promotion_eligible"] is False
     assert ingest_sources(spec, tmp_path)["added"] == 0
+
+
+@pytest.mark.parametrize("layout", ["status", "labelled"])
+def test_unbound_shadow_ingest_cannot_promote(tmp_path, layout):
+    from z0int.policy.compile import CompilerConfig, compile_policy
+    ts = "2026-10-24T10:00:00Z"
+    if layout == "status":
+        source = tmp_path / "status.json"
+        source.write_text(json.dumps({"schema": "z0int.shadow.learning.v1", "ts": ts,
+            "families": {"omp.tool": {"slm:test@rev": {"n": 60, "correct": 60}}}}))
+    else:
+        source = tmp_path / "labelled.jsonl"
+        row = {"schema": "z0int.shadow.labelled.v1", "ts": ts,
+               "family": "omp.tool", "label_source": "exact_omp_session_tool_call_join",
+               "executed_action": "read", "shadow": [
+                   {"model": "test@rev", "selected_action": "read", "confidence": .99}]}
+        source.write_bytes((canonical(row) + b"\n") * 60)
+    assert ingest_sources([{"kind": "shadow_learner", "path": str(source)}], tmp_path)["added"] == 1
+    rows = read_findings(ledger_path(tmp_path))
+    assert rows[0]["metric"]["n"] == 60
+    assert rows[0]["evidence_kind"] == "proxy"
+    assert rows[0]["metric"]["promotion_eligible"] is False
+    policy = compile_policy(rows, None, "2026-10-24T12:00:00Z",
+                            CompilerConfig(compiler_revision="a" * 40))
+    assert next(iter(policy["families"].values()))["stage"] == "none"
 
 
 def test_labelled_ingestion_never_bulk_reads_source(tmp_path, monkeypatch):

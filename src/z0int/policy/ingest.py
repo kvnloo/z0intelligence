@@ -61,11 +61,15 @@ def _shadow(data: dict, spec: dict, source: dict, ts: str) -> list[dict]:
         low, label, high, correct, n = max(candidates)
         kind = "slm" if label.startswith("slm:") else "rules" if label == "rules" else "knn"
         arm = {"kind": kind, "model": label.removeprefix("slm:"), **spec.get("arm", {})}
-        # The learning schema scores exact prequential live-session joins.
+        # Exact action joins do not attest which physical model produced a trial.
         metric = {"name": "acc_at_conf", "value": correct/n, "n": n, "ci_low": low,
                   "ci_high": high, "ci_method": "wilson95", "higher_is_better": True,
                   "live_shadow": True}
-        result.append(_finding(spec, source, ts, {"family": family, "job": "next-action"}, arm, metric))
+        unbound_slm = kind == "slm" or arm["kind"] == "slm"
+        if unbound_slm:
+            metric["promotion_eligible"] = False
+        result.append(_finding(spec, source, ts, {"family": family, "job": "next-action"}, arm, metric,
+                               evidence_kind="proxy" if unbound_slm else None))
     return result
 
 
