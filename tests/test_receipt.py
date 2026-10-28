@@ -549,5 +549,130 @@ class CounterfactualMine(unittest.TestCase):
             self.assertGreaterEqual(s["n_snapshots"], 1)
 
 
+class ReceiptVersionAttribution(unittest.TestCase):
+    @staticmethod
+    def stream(root, name, row):
+        path = root / "stream" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(row) + "\n")
+
+    def test_explicit_root_never_uses_ambient_harness_stream(self):
+        from unittest.mock import patch
+        from z0int.receipt import find_receipt
+
+        with tempfile.TemporaryDirectory() as tmp:
+            selected, ambient = Path(tmp) / "selected", Path(tmp) / "ambient"
+            for name in ("bridge.jsonl", "raw.jsonl"):
+                with self.subTest(stream=name):
+                    self.stream(selected, name, {"trace_id": "same-trace", "capability_id": "selected"})
+                    self.stream(ambient, name, {"trace_id": "same-trace", "capability_id": "ambient"})
+                    with patch.dict(os.environ, {"Z0INT_HOME": str(ambient)}):
+                        row = find_receipt("same-trace", root=selected)
+                    self.assertEqual(row["capability_id"], "selected")
+
+    def test_canonical_close_and_join_override_old_bridge_snapshot(self):
+        from unittest.mock import patch
+        from z0int.receipt import append_receipt, close_turn, find_receipt, find_receipt_by_extra, join_outcome
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"Z0INT_HOME": tmp}):
+            root = Path(tmp)
+            row = append_receipt({"trace_id": "turn", "capability_id": "fixture",
+                                  "extra": {"observation_id": "observation"}}, root=root)
+            self.stream(root, "bridge.jsonl", {"trace_id": "turn", "receipt": row})
+            close_turn("turn", measured_frontier_tokens=123, measurement_state="complete", root=root)
+            join_outcome("turn", {"test_pass": True, "source": "fixture"}, root=root)
+            for found in (find_receipt("turn", root=root),
+                          find_receipt_by_extra("observation_id", "observation", root=root)):
+                self.assertEqual(found["measured_frontier_tokens"], 123)
+                self.assertTrue(found["outcome"]["test_pass"])
+
+    def test_summary_counts_each_receipt_identity_once_after_repeated_joins(self):
+        from unittest.mock import patch
+        from z0int.receipt import append_receipt, close_turn, join_outcome, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"Z0INT_HOME": tmp}):
+            root = Path(tmp)
+            row = append_receipt({"trace_id": "turn", "capability_id": "fixture",
+                                  "baseline_input_tokens": 900, "baseline_output_tokens": 100,
+                                  "estimated_frontier_tokens_avoided": 1000}, root=root)
+            self.stream(root, "bridge.jsonl", {"trace_id": "turn", "receipt": row})
+            close_turn("turn", measured_frontier_tokens=100, measurement_state="complete", root=root)
+            for _ in range(2):
+                join_outcome("turn", {"test_pass": True, "source": "fixture"}, root=root)
+            summary = summarize_tokenomics(root=root)
+            self.assertEqual(summary["rows"], 1)
+            self.assertEqual(summary["verified_tasks"], 1)
+            self.assertEqual(summary["baseline_tokens_sum"], 1000)
+            self.assertEqual(summary["measured_frontier_tokens_sum"], 100)
+            self.assertEqual(summary["frontier_tokens_avoided_est"], 1000)
+            self.assertEqual(summary["actual_tokens_saved_authoritative"], 900)
+            self.assertEqual(summary["tokens_per_verified_task_authoritative"], 100)
+
+    def test_later_failure_revokes_prior_success_credit(self):
+        from unittest.mock import patch
+        from z0int.receipt import append_receipt, join_outcome, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"Z0INT_HOME": tmp}):
+            root = Path(tmp)
+            append_receipt({"trace_id": "turn", "capability_id": "fixture"}, root=root)
+            join_outcome("turn", {"test_pass": True, "source": "fixture"}, root=root)
+            join_outcome("turn", {"test_pass": False, "source": "fixture"}, root=root)
+            summary = summarize_tokenomics(root=root)
+            self.assertEqual(summary["verified_tasks"], 0)
+            self.assertEqual(summary["by_tier"], {"negative": 1})
+
+    def test_estimated_baseline_is_not_verified_token_measurement(self):
+        from z0int.receipt import append_receipt, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            append_receipt({"trace_id": "turn", "baseline_input_tokens": 900,
+                            "measurement_state": "complete", "outcome": {"test_pass": True}}, root=root)
+            summary = summarize_tokenomics(root=root)
+            self.assertEqual(summary["verified_tasks"], 1)
+            self.assertFalse(summary["verified_token_measurement_authoritative"])
+            self.assertIsNone(summary["tokens_per_verified_task_authoritative"])
+            self.assertIsNone(summary["tokens_per_verified_task"])
+
+    def test_limit_counts_current_identities_not_append_versions(self):
+        from z0int.receipt import append_receipt, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for trace_id in ("old", "attempt-one", "attempt-two", "attempt-one"):
+                append_receipt({"trace_id": trace_id, "capability_id": trace_id,
+                                "measured_frontier_tokens": 10}, root=root)
+            summary = summarize_tokenomics(root=root, limit=2)
+            self.assertEqual(summary["rows"], 2)
+            self.assertEqual(summary["by_capability"], {"attempt-two": 1, "attempt-one": 1})
+            self.assertEqual(summary["measured_frontier_tokens_sum"], 20)
+            self.assertEqual(summarize_tokenomics(root=root, limit=0)["rows"], 0)
+
+    def test_removed_correlation_does_not_match_stale_snapshot(self):
+        from z0int.receipt import append_receipt, find_receipt_by_extra
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            row = append_receipt({"trace_id": "turn", "extra": {"observation_id": "old"}}, root=root)
+            self.stream(root, "bridge.jsonl", {"receipt": row})
+            append_receipt({"trace_id": "turn", "extra": {"observation_id": "new"}}, root=root)
+            self.assertIsNone(find_receipt_by_extra("observation_id", "old", root=root))
+            self.assertEqual(find_receipt_by_extra("observation_id", "new", root=root)["trace_id"], "turn")
+
+    def test_unidentified_stream_rows_cannot_create_decisions(self):
+        from z0int.receipt import find_receipt, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.stream(root, "bridge.jsonl", {"outcome": {"test_pass": True}})
+            with (root / "stream" / "bridge.jsonl").open("a") as stream:
+                stream.write('null\n[]\n{bad json\n{"receipt":{"trace_id":"real","measured_frontier_tokens":7}}\n')
+            self.assertEqual(find_receipt("real", root=root)["measured_frontier_tokens"], 7)
+            summary = summarize_tokenomics(root=root)
+            self.assertEqual(summary["rows"], 1)
+            self.assertEqual(summary["verified_tasks"], 0)
+            self.assertEqual(summary["measured_frontier_tokens_sum"], 7)
+
+
 if __name__ == "__main__":
     unittest.main()

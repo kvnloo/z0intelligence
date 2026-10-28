@@ -84,6 +84,19 @@ z0int receipt join <trace_id> --test-pass true --success true
 z0int receipt summary --json
 ```
 
+Receipt reads stay within the selected `Z0INT_HOME` or explicit API root.
+Canonical receipt updates override older raw and bridge snapshots. The summary
+counts each trace once, using its latest version, so repeated joins do not add
+tasks or costs. A later negative outcome removes earlier success credit.
+Distinct attempt trace IDs remain distinct decisions.
+
+The summary limit bounds current trace identities, not append-only versions.
+It retains the last identities encountered in bridge-then-canonical append order.
+Missing trace IDs cannot contribute to totals. Tokens per verified task require
+measured tokens for every verified trace. Baselines and avoided-token estimates
+do not substitute for missing measurements. Complete measurement flags alone
+do not prove a task benefit or independent verification.
+
 ## Models (12GB example)
 
 ```text
