@@ -538,7 +538,8 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
                 failure_rate = bucket.get('failures', 0)/bucket['attempts'] if bucket.get('attempts') else None
                 unverified = {(r['family'], r['arm']) for r in db.execute('SELECT family,arm FROM learning_unverified_arms')}
                 credited = [f for f, arms in families.items() if any(
-                    (f, arm) not in unverified and v['n'] >= int(cfg.get('min_observations', 5))
+                    not arm.startswith('slm:') and (f, arm) not in unverified
+                    and v['n'] >= int(cfg.get('min_observations', 5))
                     and v['wilson95_lower'] >= float(cfg.get('credit_bar', .8)) for arm, v in arms.items())]
                 if not db.execute("SELECT 1 FROM learning_migrations WHERE name='scoped-shadow-arms-v1'").fetchone():
                     credited = []
