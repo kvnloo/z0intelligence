@@ -18,7 +18,6 @@ def low_overhead_policy():
         "tiny_parent_tokens_max": 256,
         "default_overhead_ms": 1000,
         "observed_workflow_overhead_ms": 500,
-        "parent_ms_per_token": 20,
     }
 
 
@@ -27,6 +26,7 @@ def candidate(task, **updates):
         "task": task,
         "parent_agent": "test-agent",
         "trace_id": "test-trace",
+        "expected_parent_ms": 20000,
         **updates,
     }
 
@@ -81,6 +81,7 @@ def test_multiple_rejections_keep_rule_order(low_overhead_policy):
             needs_tools=True,
             needs_session_files=True,
             needs_judgement=True,
+            expected_parent_ms=0,
         ),
         low_overhead_policy,
     )
@@ -100,7 +101,7 @@ def test_multiple_rejections_keep_rule_order(low_overhead_policy):
 
 
 def test_100_character_task_is_tiny(low_overhead_policy):
-    result = classify(candidate(padded("summarize ", 100)), low_overhead_policy)
+    result = classify(candidate(padded("summarize ", 100), expected_parent_ms=500), low_overhead_policy)
     assert result["decision"] == "PARENT_ONLY"
     assert result["reasons"] == ["TINY", "BELOW_OVERHEAD"]
 
@@ -108,7 +109,7 @@ def test_100_character_task_is_tiny(low_overhead_policy):
 def test_just_above_tiny_but_below_overhead(low_overhead_policy):
     policy = {**low_overhead_policy, "observed_workflow_overhead_ms": 10000}
     task = padded("summarize: ", 1030)  # ceil(1030 / 4) = 258
-    result = classify(candidate(task), policy)
+    result = classify(candidate(task, expected_parent_ms=5160), policy)
     assert result["decision"] == "PARENT_ONLY"
     assert result["reasons"] == ["BELOW_OVERHEAD"]
 
@@ -119,9 +120,9 @@ def test_inclusive_tiny_and_overhead_thresholds(low_overhead_policy):
     assert classify(candidate(padded("summarize: ", 1025)), policy)["decision"] == "ROUTE_WORKER"
 
     policy["observed_workflow_overhead_ms"] = 5160
-    assert classify(candidate(padded("summarize: ", 1030)), policy)["reasons"] == ["BELOW_OVERHEAD"]
+    assert classify(candidate(padded("summarize: ", 1030), expected_parent_ms=5160), policy)["reasons"] == ["BELOW_OVERHEAD"]
     policy["observed_workflow_overhead_ms"] = 5159
-    assert classify(candidate(padded("summarize: ", 1030)), policy)["decision"] == "ROUTE_WORKER"
+    assert classify(candidate(padded("summarize: ", 1030), expected_parent_ms=5160), policy)["decision"] == "ROUTE_WORKER"
 
 
 def test_implement_feature_never_infers_coding_implementation(low_overhead_policy):
@@ -179,6 +180,25 @@ def test_remote_requires_explicit_authorization_and_respects_privacy(low_overhea
     assert result["route_worker_args"]["allow_remote"] is (not private)
 
 
+def test_remote_denied_when_privacy_is_unknown(low_overhead_policy):
+    request = candidate(padded("summarize: ", 4000))
+    result = classify(request, low_overhead_policy, allow_remote=True)
+    assert result["route_worker_args"]["allow_remote"] is False
+
+
+def test_unknown_latency_cannot_produce_worker_args(low_overhead_policy):
+    request = candidate(padded("summarize: ", 4000))
+    del request["expected_parent_ms"]
+    result = classify(request, low_overhead_policy)
+    assert result["reasons"] == ["UNKNOWN_PARENT_LATENCY"]
+    assert result["route_worker_args"] is None
+
+
+def test_json_encoding_limit_counts_unicode(low_overhead_policy):
+    request = candidate("summarize: " + "é" * 7000)
+    assert classify(request, low_overhead_policy)["reasons"] == ["TOO_LARGE"]
+
+
 def test_context_is_counted_and_only_included_when_present(low_overhead_policy):
     request = candidate("extract fields", context="x" * 4000)
     result = classify(request, low_overhead_policy)
@@ -225,15 +245,14 @@ def test_worker_request_size_boundaries_block_oversize(low_overhead_policy, upda
     assert result["route_worker_args"] is None
 
 
-def test_worker_request_size_boundary_allows_exact_limit(low_overhead_policy):
+def test_combined_json_limit_blocks_individually_valid_fields(low_overhead_policy):
     request = candidate(padded("summarize: ", 24000), context="x" * 24000)
-    assert classify(request, low_overhead_policy)["decision"] == "ROUTE_WORKER"
+    assert classify(request, low_overhead_policy)["reasons"] == ["TOO_LARGE"]
 
 
-def test_policy_can_override_parent_ms_per_token(low_overhead_policy):
+def test_caller_latency_controls_overhead_guard(low_overhead_policy):
     task = padded("summarize: ", 4000)
-    policy = {**low_overhead_policy, "parent_ms_per_token": 1}
-    result = classify(candidate(task), policy)
+    result = classify(candidate(task, expected_parent_ms=1000), low_overhead_policy)
     assert result["decision"] == "PARENT_ONLY"
     assert result["reasons"] == ["BELOW_OVERHEAD"]
 
@@ -262,6 +281,7 @@ def test_default_policy_comes_from_canonical_registry(low_overhead_policy):
         {"task": "summarize", "needs_session_files": None},
         {"task": "summarize", "needs_judgement": "false"},
         {"task": "summarize", "contains_private": "no"},
+        {"task": "summarize", "expected_parent_ms": float("inf")},
         {"task": "summarize", "trace_id": None},
         {"task": "summarize", "parent_agent": ""},
     ],
@@ -279,7 +299,6 @@ def test_invalid_subtask_fields_raise_value_error(invalid, low_overhead_policy):
         {"tiny_parent_tokens_max": True},
         {"default_overhead_ms": float("nan")},
         {"observed_workflow_overhead_ms": -2},
-        {"parent_ms_per_token": float("inf")},
     ],
 )
 def test_invalid_policy_raises_value_error(policy):
@@ -296,10 +315,11 @@ def test_only_task_is_required_to_reject_a_tiny_candidate(low_overhead_policy):
     result = classify({"task": "summarize"}, low_overhead_policy)
     assert result["decision"] == "PARENT_ONLY"
     assert result["route_worker_args"] is None
+    assert "UNKNOWN_PARENT_LATENCY" in result["reasons"]
 
 
 def test_eligible_task_requires_real_dispatch_identity(low_overhead_policy):
-    request = {"task": padded("summarize: ", 4000)}
+    request = {"task": padded("summarize: ", 4000), "expected_parent_ms": 20000}
     with pytest.raises(ValueError, match="parent_agent and trace_id"):
         classify(request, low_overhead_policy)
 
