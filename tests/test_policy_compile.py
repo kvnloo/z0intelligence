@@ -35,11 +35,53 @@ def compile_rows(rows, previous=None, now=NOW, config=CONFIG):
     return compile_policy(rows, previous, now, config)
 
 
+def outcome_pairs(n=80, expires_at="2026-11-07T10:00:00Z", kind="canary"):
+    subject = {"family": "omp.tool", "job": "next-action"}
+    candidate = {"kind": "slm", "model": "synthetic@rev"}
+    reference = {"kind": "rules", "model": "synthetic@rev"}
+    protocol = {"schema": "z0.policy.paired_outcome_protocol.v1", "subject": subject,
+                "candidate_arm": candidate, "reference_arm": reference, "experiment_id": "fixture",
+                "frozen_at": "2026-10-23T00:00:00Z", "expires_at": expires_at,
+                "noninferiority_margin": .1}
+    rows = []
+    for index in range(n):
+        for role, arm in (("candidate", candidate), ("reference", reference)):
+            trace = f"{role}-{index}"
+            evaluation = {"protocol_sha256": "c" * 64, "subject": subject, "arm": arm,
+                          "experiment_id": "fixture", "pair_id": f"pair-{index}",
+                          "task_snapshot_id": f"snapshot-{index}", "arm_id": role,
+                          "observed_at": "2026-10-24T10:02:00Z"}
+            proof = {"kind": "product_check", "trace_id": trace, "receipt_id": trace,
+                     "sha256": digest(trace), "success": True, "evaluation": evaluation}
+            rows.append(Finding(ts=evaluation["observed_at"], source={"kind": "manual",
+                "adapter": "agent_outcomes", "path": "/synthetic/results.json",
+                "sha256": "b" * 64, "run_id": trace}, subject=subject, arm=arm,
+                metric={"name": "task_success", "value": 1., "n": 1, "ci_low": .206,
+                        "ci_high": 1., "ci_method": "wilson95", "higher_is_better": True,
+                        "outcome_ledger_verified": True, "promotion_eligible": True},
+                evidence_class=kind, scope_note="Synthetic paired fixture.", expires_at=expires_at,
+                baseline={"outcome_protocol": {"sha256": "c" * 64, "document": protocol}},
+                synthetic=True, evidence_kind="product_outcome", verifier_receipt=proof).to_dict())
+    return rows
+
+
 def all_evidence():
     return [finding(metric={"live_shadow": True}),
-            finding("replayed_L1", ts="2026-10-24T10:01:00Z", metric={"divergence": .01, "aa_noise_floor": .01}),
-            finding("canary", ts="2026-10-24T10:02:00Z", metric={"name": "task_success", "divergence": 0.,
-                "aa_noise_floor": .01, "outcome_ledger_verified": True})]
+            finding("replayed_L1", ts="2026-10-24T10:01:00Z",
+                    metric={"divergence": .01, "aa_noise_floor": .01})] + outcome_pairs()
+
+def test_single_product_success_does_not_demote_and_latest_failure_does():
+    base = all_evidence()[:2]
+    canary = compile_rows(base, compile_rows(base))
+    single = outcome_pairs(1)[0]
+    assert stage(compile_rows(base + [single], canary)) == "canary"
+    failed = deepcopy(single)
+    failed["verifier_receipt"]["success"] = False
+    failed["metric"]["value"] = 0.
+    failed["id"] = digest({k: v for k, v in failed.items() if k not in {"id", "prev"}})
+    result = compile_rows(base + [failed], canary)
+    assert stage(result) == "none"
+    assert next(iter(result["families"].values()))["demoted_reason"] == "latest_product_failure"
 
 
 def test_byte_identical_inputs_and_content_address():
@@ -85,7 +127,7 @@ def test_shadow_canary_requires_live_labels_and_aa_replay(shadow_metric, replay_
 
 
 @pytest.mark.parametrize("kind,verified,n,expected", [
-    ("canary", True, 50, "live"), ("replayed_L2", True, 50, "live"),
+    ("canary", True, 50, "canary"), ("replayed_L2", True, 50, "canary"),
     ("canary", False, 50, "canary"), ("canary", True, 49, "canary"),
     ("measured", True, 50, "canary"),
 ])
@@ -196,11 +238,7 @@ def test_latest_failure_cannot_repromote_from_old_success():
 
 def test_expired_outcome_demotes_live_to_canary_with_fresh_lower_stage_support():
     rows = all_evidence()
-    old_outcome = finding("canary", ts="2026-10-24T09:00:00Z",
-        expires_at="2026-10-24T12:30:00Z",
-        metric={"name": "task_success", "divergence": 0., "aa_noise_floor": .01,
-                "outcome_ledger_verified": True})
-    rows = [old_outcome] + rows[:2]
+    rows = outcome_pairs(expires_at="2026-10-24T12:30:00Z") + rows[:2]
     previous = compile_rows(rows)
     previous = compile_rows(rows, previous)
     previous = compile_rows(rows, previous)

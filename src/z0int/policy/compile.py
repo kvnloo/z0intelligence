@@ -83,6 +83,105 @@ def _promotion_evidence(row: dict) -> bool:
         return row.get("evidence_kind") == "product_outcome" and isinstance(row.get("verifier_receipt"), dict)
     return True
 
+def _outcome_cohorts(findings: list[dict], now: datetime, config: CompilerConfig,
+                     subject: dict, arm: dict) -> list[list[dict]]:
+    """Use only uniquely bound candidate/reference product checks from frozen protocols."""
+    rows = []
+    for row in findings:
+        try:
+            proof = row["verifier_receipt"]
+            evaluation = proof["evaluation"]
+            binding = row["baseline"]["outcome_protocol"]
+            protocol = binding["document"]
+            role = evaluation["arm_id"]
+            margin = protocol["noninferiority_margin"]
+            if (row.get("evidence_kind") != "product_outcome"
+                    or row["source"].get("adapter") != "agent_outcomes"
+                    or row["evidence_class"] not in {"canary", "replayed_L2"}
+                    or not row["metric"].get("promotion_eligible", True)
+                    or proof["kind"] != "product_check" or type(proof["success"]) is not bool
+                    or not all(isinstance(proof.get(k), str) and proof[k] for k in ("trace_id", "receipt_id", "sha256"))
+                    or protocol["schema"] != "z0.policy.paired_outcome_protocol.v1"
+                    or protocol["subject"] != subject or row["subject"] != subject
+                    or protocol["candidate_arm"] != arm or protocol["candidate_arm"] == protocol["reference_arm"]
+                    or role not in ("candidate", "reference") or row["arm"] != protocol[role + "_arm"]
+                    or evaluation["arm"] != row["arm"] or evaluation["subject"] != subject
+                    or evaluation["experiment_id"] != protocol["experiment_id"]
+                    or evaluation["protocol_sha256"] != binding["sha256"]
+                    or evaluation["observed_at"] != row["ts"]
+                    or not all(isinstance(evaluation.get(k), str) and evaluation[k]
+                               for k in ("experiment_id", "pair_id", "task_snapshot_id"))
+                    or type(margin) not in (int, float) or not math.isfinite(margin) or not 0 <= margin < 1
+                    or not timestamp(protocol["frozen_at"]) < timestamp(row["ts"]) <= now
+                    or timestamp(protocol["expires_at"]) <= now or _expiry(row, config) <= now):
+                continue
+            rows.append(row)
+        except (KeyError, TypeError, ValueError):
+            continue
+    # Identical receipt reimports count once; conflicting trace or receipt identities
+    # invalidate every affected observation rather than choosing a convenient one.
+    unique = {}
+    for row in findings:
+        p = row.get("verifier_receipt")
+        if row.get("evidence_kind") != "product_outcome" or not isinstance(p, dict):
+            continue
+        identity = (p.get("trace_id"), p.get("receipt_id"), p.get("sha256"))
+        if not all(isinstance(value, str) and value for value in identity):
+            continue
+        signature = canonical([p, row["subject"], row["arm"], row["baseline"], row["metric"],
+                               row["evidence_class"], row["ts"], row["expires_at"]])
+        unique.setdefault(identity, {}).setdefault(signature, row)
+    counts = [{}, {}, {}]
+    for key in unique:
+        for index, value in enumerate(key):
+            counts[index][value] = counts[index].get(value, 0) + 1
+    allowed = {id(row) for row in rows}
+    records = [(key, next(iter(values.values()))) for key, values in unique.items()
+               if len(values) == 1 and id(next(iter(values.values()))) in allowed]
+    cohorts = {}
+    for key, row in records:
+        if any(counts[index][value] != 1 for index, value in enumerate(key)):
+            continue
+        evaluation = row["verifier_receipt"]["evaluation"]
+        binding = row["baseline"]["outcome_protocol"]
+        cohort = (binding["sha256"], canonical(binding["document"]))
+        pair = (evaluation["experiment_id"], evaluation["pair_id"])
+        cohorts.setdefault(cohort, {}).setdefault(pair, []).append(row)
+    passing = []
+    for pairs in cohorts.values():
+        matched = []
+        snapshots = {}
+        for pair in pairs.values():
+            if len(pair) != 2:
+                continue
+            by_role = {r["verifier_receipt"]["evaluation"]["arm_id"]: r for r in pair}
+            if set(by_role) != {"candidate", "reference"}:
+                continue
+            candidate, reference = by_role["candidate"], by_role["reference"]
+            snapshot = candidate["verifier_receipt"]["evaluation"]["task_snapshot_id"]
+            if snapshot != reference["verifier_receipt"]["evaluation"]["task_snapshot_id"]:
+                continue
+            snapshots[snapshot] = snapshots.get(snapshot, 0) + 1
+            matched.append((snapshot, candidate, reference))
+        matched = [(c, r) for snapshot, c, r in matched if snapshots[snapshot] == 1]
+        n = len(matched)
+        if n < config.n_live:
+            continue
+        successes = sum(c["verifier_receipt"]["success"] for c, _ in matched)
+        losses = sum(not c["verifier_receipt"]["success"] and r["verifier_receipt"]["success"]
+                     for c, r in matched)
+        # Conservative bound on loss probability, not an asserted A/A noise floor.
+        z = 1.959963984540054
+        def bounds(count):
+            p = count / n
+            center = (p + z*z/(2*n)) / (1 + z*z/n)
+            half = z*math.sqrt(p*(1-p)/n + z*z/(4*n*n)) / (1 + z*z/n)
+            return center-half, center+half
+        margin = matched[0][0]["baseline"]["outcome_protocol"]["document"]["noninferiority_margin"]
+        if bounds(successes)[0] >= config.bar and bounds(losses)[1] <= margin:
+            passing.append([row for pair in matched for row in pair])
+    return passing
+
 
 def option_capacity_key(scope: dict) -> str:
     """Lossless key for an exact physical model scope, shared with O13 readers."""
@@ -292,7 +391,8 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
                    and r["metric"].get("higher_is_better") is True
                    and r["evidence_class"] not in {"inference", "published"}
                    and _promotion_evidence(r)
-                   and timestamp(r["ts"]) <= now]
+                   and timestamp(r["ts"]) <= now
+                   and r.get("evidence_kind") != "product_outcome"]
         before = prior.get("stage", "none")
         if before not in STAGES:
             raise ValueError("Unknown previous policy stage")
@@ -307,6 +407,11 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
         same = [r for r in quality if r["arm"] == arm]
         fresh = [r for r in same if _expiry(r, config) > now]
         latest = same[-1] if same else None
+        product = [r for r in rows if r["arm"] == arm
+                   and r.get("evidence_kind") == "product_outcome"
+                   and _promotion_evidence(r) and timestamp(r["ts"]) <= now
+                   and _expiry(r, config) > now]
+        latest_product = product[-1] if product else None
         stage, reason = before, None
         # Latest evidence dominates older successes. An expired or absent arm loses all credit.
         if before != "none":
@@ -316,6 +421,8 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
                 stage, reason = "none", "latest_ci_below_shadow_bar"
             elif before in {"canary", "live"} and latest["metric"]["ci_low"] < config.bar:
                 stage, reason = "shadow", "latest_ci_below_bar"
+        if latest_product and latest_product["verifier_receipt"].get("success") is False:
+            stage, reason = "none", "latest_product_failure"
         health = [r for r in rows if r["arm"] == arm and r["evidence_class"] == "measured"
                   and _promotion_evidence(r)
                   and r["metric"]["name"] == "endpoint_health" and timestamp(r["ts"]) <= now]
@@ -324,7 +431,7 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
             since = last_health.get("unhealthy_since")
             if last_health["value"] == 0 and since and now - timestamp(since) > timedelta(hours=config.unhealthy_hours):
                 stage, reason = "none", "endpoint_unhealthy"
-        used = []
+        used, outcome = [], []
         if reason is None and latest and latest["metric"].get("promotion_eligible", True):
             eligible = [r for r in fresh if r["metric"].get("promotion_eligible", True)]
             measured = [r for r in eligible if r["evidence_class"] == "measured"
@@ -333,10 +440,8 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
                       and r["metric"].get("live_shadow") is True
                       and r["metric"]["ci_low"] >= config.bar and r["metric"]["n"] >= config.n_canary]
             replay = [r for r in eligible if r["evidence_class"] == "replayed_L1" and _noninferior(r)]
-            outcome = [r for r in eligible if r["evidence_class"] in {"canary", "replayed_L2"}
-                       and r["metric"]["name"] == "task_success"
-                       and r["metric"].get("outcome_ledger_verified") is True
-                       and r["metric"]["n"] >= config.n_live and _noninferior(r)]
+            cohorts = _outcome_cohorts(findings, now, config, latest["subject"], arm)
+            outcome = cohorts[-1] if cohorts else []
             supported = ("live" if measured and shadow and replay and outcome else
                          "canary" if measured and shadow and replay else
                          "shadow" if measured else "none")
@@ -347,18 +452,23 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
             elif reason is None and before == "shadow" and shadow and replay and latest["metric"]["ci_low"] >= config.bar:
                 stage, used = "canary", [shadow[-1], replay[-1]]
             elif reason is None and before == "canary" and outcome and latest["metric"]["ci_low"] >= config.bar:
-                stage, used = "live", [outcome[-1]]
+                stage, used = "live", outcome
             if reason is None:
                 used = (measured[-1:] if stage == "shadow" else
                         shadow[-1:] + replay[-1:] if stage == "canary" else
-                        shadow[-1:] + replay[-1:] + outcome[-1:] if stage == "live" else used)
+                        shadow[-1:] + replay[-1:] + outcome if stage == "live" else used)
         # Carry only fresh evidence for this exact arm. A demotion cites its latest observation too.
         evidence_rows = {r["id"]: r for r in fresh}
-        for row in used + ([latest] if reason and latest else []) + (health[-1:] if reason == "endpoint_unhealthy" else []):
+        for row in (used + ([latest] if reason and latest else [])
+                    + ([latest_product] if reason == "latest_product_failure" else [])
+                    + (health[-1:] if reason == "endpoint_unhealthy" else [])):
             evidence_rows[row["id"]] = row
         evidence = sorted(evidence_rows)
         expiry = min((_expiry(r, config) for r in used), default=max(
             (_expiry(r, config) for r in fresh), default=now))
+        if stage == "live" and outcome:
+            expiry = min(expiry, *(timestamp(r["baseline"]["outcome_protocol"]["document"]["expires_at"])
+                                   for r in outcome))
         rule_id = prior.get("rule_id", "F-" + key + "-1")
         families[key] = {"family": family, "scope": scope, "stage": stage, "arm": arm,
                          "threshold": config.bar, "abstain_to": config.abstain_to,
