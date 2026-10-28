@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import json
+import os
+import subprocess
+import sys
 
 import pytest
 
@@ -582,14 +586,100 @@ def test_query_outcome_invalid_arguments_handles_and_rpc_are_invalid(factory):
         "invalid_arguments", "invalid_id", "invalid_arguments"]
 
 
-def test_query_outcome_unknown_internal_error_defaults_to_error(factory):
+
+
+@pytest.mark.parametrize("private_error", [
+    "SYNTHETIC_PRIVATE_EXCEPTION", {"body": "SYNTHETIC_PRIVATE_EXCEPTION"},
+    ["SYNTHETIC_PRIVATE_EXCEPTION"], None,
+])
+def test_audit_unknown_error_content_is_not_persisted(factory, private_error):
     server, _, _, _ = factory()
-    coded = {"error": "synthetic_unknown_error_code"}
-    assert server._audit("fetch", "opaque synthetic handle", coded) == coded
-    row = outcome_rows(server)[-1]
-    assert row["outcome"] == "error"
-    assert row["decision"] == "synthetic_unknown_error_code"
-    assert row["count"] == 0
+    server._audit("fetch", "SYNTHETIC_PRIVATE_QUERY", {"error": private_error})
+    raw = (server.state_dir / "audit.jsonl").read_text()
+    assert "SYNTHETIC_PRIVATE" not in raw
+    assert outcome_rows(server)[-1]["decision"] == "error"
+
+
+@pytest.mark.parametrize("written", [0, 17, -1])
+def test_audit_short_write_preserves_prior_receipts_and_allows_retry(
+        factory, monkeypatch, written):
+    server, _, _, _ = factory()
+    token = server.search("before")["results"][0]["id"]
+    path = server.state_dir / "audit.jsonl"
+    before = path.read_bytes()
+    real_fdopen = os.fdopen
+
+    class ShortWriter:
+        def __init__(self, fd, *args, **kwargs):
+            self.stream = real_fdopen(fd, *args, **kwargs)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.stream.close()
+
+        def fileno(self):
+            return self.stream.fileno()
+
+        def write(self, data):
+            size = len(data) - 1 if written == -1 else written
+            return self.stream.write(data[:size])
+
+    with monkeypatch.context() as patch:
+        patch.setattr("z0int.memory_mcp.os.fdopen", ShortWriter)
+        assert server.fetch(token) == {"error": "audit_unavailable"}
+    assert path.read_bytes() == before
+    assert server.fetch(token)["record"]["text"] == "Safe original text"
+    assert [row["tool"] for row in outcome_rows(server)] == ["search", "fetch"]
+
+
+@pytest.mark.parametrize("tail", [
+    b'{"schema":', b'{"schema":"z0int.memory_query_outcome.v1"}',
+    b'not-json\n', b'[]\n',
+])
+def test_audit_dirty_tail_blocks_disclosure_without_rewriting_history(factory, tail):
+    server, _, _, _ = factory()
+    token = server.search("before")["results"][0]["id"]
+    path = server.state_dir / "audit.jsonl"
+    before = path.read_bytes() + tail
+    path.write_bytes(before)
+    assert server.fetch(token) == {"error": "audit_unavailable"}
+    assert server.search("retry") == {"error": "audit_unavailable"}
+    assert path.read_bytes() == before
+
+
+def test_audit_busy_writer_fails_closed_without_modifying_receipts(factory):
+    server, _, _, _ = factory()
+    token = server.search("before")["results"][0]["id"]
+    path = server.state_dir / "audit.jsonl"
+    before = path.read_bytes()
+    with path.open("rb") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        assert server.fetch(token) == {"error": "audit_unavailable"}
+        assert path.read_bytes() == before
+    assert server.fetch(token)["status"] == "ok"
+
+
+@pytest.mark.parametrize("kind", ["symlink", "public_permissions", "fifo"])
+def test_audit_unsafe_file_blocks_without_touching_target(factory, kind):
+    server, _, _, _ = factory()
+    token = server.search("before")["results"][0]["id"]
+    path = server.state_dir / "audit.jsonl"
+    before = path.read_bytes()
+    saved = path.with_suffix(".saved")
+    path.rename(saved)
+    if kind == "symlink":
+        path.symlink_to(saved)
+    elif kind == "public_permissions":
+        path.write_bytes(before)
+        path.chmod(0o644)
+    else:
+        os.mkfifo(path, 0o600)
+    assert server.fetch(token) == {"error": "audit_unavailable"}
+    assert saved.read_bytes() == before
+    if kind == "public_permissions":
+        assert path.read_bytes() == before
 
 
 def test_query_outcome_failed_audit_blocks_search_before_disclosure(factory):
@@ -609,4 +699,27 @@ def test_query_outcome_fetch_policy_revocation_logs_denied(factory):
     assert row["tool"] == "fetch" and row["outcome"] == "denied"
     assert row["decision"] == "denied" and row["count"] == 0
     assert not backend.fetch_calls
+
+
+def test_stdio_rejects_invalid_frame_and_serves_next_request(factory):
+    pytest.importorskip("mcp")
+    server, policy, _, _ = factory()
+    requests = [
+        {"jsonrpc": "2.0", "id": [], "method": "ping"},
+        {"jsonrpc": "2.0", "id": 1, "method": "ping"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+         "params": {"name": "fetch", "arguments": {"id": "invalid"}}},
+    ]
+    reply = subprocess.run(
+        [sys.executable, "-m", "z0int.memory_mcp"],
+        input="".join(json.dumps(item) + "\n" for item in requests),
+        text=True, capture_output=True, timeout=15,
+        env={**os.environ, "Z0INT_MEMORY_MCP_POLICY": str(policy),
+             "Z0INT_MEMORY_MCP_STATE": str(server.state_dir),
+             "Z0INT_MEMORY_MCP_PRINCIPAL": "operator"})
+    assert reply.returncode == 0, reply.stderr
+    invalid, ping, fetch = map(json.loads, reply.stdout.splitlines())
+    assert invalid["error"]["code"] == -32600
+    assert ping == {"jsonrpc": "2.0", "id": 1, "result": {}}
+    assert json.loads(fetch["result"]["content"][0]["text"]) == {"error": "invalid_id"}
 

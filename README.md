@@ -473,19 +473,41 @@ and 0600 audit log contain only fixed decisions, counts, sizes and keyed
 query/handle hashes, never raw prompts or originals. Audit failure blocks
 disclosure. Output text is untrusted evidence even when successfully read.
 
+Audit appends take a nonblocking exclusive file lock. A busy writer, unsafe
+file, or malformed/unterminated final JSON-object frame returns
+`audit_unavailable` without disclosure. Rows are capped at 8192 bytes; only
+the final frame is checked on the request path, not the entire historical
+ledger. A detected short write is rolled back to its pre-write byte offset
+under that same lock, preserving earlier receipts. This is not a claim of
+power-loss durability or authenticated offline replay.
+
+A pre-existing damaged tail is preserved, not silently discarded or
+acknowledged. Recovery is an explicit offline operator action: stop all
+writers, retain a private byte-for-byte copy, validate the complete
+newline-terminated prefix, and remove only the verified incomplete suffix
+under the file lock. A complete but malformed row or corruption inside the
+prefix needs investigation, not automatic truncation. Never count an
+unterminated JSON object as a completed receipt.
+
 Each successfully appended row in that **same** private audit.jsonl has
 schema `z0int.memory_query_outcome.v1`, tool (`search`, `fetch`, or `invalid`),
 and outcome (`hit`, `miss`, `denied`, `unavailable`, `stale`,
 `rate_limited`, `invalid`, or `error`). A nonempty successful search or
 original fetch is a hit; an empty authorized search is a miss, not an outage.
 An entirely policy-filtered search is a denial, not a miss. Unknown error
-codes map to `error` without changing the tool response. Existing
-`timestamp`, keyed `query_hmac`, `count`, `bytes`, `denied_count`,
+contents map to `error` in both `decision` and `outcome` without changing the
+tool response; arbitrary exception strings or objects are never persisted.
+Existing `timestamp`, keyed `query_hmac`, `count`, `bytes`, `denied_count`,
 `unavailable_count`, and `decision` remain in the row. Neither raw
 queries/handles nor source bodies, paths, or credentials are logged. These
 are retrieval dispositions only: they do **not** measure answer quality,
 injection, downstream usefulness, or independent verification. No outcome
 mutation tool, secondary ledger, or permission is created.
+
+Stdio request validation uses Pydantic's `TypeAdapter` for the MCP message
+type, which can be either a root model or a union. The repository dependency
+remains pinned to MCP 1.26.0; the same entry point was also exercised with
+the separately installed Hermes MCP 2.3.0. Neither smoke activates a client.
 
 Run the focused suites on the MBP. Revision regressions replace the original
 and its content digest together, then independently exercise stale handles and
