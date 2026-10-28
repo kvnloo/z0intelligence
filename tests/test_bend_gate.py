@@ -8,9 +8,11 @@ or ``$Z0INT_BEND_GATE_BIN``); build it with ``z0int.bend_gate.build_kernel()``.
 from __future__ import annotations
 
 import copy
+import importlib.util
 import json
 import os
 import stat
+import subprocess
 import sys
 import unittest
 from collections import Counter
@@ -20,8 +22,12 @@ from z0int import bend_gate as bg
 
 ROOT = Path(__file__).resolve().parents[1]
 REF = ROOT / "third_party" / "aodl_a848270"
-sys.path.insert(0, str(REF))
-from aodl_contract import validate  # noqa: E402
+# Load the frozen validator under a distinct name without changing import
+# resolution for the installed aodl_contract package.
+_spec = importlib.util.spec_from_file_location("bend_aodl_reference", REF / "aodl_contract" / "validator.py")
+_reference = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_reference)
+validate = _reference.validate
 
 CATALOG = bg.load_catalog(REF / "harnesses" / "catalog.json")
 FIXTURES = sorted((REF / "examples").rglob("*.json"))
@@ -45,6 +51,42 @@ def fake_kernel(tmp: Path, body: str) -> Path:
     path.write_text("#!/bin/sh\n" + body + "\n")
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
     return path
+
+
+class ReferenceIsolationTests(unittest.TestCase):
+    def test_reference_and_canonical_imports_are_order_independent(self) -> None:
+        # Fresh interpreters reproduce pytest collection before any other
+        # module can cache the installed package.
+        code = """
+import importlib
+import runpy
+import sys
+from pathlib import Path
+
+reference_first, script, reference = sys.argv[1:]
+before = sys.path[:]
+if reference_first == "0":
+    canonical = importlib.import_module("aodl_contract")
+namespace = runpy.run_path(script, run_name="bend_reference_collection")
+expected = before if Path(script).name == "test_bend_gate.py" else [str(Path(script).resolve().parents[1] / "src"), *before]
+assert sys.path == expected
+assert str(Path(reference).resolve().parents[1]) not in sys.path
+if reference_first == "1":
+    canonical = importlib.import_module("aodl_contract")
+assert canonical is sys.modules["aodl_contract"]
+assert canonical.CANON_VERSION == "aodl-canon-1"
+assert callable(canonical.validate) and callable(canonical.semantic_fingerprint)
+assert Path(namespace["validate"].__code__.co_filename).resolve() == Path(reference).resolve()
+assert namespace["validate"]({})  # frozen validator still rejects an invalid document
+"""
+        reference = REF / "aodl_contract" / "validator.py"
+        for script in (Path(__file__), ROOT / "benchmarks" / "bend_gate_parity.py"):
+            for reference_first in ("0", "1"):
+                with self.subTest(script=script.name, reference_first=reference_first):
+                    subprocess.run(
+                        [sys.executable, "-c", code, reference_first, str(script), str(reference)],
+                        check=True, cwd=ROOT,
+                    )
 
 
 class EncoderTests(unittest.TestCase):
