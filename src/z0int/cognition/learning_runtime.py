@@ -47,6 +47,7 @@ def choice_predictor(db, endpoint, identity: dict, scope: dict, *, home: Path | 
         id INTEGER PRIMARY KEY,ts REAL,family TEXT,strategy TEXT,body TEXT)''')
 
     def predict(prompt: str, choices: list[str], strategy: dict) -> dict:
+        rpc_records = []
         def chat(messages, **kwargs):
             from .shadow import failure_class
             started = time.time()
@@ -63,10 +64,47 @@ def choice_predictor(db, endpoint, identity: dict, scope: dict, *, home: Path | 
                 row.update(error=error, failure_class=failure_class(error))
                 raise
             finally:
-                db.execute('INSERT INTO learning_rpc(ts,family,strategy,body) VALUES(?,?,?,?)',
-                    (started, strategy.get('family'), strategy.get('strategy_id'), json.dumps(row)))
-        return score_choices(prompt, [{'id': choice, 'description': choice} for choice in choices],
-            chat, n_ctx=scope['n_ctx'], min_margin=.25, policy_identity=identity, policy_home=home)
+                rpc_records.append((started, strategy.get('family'),
+                                    strategy.get('strategy_id'), json.dumps(row)))
+        try:
+            if strategy.get('decision_method')=='slm_pipeline_v1':
+                from types import SimpleNamespace
+                from .slm_scoped import run_scoped
+                # The caller pins this set from the decision's graph. A frozen
+                # training vocabulary is not evidence that an action is legal.
+                legal=SimpleNamespace(ids=lambda:tuple(choices))
+                backend=SimpleNamespace(_transport=SimpleNamespace(chat=chat),
+                    config=SimpleNamespace(model=endpoint.served_model),
+                    backend_id=identity.get('backend'))
+                projected = json.loads(prompt)
+                context = {
+                    'task': projected.get('task'),
+                    'previous_tools': [{'tool': value} for value in projected.get('previous_tools', [])
+                                       if isinstance(value, str)],
+                    'examples': [{'previous_tools': item.get('previous_tools', []),
+                                  'next_tool': item.get('label')}
+                                 for item in projected.get('examples', []) if isinstance(item, dict)],
+                }
+                return run_scoped({'goal_context':context},legal,backend,strategy['method_config'],
+                    n_ctx=scope['n_ctx'],policy_identity=identity,policy_home=home)
+            methods = {'methods-hierarchy-v1':'hierarchical',
+                       'methods-threeway-v1':'tournament3'}
+            method = methods.get(strategy.get('strategy_id'))
+            if method:
+                from .slm_methods import predict_method
+                if home is not None:
+                    from .choice_capacity import effective_cap
+                    if effective_cap(.6, identity, home) < 3:
+                        return {'selected_action':None,'abstained':True,
+                                'error':'option_capacity_insufficient'}
+                return predict_method(prompt, choices, chat, method=method,
+                                      n_ctx=scope['n_ctx'])
+            return score_choices(prompt, [{'id': choice, 'description': choice} for choice in choices],
+                chat, n_ctx=scope['n_ctx'], min_margin=.25, policy_identity=identity, policy_home=home)
+        finally:
+            # Batched RPCs complete on worker threads; SQLite belongs to caller.
+            db.executemany('INSERT INTO learning_rpc(ts,family,strategy,body) VALUES(?,?,?,?)',
+                           rpc_records)
     return predict
 
 
@@ -77,16 +115,21 @@ def _current(db) -> dict:
     return {r[0]: r[1] for r in db.execute('SELECT family,current_strategy FROM learning_search_families')}
 
 
-def _configs(current: dict) -> dict:
-    catalogue = {s['id']: s['config'] for s in DEFAULT_STRATEGIES}
+def _configs(current: dict, catalogue_rows=DEFAULT_STRATEGIES) -> dict:
+    from .learning_search import _validate_strategy
+    catalogue = {s['id']: _validate_strategy(s)['config'] for s in catalogue_rows}
     result = {}
     for family, strategy in current.items():
         config = catalogue.get(strategy, catalogue['history-1'])
-        result[family] = {'strategy_id': strategy, 'history_width': min(8, config['history_width']),
+        result[family] = {
+            'strategy_id': strategy, 'history_width': min(8, config['history_width']),
             'candidate_k': min(3, config['candidate_k']), 'prompt_bytes': min(3000, config['prompt_bytes']),
             'retrieval_k': config.get('retrieval_k', 64),
             'candidate_source': config.get('candidate_source', 'history'),
-            'recent_sessions_n': config.get('recent_sessions_n', 5)}
+            'recent_sessions_n': config.get('recent_sessions_n', 5),
+            'decision_method': config.get('decision_method', 'per_candidate_binary_logit'),
+            'method_config': dict(config),
+        }
     return result
 
 
@@ -118,7 +161,8 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
                            WHERE l.family='omp.tool' ORDER BY l.ts,l.id'''):
         receipt = json.loads(row['body'])
         shadows = [s for s in receipt.get('shadow', [])
-                   if s.get('model') == identity['model'] and s.get('arm') == 'goal-binary']
+                   if s.get('model') == identity['model'] and
+                   (s.get('arm') == 'goal-binary' or str(s.get('arm','')).startswith('slm-method:'))]
         if not shadows:
             continue
         strategy = receipt.get('projection_strategy', 'history-1')
@@ -130,7 +174,8 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
         decisions = [('history_bigram', action if confidence >= .8 else None, {
             'kind': 'knn', 'model': 'history-bigram-v1', 'quant': 'none',
             'engine': 'python-stdlib', 'backend': 'cpu', 'device': 'groot'})]
-        decisions += [('goal_binary', s.get('selected_action') if not s.get('error') else None, identity) for s in shadows]
+        decisions += [('goal_binary' if s.get('arm') == 'goal-binary' else s['arm'],
+                       s.get('selected_action') if not s.get('error') else None, identity) for s in shadows]
         for arm, selected, arm_identity in decisions:
             key = strategy, arm, json.dumps(projection, sort_keys=True)
             value = groups.setdefault(key, {'family': 'omp.tool', 'arm': arm + '@' +
@@ -143,7 +188,7 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
             value['n'] += int(covered)
             value['total'] += 1
             value['correct'] += correct
-            matched[arm].update(total=1, covered=int(covered), correct=correct)
+            matched.setdefault(arm, Counter()).update(total=1, covered=int(covered), correct=correct)
     comparison = {}
     for arm, counts in matched.items():
         n, total, correct = counts['covered'], counts['total'], counts['correct']
@@ -178,6 +223,7 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
         part = derive_jobs(db, now=now, max_calls=10000)
         for key in derived:
             derived[key] += part[key]
+        db.commit()
         if part['calls_scanned'] < 10000:
             break
     endpoints = load_serving(home/'config'/'serving.json')
@@ -190,11 +236,14 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
         return result
     identity, scope = serving_identity(endpoint)
     current = _current(db)
-    strategies = _configs(current)
+    from .slm_candidates import candidate_catalogue
+    catalogue = candidate_catalogue(home, DEFAULT_STRATEGIES)
+    strategies = _configs(current, catalogue)
     metrics = run_jobs(db, choice_predictor(db, endpoint, identity, scope, home=home), now=now,
         max_jobs=int(config.get('jobs_per_tick', 48)), deadline=deadline,
         strategy_id='history-1', history_width=1, strategies=strategies,
         slm_arm='slm:' + endpoint.served_model)
+    db.commit()
     result.update(metrics, identity=identity, serving_scope=scope)
     observations = _atomic_observations(metrics['families'], identity, scope)
     tool_rows, matched = tool_observations(db, identity, scope)
@@ -219,7 +268,9 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
     census = census_queue(home, config)
     result['census_queue'] = census
     result['search'] = search_tick(db, tick_id=tick_id, now=now,
-        observations=combined.values(), census_queue=census, config=search_config)
+        observations=combined.values(), census_queue=census, config=search_config,
+        strategies=catalogue)
+    db.commit()
     artifact = home/'loop'/'findings-sources'/('shadow-' + hashlib.sha256(tick_id.encode()).hexdigest() + '.json')
     artifact.parent.mkdir(parents=True, exist_ok=True)
     atomic_json(artifact, {'ts': now, 'identity': identity, 'scope': scope,
@@ -227,6 +278,7 @@ def runtime_tick(db, home: Path, *, now: float, deadline: float, config: dict) -
     result['findings'] = emit_findings(db, tick_id=tick_id, now=now,
         observations=observations, source_path=artifact, run_id='shadow-' + tick_id,
         home=home, config=search_config)
+    db.commit()
     result['findings_source'] = str(artifact)
     rpc = [json.loads(r[0]) for r in db.execute('SELECT body FROM learning_rpc WHERE ts>=?', (now,))]
     errors = sum(bool(r.get('error')) for r in rpc)

@@ -57,6 +57,14 @@ DEFAULT_STRATEGIES = (
                 'retrieval_k': 3, 'max_examples': 512, 'previous_only': True,
                 'narrowing': 'deterministic', 'decision_method': 'per_candidate_binary_logit',
                 'abstain': 'top_margin'}},
+    {'id': 'methods-threeway-v1', 'kind': 'bounded_projection',
+     'config': {'history_width': 1, 'candidate_k': 3, 'max_options': 3, 'prompt_bytes': 3000,
+                'narrowing': 'deterministic', 'decision_method': 'slm_threeway_v1',
+                'abstain': 'missing_logits'}},
+    {'id': 'methods-hierarchy-v1', 'kind': 'bounded_projection',
+     'config': {'history_width': 1, 'candidate_k': 3, 'max_options': 3, 'prompt_bytes': 3000,
+                'narrowing': 'deterministic', 'decision_method': 'semantic_hierarchy_binary_v1',
+                'abstain': 'top_margin'}},
 )
 
 
@@ -304,6 +312,8 @@ def search_tick(db: sqlite3.Connection, *, tick_id: str, now: float,
                 'SELECT strategy FROM learning_search_trials WHERE family=?', (family,))}
             selected = None
             for candidate in catalogue:
+                if candidate.get('families') and family not in candidate['families']:
+                    continue
                 if candidate['id'] in used:
                     continue
                 reason = _blocked(candidate, endpoints or {}, unavailable or {})

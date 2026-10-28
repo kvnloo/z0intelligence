@@ -148,7 +148,8 @@ def larger():
 
 
 def test_unavailable_larger_model_records_block_and_tries_alternative(db):
-    strategies = (DEFAULT_STRATEGIES[0], larger(), DEFAULT_STRATEGIES[-1])
+    strategies = (DEFAULT_STRATEGIES[0], larger(),
+                  next(s for s in DEFAULT_STRATEGIES if s['id']=='few-shot-3'))
     for i in (1, 2, 3):
         report = tick(db, i, [observation()], strategies=strategies)
     blocked = next(e for e in report['events'] if e['type'] == 'blocked')
@@ -179,7 +180,7 @@ def test_recent_sessions_and_retrieval_are_bounded_proposals(db):
     for i in (1, 2, 3):
         report = tick(db, i, [observation()], strategies=(DEFAULT_STRATEGIES[0], recent))
     assert report['families']['omp.tool']['strategy'] == recent
-    unsafe = copy.deepcopy(DEFAULT_STRATEGIES[-1])
+    unsafe = copy.deepcopy(next(s for s in DEFAULT_STRATEGIES if s['id']=='few-shot-3'))
     unsafe['config']['previous_only'] = False
     with pytest.raises(ValueError, match='exclude current and future'):
         tick(db, 4, [], strategies=(unsafe,))
@@ -187,11 +188,19 @@ def test_recent_sessions_and_retrieval_are_bounded_proposals(db):
 
 def test_small_model_candidate_caps_default_three_and_explicit_17b_five(db):
     assert [s['id'] for s in DEFAULT_STRATEGIES] == [
-        'history-1', 'history-3', 'projection-recent-sessions', 'few-shot-3']
-    assert all(s['config']['candidate_k'] <= 3 and
-               s['config']['decision_method'] == 'per_candidate_binary_logit' and
-               s['config']['narrowing'] == 'deterministic' and
-               s['config']['abstain'] == 'top_margin' for s in DEFAULT_STRATEGIES)
+        'history-1', 'history-3', 'projection-recent-sessions', 'few-shot-3',
+        'methods-threeway-v1', 'methods-hierarchy-v1']
+    assert all(s['config']['candidate_k'] <= 3 and s['config']['max_options'] <= 3 and
+               s['config']['narrowing'] == 'deterministic' for s in DEFAULT_STRATEGIES)
+    expected_methods={
+        'history-1':('per_candidate_binary_logit','top_margin'),
+        'history-3':('per_candidate_binary_logit','top_margin'),
+        'projection-recent-sessions':('per_candidate_binary_logit','top_margin'),
+        'few-shot-3':('per_candidate_binary_logit','top_margin'),
+        'methods-threeway-v1':('slm_threeway_v1','missing_logits'),
+        'methods-hierarchy-v1':('semantic_hierarchy_binary_v1','top_margin')}
+    assert {s['id']:(s['config']['decision_method'],s['config']['abstain'])
+            for s in DEFAULT_STRATEGIES} == expected_methods
     for options in (4, 24, 64):
         invalid = copy.deepcopy(DEFAULT_STRATEGIES[0])
         invalid['config'].update(candidate_k=options, max_options=options, model_size_b=.6)
