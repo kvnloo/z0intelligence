@@ -484,11 +484,13 @@ def test_scoped_pipeline_validates_pinned_graph_set_not_history(tmp_path, monkey
     from types import SimpleNamespace
     from z0int.cognition import learning_runtime
     from z0int.cognition.adapters.transport import ChatOutcome
+    contexts=[]
 
     class Transport:
         def __init__(self, config):
             pass
         def chat(self, messages, **kwargs):
+            contexts.append(json.loads(messages[-1]['content'])['context'])
             raw = {'choices': [{'message': {'content': 'yes'}, 'logprobs': {'content': [{
                 'token': 'yes', 'logprob': -.1, 'top_logprobs': [
                     {'token': 'yes', 'logprob': -.1}, {'token': 'no', 'logprob': -3}]}]}}]}
@@ -508,13 +510,28 @@ def test_scoped_pipeline_validates_pinned_graph_set_not_history(tmp_path, monkey
     catalogue=[{'id':'history-1','kind':'bounded_projection','config':config}]
     strategy=learning_runtime._configs({'omp.model_choice':'history-1'},catalogue)
     target=job_id('session','6','omp.model_choice')
-    run_jobs(db,predict,now=20,max_jobs=20,families=('omp.model_choice',),
+    pending=run_jobs(db,predict,now=19,max_jobs=1,families=('omp.model_choice',),
+                     strategies=strategy)
+    assert pending['jobs_evaluated']==0
+    assert db.execute('SELECT COUNT(*) FROM family_evaluations').fetchone()[0]==0
+    run_jobs(db,predict,now=20,max_jobs=1,families=('omp.model_choice',),
              strategies=strategy,legal_candidates={target:['d']})
     result=db.execute("SELECT prediction,choices,error FROM family_evaluations WHERE id=? AND arm LIKE 'slm:%'",(target,)).fetchone()
     assert result['prediction']=='d' and result['error'] is None
     assert json.loads(result['choices'])==['d']
     prompt=db.execute("SELECT prompt FROM family_evaluations WHERE id=? AND arm LIKE 'slm:%'",(target,)).fetchone()['prompt']
     assert 'd' not in json.loads(prompt)['choices']
+    baseline=db.execute("SELECT prediction,choices FROM family_evaluations WHERE id=? AND arm LIKE 'heuristic:%'",(target,)).fetchone()
+    assert baseline['prediction'] is None and json.loads(baseline['choices'])==['d']
+    assert contexts and contexts[0]['previous_tools']==[{'tool':'read','intent':None}]
+    assert contexts[0]['task']=='Predict the exact next explicit model argument.'
+    assert contexts[0]['examples'] and all(item['next_tool'] != 'd' for item in contexts[0]['examples'])
+    assert 'choices' not in contexts[0]
+    empty=job_id('session','5','omp.model_choice')
+    run_jobs(db,predict,now=20,max_jobs=1,families=('omp.model_choice',),
+             strategies=strategy,legal_candidates={empty:[]})
+    rows=db.execute('SELECT prediction,choices FROM family_evaluations WHERE id=?',(empty,)).fetchall()
+    assert len(rows)==2 and all(row['prediction'] is None and json.loads(row['choices'])==[] for row in rows)
 
     # Even a faulty predictor cannot select a frozen but graph-illegal action.
     changed={**strategy['omp.model_choice'],'strategy_id':'second'}

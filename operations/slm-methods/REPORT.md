@@ -128,9 +128,10 @@ contained two path-kind joins with unavailable native ancestry.
 The original powered search filtered its training vocabulary using labels from
 the evaluation cohort. Its negative result remains a historical observation,
 not a valid training-only evaluation or a promotion claim. The corrected runner
-builds categories solely from the earlier training prefix; unseen evaluation
-labels remain in the denominator and count toward fallback. A fresh matched
-measurement is required to establish outcomes under that corrected protocol.
+builds categories solely from calls and receipts preceding the earliest evaluated
+call or receipt. Unseen evaluation labels remain in the denominator: a wrong
+prediction stays wrong, and only actual abstentions count toward fallback.
+A fresh matched measurement is required under that corrected protocol.
 The runner stores a training digest, row count, exclusive cutoff and categories.
 Runner database, session directory, endpoint and candidate home are explicit
 inputs; output files and manifests should remain private when they contain

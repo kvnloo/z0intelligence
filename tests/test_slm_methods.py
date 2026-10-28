@@ -127,10 +127,14 @@ def test_pipeline_portfolio_retains_scope_and_dispatches(monkeypatch):
         timeout_s=1,runtime=None,quantization=None)
     db=sqlite3.connect(':memory:')
     predict=learning_runtime.choice_predictor(db,endpoint,{}, {'n_ctx':4096})
-    answer=predict(json.dumps({'latest_user_message':'inspect then change'}),['read','edit'],strategy)
+    answer=predict(json.dumps({'task':'Predict next tool', 'previous_tools':['read'],
+                               'examples':[{'previous_tools':['find'], 'label':'read'}]}),
+                   ['read','edit'],strategy)
     assert answer['selected_action']=='edit'
     assert answer['arm_scope']==slm_scoped.scope_digest(config)
-    assert captured==[({'goal_context':{'latest_user_message':'inspect then change'}},
+    assert captured==[({'goal_context':{'task':'Predict next tool',
+                        'previous_tools':[{'tool':'read'}],
+                        'examples':[{'previous_tools':['find'],'next_tool':'read'}]}},
                        ('read','edit'),config)]
 
 
@@ -154,10 +158,21 @@ def test_search_training_vocabulary_ignores_holdout_labels():
     import sqlite3
     db=sqlite3.connect(':memory:')
     db.row_factory=sqlite3.Row
-    db.execute('CREATE TABLE labels(id TEXT,ts REAL,action TEXT,features TEXT,family TEXT)')
-    db.executemany('INSERT INTO labels VALUES(?,?,?,?,?)', [
-        ('1',1,'read','[]','omp.tool'), ('2',2,'edit','["read"]','omp.tool')])
-    first=module.training_scope(db,[{'ts':3,'label':'read'}])
-    second=module.training_scope(db,[{'ts':3,'label':'unseen'}])
-    assert first==second
-    assert 'unseen' not in {item for group in first[3][3] for item in group}
+    db.execute('CREATE TABLE labels(id TEXT,session TEXT,call TEXT,ts REAL,action TEXT,features TEXT,family TEXT)')
+    db.execute('CREATE TABLE calls(session TEXT,call TEXT,ts REAL)')
+    db.executemany('INSERT INTO labels VALUES(?,?,?,?,?,?,?)', [
+        ('1','s','1',1,'read','[]','omp.tool'),
+        ('2','s','2',2,'future','[]','omp.tool'),
+        ('3','s','3',2,'edit','["read"]','omp.tool')])
+    db.executemany('INSERT INTO calls VALUES(?,?,?)', [
+        ('s','1',1), ('s','2',5), ('s','3',2), ('s','eval',3)])
+    first=module.training_scope(db,[{'ts':4,'session':'s','call':'eval','label':'read'}])
+    second=module.training_scope(db,[{'ts':4,'session':'s','call':'eval','label':'unseen'}])
+    assert first==second and first[0]==3
+    vocabulary={item for group in first[3][3] for item in group}
+    assert vocabulary=={'read','edit'}
+    assert 'future' not in vocabulary
+    wrong=module.score_prediction({'selected_action':'read','category':0},'unseen',[['read']])
+    assert wrong['correct'] is False and wrong['abstain'] is False
+    abstained=module.score_prediction({'selected_action':None,'category':None},'unseen',[['read']])
+    assert abstained['abstain'] is True

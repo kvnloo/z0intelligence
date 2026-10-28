@@ -8,6 +8,7 @@ import argparse
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
 import itertools
+import math
 import json
 from pathlib import Path
 import random
@@ -25,13 +26,36 @@ from z0int.cognition.slm_candidates import publish_candidate
 
 def training_scope(db, evaluation_rows):
     """Build categories exclusively from records preceding the frozen sample."""
-    cutoff=min(row['ts'] for row in evaluation_rows)
-    rows=list(db.execute("SELECT id,ts,action,features FROM labels WHERE family='omp.tool' AND ts<? ORDER BY ts,id",(cutoff,)))
+    evaluation_times=[]
+    for row in evaluation_rows:
+        call=db.execute("SELECT ts FROM calls WHERE session=? AND call=?",
+                        (row['session'],row['call'])).fetchone()
+        if call is None or not isinstance(call['ts'], (int,float)) or not math.isfinite(call['ts']) or call['ts'] <= 0:
+            raise ValueError('missing_evaluation_call_time')
+        if not isinstance(row['ts'], (int,float)) or not math.isfinite(row['ts']) or row['ts'] <= 0:
+            raise ValueError('missing_evaluation_receipt_time')
+        evaluation_times.extend((row['ts'],call['ts']))
+    cutoff=min(evaluation_times)
+    rows=list(db.execute("""SELECT l.id,l.ts,l.action,l.features FROM labels l
+        JOIN calls c ON c.session=l.session AND c.call=l.call
+        WHERE l.family='omp.tool' AND l.ts>0 AND l.ts<? AND c.ts>0 AND c.ts<?
+        ORDER BY l.ts,l.id""",(cutoff,cutoff)))
     training=[{'label':r['action'],'features':json.loads(r['features'])} for r in rows]
     digest=hashlib.sha256(json.dumps(
         [{'id':r['id'], **example} for r,example in zip(rows,training)],
         sort_keys=True,separators=(',',':')).encode()).hexdigest()
     return cutoff,training,digest,{count:cluster_tools(training,count) for count in (3,5,8)}
+
+
+def score_prediction(answer, label, groups):
+    """Score what the pipeline returned; gold never changes its decision."""
+    selected=answer.get('selected_action')
+    category=answer.get('category')
+    recall=any(label in group for group in groups)
+    return {'correct': selected == label, 'abstain': selected is None,
+            'category_correct': category is not None and label in groups[category],
+            'candidate_recall': recall,
+            'frontier_reason_if_requested_tool_unseen': None if recall else 'tool_not_in_observed_vocab'}
 
 
 def main():
@@ -97,14 +121,8 @@ def main():
                     error=None
                 except Exception as exc:
                     answer={'selected_action':None,'category':None};error=type(exc).__name__
-                category=answer.get('category');recall=any(row['label'] in group for group in groups)
-                # Unseen labels cannot be covered by the frozen vocabulary;
-                # retain them in the denominator and charge fallback.
-                selected=answer.get('selected_action') if recall else None
-                return {'id':row['id'],'session':row['session'],'split':row['_split'],'correct':selected==row['label'],
-                        'abstain':selected is None,'category_correct':category is not None and row['label'] in groups[category],
-                        'candidate_recall':recall,'tools':sum(map(len,groups)),
-                        'frontier_reason_if_requested_tool_unseen':None if recall else 'tool_not_in_observed_vocab',
+                return {'id':row['id'],'session':row['session'],'split':row['_split'],
+                        **score_prediction(answer,row['label'],groups), 'tools':sum(map(len,groups)),
                         'wall_ms':1000*(time.monotonic()-started),'tokens':sum(r['tokens'] for r in account),
                         'failed_rpcs':sum(r['failed'] for r in account),'error':error}
             outcomes=list(pool.map(evaluate,prepared))

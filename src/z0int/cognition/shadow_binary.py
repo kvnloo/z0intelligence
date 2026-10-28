@@ -34,6 +34,9 @@ def _context(payload: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]
         "last_assistant_sentence": _text(raw.get("last_assistant_sentence"), 300),
         "previous_tools": [],
     }
+    task = _text(raw.get("task"), 300)
+    if task is not None:
+        context["task"] = task
     history = raw.get("previous_tools")
     if isinstance(history, list):
         for row in history[-5:]:

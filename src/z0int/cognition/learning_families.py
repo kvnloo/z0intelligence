@@ -303,11 +303,11 @@ def _evaluate(db: sqlite3.Connection, row: Mapping, predict: Predict, *, now: fl
         history_width=strategy["history_width"], model_cap=strategy["model_cap"])
     scoped_choices = choices
     if strategy.get("decision_method") == "slm_pipeline_v1":
-        # Only a graph-derived set pinned to this job may authorize a scoped
-        # candidate; absence is an abstention, not a historical-label fallback.
-        pinned = (legal_candidates or {}).get(row["id"], ())
+        # Missing or malformed graph evidence is pending; a supplied empty
+        # graph is different and is a genuine, recordable abstention.
+        pinned = (legal_candidates or {}).get(row["id"])
         if not isinstance(pinned, (list, tuple)) or any(not _name(value) for value in pinned):
-            pinned = ()
+            return
         groups = strategy["method_config"]["frozen_categories"]
         vocabulary = {value for group in groups for value in group}
         scoped_choices = list(dict.fromkeys(value for value in pinned if value in vocabulary))
@@ -316,7 +316,7 @@ def _evaluate(db: sqlite3.Connection, row: Mapping, predict: Predict, *, now: fl
         if db.execute("SELECT 1 FROM family_evaluations WHERE id=? AND arm=?", (row["id"], arm)).fetchone():
             continue
         if base_arm == BASELINE:
-            selected, confidence = _baseline(row["features"], examples, choices, strategy["history_width"])
+            selected, confidence = _baseline(row["features"], examples, scoped_choices, strategy["history_width"])
             error = None
         else:
             try:
@@ -328,7 +328,7 @@ def _evaluate(db: sqlite3.Connection, row: Mapping, predict: Predict, *, now: fl
                 selected, confidence, error = None, 0.0, "predictor_exception"
         db.execute("INSERT OR IGNORE INTO family_evaluations VALUES(?,?,?,?,?,?,?,?,?)",
                    (row["id"], arm, selected, confidence, now + time.monotonic() - started,
-                    int(prospective), prompt, _json(scoped_choices if base_arm == slm_arm else choices), error))
+                    int(prospective), prompt, _json(scoped_choices), error))
 
 
 def run_jobs(db: sqlite3.Connection, predict: Predict, *, now: float | None = None,
@@ -373,9 +373,22 @@ def run_jobs(db: sqlite3.Connection, predict: Predict, *, now: float | None = No
             _json(method_config)
             strategy.update(decision_method=method, method_config=method_config)
         arm = _arm_key(db, slm_arm, strategy)
-        queue = db.execute("""SELECT j.* FROM family_jobs j WHERE family=?
+        query = """SELECT j.* FROM family_jobs j WHERE family=?
             AND NOT EXISTS(SELECT 1 FROM family_evaluations e WHERE e.id=j.id AND e.arm=?)
-            ORDER BY ts,id LIMIT ?""", (family, arm, max(0, max_jobs))).fetchall()
+            ORDER BY ts,id"""
+        if method == "slm_pipeline_v1":
+            # Skip unavailable graphs before applying the job limit, so an
+            # older pending job cannot starve a later graph-ready one.
+            queue = []
+            if max_jobs > 0:
+                for row in db.execute(query, (family, arm)):
+                    pinned = (legal_candidates or {}).get(row["id"])
+                    if isinstance(pinned, (list, tuple)) and all(_name(value) for value in pinned):
+                        queue.append(row)
+                        if len(queue) >= max_jobs:
+                            break
+        else:
+            queue = db.execute(query + " LIMIT ?", (family, arm, max(0, max_jobs))).fetchall()
         queues.append((queue, strategy))
     db.commit()
     processed = 0

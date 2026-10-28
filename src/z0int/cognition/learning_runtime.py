@@ -76,7 +76,16 @@ def choice_predictor(db, endpoint, identity: dict, scope: dict, *, home: Path | 
                 backend=SimpleNamespace(_transport=SimpleNamespace(chat=chat),
                     config=SimpleNamespace(model=endpoint.served_model),
                     backend_id=identity.get('backend'))
-                return run_scoped({'goal_context':json.loads(prompt)},legal,backend,strategy['method_config'],
+                projected = json.loads(prompt)
+                context = {
+                    'task': projected.get('task'),
+                    'previous_tools': [{'tool': value} for value in projected.get('previous_tools', [])
+                                       if isinstance(value, str)],
+                    'examples': [{'previous_tools': item.get('previous_tools', []),
+                                  'next_tool': item.get('label')}
+                                 for item in projected.get('examples', []) if isinstance(item, dict)],
+                }
+                return run_scoped({'goal_context':context},legal,backend,strategy['method_config'],
                     n_ctx=scope['n_ctx'],policy_identity=identity,policy_home=home)
             methods = {'methods-hierarchy-v1':'hierarchical',
                        'methods-threeway-v1':'tournament3'}
