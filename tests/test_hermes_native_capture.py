@@ -235,7 +235,6 @@ def test_persisted_user_decision_uses_production_claim_admission(native, tmp_pat
     )
     assert isinstance(events[0].payload, dict)
     assert isinstance(event.payload, dict)
-    assert events[0].payload["locator"] == "agentsview:native-session#1"
     assert events[0].payload["native_source_validated"] is True
     assert event.payload["observed_at"] == "2026-10-09T00:00:00.125000Z"
     assert event.payload["admission_method"] == "native_user_claim_attestation.v1"
@@ -247,6 +246,32 @@ def test_persisted_user_decision_uses_production_claim_admission(native, tmp_pat
     assert selected[0]["value"] == json.loads(row["content"])["value"]
     assert row["content"] not in EventLog(ledger).events_path.read_text()
     assert (native / "state.db").read_bytes() == before
+
+
+def test_native_reference_never_hydrates_a_colliding_agentsview_row(native, tmp_path):
+    from memory_fixture import build_av_db
+    from z0int.memory.surface import inspect
+
+    row = _persist(native)
+    ledger = tmp_path / "ledger"
+    _capture(native, row, ledger)
+    reference = next(event for event in EventLog(ledger).iter_events()
+                     if event.event_type == "source.reference")
+    archive = tmp_path / "archive.db"
+    build_av_db(archive)
+    with sqlite3.connect(archive) as conn:
+        conn.execute("UPDATE sessions SET id = 'native-session' WHERE id = 'h1'")
+        conn.execute("UPDATE messages SET session_id = 'native-session', content = ? WHERE id = 1",
+                     ("unrelated archive row",))
+    # The same session name and integer row ID exist in both independent stores.
+    archived = inspect("agentsview:native-session#1", av_db=archive)
+    assert archived["ok"]
+    assert any(message["text"] == "unrelated archive row" for message in archived["messages"])
+    native_read = inspect(reference.payload["locator"], av_db=archive, ledger_root=ledger)
+    assert native_read["ok"] is False
+    assert "unrelated archive row" not in json.dumps(native_read)
+    packet = project_claims(_scope(), ledger_root=ledger)
+    assert packet.measurements["selected_claims"][0]["origin_trust"] == "explicit_user"
 
 
 def test_explicit_correction_survives_restart_without_duplicate_claims(native, tmp_path):

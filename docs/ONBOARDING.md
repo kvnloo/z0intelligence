@@ -190,6 +190,17 @@ The existing `Z0INT_MEMORY_SOURCE_INGEST=references` opt-in is for an
 authorized host/operator only; disabled capture must create no ledger directory.
 Original content stays in the native Hermes database.
 
+Native evidence uses `hermes-native:<session>#<message-uid>`, not an AgentsView
+row locator. Native row IDs and archive row IDs are independent. The generic
+AgentsView inspector rejects native locators instead of reading a coincidentally
+matching archive row. Native rehydration still requires the trusted session
+binding and exact-source checks above. This does not add a model-facing native
+fetch tool or extend any source grant.
+
+Previously recorded ambiguous locators are not rewritten or treated as an
+archive-to-native mapping. Originals remain in their owning store. Any historical
+repair needs independently verified source identity, not a matching integer ID.
+
 The freshness/scope prerequisite supplies the canonical `memory_contract.py`
 and `context_resolve.py`; no aggregate wiring branch is merged. A trusted Hermes
 host/session/workstream binding is still missing, so runtime activation remains

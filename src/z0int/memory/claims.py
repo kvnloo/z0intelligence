@@ -247,7 +247,14 @@ def _validated_user_reference(
         if (
             identity is not None
             and identity.source_system in {"codex", "claude", "claude-code", "hermes", "omp", "omo", "dsh", "agentsview"}
-            and parent.payload.get("locator") == f"agentsview:{identity.source_session}#{identity.source_seq if identity.source_seq is not None else identity.source_event_id}"
+            and (
+                parent.payload.get("locator") == f"agentsview:{identity.source_session}#{identity.source_seq if identity.source_seq is not None else identity.source_event_id}"
+                or (
+                    identity.source_system == "hermes"
+                    and identity.source_event_id is not None
+                    and parent.payload.get("locator") == f"hermes-native:{identity.source_session}#{identity.source_event_id}"
+                )
+            )
             and identity.event_uid in evidence_uids
             and parent.payload.get("native_source_validated") is True
             and parent.payload.get("role") == "user"
