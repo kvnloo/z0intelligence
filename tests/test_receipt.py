@@ -674,5 +674,66 @@ class ReceiptVersionAttribution(unittest.TestCase):
             self.assertEqual(summary["measured_frontier_tokens_sum"], 7)
 
 
+class ReceiptMeasurementCompleteness(unittest.TestCase):
+    def test_one_component_does_not_become_a_complete_total(self):
+        from z0int.receipt import append_receipt, close_turn, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for field in ("input_tokens", "output_tokens"):
+                with self.subTest(field=field):
+                    append_receipt({"trace_id": field, "baseline_input_tokens": 1000}, root=root)
+                    result = close_turn(field, **{field: 100}, measurement_state="complete", root=root)
+                    self.assertIsNone(result["measured_frontier_tokens"])
+                    self.assertEqual(result["receipt"][field], 100)
+                    self.assertEqual(result["measurement_state"], "partial")
+                    self.assertIsNone(result["actual_tokens_saved"])
+            self.assertEqual(summarize_tokenomics(root=root)["actual_tokens_saved_authoritative"], 0)
+
+    def test_partial_correction_clears_old_total_and_savings(self):
+        from z0int.receipt import append_receipt, close_turn
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            append_receipt({"trace_id": "turn", "baseline_input_tokens": 1000}, root=root)
+            close_turn("turn", input_tokens=90, output_tokens=10, measurement_state="complete", root=root)
+            corrected = close_turn("turn", input_tokens=150, root=root)
+            self.assertIsNone(corrected["measured_frontier_tokens"])
+            self.assertIsNone(corrected["actual_tokens_saved"])
+            self.assertEqual(corrected["measurement_state"], "partial")
+            self.assertNotIn("output_tokens", corrected["receipt"])
+
+    def test_explicit_total_does_not_require_component_breakdown(self):
+        from z0int.receipt import close_turn
+
+        with tempfile.TemporaryDirectory() as tmp:
+            result = close_turn("turn", measured_frontier_tokens=123, input_tokens=100,
+                                measurement_state="complete", root=Path(tmp))
+            self.assertEqual(result["measured_frontier_tokens"], 123)
+            self.assertEqual(result["measurement_state"], "complete")
+
+    def test_token_regression_remains_signed_in_close_and_summary(self):
+        from z0int.receipt import append_receipt, close_turn, summarize_tokenomics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for trace, measured in (("saved", 80), ("regressed", 160)):
+                append_receipt({"trace_id": trace, "baseline_input_tokens": 100}, root=root)
+                closed = close_turn(trace, measured_frontier_tokens=measured,
+                                    measurement_state="complete", root=root)
+                self.assertEqual(closed["actual_tokens_saved"], 100 - measured)
+            summary = summarize_tokenomics(root=root)
+            self.assertEqual(summary["actual_tokens_saved"], -40)
+            self.assertEqual(summary["actual_tokens_saved_authoritative"], -40)
+
+    def test_no_usage_cannot_infer_full_baseline_savings(self):
+        from z0int.receipt import build_receipt
+
+        for usage in ({}, {"input_tokens": 20}, {"output_tokens": 20}):
+            with self.subTest(usage=usage):
+                receipt = build_receipt(baseline_input_tokens=1000, **usage)
+                self.assertIsNone(receipt.tokens_saved_est())
+
+
 if __name__ == "__main__":
     unittest.main()

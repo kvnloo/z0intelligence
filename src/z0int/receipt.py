@@ -295,9 +295,12 @@ class DecisionReceipt:
         if self.baseline_input_tokens is None and self.baseline_output_tokens is None:
             return None
         base = int(self.baseline_input_tokens or 0) + int(self.baseline_output_tokens or 0)
-        used = int(self.input_tokens or 0) + int(self.output_tokens or 0)
         if self.measured_frontier_tokens is not None:
             used = int(self.measured_frontier_tokens)
+        elif self.input_tokens is not None and self.output_tokens is not None:
+            used = int(self.input_tokens) + int(self.output_tokens)
+        else:
+            return None
         return max(0, base - used)
 
 
@@ -578,11 +581,20 @@ def close_turn(
     """
     base = find_receipt(trace_id, root=root) or {"trace_id": trace_id, "schema": SCHEMA}
     closed = dict(base)
-    # unwrap nested bridge receipt fields already merged by find_receipt
+    # Usage arguments replace the previous usage snapshot, not one component of it.
+    has_usage = any(value is not None for value in
+                    (measured_frontier_tokens, input_tokens, output_tokens))
+    incomplete_total = (
+        measured_frontier_tokens is None
+        and (input_tokens is None) != (output_tokens is None)
+    )
+    if has_usage:
+        for key in ("measured_frontier_tokens", "input_tokens", "output_tokens", "cached_input_tokens"):
+            closed.pop(key, None)
     if measured_frontier_tokens is not None:
         closed["measured_frontier_tokens"] = int(measured_frontier_tokens)
-    elif input_tokens is not None or output_tokens is not None:
-        closed["measured_frontier_tokens"] = int(input_tokens or 0) + int(output_tokens or 0)
+    elif input_tokens is not None and output_tokens is not None:
+        closed["measured_frontier_tokens"] = int(input_tokens) + int(output_tokens)
     if input_tokens is not None:
         closed["input_tokens"] = int(input_tokens)
     if output_tokens is not None:
@@ -601,6 +613,11 @@ def close_turn(
     normalized_reason = normalize_state_reason(state_reason)
     if normalized_reason is not None:
         closed["state_reason"] = normalized_reason
+    if incomplete_total:
+        if normalize_measurement_state(closed.get("measurement_state")) not in EXPLICIT_INCOMPLETE_MEASUREMENT_STATES:
+            closed["measurement_state"] = "partial"
+        if normalized_reason is None:
+            closed["state_reason"] = "incomplete_token_usage"
     closed["schema"] = SCHEMA
     closed["close_ts"] = time.time()
     closed["close_source"] = source
@@ -614,11 +631,10 @@ def close_turn(
         base_tot = None
     meas = closed.get("measured_frontier_tokens")
     state = normalize_measurement_state(closed.get("measurement_state"))
-    if state in EXPLICIT_INCOMPLETE_MEASUREMENT_STATES:
-        closed.pop("actual_tokens_saved", None)
-    elif base_tot is not None and meas is not None:
+    closed.pop("actual_tokens_saved", None)
+    if state not in EXPLICIT_INCOMPLETE_MEASUREMENT_STATES and base_tot is not None and meas is not None:
         try:
-            closed["actual_tokens_saved"] = max(0, base_tot - int(meas))
+            closed["actual_tokens_saved"] = base_tot - int(meas)
         except (TypeError, ValueError):
             pass
     # strip non-receipt noise from bridge merge
@@ -696,7 +712,7 @@ def summarize_tokenomics(*, root: Path | None = None, limit: int = 5000) -> dict
         if base_tot is not None and meas_i is not None:
             rows_with_both += 1
             if state not in EXPLICIT_INCOMPLETE_MEASUREMENT_STATES:
-                saved = max(0, base_tot - meas_i)
+                saved = base_tot - meas_i
                 actual_saved += saved
                 if state == "complete":
                     actual_saved_authoritative += saved

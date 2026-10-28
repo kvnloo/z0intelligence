@@ -97,6 +97,16 @@ measured tokens for every verified trace. Baselines and avoided-token estimates
 do not substitute for missing measurements. Complete measurement flags alone
 do not prove a task benefit or independent verification.
 
+Close-turn usage arguments replace the previous usage snapshot. Without an
+explicit total, both input and output counts are required. One missing count
+keeps the total unknown and the measurement partial. It cannot retain earlier
+savings or a stale count from a previous close.
+
+Measured savings are signed baseline-minus-usage deltas. A negative value means
+the turn used more tokens than its baseline. Summaries retain these regressions.
+The `/usage` offload total includes only complete measurements, including negative
+deltas. Character-based SoL-Pi and RLM estimates remain separate.
+
 ## Models (12GB example)
 
 ```text

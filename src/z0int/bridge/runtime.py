@@ -668,6 +668,10 @@ class BridgeRuntime:
             closed = {"ok": False, "error": str(exc), "trace_id": trace_id}
 
         ok = not closed.get("error") and closed.get("ok") is not False
+        if ok:
+            measurement_state = closed.get("measurement_state")
+            state_reason = closed.get("state_reason")
+            measured = closed.get("measured_frontier_tokens")
         heart = {
             "schema": SCHEMA_HEART,
             "ts": time.time(),
