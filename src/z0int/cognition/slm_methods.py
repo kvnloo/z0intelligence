@@ -52,6 +52,8 @@ def predict_method(prompt, choices, chat, *, method, seed=42, n_ctx=4096):
 
     if not choices:
         return {'selected_action': None, 'abstained': True}
+    if len(choices) == 1 and method in ('bt', 'tournament3'):
+        return {'selected_action': None, 'abstained': True, 'error': 'no_comparison'}
     if method == 'goal_binary':
         return score(choices)
     if method == 'vote3':

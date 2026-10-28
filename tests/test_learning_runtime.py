@@ -94,7 +94,8 @@ def test_tool_comparison_keeps_abstentions_out_of_accuracy_denominator(tmp_path)
     for i, selected in enumerate(('read', None)):
         receipt = {'identity_contract': 'session-tool-call.v1', 'projection_strategy': 'history-1',
                    'projection_config': {'candidate_k': 3}, 'shadow': [{
-                       'model': IDENTITY['model'], 'arm': 'goal-binary', 'selected_action': selected}]}
+                       'model': IDENTITY['model'], 'physical_identity': IDENTITY,
+                       'arm': 'goal-binary', 'selected_action': selected}]}
         db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
                    (str(i), 's', str(i), 100+i, 'omp.tool', json.dumps(receipt)))
         db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
@@ -104,6 +105,26 @@ def test_tool_comparison_keeps_abstentions_out_of_accuracy_denominator(tmp_path)
         'accuracy': 1, 'coverage': .5, 'wilson95_lower': comparison['goal_binary']['wilson95_lower']}
     slm = next(row for row in observations if row['identity']['kind'] == 'slm')
     assert slm['n'] == 1 and slm['total'] == 2
+    db.close()
+
+
+def test_tool_comparison_excludes_alias_only_and_other_physical_identity(tmp_path):
+    db = connect(tmp_path)
+    for i, physical in enumerate((None, {**IDENTITY, 'backend':'cpu'}, IDENTITY)):
+        shadow={'model':IDENTITY['model'],'arm':'slm-method:scope',
+                'method_config':{'decision_method':'scoped'},'selected_action':'read','rpc_count':1}
+        if physical is not None:
+            shadow['physical_identity']=physical
+        receipt={'shadow':[shadow], 'projection_config':{'candidate_k':3}}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(i),'s',str(i),100+i,'omp.tool',json.dumps(receipt)))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(i),'s',str(i),'omp.tool',100+i,'read','[]',None,120))
+    observations, comparison=runtime.tool_observations(db,IDENTITY,SCOPE)
+    slm=next(row for row in observations if row['identity']['kind']=='slm')
+    assert slm['total']==1 and slm['arm']=='slm:'+IDENTITY['model']+':slm-method:scope'
+    assert slm['projection']=={'decision_method':'scoped'}
+    assert comparison['slm-method:scope']['total']==1
     db.close()
 
 

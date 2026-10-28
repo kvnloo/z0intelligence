@@ -338,7 +338,7 @@ def _decision_rows(
     legal: Any, payload: Mapping[str, Any], *, timeout_s: float,
     shortlist: Sequence[str] = (), n_ctx: int = 4096,
     policy_identity: dict | None = None, policy_home: Path | None = None,
-    decision_config: Mapping[str, Any] | None = None, requested_tool: str | None = None,
+    decision_config: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Run scoped counterfactual arms under one shared caller deadline."""
     from .shadow_binary import run_goal_binary
@@ -350,7 +350,7 @@ def _decision_rows(
         if decision_config and decision_config.get('decision_method') != 'per_candidate_binary_logit':
             from .slm_scoped import run_scoped
             row = run_scoped(payload, legal, backend, dict(decision_config),
-                requested_tool=requested_tool, shortlist=shortlist, n_ctx=n_ctx,
+                shortlist=shortlist, n_ctx=n_ctx,
                 policy_identity=policy_identity, policy_home=policy_home)
         else:
             row = run_goal_binary(payload, legal, backend, shortlist=shortlist, n_ctx=n_ctx,
@@ -580,8 +580,7 @@ def run_shadow(
             shadow_rows = _decision_rows(resolved, legal, binary_payload,
                 timeout_s=_timeout_s(payload, timeout_s), shortlist=shortlist, n_ctx=n_ctx,
                 policy_identity=learning_state.get('experiments', {}).get('identity'),
-                policy_home=paths.home(), decision_config=projection_config,
-                requested_tool=tool_name)
+                policy_home=paths.home(), decision_config=projection_config)
     if local is not None:
         shadow_rows.append(local)
 

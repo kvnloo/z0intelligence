@@ -28,7 +28,7 @@ def validate_pipeline_config(config):
     return names
 
 
-def run_scoped(payload, legal, backend, config, *, requested_tool=None, shortlist=(),
+def run_scoped(payload, legal, backend, config, *, shortlist=(),
                n_ctx=4096, policy_identity=None, policy_home=None):
     started=time.monotonic()
     digest=scope_digest(config)
@@ -67,11 +67,8 @@ def run_scoped(payload, legal, backend, config, *, requested_tool=None, shortlis
             if config.get(stage) and config[stage] != actual_model:
                 raise ValueError('stage_model_not_bound_to_backend')
         if method=='slm_pipeline_v1':
-            names=validate_pipeline_config(config)
+            validate_pipeline_config(config)
             groups=config['frozen_categories']
-            if requested_tool and requested_tool not in names:
-                row.update(frontier_reason='tool_not_in_observed_vocab')
-                return row
             legal_ids=set(legal.ids())
             # Frozen membership remains part of scope; the live legality filter
             # cannot add a tool or change its trained category.

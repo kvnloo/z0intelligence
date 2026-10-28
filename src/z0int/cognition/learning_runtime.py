@@ -160,9 +160,13 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
     for row in db.execute('''SELECT l.*,r.body FROM labels l JOIN receipts r USING(id)
                            WHERE l.family='omp.tool' ORDER BY l.ts,l.id'''):
         receipt = json.loads(row['body'])
+        # Old receipts contain an alias, not a measured physical serving
+        # identity. Never relabel them with the identity measured today.
         shadows = [s for s in receipt.get('shadow', [])
-                   if s.get('model') == identity['model'] and
-                   (s.get('arm') == 'goal-binary' or str(s.get('arm','')).startswith('slm-method:'))]
+                   if s.get('physical_identity') == identity and
+                   s.get('model') == identity['model'] and
+                   (s.get('arm') == 'goal-binary' or str(s.get('arm','')).startswith('slm-method:')) and
+                   (not str(s.get('arm','')).startswith('slm-method:') or s.get('rpc_count', 0) > 0)]
         if not shadows:
             continue
         strategy = receipt.get('projection_strategy', 'history-1')
@@ -175,12 +179,16 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
             'kind': 'knn', 'model': 'history-bigram-v1', 'quant': 'none',
             'engine': 'python-stdlib', 'backend': 'cpu', 'device': 'groot'})]
         decisions += [('goal_binary' if s.get('arm') == 'goal-binary' else s['arm'],
-                       s.get('selected_action') if not s.get('error') else None, identity) for s in shadows]
+                       s.get('selected_action') if not (s.get('error') or s.get('parse_error')) else None, identity) for s in shadows]
         for arm, selected, arm_identity in decisions:
-            key = strategy, arm, json.dumps(projection, sort_keys=True)
-            value = groups.setdefault(key, {'family': 'omp.tool', 'arm': arm + '@' +
-                hashlib.sha256(key[2].encode()).hexdigest()[:12], 'strategy': strategy,
-                'correct': 0, 'n': 0, 'total': 0, 'identity': arm_identity, 'projection': projection,
+            method = next((s for s in shadows if s.get('arm') == arm), None)
+            arm_projection = method.get('method_config', projection) if method else projection
+            key = strategy, arm, json.dumps(arm_projection, sort_keys=True)
+            published_arm = ('slm:' + identity['model'] + ':' + arm
+                             if arm.startswith('slm-method:') else
+                             arm + '@' + hashlib.sha256(key[2].encode()).hexdigest()[:12])
+            value = groups.setdefault(key, {'family': 'omp.tool', 'arm': published_arm, 'strategy': strategy,
+                'correct': 0, 'n': 0, 'total': 0, 'identity': arm_identity, 'projection': arm_projection,
                 'scope': scope, 'scope_note': 'Matched exact native OMP tool-call joins; accuracy conditional on coverage; no execution authority or cross-model/device/projection generalization',
                 'evidence_class': 'live_shadow', 'prospective': True})
             covered = selected is not None

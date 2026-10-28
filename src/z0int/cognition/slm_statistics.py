@@ -3,6 +3,23 @@ from collections import defaultdict
 import json
 from pathlib import Path
 import random
+import math
+
+
+def frozen_cutoff(db, evaluation_rows):
+    """Earliest receipt or native call start in the entire frozen sample."""
+    times = []
+    for row in evaluation_rows:
+        call = db.execute("SELECT ts FROM calls WHERE session=? AND call=?",
+                          (row['session'], row['call'])).fetchone()
+        if call is None or not isinstance(call['ts'], (int, float)) or not math.isfinite(call['ts']) or call['ts'] <= 0:
+            raise ValueError('missing_evaluation_call_time')
+        if not isinstance(row['ts'], (int, float)) or not math.isfinite(row['ts']) or row['ts'] <= 0:
+            raise ValueError('missing_evaluation_receipt_time')
+        times.extend((row['ts'], call['ts']))
+    if not times:
+        raise ValueError('empty_evaluation_sample')
+    return min(times)
 
 
 def frozen_sample(db, path, n=400):
@@ -63,10 +80,12 @@ def frozen_sample(db, path, n=400):
 
 def expected_cost(rows):
     n=len(rows)
-    covered=sum(not row['abstain'] for row in rows)
-    correct=sum(row['correct'] for row in rows)
+    if not n:
+        raise ValueError('empty cost sample')
+    wrong_covered=sum(not row['abstain'] and not row['correct'] for row in rows)
+    abstentions=sum(bool(row['abstain']) for row in rows)
     wall=sum(row['wall_ms'] for row in rows)/n
-    return wall + ((1-correct/covered)*6034+(1-covered/n)*7999 if covered else 7999)
+    return wall + wrong_covered/n*6034 + abstentions/n*7999
 
 
 def expected_cost_interval(rows, repeats=1000):

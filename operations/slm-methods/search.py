@@ -8,7 +8,6 @@ import argparse
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
 import itertools
-import math
 import json
 from pathlib import Path
 import random
@@ -19,23 +18,14 @@ import urllib.request
 from z0int.cognition.slm_context_reconstruct import reconstruct
 from z0int.cognition.slm_pipeline import cluster_tools,pipeline
 from z0int.cognition.adapters.transport import OpenAICompatTransport,ServerConfig
-from z0int.cognition.slm_statistics import frozen_sample,expected_cost,expected_cost_interval
+from z0int.cognition.slm_statistics import frozen_sample,frozen_cutoff,expected_cost,expected_cost_interval
 from z0int.cognition.learning_search import wilson_interval
 from z0int.cognition.slm_candidates import publish_candidate
 
 
 def training_scope(db, evaluation_rows):
     """Build categories exclusively from records preceding the frozen sample."""
-    evaluation_times=[]
-    for row in evaluation_rows:
-        call=db.execute("SELECT ts FROM calls WHERE session=? AND call=?",
-                        (row['session'],row['call'])).fetchone()
-        if call is None or not isinstance(call['ts'], (int,float)) or not math.isfinite(call['ts']) or call['ts'] <= 0:
-            raise ValueError('missing_evaluation_call_time')
-        if not isinstance(row['ts'], (int,float)) or not math.isfinite(row['ts']) or row['ts'] <= 0:
-            raise ValueError('missing_evaluation_receipt_time')
-        evaluation_times.extend((row['ts'],call['ts']))
-    cutoff=min(evaluation_times)
+    cutoff=frozen_cutoff(db,evaluation_rows)
     rows=list(db.execute("""SELECT l.id,l.ts,l.action,l.features FROM labels l
         JOIN calls c ON c.session=l.session AND c.call=l.call
         WHERE l.family='omp.tool' AND l.ts>0 AND l.ts<? AND c.ts>0 AND c.ts<?
@@ -92,7 +82,7 @@ def main():
     leaderboard=[]
     def document(status):
         return {'status':status,'evidence_class':'replayed_L1','models':models,'manifest':'sha256:'+hashlib.sha256(Path(args.manifest).read_bytes()).hexdigest(),
-                'winner_qualified':False,'multiple_comparison_note':'54 or more exploratory variants; Wilson/bootstrap intervals are not simultaneous and selection is dev-only',
+                'winner_qualified':False,'multiple_comparison_note':'54 or more exploratory variants; Wilson/bootstrap intervals are not simultaneous and selection is dev-only; row-stratified splits do not establish independent sessions or work items',
                 'training':{'cutoff_exclusive':cutoff,'digest':training_digest,'rows':len(training),
                             'frozen_categories':groups,
                             'supported_tools':sorted(supported_tools)},
