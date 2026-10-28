@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import multiprocessing
 import sqlite3
 import subprocess
 import sys
@@ -12,9 +13,9 @@ from pathlib import Path
 import pytest
 
 import adapters.hermes_z0int as adapter
-from z0int.memory.claims import project_claims
+from z0int.memory.claims import project_claims, record_claim
 from z0int.memory.event_log import EventLog
-from z0int.memory_contract import EventIdentity, MemoryScope
+from z0int.memory_contract import BitemporalClaim, EventIdentity, MemoryScope
 
 
 @pytest.fixture(autouse=True)
@@ -90,6 +91,131 @@ def _capture(home, row, ledger, *, binding=None, **changes):
         "expected_content_hash": "sha256:" + hashlib.sha256(row["content"].encode()).hexdigest(),
         "ledger_root": ledger, **changes,
     })
+
+
+def _concurrent_capture_worker(home, row, ledger, start, snapshots, results):
+    # On the old implementation, force both processes to finish their stale
+    # pre-append snapshots before either proceeds to the first append.
+    original = EventLog.iter_events
+
+    def synchronized_snapshot(self, **kwargs):
+        events = list(original(self, **kwargs))
+        snapshots.wait(timeout=15)
+        yield from events
+
+    EventLog.iter_events = synchronized_snapshot
+    try:
+        start.wait(timeout=15)
+        event = _capture(home, row, ledger)
+        results.put(("ok", event.event_id))
+    except BaseException as exc:
+        results.put(("error", repr(exc)))
+
+
+def test_simultaneous_native_source_retries_share_one_claim(native, tmp_path):
+    row = _persist(native)
+    ledger = tmp_path / "ledger"
+    log = EventLog(ledger)
+    log.events_path.touch(mode=0o600)
+    context = multiprocessing.get_context("spawn")
+    start = context.Barrier(2)
+    snapshots = context.Barrier(2)
+    results = context.Queue()
+    processes = [
+        context.Process(target=_concurrent_capture_worker,
+                        args=(native, row, ledger, start, snapshots, results))
+        for _ in range(2)
+    ]
+    for process in processes:
+        process.start()
+    try:
+        outcomes = [results.get(timeout=30) for _ in processes]
+    finally:
+        for process in processes:
+            process.join(timeout=5)
+            if process.is_alive():
+                process.terminate()
+                process.join()
+    assert all(process.exitcode == 0 for process in processes)
+    assert all(status == "ok" for status, _ in outcomes), outcomes
+    assert outcomes[0][1] == outcomes[1][1]
+    events = list(log.iter_events(require_complete=True))
+    assert [event.event_type for event in events] == ["source.reference", "memory.claim"]
+    assert events[1].event_id == outcomes[0][1]
+
+
+def test_unlinked_native_disagreement_is_not_supersession(native, tmp_path):
+    ledger = tmp_path / "ledger"
+    first = _capture(native, _persist(native), ledger)
+    second = _capture(native, _persist(native, _content(
+        value={"decision": "canary", "synthetic": True,
+               "attribution": "test controller, not a historical human statement"},
+    ), row_id=2), ledger)
+    packet = project_claims(_scope(), ledger_root=ledger)
+    assert packet.contradictions
+    history = packet.measurements["claim_history"]
+    assert [row["claim_id"] for row in history] == [
+        first.payload["claim_id"], second.payload["claim_id"],
+    ]
+    assert all(row["superseded_by"] is None for row in history)
+
+
+@pytest.mark.parametrize("generic_first", [True, False])
+@pytest.mark.parametrize("same_claim_id", [True, False])
+def test_generic_claim_cannot_impersonate_or_block_native_replay(
+    native, tmp_path, generic_first, same_claim_id,
+):
+    row = _persist(native)
+    template = _capture(native, row, tmp_path / "template")
+    ledger = tmp_path / "ledger"
+    payload = template.payload
+    generic = BitemporalClaim(
+        claim_id=payload["claim_id"] if same_claim_id else "generic-conflict",
+        scope=_scope(), subject=payload["subject"], predicate=payload["predicate"],
+        value={"decision": "forged"}, status="observed",
+        observed_at=payload["observed_at"], recorded_at=payload["recorded_at"],
+        evidence_event_uids=tuple(payload["evidence_event_uids"]),
+        origin_trust="explicit_user",
+    )
+    if generic_first:
+        generic_event = record_claim(generic, ledger_root=ledger)
+    admitted = _capture(native, row, ledger)
+    if not generic_first:
+        generic_event = record_claim(generic, ledger_root=ledger)
+    replay = _capture(native, row, ledger)
+    assert generic_event.payload["origin_trust"] == "model_assertion"
+    assert admitted.event_id != generic_event.event_id
+    assert admitted.payload["admission_method"] == "native_user_claim_attestation.v1"
+    assert replay.event_id == admitted.event_id
+    events = list(EventLog(ledger).iter_events(require_complete=True))
+    assert sum(event.event_type == "source.reference" for event in events) == 1
+    assert sum(event.event_type == "memory.claim" for event in events) == 2
+
+
+def test_interrupted_reference_only_admission_replays_after_state_repair(native, tmp_path, monkeypatch):
+    row = _persist(native)
+    ledger = tmp_path / "ledger"
+    original = EventLog._append_admitted_user_event
+
+    def interrupt_before_claim(self, event_type, *args, **kwargs):
+        if event_type == "memory.claim":
+            raise OSError("synthetic interruption")
+        return original(self, event_type, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(EventLog, "_append_admitted_user_event", interrupt_before_claim)
+        with pytest.raises(OSError, match="synthetic interruption"):
+            _capture(native, row, ledger)
+    log = EventLog(ledger)
+    assert [event.event_type for event in log.iter_events()] == ["source.reference"]
+    log.state_path.unlink()
+    log.index_path.unlink()
+    admitted = _capture(native, row, ledger)
+    replay = _capture(native, row, ledger)
+    assert replay.event_id == admitted.event_id
+    events = list(log.iter_events(require_complete=True))
+    assert [event.event_type for event in events] == ["source.reference", "memory.claim"]
+    assert admitted.parent_event_ids == (events[0].event_id,)
 
 
 def test_persisted_user_decision_uses_production_claim_admission(native, tmp_path):

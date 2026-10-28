@@ -436,71 +436,97 @@ def admit_user_claim(
     _check_claim_size(claim, locator)
 
     log = EventLog(ledger_root)
-    events = list(log.iter_events()) if log.events_path.is_file() else []
-    by_id = {event.event_id: event for event in events}
-    claim_rows = _claim_event_rows(events)
-    previous: tuple[MemoryEvent, dict[str, Any], MemoryScope] | None = None
-    if correction_of is not None:
-        previous = next(((event, payload, row_scope) for event, payload, row_scope in claim_rows
-                         if payload.get("claim_id") == correction_of), None)
-        if previous is None:
-            raise ValueError("correction_of must name an existing claim")
-        prior_event, prior_payload, prior_scope = previous
-        if (
-            prior_scope != scope
-            or prior_payload.get("subject") != subject
-            or prior_payload.get("predicate") != predicate
-            or _effective_trust(prior_event, prior_payload, prior_scope, by_id) != "explicit_user"
-        ):
-            raise ValueError("correction_of must name an explicit user claim for the same scoped subject/predicate")
+    with log._locked_writer() as locked_events:
+        # Validate/repair derived state before scanning, and keep this same
+        # event-file lock through both appends and all admission decisions.
+        log._append_state_locked(locked_events)
+        events = [MemoryEvent.from_dict(row) for row, _, _ in log._scan_locked(locked_events)]
+        by_id = {event.event_id: event for event in events}
+        claim_rows = _claim_event_rows(events)
+        native_rows = []
+        for event, payload, row_scope in claim_rows:
+            if payload.get("admission_method") != "native_user_claim_attestation.v1":
+                continue
+            for parent_id in event.parent_event_ids:
+                parent = by_id.get(parent_id)
+                if parent is None or parent.event_type != "source.reference" or not isinstance(parent.payload, dict):
+                    continue
+                parent_identity = parent.event_identity()
+                if (
+                    parent_identity is not None
+                    and parent_identity.event_uid in (payload.get("evidence_event_uids") or ())
+                    and parent.payload.get("native_source_validated") is True
+                    and parent.payload.get("role") == "user"
+                    and _scope_from(parent.payload.get("scope")) == row_scope
+                ):
+                    native_rows.append((event, payload, row_scope))
+                    break
+        previous: tuple[MemoryEvent, dict[str, Any], MemoryScope] | None = None
+        if correction_of is not None:
+            previous = next(((event, payload, row_scope) for event, payload, row_scope in native_rows
+                             if payload.get("claim_id") == correction_of
+                             and _effective_trust(event, payload, row_scope, by_id) == "explicit_user"), None)
+            if previous is None:
+                raise ValueError("correction_of must name an existing explicit user claim")
+            _, prior_payload, prior_scope = previous
+            if (
+                prior_scope != scope
+                or prior_payload.get("subject") != subject
+                or prior_payload.get("predicate") != predicate
+            ):
+                raise ValueError("correction_of must name an explicit user claim for the same scoped subject/predicate")
 
-    # Reject a second, differently normalized decision for the same source event
-    # and claim key. A separate source message is required for a new decision.
-    for event, prior_payload, prior_scope in claim_rows:
-        if (
-            prior_scope == scope
-            and prior_payload.get("subject") == subject
-            and prior_payload.get("predicate") == predicate
-            and identity.event_uid in (prior_payload.get("evidence_event_uids") or ())
-            and prior_payload.get("claim_id") != claim_id
-        ):
-            raise ValueError("the same native source event already supports another value for this claim")
+        # Only native-attested claims can establish that a source event has
+        # already supported a different normalized decision.
+        for event, prior_payload, prior_scope in native_rows:
+            if (
+                prior_scope == scope
+                and prior_payload.get("subject") == subject
+                and prior_payload.get("predicate") == predicate
+                and identity.event_uid in (prior_payload.get("evidence_event_uids") or ())
+                and prior_payload.get("claim_id") != claim_id
+            ):
+                raise ValueError("the same native source event already supports another value for this claim")
 
-    reference_payload = {
-        "locator": locator,
-        "scope": scope.to_dict(),
-        "role": "user",
-        "native_source_validated": True,
-    }
-    source_name = locator.split(":", 1)[0] if ":" in locator else identity.source_system
-    reference = log._append_admitted_user_event(
-        "source.reference",
-        reference_payload,
-        source=source_name,
-        project=scope.project,
-        session_id=identity.source_session,
-        identity=identity,
-    )
+        reference_payload = {
+            "locator": locator,
+            "scope": scope.to_dict(),
+            "role": "user",
+            "native_source_validated": True,
+        }
+        source_name = locator.split(":", 1)[0] if ":" in locator else identity.source_system
+        reference = log._append_admitted_user_event(
+            "source.reference",
+            reference_payload,
+            source=source_name,
+            project=scope.project,
+            session_id=identity.source_session,
+            identity=identity,
+            _locked_events=locked_events,
+        )
 
-    existing = next((event for event, payload, _ in claim_rows if payload.get("claim_id") == claim_id), None)
-    if existing is not None:
-        return existing
+        existing = next((event for event, payload, _ in native_rows
+                         if payload.get("claim_id") == claim_id
+                         and reference.event_id in event.parent_event_ids), None)
+        if existing is not None:
+            return existing
 
-    claim_payload = {
-        **claim.to_dict(),
-        "correction_of": correction_of,
-        "admission_method": "native_user_claim_attestation.v1",
-    }
-    parents = [reference.event_id]
-    if previous is not None:
-        parents.append(previous[0].event_id)
-    return log._append_admitted_user_event(
-        "memory.claim",
-        claim_payload,
-        source="z0-memory",
-        project=scope.project,
-        parent_event_ids=parents,
-    )
+        claim_payload = {
+            **claim.to_dict(),
+            "correction_of": correction_of,
+            "admission_method": "native_user_claim_attestation.v1",
+        }
+        parents = [reference.event_id]
+        if previous is not None:
+            parents.append(previous[0].event_id)
+        return log._append_admitted_user_event(
+            "memory.claim",
+            claim_payload,
+            source="z0-memory",
+            project=scope.project,
+            parent_event_ids=parents,
+            _locked_events=locked_events,
+        )
 
 
 def record_claim(claim: BitemporalClaim, *, ledger_root: str | Path | None = None) -> MemoryEvent:
@@ -575,11 +601,9 @@ def project_claims(
     winners: list[dict[str, Any]] = []
     contradiction_text: list[str] = []
     resolved_conflict_text: list[str] = []
-    winner_by_group: dict[tuple[Any, ...], dict[str, Any]] = {}
-    for key, rows in groups.items():
+    for rows in groups.values():
         winner, conflicts, resolved_conflicts = _reduce_scope_group(rows)
         winners.append(winner)
-        winner_by_group[key] = winner
         contradiction_text.extend(conflicts)
         resolved_conflict_text.extend(resolved_conflicts)
 
@@ -601,10 +625,7 @@ def project_claims(
     history: list[dict[str, Any]] = []
     for row in sorted(visible, key=lambda item: item["event_id"]):
         superseded_by = correction_parent.get(row["event_id"])
-        if superseded_by is None and row["event_id"] not in winner_event_ids:
-            scope_obj = row["scope_object"]
-            key = (scope_obj.path(), row.get("subject"), row.get("predicate"))
-            superseded_by = winner_by_group[key]["claim_id"]
+        # Selection by trust or recency is not an explicit correction.
         history.append(
             {
                 "claim_id": row["claim_id"],

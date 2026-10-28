@@ -92,6 +92,30 @@ def _admit(
     )
 
 
+def test_replay_is_idempotent_even_when_source_is_not_projection_trusted(tmp_path, monkeypatch):
+    from z0int.memory.event_log import EventLog
+
+    monkeypatch.setenv("Z0INT_MEMORY_SOURCE_INGEST", "references")
+    scope = MemoryScope(user="u1", project="p1")
+    content = "Synthetic source decision"
+    identity = _native_identity(event_id="1", content=content, system="other-source")
+    args = {
+        "identity": identity, "locator": "custom:s1#1", "scope": scope,
+        "subject": "deployment", "predicate": "strategy", "value": "blue-green",
+        "observed_at": "2026-10-01T00:00:00Z",
+        "source_reader": _reader(identity, content, scope),
+        "ledger_root": tmp_path / "memory",
+    }
+    first = admit_user_claim(**args)
+    second = admit_user_claim(**args)
+    assert first.event_id == second.event_id
+    assert [event.event_type for event in EventLog(args["ledger_root"]).iter_events()] == [
+        "source.reference", "memory.claim",
+    ]
+    packet = project_claims(scope, ledger_root=args["ledger_root"])
+    assert packet.measurements["selected_claims"][0]["origin_trust"] == "model_assertion"
+
+
 def test_admission_hydrates_user_source_and_persists_reference_only(tmp_path, monkeypatch):
     scope = MemoryScope(user="u1", project="p1", repo="org/repo", task="task-a")
     event = _admit(
