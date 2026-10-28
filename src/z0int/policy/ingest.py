@@ -226,8 +226,11 @@ def _product_verifier(row: dict) -> tuple[dict | None, str | None]:
             raise FindingsError("Verifier did not observe the real product target")
         if type(success) is not bool or not isinstance(receipt_id, str) or not receipt_id:
             raise FindingsError("Product check needs receipt id and boolean success")
-        return {"kind": kind, "path": str(path), "sha256": sha, "receipt_id": receipt_id,
-                "observed_target": target, "success": success}, None
+        proof = {"kind": kind, "path": str(path), "sha256": sha, "receipt_id": receipt_id,
+                 "trace_id": trace_id, "observed_target": target, "success": success}
+        if not event_id and isinstance(document.get("evaluation"), dict):
+            proof["evaluation"] = document["evaluation"]
+        return proof, None
     except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         return None, str(exc)
 
@@ -247,6 +250,40 @@ def _outcome_metric(row: dict, metric: dict, checked: tuple | None = None) -> tu
         metric["proxy_reason"] = reason
     return metric, "product_outcome" if proof is not None else "proxy", proof
 
+
+def _outcome_baseline(row: dict, proof: dict | None, subject: dict, arm: dict, ts: str) -> dict:
+    """Bind a product check to an immutable, prospectively frozen paired protocol."""
+    try:
+        evaluation = proof["evaluation"]
+        reference = row["outcome_protocol"]
+        path = Path(reference["path"])
+        if not path.is_absolute():
+            return {}
+        raw = path.read_bytes()
+        sha = hashlib.sha256(raw).hexdigest()
+        protocol = json.loads(raw)
+        if sha != reference["sha256"] or evaluation["protocol_sha256"] != sha:
+            return {}
+        if (protocol["schema"] != "z0.policy.paired_outcome_protocol.v1"
+                or protocol["subject"] != subject
+                or evaluation["subject"] != subject
+                or evaluation["arm"] != arm
+                or evaluation["experiment_id"] != protocol["experiment_id"]
+                or evaluation["arm_id"] not in ("candidate", "reference")
+                or arm != protocol[evaluation["arm_id"] + "_arm"]
+                or not all(isinstance(evaluation.get(k), str) and evaluation[k]
+                           for k in ("experiment_id", "pair_id", "task_snapshot_id"))
+                or not isinstance(protocol["experiment_id"], str) or not protocol["experiment_id"]
+                or protocol["candidate_arm"] == protocol["reference_arm"]
+                or evaluation["observed_at"] != ts):
+            return {}
+        margin = protocol["noninferiority_margin"]
+        if (type(margin) not in (int, float) or not math.isfinite(margin) or not 0 <= margin < 1
+                or not timestamp(protocol["frozen_at"]) < timestamp(ts) < timestamp(protocol["expires_at"])):
+            return {}
+        return {"outcome_protocol": {"sha256": sha, "document": protocol}}
+    except (KeyError, TypeError, ValueError, OSError, AttributeError):
+        return {}
 
 def _agent_outcomes(data: dict | list, spec: dict, source: dict, ts: str) -> list[dict]:
     rows = data if isinstance(data, list) else data.get("rows", data.get("findings"))
@@ -271,10 +308,11 @@ def _agent_outcomes(data: dict | list, spec: dict, source: dict, ts: str) -> lis
             arm = {"kind": "llm", "model": row["model"]}
         metric, evidence_kind, proof = _outcome_metric(row, metric, (proof, reason))
         row_source = {**source, "adapter": "agent_outcomes", "run_id": row.get("run_id", source["run_id"])}
-        result.append(_finding(spec, row_source, _time(row.get("ts") or row.get("ended_at") or ts),
+        observed_at = _time(row.get("ts") or row.get("ended_at") or ts)
+        result.append(_finding(spec, row_source, observed_at,
             subject, arm, metric, evidence_class=row.get("evidence_class", "measured"),
             scope_note=row.get("scope_note", "This agent outcome only. Ledger task_kind is heuristic. Push, PR and test signals are proxies, not product truth."),
-            expires_at=row.get("expires_at"), baseline=row.get("baseline"),
+            expires_at=row.get("expires_at"), baseline=_outcome_baseline(row, proof, subject, arm, observed_at),
             evidence_kind=evidence_kind, verifier_receipt=proof))
     return result
 
@@ -299,9 +337,12 @@ def _eval(data: dict, spec: dict, source: dict, ts: str) -> list[dict]:
             row_source["adapter"] = "agent_outcomes"
         elif evidence_kind == "proxy":
             metric["promotion_eligible"] = False
-        result.append(_finding(spec, row_source, _time(row.get("ts", ts)), row["subject"], row["arm"], metric,
+        observed_at = _time(row.get("ts", ts))
+        baseline = (_outcome_baseline(row, proof, row["subject"], row["arm"], observed_at)
+                    if row_source.get("adapter") == "agent_outcomes" else row.get("baseline"))
+        result.append(_finding(spec, row_source, observed_at, row["subject"], row["arm"], metric,
             evidence_class=row["evidence_class"], scope_note=row["scope_note"],
-            expires_at=row.get("expires_at"), baseline=row.get("baseline"),
+            expires_at=row.get("expires_at"), baseline=baseline,
             evidence_kind=evidence_kind, verifier_receipt=proof))
     return result
 
