@@ -152,6 +152,11 @@ def test_tool_comparison_pairs_each_configured_arm_with_its_own_calls(tmp_path):
     db = connect(tmp_path)
     db.execute('INSERT INTO examples VALUES(?,?,?,?,?)',
                ('prior', 'omp.tool', 'read', '["a","b"]', 1))
+    db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)', ('prior', 's', 'prior', 1, 'omp.tool', '{}'))
+    db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+               ('prior', 's', 'prior', 'omp.tool', 1, 'read', '["a","b"]', None, 1))
+    db.execute('INSERT INTO calls(session,call,tool,features,ts) VALUES(?,?,?,?,?)',
+               ('s', 'prior', 'read', '["a","b"]', 1))
     scope_a = {'base_url': 'http://a', 'model': 'alias', 'runtime': 'cpu',
                'quantization': 'q8', 'revision': 'one', 'identity_binding': 'unattested'}
     scope_b = {**scope_a, 'runtime': 'cuda', 'revision': 'two'}
@@ -173,12 +178,14 @@ def test_tool_comparison_pairs_each_configured_arm_with_its_own_calls(tmp_path):
                    (str(i), 's', str(i), 100+i, 'omp.tool', json.dumps(body)))
         db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
                    (str(i), 's', str(i), 'omp.tool', 100+i, label, '["a","b"]', None, 120))
+        db.execute('INSERT INTO calls(session,call,tool,features,ts) VALUES(?,?,?,?,?)',
+                   ('s', str(i), label, '["a","b"]', 100+i))
     observations, comparison = runtime.tool_observations(db, IDENTITY, SCOPE)
     arms = list(comparison['arms'].values())
     assert len(arms) == 5 and len(observations) == 10
     def group(scope, model='alias', method='goal-binary'):
-        return next(a for a in arms if a['provenance']['request_scope'] == scope
-                    and a['provenance']['model'] == model and a['provenance']['method'] == method)
+        return next(a for a in arms if a['provenance']['legacy_result_scope'] ==
+                    {'model': model, 'request_scope': scope} and a['provenance']['method'] == method)
     a, b = group(scope_a), group(scope_b)
     assert (a['model']['total'], a['model']['n'], a['model']['correct']) == (2, 2, 2)
     assert (a['baseline']['total'], a['baseline']['n'], a['baseline']['correct']) == (2, 2, 1)
@@ -189,6 +196,74 @@ def test_tool_comparison_pairs_each_configured_arm_with_its_own_calls(tmp_path):
     assert group(None, 'unavailable')['model']['total'] == 1
     assert comparison['binding']['attempts'] == 7
     assert all(row['evidence_kind'] == 'proxy' and not row['promotion_eligible'] for row in observations)
+    db.close()
+
+
+def test_logical_request_cohorts_include_timeouts_and_unavailable_without_starvation(tmp_path):
+    from z0int.cognition.learning_search import SearchConfig, search_tick
+    db = connect(tmp_path)
+    for i in range(10):
+        first = {'requested_model': 'registry-a', 'arm': 'goal-binary',
+                 'model': 'served-alias' if i == 9 else 'registry-a',
+                 'request_scope': {'base_url': 'http://a', 'identity_binding': 'unattested'},
+                 'selected_action': 'read' if i == 9 else None}
+        if i != 9:
+            first['error'] = 'shadow_timeout'
+        second = {'requested_model': 'registry-b', 'arm': 'goal-binary',
+                  'model': 'registry-b' if i == 0 else 'served-b',
+                  'request_scope': None if i == 0 else {
+                      'base_url': 'http://b', 'identity_binding': 'unattested'},
+                  'selected_action': None if i == 0 else 'read'}
+        if i == 0:
+            second['error'] = 'unavailable'
+        body = {'projection_strategy': 'history-1', 'shadow': [first, second]}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(i), 's', str(i), 100+i, 'omp.tool', json.dumps(body)))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(i), 's', str(i), 'omp.tool', 100+i, 'read', '[]', None, 120))
+    rows, comparison = runtime.tool_observations(db, IDENTITY, SCOPE)
+    arms = {arm['provenance']['requested_model']: arm for arm in comparison['arms'].values()}
+    assert set(arms) == {'registry-a', 'registry-b'}
+    assert (arms['registry-a']['model']['total'], arms['registry-a']['model']['n']) == (10, 1)
+    assert (arms['registry-b']['model']['total'], arms['registry-b']['model']['n']) == (10, 9)
+    assert all(arm['baseline']['total'] == 10 for arm in arms.values())
+    assert all(len(arm['result_variants']) == 2 for arm in arms.values())
+    cfg = SearchConfig(plateau_ticks=2, min_observations=5)
+    first = search_tick(db, tick_id='1', now=120, observations=rows, config=cfg)
+    second = search_tick(db, tick_id='2', now=121, observations=rows, config=cfg)
+    assert first['families']['omp.tool']['current_strategy'] == 'history-1'
+    assert second['families']['omp.tool']['current_strategy'] == 'history-3'
+    assert all(row['promotion_eligible'] is False for row in rows)
+    db.close()
+
+
+def test_baseline_uses_only_calls_and_receipts_prior_to_target_start(tmp_path):
+    db = connect(tmp_path)
+    def prior(name, receipt_ts, call_ts, action):
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (name, 's', name, receipt_ts, 'omp.tool', '{}'))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (name, 's', name, 'omp.tool', receipt_ts, action, '["a","b"]', None, 200))
+        db.execute('INSERT INTO examples VALUES(?,?,?,?,?)',
+                   (name, 'omp.tool', action, '["a","b"]', receipt_ts))
+        db.execute('INSERT INTO calls(session,call,tool,features,ts) VALUES(?,?,?,?,?)',
+                   ('s', name, action, '["a","b"]', call_ts))
+    prior('valid', 40, 40, 'read')
+    prior('future-call', 50, 150, 'edit')
+    prior('future-receipt', 150, 50, 'edit')
+    prior('missing-call-time', 60, 0, 'edit')
+    for name in ('target', 'missing-target-call'):
+        body = {'shadow': [{'requested_model': 'registry', 'arm': 'goal-binary',
+                            'model': 'alias', 'selected_action': 'read'}]}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (name, 's', name, 200, 'omp.tool', json.dumps(body)))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (name, 's', name, 'omp.tool', 200, 'read', '["a","b"]', None, 210))
+    db.execute('INSERT INTO calls(session,call,tool,features,ts) VALUES(?,?,?,?,?)',
+               ('s', 'target', 'read', '["a","b"]', 100))
+    _, comparison = runtime.tool_observations(db, IDENTITY, SCOPE)
+    arm = next(iter(comparison['arms'].values()))
+    assert (arm['baseline']['total'], arm['baseline']['n'], arm['baseline']['correct']) == (2, 1, 1)
     db.close()
 
 

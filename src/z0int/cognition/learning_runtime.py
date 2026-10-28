@@ -168,35 +168,55 @@ def _atomic_observations(metrics: dict, identity: dict, scope: dict) -> list[dic
 def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict]:
     """Build non-promotable research curves and paired, unattested diagnostics.
 
-    Neither the currently served identity nor a receipt's configured request
-    scope attests the bytes that produced a shadow response.
+    A requested registry model identifies a logical research cohort, not a
+    physical model. Older rows without it stay separate by recorded model and
+    request scope; their unknown provenance cannot safely be merged.
+    Baselines use only labels and native calls known strictly before the
+    target's call and receipt. Missing target timing means abstention.
     """
     from .learning import predict, STRATEGIES, wilson
     groups = {}
-    for row in db.execute('''SELECT l.*,r.body FROM labels l JOIN receipts r USING(id)
+    for row in db.execute('''SELECT l.*,r.body,c.ts AS call_ts FROM labels l JOIN receipts r USING(id)
+                           LEFT JOIN calls c ON c.session=l.session AND c.call=l.call
                            WHERE l.family='omp.tool' ORDER BY l.ts,l.id'''):
         receipt = json.loads(row['body'])
         shadows = [s for s in receipt.get('shadow', [])
                    if s.get('arm') == 'goal-binary' or str(s.get('arm', '')).startswith('slm-method:')]
         if not shadows:
             continue
-        previous = db.execute('''SELECT action,features,ts FROM examples WHERE family='omp.tool'
-            AND ts<? ORDER BY ts DESC,id DESC LIMIT 512''', (row['ts'],)).fetchall()
-        examples = [{'action': e['action'], 'history': json.loads(e['features']), 'ts': e['ts']} for e in previous]
+        examples = []
+        if row['call_ts'] and row['call_ts'] > 0 and row['ts'] and row['ts'] > 0:
+            cutoff = min(row['call_ts'], row['ts'])
+            previous = db.execute('''SELECT e.action,e.features,e.ts FROM examples e
+                JOIN labels l ON l.id=e.id JOIN receipts r ON r.id=e.id
+                JOIN calls c ON c.session=l.session AND c.call=l.call
+                WHERE e.family='omp.tool' AND e.ts>0 AND e.ts<?
+                  AND l.ts>0 AND l.ts<? AND r.ts>0 AND r.ts<? AND c.ts>0 AND c.ts<?
+                ORDER BY e.ts DESC,e.id DESC LIMIT 512''',
+                (cutoff, cutoff, cutoff, cutoff)).fetchall()
+            examples = [{'action': e['action'], 'history': json.loads(e['features']), 'ts': e['ts']}
+                        for e in previous]
         action, confidence = predict(json.loads(row['features']), examples, STRATEGIES[4])
         baseline = action if confidence >= .8 else None
         for shadow in shadows:
+            requested = shadow.get('requested_model')
             provenance = {
-                'request_scope': shadow.get('request_scope'),
-                'model': shadow.get('model'),
-                'requested_model': shadow.get('requested_model'),
+                'requested_model': requested if isinstance(requested, str) and requested else None,
                 'method': shadow.get('arm'),
                 'method_config': shadow.get('method_config'),
                 'strategy': receipt.get('projection_strategy') or 'history-1',
                 'projection': receipt.get('projection_config') or {},
             }
+            if provenance['requested_model'] is None:
+                provenance['legacy_result_scope'] = {
+                    'model': shadow.get('model'), 'request_scope': shadow.get('request_scope')}
             key = json.dumps(provenance, sort_keys=True, separators=(',', ':'))
-            group = groups.setdefault(key, {'provenance': provenance, 'model': Counter(), 'baseline': Counter()})
+            group = groups.setdefault(key, {'provenance': provenance, 'model': Counter(),
+                                            'baseline': Counter(), 'variants': Counter()})
+            variant = json.dumps({'model': shadow.get('model'),
+                                  'request_scope': shadow.get('request_scope')},
+                                 sort_keys=True, separators=(',', ':'))
+            group['variants'][variant] += 1
             failed = (shadow.get('error') or shadow.get('parse_error') or shadow.get('timed_out')
                       or shadow.get('abstained') or
                       ('rpc_count' in shadow and not shadow['rpc_count']) or
@@ -218,6 +238,8 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
         digest = hashlib.sha256(key.encode()).hexdigest()
         provenance = group['provenance']
         arms[digest] = {'provenance': provenance, 'classification': 'unattested_diagnostic_only',
+                        'result_variants': [{'metadata': json.loads(variant), 'attempts': count}
+                                            for variant, count in sorted(group['variants'].items())],
                         'model': summary(group['model']), 'baseline': summary(group['baseline'])}
         for name in ('model', 'baseline'):
             counts = group[name]
