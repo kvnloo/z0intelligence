@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .. import paths
 from .compile import iso
-from .findings import Finding, FindingsError, append_findings, canonical, ledger_path, read_findings, timestamp
+from .findings import Finding, FindingsError, append_findings, canonical, ledger_path, outcome_members, read_findings, timestamp
 
 KINDS = {"shadow_learner", "edge_probe", "engine_bench", "shadow_offload", "z0eval_result", "agent_outcomes"}
 
@@ -262,8 +262,9 @@ def _outcome_baseline(row: dict, proof: dict | None, subject: dict, arm: dict, t
         raw = path.read_bytes()
         sha = hashlib.sha256(raw).hexdigest()
         protocol = json.loads(raw)
-        if sha != reference["sha256"] or evaluation["protocol_sha256"] != sha:
+        if raw != canonical(protocol) or sha != reference["sha256"] or evaluation["protocol_sha256"] != sha:
             return {}
+        outcome_members(protocol)
         if (protocol["schema"] != "z0.policy.paired_outcome_protocol.v1"
                 or protocol["subject"] != subject
                 or evaluation["subject"] != subject

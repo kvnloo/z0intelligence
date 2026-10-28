@@ -11,7 +11,7 @@ import tempfile
 from urllib.parse import urlsplit
 
 from .. import paths
-from .findings import FindingsError, canonical, digest, locked, timestamp, validate
+from .findings import FindingsError, canonical, digest, locked, outcome_members, timestamp, validate
 
 SCHEMA = "z0.decision_policy.v1"
 STAGES = ("none", "shadow", "canary", "live")
@@ -95,6 +95,7 @@ def _outcome_cohorts(findings: list[dict], now: datetime, config: CompilerConfig
             protocol = binding["document"]
             role = evaluation["arm_id"]
             margin = protocol["noninferiority_margin"]
+            outcome_members(protocol)
             if (row.get("evidence_kind") != "product_outcome"
                     or row["source"].get("adapter") != "agent_outcomes"
                     or row["evidence_class"] not in {"canary", "replayed_L2"}
@@ -107,6 +108,7 @@ def _outcome_cohorts(findings: list[dict], now: datetime, config: CompilerConfig
                     or role not in ("candidate", "reference") or row["arm"] != protocol[role + "_arm"]
                     or evaluation["arm"] != row["arm"] or evaluation["subject"] != subject
                     or evaluation["experiment_id"] != protocol["experiment_id"]
+                    or digest(protocol) != binding["sha256"]
                     or evaluation["protocol_sha256"] != binding["sha256"]
                     or evaluation["observed_at"] != row["ts"]
                     or not all(isinstance(evaluation.get(k), str) and evaluation[k]
@@ -149,21 +151,25 @@ def _outcome_cohorts(findings: list[dict], now: datetime, config: CompilerConfig
         cohorts.setdefault(cohort, {}).setdefault(pair, []).append(row)
     passing = []
     for pairs in cohorts.values():
+        first = next(iter(pairs.values()))[0]
+        protocol = first["baseline"]["outcome_protocol"]["document"]
+        expected = outcome_members(protocol)
+        if set(pairs) != {(protocol["experiment_id"], pair_id) for pair_id in expected}:
+            continue
         matched = []
-        snapshots = {}
-        for pair in pairs.values():
+        for (_, pair_id), pair in pairs.items():
             if len(pair) != 2:
-                continue
+                break
             by_role = {r["verifier_receipt"]["evaluation"]["arm_id"]: r for r in pair}
             if set(by_role) != {"candidate", "reference"}:
-                continue
+                break
             candidate, reference = by_role["candidate"], by_role["reference"]
-            snapshot = candidate["verifier_receipt"]["evaluation"]["task_snapshot_id"]
-            if snapshot != reference["verifier_receipt"]["evaluation"]["task_snapshot_id"]:
-                continue
-            snapshots[snapshot] = snapshots.get(snapshot, 0) + 1
-            matched.append((snapshot, candidate, reference))
-        matched = [(c, r) for snapshot, c, r in matched if snapshots[snapshot] == 1]
+            if any(r["verifier_receipt"]["evaluation"]["task_snapshot_id"] != expected[pair_id]
+                   for r in pair):
+                break
+            matched.append((candidate, reference))
+        if len(matched) != len(expected):
+            continue
         n = len(matched)
         if n < config.n_live:
             continue

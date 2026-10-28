@@ -30,6 +30,24 @@ def canonical(value: Any) -> bytes:
 def digest(value: Any) -> str:
     return hashlib.sha256(canonical(value)).hexdigest()
 
+def outcome_members(protocol: dict) -> dict[str, str]:
+    """Return the complete frozen pair/snapshot manifest, or reject it."""
+    if protocol.get("expected_roles") != ["candidate", "reference"]:
+        raise FindingsError("Paired outcome protocol requires both expected roles")
+    members = protocol.get("expected_pairs")
+    if not isinstance(members, list) or not 1 <= len(members) <= 1_000:
+        raise FindingsError("Paired outcome protocol requires bounded expected pairs")
+    pairs, snapshots = {}, set()
+    for member in members:
+        if (not isinstance(member, dict) or set(member) != {"pair_id", "task_snapshot_id"}
+                or any(not isinstance(member[key], str) or not member[key]
+                       for key in ("pair_id", "task_snapshot_id"))
+                or member["pair_id"] in pairs or member["task_snapshot_id"] in snapshots):
+            raise FindingsError("Paired outcome protocol has invalid or duplicate members")
+        pairs[member["pair_id"]] = member["task_snapshot_id"]
+        snapshots.add(member["task_snapshot_id"])
+    return pairs
+
 
 def timestamp(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))

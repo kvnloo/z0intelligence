@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import pytest
 
 from z0int.policy.compile import CompilerConfig, _outcome_cohorts
-from z0int.policy.findings import ledger_path, read_findings
+from z0int.policy.findings import canonical, ledger_path, read_findings
 from z0int.policy.ingest import ingest_sources
 
 
@@ -19,9 +19,11 @@ def test_receipts_form_only_bound_independent_pairs(tmp_path, adapter):
     protocol = {"schema": "z0.policy.paired_outcome_protocol.v1", "subject": subject,
         "candidate_arm": candidate, "reference_arm": reference, "experiment_id": "exp",
         "frozen_at": "2026-10-23T00:00:00Z", "expires_at": "2026-10-26T00:00:00Z",
-        "noninferiority_margin": .9}
+        "noninferiority_margin": .9, "expected_roles": ["candidate", "reference"],
+        "expected_pairs": [{"pair_id": f"pair-{i}", "task_snapshot_id": f"snapshot-{i}"}
+                           for i in range(2)]}
     path = tmp_path / "protocol.json"
-    raw = json.dumps(protocol).encode()
+    raw = canonical(protocol)
     path.write_bytes(raw)
     sha = hashlib.sha256(raw).hexdigest()
     rows = []
@@ -79,3 +81,20 @@ def test_receipts_form_only_bound_independent_pairs(tmp_path, adapter):
         else:
             altered[2]["evidence_kind"] = "proxy"
         assert not _outcome_cohorts(altered, now, config, subject, candidate)
+    altered = deepcopy(findings)
+    for row in altered:
+        row["baseline"]["outcome_protocol"]["document"]["noninferiority_margin"] = .99
+    assert not _outcome_cohorts(altered, now, config, subject, candidate)
+
+    extra = deepcopy(findings[0])
+    extra["verifier_receipt"]["trace_id"] = "unknown-trace"
+    extra["verifier_receipt"]["receipt_id"] = "unknown-receipt"
+    extra["verifier_receipt"]["sha256"] = "f" * 64
+    extra["verifier_receipt"]["evaluation"]["pair_id"] = "unknown-pair"
+    extra["verifier_receipt"]["evaluation"]["task_snapshot_id"] = "unknown-snapshot"
+    assert not _outcome_cohorts(findings + [extra], now, config, subject, candidate)
+
+    duplicate = deepcopy(extra)
+    duplicate["verifier_receipt"]["evaluation"]["pair_id"] = "pair-0"
+    duplicate["verifier_receipt"]["evaluation"]["task_snapshot_id"] = "snapshot-0"
+    assert not _outcome_cohorts(findings + [duplicate], now, config, subject, candidate)
