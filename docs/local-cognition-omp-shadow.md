@@ -69,6 +69,16 @@ A real loopback HTTP smoke exercised two repeated 503s, a configured timeout,
 parser rejection, invalid native tool call and recovery: all six attempts were
 persisted. Those were synthetic responses, not model-quality evidence.
 
+Challengers with the same configured server URL (ignoring a trailing slash) run
+as one ordered group; different endpoints can run concurrently. A process-local
+lock also excludes overlapping groups from separate calls. Waiting consumes the
+existing shared caller deadline: an arm not started before expiry is not started
+later, and its timeout row remains in the cohort. An already-running arm is not
+cancelled and holds the endpoint lock until it finishes. Locks are released on
+errors and are not retained after their users finish. This is not a cross-process
+endpoint lease or proof that different URL aliases name different hardware; the
+supervisor separately protects residency during each upstream response.
+
 ## Run it
 
 ```bash

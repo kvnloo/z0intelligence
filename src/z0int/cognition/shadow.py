@@ -26,6 +26,7 @@ import fcntl
 import threading
 import re
 import time
+import weakref
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -43,6 +44,29 @@ SOURCE_REVISION = _SOURCE_STAMP.read_text().strip() if _SOURCE_STAMP.exists() el
 _ALLOWED_KINDS = ("tool", "model", "control")
 _ALLOWED_RISKS = ("read", "write", "destructive", "publish", "credential", "payment")
 DEFAULT_SERVER_TIMEOUT_MS = 30_000
+
+# Process-local coordination complements the supervisor's per-response lock.
+# A timed-out caller cannot release an arm that is still using its server.
+_server_locks: weakref.WeakValueDictionary[str | None, threading.Lock] = weakref.WeakValueDictionary()
+_server_locks_guard = threading.Lock()
+
+
+def _server_key(backend: Any) -> str | None:
+    config = getattr(getattr(backend, "_transport", None), "config", None)
+    if config is None:
+        config = getattr(backend, "config", None)
+    base_url = getattr(config, "base_url", None)
+    # Unknown endpoints cannot safely be assumed to be independent.
+    return base_url.rstrip("/") if isinstance(base_url, str) and base_url else None
+
+
+def _server_lock(key: str | None) -> threading.Lock:
+    with _server_locks_guard:
+        lock = _server_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _server_locks[key] = lock
+        return lock
 
 
 class ShadowPayloadError(ValueError):
@@ -360,13 +384,28 @@ def _decision_rows(
         with lock:
             results[index] = row
 
-    threads = []
+    def run_group(group: list[tuple[int, Any]], server_lock: threading.Lock) -> None:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not server_lock.acquire(timeout=remaining):
+            return
+        try:
+            for index, backend in group:
+                if time.monotonic() >= deadline:
+                    return
+                run(index, backend)
+        finally:
+            server_lock.release()
+
+    groups: dict[str | None, list[tuple[int, Any]]] = {}
     for index, (_, backend, _) in enumerate(resolved):
         if backend is not None:
-            thread = threading.Thread(target=run, args=(index, backend), daemon=True,
-                                      name=f'z0int-shadow-{index}')
-            threads.append(thread)
-            thread.start()
+            groups.setdefault(_server_key(backend), []).append((index, backend))
+    threads = []
+    for number, (key, group) in enumerate(groups.items()):
+        thread = threading.Thread(target=run_group, args=(group, _server_lock(key)), daemon=True,
+                                  name=f'z0int-shadow-{number}')
+        threads.append(thread)
+        thread.start()
     for thread in threads:
         thread.join(max(0, deadline-time.monotonic()))
     rows = []
