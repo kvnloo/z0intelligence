@@ -59,9 +59,8 @@ def home(monkeypatch, tmp_path):
 
 @pytest.fixture
 def inline(monkeypatch):
-    def run(argv, job):
-        he.handle('opportunity', json.dumps(job), argv[argv.index('--harness') + 1])
-    monkeypatch.setattr(hc, 'spawn_detached', run)
+    monkeypatch.setattr(hc, 'spawn_opportunity',
+                        lambda harness, payload, ctx: hc.record_opportunity(harness, payload, ctx))
 
 
 def rows(home, name):

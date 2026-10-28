@@ -254,7 +254,7 @@ class BridgeRuntime:
         # Per-generation resident DecisionBackend instances (not shared across reloads).
         self._decision_backends = ResidentDecisionCache()
         # Capture: the detached opportunity build (tests may pass a stand-in for the spawn).
-        self._capture_spawn = capture_spawn or hc.spawn_detached
+        self._capture_spawn = capture_spawn or hc.spawn_opportunity
 
     # --- capture (shadow: nothing here reaches the host) ---------------------
     def _capture(self, harness: str, kind: str, job: dict[str, Any]) -> None:
@@ -266,7 +266,7 @@ class BridgeRuntime:
             if kind == "opportunity_record":
                 ctx = hc.begin_turn(harness, job)
                 if ctx:
-                    self._capture_spawn(hc.child_argv(harness), {"payload": job, "ctx": ctx})
+                    self._capture_spawn(harness, job, ctx)
             else:
                 ctx = hc.outcome_context(harness, job["turn"])
                 if ctx and ctx.get("trace_id") is not None:

@@ -45,8 +45,7 @@ def emit_opportunity_async(hook):
     if os.environ.get('Z0INT_CLAUDE_CODE_OPPORTUNITIES', '1' if config().get('opportunities', True) else '0') == '0':
         return False
     ctx = harness_capture.begin_turn(HARNESS, hook)
-    harness_capture.spawn_detached(harness_capture.child_argv(HARNESS), {'payload': hook, 'ctx': ctx})
-    return True
+    return harness_capture.spawn_opportunity(HARNESS, hook, ctx)
 
 
 def on_opportunity(hook, root=None):

@@ -19,7 +19,6 @@ DecisionOpportunity build (decision_opportunity + state_packet, 1-3 s) runs in a
 
 from __future__ import annotations
 
-import contextlib
 import fcntl
 import hashlib
 import json
@@ -31,7 +30,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Iterator, Mapping
+from typing import Any, Callable, Mapping
 
 from .harness_id import turn_key
 
@@ -53,7 +52,6 @@ IDENTITY = ('harness', 'session_id', 'trace_id', 'turn_key', 'work_item_id', 'at
             'policy_revision', 'privacy_class')
 MAX_CHILDREN = 4  # detached builds at once, across all hook processes (a subagent burst must not fork-bomb)
 KEEP = 32  # per-session memory (recent turns, appended markers, source revisions): small, read on every hook
-SLOT_WAIT_S = 60.0
 _SCHEMA_RE = re.compile(r'^z0int\.([a-z0-9_]+)\.([a-z_]+)\.(v\d+)$')
 GIT_UNKNOWN = {'key': 'git', 'source_status': 'source_unavailable'}
 
@@ -601,6 +599,17 @@ def child_argv(harness: str) -> list[str]:
     return [sys.executable, '-m', 'z0int.hook_adapter', '--harness', harness, 'opportunity']
 
 
+def spawn_opportunity(harness: str, payload: Mapping[str, Any], ctx: Mapping[str, Any] | None) -> bool:
+    slot = try_slot()
+    if slot is None:
+        record_drop(harness, 'opportunity_record', 'fanout_cap')
+        return False
+    with slot:
+        spawn_detached(child_argv(harness), {'payload': payload, 'ctx': ctx, 'slot_fd': slot.fileno()},
+                       pass_fds=(slot.fileno(),))
+    return True
+
+
 def spawn_detached(argv: list[str], payload: Mapping[str, Any], *, pass_fds: tuple[int, ...] = ()) -> None:
     """Hand one job to a detached child (own session, no stdio): the hook returns while the child builds.
     ``pass_fds``: e.g. a locked slot file the child holds until it exits."""
@@ -630,22 +639,6 @@ def try_slot(root: str | Path | None = None, pool: str = 'capture-slots') -> Any
     return None
 
 
-@contextlib.contextmanager
-def build_slot(root: str | Path | None = None) -> Iterator[bool]:
-    """One of MAX_CHILDREN build slots (flock, shared by every hook process); False after SLOT_WAIT_S."""
-    deadline = time.monotonic() + SLOT_WAIT_S
-    while True:
-        fh = try_slot(root)
-        if fh is not None:
-            try:
-                yield True
-            finally:
-                fh.close()
-            return
-        if time.monotonic() >= deadline:
-            yield False
-            return
-        time.sleep(0.1)
 
 
 # ----------------------------------------------------------------------------- in-process hosts: bounded spool

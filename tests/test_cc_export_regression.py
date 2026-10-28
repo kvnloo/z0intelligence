@@ -34,8 +34,8 @@ def replay(monkeypatch, tmp_path):
     monkeypatch.setattr(sp, 'repo_root', lambda p: Path(p) if str(p).endswith('repo') else None)
     monkeypatch.setattr(sp, 'build_state_packet', lambda *a, **k: json.loads(json.dumps(GOLDEN['packet'])))
     monkeypatch.setattr(automatic, 'handle_event', lambda e: {'action': 'native', 'disabled': True})
-    monkeypatch.setattr(hc, 'spawn_detached',
-                        lambda argv, job: he.handle('opportunity', json.dumps(job), argv[argv.index('--harness') + 1]))
+    monkeypatch.setattr(hc, 'spawn_opportunity',
+                        lambda harness, payload, ctx: hc.record_opportunity(harness, payload, ctx))
     (tmp_path / 'repo').mkdir()
     (tmp_path / 'plain').mkdir()
     for session, pid, cwd, prompt, reply, tools in GOLDEN['turns']:

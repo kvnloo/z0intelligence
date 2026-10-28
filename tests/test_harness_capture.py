@@ -5,6 +5,7 @@ Synthetic payloads only; every test writes under its own Z0INT_HOME.
 import inspect
 import json
 import os
+import socket
 import subprocess
 import sys
 import threading
@@ -393,3 +394,63 @@ def test_spool_put_racing_close_is_written_or_counted_never_lost(home):
     assert not closers[0].is_alive()
     assert len(written) + spool.dropped == 1
     assert hc.drop_count('codex') == spool.dropped
+
+
+def test_capture_slot_is_held_until_the_real_child_exits(home, tmp_path, monkeypatch):
+    socket_path = str(tmp_path / 'capture.sock')
+    children = []
+    popen = subprocess.Popen
+
+    def start(*args, **kwargs):
+        child = popen(*args, **kwargs)
+        children.append(child)
+        return child
+
+    monkeypatch.setattr(hc.subprocess, 'Popen', start)
+    monkeypatch.setattr(hc, 'child_argv', lambda harness: [
+        sys.executable, '-c',
+        'import json,socket,sys; json.load(sys.stdin); '
+        's=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); '
+        's.sendall(b"r"); s.recv(1)', socket_path,
+    ])
+    held = [hc.try_slot() for _ in range(hc.MAX_CHILDREN - 1)]
+    try:
+        with socket.socket(socket.AF_UNIX) as server:
+            server.bind(socket_path)
+            server.listen(1)
+            server.settimeout(10)
+            assert hc.spawn_opportunity('codex', {}, None)
+            connection, _ = server.accept()
+            with connection:
+                connection.settimeout(10)
+                assert connection.recv(1) == b'r'
+                assert hc.try_slot() is None
+                connection.sendall(b'x')
+            assert children[0].wait(timeout=10) == 0
+            recovered = hc.try_slot()
+            assert recovered is not None
+            recovered.close()
+    finally:
+        for child in children:
+            if child.poll() is None:
+                child.kill()
+            child.wait(timeout=10)
+        for slot in held:
+            slot.close()
+
+
+def test_capture_spawn_failure_releases_reserved_capacity(home, monkeypatch):
+    def fail(*args, **kwargs):
+        raise OSError('cannot start capture child')
+
+    monkeypatch.setattr(hc, 'spawn_detached', fail)
+    held = [hc.try_slot() for _ in range(hc.MAX_CHILDREN - 1)]
+    try:
+        with pytest.raises(OSError, match='cannot start capture child'):
+            hc.spawn_opportunity('codex', {}, None)
+        recovered = hc.try_slot()
+        assert recovered is not None
+        recovered.close()
+    finally:
+        for slot in held:
+            slot.close()
