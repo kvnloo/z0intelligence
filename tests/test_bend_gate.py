@@ -8,6 +8,7 @@ or ``$Z0INT_BEND_GATE_BIN``); build it with ``z0int.bend_gate.build_kernel()``.
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import json
 import os
@@ -193,10 +194,32 @@ class FailClosedTests(unittest.TestCase):
             ok = gate.check_document(self.doc, CATALOG, canonical=lambda doc: [])
             self.assertTrue(ok.allowed)
 
-    def test_decision_records_revisions(self) -> None:
-        d = self.check(bg.BendGate(self.tmp / "nope"))
-        self.assertEqual(d.aodl_reference, bg.AODL_REFERENCE)
-        self.assertEqual(len(d.kernel_revision), 16)
+    def test_unbound_executable_cannot_claim_current_source_revision(self) -> None:
+        path = fake_kernel(self.tmp, "while read line; do echo ALLOW; done")
+        with bg.BendGate(path, threads=None) as gate:
+            decision = gate.check_spawn(spawn())
+        self.assertTrue(decision.allowed)
+        self.assertIsNone(decision.kernel_revision)
+        self.assertEqual(decision.build_provenance, "unverified")
+        self.assertEqual(decision.executable_sha256, hashlib.sha256(path.read_bytes()).hexdigest())
+
+    def test_missing_executable_has_no_runtime_identity(self) -> None:
+        decision = self.check(bg.BendGate(self.tmp / "nope"))
+        self.assertFalse(decision.allowed)
+        self.assertIsNone(decision.kernel_revision)
+        self.assertIsNone(decision.executable_sha256)
+
+    def test_restart_cannot_silently_switch_executable_identity(self) -> None:
+        path = fake_kernel(self.tmp, "while read line; do echo ALLOW; done")
+        with bg.BendGate(path, threads=None) as gate:
+            first = gate.check_spawn(spawn())
+            self.assertTrue(first.allowed)
+            gate.close()
+            fake_kernel(self.tmp, "while read line; do echo DENY 101; done")
+            second = gate.check_spawn(spawn())
+        self.assertFalse(second.allowed)
+        self.assertEqual(second.source, "fail-closed")
+        self.assertIn("executable changed", second.detail)
 
 
 @unittest.skipUnless(HAVE_KERNEL, "Bend gate kernel not built (z0int.bend_gate.build_kernel())")
