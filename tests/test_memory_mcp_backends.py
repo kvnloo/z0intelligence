@@ -443,3 +443,24 @@ def test_sqlite_caps_hits_per_session_and_keeps_scope_filter(native, tmp_path):
     sessions = [r["native"]["session_id"] for r in found]
     assert sessions.count(SESSION) == 2 and "codex:other-2" in sessions
     assert all(r["scope"] == PROJECT for r in found)
+
+
+@pytest.mark.parametrize("message_class", [None, "thinking"])
+def test_sqlite_session_diversity_survives_a_longer_high_ranked_transcript(
+    native, tmp_path, message_class
+):
+    rows = [
+        (SESSION, PROJECT, i, "assistant", "continuity", message_class)
+        for i in range(100)
+    ]
+    rows.append((
+        "codex:owner-decision", PROJECT, 1, "user",
+        "continuity must preserve the corrected owner decision across harnesses", None,
+    ))
+    _sqlite_archive(tmp_path, rows)
+    found = backend.search_backend("agentsview", "continuity", [grant()], 3, 2)
+    sessions = [row["native"]["session_id"] for row in found]
+    assert "codex:owner-decision" in sessions
+    assert sessions.count(SESSION) == (0 if message_class else 2)
+    assert all(row["scope"] == PROJECT for row in found)
+    assert native["calls"] == []

@@ -352,6 +352,13 @@ are denied even when their SHA-256 content hashes match. The backend also
 checks the session's native project **before and after** the original read.
 Thinking, tool-use, system and unknown-class messages fail closed.
 
+When a compatible local AgentsView SQLite archive is available, search ranks
+matches across all granted projects together. It returns at most two eligible
+messages per session and applies the result limit after that selection, so a
+long transcript cannot exhaust a fixed candidate window. Candidate identities
+are streamed under the same request deadline; excluded message classes do not
+consume the result limit. The HTTP fallback retains its per-project search path.
+
 `source_version` is SHA-256 of the **complete normalized AgentsView
 message `content` UTF-8 bytes**, read from the message endpoint (not
 a display date and **not** a digest of the underlying provider's raw JSONL).

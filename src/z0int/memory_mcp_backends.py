@@ -342,25 +342,17 @@ def _original_sqlite(grant: dict[str, Any], native: dict[str, Any], conn: sqlite
 _PER_SESSION = 2
 
 
-def _ranked_candidates(conn: sqlite3.Connection, scopes: list[str], query: str,
-                       limit: int) -> list[tuple[str, dict[str, Any]]]:
-    """One FTS query across every granted scope, ordered by BM25 rank (scope filter stays in SQL)."""
+def _ranked_candidates(conn: sqlite3.Connection, scopes: list[str], query: str) -> sqlite3.Cursor:
+    """Stream ranked candidates; rejected or capped rows must not consume the result limit."""
     marks = ",".join("?" * len(scopes))
-    try:
-        rows = conn.execute(
-            "select m.session_id, m.ordinal, s.project from messages_fts f join messages m on m.id = f.rowid "
-            f"join sessions s on s.id = m.session_id where messages_fts match ? and s.project in ({marks}) "
-            "and m.is_system = 0 and m.role in ('user', 'assistant') order by f.rank limit ?",
-            (_fts_query(query), *scopes, limit)).fetchall()
-    except sqlite3.Error:
-        raise BackendUnavailable("sqlite_unavailable") from None
-    out = []
-    for session_id, ordinal, project in rows:
-        try:
-            out.append((project, _native_id(session_id, ordinal)))
-        except BackendUnavailable:
-            continue
-    return out
+    return conn.execute(
+        "select m.session_id, m.ordinal, s.project from messages_fts f join messages m on m.id = f.rowid "
+        f"join sessions s on s.id = m.session_id where messages_fts match ? and s.project in ({marks}) "
+        "and m.is_system = 0 and m.role in ('user', 'assistant') "
+        "and coalesce(m.has_thinking, 0) = 0 and coalesce(m.has_tool_use, 0) = 0 "
+        "and coalesce(m.thinking_text, '') = '' order by f.rank",
+        (_fts_query(query), *scopes),
+    )
 
 
 def _search_sqlite(query: str, grants: list[dict[str, Any]], limit: int, deadline: float) -> list[dict[str, Any]]:
@@ -374,8 +366,13 @@ def _search_sqlite(query: str, grants: list[dict[str, Any]], limit: int, deadlin
             by_scope.setdefault(grant["scope"], []).append(grant)
         output: list[dict[str, Any]] = []
         per_session: dict[str, int] = {}
-        for project, native in _ranked_candidates(conn, list(by_scope), query, limit * 8):
-            if per_session.get(native["session_id"], 0) >= _PER_SESSION:
+        for session_id, ordinal, project in _ranked_candidates(conn, list(by_scope), query):
+            _remaining(deadline)
+            if per_session.get(session_id, 0) >= _PER_SESSION:
+                continue
+            try:
+                native = _native_id(session_id, ordinal)
+            except BackendUnavailable:
                 continue
             for grant in by_scope.get(project, []):
                 try:
@@ -390,6 +387,8 @@ def _search_sqlite(query: str, grants: list[dict[str, Any]], limit: int, deadlin
             if len(output) >= limit:
                 return output
         return output
+    except sqlite3.Error:
+        raise BackendUnavailable("sqlite_unavailable") from None
     finally:
         conn.close()
 
