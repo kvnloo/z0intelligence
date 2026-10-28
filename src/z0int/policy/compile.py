@@ -1,7 +1,7 @@
 """Pure evidence-to-policy stage machine. Persistence is a separate operation."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 import json
 import os
@@ -31,7 +31,7 @@ class CompilerConfig:
     unhealthy_hours: float = 24
     canary_share: float = .1
     abstain_to: str = "jev"
-    option_capacity_bar: float = .95
+    option_capacity_costs: dict | None = None
     option_capacity_tasks: tuple[str, ...] = ("T1", "T2", "T3", "T4")
 
 
@@ -76,10 +76,22 @@ def _noninferior(row: dict) -> bool:
             and 0 <= divergence <= floor)
 
 
+def _promotion_evidence(row: dict) -> bool:
+    if row.get("evidence_kind") == "proxy":
+        return False
+    if row["source"].get("adapter") == "agent_outcomes":
+        return row.get("evidence_kind") == "product_outcome" and isinstance(row.get("verifier_receipt"), dict)
+    return True
+
+
 def option_capacity_key(scope: dict) -> str:
     """Lossless key for an exact physical model scope, shared with O13 readers."""
     if set(scope) != set(SCOPE_FIELDS) or any(not isinstance(v, str) or not v for v in scope.values()):
         raise ValueError("Option capacity requires exact model/quant/engine/backend/device")
+    model = scope["model"]
+    if (not model.startswith("sha256:") or len(model) != 71
+            or any(char not in "0123456789abcdef" for char in model[7:])):
+        raise ValueError("Option capacity model must identify GGUF bytes as sha256:<digest>")
     return canonical(scope).decode("utf-8")
 
 
@@ -90,6 +102,13 @@ def _choice_lower(row: dict) -> float | None:
             or not 0 <= metric["value"] <= 1 or not 0 <= metric["ci_low"] <= 1):
         return None
     p, n = metric["value"], metric["n"]
+    if "answered" in metric and (type(metric["answered"]) is not int or metric["answered"] != n):
+        return None
+    if "abstained" in metric:
+        abstained = metric["abstained"]
+        if (type(abstained) is not int or abstained < 0
+                or metric.get("denominator") != n + abstained):
+            return None
     if "correct" in metric:
         correct = metric["correct"]
         if type(correct) is not int or not 0 <= correct <= n or abs(p - correct/n) > 1e-12:
@@ -99,10 +118,85 @@ def _choice_lower(row: dict) -> float | None:
     return min(metric["ci_low"], lower)
 
 
+def _capacity_costs(config: CompilerConfig, risk: str, findings: list[dict], now: datetime,
+                    scope: dict) -> dict:
+    """All costs use one common unit (e.g. O14 pace-adjusted milliseconds)."""
+    supplied = (config.option_capacity_costs or {}).get(risk)
+    defaults = {"read": 20., "mutating_reversible": 100.}
+    if risk == "destructive":
+        return {"measured": False, "blocked": True, "finding_ids": []}
+    if supplied is None:
+        costs = {}
+        for row in findings:
+            field = row["metric"]["name"]
+            if (field not in {"cost_call", "cost_frontier", "cost_error", "abstain_rate"}
+                    or row["subject"].get("family") != "choice.error_cost"
+                    or row["subject"].get("risk_class") != risk
+                    or row["evidence_class"] != "measured" or not _promotion_evidence(row)
+                    or scope_of(row) != scope
+                    or timestamp(row["ts"]) > now or _expiry(row, config) <= now):
+                continue
+            prior = costs.get(field)
+            if prior is None or (timestamp(row["ts"]), row["id"]) > (timestamp(prior["ts"]), prior["id"]):
+                costs[field] = row
+        units = {row["metric"].get("cost_unit") for row in costs.values()}
+        if len(costs) == 4 and len(units) == 1 and units <= {"latency_ms_lambda0", "o14_score_ms"}:
+            supplied = {field: row["metric"]["value"] for field, row in costs.items()}
+            supplied.update(measured=True, finding_ids=sorted(row["id"] for row in costs.values()))
+            supplied["cost_unit"] = next(iter(units))
+    inputs = dict(supplied or {"cost_call": .1, "cost_frontier": 1.,
+                              "cost_error": defaults[risk], "abstain_rate": 0.,
+                              "measured": False, "finding_ids": []})
+    if type(inputs.get("measured")) is not bool:
+        raise ValueError("Capacity measurement status must be boolean")
+    if (not isinstance(inputs.get("finding_ids"), list)
+            or any(not isinstance(value, str) or not value for value in inputs["finding_ids"])):
+        raise ValueError("Capacity finding_ids must be a string list")
+    for field in ("cost_call", "cost_frontier", "cost_error", "abstain_rate"):
+        value = inputs.get(field)
+        if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+            raise ValueError(f"Invalid option capacity cost: {field}")
+    if inputs["cost_error"] <= 0 or inputs["cost_frontier"] <= 0 or inputs["abstain_rate"] > 1:
+        raise ValueError("Invalid option capacity error/frontier/abstention cost")
+    if inputs.get("measured"):
+        ids = inputs.get("finding_ids")
+        sources = [row for row in findings if row["id"] in (ids or [])]
+        units = {row["metric"].get("cost_unit") for row in sources}
+        if (not ids or len(ids) != len(set(ids)) or len(sources) != len(ids) or any(
+                row["evidence_class"] != "measured"
+                or not _promotion_evidence(row)
+                or row["subject"].get("family") != "choice.error_cost"
+                or row["subject"].get("risk_class") != risk
+                or timestamp(row["ts"]) > now or _expiry(row, config) <= now
+                for row in sources)
+                or units not in ({"latency_ms_lambda0"}, {"o14_score_ms"})
+                or inputs.get("cost_unit") != next(iter(units), None)
+                or {row["metric"]["name"] for row in sources} !=
+                   {"cost_call", "cost_frontier", "cost_error", "abstain_rate"}):
+            raise ValueError("Measured costs require fresh exact-scope, risk-bound findings with one permitted unit")
+        source_scopes = [scope_of(row) for row in sources]
+        try:
+            for source_scope in source_scopes:
+                option_capacity_key(source_scope)
+        except ValueError as exc:
+            raise ValueError("Measured costs require exact physical scope") from exc
+        if any(source_scope != source_scopes[0] for source_scope in source_scopes):
+            raise ValueError("Measured costs require one exact-scope")
+        for field in ("cost_call", "cost_frontier", "cost_error", "abstain_rate"):
+            if not any(row["metric"]["name"] == field and row["metric"]["value"] == inputs[field]
+                       for row in sources):
+                raise ValueError(f"Measured cost has no matching finding: {field}")
+        if source_scopes[0] != scope:
+            overrides = dict(config.option_capacity_costs or {})
+            overrides.pop(risk, None)
+            return _capacity_costs(replace(config, option_capacity_costs=overrides), risk, findings, now, scope)
+        inputs["expires_at"] = iso(min(_expiry(row, config) for row in sources))
+    inputs["status"] = "measured" if inputs.get("measured") else "unmeasured"
+    return inputs
+
+
 def _compile_option_capacity(findings: list[dict], now: datetime, config: CompilerConfig) -> dict:
-    """Bound option counts across every required task, without routing credit."""
-    if not math.isfinite(config.option_capacity_bar) or not 0 <= config.option_capacity_bar <= 1:
-        raise ValueError("option_capacity_bar must be between zero and one")
+    """Bound selective decisions by risk-specific expected cost, not a fixed bar."""
     tasks = set(config.option_capacity_tasks)
     if any(not isinstance(task, str) or not task for task in tasks):
         raise ValueError("option_capacity_tasks must contain nonempty task names")
@@ -111,12 +205,15 @@ def _compile_option_capacity(findings: list[dict], now: datetime, config: Compil
         scope = scope_of(row)
         if set(scope) != set(SCOPE_FIELDS) or any(not isinstance(v, str) or not v for v in scope.values()):
             continue
-        key = option_capacity_key(scope)
+        try:
+            key = option_capacity_key(scope)
+        except ValueError:
+            continue
         scopes[key] = scope
         if (row["subject"].get("family") != "choice.option_capacity"
                 or row["subject"].get("job") != "ChoiceLadder"
                 or row["metric"]["name"] != "choice_accuracy"
-                or row["evidence_class"] != "measured" or timestamp(row["ts"]) > now):
+                or row["evidence_class"] != "measured" or not _promotion_evidence(row) or timestamp(row["ts"]) > now):
             continue
         task = row["subject"].get("task", row["metric"].get("task"))
         k = row["metric"].get("option_count")
@@ -129,30 +226,43 @@ def _compile_option_capacity(findings: list[dict], now: datetime, config: Compil
             cells[identity] = row
     result = {}
     for key in sorted(scopes):
-        maxima, selected = [], []
-        for task in sorted(tasks):
-            passing = []
-            for (cell_key, cell_task, k), row in cells.items():
-                if cell_key != key or cell_task != task or _expiry(row, config) <= now:
-                    continue
-                lower = _choice_lower(row)
-                if lower is not None and lower >= config.option_capacity_bar:
-                    passing.append((k, lower, row))
-            if passing:
-                best = max(passing, key=lambda cell: (cell[0], cell[1], cell[2]["id"]))
-                maxima.append(best[0])
-                selected.append((best[1], best[2]))
-            else:
-                maxima.append(2)
-        complete = bool(tasks) and len(selected) == len(tasks)
-        credited = selected if complete else []
-        result[key] = {
-            "allowed_k": min(maxima) if maxima else 2,
-            "finding_ids": sorted(row["id"] for _, row in credited),
-            "wilson_lower": min((lower for lower, _ in credited), default=None),
-            "task": sorted(tasks), "bar": config.option_capacity_bar,
-            "expires_at": iso(min((_expiry(row, config) for _, row in credited), default=now)),
-        }
+        result[key] = {}
+        for risk in ("read", "mutating_reversible", "destructive"):
+            inputs = _capacity_costs(config, risk, findings, now, scopes[key])
+            blocked = inputs.get("blocked", False)
+            bar = None if blocked else 1 - (
+                inputs["cost_frontier"] * (1 - inputs["abstain_rate"]) -
+                inputs["cost_call"]) / inputs["cost_error"]
+            maxima, selected = [], []
+            for task in sorted(tasks):
+                passing = []
+                for (cell_key, cell_task, k), row in cells.items():
+                    if (cell_key != key or cell_task != task or _expiry(row, config) <= now
+                            or blocked or not inputs.get("measured")):
+                        continue
+                    lower = _choice_lower(row)
+                    if lower is not None and lower > bar:
+                        passing.append((k, lower, row))
+                if passing:
+                    best = max(passing, key=lambda cell: (cell[0], cell[1], cell[2]["id"]))
+                    maxima.append(best[0])
+                    selected.append((best[1], best[2]))
+                else:
+                    maxima.append(0)
+            complete = bool(tasks) and len(selected) == len(tasks)
+            credited = selected if complete else []
+            result[key][risk] = {
+                "allowed_k": min(maxima) if complete else 0,
+                "bar_derived": bar, "inputs": inputs,
+                "finding_ids": sorted({row["id"] for _, row in credited} |
+                                      set(inputs.get("finding_ids", []))),
+                "wilson_lower": min((lower for lower, _ in credited), default=None),
+                "task": sorted(tasks),
+                "expires_at": iso(min(
+                    [_expiry(row, config) for _, row in credited] +
+                    ([timestamp(inputs["expires_at"])] if inputs.get("expires_at") else []),
+                    default=now)),
+            }
     return result
 
 
@@ -181,6 +291,7 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
         quality = [r for r in rows if r["metric"]["name"] in QUALITY
                    and r["metric"].get("higher_is_better") is True
                    and r["evidence_class"] not in {"inference", "published"}
+                   and _promotion_evidence(r)
                    and timestamp(r["ts"]) <= now]
         before = prior.get("stage", "none")
         if before not in STAGES:
@@ -206,6 +317,7 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
             elif before in {"canary", "live"} and latest["metric"]["ci_low"] < config.bar:
                 stage, reason = "shadow", "latest_ci_below_bar"
         health = [r for r in rows if r["arm"] == arm and r["evidence_class"] == "measured"
+                  and _promotion_evidence(r)
                   and r["metric"]["name"] == "endpoint_health" and timestamp(r["ts"]) <= now]
         if health:
             last_health = health[-1]["metric"]
@@ -258,7 +370,7 @@ def compile_policy(findings: list[dict], previous_policy: dict | None, now: date
     serving = {}
     for row in sorted(findings, key=lambda r: (timestamp(r["ts"]), r["id"])):
         url = row["source"].get("url")
-        if (row["evidence_class"] != "measured" or not url or _expiry(row, config) <= now
+        if (row["evidence_class"] != "measured" or not _promotion_evidence(row) or not url or _expiry(row, config) <= now
                 or timestamp(row["ts"]) > now):
             continue
         parsed = urlsplit(url)

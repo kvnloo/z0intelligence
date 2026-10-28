@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "z0.decision_policy.scope.v1",
+  "title": "Content-addressed physical option-capacity scope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["model", "quant", "engine", "backend", "device"],
+  "properties": {
+    "model": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "SHA-256 of actual served GGUF file bytes, never an endpoint alias"},
+    "quant": {"type": "string", "minLength": 1},
+    "engine": {"type": "string", "minLength": 1, "description": "Actual serving runtime build_info identity, not an engine product label"},
+    "backend": {"type": "string", "minLength": 1},
+    "device": {"type": "string", "minLength": 1}
+  }
+}
