@@ -620,3 +620,13 @@ def test_persisted_observation_keeps_identity_without_prompt_or_tool_arguments(t
     assert receipt["tool_name"] == "read"
     assert receipt["tool_call_id"] == "call-private"
     assert "state" not in receipt
+
+
+def test_absent_scoped_candidate_preserves_goal_binary_shadow(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    backend = _FakeBackend(action="read")
+    result = run_shadow(_payload(), registry=_FakeRegistry(backends={"m1": backend}), write=False)
+    assert result["ok"] is True
+    assert result["shadow"][0]["selected_action"] == "read"
+    assert {value for call in backend.seen_legal for value in call} == {"read", "grep"}
+    assert result["selected_action"] is None and result["executed_action"] is None
