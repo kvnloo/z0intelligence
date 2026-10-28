@@ -346,7 +346,22 @@ def _decision_rows(
     lock = threading.Lock()
     deadline = time.monotonic() + max(.1, timeout_s)
 
+    def measured_identity(backend: Any) -> dict | None:
+        """Measure only the transport that will actually make the prediction."""
+        from .learning_runtime import measured_serving_identity
+        try:
+            transport = backend._transport
+            config = backend.config
+            if (transport.config.base_url != config.base_url or
+                    transport.config.model != config.model):
+                return None
+            identity, _ = measured_serving_identity(transport, config.model)
+            return identity if identity.get('model') == config.model else None
+        except Exception:
+            return None
+
     def run(index: int, backend: Any) -> None:
+        before_identity = measured_identity(backend)
         if decision_config and decision_config.get('decision_method') != 'per_candidate_binary_logit':
             from .slm_scoped import run_scoped
             row = run_scoped(payload, legal, backend, dict(decision_config),
@@ -355,6 +370,9 @@ def _decision_rows(
         else:
             row = run_goal_binary(payload, legal, backend, shortlist=shortlist, n_ctx=n_ctx,
                                   policy_identity=policy_identity, policy_home=policy_home)
+        after_identity = measured_identity(backend) if before_identity else None
+        if before_identity is not None and before_identity == after_identity:
+            row['physical_identity'] = before_identity
         row['failure_class'] = failure_class(row.get('error') or row.get('parse_error'))
         with lock:
             results[index] = row

@@ -128,6 +128,70 @@ def test_tool_comparison_excludes_alias_only_and_other_physical_identity(tmp_pat
     db.close()
 
 
+
+def test_bound_shadow_receipts_keep_zero_rpc_abstentions_in_denominator(tmp_path):
+    db=connect(tmp_path)
+    for i in range(10):
+        shadow={'model':IDENTITY['model'],'physical_identity':IDENTITY,
+                'arm':'slm-method:scope','method_config':{'decision_method':'scoped'},
+                'selected_action':'read','rpc_count':int(i == 0)}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(i),'s',str(i),100+i,'omp.tool',json.dumps({'shadow':[shadow]})))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(i),'s',str(i),'omp.tool',100+i,'read','[]',None,120))
+    observations,comparison=runtime.tool_observations(db,IDENTITY,SCOPE)
+    slm=next(row for row in observations if row['identity']['kind']=='slm')
+    assert (slm['n'],slm['total'],slm['correct']) == (1,10,1)
+    assert comparison['slm-method:scope']['coverage'] == .1
+    assert comparison['history_bigram']['total'] == 10
+    db.close()
+
+
+def test_shadow_measures_identity_on_actual_transport_for_receipt(tmp_path,monkeypatch):
+    from z0int.cognition import shadow, slm_scoped
+    config=SimpleNamespace(base_url='http://fixture',model=IDENTITY['model'])
+    class Transport:
+        def __init__(self):
+            self.config=config
+            self.device='CUDA0'
+        def _get(self,path):
+            if path == '/props':
+                return {'build_info':'measured'}
+            if path.startswith('/props?'):
+                return {'model_alias':IDENTITY['model'],'model_ftype':'Q8_0'}
+            if path.startswith('/slots?'):
+                return [{'n_ctx':4096}]
+            if path == '/models':
+                return {'data':[{'id':IDENTITY['model'],'status':{'args':['--device',self.device]}}]}
+            raise AssertionError(path)
+    transport=Transport()
+    backend=SimpleNamespace(config=config,_transport=transport)
+    monkeypatch.setattr(slm_scoped,'run_scoped',lambda *a,**kw:{
+        'model':IDENTITY['model'],'arm':'slm-method:scope','method_config':{},
+        'selected_action':'read','rpc_count':1})
+    spec=SimpleNamespace(model_id='alias')
+    def decide():
+        return shadow._decision_rows([(spec,backend,None)],None,{},timeout_s=5,
+            decision_config={'decision_method':'slm_bt_v1'})[0]
+    result=decide()
+    assert result['physical_identity'] == IDENTITY
+    db=connect(tmp_path)
+    db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+               ('1','s','1',100,'omp.tool',json.dumps({'shadow':[result]})))
+    db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+               ('1','s','1','omp.tool',100,'read','[]',None,120))
+    observations,_=runtime.tool_observations(db,IDENTITY,SCOPE)
+    assert next(row for row in observations if row['identity']['kind']=='slm')['n']==1
+    transport.device='CPU'
+    assert decide()['physical_identity']['backend']=='cpu'
+    def switching(*args,**kwargs):
+        transport.device='CPU'
+        return {'model':IDENTITY['model'],'arm':'slm-method:scope','rpc_count':1}
+    transport.device='CUDA0'
+    monkeypatch.setattr(slm_scoped,'run_scoped',switching)
+    assert 'physical_identity' not in decide()
+    db.close()
+
 def test_census_queue_keeps_only_exact_new_families_and_frozen_provenance(tmp_path):
     folder = tmp_path/'loop'
     folder.mkdir()

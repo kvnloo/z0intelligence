@@ -17,12 +17,17 @@ from .registry import load_serving
 def serving_identity(endpoint) -> tuple[dict, dict]:
     transport = OpenAICompatTransport(ServerConfig(endpoint.base_url, endpoint.served_model,
         timeout_s=max(10, endpoint.timeout_s), runtime=endpoint.runtime,
-        quantization=endpoint.quantization))
+        quantization=endpoint.quantization, api_key=getattr(endpoint, 'api_key', None)))
+    return measured_serving_identity(transport, endpoint.served_model)
+
+
+def measured_serving_identity(transport, served_model) -> tuple[dict, dict]:
+    """Measure the server and model addressed by this actual transport."""
     root = transport._get('/props')
-    props = transport._get('/props?model=' + quote(endpoint.served_model))
-    slots = transport._get('/slots?model=' + quote(endpoint.served_model))
+    props = transport._get('/props?model=' + quote(served_model))
+    slots = transport._get('/slots?model=' + quote(served_model))
     models = transport._get('/models')
-    model = next((m for m in models.get('data', []) if m.get('id') == endpoint.served_model), {})
+    model = next((m for m in models.get('data', []) if m.get('id') == served_model), {})
     args = model.get('status', {}).get('args', [])
     device = args[args.index('--device')+1] if '--device' in args else 'unreported'
     backend = 'cuda' if device.startswith('CUDA') else 'cpu' if device in ('none', 'CPU') else device
@@ -32,7 +37,7 @@ def serving_identity(endpoint) -> tuple[dict, dict]:
     n_ctx = min([s['n_ctx'] for s in slots] or [props['default_generation_settings']['n_ctx']])
     identity = {'kind': 'slm', 'model': props['model_alias'], 'quant': props['model_ftype'],
                 'engine': 'llama.cpp@' + build, 'backend': backend, 'device': 'groot'}
-    scope = {'base_url': endpoint.base_url, 'served_model': endpoint.served_model,
+    scope = {'base_url': transport.config.base_url, 'served_model': served_model,
              'n_ctx': n_ctx, 'slots': len(slots), 'revision': 'not_reported_by_endpoint'}
     return identity, scope
 
@@ -165,8 +170,7 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
         shadows = [s for s in receipt.get('shadow', [])
                    if s.get('physical_identity') == identity and
                    s.get('model') == identity['model'] and
-                   (s.get('arm') == 'goal-binary' or str(s.get('arm','')).startswith('slm-method:')) and
-                   (not str(s.get('arm','')).startswith('slm-method:') or s.get('rpc_count', 0) > 0)]
+                   (s.get('arm') == 'goal-binary' or str(s.get('arm','')).startswith('slm-method:'))]
         if not shadows:
             continue
         strategy = receipt.get('projection_strategy', 'history-1')
@@ -179,7 +183,9 @@ def tool_observations(db, identity: dict, scope: dict) -> tuple[list[dict], dict
             'kind': 'knn', 'model': 'history-bigram-v1', 'quant': 'none',
             'engine': 'python-stdlib', 'backend': 'cpu', 'device': 'groot'})]
         decisions += [('goal_binary' if s.get('arm') == 'goal-binary' else s['arm'],
-                       s.get('selected_action') if not (s.get('error') or s.get('parse_error')) else None, identity) for s in shadows]
+                       s.get('selected_action') if not (s.get('error') or s.get('parse_error') or
+                           (str(s.get('arm','')).startswith('slm-method:') and not s.get('rpc_count'))) else None,
+                       identity) for s in shadows]
         for arm, selected, arm_identity in decisions:
             method = next((s for s in shadows if s.get('arm') == arm), None)
             arm_projection = method.get('method_config', projection) if method else projection
