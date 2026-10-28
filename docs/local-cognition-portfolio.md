@@ -400,6 +400,12 @@ unchanged. Held-slot measurements now refuse children rather than accumulating
 60-second waiters; real child delivery and inherited-lock lifetime require separate
 runtime checks.
 
+Cold hook startup also pays for imported dependencies. The canonical turn-key module
+does not construct a bridge-only dataclass or import `dataclasses` and `inspect`.
+The Hermes transport adapter constructs its existing serialized identity mapping
+directly and still omits unknown fields. This removes unrelated startup work without
+changing the turn-key algorithm or the envelope schema.
+
 ### Ownership boundary
 
 | Concern | Owner |

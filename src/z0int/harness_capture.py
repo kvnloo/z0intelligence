@@ -653,8 +653,6 @@ def try_slot(root: str | Path | None = None, pool: str = 'capture-slots') -> Any
     return None
 
 
-
-
 # ----------------------------------------------------------------------------- in-process hosts: bounded spool
 class Spool:
     """Bounded writer for hosts that live across turns (P-2/P-3 contracts).
