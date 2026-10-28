@@ -30,6 +30,26 @@ def fixture(tmp_path, n=60):
     return home, sessions, now
 
 
+def test_scoped_arms_remain_distinct_and_zero_rpc_cannot_receive_credit(tmp_path):
+    from z0int.cognition.learning import score, arm_scores
+    db=connect(tmp_path)
+    for i in range(3):
+        shadow=[
+            {'model':'m','arm':'slm-method:alpha','selected_action':'read','rpc_count':1},
+            {'model':'m','arm':'slm-method:beta','selected_action':'edit','rpc_count':1},
+            {'model':'m','arm':'slm-method:zero','selected_action':'read','rpc_count':0}]
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(i),'s',str(i),100+i,'omp.tool',json.dumps({'shadow':shadow})))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(i),'s',str(i),'omp.tool',100+i,'read','[]',None,120))
+    assert score(db,.8,time.monotonic()+30)
+    arms=arm_scores(db)['omp.tool']
+    assert arms['slm:m:slm-method:alpha']['correct']==3
+    assert arms['slm:m:slm-method:beta']['correct']==0
+    assert arms['slm:m:slm-method:zero']['n']==0
+    db.close()
+
+
 def test_prequential_join_credit_and_incremental_stall(tmp_path):
     home, sessions, now = fixture(tmp_path)
     first = learn(home, sessions=sessions, now=now)

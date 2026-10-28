@@ -13,8 +13,18 @@ from z0int.cognition.slm_methods import METHODS,predict_method
 from z0int.cognition.learning_families import _prior,project_prompt,_baseline
 from z0int.cognition.adapters.transport import OpenAICompatTransport,ServerConfig
 from z0int.cognition.slm_context_reconstruct import reconstruct
-from z0int.cognition.slm_statistics import frozen_sample,expected_cost,expected_cost_interval
+from z0int.cognition.slm_statistics import frozen_sample,frozen_cutoff,expected_cost,expected_cost_interval
 from z0int.cognition.learning_search import wilson_interval
+
+
+def tool_examples(db, cutoff):
+    """Frozen prior labels require both receipt and native call before cutoff."""
+    rows=db.execute("""SELECT l.action,l.features FROM labels l
+        JOIN calls c ON c.session=l.session AND c.call=l.call
+        WHERE l.family='omp.tool' AND l.ts>0 AND l.ts<? AND c.ts>0 AND c.ts<?
+        ORDER BY l.ts DESC,l.id DESC LIMIT 64""",(cutoff,cutoff))
+    return [dict(label=e['action'],features=json.loads(e['features'])) for e in rows][::-1]
+
 
 
 def main():
@@ -37,16 +47,17 @@ def main():
         for family,table in (('omp.tool','labels'),('omp.path_kind','family_jobs')):
             rows=list(db.execute(f'SELECT * FROM {table} WHERE family=? '+('AND label IS NOT NULL ' if table=='family_jobs' else '')+'ORDER BY ts,id',(family,)))
             selected.extend(dict(r,**({'label':r['action']} if family=='omp.tool' else {})) for r in random.Random(20261025).sample(rows,min(args.n,len(rows))))
+    cutoff=frozen_cutoff(db,selected)
     contexts=reconstruct(args.sessions,[(r['session'],r['call']) for r in selected])
     prepared=[]
     for row in selected:
         if row['family']=='omp.tool':
-            examples=[dict(label=e['action'],features=json.loads(e['features'])) for e in db.execute("SELECT action,features FROM labels WHERE family=? AND ts<? ORDER BY ts DESC LIMIT 64",(row['family'],row['ts']))][::-1]
+            examples=tool_examples(db,cutoff)
             counts=Counter(e['label'] for e in examples)
             choices=sorted(counts,key=lambda v:(-counts[v],v))[:3]
             body={'task':'Predict next tool','examples':examples[-3:]}
         else:
-            examples=_prior(db,row,64)
+            examples=_prior(db,{**row,'ts':cutoff},64)
             prompt,choices=project_prompt(row['family'],row['features'],examples,history_width=1)
             body=json.loads(prompt)
         native_context=contexts.get((row['session'],row['call']))
@@ -106,6 +117,6 @@ def main():
                                     expected_proxy_ms=expected_cost(rows),expected_proxy_ci95_ms=expected_cost_interval(rows),
                                     errors=sum(r['error'] is not None for r in rows),failed_rpcs=sum(r['failed_rpc_count'] for r in rows)))
     Path(args.output).write_text(json.dumps({'status':'complete','model':args.model,'evidence_class':'replayed_L1','manifest':'sha256:'+hashlib.sha256(Path(args.manifest).read_bytes()).hexdigest() if args.manifest else None,
-                                           'context':'exact_native_ancestor_chain','rows':results,'summary':summary},indent=2))
+                                           'context':'exact_native_ancestor_chain','evaluation':'frozen pre-sample training; row-stratified splits, not independent sessions or work items','training_cutoff_exclusive':cutoff,'rows':results,'summary':summary},indent=2))
 
 if __name__=='__main__':main()

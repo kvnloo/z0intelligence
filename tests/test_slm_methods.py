@@ -43,20 +43,25 @@ def test_scoped_identity_changes_with_frozen_categories():
     assert scope_digest(config)==scope_digest(dict(reversed(list(config.items()))))
 
 
-def test_unseen_tool_never_reaches_model():
+def test_gold_tool_does_not_change_scoped_prediction(monkeypatch):
     from types import SimpleNamespace
-    from z0int.cognition.slm_scoped import run_scoped
-    def forbidden(*args,**kwargs):
-        raise AssertionError('unseen tools must route before inference')
-    backend=SimpleNamespace(_transport=SimpleNamespace(chat=forbidden),
-                            config=SimpleNamespace(model='test'),backend_id='test')
+    from z0int.cognition import slm_scoped
+    calls=[]
+    def pipeline(prompt, groups, first, final, **kwargs):
+        calls.append((prompt, groups))
+        first([{'role':'user','content':prompt}])
+        return {'selected_action':'read','abstained':False}
+    monkeypatch.setattr(slm_scoped,'pipeline',pipeline)
+    backend=SimpleNamespace(_transport=SimpleNamespace(chat=lambda *a,**kw:
+        SimpleNamespace(usage={})),config=SimpleNamespace(model='test'),backend_id='test')
     legal=SimpleNamespace(ids=lambda:('read','new_tool'))
     config={'decision_method':'slm_pipeline_v1','frozen_categories':[['read']],
             'training_digest':'fixed'}
-    row=run_scoped({},legal,backend,config,requested_tool='new_tool')
-    assert row['selected_action'] is None
-    assert row['frontier_reason']=='tool_not_in_observed_vocab'
-    assert row['arm'].startswith('slm-method:')
+    first=slm_scoped.run_scoped({'facts':{'tool_name':'read'}},legal,backend,config)
+    second=slm_scoped.run_scoped({'facts':{'tool_name':'new_tool'}},legal,backend,config)
+    assert calls[0] == calls[1]
+    assert first['selected_action'] == second['selected_action'] == 'read'
+    assert first['rpc_count'] == second['rpc_count'] == 1
 
 
 def test_reconstructor_fails_closed_on_missing_ancestor(tmp_path):
@@ -176,3 +181,49 @@ def test_search_training_vocabulary_ignores_holdout_labels():
     assert wrong['correct'] is False and wrong['abstain'] is False
     abstained=module.score_prediction({'selected_action':None,'category':None},'unseen',[['read']])
     assert abstained['abstain'] is True
+
+
+def test_cost_weights_wrong_and_abstained_decisions():
+    import pytest
+    from z0int.cognition.slm_statistics import expected_cost
+    rows=[{'correct':False,'abstain':False,'wall_ms':10},
+          {'correct':False,'abstain':True,'wall_ms':20},
+          {'correct':True,'abstain':False,'wall_ms':30}]
+    assert expected_cost(rows) == pytest.approx(20+(6034+7999)/3)
+    assert expected_cost([rows[1]]) == 8019
+    assert expected_cost([rows[2]]) == 30
+    with pytest.raises(ValueError,match='empty'):
+        expected_cost([])
+
+
+def test_singleton_comparison_never_claims_model_decision():
+    from z0int.cognition.slm_methods import predict_method
+    def forbidden(*args,**kwargs):
+        raise AssertionError('singleton must not call the model')
+    for method in ('bt','tournament3'):
+        row=predict_method('{}',['read'],forbidden,method=method)
+        assert row['selected_action'] is None and row['abstained']
+
+
+def test_measure_frozen_examples_exclude_future_calls_and_sample_labels():
+    import importlib.util
+    import sqlite3
+    from pathlib import Path
+    from z0int.cognition.slm_statistics import frozen_cutoff
+    path=Path(__file__).resolve().parents[1]/'operations'/'slm-methods'/'measure.py'
+    spec=importlib.util.spec_from_file_location('slm_measure',path)
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    db=sqlite3.connect(':memory:'); db.row_factory=sqlite3.Row
+    db.execute('CREATE TABLE labels(id TEXT,session TEXT,call TEXT,ts REAL,action TEXT,features TEXT,family TEXT)')
+    db.execute('CREATE TABLE calls(session TEXT,call TEXT,ts REAL)')
+    db.executemany('INSERT INTO labels VALUES(?,?,?,?,?,?,?)',[
+        ('a','s','a',1,'read','[]','omp.tool'),
+        ('b','s','b',2,'future','[]','omp.tool'),
+        ('c','s','c',4,'holdout','[]','omp.tool')])
+    db.executemany('INSERT INTO calls VALUES(?,?,?)',[
+        ('s','a',1),('s','b',9),('s','c',4),('s','dev',3)])
+    sample=[{'session':'s','call':'dev','ts':5},{'session':'s','call':'c','ts':4}]
+    cutoff=frozen_cutoff(db,sample)
+    assert cutoff == 3
+    assert module.tool_examples(db,cutoff)==[{'label':'read','features':[]}]
