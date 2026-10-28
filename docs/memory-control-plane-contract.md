@@ -205,6 +205,15 @@ There is no second index, memory database, store, registry or bridge.
   local-filesystem boundary. A scope label from a model is not a grant:
   source-scope attribution, caller authentication and policy live at the
   existing host/read-facade admission boundary.
+- Memory retrieval applies both `request_scope` and the existing `ScopePolicy`.
+  Comparable boundaries use their narrower ancestor-visibility set. Disjoint
+  boundaries stop before retrieval or injection ownership. Requester and
+  cross-harness restrictions remain in force. This does not authenticate either
+  scope or replace the source's access checks.
+- The resolver preserves the memory surface's failed verdict. A lexical hit
+  cannot hide conflicting current claims, and a temporal hit cannot hide an
+  unavailable required lexical source. Rejected memory contributes no evidence.
+  Conflicts remain in the packet, and failed required needs remain explicit gaps.
 - MemorySnapshot.build is reused, not reimplemented. It binds the
   requested scope, workstream/state revision, source versions, policy
   revision, compiler/ontology revision and optional repository HEAD plus
