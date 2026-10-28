@@ -217,7 +217,8 @@ def test_route_worker_args_use_live_mcp_schema(low_overhead_policy):
     [{"task": padded("summarize: ", 24001)}, {"context": "x" * 24001}],
 )
 def test_worker_request_size_boundaries_block_oversize(low_overhead_policy, updates):
-    request = candidate(padded("summarize: ", 4000), **updates)
+    request = candidate(padded("summarize: ", 4000))
+    request.update(updates)
     result = classify(request, low_overhead_policy)
     assert result["decision"] == "PARENT_ONLY"
     assert "TOO_LARGE" in result["reasons"]
