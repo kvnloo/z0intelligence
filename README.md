@@ -30,6 +30,30 @@ The current repository is much more than the original OpenJev prototype.
 
 The source of truth for the current architectural boundary is [zer0.repo.yaml](zer0.repo.yaml).
 
+## Candidate artifact imports
+
+Use `z0int artifacts inspect MANIFEST --json`, then
+`z0int artifacts import MANIFEST --json`. Import always creates an unpromoted
+candidate. Evolution Lab remains the producer and the independent evaluation
+owner remains responsible for promotion.
+
+The v1 identity matches Evolution Lab's exporter: SHA-256 over the sorted file
+digests joined with `|`. Import checks both the declared digests and the artifact
+ID. Bundle members must be regular relative files, with no traversal, symlink,
+duplicate destination basename, or reserved `manifest.json` destination.
+
+Import copies into private staging, verifies the copied bytes, then publishes
+one identity directory atomically. An interrupted copy publishes nothing.
+Exact reimport preserves the existing artifact and any independent local
+promotion. Different metadata or damaged installed bytes cause a conflict.
+The former `--force` overwrite option is removed.
+
+Artifact discovery reads published identity directories, not staging or the
+old index file. `inspect` and `import` verify bytes. `list` and `get_artifact`
+read metadata only, without hashing model weights on a preflight call.
+An artifact hash does not authenticate its producer, prove training quality,
+or attest the weights loaded by a runtime.
+
 ## Evidence-bound decision policy
 
 `z0int policy ingest` converts supported JSON measurements into an append-only,

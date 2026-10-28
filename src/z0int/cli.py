@@ -550,7 +550,6 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(arti)
     artim = art_sub.add_parser("import", help="Import candidate artifact (never promotes)")
     artim.add_argument("manifest")
-    artim.add_argument("--force", action="store_true")
     _json_flag(artim)
     artl = art_sub.add_parser("list", help="List installed specialists")
     _json_flag(artl)
@@ -1028,7 +1027,7 @@ def main(argv: list[str] | None = None) -> int:
             _print(out, as_json=as_json)
             return 0 if out.get("ok") else 1
         if args.artifacts_cmd == "import":
-            out = import_manifest(args.manifest, force=bool(getattr(args, "force", False)))
+            out = import_manifest(args.manifest)
             _print(out, as_json=as_json)
             return 0 if out.get("ok") else 1
         if args.artifacts_cmd == "list":
