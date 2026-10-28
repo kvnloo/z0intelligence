@@ -68,6 +68,26 @@ def test_missing_arm_or_insufficient_evaluations_is_not_a_plateau(db):
                       config=SearchConfig(min_observations=5))
     assert not report['events']
 
+
+@pytest.mark.parametrize(('sparse_counts', 'with_sampled_arm', 'expected_strategy'), [
+    ([1, 1, 1], True, 'history-3'),
+    ([1, 2, 3], True, 'history-1'),
+    ([1, 1, 1], False, 'history-1'),
+])
+def test_inactive_sparse_proxy_does_not_starve_sampled_research(
+        db, sparse_counts, with_sampled_arm, expected_strategy):
+    for i, count in enumerate(sparse_counts, 1):
+        rows = [{**observation('retired-model', n=count, correct=0),
+                 'evidence_kind': 'proxy', 'promotion_eligible': False}]
+        if with_sampled_arm:
+            rows.append({**observation('active-model'), 'evidence_kind': 'proxy',
+                         'promotion_eligible': False})
+        report = tick(db, i, rows, config=SearchConfig(min_observations=5))
+    assert report['families']['omp.tool']['current_strategy'] == expected_strategy
+    curves = [json.loads(row[0]) for row in db.execute(
+        "SELECT body FROM learning_search_curves WHERE arm='retired-model' ORDER BY rowid")]
+    assert [row['total'] for row in curves] == sparse_counts
+
 def test_abstention_only_arm_still_advances_after_real_evaluations(db):
     abstentions = {**observation(n=0, correct=0), 'total': 100}
     for i in (1, 2, 3):
