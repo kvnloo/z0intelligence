@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import importlib.util
 import json
 import platform
 import random
@@ -38,10 +39,14 @@ from typing import Any, Callable, Iterator
 ROOT = Path(__file__).resolve().parents[1]
 REF = ROOT / "third_party" / "aodl_a848270"
 sys.path.insert(0, str(ROOT / "src"))
-sys.path.insert(0, str(REF))
 
-from aodl_contract import validate  # noqa: E402
 from z0int import bend_gate as bg  # noqa: E402
+
+# Keep the frozen reference independent of the installed canonical package.
+_spec = importlib.util.spec_from_file_location("bend_aodl_reference", REF / "aodl_contract" / "validator.py")
+_reference = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_reference)
+validate = _reference.validate
 
 CATALOG = bg.load_catalog(REF / "harnesses" / "catalog.json")
 H = "0" * 64
