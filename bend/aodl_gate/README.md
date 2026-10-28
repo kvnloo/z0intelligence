@@ -16,6 +16,9 @@ AODL JSON ──► z0int.bend_gate (host, Python)            ──► Bend ker
 Built against Bend **2.0.34** (BendTT, an affine dependent type theory with
 laws and proofs). This is not Bend 1 / HVM. The AODL reference is frozen at
 `kvnloo/aodl@a848270` in `third_party/aodl_a848270/`.
+The parity runner and tests load that frozen validator under an isolated module
+name. They never put the reference package on `sys.path` or replace the installed
+`aodl_contract`, whose canonicalization API remains authoritative for runtime use.
 
 ## Files
 

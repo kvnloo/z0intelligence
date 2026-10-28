@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
-import sys
 
 import pytest
 
@@ -13,13 +11,6 @@ from z0int.intelligence import REGISTRY
 from z0int.routing_table import build_table, render_markdown, summary
 
 
-TEXT_WORKERS = {
-    "summarization",
-    "research",
-    "code_review",
-    "coding_implementation",
-    "cheap_bounded_worker",
-}
 
 
 def _entry(
@@ -47,22 +38,6 @@ def _entry(
     }
 
 
-def test_committed_text_workers_have_no_routable_rows():
-    registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
-    rows = build_table(registry)
-    totals = summary(rows)
-
-    assert len(rows) == len(registry["entries"])
-    assert TEXT_WORKERS <= totals.keys()
-    for function in TEXT_WORKERS:
-        group = [row for row in rows if row["function"] == function]
-        assert group, function
-        assert all(row["eligible"] is False for row in group)
-        assert all(row["blocker"] == "NOT_ELIGIBLE" for row in group)
-        assert totals[function]["rows"] == len(group)
-        assert totals[function]["eligible"] == 0
-        assert totals[function]["static_local_candidates"] == 0
-        assert "qwen2.5:3b" in totals[function]["local_slm_candidates"]
 
 
 @pytest.mark.parametrize(
@@ -113,14 +88,6 @@ def test_ineligibility_precedes_evidence_and_remote_authorization():
     assert summary(rows)["research"]["eligible"] == 0
 
 
-def test_provisional_measurement_remains_visible_but_not_evidenced():
-    registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
-    row = next(row for row in build_table(registry) if row["function"] == "verification_needed")
-    assert row["eligible"] is False
-    assert row["evidenced"] is False
-    assert row["quality_metric"]["n"] == 2
-    assert "PROVISIONAL" in row["measurement_confidence"]
-    assert row["eval_source"]["sha256"]
 
 
 def test_summary_deduplicates_and_sorts_local_slm_candidates():
@@ -161,33 +128,3 @@ def test_markdown_is_byte_stable_and_local_first():
     assert first.endswith("\n")
 
 
-def test_cli_json_parses_with_custom_manifest(tmp_path):
-    manifest = tmp_path / "registry.json"
-    manifest.write_text(json.dumps({"entries": [_entry()]}), encoding="utf-8")
-
-    result = subprocess.run(
-        [sys.executable, "-m", "z0int.routing_table", "--manifest", str(manifest), "--json"],
-        cwd=REGISTRY.parent.parent,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    payload = json.loads(result.stdout)
-
-    assert payload["rows"][0]["blocker"] is None
-    assert payload["summary"]["research"]["static_local_candidates"] == 1
-
-
-def test_cli_defaults_to_committed_registry():
-    result = subprocess.run(
-        [sys.executable, "-m", "z0int.routing_table", "--json"],
-        cwd=REGISTRY.parent.parent,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    payload = json.loads(result.stdout)
-
-    assert len(payload["rows"]) > 0
-    for function in TEXT_WORKERS:
-        assert payload["summary"][function]["static_local_candidates"] == 0

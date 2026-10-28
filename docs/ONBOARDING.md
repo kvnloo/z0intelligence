@@ -129,6 +129,17 @@ configuration; installing the package is not a production activation.
 Hermes can use the standalone [bend-native plugin](https://github.com/kvnloo/bend-native)
 for native Bend verification and opt-in z0 shadow composition.
 
+`python -m z0int.routing_table --json` reports the committed capability registry
+through the existing evidence-integrity gate. Its `static_local_candidates` count
+does not establish endpoint availability, measured quality or permission to route.
+Measurement confidence and source metadata remain visible beside each entry.
+
+`z0int.delegation_eligibility.classify` provides a pure preflight hint for bounded
+text subtasks. It requires an explicit parent-latency estimate before returning
+worker arguments; unknown latency stays with the parent. Unknown privacy keeps
+remote transmission disabled. Neither diagnostic is connected to live dispatch,
+and `ROUTE_WORKER` is not execution authorization.
+
 ## Scoped workstream capture (Draft integration, inactive)
 
 The canonical continuity plan is [z0intelligence#22](https://github.com/kvnloo/z0intelligence/issues/22).
