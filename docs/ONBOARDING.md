@@ -140,39 +140,39 @@ worker arguments; unknown latency stays with the parent. Unknown privacy keeps
 remote transmission disabled. Neither diagnostic is connected to live dispatch,
 and `ROUTE_WORKER` is not execution authorization.
 
-## Scoped workstream capture (Draft integration, inactive)
+## Scoped workstream capture (preview, inactive)
 
 The canonical continuity plan is [z0intelligence#22](https://github.com/kvnloo/z0intelligence/issues/22).
-This capture-only branch reconciles identity-aware `EventLog` admission from
-`integrate/wiring-20261003@05e50151ec04ea40892be46645fb208aff2a1f70`
-with later native Hermes claim-attestation and correction from
-`feat/hermes-multiharness-20261009@285d74f18c68aec233b0be1bce472d9085bd5817`.
-It does **not** merge either aggregate branch, move original transcripts,
-or activate capture, retrieval, injection, a host hook or a service.
+The capture integration in [PR #197](https://github.com/kvnloo/z0intelligence/pull/197)
+and its freshness/scope prerequisite in
+[PR #198](https://github.com/kvnloo/z0intelligence/pull/198) are merged into
+preview. They do **not** move original transcripts or activate capture,
+retrieval, injection, a host hook or a service.
 
 The selected native adapter is `adapters/hermes_z0int/native_capture.py`.
 A trusted host must bind the persisted Hermes session, absolute
 `HERMES_HOME`, user/project/repo/task scope, message UID/row, and source-text
 SHA-256. Only unmarked native `role=user` decisions in the strict
 `z0int.hermes.native_decision.v1` grammar may be admitted with native
-references and bounded facts. Explicit same-scope `correction_of` preserves
-D1 history when D2 becomes current. Injected briefs, tool notifications and
-assistant prose never gain independent user provenance.
+references and bounded facts. Admission serializes source-reference replay and
+claim creation under the canonical event-file lock; an interrupted
+reference-only admission can be retried. Explicit same-scope `correction_of`
+preserves D1 history when D2 becomes current. Unlinked disagreements remain
+contradictions, not explicit supersessions. Injected briefs, tool notifications
+and assistant prose never gain independent user provenance. Source-role
+attestation does not authenticate human authorship.
 
-Capture defaults **off**. This PR never changes a profile or environment.
+Capture defaults **off**. The integration does not change a profile or environment.
 The existing `Z0INT_MEMORY_SOURCE_INGEST=references` opt-in is for an
 authorized host/operator only; disabled capture must create no ledger directory.
 Original content stays in the native Hermes database.
 
-**Stacked prerequisite:** this Draft PR depends on the minimal freshness/scope
-branch from [PR #198](https://github.com/kvnloo/z0intelligence/pull/198),
-pinned at `8aac6cf208d6be183332fffec68d64220d497fee`. That branch supplies
-the canonical `memory_contract.py` and `context_resolve.py`; no aggregate
-wiring branch is merged. Capture tests can run against this combined source.
-A trusted Hermes host/session/workstream binding is still missing, so runtime
-activation remains blocked independently of passing library tests.
+The freshness/scope prerequisite supplies the canonical `memory_contract.py`
+and `context_resolve.py`; no aggregate wiring branch is merged. A trusted Hermes
+host/session/workstream binding is still missing, so runtime activation remains
+blocked independently of passing library tests.
 
-After those prerequisites, OMP should run from repo root:
+For the synthetic library checks, run from the repo root:
 
 ```bash
 PYTHONPATH=src python -m pytest -q tests/test_memory_event_log.py tests/test_memory_event_identity.py
