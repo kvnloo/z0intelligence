@@ -42,12 +42,15 @@ def outcome_pairs(n=80, expires_at="2026-11-07T10:00:00Z", kind="canary"):
     protocol = {"schema": "z0.policy.paired_outcome_protocol.v1", "subject": subject,
                 "candidate_arm": candidate, "reference_arm": reference, "experiment_id": "fixture",
                 "frozen_at": "2026-10-23T00:00:00Z", "expires_at": expires_at,
-                "noninferiority_margin": .1}
+                "noninferiority_margin": .1, "expected_roles": ["candidate", "reference"],
+                "expected_pairs": [{"pair_id": f"pair-{i}", "task_snapshot_id": f"snapshot-{i}"}
+                                   for i in range(n)]}
+    protocol_sha = digest(protocol)
     rows = []
     for index in range(n):
         for role, arm in (("candidate", candidate), ("reference", reference)):
             trace = f"{role}-{index}"
-            evaluation = {"protocol_sha256": "c" * 64, "subject": subject, "arm": arm,
+            evaluation = {"protocol_sha256": protocol_sha, "subject": subject, "arm": arm,
                           "experiment_id": "fixture", "pair_id": f"pair-{index}",
                           "task_snapshot_id": f"snapshot-{index}", "arm_id": role,
                           "observed_at": "2026-10-24T10:02:00Z"}
@@ -60,7 +63,7 @@ def outcome_pairs(n=80, expires_at="2026-11-07T10:00:00Z", kind="canary"):
                         "ci_high": 1., "ci_method": "wilson95", "higher_is_better": True,
                         "outcome_ledger_verified": True, "promotion_eligible": True},
                 evidence_class=kind, scope_note="Synthetic paired fixture.", expires_at=expires_at,
-                baseline={"outcome_protocol": {"sha256": "c" * 64, "document": protocol}},
+                baseline={"outcome_protocol": {"sha256": protocol_sha, "document": protocol}},
                 synthetic=True, evidence_kind="product_outcome", verifier_receipt=proof).to_dict())
     return rows
 
@@ -82,6 +85,28 @@ def test_single_product_success_does_not_demote_and_latest_failure_does():
     result = compile_rows(base + [failed], canary)
     assert stage(result) == "none"
     assert next(iter(result["families"].values()))["demoted_reason"] == "latest_product_failure"
+
+
+def test_incomplete_frozen_cohort_cannot_hide_candidate_failures():
+    base = all_evidence()[:2]
+    previous = compile_rows(base, compile_rows(base))
+    outcomes = outcome_pairs(160)
+    retained = []
+    for row in outcomes:
+        evaluation = row["verifier_receipt"]["evaluation"]
+        index = int(evaluation["pair_id"].split("-")[-1])
+        if index >= 80 and evaluation["arm_id"] == "reference":
+            continue
+        row = deepcopy(row)
+        if index >= 80:
+            row["verifier_receipt"]["success"] = False
+            row["metric"]["value"] = 0.
+        elif index == 79 and evaluation["arm_id"] == "candidate":
+            row["ts"] = "2026-10-24T11:00:00Z"
+            row["verifier_receipt"]["evaluation"]["observed_at"] = row["ts"]
+        row["id"] = digest({k: v for k, v in row.items() if k not in {"id", "prev"}})
+        retained.append(row)
+    assert stage(compile_rows(base + retained, previous)) == "canary"
 
 
 def test_byte_identical_inputs_and_content_address():
