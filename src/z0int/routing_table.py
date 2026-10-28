@@ -38,6 +38,9 @@ def build_table(registry: dict) -> list[dict]:
                 "local": local,
                 "eligible": eligible,
                 "evidenced": has_evidence,
+                "measurement_confidence": entry.get("measurement_confidence"),
+                "quality_metric": entry.get("quality_metric"),
+                "eval_source": entry.get("eval_source"),
                 "blocker": blocker,
             }
         )
@@ -55,7 +58,7 @@ def summary(rows: list[dict]) -> dict:
                 "rows": 0,
                 "eligible": 0,
                 "evidenced": 0,
-                "routable": 0,
+                "static_local_candidates": 0,
                 "local_slm_candidates": [],
             }
             local_slms[function] = set()
@@ -64,7 +67,7 @@ def summary(rows: list[dict]) -> dict:
         group["rows"] += 1
         group["eligible"] += int(row["eligible"])
         group["evidenced"] += int(row["evidenced"])
-        group["routable"] += int(row["blocker"] is None)
+        group["static_local_candidates"] += int(row["blocker"] is None)
         if row["local"] and row["route"] == "LOCAL_MODEL":
             local_slms[function].add(row["model"])
 
@@ -83,10 +86,10 @@ def _markdown_cell(value: object) -> str:
 
 def render_markdown(rows: list[dict]) -> str:
     """Render a stable, local-first table without changing the input rows."""
-    columns = ("function", "provider", "model", "route", "local", "eligible", "evidenced", "blocker")
+    columns = ("function", "provider", "model", "route", "local", "eligible", "evidenced", "measurement_confidence", "blocker")
     lines = [
-        "| Function | Provider | Model | Route | Local | Eligible | Evidenced | Blocker |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Function | Provider | Model | Route | Local | Eligible | Evidenced | Measurement confidence | Blocker |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     ordered = sorted(
         rows,

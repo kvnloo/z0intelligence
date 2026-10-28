@@ -61,7 +61,7 @@ def test_committed_text_workers_have_no_routable_rows():
         assert all(row["blocker"] == "NOT_ELIGIBLE" for row in group)
         assert totals[function]["rows"] == len(group)
         assert totals[function]["eligible"] == 0
-        assert totals[function]["routable"] == 0
+        assert totals[function]["static_local_candidates"] == 0
         assert "qwen2.5:3b" in totals[function]["local_slm_candidates"]
 
 
@@ -86,7 +86,7 @@ def test_evidenced_eligible_candidate_respects_locality(local, expected_blocker,
         "rows": 1,
         "eligible": 1,
         "evidenced": 1,
-        "routable": routable,
+        "static_local_candidates": routable,
         "local_slm_candidates": ["qwen2.5:3b"] if local else [],
     }
 
@@ -99,7 +99,7 @@ def test_missing_evidence_precedes_remote_authorization():
     assert rows[0]["eligible"] is True
     assert rows[0]["evidenced"] is False
     assert rows[0]["blocker"] == "NO_EVIDENCE"
-    assert summary(rows)["research"]["routable"] == 0
+    assert summary(rows)["research"]["static_local_candidates"] == 0
 
 
 def test_ineligibility_precedes_evidence_and_remote_authorization():
@@ -111,6 +111,16 @@ def test_ineligibility_precedes_evidence_and_remote_authorization():
     assert rows[0]["evidenced"] is False
     assert rows[0]["blocker"] == "NOT_ELIGIBLE"
     assert summary(rows)["research"]["eligible"] == 0
+
+
+def test_provisional_measurement_remains_visible_but_not_evidenced():
+    registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    row = next(row for row in build_table(registry) if row["function"] == "verification_needed")
+    assert row["eligible"] is False
+    assert row["evidenced"] is False
+    assert row["quality_metric"]["n"] == 2
+    assert "PROVISIONAL" in row["measurement_confidence"]
+    assert row["eval_source"]["sha256"]
 
 
 def test_summary_deduplicates_and_sorts_local_slm_candidates():
@@ -126,7 +136,7 @@ def test_summary_deduplicates_and_sorts_local_slm_candidates():
 
     assert result["rows"] == 4
     assert result["eligible"] == result["evidenced"] == 4
-    assert result["routable"] == 3
+    assert result["static_local_candidates"] == 3
     assert result["local_slm_candidates"] == ["a-model", "z-model"]
 
 
@@ -165,7 +175,7 @@ def test_cli_json_parses_with_custom_manifest(tmp_path):
     payload = json.loads(result.stdout)
 
     assert payload["rows"][0]["blocker"] is None
-    assert payload["summary"]["research"]["routable"] == 1
+    assert payload["summary"]["research"]["static_local_candidates"] == 1
 
 
 def test_cli_defaults_to_committed_registry():
@@ -180,4 +190,4 @@ def test_cli_defaults_to_committed_registry():
 
     assert len(payload["rows"]) > 0
     for function in TEXT_WORKERS:
-        assert payload["summary"][function]["routable"] == 0
+        assert payload["summary"][function]["static_local_candidates"] == 0

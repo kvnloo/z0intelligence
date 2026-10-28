@@ -13,7 +13,7 @@ from .intelligence import REGISTRY
 
 _ALLOWED_INPUTS = frozenset({
     "task", "context", "needs_tools", "needs_session_files", "needs_judgement",
-    "contains_private", "parent_agent", "trace_id",
+    "contains_private", "parent_agent", "trace_id", "expected_parent_ms",
 })
 _BOOLEAN_INPUTS = (
     "needs_tools", "needs_session_files", "needs_judgement", "contains_private",
@@ -58,7 +58,7 @@ def _nonnegative_number(value: object, name: str) -> int | float:
     return value
 
 
-def _policy_values(policy: dict | None) -> tuple[int, int | float, int | float]:
+def _policy_values(policy: dict | None) -> tuple[int, int | float]:
     if policy is None:
         policy = json.loads(REGISTRY.read_text(encoding="utf-8"))["delegation_policy"]
     if not isinstance(policy, dict):
@@ -73,10 +73,7 @@ def _policy_values(policy: dict | None) -> tuple[int, int | float, int | float]:
     observed_overhead = _nonnegative_number(
         policy.get("observed_workflow_overhead_ms", 0), "observed_workflow_overhead_ms"
     )
-    parent_ms_per_token = _nonnegative_number(
-        policy.get("parent_ms_per_token", 20), "parent_ms_per_token"
-    )
-    return tiny, max(default_overhead, observed_overhead), parent_ms_per_token
+    return tiny, max(default_overhead, observed_overhead)
 
 
 def classify(
@@ -86,7 +83,9 @@ def classify(
 
     Rules a-e are evaluated in order, recording every applicable rejecting
     reason. The first rejecting guard wins; a worker is eligible only when
-    no guard matches. Private content never receives remote authorization.
+    no guard matches. Unknown privacy never permits remote transmission.
+    Latency must be supplied by the caller; input length is not latency evidence.
+    Classification is not authorization, availability, or proof of quality.
 
     A caller must supply nonempty parent_agent and trace_id before a task
     eligible for route_worker can yield a dispatchable argument object.
@@ -114,9 +113,11 @@ def classify(
             if not isinstance(value, str) or not value.strip() or len(value) > 200:
                 raise ValueError(f"{key} must be nonempty text of at most 200 characters")
 
-    tiny_max, overhead_ms, ms_per_token = _policy_values(policy)
+    tiny_max, overhead_ms = _policy_values(policy)
     estimated_tokens = math.ceil((len(task) + len(context)) / 4)
-    estimated_ms = estimated_tokens * ms_per_token
+    estimated_ms = subtask.get("expected_parent_ms")
+    if estimated_ms is not None:
+        estimated_ms = _nonnegative_number(estimated_ms, "expected_parent_ms")
 
     reasons = []
     # a. A worker cannot access the parent's tools, session files or judgement.
@@ -130,7 +131,9 @@ def classify(
     # b-c. Avoid tiny jobs and work cheaper than the observed offload overhead.
     if estimated_tokens <= tiny_max:
         reasons.append("TINY")
-    if estimated_ms <= overhead_ms:
+    if estimated_ms is None:
+        reasons.append("UNKNOWN_PARENT_LATENCY")
+    elif estimated_ms <= overhead_ms:
         reasons.append("BELOW_OVERHEAD")
     # d. Keep bounds aligned with worker_routing.validate_request.
     if len(task) > 24000 or len(context) > 24000:
@@ -160,10 +163,19 @@ def classify(
         "function": function,
         "expected_parent_tokens": estimated_tokens,
         "expected_parent_ms": estimated_ms,
-        "allow_remote": bool(allow_remote and not subtask.get("contains_private", False)),
+        "allow_remote": allow_remote and subtask.get("contains_private") is False,
     }
     if context:
         args["context"] = context
+    # intelligence.validate also limits the JSON-encoded request, including
+    # the harness added by the MCP adapter. Reserve its maximum valid length.
+    if len(json.dumps({**args, "harness": "x" * 200}, allow_nan=False)) > 40000:
+        return {
+            "decision": "PARENT_ONLY",
+            "reasons": ["TOO_LARGE"],
+            "function": function,
+            "route_worker_args": None,
+        }
     return {
         "decision": "ROUTE_WORKER",
         "reasons": [],
