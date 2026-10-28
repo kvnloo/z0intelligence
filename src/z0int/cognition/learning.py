@@ -309,6 +309,24 @@ def _migrate_scoped_scores(db, threshold, deadline):
                 if str(shadow.get('arm', '')).startswith('slm-method:'):
                     affected.add((row['family'], 'slm:' + str(shadow.get('model') or shadow.get('label'))))
         for family, arm in affected:
+            if time.monotonic() >= deadline:
+                db.execute('ROLLBACK TO scoped_score_migration')
+                db.execute('RELEASE scoped_score_migration')
+                return False
+            pool = db.execute('SELECT total,covered,correct FROM scores WHERE family=? AND arm=?',
+                              (family, arm)).fetchone()
+            if pool:
+                retained = db.execute('''SELECT COUNT(*) FROM evaluated e JOIN labels l ON l.id=e.id
+                    JOIN receipts r ON r.id=e.id JOIN examples x ON x.id=e.id
+                    WHERE e.arm=? AND l.family=?''', (arm, family)).fetchone()[0]
+                if retained != pool['total']:
+                    # Preserve the whole opaque pool, not a guessed subtraction
+                    # of differently scored arms. It overlaps rebuilt history.
+                    snapshot = arm + ':legacy-pooled-snapshot'
+                    db.execute('INSERT INTO scores VALUES(?,?,?,?,?)',
+                               (family, snapshot, pool['total'], pool['covered'], pool['correct']))
+                    db.execute('INSERT OR IGNORE INTO learning_unverified_arms VALUES(?,?)',
+                               (family, snapshot))
             db.execute('DELETE FROM scores WHERE family=? AND arm=?', (family, arm))
             db.execute('DELETE FROM evaluated WHERE arm=? AND id IN (SELECT id FROM labels WHERE family=?)',
                        (arm, family))

@@ -76,6 +76,43 @@ def test_preupgrade_pooled_scoped_scores_rebuild_from_receipts_idempotently(tmp_
     db.close()
 
 
+def test_preupgrade_partial_scoped_pool_preserves_original_unverified_snapshot(tmp_path):
+    from z0int.cognition.learning import score, arm_scores
+    db = connect(tmp_path)
+    shadow = {'model': 'm', 'arm': 'slm-method:alpha', 'rpc_count': 1, 'selected_action': 'read'}
+    db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+               ('retained', 's', 'c', 100, 'omp.tool', json.dumps({'shadow': [shadow]})))
+    db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+               ('retained', 's', 'c', 'omp.tool', 100, 'read', '[]', None, 120))
+    db.execute('INSERT INTO examples VALUES(?,?,?,?,?)', ('retained', 'omp.tool', 'read', '[]', 100))
+    db.execute('INSERT INTO evaluated VALUES(?,?)', ('retained', 'slm:m'))
+    db.execute('INSERT INTO scores VALUES(?,?,?,?,?)', ('omp.tool', 'slm:m', 100, 80, 60))
+    assert score(db, .8, time.monotonic()+30)
+    arms = arm_scores(db)['omp.tool']
+    snapshot = arms['slm:m:legacy-pooled-snapshot']
+    assert (snapshot['total'], snapshot['n'], snapshot['correct']) == (100, 80, 60)
+    assert arms['slm:m:slm-method:alpha']['total'] == 1
+    assert db.execute('SELECT 1 FROM learning_unverified_arms WHERE family=? AND arm=?',
+                      ('omp.tool', 'slm:m:legacy-pooled-snapshot')).fetchone()
+    assert score(db, .8, time.monotonic()+30)
+    assert arm_scores(db)['omp.tool'] == arms
+    db.close()
+
+
+def test_preupgrade_lost_pooled_history_remains_unverified(tmp_path):
+    from z0int.cognition.learning import score, arm_scores
+    db = connect(tmp_path)
+    db.execute('INSERT INTO scores VALUES(?,?,?,?,?)', ('omp.tool', 'slm:m', 100, 80, 60))
+    assert score(db, .8, time.monotonic()+30)
+    arms = arm_scores(db)['omp.tool']
+    assert (arms['slm:m']['total'], arms['slm:m']['n'], arms['slm:m']['correct']) == (100, 80, 60)
+    assert db.execute('SELECT 1 FROM learning_unverified_arms WHERE family=? AND arm=?',
+                      ('omp.tool', 'slm:m')).fetchone()
+    assert score(db, .8, time.monotonic()+30)
+    assert arm_scores(db)['omp.tool'] == arms
+    db.close()
+
+
 def test_prequential_join_credit_and_incremental_stall(tmp_path):
     home, sessions, now = fixture(tmp_path)
     first = learn(home, sessions=sessions, now=now)

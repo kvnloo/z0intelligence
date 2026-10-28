@@ -403,6 +403,13 @@ def emit_findings(db: sqlite3.Connection, *, tick_id: str, now: float,
         if key in seen:
             raise ValueError('duplicate finding observation')
         seen.add(key)
+        if row.get('promotion_eligible') is False or row.get('evidence_kind') == 'proxy':
+            blocked.append({'family': row['family'], 'arm': row['arm'], 'status': 'blocked',
+                            'reason': 'nonpromotable_research_observation'})
+            _event(db, row['family'], tick_id, {
+                'type': 'finding_blocked', 'arm': row['arm'], 'strategy': row['strategy'],
+                'reason': 'nonpromotable_research_observation'})
+            continue
         if not row['n']:
             blocked.append({'family': row['family'], 'arm': row['arm'], 'status': 'blocked', 'reason': 'n_zero'})
             _event(db, row['family'], tick_id, {
