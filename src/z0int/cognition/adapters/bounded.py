@@ -82,7 +82,7 @@ class JevBoundedToolBackend:
                 latency_ms=0.0,
                 abstained=True,
                 candidate_action_count=0,
-                parse_error="no legal actions",
+                error="no legal actions",
             )
         if not caps.supports_choice:
             return ToolDecision(
@@ -96,7 +96,7 @@ class JevBoundedToolBackend:
                 latency_ms=0.0,
                 abstained=True,
                 candidate_action_count=len(ids),
-                parse_error="backend does not support choice questions",
+                error="backend does not support choice questions",
             )
         if len(ids) > caps.max_choice_options:
             # Too many options for a bounded scorer: hand back to the caller,
@@ -112,7 +112,7 @@ class JevBoundedToolBackend:
                 latency_ms=0.0,
                 abstained=True,
                 candidate_action_count=len(ids),
-                parse_error=(
+                error=(
                     f"{len(ids)} options exceed backend max {caps.max_choice_options}"
                 ),
             )
@@ -177,7 +177,7 @@ class JevBoundedToolBackend:
                 abstained=True,
                 invalid_call=True,
                 candidate_action_count=len(ids),
-                parse_error=f"invalid_call:{selected}",
+                error=f"invalid_call:{selected}",
                 diagnostics=dict(result.diagnostics),
             )
         return ToolDecision(

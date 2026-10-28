@@ -871,6 +871,8 @@ class CandidateRungBackend:
                     irrelevant_call=decision.irrelevant_call,
                     unnecessary_call=decision.unnecessary_call,
                     parse_error=decision.parse_error,
+                    error=decision.error,
+                    error_kind=decision.error_kind,
                     reasoning_metadata=decision.reasoning_metadata,
                     diagnostics=merged,
                 )

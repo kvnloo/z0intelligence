@@ -378,6 +378,8 @@ def test_transport_classification_counts_legacy_errors_without_relabelling(tmp_p
         ('request exceeds context size 4096', 'context_overflow'),
         ('RuntimeError: functiongemma_270m is not served', 'model_not_served'),
         ('unparseable_response', 'parse_error'),
+        ('non_binary_response', 'parse_error'),
+        ('invalid_call:rm', 'invalid_call'),
     ]
     for index, (error, kind) in enumerate(failures):
         assert failure_class(error) == kind
@@ -385,9 +387,9 @@ def test_transport_classification_counts_legacy_errors_without_relabelling(tmp_p
         db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
                    (str(index), 's', str(index), 100, 'omp.tool', body))
     metrics = transport_metrics(db, 0)
-    assert metrics['attempts'] == 7
+    assert metrics['attempts'] == 9
     assert metrics['errors'] == 6
-    assert metrics['parse_errors'] == 1
+    assert metrics['parse_errors'] == 2
     assert metrics['failure_classes']['connection_refused'] == 1
     assert json.loads(db.execute("SELECT body FROM receipts WHERE id='0'").fetchone()[0])['shadow'][0]['parse_error']
     db.close()

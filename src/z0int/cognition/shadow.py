@@ -425,6 +425,8 @@ def failure_class(error: Any) -> str | None:
     text = str(error or "").lower()
     if not text:
         return None
+    if text.startswith("invalid_call:"):
+        return "invalid_call"
     if "context_overflow" in text or ("exceed" in text and "context" in text):
         return "context_overflow"
     if "connection refused" in text or "errno 111" in text:
@@ -439,7 +441,7 @@ def failure_class(error: Any) -> str | None:
         return "model_not_served"
     if "transport_error" in text or "badstatusline" in text:
         return "transport_error"
-    return "parse_error" if ("unparseable" in text or "invalid_call" in text) else "backend_error"
+    return "parse_error" if ("unparseable" in text or text == "non_binary_response") else "backend_error"
 
 
 
@@ -742,14 +744,15 @@ def summarize_shadow_receipts(
                     ),
                 )
                 counts["rows"] += 1
-                # A backend that could not reach its server still returns a row
-                # of its own, with the failure in ``parse_error``.
+                # Historical rows stored transport failures in parse_error.
+                # New rows separate transport, parser and invalid-action failures.
                 failure = row.get("error") or row.get("parse_error")
-                failure = failure if isinstance(failure, str) else ""
-                if not row.get("backend") or row.get("error") or failure.startswith(
-                    "transport_error"
-                ):
-                    timed_out = failure == "shadow_timeout" or "timed out" in failure
+                kind = failure_class(failure)
+                error_kind = row.get("error_kind")
+                if (not row.get("backend") or error_kind in ("transport", "timeout")
+                        or kind in TRANSPORT_FAILURES
+                        or (row.get("error") and kind != "invalid_call")):
+                    timed_out = error_kind == "timeout" or kind == "timeout"
                     counts["timed_out" if timed_out else "unreachable"] += 1
                     continue
                 counts["answered"] += 1
