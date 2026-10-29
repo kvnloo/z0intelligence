@@ -53,6 +53,32 @@ Response: `z0int.cognition.shadow.v1` with `graph_digest`, `candidate_action_cou
 `legal_ids`, `eliminated`, `deterministic_solution`, `escalation`, `shadow`
 (one row per backend) and `receipts_path`.
 
+Local generative decisions record `error_kind` as `transport`, `timeout`,
+`parse`, or `none`. `parse_error` is reserved for rejected parser output.
+Transport failures, preconditions and invalid-action rejection use `error`;
+an invalid parsed action also keeps `invalid_call: true`. `none` therefore
+does not imply success: consumers must check abstention, error and selection.
+The bounded adapter uses the same non-parser error field for preconditions
+and invalid actions. Historical receipts are classified without rewriting them.
+
+Every attempted row remains in the cohort, including repeated outages and
+deadline failures. No outage deduplication, prewarm request or timeout increase
+is part of this correction. The scorecard keeps invalid answers distinct from
+unreachable servers; protocol-invalid binary responses count as parser failures.
+A real loopback HTTP smoke exercised two repeated 503s, a configured timeout,
+parser rejection, invalid native tool call and recovery: all six attempts were
+persisted. Those were synthetic responses, not model-quality evidence.
+
+Challengers with the same configured server URL (ignoring a trailing slash) run
+as one ordered group; different endpoints can run concurrently. A process-local
+lock also excludes overlapping groups from separate calls. Waiting consumes the
+existing shared caller deadline: an arm not started before expiry is not started
+later, and its timeout row remains in the cohort. An already-running arm is not
+cancelled and holds the endpoint lock until it finishes. Locks are released on
+errors and are not retained after their users finish. This is not a cross-process
+endpoint lease or proof that different URL aliases name different hardware; the
+supervisor separately protects residency during each upstream response.
+
 ## Run it
 
 ```bash

@@ -80,7 +80,7 @@ def home(tmp_path):
         yield tmp_path / "z0"
 
 
-def inline_spawn(argv, job):
+def inline_spawn(argv, job, *, pass_fds=()):
     """The detached child's job, run in-process (argv is hc.child_argv(harness))."""
     hc.record_opportunity(argv[argv.index("--harness") + 1], job["payload"], job["ctx"])
 
@@ -142,9 +142,9 @@ def test_bridge_reply_latency_stays_within_its_bound_over_200_turns(home, tmp_pa
     stand_in = ["cat"]
     spawned, repo = [], git_repo(tmp_path / "task-repo")  # a real task repo: the build would read its git state
 
-    def spawn(argv, job):
+    def spawn(argv, job, *, pass_fds=()):
         spawned.append(job["ctx"]["turn_key"])
-        hc.spawn_detached(stand_in, job)
+        hc.spawn_detached(stand_in, job, pass_fds=pass_fds)
 
     sides = {"off": (tmp_path / "off", "0", BridgeRuntime(generation=1, instance_id="off", build_id="b",
                                                             capture_spawn=spawn)),

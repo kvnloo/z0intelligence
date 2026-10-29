@@ -54,6 +54,7 @@ def cmd_onboard(
     dry_run: bool,
     sync_models: bool,
     skip_evolution_lab: bool,
+    omp_extensions: list[str] | None,
     as_json: bool,
 ) -> int:
     from .onboard import run_onboard
@@ -64,6 +65,7 @@ def cmd_onboard(
         dry_run=dry_run,
         sync_models=sync_models,
         skip_evolution_lab=skip_evolution_lab,
+        omp_extensions=omp_extensions,
     )
     if as_json:
         print(json.dumps(report, indent=2, default=str))
@@ -294,9 +296,11 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(on)
     on.add_argument("--auto", action="store_true", default=True, help="Non-interactive safe path (default)")
     on.add_argument("--force", action="store_true", help="Re-run steps marked done")
-    on.add_argument("--dry-run", action="store_true", help="Plan only; no clone/pip/symlink/download")
+    on.add_argument("--dry-run", action="store_true", help="Plan only; do not change files")
     on.add_argument("--sync-models", action="store_true", help="Download resident HF weights")
     on.add_argument("--skip-evolution-lab", action="store_true")
+    on.add_argument("--omp-extension", dest="omp_extensions", action="append", metavar="NAME",
+                    help="Opt in to a named OMP extension; repeat for multiple extensions")
 
     ms = sub.add_parser("models", help="Model plan / sync")
     ms_sub = ms.add_subparsers(dest="models_cmd", required=True)
@@ -546,7 +550,6 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(arti)
     artim = art_sub.add_parser("import", help="Import candidate artifact (never promotes)")
     artim.add_argument("manifest")
-    artim.add_argument("--force", action="store_true")
     _json_flag(artim)
     artl = art_sub.add_parser("list", help="List installed specialists")
     _json_flag(artl)
@@ -941,6 +944,7 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=bool(getattr(args, "dry_run", False)),
             sync_models=bool(getattr(args, "sync_models", False)),
             skip_evolution_lab=bool(getattr(args, "skip_evolution_lab", False)),
+            omp_extensions=args.omp_extensions,
             as_json=as_json,
         )
     if args.cmd == "models":
@@ -1023,7 +1027,7 @@ def main(argv: list[str] | None = None) -> int:
             _print(out, as_json=as_json)
             return 0 if out.get("ok") else 1
         if args.artifacts_cmd == "import":
-            out = import_manifest(args.manifest, force=bool(getattr(args, "force", False)))
+            out = import_manifest(args.manifest)
             _print(out, as_json=as_json)
             return 0 if out.get("ok") else 1
         if args.artifacts_cmd == "list":

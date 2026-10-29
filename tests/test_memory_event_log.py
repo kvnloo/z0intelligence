@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from z0int.memory.event_log import EventLog, EventLogCorruption
+from z0int.memory.event_log import EventLog, EventLogCorruption, MemoryEvent
 
 
 class EventLogTests(unittest.TestCase):
@@ -37,8 +37,18 @@ class EventLogTests(unittest.TestCase):
         event = self.log.append("tool.result", payload, source="omp")
         self.assertIsNone(event.payload)
         self.assertIsNotNone(event.blob)
-        self.assertEqual(self.log.get(0, resolve_blob=True).payload, payload)
+        self.assertEqual(self.log.resolve_payload(self.log.get(0)), payload)
         self.assertEqual(self.log.verify()["blobs"], 1)
+
+    def test_resolving_payload_preserves_canonical_envelope(self):
+        for payload in ({"text": "small"}, {"text": "large-" + "x" * 5000}):
+            with self.subTest(size=len(payload["text"])):
+                stored = self.log.append("tool.result", payload, source="fixture")
+                event = self.log.get(stored.event_id)
+                resolved = self.log.resolve_payload(event)
+                self.assertEqual(resolved, payload)
+                self.assertEqual(event.to_dict(), stored.to_dict())
+                self.assertEqual(MemoryEvent.from_dict(event.to_dict()), event)
 
     def test_rebuild_index_does_not_mutate_event_log(self):
         for i in range(5):

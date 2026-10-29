@@ -6,6 +6,7 @@ No network listener, store mutation, arbitrary path, URL, or execution tool exis
 from __future__ import annotations
 
 import base64
+import fcntl
 import hashlib
 import hmac
 import json
@@ -31,6 +32,7 @@ MAX_REQUEST_BYTES = 8192
 MAX_QUERY_BYTES = 1024
 MAX_CACHED = 256
 ID_TTL_SECONDS = 600
+MAX_AUDIT_ROW_BYTES = 8192
 
 
 def encoded(value: Any) -> bytes:
@@ -170,22 +172,49 @@ class MemoryServer:
         return "error"
 
     def _audit(self, tool: str, query: str, payload: dict, denied: int = 0) -> dict:
+        error = payload.get("error")
+        decision = "allowed" if "error" not in payload else (
+            error if error in ("invalid_arguments", "invalid_id", "denied",
+                               "unavailable", "stale", "rate_limited", "byte_limit") else "error")
         event = {"schema": "z0int.memory_query_outcome.v1", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "tool": tool,
                  "query_hmac": self._hash("query", query), "count": len(payload.get("results", [])) if tool == "search" else int("record" in payload),
                  "bytes": len(encoded(payload)), "denied_count": denied,
                  "unavailable_count": sum(v == "unavailable" for v in payload.get("backends", {}).values()),
-                 "decision": payload.get("error", "allowed"),
+                 "decision": decision,
                  "outcome": self._outcome(tool, payload, denied)}
         try:
-            fd = os.open(self.state_dir / "audit.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+            fd = os.open(self.state_dir / "audit.jsonl", os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
             with os.fdopen(fd, "ab", buffering=0) as stream:
-                info = os.fstat(stream.fileno())
+                # Cooperating writers must not append between our saved offset
+                # and rollback. Busy audit storage must not stall the caller.
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                info = os.fstat(fd)
                 if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) & 0o077:
                     raise OSError("private audit file required")
+                start = info.st_size
+                if start:
+                    # Check only the final frame, not a full historical replay.
+                    # A previous crash's fragment is never silently repaired.
+                    tail = os.pread(fd, min(start, MAX_AUDIT_ROW_BYTES + 1),
+                                    max(0, start - MAX_AUDIT_ROW_BYTES - 1))
+                    boundary = tail.rfind(b"\n", 0, len(tail) - 1)
+                    row = tail[boundary + 1:]
+                    if (not tail.endswith(b"\n") or
+                            len(row) > MAX_AUDIT_ROW_BYTES or
+                            not isinstance(json.loads(row), dict)):
+                        raise ValueError("incomplete audit tail")
                 data = encoded(event) + b"\n"
-                if stream.write(data) != len(data):
-                    raise OSError("incomplete audit write")
-        except OSError:
+                if len(data) > MAX_AUDIT_ROW_BYTES:
+                    raise ValueError("audit row too large")
+                try:
+                    if stream.write(data) != len(data):
+                        raise OSError("incomplete audit write")
+                except OSError:
+                    # Undo only this failed attempt while retaining the lock.
+                    # If truncation fails, the dirty tail remains fail-closed.
+                    os.ftruncate(fd, start)
+                    raise
+        except (OSError, ValueError):
             return {"error": "audit_unavailable"}
         return payload
 
@@ -408,7 +437,9 @@ class MemoryServer:
         return failure if failure is not None else self._audit("invalid", "", {"error": "invalid_arguments"})
 
     def handle(self, message: Any) -> dict | None:
-        if not isinstance(message, dict) or message.get("jsonrpc") != "2.0" or not isinstance(message.get("method"), str):
+        if (not isinstance(message, dict) or message.get("jsonrpc") != "2.0" or
+                not isinstance(message.get("method"), str) or
+                ("id" in message and type(message["id"]) not in (int, str))):
             return {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid request"}}
         method = message["method"]
         if "id" not in message:
@@ -450,6 +481,9 @@ TOOLS = [
 def serve() -> None:
     try:
         from mcp.types import JSONRPCMessage
+        from pydantic import TypeAdapter
+
+        request_adapter = TypeAdapter(JSONRPCMessage)
 
         policy = Path(os.environ["Z0INT_MEMORY_MCP_POLICY"]).expanduser()
         state = Path(os.environ.get("Z0INT_MEMORY_MCP_STATE", "~/.z0int/state/memory-mcp")).expanduser()
@@ -473,7 +507,7 @@ def serve() -> None:
         else:
             try:
                 message = json.loads(line)
-                JSONRPCMessage.model_validate(message)
+                request_adapter.validate_python(message)
                 response = server.handle(message)
             except (ValueError, UnicodeError, TypeError, RecursionError):
                 response = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Invalid JSON"}}

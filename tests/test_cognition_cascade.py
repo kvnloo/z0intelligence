@@ -322,6 +322,26 @@ def test_shadow_receipts_are_marked_shadow_and_live_ones_live():
 # --- receipt semantics --------------------------------------------------
 
 
+@pytest.mark.parametrize("supervisor", [
+    {"wall_ms": 5000, "active_ms": 2000, "queue_wait_ms": 3000},
+    {"wall_ms": 5000},
+])
+def test_supervisor_elapsed_time_is_not_gpu_utilization(supervisor):
+    from dataclasses import replace
+
+    class Backend(_Recorder):
+        def decide(self, request):
+            return replace(super().decide(request), diagnostics={"supervisor": supervisor})
+
+    outcome = CognitionCascade(orchestrator=Backend("local", action="a")).run(
+        _ctx(authority=("read", "write"))
+    )
+    receipt = outcome.receipts[0]
+    assert "gpu_ms" not in receipt["cost"]
+    assert receipt["latency"].get("queue_wait_ms") == supervisor.get("queue_wait_ms")
+    assert receipt["extra"]["supervisor"] == supervisor
+
+
 def test_selected_action_and_executed_action_stay_separate():
     ctx = _ctx(authority=("read", "write"))
     outcome = CognitionCascade(orchestrator=_Recorder("nemotron", action="a")).run(ctx)

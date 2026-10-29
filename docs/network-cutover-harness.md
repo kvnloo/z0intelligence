@@ -3,7 +3,7 @@
 ## OMP
 
 Canonical extension tree: `omp-extensions/z0int-bridge/` in this repo.
-`z0int onboard` symlinks each child of `omp-extensions/` into `~/.omp/agent/extensions/`.
+`z0int onboard --omp-extension z0int-bridge` opts in to this extension. Default onboarding leaves OMP extensions unchanged.
 Do not maintain a second copy under `~/.omp` by hand.
 
 ## Hermes

@@ -83,6 +83,9 @@ def connect(home: Path) -> sqlite3.Connection:
       CREATE TABLE IF NOT EXISTS examples(id TEXT PRIMARY KEY, family TEXT, action TEXT,
         features TEXT, ts REAL);
       CREATE TABLE IF NOT EXISTS ticks(ts REAL PRIMARY KEY, body TEXT);
+      CREATE TABLE IF NOT EXISTS learning_migrations(name TEXT PRIMARY KEY);
+      CREATE TABLE IF NOT EXISTS learning_unverified_arms(family TEXT, arm TEXT,
+        PRIMARY KEY(family,arm));
     ''')
     columns = {r['name'] for r in db.execute('PRAGMA table_info(calls)')}
     for name, kind in (('arguments', 'TEXT'), ('outcome_ts', 'REAL')):
@@ -258,7 +261,116 @@ def predict(history: list, examples: list, strategy: tuple) -> tuple[str | None,
     return action, n / sum(votes.values())
 
 
+def _shadow_prediction(receipt, shadow):
+    if shadow.get('backend') == 'shadow-portfolio':
+        return None
+    arm = 'slm:' + str(shadow.get('model') or shadow.get('label'))
+    scoped = str(shadow.get('arm', '')).startswith('slm-method:')
+    binary = shadow.get('arm') == 'goal-binary'
+    if scoped:
+        arm += ':' + shadow['arm']
+    if binary:
+        scope = json.dumps(receipt.get('projection_config') or {}, sort_keys=True)
+        arm += ':goal-binary:' + receipt.get('projection_strategy', 'history-1') + '@' + hashlib.sha256(scope.encode()).hexdigest()[:12]
+    selected = shadow.get('selected_action') if not (shadow.get('error') or shadow.get('parse_error')) else None
+    if scoped and not shadow.get('rpc_count'):
+        selected = None
+    confidence = shadow.get('confidence')
+    return arm, selected, float(confidence) if confidence is not None else 0.0, not (binary or scoped)
+
+
+def _record_prediction(db, row, prediction, threshold):
+    arm, action, confidence, confidence_gated = prediction
+    if not db.execute('INSERT OR IGNORE INTO evaluated VALUES(?,?)', (row['id'], arm)).rowcount:
+        return
+    covered = int(action is not None and (not confidence_gated or confidence >= threshold))
+    correct = int(bool(covered and action == row['action']))
+    db.execute('''INSERT INTO scores VALUES(?,?,1,?,?) ON CONFLICT(family,arm)
+      DO UPDATE SET total=total+1,covered=covered+excluded.covered,correct=correct+excluded.correct''',
+               (row['family'], arm, covered, correct))
+
+
+def _migrate_scoped_scores(db, threshold, deadline):
+    """Rebuild contaminated legacy model pools from retained joined receipts."""
+    name = 'scoped-shadow-arms-v1'
+    if db.execute('SELECT 1 FROM learning_migrations WHERE name=?', (name,)).fetchone():
+        return True
+    db.execute('SAVEPOINT scoped_score_migration')
+    try:
+        query = '''SELECT l.id,l.family,l.action,r.body FROM labels l
+                   JOIN receipts r USING(id) JOIN examples e USING(id)'''
+        affected = set()
+        for row in db.execute(query):
+            if time.monotonic() >= deadline:
+                db.execute('ROLLBACK TO scoped_score_migration')
+                db.execute('RELEASE scoped_score_migration')
+                return False
+            for shadow in json.loads(row['body']).get('shadow') or []:
+                if str(shadow.get('arm', '')).startswith('slm-method:'):
+                    affected.add((row['family'], 'slm:' + str(shadow.get('model') or shadow.get('label'))))
+        for family, arm in affected:
+            if time.monotonic() >= deadline:
+                db.execute('ROLLBACK TO scoped_score_migration')
+                db.execute('RELEASE scoped_score_migration')
+                return False
+            pool = db.execute('SELECT total,covered,correct FROM scores WHERE family=? AND arm=?',
+                              (family, arm)).fetchone()
+            if pool:
+                retained = db.execute('''SELECT COUNT(*) FROM evaluated e JOIN labels l ON l.id=e.id
+                    JOIN receipts r ON r.id=e.id JOIN examples x ON x.id=e.id
+                    WHERE e.arm=? AND l.family=?''', (arm, family)).fetchone()[0]
+                if retained != pool['total']:
+                    # Preserve the whole opaque pool, not a guessed subtraction
+                    # of differently scored arms. It overlaps rebuilt history.
+                    snapshot = arm + ':legacy-pooled-snapshot'
+                    db.execute('INSERT INTO scores VALUES(?,?,?,?,?)',
+                               (family, snapshot, pool['total'], pool['covered'], pool['correct']))
+                    db.execute('INSERT OR IGNORE INTO learning_unverified_arms VALUES(?,?)',
+                               (family, snapshot))
+            db.execute('DELETE FROM scores WHERE family=? AND arm=?', (family, arm))
+            db.execute('DELETE FROM evaluated WHERE arm=? AND id IN (SELECT id FROM labels WHERE family=?)',
+                       (arm, family))
+        for row in db.execute(query):
+            if time.monotonic() >= deadline:
+                db.execute('ROLLBACK TO scoped_score_migration')
+                db.execute('RELEASE scoped_score_migration')
+                return False
+            receipt = json.loads(row['body'])
+            for shadow in receipt.get('shadow') or []:
+                base = 'slm:' + str(shadow.get('model') or shadow.get('label'))
+                if (row['family'], base) not in affected:
+                    continue
+                prediction = _shadow_prediction(receipt, shadow)
+                if prediction and (prediction[0] == base or str(shadow.get('arm', '')).startswith('slm-method:')):
+                    _record_prediction(db, row, prediction, threshold)
+        # An opaque pre-upgrade pool cannot be separated if its underlying
+        # joined receipts were lost. Retain its counts, but never credit it.
+        pools = db.execute("SELECT family,arm,total FROM scores WHERE arm LIKE 'slm:%'").fetchall()
+        for pool in pools:
+            if time.monotonic() >= deadline:
+                db.execute('ROLLBACK TO scoped_score_migration')
+                db.execute('RELEASE scoped_score_migration')
+                return False
+            if ':slm-method:' in pool['arm'] or ':goal-binary:' in pool['arm']:
+                continue
+            retained = db.execute('''SELECT COUNT(*) FROM evaluated e JOIN labels l ON l.id=e.id
+                JOIN receipts r ON r.id=e.id JOIN examples x ON x.id=e.id
+                WHERE e.arm=? AND l.family=?''', (pool['arm'], pool['family'])).fetchone()[0]
+            if retained != pool['total']:
+                db.execute('INSERT OR IGNORE INTO learning_unverified_arms VALUES(?,?)',
+                           (pool['family'], pool['arm']))
+        db.execute('INSERT INTO learning_migrations VALUES(?)', (name,))
+        db.execute('RELEASE scoped_score_migration')
+        return True
+    except Exception:
+        db.execute('ROLLBACK TO scoped_score_migration')
+        db.execute('RELEASE scoped_score_migration')
+        raise
+
+
 def score(db: sqlite3.Connection, threshold: float, deadline: float) -> bool:
+    if not _migrate_scoped_scores(db, threshold, deadline):
+        return False
     # Bounded memory and prequential order: predict before adding the current row.
     memory = defaultdict(lambda: deque(maxlen=512))
     for ex in db.execute('SELECT * FROM examples ORDER BY ts,id'):
@@ -274,26 +386,13 @@ def score(db: sqlite3.Connection, threshold: float, deadline: float) -> bool:
         predictions = [('rules', *predict(history, past, STRATEGIES[3]), True)]
         predictions += [(s[0], *predict(history, past, s), True) for s in STRATEGIES if s[4] != 'rules']
         for shadow in receipt.get('shadow') or []:
-            if shadow.get('backend') == 'shadow-portfolio':
-                continue
-            confidence = shadow.get('confidence')
-            arm = 'slm:' + str(shadow.get('model') or shadow.get('label'))
-            binary = shadow.get('arm') == 'goal-binary'
-            if binary:
-                scope = json.dumps(receipt.get('projection_config') or {}, sort_keys=True)
-                arm += ':goal-binary:' + receipt.get('projection_strategy', 'history-1') + '@' + hashlib.sha256(scope.encode()).hexdigest()[:12]
-            selected = shadow.get('selected_action') if not (shadow.get('error') or shadow.get('parse_error')) else None
-            predictions.append((arm, selected, float(confidence) if confidence is not None else 0.0, not binary))
+            prediction = _shadow_prediction(receipt, shadow)
+            if prediction is not None:
+                predictions.append(prediction)
         # A late join may be older than retained examples; it must abstain,
         # never train on later usage and call that a historical prediction.
-        for arm, action, confidence, confidence_gated in predictions:
-            if not db.execute('INSERT OR IGNORE INTO evaluated VALUES(?,?)', (row['id'], arm)).rowcount:
-                continue
-            covered = int(action is not None and (not confidence_gated or confidence >= threshold))
-            correct = int(bool(covered and action == row['action']))
-            db.execute('''INSERT INTO scores VALUES(?,?,1,?,?) ON CONFLICT(family,arm)
-              DO UPDATE SET total=total+1,covered=covered+excluded.covered,correct=correct+excluded.correct''',
-                       (row['family'], arm, covered, correct))
+        for prediction in predictions:
+            _record_prediction(db, row, prediction, threshold)
         db.execute('INSERT INTO examples VALUES(?,?,?,?,?)',
                    (row['id'], row['family'], row['action'], row['features'], row['ts']))
         memory[row['family']].append({'action': row['action'], 'history': history, 'ts': row['ts']})
@@ -455,9 +554,16 @@ def learn(home: Path, *, sessions: Path | None = None, deadline: float | None = 
                 health = json.loads(health_path.read_text()) if health_path.exists() else {}
                 bucket = health.get('days', {}).get(time.strftime('%Y-%m-%d', time.gmtime(now)), {})
                 failure_rate = bucket.get('failures', 0)/bucket['attempts'] if bucket.get('attempts') else None
-                credited = [f for f, arms in families.items() if any(v['n'] >= int(cfg.get('min_observations', 5)) and v['wilson95_lower'] >= float(cfg.get('credit_bar', .8)) for v in arms.values())]
+                unverified = {(r['family'], r['arm']) for r in db.execute('SELECT family,arm FROM learning_unverified_arms')}
+                credited = [f for f, arms in families.items() if any(
+                    not arm.startswith('slm:') and (f, arm) not in unverified
+                    and v['n'] >= int(cfg.get('min_observations', 5))
+                    and v['wilson95_lower'] >= float(cfg.get('credit_bar', .8)) for arm, v in arms.items())]
+                if not db.execute("SELECT 1 FROM learning_migrations WHERE name='scoped-shadow-arms-v1'").fetchone():
+                    credited = []
                 labels_day = db.execute('SELECT COUNT(*) FROM labels WHERE ts>=?', (now-86400,)).fetchone()[0]
                 state = {'schema': SCHEMA, 'ts': now, 'families': families, 'labelled_per_family': counts,
+                         'unverified_legacy_arms': [list(item) for item in sorted(unverified)],
                          'labelled_rows_added': added, 'labels_day': labels_day, 'credited_families': credited,
                          'shadow_credit_only': True, 'transport_attempts_day': transport_day['attempts'],
                          'transport_errors_day': errors, 'transport_error_rate': rate,

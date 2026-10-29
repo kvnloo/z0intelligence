@@ -210,40 +210,47 @@ class ModelSupervisor:
     # ---- proxying ---------------------------------------------------
     def forward(self, model_id: str, payload: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
         """Send one chat completion to the resident model and return its reply."""
-        t_start = time.time()
-        try:
-            server = self.ensure(model_id)
-        except (SupervisorError, RuntimeError) as exc:
-            return 503, {"error": {"message": str(exc), "type": "model_unavailable"}}
-        load_ms = 0.0
+        t_start = time.monotonic()
+        # A resident child belongs to this request until the complete response
+        # has been consumed. Swaps, explicit release and idle eviction share
+        # this lock; none may stop the child during upstream I/O.
         with self._lock:
+            t_active = time.monotonic()
+            try:
+                server = self.ensure(model_id)
+            except (SupervisorError, RuntimeError) as exc:
+                return 503, {"error": {"message": str(exc), "type": "model_unavailable"}}
+            load_ms = 0.0
             if self._current is not None:
                 self._current.requests += 1
                 load_ms = self._current.load_ms if self._current.requests == 1 else 0.0
 
-        body = dict(payload)
-        body["model"] = model_id  # llama-server ignores it, but keep it coherent
-        if body.get("max_tokens"):
-            body["max_tokens"] = min(int(body["max_tokens"]), self.max_tokens_cap)
-        data = json.dumps(body).encode("utf-8")
-        req = Request(
-            f"{server.base_url}/v1/chat/completions",
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urlopen(req, timeout=600) as resp:
-                out = json.loads(resp.read().decode("utf-8"))
-        except HTTPError as exc:
-            detail = exc.read().decode("utf-8", "replace")[:400]
-            return exc.code, {"error": {"message": detail, "type": "upstream_error"}}
-        except (URLError, OSError, TimeoutError) as exc:
-            return 502, {"error": {"message": f"{type(exc).__name__}: {exc}",
-                                   "type": "upstream_unreachable"}}
-        except json.JSONDecodeError as exc:
-            return 502, {"error": {"message": f"non-JSON upstream: {exc}",
-                                   "type": "upstream_error"}}
+            body = dict(payload)
+            body["model"] = model_id  # llama-server ignores it, but keep it coherent
+            if body.get("max_tokens"):
+                body["max_tokens"] = min(int(body["max_tokens"]), self.max_tokens_cap)
+            data = json.dumps(body).encode("utf-8")
+            req = Request(
+                f"{server.base_url}/v1/chat/completions",
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                with urlopen(req, timeout=600) as resp:
+                    out = json.loads(resp.read().decode("utf-8"))
+            except HTTPError as exc:
+                detail = exc.read().decode("utf-8", "replace")[:400]
+                return exc.code, {"error": {"message": detail, "type": "upstream_error"}}
+            except (URLError, OSError, TimeoutError) as exc:
+                return 502, {"error": {"message": f"{type(exc).__name__}: {exc}",
+                                       "type": "upstream_unreachable"}}
+            except json.JSONDecodeError as exc:
+                return 502, {"error": {"message": f"non-JSON upstream: {exc}",
+                                       "type": "upstream_error"}}
+            finally:
+                self._last_use = time.time()
+                t_end = time.monotonic()
 
         # Attach supervisor-level facts so a router can see residency cost.
         out.setdefault("z0int_supervisor", {})
@@ -254,7 +261,9 @@ class ModelSupervisor:
                 "resident_model": model_id,
                 "load_ms": load_ms,
                 "cold": load_ms > 0,
-                "wall_ms": (time.time() - t_start) * 1000.0,
+                "wall_ms": (t_end - t_start) * 1000.0,
+                "queue_wait_ms": (t_active - t_start) * 1000.0,
+                "active_ms": (t_end - t_active) * 1000.0,
             }
         )
         return 200, out

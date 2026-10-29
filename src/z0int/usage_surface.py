@@ -55,10 +55,10 @@ def model_speed(row: dict[str, Any]) -> dict[str, Any]:
 def _offload_saved(receipts: list[dict[str, Any]]) -> int:
     total = 0
     for row in receipts:
-        if row.get("measurement_state") in {"partial", "unknown", "missing"}:
+        if row.get("measurement_state") != "complete":
             continue
         value = row.get("actual_tokens_saved")
-        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        if isinstance(value, int) and not isinstance(value, bool):
             total += value
     return total
 

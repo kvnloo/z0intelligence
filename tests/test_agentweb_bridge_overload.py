@@ -1,6 +1,6 @@
+import http.client
+import socket
 import threading
-import urllib.error
-import urllib.request
 
 from z0int.agentweb_bridge_capabilities import MAX_ACTIVE
 from z0int.intelligence_service import (
@@ -33,23 +33,24 @@ def test_host_overload_is_503_before_handler_execution():
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
 
-        url = f"http://127.0.0.1:{server.server_address[1]}/v1/plan"
-        req = urllib.request.Request(
-            url,
-            data=b'{"ignored":true}',
-            headers={"content-type": "application/json"},
-            method="POST",
+        # Admission rejects before reading a request. Send one complete HTTP
+        # frame so a client-side second-write race cannot hide the 503 response.
+        body = b'{"ignored":true}'
+        request = (
+            b"POST /v1/plan HTTP/1.1\r\n"
+            b"Host: localhost\r\n"
+            b"Content-Type: application/json\r\n"
+            b"Content-Length: 16\r\n"
+            b"Connection: close\r\n\r\n" + body
         )
-
-        try:
-            urllib.request.urlopen(req, timeout=3)
-        except urllib.error.HTTPError as exc:
-            assert exc.code == 503
-            assert exc.headers["Retry-After"] == "1"
-            assert exc.headers["X-Z0-Execution"] == "not_started"
-            assert exc.read() == b""
-        else:
-            raise AssertionError("overloaded z0 service did not reject with 503")
+        with socket.create_connection(server.server_address, timeout=3) as connection:
+            connection.sendall(request)
+            response = http.client.HTTPResponse(connection)
+            response.begin()
+            assert response.status == 503
+            assert response.headers["Retry-After"] == "1"
+            assert response.headers["X-Z0-Execution"] == "not_started"
+            assert response.read() == b""
 
         with METRIC_LOCK:
             assert METRICS["rejected_connections_total"] == before_rejected + 1

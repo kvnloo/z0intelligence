@@ -42,11 +42,11 @@ def emit_opportunity_async(hook):
     child builds the record (1-3 s) and appends it to a private local file. Nothing is injected, routed or
     sent anywhere.
     """
-    if os.environ.get('Z0INT_CLAUDE_CODE_OPPORTUNITIES', '1' if config().get('opportunities', True) else '0') == '0':
+    opportunities = os.environ.get('Z0INT_CLAUDE_CODE_OPPORTUNITIES')
+    if opportunities == '0' or (opportunities is None and not config().get('opportunities', True)):
         return False
     ctx = harness_capture.begin_turn(HARNESS, hook)
-    harness_capture.spawn_detached(harness_capture.child_argv(HARNESS), {'payload': hook, 'ctx': ctx})
-    return True
+    return harness_capture.spawn_opportunity(HARNESS, {'payload': hook, 'ctx': ctx})
 
 
 def on_opportunity(hook, root=None):
@@ -75,7 +75,7 @@ def on_prompt(hook, capture=None):
     session = hook.get('session_id') or HARNESS
     event = dict(harness=HARNESS, session_id=session, turn_id=turn_id(hook), instance_id=session, text=text)
     result = automatic.handle_event(event)
-    if shadow() or result.get('action') != 'context':
+    if result.get('action') != 'context' or shadow():
         # Nothing reaches the model, so nothing is recorded as delivered.
         return None
     try:

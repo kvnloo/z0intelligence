@@ -158,7 +158,7 @@ def capture_native_decision(
         raise ValueError("invalid native message identity")
     if not isinstance(expected_content_hash, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", expected_content_hash):
         raise ValueError("invalid expected content hash")
-    locator = f"agentsview:{session_id}#{message_id}"
+    locator = f"hermes-native:{session_id}#{message_uid}"
 
     def source_reader(requested_locator: str) -> dict[str, Any]:
         if requested_locator != locator:

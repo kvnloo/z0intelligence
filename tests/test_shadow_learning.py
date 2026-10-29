@@ -30,6 +30,89 @@ def fixture(tmp_path, n=60):
     return home, sessions, now
 
 
+def test_scoped_arms_remain_distinct_and_zero_rpc_cannot_receive_credit(tmp_path):
+    from z0int.cognition.learning import score, arm_scores
+    db=connect(tmp_path)
+    for i in range(3):
+        shadow=[
+            {'model':'m','arm':'slm-method:alpha','selected_action':'read','rpc_count':1},
+            {'model':'m','arm':'slm-method:beta','selected_action':'edit','rpc_count':1},
+            {'model':'m','arm':'slm-method:zero','selected_action':'read','rpc_count':0}]
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(i),'s',str(i),100+i,'omp.tool',json.dumps({'shadow':shadow})))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(i),'s',str(i),'omp.tool',100+i,'read','[]',None,120))
+    assert score(db,.8,time.monotonic()+30)
+    arms=arm_scores(db)['omp.tool']
+    assert arms['slm:m:slm-method:alpha']['correct']==3
+    assert arms['slm:m:slm-method:beta']['correct']==0
+    assert arms['slm:m:slm-method:zero']['n']==0
+    db.close()
+
+
+def test_preupgrade_pooled_scoped_scores_rebuild_from_receipts_idempotently(tmp_path):
+    from z0int.cognition.learning import score, arm_scores
+    db=connect(tmp_path)
+    for i, method in enumerate(('alpha','beta','alpha')):
+        shadow={'model':'m','arm':'slm-method:'+method,'rpc_count':1,
+                'selected_action':'read' if method=='alpha' else 'edit'}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(i),'s',str(i),100+i,'omp.tool',json.dumps({'shadow':[shadow]})))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(i),'s',str(i),'omp.tool',100+i,'read','[]',None,120))
+        db.execute('INSERT INTO examples VALUES(?,?,?,?,?)',
+                   (str(i),'omp.tool','read','[]',100+i))
+        db.execute('INSERT INTO evaluated VALUES(?,?)',(str(i),'slm:m'))
+    db.execute('INSERT INTO scores VALUES(?,?,?,?,?)',('omp.tool','slm:m',3,3,3))
+    db.execute('INSERT INTO scores VALUES(?,?,?,?,?)',('omp.tool','slm:other',4,4,4))
+    assert score(db,.8,time.monotonic()+30)
+    arms=arm_scores(db)['omp.tool']
+    assert 'slm:m' not in arms
+    assert (arms['slm:m:slm-method:alpha']['total'],arms['slm:m:slm-method:alpha']['correct'])==(2,2)
+    assert (arms['slm:m:slm-method:beta']['total'],arms['slm:m:slm-method:beta']['correct'])==(1,0)
+    assert arms['slm:other']['correct']==4
+    assert score(db,.8,time.monotonic()+30)
+    assert arm_scores(db)['omp.tool']==arms
+    db.close()
+
+
+def test_preupgrade_partial_scoped_pool_preserves_original_unverified_snapshot(tmp_path):
+    from z0int.cognition.learning import score, arm_scores
+    db = connect(tmp_path)
+    shadow = {'model': 'm', 'arm': 'slm-method:alpha', 'rpc_count': 1, 'selected_action': 'read'}
+    db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+               ('retained', 's', 'c', 100, 'omp.tool', json.dumps({'shadow': [shadow]})))
+    db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+               ('retained', 's', 'c', 'omp.tool', 100, 'read', '[]', None, 120))
+    db.execute('INSERT INTO examples VALUES(?,?,?,?,?)', ('retained', 'omp.tool', 'read', '[]', 100))
+    db.execute('INSERT INTO evaluated VALUES(?,?)', ('retained', 'slm:m'))
+    db.execute('INSERT INTO scores VALUES(?,?,?,?,?)', ('omp.tool', 'slm:m', 100, 80, 60))
+    assert score(db, .8, time.monotonic()+30)
+    arms = arm_scores(db)['omp.tool']
+    snapshot = arms['slm:m:legacy-pooled-snapshot']
+    assert (snapshot['total'], snapshot['n'], snapshot['correct']) == (100, 80, 60)
+    assert arms['slm:m:slm-method:alpha']['total'] == 1
+    assert db.execute('SELECT 1 FROM learning_unverified_arms WHERE family=? AND arm=?',
+                      ('omp.tool', 'slm:m:legacy-pooled-snapshot')).fetchone()
+    assert score(db, .8, time.monotonic()+30)
+    assert arm_scores(db)['omp.tool'] == arms
+    db.close()
+
+
+def test_preupgrade_lost_pooled_history_remains_unverified(tmp_path):
+    from z0int.cognition.learning import score, arm_scores
+    db = connect(tmp_path)
+    db.execute('INSERT INTO scores VALUES(?,?,?,?,?)', ('omp.tool', 'slm:m', 100, 80, 60))
+    assert score(db, .8, time.monotonic()+30)
+    arms = arm_scores(db)['omp.tool']
+    assert (arms['slm:m']['total'], arms['slm:m']['n'], arms['slm:m']['correct']) == (100, 80, 60)
+    assert db.execute('SELECT 1 FROM learning_unverified_arms WHERE family=? AND arm=?',
+                      ('omp.tool', 'slm:m')).fetchone()
+    assert score(db, .8, time.monotonic()+30)
+    assert arm_scores(db)['omp.tool'] == arms
+    db.close()
+
+
 def test_prequential_join_credit_and_incremental_stall(tmp_path):
     home, sessions, now = fixture(tmp_path)
     first = learn(home, sessions=sessions, now=now)
@@ -53,6 +136,14 @@ def test_prequential_join_credit_and_incremental_stall(tmp_path):
     ledger = json.loads((home/'loop'/'strategy-ledger.json').read_text())
     assert ledger['trials'][0]['result'] == 'failed'
     assert len({t['id'] for t in ledger['trials']}) == len(ledger['trials'])
+
+
+def test_unattested_shadow_accuracy_does_not_credit_family(tmp_path):
+    home, sessions, now = fixture(tmp_path, 1)
+    report=learn(home,sessions=sessions,now=now,
+                 config={'min_observations':1,'credit_bar':0})
+    assert report['families']['omp.tool']['slm:test']['correct']==1
+    assert report['credited_families']==[]
 
 
 def test_dead_endpoint_degrades_and_evolves(tmp_path, monkeypatch):
@@ -287,6 +378,8 @@ def test_transport_classification_counts_legacy_errors_without_relabelling(tmp_p
         ('request exceeds context size 4096', 'context_overflow'),
         ('RuntimeError: functiongemma_270m is not served', 'model_not_served'),
         ('unparseable_response', 'parse_error'),
+        ('non_binary_response', 'parse_error'),
+        ('invalid_call:rm', 'invalid_call'),
     ]
     for index, (error, kind) in enumerate(failures):
         assert failure_class(error) == kind
@@ -294,9 +387,9 @@ def test_transport_classification_counts_legacy_errors_without_relabelling(tmp_p
         db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
                    (str(index), 's', str(index), 100, 'omp.tool', body))
     metrics = transport_metrics(db, 0)
-    assert metrics['attempts'] == 7
+    assert metrics['attempts'] == 9
     assert metrics['errors'] == 6
-    assert metrics['parse_errors'] == 1
+    assert metrics['parse_errors'] == 2
     assert metrics['failure_classes']['connection_refused'] == 1
     assert json.loads(db.execute("SELECT body FROM receipts WHERE id='0'").fetchone()[0])['shadow'][0]['parse_error']
     db.close()

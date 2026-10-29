@@ -294,25 +294,6 @@ def _fts_query(query: str) -> str:
     return " ".join('"' + t.replace('"', "") + '"' for t in tokens)
 
 
-def _sqlite_candidates(conn: sqlite3.Connection, grant: dict[str, Any], query: str,
-                       limit: int) -> list[dict[str, Any]]:
-    try:
-        rows = conn.execute(
-            "select m.session_id, m.ordinal from messages_fts f join messages m on m.id = f.rowid "
-            "join sessions s on s.id = m.session_id where messages_fts match ? and s.project = ? "
-            "and m.is_system = 0 and m.role in ('user', 'assistant') order by f.rank limit ?",
-            (_fts_query(query), grant["scope"], limit)).fetchall()
-    except sqlite3.Error:
-        raise BackendUnavailable("sqlite_unavailable") from None
-    out = []
-    for session_id, ordinal in rows:
-        try:
-            out.append(_native_id(session_id, ordinal))
-        except BackendUnavailable:
-            continue
-    return out
-
-
 def _original_sqlite(grant: dict[str, Any], native: dict[str, Any], conn: sqlite3.Connection) -> dict[str, Any]:
     """Same contract as `_original`, from one consistent read-only snapshot."""
     _supported_grant(grant)
@@ -357,24 +338,57 @@ def _original_sqlite(grant: dict[str, Any], native: dict[str, Any], conn: sqlite
     }
 
 
+# At most this many hits per session, so one long transcript cannot fill every slot.
+_PER_SESSION = 2
+
+
+def _ranked_candidates(conn: sqlite3.Connection, scopes: list[str], query: str) -> sqlite3.Cursor:
+    """Stream ranked candidates; rejected or capped rows must not consume the result limit."""
+    marks = ",".join("?" * len(scopes))
+    return conn.execute(
+        "select m.session_id, m.ordinal, s.project from messages_fts f join messages m on m.id = f.rowid "
+        f"join sessions s on s.id = m.session_id where messages_fts match ? and s.project in ({marks}) "
+        "and m.is_system = 0 and m.role in ('user', 'assistant') "
+        "and coalesce(m.has_thinking, 0) = 0 and coalesce(m.has_tool_use, 0) = 0 "
+        "and coalesce(m.thinking_text, '') = '' order by f.rank",
+        (_fts_query(query), *scopes),
+    )
+
+
 def _search_sqlite(query: str, grants: list[dict[str, Any]], limit: int, deadline: float) -> list[dict[str, Any]]:
+    """Rank across grants, not grant-by-grant: concatenating per-grant results let the first
+    (often largest, automation-heavy) project fill every slot, so owner sessions in later grants
+    were never returned. Each hit is still re-proven against a grant for its own scope."""
     conn = _sqlite_connect(deadline)
     try:
-        output: list[dict[str, Any]] = []
+        by_scope: dict[str, list[dict[str, Any]]] = {}
         for grant in grants:
-            for native in _sqlite_candidates(conn, grant, query, limit):
+            by_scope.setdefault(grant["scope"], []).append(grant)
+        output: list[dict[str, Any]] = []
+        per_session: dict[str, int] = {}
+        for session_id, ordinal, project in _ranked_candidates(conn, list(by_scope), query):
+            _remaining(deadline)
+            if per_session.get(session_id, 0) >= _PER_SESSION:
+                continue
+            try:
+                native = _native_id(session_id, ordinal)
+            except BackendUnavailable:
+                continue
+            for grant in by_scope.get(project, []):
                 try:
                     original = _original_sqlite(grant, native, conn)
                 except BackendIdentityDenied:
                     raise
-                except BackendDenied:
-                    continue
-                except BackendStale:
+                except (BackendDenied, BackendStale):
                     continue
                 output.append(original)
-                if len(output) >= limit:
-                    return output
+                per_session[native["session_id"]] = per_session.get(native["session_id"], 0) + 1
+                break
+            if len(output) >= limit:
+                return output
         return output
+    except sqlite3.Error:
+        raise BackendUnavailable("sqlite_unavailable") from None
     finally:
         conn.close()
 

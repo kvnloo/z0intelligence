@@ -1,6 +1,7 @@
 """Synthetic evidence only. Do not read operational traces."""
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 
@@ -63,22 +64,36 @@ def test_missing_provenance_is_refused(changes):
         finding(**changes)
 
 
-def test_shadow_ingest_is_idempotent_and_keeps_best_arm(tmp_path):
+def test_shadow_ingest_preserves_rules_alongside_best_unbound_slm(tmp_path):
+    from z0int.policy.compile import CompilerConfig, compile_policy
+
     source = tmp_path / "status.json"
-    source.write_text(json.dumps({"schema": "z0int.shadow.learning.v1", "ts": 1792800000,
-        "families": {"omp.tool": {"rules": {"n": 100, "correct": 90},
+    source.write_text(json.dumps({"schema": "z0int.shadow.learning.v1", "ts": "2026-10-24T10:00:00Z",
+        "families": {"omp.tool": {"rules": {"n": 100, "correct": 95},
                                   "slm:synthetic@rev": {"n": 100, "correct": 100}}}}))
     spec = [{"kind": "shadow_learner", "path": str(source)}]
-    assert ingest_sources(spec, tmp_path)["added"] == 1
+    assert ingest_sources(spec, tmp_path)["added"] == 2
     before = ledger_path(tmp_path).read_bytes()
     result = ingest_sources(spec, tmp_path)
     assert result["added"] == 0
     assert result["sources"][0]["reason"] == "source_sha256_already_ingested"
     assert ledger_path(tmp_path).read_bytes() == before
-    row = read_findings(ledger_path(tmp_path))[0]
+    rows = read_findings(ledger_path(tmp_path))
+    row = next(row for row in rows if row["arm"]["kind"] == "slm")
     assert row["arm"]["model"] == "synthetic@rev"
     assert .96 < row["metric"]["ci_low"] < 1
     assert row["metric"]["live_shadow"] is True
+    assert row["evidence_kind"] == "proxy"
+    assert row["metric"]["promotion_eligible"] is False
+    rules = next(row for row in rows if row["arm"]["kind"] == "rules")
+    assert rules["metric"]["n"] == 100
+    assert rules.get("evidence_kind") != "proxy"
+    policy = compile_policy(rows, None, "2026-10-24T12:00:00Z",
+                            CompilerConfig(compiler_revision="a" * 40))
+    assert any(family["stage"] == "shadow" and family["arm"] == rules["arm"]
+               for family in policy["families"].values())
+    assert not any(family["stage"] != "none" and family["arm"] == row["arm"]
+                   for family in policy["families"].values())
 
 
 def test_unknown_and_prose_sources_record_reason(tmp_path):
@@ -140,7 +155,87 @@ def test_labelled_shadow_ingest_requires_exact_join_and_confident_predictions(tm
     row = read_findings(ledger_path(tmp_path))[0]
     assert row["metric"]["n"] == 1 and row["metric"]["value"] == 1.
     assert row["arm"]["model"] == "synthetic@rev"
+    assert row["evidence_kind"] == "proxy"
+    assert row["metric"]["promotion_eligible"] is False
     assert ingest_sources(spec, tmp_path)["added"] == 0
+
+
+@pytest.mark.parametrize("layout", ["status", "labelled"])
+def test_unbound_shadow_ingest_cannot_promote(tmp_path, layout):
+    from z0int.policy.compile import CompilerConfig, compile_policy
+    ts = "2026-10-24T10:00:00Z"
+    if layout == "status":
+        source = tmp_path / "status.json"
+        source.write_text(json.dumps({"schema": "z0int.shadow.learning.v1", "ts": ts,
+            "families": {"omp.tool": {"slm:test@rev": {"n": 60, "correct": 60}}}}))
+    else:
+        source = tmp_path / "labelled.jsonl"
+        row = {"schema": "z0int.shadow.labelled.v1", "ts": ts,
+               "family": "omp.tool", "label_source": "exact_omp_session_tool_call_join",
+               "executed_action": "read", "shadow": [
+                   {"model": "test@rev", "selected_action": "read", "confidence": .99}]}
+        source.write_bytes((canonical(row) + b"\n") * 60)
+    assert ingest_sources([{"kind": "shadow_learner", "path": str(source)}], tmp_path)["added"] == 1
+    rows = read_findings(ledger_path(tmp_path))
+    assert rows[0]["metric"]["n"] == 60
+    assert rows[0]["evidence_kind"] == "proxy"
+    assert rows[0]["metric"]["promotion_eligible"] is False
+    policy = compile_policy(rows, None, "2026-10-24T12:00:00Z",
+                            CompilerConfig(compiler_revision="a" * 40))
+    assert next(iter(policy["families"].values()))["stage"] == "none"
+
+
+def test_labelled_ingestion_never_bulk_reads_source(tmp_path, monkeypatch):
+    source = tmp_path / "labelled.jsonl"
+    row = {"schema": "z0int.shadow.labelled.v1", "ts": 1792800000,
+           "family": "omp.tool", "label_source": "exact_omp_session_tool_call_join",
+           "executed_action": "read", "shadow": [
+               {"model": "synthetic@rev", "selected_action": "read", "confidence": .99}]}
+    source.write_bytes(canonical(row) + b"\n")
+    original = Path.read_bytes
+    def no_bulk_read(path):
+        if path == source:
+            raise AssertionError("Labelled history must stream")
+        return original(path)
+    monkeypatch.setattr(Path, "read_bytes", no_bulk_read)
+    spec = [{"kind": "shadow_learner", "path": str(source)}]
+    assert ingest_sources(spec, tmp_path)["added"] == 1
+    assert ingest_sources(spec, tmp_path)["added"] == 0
+
+
+def test_labelled_parser_memory_is_independent_of_history_length(tmp_path):
+    import tracemalloc
+    from z0int.policy.ingest import _load_labelled
+    source = tmp_path / "labelled.jsonl"
+    row = {"schema": "z0int.shadow.labelled.v1", "ts": 1792800000,
+           "family": "omp.tool", "label_source": "exact_omp_session_tool_call_join",
+           "executed_action": "read", "payload": "x" * 8192, "shadow": [
+               {"model": "synthetic@rev", "selected_action": "read", "confidence": .99}]}
+    line = canonical(row) + b"\n"
+    peaks = []
+    for count in (10, 2000):
+        with source.open("wb") as stream:
+            for _ in range(count):
+                stream.write(line)
+        tracemalloc.start()
+        result = _load_labelled(source, .8)
+        peaks.append(tracemalloc.get_traced_memory()[1])
+        tracemalloc.stop()
+        assert result["families"]["omp.tool"]["slm:synthetic@rev"]["n"] == count
+    assert peaks[1] < peaks[0] + 256 * 1024
+
+
+def test_ingestion_rejects_source_changed_after_hash(tmp_path, monkeypatch):
+    import z0int.policy.ingest as ingest
+    source = tmp_path / "labelled.jsonl"
+    source.write_text("{}\n")
+    def changed(*args, **kwargs):
+        source.write_text("{}\n{}\n")
+        return {"ts": 1792800000}
+    monkeypatch.setattr(ingest, "_load_source", changed)
+    report = ingest_sources([{"kind": "shadow_learner", "path": str(source)}], tmp_path)
+    assert report["added"] == 0
+    assert "changed while parsing" in report["sources"][0]["reason"]
 
 
 def test_structured_engine_bench_and_offload_adapters(tmp_path):
@@ -241,3 +336,163 @@ def test_eval_identity_metadata_does_not_override_receipt_provenance(tmp_path):
     assert emitted["source"]["expected_model_id"] == "synthetic-alias"
     assert emitted["source"]["engine_build"] == "synthetic-build"
     assert emitted["source"]["model_sha256"] == "f" * 64
+
+
+def test_push_only_agent_outcome_is_proxy_and_cannot_promote(tmp_path):
+    from z0int.policy.compile import CompilerConfig, compile_policy
+
+    row = finding(synthetic=True)
+    row.update(run_id="fixture-run", outcome="verified_success", evidence="pushed",
+               pr_url="https://example.invalid/pull/1")
+    row["metric"].update(n=1000, ci_low=.99, value=1., live_shadow=True,
+                         outcome_ledger_verified=True)
+    source = tmp_path / "agent-outcomes.json"
+    source.write_text(json.dumps({"rows": [row]}))
+    assert ingest_sources([{"kind": "agent_outcomes", "path": str(source)}], tmp_path)["added"] == 1
+    rows = read_findings(ledger_path(tmp_path))
+    assert rows[0]["evidence_kind"] == "proxy"
+    assert rows[0]["metric"]["promotion_eligible"] is False
+    assert rows[0]["metric"]["outcome_ledger_verified"] is False
+    policy = compile_policy(rows, None, "2026-10-24T12:00:00Z",
+                            CompilerConfig(compiler_revision="a" * 40))
+    assert next(iter(policy["families"].values()))["stage"] == "none"
+
+
+def product_receipt(tmp_path, *, trace="fixture-run", success=True, aodl=False):
+    target = tmp_path / "product-state.json"
+    target.write_text(json.dumps({"feature_enabled": success}))
+    observed = {"kind": "filesystem", "id": str(target), "observed": True,
+                "state": json.loads(target.read_text())}
+    if aodl:
+        document = {"eventLog": [{"eventId": "state-update-fixture", "type": "stateUpdate",
+            "sourceHash": "d" * 64, "payload": {"traceId": trace, "verified": True,
+                "success": success, "verifier": "fixture-product-observer", "observed_target": observed}}]}
+    else:
+        document = {"schema": "z0.product_check.v1", "id": "product-check-fixture",
+            "run_id": trace, "verified": True, "success": success,
+            "verifier": "fixture-product-observer", "observed_target": observed}
+    path = tmp_path / "verifier.json"
+    path.write_bytes(canonical(document))
+    reference = {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+    if aodl:
+        reference["event_id"] = "state-update-fixture"
+    return reference, document
+
+
+@pytest.mark.parametrize("aodl", [False, True])
+def test_real_target_verifier_receipt_is_bound_to_product_outcome(tmp_path, aodl):
+    reference, _ = product_receipt(tmp_path, aodl=aodl)
+    source = tmp_path / "agent-outcomes.json"
+    row = {"run_id": "fixture-run", "ts": "2026-10-24T00:00:00Z",
+           "model": "fixture-model", "task_kind": "code", "outcome": "verified_success",
+           "synthetic": True, "verifier_receipt": reference}
+    source.write_text(json.dumps({"rows": [row]}))
+    assert ingest_sources([{"kind": "agent_outcomes", "path": str(source)}], tmp_path)["added"] == 1
+    emitted = read_findings(ledger_path(tmp_path))[0]
+    assert emitted["evidence_kind"] == "product_outcome"
+    assert emitted["metric"]["outcome_ledger_verified"] is True
+    assert emitted["metric"]["n"] == 1
+    assert emitted["verifier_receipt"]["observed_target"]["state"] == {"feature_enabled": True}
+    assert emitted["verifier_receipt"]["sha256"] == reference["sha256"]
+
+
+@pytest.mark.parametrize("attack", ["wrong_run", "wrong_hash", "missing_observation", "test_only", "push_only"])
+def test_proxy_receipts_never_mint_product_truth(tmp_path, attack):
+    reference, document = product_receipt(tmp_path)
+    if attack == "wrong_run":
+        document["run_id"] = "unrelated-run"
+    elif attack == "missing_observation":
+        del document["observed_target"]
+    elif attack in {"test_only", "push_only"}:
+        document["observed_target"]["kind"] = "test" if attack == "test_only" else "push"
+    verifier = tmp_path / "verifier.json"
+    verifier.write_bytes(canonical(document))
+    if attack != "wrong_hash":
+        reference["sha256"] = hashlib.sha256(verifier.read_bytes()).hexdigest()
+    else:
+        reference["sha256"] = "0" * 64
+    source = tmp_path / "agent-outcomes.json"
+    row = finding(synthetic=True)
+    row.update(run_id="fixture-run", verifier_receipt=reference, outcome="verified_success")
+    source.write_text(json.dumps({"rows": [row]}))
+    assert ingest_sources([{"kind": "agent_outcomes", "path": str(source)}], tmp_path)["added"] == 1
+    emitted = read_findings(ledger_path(tmp_path))[0]
+    assert emitted["evidence_kind"] == "proxy"
+    assert emitted["metric"]["promotion_eligible"] is False
+
+
+def test_aodl_pytest_state_update_without_product_observation_is_proxy(tmp_path):
+    reference, document = product_receipt(tmp_path, aodl=True)
+    payload = document["eventLog"][0]["payload"]
+    payload["verifier"] = "pytest"
+    del payload["observed_target"]
+    verifier = tmp_path / "verifier.json"
+    verifier.write_bytes(canonical(document))
+    reference["sha256"] = hashlib.sha256(verifier.read_bytes()).hexdigest()
+    row = finding(synthetic=True)
+    row.update(run_id="fixture-run", verifier_receipt=reference)
+    source = tmp_path / "agent-outcomes.json"
+    source.write_text(json.dumps({"rows": [row]}))
+    assert ingest_sources([{"kind": "agent_outcomes", "path": str(source)}], tmp_path)["added"] == 1
+    assert read_findings(ledger_path(tmp_path))[0]["evidence_kind"] == "proxy"
+
+
+def test_z0eval_export_cannot_launder_push_only_outcomes(tmp_path):
+    row = finding(synthetic=True)
+    row.update(run_id="fixture-run", outcome="verified_success", evidence="pushed")
+    source = tmp_path / "receipt.json"
+    source.write_text(json.dumps({"schema": "z0eval.result.v1", "ts": row["ts"],
+        "source": {"adapter": "agent_outcomes"}, "verdict": "KEEP",
+        "gates": {key: "pass" for key in
+            ("contract", "authority", "quality_noninferiority", "latency_tail")},
+        "findings": [row]}))
+    assert ingest_sources([{"kind": "z0eval_result", "path": str(source)}], tmp_path)["added"] == 1
+    assert read_findings(ledger_path(tmp_path))[0]["evidence_kind"] == "proxy"
+
+
+def test_sqlite_outcome_ledger_reads_frozen_snapshot_and_ignores_duplicates(tmp_path):
+    import sqlite3
+
+    source = tmp_path / "ledger.sqlite"
+    connection = sqlite3.connect(source)
+    connection.execute("CREATE TABLE runs (run_id TEXT, model TEXT, task_kind TEXT, ended_at REAL, outcome TEXT, evidence TEXT, dup_of TEXT)")
+    connection.executemany("INSERT INTO runs VALUES (?,?,?,?,?,?,?)", [
+        ("fixture-run", "fixture-model", "code", 1792800000., "verified_success", "pushed", None),
+        ("duplicate", "fixture-model", "code", 1792800000., "verified_success", "tests_pass", "fixture-run")])
+    connection.commit()
+    connection.close()
+    spec = [{"kind": "agent_outcomes", "path": str(source), "synthetic": True}]
+    before = source.read_bytes()
+    assert ingest_sources(spec, tmp_path)["added"] == 1
+    emitted = read_findings(ledger_path(tmp_path))[0]
+    assert emitted["evidence_kind"] == "proxy"
+    assert emitted["source"]["sha256"] == hashlib.sha256(before).hexdigest()
+    assert source.read_bytes() == before
+    assert ingest_sources(spec, tmp_path)["added"] == 0
+
+
+@pytest.mark.parametrize("aodl", [False, True])
+def test_product_failure_overrides_claimed_aggregate_success(tmp_path, aodl):
+    reference, _ = product_receipt(tmp_path, success=False, aodl=aodl)
+    row = finding(synthetic=True)
+    row.update(run_id="fixture-run", outcome="verified_success", verifier_receipt=reference)
+    row["metric"].update(value=1., ci_low=.99, n=1000)
+    source = tmp_path / "outcomes.json"
+    source.write_text(json.dumps({"rows": [row]}))
+    assert ingest_sources([{"kind": "agent_outcomes", "path": str(source)}], tmp_path)["added"] == 1
+    emitted = read_findings(ledger_path(tmp_path))[0]
+    assert emitted["evidence_kind"] == "product_outcome"
+    assert emitted["metric"]["name"] == "task_success"
+    assert emitted["metric"]["value"] == 0.
+    assert emitted["metric"]["n"] == 1
+    assert emitted["verifier_receipt"]["success"] is False
+
+
+def test_sqlite_outcome_ledger_with_wal_is_rejected(tmp_path):
+    source = tmp_path / "ledger.sqlite"
+    source.write_bytes(b"not read while WAL exists")
+    tmp_path.joinpath("ledger.sqlite-wal").write_bytes(b"pending writes")
+    report = ingest_sources([{"kind": "agent_outcomes", "path": str(source)}], tmp_path)
+    assert report["added"] == 0
+    assert report["sources"][0]["status"] == "skipped"
+    assert "live WAL" in report["sources"][0]["reason"]
