@@ -23,11 +23,8 @@ import fcntl
 import hashlib
 import json
 import os
-import queue
 import re
-import subprocess
 import sys
-import threading
 import time
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -501,6 +498,8 @@ def record_built_opportunity(harness: str, record: Mapping[str, Any], *,
 
 def observed_revisions(cwd: Any) -> dict[str, Any]:
     """The task repo's git HEAD now (one git call), to compare with the revision the opportunity saw."""
+    import subprocess
+
     try:
         proc = subprocess.run(['git', '--no-optional-locks', '-C', str(cwd), 'rev-parse', 'HEAD'], capture_output=True,
                               text=True, timeout=5, env=dict(os.environ, GIT_OPTIONAL_LOCKS='0'), check=False)
@@ -605,6 +604,8 @@ def spawn_detached(argv: list[str], payload: Mapping[str, Any], *, pass_fds: tup
     Inherited slot descriptors remain locked until the child exits. Linux uses memory-backed input;
     other platforms use a private anonymous temporary file, closed by both processes after use.
     """
+    import subprocess
+
     if hasattr(os, 'memfd_create'):
         source = os.fdopen(os.memfd_create('z0int-job', os.MFD_CLOEXEC), 'w+b')
     else:
@@ -665,6 +666,9 @@ class Spool:
 
     def __init__(self, harness: str, *, root: str | Path | None = None, maxsize: int = 1000,
                  close_timeout: float = 2.0, write: Callable[[str, Mapping[str, Any]], Any] | None = None):
+        import queue
+        import threading
+
         self.harness, self.root, self.close_timeout, self.dropped = harness, root, close_timeout, 0
         self._write = write or (lambda kind, row: append(harness, kind, row, root=root))
         self._queue: queue.Queue = queue.Queue(maxsize=maxsize)
@@ -676,6 +680,8 @@ class Spool:
         self._worker.start()
 
     def put(self, kind: str, row: Mapping[str, Any]) -> bool:
+        import queue
+
         with self._put_lock:
             reason = 'closed'
             if not self._sealed:
@@ -695,6 +701,8 @@ class Spool:
             pass  # a lost drop marker never affects the host
 
     def _run(self) -> None:
+        import queue
+
         while True:
             try:
                 item = self._queue.get(timeout=0.05)
@@ -716,6 +724,8 @@ class Spool:
             self._queue.task_done()
 
     def close(self) -> None:
+        import queue
+
         deadline = time.monotonic() + self.close_timeout
         reserve = min(0.5, self.close_timeout / 4)
         with self._put_lock:  # from here every put is a counted 'closed' drop; everything queued is drained below

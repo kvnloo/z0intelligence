@@ -368,7 +368,7 @@ def test_full_capture_pool_refuses_before_process_creation(home, monkeypatch, tm
     def unexpected_launch(*args, **kwargs):
         launches.append(args)
         raise AssertionError('full capture pool started a process')
-    monkeypatch.setattr(hc.subprocess, 'Popen', unexpected_launch)
+    monkeypatch.setattr(subprocess, 'Popen', unexpected_launch)
     p = payload(harness, cwd=tmp_path)
     try:
         assert hook('prompt', p, harness) is None
@@ -381,7 +381,6 @@ def test_full_capture_pool_refuses_before_process_creation(home, monkeypatch, tm
     finally:
         for fh in held:
             fh.close()
-
 
 def test_detached_builds_share_a_bounded_set_of_slots(home, inline, tmp_path):
     p = payload('codex', cwd=tmp_path)
@@ -410,7 +409,7 @@ def test_failed_handoff_releases_slot_and_counts_one_drop(home, monkeypatch, fai
     else:
         def fail(*args, **kwargs):
             raise OSError('synthetic launch failure')
-        monkeypatch.setattr(hc.subprocess, 'Popen', fail)
+        monkeypatch.setattr(subprocess, 'Popen', fail)
     assert hc.spawn_opportunity('codex', job) is False
     assert [r['reason'] for r in rows(home, 'codex', 'drops.jsonl')] == ['spawn_failed']
     held = [hc.try_slot() for _ in range(hc.MAX_CHILDREN)]

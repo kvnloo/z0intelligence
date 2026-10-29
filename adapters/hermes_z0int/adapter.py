@@ -10,6 +10,7 @@ import time
 from typing import Any
 
 
+
 def normalize_envelope(raw: dict[str, Any], *, build_id: str | None = None) -> dict[str, Any]:
     """Map a Hermes tool/turn envelope into a stable z0int event dict."""
     session_id = (

@@ -687,6 +687,14 @@ whole-task success nor an AODL admission grant.
 - **Mutation receipts**: a pure disposition kernel distinguishes provider retries from
   ambiguous world effects; it does not itself retry tools or authorize execution.
 
+Opportunity capture reserves one of four process-shared slots before spawning a
+child. The child inherits the locked descriptor and holds it until capture
+finishes. When all slots are occupied, the hook records a `fanout_cap` drop
+without starting a waiting process. Claude Code, Codex, Grok, and OMP share this
+admission path; memory-seam capture uses the same slot pool.
+Hook-time identity helpers stay in `harness_id`; the Hermes adapter constructs
+its bridge record directly, without loading dataclasses and inspection code.
+
 For exact source PRs, integrated/retained status, verification and reproducible test setup,
 see [the current reconciliation audit](docs/pr-reconciliation-2026-10-02.md).
 
