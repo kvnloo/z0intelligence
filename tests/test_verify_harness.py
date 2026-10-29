@@ -137,7 +137,8 @@ def test_expired_deadline_visits_no_session(tmp_path, monkeypatch, harness):
     assert report['rows'] == [] and report['appended'] == 0 and report['failures'] == []
 
 
-def test_bounded_sweeps_resume_unwritten_sessions_and_preserve_append_order(tmp_path, monkeypatch):
+@pytest.mark.parametrize('all_turns', [False, True])
+def test_bounded_sweeps_resume_unwritten_sessions_and_preserve_append_order(tmp_path, monkeypatch, all_turns):
     home, projects = tmp_path / 'z0home', tmp_path / 'projects'
     hc.state_dir('claude-code', home).mkdir(parents=True, exist_ok=True)
     clock = [0.0]
@@ -171,6 +172,48 @@ def test_bounded_sweeps_resume_unwritten_sessions_and_preserve_append_order(tmp_
     assert [r['session_id'] for r in ov.read_jsonl(path)] == ['a', 'b', 'c']
     final = ov.verify_harness('claude-code', gh=ov.GitHub(runner=fake_gh), **kw)
     assert final['status'] == 'success' and final['appended'] == 0
+    assert path.read_bytes() == prefix
+
+
+def test_capture_only_session_does_not_starve_unwritten_outcomes(tmp_path, monkeypatch):
+    home, projects = tmp_path / 'z0home', tmp_path / 'projects'
+    clock, visited = [0.0], []
+    for sid in ('a', 'b', 'c'):
+        t = Transcript(session=sid)
+        t.prompt('p1', 'test', T0)
+        t.write(projects)
+        cc_opportunity(home, sid, 'p1')
+        if sid != 'a':
+            observed(home, sid, 'p1')
+    real_session_turns = ov.session_turns
+
+    def session_turns(path):
+        visited.append(path.stem)
+        turns = real_session_turns(path)
+        clock[0] += 5.0
+        return turns
+
+    monkeypatch.setattr(ov, 'session_turns', session_turns)
+    monkeypatch.setattr(ov.time, 'monotonic', lambda: clock[0])
+    kw = dict(root=home, projects=projects, now=T0 + DAY, write=True,
+              density=False, gh=ov.GitHub(enabled=False))
+    path = hc.state_dir('claude-code', home) / 'outcomes_verified.jsonl'
+    prefix = b''
+    for expected_sid, appended in (('b', 1), ('c', 1), ('a', 0)):
+        report = ov.verify_harness('claude-code', deadline=clock[0] + 5, **kw)
+        assert visited[-1] == expected_sid
+        assert report['appended'] == appended
+        assert report['partial'] is True and report['status'] == 'partial'
+        assert report['sessions'] == {'total': 3, 'visited': 1, 'not_visited': 2}
+        assert report['transcripts']['projects_dir'] == 1
+        assert not report['failures']
+        assert path.read_bytes().startswith(prefix)
+        prefix = path.read_bytes()
+    assert visited == ['b', 'c', 'a']
+    assert [r['session_id'] for r in ov.read_jsonl(path)] == ['b', 'c']
+    final = ov.verify_harness('claude-code', **kw)
+    assert final['status'] == 'success' and final['appended'] == 0
+    assert final['transcripts']['projects_dir'] == 3
     assert path.read_bytes() == prefix
 
 

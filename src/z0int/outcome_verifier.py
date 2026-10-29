@@ -930,7 +930,7 @@ def _rows_for_session(turns: list[dict[str, Any]], session_id: str, *, index: Re
 
 
 def _budget_sessions(sessions: Mapping[str, Any], expected: Iterable[tuple], *, root: Path | None,
-                     harness: str, deadline: float | None) -> list[str]:
+                     harness: str, deadline: float | None, all_turns: bool = False) -> list[str]:
     """Keep source order, but in bounded sweeps visit unwritten turns before refreshes."""
     order = list(sessions)
     if deadline is None:
@@ -938,7 +938,10 @@ def _budget_sessions(sessions: Mapping[str, Any], expected: Iterable[tuple], *, 
     written = {(r.get('session_id'), r.get('trace_id'))
                for r in read_jsonl(state_dir(root, harness) / 'outcomes_verified.jsonl')}
     pending = {sid for sid, trace in expected if (sid, trace) not in written}
-    pending.update(set(order) - {sid for sid, _ in written})
+    if all_turns:
+        # Only all-turn sweeps emit rows for sessions without observed outcomes.
+        # Capture-only diagnostics must not starve row-producing pending work.
+        pending.update(set(order) - {sid for sid, _ in written})
     return [sid for sid in order if sid in pending] + [sid for sid in order if sid not in pending]
 
 
@@ -988,7 +991,7 @@ def verify(*, root: Path | None = None, since: float = 0.0, all_turns: bool = Fa
                 continue
     rows = []
     order = _budget_sessions(dict(sorted(sessions.items())), obs_by_key, root=root, harness=HARNESS,
-                             deadline=deadline)
+                             deadline=deadline, all_turns=all_turns)
     progress['sessions_total'] = len(order)
     progress['sessions_visited'] = 0
     progress['sessions_not_visited'] = len(order)
