@@ -1,17 +1,17 @@
 [Unit]
-Description=z0intelligence host SLM (llama.cpp server on the host's best local device)
-After=network-online.target docker.service
+Description=z0 SLM: llama.cpp Vulkan router on the R9 M370X (127.0.0.1:11520 and the Kind bridge)
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-# Host delta lives only in this file: LLAMA_SERVER, Z0INT_SLM_MODEL, Z0INT_SLM_DEVICE,
-# Z0INT_SLM_BIND (loopback or the Kind bridge gateway), Z0INT_SLM_PORT, Z0INT_SLM_CTX,
-# Z0INT_SLM_ARGS (extra llama-server flags, e.g. --reasoning-budget 0 for thinking models).
-EnvironmentFile=%h/.config/z0intelligence/slm.env
-ExecStart=/bin/sh -c 'exec "$LLAMA_SERVER" -m "$Z0INT_SLM_MODEL" --device "$Z0INT_SLM_DEVICE" -ngl 99 --host "$Z0INT_SLM_BIND" --port "$Z0INT_SLM_PORT" -c "$${Z0INT_SLM_CTX:-8192}" --parallel 2 --no-webui $${Z0INT_SLM_ARGS}'
+# Host 0 runs the same llama.cpp router on CUDA0, tailnet :11530, models-max 2, ctx 8192.
+# This card is RADV VERDE, 2048 MiB, no fp16 and no matrix cores. One resident model,
+# ctx 2048, parallel 1. The 1.7B Q4 is on demand only; it may refuse if the desktop holds VRAM.
+ExecStart=/home/kvn/.local/opt/llama.cpp/b11270-vulkan/llama-server --models-dir /home/kvn/.local/share/z0int-models/router --models-max 1 --device Vulkan0 -ngl 99 -c 2048 --parallel 1 --host 127.0.0.1 --port 11520 --no-webui --reasoning off -t 4 --sleep-idle-seconds 900
 Restart=on-failure
 RestartSec=5
-UMask=0077
+Nice=5
 
 [Install]
 WantedBy=default.target
