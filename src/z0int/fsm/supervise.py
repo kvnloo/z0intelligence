@@ -1070,8 +1070,11 @@ def touched_worktrees(w: Worker, calls_by_session: dict[str, list[Call]], roots:
         for p in paths:
             if not p.startswith("/"):
                 continue
-            top = roots.find(p) or toplevel(roots.norm(p))
-            if top and top not in SKIP_TOPS and not top.startswith("/tmp") and top not in out:
+            # Inventory-backed worktrees are trusted even under a temporary root
+            # (including pytest fixtures). Do not admit arbitrary /tmp fallbacks.
+            inventoried = roots.find(p)
+            top = inventoried or toplevel(roots.norm(p))
+            if top and top not in SKIP_TOPS and (inventoried or not top.startswith("/tmp")) and top not in out:
                 out.append(top)
         return out
 
