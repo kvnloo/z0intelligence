@@ -20,14 +20,13 @@ def _iter_receipts(since: float | None = None):
     if not root.is_dir():
         return
     for p in sorted(root.glob("**/*")):
-        if p.suffix not in (".json", ".jsonl") and p.name.endswith(".jsonl") is False:
-            if p.suffix == ".json":
-                try:
-                    data = json.loads(p.read_text(encoding="utf-8"))
-                    if isinstance(data, dict):
-                        yield data
-                except Exception:
-                    continue
+        if p.suffix == ".json":
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    yield data
+            except Exception:
+                continue
             continue
         if p.suffix == ".jsonl" or p.name.endswith(".jsonl"):
             try:
