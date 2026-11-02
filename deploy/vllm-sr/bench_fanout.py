@@ -46,6 +46,21 @@ def run(conc):
 
 
 report = {}
+# Rate-limit preflight: what this run asks of each model bucket vs its published/observed limit.
+try:
+    LIM = {(m["provider"] + "-" + m["model"].split("/")[-1]): m for m in json.load(open(__import__("os").path.join(__import__("os").path.dirname(__file__) or ".", "limits.json")))["models"]}
+except (OSError, ValueError, KeyError):
+    LIM = {}
+EST_TOK = int(__import__("os").environ.get("EST_TOKENS_PER_CALL", "350"))
+if LIM:
+    pool = [k for k in LIM if k in ("groq-gpt-oss-20b", "groq-gpt-oss-120b", "groq-qwen3.8-27b", "cerebras-gpt-oss-120b", "cerebras-qwen-3.8-27b")]
+    per = 2 * N / len(pool)  # both runs, uniform random share
+    pre = {k: {"calls": round(per, 1), "rpm_limit": LIM[k].get("rpm"), "tpm_limit": LIM[k]["tpm"], "rpd_limit": LIM[k]["rpd"],
+               "rpd_used_pct": round(100 * per / LIM[k]["rpd"], 2),
+               "rpm_overrun_if_within_1min": bool(LIM[k].get("rpm")) and per > LIM[k]["rpm"],
+               "tpm_overrun_if_within_1min": per * EST_TOK > LIM[k]["tpm"]} for k in pool}
+    report["preflight"] = {"est_tokens_per_call": EST_TOK, "per_model": pre,
+                           "capacity_share_rpm": {k: round((LIM[k].get("rpm") or 0) / sum((LIM[j].get("rpm") or 0) for j in pool), 3) for k in pool}}
 for label, conc in (("serial", 1), (f"fanout_c{C}", C)):
     rows, wall, pk = run(conc)
     ok = [r for r in rows if r["status"] == 200 and r["answer"]]
@@ -55,7 +70,8 @@ for label, conc in (("serial", 1), (f"fanout_c{C}", C)):
                      "statuses": dict(Counter(str(r["status"]) for r in rows)),
                      "models": dict(Counter(r["model"] for r in ok)),
                      "p50_s": lat[len(lat) // 2] if lat else None, "p95_s": lat[int(len(lat) * 0.95) - 1] if lat else None,
-                     "agg_completion_tok_per_s": round(toks / wall, 1)}
+                     "agg_completion_tok_per_s": round(toks / wall, 1),
+                     "tokens_spent": sum((r.get("completion_tokens") or 0) for r in ok)}
     if OUT:
         with open(OUT, "a") as f:
             for r in rows:
