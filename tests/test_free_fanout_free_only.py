@@ -6,6 +6,7 @@ is a stub and every socket connection fails the test.
 import copy
 import json
 import socket
+import sys
 import types
 
 import pytest
@@ -28,6 +29,54 @@ class HttpError(Exception):
     def __init__(self, code):
         super().__init__(code)
         self.code = code
+
+
+def test_fanout_plan_loads_kerdoios_builder_and_preserves_shape(monkeypatch, tmp_path):
+    calls = []
+
+    def build_fanout(tasks, *, workers):
+        calls.append((tasks, workers))
+        return {"slots": [{"slot": 0, "provider": "nous", "model": "free"}]}
+
+    package = types.ModuleType("kerdoios")
+    package.__path__ = []
+    module = types.ModuleType("kerdoios.free_fanout")
+    module.build_fanout = build_fanout
+    monkeypatch.setitem(sys.modules, "kerdoios", package)
+    monkeypatch.setitem(sys.modules, "kerdoios.free_fanout", module)
+    monkeypatch.setattr(ff, "KERDOIOS_ROOT", tmp_path)
+
+    assert ff.fanout_plan(1) == {
+        "slots": [{"slot": 0, "provider": "nous", "model": "free"}]
+    }
+    assert calls == [([], 1)]
+    assert sys.path[0] == str(tmp_path)
+
+
+def test_fanout_plan_propagates_builder_errors(monkeypatch):
+    module = types.ModuleType("kerdoios.free_fanout")
+
+    def unavailable(tasks, *, workers):
+        raise RuntimeError("no free providers")
+
+    module.build_fanout = unavailable
+    monkeypatch.setitem(sys.modules, "kerdoios.free_fanout", module)
+
+    with pytest.raises(RuntimeError, match="no free providers"):
+        ff.fanout_plan()
+
+
+def test_plan_for_builds_single_candidate_and_rejects_incomplete_slot():
+    assert ff._plan_for({"provider": "groq", "model": "free-model"}) == {
+        "candidates": [{"provider": "groq", "model": "free-model"}],
+        "source": "z0int.free_fanout",
+        "category": "probe",
+        "reason": "free fanout probe",
+        "harness": "omp",
+        "caller_trace_id": "free-fanout",
+    }
+    with pytest.raises(KeyError, match="model"):
+        ff._plan_for({"provider": "groq"})
 
 
 @pytest.fixture
@@ -156,6 +205,83 @@ def test_cursor_used_is_computed_from_recorded_attempts(probe, monkeypatch):
     monkeypatch.setattr(ff, "execute_plan", lambda *args, **kwargs: {
         "ok": True, "provider": "cursor", "model": "m", "attempts": [{"provider": "cursor", "model": "m", "extra": {}}]})
     assert ff.run(1)["cursor_used"] is True
+
+
+def test_one_maps_attempt_rows_without_leaking_transport_payload(probe, monkeypatch):
+    _, _, policy, _ = probe
+    _, providers = ff.configuration()
+    monkeypatch.setattr(ff, "execute_plan", lambda *args, **kwargs: {
+        "ok": False,
+        "provider": "nous",
+        "model": "free-model",
+        "refusal_reason": "exhausted",
+        "attempts": [
+            {
+                "provider": "nous",
+                "model": "free-model",
+                "extra": {
+                    "status": "failed",
+                    "http_status": 429,
+                    "finish_reason": "length",
+                    "sidestep": True,
+                    "response_body": "must not escape",
+                },
+            },
+            {"provider": "groq", "model": "fallback", "extra": None},
+        ],
+    })
+
+    row = ff._one(
+        {"slot": 3, "provider": "nous", "model": SLOTS[0][1]}, policy, providers
+    )
+
+    assert row == {
+        "slot": 3,
+        "ok": False,
+        "provider": "nous",
+        "model": "free-model",
+        "refusal_reason": "exhausted",
+        "attempts": [
+            {
+                "provider": "nous",
+                "model": "free-model",
+                "status": "failed",
+                "http_status": 429,
+                "finish": "length",
+                "sidestep": True,
+            },
+            {
+                "provider": "groq",
+                "model": "fallback",
+                "status": None,
+                "http_status": None,
+                "finish": None,
+                "sidestep": None,
+            },
+        ],
+    }
+
+
+def test_one_maps_execution_exception_to_stable_error_name(probe, monkeypatch):
+    _, _, policy, _ = probe
+    _, providers = ff.configuration()
+
+    class ProviderUnavailable(Exception):
+        pass
+
+    def fail(*args, **kwargs):
+        raise ProviderUnavailable("secret provider details")
+
+    monkeypatch.setattr(ff, "execute_plan", fail)
+    row = ff._one(
+        {"slot": 2, "provider": "nous", "model": SLOTS[0][1]}, policy, providers
+    )
+    assert row == {
+        "slot": 2,
+        "ok": False,
+        "provider": "nous",
+        "error": "ProviderUnavailable",
+    }
 
 
 def test_a_malformed_slot_is_reported_and_costs_no_other_slot(probe):
