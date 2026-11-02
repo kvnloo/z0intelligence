@@ -370,14 +370,16 @@ def _sqlite_archive(tmp_path, rows, *, user_version=113, stamps=None):
     path = tmp_path / ".agentsview" / "sessions.db"
     conn = sqlite3.connect(path)
     conn.executescript("""
-        create table sessions (id text primary key, project text, machine text);
+        create table sessions (id text primary key, project text, machine text, entrypoint text not null default '',
+          session_kind text not null default '', relationship_type text not null default '');
         create table messages (id integer primary key, session_id text, ordinal integer, role text, content text,
           timestamp text, is_system integer default 0, has_thinking integer default 0,
           has_tool_use integer default 0, thinking_text text default '');
         create virtual table messages_fts using fts5(content, content='messages', content_rowid='id');
     """)
     for sid, project, ordinal, role, content, extra in rows:
-        conn.execute("insert or ignore into sessions values (?,?,?)", (sid, project, "fixture-host"))
+        conn.execute("insert or ignore into sessions (id, project, machine, relationship_type) values (?,?,?,?)",
+                     (sid, project, "fixture-host", "subagent" if extra == "subagent" else ""))
         cur = conn.execute("insert into messages (session_id, ordinal, role, content, timestamp, has_thinking) "
                            "values (?,?,?,?,?,?)", (sid, ordinal, role, content,
                                                     (stamps or {}).get((sid, ordinal), "2026-10-22T17:00:00Z"),
@@ -499,3 +501,16 @@ def test_sqlite_host_falls_back_to_raw_machine_without_label_table(native, tmp_p
     _sqlite_archive(tmp_path, [(SESSION, PROJECT, 7, "assistant", "unlabelled host answer", None)])
     rows = backend.search_backend("agentsview", "unlabelled", [grant()], 1, 2)
     assert rows[0]["host"] == "fixture-host"
+
+
+def test_sqlite_ranks_owner_turns_before_machine_text(native, tmp_path):
+    """2026-11-02 replay probe: compaction handoffs and subagent prompts quoting the owner outranked the owner."""
+    _sqlite_archive(tmp_path, [
+        ("codex:handoff", PROJECT, 1, "user", "[CONTEXT COMPACTION] summary: uniichat uniichat uniichat import", None),
+        ("codex:worker", PROJECT, 1, "user", "uniichat uniichat uniichat import brief for a worker", "subagent"),
+        (SESSION, PROJECT, 9, "user", "did we try the uniichat handler directly after the import of chats?", None),
+    ])
+    rows = backend.search_backend("agentsview", "uniichat import", [grant()], 3, 2)
+    assert rows[0]["text"].startswith("did we try the uniichat handler")
+    assert {r["text"][:20] for r in rows[1:]} == {"[CONTEXT COMPACTION]", "uniichat uniichat un"}
+

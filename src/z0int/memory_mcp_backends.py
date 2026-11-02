@@ -382,24 +382,41 @@ def _fts_phrase(query: str) -> str | None:
     return '"' + " ".join(tokens) + '"'
 
 
+# Owner-first ranking (2026-11-02 replay probes): machine-generated text outranked the owner's own words.
+# Compaction handoffs, workflow-harness tasks, delegation receipts, subagent/non-interactive/SDK sessions and
+# batch extraction prompts all quote owner text, so BM25 ranks them high, yet they answer nothing. They stay
+# searchable; they only sort after human-driven turns, across both FTS passes.
+MACHINE_PREFIXES = (
+    "[CONTEXT COMPACTION", "[PRIOR CONTEXT", "[Workflow harness", "[ASYNC DELEGATION",
+    "You are predicting which tool", "You extract ", "You are an extraction worker", "<system-reminder>",
+)
+_MACHINE_TIER = (
+    "(case when s.relationship_type = 'subagent' or s.session_kind = 'non-interactive' "
+    "or s.entrypoint like 'sdk-%' or "
+    + " or ".join("substr(m.content, 1, %d) = '%s'" % (len(p), p.replace("'", "''")) for p in MACHINE_PREFIXES)
+    + " then 1 else 0 end)"
+)
+
+
 def _ranked_candidates(conn: sqlite3.Connection, scopes: list[str], match: str,
-                       limit: int) -> list[tuple[str, dict[str, Any]]]:
+                       limit: int) -> list[tuple[str, dict[str, Any], int]]:
     """One FTS query across every granted scope, ordered by BM25 rank (scope filter stays in SQL).
     Equal ranks go to the newer message first."""
     marks = ",".join("?" * len(scopes))
     try:
         rows = conn.execute(
-            "select m.session_id, m.ordinal, s.project from messages_fts f join messages m on m.id = f.rowid "
+            "select m.session_id, m.ordinal, s.project, " + _MACHINE_TIER + " from messages_fts f "
+            "join messages m on m.id = f.rowid "
             f"join sessions s on s.id = m.session_id where messages_fts match ? and s.project in ({marks}) "
             "and m.is_system = 0 and m.role in ('user', 'assistant') "
-            "order by f.rank, m.timestamp desc, m.id desc limit ?",
+            "order by " + _MACHINE_TIER + ", f.rank, m.timestamp desc, m.id desc limit ?",
             (match, *scopes, limit)).fetchall()
     except sqlite3.Error:
         raise BackendUnavailable("sqlite_unavailable") from None
     out = []
-    for session_id, ordinal, project in rows:
+    for session_id, ordinal, project, machine in rows:
         try:
-            out.append((project, _native_id(session_id, ordinal)))
+            out.append((project, _native_id(session_id, ordinal), int(machine)))
         except BackendUnavailable:
             continue
     return out
@@ -424,26 +441,30 @@ def _search_sqlite(query: str, grants: list[dict[str, Any]], limit: int, deadlin
         per_session: dict[str, int] = {}
         seen: set[tuple[str, int]] = set()
         passes = [m for m in (phrase_match, token_match) if m is not None]
-        for match in passes:
-            for project, native in _ranked_candidates(conn, list(by_scope), match, limit * 8):
-                key = (native["session_id"], native["ordinal"])
-                if key in seen:
+        # Human-driven turns from either pass come before machine text from either pass; within a tier the
+        # phrase pass still leads and each pass keeps its BM25 order (stable sort).
+        ranked = [(machine, i, project, native) for i, match in enumerate(passes)
+                  for project, native, machine in _ranked_candidates(conn, list(by_scope), match, limit * 8)]
+        ranked.sort(key=lambda r: (r[0], r[1]))
+        for _machine, _pass, project, native in ranked:
+            key = (native["session_id"], native["ordinal"])
+            if key in seen:
+                continue
+            seen.add(key)
+            if per_session.get(native["session_id"], 0) >= _PER_SESSION:
+                continue
+            for grant in by_scope.get(project, []):
+                try:
+                    original = _original_sqlite(grant, native, conn)
+                except BackendIdentityDenied:
+                    raise
+                except (BackendDenied, BackendStale):
                     continue
-                seen.add(key)
-                if per_session.get(native["session_id"], 0) >= _PER_SESSION:
-                    continue
-                for grant in by_scope.get(project, []):
-                    try:
-                        original = _original_sqlite(grant, native, conn)
-                    except BackendIdentityDenied:
-                        raise
-                    except (BackendDenied, BackendStale):
-                        continue
-                    output.append(original)
-                    per_session[native["session_id"]] = per_session.get(native["session_id"], 0) + 1
-                    break
-                if len(output) >= limit:
-                    return output
+                output.append(original)
+                per_session[native["session_id"]] = per_session.get(native["session_id"], 0) + 1
+                break
+            if len(output) >= limit:
+                return output
         return output
     finally:
         conn.close()
