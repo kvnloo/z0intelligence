@@ -1,0 +1,72 @@
+version: v0.3
+# Turbo v2 (2026-11-01): pool of measured free/fast backends for parallel small calls.
+# Probed 2026-11-01 (probes.jsonl): Groq 3 models TTFT ~0.21s, Cerebras 2 models ~0.18-0.25s.
+# Excluded: NVIDIA gpt-oss-20b (TTFT 18-29s), OpenRouter nemotron-3-super:free (no longer free),
+# Cerebras uses provider vllm + openai_compat_gateway: the router rejects its non-canonical `time_info` field otherwise.
+# OpenCode Zen free (API refuses: "free models work in OpenCode only"), DeepSeek (paid).
+listeners:
+  - name: http-8899
+    address: 0.0.0.0
+    port: 8899
+    timeout: 300s
+providers:
+  defaults:
+    model: groq-gpt-oss-20b
+  models:
+    - name: groq-gpt-oss-20b
+      provider_model_id: openai/gpt-oss-20b
+      backend_refs:
+        - {name: groq, provider: groq, api_key_env: GROQ_API_KEY, weight: 100}
+    - name: groq-gpt-oss-120b
+      provider_model_id: openai/gpt-oss-120b
+      backend_refs:
+        - {name: groq, provider: groq, api_key_env: GROQ_API_KEY, weight: 100}
+    - name: groq-qwen3.8-27b
+      provider_model_id: qwen/qwen3.8-27b
+      backend_refs:
+        - {name: groq, provider: groq, api_key_env: GROQ_API_KEY, weight: 100}
+    - name: cerebras-gpt-oss-120b
+      provider_model_id: gpt-oss-120b
+      backend_refs:
+        - {name: cerebras, provider: vllm, openai_compat_gateway: true, base_url: "https://api.cerebras.ai/v1", api_key_env: CEREBRAS_API_KEY, weight: 100}
+    - name: cerebras-qwen-3.8-27b
+      provider_model_id: qwen-3.8-27b
+      backend_refs:
+        - {name: cerebras, provider: vllm, openai_compat_gateway: true, base_url: "https://api.cerebras.ai/v1", api_key_env: CEREBRAS_API_KEY, weight: 100}
+routing:
+  modelCards:
+    - name: groq-gpt-oss-20b
+    - name: groq-gpt-oss-120b
+    - name: groq-qwen3.8-27b
+    - name: cerebras-gpt-oss-120b
+    - name: cerebras-qwen-3.8-27b
+  decisions:
+    - name: turbo-fanout
+      description: "Spread independent small calls across every fast free backend; fail over on rate limits."
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      modelRefs:
+        - {model: groq-gpt-oss-20b, use_reasoning: false}
+        - {model: groq-qwen3.8-27b, use_reasoning: false}
+        - {model: groq-gpt-oss-120b, use_reasoning: false}
+        - {model: cerebras-qwen-3.8-27b, use_reasoning: false}
+        - {model: cerebras-gpt-oss-120b, use_reasoning: false}
+      algorithm:
+        type: random
+      fallback:
+        enabled: true
+        max_attempts: 4
+        total_timeout: 60s
+        per_attempt_timeout: 30s
+        retryable_status_codes: [413, 429, 500, 502, 503, 504]
+global:
+  router:
+    fallback:
+      enabled: true
+      max_attempts: 4
+      circuit_breaker:
+        consecutive_failures: 2
+        cooldown_period: 30s
+        half_open_probes: 1
