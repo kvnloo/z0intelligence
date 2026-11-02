@@ -394,6 +394,10 @@ _MACHINE_TIER = (
     "(case when s.relationship_type = 'subagent' or s.session_kind = 'non-interactive' "
     "or s.entrypoint like 'sdk-%' or "
     + " or ".join("substr(m.content, 1, %d) = '%s'" % (len(p), p.replace("'", "''")) for p in MACHINE_PREFIXES)
+    # Injected envelopes: an all-caps bracket tag ("[IMPORTANT: ...", "[SYSTEM: ...") or an XML-ish tag
+    # ("<agent-message ...>"). The owner's own out-of-band messages keep their wrapper and stay tier 0.
+    + " or (m.content glob '[[][A-Z][A-Z]*' and substr(m.content, 1, 13) != '[OUT-OF-BAND ')"
+    + " or m.content glob '<[a-z]*'"
     + " then 1 else 0 end)"
 )
 

@@ -508,9 +508,13 @@ def test_sqlite_ranks_owner_turns_before_machine_text(native, tmp_path):
     _sqlite_archive(tmp_path, [
         ("codex:handoff", PROJECT, 1, "user", "[CONTEXT COMPACTION] summary: uniichat uniichat uniichat import", None),
         ("codex:worker", PROJECT, 1, "user", "uniichat uniichat uniichat import brief for a worker", "subagent"),
+        ("codex:skill", PROJECT, 1, "user", "[IMPORTANT: invoked skill] uniichat import uniichat import", None),
+        ("codex:handback", PROJECT, 1, "user", "<agent-message from=x> uniichat import uniichat import", None),
+        ("codex:oob", PROJECT, 1, "user", "[OUT-OF-BAND USER MESSAGE] uniichat import, are we done?", None),
         (SESSION, PROJECT, 9, "user", "did we try the uniichat handler directly after the import of chats?", None),
     ])
-    rows = backend.search_backend("agentsview", "uniichat import", [grant()], 3, 2)
-    assert rows[0]["text"].startswith("did we try the uniichat handler")
-    assert {r["text"][:20] for r in rows[1:]} == {"[CONTEXT COMPACTION]", "uniichat uniichat un"}
+    rows = backend.search_backend("agentsview", "uniichat import", [grant()], 6, 2)
+    human = {"did we try the uniichat ", "[OUT-OF-BAND USER MESSA"}
+    assert {r["text"][:24] for r in rows[:2]} == {"did we try the uniichat ", "[OUT-OF-BAND USER MESSAG"}
+    assert len(rows) == 6
 
