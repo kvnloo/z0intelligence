@@ -505,3 +505,17 @@ def sqlite_auth_ok(known: Bool, before: Nat, after: Nat) -> Bool:
 
 def sqlite_sidecar_allows(current: Bool) -> Bool:
   current
+
+
+# ------------------------------------------------------------------ O17
+# GitHub access. One account's 5000/h core budget serves every agent, so a
+# background poller (a timer-started unit) must read REST through ghcache; it
+# never falls back to api.github.com when the cache is down. Interactive
+# reads may go direct. A repo under feedback backoff (a maintainer objected to
+# how we contribute) refuses our public writes until a lesson is recorded.
+# Who is a poller, and whether a call is cached, are host facts (Python side).
+def gh_read_allows(cached: Bool, poller: Bool) -> Bool:
+  Bool.or(cached, Bool.not(poller))
+
+def gh_write_allows(backoff: Bool) -> Bool:
+  Bool.not(backoff)

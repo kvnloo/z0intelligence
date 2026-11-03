@@ -173,6 +173,12 @@ def cases(seed: int = 0, n_rand: int = 120) -> list[tuple[str, str, str, str]]:
     for current in B2:
         out.append(("O16 sidecars", "Bool", f"O.sqlite_sidecar_allows({b(current)})",
                     b(P.sqlite_sidecar_allows(current))))
+    for cached, poller in itertools.product(B2, B2):
+        out.append(("O17 read", "Bool", f"O.gh_read_allows({b(cached)}, {b(poller)})",
+                    b(P.gh_read_allows(cached, poller))))
+    for backoff in B2:
+        out.append(("O17 write", "Bool", f"O.gh_write_allows({b(backoff)})",
+                    b(P.gh_write_allows(backoff))))
     return out
 
 

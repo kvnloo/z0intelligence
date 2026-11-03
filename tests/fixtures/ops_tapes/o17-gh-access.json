@@ -1,0 +1,25 @@
+{
+  "law": "O17",
+  "kind": "gh-access",
+  "incident": "2026-11-03 gh-feedback-watch v1 ran from a 60 s systemd timer and read /notifications and thread comments straight from api.github.com with the owner's token, bypassing ghcache (the shared budgeted read proxy).",
+  "owner_message": "make sure we're using gh-contr-archive style cached api, so that we dont exhaust gh api. see the timer we setup. make sure this doesn't just ignore that....if it is able to, we need to set bend laws and actually enforce them asap",
+  "actual": "Backfill made ~150 direct core calls in 2 min; ghcache stats showed none of them. Rewritten to read only via 127.0.0.1:18090 with no token.",
+  "items": [
+    {"label": "timer poller: gh api notifications direct", "argv": ["api", "/notifications?participating=true"],
+     "facts": {"poller": true}, "expect": "routed"},
+    {"label": "timer poller: gh api with --include cannot be replayed by ghc", "argv": ["api", "-i", "repos/o/r/issues/1/comments"],
+     "facts": {"poller": true}, "expect": "refused"},
+    {"label": "timer poller: graphql query", "argv": ["api", "graphql", "-f", "query=query { viewer { login } }"],
+     "facts": {"poller": true}, "expect": "routed"},
+    {"label": "interactive agent: gh api read direct", "argv": ["api", "repos/o/r/pulls/1"],
+     "facts": {"poller": false}, "expect": "allowed"},
+    {"label": "comment on a repo under feedback backoff", "argv": ["pr", "comment", "1", "-R", "o/r", "-b", "x"],
+     "facts": {"backoff": true}, "expect": "refused"},
+    {"label": "gh api POST comment on a repo under backoff", "argv": ["api", "repos/o/r/issues/1/comments", "-f", "body=x"],
+     "facts": {"backoff": true}, "expect": "refused"},
+    {"label": "comment on a clear repo", "argv": ["issue", "comment", "1", "-R", "o/r", "-b", "x"],
+     "facts": {"backoff": false}, "expect": "allowed"},
+    {"label": "porcelain read is outside O17 (GraphQL pool)", "argv": ["pr", "view", "1", "-R", "o/r"],
+     "facts": {"poller": true}, "expect": "allowed"}
+  ]
+}

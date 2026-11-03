@@ -180,6 +180,12 @@ MUTATIONS = [
     ('O16 o16_sqlite_auth_retained', 'always refuse auth', '  Bool.and(known, Bool.not(Nat.is_gt(before, after)))', '  False{}'),
     ('O16 o16_sqlite_current_sidecar', 'always refuse sidecars', 'def sqlite_sidecar_allows(current: Bool) -> Bool:\n  current', 'def sqlite_sidecar_allows(current: Bool) -> Bool:\n  False{}'),
     ('O16 o16_sqlite_unknown_holders', 'unknown scan declared healthy', '  Bool.and(complete, Bool.not(ghosts))', '  Bool.not(ghosts)'),
+    ('O17 o17_poller_direct_read_refused', 'poller falls back to api.github.com', '  Bool.or(cached, Bool.not(poller))', '  True{}'),
+    ('O17 o17_poller_cached_read_allowed', 'cached poller reads refused', '  Bool.or(cached, Bool.not(poller))', '  Bool.and(cached, Bool.not(poller))'),
+    ('O17 o17_interactive_direct_read_allowed', 'interactive direct reads refused', '  Bool.or(cached, Bool.not(poller))', '  cached'),
+    ('O17 o17_cached_read_always_allowed', 'cache ignored for pollers', '  Bool.or(cached, Bool.not(poller))', '  Bool.not(poller)'),
+    ('O17 o17_backoff_write_refused', 'backoff ignored on write', '  Bool.not(backoff)', '  True{}'),
+    ('O17 o17_clear_write_allowed', 'every write refused', '  Bool.not(backoff)', '  False{}'),
 ]
 
 
@@ -205,7 +211,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--verdict", action="store_true")
     ap.add_argument("--out")
+    ap.add_argument("--law", help="only mutants whose law starts with this (e.g. O17)")
     args = ap.parse_args()
+    mutations = [m for m in MUTATIONS if not args.law or m[0].split()[0] == args.law]
     rows = []
     with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as td:
         work = Path(td)
@@ -215,7 +223,7 @@ def main() -> int:
         rows.append({"law": "-", "mutation": "reference (unmodified)", "proofs_check": ok,
                      "where": "" if ok else first_location(out)})
         ref = (HERE / "ops.bend").read_text()
-        for law, desc, old, new in MUTATIONS:
+        for law, desc, old, new in mutations:
             if ref.count(old) != 1:
                 rows.append({"law": law, "mutation": desc, "proofs_check": None,
                              "where": f"MUTATION DID NOT APPLY (matches: {ref.count(old)})"})
@@ -230,12 +238,12 @@ def main() -> int:
     for r in rows:
         status = {True: "PASS", False: "FAIL", None: "N/A"}[r["proofs_check"]]
         print(f"{status:4}  {r['law']:34} {r['mutation']}  {r['where']}")
-    print(f"reference passes: {ref_ok}; mutations rejected: {caught}/{len(MUTATIONS)}; laws covered: {' '.join(laws)}")
+    print(f"reference passes: {ref_ok}; mutations rejected: {caught}/{len(mutations)}; laws covered: {' '.join(laws)}")
     if args.out:
         Path(args.out).write_text(json.dumps({"verdict_mode": args.verdict, "rows": rows,
-                                              "rejected": caught, "total": len(MUTATIONS),
+                                              "rejected": caught, "total": len(mutations),
                                               "reference_restored": True}, indent=2) + "\n")
-    return 0 if ref_ok and caught == len(MUTATIONS) else 1
+    return 0 if ref_ok and caught == len(mutations) else 1
 
 
 if __name__ == "__main__":

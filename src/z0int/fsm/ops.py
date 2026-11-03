@@ -413,3 +413,12 @@ def sqlite_auth_ok(known: bool, before: int, after: int) -> bool:
 
 def sqlite_sidecar_allows(current: bool) -> bool:
     return current
+
+
+# O17: GitHub access. Pollers read REST only through ghcache; backoff refuses writes.
+def gh_read_allows(cached: bool, poller: bool) -> bool:
+    return cached or not poller
+
+
+def gh_write_allows(backoff: bool) -> bool:
+    return not backoff

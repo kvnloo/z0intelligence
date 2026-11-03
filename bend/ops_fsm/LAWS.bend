@@ -540,3 +540,25 @@ law o16_sqlite_current_sidecar:
 law o16_sqlite_unknown_holders:
   for ghosts: Bool
   {O.sqlite_holders_ok(False{}, ghosts) == False{} : Bool}
+
+
+# O17: background pollers read GitHub only through ghcache (no direct
+# fallback); interactive reads may go direct; feedback backoff refuses writes.
+law o17_poller_direct_read_refused:
+  {O.gh_read_allows(False{}, True{}) == False{} : Bool}
+
+law o17_poller_cached_read_allowed:
+  {O.gh_read_allows(True{}, True{}) == True{} : Bool}
+
+law o17_interactive_direct_read_allowed:
+  {O.gh_read_allows(False{}, False{}) == True{} : Bool}
+
+law o17_cached_read_always_allowed:
+  for poller: Bool
+  {O.gh_read_allows(True{}, poller) == True{} : Bool}
+
+law o17_backoff_write_refused:
+  {O.gh_write_allows(True{}) == False{} : Bool}
+
+law o17_clear_write_allowed:
+  {O.gh_write_allows(False{}) == True{} : Bool}

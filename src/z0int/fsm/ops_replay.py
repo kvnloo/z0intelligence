@@ -192,8 +192,23 @@ def _o16(t):
     return rows, {"items": len(rows), "ok": ok}
 
 
+def _o17(t):
+    from .gh_route import classify, decision
+    rows, ok = [], True
+    for item in t["items"]:
+        c = classify(item["argv"])
+        f = item["facts"]
+        d = decision(c["op"], f.get("poller", False), f.get("cached", False), f.get("backoff", False))
+        route = "ghc" if (not d["allowed"] and c["routable"]) else None
+        outcome = "allowed" if d["allowed"] else ("routed" if route else "refused")
+        rows.append({"label": item["label"], "outcome": outcome, "law": d["law"]})
+        ok &= outcome == item["expect"]
+    return rows, {"items": len(rows), "ok": ok}
+
+
 KINDS = {"commands": _o1, "reflog": _o2, "rollout": _o3, "push": _o4, "phone": _o5, "a11y": _o6,
-         "routing": _o7, "health": _o8, "gateway": _o9, "sqlite-store": _o16}
+         "routing": _o7, "health": _o8, "gateway": _o9, "sqlite-store": _o16,
+         "gh-access": _o17}
 
 
 def replay(path: str) -> dict:
