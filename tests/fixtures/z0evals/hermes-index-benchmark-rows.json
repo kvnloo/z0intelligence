@@ -1,0 +1,269 @@
+{
+ "schema": "z0int.external-benchmark-rows.v1",
+ "snapshot": {
+  "source_url": "https://portal.nousresearch.com/bench",
+  "captured_at": "2026-11-03T20:32:51Z",
+  "raw_sha256": "75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+  "evidence_status": "source-reported"
+ },
+ "use_rule": "Prior only. A Hermes Index or suite score is never p_accept for a routing task class; it is an external_benchmark row with its source and capture time.",
+ "skipped": [
+  {
+   "model": "Nemotron Super 3.5",
+   "reason": "catalog lists only nemotron-3.5-super-vl; whether the page's 'Nemotron Super 3.5' is the -vl checkpoint is not stated"
+  }
+ ],
+ "rows": [
+  {
+   "provider": "anthropic",
+   "model": "claude-opus-5-5",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.hermes_index.mean",
+   "benchmark": "Hermes Index (Hermes Agent harness, pass@1, source-reported)",
+   "score": 63.31,
+   "unit": "percent"
+  },
+  {
+   "provider": "anthropic",
+   "model": "claude-opus-5-5",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.hermes_index.mean",
+   "benchmark": "Hermes Index cost per task [provisional]",
+   "score": 4.99,
+   "unit": "USD_per_task"
+  },
+  {
+   "provider": "anthropic",
+   "model": "claude-opus-5-5",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.hermes_bench",
+   "benchmark": "Hermes Bench (Hermes Agent harness, pass@1, source-reported)",
+   "score": 76.73,
+   "unit": "percent"
+  },
+  {
+   "provider": "anthropic",
+   "model": "claude-opus-5-5",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.hermes_bench",
+   "benchmark": "Hermes Bench cost per task",
+   "score": 0.516,
+   "unit": "USD_per_task"
+  },
+  {
+   "provider": "anthropic",
+   "model": "claude-opus-5-5",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.terminalbench_4",
+   "benchmark": "TerminalBench 4 (Hermes Agent harness, pass@1, source-reported)",
+   "score": 54.0,
+   "unit": "percent"
+  },
+  {
+   "provider": "anthropic",
+   "model": "claude-opus-5-5",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.terminalbench_4",
+   "benchmark": "TerminalBench 4 cost per task [provisional]",
+   "score": 6.27,
+   "unit": "USD_per_task"
+  },
+  {
+   "provider": "anthropic",
+   "model": "claude-opus-5-5",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.terminalbench_science",
+   "benchmark": "TerminalBench Science (Hermes Agent harness, pass@1, source-reported)",
+   "score": 52.9,
+   "unit": "percent"
+  },
+  {
+   "provider": "anthropic",
+   "model": "claude-opus-5-5",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.terminalbench_science",
+   "benchmark": "TerminalBench Science cost per task",
+   "score": 12.65,
+   "unit": "USD_per_task"
+  },
+  {
+   "provider": "anthropic",
+   "model": "claude-opus-5-5",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.skillsbench",
+   "benchmark": "SkillsBench (clean) (Hermes Agent harness, pass@1, source-reported)",
+   "score": 69.6,
+   "unit": "percent"
+  },
+  {
+   "provider": "anthropic",
+   "model": "claude-opus-5-5",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.skillsbench",
+   "benchmark": "SkillsBench (clean) cost per task",
+   "score": 0.51,
+   "unit": "USD_per_task"
+  },
+  {
+   "provider": "openai-codex",
+   "model": "gpt-6.1-sol",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.hermes_index.mean",
+   "benchmark": "Hermes Index (Hermes Agent harness, pass@1, source-reported)",
+   "score": 57.09,
+   "unit": "percent"
+  },
+  {
+   "provider": "openai-codex",
+   "model": "gpt-6.1-sol",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.hermes_index.mean",
+   "benchmark": "Hermes Index cost per task",
+   "score": 1.19,
+   "unit": "USD_per_task"
+  },
+  {
+   "provider": "openai-codex",
+   "model": "gpt-6.1-sol",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.hermes_bench",
+   "benchmark": "Hermes Bench (Hermes Agent harness, pass@1, source-reported)",
+   "score": 73.93,
+   "unit": "percent"
+  },
+  {
+   "provider": "openai-codex",
+   "model": "gpt-6.1-sol",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.hermes_bench",
+   "benchmark": "Hermes Bench cost per task",
+   "score": 0.26,
+   "unit": "USD_per_task"
+  },
+  {
+   "provider": "openai-codex",
+   "model": "gpt-6.1-sol",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.terminalbench_4",
+   "benchmark": "TerminalBench 4 (Hermes Agent harness, pass@1, source-reported)",
+   "score": 50.8,
+   "unit": "percent"
+  },
+  {
+   "provider": "openai-codex",
+   "model": "gpt-6.1-sol",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.terminalbench_4",
+   "benchmark": "TerminalBench 4 cost per task",
+   "score": 1.62,
+   "unit": "USD_per_task"
+  },
+  {
+   "provider": "openai-codex",
+   "model": "gpt-6.1-sol",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.terminalbench_science",
+   "benchmark": "TerminalBench Science (Hermes Agent harness, pass@1, source-reported)",
+   "score": 51.4,
+   "unit": "percent"
+  },
+  {
+   "provider": "openai-codex",
+   "model": "gpt-6.1-sol",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.terminalbench_science",
+   "benchmark": "TerminalBench Science cost per task",
+   "score": 2.46,
+   "unit": "USD_per_task"
+  },
+  {
+   "provider": "openai-codex",
+   "model": "gpt-6.1-sol",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.skillsbench",
+   "benchmark": "SkillsBench (clean) (Hermes Agent harness, pass@1, source-reported)",
+   "score": 52.3,
+   "unit": "percent"
+  },
+  {
+   "provider": "openai-codex",
+   "model": "gpt-6.1-sol",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.skillsbench",
+   "benchmark": "SkillsBench (clean) cost per task",
+   "score": 0.417,
+   "unit": "USD_per_task"
+  },
+  {
+   "provider": "opencode-zen",
+   "model": "deepseek-v4.1-flash-free",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.hermes_index.mean",
+   "benchmark": "Hermes Index (Hermes Agent harness, pass@1, source-reported) [free variant: same family, endpoint weights unverified]",
+   "score": 36.91,
+   "unit": "percent"
+  },
+  {
+   "provider": "opencode-zen",
+   "model": "deepseek-v4.1-flash-free",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.hermes_bench",
+   "benchmark": "Hermes Bench (Hermes Agent harness, pass@1, source-reported) [free variant: same family, endpoint weights unverified]",
+   "score": 70.74,
+   "unit": "percent"
+  },
+  {
+   "provider": "opencode-zen",
+   "model": "deepseek-v4.1-flash-free",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.terminalbench_4",
+   "benchmark": "TerminalBench 4 (Hermes Agent harness, pass@1, source-reported) [free variant: same family, endpoint weights unverified]",
+   "score": 17.5,
+   "unit": "percent"
+  },
+  {
+   "provider": "opencode-zen",
+   "model": "deepseek-v4.1-flash-free",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.terminalbench_science",
+   "benchmark": "TerminalBench Science (Hermes Agent harness, pass@1, source-reported) [free variant: same family, endpoint weights unverified]",
+   "score": 2.9,
+   "unit": "percent"
+  },
+  {
+   "provider": "opencode-zen",
+   "model": "deepseek-v4.1-flash-free",
+   "source": "https://portal.nousresearch.com/bench#captured=2026-11-03T20:32:51Z&sha256=75e80754e88f0fe80af4822edcb0fdd95602ed6e46a701bbeb7a557f263f73bb",
+   "observed_at": "2026-11-03T20:32:51Z",
+   "task_class": "external.skillsbench",
+   "benchmark": "SkillsBench (clean) (Hermes Agent harness, pass@1, source-reported) [free variant: same family, endpoint weights unverified]",
+   "score": 56.5,
+   "unit": "percent"
+  }
+ ],
+ "fixture_note": "Subset of z0evals studies/hermes-index-prior-v0/data/benchmark-rows-20261103T2032Z.json (3 identities)"
+}
