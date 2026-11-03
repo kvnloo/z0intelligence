@@ -45,15 +45,16 @@ cd "$HERE"
 # until its 600s timeout after a rollout. Bound it and gate on the Deployment rollout instead.
 LOG=$(mktemp)
 set +e
-timeout 180 "$ENV_PY" "$ENV_EXEC" --allow GROQ_API_KEY --allow CEREBRAS_API_KEY -- \
+timeout 180 "$ENV_PY" "$ENV_EXEC" --allow GROQ_API_KEY --allow CEREBRAS_API_KEY --allow NVIDIA_API_KEY --allow OPENROUTER_API_KEY --allow GEMINI_API_KEY -- \
   env PATH="$(dirname "$VSR"):$HOME/.local/bin:$PATH" KUBECONFIG="$KUBECONFIG" \
   "$VSR" serve --target kubernetes --config "$CFG" --chart-dir "$CHART" --namespace vllm-sr \
   --profile dev --platform cpu --minimal > "$LOG" 2>&1
 rc=$?
 set -e
 grep -v API_KEY "$LOG" | grep -E 'upgraded|deployed|rror' || true
-# 124 = our timeout cut the CLI's pod wait after helm finished; anything else non-zero is a real failure.
-if [[ $rc -ne 0 && $rc -ne 124 ]] || ! grep -qE 'has been upgraded|Install complete|deployed successfully' "$LOG"; then
+# Helm's success line is the contract. After it, any CLI exit (124 = our timeout, 1 = its pod wait hit the
+# deleted outgoing pod: "kubectl wait failed ... NotFound") is the CLI's wait, not the deploy; the rollout gate below decides.
+if ! grep -qE 'has been upgraded|Install complete|deployed successfully' "$LOG"; then
   echo "deploy failed (rc=$rc); log: $LOG" >&2; exit 1
 fi
 rm -f "$LOG"
