@@ -170,7 +170,7 @@ recipes:
             per_attempt_timeout: 900s
             retryable_status_codes: [401, 403, 408, 429, 500, 502, 503, 504, 529]
   - name: private
-    description: "O18 paid lane for T1 personal data: Claude Opus -> ChatGPT Sol only (pol-1.2 lists Claude/ChatGPT/Codex; Grok is not approved for T1)."
+    description: "O18 paid lane for T1 personal data: Claude Opus -> ChatGPT Sol -> Grok (owner approved Grok for T1 2026-11-03)."
     routing:
       decisions:
         - name: private
@@ -182,11 +182,12 @@ recipes:
           modelRefs:
             - {model: paid-claude-opus-5-5, use_reasoning: false}
             - {model: paid-gpt-6.1-sol, use_reasoning: false}
+            - {model: paid-grok-4.7, use_reasoning: false}
           algorithm:
             type: static
           fallback:
             enabled: true
-            max_attempts: 2
+            max_attempts: 3
             total_timeout: 1800s
             per_attempt_timeout: 900s
             retryable_status_codes: [401, 403, 408, 429, 500, 502, 503, 504, 529]

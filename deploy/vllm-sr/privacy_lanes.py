@@ -4,13 +4,13 @@
 The routing decision is z0intelligence O18 (bend/ops_fsm, twin z0int.fsm.ops.route): the client
 (the Hermes privacy-route plugin) picks a lane for the request's data tier and calls that lane's
 virtual model. This check is the other half: the router config must not put a backend in a lane
-that the lane's tiers may not reach (for example Grok or a train-on-prompts free model inside the
+that the lane's tiers may not reach (for example a train-on-prompts free model inside the
 T1 paid lane, or any hosted backend inside the local lane).
 
     python3 deploy/vllm-sr/privacy_lanes.py [--config deploy/vllm-sr/config.yaml] [--json]
 
 Exit 0 when every lane conforms, 1 otherwise. Backend classes come from base_url / backend name
-(pol-1.2, sft-svlm/data/privacy/README.md): local host, approved paid subscription (Claude, ChatGPT),
+(pol-1.2, sft-svlm/data/privacy/README.md): local host, approved paid subscription (Claude, ChatGPT, Grok),
 approved free (Cerebras), and everything else (public: may train on or log prompts).
 Not checked: whether the router's global fallback can leave a recipe's modelRefs (vllm-sr docs say
 fallback stays within the decision's modelRefs; re-check on upgrades).
@@ -30,7 +30,7 @@ LANES = {"vllm-sr/local": "local", "vllm-sr/private": "paid", "vllm-sr/free-priv
          "vllm-sr/turbo": "free_pub"}
 # Backend classes each lane may contain. free_pub only serves T0, so any backend is acceptable there.
 LANE_OK = {"local": {"local"}, "paid": {"paid_ok"}, "free_ok": {"free_ok"},
-           "free_pub": {"local", "paid_ok", "free_ok", "public", "paid_unlisted"}}
+           "free_pub": {"local", "paid_ok", "free_ok", "public"}}
 
 
 def backend_class(ref: dict) -> str:
@@ -38,10 +38,8 @@ def backend_class(ref: dict) -> str:
     name = ref.get("name", "")
     if url.startswith(("http://100.113.138.100:", "http://127.0.0.1:", "http://localhost:")):
         return "local"
-    if name in ("subproxy-anthropic", "subproxy-codex"):
+    if name in ("subproxy-anthropic", "subproxy-codex", "subproxy-xai"):  # Grok approved for T1 2026-11-03
         return "paid_ok"
-    if name == "subproxy-xai":
-        return "paid_unlisted"
     if "api.cerebras.ai" in url:
         return "free_ok"
     return "public"
