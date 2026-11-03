@@ -80,7 +80,7 @@ is the owner's table in `sft-svlm/data/privacy/README.md` (pol-1.2, approved 202
 | tier | lanes allowed |
 |---|---|
 | T0 public | local, paid, approved free (Cerebras), public free (may train on prompts) |
-| T1 personal | local, paid (Claude/ChatGPT/Codex), approved free |
+| T1 personal | local, paid (Claude/ChatGPT/Codex/Grok; Grok approved 2026-11-03), approved free |
 | T2 sensitive, T3 third-party, unclassified | local only |
 | T4 secret | none (refuse) |
 

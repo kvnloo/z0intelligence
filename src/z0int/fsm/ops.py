@@ -426,7 +426,7 @@ def gh_write_allows(backoff: bool) -> bool:
 
 # O18: privacy-tier model routing. Tier eligibility is the owner's table in
 # sft-svlm/data/privacy/README.md (pol-1.2, approved 2026-10-20):
-#   T0 public -> any lane; T1 personal -> local, paid subs (Claude/ChatGPT/Codex),
+#   T0 public -> any lane; T1 personal -> local, paid subs (Claude/ChatGPT/Codex/Grok),
 #   approved free (Cerebras); T2 sensitive / T3 third-party -> local only;
 #   T4 secret -> nothing. An unclassified tier is local-only.
 # Free lanes never take agentic (tool/code) work; agentic T0/T1 work never

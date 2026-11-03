@@ -525,7 +525,7 @@ def gh_write_allows(backoff: Bool) -> Bool:
 # ------------------------------------------------------------------ O18
 # Privacy-tier model routing. The owner's tier table (sft-svlm/data/privacy
 # README, pol-1.2, approved 2026-10-20): public data may go anywhere; personal
-# (T1) data to local, his paid subscriptions (Claude/ChatGPT/Codex) or the
+# (T1) data to local, his paid subscriptions (Claude/ChatGPT/Codex/Grok) or the
 # approved free lane (Cerebras), never to a free lane that may train on it;
 # sensitive (T2), third-party (T3) and unclassified data stay local; secrets
 # (T4) go to no model. Free lanes take only simple, non-agentic work. Agentic

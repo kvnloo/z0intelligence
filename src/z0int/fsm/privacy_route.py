@@ -10,7 +10,7 @@ The decision (which lane, or wait, or refuse) is ops.route. This module gathers 
 and maps the chosen lane to a vLLM Semantic Router virtual model:
 
   local     vllm-sr/local         groot llama.cpp router (never leaves the host)
-  paid      vllm-sr/private       Claude -> ChatGPT subscriptions only (no Grok: not in pol-1.2)
+  paid      vllm-sr/private       Claude -> ChatGPT -> Grok subscriptions (Grok approved for T1 2026-11-03)
   free_ok   vllm-sr/free-private  Cerebras (approved for T1 on 2026-10-20)
   free_pub  vllm-sr/turbo         Groq/NIM/OpenRouter free pools (public data only)
 
