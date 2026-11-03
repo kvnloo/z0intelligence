@@ -136,3 +136,181 @@ def test_host_overload_503_survives_split_headers_and_body(monkeypatch):
             thread.join(timeout=3)
         for _ in range(acquired):
             SLOTS.release()
+
+
+def test_idle_rejected_clients_do_not_stall_later_admissions(monkeypatch):
+    # Review of #301: the overload drain ran on the accept loop, so each
+    # rejected client that sent a partial header and went silent blocked
+    # accept() for the full drain deadline. Three such clients delayed the
+    # next admissible request by ~3 s even after a slot had freed.
+    import z0int.intelligence_service as svc
+
+    DRAINING.clear()
+    rejected = threading.Semaphore(0)
+    first_rejection = []
+    original_metric = svc.metric
+
+    def recording_metric(name, amount=1):
+        original_metric(name, amount)
+        if name == "rejected_connections_total":
+            if not first_rejection:
+                first_rejection.append(time.monotonic())
+            rejected.release()
+
+    monkeypatch.setattr(svc, "metric", recording_metric)
+
+    acquired = 0
+    server = None
+    thread = None
+    idle = []
+    try:
+        for _ in range(MAX_ACTIVE):
+            assert SLOTS.acquire(blocking=False)
+            acquired += 1
+
+        with METRIC_LOCK:
+            before_rejected = METRICS["rejected_connections_total"]
+            before_admitted = METRICS["admitted_connections_total"]
+
+        server = Service(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        for _ in range(3):
+            client = socket.create_connection(server.server_address, timeout=10)
+            idle.append(client)
+            client.sendall(b"POST /v1/plan HTTP/1.1\r\nHost: 127.0")
+
+        # All three must be rejected before the slot frees, or one of them
+        # would be admitted instead of the request under test.
+        for _ in range(3):
+            assert rejected.acquire(timeout=10)
+        SLOTS.release()
+        acquired -= 1
+
+        url = f"http://127.0.0.1:{server.server_address[1]}/healthz"
+        with urllib.request.urlopen(url, timeout=10) as response:
+            assert response.status == 200
+            assert response.read() == b'{"ok": true}'
+        elapsed = time.monotonic() - first_rejection[0]
+        assert elapsed < 1.5, f"admission stalled {elapsed:.2f}s behind idle rejected clients"
+
+        # The idle clients still get the exact overload reply once their
+        # bounded drain gives up.
+        for client in idle:
+            response = b""
+            while chunk := client.recv(65536):
+                response += chunk
+            status, _, rest = response.partition(b"\r\n")
+            headers, _, payload = rest.partition(b"\r\n\r\n")
+            header_lines = headers.split(b"\r\n")
+            assert status == b"HTTP/1.1 503 Service Unavailable"
+            assert b"Retry-After: 1" in header_lines
+            assert b"X-Z0-Execution: not_started" in header_lines
+            assert b"Content-Length: 0" in header_lines
+            assert payload == b""
+
+        with METRIC_LOCK:
+            assert METRICS["rejected_connections_total"] == before_rejected + 3
+            assert METRICS["admitted_connections_total"] == before_admitted + 1
+    finally:
+        for client in idle:
+            client.close()
+        if server is not None:
+            server.shutdown()
+            server.server_close()
+        if thread is not None:
+            thread.join(timeout=3)
+        for _ in range(acquired):
+            SLOTS.release()
+
+
+def test_exhausted_reject_drains_reply_503_without_blocking(monkeypatch):
+    import z0int.intelligence_service as svc
+
+    draining = threading.Event()
+    draining.set()
+    monkeypatch.setattr(svc, "DRAINING", draining)
+    exhausted = threading.BoundedSemaphore(1)
+    assert exhausted.acquire(blocking=False)
+    monkeypatch.setattr(svc, "REJECT_DRAINS", exhausted)
+
+    class IdleClient:
+        timeout = None
+        sent = b""
+
+        def settimeout(self, timeout):
+            self.timeout = timeout
+
+        def recv(self, size):
+            if self.timeout == 0.0:
+                raise BlockingIOError
+            raise AssertionError("blocking drain on the accept loop")
+
+        def sendall(self, data):
+            self.sent += data
+
+    server = Service.__new__(Service)
+    closed = []
+    server.shutdown_request = closed.append
+    request = IdleClient()
+    with METRIC_LOCK:
+        before_rejected = METRICS["rejected_connections_total"]
+    server.process_request(request, ("127.0.0.1", 1234))
+
+    assert closed == [request]
+    assert request.sent.startswith(b"HTTP/1.1 503 Service Unavailable\r\n")
+    assert b"\r\nX-Z0-Execution: not_started\r\n" in request.sent
+    with METRIC_LOCK:
+        assert METRICS["rejected_connections_total"] == before_rejected + 1
+
+
+def test_shutdown_waits_for_inflight_reject_drain_503(monkeypatch):
+    import z0int.intelligence_service as svc
+
+    # Withhold the declared body so the connection must be handed to a drain
+    # worker. A returned server_close() must mean its 503 and close are done.
+    draining = threading.Event()
+    draining.set()
+    monkeypatch.setattr(svc, "DRAINING", draining)
+    handed_off = threading.Event()
+    original_drain = Service.drain_and_reject
+
+    def record_handoff(self, request, data):
+        handed_off.set()
+        return original_drain(self, request, data)
+
+    monkeypatch.setattr(Service, "drain_and_reject", record_handoff)
+    server = Service(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with socket.create_connection(server.server_address, timeout=3) as client:
+            client.sendall(
+                b"POST /v1/plan HTTP/1.1\r\nHost: x\r\nContent-Length: 1\r\n\r\n"
+            )
+            assert handed_off.wait(timeout=3), "no reject-thread handoff"
+            server.shutdown()
+            server.server_close()
+
+            # Base 8852fa5 closes the server without waiting for the daemon
+            # worker's one-second drain. Do not wait for that late response.
+            client.settimeout(0.25)
+            response = b""
+            while chunk := client.recv(65536):
+                response += chunk
+
+        status, _, rest = response.partition(b"\r\n")
+        headers, separator, payload = rest.partition(b"\r\n\r\n")
+        assert status == b"HTTP/1.1 503 Service Unavailable"
+        assert separator == b"\r\n\r\n"
+        header_lines = headers.split(b"\r\n")
+        assert b"Retry-After: 1" in header_lines
+        assert b"X-Z0-Execution: not_started" in header_lines
+        assert b"Content-Length: 0" in header_lines
+        assert payload == b""
+        # The recv loop terminated on EOF, not on a timeout or reset.
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)

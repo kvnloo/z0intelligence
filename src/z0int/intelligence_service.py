@@ -112,19 +112,31 @@ def metrics_text():
 
 REJECT_DRAIN_SECONDS=1.0
 REJECT_DRAIN_BYTES=1<<20
+REJECT_DRAINS=threading.BoundedSemaphore(SOCKET_BACKLOG)
+REJECTED_REPLY=(
+    b'HTTP/1.1 503 Service Unavailable\r\n'
+    b'Retry-After: 1\r\n'
+    b'X-Z0-Execution: not_started\r\n'
+    b'Content-Length: 0\r\n'
+    b'Connection: close\r\n\r\n'
+)
 
 
-def drain_rejected_request(request, seconds=REJECT_DRAIN_SECONDS, cap=REJECT_DRAIN_BYTES):
+def drain_rejected_request(request, seconds=REJECT_DRAIN_SECONDS, cap=REJECT_DRAIN_BYTES, data=b'', stop_event=None):
     """Read and discard headers plus Content-Length body before the 503.
 
     Closing with unread request bytes makes the kernel reset the connection, so a
     client still writing (headers and body in separate sends) gets EPIPE/ECONNRESET
-    instead of the 503. Bounded by deadline and byte cap; runs on the accept loop.
+    instead of the 503. Bounded by deadline and byte cap. seconds=None reads only
+    what is already buffered, never blocking. Returns (finished, data); unfinished
+    only when seconds=None and the request is still incomplete. stop_event
+    allows server_close() to end a pending drain before its deadline.
     """
-    deadline=time.monotonic()+seconds
-    data=b''; need=None
+    deadline=None if seconds is None else time.monotonic()+seconds
+    need=None
     try:
         while len(data)<=cap:
+            if stop_event is not None and stop_event.is_set():return True,data
             if need is None and b'\r\n\r\n' in data:
                 head,_,_=data.partition(b'\r\n\r\n')
                 length=0
@@ -132,16 +144,25 @@ def drain_rejected_request(request, seconds=REJECT_DRAIN_SECONDS, cap=REJECT_DRA
                     name,_,value=line.partition(b':')
                     if name.strip().lower()==b'content-length':
                         length=int(value.strip())
-                if length<0 or len(head)+4+length>cap:return
+                if length<0 or len(head)+4+length>cap:return True,data
                 need=len(head)+4+length
-            if need is not None and len(data)>=need:return
-            remaining=deadline-time.monotonic()
-            if remaining<=0:return
-            request.settimeout(remaining)
-            chunk=request.recv(min(65536,cap+1-len(data)))
-            if not chunk:return
+            if need is not None and len(data)>=need:return True,data
+            if deadline is None:request.settimeout(0.0)
+            else:
+                remaining=deadline-time.monotonic()
+                if remaining<=0:return True,data
+                request.settimeout(min(remaining, 0.05) if stop_event is not None else remaining)
+            try:chunk=request.recv(min(65536,cap+1-len(data)))
+            except TimeoutError:
+                if stop_event is not None:continue
+                raise
+            except BlockingIOError:
+                if deadline is None:return False,data
+                raise
+            if not chunk:return True,data
             data+=chunk
-    except (OSError,ValueError):return
+        return True,data
+    except (OSError,ValueError):return True,data
     finally:request.settimeout(None)
 
 
@@ -149,24 +170,63 @@ class Service(ThreadingHTTPServer):
     daemon_threads=False
     request_queue_size=SOCKET_BACKLOG
 
+    def __init__(self, *args, **kwargs):
+        self._reject_threads_lock = threading.Lock()
+        self._reject_threads = set()
+        self._reject_stop = threading.Event()
+        super().__init__(*args, **kwargs)
+
     def process_request(self, request, address):
         if DRAINING.is_set() or not SLOTS.acquire(blocking=False):
             metric("rejected_connections_total")
-            drain_rejected_request(request)
-            try:request.sendall(
-                b'HTTP/1.1 503 Service Unavailable\r\n'
-                b'Retry-After: 1\r\n'
-                b'X-Z0-Execution: not_started\r\n'
-                b'Content-Length: 0\r\n'
-                b'Connection: close\r\n\r\n'
-            )
-            except (BrokenPipeError,ConnectionResetError):pass
-            finally:self.shutdown_request(request)
+            # Never block accept() on a slow or idle rejected client: finish
+            # what is already buffered here, hand the rest to a bounded
+            # drain thread, and skip the drain when those are exhausted.
+            finished,data=drain_rejected_request(request,None)
+            if not finished and REJECT_DRAINS.acquire(blocking=False):
+                worker = threading.Thread(target=self.drain_and_reject,args=(request,data),daemon=True)
+                with self._reject_threads_lock:
+                    self._reject_threads.add(worker)
+                    try:
+                        worker.start()
+                    except RuntimeError:
+                        self._reject_threads.discard(worker)
+                        REJECT_DRAINS.release()
+                    else:
+                        return
+            self.reject(request)
             return
         metric("admitted_connections_total")
         try:super().process_request(request,address)
         except Exception:
             SLOTS.release();raise
+
+    def drain_and_reject(self, request, data):
+        try:
+            drain_rejected_request(request,data=data,stop_event=self._reject_stop)
+            self.reject(request)
+        finally:
+            REJECT_DRAINS.release()
+            with self._reject_threads_lock:
+                self._reject_threads.discard(threading.current_thread())
+
+    def server_close(self):
+        # Reject workers are daemon threads, not ThreadingHTTPServer workers.
+        # Flush their 503s before returning from a graceful close.
+        self._reject_stop.set()
+        deadline = time.monotonic() + REJECT_DRAIN_SECONDS
+        try:
+            with self._reject_threads_lock:
+                workers = tuple(self._reject_threads)
+            for worker in workers:
+                worker.join(max(0.0, deadline - time.monotonic()))
+        finally:
+            super().server_close()
+
+    def reject(self, request):
+        try:request.sendall(REJECTED_REPLY)
+        except (BrokenPipeError,ConnectionResetError):pass
+        finally:self.shutdown_request(request)
 
     def process_request_thread(self, request, address):
         try:super().process_request_thread(request,address)
