@@ -8,7 +8,7 @@ listeners:
   - name: http-8899
     address: 0.0.0.0
     port: 8899
-    timeout: 300s
+    timeout: 1800s
 providers:
   defaults:
     model: groq-gpt-oss-20b
@@ -58,8 +58,27 @@ providers:
       provider_model_id: gemini-3.5-flash-lite
       backend_refs:
         - {name: gemini, provider: vllm, openai_compat_gateway: true, base_url: "https://generativelanguage.googleapis.com/v1beta/openai", api_key_env: GEMINI_API_KEY, weight: 100}
+    # --- paid subscriptions (2026-11-03): host sub-proxy (subproxy/sub_proxy.py) attaches the owner's
+    # Hermes-pool OAuth credentials; the router only sees VLLM_SR_SUBPROXY_TOKEN. 10.42.0.1 = groot cni0.
+    - name: paid-claude-opus-5-5
+      provider_model_id: claude-opus-5-5
+      api_format: anthropic
+      backend_refs:
+        - {name: subproxy-anthropic, provider: anthropic, base_url: "http://10.42.0.1:18800/anthropic", api_key_env: VLLM_SR_SUBPROXY_TOKEN, weight: 100}
+    - name: paid-gpt-6.1-sol
+      provider_model_id: gpt-6.1-sol
+      api_format: responses
+      backend_refs:
+        - {name: subproxy-codex, provider: openai, base_url: "http://10.42.0.1:18800/codex/v1", api_key_env: VLLM_SR_SUBPROXY_TOKEN, weight: 100}
+    - name: paid-grok-4.7
+      provider_model_id: grok-4.7
+      backend_refs:
+        - {name: subproxy-xai, provider: vllm, openai_compat_gateway: true, base_url: "http://10.42.0.1:18800/xai/v1", api_key_env: VLLM_SR_SUBPROXY_TOKEN, weight: 100}
 routing:
   modelCards:
+    - name: paid-claude-opus-5-5
+    - name: paid-gpt-6.1-sol
+    - name: paid-grok-4.7
     - name: groq-gpt-oss-20b
     - name: groq-gpt-oss-120b
     - name: groq-qwen3.8-27b
@@ -106,7 +125,31 @@ entrypoints:
     recipe: free-longctx
   - model_names: ["vllm-sr/free-public"]
     recipe: free-public
+  - model_names: ["vllm-sr/paid"]
+    recipe: paid
 recipes:
+  - name: paid
+    description: "Owner paid subscriptions for main agent turns: Claude Opus (Ultra/sub2/original pool, rotated by the sub-proxy) -> ChatGPT Sol -> Grok."
+    routing:
+      decisions:
+        - name: paid
+          description: "Ordered paid fallback; Claude first."
+          priority: 100
+          rules:
+            operator: AND
+            conditions: []
+          modelRefs:
+            - {model: paid-claude-opus-5-5, use_reasoning: false}
+            - {model: paid-gpt-6.1-sol, use_reasoning: false}
+            - {model: paid-grok-4.7, use_reasoning: false}
+          algorithm:
+            type: static
+          fallback:
+            enabled: true
+            max_attempts: 3
+            total_timeout: 1800s
+            per_attempt_timeout: 900s
+            retryable_status_codes: [401, 403, 408, 429, 500, 502, 503, 504, 529]
   - name: free-quality
     description: "Most accurate reliable free models (hard-tier 0.94-1.00, reliability >= 0.97). Easy, well-defined, non-code work only."
     routing:
