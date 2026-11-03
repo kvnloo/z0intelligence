@@ -654,6 +654,7 @@ class Catalog:
             self.sources[source]['status'] = 'rejected'
             self.issues.append({'source': source, 'issue': 'invalid_canonical_findings_chain_no_acceptance_imported'})
             return
+        self.performance_findings(findings, path, source, finding_timestamp)
         for finding in sorted(findings, key=lambda item: (finding_timestamp(item['ts']), item['id'])):
             subject, arm, measurement = finding['subject'], finding['arm'], finding['metric']
             if (finding.get('synthetic', False) or finding['evidence_class'] != 'measured'
@@ -725,6 +726,47 @@ class Catalog:
             task_row.setdefault('acceptance_findings', []).append(prior)
             task_row['p_accept'] = prior
             self.identity(row, finding_source, finding['ts'], 'exact_task_measured_acceptance_prior')
+
+    # z0evals-certified latency findings (family model.routing.performance) fill only
+    # metrics this catalog has no measurement for. Retained TTFT samples from OMP/rate
+    # ledgers stay authoritative; a battery median never overwrites them.
+    PERFORMANCE_METRICS = {'ttft_p50_ms': 'ms', 'tokens_per_second': 'output_tokens/s'}
+
+    def performance_findings(self, findings, path, source, finding_timestamp):
+        for finding in sorted(findings, key=lambda item: (finding_timestamp(item['ts']), item['id'])):
+            subject, arm, measurement = finding['subject'], finding['arm'], finding['metric']
+            name = measurement.get('name')
+            if (finding.get('synthetic', False) or finding['evidence_class'] != 'measured'
+                    or finding['source'].get('kind') != 'z0eval_result'
+                    or subject.get('family') != 'model.routing.performance'
+                    or arm.get('kind') != 'frontier' or name not in self.PERFORMANCE_METRICS
+                    or measurement.get('higher_is_better') is not (name == 'tokens_per_second')):
+                continue
+            observed = finding_timestamp(finding['ts']).timestamp()
+            if not observed <= self.now < finding_timestamp(finding['expires_at']).timestamp():
+                continue
+            value = number(measurement.get('value'))
+            if value is None or value <= 0 or type(measurement.get('n')) is not int or measurement['n'] < 1:
+                continue
+            row = self.row(arm.get('provider'), arm.get('model'))
+            if row is None:
+                self.issues.append({'source': source, 'issue': 'performance_finding_provider_not_in_catalog_scope',
+                                    'provider': arm.get('provider'), 'model': arm.get('model')})
+                continue
+            current = row['performance'][name]
+            if current['value'] is not None and current.get('basis') != 'z0eval_certified_battery_median':
+                continue
+            finding_source = source + ':' + finding['id']
+            self.sources[finding_source] = {
+                'path': str(path.resolve()), 'kind': 'canonical_performance_finding', 'finding_id': finding['id'],
+                'captured_at': self.at, 'snapshot_at': finding['ts'], 'expires_at': finding['expires_at'],
+                'original_source_path': finding['source']['path'],
+                'original_source_sha256': finding['source']['sha256'], 'status': 'canonical_chain_validated'}
+            row['performance'][name] = {**metric(value, self.PERFORMANCE_METRICS[name], finding_source, finding['ts'],
+                                                 'z0eval_certified_battery_median'),
+                                        'n': measurement['n'], 'scope_note': finding['scope_note'],
+                                        'expires_at': finding['expires_at']}
+            self.identity(row, finding_source, finding['ts'], 'z0eval_certified_measurement')
 
     def benchmarks(self, args):
         # This public claim applies only to the exact Haiku 4.5 model family.

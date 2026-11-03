@@ -1,0 +1,1041 @@
+{
+ "evidence": {
+  "grading_audit": {
+   "failed_calls": 20,
+   "regraded": 140,
+   "rejected": [],
+   "rows": 160,
+   "runner_disagreed": 0
+  },
+  "row_files": [
+   {
+    "path": "rows.jsonl",
+    "sha256": "788066d30209c2b29c12047bc94ce5b42957896dec2dd323bac61d3268fd332c"
+   }
+  ]
+ },
+ "findings": [
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-120b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 2,
+    "ci_high": 1.0,
+    "ci_low": 0.34238022750665303,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 2,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.classify"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-120b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 6,
+    "ci_high": 1.0,
+    "ci_low": 0.6096657120978346,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.extract"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-120b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 6,
+    "ci_high": 1.0,
+    "ci_low": 0.6096657120978346,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.format"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-120b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 1,
+    "ci_high": 0.5635028221864702,
+    "ci_low": 0.030053369748306635,
+    "ci_method": "wilson95",
+    "failed_calls": 5,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 0.16666666666666666
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.longctx"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-120b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 14,
+    "ci_high": 1.0,
+    "ci_low": 0.7846891972623643,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 14,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.reason"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-120b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 6,
+    "ci_high": 1.0,
+    "ci_low": 0.6096657120978346,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.verify"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-20b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 2,
+    "ci_high": 1.0,
+    "ci_low": 0.34238022750665303,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 2,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.classify"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-20b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 6,
+    "ci_high": 1.0,
+    "ci_low": 0.6096657120978346,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.extract"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-20b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 6,
+    "ci_high": 1.0,
+    "ci_low": 0.6096657120978346,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.format"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-20b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 1,
+    "ci_high": 0.5635028221864702,
+    "ci_low": 0.030053369748306635,
+    "ci_method": "wilson95",
+    "failed_calls": 5,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 0.16666666666666666
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.longctx"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-20b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 14,
+    "ci_high": 1.0,
+    "ci_low": 0.7846891972623643,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 14,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.reason"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-20b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 6,
+    "ci_high": 1.0,
+    "ci_low": 0.6096657120978346,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.verify"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "provider": "nvidia",
+    "transport": "nvidia"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 2,
+    "ci_high": 1.0,
+    "ci_low": 0.34238022750665303,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 2,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.classify"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "provider": "nvidia",
+    "transport": "nvidia"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 6,
+    "ci_high": 1.0,
+    "ci_low": 0.6096657120978346,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.extract"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "provider": "nvidia",
+    "transport": "nvidia"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 5,
+    "ci_high": 0.9699466302516935,
+    "ci_low": 0.43649717781352987,
+    "ci_method": "wilson95",
+    "failed_calls": 1,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 0.8333333333333334
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.format"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "provider": "nvidia",
+    "transport": "nvidia"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 4,
+    "ci_high": 0.9032285888942195,
+    "ci_low": 0.299993315138392,
+    "ci_method": "wilson95",
+    "failed_calls": 2,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 0.6666666666666666
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.longctx"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "provider": "nvidia",
+    "transport": "nvidia"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 10,
+    "ci_high": 0.8827862135542308,
+    "ci_low": 0.4535091567010681,
+    "ci_method": "wilson95",
+    "failed_calls": 4,
+    "higher_is_better": true,
+    "n": 14,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 0.7142857142857143
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.reason"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "provider": "nvidia",
+    "transport": "nvidia"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 3,
+    "ci_high": 0.8123836935173494,
+    "ci_low": 0.1876163064826506,
+    "ci_method": "wilson95",
+    "failed_calls": 3,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 0.5
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.verify"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3.5-super-vl:free",
+    "provider": "openrouter",
+    "transport": "openrouter"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 2,
+    "ci_high": 1.0,
+    "ci_low": 0.34238022750665303,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 2,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.classify"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3.5-super-vl:free",
+    "provider": "openrouter",
+    "transport": "openrouter"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 6,
+    "ci_high": 1.0,
+    "ci_low": 0.6096657120978346,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.extract"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3.5-super-vl:free",
+    "provider": "openrouter",
+    "transport": "openrouter"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 6,
+    "ci_high": 1.0,
+    "ci_low": 0.6096657120978346,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.format"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3.5-super-vl:free",
+    "provider": "openrouter",
+    "transport": "openrouter"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 6,
+    "ci_high": 1.0,
+    "ci_low": 0.6096657120978346,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.longctx"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3.5-super-vl:free",
+    "provider": "openrouter",
+    "transport": "openrouter"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 14,
+    "ci_high": 1.0,
+    "ci_low": 0.7846891972623643,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 14,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.reason"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3.5-super-vl:free",
+    "provider": "openrouter",
+    "transport": "openrouter"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "acceptance_kind": "rubric_draft_quality",
+    "accepted": 6,
+    "ci_high": 1.0,
+    "ci_low": 0.6096657120978346,
+    "ci_method": "wilson95",
+    "failed_calls": 0,
+    "higher_is_better": true,
+    "n": 6,
+    "name": "acceptance_rate",
+    "promotion_eligible": false,
+    "value": 1.0
+   },
+   "scope_note": "Only this frozen 20-task deterministic non-code battery (free-taskfit-v0, task set sha256 119209b5c61d), this exact provider/model route, temperature 0, streaming. A failed call counts as not accepted. Proxy for draft quality, not product success; no generalization to code, tools or other prompts.",
+   "subject": {
+    "family": "model.routing.acceptance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.verify"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-120b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "basis": "streamed first content-or-reasoning delta; min/max carried in ci_low/ci_high",
+    "ci_high": 1013.3171081542969,
+    "ci_low": 181.53142929077148,
+    "ci_method": "none",
+    "higher_is_better": false,
+    "n": 35,
+    "name": "ttft_p50_ms",
+    "value": 286.7312431335449
+   },
+   "scope_note": "Client-side TTFT from groot over the public internet for this battery; includes network RTT.",
+   "subject": {
+    "family": "model.routing.performance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.all"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-120b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "basis": "provider-reported completion_tokens / (total - ttft); includes reasoning tokens",
+    "ci_high": 508.8990426271442,
+    "ci_low": 456.84609519660165,
+    "ci_method": "none",
+    "higher_is_better": true,
+    "n": 35,
+    "name": "tokens_per_second",
+    "value": 483.2700874218704
+   },
+   "scope_note": "Median decode rate on this battery's answers; short answers understate sustained tok/s.",
+   "subject": {
+    "family": "model.routing.performance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.all"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-20b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "basis": "streamed first content-or-reasoning delta; min/max carried in ci_low/ci_high",
+    "ci_high": 1620.4893589019775,
+    "ci_low": 111.8311882019043,
+    "ci_method": "none",
+    "higher_is_better": false,
+    "n": 35,
+    "name": "ttft_p50_ms",
+    "value": 303.2553195953369
+   },
+   "scope_note": "Client-side TTFT from groot over the public internet for this battery; includes network RTT.",
+   "subject": {
+    "family": "model.routing.performance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.all"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "openai/gpt-oss-20b",
+    "provider": "groq",
+    "transport": "groq"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "basis": "provider-reported completion_tokens / (total - ttft); includes reasoning tokens",
+    "ci_high": 1077.0953544680299,
+    "ci_low": 673.4778206730803,
+    "ci_method": "none",
+    "higher_is_better": true,
+    "n": 35,
+    "name": "tokens_per_second",
+    "value": 888.1444375636748
+   },
+   "scope_note": "Median decode rate on this battery's answers; short answers understate sustained tok/s.",
+   "subject": {
+    "family": "model.routing.performance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.all"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "provider": "nvidia",
+    "transport": "nvidia"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "basis": "streamed first content-or-reasoning delta; min/max carried in ci_low/ci_high",
+    "ci_high": 3516.1495208740234,
+    "ci_low": 441.79415702819824,
+    "ci_method": "none",
+    "higher_is_better": false,
+    "n": 30,
+    "name": "ttft_p50_ms",
+    "value": 615.2034997940063
+   },
+   "scope_note": "Client-side TTFT from groot over the public internet for this battery; includes network RTT.",
+   "subject": {
+    "family": "model.routing.performance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.all"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "provider": "nvidia",
+    "transport": "nvidia"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "basis": "provider-reported completion_tokens / (total - ttft); includes reasoning tokens",
+    "ci_high": 149.31743342105975,
+    "ci_low": 18.623913132043096,
+    "ci_method": "none",
+    "higher_is_better": true,
+    "n": 30,
+    "name": "tokens_per_second",
+    "value": 83.95044283255473
+   },
+   "scope_note": "Median decode rate on this battery's answers; short answers understate sustained tok/s.",
+   "subject": {
+    "family": "model.routing.performance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.all"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3.5-super-vl:free",
+    "provider": "openrouter",
+    "transport": "openrouter"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "basis": "streamed first content-or-reasoning delta; min/max carried in ci_low/ci_high",
+    "ci_high": 2437.713623046875,
+    "ci_low": 361.8457317352295,
+    "ci_method": "none",
+    "higher_is_better": false,
+    "n": 40,
+    "name": "ttft_p50_ms",
+    "value": 452.0779848098755
+   },
+   "scope_note": "Client-side TTFT from groot over the public internet for this battery; includes network RTT.",
+   "subject": {
+    "family": "model.routing.performance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.all"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  },
+  {
+   "arm": {
+    "kind": "frontier",
+    "model": "nvidia/nemotron-3.5-super-vl:free",
+    "provider": "openrouter",
+    "transport": "openrouter"
+   },
+   "evidence_class": "measured",
+   "evidence_kind": "proxy",
+   "expires_at": "2026-11-17T20:46:57.582134Z",
+   "metric": {
+    "basis": "provider-reported completion_tokens / (total - ttft); includes reasoning tokens",
+    "ci_high": 295.655460966938,
+    "ci_low": 131.54030926348096,
+    "ci_method": "none",
+    "higher_is_better": true,
+    "n": 40,
+    "name": "tokens_per_second",
+    "value": 227.0138951262992
+   },
+   "scope_note": "Median decode rate on this battery's answers; short answers understate sustained tok/s.",
+   "subject": {
+    "family": "model.routing.performance",
+    "job": "ShadowEvals",
+    "study": "free-taskfit-v0",
+    "task": "taskfit.all"
+   },
+   "ts": "2026-11-03T20:46:57.582134Z"
+  }
+ ],
+ "gates": {
+  "authority": "not_applicable",
+  "contract": "pass",
+  "latency_tail": "not_applicable",
+  "quality_noninferiority": "not_applicable"
+ },
+ "limitations": [
+  "20 tasks; classify has 1 task, so per-family n is tasks x repeats and one task moves a family score a lot.",
+  "Free routes are shared capacity; reliability is a point-in-time measurement.",
+  "Deterministic graders measure exact-format answers, not open-ended usefulness."
+ ],
+ "run_id": "free-taskfit-pilot-20261103",
+ "schema": "z0eval.result.v1",
+ "source": {
+  "adapter": "free_taskfit",
+  "task_set_origin": "kvnloo/z0intelligence@f12b926e:deploy/vllm-sr/profiles/tasks.py",
+  "task_set_sha256": "119209b5c61d07c8ebf109aeb995b778e58fc0cd49ec6f04fa90df4b90ed987b"
+ },
+ "suite_id": "free-taskfit-v0",
+ "suite_revision": "119209b5c61d07c8ebf109aeb995b778e58fc0cd49ec6f04fa90df4b90ed987b",
+ "ts": "2026-11-03T20:46:57.582134Z",
+ "verdict": "PARTIAL"
+}
