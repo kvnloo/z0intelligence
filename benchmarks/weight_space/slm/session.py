@@ -110,6 +110,9 @@ def summarize(rows: list[dict]) -> dict:
             "no_boxed_answer": sum(r["pred"] is None and not r["cut"] for r in rows)}
 
 
+GPU_MIN_MB = int(os.environ.get("WSP_GPU_MIN_MB", "6000"))
+
+
 def _mem_available_mb() -> int:
     for ln in Path("/proc/meminfo").read_text().splitlines():
         if ln.startswith("MemAvailable:"):
@@ -120,15 +123,18 @@ def _mem_available_mb() -> int:
 def gpu_job(mode: str, req: dict, out: Path, attempts: int = 8) -> dict:
     """Run gpu.py in a subprocess. The host's agent-oom-guard may TERM it under memory pressure: wait for headroom
     (MemAvailable >= 6 GB) and retry; every attempt is logged."""
+    if os.environ.get("WSP_BACKEND", "local") == "modal" and os.environ.get("WSP_MODAL_GPU", "L4") != "local":
+        import modal_backend  # noqa: PLC0415 - optional dependency
+        return modal_backend.remote_gpu_job(mode, req, out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "request.json").write_text(json.dumps(req))
     for a in range(attempts):
         for _ in range(120):  # up to 20 min for headroom
-            if _mem_available_mb() >= 6000:
+            if _mem_available_mb() >= GPU_MIN_MB:
                 break
             time.sleep(10)
-        if _mem_available_mb() < 6000:
-            raise RuntimeError('host RAM below 6 GB for 20 minutes; GPU run not started')
+        if _mem_available_mb() < GPU_MIN_MB:
+            raise RuntimeError(f'host RAM below {GPU_MIN_MB} MB for 20 minutes; GPU run not started')
         p = subprocess.run([str(VENV / "bin" / "python"), str(HERE / "gpu.py"), mode, str(out / "request.json"),
                             str(out)], check=False, capture_output=True, text=True,
                            env={**os.environ, "TOKENIZERS_PARALLELISM": "false"})
@@ -245,7 +251,7 @@ def run_session(editor: str, target: str, passes: int, run_id: str, effort: str)
                 st["python_runs"] += 1
                 # The editor's CPU tensor analysis also needs host RAM; do not repeatedly provoke the guard.
                 for _ in range(360):
-                    if _mem_available_mb() >= 6000:
+                    if _mem_available_mb() >= GPU_MIN_MB:
                         break
                     time.sleep(10)
                 if _mem_available_mb() < 6000:

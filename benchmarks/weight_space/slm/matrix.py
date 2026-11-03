@@ -8,6 +8,7 @@ import argparse
 import json
 import subprocess
 import sys
+import os
 import time
 from pathlib import Path
 
@@ -36,15 +37,16 @@ def main():
                '--editor', editor, '--passes', str(a.passes), '--effort', 'high']
         # Admission precedes subprocess imports as well as GPU work: importing the client/model stacks can
         # itself exceed the host's headroom. After a bounded wait, exit with resumable capacity status.
+        need = int(os.environ.get('WSP_ADMIT_MB', 1500 if os.environ.get('WSP_BACKEND') == 'modal' else 6000))
         mem = 0
         for _ in range(360):
             mem = next(int(ln.split()[1]) // 1024 for ln in Path('/proc/meminfo').read_text().splitlines()
                        if ln.startswith('MemAvailable:'))
-            if mem >= 6000:
+            if mem >= need:
                 break
             time.sleep(10)
-        if mem < 6000:
-            print('CAPACITY_BLOCKED: <6 GB available for one hour; resume this matrix later', flush=True)
+        if mem < need:
+            print(f'CAPACITY_BLOCKED: <{need} MB available for one hour; resume this matrix later', flush=True)
             return 75
         print(time.strftime('%F %T'), 'START', target, editor, flush=True)
         with open(root/f'{target}__{editor}.log', 'a') as f:

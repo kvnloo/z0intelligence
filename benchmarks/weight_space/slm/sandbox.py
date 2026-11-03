@@ -5,6 +5,7 @@ save_edit, drop_edit, edited, tok, practice()."""
 from __future__ import annotations
 
 import json
+import os
 import resource
 import subprocess
 import sys
@@ -89,6 +90,9 @@ def _limits():
 
 
 def run(code: str, work: Path, model_dir: Path, practice_dir: Path, venv: Path, log: Path) -> str:
+    if os.environ.get("WSP_BACKEND", "local") == "modal":
+        t0 = time.time()
+        return _finish(_modal(code, work, model_dir), code, log, t0, backend="modal")
     py = venv / "bin" / "python"
     real_py = py.resolve()
     # the uv-managed interpreters the venv points at (bind the parent: the venv link goes through a version alias)
@@ -109,11 +113,22 @@ def run(code: str, work: Path, model_dir: Path, practice_dir: Path, venv: Path, 
         out = p.stdout + (("\n[stderr]\n" + p.stderr[-4000:]) if p.stderr.strip() else "")
     except subprocess.TimeoutExpired:
         out = f"[timed out after {TIMEOUT} s]"
+    return _finish(out, code, log, t0)
+
+
+def _modal(code: str, work: Path, model_dir: Path) -> str:
+    import modal_backend  # noqa: PLC0415 - optional dependency
+    t0 = time.time()
+    out = modal_backend.sandbox_exec(PRELUDE + "\n" + _with_last_expr(code), work, model_dir, TIMEOUT)
+    return out if time.time() - t0 < TIMEOUT + 240 else out + "\n[timed out]"
+
+
+def _finish(out: str, code: str, log: Path, t0: float, backend: str = "bwrap") -> str:
     out = out.encode("ascii", "replace").decode()
     if len(out) > MAX_OUT:
         out = out[:MAX_OUT] + f"\n[output cut at {MAX_OUT:,} characters]"
     with open(log, "a") as f:
-        f.write(json.dumps({"t": time.time(), "kind": "python", "s": round(time.time() - t0, 2), "code": code,
+        f.write(json.dumps({"t": time.time(), "kind": "python", "backend": backend, "s": round(time.time() - t0, 2), "code": code,
                             "out": out[:6000]}) + "\n")
     return out or "(no output)"
 
