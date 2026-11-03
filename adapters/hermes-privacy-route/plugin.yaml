@@ -1,0 +1,8 @@
+name: privacy-route
+version: "0.1.0"
+description: "O18 privacy-tier model routing. Picks the vLLM Semantic Router lane (local SLM, paid subscriptions, approved free, public free) for every main-turn request from the session's data tier, using the proven z0intelligence O18 table; blocks tool calls that would read T4 secrets; queues or refuses instead of falling back to a lane the tier does not allow."
+author: "kvnloo / Hermes Agent"
+provides_hooks:
+  - pre_tool_call
+provides_middleware:
+  - llm_request

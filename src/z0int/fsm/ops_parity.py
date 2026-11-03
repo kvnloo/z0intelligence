@@ -179,6 +179,26 @@ def cases(seed: int = 0, n_rand: int = 120) -> list[tuple[str, str, str, str]]:
     for backoff in B2:
         out.append(("O17 write", "Bool", f"O.gh_write_allows({b(backoff)})",
                     b(P.gh_write_allows(backoff))))
+    tiers = {P.Tier.PUBLIC: "PtPublic", P.Tier.PERSONAL: "PtPersonal", P.Tier.UNKNOWN: "PtUnknown",
+             P.Tier.SENSITIVE: "PtSensitive", P.Tier.THIRD: "PtThird", P.Tier.SECRET: "PtSecret"}
+    lanes = {P.MLane.LOCAL: "PlLocal", P.MLane.PAID: "PlPaid", P.MLane.FREE_OK: "PlFreeOk",
+             P.MLane.FREE_PUB: "PlFreePub"}
+    tasks = {P.Task.AGENTIC: "PkAgentic", P.Task.SIMPLE: "PkSimple"}
+
+    def route_str(r) -> str:
+        kind, lane = r
+        return {"use": lambda: f"ops.PrUse{{ops.{lanes[lane]}{{}}}}", "queue": lambda: "ops.PrQueue{}",
+                "refuse": lambda: "ops.PrRefuse{}"}[kind]()
+    for t, k, loc, paid, fok, fpub in itertools.product(tiers, tasks, B2, B2, B2, B2):
+        out.append(("O18 route", "O.PRoute",
+                    f"O.route(O.{tiers[t]}{{}}, O.{tasks[k]}{{}}, {b(loc)}, {b(paid)}, {b(fok)}, {b(fpub)})",
+                    route_str(P.route(t, k, loc, paid, fok, fpub))))
+    for x, y in itertools.product(tiers, tiers):
+        out.append(("O18 join", "O.PTier", f"O.tier_join(O.{tiers[x]}{{}}, O.{tiers[y]}{{}})",
+                    f"ops.{tiers[P.tier_join(x, y)]}{{}}"))
+    for t, lane in itertools.product(tiers, lanes):
+        out.append(("O18 allows", "Bool", f"O.tier_allows(O.{tiers[t]}{{}}, O.{lanes[lane]}{{}})",
+                    b(P.tier_allows(t, lane))))
     return out
 
 

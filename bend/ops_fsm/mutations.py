@@ -186,6 +186,27 @@ MUTATIONS = [
     ('O17 o17_cached_read_always_allowed', 'cache ignored for pollers', '  Bool.or(cached, Bool.not(poller))', '  Bool.not(poller)'),
     ('O17 o17_backoff_write_refused', 'backoff ignored on write', '  Bool.not(backoff)', '  True{}'),
     ('O17 o17_clear_write_allowed', 'every write refused', '  Bool.not(backoff)', '  False{}'),
+    # O18 privacy-tier model routing
+    ('O18 o18_secret_refused', 'secrets are routed like any other tier',
+     '    case PtSecret{}:\n      PrRefuse{}\n    case _:\n      route_open(t, k, loc, paid, fok, fpub)', '    case _:\n      route_open(t, k, loc, paid, fok, fpub)'),
+    ('O18 o18_route_sound', 'personal data may go to a free lane that trains on prompts',
+     '    case PlFreePub{}:\n      False{}\n    case _:\n      True{}', '    case PlFreePub{}:\n      True{}\n    case _:\n      True{}'),
+    ('O18 o18_route_sound', 'sensitive and unknown tiers may use the cloud',
+     '    case PtSecret{}:\n      False{}\n    case _:\n      local_lane(l)', '    case PtSecret{}:\n      False{}\n    case _:\n      True{}'),
+    ('O18 o18_free_never_agentic', 'agentic work routed like simple work (free lanes first)',
+     '    case PkAgentic{}:\n      agentic_by(tier_allows(t, PlPaid{}), t, loc, paid)', '    case PkAgentic{}:\n      route_simple(t, loc, paid, fok, fpub)'),
+    ('O18 o18_agentic_no_weak_fallback', 'agentic personal work falls back to the local model',
+     '      pick(lane_ok(t, PkAgentic{}, PlPaid{}, paid), PlPaid{}, PrQueue{})', '      pick(lane_ok(t, PkAgentic{}, PlPaid{}, paid), PlPaid{}, pick(lane_ok(t, PkAgentic{}, PlLocal{}, loc), PlLocal{}, PrQueue{}))'),
+    ('O18 o18_sensitive_waits_without_local', 'lane availability is ignored',
+     '  Bool.and(up, Bool.and(tier_allows(t, l), task_fits(k, l)))', '  Bool.and(tier_allows(t, l), task_fits(k, l))'),
+    ('O18 o18_public_simple_prefers_free', 'public free lane preferred over the approved one',
+     '  pick(lane_ok(t, PkSimple{}, PlFreeOk{}, fok), PlFreeOk{},\n    pick(lane_ok(t, PkSimple{}, PlFreePub{}, fpub), PlFreePub{},', '  pick(lane_ok(t, PkSimple{}, PlFreePub{}, fpub), PlFreePub{},\n    pick(lane_ok(t, PkSimple{}, PlFreeOk{}, fok), PlFreeOk{},'),
+    ('O18 o18_join_sound_right', 'taint join ignores the second tier',
+     '  join_by(Nat.is_gt(tier_rank(b), tier_rank(a)), a, b)', '  join_by(False{}, a, b)'),
+    ('O18 o18_join_secret', 'secret ranks below third-party data',
+     '    case PtSecret{}:\n      5n', '    case PtSecret{}:\n      3n'),
+    ('O18 o18_unknown_agentic_local', 'unclassified data counts as personal',
+     '    case PtPersonal{}:\n      personal_allows(l)\n    case PtSecret{}:', '    case PtPersonal{}:\n      personal_allows(l)\n    case PtUnknown{}:\n      personal_allows(l)\n    case PtSecret{}:'),
 ]
 
 
