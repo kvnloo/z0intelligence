@@ -54,29 +54,18 @@ providers:
       provider_model_id: dots-studio/dots-3-note-preview:free
       backend_refs:
         - {name: openrouter, provider: vllm, openai_compat_gateway: true, base_url: "https://openrouter.ai/api/v1", api_key_env: OPENROUTER_API_KEY, weight: 100}
-    - name: gemini-3.5-flash-lite
-      provider_model_id: gemini-3.5-flash-lite
-      backend_refs:
-        - {name: gemini, provider: vllm, openai_compat_gateway: true, base_url: "https://generativelanguage.googleapis.com/v1beta/openai", api_key_env: GEMINI_API_KEY, weight: 100}
     # --- paid subscriptions (2026-11-03): host sub-proxy (subproxy/sub_proxy.py) attaches the owner's
     # Hermes-pool OAuth credentials; the router only sees VLLM_SR_SUBPROXY_TOKEN. 10.42.0.1 = groot cni0.
-    - name: paid-claude-opus-5-5
-      provider_model_id: claude-opus-5-5
-      api_format: anthropic
-      backend_refs:
-        - {name: subproxy-anthropic, provider: anthropic, base_url: "http://10.42.0.1:18800/anthropic", api_key_env: VLLM_SR_SUBPROXY_TOKEN, weight: 100}
     - name: paid-gpt-6.1-sol
       provider_model_id: gpt-6.1-sol
-      api_format: responses
       backend_refs:
-        - {name: subproxy-codex, provider: openai, base_url: "http://10.42.0.1:18800/codex/v1", api_key_env: VLLM_SR_SUBPROXY_TOKEN, weight: 100}
+        - {name: subproxy-codexchat, provider: vllm, openai_compat_gateway: true, base_url: "http://10.42.0.1:18800/codexchat/v1", api_key_env: VLLM_SR_SUBPROXY_TOKEN, weight: 100}
     - name: paid-grok-4.7
       provider_model_id: grok-4.7
       backend_refs:
         - {name: subproxy-xai, provider: vllm, openai_compat_gateway: true, base_url: "http://10.42.0.1:18800/xai/v1", api_key_env: VLLM_SR_SUBPROXY_TOKEN, weight: 100}
 routing:
   modelCards:
-    - name: paid-claude-opus-5-5
     - name: paid-gpt-6.1-sol
     - name: paid-grok-4.7
     - name: groq-gpt-oss-20b
@@ -89,7 +78,6 @@ routing:
     - name: or-nemotron-3-ultra-free
     - name: or-nemotron-3.5-super-vl-free
     - name: or-dots-3-note-free
-    - name: gemini-3.5-flash-lite
   decisions:
     - name: turbo-fanout
       description: "Spread independent small calls across every fast free backend; fail over on rate limits."
@@ -123,23 +111,20 @@ entrypoints:
     recipe: free-verify
   - model_names: ["vllm-sr/free-longctx"]
     recipe: free-longctx
-  - model_names: ["vllm-sr/free-public"]
-    recipe: free-public
   - model_names: ["vllm-sr/paid"]
     recipe: paid
 recipes:
   - name: paid
-    description: "Owner paid subscriptions for main agent turns: Claude Opus (Ultra/sub2/original pool, rotated by the sub-proxy) -> ChatGPT Sol -> Grok."
+    description: "Owner paid subscriptions: ChatGPT Sol -> Grok. Claude is NOT routed here: Anthropic bills router-shaped requests as third-party usage (extra usage, not plan limits; 400 seen 2026-11-03), so Claude turns stay on Hermes' direct Anthropic provider."
     routing:
       decisions:
         - name: paid
-          description: "Ordered paid fallback; Claude first."
+          description: "Ordered paid fallback: ChatGPT first, then Grok."
           priority: 100
           rules:
             operator: AND
             conditions: []
           modelRefs:
-            - {model: paid-claude-opus-5-5, use_reasoning: false}
             - {model: paid-gpt-6.1-sol, use_reasoning: false}
             - {model: paid-grok-4.7, use_reasoning: false}
           algorithm:
@@ -234,26 +219,6 @@ recipes:
             - {model: or-nemotron-3-ultra-free, use_reasoning: false}
             - {model: nim-nemotron-3-ultra, use_reasoning: false}
             - {model: or-dots-3-note-free, use_reasoning: false}
-          algorithm:
-            type: random
-          fallback:
-            enabled: true
-            max_attempts: 3
-            total_timeout: 240s
-            per_attempt_timeout: 120s
-            retryable_status_codes: [408, 413, 429, 500, 502, 503, 504]
-  - name: free-public
-    description: "Gemini free tier. Google may use prompts for training: scrubbed, non-private inputs only."
-    routing:
-      decisions:
-        - name: free-public
-          description: "Gemini free tier. Google may use prompts for training: scrubbed, non-private inputs only."
-          priority: 100
-          rules:
-            operator: AND
-            conditions: []
-          modelRefs:
-            - {model: gemini-3.5-flash-lite, use_reasoning: false}
           algorithm:
             type: random
           fallback:

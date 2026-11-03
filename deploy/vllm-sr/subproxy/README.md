@@ -1,8 +1,15 @@
 # Sub-proxy: paid subscription lanes for the router
 
-`vllm-sr/paid` routes main agent turns to the owner's subscriptions in a fixed order:
-Claude Opus 5.5, then ChatGPT `gpt-6.1-sol`, then Grok 4.7 (`algorithm: static` plus
-fallback on 401/403/408/429/5xx/529).
+`vllm-sr/paid` routes to the owner's subscriptions in a fixed order: ChatGPT `gpt-6.1-sol`,
+then Grok 4.7 (`algorithm: static` plus fallback on 401/403/408/429/5xx/529). groot and the
+MBP share it: the MBP reaches the router through `router_gateway.py`
+(`http://100.113.138.100:8898/v1`, bearer `VLLM_SR_CLIENT_TOKEN`).
+
+**Claude is not routed.** When the router translates a real Hermes request, Anthropic answers
+`400 "Third-party apps now draw from your extra usage, not your plan limits"`. Small curl
+probes still pass, but agent turns would bill extra usage. Claude turns therefore stay on
+Hermes' direct Anthropic provider. The `/anthropic` lane is kept only for probes. Don't try
+to make router-shaped requests look like Claude Code to get around this.
 
 The router pod never holds a subscription credential. It calls this host proxy with
 `VLLM_SR_SUBPROXY_TOKEN`. The proxy then attaches the live OAuth credential from the Hermes
@@ -12,6 +19,7 @@ credential pool of the `clean` profile:
 |---|---|---|
 | `/anthropic/v1/messages` | api.anthropic.com | `anthropic` (claude-ultra, claude-sub2, ANTHROPIC_TOKEN, by priority; rotates on 429) |
 | `/codex/v1/responses` | chatgpt.com/backend-api/codex | `openai-codex` |
+| `/codexchat/v1/chat/completions` | same, through a Chat Completions facade (router uses this one) | `openai-codex` |
 | `/xai/v1/chat/completions` | api.x.ai | `xai-oauth` |
 
 - **Hermes code does the hard parts.** Selection, refresh and cooldown run through Hermes'
@@ -36,6 +44,16 @@ The token lives in bws ("Hermes keys", `VLLM_SR_SUBPROXY_TOKEN`) and in the DSH 
 `refs:`. `deploy.sh` passes it to the router Secret.
 
 ## Pitfalls
+- **The router's strict decoder rejects unknown fields.** Seen so far: Anthropic `usage.speed`,
+  `container`, `stop_details`; Codex `attribution`. The proxy whitelists Anthropic fields and
+  strips Codex ones. A new field shows in router logs as
+  `neutral_response_decode_failed ... unknown field "X"`.
+- **The router can't stream a Responses-format backend.** It decodes the body as one JSON
+  object, so a streaming client gets an empty stream (Hermes logs `EmptyStreamError` and
+  retries until it times out). That's why GPT goes through `/codexchat`, which converts
+  Responses SSE into chat.completion chunks with Hermes' own message/tool converters.
+- **The router passes the client's own Authorization header through** and puts its key in
+  `x-api-key` for Anthropic backends. The proxy accepts its token from either header.
 - **Use `HERMES_HOME` = the `clean` profile, not root `~/.hermes`.** On 2026-11-03 the
   root copy of the Codex grant was stale (`refresh_token_reused`), so `select()` tried a
   refresh, got 401 and reported every Codex credential as cooling down. The same pool

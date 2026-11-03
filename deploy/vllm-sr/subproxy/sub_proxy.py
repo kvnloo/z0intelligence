@@ -34,6 +34,7 @@ from agent.anthropic_adapter import (  # noqa: E402
 )
 from agent.codex_headers import CODEX_AUX_BASE_URL, codex_cloudflare_headers  # noqa: E402
 from agent.credential_pool import load_pool  # noqa: E402
+from agent.codex_responses_adapter import _chat_messages_to_responses_input, _responses_tools  # noqa: E402
 from hermes_cli.auth import DEFAULT_XAI_OAUTH_BASE_URL  # noqa: E402
 
 log = logging.getLogger("sub_proxy")
@@ -146,11 +147,220 @@ def build_xai(entry, body: dict, in_headers, rel: str):
     return f"{base}{rel}", headers, json.dumps(body).encode(), stream, stream
 
 
+def build_codexchat(entry, body: dict, in_headers):
+    """chat.completions request -> Codex Responses request (Hermes' own converters)."""
+    msgs = body.get("messages") or []
+    system = [m for m in msgs if m.get("role") in ("system", "developer")]
+    rest = [m for m in msgs if m.get("role") not in ("system", "developer")]
+    instr = []
+    for m in system:
+        c = m.get("content")
+        instr.append(c if isinstance(c, str) else "\n".join(p.get("text", "") for p in c or [] if isinstance(p, dict)))
+    rb = {"model": body.get("model"), "instructions": "\n\n".join(t for t in instr if t) or "You are a helpful assistant.",
+          "input": _chat_messages_to_responses_input(rest, replay_encrypted_reasoning=False),
+          "stream": True, "store": False, "parallel_tool_calls": body.get("parallel_tool_calls", True)}
+    tools = _responses_tools(body.get("tools"))
+    if tools:
+        rb["tools"] = tools
+        tc = body.get("tool_choice")
+        if isinstance(tc, str):
+            rb["tool_choice"] = tc
+        elif isinstance(tc, dict) and tc.get("function"):
+            rb["tool_choice"] = {"type": "function", "name": tc["function"].get("name")}
+    effort = body.get("reasoning_effort") or (body.get("reasoning") or {}).get("effort")
+    if effort:
+        rb["reasoning"] = {"effort": effort}
+    token = _bearer(entry)
+    headers = {"authorization": f"Bearer {token}", "content-type": "application/json", "accept": "text/event-stream"}
+    headers.update(codex_cloudflare_headers(token, base_url=CODEX_AUX_BASE_URL))
+    return f"{CODEX_AUX_BASE_URL}/responses", headers, json.dumps(rb).encode(), True, bool(body.get("stream"))
+
+
+class _ChatFromResponses:
+    """Turns Codex Responses SSE events into chat.completion chunks."""
+
+    def __init__(self, model):
+        self.model, self.id, self.created = model, "chatcmpl-subproxy", int(time.time())
+        self.tool_index: dict[str, int] = {}
+        self.usage = None
+        self.saw_tool = False
+        self.text, self.calls = [], {}
+
+    def chunk(self, delta, finish=None, usage=None):
+        c = {"id": self.id, "object": "chat.completion.chunk", "created": self.created, "model": self.model,
+             "choices": [{"index": 0, "delta": delta, "finish_reason": finish}]}
+        if usage is not None:
+            c["usage"] = usage
+        return c
+
+    def on_event(self, ev):
+        t, out = ev.get("type"), []
+        if t == "response.created":
+            self.id = (ev.get("response") or {}).get("id") or self.id
+            out.append(self.chunk({"role": "assistant", "content": ""}))
+        elif t == "response.output_text.delta":
+            self.text.append(ev.get("delta") or "")
+            out.append(self.chunk({"content": ev.get("delta") or ""}))
+        elif t == "response.output_item.added" and (ev.get("item") or {}).get("type") == "function_call":
+            it = ev["item"]
+            i = self.tool_index.setdefault(it.get("id") or it.get("call_id"), len(self.tool_index))
+            self.saw_tool = True
+            self.calls[i] = {"id": it.get("call_id"), "type": "function", "function": {"name": it.get("name"), "arguments": ""}}
+            out.append(self.chunk({"tool_calls": [{"index": i, "id": it.get("call_id"), "type": "function",
+                                                   "function": {"name": it.get("name"), "arguments": ""}}]}))
+        elif t == "response.function_call_arguments.delta":
+            i = self.tool_index.get(ev.get("item_id"), 0)
+            if i in self.calls:
+                self.calls[i]["function"]["arguments"] += ev.get("delta") or ""
+            out.append(self.chunk({"tool_calls": [{"index": i, "function": {"arguments": ev.get("delta") or ""}}]}))
+        elif t in ("response.completed", "response.incomplete"):
+            u = (ev.get("response") or {}).get("usage") or {}
+            self.usage = {"prompt_tokens": u.get("input_tokens", 0), "completion_tokens": u.get("output_tokens", 0),
+                          "total_tokens": u.get("total_tokens", 0),
+                          "prompt_tokens_details": {"cached_tokens": (u.get("input_tokens_details") or {}).get("cached_tokens", 0)},
+                          "completion_tokens_details": {"reasoning_tokens": (u.get("output_tokens_details") or {}).get("reasoning_tokens", 0)}}
+            finish = "tool_calls" if self.saw_tool else ("length" if t == "response.incomplete" else "stop")
+            out.append(self.chunk({}, finish=finish, usage=self.usage))
+            self.finish = finish
+        elif t in ("response.failed", "error"):
+            err = (ev.get("response") or {}).get("error") or ev.get("error") or ev
+            raise RuntimeError(json.dumps(err)[:300])
+        return out
+
+    def final(self):
+        msg = {"role": "assistant", "content": "".join(self.text) or None}
+        if self.calls:
+            msg["tool_calls"] = [self.calls[i] for i in sorted(self.calls)]
+        return {"id": self.id, "object": "chat.completion", "created": self.created, "model": self.model,
+                "choices": [{"index": 0, "message": msg, "finish_reason": getattr(self, "finish", "stop")}],
+                "usage": self.usage or {}}
+
+
+async def _iter_sse(resp):
+    buf = b""
+    async for chunk in resp.content.iter_any():
+        buf += chunk
+        while b"\n\n" in buf:
+            event, buf = buf.split(b"\n\n", 1)
+            for line in event.split(b"\n"):
+                if line.startswith(b"data:"):
+                    try:
+                        yield json.loads(line[5:].strip())
+                    except ValueError:
+                        pass
+
+
 LANES = {
     "anthropic": (Lane("anthropic", "anthropic"), {"/messages"}),
     "codex": (Lane("codex", "openai-codex"), {"/responses"}),
+    # Chat Completions facade over the Codex backend: the router passes OpenAI SSE through for
+    # openai-format backends, but cannot stream a Responses-format backend.
+    "codexchat": (Lane("codexchat", "openai-codex"), {"/chat/completions"}),
     "xai": (Lane("xai", "xai-oauth"), {"/chat/completions", "/responses"}),
 }
+
+
+# --- Anthropic response canonicalizer. The router's strict decoder rejects any field outside the
+# classic Messages v1 schema (seen: usage.speed, container, stop_details on Opus 5.5).
+_A_BLOCK = {"text": ("type", "text"), "tool_use": ("type", "id", "name", "input"),
+            "thinking": ("type", "thinking", "signature"), "redacted_thinking": ("type", "data")}
+_A_DELTA = {"text_delta": ("type", "text"), "input_json_delta": ("type", "partial_json"),
+            "thinking_delta": ("type", "thinking"), "signature_delta": ("type", "signature")}
+_A_USAGE = ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
+
+
+def _pick(d, keys):
+    return {k: d[k] for k in keys if isinstance(d, dict) and k in d}
+
+
+def _a_block(b):
+    return _pick(b, _A_BLOCK.get(b.get("type"), ("type",))) if isinstance(b, dict) else b
+
+
+def _a_message(m):
+    out = _pick(m, ("id", "type", "role", "model", "stop_reason", "stop_sequence"))
+    if "content" in m:
+        out["content"] = [_a_block(b) for b in m.get("content") or []]
+    if "usage" in m:
+        out["usage"] = _pick(m["usage"], _A_USAGE)
+    return out
+
+
+def canon_anthropic_event(ev: dict) -> dict:
+    t = ev.get("type")
+    if t == "message" or (t is None and "content" in ev):
+        return _a_message(ev)
+    if t == "message_start":
+        return {"type": t, "message": _a_message(ev.get("message") or {})}
+    if t == "content_block_start":
+        return {"type": t, "index": ev.get("index"), "content_block": _a_block(ev.get("content_block") or {})}
+    if t == "content_block_delta":
+        d = ev.get("delta") or {}
+        return {"type": t, "index": ev.get("index"), "delta": _pick(d, _A_DELTA.get(d.get("type"), ("type",)))}
+    if t == "content_block_stop":
+        return {"type": t, "index": ev.get("index")}
+    if t == "message_delta":
+        return {"type": t, "delta": _pick(ev.get("delta") or {}, ("stop_reason", "stop_sequence")),
+                "usage": _pick(ev.get("usage") or {}, _A_USAGE)}
+    if t in ("message_stop", "ping"):
+        return {"type": t}
+    if t == "error":
+        return {"type": t, "error": _pick(ev.get("error") or {}, ("type", "message"))}
+    return ev
+
+
+async def _relay_anthropic_sse(resp, out):
+    buf = b""
+    async for chunk in resp.content.iter_any():
+        buf += chunk
+        while b"\n\n" in buf:
+            event, buf = buf.split(b"\n\n", 1)
+            lines = []
+            for line in event.split(b"\n"):
+                if line.startswith(b"data:"):
+                    try:
+                        line = b"data: " + json.dumps(canon_anthropic_event(json.loads(line[5:].strip()))).encode()
+                    except ValueError:
+                        pass
+                lines.append(line)
+            await out.write(b"\n".join(lines) + b"\n\n")
+    if buf.strip():
+        await out.write(buf)
+
+
+# --- Responses (Codex) canonicalizer: drop fields the router's strict decoder rejects. Observed on
+# chatgpt.com/backend-api/codex (2026-11-03): "attribution", "speed". Extend from router logs
+# (`neutral_response_decode_failed ... unknown field "X"`).
+_R_DROP = {"attribution", "speed", "prompt_cache_key", "safety_identifier", "service_tier",
+           "billing", "moderation", "user_id", "conversation", "prompt_cache_retention", "background",
+           "top_logprobs", "max_tool_calls", "store", "content_filter"}
+
+
+def canon_responses(o):
+    if isinstance(o, dict):
+        return {k: canon_responses(v) for k, v in o.items() if k not in _R_DROP}
+    if isinstance(o, list):
+        return [canon_responses(v) for v in o]
+    return o
+
+
+async def _relay_codex_sse(resp, out):
+    buf = b""
+    async for chunk in resp.content.iter_any():
+        buf += chunk
+        while b"\n\n" in buf:
+            event, buf = buf.split(b"\n\n", 1)
+            lines = []
+            for line in event.split(b"\n"):
+                if line.startswith(b"data:"):
+                    try:
+                        line = b"data: " + json.dumps(canon_responses(json.loads(line[5:].strip()))).encode()
+                    except ValueError:
+                        pass
+                lines.append(line)
+            await out.write(b"\n".join(lines) + b"\n\n")
+    if buf.strip():
+        await out.write(buf)
 
 
 async def _aggregate_codex_sse(resp) -> tuple[int, bytes]:
@@ -171,7 +381,7 @@ async def _aggregate_codex_sse(resp) -> tuple[int, bytes]:
     if final is None:
         return 502, json.dumps({"error": {"message": "codex stream ended without a final response"}}).encode()
     status = 200 if final.get("status") in ("completed", "incomplete") else 502
-    return status, json.dumps(final).encode()
+    return status, json.dumps(canon_responses(final)).encode()
 
 
 def make_app(token: str) -> web.Application:
@@ -188,12 +398,15 @@ def make_app(token: str) -> web.Application:
         return web.json_response({"status": "ok", "lanes": sorted(LANES)})
 
     async def handle(request: web.Request):
+        # The router may pass the client's own Authorization through and put its configured key in
+        # x-api-key (Anthropic backends), so accept the token from either header.
         auth = request.headers.get("authorization", "")
-        presented = auth[7:] if auth.lower().startswith("bearer ") else request.headers.get("x-api-key", "")
-        if not token or not hmac.compare_digest(presented.encode(), token.encode()):
+        presented = [auth[7:] if auth.lower().startswith("bearer ") else "", request.headers.get("x-api-key", "")]
+        if not token or not any(p and hmac.compare_digest(p.encode(), token.encode()) for p in presented):
             return web.json_response({"error": {"message": "bad proxy token"}}, status=401)
         lane_name, rel = request.match_info["lane"], "/" + request.match_info["tail"]
         if lane_name not in LANES or rel not in LANES[lane_name][1]:
+            log.warning("not forwarded: %s %s", request.method, request.path)
             return web.json_response({"error": {"message": f"not forwarded: {lane_name}{rel}"}}, status=404)
         lane = LANES[lane_name][0]
         try:
@@ -211,6 +424,8 @@ def make_app(token: str) -> web.Application:
                 url, headers, data, up_stream, want_stream = build_anthropic(entry, body, request.headers)
             elif lane_name == "codex":
                 url, headers, data, up_stream, want_stream = build_codex(entry, body, request.headers)
+            elif lane_name == "codexchat":
+                url, headers, data, up_stream, want_stream = build_codexchat(entry, body, request.headers)
             else:
                 url, headers, data, up_stream, want_stream = build_xai(entry, body, request.headers, rel)
             tried.append(getattr(entry, "label", None) or entry.id)
@@ -223,19 +438,65 @@ def make_app(token: str) -> web.Application:
                 continue
             row = {"ts": t0, "lane": lane_name, "model": raw.get("model"), "credential": tried[-1],
                    "tried": tried, "status": resp.status, "stream": want_stream}
-            if lane_name == "codex" and not want_stream and resp.status == 200:
+            if lane_name == "codexchat" and resp.status == 200:
+                conv = _ChatFromResponses(raw.get("model"))
+                try:
+                    if not want_stream:
+                        async for ev in _iter_sse(resp):
+                            conv.on_event(ev)
+                        row.update(secs=round(time.time() - t0, 2))
+                        _record(row)
+                        return web.json_response(conv.final())
+                    out = web.StreamResponse(status=200, headers={"content-type": "text/event-stream", "cache-control": "no-cache"})
+                    await out.prepare(request)
+                    async for ev in _iter_sse(resp):
+                        for c in conv.on_event(ev):
+                            await out.write(b"data: " + json.dumps(c).encode() + b"\n\n")
+                    await out.write(b"data: [DONE]\n\n")
+                    await out.write_eof()
+                    row.update(secs=round(time.time() - t0, 2))
+                    _record(row)
+                    return out
+                except RuntimeError as exc:
+                    row.update(status=502, detail=str(exc))
+                    _record(row)
+                    return web.json_response({"error": {"message": str(exc)}}, status=502)
+                finally:
+                    resp.release()
+            # The router decodes Responses-format backends as one JSON object even when the client
+            # streams (it re-streams to the client itself), so the codex lane always aggregates.
+            if lane_name == "codex" and resp.status == 200:
                 status, out = await _aggregate_codex_sse(resp)
                 resp.release()
                 row.update(status=status, secs=round(time.time() - t0, 2))
                 _record(row)
                 return web.Response(status=status, body=out, content_type="application/json")
+            if lane_name == "anthropic" and resp.status == 200 and not want_stream:
+                try:
+                    body_out = json.dumps(canon_anthropic_event(json.loads(await resp.read()))).encode()
+                finally:
+                    resp.release()
+                row["secs"] = round(time.time() - t0, 2)
+                _record(row)
+                return web.Response(status=200, body=body_out, content_type="application/json")
+            if resp.status >= 400:
+                err = await resp.read()
+                resp.release()
+                row.update(secs=round(time.time() - t0, 2), detail=err[:400].decode("utf-8", "replace"))
+                _record(row)
+                return web.Response(status=resp.status, body=err, content_type="application/json")
             out = web.StreamResponse(status=resp.status)
             for k, v in resp.headers.items():
                 if k.lower() not in HOP and not k.lower().startswith(("set-cookie", "cf-", "anthropic-organization")):
                     out.headers[k] = v
             await out.prepare(request)
-            async for chunk in resp.content.iter_any():
-                await out.write(chunk)
+            if lane_name == "anthropic" and resp.status == 200:
+                await _relay_anthropic_sse(resp, out)
+            elif lane_name == "codex" and resp.status == 200:
+                await _relay_codex_sse(resp, out)
+            else:
+                async for chunk in resp.content.iter_any():
+                    await out.write(chunk)
             await out.write_eof()
             resp.release()
             row["secs"] = round(time.time() - t0, 2)
@@ -250,6 +511,7 @@ def make_app(token: str) -> web.Application:
     app.on_cleanup.append(on_cleanup)
     app.router.add_get("/health", health)
     app.router.add_post("/{lane}/v1/{tail:.*}", handle)
+    app.router.add_route("*", "/{any:.*}", lambda r: (log.warning("unrouted: %s %s", r.method, r.path), web.json_response({"error": {"message": "unrouted " + r.path}}, status=404))[1])
     return app
 
 

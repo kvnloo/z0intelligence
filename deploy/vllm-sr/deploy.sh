@@ -36,6 +36,8 @@ PY
   touch "$CACHE.tmp/.patched"
   rm -rf "$CACHE" && mv "$CACHE.tmp" "$CACHE"
 fi
+# Owner rule: no Google/Gemini route or key may ever reach the router (Gemini only via the agy CLI).
+python3 "$HERE/no_google_guard.py" "$CFG" "$0" || { echo "deploy refused by no_google_guard" >&2; exit 1; }
 CHART=$CACHE/deploy/helm/semantic-router
 REV="cfg-$(sha256sum "$CFG" | cut -c1-12)"
 sed -i -E "s/^  applyValuesRevision: .*/  applyValuesRevision: \"$REV\"/" "$CHART/values.yaml"
@@ -45,7 +47,7 @@ cd "$HERE"
 # until its 600s timeout after a rollout. Bound it and gate on the Deployment rollout instead.
 LOG=$(mktemp)
 set +e
-timeout 180 "$ENV_PY" "$ENV_EXEC" --allow GROQ_API_KEY --allow CEREBRAS_API_KEY --allow NVIDIA_API_KEY --allow OPENROUTER_API_KEY --allow GEMINI_API_KEY --allow VLLM_SR_SUBPROXY_TOKEN -- \
+timeout 180 "$ENV_PY" "$ENV_EXEC" --allow GROQ_API_KEY --allow CEREBRAS_API_KEY --allow NVIDIA_API_KEY --allow OPENROUTER_API_KEY --allow VLLM_SR_SUBPROXY_TOKEN -- \
   env PATH="$(dirname "$VSR"):$HOME/.local/bin:$PATH" KUBECONFIG="$KUBECONFIG" \
   "$VSR" serve --target kubernetes --config "$CFG" --chart-dir "$CHART" --namespace vllm-sr \
   --profile dev --platform cpu --minimal > "$LOG" 2>&1
