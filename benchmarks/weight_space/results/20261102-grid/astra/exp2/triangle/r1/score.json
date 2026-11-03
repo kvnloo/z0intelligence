@@ -1,0 +1,21 @@
+{
+ "answer_line": "Most likely, each image shows one white, approximately isosceles triangle outline on black. Its point faces upward and its base is horizontal. It occupies much of the central image: roughly 6\u201310 pixels tall and 6\u201310 pixels wide, with some variation. Larger examples extend close to the bottom edge.",
+ "predicted": "triangle",
+ "truth": "triangle",
+ "correct": true,
+ "confidence": 84.0,
+ "editor": "astra",
+ "task": "exp2/triangle",
+ "rep": 1,
+ "valid": true,
+ "audit": "item kinds=['agent_message', 'error', 'reasoning']",
+ "usage": {
+  "input_tokens": 104638,
+  "cached_input_tokens": 2432,
+  "cache_write_input_tokens": 0,
+  "output_tokens": 2484,
+  "reasoning_output_tokens": 1887
+ },
+ "wall_s": 84.1,
+ "model_observed": "gpt-6-astra"
+}

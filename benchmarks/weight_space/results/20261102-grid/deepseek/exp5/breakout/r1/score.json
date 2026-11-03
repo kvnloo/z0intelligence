@@ -1,0 +1,47 @@
+{
+ "edit_report": {
+  "block": true,
+  "statements": 27,
+  "applied": 27,
+  "errors": [],
+  "cut_off": false,
+  "tensors_touched": [
+   "W1",
+   "W2",
+   "W3",
+   "b1",
+   "b3"
+  ],
+  "nonzero_total": 190
+ },
+ "minatar": {
+  "mean": 7.602,
+  "se": 0.2534123395058216,
+  "episodes": 1000,
+  "max": 56.0,
+  "mean_length": 89.112,
+  "seed": 0,
+  "max_steps": 10000
+ },
+ "mean": 7.602,
+ "editor": "deepseek",
+ "task": "exp5/breakout",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API)",
+ "usage": {
+  "prompt_tokens": 2784,
+  "completion_tokens": 36834,
+  "total_tokens": 39618,
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 36247
+  },
+  "prompt_cache_hit_tokens": 0,
+  "prompt_cache_miss_tokens": 2784
+ },
+ "wall_s": 520.9,
+ "model_observed": "deepseek-v4-pro"
+}

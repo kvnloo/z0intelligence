@@ -1,0 +1,42 @@
+{
+ "edit_report": {
+  "block": true,
+  "statements": 100,
+  "applied": 100,
+  "errors": [],
+  "cut_off": false,
+  "tensors_touched": [
+   "W1",
+   "W2",
+   "W3",
+   "b1",
+   "b2",
+   "b3"
+  ],
+  "nonzero_total": 1708
+ },
+ "minatar": {
+  "mean": 586.358,
+  "se": 6.952789448639813,
+  "episodes": 1000,
+  "max": 802.0,
+  "mean_length": 8277.858,
+  "seed": 0,
+  "max_steps": 10000
+ },
+ "mean": 586.358,
+ "editor": "astra",
+ "task": "exp5/breakout",
+ "rep": 1,
+ "valid": true,
+ "audit": "item kinds=['agent_message', 'error', 'reasoning']",
+ "usage": {
+  "input_tokens": 10961,
+  "cached_input_tokens": 0,
+  "cache_write_input_tokens": 0,
+  "output_tokens": 28483,
+  "reasoning_output_tokens": 23717
+ },
+ "wall_s": 852.3,
+ "model_observed": "gpt-6-astra"
+}

@@ -1,0 +1,21 @@
+{
+ "answer_line": "A single hollow white square on a black background, aligned with the pixel grid. Its outline is approximately one pixel thick. Position and size vary within the image, generally leaving a black margin. A representative square is six pixels wide and six pixels tall.",
+ "predicted": "square",
+ "truth": "square",
+ "correct": true,
+ "confidence": 82.0,
+ "editor": "astra",
+ "task": "exp2/square",
+ "rep": 1,
+ "valid": true,
+ "audit": "item kinds=['agent_message', 'error', 'reasoning']",
+ "usage": {
+  "input_tokens": 104652,
+  "cached_input_tokens": 0,
+  "cache_write_input_tokens": 0,
+  "output_tokens": 1930,
+  "reasoning_output_tokens": 1444
+ },
+ "wall_s": 53.8,
+ "model_observed": "gpt-6-astra"
+}

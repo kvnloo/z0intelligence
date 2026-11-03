@@ -1,0 +1,38 @@
+{
+ "editor": "opus",
+ "model_requested": "claude-opus-5-5",
+ "model_observed": "claude-opus-5-5",
+ "text": "**Observations:**\n\n- **Indexing.** Input i = (row\u00b710 + col)\u00b75 + channel, so W1 lines 55\u201359 belong to cell (1,1), channels 0\u20134.\n- **Channel 0 (agent).**\n  - Weights are tiny (|w| < 0.2) on the whole wall border.\n  - Inside the grid, most cells have very large weights. Examples: (1,3) ch0 starts 4.742\u2026; (3,5) ch0 has \u22125.208 and 4.832; (5,7) ch0 has \u22124.928 and 5.834.\n  - A specific set of interior cells has only initialisation-sized weights for every channel. Examples: input lines 110\u2013119 (cells (2,2), (2,3)), 130\u2013139 ((2,6), (2,7)), 220\u2013229 ((4,4), (4,5)) and 270\u2013279 ((5,4), (5,5)).\n  - Mapping which interior cells are \"live\" (`.`) versus \"dead\" (`#`) gives a perfectly symmetric maze:\n    ```\n    . . . . . . . .\n    . # # . . # # .\n    . # . . . . # .\n    . . . # # . . .\n    . . . # # . . .\n    . # . . . . # .\n    . # # . . # # .\n    . . . . . . . .\n    ```\n    The agent is never seen in the `#` cells, so they behave as fixed internal walls.\n- **Channel 1 (moving objects).**\n  - Large, structured weights on the same open corridor cells. Examples: (1,4) has 3.448 on unit 12; (3,5) has 4.201 on unit 2; (5,8) has 4.226 on unit 16 and \u22125.925 on unit 19.\n  - So several moving things roam the maze, and the policy reacts strongly to where they are.\n- **Channel 2 (reward targets).**\n  - Weights are mostly modest and spread over the corridor cells.\n  - Hidden unit 6 is systematically negative on targets in the top-left area: (1,1) \u22121.49, (1,2) \u22122.36, (1,3) \u22121.91, (1,4) \u22120.88, (2,4) \u22124.876, (2,5) \u22120.854.\n  - This looks like a counter of remaining collectibles scattered through the maze, rather than a single goal.\n- **Channel 3 (obstacles).** Weights are tiny everywhere. Because the walls are fixed, this channel is constant and carries no information; the maze is instead encoded through where the agent can be.\n- **Channel 4 (previous frame).**\n  - Moderate weights in open cells, with a consistent positive weight on unit 6 (about 0.6\u20130.9). Examples: (1,3) ch4 has 1.043; (2,5) has 0.704.\n  - This lets the network infer which way the ghosts and the agent are moving.\n- **Output biases.** No-op \u22120.873 (lowest), up 0.703, down 0.712, left 0.595, right \u22120.092. Standing still is discouraged, and all four movement actions are used, as expected in maze navigation.\n\n**Reasoning:**\n\n- **Ruled out:**\n  - Catch/Breakout-style games would restrict the agent to one row.\n  - Frogger and lane-dodging games would have lane-structured hazards and a single goal row.\n  - Snake would have no fixed internal walls.\n  - A pure gridworld goal-reach game would have no moving objects.\n- **What fits:** a fixed, symmetric internal maze, the agent able to occupy every corridor cell, several moving enemies roaming the same corridors, and many scattered reward items. That is the Pac-Man formula: navigate a maze eating pellets while avoiding ghosts.\n\n**Game:** Pac-Man (a mini grid Pac-Man: fixed symmetric maze, pellets, chasing ghosts).\n\n**Description:** The agent moves through a fixed maze collecting pellets scattered along the corridors, each giving reward. It must avoid the moving ghosts, since touching one ends the episode.\n\n**Confidence:** 72%",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 79060,
+  "output_tokens": 8357,
+  "output_tokens_details": {
+   "thinking_tokens": 7021
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 72.06034708023071,
+ "exit_code": 0,
+ "tool_free": true,
+ "audit_note": "no tools offered (raw API); stop_reason=end_turn",
+ "raw_path": "/home/kvn/.z0int/state/weight-space/20261102-grid/opus/exp1/pacman/r1/response.json",
+ "extra": {
+  "stop_reason": "end_turn"
+ },
+ "valid": true,
+ "task": "exp1/pacman",
+ "rep": 1,
+ "effort": "high",
+ "prompt_sha256": "1c75e66aab1e611bdb07a87d6f70e3d2ba3d149e58f259b5ad7a485661244acf",
+ "logs_sha": "4d09ba6d6a7e891dd8063974dfe81b3d78e3494f",
+ "finished_at": "2026-11-02T23:11:05-0600"
+}

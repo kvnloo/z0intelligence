@@ -1,0 +1,49 @@
+{
+ "edit_report": {
+  "block": true,
+  "statements": 216,
+  "applied": 216,
+  "errors": [],
+  "cut_off": false,
+  "tensors_touched": [
+   "W1",
+   "W2",
+   "W3",
+   "b1",
+   "b2",
+   "b3"
+  ],
+  "nonzero_total": 1590
+ },
+ "minatar": {
+  "mean": 0.0,
+  "se": 0.0,
+  "episodes": 1000,
+  "max": 0.0,
+  "mean_length": 136.106,
+  "seed": 0,
+  "max_steps": 10000
+ },
+ "mean": 0.0,
+ "editor": "deepseek",
+ "task": "exp5/seaquest",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API)",
+ "usage": {
+  "prompt_tokens": 4895,
+  "completion_tokens": 81802,
+  "total_tokens": 86697,
+  "prompt_tokens_details": {
+   "cached_tokens": 4864
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 75807
+  },
+  "prompt_cache_hit_tokens": 4864,
+  "prompt_cache_miss_tokens": 31
+ },
+ "wall_s": 1426.7,
+ "model_observed": "deepseek-v4-pro",
+ "finish": "stop"
+}

@@ -1,0 +1,21 @@
+{
+ "answer_line": "**Pac-Man \u2014 a simplified grid-based maze, pellet-collection, and ghost-avoidance variant.**",
+ "predicted": "pacman",
+ "truth": "pacman",
+ "correct": true,
+ "confidence": 95.0,
+ "editor": "astra",
+ "task": "exp1/pacman",
+ "rep": 1,
+ "valid": true,
+ "audit": "item kinds=['agent_message', 'error', 'reasoning']",
+ "usage": {
+  "input_tokens": 78590,
+  "cached_input_tokens": 0,
+  "cache_write_input_tokens": 0,
+  "output_tokens": 1352,
+  "reasoning_output_tokens": 516
+ },
+ "wall_s": 33.1,
+ "model_observed": "gpt-6-astra"
+}

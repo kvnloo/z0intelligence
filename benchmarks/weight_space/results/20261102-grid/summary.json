@@ -1,0 +1,51 @@
+{
+ "run_id": "20261102-grid",
+ "extra": "",
+ "arms": {
+  "argon": {
+   "read_correct": 7,
+   "read_total": 7,
+   "write_mean_score": {
+    "exp5/asterix": 31.571,
+    "exp5/breakout": 61.293,
+    "exp5/seaquest": 1.762
+   }
+  },
+  "astra": {
+   "read_correct": 7,
+   "read_total": 7,
+   "write_mean_score": {
+    "exp5/asterix": 42.246,
+    "exp5/breakout": 586.358,
+    "exp5/seaquest": 43.173
+   }
+  },
+  "deepseek": {
+   "read_correct": 4,
+   "read_total": 7,
+   "write_mean_score": {
+    "exp5/asterix": 2.304,
+    "exp5/breakout": 7.602,
+    "exp5/seaquest": 0.0
+   }
+  },
+  "fable": {
+   "read_correct": 7,
+   "read_total": 7,
+   "write_mean_score": {
+    "exp5/asterix": null,
+    "exp5/breakout": null,
+    "exp5/seaquest": 0.108
+   }
+  },
+  "opus": {
+   "read_correct": 7,
+   "read_total": 7,
+   "write_mean_score": {
+    "exp5/asterix": 47.284,
+    "exp5/breakout": null,
+    "exp5/seaquest": 46.159
+   }
+  }
+ }
+}

@@ -1,0 +1,22 @@
+{
+ "answer_line": "Freeway (Atari *Freeway* / 6-lane road-crossing game, akin to the road-crossing half of *Frogger*)",
+ "predicted": "freeway",
+ "truth": "freeway",
+ "correct": true,
+ "confidence": 99.0,
+ "editor": "argon",
+ "task": "exp1/freeway",
+ "rep": 1,
+ "valid": true,
+ "audit": "status=SUCCESS step_types=['agent_response', 'user_input']",
+ "usage": {
+  "input_tokens": 112548,
+  "output_tokens": 40980,
+  "thinking_tokens": 34787,
+  "cache_read_tokens": 0,
+  "total_tokens": 153528,
+  "num_turns": 1
+ },
+ "wall_s": 357.6,
+ "model_observed": "gemini-4-argon-high"
+}

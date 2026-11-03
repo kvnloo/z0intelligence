@@ -1,0 +1,27 @@
+{
+ "answer_line": "Freeway, specifically the MinAtar/Atari-style Freeway crossing game.",
+ "predicted": "freeway",
+ "truth": "freeway",
+ "correct": true,
+ "confidence": 93.0,
+ "editor": "deepseek",
+ "task": "exp1/freeway",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API)",
+ "usage": {
+  "prompt_tokens": 70298,
+  "completion_tokens": 38173,
+  "total_tokens": 108471,
+  "prompt_tokens_details": {
+   "cached_tokens": 896
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 37143
+  },
+  "prompt_cache_hit_tokens": 896,
+  "prompt_cache_miss_tokens": 69402
+ },
+ "wall_s": 383.2,
+ "model_observed": "deepseek-v4-pro"
+}

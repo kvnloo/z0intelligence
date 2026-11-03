@@ -1,0 +1,42 @@
+{
+ "edit_report": {
+  "block": true,
+  "statements": 195,
+  "applied": 195,
+  "errors": [],
+  "cut_off": false,
+  "tensors_touched": [
+   "W1",
+   "W2",
+   "W3",
+   "b1",
+   "b2",
+   "b3"
+  ],
+  "nonzero_total": 644
+ },
+ "minatar": {
+  "mean": 43.173,
+  "se": 0.7895355833890182,
+  "episodes": 1000,
+  "max": 104.0,
+  "mean_length": 1702.384,
+  "seed": 0,
+  "max_steps": 10000
+ },
+ "mean": 43.173,
+ "editor": "astra",
+ "task": "exp5/seaquest",
+ "rep": 1,
+ "valid": true,
+ "audit": "item kinds=['agent_message', 'error', 'reasoning']",
+ "usage": {
+  "input_tokens": 12954,
+  "cached_input_tokens": 2432,
+  "cache_write_input_tokens": 0,
+  "output_tokens": 30561,
+  "reasoning_output_tokens": 26883
+ },
+ "wall_s": 1020.6,
+ "model_observed": "gpt-6-astra"
+}

@@ -1,0 +1,27 @@
+{
+ "answer_line": "Generated images show a centered, large white digit \u201c3\u201d on a black background. It occupies roughly rows 3\u20139 and columns 2\u20139 of the 12\u00d712 grid, with a thick top bar, a middle bar, a bottom bar, and an open left side.",
+ "predicted": "circle",
+ "truth": "square",
+ "correct": false,
+ "confidence": 68.0,
+ "editor": "deepseek",
+ "task": "exp2/square",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API)",
+ "usage": {
+  "prompt_tokens": 96390,
+  "completion_tokens": 57215,
+  "total_tokens": 153605,
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 56406
+  },
+  "prompt_cache_hit_tokens": 0,
+  "prompt_cache_miss_tokens": 96390
+ },
+ "wall_s": 572.8,
+ "model_observed": "deepseek-v4-pro"
+}

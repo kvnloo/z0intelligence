@@ -1,0 +1,42 @@
+{
+ "edit_report": {
+  "block": true,
+  "statements": 162,
+  "applied": 162,
+  "errors": [],
+  "cut_off": false,
+  "tensors_touched": [
+   "W1",
+   "W2",
+   "W3",
+   "b1",
+   "b2",
+   "b3"
+  ],
+  "nonzero_total": 1016
+ },
+ "minatar": {
+  "mean": 42.246,
+  "se": 0.9762707557786356,
+  "episodes": 1000,
+  "max": 157.0,
+  "mean_length": 718.034,
+  "seed": 0,
+  "max_steps": 10000
+ },
+ "mean": 42.246,
+ "editor": "astra",
+ "task": "exp5/asterix",
+ "rep": 1,
+ "valid": true,
+ "audit": "item kinds=['agent_message', 'error', 'reasoning']",
+ "usage": {
+  "input_tokens": 11045,
+  "cached_input_tokens": 10880,
+  "cache_write_input_tokens": 0,
+  "output_tokens": 26761,
+  "reasoning_output_tokens": 20941
+ },
+ "wall_s": 942.6,
+ "model_observed": "gpt-6-astra"
+}

@@ -1,0 +1,52 @@
+{
+ "edit_report": {
+  "block": true,
+  "statements": 168,
+  "applied": 168,
+  "errors": [],
+  "cut_off": false,
+  "tensors_touched": [
+   "W1",
+   "W2",
+   "W3",
+   "b1",
+   "b2",
+   "b3"
+  ],
+  "nonzero_total": 600
+ },
+ "minatar": {
+  "mean": 47.284,
+  "se": 1.054671359085699,
+  "episodes": 1000,
+  "max": 177.0,
+  "mean_length": 782.483,
+  "seed": 0,
+  "max_steps": 10000
+ },
+ "mean": 47.284,
+ "editor": "opus",
+ "task": "exp5/asterix",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 3947,
+  "output_tokens": 63828,
+  "output_tokens_details": {
+   "thinking_tokens": 58225
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 593.3,
+ "model_observed": "claude-opus-5-5"
+}

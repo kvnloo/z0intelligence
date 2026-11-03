@@ -1,0 +1,22 @@
+{
+ "answer_line": "Pac-Man",
+ "predicted": "pacman",
+ "truth": "pacman",
+ "correct": true,
+ "confidence": 99.0,
+ "editor": "argon",
+ "task": "exp1/pacman",
+ "rep": 1,
+ "valid": true,
+ "audit": "status=SUCCESS step_types=['agent_response', 'user_input']",
+ "usage": {
+  "input_tokens": 112576,
+  "output_tokens": 27543,
+  "thinking_tokens": 24216,
+  "cache_read_tokens": 0,
+  "total_tokens": 140119,
+  "num_turns": 1
+ },
+ "wall_s": 248.3,
+ "model_observed": "gemini-4-argon-high"
+}

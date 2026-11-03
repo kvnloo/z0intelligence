@@ -1,0 +1,38 @@
+{
+ "editor": "fable",
+ "model_requested": "claude-fable-5-1",
+ "model_observed": "claude-fable-5-1",
+ "text": "## Design\n\n**Strategy.** The sub never moves horizontally: it stays at column 5 facing left (its start pose), so its bullets sweep columns 4\u21920 of its own row and anything entering that \"kill zone\" from either direction dies if we keep firing. All enemies/bullets move horizontally, so a vertical step is a perfect dodge. The policy is:\n\n1. **Dive** from the surface (row 0) when row 1's right half is clear.\n2. **Hunt**: move up/down toward rows containing a target (enemy in columns 0\u20113, or a diver anywhere; divers weighted 1.5\u00d7, nearer rows weighted more), while rows containing a threat (enemy/bullet in columns 5\u20118 at distance 1, and anything near column 5 in an adjacent row) repel.\n3. **Hold & fire** when a target/diver is ahead in my own row.\n4. **Dodge** (strong vertical move) when a danger is at columns 6\u20117 of my row, an enemy bullet at columns 2\u20114, or an enemy at column 4 while my shot is on cooldown (detected by my own bullet being visible anywhere). Default dodge is up (down in row 1); adjacent\u2011row repulsion flips the direction.\n5. **Surface** when the oxygen bar is below 3 cells and the diver bar shows \u22651 diver (both readable unambiguously from gauge cells 2 and 8). \"Up\" from row 1 is blocked unless a diver is certain (gauge col 8 lit while some col 0\u20117 unlit).\n\n**Hidden units (layer 1).** Units 0\u20117: per\u2011row \"hunt direction\" h_r = tanh(signed, distance\u2011weighted sum of targets above minus below, with threat repulsion), gated to \u22480 offset only when the player is in row r (ch0 row sum = 2 \u2192 +60, bias \u221260; otherwise saturated at \u22121). Units 8\u201115: per\u2011row dodge trigger dz_r (same gating, threshold logic on danger cells + my-bullet-in-flight). Units 16\u201123: per\u2011row \"target ahead in my row\" TR_r. Unit 24: at row 0; 25: at row 0 and row 1 clear; 26: in row 1; 27: diver certain; 28: surface\u2011now (oxygen<60 & diver). Units 29\u201131 unused.\n\n**Layer 2** sums each per\u2011row family (the 7 inactive rows contribute a constant \u22127 which the bias cancels) to get U (hunt up\u2011ness, 0 at surface), DZU/DZD (dodge, dodge\u2011in\u2011row\u20111), G1 (block up in row 1 without a certain diver), dive, surface, and target\u2011ahead signals. **Layer 3** combines them: fire \u22480 idle (8 with target ahead), up/down \u2248 \u22124 idle, \u00b18\u00b7U for hunting, +17 for dodges, +16 for surfacing, +12 for diving, \u221210 gate; left/right/noop are never chosen.\n\n```edits\n# ================= Layer 1 =================\n# ---- hunt units h_r: unit j=r-1 for rows r=1..8 ----\nb1[0:8] = -60\nW1[60:120:6, 0] = 30\nW1[120:180:6, 1] = 30\nW1[180:240:6, 2] = 30\nW1[240:300:6, 3] = 30\nW1[300:360:6, 4] = 30\nW1[360:420:6, 5] = 30\nW1[420:480:6, 6] = 30\nW1[480:540:6, 7] = 30\n# unit 0 (row 1): all other rows are below\nW1[122:180:6, 0] = -3.75\nW1[121:145:6, 0] = 1.25\nW1[145, 0] = 8.75\nW1[151:163:6, 0] = 11.25\nW1[163:175:6, 0] = 6.25\nW1[175, 0] = 3.75\nW1[182:240:6, 0] = -3.0\nW1[181:205:6, 0] = 1.0\nW1[205:240:6, 0] = 3.0\nW1[242:300:6, 0] = -2.25\nW1[241:265:6, 0] = 0.75\nW1[265:300:6, 0] = 2.25\nW1[302:360:6, 0] = -1.8\nW1[301:325:6, 0] = 0.6\nW1[325:360:6, 0] = 1.8\nW1[362:420:6, 0] = -1.5\nW1[361:385:6, 0] = 0.5\nW1[385:420:6, 0] = 1.5\nW1[422:480:6, 0] = -1.2\nW1[421:445:6, 0] = 0.4\nW1[445:480:6, 0] = 1.2\nW1[482:540:6, 0] = -1.05\nW1[481:505:6, 0] = 0.35\nW1[505:540:6, 0] = 1.05\n# unit 1 (row 2)\nW1[62:120:6, 1] = 3.75\nW1[61:85:6, 1] = -1.25\nW1[85, 1] = -8.75\nW1[91:103:6, 1] = -11.25\nW1[103:115:6, 1] = -6.25\nW1[115, 1] = -3.75\nW1[182:240:6, 1] = -3.75\nW1[181:205:6, 1] = 1.25\nW1[205, 1] = 8.75\nW1[211:223:6, 1] = 11.25\nW1[223:235:6, 1] = 6.25\nW1[235, 1] = 3.75\nW1[242:300:6, 1] = -3.0\nW1[241:265:6, 1] = 1.0\nW1[265:300:6, 1] = 3.0\nW1[302:360:6, 1] = -2.25\nW1[301:325:6, 1] = 0.75\nW1[325:360:6, 1] = 2.25\nW1[362:420:6, 1] = -1.8\nW1[361:385:6, 1] = 0.6\nW1[385:420:6, 1] = 1.8\nW1[422:480:6, 1] = -1.5\nW1[421:445:6, 1] = 0.5\nW1[445:480:6, 1] = 1.5\nW1[482:540:6, 1] = -1.2\nW1[481:505:6, 1] = 0.4\nW1[505:540:6, 1] = 1.2\n# unit 2 (row 3)\nW1[62:120:6, 2] = 3.0\nW1[61:85:6, 2] = -1.0\nW1[85:120:6, 2] = -3.0\nW1[122:180:6, 2] = 3.75\nW1[121:145:6, 2] = -1.25\nW1[145, 2] = -8.75\nW1[151:163:6, 2] = -11.25\nW1[163:175:6, 2] = -6.25\nW1[175, 2] = -3.75\nW1[242:300:6, 2] = -3.75\nW1[241:265:6, 2] = 1.25\nW",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 6845,
+  "output_tokens": 128000,
+  "output_tokens_details": {
+   "thinking_tokens": 125691
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 1615.4038965702057,
+ "exit_code": 0,
+ "tool_free": true,
+ "audit_note": "no tools offered (raw API); stop_reason=max_tokens",
+ "raw_path": "/home/kvn/.z0int/state/weight-space/20261102-grid/fable/exp5/seaquest/r1/response.json",
+ "extra": {
+  "stop_reason": "max_tokens"
+ },
+ "valid": true,
+ "task": "exp5/seaquest",
+ "rep": 1,
+ "effort": "xhigh",
+ "prompt_sha256": "81e51857d7cffac29b12a389dee6ffcda2256a9e03f6cf91f4fd96e1eb855bf6",
+ "logs_sha": "4d09ba6d6a7e891dd8063974dfe81b3d78e3494f",
+ "finished_at": "2026-11-03T00:32:55-0600"
+}

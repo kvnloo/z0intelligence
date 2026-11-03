@@ -1,0 +1,31 @@
+{
+ "answer_line": "Solid white, axis-aligned filled rectangles (sometimes squares) on a black background. Each image has one rectangle at a random position, with sides from roughly 3 to 10 pixels. Its edges fall anywhere between row/column 1 and row/column 10, so the 1-pixel outer frame always stays black.",
+ "predicted": "square",
+ "truth": "square",
+ "correct": true,
+ "confidence": 50.0,
+ "editor": "opus",
+ "task": "exp2/square",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 108881,
+  "output_tokens": 18855,
+  "output_tokens_details": {
+   "thinking_tokens": 17132
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 171.2,
+ "model_observed": "claude-opus-5-5"
+}

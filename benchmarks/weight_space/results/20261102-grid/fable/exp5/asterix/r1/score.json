@@ -1,0 +1,44 @@
+{
+ "edit_report": {
+  "block": false,
+  "statements": 0,
+  "applied": 0,
+  "errors": [],
+  "cut_off": false
+ },
+ "minatar": {
+  "mean": 0.519,
+  "se": 0.029334271756760885,
+  "episodes": 1000,
+  "max": 6.0,
+  "mean_length": 70.915,
+  "seed": 0,
+  "max_steps": 10000
+ },
+ "mean": 0.519,
+ "editor": "fable",
+ "task": "exp5/asterix",
+ "rep": 1,
+ "valid": false,
+ "audit": "no tools offered (raw API); stop_reason=max_tokens",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 3947,
+  "output_tokens": 128000,
+  "output_tokens_details": {
+   "thinking_tokens": 128000
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 1671.0,
+ "model_observed": "claude-fable-5-1",
+ "finish": "max_tokens"
+}

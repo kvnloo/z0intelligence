@@ -1,0 +1,27 @@
+{
+ "answer_line": "- The model generates a centered white capital **\u201cA\u201d** on a black/dark background, likely with slightly thick diagonal strokes and a clear crossbar.",
+ "predicted": "circle",
+ "truth": "triangle",
+ "correct": false,
+ "confidence": 82.0,
+ "editor": "deepseek",
+ "task": "exp2/triangle",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API)",
+ "usage": {
+  "prompt_tokens": 96374,
+  "completion_tokens": 46592,
+  "total_tokens": 142966,
+  "prompt_tokens_details": {
+   "cached_tokens": 768
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 46061
+  },
+  "prompt_cache_hit_tokens": 768,
+  "prompt_cache_miss_tokens": 95606
+ },
+ "wall_s": 472.9,
+ "model_observed": "deepseek-v4-pro"
+}

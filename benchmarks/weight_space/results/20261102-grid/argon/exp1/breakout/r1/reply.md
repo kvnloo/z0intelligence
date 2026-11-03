@@ -1,0 +1,63 @@
+**Observations:**
+* **Channel 0 (agent):** Weights are near zero (random initialization noise within roughly $\pm 0.20$) across all interior cells in rows 1 to 7 (e.g., input 55 at row 1, col 1: `0.134, 0.142, -0.121`; input 220 at row 4, col 4: `-0.057, -0.095, 0.036`). However, in **row 8, columns 1 to 8** (the bottom row of the playable area, inputs 405, 410, 415, 420, 425, 430, 435, 440), the weights are very large:
+  * Input 405 (row 8, col 1): `-1.841` (unit 5), `-3.293` (unit 13), `4.066` (unit 15), `2.480` (unit 23), `-4.013` (unit 31)
+  * Input 410 (row 8, col 2): `-1.280` (unit 3), `-1.930` (unit 5), `2.794` (unit 6), `-1.659` (unit 16), `1.595` (unit 30)
+  * Input 415 (row 8, col 3): `1.461` (unit 5), `-1.225` (unit 13), `-1.856` (unit 15), `1.805` (unit 30)
+  * Input 420 (row 8, col 4): `1.605` (unit 5), `1.444` (unit 6), `-2.363` (unit 15)
+  * Input 425 (row 8, col 5): `-0.787` (unit 0), `0.811` (unit 17), `1.113` (unit 18), `-1.026` (unit 20), `0.932` (unit 28)
+  * Input 430 (row 8, col 6): `-0.952` (unit 5), `-1.539` (unit 10), `0.995` (unit 12), `1.499` (unit 28)
+  * Input 435 (row 8, col 7): `-2.107` (unit 0), `1.964` (unit 11), `1.513` (unit 14), `-3.053` (unit 19), `1.459` (unit 28)
+  * Input 440 (row 8, col 8): `3.855` (unit 5), `-1.964` (unit 7), `3.730` (unit 8), `2.317` (unit 11), `-2.516` (unit 12), `-4.701` (unit 13), `-2.694` (unit 15)
+  This shows the player-controlled agent is confined to the bottom playable row (row 8) and moves horizontally across columns 1–8.
+
+* **Channel 1 (moving objects):** Weights are massive across **rows 1 to 7, columns 1 to 8**, but drop to near-zero noise in **row 8** (inputs 406, 411, 416, 421, 426, 431, 436, 441 are all within $\pm 0.13$, e.g., input 406: `-0.066, -0.122, 0.065`). Examples of the large weights across rows 1–7 include:
+  * Row 1: input 66 (col 3) has `3.194, 2.708, -4.791, 3.436`; input 86 (col 7) has `3.079, -3.025, 3.176, -3.681` (while cols 1, 4, 8 in row 1 are smaller because the top row is blocked initially).
+  * Row 2: input 111 (col 2) has `3.408, 2.416, -6.356, 4.570, 4.816`; input 131 (col 6) has `4.060, -4.258, -4.357, 4.882`.
+  * Row 3: input 156 (col 1) has `-2.058, 2.957, -6.120, 4.455, 4.062`; input 161 (col 2) has `4.168, -5.880, 3.957, 4.621`.
+  * Row 4: input 206 (col 1) has `5.482, -5.880, 6.095, 5.670`; input 216 (col 3) has `4.087, 4.479, 7.879, -4.520, 6.421`.
+  * Row 5: input 261 (col 2) has `-7.876, -6.484, 4.218, 4.802`; input 266 (col 3) has `-4.174, 5.212, -4.033, 6.701`.
+  * Row 6: input 306 (col 1) has `4.058, -3.428, 5.662, 3.209`; input 316 (col 3) has `4.158, -5.256, 4.247, 5.379, -5.554`.
+  * Row 7: input 376 (col 5) has `7.350, -6.080, 5.904, 5.590, -5.641, 6.284`; input 381 (col 6) has `6.266, -6.780, 6.075, 6.705, -5.312, 5.220`.
+   Notably, across almost all of these cells in rows 1–7, hidden units 5, 6, 8, 17, 18, 28, and 30 consistently receive strong positive weights while units 7, 10, 12, 13, 19, 20, and 31 receive strong negative weights.
+
+* **Channel 2 (reward targets):** Weights are large **only in rows 1, 2, and 3, columns 1 to 8**, and are completely dead (noise within $\pm 0.18$) in rows 4 to 8 (e.g., input 207 at row 4, col 1: `-0.017, -0.050, 0.055`; input 257 at row 5, col 1: `-0.028, 0.058, -0.023`). Specifically:
+  * Row 1 (inputs 57, 62, 67, 72, 77, 82, 87, 92): e.g., input 57 (col 1) has `0.847, -0.958, 0.590, 0.599`; input 62 (col 2) has `0.897, 0.572, 1.620`; input 72 (col 4) has `1.034, -0.691, 0.889`; input 77 (col 5) has `2.148, 0.770, -0.810`; input 82 (col 6) has `-2.096, -0.878, -0.854`; input 87 (col 7) has `1.348, 1.336, 1.013`.
+  * Row 2 (inputs 107, 112, 117, 122, 127, 132, 137, 142): e.g., input 107 (col 1) has `0.727, 1.018, -1.006, -1.004`; input 112 (col 2) has `-1.001, 0.700, 0.603`; input 127 (col 5) has `0.549, 1.097, -0.588`; input 137 (col 7) has `1.050, 1.004, -2.417, 1.070`; input 142 (col 8) has `-0.693, 0.810, 1.323`.
+  * Row 3 (inputs 157, 162, 167, 172, 177, 182, 187, 192), where the weights are largest of all: input 157 (col 1) has `-4.811, -0.874, -3.236`; input 162 (col 2) has `-1.601, -2.026, 1.705`; input 167 (col 3) has `-1.104, 2.365, -0.900`; input 172 (col 4) has `-0.923, 0.866, 1.680`; input 177 (col 5) has `-1.636, 0.816, -1.111`; input 182 (col 6) has `-0.762, -1.547, 0.821`; input 187 (col 7) has `-4.640, -2.380, -2.930`; input 192 (col 8) has `-2.944, 1.008, 1.600, -1.246`.
+  This indicates a 3-row layer of destructible reward targets (bricks) across the top of the playable area (rows 1–3), with row 3 (the lowest row of bricks, hit first) having the strongest influence.
+
+* **Channel 3 (obstacles):** Weights are small noise across the entire 8x8 playable interior (e.g., input 58 at row 1, col 1: `0.169, 0.065, -0.043`; input 163 at row 3, col 2: `-0.022, -0.023, 0.064`), showing there are no internal obstacles. On the 36 outer border cells (row 0, row 9, col 0, col 9: inputs 3, 8, 13, ..., 498), where Channel 3 is always `1`, the weights show a small uniform bias-like pattern aligned with `b1` (e.g., input 33 has `0.336` on unit 1, `-0.234` on unit 6, `0.289` on unit 12, matching `b1[1]=0.199`, `b1[6]=-0.142`, `b1[12]=0.186`).
+
+* **Channel 4 (previous frame):** Weights are very large across **rows 1 to 7, columns 1 to 8**, closely tracking the pattern of Channel 1 (e.g., input 69 at row 1, col 3: `2.123, -4.301, 3.057, 2.985`; input 119 at row 2, col 3: `3.637, -5.154, 3.395, 3.855`; input 179 at row 3, col 5: `3.178, 4.079, 3.889, 4.042`; input 219 at row 4, col 3: `2.471, -2.300, 3.840, 3.474`; input 319 at row 6, col 3: `4.371, 5.435, -3.275, 4.067, 5.001`; input 384 at row 7, col 6: `2.993, 2.027, 3.167, 2.024`). It also has moderate-to-large weights in **row 8, columns 1 to 8** (inputs 409, 414, 419, 424, 429, 434, 439, 444; e.g., input 409: `-0.916, -1.189, 0.987, 1.292, -0.998`; input 439: `-1.410, 1.729, 1.170, -1.901`). Combining Channel 1 and Channel 4 lets the network compute the velocity/trajectory of the moving object and the previous position of the paddle.
+
+* **Output layer (`W3` and `b3`):**
+  * The output biases `b3` are all similar (`1.221, 1.008, 1.024, 0.897, 1.298`).
+  * However, in `W3`, columns 0 (no-op), 1 (up), and 2 (down) have **nearly identical weights** across almost every hidden unit:
+    * Unit 1: `1.502, 1.718, 1.370` (vs. `1.597` left, `-1.796` right)
+    * Unit 5: `-1.616, -1.409, -1.560` (vs. `-1.293` left, `1.419` right)
+    * Unit 10: `1.460, 1.354, 1.328` (vs. `-0.903` left, `1.549` right)
+    * Unit 14: `0.946, 0.880, 0.802` (vs. `2.492` left, `-1.654` right)
+    * Unit 17: `1.534, 1.461, 1.447` (vs. `-1.106` left, `1.391` right)
+    * Unit 18: `-1.270, -1.182, -1.382` (vs. `0.462` left, `-1.604` right)
+    * Unit 22: `0.376, 0.387, 0.537` (vs. `-5.336` left, `-1.203` right)
+    * Unit 28: `1.547, 1.395, 1.382` (vs. `1.417` left, `-1.013` right)
+    * Unit 29: `1.535, 1.638, 1.406` (vs. `-1.549` left, `1.526` right)
+    * Unit 30: `-1.645, -1.382, -1.458` (vs. `-1.346` left, `1.380` right)
+  * Meanwhile, **action 3 (left)** and **action 4 (right)** have large, specialized, and often opposing weights (e.g., unit 11 has `4.057` for left vs. `-0.414` for right; unit 22 has `-5.336` for left; unit 4 has `3.081` for left vs. `0.115` for right; unit 24 has `3.031` for right; unit 3 has `-3.063` for right; unit 21 has `-2.949` for right). This proves that **up (action 1) and down (action 2) are functionally identical to no-op (action 0)**—the agent can only move left or right, or stay put.
+
+**Reasoning:**
+* **Ruled out:**
+  * 2D navigation, maze, Pac-Man, Snake, or grid-world foraging games are ruled out because the agent (Channel 0) never leaves row 8, there are no internal obstacles (Channel 3 is unused inside the 8x8 grid), and the vertical actions (up/down) are treated identically to no-op in `W3`.
+  * Space Invaders / vertical shooters where enemies descend are ruled out because the reward targets (Channel 2) are strictly confined to the top three rows (rows 1–3) and never appear in rows 4–8, and there is no shooting action (up and down are both equivalent to no-op).
+  * Pong or simple ball-catching without bricks is ruled out because Channel 2 (reward targets) has a static 3-row block structure across rows 1–3, columns 1–8, while the moving object (Channel 1) travels through the entire space from row 1 to row 7.
+* **Fits the observations:**
+  * A brick-breaking paddle game (**Breakout**) matches every single feature of the weights: a horizontal paddle restricted to the bottom row (row 8), where only left (action 3), right (action 4), and stay/no-op (actions 0, 1, 2) affect movement; a bouncing ball (Channel 1) whose current and previous positions (Channel 4) are tracked across rows 1–7 to infer velocity and bounce angles; and three rows of bricks at the top of the screen (rows 1–3 in Channel 2) that yield reward when hit by the ball.
+
+**Game:**
+Breakout (on an 8x8 playable grid within a 10x10 walled board).
+
+**Description:**
+The agent controls a horizontal paddle along the bottom row (row 8), moving left or right (with up and down acting as no-ops) to bounce a moving ball back up into the arena and prevent it from falling past the bottom. The ball bounces off the walls and paddle to break three rows of target bricks at the top of the grid (rows 1–3), giving reward for each brick destroyed.
+
+**Confidence:**
+99%

@@ -1,0 +1,31 @@
+{
+ "answer_line": "Each generated image is a single solid white, upward\u2011pointing, roughly equilateral triangle on a black background: a point near the top (row 1\u20133, somewhere in columns 3\u20138), two straight sides sloping down at about 30\u00b0 from vertical (\u2248 \u00bd column per row), and a flat horizontal base somewhere in rows 6\u201311 spanning up to columns 1\u201310. Size varies from about 5 to 9 rows high (base 5\u201310 pixels wide) and position shifts left/right and up/down, but the triangle never touches the outer one\u2011pixel frame. Interior is filled white, outside is black.",
+ "predicted": "triangle",
+ "truth": "triangle",
+ "correct": true,
+ "confidence": 55.0,
+ "editor": "fable",
+ "task": "exp2/triangle",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 109151,
+  "output_tokens": 44611,
+  "output_tokens_details": {
+   "thinking_tokens": 41009
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 483.7,
+ "model_observed": "claude-fable-5-1"
+}

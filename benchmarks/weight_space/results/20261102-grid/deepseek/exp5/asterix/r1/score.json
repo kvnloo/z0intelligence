@@ -1,0 +1,46 @@
+{
+ "edit_report": {
+  "block": true,
+  "statements": 182,
+  "applied": 182,
+  "errors": [],
+  "cut_off": false,
+  "tensors_touched": [
+   "W1",
+   "W2",
+   "W3",
+   "b3"
+  ],
+  "nonzero_total": 4292
+ },
+ "minatar": {
+  "mean": 2.304,
+  "se": 0.07870055767132643,
+  "episodes": 1000,
+  "max": 16.0,
+  "mean_length": 85.058,
+  "seed": 0,
+  "max_steps": 10000
+ },
+ "mean": 2.304,
+ "editor": "deepseek",
+ "task": "exp5/asterix",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API)",
+ "usage": {
+  "prompt_tokens": 2903,
+  "completion_tokens": 50826,
+  "total_tokens": 53729,
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 47698
+  },
+  "prompt_cache_hit_tokens": 0,
+  "prompt_cache_miss_tokens": 2903
+ },
+ "wall_s": 759.4,
+ "model_observed": "deepseek-v4-pro"
+}

@@ -1,0 +1,27 @@
+{
+ "answer_line": "Pac-Man, or a small 10\u00d710 gridworld variant of Pac-Man.",
+ "predicted": "pacman",
+ "truth": "pacman",
+ "correct": true,
+ "confidence": 78.0,
+ "editor": "deepseek",
+ "task": "exp1/pacman",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API)",
+ "usage": {
+  "prompt_tokens": 70326,
+  "completion_tokens": 28944,
+  "total_tokens": 99270,
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 28417
+  },
+  "prompt_cache_hit_tokens": 0,
+  "prompt_cache_miss_tokens": 70326
+ },
+ "wall_s": 354.2,
+ "model_observed": "deepseek-v4-pro"
+}

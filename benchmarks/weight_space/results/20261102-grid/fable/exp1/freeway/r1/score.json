@@ -1,0 +1,31 @@
+{
+ "answer_line": "Road-crossing game \u2013 Freeway (Atari/MinAtar) / Frogger-style lane crossing.",
+ "predicted": "freeway",
+ "truth": "freeway",
+ "correct": true,
+ "confidence": 75.0,
+ "editor": "fable",
+ "task": "exp1/freeway",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 78925,
+  "output_tokens": 25589,
+  "output_tokens_details": {
+   "thinking_tokens": 23591
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 276.7,
+ "model_observed": "claude-fable-5-1"
+}

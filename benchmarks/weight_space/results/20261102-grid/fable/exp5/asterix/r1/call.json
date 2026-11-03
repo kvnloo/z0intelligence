@@ -1,0 +1,38 @@
+{
+ "editor": "fable",
+ "model_requested": "claude-fable-5-1",
+ "model_observed": "claude-fable-5-1",
+ "text": "",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 3947,
+  "output_tokens": 128000,
+  "output_tokens_details": {
+   "thinking_tokens": 128000
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 1670.97389626503,
+ "exit_code": 0,
+ "tool_free": true,
+ "audit_note": "no tools offered (raw API); stop_reason=max_tokens",
+ "raw_path": "/home/kvn/.z0int/state/weight-space/20261102-grid/fable/exp5/asterix/r1/response.json",
+ "extra": {
+  "stop_reason": "max_tokens"
+ },
+ "valid": false,
+ "task": "exp5/asterix",
+ "rep": 1,
+ "effort": "xhigh",
+ "prompt_sha256": "9e8243d5545956e42b8bd130bceba6ed90ecb807768be3ae0f498f765197f5da",
+ "logs_sha": "4d09ba6d6a7e891dd8063974dfe81b3d78e3494f",
+ "finished_at": "2026-11-03T01:00:46-0600"
+}

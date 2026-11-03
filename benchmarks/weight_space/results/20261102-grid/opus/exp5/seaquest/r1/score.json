@@ -1,0 +1,53 @@
+{
+ "edit_report": {
+  "block": true,
+  "statements": 193,
+  "applied": 193,
+  "errors": [],
+  "cut_off": false,
+  "tensors_touched": [
+   "W1",
+   "W2",
+   "W3",
+   "b1",
+   "b2",
+   "b3"
+  ],
+  "nonzero_total": 1199
+ },
+ "minatar": {
+  "mean": 46.159,
+  "se": 1.15996346245657,
+  "episodes": 1000,
+  "max": 203.0,
+  "mean_length": 856.268,
+  "seed": 0,
+  "max_steps": 10000
+ },
+ "mean": 46.159,
+ "editor": "opus",
+ "task": "exp5/seaquest",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 6845,
+  "output_tokens": 117427,
+  "output_tokens_details": {
+   "thinking_tokens": 113381
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 1122.7,
+ "model_observed": "claude-opus-5-5",
+ "finish": "end_turn"
+}

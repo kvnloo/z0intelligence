@@ -1,0 +1,21 @@
+{
+ "answer_line": "Most likely, **one white circular outline on a black background**, with a black interior. The outline is roughly one pixel thick, with stair-stepped edges. Circles are approximately 6\u201310 pixels across and lie near the image center, with modest position and size variation.",
+ "predicted": "circle",
+ "truth": "circle",
+ "correct": true,
+ "confidence": 86.0,
+ "editor": "astra",
+ "task": "exp2/circle",
+ "rep": 1,
+ "valid": true,
+ "audit": "item kinds=['agent_message', 'error', 'reasoning']",
+ "usage": {
+  "input_tokens": 104656,
+  "cached_input_tokens": 8064,
+  "cache_write_input_tokens": 0,
+  "output_tokens": 1865,
+  "reasoning_output_tokens": 1383
+ },
+ "wall_s": 67.0,
+ "model_observed": "gpt-6-astra"
+}

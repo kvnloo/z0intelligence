@@ -1,0 +1,81 @@
+Observations:
+1. **Output biases (`b3`, shape 144 = 12 × 12) define a black outer border and rounded active interior:**
+   - The entire 1-pixel outer boundary of the 12 × 12 grid is strongly negative:
+     - Row 0 (indices 0..11): `-0.551, -0.602, -0.555, -0.453, -0.329, -0.344, -0.380, -0.439, -0.448, -0.465, -0.523, -0.605`.
+     - Row 11 (indices 132..143): `-0.476, -0.489, -0.571, -0.518, -0.372, -0.281, -0.388, -0.367, -0.381, -0.534, -0.428, -0.571`.
+     - Column 0 (indices 0, 12, ..., 132): `-0.551, -0.444, -0.457, -0.554, -0.471, -0.435, -0.435, -0.345, -0.501, -0.513, -0.599, -0.476`.
+     - Column 11 (indices 11, 23, ..., 143): `-0.605, -0.579, -0.483, -0.588, -0.519, -0.357, -0.426, -0.341, -0.492, -0.509, -0.586, -0.571`.
+   - The corners of the inner 10 × 10 region are also negative: `(1,1) = -0.483` (index 13), `(1,10) = -0.397` (index 22), `(10,1) = -0.470` (index 121), `(10,10) = -0.358` (index 130).
+   - The central region (rows 2..8, columns 2..9) has near-zero or slightly positive biases, peaking around `(5,6) = 0.182` (index 66), `(5,7) = 0.122` (index 67), `(6,5) = 0.115` (index 77), and `(4,7) = 0.106` (index 55).
+
+2. **Input weights (`W1`, rows 0..143) ignore the outer border and inner corners, and detect curved arcs across rows 1..9, columns 1..10:**
+   - **Inactive border and corners:** Rows 0..11 (image row 0) and rows 132..143 (image row 11) have near-zero weights across all 64 units (magnitudes $\le 0.018$ in row 11; $\le 0.046$ in row 0 except `0.075` at `(0,5)`, col 9). Column 0 and Column 11 are similarly near zero. Crucially, in image row 1 (rows 12..23) and image row 9 (rows 108..119), the corner pixels `(1,1)` (row 13, max `0.030`), `(1,10)` (row 22, max `0.025`), `(9,1)` (row 109, max `0.039`), and `(9,10)` (row 118, max `0.053`) are inactive, while the middle pixels `(1,2)..(1,9)` and `(9,2)..(9,9)` have large weights (up to `0.437` and `0.418`).
+   - **Hollow ring / arc detectors in columns of `W1`:**
+     - **Column 9 of `W1`** forms a hollow ring in the upper-left/center (rows 1..5, cols 2..8):
+       - Row 1, cols 3..7 (rows 15..19): `0.200, 0.402, 0.437, 0.339, 0.134` (top cap).
+       - Row 2, cols 2..3 (rows 26..27): `0.166, 0.365` and cols 6..7 (rows 30..31): `0.201, 0.282`.
+       - Row 3, cols 2..3 (rows 38..39): `0.244, 0.235` and cols 7..8 (rows 43..44): `0.167, 0.152`, while the interior pixels `(3,4), (3,5), (3,6)` drop to `0.066, 0.010, 0.047`.
+       - Row 4, cols 2..3 (rows 50..51): `0.178, 0.161` and cols 7..8 (rows 55..56): `0.096, 0.095`, while interior pixels `(4,4), (4,5), (4,6)` drop to `0.049, 0.026, 0.046`.
+     - **Column 49 of `W1`** detects a left arc along Column 1–2: `(2,2) = 0.221`, `(3,1) = 0.272`, `(3,2) = 0.310`, `(4,1) = 0.444`, `(4,2) = 0.259`, `(5,1) = 0.492`, `(5,2) = 0.239`, `(6,1) = 0.427`, `(6,2) = 0.248`, `(7,2) = 0.227`.
+     - **Column 31 of `W1`** detects a top-right/right arc: `(1,7) = 0.140`, `(1,8) = 0.242`, `(1,9) = 0.315`, `(2,9) = 0.412`, `(3,9) = 0.233`, `(3,10) = 0.416`, `(4,10) = 0.367`, `(5,10) = 0.261`.
+     - **Column 55 of `W1`** detects a bottom arc centered around Row 8: `(8,3) = 0.413`, `(8,4) = 0.525`, `(8,5) = 0.420`, `(8,6) = 0.325`, curving up to `(7,2) = 0.309`, `(7,3) = 0.339` on the left and `(7,6) = 0.213`, `(7,7) = 0.201` on the right, with the interior `(7,4) = 0.139`, `(7,5) = 0.101` much lower.
+     - **Column 22 of `W1`** detects a bottom-left arc along Row 9 and Cols 1–2: `(7,1) = 0.202`, `(8,1) = 0.254`, `(8,2) = 0.237`, `(9,2) = 0.380`, `(9,3) = 0.273`, `(9,4) = 0.405`, `(9,5) = 0.418`, `(9,6) = 0.314`, `(9,7) = 0.199`.
+   - **Step encoding (rows 144..159 of `W1`):** High-frequency step inputs (rows 144..147 and 152..155, $k=0..3$) have near-zero weights, whereas low-frequency step inputs (rows 148..151 and 156..159, $k=4..7$, especially row 157 = $\cos(t / 316.2)$ with weights up to `1.456` and `-1.591`) strongly modulate the layer-1 thresholds across diffusion steps.
+
+3. **Output weights (`W3`, shape 64 × 144) consist of 12 × 12 templates of hollow circles (rings) and circular arcs of diameter ~7–8 pixels at shifted positions:**
+   Since `h2 = relu(h1 @ W2 + b2) >= 0`, each active unit $i$ of `h2` adds a non-negative multiple of row `W3[i]` to the output image:
+   - **`W3[33]` (full hollow circle in rows 3..9, cols 3..9):**
+     - Row 3, cols 5..8 (indices 41..44): `0.168, 0.211, 0.237, 0.159` (top arc).
+     - Row 4: left leg at `(4,4) = 0.187, (4,5) = 0.101`, interior dips to `(4,6) = 0.042`, right leg at `(4,8) = 0.207, (4,9) = 0.105`.
+     - Row 5: left leg at `(5,3) = 0.119, (5,4) = 0.127`, hollow interior `(5,5)..(5,7) = -0.044, -0.020, -0.002`, right leg at `(5,9) = 0.243`.
+     - Row 6: left leg at `(6,3) = 0.143, (6,4) = 0.124`, hollow interior `(6,5) = -0.017`, right leg at `(6,9) = 0.288`.
+     - Row 7: left leg at `(7,4) = 0.140`, right leg at `(7,8) = 0.166, (7,9) = 0.227`.
+     - Row 8, cols 4..9 (indices 100..105): `0.130, 0.167, 0.148, 0.121, 0.143, 0.130`.
+     - Row 9, cols 5..8 (indices 113..116): `0.134, 0.177, 0.211, 0.188` (bottom arc).
+   - **`W3[26]` (top arch of a hollow circle centered at `(4,6)`, spanning cols 3..9):**
+     - Row 1, cols 4..8 (indices 16..20): `0.194, 0.408, 0.507, 0.503, 0.323`.
+     - Row 2: left leg `(2,3) = 0.139, (2,4) = 0.271`, interior `(2,6) = 0.063`, right leg `(2,8) = 0.271, (2,9) = 0.215`.
+     - Row 3: left leg `(3,3) = 0.141`, interior `(3,5) = 0.063, (3,6) = 0.065`, right leg `(3,9) = 0.195`.
+   - **`W3[39]` (bottom arch of a hollow circle centered at `(7,6)`, spanning cols 3..9):**
+     - Row 10, cols 4..8 (indices 124..128): `0.244, 0.419, 0.525, 0.582, 0.367`.
+     - Row 9: left leg `(9,3) = 0.232, (9,4) = 0.229`, interior `(9,6) = -0.010`, right leg `(9,8) = 0.382, (9,9) = 0.244`.
+     - Row 8: left leg `(8,2) = 0.109`, interior `(8,6) = -0.038`, right leg `(8,8) = 0.207, (8,9) = 0.327`.
+     - Row 7: right leg `(7,9) = 0.261`.
+   - **`W3[40]` (top-left hollow arc touching Row 1 and Col 1):**
+     - Row 1, cols 2..5 (indices 14..17): `0.351, 0.552, 0.382, 0.242` (while corner `(1,1)` is `0.049`).
+     - Row 2, cols 1..2 (indices 25..26): `0.348, 0.577` (interior `(2,4) = 0.025`).
+     - Col 1, rows 3..5 (indices 37, 49, 61): `0.539, 0.361, 0.219` (interior `(3,3) = -0.096`).
+   - **`W3[55]` (left half of a hollow circle spanning rows 2..8, cols 1..7):**
+     - Row 2, cols 3..5: `0.205, 0.204, 0.122`; Row 3, cols 2..4: `0.404, 0.297, 0.156`; Col 1, rows 4..7: `0.334, 0.336, 0.345, 0.196` (with `(7,2) = 0.384` and interior `(4,3) = -0.014`); Row 8, cols 2..3: `0.237, 0.193`.
+   - **`W3[15]` (right half of a hollow circle touching Col 10, rows 3..9):**
+     - Col 10, rows 3..8 (indices 46, 58, 70, 82, 94, 106): `0.168, 0.360, 0.519, 0.519, 0.344, 0.127`, curving inward at `(3,9) = 0.145, (4,9) = 0.180` and `(7,9) = 0.239, (8,8) = 0.188, (8,9) = 0.221`, with negative interior weights at `(5,6) = -0.067, (6,6) = -0.120`.
+   - **Interior-suppression units:** Multiple `W3` rows (e.g., `W3[3]` with `-0.206` to `-0.337` at rows 5..6, cols 2..6; `W3[36]` with `-0.505` at `(5,6)` and `-0.432` at `(6,7)`) strongly push the interior of the circle to `-1` (black).
+
+Reasoning:
+- **Shape (hollow circle / ring vs. filled disk or polygon):** Every spatial filter in `W1` and output template in `W3` traces a round perimeter that skips square corners (e.g., `(1,1)`, `(1,10)`, `(9,1)`, `(9,10)` are completely inactive in `W1` and negative in `b3`, ruling out rectangles or squares) and has zero or strongly negative weights in the center surrounded by positive weights on the perimeter (ruling out filled disks).
+- **Size (consistent diameter ~7–8 pixels / radius ~3):** Across all shifted templates in `W3` and `W1`—such as `W3[33]` (rows 3..9, cols 3..9), `W3[26]` (top at row 1, width across cols 3..9 at row 3), `W3[39]` (bottom at row 10, width across cols 3..9 at row 9), `W3[55]` (rows 2..8), and `W3[1]` (rows 4..10)—the distance between opposite sides of the ring is consistently 7 pixels (sometimes 7–8 pixels with a 1–2 pixel stroke width), corresponding to a circle of radius $R \approx 3$ pixels.
+- **Position (variable translation inside the 10 × 10 interior):** Different hidden units specialize in circles shifted to different horizontal and vertical locations (e.g., `W3[40]` at top-left touching row 1 and col 1; `W3[58]` and `W1[:,31]` at top-right touching row 1–2 and col 9–10; `W3[1]` at bottom-left touching row 9–10 and col 1; `W3[39]` and `W3[15]` at bottom/right touching row 10 and col 10; `W3[33]` near the center). In `W2`, units corresponding to one circle location mutually inhibit units for incompatible locations while exciting matching arcs. Thus, each generated image contains a single white hollow circle at a random position within the inner 10 × 10 region (rows 1..10, columns 1..10), never touching the 1-pixel outer border (row 0, row 11, col 0, col 11).
+
+Images:
+The model generates 12 × 12 grayscale images showing a **single white hollow circle (ring) on a black background**.
+- **What is drawn:** An unfilled circular ring (white outline, `+1`, with a hollow black interior, `-1`, on a black background, `-1`).
+- **How big:** Outer diameter of **7 to 8 pixels** (radius $\approx 3$ pixels), with a ring stroke thickness of **1 to 2 pixels** and a hollow black center of **3 to 5 pixels** across.
+- **Where:** Randomly positioned anywhere inside the inner **10 × 10** area (rows 1..10, columns 1..10, i.e., circle center roughly in rows 4..7 and columns 4..7), always leaving at least a 1-pixel black margin along all four outer edges (row 0, row 11, column 0, and column 11 are always black).
+
+Example:
+```
+............
+............
+....####....
+...##..##...
+..##....##..
+..#......#..
+..##....##..
+...##..##...
+....####....
+............
+............
+............
+```
+
+Confidence: 95%

@@ -1,0 +1,31 @@
+{
+ "answer_line": "Breakout (Atari Breakout\u2013style brick-breaker): paddle on row 8, bricks in rows 1\u20133, one bouncing ball.",
+ "predicted": "breakout",
+ "truth": "breakout",
+ "correct": true,
+ "confidence": 85.0,
+ "editor": "fable",
+ "task": "exp1/breakout",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 79144,
+  "output_tokens": 17779,
+  "output_tokens_details": {
+   "thinking_tokens": 15474
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 196.0,
+ "model_observed": "claude-fable-5-1"
+}

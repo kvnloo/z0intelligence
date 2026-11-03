@@ -1,0 +1,22 @@
+{
+ "answer_line": "Pong",
+ "predicted": "pong",
+ "truth": "pong",
+ "correct": true,
+ "confidence": 99.0,
+ "editor": "argon",
+ "task": "exp1/pong",
+ "rep": 1,
+ "valid": true,
+ "audit": "status=SUCCESS step_types=['agent_response', 'user_input']",
+ "usage": {
+  "input_tokens": 112576,
+  "output_tokens": 43166,
+  "thinking_tokens": 39837,
+  "cache_read_tokens": 0,
+  "total_tokens": 155742,
+  "num_turns": 1
+ },
+ "wall_s": 379.6,
+ "model_observed": "gemini-4-argon-high"
+}

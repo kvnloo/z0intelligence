@@ -1,0 +1,21 @@
+{
+ "answer_line": "Pong**, most likely a simplified single-paddle variant with a left-side paddle and right-side scoring boundary.",
+ "predicted": "pong",
+ "truth": "pong",
+ "correct": true,
+ "confidence": 97.0,
+ "editor": "astra",
+ "task": "exp1/pong",
+ "rep": 1,
+ "valid": true,
+ "audit": "item kinds=['agent_message', 'error', 'reasoning']",
+ "usage": {
+  "input_tokens": 78590,
+  "cached_input_tokens": 0,
+  "cache_write_input_tokens": 0,
+  "output_tokens": 1502,
+  "reasoning_output_tokens": 774
+ },
+ "wall_s": 59.6,
+ "model_observed": "gpt-6-astra"
+}

@@ -1,0 +1,22 @@
+{
+ "answer_line": "Breakout (on an 8x8 playable grid within a 10x10 walled board).",
+ "predicted": "breakout",
+ "truth": "breakout",
+ "correct": true,
+ "confidence": 99.0,
+ "editor": "argon",
+ "task": "exp1/breakout",
+ "rep": 1,
+ "valid": true,
+ "audit": "status=SUCCESS step_types=['agent_response', 'user_input']",
+ "usage": {
+  "input_tokens": 112599,
+  "output_tokens": 29470,
+  "thinking_tokens": 24768,
+  "cache_read_tokens": 0,
+  "total_tokens": 142069,
+  "num_turns": 1
+ },
+ "wall_s": 253.2,
+ "model_observed": "gemini-4-argon-high"
+}

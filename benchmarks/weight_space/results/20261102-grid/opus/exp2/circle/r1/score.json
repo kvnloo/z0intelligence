@@ -1,0 +1,31 @@
+{
+ "answer_line": "The model generates MNIST-style handwritten digits downscaled to 12\u00d712. Each image is a single white digit, drawn in strokes about 1\u20132 pixels thick, roughly centred. The digit spans about 8\u201310 rows (rows 1\u201310) and about 6\u20139 columns, on a black background with a black margin of at least one pixel. Shapes include loops (0, 6, 8, 9), bars and diagonals (1, 7, 4), and curved digits (2, 3, 5).",
+ "predicted": "circle",
+ "truth": "circle",
+ "correct": true,
+ "confidence": 45.0,
+ "editor": "opus",
+ "task": "exp2/circle",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 108583,
+  "output_tokens": 6279,
+  "output_tokens_details": {
+   "thinking_tokens": 4401
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 65.0,
+ "model_observed": "claude-opus-5-5"
+}

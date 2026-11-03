@@ -1,0 +1,31 @@
+{
+ "answer_line": "Each image is a single solid white axis\u2011aligned rectangle (sides of roughly 2\u201310 pixels, often 3\u20137, not necessarily square) at a random position, on a black background, confined to the inner 10\u00d710 area; the outermost ring of pixels is always black. Edges are sharp, one pixel precise.",
+ "predicted": "square",
+ "truth": "square",
+ "correct": true,
+ "confidence": 60.0,
+ "editor": "fable",
+ "task": "exp2/square",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 108881,
+  "output_tokens": 42903,
+  "output_tokens_details": {
+   "thinking_tokens": 39956
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 482.7,
+ "model_observed": "claude-fable-5-1"
+}

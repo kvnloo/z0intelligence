@@ -1,0 +1,38 @@
+{
+ "editor": "fable",
+ "model_requested": "claude-fable-5-1",
+ "model_observed": "claude-fable-5-1",
+ "text": "**Observations**\n\n1. *Which pixels the network reads (W1 rows).* Rows 0\u201311 (image row 0), rows 132\u2013143 (image row 11) and the pixels in columns 0 and 11 have only tiny weights (|w| \u2272 0.03, e.g. row 0: `0.001 0.006 -0.006 \u2026`, row 12: `0.004 0.003 -0.012 \u2026`, row 143: `-0.001 -0.004 0.000 \u2026`). Large weights (|w| up to 0.4\u20130.5) start at pixel 14 (row 1, col 2: `-0.122 \u2026 0.112`), run through pixels 15\u201321, 25/26\u201334, 37\u201346, 49\u201358, 61\u201370, 73\u201382, 85\u201394, 97\u2013106, 109\u2013118, 123\u2013129, and stop. Corner pixels of that block (13, 22/23, 121/122, 130) are weak. So the content lives in rows 1\u201310, columns 1\u201310, with the corners of that block rarely used \u2013 a roughly rounded blob of \u22488\u201310 px in each direction, surrounded by an always-black 1-pixel frame.\n\n2. *Time inputs.* Only the low-frequency step features matter: W1 rows 148\u2013151 (sin, k=4..7) and 156\u2013159 (cos, k=4..7) are huge (e.g. row 157: `0.563 -1.018 0.983 \u2026 1.438 \u2026 -1.591 1.456`), while rows 144\u2013147 and 152\u2013155 are \u22480. Standard DDPM behaviour, nothing image-specific.\n\n3. *Background.* b3 is negative everywhere on the frame (\u2248 \u22120.45 \u2026 \u22120.60 on rows 0, 11 and columns 0, 11) and rises to \u22480 to +0.18 in the centre (row 5: `\u2026 0.011 0.081 -0.001 0.057 0.182 0.122 0.076 \u2026`). Several h2 units with large positive b2 (unit 7: 0.680, units 11, 33, 34, 45: 0.44\u20130.57) have uniformly negative W3 rows (row 7 of W3: all \u2248 \u22120.1\u2026\u22120.2) \u2013 an \"always-on black background\" channel. So images are white strokes on black, the mean image being a grey blob in the middle: the contents vary a lot from image to image.\n\n4. *Stroke templates in W3 (each row = what one hidden unit paints).* Reshaping the rows to 12\u00d712:\n   - unit 30: `0.194 0.408 0.507 0.503 0.323` at pixels 16\u201320 \u2192 a horizontal bar on row 1, cols 4\u20138; unit 4: `0.295 0.467 0.500 0.393` at 27\u201330 \u2192 a bar on row 2, cols 3\u20136 (tops of 7/5/3/2/0).\n   - unit 42: 14\u201316 `0.351 0.552 0.382`, 25\u201326 `0.348 0.577`, 37 `0.539`, 49 `0.361`, 61 `0.219` \u2192 an arc from the top centre curving down the left edge (upper-left of 0/6/2/8).\n   - unit 59: 31\u201333 `0.441 0.521`, 45 `0.578`, 58 `0.310`, 70 `0.185` \u2192 the mirror image, an upper-right arc.\n   - unit 41: 91 `0.261`, 103 `0.327`, 116\u2013117 `0.382 0.244`, 124\u2013129 `0.244 0.419 0.525 0.582 0.367` plus 111\u2013112 `0.232 0.229` \u2192 a bottom arc on rows 9\u201310 closing from the right side.\n   - unit 18: 38, 50, 62, 74, 86 = `0.205 0.395 0.501 0.472 0.353` \u2192 straight vertical on column 2, rows 3\u20138 (left side of 0/6/4); unit 57 similar on cols 1\u20133; unit 2 (44, 56\u201357, 68\u201369: `0.385 0.427 0.312 0.220 0.201`) and unit 20 (58, 70, 82, 94: `0.360 0.519 0.519 0.344`) \u2192 verticals on cols 7\u20139 and col 10 (right sides).\n   - unit 28: negatives `-0.208` (42), `-0.243` (53), `-0.141` (75), `-0.305` (98), `-0.296` (111), `-0.209` (123) \u2192 a diagonal from top-right (row 3, col 6\u20137) to bottom-left (row 10, col 3): the stroke of a 7 (or 2). Units 25, 29, 56 are \"top bar + descending stroke\" (unit 56: 29\u201333 `-0.287 -0.318 -0.258 -0.210`, then 40, 51, 63, 75, 87 `-0.333 -0.253 -0.420 -0.369 -0.305`), i.e. 7-shapes, each paired with positive weight in the lower-left (rows 6\u201310, cols 2\u20135) \u2013 \"not a 7, but something with mass at lower left\".\n   - unit 37: 30\u201331 `-0.294 -0.303`, 42, 68, 80, 93, 105 `-0.295 -0.252 -0.252 -0.234 -0.146` \u2192 a slightly slanted vertical through the middle (a \"1\").\n   - unit 3: row 5 cols 1\u20137 `-0.138 -0.215 -0.265 -0.241 -0.201 -0.230 -0.185`, row 6 `-0.206 -0.306 -0.337 -0.322 -0.233` \u2192 a horizontal crossbar at mid-height (3/4/5/8); unit 52: crossbar on row 5 (`-0.375 -0.445 -0.421`) plus a left stem on rows 6\u201310 and a positive bottom-centre blob.\n   - unit 24 (88\u201389 `0.249 0.434`, 99\u2013100 `0.252 0.196`), unit 26 (98\u2013100 `0.222 0.458 0.333`), unit 46 (63, 75\u201376, 87\u201388 `0.245 0.286 0.287 0.251 0.237`) \u2192 lower loops / lower-left blobs (6, 8, 2, 5 bottoms); unit 40 \u2192 a filled centre (rows 5\u20137, cols 4\u20136) with a negative ring; unit 47 \u2192 a blob on rows 3\u20135, cols 4\u20136 (top of 1/4/9).\n   - Units 14, 32, 55, 58(\u2013ish) have unstructured \u00b10.1 noise in W3 (`0.020 -0.041 0.085 0.066 \u2026`) \u2013 dead units left at initialisation.\n\n**Reasoning**\n\nThe read/write region is a rounded \u22489\u00d79 blob centred in the frame with an always-black border \u2013 exactly what a centred, size-normalised glyph gives (e.g. MNIST shrunk to 12\u00d712). The templates are not object parts or textures but pen strokes: horizontal top bars, left and right arcs, straight left/right verticals, a bottom arc, a top-right-to-bottom-left diagonal, a central vertical, a mid-height crossbar, lower loops. Several units explicitly trade one stroke configuration for another (remove the 7-shape, add lower-left mass; remove the left arc; remove the central \"1\"), which only makes sense if the training set contains *several different* glyph classes drawn in roughly the same box. Uniform shapes (a single blob, a bar, a fixed object) are ruled out: the mean image (b3) is only mildly positive in the centre, and the templates are thin curved strokes, not filled regions. A single digit class is ruled out by the mutually exclusive templates (loops vs. 7-diagonal vs. central vertical vs. crossbar). The combination top bar + diagonal (7), closed-loop arcs (0/6/8/9), crossbar (3/4/5/8), central stroke (1), bottom-left hook plus base (2) covers the handwritten decimal digits.\n\n**Images**\n\nLow-resolution handwritten digits, 0\u20139 (MNIST-style), rendered as white (~+1) 1\u20132-pixel-wide strokes on a black (\u22121) background. Each digit is centred, occupying roughly rows 1\u201310 and columns 2\u20139 (about 8 px wide, 10 px tall), with the outermost row/column always black; the lower-right and lower-left corners of that box are used less. Different samples show different digits (loops like 0/6/8/9, a 7 with top bar and diagonal, a central vertical 1, digits with a mid crossbar such as 3/4/5, a 2 with a hooked bottom), with the usual handwriting variation in slant and thickness.\n\n**Example**\n\n```\n............\n....####....\n...##..##...\n..##....##..\n..#......#..\n..#......#..\n..#......#..\n..#......#..\n..##....##..\n...##..##...\n....####....\n............\n```\n\n**Confidence:** 62%",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 108583,
+  "output_tokens": 22730,
+  "output_tokens_details": {
+   "thinking_tokens": 19805
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 298.1695885658264,
+ "exit_code": 0,
+ "tool_free": true,
+ "audit_note": "no tools offered (raw API); stop_reason=end_turn",
+ "raw_path": "/home/kvn/.z0int/state/weight-space/20261102-grid/fable/exp2/circle/r1/response.json",
+ "extra": {
+  "stop_reason": "end_turn"
+ },
+ "valid": true,
+ "task": "exp2/circle",
+ "rep": 1,
+ "effort": "high",
+ "prompt_sha256": "f02e93fcdb15177695684005f4345a6f9fc94d9925ad6c0fe69545203676693b",
+ "logs_sha": "4d09ba6d6a7e891dd8063974dfe81b3d78e3494f",
+ "finished_at": "2026-11-02T23:19:30-0600"
+}

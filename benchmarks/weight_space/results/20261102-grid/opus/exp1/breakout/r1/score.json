@@ -1,0 +1,31 @@
+{
+ "answer_line": "Breakout (brick\u2011breaker / Arkanoid\u2011style). The paddle sits on the bottom row and a ball bounces up into three rows of bricks at the top.",
+ "predicted": "breakout",
+ "truth": "breakout",
+ "correct": true,
+ "confidence": 88.0,
+ "editor": "opus",
+ "task": "exp1/breakout",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 79144,
+  "output_tokens": 11746,
+  "output_tokens_details": {
+   "thinking_tokens": 10252
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 97.5,
+ "model_observed": "claude-opus-5-5"
+}

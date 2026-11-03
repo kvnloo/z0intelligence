@@ -1,0 +1,18 @@
+**Observations:**
+- **Channel 0 — agent:** Large weights occur across several interior rows, especially central columns. At `(2,4)`, weights include **4.331, −2.970, 3.294, −3.827**; at `(3,4)`, they include **4.950** and **−4.942**. This suggests a player that travels through the grid, not a paddle confined to one edge. Row 1 has comparatively small agent weights, consistent with a destination that immediately triggers a reset.
+- **Channel 1 — moving objects:** Strong structure appears in horizontal bands across rows 2–7. Within a row, patterns repeat across columns. For example, at `(2,1)` and `(2,5)`, weights to hidden unit 18 are **−1.898** and **−1.879**, and to unit 25 are **1.562** and **1.611**. At `(3,2)` and `(3,6)`, weights to unit 12 are **6.639** and **6.689**. These repeated, row-specific patterns suggest traffic lanes with regularly spaced vehicles. The bottom playable row lacks comparable moving-object structure.
+- **Channel 2 — reward targets:** The clear structure is across **row 1**, rather than scattered throughout the interior. At `(1,1)`, weights to units 3, 25, and 28 are **−0.550, 0.440, 0.464**. Similar vectors recur across that row. This suggests a fixed destination strip, not randomly placed food.
+- **Channel 3 — obstacles:** The border has a repeated vector, while interior obstacle weights are generally small. At `(0,0)`, weights to units 3, 25, and 28 are **−0.477, 0.440, 0.437**, close to the corresponding biases **−0.492, 0.434, 0.434**. Always-present border inputs can learn bias-like contributions; these weights do not establish a maze. There is little evidence of meaningful interior static obstacles.
+- **Channel 4 — previous frame:** Strong weights occur in the traffic region, with horizontally shifted similarities to current moving-object weights. For example, previous-frame `(2,3)` has **2.042** to unit 15, while current moving-object `(2,4)` has **2.140**. Previous-frame `(2,1)` has **−2.266** to unit 11, versus **−2.373** for current moving-object `(2,2)`. This supports tracking horizontal motion.
+- **Outputs:** Biases are **[−0.029, 3.142, −1.862, 0.173, −1.269]**: a substantial baseline preference for **up**, with down discouraged. State-dependent control remains strong: output-layer unit 6 has **2.626** toward up and **−2.432** toward right; unit 29 has **−1.691** toward left and **2.315** toward right. Thus, the policy can adjust movement rather than simply always advance.
+
+**Reasoning:**  
+A bottom-to-top crossing task fits the fixed upper goal, safe lower row, horizontal moving hazards, and upward action bias. The periodic lane structure particularly suggests road traffic.
+
+Snake and collectible-maze games fit poorly because reward targets are not distributed throughout the board. Pong and Breakout fit poorly because the agent occupies multiple rows and strongly favors upward movement. Frogger is a close relative, but there is no clear evidence of its river, logs, or separate home slots. A road-only **Freeway** variant is the best fit. Weights alone cannot uniquely establish the game’s exact rules.
+
+**Game:** Freeway — a grid-based road-crossing game, similar to Atari Freeway.
+
+**Description:** The agent crosses horizontal lanes of moving cars, traveling from the bottom to the top while avoiding collisions. Reaching the upper destination gives reward, likely followed by a reset for another crossing.
+
+**Confidence:** 97%

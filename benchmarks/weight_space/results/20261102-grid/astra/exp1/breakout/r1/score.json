@@ -1,0 +1,21 @@
+{
+ "answer_line": "Breakout \u2014 a grid-based paddle-and-ball brick breaker.**",
+ "predicted": "breakout",
+ "truth": "breakout",
+ "correct": true,
+ "confidence": 99.0,
+ "editor": "astra",
+ "task": "exp1/breakout",
+ "rep": 1,
+ "valid": true,
+ "audit": "item kinds=['agent_message', 'error', 'reasoning']",
+ "usage": {
+  "input_tokens": 78616,
+  "cached_input_tokens": 2432,
+  "cache_write_input_tokens": 0,
+  "output_tokens": 1893,
+  "reasoning_output_tokens": 1168
+ },
+ "wall_s": 59.7,
+ "model_observed": "gpt-6-astra"
+}

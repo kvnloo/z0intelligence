@@ -1,0 +1,43 @@
+{
+ "answer_line": "Pac\u2011Man\u2013style maze game: the agent moves through a fixed symmetric maze (corner L\u2011blocks + central 2\u00d72 block) collecting pellets while avoiding ghosts that roam the same corridors.",
+ "predicted": "pacman",
+ "truth": "pacman",
+ "correct": true,
+ "confidence": 70.0,
+ "editor": "fable",
+ "task": "exp1/pacman",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 79060,
+  "output_tokens": 13696,
+  "output_tokens_details": {
+   "thinking_tokens": 11458
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 159.7,
+ "model_observed": "claude-fable-5-1",
+ "rescored": [
+  {
+   "from": {
+    "answer_line": "Pac\u2011Man\u2013style maze game: the agent moves through a fixed symmetric maze (corner L\u2011blocks + central 2\u00d72 block) collecting pellets while avoiding ghosts that roam the same corridors.",
+    "predicted": null,
+    "truth": "pacman",
+    "correct": false,
+    "confidence": 70.0
+   },
+   "at": "2026-11-03 13:00:07"
+  }
+ ]
+}

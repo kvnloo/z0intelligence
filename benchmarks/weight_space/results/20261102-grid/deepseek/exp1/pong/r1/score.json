@@ -1,0 +1,29 @@
+{
+ "answer_line": null,
+ "predicted": null,
+ "truth": "pong",
+ "correct": false,
+ "confidence": null,
+ "editor": "deepseek",
+ "task": "exp1/pong",
+ "rep": 1,
+ "valid": false,
+ "audit": "no tools offered (raw API)",
+ "usage": {
+  "prompt_tokens": 70326,
+  "completion_tokens": 64000,
+  "total_tokens": 134326,
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 64000
+  },
+  "prompt_cache_hit_tokens": 0,
+  "prompt_cache_miss_tokens": 70326
+ },
+ "wall_s": 557.4,
+ "model_observed": "deepseek-v4-pro",
+ "finish": "length",
+ "note": "scored after the run from call.json (empty reply: output budget spent reasoning)"
+}

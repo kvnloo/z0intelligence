@@ -1,0 +1,31 @@
+{
+ "answer_line": "Pac-Man (a mini grid Pac-Man: fixed symmetric maze, pellets, chasing ghosts).",
+ "predicted": "pacman",
+ "truth": "pacman",
+ "correct": true,
+ "confidence": 72.0,
+ "editor": "opus",
+ "task": "exp1/pacman",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 79060,
+  "output_tokens": 8357,
+  "output_tokens_details": {
+   "thinking_tokens": 7021
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 72.1,
+ "model_observed": "claude-opus-5-5"
+}

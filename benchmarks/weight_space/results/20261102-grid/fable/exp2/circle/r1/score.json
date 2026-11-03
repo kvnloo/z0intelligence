@@ -1,0 +1,31 @@
+{
+ "answer_line": "Low-resolution handwritten digits, 0\u20139 (MNIST-style), rendered as white (~+1) 1\u20132-pixel-wide strokes on a black (\u22121) background. Each digit is centred, occupying roughly rows 1\u201310 and columns 2\u20139 (about 8 px wide, 10 px tall), with the outermost row/column always black; the lower-right and lower-left corners of that box are used less. Different samples show different digits (loops like 0/6/8/9, a 7 with top bar and diagonal, a central vertical 1, digits with a mid crossbar such as 3/4/5, a 2 with a hooked bottom), with the usual handwriting variation in slant and thickness.",
+ "predicted": "circle",
+ "truth": "circle",
+ "correct": true,
+ "confidence": 62.0,
+ "editor": "fable",
+ "task": "exp2/circle",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 108583,
+  "output_tokens": 22730,
+  "output_tokens_details": {
+   "thinking_tokens": 19805
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 298.2,
+ "model_observed": "claude-fable-5-1"
+}

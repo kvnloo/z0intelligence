@@ -1,0 +1,31 @@
+{
+ "answer_line": "A single solid white triangle pointing up, on a black background.",
+ "predicted": "triangle",
+ "truth": "triangle",
+ "correct": true,
+ "confidence": 60.0,
+ "editor": "opus",
+ "task": "exp2/triangle",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 109151,
+  "output_tokens": 19028,
+  "output_tokens_details": {
+   "thinking_tokens": 17344
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 165.2,
+ "model_observed": "claude-opus-5-5"
+}

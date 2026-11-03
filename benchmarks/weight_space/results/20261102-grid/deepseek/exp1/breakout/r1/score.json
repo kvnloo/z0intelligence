@@ -1,0 +1,27 @@
+{
+ "answer_line": "MinAtar Breakout / Breakout (MinAtar variant).",
+ "predicted": "breakout",
+ "truth": "breakout",
+ "correct": true,
+ "confidence": 95.0,
+ "editor": "deepseek",
+ "task": "exp1/breakout",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API)",
+ "usage": {
+  "prompt_tokens": 70352,
+  "completion_tokens": 43382,
+  "total_tokens": 113734,
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 42565
+  },
+  "prompt_cache_hit_tokens": 0,
+  "prompt_cache_miss_tokens": 70352
+ },
+ "wall_s": 454.2,
+ "model_observed": "deepseek-v4-pro"
+}

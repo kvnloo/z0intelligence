@@ -1,0 +1,44 @@
+{
+ "edit_report": {
+  "block": true,
+  "statements": 60,
+  "applied": 60,
+  "errors": [],
+  "cut_off": false,
+  "tensors_touched": [
+   "W1",
+   "W2",
+   "W3",
+   "b1",
+   "b2",
+   "b3"
+  ],
+  "nonzero_total": 437
+ },
+ "minatar": {
+  "mean": 61.293,
+  "se": 2.0814643029955247,
+  "episodes": 1000,
+  "max": 536.0,
+  "mean_length": 929.802,
+  "seed": 0,
+  "max_steps": 10000
+ },
+ "mean": 61.293,
+ "editor": "argon",
+ "task": "exp5/breakout",
+ "rep": 1,
+ "valid": true,
+ "audit": "status=ERROR step_types=['agent_response', 'error_message', 'user_input']",
+ "usage": {
+  "input_tokens": 21540,
+  "output_tokens": 105957,
+  "thinking_tokens": 101704,
+  "cache_read_tokens": 0,
+  "total_tokens": 127497,
+  "num_turns": 1
+ },
+ "wall_s": 1124.7,
+ "model_observed": "gemini-4-argon-high",
+ "finish": null
+}

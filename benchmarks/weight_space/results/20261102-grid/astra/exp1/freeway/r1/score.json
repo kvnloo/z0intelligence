@@ -1,0 +1,21 @@
+{
+ "answer_line": "Freeway \u2014 a grid-based road-crossing game, similar to Atari Freeway.",
+ "predicted": "freeway",
+ "truth": "freeway",
+ "correct": true,
+ "confidence": 97.0,
+ "editor": "astra",
+ "task": "exp1/freeway",
+ "rep": 1,
+ "valid": true,
+ "audit": "item kinds=['agent_message', 'error', 'reasoning']",
+ "usage": {
+  "input_tokens": 78562,
+  "cached_input_tokens": 0,
+  "cache_write_input_tokens": 0,
+  "output_tokens": 2410,
+  "reasoning_output_tokens": 1552
+ },
+ "wall_s": 63.4,
+ "model_observed": "gpt-6-astra"
+}

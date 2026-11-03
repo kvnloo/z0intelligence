@@ -1,0 +1,54 @@
+{
+ "edit_report": {
+  "block": true,
+  "statements": 72,
+  "applied": 71,
+  "errors": [
+   {
+    "statement": "W",
+    "error": "not a statement"
+   }
+  ],
+  "cut_off": true,
+  "tensors_touched": [
+   "W1",
+   "b1"
+  ],
+  "nonzero_total": 422
+ },
+ "minatar": {
+  "mean": 0.108,
+  "se": 0.01226729336432803,
+  "episodes": 1000,
+  "max": 4.0,
+  "mean_length": 30.6,
+  "seed": 0,
+  "max_steps": 10000
+ },
+ "mean": 0.108,
+ "editor": "fable",
+ "task": "exp5/seaquest",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=max_tokens",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 6845,
+  "output_tokens": 128000,
+  "output_tokens_details": {
+   "thinking_tokens": 125691
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 1615.4,
+ "model_observed": "claude-fable-5-1",
+ "finish": "max_tokens"
+}

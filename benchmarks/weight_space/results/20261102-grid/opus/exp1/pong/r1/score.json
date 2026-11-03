@@ -1,0 +1,31 @@
+{
+ "answer_line": "Pong (single-player paddle-and-ball, played against a wall or goal).",
+ "predicted": "pong",
+ "truth": "pong",
+ "correct": true,
+ "confidence": 70.0,
+ "editor": "opus",
+ "task": "exp1/pong",
+ "rep": 1,
+ "valid": true,
+ "audit": "no tools offered (raw API); stop_reason=end_turn",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 78935,
+  "output_tokens": 16985,
+  "output_tokens_details": {
+   "thinking_tokens": 15477
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 157.8,
+ "model_observed": "claude-opus-5-5"
+}

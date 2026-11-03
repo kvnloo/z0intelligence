@@ -1,0 +1,34 @@
+{
+ "editor": "deepseek",
+ "model_requested": "deepseek-v4-pro",
+ "model_observed": "deepseek-v4-pro",
+ "text": "",
+ "usage": {
+  "prompt_tokens": 70326,
+  "completion_tokens": 64000,
+  "total_tokens": 134326,
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 64000
+  },
+  "prompt_cache_hit_tokens": 0,
+  "prompt_cache_miss_tokens": 70326
+ },
+ "wall_s": 557.3519330024719,
+ "exit_code": 0,
+ "tool_free": true,
+ "audit_note": "no tools offered (raw API)",
+ "raw_path": "/home/kvn/.z0int/state/weight-space/20261102-grid/deepseek/exp1/pong/r1/response.json",
+ "extra": {
+  "finish_reason": "length"
+ },
+ "valid": false,
+ "task": "exp1/pong",
+ "rep": 1,
+ "effort": "high",
+ "prompt_sha256": "1b143ac2f46ab7a0c4b3eb45bd2b9d82314c3b24e2d2412f80566946c935c5ba",
+ "logs_sha": "4d09ba6d6a7e891dd8063974dfe81b3d78e3494f",
+ "finished_at": "2026-11-02T23:17:30-0600"
+}

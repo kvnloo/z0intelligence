@@ -1,0 +1,38 @@
+{
+ "editor": "fable",
+ "model_requested": "claude-fable-5-1",
+ "model_observed": "claude-fable-5-1",
+ "text": "**Observations**\n\n*Indexing check.* Input i = (row\u00b710+col)\u00b75 + ch, so each block of 5 consecutive W1 rows is one cell (agent, moving, reward, obstacle, prev-frame). Rows 0\u201354 (row 0 and cell (1,0)) and rows 95\u2013104, 145\u2013154, \u2026 445\u2013499 (all border cells) are uniformly tiny (|w| < ~0.2). The border is constant, so its weights never grew \u2013 consistent.\n\n*Channel 0 (agent).* Very large weights, but only at a specific subset of interior cells:\n- row 55 (1,1): 1.706 \u22123.242 \u2026 4.081; row 65 (1,3): 4.742 \u2026 3.821 \u2026 3.890; row 120 (2,4): \u22123.315 \u22123.218 \u2026 5.140 4.144; row 175 (3,5): \u22125.208 \u2026 4.832; row 210 (4,2): \u2026 7.277 \u2026 4.750; row 230 (4,6): \u22125.170 \u2026 \u22125.528 \u22125.508; row 285 (5,7): \u22124.928 5.834; row 405 (8,1): \u22125.493 \u2026 \u22124.595; row 425 (8,5): \u22125.622 \u2026 \u22124.562 \u22124.434; row 440 (8,8): 2.749 \u2026 4.183.\n- But at 16 interior cells the agent channel is essentially zero (|w| \u2264 0.13): (2,2) row 110, (2,3) row 115, (2,6) row 130, (2,7) row 135, (3,2) row 160, (3,7) row 185, (4,4) row 220, (4,5) row 225, (5,4) row 270, (5,5) row 275, (6,2) row 310, (6,7) row 335, (7,2) row 360, (7,3) row 365, (7,6) row 380, (7,7) row 385.\nThe agent never occupies those cells. Laid out on the 8\u00d78 interior they form a perfectly symmetric pattern:\n```\nrow1: . . . . . . . .\nrow2: . # # . . # # .\nrow3: . # . . . . # .\nrow4: . . . # # . . .\nrow5: . . . # # . . .\nrow6: . # . . . . # .\nrow7: . # # . . # # .\nrow8: . . . . . . . .\n```\ni.e. four L\u2011shaped corner blocks plus a central 2\u00d72 block \u2013 a fixed interior maze.\n\n*Channel 1 (moving objects).* Moderate-to-large weights (1\u20136) at exactly the same corridor cells, and ~0 at the 16 blocked cells: row 126 (2,5): 2.762 \u2026 \u22125.209; row 236 (4,7): 4.226 \u2026 \u22125.925; row 241 (4,8): \u22124.641 \u2026 4.077; row 376 (7,5): 5.421 \u2026 \u22124.042; row 331 (6,6): \u22124.838; row 256 (5,1): \u22124.448. So the moving things travel through the same corridors as the agent, and their position strongly modulates the policy (avoid/escape behaviour).\n\n*Channel 2 (reward targets).* Weak almost everywhere; the only notable structure is a single hidden unit (unit 6) that collects negative weight from reward cells near the top-left: row 57 (1,1) \u22121.490, row 62 (1,2) \u22122.361, row 67 (1,3) \u22121.905, row 72 (1,4) \u22120.883, row 122 (2,4) \u22124.876, row 127 (2,5) \u22120.854, row 107 (2,1) \u22120.628; plus row 322 (6,4) with several \u00b11.5 values. Elsewhere |w| < 0.5. This looks like reward targets are nearly everywhere in the corridors (so almost constant and uninformative), with the net only tracking where a few remaining ones are.\n\n*Channel 3 (obstacles).* Tiny at every cell, including the border and the 16 interior block cells (e.g. rows 3, 58, 113, 123, 223, 273). So the obstacle layer is static (constant input \u2192 unused), and the moving objects are not in channel 3 \u2013 nothing in the obstacle layer ever moves.\n\n*Channel 4 (previous frame).* Consistent moderate weights at corridor cells, especially unit 6 \u2248 +0.7\u2026+1.0 (row 124: 0.898, row 109: 0.866\u2026 row 194: 0.891, row 239: 0.742, row 374: 0.601) and some \u22122 to \u22123 at unit 9 (rows 84, 89, 94, 144). Used to infer movement direction of the moving objects.\n\n*Output layer.* b3 = [\u22120.873, 0.703, 0.712, 0.595, \u22120.092]: no-op is strongly disfavoured; the agent always wants to move. W3 columns have many |w| > 2 for the four movement actions (e.g. unit 9 \u2192 down \u22123.070; unit 19 \u2192 down \u22122.927; unit 28 \u2192 right 2.500; unit 25 \u2192 left \u22122.491), while the no-op column is comparatively bland \u2013 the policy is a directional controller.\n\n**Reasoning**\n\n- The agent channel being exactly silent at a fixed, symmetric set of 16 interior cells means those cells are permanent walls: the game has a built\u2011in maze, not an open arena. That rules out open\u2011field games (dodge, chase on an empty board, Snake on an open grid).\n- Both the agent and the moving objects use the same corridor cells \u2192 the moving objects are maze\u2011dwelling enemies (ghosts), not falling blocks or a paddle/ball (Breakout/Pong would show column/row structure, Frogger/road\u2011crossing would show row\u2011band structure, Space Invaders would show agent confined to one row). The agent weights span all rows 1\u20138, so it moves freely in 2D.\n- Strong dependence on enemy positions and on the previous\u2011frame channel indicates evasion of chasing enemies; weak dependence on reward\u2011target positions indicates the reward targets fill the corridors (pellets) so their positions are nearly constant early on and only matter for the last few.\n- Static obstacle channel, moving\u2011object channel busy, reward channel mostly saturated, fixed symmetric maze, anti\u2011no\u2011op bias: this is the Pac\u2011Man template.\n\n**Game:** Pac\u2011Man\u2013style maze game: the agent moves through a fixed symmetric maze (corner L\u2011blocks + central 2\u00d72 block) collecting pellets while avoiding ghosts that roam the same corridors.\n\n**Description:** The agent navigates the maze corridors and is rewarded for eating pellets (reward targets) scattered along them; the episode ends (negative outcome) if it is caught by one of the moving ghosts, so the policy mainly reads its own position and the ghosts' positions/motion to pick a safe direction and keeps moving.\n\n**Confidence:** 70%",
+ "usage": {
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 0,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 0,
+  "inference_geo": "global",
+  "input_tokens": 79060,
+  "output_tokens": 13696,
+  "output_tokens_details": {
+   "thinking_tokens": 11458
+  },
+  "server_tool_use": null,
+  "service_tier": "standard",
+  "speed": "standard"
+ },
+ "wall_s": 159.72517776489258,
+ "exit_code": 0,
+ "tool_free": true,
+ "audit_note": "no tools offered (raw API); stop_reason=end_turn",
+ "raw_path": "/home/kvn/.z0int/state/weight-space/20261102-grid/fable/exp1/pacman/r1/response.json",
+ "extra": {
+  "stop_reason": "end_turn"
+ },
+ "valid": true,
+ "task": "exp1/pacman",
+ "rep": 1,
+ "effort": "high",
+ "prompt_sha256": "1c75e66aab1e611bdb07a87d6f70e3d2ba3d149e58f259b5ad7a485661244acf",
+ "logs_sha": "4d09ba6d6a7e891dd8063974dfe81b3d78e3494f",
+ "finished_at": "2026-11-02T23:14:11-0600"
+}
