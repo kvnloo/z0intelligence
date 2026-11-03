@@ -422,3 +422,70 @@ def gh_read_allows(cached: bool, poller: bool) -> bool:
 
 def gh_write_allows(backoff: bool) -> bool:
     return not backoff
+
+
+# O18: privacy-tier model routing. Tier eligibility is the owner's table in
+# sft-svlm/data/privacy/README.md (pol-1.2, approved 2026-10-20):
+#   T0 public -> any lane; T1 personal -> local, paid subs (Claude/ChatGPT/Codex),
+#   approved free (Cerebras); T2 sensitive / T3 third-party -> local only;
+#   T4 secret -> nothing. An unclassified tier is local-only.
+# Free lanes never take agentic (tool/code) work; agentic T0/T1 work never
+# falls back to the weak local lane: with no paid lane it waits.
+class Tier(Enum):
+    PUBLIC = 0
+    PERSONAL = 1
+    UNKNOWN = 2
+    SENSITIVE = 3
+    THIRD = 4
+    SECRET = 5
+
+
+class MLane(Enum):
+    LOCAL = "local"
+    PAID = "paid"
+    FREE_OK = "free_ok"
+    FREE_PUB = "free_pub"
+
+
+class Task(Enum):
+    AGENTIC = "agentic"
+    SIMPLE = "simple"
+
+
+def tier_join(a: Tier, b: Tier) -> Tier:
+    return b if b.value > a.value else a
+
+
+def tier_allows(t: Tier, lane: MLane) -> bool:
+    if t is Tier.PUBLIC:
+        return True
+    if t is Tier.PERSONAL:
+        return lane is not MLane.FREE_PUB
+    if t is Tier.SECRET:
+        return False
+    return lane is MLane.LOCAL
+
+
+def task_fits(k: Task, lane: MLane) -> bool:
+    return k is Task.SIMPLE or lane in (MLane.PAID, MLane.LOCAL)
+
+
+def _lane_ok(t: Tier, k: Task, lane: MLane, up: bool) -> bool:
+    return up and tier_allows(t, lane) and task_fits(k, lane)
+
+
+SIMPLE_ORDER = (MLane.FREE_OK, MLane.FREE_PUB, MLane.LOCAL, MLane.PAID)
+
+
+def route(t: Tier, k: Task, local: bool, paid: bool, free_ok: bool, free_pub: bool):
+    """('use', MLane) | ('queue', None) | ('refuse', None)."""
+    if t is Tier.SECRET:
+        return ("refuse", None)
+    up = {MLane.LOCAL: local, MLane.PAID: paid, MLane.FREE_OK: free_ok, MLane.FREE_PUB: free_pub}
+    if k is Task.AGENTIC:
+        lane = MLane.PAID if tier_allows(t, MLane.PAID) else MLane.LOCAL
+        return ("use", lane) if _lane_ok(t, k, lane, up[lane]) else ("queue", None)
+    for lane in SIMPLE_ORDER:
+        if _lane_ok(t, k, lane, up[lane]):
+            return ("use", lane)
+    return ("queue", None)

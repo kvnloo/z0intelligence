@@ -1,0 +1,74 @@
+{
+  "verdict_mode": true,
+  "rows": [
+    {
+      "law": "-",
+      "mutation": "reference (unmodified)",
+      "proofs_check": true,
+      "where": ""
+    },
+    {
+      "law": "O18 o18_secret_refused",
+      "mutation": "secrets are routed like any other tier",
+      "proofs_check": false,
+      "where": "Laws.o18_secret_refused"
+    },
+    {
+      "law": "O18 o18_route_sound",
+      "mutation": "personal data may go to a free lane that trains on prompts",
+      "proofs_check": false,
+      "where": "Laws.o18_route_sound"
+    },
+    {
+      "law": "O18 o18_route_sound",
+      "mutation": "sensitive and unknown tiers may use the cloud",
+      "proofs_check": false,
+      "where": "Laws.o18_route_sound"
+    },
+    {
+      "law": "O18 o18_free_never_agentic",
+      "mutation": "agentic work routed like simple work (free lanes first)",
+      "proofs_check": false,
+      "where": "Laws.o18_route_sound"
+    },
+    {
+      "law": "O18 o18_agentic_no_weak_fallback",
+      "mutation": "agentic personal work falls back to the local model",
+      "proofs_check": false,
+      "where": "Laws.o18_agentic_no_weak_fallback"
+    },
+    {
+      "law": "O18 o18_sensitive_waits_without_local",
+      "mutation": "lane availability is ignored",
+      "proofs_check": false,
+      "where": "Laws.o18_route_sound"
+    },
+    {
+      "law": "O18 o18_public_simple_prefers_free",
+      "mutation": "public free lane preferred over the approved one",
+      "proofs_check": false,
+      "where": "Laws.o18_public_simple_prefers_free"
+    },
+    {
+      "law": "O18 o18_join_sound_right",
+      "mutation": "taint join ignores the second tier",
+      "proofs_check": false,
+      "where": "Laws.o18_join_sound_right"
+    },
+    {
+      "law": "O18 o18_join_secret",
+      "mutation": "secret ranks below third-party data",
+      "proofs_check": false,
+      "where": "Laws.o18_join_sound_left"
+    },
+    {
+      "law": "O18 o18_unknown_agentic_local",
+      "mutation": "unclassified data counts as personal",
+      "proofs_check": false,
+      "where": "Laws.o18_route_sound"
+    }
+  ],
+  "rejected": 10,
+  "total": 10,
+  "reference_restored": true
+}
