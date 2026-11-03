@@ -1,0 +1,50 @@
+{
+  "verdict_mode": true,
+  "rows": [
+    {
+      "law": "-",
+      "mutation": "reference (unmodified)",
+      "proofs_check": true,
+      "where": ""
+    },
+    {
+      "law": "O17 o17_poller_direct_read_refused",
+      "mutation": "poller falls back to api.github.com",
+      "proofs_check": false,
+      "where": "Laws.o17_poller_direct_read_refused"
+    },
+    {
+      "law": "O17 o17_poller_cached_read_allowed",
+      "mutation": "cached poller reads refused",
+      "proofs_check": false,
+      "where": "Laws.o17_poller_cached_read_allowed"
+    },
+    {
+      "law": "O17 o17_interactive_direct_read_allowed",
+      "mutation": "interactive direct reads refused",
+      "proofs_check": false,
+      "where": "Laws.o17_interactive_direct_read_allowed"
+    },
+    {
+      "law": "O17 o17_cached_read_always_allowed",
+      "mutation": "cache ignored for pollers",
+      "proofs_check": false,
+      "where": "Laws.o17_poller_cached_read_allowed"
+    },
+    {
+      "law": "O17 o17_backoff_write_refused",
+      "mutation": "backoff ignored on write",
+      "proofs_check": false,
+      "where": "Laws.o17_backoff_write_refused"
+    },
+    {
+      "law": "O17 o17_clear_write_allowed",
+      "mutation": "every write refused",
+      "proofs_check": false,
+      "where": "Laws.o17_clear_write_allowed"
+    }
+  ],
+  "rejected": 6,
+  "total": 6,
+  "reference_restored": true
+}
