@@ -263,3 +263,54 @@ def test_exhausted_reject_drains_reply_503_without_blocking(monkeypatch):
     assert b"\r\nX-Z0-Execution: not_started\r\n" in request.sent
     with METRIC_LOCK:
         assert METRICS["rejected_connections_total"] == before_rejected + 1
+
+
+def test_shutdown_waits_for_inflight_reject_drain_503(monkeypatch):
+    import z0int.intelligence_service as svc
+
+    # Withhold the declared body so the connection must be handed to a drain
+    # worker. A returned server_close() must mean its 503 and close are done.
+    draining = threading.Event()
+    draining.set()
+    monkeypatch.setattr(svc, "DRAINING", draining)
+    handed_off = threading.Event()
+    original_drain = Service.drain_and_reject
+
+    def record_handoff(self, request, data):
+        handed_off.set()
+        return original_drain(self, request, data)
+
+    monkeypatch.setattr(Service, "drain_and_reject", record_handoff)
+    server = Service(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with socket.create_connection(server.server_address, timeout=3) as client:
+            client.sendall(
+                b"POST /v1/plan HTTP/1.1\r\nHost: x\r\nContent-Length: 1\r\n\r\n"
+            )
+            assert handed_off.wait(timeout=3), "no reject-thread handoff"
+            server.shutdown()
+            server.server_close()
+
+            # Base 8852fa5 closes the server without waiting for the daemon
+            # worker's one-second drain. Do not wait for that late response.
+            client.settimeout(0.25)
+            response = b""
+            while chunk := client.recv(65536):
+                response += chunk
+
+        status, _, rest = response.partition(b"\r\n")
+        headers, separator, payload = rest.partition(b"\r\n\r\n")
+        assert status == b"HTTP/1.1 503 Service Unavailable"
+        assert separator == b"\r\n\r\n"
+        header_lines = headers.split(b"\r\n")
+        assert b"Retry-After: 1" in header_lines
+        assert b"X-Z0-Execution: not_started" in header_lines
+        assert b"Content-Length: 0" in header_lines
+        assert payload == b""
+        # The recv loop terminated on EOF, not on a timeout or reset.
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)

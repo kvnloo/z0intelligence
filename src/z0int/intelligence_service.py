@@ -122,19 +122,21 @@ REJECTED_REPLY=(
 )
 
 
-def drain_rejected_request(request, seconds=REJECT_DRAIN_SECONDS, cap=REJECT_DRAIN_BYTES, data=b''):
+def drain_rejected_request(request, seconds=REJECT_DRAIN_SECONDS, cap=REJECT_DRAIN_BYTES, data=b'', stop_event=None):
     """Read and discard headers plus Content-Length body before the 503.
 
     Closing with unread request bytes makes the kernel reset the connection, so a
     client still writing (headers and body in separate sends) gets EPIPE/ECONNRESET
     instead of the 503. Bounded by deadline and byte cap. seconds=None reads only
     what is already buffered, never blocking. Returns (finished, data); unfinished
-    only when seconds=None and the request is still incomplete.
+    only when seconds=None and the request is still incomplete. stop_event
+    allows server_close() to end a pending drain before its deadline.
     """
     deadline=None if seconds is None else time.monotonic()+seconds
     need=None
     try:
         while len(data)<=cap:
+            if stop_event is not None and stop_event.is_set():return True,data
             if need is None and b'\r\n\r\n' in data:
                 head,_,_=data.partition(b'\r\n\r\n')
                 length=0
@@ -149,8 +151,11 @@ def drain_rejected_request(request, seconds=REJECT_DRAIN_SECONDS, cap=REJECT_DRA
             else:
                 remaining=deadline-time.monotonic()
                 if remaining<=0:return True,data
-                request.settimeout(remaining)
+                request.settimeout(min(remaining, 0.05) if stop_event is not None else remaining)
             try:chunk=request.recv(min(65536,cap+1-len(data)))
+            except TimeoutError:
+                if stop_event is not None:continue
+                raise
             except BlockingIOError:
                 if deadline is None:return False,data
                 raise
@@ -165,6 +170,12 @@ class Service(ThreadingHTTPServer):
     daemon_threads=False
     request_queue_size=SOCKET_BACKLOG
 
+    def __init__(self, *args, **kwargs):
+        self._reject_threads_lock = threading.Lock()
+        self._reject_threads = set()
+        self._reject_stop = threading.Event()
+        super().__init__(*args, **kwargs)
+
     def process_request(self, request, address):
         if DRAINING.is_set() or not SLOTS.acquire(blocking=False):
             metric("rejected_connections_total")
@@ -173,10 +184,16 @@ class Service(ThreadingHTTPServer):
             # drain thread, and skip the drain when those are exhausted.
             finished,data=drain_rejected_request(request,None)
             if not finished and REJECT_DRAINS.acquire(blocking=False):
-                try:
-                    threading.Thread(target=self.drain_and_reject,args=(request,data),daemon=True).start()
-                    return
-                except RuntimeError:REJECT_DRAINS.release()
+                worker = threading.Thread(target=self.drain_and_reject,args=(request,data),daemon=True)
+                with self._reject_threads_lock:
+                    self._reject_threads.add(worker)
+                    try:
+                        worker.start()
+                    except RuntimeError:
+                        self._reject_threads.discard(worker)
+                        REJECT_DRAINS.release()
+                    else:
+                        return
             self.reject(request)
             return
         metric("admitted_connections_total")
@@ -186,9 +203,25 @@ class Service(ThreadingHTTPServer):
 
     def drain_and_reject(self, request, data):
         try:
-            drain_rejected_request(request,data=data)
+            drain_rejected_request(request,data=data,stop_event=self._reject_stop)
             self.reject(request)
-        finally:REJECT_DRAINS.release()
+        finally:
+            REJECT_DRAINS.release()
+            with self._reject_threads_lock:
+                self._reject_threads.discard(threading.current_thread())
+
+    def server_close(self):
+        # Reject workers are daemon threads, not ThreadingHTTPServer workers.
+        # Flush their 503s before returning from a graceful close.
+        self._reject_stop.set()
+        deadline = time.monotonic() + REJECT_DRAIN_SECONDS
+        try:
+            with self._reject_threads_lock:
+                workers = tuple(self._reject_threads)
+            for worker in workers:
+                worker.join(max(0.0, deadline - time.monotonic()))
+        finally:
+            super().server_close()
 
     def reject(self, request):
         try:request.sendall(REJECTED_REPLY)
