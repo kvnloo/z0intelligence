@@ -31,8 +31,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import editors  # noqa: E402
-import edits  # noqa: E402
+import editors
+import edits
 
 LOGS_REPO = "https://github.com/RikiyaT/lm_understand-logs.git"
 LOGS_SHA = "4d09ba6d6a7e891dd8063974dfe81b3d78e3494f"
@@ -59,7 +59,7 @@ def fetch() -> Path:
     if not (CACHE / ".git").exists():
         CACHE.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(["git", "clone", "-q", "--filter=blob:limit=5m", LOGS_REPO, str(CACHE)], check=True)
-    head = subprocess.run(["git", "-C", str(CACHE), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    head = subprocess.run(["git", "-C", str(CACHE), "rev-parse", "HEAD"], check=False, capture_output=True, text=True).stdout.strip()
     if head != LOGS_SHA:
         subprocess.run(["git", "-C", str(CACHE), "checkout", "-q", LOGS_SHA], check=True)
     return CACHE
@@ -90,7 +90,7 @@ def _line(text: str, label: str) -> str | None:
     """The answer for `label`: text after "Label:", "**Label:**" or a "## Label" heading; when that line
     holds nothing but markup, the next non-empty line. The last occurrence wins (the answer block)."""
     lines = text.splitlines()
-    pat = re.compile(rf"^[#>*_\s]*{label}[*_\s]*(?::|$)[*_\s]*(.*)$", re.I)
+    pat = re.compile(rf"^[#>*_\s]*{label}[*_\s]*(?::|$)[*_\s]*(.*)$", re.IGNORECASE)
     found = None
     for i, ln in enumerate(lines):
         m = pat.match(ln)
@@ -133,7 +133,7 @@ def score_write(task: dict, text: str, out: Path, episodes: int) -> dict:
     py = str(py) if py.exists() else sys.executable
     p = subprocess.run([py, str(HERE / "minatar_eval.py"), str(out / "net.npz"), "--game", task["truth"],
                         "--prompt", str(task["prompt_path"]), "--episodes", str(episodes), "--seed", "0"],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, check=False)
     res = json.loads(p.stdout) if p.returncode == 0 else {"error": p.stderr[-2000:]}
     return {"edit_report": rep, "minatar": res, "mean": res.get("mean")}
 

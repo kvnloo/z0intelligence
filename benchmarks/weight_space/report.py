@@ -97,8 +97,8 @@ def main():
         p = PPO[t]
         md.append(f"| {t.split('/')[1]} | {p[0]} / {p[1]} | {PAPER_ASTRA[t]} | " + " | ".join(
             " / ".join(write_cell(r) for r in by.get((x, t), [])) or "—" for x in write_arms) + " |")
-    md += ["", "∅ (no weights) = the reply had no `edits` block: the model spent its whole output budget "
-           "(128k tokens on the API routes) reasoning.", "",
+    md += ["", ("∅ (no weights) = the reply had no `edits` block: the model spent its whole output budget "
+           "(128k tokens on the API routes) reasoning."), "",
            "## Cost per cell", "", "| arm | task | effort | out tok | reasoning tok | wall s | finish |",
            "|---|---|---|---|---|---|---|"]
     for r in sorted(rows, key=lambda r: (r["arm"], r["task"], r["rep"])):

@@ -60,7 +60,7 @@ def model_dir(target: str) -> Path:
     cached = home / 'hub' / ('models--' + t['hf'].replace('/', '--')) / 'snapshots' / str(t['rev'])
     if (cached / 'config.json').exists() and any(cached.glob('*.safetensors')):
         return cached
-    from huggingface_hub import snapshot_download  # noqa: PLC0415
+    from huggingface_hub import snapshot_download
     return Path(snapshot_download(t["hf"], revision=t["rev"],
                                   allow_patterns=["*.json", "*.safetensors", "*.jinja", "*.model", "*.txt"]))
 
@@ -86,7 +86,7 @@ def pin_data() -> dict:
     if f.exists():
         DATA_REVS.update(json.loads(f.read_text()))
     else:
-        from huggingface_hub import HfApi  # noqa: PLC0415
+        from huggingface_hub import HfApi
         api = HfApi()
         DATA_REVS.update({"math500": api.dataset_info("HuggingFaceH4/MATH-500").sha,
                           "gsm8k": api.dataset_info("openai/gsm8k").sha})
@@ -98,16 +98,16 @@ def pin_data() -> dict:
 def eval_items() -> list[dict]:
     """A fixed, seed-chosen subset of MATH-500 and GSM8K test (never shown to the editor)."""
     pin_data()
-    import random  # noqa: PLC0415
+    import random
 
-    from huggingface_hub import hf_hub_download  # noqa: PLC0415
+    from huggingface_hub import hf_hub_download
     out = []
     p = hf_hub_download("HuggingFaceH4/MATH-500", "test.jsonl", repo_type="dataset", revision=DATA_REVS["math500"])
     m = [json.loads(x) for x in Path(p).read_text().split("\n") if x.strip()]
     for r in random.Random(0).sample(m, EVAL_N):
         out.append({"id": "math500:" + r["unique_id"], "source": "math500", "problem": r["problem"],
                     "answer": r["answer"]})
-    import pyarrow.parquet as pq  # noqa: PLC0415
+    import pyarrow.parquet as pq
     p = hf_hub_download("openai/gsm8k", "main/test-00000-of-00001.parquet", repo_type="dataset", revision=DATA_REVS["gsm8k"])
     g = pq.read_table(p).to_pylist()
     for i in sorted(random.Random(0).sample(range(len(g)), EVAL_N)):
@@ -138,13 +138,13 @@ def is_correct(pred: str | None, gold: str) -> bool:
     if pred is None:
         return False
     try:
-        from math_verify import parse, verify  # noqa: PLC0415
+        from math_verify import parse, verify
         g, p = parse("\\boxed{" + gold + "}"), parse("\\boxed{" + pred + "}")
         if g and p and verify(g, p):
             return True
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001, S110 - fallback below is exact normalization, not an assumed pass
         pass
-    norm = lambda s: re.sub(r"[\s$]|\\[!,;]|\\text\{[^}]*\}|\\left|\\right", "", s).rstrip(".")  # noqa: E731
+    norm = lambda s: re.sub(r"[\s$]|\\[!,;]|\\text\{[^}]*\}|\\left|\\right", "", s).rstrip(".")
     return norm(pred) == norm(gold)
 
 

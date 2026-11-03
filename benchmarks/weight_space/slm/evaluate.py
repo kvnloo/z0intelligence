@@ -15,8 +15,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import common as C  # noqa: E402
-from session import _paired, gpu_job, summarize  # noqa: E402
+import common as C
+from session import _paired, gpu_job, summarize
 
 OUT = HERE.parent / "results" / "slm"
 

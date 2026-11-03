@@ -105,7 +105,8 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args(argv)
     net = dict(np.load(a.net))
-    res = evaluate(net, a.game, channel_map(open(a.prompt).read()), a.episodes, a.seed)
+    from pathlib import Path
+    res = evaluate(net, a.game, channel_map(Path(a.prompt).read_text()), a.episodes, a.seed)
     json.dump(res, sys.stdout)
     print()
 

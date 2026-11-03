@@ -105,7 +105,7 @@ def run(code: str, work: Path, model_dir: Path, practice_dir: Path, venv: Path, 
            str(py), "-I", "-c", PRELUDE + "\n" + _with_last_expr(code)]
     t0 = time.time()
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT, preexec_fn=_limits)
+        p = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=TIMEOUT, preexec_fn=_limits)
         out = p.stdout + (("\n[stderr]\n" + p.stderr[-4000:]) if p.stderr.strip() else "")
     except subprocess.TimeoutExpired:
         out = f"[timed out after {TIMEOUT} s]"

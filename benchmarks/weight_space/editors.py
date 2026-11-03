@@ -133,7 +133,7 @@ def call(editor: str, prompt: str, effort: str, workdir: Path, timeout_s: int = 
 
 def _run(cmd, stdin: str, cwd: Path, env=None, timeout_s=3600):
     t0 = time.time()
-    p = subprocess.run(cmd, input=stdin, capture_output=True, text=True, cwd=cwd, env=env, timeout=timeout_s)
+    p = subprocess.run(cmd, check=False, input=stdin, capture_output=True, text=True, cwd=cwd, env=env, timeout=timeout_s)
     return p, time.time() - t0
 
 
@@ -178,7 +178,7 @@ def _claude(editor, model, prompt, effort, workdir, timeout_s):
     token = os.environ.get("ANTHROPIC_TOKEN")
     if not token:
         raise RuntimeError("ANTHROPIC_TOKEN missing: run under `bws-env-exec --scope hermes -- ...`")
-    ver = subprocess.run(["claude", "--version"], capture_output=True, text=True).stdout.split()[0]
+    ver = subprocess.run(["claude", "--version"], check=False, capture_output=True, text=True).stdout.split()[0]
     client = anthropic.Anthropic(auth_token=token, timeout=timeout_s, default_headers={
         "anthropic-beta": "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14",
         "user-agent": f"claude-code/{ver} (external, cli)", "x-app": "cli"})
@@ -379,7 +379,7 @@ def _claude_msgs(editor, model, msgs, effort, workdir, timeout_s):
     import anthropic
 
     token = os.environ["ANTHROPIC_TOKEN"]
-    ver = subprocess.run(["claude", "--version"], capture_output=True, text=True).stdout.split()[0]
+    ver = subprocess.run(["claude", "--version"], check=False, capture_output=True, text=True).stdout.split()[0]
     client = anthropic.Anthropic(auth_token=token, timeout=timeout_s, default_headers={
         "anthropic-beta": "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14",
         "user-agent": f"claude-code/{ver} (external, cli)", "x-app": "cli"})

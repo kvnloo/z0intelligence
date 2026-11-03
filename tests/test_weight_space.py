@@ -14,8 +14,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "slm"))
 
 np = pytest.importorskip("numpy")
-import edits  # noqa: E402
-import run  # noqa: E402
+import edits
+import run
 
 LOGS = run.CACHE
 needs_logs = pytest.mark.skipif(not (LOGS / "exp1_which_game").exists(), reason="lm_understand-logs not fetched")

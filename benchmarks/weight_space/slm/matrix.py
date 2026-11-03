@@ -6,11 +6,10 @@ Never changes services, the OOM guard, or other users' GPU jobs.
 """
 import argparse
 import json
-import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -35,19 +34,34 @@ def main():
             continue
         cmd = [sys.executable, str(HERE/'session.py'), '--run-id', a.run_id, '--target', target,
                '--editor', editor, '--passes', str(a.passes), '--effort', 'high']
+        # Admission precedes subprocess imports as well as GPU work: importing the client/model stacks can
+        # itself exceed the host's headroom. After a bounded wait, exit with resumable capacity status.
+        mem = 0
+        for _ in range(360):
+            mem = next(int(ln.split()[1]) // 1024 for ln in Path('/proc/meminfo').read_text().splitlines()
+                       if ln.startswith('MemAvailable:'))
+            if mem >= 6000:
+                break
+            time.sleep(10)
+        if mem < 6000:
+            print('CAPACITY_BLOCKED: <6 GB available for one hour; resume this matrix later', flush=True)
+            return 75
         print(time.strftime('%F %T'), 'START', target, editor, flush=True)
         with open(root/f'{target}__{editor}.log', 'a') as f:
             try:
-                p = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, timeout=8*3600)
+                p = subprocess.run(cmd, check=False, stdout=f, stderr=subprocess.STDOUT, timeout=8*3600)
                 code = p.returncode
             except subprocess.TimeoutExpired:
                 code = 124
         with open(events,'a') as f:
             f.write(json.dumps({'time':time.strftime('%FT%T%z'),'target':target,'editor':editor,'exit_code':code})+'\n')
         print(time.strftime('%F %T'), 'END', target, editor, code, flush=True)
+        if code in (-9, -15, 137, 143):
+            print('CAPACITY_ABORT: signalled cell; stopping instead of cascading through all remaining cells', flush=True)
+            return 75
     cmd = [sys.executable,str(HERE/'evaluate.py'),'--run-id',a.run_id]
     with open(root/'evaluation.log','a') as f:
-        p = subprocess.run(cmd,stdout=f,stderr=subprocess.STDOUT,timeout=24*3600)
+        p = subprocess.run(cmd,check=False,stdout=f,stderr=subprocess.STDOUT,timeout=24*3600)
     print('EVALUATION exit',p.returncode,flush=True)
     return p.returncode
 

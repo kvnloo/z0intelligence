@@ -25,10 +25,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
-import common as C  # noqa: E402
-import sandbox  # noqa: E402
-
-import editors  # noqa: E402
+import common as C
+import editors
+import sandbox
 
 VENV = Path(os.environ.get("WSP_GPU_VENV", HERE.parent.parent.parent / ".venv-wsp-gpu"))
 MAX_TURNS, MAX_PY = 45, 40
@@ -73,7 +72,7 @@ RULES. Not allowed: (a) gradient descent or any other training: no backward pass
 HOW THE SESSION RUNS. One block per reply (```python or ```forward). It continues until all {passes} forward passes are used or {MAX_TURNS} replies have been made; then make your final choice (the tensors in /work/edited when you finish are submitted; an empty /work/edited submits the unedited model) and reply without a code block, saying what you changed, the evidence for it and why you expect it to help."""
 
 
-_BLOCK = re.compile(r"```(python|forward)[ \t]*\n(.*?)```", re.S)
+_BLOCK = re.compile(r"```(python|forward)[ \t]*\n(.*?)```", re.DOTALL)
 
 
 def first_block(text: str):
@@ -112,7 +111,7 @@ def summarize(rows: list[dict]) -> dict:
 
 
 def _mem_available_mb() -> int:
-    for ln in open("/proc/meminfo"):
+    for ln in Path("/proc/meminfo").read_text().splitlines():
         if ln.startswith("MemAvailable:"):
             return int(ln.split()[1]) // 1024
     return 0
@@ -131,7 +130,7 @@ def gpu_job(mode: str, req: dict, out: Path, attempts: int = 8) -> dict:
         if _mem_available_mb() < 6000:
             raise RuntimeError('host RAM below 6 GB for 20 minutes; GPU run not started')
         p = subprocess.run([str(VENV / "bin" / "python"), str(HERE / "gpu.py"), mode, str(out / "request.json"),
-                            str(out)], capture_output=True, text=True,
+                            str(out)], check=False, capture_output=True, text=True,
                            env={**os.environ, "TOKENIZERS_PARALLELISM": "false"})
         (out / f"gpu.{a}.log").write_text(p.stdout[-20000:] + "\n--- stderr ---\n" + p.stderr[-40000:])
         if p.returncode == 0:

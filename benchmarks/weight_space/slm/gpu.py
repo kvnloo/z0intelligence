@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import common as C  # noqa: E402
+import common as C
 
 LOCK = C.STATE / "gpu.lock"
 
@@ -136,8 +136,7 @@ def generate(req: dict, out: Path) -> dict:
                          "correct": (C.is_correct(pred, gold) if gold is not None else None)})
         print(f"batch {b0 // bs + 1}/{-(-len(jobs) // bs)} {time.time() - t0:.0f}s", flush=True)
     with open(out / "gen.jsonl", "w") as f:
-        for r in rows:
-            f.write(json.dumps(r) + "\n")
+        f.writelines(json.dumps(r) + "\n" for r in rows)
     return {"generations": len(rows), "wall_s": round(time.time() - t0, 1), "checkpoint": str(ck), "engine": "hf"}
 
 
@@ -169,10 +168,10 @@ def teacher_forced(req: dict, out: Path) -> dict:
                 v, ix = logp.topk(topk, -1)
                 tk_ids.append(ix.cpu().numpy())
                 tk_lp.append(v.cpu().numpy())
-            for l in hs:
-                hs[l].append(o.hidden_states[l][0].float().cpu().numpy())
-            for l in mlps:
-                mlps[l].append(store[l][0].numpy())
+            for l, values in hs.items():
+                values.append(o.hidden_states[l][0].float().cpu().numpy())
+            for l, values in mlps.items():
+                values.append(store[l][0].numpy())
             lens.append(ids.shape[1])
     for h in hooks:
         h.remove()

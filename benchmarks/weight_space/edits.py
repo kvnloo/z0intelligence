@@ -20,8 +20,8 @@ SHAPES = {"W1": (600, 32), "b1": (32,), "W2": (32, 32), "b2": (32,), "W3": (32, 
 NAMES = {"W1": "actor/dense1/kernel", "b1": "actor/dense1/bias", "W2": "actor/dense2/kernel",
          "b2": "actor/dense2/bias", "W3": "actor/logits/kernel", "b3": "actor/logits/bias"}
 
-_BLOCK = re.compile(r"```edits[ \t]*\n(.*?)(?:```|\Z)", re.S)
-_STMT = re.compile(r"^\s*(W1|b1|W2|b2|W3|b3)\s*\[(.*?)\]\s*(\+=|-=|\*=|=)\s*(.+)$", re.S)
+_BLOCK = re.compile(r"```edits[ \t]*\n(.*?)(?:```|\Z)", re.DOTALL)
+_STMT = re.compile(r"^\s*(W1|b1|W2|b2|W3|b3)\s*\[(.*?)\]\s*(\+=|-=|\*=|=)\s*(.+)$", re.DOTALL)
 
 
 def last_block(text: str) -> tuple[str | None, bool]:
@@ -29,7 +29,7 @@ def last_block(text: str) -> tuple[str | None, bool]:
     if not blocks:
         return None, False
     m = blocks[-1]
-    cut_off = not text[m.end() - 3:m.end()] == "```"
+    cut_off = text[m.end() - 3:m.end()] != "```"
     return m.group(1), cut_off
 
 
