@@ -663,3 +663,23 @@ def Laws.o16_sqlite_current_sidecar():
 
 def Laws.o16_sqlite_unknown_holders(ghosts):
   {==}
+
+
+# O17. Every row of the GitHub access table is a constructor equality.
+def Laws.o17_poller_direct_read_refused():
+  {==}
+
+def Laws.o17_poller_cached_read_allowed():
+  {==}
+
+def Laws.o17_interactive_direct_read_allowed():
+  {==}
+
+def Laws.o17_cached_read_always_allowed(poller):
+  {==}
+
+def Laws.o17_backoff_write_refused():
+  {==}
+
+def Laws.o17_clear_write_allowed():
+  {==}
