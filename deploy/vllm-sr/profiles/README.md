@@ -2,7 +2,7 @@
 
 Clients pick an objective by model name; the router picks the backend. Every profile is an `entrypoints` entry
 mapped to a `recipes` entry in `../config.yaml`. Hermes aliases (`clean` profile): `turbo`, `free-quality`,
-`free-reasoning`, `free-verify`, `free-longctx`, `free-public`, e.g. `hermes -m free-quality -z "..."`.
+`free-reasoning`, `free-verify`, `free-longctx`, e.g. `hermes -m free-quality -z "..."`.
 
 | Profile (model name) | For | Backends (random + fallback on 408/413/429/5xx) |
 |---|---|---|
@@ -11,7 +11,6 @@ mapped to a `recipes` entry in `../config.yaml`. Hermes aliases (`clean` profile
 | `vllm-sr/free-reasoning` | Arithmetic, dates, logic, table aggregation | nemotron-3.5-super-vl:free, nemotron-3-ultra (x2), dots-3-note:free |
 | `vllm-sr/free-verify` | The *check* in draft->check; claim and answer verification | same as free-reasoning |
 | `vllm-sr/free-longctx` | 8k-32k token inputs (needle and multi-needle) | same as free-reasoning (Groq excluded: 413 above 8K TPM) |
-| `vllm-sr/free-public` | Scrubbed, non-private inputs only (Google may train on free-tier prompts) | Gemini 3.5 Flash Lite |
 
 Owner rules that apply to every free profile: easy, well-defined, non-code tasks; verify the output.
 Cerebras is trial credit, not free; it sits only in `turbo`.
