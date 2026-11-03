@@ -74,11 +74,23 @@ providers:
       provider_model_id: grok-4.7
       backend_refs:
         - {name: subproxy-xai, provider: vllm, openai_compat_gateway: true, base_url: "http://10.42.0.1:18800/xai/v1", api_key_env: VLLM_SR_SUBPROXY_TOKEN, weight: 100}
+    # --- O18 privacy lanes (2026-11-03): local = groot's llama.cpp router (z0-farm-llama.service, tailnet IP;
+    # reachable from the pod, never leaves the host). Lane per tier: z0intelligence bend/ops_fsm O18, privacy_lanes.py.
+    - name: local-qwen3-14b
+      provider_model_id: qwen3-14b-q4km
+      backend_refs:
+        - {name: groot-llama, provider: vllm, openai_compat_gateway: true, base_url: "http://100.113.138.100:11530/v1", weight: 100}
+    - name: local-qwen3-8b
+      provider_model_id: qwen3-8b-q4km
+      backend_refs:
+        - {name: groot-llama, provider: vllm, openai_compat_gateway: true, base_url: "http://100.113.138.100:11530/v1", weight: 100}
 routing:
   modelCards:
     - name: paid-claude-opus-5-5
     - name: paid-gpt-6.1-sol
     - name: paid-grok-4.7
+    - name: local-qwen3-14b
+    - name: local-qwen3-8b
     - name: groq-gpt-oss-20b
     - name: groq-gpt-oss-120b
     - name: groq-qwen3.8-27b
@@ -127,6 +139,13 @@ entrypoints:
     recipe: free-public
   - model_names: ["vllm-sr/paid"]
     recipe: paid
+  # O18 privacy lanes: tier-approved pools only (privacy_lanes.py checks every pool's backends).
+  - model_names: ["vllm-sr/private"]
+    recipe: private
+  - model_names: ["vllm-sr/free-private"]
+    recipe: free-private
+  - model_names: ["vllm-sr/local"]
+    recipe: local
 recipes:
   - name: paid
     description: "Owner paid subscriptions for main agent turns: Claude Opus (Ultra/sub2/original pool, rotated by the sub-proxy) -> ChatGPT Sol -> Grok."
@@ -150,6 +169,69 @@ recipes:
             total_timeout: 1800s
             per_attempt_timeout: 900s
             retryable_status_codes: [401, 403, 408, 429, 500, 502, 503, 504, 529]
+  - name: private
+    description: "O18 paid lane for T1 personal data: Claude Opus -> ChatGPT Sol only (pol-1.2 lists Claude/ChatGPT/Codex; Grok is not approved for T1)."
+    routing:
+      decisions:
+        - name: private
+          description: "Ordered paid fallback over tier-approved subscriptions."
+          priority: 100
+          rules:
+            operator: AND
+            conditions: []
+          modelRefs:
+            - {model: paid-claude-opus-5-5, use_reasoning: false}
+            - {model: paid-gpt-6.1-sol, use_reasoning: false}
+          algorithm:
+            type: static
+          fallback:
+            enabled: true
+            max_attempts: 2
+            total_timeout: 1800s
+            per_attempt_timeout: 900s
+            retryable_status_codes: [401, 403, 408, 429, 500, 502, 503, 504, 529]
+  - name: free-private
+    description: "O18 approved free lane for T1 simple work: Cerebras only (owner approved 2026-10-20). Non-code tasks."
+    routing:
+      decisions:
+        - name: free-private
+          description: "Cerebras pool."
+          priority: 100
+          rules:
+            operator: AND
+            conditions: []
+          modelRefs:
+            - {model: cerebras-qwen-3.8-27b, use_reasoning: false}
+            - {model: cerebras-gpt-oss-120b, use_reasoning: false}
+          algorithm:
+            type: random
+          fallback:
+            enabled: true
+            max_attempts: 2
+            total_timeout: 120s
+            per_attempt_timeout: 60s
+            retryable_status_codes: [408, 413, 429, 500, 502, 503, 504]
+  - name: local
+    description: "O18 local lane for T2/T3/unclassified data: groot llama.cpp router only; nothing leaves the host."
+    routing:
+      decisions:
+        - name: local
+          description: "Local SLMs (8k context)."
+          priority: 100
+          rules:
+            operator: AND
+            conditions: []
+          modelRefs:
+            - {model: local-qwen3-14b, use_reasoning: false}
+            - {model: local-qwen3-8b, use_reasoning: false}
+          algorithm:
+            type: static
+          fallback:
+            enabled: true
+            max_attempts: 2
+            total_timeout: 600s
+            per_attempt_timeout: 300s
+            retryable_status_codes: [500, 502, 503, 504]
   - name: free-quality
     description: "Most accurate reliable free models (hard-tier 0.94-1.00, reliability >= 0.97). Easy, well-defined, non-code work only."
     routing:
