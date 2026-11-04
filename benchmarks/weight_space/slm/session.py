@@ -42,8 +42,43 @@ def arch_text(model_dir: Path, target: str) -> str:
     return C.TARGETS[target]["about"] + ". Config (text part): " + json.dumps({k: tc[k] for k in keys if k in tc})
 
 
-def task_prompt(target: str, model_dir: Path, passes: int) -> str:
+def toolchoice_prompt(target: str, model_dir: Path, passes: int) -> str:
+    """Tool-choice variant of the task: same tools, budget and rules; the skill and the practice data differ."""
+    import toolchoice as T  # noqa: PLC0415
+    base = task_prompt(target, model_dir, passes, _math=True)
+    head = (f"TASK. You are given the weights of a small language model: {arch_text(model_dir, target)}. It is a "
+            "function-calling model used to pick which tool an agent should call. Your job is to make it better at "
+            "CHOOSING TOOLS by EDITING ITS WEIGHTS DIRECTLY. Its two known failures: (1) it calls a tool when none of "
+            "the offered tools fits the request (it should answer in plain text instead), and (2) among several "
+            "similar tools it picks a wrong near-miss. Find out what goes wrong inside the network and repair that "
+            "with targeted changes.\n\nHOW IT WILL BE MEASURED. After you finish, your edited model and the unedited "
+            "model are evaluated on held-out items of the same two kinds (no overlap with practice): the model's chat "
+            f"template with a developer message \"{T.SYSTEM}\", the tools, and the user request; sampling as in the "
+            "model card, at most 256 new tokens. Graded: only the name of the first function called "
+            "(<start_function_call>call:NAME...), or no call. Correct = the reference function, or no call when no "
+            "tool fits. Calls to unknown names are wrong. The config, tokenizer, chat template and decoding settings "
+            "are fixed: only weight values can change (same tensor names and shapes). You never see the held-out items.")
+    tools_part = base[base.index("\n\nYOUR TOOLS") if "\n\nYOUR TOOLS" in base else base.index("\n1. A Python sandbox"):]
+    tools_part = tools_part.replace(
+        "practice problems read-only in /practice", "practice items read-only in /practice")
+    import re as _re  # noqa: PLC0415
+    tools_part = _re.sub(r"2\. Practice problems with answers.*?\n", (
+        "2. Practice items (none of them is in the evaluation), one JSON object per line in "
+        "/practice/toolchoice_practice.jsonl: id, kind (\"abstain\" = no tool fits, gold \"none\"; \"choose\" = gold "
+        "is one function name), user, tools (name, description, parameters), gold.\n"), tools_part, count=1, flags=_re.S)
+    tools_part = tools_part.replace('"problems": ["<practice id>", ...], "prompts": ["<your own user message>", ...] (optional)',
+                                    '"problems": ["<practice id>", ...]')
+    tools_part = tools_part.replace(
+        "read failing practice answers: wrong answer, no final answer, or cut off at the token limit, often while "
+        "repeating itself", "read failing practice items: a call when no tool fits, a wrong similar tool, or an unknown "
+        "name; each generation result also reports false_call_pct, near_miss_pct and missed_call_pct")
+    return head + tools_part
+
+
+def task_prompt(target: str, model_dir: Path, passes: int, _math: bool = False) -> str:
     t = C.TARGETS[target]
+    if t.get("task") == "toolchoice" and not _math:
+        return toolchoice_prompt(target, model_dir, passes)
     think = ("the chat template with thinking enabled (the model reasons between <think> and </think>, then answers)"
              if t["thinking"] else "the model's chat template (no thinking mode)")
     samp = ", ".join(f"{k} {v}" for k, v in t["sampling"].items())
@@ -148,6 +183,43 @@ def gpu_job(mode: str, req: dict, out: Path, attempts: int = 8) -> dict:
     raise RuntimeError(f"forward pass failed (rc={p.returncode}): " + " | ".join(tail)[-1500:])
 
 
+def _forward_toolchoice(req, k, work, target, ids, n, mt, model) -> str:
+    import toolchoice as T  # noqa: PLC0415
+    if req.get("prompts"):
+        raise ValueError("custom prompts are not supported for the tool-choice task; use practice ids")
+    pr = {it["id"]: it for it in T.load("practice")}
+    missing = [i for i in ids if i not in pr]
+    if missing:
+        raise ValueError(f"unknown practice ids: {missing[:5]}")
+    items = [{"id": i, "source": pr[i]["kind"], "seed": int.from_bytes(i.encode()[-6:], "little") % 100_000,
+              "messages": [{"role": "developer", "content": T.SYSTEM}, {"role": "user", "content": pr[i]["user"]}],
+              "tools": T.to_openai_tools(pr[i]["tools"])} for i in ids]
+    arms = ["original", "edited"] if model == "both" else [model]
+    res = {}
+    for arm in arms:
+        out = work / ".gpu" / f"gen_{k}_{arm}"
+        gpu_job("generate", {"target": target, "edit_dir": str(work / "edited") if arm == "edited" else None,
+                             "items": items, "n": n, "max_tokens": mt}, out)
+        rws = []
+        for x in (out / "gen.jsonl").read_text().splitlines():
+            r = json.loads(x)
+            it = pr[r["id"]]
+            r["pred"] = T.predicted(r["text"], [tl["name"] for tl in it["tools"]])
+            r["gold"], r["source"], r["kind"] = it["gold"], it["kind"], it["kind"]
+            r["correct"] = r["pred"] == it["gold"]
+            rws.append(r)
+        name = f"gen_{k}_{arm}.jsonl" if model == "both" else f"gen_{k}.jsonl"
+        (work / name).write_text("".join(json.dumps(r) + "\n" for r in rws))
+        res[arm] = rws
+    summ = {arm: summarize(r) | {"choice": T.score(r)} for arm, r in res.items()}
+    for v in summ.values():
+        v.pop("no_boxed_answer", None)
+    if model == "both":
+        summ["paired"] = _paired(res["original"], res["edited"])
+    summ["files"] = sorted(p.name for p in work.glob(f"gen_{k}*.jsonl"))
+    return json.dumps(summ, indent=1)
+
+
 def forward(req: dict, k: int, work: Path, target: str) -> str:
     t = C.TARGETS[target]
     typ = req.get("type")
@@ -160,6 +232,8 @@ def forward(req: dict, k: int, work: Path, target: str) -> str:
         if (len(ids) + len(prompts)) * n > cap:
             raise ValueError(f"items x n = {(len(ids) + len(prompts)) * n} > {cap}")
         mt = min(int(req.get("max_tokens", t["practice_max_tokens"])), t["practice_max_tokens"])
+        if t.get("task") == "toolchoice":
+            return _forward_toolchoice(req, k, work, target, ids, n, mt, model)
         rows = C.practice(set(ids))
         missing = [i for i in ids if i not in rows]
         if missing:

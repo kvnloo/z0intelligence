@@ -50,7 +50,8 @@ TARGETS = {
         "frozen_re": r"(^|\.)(norm\.weight|embed_tokens\.weight)$|^lm_head\.weight$",
         "tensor_re": r"^model\.",
         "practice_max_tokens": 256, "eval_max_tokens": 256,
-        "about": "FunctionGemma 270M (z0 slm-router bounded choice 51/84; picks dangerous near-misses); task = toolchoice.py",
+        "task": "toolchoice",
+        "about": "FunctionGemma 270M (a Gemma 3 based function-calling model; instruct checkpoint, unsloth mirror of google/functiongemma-270m-it)",
     },
 }
 
