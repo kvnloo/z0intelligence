@@ -489,3 +489,26 @@ def route(t: Tier, k: Task, local: bool, paid: bool, free_ok: bool, free_pub: bo
         if _lane_ok(t, k, lane, up[lane]):
             return ("use", lane)
     return ("queue", None)
+
+
+# O19: spending. No real money without the owner's approval. Free tiers and
+# flat subscriptions pass; free credit only while it fits the cap AND a hard
+# stop is armed; metered and unclassified surfaces only with an approval record.
+class Fund(Enum):
+    FREE = "free"
+    SUB = "subscription"
+    CREDIT = "credit"
+    METERED = "metered"
+    UNKNOWN = "unknown"
+
+
+def spend_credit_ok(approved: bool, fits: bool, armed: bool) -> bool:
+    return approved or (fits and armed)
+
+
+def spend_allows(f: Fund, approved: bool, fits: bool, armed: bool) -> bool:
+    if f in (Fund.FREE, Fund.SUB):
+        return True
+    if f is Fund.CREDIT:
+        return spend_credit_ok(approved, fits, armed)
+    return approved

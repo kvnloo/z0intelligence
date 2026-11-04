@@ -747,3 +747,49 @@ law o18_join_secret:
   for a: O.PTier
   {O.tier_join(a, O.PtSecret{}) == O.PtSecret{} : O.PTier}
 # <<< O18 privacy route
+
+
+# O19: no real-money spend without the owner's approval. Free and flat
+# subscription calls are allowed; free credit only under the cap with a hard
+# stop armed; metered and unclassified surfaces only with an approval record.
+law o19_free_allowed:
+  for approved: Bool
+  for fits: Bool
+  for armed: Bool
+  {O.spend_allows(O.SfFree{}, approved, fits, armed) == True{} : Bool}
+
+law o19_subscription_allowed:
+  for approved: Bool
+  for fits: Bool
+  for armed: Bool
+  {O.spend_allows(O.SfSub{}, approved, fits, armed) == True{} : Bool}
+
+# no host fact other than an approval record unlocks a metered surface
+law o19_metered_needs_approval:
+  for fits: Bool
+  for armed: Bool
+  {O.spend_allows(O.SfMetered{}, False{}, fits, armed) == False{} : Bool}
+
+# an unclassified surface counts as metered (fail closed)
+law o19_unknown_refused:
+  for fits: Bool
+  for armed: Bool
+  {O.spend_allows(O.SfUnknown{}, False{}, fits, armed) == False{} : Bool}
+
+# free credit with no hard stop armed could overflow onto a card
+law o19_credit_unguarded_refused:
+  for fits: Bool
+  {O.spend_allows(O.SfCredit{}, False{}, fits, False{}) == False{} : Bool}
+
+law o19_credit_over_cap_refused:
+  for armed: Bool
+  {O.spend_allows(O.SfCredit{}, False{}, False{}, armed) == False{} : Bool}
+
+law o19_credit_guarded_allowed:
+  {O.spend_allows(O.SfCredit{}, False{}, True{}, True{}) == True{} : Bool}
+
+law o19_approval_allows:
+  for f: O.SFund
+  for fits: Bool
+  for armed: Bool
+  {O.spend_allows(f, True{}, fits, armed) == True{} : Bool}

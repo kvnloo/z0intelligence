@@ -1,0 +1,8 @@
+name: spend-gate
+version: "0.1.0"
+description: "O19: no real money without the owner's approval. Blocks tool calls that would launch paid compute or call a paid API, and refuses metered/unclassified LLM provider requests, using the proven z0intelligence O19 decision; free tiers and flat subscriptions pass, free credit only under its cap with the hard stop armed."
+author: "kvnloo / Hermes Agent"
+provides_hooks:
+  - pre_tool_call
+provides_middleware:
+  - llm_request

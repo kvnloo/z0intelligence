@@ -199,6 +199,12 @@ def cases(seed: int = 0, n_rand: int = 120) -> list[tuple[str, str, str, str]]:
     for t, lane in itertools.product(tiers, lanes):
         out.append(("O18 allows", "Bool", f"O.tier_allows(O.{tiers[t]}{{}}, O.{lanes[lane]}{{}})",
                     b(P.tier_allows(t, lane))))
+    funds = {P.Fund.FREE: "SfFree", P.Fund.SUB: "SfSub", P.Fund.CREDIT: "SfCredit",
+             P.Fund.METERED: "SfMetered", P.Fund.UNKNOWN: "SfUnknown"}
+    for f, approved, fits, armed in itertools.product(funds, B2, B2, B2):
+        out.append(("O19 spend", "Bool",
+                    f"O.spend_allows(O.{funds[f]}{{}}, {b(approved)}, {b(fits)}, {b(armed)})",
+                    b(P.spend_allows(f, approved, fits, armed))))
     return out
 
 

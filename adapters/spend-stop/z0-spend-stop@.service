@@ -1,0 +1,9 @@
+[Unit]
+Description=O19 hard stop: stop every %i job once the month's spend reaches its cap
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=%h/.local/lib/z0-guard/spend/current/src
+Environment=Z0_SPEND_MODAL_CLI=%h/.local/lib/z0-guard/spend/modal-venv/bin/modal
+ExecStart=/usr/bin/python3 -m z0int.fsm.spend_gate stop-tick --surface %i
+Nice=10

@@ -206,9 +206,28 @@ def _o17(t):
     return rows, {"items": len(rows), "ok": ok}
 
 
+def _o19(t):
+    from . import ops as P
+    from .spend_gate import command_surfaces, decision, llm_surface
+    rows, ok = [], True
+    for item in t["items"]:
+        f = item.get("facts", {})
+        if "provider" in item:
+            surfaces = [(*llm_surface(item["provider"], item.get("base_url"), item.get("model")), "provider")]
+        else:
+            surfaces = command_surfaces(item.get("cmd", ""), item.get("code"))
+        ds = [decision(s, fund, f.get("approved", False), f.get("fits", False), f.get("armed", False))
+              for s, fund, _ in surfaces]
+        outcome = "allowed" if all(d["allowed"] for d in ds) else "refused"
+        rows.append({"label": item["label"], "outcome": outcome, "laws": [d["law"] for d in ds],
+                     "surfaces": [d["surface"] for d in ds]})
+        ok &= outcome == item["expect"]
+    return rows, {"items": len(rows), "ok": ok}
+
+
 KINDS = {"commands": _o1, "reflog": _o2, "rollout": _o3, "push": _o4, "phone": _o5, "a11y": _o6,
          "routing": _o7, "health": _o8, "gateway": _o9, "sqlite-store": _o16,
-         "gh-access": _o17}
+         "gh-access": _o17, "spend": _o19}
 
 
 def replay(path: str) -> dict:

@@ -659,3 +659,39 @@ def route(+t: PTier, k: PTask, loc: Bool, paid: Bool, fok: Bool, fpub: Bool) -> 
     case _:
       route_open(t, k, loc, paid, fok, fpub)
 # <<< O18 privacy route
+
+
+# ------------------------------------------------------------------ O19
+# Spending. No real money leaves the owner's accounts without his approval
+# (owner, 2026-11-04: "set a law such that u cannot accidentally even spend
+# money thru a paid LLM or something without approval").
+# Free tiers and flat subscriptions he already pays need no approval: a call
+# adds no charge. Free credit (Modal's monthly $30) may be used only while the
+# month's spend fits under the cap AND a hard stop is armed that halts every
+# job at the cap, so the credit can never overflow onto a card. Metered
+# (pay-as-you-go) and unclassified surfaces need an owner approval record.
+# The funding class, the approval record, the spend-vs-cap fact and the armed
+# stop are host facts (Python side: z0int.fsm.spend_gate); text is never an
+# approval.
+type SFund is Data:
+  SfFree{}
+  SfSub{}
+  SfCredit{}
+  SfMetered{}
+  SfUnknown{}
+
+def spend_credit_ok(approved: Bool, fits: Bool, armed: Bool) -> Bool:
+  Bool.or(approved, Bool.and(fits, armed))
+
+def spend_allows(f: SFund, approved: Bool, fits: Bool, armed: Bool) -> Bool:
+  match f:
+    case SfFree{}:
+      True{}
+    case SfSub{}:
+      True{}
+    case SfCredit{}:
+      spend_credit_ok(approved, fits, armed)
+    case SfMetered{}:
+      approved
+    case SfUnknown{}:
+      approved

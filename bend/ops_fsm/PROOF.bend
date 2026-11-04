@@ -2025,3 +2025,44 @@ def Laws.o18_join_secret(a):
     case O.PtSecret{}:
       {==}
 # <<< O18 privacy route
+
+
+# O19. Spending: constructor equalities, split on the variable the kernel
+# matches before the decisive constructor.
+def Laws.o19_free_allowed(approved, fits, armed):
+  {==}
+
+def Laws.o19_subscription_allowed(approved, fits, armed):
+  {==}
+
+def Laws.o19_metered_needs_approval(fits, armed):
+  {==}
+
+def Laws.o19_unknown_refused(fits, armed):
+  {==}
+
+def Laws.o19_credit_unguarded_refused(fits):
+  match fits:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def Laws.o19_credit_over_cap_refused(armed):
+  {==}
+
+def Laws.o19_credit_guarded_allowed():
+  {==}
+
+def Laws.o19_approval_allows(f, fits, armed):
+  match f:
+    case O.SfFree{}:
+      {==}
+    case O.SfSub{}:
+      {==}
+    case O.SfCredit{}:
+      {==}
+    case O.SfMetered{}:
+      {==}
+    case O.SfUnknown{}:
+      {==}
