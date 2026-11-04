@@ -81,6 +81,14 @@ LLM_PROVIDERS: dict[str, str] = {
     "azure": "metered",
 }
 
+# Free-tier endpoints by host, for providers that reach Hermes as `custom`/`custom:<name>`.
+FREE_HOSTS: dict[str, str] = {
+    "api.groq.com": "groq", "api.cerebras.ai": "cerebras", "api.sambanova.ai": "sambanova",
+    "api.kilo.ai": "kilo-free", "api.llm7.io": "llm7", "oai.endpoints.kepler.ai.cloud.ovh.net": "ovh-free",
+    "text.pollinations.ai": "pollinations", "api.z.ai": "zai-free", "api.siliconflow.com": "siliconflow",
+    "api.cohere.ai": "cohere", "integrate.api.nvidia.com": "nvidia",
+}
+
 # Command-line surfaces: (surface, funding, regex over the command text).
 CLI_SURFACES: list[tuple[str, str, str]] = [
     ("modal", "credit", r"(?:^|[\s;&|(`$])modal\s+(?:run|deploy|serve|shell|launch)\b"),
@@ -156,6 +164,8 @@ def llm_surface(provider: str | None, base_url: str | None, model: str | None) -
             rule = "rule:vllm-sr"
         elif "openrouter.ai" in host:
             rule = "rule:openrouter"
+        elif host in FREE_HOSTS:
+            prov, rule = FREE_HOSTS[host], LLM_PROVIDERS.get(FREE_HOSTS[host], "free")
         else:
             for h, surface in METERED_HOSTS.items():
                 if host == h or host.endswith("." + h):

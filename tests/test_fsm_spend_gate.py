@@ -93,6 +93,8 @@ def test_openrouter_free_only_for_free_models():
     ("custom:vllm-sr", "http://10.43.216.55:8899/v1", "vllm-sr/paid", F.SUB),
     ("custom:vllm-sr", "http://10.43.216.55:8899/v1", "vllm-sr/turbo", F.FREE),
     ("groq", "https://api.groq.com/openai/v1", "openai/gpt-oss-120b", F.FREE),
+    ("custom", "https://api.groq.com/openai/v1", "openai/gpt-oss-120b", F.FREE),
+    ("custom:kilo-free", "https://api.kilo.ai/api/gateway", "nvidia/nemotron:free", F.FREE),
     ("deepseek", "", "deepseek-chat", F.METERED),
     ("brand-new", "https://api.brand.ai/v1", "m", F.UNKNOWN),
     ("", "https://api.openai.com/v1", "gpt-6", F.METERED),

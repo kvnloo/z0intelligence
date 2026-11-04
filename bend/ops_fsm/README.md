@@ -104,3 +104,46 @@ python3 bend/ops_fsm/mutations.py --verdict --law O18
 PYTHONPATH=src python3 -m pytest -q tests/test_fsm_privacy_route.py
 PYTHONPATH=src python3 -m z0int.fsm.privacy_route decide --tier personal --task agentic --live
 ```
+
+## O19 spending: no real money without the owner's approval
+
+Owner, 2026-11-04, after an agent launched four Modal H200s on free credit with
+nothing stopping it at the credit: "set a law such that u cannot accidentally
+even spend money thru a paid LLM or something without approval."
+
+`spend_allows(funding, approved, fits, armed)`:
+
+| funding | allowed when |
+| --- | --- |
+| free tier (no card behind it) | always |
+| flat subscription already paid (Claude, ChatGPT, Grok, Nous, Copilot) | always |
+| free credit that could overflow onto a card (Modal $30/month) | owner approval, or month spend + estimate under the cap ($26) **and** the hard stop armed |
+| metered pay-as-you-go (API keys, cloud GPUs, HF Jobs) | owner approval only |
+| unclassified | owner approval only (fails closed) |
+
+Claims: `o19_free_allowed`, `o19_subscription_allowed`, `o19_metered_needs_approval`,
+`o19_unknown_refused`, `o19_credit_unguarded_refused`, `o19_credit_over_cap_refused`,
+`o19_credit_guarded_allowed`, `o19_approval_allows` (8). Nine O19 mutants
+(`mutations.py --law O19`) each break one row; every one must be rejected.
+
+Host facts and call sites (`src/z0int/fsm/spend_gate.py`, not proven):
+
+- **funding** of a command (`modal run|deploy|serve|shell|launch`, Python that calls
+  `modal.Function.from_name(...).remote`, `hf jobs`, RunPod, Vast, SkyPilot, cloud
+  CLIs, `https://` calls to paid API hosts) or an LLM provider request (by provider
+  name, then base-URL host). Owner overrides: `~/.config/z0-guard/spend-funding.json`.
+- **approved**: an unexpired row in `~/.config/z0-guard/spend-approvals.json`, written
+  only by `z0-guard spend approve` from a real TTY outside a Hermes session. The
+  Hermes plugin blocks any agent tool call that mentions that file, the funding file
+  or the O19 switch. Chat text is never an approval.
+- **fits**: live `modal billing report` month total (cached 60 s) + estimate < cap;
+  unreadable billing counts as not fitting.
+- **armed**: `systemctl --user is-active z0-spend-stop@modal.timer`. The timer runs
+  `spend_gate stop-tick` every 2 minutes and stops every non-stopped Modal app once the
+  month reaches the cap, whoever launched it.
+
+Runtime: `adapters/spend-stop/install.sh [HERMES_HOME]` stamps the kernel to
+`~/.local/lib/z0-guard/spend/<sha>`, installs and starts the timer, and copies the
+`spend-gate` Hermes plugin (pre_tool_call + llm_request). Not covered: Hermes
+auxiliary calls (they skip llm_request middleware), other harnesses (OMP, Codex CLI,
+Claude Code) until they get their own adapter, and SDKs the classifier does not know.
