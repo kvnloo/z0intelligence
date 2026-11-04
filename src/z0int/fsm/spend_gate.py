@@ -362,7 +362,7 @@ def refusal_text(res: dict) -> str:
         else:
             parts.append(f"{r['surface']} is {r['funding']} (real money) and has no owner approval")
     return ("O19 refused: " + "; ".join(parts) + ". No real money is spent without the owner's approval. "
-            "Ask the owner; he approves with `z0-guard spend approve --surface S --cap-usd N --hours H` "
+            "Ask the owner; he approves with `z0-spend approve --surface S --cap-usd N --hours H` "
             "in his own terminal. Agents never write the approval file.")
 
 

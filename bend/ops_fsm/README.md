@@ -133,7 +133,7 @@ Host facts and call sites (`src/z0int/fsm/spend_gate.py`, not proven):
   CLIs, `https://` calls to paid API hosts) or an LLM provider request (by provider
   name, then base-URL host). Owner overrides: `~/.config/z0-guard/spend-funding.json`.
 - **approved**: an unexpired row in `~/.config/z0-guard/spend-approvals.json`, written
-  only by `z0-guard spend approve` from a real TTY outside a Hermes session. The
+  only by `z0-spend approve` (or `z0-guard spend approve` once z0-guard is restamped) from a real TTY outside a Hermes session. The
   Hermes plugin blocks any agent tool call that mentions that file, the funding file
   or the O19 switch. Chat text is never an approval.
 - **fits**: live `modal billing report` month total (cached 60 s) + estimate < cap;

@@ -13,6 +13,13 @@ ln -sfn "$LIB/$SHA" "$LIB/current"
 if [ ! -x "$LIB/modal-venv/bin/modal" ]; then
   uv venv -q "$LIB/modal-venv" --python 3.12 && uv pip install -q --python "$LIB/modal-venv/bin/python" modal
 fi
+mkdir -p "$HOME/.local/bin"
+cat > "$HOME/.local/bin/z0-spend" <<SH
+#!/usr/bin/env bash
+# O19 spend gate CLI (stamped kernel). Owner: z0-spend approve --surface S --cap-usd N --hours H
+PYTHONPATH=$LIB/current/src Z0_SPEND_MODAL_CLI=$LIB/modal-venv/bin/modal exec python3 -m z0int.fsm.spend_gate "\$@"
+SH
+chmod +x "$HOME/.local/bin/z0-spend"
 mkdir -p "$HOME/.config/systemd/user"
 cp "$REPO"/adapters/spend-stop/z0-spend-stop@.{service,timer} "$HOME/.config/systemd/user/"
 systemctl --user daemon-reload
