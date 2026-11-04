@@ -250,11 +250,12 @@ def run_session(editor: str, target: str, passes: int, run_id: str, effort: str)
             else:
                 st["python_runs"] += 1
                 # The editor's CPU tensor analysis also needs host RAM; do not repeatedly provoke the guard.
-                for _ in range(360):
+                remote = os.environ.get("WSP_BACKEND", "local") == "modal"  # the sandbox runs on Modal, not here
+                for _ in range(0 if remote else 360):
                     if _mem_available_mb() >= GPU_MIN_MB:
                         break
                     time.sleep(10)
-                if _mem_available_mb() < 6000:
+                if not remote and _mem_available_mb() < GPU_MIN_MB:
                     st['aborted'] = 'host RAM below 6 GB for one hour; no tensor analysis executed'
                     st_path.write_text(json.dumps(st, indent=1))
                     raise RuntimeError(st['aborted'])
