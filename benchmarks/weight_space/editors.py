@@ -169,6 +169,19 @@ def _codex(editor, model, prompt, effort, workdir, timeout_s):
                  not tool_items, f"item kinds={sorted(kinds)}", str(raw))
 
 
+
+def _claude_token() -> str:
+    """WSP_CLAUDE_POOL_LABEL=<label>: read that Hermes pool row's current access token on every call (Hermes refreshes
+    it), e.g. claude-ultra while the main subscription is rate limited. Otherwise ANTHROPIC_TOKEN. Never logged."""
+    label = os.environ.get("WSP_CLAUDE_POOL_LABEL")
+    if not label:
+        return os.environ["ANTHROPIC_TOKEN"]
+    auth = json.loads((Path.home() / ".hermes" / "auth.json").read_text())
+    for row in auth.get("credential_pool", {}).get("anthropic", []):
+        if row.get("label") == label and row.get("access_token"):
+            return row["access_token"]
+    raise RuntimeError(f"no Hermes anthropic pool row labelled {label!r}")
+
 def _claude(editor, model, prompt, effort, workdir, timeout_s):
     """Anthropic Messages API on the owner's Claude subscription (OAuth token ANTHROPIC_TOKEN, as Hermes
     sends it). No tools are offered; the system is the Claude Code identity line OAuth requires, then the
@@ -378,7 +391,7 @@ class Chat:
 def _claude_msgs(editor, model, msgs, effort, workdir, timeout_s):
     import anthropic
 
-    token = os.environ["ANTHROPIC_TOKEN"]
+    token = _claude_token()
     ver = subprocess.run(["claude", "--version"], check=False, capture_output=True, text=True).stdout.split()[0]
     client = anthropic.Anthropic(auth_token=token, timeout=timeout_s, default_headers={
         "anthropic-beta": "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14",
