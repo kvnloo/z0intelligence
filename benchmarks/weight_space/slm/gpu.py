@@ -105,9 +105,12 @@ def generate(req: dict, out: Path) -> dict:
 
     jobs = []
     for it in req["items"]:
-        user = it.get("prompt") or (it["problem"] + "\n" + C.INSTRUCTION)
+        if it.get("messages"):  # tool-calling items (toolchoice.py): the model's own chat template renders the tools
+            text = tok.apply_chat_template(it["messages"], tools=it.get("tools"), tokenize=False, add_generation_prompt=True)
+        else:
+            text = _chat(tok, req["target"], it.get("prompt") or (it["problem"] + "\n" + C.INSTRUCTION))
         for k in range(req.get("n", 1)):
-            jobs.append((it, k, _chat(tok, req["target"], user)))
+            jobs.append((it, k, text))
     bs = int(os.environ.get("WSP_GEN_BATCH", "2"))
     rows, t0 = [], time.time()
     eos = [i for i in {tok.eos_token_id, *(model.generation_config.eos_token_id if isinstance(
@@ -129,7 +132,7 @@ def generate(req: dict, out: Path) -> dict:
             for special in (tok.eos_token, tok.pad_token):
                 if special:
                     text = text.replace(special, '')
-            pred = C.last_boxed(text)
+            pred = None if it.get("messages") else C.last_boxed(text)
             gold = it.get("answer")
             rows.append({"id": it["id"], "sample": k, "source": it.get("source"), "text": text, "tokens": n,
                          "cut": (not ended) and n >= req["max_tokens"], "pred": pred,

@@ -44,6 +44,14 @@ TARGETS = {
         "practice_max_tokens": 2048, "eval_max_tokens": 4096,
         "about": "Gemma 3 270M instruct (the paper's follow-up target: it does not loop; ungated unsloth mirror of google/gemma-3-270m-it)",
     },
+    "functiongemma-270m": {
+        "hf": "unsloth/functiongemma-270m-it", "rev": "79eaaa84125b897f5a0ad6638362b864fec813ad", "thinking": False,
+        "sampling": {"temperature": 1.0, "top_p": 0.95, "top_k": 64},
+        "frozen_re": r"(^|\.)(norm\.weight|embed_tokens\.weight)$|^lm_head\.weight$",
+        "tensor_re": r"^model\.",
+        "practice_max_tokens": 256, "eval_max_tokens": 256,
+        "about": "FunctionGemma 270M (z0 slm-router bounded choice 51/84; picks dangerous near-misses); task = toolchoice.py",
+    },
 }
 
 # Forward-pass limits of this scaled-down protocol (the paper: 512 generations, 1,024 texts, 32,768 tokens)
