@@ -376,7 +376,7 @@ def receipt(row: dict) -> None:
 
 
 def touches_protected(text: str) -> bool:
-    return any(p in (text or "") for p in PROTECTED) or bool(re.search(r'modes\.json[\s\S]*"O19"|"O19"[\s\S]*modes\.json', text or ""))
+    return any(p in (text or "") for p in PROTECTED) or bool(re.search(r"modes\.json[\s\S]*O19|O19[\s\S]*modes\.json", text or ""))
 
 
 # ------------------------------------------------------------------ the hard stop
@@ -416,7 +416,7 @@ def _exit(res: dict) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="z0-guard spend", description="O19: no real money without owner approval")
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub = ap.add_subparsers(dest="op", required=True)
     c = sub.add_parser("check-cmd")
     c.add_argument("--cmd", required=True)
     c.add_argument("--code-file")
@@ -439,23 +439,23 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status")
     args = ap.parse_args(argv)
 
-    if args.cmd == "check-cmd":
+    if args.op == "check-cmd":
         code = Path(args.code_file).read_text() if args.code_file else None
         res = evaluate(command_surfaces(args.cmd, code), args.estimate_usd)
         _print(res)
         return _exit(res)
-    if args.cmd == "check-llm":
+    if args.op == "check-llm":
         surface, fund = llm_surface(args.provider, args.base_url, args.model)
         res = evaluate([(surface, fund, "provider request")])
         _print(res)
         return _exit(res)
-    if args.cmd == "decide":
+    if args.op == "decide":
         _print(decision("-", _fund(args.funding), args.approved, args.fits, args.armed))
         return 0
-    if args.cmd == "stop-tick":
+    if args.op == "stop-tick":
         _print(stop_tick(args.surface))
         return 0
-    if args.cmd == "approve":
+    if args.op == "approve":
         if not (sys.stdin.isatty() and sys.stdout.isatty()) or os.environ.get("HERMES_SESSION_ID"):
             print("O19: approvals are made by the owner in his own terminal, not by an agent.", file=sys.stderr)
             return EXIT_REFUSED
@@ -468,7 +468,7 @@ def main(argv: list[str] | None = None) -> int:
         os.chmod(APPROVALS_FILE, 0o600)
         print(f"approved {args.surface} up to ${args.cap_usd} until {rows[-1]['expires']}")
         return 0
-    if args.cmd == "status":
+    if args.op == "status":
         _print({"mode": mode(), "approvals": approvals(),
                 "credit": {k: {"month_spend_usd": month_spend(k), "cap_usd": cap(k), "armed": armed(k)}
                            for k in CREDIT}})
