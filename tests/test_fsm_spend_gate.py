@@ -146,7 +146,8 @@ def test_approve_needs_owner_terminal(capsys):
 def test_report_mode_allows_but_logs(monkeypatch):
     monkeypatch.setenv("Z0_GUARD_O19", "report")
     assert S.main(["check-cmd", "--cmd", "hf jobs run img cmd"]) == 0
-    assert S.RECEIPTS.read_text().count('"allowed": false') == 1
+    rows = [json.loads(x) for x in S.RECEIPTS.read_text().splitlines()]
+    assert [(r["event"], r["allowed"], r["mode"]) for r in rows] == [("check", False, "report")]
 
 
 def test_cli_exit_codes():
