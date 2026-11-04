@@ -78,6 +78,7 @@ command, git ref update, adb dump or config line becomes those inputs is classif
 | O13 | Shadow/canary/live requests and configured arms/families require exact-scope, risk-specific option capacity. Default zero; destructive never SLM. | `z0-guard policy` | audit, exit 3 with offending IDs |
 
 | O16 | A guarded SQLite store may be replaced/unlinked/recreated only with a complete empty-holder census; no ghost FD holders; auth count non-decreasing with a known baseline; sidecar remover holds the current DB inode. | `z0-guard sqlite-ghosts --db DB` | enforce for proposed-action refusals; read-only audit |
+| O19 | No real money without the owner's approval: free tiers and flat subscriptions pass; free credit (Modal) only while month spend + estimate < cap ($26 of $30) **and** the hard-stop timer is armed; metered and unclassified surfaces only with an unexpired owner approval record (TTY-only `approve`; agents cannot write it). | Hermes `spend-gate` plugin (pre_tool_call + llm_request) -> `z0int.fsm.spend_gate`; `z0-spend-stop@modal.timer` stops every Modal app at the cap; `z0-guard spend ...` | enforce |
 
 Switch a gate: `Z0_GUARD_O<n>=off|report|enforce` in the environment, or
 `~/.config/z0-guard/modes.json` (`{"O3": "enforce"}`). `z0-guard modes` prints the effective modes.

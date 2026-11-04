@@ -1,0 +1,620 @@
+{
+  "verdict_mode": true,
+  "rows": [
+    {
+      "law": "-",
+      "mutation": "reference (unmodified)",
+      "proofs_check": true,
+      "where": ""
+    },
+    {
+      "law": "O1 o1_groot_admits_only",
+      "mutation": "groot admits every class",
+      "proofs_check": false,
+      "where": "Laws.o1_groot_admits_only"
+    },
+    {
+      "law": "O1 o1_groot_admits_only",
+      "mutation": "unknown classes count as groot classes",
+      "proofs_check": false,
+      "where": "Laws.o1_groot_admits_only"
+    },
+    {
+      "law": "O1 o1_never_groot_fallback",
+      "mutation": "no room off groot: fall back to groot",
+      "proofs_check": false,
+      "where": "phone_not_groot"
+    },
+    {
+      "law": "O1 o1_full_waits",
+      "mutation": "no room anywhere: squeeze onto a phone anyway",
+      "proofs_check": false,
+      "where": "Laws.o1_full_waits"
+    },
+    {
+      "law": "O1 o1_never_groot_fallback",
+      "mutation": "placement ignores the class",
+      "proofs_check": false,
+      "where": "Laws.o1_never_groot_fallback"
+    },
+    {
+      "law": "O1 o1_mbp_takes_heavy",
+      "mutation": "heavy jobs wait even when the MBP has room",
+      "proofs_check": false,
+      "where": "Laws.o1_mbp_takes_heavy"
+    },
+    {
+      "law": "O2 o2_served_refuses",
+      "mutation": "served worktree accepts any op",
+      "proofs_check": false,
+      "where": "Laws.o2_served_refuses"
+    },
+    {
+      "law": "O2 o2_served_refuses",
+      "mutation": "rollback (moving the served branch backwards) outside the transaction",
+      "proofs_check": false,
+      "where": "Laws.o2_served_refuses"
+    },
+    {
+      "law": "O2 o2_txn_can_rollback",
+      "mutation": "the transaction cannot roll back",
+      "proofs_check": false,
+      "where": "Laws.o2_txn_can_rollback"
+    },
+    {
+      "law": "O2 o2_served_refuses",
+      "mutation": "ff-merge outside the rollout transaction",
+      "proofs_check": false,
+      "where": "Laws.o2_served_refuses"
+    },
+    {
+      "law": "O2 o2_served_refuses",
+      "mutation": "the served lease is ignored",
+      "proofs_check": false,
+      "where": "Laws.o2_served_refuses"
+    },
+    {
+      "law": "O2 o2_txn_can_ff",
+      "mutation": "the transaction itself cannot merge",
+      "proofs_check": false,
+      "where": "Laws.o2_txn_can_ff"
+    },
+    {
+      "law": "O2 o2_rollout_ff_idle",
+      "mutation": "rollout accepts a non-fast-forward merge",
+      "proofs_check": false,
+      "where": "Laws.o2_rollout_ff_idle"
+    },
+    {
+      "law": "O2 o2_rollout_ff_idle",
+      "mutation": "restart without the idle check",
+      "proofs_check": false,
+      "where": "Laws.o2_rollout_ff_idle"
+    },
+    {
+      "law": "O3 o3_promoted_needs_clean",
+      "mutation": "candidate built in the served worktree is promoted",
+      "proofs_check": false,
+      "where": "Laws.o2_rollout_ff_idle"
+    },
+    {
+      "law": "O3 o3_promoted_needs_check",
+      "mutation": "a failed launch check is promoted anyway",
+      "proofs_check": false,
+      "where": "finish_promoted"
+    },
+    {
+      "law": "O3 o3_admissible_fail_rolls_back",
+      "mutation": "a failed launch check is reported as deferred, not rolled back",
+      "proofs_check": false,
+      "where": "go_fail"
+    },
+    {
+      "law": "O3 o3_promoted_needs_review",
+      "mutation": "review receipt ignored for review-gated PRs",
+      "proofs_check": false,
+      "where": "adm_pre"
+    },
+    {
+      "law": "O3 o3_no_device_work_in_call",
+      "mutation": "restart and launch check run during the owner's call",
+      "proofs_check": false,
+      "where": "Laws.o2_rollout_ff_idle"
+    },
+    {
+      "law": "O3 o3_no_device_work_in_call",
+      "mutation": "a deferred rollout runs anyway",
+      "proofs_check": false,
+      "where": "go_touched"
+    },
+    {
+      "law": "O3 o3_admissible_pass_promotes",
+      "mutation": "every rollout is refused",
+      "proofs_check": false,
+      "where": "decide_touched"
+    },
+    {
+      "law": "O4 o4_private_stays_private",
+      "mutation": "private artifacts push anywhere",
+      "proofs_check": false,
+      "where": "Laws.o4_private_stays_private"
+    },
+    {
+      "law": "O4 o4_private_stays_private",
+      "mutation": "unknown visibility counts as private",
+      "proofs_check": false,
+      "where": "Laws.o4_private_stays_private"
+    },
+    {
+      "law": "O4 o4_nonprivate_free",
+      "mutation": "non-private pushes are refused",
+      "proofs_check": false,
+      "where": "Laws.o4_nonprivate_free"
+    },
+    {
+      "law": "O5 o5_touch_needs_intent",
+      "mutation": "tap without an owner phone-operation intent",
+      "proofs_check": false,
+      "where": "Laws.o5_touch_needs_intent"
+    },
+    {
+      "law": "O5 o5_touch_needs_foreground",
+      "mutation": "tap into whatever app is in the foreground",
+      "proofs_check": false,
+      "where": "Laws.o5_touch_needs_intent"
+    },
+    {
+      "law": "O5 o5_no_chain_install_in_call",
+      "mutation": "install the call-chain app during a live call",
+      "proofs_check": false,
+      "where": "Laws.o5_no_chain_install_in_call"
+    },
+    {
+      "law": "O5 o5_no_chain_restart_in_call",
+      "mutation": "restart the call-chain app during a live call",
+      "proofs_check": false,
+      "where": "Laws.o5_no_chain_restart_in_call"
+    },
+    {
+      "law": "O6 o6_a11y_superset",
+      "mutation": "post-state not consulted for the first service",
+      "proofs_check": false,
+      "where": "Laws.o6_a11y_superset"
+    },
+    {
+      "law": "O6 o6_a11y_superset",
+      "mutation": "only the first service is checked",
+      "proofs_check": false,
+      "where": "Laws.o6_a11y_superset"
+    },
+    {
+      "law": "O6 o6_a11y_superset",
+      "mutation": "any service counts as owner-removed",
+      "proofs_check": false,
+      "where": "Laws.o6_a11y_superset"
+    },
+    {
+      "law": "O7 o7_no_cancelled_provider",
+      "mutation": "cancelled providers still route",
+      "proofs_check": false,
+      "where": "Laws.o7_no_cancelled_provider"
+    },
+    {
+      "law": "O7 o7_no_sol_design",
+      "mutation": "design roles may route to Sol",
+      "proofs_check": false,
+      "where": "Laws.o7_no_sol_design"
+    },
+    {
+      "law": "O8 o8_no_silent_strike",
+      "mutation": "strikes past the limit stay silent",
+      "proofs_check": false,
+      "where": "Laws.o8_no_silent_strike"
+    },
+    {
+      "law": "O8 o8_emit_marks_notified",
+      "mutation": "emission does not mark the node notified (repeats)",
+      "proofs_check": false,
+      "where": "emit_bad"
+    },
+    {
+      "law": "O8 o8_notify_once",
+      "mutation": "a notified node notifies on every strike",
+      "proofs_check": false,
+      "where": "Laws.o8_notify_once"
+    },
+    {
+      "law": "O8 o8_notified_sticks",
+      "mutation": "a notified node re-arms without recovering",
+      "proofs_check": false,
+      "where": "Laws.o8_notified_sticks"
+    },
+    {
+      "law": "O9 o9_restart_never_fails",
+      "mutation": "gateway restart marks runs Failed",
+      "proofs_check": false,
+      "where": "Laws.o9_restart_interrupts"
+    },
+    {
+      "law": "O9 o9_restart_interrupts",
+      "mutation": "gateway restart is ignored (runs look active)",
+      "proofs_check": false,
+      "where": "Laws.o9_restart_interrupts"
+    },
+    {
+      "law": "O9 o9_interrupted_exits",
+      "mutation": "an interrupted run silently fails on error",
+      "proofs_check": false,
+      "where": "Laws.o9_interrupted_exits"
+    },
+    {
+      "law": "O9 o9_resume_needs_session",
+      "mutation": "resume without the run's session",
+      "proofs_check": false,
+      "where": "Laws.o9_resume_needs_session"
+    },
+    {
+      "law": "O10 o10_phone_no_agent_resource_caps",
+      "mutation": "phone admission gated by memory",
+      "proofs_check": false,
+      "where": "Laws.o10_phone_no_agent_resource_caps"
+    },
+    {
+      "law": "O10 o10_phone_no_agent_resource_caps",
+      "mutation": "phone admission gated by cpu",
+      "proofs_check": false,
+      "where": "Laws.o10_phone_no_agent_resource_caps"
+    },
+    {
+      "law": "O10 o10_phone_no_agent_resource_caps",
+      "mutation": "phone admission gated by battery",
+      "proofs_check": false,
+      "where": "Laws.o10_phone_no_agent_resource_caps"
+    },
+    {
+      "law": "O10 o10_phone_no_agent_resource_caps",
+      "mutation": "phone admission gated by thermal",
+      "proofs_check": false,
+      "where": "Laws.o10_phone_no_agent_resource_caps"
+    },
+    {
+      "law": "O10 o10_phone_placement_no_agent_resource_caps",
+      "mutation": "phone placement gated by memory",
+      "proofs_check": false,
+      "where": "Laws.o10_phone_placement_no_agent_resource_caps"
+    },
+    {
+      "law": "O11 o11_none_not_credited",
+      "mutation": "none stage receives offload credit",
+      "proofs_check": false,
+      "where": "Laws.o11_none_not_credited"
+    },
+    {
+      "law": "O11 o11_shadow_not_credited",
+      "mutation": "shadow stage receives offload credit",
+      "proofs_check": false,
+      "where": "Laws.o11_shadow_not_credited"
+    },
+    {
+      "law": "O11 o11_named_family",
+      "mutation": "a policy cell credits another family",
+      "proofs_check": false,
+      "where": "Laws.o11_evidence_bound_route"
+    },
+    {
+      "law": "O11 o11_named_arm",
+      "mutation": "a credited family routes to an unnamed arm",
+      "proofs_check": false,
+      "where": "Laws.o11_evidence_bound_route"
+    },
+    {
+      "law": "O11 o11_evidence_bound_route",
+      "mutation": "offload bypasses evidence stage",
+      "proofs_check": false,
+      "where": "Laws.o11_evidence_bound_route"
+    },
+    {
+      "law": "O12 o12_offload_obligation",
+      "mutation": "live frontier fallback ignores abstention",
+      "proofs_check": false,
+      "where": "Laws.o12_offload_obligation"
+    },
+    {
+      "law": "O12 o12_offload_obligation",
+      "mutation": "healthy endpoints permit silent frontier fallback",
+      "proofs_check": false,
+      "where": "Laws.o12_offload_obligation"
+    },
+    {
+      "law": "O12 o12_abstain_can_fallback",
+      "mutation": "recorded abstentions cannot fall back",
+      "proofs_check": false,
+      "where": "Laws.o12_offload_obligation"
+    },
+    {
+      "law": "O11 o11_named_family",
+      "mutation": "offload dispatcher bypasses the policy cell",
+      "proofs_check": false,
+      "where": "Laws.o11_evidence_bound_route"
+    },
+    {
+      "law": "O13 o13_default_zero",
+      "mutation": "missing evidence permits 24 candidates",
+      "proofs_check": false,
+      "where": "Laws.o13_default_zero"
+    },
+    {
+      "law": "O13 o13_k2_rejected",
+      "mutation": "missing evidence permits a binary choice",
+      "proofs_check": false,
+      "where": "Laws.o13_default_zero"
+    },
+    {
+      "law": "O13 o13_exact_scope",
+      "mutation": "capacity transfers across physical scopes",
+      "proofs_check": false,
+      "where": "Laws.o13_exact_scope"
+    },
+    {
+      "law": "O13 o13_default_zero",
+      "mutation": "scope match substitutes for measured evidence",
+      "proofs_check": false,
+      "where": "Laws.o13_default_zero"
+    },
+    {
+      "law": "O13 o13_credited_limit",
+      "mutation": "measured capacity is ignored",
+      "proofs_check": false,
+      "where": "option_mismatch"
+    },
+    {
+      "law": "O13 o13_option_capacity",
+      "mutation": "request dispatcher ignores capacity",
+      "proofs_check": false,
+      "where": "Laws.o13_option_capacity"
+    },
+    {
+      "law": "O13 o13_k2_rejected",
+      "mutation": "comparison rejects the boundary and admits excess",
+      "proofs_check": false,
+      "where": "Laws.o13_option_capacity"
+    },
+    {
+      "law": "O13 o13_credited_excess_rejected",
+      "mutation": "capacity has an off-by-one allowance",
+      "proofs_check": false,
+      "where": "Laws.o13_option_capacity"
+    },
+    {
+      "law": "O13 o13_destructive_never",
+      "mutation": "destructive acquires SLM authority",
+      "proofs_check": false,
+      "where": "Laws.o13_destructive_never"
+    },
+    {
+      "law": "O13 o13_unknown_never",
+      "mutation": "unknown risk acquires SLM authority",
+      "proofs_check": false,
+      "where": "Laws.o13_destructive_never"
+    },
+    {
+      "law": "O16 o16_sqlite_replace_no_holders",
+      "mutation": "ignore holders",
+      "proofs_check": false,
+      "where": "Laws.o16_sqlite_replace_no_holders"
+    },
+    {
+      "law": "O16 o16_sqlite_replace_scan_complete",
+      "mutation": "ignore scan completeness",
+      "proofs_check": false,
+      "where": "Laws.o16_sqlite_replace_no_holders"
+    },
+    {
+      "law": "O16 o16_sqlite_no_ghost_holders",
+      "mutation": "ignore ghosts",
+      "proofs_check": false,
+      "where": "Laws.o16_sqlite_no_ghost_holders"
+    },
+    {
+      "law": "O16 o16_sqlite_auth_non_decreasing",
+      "mutation": "lose credentials",
+      "proofs_check": false,
+      "where": "Laws.o16_sqlite_auth_non_decreasing"
+    },
+    {
+      "law": "O16 o16_sqlite_auth_known",
+      "mutation": "unknown baseline earns credit",
+      "proofs_check": false,
+      "where": "Laws.o16_sqlite_auth_non_decreasing"
+    },
+    {
+      "law": "O16 o16_sqlite_sidecar_current_inode",
+      "mutation": "stale inode removes sidecars",
+      "proofs_check": false,
+      "where": "Laws.o16_sqlite_sidecar_current_inode"
+    },
+    {
+      "law": "O16 o16_sqlite_quiescent_replace",
+      "mutation": "always refuse replacement",
+      "proofs_check": false,
+      "where": "Laws.o16_sqlite_replace_no_holders"
+    },
+    {
+      "law": "O16 o16_sqlite_healthy_holders",
+      "mutation": "always refuse health",
+      "proofs_check": false,
+      "where": "Laws.o16_sqlite_no_ghost_holders"
+    },
+    {
+      "law": "O16 o16_sqlite_auth_retained",
+      "mutation": "always refuse auth",
+      "proofs_check": false,
+      "where": "Laws.o16_sqlite_auth_non_decreasing"
+    },
+    {
+      "law": "O16 o16_sqlite_current_sidecar",
+      "mutation": "always refuse sidecars",
+      "proofs_check": false,
+      "where": "Laws.o16_sqlite_sidecar_current_inode"
+    },
+    {
+      "law": "O16 o16_sqlite_unknown_holders",
+      "mutation": "unknown scan declared healthy",
+      "proofs_check": false,
+      "where": "Laws.o16_sqlite_no_ghost_holders"
+    },
+    {
+      "law": "O17 o17_poller_direct_read_refused",
+      "mutation": "poller falls back to api.github.com",
+      "proofs_check": false,
+      "where": "Laws.o17_poller_direct_read_refused"
+    },
+    {
+      "law": "O17 o17_poller_cached_read_allowed",
+      "mutation": "cached poller reads refused",
+      "proofs_check": false,
+      "where": "Laws.o17_poller_cached_read_allowed"
+    },
+    {
+      "law": "O17 o17_interactive_direct_read_allowed",
+      "mutation": "interactive direct reads refused",
+      "proofs_check": false,
+      "where": "Laws.o17_interactive_direct_read_allowed"
+    },
+    {
+      "law": "O17 o17_cached_read_always_allowed",
+      "mutation": "cache ignored for pollers",
+      "proofs_check": false,
+      "where": "Laws.o17_poller_cached_read_allowed"
+    },
+    {
+      "law": "O17 o17_backoff_write_refused",
+      "mutation": "backoff ignored on write",
+      "proofs_check": false,
+      "where": "Laws.o17_backoff_write_refused"
+    },
+    {
+      "law": "O17 o17_clear_write_allowed",
+      "mutation": "every write refused",
+      "proofs_check": false,
+      "where": "Laws.o17_clear_write_allowed"
+    },
+    {
+      "law": "O18 o18_secret_refused",
+      "mutation": "secrets are routed like any other tier",
+      "proofs_check": false,
+      "where": "Laws.o18_secret_refused"
+    },
+    {
+      "law": "O18 o18_route_sound",
+      "mutation": "personal data may go to a free lane that trains on prompts",
+      "proofs_check": false,
+      "where": "Laws.o18_route_sound"
+    },
+    {
+      "law": "O18 o18_route_sound",
+      "mutation": "sensitive and unknown tiers may use the cloud",
+      "proofs_check": false,
+      "where": "Laws.o18_route_sound"
+    },
+    {
+      "law": "O18 o18_free_never_agentic",
+      "mutation": "agentic work routed like simple work (free lanes first)",
+      "proofs_check": false,
+      "where": "Laws.o18_route_sound"
+    },
+    {
+      "law": "O18 o18_agentic_no_weak_fallback",
+      "mutation": "agentic personal work falls back to the local model",
+      "proofs_check": false,
+      "where": "Laws.o18_agentic_no_weak_fallback"
+    },
+    {
+      "law": "O18 o18_sensitive_waits_without_local",
+      "mutation": "lane availability is ignored",
+      "proofs_check": false,
+      "where": "Laws.o18_route_sound"
+    },
+    {
+      "law": "O18 o18_public_simple_prefers_free",
+      "mutation": "public free lane preferred over the approved one",
+      "proofs_check": false,
+      "where": "Laws.o18_public_simple_prefers_free"
+    },
+    {
+      "law": "O18 o18_join_sound_right",
+      "mutation": "taint join ignores the second tier",
+      "proofs_check": false,
+      "where": "Laws.o18_join_sound_right"
+    },
+    {
+      "law": "O18 o18_join_secret",
+      "mutation": "secret ranks below third-party data",
+      "proofs_check": false,
+      "where": "Laws.o18_join_sound_left"
+    },
+    {
+      "law": "O18 o18_unknown_agentic_local",
+      "mutation": "unclassified data counts as personal",
+      "proofs_check": false,
+      "where": "Laws.o18_route_sound"
+    },
+    {
+      "law": "O19 o19_metered_needs_approval",
+      "mutation": "metered (pay-as-you-go) spend allowed without approval",
+      "proofs_check": false,
+      "where": "Laws.o19_metered_needs_approval"
+    },
+    {
+      "law": "O19 o19_metered_needs_approval",
+      "mutation": "metered spend treated like free credit (cap + stop instead of approval)",
+      "proofs_check": false,
+      "where": "Laws.o19_metered_needs_approval"
+    },
+    {
+      "law": "O19 o19_unknown_refused",
+      "mutation": "unclassified surfaces fail open",
+      "proofs_check": false,
+      "where": "Laws.o19_unknown_refused"
+    },
+    {
+      "law": "O19 o19_credit_unguarded_refused",
+      "mutation": "free credit used with no hard stop armed",
+      "proofs_check": false,
+      "where": "Laws.o19_credit_unguarded_refused"
+    },
+    {
+      "law": "O19 o19_credit_over_cap_refused",
+      "mutation": "free credit used past the cap",
+      "proofs_check": false,
+      "where": "Laws.o19_credit_over_cap_refused"
+    },
+    {
+      "law": "O19 o19_credit_guarded_allowed",
+      "mutation": "free credit never usable without approval",
+      "proofs_check": false,
+      "where": "Laws.o19_credit_guarded_allowed"
+    },
+    {
+      "law": "O19 o19_free_allowed",
+      "mutation": "free tiers need approval",
+      "proofs_check": false,
+      "where": "Laws.o19_free_allowed"
+    },
+    {
+      "law": "O19 o19_subscription_allowed",
+      "mutation": "flat subscriptions need approval",
+      "proofs_check": false,
+      "where": "Laws.o19_subscription_allowed"
+    },
+    {
+      "law": "O19 o19_approval_allows",
+      "mutation": "an owner approval is ignored for metered spend",
+      "proofs_check": false,
+      "where": "Laws.o19_approval_allows"
+    }
+  ],
+  "rejected": 101,
+  "total": 101,
+  "reference_restored": true
+}

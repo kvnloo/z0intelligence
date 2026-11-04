@@ -19,10 +19,11 @@ the inputs (git, systemd, adb, broker.db, configs, gh) and acts on the verdict.
     z0-guard policy --receipts GLOB --policy PATH --since 24h [--static ROOT] [--json] O11/O12/O13 audit
     z0-guard sqlite-ghosts --db DB [--last-receipt JSON] O16 read-only SQLite census
     z0-guard gh-route shim|decide|scan ...  O17 pollers read GitHub via ghcache; feedback backoff refuses writes
+    z0-guard spend check-cmd|check-llm|decide|stop-tick|approve|status  O19 no real money without owner approval
     z0-guard replay TAPE...             replay incident tapes through the gates
     z0-guard modes                      show each gate's mode
 
-Modes: off | report | enforce. Default enforce for O1, O2, O4, O6, O10, O16, O17 (pure refusals
+Modes: off | report | enforce. Default enforce for O1, O2, O4, O6, O10, O16, O17, O19 (pure refusals
 of known-bad actions); report for O3, O5, O7, O8, O9. Override per gate with
 Z0_GUARD_O<n>=MODE or ~/.config/z0-guard/modes.json. A gate's verdict is never
 an authorization: a pass means only "this gate did not refuse".
@@ -64,7 +65,7 @@ GROOT_NAMES = {"groot"}
 CALL_CHAIN_PACKAGES = {"app.lawnchair.play.debug"}
 DEFAULT_MODES = {"O1": "enforce", "O2": "enforce", "O3": "report", "O4": "enforce", "O5": "report",
                  "O6": "enforce", "O7": "report", "O8": "report", "O9": "report", "O10": "enforce", "O16": "enforce",
-                 "O17": "enforce"}
+                 "O17": "enforce", "O19": "enforce"}
 EXIT_REFUSED = 3
 ZERO = "0" * 40
 
@@ -1177,6 +1178,11 @@ def main(argv: list[str] | None = None) -> int:
                         add_help=False)
     gr.add_argument("rest", nargs=argparse.REMAINDER)
     gr.set_defaults(fn=lambda a: __import__("z0int.fsm.gh_route", fromlist=["main"]).main(a.rest))
+
+    sp = sub.add_parser("spend", help="O19: no real money (paid compute, metered APIs) without owner approval",
+                        add_help=False)
+    sp.add_argument("rest", nargs=argparse.REMAINDER)
+    sp.set_defaults(fn=lambda a: __import__("z0int.fsm.spend_gate", fromlist=["main"]).main(a.rest))
 
     rp = sub.add_parser("replay", help="replay incident tapes through the gates")
     rp.add_argument("tapes", nargs="+")

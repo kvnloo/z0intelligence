@@ -207,6 +207,25 @@ MUTATIONS = [
      '    case PtSecret{}:\n      5n', '    case PtSecret{}:\n      3n'),
     ('O18 o18_unknown_agentic_local', 'unclassified data counts as personal',
      '    case PtPersonal{}:\n      personal_allows(l)\n    case PtSecret{}:', '    case PtPersonal{}:\n      personal_allows(l)\n    case PtUnknown{}:\n      personal_allows(l)\n    case PtSecret{}:'),
+    # O19 spending
+    ('O19 o19_metered_needs_approval', 'metered (pay-as-you-go) spend allowed without approval',
+     '    case SfMetered{}:\n      approved', '    case SfMetered{}:\n      True{}'),
+    ('O19 o19_metered_needs_approval', 'metered spend treated like free credit (cap + stop instead of approval)',
+     '    case SfMetered{}:\n      approved', '    case SfMetered{}:\n      spend_credit_ok(approved, fits, armed)'),
+    ('O19 o19_unknown_refused', 'unclassified surfaces fail open',
+     '    case SfUnknown{}:\n      approved', '    case SfUnknown{}:\n      True{}'),
+    ('O19 o19_credit_unguarded_refused', 'free credit used with no hard stop armed',
+     '  Bool.or(approved, Bool.and(fits, armed))', '  Bool.or(approved, fits)'),
+    ('O19 o19_credit_over_cap_refused', 'free credit used past the cap',
+     '  Bool.or(approved, Bool.and(fits, armed))', '  Bool.or(approved, armed)'),
+    ('O19 o19_credit_guarded_allowed', 'free credit never usable without approval',
+     '  Bool.or(approved, Bool.and(fits, armed))', '  approved'),
+    ('O19 o19_free_allowed', 'free tiers need approval',
+     '    case SfFree{}:\n      True{}', '    case SfFree{}:\n      approved'),
+    ('O19 o19_subscription_allowed', 'flat subscriptions need approval',
+     '    case SfSub{}:\n      True{}', '    case SfSub{}:\n      approved'),
+    ('O19 o19_approval_allows', 'an owner approval is ignored for metered spend',
+     '    case SfMetered{}:\n      approved', '    case SfMetered{}:\n      False{}'),
 ]
 
 
