@@ -61,11 +61,26 @@ def main():
         if code in (-9, -15, 137, 143):
             print('CAPACITY_ABORT: signalled cell; stopping instead of cascading through all remaining cells', flush=True)
             return 75
-    cmd = [sys.executable,str(HERE/'evaluate.py'),'--run-id',a.run_id]
+    rc = 0
+    tc = [t for t in a.targets.split(',') if C.TARGETS[t].get('task') == 'toolchoice']
     with open(root/'evaluation.log','a') as f:
-        p = subprocess.run(cmd,check=False,stdout=f,stderr=subprocess.STDOUT,timeout=24*3600)
-    print('EVALUATION exit',p.returncode,flush=True)
-    return p.returncode
+        for t in tc:  # tool-choice targets: dev split, unedited once, then each editor's submitted edits
+            jobs = [] if (root/'toolchoice-dev-unedited').exists() else [[]]
+            for e in a.editors.split(','):
+                ed = root/f'{t}__{e}'/'work'/'edited'
+                if (root/f'toolchoice-dev-{e}.json').exists() or not any(ed.glob('*.npy')):
+                    continue
+                jobs.append(['--edit-dir', str(ed), '--label', e])
+            for extra in jobs:
+                p = subprocess.run([sys.executable, str(HERE/'toolchoice_eval.py'), a.run_id, *extra], check=False,
+                                   stdout=f, stderr=subprocess.STDOUT, timeout=4*3600)
+                rc = rc or p.returncode
+        if any(C.TARGETS[t].get('task') != 'toolchoice' for t in a.targets.split(',')):
+            p = subprocess.run([sys.executable,str(HERE/'evaluate.py'),'--run-id',a.run_id],check=False,stdout=f,
+                               stderr=subprocess.STDOUT,timeout=24*3600)
+            rc = rc or p.returncode
+    print('EVALUATION exit',rc,flush=True)
+    return rc
 
 
 if __name__ == '__main__':

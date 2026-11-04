@@ -46,13 +46,19 @@ def main() -> None:
     ap.add_argument("--split", default="dev", choices=["practice", "dev", "sealed"])
     ap.add_argument("--edit-dir")
     ap.add_argument("--limit", type=int)
+    ap.add_argument("--label", help="name for this edited model in the run root (e.g. the editor)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     if a.split == "sealed" and os.environ.get("WSP_ROLE") != "tiny-evaluator":
         raise SystemExit("sealed split is tiny-evaluator only")
     items = T.load(a.split)[: a.limit] if a.limit else T.load(a.split)
-    label = ("edited" if a.edit_dir else "unedited") + ("-dry" if a.dry_run else "")
-    out = STATE / a.run_id / f"toolchoice-{a.split}-{label}"
+    label = (a.label or "edited" if a.edit_dir else "unedited") + ("-dry" if a.dry_run else "")
+    if a.edit_dir:  # Modal syncs edits per session: outputs of an edited pass must live in that session's work dir
+        if not any(Path(a.edit_dir).glob("*.npy")):
+            raise SystemExit(f"no edits in {a.edit_dir}: the editor submitted the unedited model")
+        out = Path(a.edit_dir).parent / "eval" / f"toolchoice-{a.split}"
+    else:
+        out = STATE / a.run_id / f"toolchoice-{a.split}-{label}"
     out.mkdir(parents=True, exist_ok=False)
     req = request(items, 256, a.edit_dir)
     if a.dry_run:
@@ -70,6 +76,8 @@ def main() -> None:
                          "invalid_name_pct": round(100 * sum(r["pred"].startswith("invalid:") for r in rows) / len(rows), 1),
                          "cut_pct": round(100 * sum(bool(r["cut"]) for r in rows) / len(rows), 1), "gen": res}
     (out / "score.json").write_text(json.dumps(s, indent=1) + "\n")
+    if a.edit_dir:
+        (STATE / a.run_id / f"toolchoice-{a.split}-{label}.json").write_text(json.dumps(s, indent=1) + "\n")
     print(json.dumps({k: v for k, v in s.items() if k != "gen"}))
 
 
