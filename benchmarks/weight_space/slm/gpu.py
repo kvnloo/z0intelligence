@@ -68,11 +68,16 @@ def _chat(tok, target, user, enable_thinking=None):
     return tok.apply_chat_template([{"role": "user", "content": user}], tokenize=False, add_generation_prompt=True, **kw)
 
 
+DEVICE = os.environ.get("WSP_DEVICE", "cuda")  # "cpu" for CPU-only workers (e.g. the MBP fleet for a 270M model)
+
+
 def _load_hf(ck: Path):
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
     tok = AutoTokenizer.from_pretrained(str(ck))
-    model = AutoModelForCausalLM.from_pretrained(str(ck), dtype=torch.bfloat16).cuda().eval()
+    dev = DEVICE
+    dt = torch.bfloat16 if dev == "cuda" else torch.float32  # CPU: fp32 (bf16 matmuls are slow/unsupported on many CPUs)
+    model = AutoModelForCausalLM.from_pretrained(str(ck), dtype=dt).to(dev).eval()
     return tok, model
 
 
@@ -117,7 +122,7 @@ def generate(req: dict, out: Path) -> dict:
         model.generation_config.eos_token_id, list) else [model.generation_config.eos_token_id])} if i is not None]
     for b0 in range(0, len(jobs), bs):
         chunk = jobs[b0:b0 + bs]
-        enc = tok([j[2] for j in chunk], return_tensors="pt", padding=True, add_special_tokens=False).to("cuda")
+        enc = tok([j[2] for j in chunk], return_tensors="pt", padding=True, add_special_tokens=False).to(DEVICE)
         L = enc.input_ids.shape[1]
         torch.manual_seed(1_000_003 * (b0 // bs + 1) + int(req.get("seed", 0)))
         with torch.no_grad():
@@ -163,7 +168,7 @@ def teacher_forced(req: dict, out: Path) -> dict:
     tk_ids, tk_lp = [], []
     with torch.no_grad():
         for text in texts:
-            ids = tok(text, return_tensors="pt", truncation=True, max_length=C.TF_MAX_TOKENS).input_ids.cuda()
+            ids = tok(text, return_tensors="pt", truncation=True, max_length=C.TF_MAX_TOKENS).input_ids.to(DEVICE)
             o = model(ids, output_hidden_states=bool(hs))
             logp = torch.log_softmax(o.logits[0, :-1].float(), -1)
             lps.append(logp.gather(1, ids[0, 1:, None])[:, 0].cpu().numpy())

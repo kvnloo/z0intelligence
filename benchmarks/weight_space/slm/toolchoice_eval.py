@@ -63,9 +63,12 @@ def main() -> None:
     req = request(items, 256, a.edit_dir)
     if a.dry_run:
         res = fake_generate(req, out)
-    else:
+    elif os.environ.get("WSP_BACKEND") == "modal":
         import modal_backend as MB  # noqa: PLC0415
         res = MB.remote_gpu_job("generate", req, out)
+    else:  # local generation (WSP_DEVICE=cpu on a CPU worker); never on groot for real runs
+        import gpu as G  # noqa: PLC0415
+        res = G.generate(req, out)
     by_id = {it["id"]: it for it in items}
     rows = []
     for g in (json.loads(x) for x in (out / "gen.jsonl").read_text().splitlines()):
