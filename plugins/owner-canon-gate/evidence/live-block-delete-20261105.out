@@ -1,0 +1,8 @@
+  Command helper: helper output was not a KEY=VALUE map; nothing to apply
+The gate blocked the delete. I made exactly one terminal call. This is what it returned, word for word:
+
+{"error": "owner-canon gate blocked this call: delete_needs_creator_receipt (delete outside scratch without a finished-creator receipt). See bend/owner_canon/LAWS.bend and bend/owner_standing/LAWS.bend. Fix the call (a virtual display, evidence, fx/pi for GPT, a finished-creator receipt, or the owner's OK, or wait for the back-off) instead of retrying it."}
+
+I checked the directory with a read-only file listing before and after the call. Both times it held only /mnt/zer0models/owner-standing-gate-test/canary.txt, so nothing was deleted.
+
+That proves the delete_needs_creator_receipt law for A17. The canary directory is still there. Removing it would need either a finished-creator receipt or the owner's OK; I haven't retried the delete.
