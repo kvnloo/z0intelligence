@@ -1,0 +1,2 @@
+ALL PROOFS CHECK
+bend 2.0.39 is available: run bend update
