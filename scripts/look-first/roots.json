@@ -17,12 +17,15 @@
     {"name": "z0evals", "github": "kvnloo/z0evals"},
     {"name": "aodl", "github": "kvnloo/aodl"},
     {"name": "kerdoios", "github": "kvnloo/kerdoios", "paths": ["${HOME}/.hermes/profiles/chiefstaff/plugins/kerdoios"]},
-    {"name": ".files", "github": "kvnloo/.files", "paths": ["${WORKSPACE_PARENT}/.files"]},
-    {"name": "kvnloo-skills", "github": "kvnloo/kvnloo-skills", "paths": ["${WORKSPACE_PARENT}/kvnloo-skills"]}
+    {"name": ".files", "github": "kvnloo/.files", "paths": ["${WORKSPACE_PARENT}/.files", "${MOUNT}/workspace/.files"]},
+    {"name": "kvnloo-skills", "github": "kvnloo/kvnloo-skills", "paths": ["${WORKSPACE_PARENT}/kvnloo-skills", "${WORKSPACE_PARENT}/repos/kvnloo-skills", "${MOUNT}/z0-wt/salvage/skills-home/work/kvnloo-skills"]}
   ],
   "skill_roots": [
     "${HOME}/.hermes/profiles/clean/skills",
-    "${HOME}/.hermes/profiles/chiefstaff/skills"
+    "${HOME}/.hermes/profiles/chiefstaff/skills",
+    "${HOME}/.agents/skills",
+    "${HOME}/.codex/skills",
+    "${HOME}/.config/opencode/skills"
   ],
   "skill_metadata_paths": [
     "${MOUNT}/z0-wt/salvage/skills-home/skills-inventory.snapshot.json"

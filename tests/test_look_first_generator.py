@@ -253,6 +253,8 @@ class IndexAndBranches(unittest.TestCase):
                 result = GEN.generate(config_path=config, output_dir=root / "out", cache_dir=cache, checkout=repo)
             self.assertTrue(result["complete"])
             self.assertFalse(result["installation"]["applied"])
+            self.assertEqual(result["source"]["head"], GEN.git(repo, "rev-parse", "HEAD").strip())
+            self.assertFalse(result["source"]["dirty"])
             self.assertEqual(len(result["local"]), 1)
             self.assertEqual(result["registries"][0]["records"], 2)
             self.assertTrue((root / "out/capability-index.manifest.json").is_file())
@@ -267,6 +269,68 @@ class IndexAndBranches(unittest.TestCase):
             self.assertFalse(result["complete"])
             self.assertTrue(result["errors"])
             self.assertEqual(result["index"]["entries"], 0)
+
+
+class QualificationReceipt(unittest.TestCase):
+    def test_existing_registry_hashes_are_checked_without_promoting_routes(self):
+        spec = importlib.util.spec_from_file_location("qualification", ROOT / "scripts/look-first/qualify.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(Path(tmp) / "repo")
+            registry = repo / "manifests/capabilities.v1.json"
+            evidence = repo / "docs/capability.md"
+            entry = {"provider": "fixture", "model": "fixture", "function": "read", "route": "LOCAL", "eligible": True, "availability": "declared_only"}
+            sources = [None, {"path": "docs/capability.md", "sha256": module.sha256(evidence)}, {"path": "docs/capability.md", "sha256": "0" * 64}, {"path": "missing.json", "sha256": "0" * 64}]
+            COLLECT.dump_json(registry, {"schema": "z0int.capability_registry.v1", "entries": [{**entry, "eval_source": source} for source in sources]})
+            receipt = module.registry_receipt(registry)
+            self.assertEqual(receipt["integrity_counts"], {"no_evidence": 1, "matching": 1, "mismatch": 1, "missing": 1})
+            self.assertTrue(all(e["live_integration"] == "not_tested" for e in receipt["entries"]))
+            self.assertTrue(all(e["decision"] == "retain_existing_admission_and_quality_gates" for e in receipt["entries"]))
+            self.assertTrue(receipt["registry_file_dirty"])
+            COLLECT.dump_json(registry, {"schema": "z0int.capability_registry.v1", "entries": [{**entry, "eval_source": {"path": "../outside.json", "sha256": "0" * 64}}]})
+            with self.assertRaisesRegex(ValueError, "escapes"):
+                module.registry_receipt(registry)
+
+
+class SourceProvenance(unittest.TestCase):
+    def test_source_receipt_binds_revision_config_and_dirty_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = make_repo(root / "repo")
+            config = root / "roots.json"
+            config.write_text('{}\n', encoding="utf-8")
+            clean = GEN.source_receipt(repo, config)
+            self.assertEqual(clean["head"], GEN.git(repo, "rev-parse", "HEAD").strip())
+            self.assertFalse(clean["dirty"])
+            self.assertEqual(len(clean["files"][str(config.resolve())]), 64)
+            self.assertIn(str(Path(GEN.__file__).resolve()), clean["files"])
+            (repo / "docs/capability.md").write_text("Changed bytes\n", encoding="utf-8")
+            dirty = GEN.source_receipt(repo, config)
+            self.assertTrue(dirty["dirty"])
+            self.assertNotEqual(clean["tracked_diff_sha256"], dirty["tracked_diff_sha256"])
+            self.assertEqual(clean["head"], dirty["head"])
+            config.write_text('{"scope": []}\n', encoding="utf-8")
+            self.assertNotEqual(clean["files"], GEN.source_receipt(repo, config)["files"])
+
+    def test_preflight_reports_broken_links_without_writing_an_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = make_repo(root / "repo")
+            skills = root / "skills"
+            skills.mkdir()
+            (skills / "missing").symlink_to(root / "gone", target_is_directory=True)
+            config = root / "roots.json"
+            COLLECT.dump_json(config, {"scope": ["repo"], "repositories": [{"name": "repo", "github": "fixture/repo", "paths": [str(repo)]}], "skill_roots": [str(skills)]})
+            before = sorted(str(p) for p in root.rglob("*"))
+            with mock.patch.object(GEN, "write_index", side_effect=AssertionError("preflight wrote index")):
+                result = GEN.preflight(config_path=config, checkout=repo)
+            self.assertFalse(result["complete"])
+            self.assertFalse(result["installation"]["applied"])
+            self.assertEqual(result["repositories"][0]["paths"], [str(repo.resolve())])
+            self.assertEqual(result["skills"][0]["unreadable"], 1)
+            self.assertTrue(any(e["error"] == "Broken skill link" for e in result["errors"]))
+            self.assertEqual(before, sorted(str(p) for p in root.rglob("*")))
 
 
 class HeldRegistryReuse(unittest.TestCase):

@@ -679,11 +679,54 @@ def write_index(records: Iterator[dict[str, str]], output_dir: Path) -> dict[str
     return {"entries": count, "jsonl_sha256": digest.hexdigest(), "status_counts": dict(sorted(statuses.items())), "kind_counts": dict(sorted(kinds.items()))}
 
 
+def source_receipt(checkout: Path, config_path: Path) -> dict[str, Any]:
+    """Bind collection to code bytes and revision without recording private diffs.
+
+    Dirty receipts are diagnostic, not a claim that HEAD reproduces the output.
+    Untracked file contents are not hashed or collected by this receipt.
+    """
+    status = git(checkout, "status", "--porcelain=v1", "--untracked-files=normal")
+    diff = subprocess.run(["git", "-C", str(checkout), "diff", "--binary", "HEAD", "--"], capture_output=True, check=True, timeout=30).stdout
+    paths = [Path(__file__).resolve(), Path(_collect.__file__).resolve(), config_path.resolve()]
+    return {
+        "checkout": str(checkout.resolve()),
+        "head": git(checkout, "rev-parse", "HEAD").strip(),
+        "dirty": bool(status),
+        "status_sha256": hashlib.sha256(status.encode()).hexdigest(),
+        "tracked_diff_sha256": hashlib.sha256(diff).hexdigest(),
+        "files": {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths},
+    }
+
+
+def preflight(*, config_path: Path | str | None = None, checkout: Path | str | None = None) -> dict[str, Any]:
+    """Inspect discovery and skill readability only. No cache/index writes or network.
+
+    Complete means these bounded discovery checks passed, not usable integrations.
+    """
+    config_path = Path(config_path) if config_path else Path(__file__).with_name("roots.json")
+    checkout = Path(checkout).resolve() if checkout else Path(__file__).resolve().parents[2]
+    result: dict[str, Any] = {"schema": "look-first.preflight.v1", "errors": [], "skills": []}
+    result["source"] = source_receipt(checkout, config_path)
+    config = config_roots(config_path, checkout, result)
+    result["installation"] = {**config.get("installation", {}), "applied": False}
+    result["repositories"] = [{**spec, "paths": [str(path) for path in spec["paths"]]} for spec in config["repositories"]]
+    for spec in config["repositories"]:
+        if not spec["paths"]:
+            error(result, f"local:{spec['name']}", "No exact local repository discovered")
+    for root in config["skill_roots"]:
+        paths = list(walk_skills(root, result))
+        result["skills"].append({"root": str(root), "enumerated": len(paths), "unreadable": sum(not path.is_file() for path in paths)})
+    result["errors"].sort(key=lambda item: (item["scope"], item["error"]))
+    result["complete"] = not result["errors"]
+    return result
+
+
 def generate(*, config_path: Path | str | None = None, output_dir: Path | str = DEFAULT_OUTPUT, cache_dir: Path | str = DEFAULT_CACHE, checkout: Path | str | None = None, refresh_remote: bool = False, timeout: float = 60) -> dict[str, Any]:
     config_path = Path(config_path) if config_path else Path(__file__).with_name("roots.json")
     output_dir, cache_dir = Path(output_dir).expanduser().absolute(), Path(cache_dir).expanduser().absolute()
     checkout = Path(checkout).resolve() if checkout else Path(__file__).resolve().parents[2]
     manifest: dict[str, Any] = {"schema": "look-first.manifest.v1", "complete": False, "remote_refreshed": refresh_remote, "cache_dir": str(cache_dir), "output_dir": str(output_dir), "config": str(config_path.resolve()), "local": [], "github": [], "skills": [], "errors": []}
+    manifest["source"] = source_receipt(checkout, config_path)
     config = config_roots(config_path, checkout, manifest)
     manifest["installation"] = {**config.get("installation", {}), "applied": False}
     if refresh_remote:
@@ -711,13 +754,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE)
     parser.add_argument("--checkout", type=Path)
     parser.add_argument("--refresh-remote", action="store_true")
+    parser.add_argument("--preflight", action="store_true", help="Read-only discovery receipt; no index generation or remote refresh")
     parser.add_argument("--timeout", type=float, default=60, help="Per-page GitHub timeout in seconds")
     args = parser.parse_args(argv)
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
+    if args.preflight and args.refresh_remote:
+        parser.error("--preflight cannot refresh remote data")
     try:
+        if args.preflight:
+            result = preflight(config_path=args.config, checkout=args.checkout)
+            print(json.dumps(result, sort_keys=True, indent=2))
+            return 0 if result["complete"] else 2
         manifest = generate(config_path=args.config, output_dir=args.output_dir, cache_dir=args.cache_dir, checkout=args.checkout, refresh_remote=args.refresh_remote, timeout=args.timeout)
-    except (OSError, ValueError, RuntimeError, sqlite3.Error, subprocess.TimeoutExpired) as exc:
+    except (OSError, ValueError, RuntimeError, sqlite3.Error, subprocess.SubprocessError) as exc:
         print(f"look-first: {exc}", file=sys.stderr)
         return 1
     print(json.dumps({"complete": manifest["complete"], "errors": len(manifest["errors"]), "index": manifest["index"], "manifest": str(Path(args.output_dir).expanduser() / "capability-index.manifest.json")}, sort_keys=True))
