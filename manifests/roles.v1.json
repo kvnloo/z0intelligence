@@ -1,0 +1,61 @@
+{
+  "schema": "z0int.roles.v1",
+  "note": "Single role table for decide(). Rendered from z0live-voice-plan.json (7b2abf9f) and omp groot modelRoles on 2026-11-05; ordered by preference. Shadow-only: nothing reads this for live routing yet (ledger Z17).",
+  "privacy": {
+    "public": "*",
+    "personal": ["anthropic", "local"],
+    "location": ["local"],
+    "credentials": ["local"]
+  },
+  "harness_law": {
+    "openai-codex": ["fx", "pi"],
+    "gemini": ["agy"],
+    "opencode": ["opencode"],
+    "anthropic": ["hermes", "claude-code", "omp"],
+    "local": ["hermes", "llama"],
+    "groq": ["vllm-sr"],
+    "typesafe": ["z0int"]
+  },
+  "pools": {
+    "anthropic": ["claude", "claude2", "claude3"],
+    "openai-codex": ["codex"]
+  },
+  "roles": {
+    "smol": [
+      {"provider": "anthropic", "model": "claude-haiku-4-5", "harness": "hermes", "effort": "low"},
+      {"provider": "local", "model": "qwen3.5-4b", "harness": "hermes", "cost": "free"}
+    ],
+    "default": [
+      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "medium"},
+      {"provider": "local", "model": "qwen3.5-4b", "harness": "hermes", "cost": "free"}
+    ],
+    "task": [
+      {"provider": "openai-codex", "model": "gpt-6.1-sol", "harness": "fx", "effort": "low"},
+      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "medium"},
+      {"provider": "local", "model": "qwen3.5-4b", "harness": "hermes", "cost": "free"}
+    ],
+    "vision": [
+      {"provider": "openai-codex", "model": "gpt-6.1-sol", "harness": "fx", "effort": "medium"},
+      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "medium"}
+    ],
+    "plan": [
+      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "high"}
+    ],
+    "slow": [
+      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "high"}
+    ],
+    "advisor": [
+      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "high"}
+    ],
+    "judge": [
+      {"provider": "typesafe", "model": "jev-latest", "harness": "z0int"}
+    ],
+    "free": [
+      {"provider": "groq", "model": "gpt-oss-120b", "harness": "vllm-sr", "cost": "free", "inventory_id": "groq/gpt-oss-120b"},
+      {"provider": "groq", "model": "qwen3.8-27b", "harness": "vllm-sr", "cost": "free", "inventory_id": "groq/qwen3.8-27b"},
+      {"provider": "groq", "model": "gpt-oss-20b", "harness": "vllm-sr", "cost": "free", "inventory_id": "groq/gpt-oss-20b"},
+      {"provider": "opencode", "model": "deepseek-v4.1-flash-free", "harness": "opencode", "cost": "free", "inventory_id": "opencode/deepseek-v4.1-flash-free"},
+      {"provider": "local", "model": "qwen3.5-4b", "harness": "hermes", "cost": "free"}
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+import json
+import sqlite3
+
+from z0int import decide_shadow as S
+from z0int.decide import load_roles
+
+
+def sig(**over):
+    lane = lambda b, p, a: {"band": b, "pace_ratio": p, "max_workflow_agents": a, "effort": "medium"}
+    s = {"roles": load_roles(), "saturation": {}, "free_inventory": {"disabled": [], "paid": []},
+         "burn": {"lanes": {"claude": lane("under-burn", .4, 12), "claude2": lane("on-pace", .9, 6),
+                            "claude3": lane("hard-throttle", 58, 0), "codex": lane("on-pace", .93, 6)}}}
+    s.update(over)
+    return s
+
+
+def test_privacy_classifier():
+    assert S.classify_privacy("use api_key=sk-abcdefghijklmnopqrstuvwx now") == "credentials"
+    assert S.classify_privacy("No secrets, tokens or credentials in output") == "public"
+    assert S.classify_privacy("meet at 0.12345, -0.67890 tonight") == "location"
+    assert S.classify_privacy("summarize Kevin's state.db sessions") == "personal"
+    assert S.classify_privacy("write a haiku about rust") == "public"
+
+
+def _statedb(path):
+    c = sqlite3.connect(path)
+    c.executescript("""create table sessions(id text, model text, billing_provider text, parent_session_id text,
+        started_at real, ended_at real, input_tokens int, output_tokens int, cache_read_tokens int, cache_write_tokens int);
+        create table messages(id integer primary key, session_id text, role text, content text);""")
+    c.execute("insert into sessions values('kid','claude-opus-5-5','anthropic','p',100,150,10,20,30,0)")
+    c.execute("insert into sessions values('kid2','vllm-sr/paid','custom:vllm-sr','p',110,160,5,5,0,0)")
+    c.execute("insert into sessions values('root','claude-opus-5-5','anthropic',null,100,150,1,1,1,1)")
+    c.execute("insert into messages(session_id,role,content) values('kid','user','write a haiku')")
+    c.commit(); c.close()
+
+
+def test_hermes_tap_reads_only_delegated_children(tmp_path):
+    (tmp_path / "clean").mkdir(); _statedb(tmp_path / "clean" / "state.db")
+    ev = S.hermes_events(tmp_path, 0, 1000)
+    assert {e["id"] for e in ev} == {"clean:kid", "clean:kid2"}
+    kid = next(e for e in ev if e["id"] == "clean:kid")
+    assert kid["actual"]["provider"] == "anthropic" and kid["req"] == {"role": "task", "privacy": "public", "executors": ["hermes"]}
+    assert kid["tokens"]["output"] == 20
+
+
+def test_fx_tap(tmp_path):
+    d = tmp_path / "v2" / "abc"; d.mkdir(parents=True)
+    rows = [{"kind": "session_created", "ts": 5000},
+            {"kind": "set", "key": "prefs", "value": {"provider": "codex", "model": "gpt-6.1-terra", "effort": "medium"}},
+            {"kind": "item", "type": "user", "data": {"text": "write a haiku"}},
+            {"kind": "item", "type": "turn_end", "data": {"turn_summary": {"token_progress": {"input_tokens": 7, "output_tokens": 9}}}}]
+    (d / "log.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    ev = S.fx_events(tmp_path, 0, 10)
+    assert len(ev) == 1 and ev[0]["actual"] == {"harness": "fx", "provider": "openai-codex", "model": "gpt-6.1-terra", "effort": "medium"}
+    assert ev[0]["tokens"] == {"input": 7, "output": 9, "cache_read": 0, "cache_write": 0}
+
+
+def _sr(rid, ts, model, code):
+    return [json.dumps({"msg": "routing_decision", "ts": ts, "request_id": rid, "selected_model": "groq-" + model}),
+            json.dumps({"msg": "access", "ts": ts, "request_id": rid, "response_code": code})]
+
+
+def test_vllm_sr_tap_marks_saturation_from_prior_429():
+    lines = _sr("a", "2026-11-05T22:40:00.000", "gpt-oss-120b", 429) + _sr("b", "2026-11-05T22:40:10.000", "gpt-oss-20b", 200)
+    ev = S.vllm_sr_events(lines, 0, 2e9)
+    assert [e["actual"]["model"] for e in ev] == ["gpt-oss-120b", "gpt-oss-20b"]
+    assert ev[0]["saturation"] == {} and ev[1]["saturation"]["groq/gpt-oss-120b"]["available"] is False
+    rows = S.shadow_rows(ev, sig())
+    assert rows[0]["agree"] is True            # 120b is role-table first and was not yet saturated
+    assert rows[1]["decided"]["model"] == "qwen3.8-27b" and rows[1]["agree"] is False
+
+
+def test_shadow_rows_and_report():
+    ev = [{"source": "fx", "id": "x", "ts": 1, "req": {"role": "task", "privacy": "public", "executors": ["fx"]},
+           "actual": {"harness": "fx", "provider": "openai-codex", "model": "gpt-6.1-terra", "effort": "medium"},
+           "tokens": {"input": 1_000_000, "output": 0, "cache_read": 0, "cache_write": 0}},
+          {"source": "hermes-delegation", "id": "y", "ts": 1, "req": {"role": "task", "privacy": "public", "executors": ["hermes"]},
+           "actual": {"harness": "hermes", "provider": "anthropic", "model": "claude-opus-5-5", "effort": None},
+           "tokens": {"input": 10, "output": 0, "cache_read": 0, "cache_write": 0}}]
+    rows = S.shadow_rows(ev, sig())
+    assert [r["agree"] for r in rows] == [False, True]
+    price = lambda provider, model, t: {"gpt-6.1-terra": 1.0, "gpt-6.1-sol": 2.0}.get(model, 0.0) * t["input"] / 1e6
+    rep = S.report(rows + rows[:1], price)       # duplicate row is deduped
+    assert rep["n"] == 2 and rep["agree_pct"] == 50.0
+    assert rep["by_source"]["fx"]["agree_pct"] == 0.0
+    top = rep["top_disagreements"][0]
+    assert top["actual"] == "openai-codex/gpt-6.1-terra" and top["decided"] == "openai-codex/gpt-6.1-sol" and top["n"] == 1
+    assert rep["cost_delta_usd"] == 1.0
+    assert rep["quota_delta_tokens"] == {"codex": 0}
