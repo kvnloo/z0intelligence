@@ -159,10 +159,11 @@ def llm_surface(provider: str | None, base_url: str | None, model: str | None) -
     if prov in over:
         return prov, _fund(over[prov])
     rule = LLM_PROVIDERS.get(prov)
-    if rule is None and host:
+    # A free provider label must not hide a known metered destination.
+    if host and rule in (None, "free", "rule:openrouter"):
         if host in ("localhost", "127.0.0.1") or host.startswith(("10.", "100.", "192.168.")):
             rule = "rule:vllm-sr"
-        elif "openrouter.ai" in host:
+        elif host == "openrouter.ai" or host.endswith(".openrouter.ai"):
             rule = "rule:openrouter"
         elif host in FREE_HOSTS:
             prov, rule = FREE_HOSTS[host], LLM_PROVIDERS.get(FREE_HOSTS[host], "free")

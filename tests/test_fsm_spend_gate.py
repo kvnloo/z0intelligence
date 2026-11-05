@@ -241,3 +241,40 @@ def test_plugin_rewrites_metered_llm_requests(monkeypatch, tmp_path):
     assert out["request"]["messages"] == [{"role": "user", "content": "."}]
     assert mod.on_llm_request(request={"model": "claude-opus-5-5"}, provider="anthropic") is None
     assert mod.on_llm_request(request={"model": "openrouter/free"}, provider="openrouter") is None
+
+
+@pytest.mark.parametrize("purpose", ["main", "title", "compression", "vision"])
+def test_exhausted_free_route_rewrites_paid_fallbacks(monkeypatch, tmp_path, purpose):
+    """Synthetic routing through the adapter, not proof auxiliary callers invoke it."""
+    mod = _plugin(monkeypatch, tmp_path)
+    routes = [
+        ("groq", "https://api.groq.com/openai/v1", "openai/gpt-oss-120b"),
+        ("deepseek", "https://api.deepseek.com/v1", "deepseek-chat"),
+        ("groq", "https://api.openai.com/v1", "gpt-6"),
+        ("openrouter", "https://openrouter.ai/api/v1", "x/y"),
+        ("unknown", "https://unclassified.example/v1", "m"),
+    ]
+    attempts = []
+    for provider, base_url, model in routes:
+        request = {"model": model, "messages": [{"role": "user", "content": "."}], "max_tokens": 1}
+        out = mod.on_llm_request(request=request, provider=provider, base_url=base_url, purpose=purpose)
+        if out is None:
+            outcome = "synthetic_429" if not attempts else "unmodified_paid_route"
+        else:
+            assert out["request"]["model"] == mod._REFUSED_MODEL
+            outcome = "rewritten_refusal"
+        attempts.append({"provider": provider, "base_url": base_url, "model": model, "outcome": outcome})
+    print(json.dumps({"purpose": purpose, "synthetic": True, "adapter_attempts": attempts}))
+    assert [a["outcome"] for a in attempts] == ["synthetic_429"] + ["rewritten_refusal"] * 4
+    receipts = list(map(json.loads, S.RECEIPTS.read_text().splitlines()))
+    assert len(receipts) == 4
+    assert all(r["allowed"] is False for r in receipts)
+
+
+@pytest.mark.parametrize("provider", ["groq", "cerebras", "openrouter"])
+def test_free_provider_label_cannot_hide_paid_destination(provider):
+    assert S.llm_surface(provider, "https://api.openai.com/v1", "x/y:free") == ("openai-api", F.METERED)
+
+
+def test_openrouter_lookalike_is_not_free():
+    assert S.llm_surface("custom", "https://openrouter.ai.untrusted.example/v1", "x/y:free")[1] is F.UNKNOWN
