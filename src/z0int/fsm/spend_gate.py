@@ -66,6 +66,9 @@ PROTECTED = ("spend-approvals", "spend-funding", "Z0_GUARD_O19", "z0-spend-stop"
 # LLM providers by Hermes provider name. "rule:openrouter" = free only for :free models.
 LLM_PROVIDERS: dict[str, str] = {
     "anthropic": "subscription",      # Claude Max/Pro OAuth pool (claude-ultra, claude-sub2)
+    # Claude Code CLI on the same Max/Pro logins (Kevin 2026-11-05 "lets just use them"); a
+    # process:// base_url, so only the provider name can classify it.
+    "claude-subscription-directsdk-experimental": "subscription",
     "openai-codex": "subscription",   # ChatGPT plan
     "xai-oauth": "subscription",      # SuperGrok OAuth
     "nous": "subscription",           # Nous Portal plan

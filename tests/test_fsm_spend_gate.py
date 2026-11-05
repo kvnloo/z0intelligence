@@ -85,6 +85,7 @@ def test_openrouter_free_only_for_free_models():
 
 @pytest.mark.parametrize("prov,url,model,fund", [
     ("anthropic", "", "claude-opus-5-5", F.SUB),
+    ("claude-subscription-directsdk-experimental", "process://claude-subscription-directsdk-experimental", "opus", F.SUB),
     ("openai-codex", "", "gpt-6.1-sol", F.SUB),
     ("nous", "", "openai/gpt-6.1-sol", F.SUB),
     ("openrouter", "", "openrouter/free", F.FREE),
