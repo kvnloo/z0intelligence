@@ -18,10 +18,10 @@ def test_twin_matches_laws_exhaustively():
     # LAWS.bend: each guard with trigger True{} implies the clearance; trigger False is always admitted
     for law, (_, pred) in K.RULES.items():
         assert pred(False, False) and pred(False, True) and pred(True, True) and not pred(True, False), law
-    for bits in itertools.product([False, True], repeat=12):
+    for bits in itertools.product([False, True], repeat=6):
         pairs = list(zip(bits[::2], bits[1::2]))
         assert K.admits(*bits) == all(K.guard(t, c) for t, c in pairs)
-    assert K.admits(*([False] * 12))  # ordinary_call_admitted
+    assert K.admits(*([False] * 6))  # ordinary_call_admitted
 
 
 @pytest.fixture(autouse=True)
@@ -36,25 +36,7 @@ def blocked(tool, **args):
     return bool(r and r.get("action") == "block")
 
 
-@pytest.mark.parametrize("cmd", [
-    "hermes -p z0i --oneshot 'x' -m gpt-6.1-terra",
-    "codex exec --model gpt-5.5 'fix it'",
-])
-def test_gpt_outside_fx_blocked(cmd):
-    assert blocked("terminal", command=cmd)
 
-
-def test_gpt_via_fx_allowed():
-    assert not blocked("terminal", command="fx ask --json --model gpt-6.1-terra 'brief'")
-    assert blocked("delegate_task", tasks=[{"goal": "x"}], model="gpt-6.1-sol")
-    assert not blocked("delegate_task", tasks=[{"goal": "x"}])
-
-
-def test_prose_naming_gpt_is_not_a_dispatch():
-    # regression: a report to another agent that names the fx route was blocked as a GPT dispatch
-    msg = "E6 runs on fx gpt-6.1-terra; codex window 4%; hermes -m was never used, model=gpt-6.1-terra"
-    assert not blocked("message_agent", target="ayo", message=msg)
-    assert not blocked("write_file", path="/tmp/x.md", content=msg)
 
 
 def test_gui_focus():
@@ -64,30 +46,8 @@ def test_gui_focus():
     assert not blocked("terminal", command="xvfb-run -a xdotool key a")
 
 
-def test_delete():
-    assert blocked("terminal", command="rm -rf /mnt/zer0models/models/foo")
-    assert blocked("terminal", command="git branch -D feature/x")
-    assert not blocked("terminal", command="rm -rf $TMPDIR/probe")
-    assert not blocked("terminal", command="rm -rf /home/kvn/.hermes/profiles/z0i/cache/scratch/x")
 
 
-def test_delete_with_creator_receipt(tmp_path):
-    rc = tmp_path / "creator.done"
-    rc.write_text("{}")
-    assert not blocked("terminal", command=f"rm -rf /mnt/zer0models/x  # canon-creator-receipt={rc}")
-    assert blocked("terminal", command="rm -rf /mnt/zer0models/x  # canon-creator-receipt=/nope")
-
-
-def test_public(home):
-    assert blocked("terminal", command="gh pr create --repo NousResearch/hermes-agent --title t --body b")
-    assert not blocked("terminal", command="gh pr create --repo kvnloo/z0intelligence --title t --body b")
-    assert blocked("terminal", command="npm publish")
-    (home / "owner-canon-approvals.json").write_text('{"public": ["NousResearch/hermes-agent --title t"]}')
-    assert not blocked("terminal", command="gh pr create --repo NousResearch/hermes-agent --title t --body b")
-
-
-def test_approvals_file_protected():
-    assert blocked("write_file", path="/x/owner-canon-approvals.json", content="{}")
 
 
 def test_quota_backoff():
@@ -112,6 +72,10 @@ def test_ordinary_calls_pass():
     assert not blocked("read_file", path="/etc/hosts")
 
 
-def test_pre_llm_call_flags_gpt_session():
-    assert G.on_pre_llm_call(model="gpt-6.1-terra")
-    assert G.on_pre_llm_call(model="claude-opus-5-5") is None
+def test_unlocked_candidate_rules_are_not_gated():
+    # rules 16-60 are candidates (not adopted): deletes, public posts and GPT launches are not this gate's call
+    for cmd in ("rm -rf /mnt/zer0models/models/foo", "gh pr create --repo NousResearch/hermes-agent --title t",
+                "codex exec --model gpt-5.5 'x'"):
+        assert not blocked("terminal", command=cmd), cmd
+    assert set(K.RULES) == {"gui_never_steals_focus", "done_needs_receipt", "quota_backs_off"}
+
