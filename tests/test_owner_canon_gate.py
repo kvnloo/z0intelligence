@@ -145,3 +145,15 @@ def test_approvals_file_protected():
     assert blocked("write_file", path="/x/owner-canon-approvals.json", content="{}")
     assert blocked("terminal", command="echo {} > ~/.hermes/owner-canon-approvals.json")
 
+
+
+def test_gui_words_need_word_boundaries():
+    # TERM=xterm-... once matched the xte pattern and blocked a headless private tmux session
+    assert not blocked("terminal", command="env TERM=xterm-256color tmux -L a03 new-session -d bun Term.ts")
+    assert blocked("terminal", command="x" + "te 'mousemove 0 0'")
+
+
+def test_approvals_guard_judges_the_target_path_not_the_text():
+    name = "owner-canon-" + "approvals.json"
+    assert not blocked("patch", path="/x/tests/test_gate.py", old_string="a " + name, new_string="b " + name)
+    assert blocked("patch", path="/x/" + name, old_string="{}", new_string='{"public": ["x"]}')

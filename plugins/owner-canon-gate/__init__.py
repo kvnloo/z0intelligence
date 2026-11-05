@@ -50,7 +50,7 @@ _spec2.loader.exec_module(KS)
 DEFAULT_MODE = {law: "enforce" for law in (*K.RULES, *KS.RULES)} | {"done_needs_receipt": "flag"}
 _SHELL_TOOLS = {"terminal", "execute_code", "process", "mcp__terminal", "mcp__execute_code"}
 _GUI = re.compile(r"(?i)\b(xdotool|ydotool|wmctrl|wtype|xte|hyprctl\s+dispatch|swaymsg\s+focus|osascript|cliclick|"
-                  r"adb\b[^|;&]*\bshell\s+input\b|adb\b[^|;&]*\bam\s+start\b|pyautogui|pynput)")
+                  r"adb\b[^|;&]*\bshell\s+input\b|adb\b[^|;&]*\bam\s+start\b|pyautogui|pynput)\b")
 _GUI_ISOLATED = re.compile(r"(?i)(--display[ =]?[1-9]\d*|DISPLAY=:(9\d|[1-9]\d\d+)|xvfb-run|Xvfb|--headless|"
                            r"WAYLAND_DISPLAY=\S*headless|fsdisplay|cage\s+-d|\bweston\b.*--backend=headless)")
 _GPT = re.compile(r"(?i)\b(gpt-?\d[\w.\-]*|o[134](-mini|-pro)?\b|openai/[\w.\-]+|codex-mini[\w.\-]*|"
@@ -243,8 +243,9 @@ def on_pre_tool_call(tool_name: str = "", args: dict | None = None, **kw):
     args = args or {}
     try:
         raw = json.dumps(args, default=str)
-        if "owner-canon-approvals.json" in raw and (tool_name in ("write_file", "patch", "mcp__write_file", "mcp__patch")
-                                                    or (tool_name in _SHELL_TOOLS and re.search(r"(>|tee|cp|mv|sed\s+-i|write_text|open\()[^\n]*owner-canon-approvals\.json", raw))):
+        target = str(args.get("path") or "") if isinstance(args, dict) else ""
+        if (tool_name in ("write_file", "patch", "mcp__write_file", "mcp__patch") and target.endswith("owner-canon-approvals.json")) or (
+                "owner-canon-approvals.json" in raw and (tool_name in _SHELL_TOOLS and re.search(r"(>|tee|cp|mv|sed\s+-i|write_text|open\()[^\n]*owner-canon-approvals\.json", raw))):
             _receipt({"law": "approval_file_protected", "tool": tool_name, "decision": "block"})
             return {"action": "block", "message": "owner-canon: agents never write the owner's approvals file."}
         block, viol = decide(tool_name, args)
