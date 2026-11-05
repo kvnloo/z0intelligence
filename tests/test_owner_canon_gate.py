@@ -50,6 +50,13 @@ def test_gpt_via_fx_allowed():
     assert not blocked("delegate_task", tasks=[{"goal": "x"}])
 
 
+def test_prose_naming_gpt_is_not_a_dispatch():
+    # regression: a report to another agent that names the fx route was blocked as a GPT dispatch
+    msg = "E6 runs on fx gpt-6.1-terra; codex window 4%; hermes -m was never used, model=gpt-6.1-terra"
+    assert not blocked("message_agent", target="ayo", message=msg)
+    assert not blocked("write_file", path="/tmp/x.md", content=msg)
+
+
 def test_gui_focus():
     assert blocked("terminal", command="xdotool key super+1")
     assert blocked("terminal", command="adb -s S shell input tap 10 10")
