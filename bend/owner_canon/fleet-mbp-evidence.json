@@ -1,0 +1,1402 @@
+{
+  "job_id": "fleet-mbp-6e0cb365b4814e6a",
+  "class": "build",
+  "checkpoint_safe": false,
+  "queue": "lanes",
+  "stage": "/home/agentjob/.local/state/fleet/kueue/fleet-mbp-6e0cb365b4814e6a",
+  "cpus": "2",
+  "memory": 3221225472,
+  "command": [
+    "env",
+    "FLEET_BUILD_JDK=",
+    "FLEET_GRADLE_ARGS=",
+    "FLEET_BUILD_BEND_TOOLS=0",
+    "sh",
+    "-c",
+    "if [ \"${FLEET_BUILD_BEND_TOOLS:-0}\" = 1 ]; then\n  export HOME=\"$PWD/.fleet-bend-home\"\n  mkdir -p \"$HOME/.bend\" || exit $?\n  tar -xzf .fleet-bend-tools.tar.gz -C \"$HOME/.bend\" || exit $?\n  export BEND=\"$HOME/.bend/bin/bend\"\n  export PATH=\"$HOME/.bend/bin:$PATH\"\nfi\ncd \"$1\" && shift\ncase ${FLEET_BUILD_JDK:-} in\n  17) [ -n \"${JAVA17_HOME:-}\" ] || { echo \"fleet-build: no JDK 17 on $(hostname)\" >&2; exit 3; }; export JAVA_HOME=$JAVA17_HOME ;;\n  21) [ -n \"${JAVA21_HOME:-}\" ] || { echo \"fleet-build: no JDK 21 on $(hostname)\" >&2; exit 3; }; export JAVA_HOME=$JAVA21_HOME ;;\nesac\n[ -n \"${JAVA_HOME:-}\" ] && export PATH=$JAVA_HOME/bin:$PATH\ncase $1 in\n  ./gradlew|gradlew|gradle)\n    g=$1; shift\n    # FLEET_GRADLE_ARGS is word-split on purpose; \"\\ \" keeps a space inside one flag.\n    eval \"set -- $FLEET_GRADLE_ARGS \\\"\\$@\\\"\"\n    set -- \"$g\" \"$@\"\n    echo \"fleet-build: $*\" >&2 ;;\nesac\nexec \"$@\"",
+    "fleet-build",
+    ".",
+    "bash",
+    "-lc",
+    "mkdir proof-home && tar -xzf proof-tools.tar.gz -C proof-home && export HOME=$PWD/proof-home BEND=$PWD/proof-home/.bend/bin/bend PATH=$PWD/proof-home/.bend/bin:$PATH && (cd owner_canon && $BEND PROOF.bend --verdict > verdict-mbp.txt 2>&1; cat verdict-mbp.txt) && (cd owner_canon && BEND=$BEND python3 mutations.py > mutations-mbp.json; echo mut_rc=$?)"
+  ],
+  "host": false,
+  "timeout": 1800,
+  "fetch": [
+    "src/owner_canon/mutations-mbp.json",
+    "src/owner_canon/verdict-mbp.txt"
+  ],
+  "out": "/home/kvn/.hermes/profiles/z0i/cache/scratch/mbp-canon15",
+  "keep": false,
+  "placement": null,
+  "source_snapshot": {
+    "git_head": "0e32fbf0df36f84bf6a559f83699c6db3e4b71d8",
+    "dirty": false,
+    "sha256": "a2b1f74db3fd502c1360e4aaf25f53655c7ea26de350f3ea0f788ee6cd4567ce",
+    "format": "tar+gzip",
+    "files": 20,
+    "source_bytes": 83678,
+    "archive_bytes": 24341,
+    "includes": []
+  },
+  "terminal": {
+    "exit_code": 0,
+    "job": {
+      "apiVersion": "batch/v1",
+      "kind": "Job",
+      "metadata": {
+        "annotations": {
+          "fleet.z0.dev/host": "false"
+        },
+        "creationTimestamp": "2026-11-05T07:51:29Z",
+        "generation": 2,
+        "labels": {
+          "app.kubernetes.io/managed-by": "fleet-build",
+          "kueue.x-k8s.io/priority-class": "build",
+          "kueue.x-k8s.io/queue-name": "lanes"
+        },
+        "name": "fleet-mbp-6e0cb365b4814e6a",
+        "namespace": "fleet-mbp",
+        "resourceVersion": "1627381",
+        "uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+      },
+      "spec": {
+        "activeDeadlineSeconds": 1800,
+        "backoffLimit": 0,
+        "completionMode": "NonIndexed",
+        "completions": 1,
+        "manualSelector": false,
+        "parallelism": 1,
+        "podReplacementPolicy": "TerminatingOrFailed",
+        "selector": {
+          "matchLabels": {
+            "batch.kubernetes.io/controller-uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+          }
+        },
+        "suspend": false,
+        "template": {
+          "metadata": {
+            "annotations": {
+              "kueue.x-k8s.io/workload": "job-fleet-mbp-6e0cb365b4814e6a-2721b"
+            },
+            "labels": {
+              "batch.kubernetes.io/controller-uid": "ba81279a-d970-413c-a5f0-39d05a4c5548",
+              "batch.kubernetes.io/job-name": "fleet-mbp-6e0cb365b4814e6a",
+              "controller-uid": "ba81279a-d970-413c-a5f0-39d05a4c5548",
+              "fleet-job": "fleet-mbp-6e0cb365b4814e6a",
+              "job-name": "fleet-mbp-6e0cb365b4814e6a",
+              "kueue.x-k8s.io/cluster-queue-name": "lanes",
+              "kueue.x-k8s.io/local-queue-name": "lanes",
+              "kueue.x-k8s.io/podset": "main"
+            }
+          },
+          "spec": {
+            "automountServiceAccountToken": false,
+            "containers": [
+              {
+                "command": [
+                  "/usr/bin/bash",
+                  "-c",
+                  "[ ! -r /etc/fleet/toolchain.env ] || . /etc/fleet/toolchain.env; export UV_CACHE_DIR=\"$HOME/.cache/uv\" npm_config_cache=\"$HOME/.cache/npm\" npm_config_store_dir=\"$HOME/.local/share/pnpm/store\"; mkdir -p \"$UV_CACHE_DIR\" \"$npm_config_cache\" \"$npm_config_store_dir\"; \"$@\"; rc=$?; d=/work; t=$(mktemp \"$d/.exit-XXXXXX\") || exit \"$rc\"; printf \"%s\\n\" \"$rc\" > \"$t\" && mv -f \"$t\" \"$d/exit\"; exit \"$rc\"",
+                  "fleet-kueue",
+                  "env",
+                  "FLEET_BUILD_JDK=",
+                  "FLEET_GRADLE_ARGS=",
+                  "FLEET_BUILD_BEND_TOOLS=0",
+                  "sh",
+                  "-c",
+                  "if [ \"${FLEET_BUILD_BEND_TOOLS:-0}\" = 1 ]; then\n  export HOME=\"$PWD/.fleet-bend-home\"\n  mkdir -p \"$HOME/.bend\" || exit $?\n  tar -xzf .fleet-bend-tools.tar.gz -C \"$HOME/.bend\" || exit $?\n  export BEND=\"$HOME/.bend/bin/bend\"\n  export PATH=\"$HOME/.bend/bin:$PATH\"\nfi\ncd \"$1\" && shift\ncase ${FLEET_BUILD_JDK:-} in\n  17) [ -n \"${JAVA17_HOME:-}\" ] || { echo \"fleet-build: no JDK 17 on $(hostname)\" >&2; exit 3; }; export JAVA_HOME=$JAVA17_HOME ;;\n  21) [ -n \"${JAVA21_HOME:-}\" ] || { echo \"fleet-build: no JDK 21 on $(hostname)\" >&2; exit 3; }; export JAVA_HOME=$JAVA21_HOME ;;\nesac\n[ -n \"${JAVA_HOME:-}\" ] && export PATH=$JAVA_HOME/bin:$PATH\ncase $1 in\n  ./gradlew|gradlew|gradle)\n    g=$1; shift\n    # FLEET_GRADLE_ARGS is word-split on purpose; \"\\ \" keeps a space inside one flag.\n    eval \"set -- $FLEET_GRADLE_ARGS \\\"\\$@\\\"\"\n    set -- \"$g\" \"$@\"\n    echo \"fleet-build: $*\" >&2 ;;\nesac\nexec \"$@\"",
+                  "fleet-build",
+                  ".",
+                  "bash",
+                  "-lc",
+                  "mkdir proof-home && tar -xzf proof-tools.tar.gz -C proof-home && export HOME=$PWD/proof-home BEND=$PWD/proof-home/.bend/bin/bend PATH=$PWD/proof-home/.bend/bin:$PATH && (cd owner_canon && $BEND PROOF.bend --verdict > verdict-mbp.txt 2>&1; cat verdict-mbp.txt) && (cd owner_canon && BEND=$BEND python3 mutations.py > mutations-mbp.json; echo mut_rc=$?)"
+                ],
+                "env": [
+                  {
+                    "name": "HOME",
+                    "value": "/home/agentjob"
+                  },
+                  {
+                    "name": "USER",
+                    "value": "agentjob"
+                  },
+                  {
+                    "name": "LOGNAME",
+                    "value": "agentjob"
+                  },
+                  {
+                    "name": "TMPDIR",
+                    "value": "/work/tmp"
+                  },
+                  {
+                    "name": "PATH",
+                    "value": "/usr/local/bin:/usr/bin:/bin"
+                  },
+                  {
+                    "name": "FLEET_JOB_ID",
+                    "value": "fleet-mbp-6e0cb365b4814e6a"
+                  },
+                  {
+                    "name": "FLEET_NODE_NAME",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "spec.nodeName"
+                      }
+                    }
+                  }
+                ],
+                "image": "busybox:1.37.0",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "build",
+                "resources": {
+                  "limits": {
+                    "cpu": "2",
+                    "memory": "3221225472"
+                  },
+                  "requests": {
+                    "cpu": "2",
+                    "memory": "3221225472"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/work",
+                    "name": "work"
+                  },
+                  {
+                    "mountPath": "/home/agentjob",
+                    "name": "home"
+                  },
+                  {
+                    "mountPath": "/usr",
+                    "name": "toolchain-0",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/lib",
+                    "name": "toolchain-1",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/lib64",
+                    "name": "toolchain-2",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/opt",
+                    "name": "toolchain-3",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/etc/fleet",
+                    "name": "toolchain-4",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/etc/ssl",
+                    "name": "toolchain-5",
+                    "readOnly": true
+                  }
+                ],
+                "workingDir": "/work/src"
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "hostname": "mbp",
+            "nodeSelector": {
+              "kubernetes.io/hostname": "mbp",
+              "z0.dev/class-build": "true",
+              "z0.dev/class-cpu-heavy": "true",
+              "z0.dev/class-render": "true",
+              "z0.dev/cpu-admit": "true"
+            },
+            "restartPolicy": "Never",
+            "schedulerName": "default-scheduler",
+            "securityContext": {
+              "runAsGroup": 1001,
+              "runAsNonRoot": true,
+              "runAsUser": 1001
+            },
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "hostPath": {
+                  "path": "/home/agentjob/.local/state/fleet/kueue/fleet-mbp-6e0cb365b4814e6a",
+                  "type": "Directory"
+                },
+                "name": "work"
+              },
+              {
+                "hostPath": {
+                  "path": "/home/agentjob",
+                  "type": "Directory"
+                },
+                "name": "home"
+              },
+              {
+                "hostPath": {
+                  "path": "/usr",
+                  "type": "Directory"
+                },
+                "name": "toolchain-0"
+              },
+              {
+                "hostPath": {
+                  "path": "/lib",
+                  "type": "Directory"
+                },
+                "name": "toolchain-1"
+              },
+              {
+                "hostPath": {
+                  "path": "/lib64",
+                  "type": "Directory"
+                },
+                "name": "toolchain-2"
+              },
+              {
+                "hostPath": {
+                  "path": "/opt",
+                  "type": "Directory"
+                },
+                "name": "toolchain-3"
+              },
+              {
+                "hostPath": {
+                  "path": "/etc/fleet",
+                  "type": "Directory"
+                },
+                "name": "toolchain-4"
+              },
+              {
+                "hostPath": {
+                  "path": "/etc/ssl",
+                  "type": "Directory"
+                },
+                "name": "toolchain-5"
+              }
+            ]
+          }
+        },
+        "ttlSecondsAfterFinished": 604800
+      },
+      "status": {
+        "completionTime": "2026-11-05T07:51:45Z",
+        "conditions": [
+          {
+            "lastProbeTime": "2026-11-05T07:51:30Z",
+            "lastTransitionTime": "2026-11-05T07:51:30Z",
+            "message": "Job resumed",
+            "reason": "JobResumed",
+            "status": "False",
+            "type": "Suspended"
+          },
+          {
+            "lastProbeTime": "2026-11-05T07:51:45Z",
+            "lastTransitionTime": "2026-11-05T07:51:45Z",
+            "message": "Reached expected number of succeeded pods",
+            "reason": "CompletionsReached",
+            "status": "True",
+            "type": "SuccessCriteriaMet"
+          },
+          {
+            "lastProbeTime": "2026-11-05T07:51:45Z",
+            "lastTransitionTime": "2026-11-05T07:51:45Z",
+            "message": "Reached expected number of succeeded pods",
+            "reason": "CompletionsReached",
+            "status": "True",
+            "type": "Complete"
+          }
+        ],
+        "ready": 0,
+        "startTime": "2026-11-05T07:51:30Z",
+        "succeeded": 1,
+        "terminating": 0,
+        "uncountedTerminatedPods": {}
+      }
+    },
+    "workload": {
+      "apiVersion": "kueue.x-k8s.io/v1beta2",
+      "kind": "Workload",
+      "metadata": {
+        "creationTimestamp": "2026-11-05T07:51:29Z",
+        "generation": 1,
+        "labels": {
+          "kueue.x-k8s.io/job-uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+        },
+        "name": "job-fleet-mbp-6e0cb365b4814e6a-2721b",
+        "namespace": "fleet-mbp",
+        "ownerReferences": [
+          {
+            "apiVersion": "batch/v1",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "Job",
+            "name": "fleet-mbp-6e0cb365b4814e6a",
+            "uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+          }
+        ],
+        "resourceVersion": "1627385",
+        "uid": "3a9237f3-f051-4824-8afb-2fe0079a3b2d"
+      },
+      "spec": {
+        "active": true,
+        "podSets": [
+          {
+            "count": 1,
+            "name": "main",
+            "template": {
+              "metadata": {
+                "labels": {
+                  "batch.kubernetes.io/job-name": "fleet-mbp-6e0cb365b4814e6a",
+                  "fleet-job": "fleet-mbp-6e0cb365b4814e6a"
+                }
+              },
+              "spec": {
+                "automountServiceAccountToken": false,
+                "containers": [
+                  {
+                    "command": [
+                      "/usr/bin/bash",
+                      "-c",
+                      "[ ! -r /etc/fleet/toolchain.env ] || . /etc/fleet/toolchain.env; export UV_CACHE_DIR=\"$HOME/.cache/uv\" npm_config_cache=\"$HOME/.cache/npm\" npm_config_store_dir=\"$HOME/.local/share/pnpm/store\"; mkdir -p \"$UV_CACHE_DIR\" \"$npm_config_cache\" \"$npm_config_store_dir\"; \"$@\"; rc=$?; d=/work; t=$(mktemp \"$d/.exit-XXXXXX\") || exit \"$rc\"; printf \"%s\\n\" \"$rc\" > \"$t\" && mv -f \"$t\" \"$d/exit\"; exit \"$rc\"",
+                      "fleet-kueue",
+                      "env",
+                      "FLEET_BUILD_JDK=",
+                      "FLEET_GRADLE_ARGS=",
+                      "FLEET_BUILD_BEND_TOOLS=0",
+                      "sh",
+                      "-c",
+                      "if [ \"${FLEET_BUILD_BEND_TOOLS:-0}\" = 1 ]; then\n  export HOME=\"$PWD/.fleet-bend-home\"\n  mkdir -p \"$HOME/.bend\" || exit $?\n  tar -xzf .fleet-bend-tools.tar.gz -C \"$HOME/.bend\" || exit $?\n  export BEND=\"$HOME/.bend/bin/bend\"\n  export PATH=\"$HOME/.bend/bin:$PATH\"\nfi\ncd \"$1\" && shift\ncase ${FLEET_BUILD_JDK:-} in\n  17) [ -n \"${JAVA17_HOME:-}\" ] || { echo \"fleet-build: no JDK 17 on $(hostname)\" >&2; exit 3; }; export JAVA_HOME=$JAVA17_HOME ;;\n  21) [ -n \"${JAVA21_HOME:-}\" ] || { echo \"fleet-build: no JDK 21 on $(hostname)\" >&2; exit 3; }; export JAVA_HOME=$JAVA21_HOME ;;\nesac\n[ -n \"${JAVA_HOME:-}\" ] && export PATH=$JAVA_HOME/bin:$PATH\ncase $1 in\n  ./gradlew|gradlew|gradle)\n    g=$1; shift\n    # FLEET_GRADLE_ARGS is word-split on purpose; \"\\ \" keeps a space inside one flag.\n    eval \"set -- $FLEET_GRADLE_ARGS \\\"\\$@\\\"\"\n    set -- \"$g\" \"$@\"\n    echo \"fleet-build: $*\" >&2 ;;\nesac\nexec \"$@\"",
+                      "fleet-build",
+                      ".",
+                      "bash",
+                      "-lc",
+                      "mkdir proof-home && tar -xzf proof-tools.tar.gz -C proof-home && export HOME=$PWD/proof-home BEND=$PWD/proof-home/.bend/bin/bend PATH=$PWD/proof-home/.bend/bin:$PATH && (cd owner_canon && $BEND PROOF.bend --verdict > verdict-mbp.txt 2>&1; cat verdict-mbp.txt) && (cd owner_canon && BEND=$BEND python3 mutations.py > mutations-mbp.json; echo mut_rc=$?)"
+                    ],
+                    "env": [
+                      {
+                        "name": "HOME",
+                        "value": "/home/agentjob"
+                      },
+                      {
+                        "name": "USER",
+                        "value": "agentjob"
+                      },
+                      {
+                        "name": "LOGNAME",
+                        "value": "agentjob"
+                      },
+                      {
+                        "name": "TMPDIR",
+                        "value": "/work/tmp"
+                      },
+                      {
+                        "name": "PATH",
+                        "value": "/usr/local/bin:/usr/bin:/bin"
+                      },
+                      {
+                        "name": "FLEET_JOB_ID",
+                        "value": "fleet-mbp-6e0cb365b4814e6a"
+                      },
+                      {
+                        "name": "FLEET_NODE_NAME",
+                        "valueFrom": {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "spec.nodeName"
+                          }
+                        }
+                      }
+                    ],
+                    "image": "busybox:1.37.0",
+                    "imagePullPolicy": "IfNotPresent",
+                    "name": "build",
+                    "resources": {
+                      "limits": {
+                        "cpu": "2",
+                        "memory": "3221225472"
+                      },
+                      "requests": {
+                        "cpu": "2",
+                        "memory": "3221225472"
+                      }
+                    },
+                    "securityContext": {
+                      "allowPrivilegeEscalation": false,
+                      "capabilities": {
+                        "drop": [
+                          "ALL"
+                        ]
+                      }
+                    },
+                    "terminationMessagePath": "/dev/termination-log",
+                    "terminationMessagePolicy": "File",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/work",
+                        "name": "work"
+                      },
+                      {
+                        "mountPath": "/home/agentjob",
+                        "name": "home"
+                      },
+                      {
+                        "mountPath": "/usr",
+                        "name": "toolchain-0",
+                        "readOnly": true
+                      },
+                      {
+                        "mountPath": "/lib",
+                        "name": "toolchain-1",
+                        "readOnly": true
+                      },
+                      {
+                        "mountPath": "/lib64",
+                        "name": "toolchain-2",
+                        "readOnly": true
+                      },
+                      {
+                        "mountPath": "/opt",
+                        "name": "toolchain-3",
+                        "readOnly": true
+                      },
+                      {
+                        "mountPath": "/etc/fleet",
+                        "name": "toolchain-4",
+                        "readOnly": true
+                      },
+                      {
+                        "mountPath": "/etc/ssl",
+                        "name": "toolchain-5",
+                        "readOnly": true
+                      }
+                    ],
+                    "workingDir": "/work/src"
+                  }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "hostname": "mbp",
+                "nodeSelector": {
+                  "kubernetes.io/hostname": "mbp"
+                },
+                "restartPolicy": "Never",
+                "schedulerName": "default-scheduler",
+                "securityContext": {
+                  "runAsGroup": 1001,
+                  "runAsNonRoot": true,
+                  "runAsUser": 1001
+                },
+                "terminationGracePeriodSeconds": 30,
+                "volumes": [
+                  {
+                    "hostPath": {
+                      "path": "/home/agentjob/.local/state/fleet/kueue/fleet-mbp-6e0cb365b4814e6a",
+                      "type": "Directory"
+                    },
+                    "name": "work"
+                  },
+                  {
+                    "hostPath": {
+                      "path": "/home/agentjob",
+                      "type": "Directory"
+                    },
+                    "name": "home"
+                  },
+                  {
+                    "hostPath": {
+                      "path": "/usr",
+                      "type": "Directory"
+                    },
+                    "name": "toolchain-0"
+                  },
+                  {
+                    "hostPath": {
+                      "path": "/lib",
+                      "type": "Directory"
+                    },
+                    "name": "toolchain-1"
+                  },
+                  {
+                    "hostPath": {
+                      "path": "/lib64",
+                      "type": "Directory"
+                    },
+                    "name": "toolchain-2"
+                  },
+                  {
+                    "hostPath": {
+                      "path": "/opt",
+                      "type": "Directory"
+                    },
+                    "name": "toolchain-3"
+                  },
+                  {
+                    "hostPath": {
+                      "path": "/etc/fleet",
+                      "type": "Directory"
+                    },
+                    "name": "toolchain-4"
+                  },
+                  {
+                    "hostPath": {
+                      "path": "/etc/ssl",
+                      "type": "Directory"
+                    },
+                    "name": "toolchain-5"
+                  }
+                ]
+              }
+            },
+            "topologyRequest": {
+              "podIndexLabel": "batch.kubernetes.io/job-completion-index"
+            }
+          }
+        ],
+        "priority": 100,
+        "priorityClassRef": {
+          "group": "kueue.x-k8s.io",
+          "kind": "WorkloadPriorityClass",
+          "name": "build"
+        },
+        "queueName": "lanes"
+      },
+      "status": {
+        "admission": {
+          "clusterQueue": "lanes",
+          "podSetAssignments": [
+            {
+              "count": 1,
+              "flavors": {
+                "cpu": "node-mbp",
+                "memory": "node-mbp"
+              },
+              "name": "main",
+              "resourceUsage": {
+                "cpu": "2",
+                "memory": "3Gi"
+              }
+            }
+          ]
+        },
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-11-05T07:51:29Z",
+            "message": "Quota reserved in ClusterQueue lanes",
+            "observedGeneration": 1,
+            "reason": "QuotaReserved",
+            "status": "True",
+            "type": "QuotaReserved"
+          },
+          {
+            "lastTransitionTime": "2026-11-05T07:51:29Z",
+            "message": "The workload is admitted",
+            "observedGeneration": 1,
+            "reason": "Admitted",
+            "status": "True",
+            "type": "Admitted"
+          },
+          {
+            "lastTransitionTime": "2026-11-05T07:51:45Z",
+            "message": "Reached expected number of succeeded pods",
+            "observedGeneration": 1,
+            "reason": "Succeeded",
+            "status": "True",
+            "type": "Finished"
+          },
+          {
+            "lastTransitionTime": "2026-11-05T07:51:45Z",
+            "message": "All pods reached readiness and the workload is running",
+            "observedGeneration": 1,
+            "reason": "Recovered",
+            "status": "True",
+            "type": "PodsReady"
+          }
+        ]
+      }
+    },
+    "pods": [
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "annotations": {
+            "kueue.x-k8s.io/workload": "job-fleet-mbp-6e0cb365b4814e6a-2721b"
+          },
+          "creationTimestamp": "2026-11-05T07:51:30Z",
+          "generateName": "fleet-mbp-6e0cb365b4814e6a-",
+          "generation": 1,
+          "labels": {
+            "batch.kubernetes.io/controller-uid": "ba81279a-d970-413c-a5f0-39d05a4c5548",
+            "batch.kubernetes.io/job-name": "fleet-mbp-6e0cb365b4814e6a",
+            "controller-uid": "ba81279a-d970-413c-a5f0-39d05a4c5548",
+            "fleet-job": "fleet-mbp-6e0cb365b4814e6a",
+            "job-name": "fleet-mbp-6e0cb365b4814e6a",
+            "kueue.x-k8s.io/cluster-queue-name": "lanes",
+            "kueue.x-k8s.io/local-queue-name": "lanes",
+            "kueue.x-k8s.io/podset": "main"
+          },
+          "name": "fleet-mbp-6e0cb365b4814e6a-hsxl8",
+          "namespace": "fleet-mbp",
+          "ownerReferences": [
+            {
+              "apiVersion": "batch/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "Job",
+              "name": "fleet-mbp-6e0cb365b4814e6a",
+              "uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+            }
+          ],
+          "resourceVersion": "1627379",
+          "uid": "1feeb4c5-0eb5-49ee-b114-bd7dc5e1a3b0"
+        },
+        "spec": {
+          "automountServiceAccountToken": false,
+          "containers": [
+            {
+              "command": [
+                "/usr/bin/bash",
+                "-c",
+                "[ ! -r /etc/fleet/toolchain.env ] || . /etc/fleet/toolchain.env; export UV_CACHE_DIR=\"$HOME/.cache/uv\" npm_config_cache=\"$HOME/.cache/npm\" npm_config_store_dir=\"$HOME/.local/share/pnpm/store\"; mkdir -p \"$UV_CACHE_DIR\" \"$npm_config_cache\" \"$npm_config_store_dir\"; \"$@\"; rc=$?; d=/work; t=$(mktemp \"$d/.exit-XXXXXX\") || exit \"$rc\"; printf \"%s\\n\" \"$rc\" > \"$t\" && mv -f \"$t\" \"$d/exit\"; exit \"$rc\"",
+                "fleet-kueue",
+                "env",
+                "FLEET_BUILD_JDK=",
+                "FLEET_GRADLE_ARGS=",
+                "FLEET_BUILD_BEND_TOOLS=0",
+                "sh",
+                "-c",
+                "if [ \"${FLEET_BUILD_BEND_TOOLS:-0}\" = 1 ]; then\n  export HOME=\"$PWD/.fleet-bend-home\"\n  mkdir -p \"$HOME/.bend\" || exit $?\n  tar -xzf .fleet-bend-tools.tar.gz -C \"$HOME/.bend\" || exit $?\n  export BEND=\"$HOME/.bend/bin/bend\"\n  export PATH=\"$HOME/.bend/bin:$PATH\"\nfi\ncd \"$1\" && shift\ncase ${FLEET_BUILD_JDK:-} in\n  17) [ -n \"${JAVA17_HOME:-}\" ] || { echo \"fleet-build: no JDK 17 on $(hostname)\" >&2; exit 3; }; export JAVA_HOME=$JAVA17_HOME ;;\n  21) [ -n \"${JAVA21_HOME:-}\" ] || { echo \"fleet-build: no JDK 21 on $(hostname)\" >&2; exit 3; }; export JAVA_HOME=$JAVA21_HOME ;;\nesac\n[ -n \"${JAVA_HOME:-}\" ] && export PATH=$JAVA_HOME/bin:$PATH\ncase $1 in\n  ./gradlew|gradlew|gradle)\n    g=$1; shift\n    # FLEET_GRADLE_ARGS is word-split on purpose; \"\\ \" keeps a space inside one flag.\n    eval \"set -- $FLEET_GRADLE_ARGS \\\"\\$@\\\"\"\n    set -- \"$g\" \"$@\"\n    echo \"fleet-build: $*\" >&2 ;;\nesac\nexec \"$@\"",
+                "fleet-build",
+                ".",
+                "bash",
+                "-lc",
+                "mkdir proof-home && tar -xzf proof-tools.tar.gz -C proof-home && export HOME=$PWD/proof-home BEND=$PWD/proof-home/.bend/bin/bend PATH=$PWD/proof-home/.bend/bin:$PATH && (cd owner_canon && $BEND PROOF.bend --verdict > verdict-mbp.txt 2>&1; cat verdict-mbp.txt) && (cd owner_canon && BEND=$BEND python3 mutations.py > mutations-mbp.json; echo mut_rc=$?)"
+              ],
+              "env": [
+                {
+                  "name": "HOME",
+                  "value": "/home/agentjob"
+                },
+                {
+                  "name": "USER",
+                  "value": "agentjob"
+                },
+                {
+                  "name": "LOGNAME",
+                  "value": "agentjob"
+                },
+                {
+                  "name": "TMPDIR",
+                  "value": "/work/tmp"
+                },
+                {
+                  "name": "PATH",
+                  "value": "/usr/local/bin:/usr/bin:/bin"
+                },
+                {
+                  "name": "FLEET_JOB_ID",
+                  "value": "fleet-mbp-6e0cb365b4814e6a"
+                },
+                {
+                  "name": "FLEET_NODE_NAME",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "spec.nodeName"
+                    }
+                  }
+                }
+              ],
+              "image": "busybox:1.37.0",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "build",
+              "resources": {
+                "limits": {
+                  "cpu": "2",
+                  "memory": "3221225472"
+                },
+                "requests": {
+                  "cpu": "2",
+                  "memory": "3221225472"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                }
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/work",
+                  "name": "work"
+                },
+                {
+                  "mountPath": "/home/agentjob",
+                  "name": "home"
+                },
+                {
+                  "mountPath": "/usr",
+                  "name": "toolchain-0",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/lib",
+                  "name": "toolchain-1",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/lib64",
+                  "name": "toolchain-2",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/opt",
+                  "name": "toolchain-3",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/etc/fleet",
+                  "name": "toolchain-4",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/etc/ssl",
+                  "name": "toolchain-5",
+                  "readOnly": true
+                }
+              ],
+              "workingDir": "/work/src"
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "hostname": "mbp",
+          "nodeName": "mbp",
+          "nodeSelector": {
+            "kubernetes.io/hostname": "mbp",
+            "z0.dev/class-build": "true",
+            "z0.dev/class-cpu-heavy": "true",
+            "z0.dev/class-render": "true",
+            "z0.dev/cpu-admit": "true"
+          },
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Never",
+          "schedulerName": "default-scheduler",
+          "securityContext": {
+            "runAsGroup": 1001,
+            "runAsNonRoot": true,
+            "runAsUser": 1001
+          },
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "hostPath": {
+                "path": "/home/agentjob/.local/state/fleet/kueue/fleet-mbp-6e0cb365b4814e6a",
+                "type": "Directory"
+              },
+              "name": "work"
+            },
+            {
+              "hostPath": {
+                "path": "/home/agentjob",
+                "type": "Directory"
+              },
+              "name": "home"
+            },
+            {
+              "hostPath": {
+                "path": "/usr",
+                "type": "Directory"
+              },
+              "name": "toolchain-0"
+            },
+            {
+              "hostPath": {
+                "path": "/lib",
+                "type": "Directory"
+              },
+              "name": "toolchain-1"
+            },
+            {
+              "hostPath": {
+                "path": "/lib64",
+                "type": "Directory"
+              },
+              "name": "toolchain-2"
+            },
+            {
+              "hostPath": {
+                "path": "/opt",
+                "type": "Directory"
+              },
+              "name": "toolchain-3"
+            },
+            {
+              "hostPath": {
+                "path": "/etc/fleet",
+                "type": "Directory"
+              },
+              "name": "toolchain-4"
+            },
+            {
+              "hostPath": {
+                "path": "/etc/ssl",
+                "type": "Directory"
+              },
+              "name": "toolchain-5"
+            }
+          ]
+        },
+        "status": {
+          "allocatedResources": {
+            "cpu": "2",
+            "memory": "3221225472"
+          },
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-05T07:51:44Z",
+              "message": "pod sandbox is not ready",
+              "observedGeneration": 1,
+              "reason": "PodSandboxNotReady",
+              "status": "False",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-05T07:51:30Z",
+              "observedGeneration": 1,
+              "reason": "PodCompleted",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-05T07:51:43Z",
+              "observedGeneration": 1,
+              "reason": "PodCompleted",
+              "status": "False",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-05T07:51:43Z",
+              "observedGeneration": 1,
+              "reason": "PodCompleted",
+              "status": "False",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-11-05T07:51:30Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "allocatedResources": {
+                "cpu": "2",
+                "memory": "3221225472"
+              },
+              "containerID": "containerd://3ee5cf283da63956f2bddbadd762ef57602aa4d19e00a96e4ca5165bff382400",
+              "image": "docker.io/library/busybox:1.37.0",
+              "imageID": "docker.io/library/busybox@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec",
+              "lastState": {},
+              "name": "build",
+              "ready": false,
+              "resources": {
+                "limits": {
+                  "cpu": "2",
+                  "memory": "3221225472"
+                },
+                "requests": {
+                  "cpu": "2",
+                  "memory": "3221225472"
+                }
+              },
+              "restartCount": 0,
+              "started": false,
+              "state": {
+                "terminated": {
+                  "containerID": "containerd://3ee5cf283da63956f2bddbadd762ef57602aa4d19e00a96e4ca5165bff382400",
+                  "exitCode": 0,
+                  "finishedAt": "2026-11-05T07:51:42Z",
+                  "reason": "Completed",
+                  "startedAt": "2026-11-05T07:51:35Z"
+                }
+              },
+              "user": {
+                "linux": {
+                  "gid": 1001,
+                  "supplementalGroups": [
+                    1001
+                  ],
+                  "uid": 1001
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/work",
+                  "name": "work"
+                },
+                {
+                  "mountPath": "/home/agentjob",
+                  "name": "home"
+                },
+                {
+                  "mountPath": "/usr",
+                  "name": "toolchain-0",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                },
+                {
+                  "mountPath": "/lib",
+                  "name": "toolchain-1",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                },
+                {
+                  "mountPath": "/lib64",
+                  "name": "toolchain-2",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                },
+                {
+                  "mountPath": "/opt",
+                  "name": "toolchain-3",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                },
+                {
+                  "mountPath": "/etc/fleet",
+                  "name": "toolchain-4",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                },
+                {
+                  "mountPath": "/etc/ssl",
+                  "name": "toolchain-5",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "100.78.215.21",
+          "hostIPs": [
+            {
+              "ip": "100.78.215.21"
+            }
+          ],
+          "observedGeneration": 1,
+          "phase": "Succeeded",
+          "podIP": "10.42.1.138",
+          "podIPs": [
+            {
+              "ip": "10.42.1.138"
+            }
+          ],
+          "qosClass": "Guaranteed",
+          "resources": {
+            "limits": {
+              "cpu": "2",
+              "memory": "3Gi"
+            },
+            "requests": {
+              "cpu": "1999m",
+              "memory": "3221225472"
+            }
+          },
+          "startTime": "2026-11-05T07:51:30Z"
+        }
+      }
+    ],
+    "events": {
+      "job": [
+        {
+          "apiVersion": "v1",
+          "count": 1,
+          "eventTime": null,
+          "firstTimestamp": "2026-11-05T07:51:29Z",
+          "involvedObject": {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "name": "fleet-mbp-6e0cb365b4814e6a",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627330",
+            "uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+          },
+          "kind": "Event",
+          "lastTimestamp": "2026-11-05T07:51:29Z",
+          "message": "Job suspended",
+          "metadata": {
+            "creationTimestamp": "2026-11-05T07:51:29Z",
+            "name": "fleet-mbp-6e0cb365b4814e6a.18e516cb7e438228",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627331",
+            "uid": "12770411-d5d0-4f52-a010-fd549eea0daa"
+          },
+          "reason": "Suspended",
+          "reportingComponent": "job-controller",
+          "reportingInstance": "",
+          "source": {
+            "component": "job-controller"
+          },
+          "type": "Normal"
+        },
+        {
+          "action": "CreatedWorkload",
+          "apiVersion": "v1",
+          "eventTime": "2026-11-05T07:51:29.874653Z",
+          "firstTimestamp": null,
+          "involvedObject": {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "name": "fleet-mbp-6e0cb365b4814e6a",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627330",
+            "uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+          },
+          "kind": "Event",
+          "lastTimestamp": null,
+          "message": "Created Workload: fleet-mbp/job-fleet-mbp-6e0cb365b4814e6a-2721b",
+          "metadata": {
+            "creationTimestamp": "2026-11-05T07:51:29Z",
+            "name": "fleet-mbp-6e0cb365b4814e6a.18e516cb80f41b24",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627334",
+            "uid": "d9ab6aba-e322-4202-a747-930a381c9ea5"
+          },
+          "reason": "CreatedWorkload",
+          "reportingComponent": "batch/job-kueue-controller",
+          "reportingInstance": "batch/job-kueue-controller-kueue-controller-manager-65db69f9b9-2ds82",
+          "source": {},
+          "type": "Normal"
+        },
+        {
+          "action": "Started",
+          "apiVersion": "v1",
+          "eventTime": "2026-11-05T07:51:29.926767Z",
+          "firstTimestamp": null,
+          "involvedObject": {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "name": "fleet-mbp-6e0cb365b4814e6a",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627339",
+            "uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+          },
+          "kind": "Event",
+          "lastTimestamp": null,
+          "message": "Admitted by clusterQueue lanes",
+          "metadata": {
+            "creationTimestamp": "2026-11-05T07:51:29Z",
+            "name": "fleet-mbp-6e0cb365b4814e6a.18e516cb840f2fda",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627340",
+            "uid": "bc8e26ef-80bd-4fe1-8c6c-f0e846cbda80"
+          },
+          "reason": "Started",
+          "reportingComponent": "batch/job-kueue-controller",
+          "reportingInstance": "batch/job-kueue-controller-kueue-controller-manager-65db69f9b9-2ds82",
+          "source": {},
+          "type": "Normal"
+        },
+        {
+          "apiVersion": "v1",
+          "count": 1,
+          "eventTime": null,
+          "firstTimestamp": "2026-11-05T07:51:30Z",
+          "involvedObject": {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "name": "fleet-mbp-6e0cb365b4814e6a",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627339",
+            "uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+          },
+          "kind": "Event",
+          "lastTimestamp": "2026-11-05T07:51:30Z",
+          "message": "Created pod: fleet-mbp-6e0cb365b4814e6a-hsxl8",
+          "metadata": {
+            "creationTimestamp": "2026-11-05T07:51:30Z",
+            "name": "fleet-mbp-6e0cb365b4814e6a.18e516cb8b59bbab",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627342",
+            "uid": "8c47094d-efd1-44e5-b246-5c093406df1e"
+          },
+          "reason": "SuccessfulCreate",
+          "reportingComponent": "job-controller",
+          "reportingInstance": "",
+          "source": {
+            "component": "job-controller"
+          },
+          "type": "Normal"
+        },
+        {
+          "apiVersion": "v1",
+          "count": 1,
+          "eventTime": null,
+          "firstTimestamp": "2026-11-05T07:51:30Z",
+          "involvedObject": {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "name": "fleet-mbp-6e0cb365b4814e6a",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627339",
+            "uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+          },
+          "kind": "Event",
+          "lastTimestamp": "2026-11-05T07:51:30Z",
+          "message": "Job resumed",
+          "metadata": {
+            "creationTimestamp": "2026-11-05T07:51:30Z",
+            "name": "fleet-mbp-6e0cb365b4814e6a.18e516cb8b59e50b",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627343",
+            "uid": "f4555d0a-adb1-4294-93a2-1c7635142738"
+          },
+          "reason": "Resumed",
+          "reportingComponent": "job-controller",
+          "reportingInstance": "",
+          "source": {
+            "component": "job-controller"
+          },
+          "type": "Normal"
+        },
+        {
+          "apiVersion": "v1",
+          "count": 1,
+          "eventTime": null,
+          "firstTimestamp": "2026-11-05T07:51:45Z",
+          "involvedObject": {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "name": "fleet-mbp-6e0cb365b4814e6a",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627378",
+            "uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+          },
+          "kind": "Event",
+          "lastTimestamp": "2026-11-05T07:51:45Z",
+          "message": "Job completed",
+          "metadata": {
+            "creationTimestamp": "2026-11-05T07:51:45Z",
+            "name": "fleet-mbp-6e0cb365b4814e6a.18e516cf1dcc55c3",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627382",
+            "uid": "fd451540-83b4-4285-aa76-7b27988d4ce6"
+          },
+          "reason": "Completed",
+          "reportingComponent": "job-controller",
+          "reportingInstance": "",
+          "source": {
+            "component": "job-controller"
+          },
+          "type": "Normal"
+        },
+        {
+          "action": "FinishedWorkload",
+          "apiVersion": "v1",
+          "eventTime": "2026-11-05T07:51:45.401495Z",
+          "firstTimestamp": null,
+          "involvedObject": {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "name": "fleet-mbp-6e0cb365b4814e6a",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627381",
+            "uid": "ba81279a-d970-413c-a5f0-39d05a4c5548"
+          },
+          "kind": "Event",
+          "lastTimestamp": null,
+          "message": "Workload 'fleet-mbp/job-fleet-mbp-6e0cb365b4814e6a-2721b' is declared finished",
+          "metadata": {
+            "creationTimestamp": "2026-11-05T07:51:45Z",
+            "name": "fleet-mbp-6e0cb365b4814e6a.18e516cf1e6cd594",
+            "namespace": "fleet-mbp",
+            "resourceVersion": "1627384",
+            "uid": "84d8879d-9652-4922-91bf-522bd84fbd75"
+          },
+          "reason": "FinishedWorkload",
+          "reportingComponent": "batch/job-kueue-controller",
+          "reportingInstance": "batch/job-kueue-controller-kueue-controller-manager-65db69f9b9-2ds82",
+          "source": {},
+          "type": "Normal"
+        }
+      ],
+      "pods": {
+        "fleet-mbp-6e0cb365b4814e6a-hsxl8": [
+          {
+            "action": "Binding",
+            "apiVersion": "v1",
+            "eventTime": "2026-11-05T07:51:30.070468Z",
+            "firstTimestamp": null,
+            "involvedObject": {
+              "apiVersion": "v1",
+              "kind": "Pod",
+              "name": "fleet-mbp-6e0cb365b4814e6a-hsxl8",
+              "namespace": "fleet-mbp",
+              "resourceVersion": "1627341",
+              "uid": "1feeb4c5-0eb5-49ee-b114-bd7dc5e1a3b0"
+            },
+            "kind": "Event",
+            "lastTimestamp": null,
+            "message": "Successfully assigned fleet-mbp/fleet-mbp-6e0cb365b4814e6a-hsxl8 to mbp",
+            "metadata": {
+              "creationTimestamp": "2026-11-05T07:51:30Z",
+              "name": "fleet-mbp-6e0cb365b4814e6a-hsxl8.18e516cb8c9fea3b",
+              "namespace": "fleet-mbp",
+              "resourceVersion": "1627346",
+              "uid": "5cc9a4e9-3278-4ba7-9978-5488aac0467f"
+            },
+            "reason": "Scheduled",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "default-scheduler-groot",
+            "source": {},
+            "type": "Normal"
+          },
+          {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-11-05T07:51:34Z",
+            "involvedObject": {
+              "apiVersion": "v1",
+              "fieldPath": "spec.containers{build}",
+              "kind": "Pod",
+              "name": "fleet-mbp-6e0cb365b4814e6a-hsxl8",
+              "namespace": "fleet-mbp",
+              "resourceVersion": "1627345",
+              "uid": "1feeb4c5-0eb5-49ee-b114-bd7dc5e1a3b0"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-11-05T07:51:34Z",
+            "message": "Container image \"busybox:1.37.0\" already present on machine and can be accessed by the pod",
+            "metadata": {
+              "creationTimestamp": "2026-11-05T07:51:34Z",
+              "name": "fleet-mbp-6e0cb365b4814e6a-hsxl8.18e516cc9ba4e35f",
+              "namespace": "fleet-mbp",
+              "resourceVersion": "1627355",
+              "uid": "13ce8781-bd7c-4aa0-92cc-43adbb15047c"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "mbp",
+            "source": {
+              "component": "kubelet",
+              "host": "mbp"
+            },
+            "type": "Normal"
+          },
+          {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-11-05T07:51:35Z",
+            "involvedObject": {
+              "apiVersion": "v1",
+              "fieldPath": "spec.containers{build}",
+              "kind": "Pod",
+              "name": "fleet-mbp-6e0cb365b4814e6a-hsxl8",
+              "namespace": "fleet-mbp",
+              "resourceVersion": "1627345",
+              "uid": "1feeb4c5-0eb5-49ee-b114-bd7dc5e1a3b0"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-11-05T07:51:35Z",
+            "message": "Container created",
+            "metadata": {
+              "creationTimestamp": "2026-11-05T07:51:35Z",
+              "name": "fleet-mbp-6e0cb365b4814e6a-hsxl8.18e516ccb472d14f",
+              "namespace": "fleet-mbp",
+              "resourceVersion": "1627359",
+              "uid": "519e188e-9078-468c-9c59-4e59c9bb926a"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "mbp",
+            "source": {
+              "component": "kubelet",
+              "host": "mbp"
+            },
+            "type": "Normal"
+          },
+          {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-11-05T07:51:35Z",
+            "involvedObject": {
+              "apiVersion": "v1",
+              "fieldPath": "spec.containers{build}",
+              "kind": "Pod",
+              "name": "fleet-mbp-6e0cb365b4814e6a-hsxl8",
+              "namespace": "fleet-mbp",
+              "resourceVersion": "1627345",
+              "uid": "1feeb4c5-0eb5-49ee-b114-bd7dc5e1a3b0"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-11-05T07:51:35Z",
+            "message": "Container started",
+            "metadata": {
+              "creationTimestamp": "2026-11-05T07:51:35Z",
+              "name": "fleet-mbp-6e0cb365b4814e6a-hsxl8.18e516ccba22f34f",
+              "namespace": "fleet-mbp",
+              "resourceVersion": "1627360",
+              "uid": "0f0561e2-a67d-49af-b9d3-4c9135650cb8"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "mbp",
+            "source": {
+              "component": "kubelet",
+              "host": "mbp"
+            },
+            "type": "Normal"
+          }
+        ]
+      }
+    }
+  },
+  "fetch_completed": true,
+  "completed_at": 1793865107.0598104,
+  "retention_until": 1793951507.0598104
+}
