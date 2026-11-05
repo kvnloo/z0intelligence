@@ -18,7 +18,9 @@ def test_privacy_classifier():
     assert S.classify_privacy("use api_key=sk-abcdefghijklmnopqrstuvwx now") == "credentials"
     assert S.classify_privacy("No secrets, tokens or credentials in output") == "public"
     assert S.classify_privacy("meet at 0.12345, -0.67890 tonight") == "location"
-    assert S.classify_privacy("summarize Kevin's state.db sessions") == "personal"
+    assert S.classify_privacy("summarize Kevin's state.db sessions") == "public"
+    assert S.personal_hint("Input: eval/task-source.json (domain -> Kevin's own messages)")
+    assert not S.personal_hint("Use when working on owner hosts and Kevin's HUD style")
     assert S.classify_privacy("write a haiku about rust") == "public"
 
 
@@ -39,7 +41,7 @@ def test_hermes_tap_reads_only_delegated_children(tmp_path):
     ev = S.hermes_events(tmp_path, 0, 1000)
     assert {e["id"] for e in ev} == {"clean:kid", "clean:kid2"}
     kid = next(e for e in ev if e["id"] == "clean:kid")
-    assert kid["actual"]["provider"] == "anthropic" and kid["req"] == {"role": "task", "privacy": "public", "executors": ["hermes"]}
+    assert kid["actual"]["provider"] == "anthropic" and kid["req"] == {"role": "default", "privacy": "public", "executors": ["hermes"]}
     assert kid["tokens"]["output"] == 20
 
 
@@ -61,20 +63,26 @@ def _sr(rid, ts, model, code):
 
 
 def test_vllm_sr_tap_marks_saturation_from_prior_429():
-    lines = _sr("a", "2026-11-05T22:40:00.000", "gpt-oss-120b", 429) + _sr("b", "2026-11-05T22:40:10.000", "gpt-oss-20b", 200)
+    lines = (_sr("a", "2026-11-05T22:40:00.000", "gpt-oss-20b", 429) + _sr("b", "2026-11-05T22:40:10.000", "gpt-oss-120b", 200)
+             + _sr("c", "2026-11-05T22:40:20.000", "qwen3.8-27b", 429) + _sr("d", "2026-11-05T22:40:30.000", "gpt-oss-120b", 429)
+             + _sr("e", "2026-11-05T22:40:40.000", "gpt-oss-20b", 429))
     ev = S.vllm_sr_events(lines, 0, 2e9)
-    assert [e["actual"]["model"] for e in ev] == ["gpt-oss-120b", "gpt-oss-20b"]
-    assert ev[0]["saturation"] == {} and ev[1]["saturation"]["groq/gpt-oss-120b"]["available"] is False
+    assert [e["actual"]["model"] for e in ev] == ["gpt-oss-20b", "gpt-oss-120b", "qwen3.8-27b", "gpt-oss-120b", "gpt-oss-20b"]
+    assert ev[0]["saturation"] == {} and ev[1]["saturation"]["groq/gpt-oss-20b"]["available"] is False
     rows = S.shadow_rows(ev, sig())
-    assert rows[0]["agree"] is True            # 120b is role-table first and was not yet saturated
+    assert rows[0]["agree"] is True            # 20b is role-table first and was not yet saturated
     assert rows[1]["decided"]["model"] == "qwen3.8-27b" and rows[1]["agree"] is False
+    assert rows[4]["decided"]["kind"] == "HOLD"   # all three Groq models inside the 60 s cooldown
+    assert rows[4]["decided_failover"]["provider"] == "cerebras"
+    cd = S.report(rows, lambda *a: 0.0)["vllm_sr_groq_cooldown"]
+    assert cd["sent_during_groq_cooldown"] == 1 and cd["cerebras_failover_recovers_failed_calls"] == 1
 
 
 def test_shadow_rows_and_report():
     ev = [{"source": "fx", "id": "x", "ts": 1, "req": {"role": "task", "privacy": "public", "executors": ["fx"]},
-           "actual": {"harness": "fx", "provider": "openai-codex", "model": "gpt-6.1-terra", "effort": "medium"},
+           "actual": {"harness": "fx", "provider": "openai-codex", "model": "gpt-6.1-sol", "effort": "medium"},
            "tokens": {"input": 1_000_000, "output": 0, "cache_read": 0, "cache_write": 0}},
-          {"source": "hermes-delegation", "id": "y", "ts": 1, "req": {"role": "task", "privacy": "public", "executors": ["hermes"]},
+          {"source": "hermes-delegation", "id": "y", "ts": 1, "req": {"role": "default", "privacy": "public", "executors": ["hermes"]},
            "actual": {"harness": "hermes", "provider": "anthropic", "model": "claude-opus-5-5", "effort": None},
            "tokens": {"input": 10, "output": 0, "cache_read": 0, "cache_write": 0}}]
     rows = S.shadow_rows(ev, sig())
@@ -84,6 +92,6 @@ def test_shadow_rows_and_report():
     assert rep["n"] == 2 and rep["agree_pct"] == 50.0
     assert rep["by_source"]["fx"]["agree_pct"] == 0.0
     top = rep["top_disagreements"][0]
-    assert top["actual"] == "openai-codex/gpt-6.1-terra" and top["decided"] == "openai-codex/gpt-6.1-sol" and top["n"] == 1
-    assert rep["cost_delta_usd"] == 1.0
+    assert top["actual"] == "openai-codex/gpt-6.1-sol" and top["decided"] == "openai-codex/gpt-6.1-terra" and top["n"] == 1
+    assert rep["cost_delta_usd"] == -1.0
     assert rep["quota_delta_tokens"] == {"codex": 0}

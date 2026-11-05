@@ -35,19 +35,24 @@ NORMAL = {'codex': 'openai-codex', 'openai': 'openai-codex'}
 _CRED = re.compile(r'(\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{30,}|\bxox[abp]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY'
                    r'|\b(password|passwd|api[_-]?key|secret)\s*[:=]\s*\S{6,})', re.I)
 _LOC = re.compile(r'(-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}|\bhome address\s*[:=])', re.I)
-_PERSONAL = re.compile(r"(kevin|owner|state\.db|sft-svlm|\.hermes/profiles|transcript|telemetry|\bemail|gmail|calendar|inbox|agentsview|\bctx\b)", re.I)
+# The old word-match personal regex had precision 1/30 on a hand-labelled sample (Z17 labels).
+# Personal content is now only *flagged* (owner-message sources) and reported as unresolved,
+# never fed to decide() as a violation, until its class is confirmed.
+_PERSONAL_HINT = re.compile(r"(task-source\.json|owner messages|kevin'?s own messages|kevin-routing-msgs|ayo-ledger|sft-svlm/data)", re.I)
 
 
 def classify_privacy(text):
-    """Heuristic tap-side classifier; decide() itself only takes the class."""
+    """Tap-side class from secret material or coordinates only; decide() itself only takes the class."""
     text = text or ''
     if _CRED.search(text):
         return 'credentials'
     if _LOC.search(text):
         return 'location'
-    if _PERSONAL.search(text):
-        return 'personal'
     return 'public'
+
+
+def personal_hint(text):
+    return bool(_PERSONAL_HINT.search(text or ''))
 
 
 def _tok(i=0, o=0, cr=0, cw=0):
@@ -70,7 +75,8 @@ def hermes_events(root, since, until):
         for sid, model, bp, ts, i, o, cr, cw, text in rows:
             provider = (bp or '').removeprefix('custom:') or 'unknown'
             out.append({'source': 'hermes-delegation', 'id': f'{prof}:{sid}', 'ts': ts,
-                        'req': {'role': 'task', 'privacy': classify_privacy(text), 'executors': ['hermes']},
+                        'req': {'role': 'default', 'privacy': classify_privacy(text), 'executors': ['hermes']},
+                        'personal_hint': personal_hint(text),
                         'actual': {'harness': 'hermes', 'provider': NORMAL.get(provider, provider), 'model': model, 'effort': None},
                         'tokens': _tok(i, o, cr, cw)})
     return out
@@ -101,6 +107,7 @@ def fx_events(root, since, until):
             continue
         out.append({'source': 'fx', 'id': log.parent.name, 'ts': created,
                     'req': {'role': 'task', 'privacy': classify_privacy(text), 'executors': ['fx']},
+                    'personal_hint': personal_hint(text),
                     'actual': {'harness': 'fx', 'provider': NORMAL.get(prefs.get('provider'), prefs.get('provider')),
                                'model': prefs.get('model'), 'effort': prefs.get('effort')},
                     'tokens': t})
@@ -144,15 +151,43 @@ def vllm_sr_events(lines, since, until):
     return out
 
 
+FAILOVER = {'vllm-sr': 'vllm-sr-cerebras'}   # counterfactual executor, not configured live
+
+
 def shadow_rows(events, signals):
     rows = []
     for e in events:
         s = dict(signals, saturation={**(signals.get('saturation') or {}), **e.get('saturation', {})})
         d = decide(e['req'], s)
         agree = d['kind'] == 'ROUTE' and (d['provider'], d['model']) == (e['actual']['provider'], e['actual']['model'])
-        rows.append({k: e[k] for k in ('source', 'id', 'ts', 'req', 'actual', 'tokens')} |
-                    {'status': e.get('status'), 'decided': d, 'agree': agree})
+        row = {k: e[k] for k in ('source', 'id', 'ts', 'req', 'actual', 'tokens')} | {
+            'status': e.get('status'), 'personal_hint': e.get('personal_hint', False), 'decided': d, 'agree': agree}
+        extra = [FAILOVER[x] for x in e['req'].get('executors') or [] if x in FAILOVER]
+        if extra and d['kind'] == 'HOLD':
+            row['decided_failover'] = decide(dict(e['req'], executors=e['req']['executors'] + extra), s)
+        rows.append(row)
     return rows
+
+
+def _cooldown_section(rows):
+    """vllm-sr calls sent while every Groq candidate was in 429 cooldown, and what a Cerebras failover recovers."""
+    sr = [r for r in rows if r['source'] == 'vllm-sr']
+    held = [r for r in sr if r['decided']['kind'] == 'HOLD']
+    codes = collections.Counter(r.get('status') for r in held)
+    fo = [r for r in held if (r.get('decided_failover') or {}).get('kind') == 'ROUTE']
+    recovered = [r for r in fo if r.get('status') != 200]
+    served = sorted(_total(r['tokens']) for r in sr if r.get('status') == 200 and _total(r['tokens']))
+    med = served[len(served) // 2] if served else 0
+    per_min = collections.Counter(int(r['ts'] // 60) for r in fo)
+    return {'vllm_sr_calls': len(sr), 'sent_during_groq_cooldown': len(held),
+            'pct_during_cooldown': round(100.0 * len(held) / len(sr), 1) if sr else None,
+            'their_status_codes': {str(k): v for k, v in codes.most_common()},
+            'cerebras_failover_routable': len(fo),
+            'cerebras_failover_recovers_failed_calls': len(recovered),
+            'failover_targets': dict(collections.Counter(f"{r['decided_failover']['provider']}/{r['decided_failover']['model']}" for r in fo)),
+            'est_tokens_recovered': len(recovered) * med, 'est_basis': f'recovered calls x median tokens of served vllm-sr calls ({med})',
+            'peak_failover_rpm': max(per_min.values()) if per_min else 0, 'cerebras_rpm_limit_gpt_oss_120b': 1000,
+            'cost': 'unpriced: no Cerebras price in Hermes usage_pricing or the kerdoios inventory; billed against the ~$15 prepaid credit (K1104-credit)'}
 
 
 def _total(t):
@@ -187,7 +222,10 @@ def report(rows, price):
         if d['kind'] == 'ROUTE':
             quota[POOL.get(d['provider'], d['provider'])] += _total(t)
     top = sorted(groups.items(), key=lambda kv: -kv[1]['n'])
-    return {'n': n, 'agree_pct': pct(rows),
+    return {'vllm_sr_groq_cooldown': _cooldown_section(rows),
+            'n': n, 'agree_pct': pct(rows),
+            'privacy_unresolved': {'rows_with_personal_hint': sum(1 for r in rows if r.get('personal_hint')),
+                                   'note': 'flagged, not scored as violations: eval use of owner messages on GPT awaits a cited approval'},
             'by_source': {s: {'n': len(xs), 'agree_pct': pct(xs),
                               'privacy': dict(collections.Counter(r['req']['privacy'] for r in xs))} for s, xs in by.items()},
             'cost_delta_usd': round(cost, 4), 'unpriced_disagreements': unpriced, 'quota_delta_tokens': dict(quota),

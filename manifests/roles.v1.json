@@ -1,61 +1,344 @@
 {
-  "schema": "z0int.roles.v1",
-  "note": "Single role table for decide(). Rendered from z0live-voice-plan.json (7b2abf9f) and omp groot modelRoles on 2026-11-05; ordered by preference. Shadow-only: nothing reads this for live routing yet (ledger Z17).",
-  "privacy": {
-    "public": "*",
-    "personal": ["anthropic", "local"],
-    "location": ["local"],
-    "credentials": ["local"]
-  },
-  "harness_law": {
-    "openai-codex": ["fx", "pi"],
-    "gemini": ["agy"],
-    "opencode": ["opencode"],
-    "anthropic": ["hermes", "claude-code", "omp"],
-    "local": ["hermes", "llama"],
-    "groq": ["vllm-sr"],
-    "typesafe": ["z0int"]
-  },
-  "pools": {
-    "anthropic": ["claude", "claude2", "claude3"],
-    "openai-codex": ["codex"]
-  },
-  "roles": {
-    "smol": [
-      {"provider": "anthropic", "model": "claude-haiku-4-5", "harness": "hermes", "effort": "low"},
-      {"provider": "local", "model": "qwen3.5-4b", "harness": "hermes", "cost": "free"}
-    ],
-    "default": [
-      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "medium"},
-      {"provider": "local", "model": "qwen3.5-4b", "harness": "hermes", "cost": "free"}
-    ],
-    "task": [
-      {"provider": "openai-codex", "model": "gpt-6.1-sol", "harness": "fx", "effort": "low"},
-      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "medium"},
-      {"provider": "local", "model": "qwen3.5-4b", "harness": "hermes", "cost": "free"}
-    ],
-    "vision": [
-      {"provider": "openai-codex", "model": "gpt-6.1-sol", "harness": "fx", "effort": "medium"},
-      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "medium"}
-    ],
-    "plan": [
-      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "high"}
-    ],
-    "slow": [
-      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "high"}
-    ],
-    "advisor": [
-      {"provider": "anthropic", "model": "claude-opus-5-5", "harness": "hermes", "effort": "high"}
-    ],
-    "judge": [
-      {"provider": "typesafe", "model": "jev-latest", "harness": "z0int"}
-    ],
-    "free": [
-      {"provider": "groq", "model": "gpt-oss-120b", "harness": "vllm-sr", "cost": "free", "inventory_id": "groq/gpt-oss-120b"},
-      {"provider": "groq", "model": "qwen3.8-27b", "harness": "vllm-sr", "cost": "free", "inventory_id": "groq/qwen3.8-27b"},
-      {"provider": "groq", "model": "gpt-oss-20b", "harness": "vllm-sr", "cost": "free", "inventory_id": "groq/gpt-oss-20b"},
-      {"provider": "opencode", "model": "deepseek-v4.1-flash-free", "harness": "opencode", "cost": "free", "inventory_id": "opencode/deepseek-v4.1-flash-free"},
-      {"provider": "local", "model": "qwen3.5-4b", "harness": "hermes", "cost": "free"}
+ "schema": "z0int.roles.v1",
+ "revision": "2026-11-05.2",
+ "note": "Single role table for decide(). Shadow-only (ledger Z17): nothing routes live from it. Candidates are in preference order; every row cites source ids from `sources`. Where sources conflict, Kevin's own message wins over a config file; conflicts are listed.",
+ "sources": {
+  "K1024-3228": "Kevin, omp session 2026-10-24T18-59-09-096Z_01a16f47 (omp sessions/--mnt-zer0models--/2026-10-24T18-59-09-096Z_01a16f47-f4a8-7753-9976-a51a85b8b697.jsonl) line 3228, 2026-10-24T23:25Z: 'just use luna, terra, haiku ... law for model routing that uses burn rate, ttft, tok/s, model capability ... 4 options for free model providers - opencode, nous portal, openrouter, vercel ai gateway. 2 more specialty providers cerebras and groq are much faster ... kerd plugin'",
+  "K1024-2971": "Kevin, same omp session line 2971, 2026-10-24T23:06Z: 'it should use the best model for the job. it can use luna or haiku or terra or even sol 6.1'",
+  "K1024-816": "Kevin, same omp session line 816, 2026-10-24T19:51Z: 'infinite tokens thru Luna & haiku & free tier model providers'",
+  "K1104-credit": "Kevin, hermes-clean session local-1fd968c4a3be398ed7352 (2026-11-04), via owner-corrections index: ~$15 prepaid each on Cerebras and Groq, OK to spend; new top-ups need approval",
+  "PRIV-6044": "Kevin, ayo state.db message 6044 (session 20261105_095016_c1f0f5, 2026-11-05 13:46 CST) '3. yes', answering ayo message 5690 decision 3: 'public data can go to any model, your personal data to Claude or local only, and location or credentials stay local'. Recorded in z0live-lanes-20261105/BRIEF.md:34",
+  "OMP": "~/.omp/agent/config.yml modelRoles lines 6-14 (mtime 2026-11-04 22:01)",
+  "VP": "~/.z0int/config/z0live-voice-plan.json digest 7b2abf9f",
+  "FX": "~/.fx/settings.json default prefs: codex gpt-6.1-terra effort medium (fx status)",
+  "KERD": "kerdoios plugin (intake/plugins/kerdoios) kerdoios/score.py L50-66: fitness = weighted cost, capability, latency, throughput; presets.py Mode.FREE weights cost 1.0 > capability 0.35 > throughput 0.2 > latency 0.1",
+  "PROBE": "t3code-factory/20261102/turbo-fastlane/speed-20261102T2104.jsonl (medians, long answer): cerebras gpt-oss-120b TTFT 0.18 s 1777 tok/s; cerebras qwen-3.8-27b 0.17 s 1775; groq gpt-oss-20b 0.27 s 838; groq qwen3.8-27b 0.20 s 504; groq gpt-oss-120b 0.17 s 481",
+  "LIMITS": "t3code-factory/20261102/turbo-fastlane/limits.json: groq 30 rpm and 1000 rpd per model; cerebras gpt-oss-120b 1000 rpm, qwen-3.8-27b 450 rpm",
+  "CONTAIN": "router-containment-20261104/REPORT.md:7,14: Cerebras removed from the vllm-sr pool after 402 payment_required (before the K1104 credit)",
+  "SKILL4": "token-thrifty-agent-routing rule 4: keep Hermes delegation on Anthropic Opus or unused; GPT only via fx/pi",
+  "BURN": "burn-pace --json free_lane: opencode run -m opencode/deepseek-v4.1-flash-free"
+ },
+ "conflicts": [
+  "task: OMP says gpt-6.1-sol:low and VP says gpt-6.1-sol medium; K1024-3228 says terra and FX defaults to terra. Table follows K1024-3228.",
+  "smol: VP says claude-haiku-4-5, OMP says gpt-6-luna. Both are in K1024-3228; luna first (OMP order), haiku second.",
+  "free fast tier: CONTAIN removed Cerebras; K1104-credit later funded it. Cerebras sits behind executor 'vllm-sr-cerebras', which is not configured live, so it only appears in the failover counterfactual."
+ ],
+ "privacy": {
+  "public": "*",
+  "personal": [
+   "anthropic",
+   "local"
+  ],
+  "location": [
+   "local"
+  ],
+  "credentials": [
+   "local"
+  ]
+ },
+ "privacy_source": "PRIV-6044",
+ "harness_law": {
+  "openai-codex": [
+   "fx",
+   "pi"
+  ],
+  "gemini": [
+   "agy"
+  ],
+  "opencode": [
+   "opencode"
+  ],
+  "anthropic": [
+   "hermes",
+   "claude-code",
+   "omp"
+  ],
+  "local": [
+   "hermes",
+   "llama"
+  ],
+  "groq": [
+   "vllm-sr"
+  ],
+  "cerebras": [
+   "vllm-sr-cerebras",
+   "vllm-sr"
+  ],
+  "typesafe": [
+   "z0int"
+  ]
+ },
+ "pools": {
+  "anthropic": [
+   "claude",
+   "claude2",
+   "claude3"
+  ],
+  "openai-codex": [
+   "codex"
+  ]
+ },
+ "free_providers": {
+  "source": "K1024-3228",
+  "general": [
+   "opencode",
+   "nous",
+   "openrouter",
+   "vercel"
+  ],
+  "fast_specialty": [
+   "cerebras",
+   "groq"
+  ],
+  "note": "Only providers with a measured model and an executor are role candidates. Nous login and OpenCode key were reported broken in clean session local-7d2923284a73960a04b98 (2026-11-02 21:47 CST); re-probe before adding."
+ },
+ "roles": {
+  "smol": [
+   {
+    "provider": "openai-codex",
+    "model": "gpt-6-luna",
+    "harness": "fx",
+    "effort": "low",
+    "source": [
+     "OMP",
+     "K1024-3228"
     ]
-  }
+   },
+   {
+    "provider": "anthropic",
+    "model": "claude-haiku-4-5",
+    "harness": "hermes",
+    "effort": "low",
+    "source": [
+     "K1024-3228",
+     "VP"
+    ]
+   },
+   {
+    "provider": "local",
+    "model": "qwen3.5-4b",
+    "harness": "hermes",
+    "cost": "free",
+    "source": [
+     "PRIV-6044"
+    ]
+   }
+  ],
+  "default": [
+   {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "harness": "hermes",
+    "effort": "medium",
+    "source": [
+     "OMP",
+     "SKILL4"
+    ]
+   },
+   {
+    "provider": "local",
+    "model": "qwen3.5-4b",
+    "harness": "hermes",
+    "cost": "free",
+    "source": [
+     "PRIV-6044"
+    ]
+   }
+  ],
+  "task": [
+   {
+    "provider": "openai-codex",
+    "model": "gpt-6.1-terra",
+    "harness": "fx",
+    "effort": "medium",
+    "source": [
+     "K1024-3228",
+     "FX"
+    ]
+   },
+   {
+    "provider": "anthropic",
+    "model": "claude-haiku-4-5",
+    "harness": "hermes",
+    "effort": "medium",
+    "source": [
+     "K1024-3228"
+    ]
+   },
+   {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "harness": "hermes",
+    "effort": "medium",
+    "source": [
+     "K1024-2971",
+     "OMP"
+    ]
+   },
+   {
+    "provider": "local",
+    "model": "qwen3.5-4b",
+    "harness": "hermes",
+    "cost": "free",
+    "source": [
+     "PRIV-6044"
+    ]
+   }
+  ],
+  "vision": [
+   {
+    "provider": "openai-codex",
+    "model": "gpt-6.1-sol",
+    "harness": "fx",
+    "effort": "medium",
+    "source": [
+     "OMP",
+     "K1024-2971"
+    ]
+   },
+   {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "harness": "hermes",
+    "effort": "medium",
+    "source": [
+     "OMP"
+    ]
+   }
+  ],
+  "plan": [
+   {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "harness": "hermes",
+    "effort": "high",
+    "source": [
+     "OMP",
+     "VP"
+    ]
+   }
+  ],
+  "slow": [
+   {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "harness": "hermes",
+    "effort": "high",
+    "source": [
+     "OMP",
+     "VP"
+    ]
+   }
+  ],
+  "advisor": [
+   {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "harness": "hermes",
+    "effort": "high",
+    "source": [
+     "OMP"
+    ]
+   }
+  ],
+  "judge": [
+   {
+    "provider": "typesafe",
+    "model": "jev-latest",
+    "harness": "z0int",
+    "source": [
+     "OMP",
+     "VP"
+    ]
+   }
+  ],
+  "free": [
+   {
+    "provider": "groq",
+    "model": "gpt-oss-20b",
+    "harness": "vllm-sr",
+    "cost": "free",
+    "inventory_id": "groq/gpt-oss-20b",
+    "source": [
+     "KERD",
+     "PROBE",
+     "LIMITS"
+    ],
+    "why_order": "$0; TTFT ties at ~0.2 s; highest Groq tok/s (838)"
+   },
+   {
+    "provider": "groq",
+    "model": "qwen3.8-27b",
+    "harness": "vllm-sr",
+    "cost": "free",
+    "inventory_id": "groq/qwen3.8-27b",
+    "source": [
+     "KERD",
+     "PROBE",
+     "LIMITS"
+    ],
+    "why_order": "$0; 504 tok/s"
+   },
+   {
+    "provider": "groq",
+    "model": "gpt-oss-120b",
+    "harness": "vllm-sr",
+    "cost": "free",
+    "inventory_id": "groq/gpt-oss-120b",
+    "source": [
+     "KERD",
+     "PROBE",
+     "LIMITS"
+    ],
+    "why_order": "$0; 481 tok/s"
+   },
+   {
+    "provider": "cerebras",
+    "model": "gpt-oss-120b",
+    "harness": "vllm-sr-cerebras",
+    "cost": "prepaid",
+    "source": [
+     "K1024-3228",
+     "K1104-credit",
+     "PROBE",
+     "LIMITS",
+     "CONTAIN"
+    ],
+    "why_order": "prepaid credit ranks below $0 under KERD Mode.FREE; 1777 tok/s, 1000 rpm"
+   },
+   {
+    "provider": "cerebras",
+    "model": "qwen-3.8-27b",
+    "harness": "vllm-sr-cerebras",
+    "cost": "prepaid",
+    "source": [
+     "K1024-3228",
+     "K1104-credit",
+     "PROBE",
+     "LIMITS"
+    ],
+    "why_order": "1775 tok/s, 450 rpm"
+   },
+   {
+    "provider": "opencode",
+    "model": "deepseek-v4.1-flash-free",
+    "harness": "opencode",
+    "cost": "free",
+    "inventory_id": "opencode/deepseek-v4.1-flash-free",
+    "source": [
+     "K1024-3228",
+     "BURN"
+    ]
+   },
+   {
+    "provider": "local",
+    "model": "qwen3.5-4b",
+    "harness": "hermes",
+    "cost": "free",
+    "source": [
+     "PRIV-6044"
+    ]
+   }
+  ]
+ }
 }

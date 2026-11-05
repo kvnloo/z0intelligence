@@ -33,10 +33,17 @@ def test_role_table_obeys_harness_law():
                 assert c["harness"] in law[c["provider"]], (role, c)
 
 
-def test_task_on_fx_picks_sol_low_on_codex():
+def test_every_candidate_cites_a_known_source():
+    for role, cands in ROLES["roles"].items():
+        for c in cands:
+            assert c.get("source") and set(c["source"]) <= set(ROLES["sources"]), (role, c)
+    assert ROLES["privacy_source"] in ROLES["sources"]
+
+
+def test_task_on_fx_picks_terra_medium_on_codex():
     d = decide({"role": "task", "privacy": "public", "executors": ["fx"]}, signals())
     assert d["kind"] == "ROUTE"
-    assert (d["harness"], d["provider"], d["model"], d["effort"], d["account"]) == ("fx", "openai-codex", "gpt-6.1-sol", "low", "codex")
+    assert (d["harness"], d["provider"], d["model"], d["effort"], d["account"]) == ("fx", "openai-codex", "gpt-6.1-terra", "medium", "codex")
     assert d["receipt_id"] and "codex on-pace" in d["reason"]
 
 
@@ -76,10 +83,12 @@ def test_location_and_credentials_are_local_only(privacy):
 def test_saturated_model_is_skipped_then_hold_when_all_saturated():
     sat = {"groq/gpt-oss-20b": {"available": False, "reason": "429 cooldown"}}
     d = decide({"role": "free", "privacy": "public", "executors": ["vllm-sr"]}, signals(saturation=sat))
-    assert d["kind"] == "ROUTE" and d["model"] != "gpt-oss-20b"
+    assert d["kind"] == "ROUTE" and d["model"] == "qwen3.8-27b"
     sat = {"groq": {"available": False, "reason": "429 cooldown"}}
     d = decide({"role": "free", "privacy": "public", "executors": ["vllm-sr"]}, signals(saturation=sat))
     assert d["kind"] == "HOLD" and all("429" in r for r in d["rejected"] if r.startswith("groq/"))
+    d = decide({"role": "free", "privacy": "public", "executors": ["vllm-sr", "vllm-sr-cerebras"]}, signals(saturation=sat))
+    assert (d["provider"], d["model"]) == ("cerebras", "gpt-oss-120b")
 
 
 def test_free_inventory_disables_a_free_candidate():
