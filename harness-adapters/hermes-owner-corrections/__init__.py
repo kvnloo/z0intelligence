@@ -8,6 +8,8 @@ Each turn this adds at most three short blocks, each only when it has something 
   1. <sop-updates>      memory/USER entries and skills added or changed since this session started
   2. <sibling-sessions> other live sessions in this profile: T3 title + Kevin's latest ask (redacted)
   3. <owner-corrections> top-3 past corrections matching this message (z0intelligence#239 reader)
+  4. <skill-cards>       top-2 skill cards (When -> Use), same reader over CARDS.jsonl; OFF unless
+                         plugins.entries.owner-corrections.settings.skill_cards is true (ROUTER-DESIGN step 1)
 Injected context persists in the transcript (api_content sidecar), so each item is sent once per session.
 Read-only on every source. Any failure injects nothing; never raises into the turn.
 """
@@ -30,6 +32,10 @@ SKILLS = PROFILE / 'skills'
 T3_DB = HOME / '.t3/userdata/statev2.sqlite'
 STATE = PROFILE / 'cache/owner-context'
 READER = HOME / '.local/lib/z0-state-packet/current/src/z0int/orientation.py'
+CARDS = HOME / '.local/state/z0int/CARDS.jsonl'  # best-way-map refresh.sh installs render_map.py's cards.jsonl here
+CARDS_K = 2
+CARDS_HEADER = ('Skill cards matching this request (When -> Use). Load the named skill before generic tools '
+                'when the When fits; skip a card whose "not when" applies:')
 
 SIBLING_WINDOW_S = 6 * 3600
 SIBLING_REFRESH_S = 10 * 60
@@ -50,6 +56,23 @@ SAVE_NUDGE = ('<standing-rule-check>This message may state a standing rule, pref
               'line what you saved.</standing-rule-check>')
 
 _orientation = None
+_ctx = None  # PluginContext from register(); settings are read through it on every turn
+
+
+def _setting(key, default):
+    try:
+        return _ctx.get_config(key, default) if _ctx is not None else default
+    except Exception:
+        return default
+
+
+def skill_cards(prompt, path=None, k=CARDS_K):
+    """Top-k skill cards for this prompt: the corrections reader over the cards corpus, re-tagged."""
+    text = _reader().corrections(prompt, path=Path(path or CARDS), k=k)
+    if '<owner-corrections>\n' not in text:
+        return ''
+    body = text.split('<owner-corrections>\n', 1)[1].rsplit('\n</owner-corrections>', 1)[0]
+    return CARDS_HEADER + '\n<skill-cards>\n' + body + '\n</skill-cards>'
 
 
 def _reader():
@@ -79,9 +102,9 @@ def owner_text(raw):
     if m:
         t = m.group(1)
     t = re.sub(r'<(runtime_info|t3_code_instructions|pull_request_linking|owner-corrections|sop-updates|'
-               r'sibling-sessions|standing-rule-check)>.*?</\1>', '', t, flags=re.S)
+               r'sibling-sessions|standing-rule-check|skill-cards)>.*?</\1>', '', t, flags=re.S)
     t = re.sub(r'(Kevin already corrected agents|Saved in other sessions of this profile|Other live sessions in '
-               r'this profile)[^\n]*\n?', '', t)
+               r'this profile|Skill cards matching this request)[^\n]*\n?', '', t)
     return ' '.join(t.split())
 
 
@@ -328,6 +351,10 @@ def owner_context_hook(session_id=None, user_message=None, conversation_history=
         text = _reader().corrections(prompt) if prompt.strip() else ''
         if text:
             parts.append(text)
+        if prompt.strip() and _setting('skill_cards', False) is True:
+            text = skill_cards(prompt, _setting('skill_cards_path', None))
+            if text:
+                parts.append(text)
     except Exception as exc:
         _log.warning('owner-context corrections: %s', exc)
     if sid:
@@ -342,4 +369,6 @@ corrections_hook = owner_context_hook  # name used by the first version and the 
 
 
 def register(ctx):
+    global _ctx
+    _ctx = ctx
     ctx.register_hook('pre_llm_call', owner_context_hook)

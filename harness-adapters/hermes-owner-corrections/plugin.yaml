@@ -1,5 +1,5 @@
 name: owner-corrections
-version: 2.0.0
+version: 2.1.0
 description: Cross-session awareness for this profile. Per turn, sends only what is new for the session - memory/skill changes saved by sibling sessions after it started, sibling sessions' latest owner asks, top-3 matching owner corrections, and a save-it nudge when the owner states a standing rule.
 author: kvnloo
 provides_hooks:
