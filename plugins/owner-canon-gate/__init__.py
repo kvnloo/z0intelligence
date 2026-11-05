@@ -102,8 +102,10 @@ def facts(tool: str, args: dict) -> dict:
     t = _text(tool, args)
     f = {}
     # GPT route: a GPT model named in a dispatch (delegate_task, hermes -m, codex/openai CLIs) not via fx/pi
-    dispatch = tool in ("delegate_task", "mcp__delegate_task") or bool(
-        re.search(r"(?i)\b(hermes|codex|openai|llm|aider|opencode|claude)\b[^\n]*(-m|--model|model[=:])", t))
+    # only real launches count: delegate_task, or a shell command line that starts a model CLI. Prose that merely
+    # names a GPT model (messages, files being written) is not a dispatch.
+    dispatch = tool in ("delegate_task", "mcp__delegate_task") or (tool in _SHELL_TOOLS and bool(
+        re.search(r"(?i)\b(hermes|codex|openai|llm|aider|opencode|claude)\b[^\n]*(-m|--model|model[=:])", t)))
     gpt = dispatch and bool(_GPT.search(t))
     f["gpt_only_via_fx_pi"] = (gpt, gpt and bool(_FX_PI.search(t)), "GPT model dispatched outside fx/pi")
     gui = tool in _SHELL_TOOLS and bool(_GUI.search(t))
