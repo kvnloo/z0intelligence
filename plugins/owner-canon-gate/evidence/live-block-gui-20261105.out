@@ -1,0 +1,6 @@
+  Command helper: helper output was not a KEY=VALUE map; nothing to apply
+I ran the command once, and it did not execute. A gate blocked it with this message:
+
+{"error": "owner-canon gate blocked this call: gui_never_steals_focus (GUI input on the owner's display). See bend/owner_canon/LAWS.bend. Fix the call (a virtual display, evidence, or wait for the back-off) instead of retrying it."}
+
+You asked for exactly one terminal call, so I didn't retry or try a workaround. If you want it to run, it would need a virtual display instead of your main screen, for example DISPLAY=:99 with a running Xvfb. I'd need your go-ahead for that.
