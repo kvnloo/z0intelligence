@@ -1,0 +1,8 @@
+name: owner-canon-gate
+version: "0.1.0"
+description: "Owner canon (unified-memory/OWNER-CANON.md) at runtime: evaluates the Lean-proven bend/owner_canon law predicates on every tool call and blocks or flags violations (GPT only via fx/pi, no focus-stealing GUI, receipts for done claims, quota back-off, creator receipt before deletes, owner OK before public actions)."
+author: "kvnloo / Hermes Agent"
+provides_hooks:
+  - pre_tool_call
+  - post_tool_call
+  - pre_llm_call
