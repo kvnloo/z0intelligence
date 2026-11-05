@@ -72,10 +72,76 @@ def test_ordinary_calls_pass():
     assert not blocked("read_file", path="/etc/hosts")
 
 
-def test_unlocked_candidate_rules_are_not_gated():
-    # rules 16-60 are candidates (not adopted): deletes, public posts and GPT launches are not this gate's call
-    for cmd in ("rm -rf /mnt/zer0models/models/foo", "gh pr create --repo NousResearch/hermes-agent --title t",
-                "codex exec --model gpt-5.5 'x'"):
-        assert not blocked("terminal", command=cmd), cmd
-    assert set(K.RULES) == {"gui_never_steals_focus", "done_needs_receipt", "quota_backs_off"}
+KS = G.KS
+
+
+def test_standing_twin_matches_laws_exhaustively():
+    for law, (_, pred) in KS.RULES.items():
+        assert pred(False, False) and pred(False, True) and pred(True, True) and not pred(True, False), law
+    for bits in itertools.product([False, True], repeat=6):
+        pairs = list(zip(bits[::2], bits[1::2]))
+        assert KS.admits(*bits) == all(KS.guard(t, c) for t, c in pairs)
+    assert KS.admits(False, False, True, True, False, False)  # receipted_delete_admitted (Kevin 23:25)
+
+
+def test_gpt_outside_fx_blocked_and_via_fx_allowed():
+    assert blocked("terminal", command="codex exec --model gpt-6.1-terra 'x'")
+    assert blocked("delegate_task", goal="x", model="gpt-6.1-sol")
+    assert not blocked("terminal", command="fx ask --json --model gpt-6.1-terra 'x'")
+
+
+def test_prose_naming_gpt_is_not_a_dispatch():
+    assert not blocked("message_agent", target="ayo", message="ran fx gpt-6.1-terra, see /a/b/c")
+    assert not blocked("write_file", path="/x/notes.md", content="GPT models only via fx (gpt-6.1-terra)")
+
+
+def test_delete_outside_scratch_blocked():
+    assert blocked("terminal", command="rm -rf /mnt/zer0models/models/foo")
+    assert blocked("terminal", command="git worktree remove /mnt/zer0models/z0-wt/x")
+
+
+def test_delete_in_scratch_allowed(monkeypatch):
+    monkeypatch.setenv("TMPDIR", "/home/kvn/.hermes/profiles/z0i/cache/scratch")
+    assert not blocked("terminal", command="rm -rf /tmp/foo")
+    assert not blocked("terminal", command="rm -rf $TMPDIR/foo")
+    assert not blocked("terminal", command="rm -rf ~/.cache/pip/x")
+
+
+def test_var_and_tilde_resolved_before_judging(monkeypatch, tmp_path):
+    monkeypatch.setenv("TMPDIR", "/home/kvn/.hermes/profiles/z0i/cache/scratch")
+    assert not blocked("terminal", command="B=$TMPDIR/z0v2-base; rm -rf $B")          # inline assignment -> scratch
+    assert blocked("terminal", command="B=/mnt/zer0models/models; rm -rf $B/old")      # inline assignment -> real data
+    monkeypatch.setenv("TARGET", "/mnt/zer0models/models/old")
+    assert blocked("terminal", command="rm -rf \"$TARGET\"")                          # env of the call
+    assert blocked("terminal", command="rm -rf ~/projects")                             # ~ expands to home, not scratch
+    assert not blocked("terminal", command="rm -rf /tmp/$UNSET_VAR_X/y")               # unresolvable, scratch prefix: flag
+    assert blocked("terminal", command="rm -rf $UNSET_VAR_X/y")                        # unresolvable, no scratch prefix
+
+
+def test_creator_finished_receipt_satisfies_delete(home):
+    d = home / "owner-canon-gate" / "creator-receipts"; d.mkdir(parents=True)
+    tgt = "/mnt/zer0models/z0-wt/old-wt"
+    assert blocked("terminal", command=f"rm -rf {tgt}")
+    (d / "r.jsonl").write_text('{"path": "%s", "kib": 10, "creator": "session local-abc", "why_finished": "merged"}\n' % tgt)
+    assert not blocked("terminal", command=f"rm -rf {tgt}")
+    assert blocked("terminal", command="rm -rf /mnt/zer0models/z0-wt/other-wt")  # receipt names one target only
+
+
+def test_receipt_without_creator_does_not_count(home):
+    d = home / "owner-canon-gate" / "creator-receipts"; d.mkdir(parents=True)
+    (d / "r.jsonl").write_text('{"path": "/mnt/zer0models/z0-wt/x", "why": "old"}\n')
+    assert blocked("terminal", command="rm -rf /mnt/zer0models/z0-wt/x")
+
+
+def test_public_needs_owner_ok(home):
+    cmd = "gh pr create --repo NousResearch/hermes-agent --title t --body b"
+    assert blocked("terminal", command=cmd)
+    assert not blocked("terminal", command="gh issue create --repo kvnloo/oss-factory --title t")
+    (home / "owner-canon-approvals.json").write_text('{"public": ["NousResearch/hermes-agent --title t"]}')
+    assert not blocked("terminal", command=cmd)
+
+
+def test_approvals_file_protected():
+    assert blocked("write_file", path="/x/owner-canon-approvals.json", content="{}")
+    assert blocked("terminal", command="echo {} > ~/.hermes/owner-canon-approvals.json")
 

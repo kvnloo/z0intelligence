@@ -1,6 +1,6 @@
 name: owner-canon-gate
-version: "0.2.0"
-description: "Owner canon (unified-memory/OWNER-CANON.md, locked rules 1-15) at runtime: evaluates the Lean-proven bend/owner_canon law predicates on every tool call and blocks or flags violations (rule 3 no focus-stealing GUI, rule 6 receipts for done claims, rule 15 quota back-off)."
+version: "0.3.0"
+description: "Owner canon (unified-memory/OWNER-CANON.md, locked rules 1-15) at runtime: evaluates the Lean-proven bend/owner_canon law predicates on every tool call and blocks or flags violations (rule 3 no focus-stealing GUI, rule 6 receipts for done claims, rule 15 quota back-off) plus Kevin's standing rules (bend/owner_standing: GPT via fx/pi, deletes need a finished-creator receipt, public needs his OK)."
 author: "kvnloo / Hermes Agent"
 provides_hooks:
   - pre_tool_call
