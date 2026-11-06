@@ -114,6 +114,7 @@ def step_doctor(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
 
 def step_models_plan(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     plan = models_mgmt.plan_models()
+    _validate_model_plan(plan)
     ctx["models_plan"] = plan
     cfg = paths.config_path()
     cfg.parent.mkdir(parents=True, exist_ok=True)
@@ -133,7 +134,8 @@ def step_models_sync(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, An
     if not ctx.get("sync_models"):
         _mark(state, "models.sync", "skipped", "pass --sync-models to download resident HF weights")
         return {"ok": True, "skipped": True}
-    plan = ctx.get("models_plan") or models_mgmt.plan_models()
+    plan = ctx["models_plan"] if "models_plan" in ctx else models_mgmt.plan_models()
+    _validate_model_plan(plan)
     ctx["models_plan"] = plan
     # A retry must use the same resident plan, even after a crash in the downloader.
     if "run" in state:
@@ -184,16 +186,29 @@ def step_evolution_lab(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, 
 
 
 def step_omp_links(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
-    omp = doctor.discover_omp()
-    if not omp.get("omp_home"):
-        _mark(state, "omp_plugins", "skipped", "OMP not installed")
-        return {"ok": True, "skipped": True, "reason": "no_omp"}
+    selected_paths = ctx.get("omp_paths")
+    if selected_paths is None:
+        omp = doctor.discover_omp()
+        if not omp.get("omp_home"):
+            _mark(state, "omp_plugins", "skipped", "OMP not installed")
+            return {"ok": True, "skipped": True, "reason": "no_omp"}
+        if ctx.get("dry_run"):
+            _mark(state, "omp_plugins", "would_run", json.dumps(omp.get("missing_links")))
+            return {"ok": True, "dry_run": True, "missing": omp.get("missing_links")}
+        selected_paths = {
+            "extensions_dir": str(Path(omp["extensions_dir"] or (Path.home() / ".omp" / "agent" / "extensions")).resolve()),
+            "repo_extensions": str(Path(omp["repo_extensions"] or (_repo_root() / "omp-extensions")).resolve()),
+        }
     if ctx.get("dry_run"):
-        _mark(state, "omp_plugins", "would_run", json.dumps(omp.get("missing_links")))
-        return {"ok": True, "dry_run": True, "missing": omp.get("missing_links")}
-    ext_dir = Path(omp["extensions_dir"] or (Path.home() / ".omp" / "agent" / "extensions"))
+        _mark(state, "omp_plugins", "would_run", json.dumps(selected_paths))
+        return {"ok": True, "dry_run": True, "paths": selected_paths}
+    ctx["omp_paths"] = selected_paths
+    if "run" in state:
+        state["run"]["context"]["omp_paths"] = selected_paths
+        save_state(state)
+    ext_dir = Path(selected_paths["extensions_dir"])
+    repo_ext = Path(selected_paths["repo_extensions"])
     ext_dir.mkdir(parents=True, exist_ok=True)
-    repo_ext = Path(omp["repo_extensions"] or (_repo_root() / "omp-extensions"))
     linked: list[str] = []
     for child in sorted(repo_ext.iterdir()):
         if not child.is_dir() or child.name.startswith("."):
@@ -301,6 +316,17 @@ def _select_steps(only: list[str] | None) -> list[str]:
     return [name for name in names if name in only]
 
 
+def _validate_model_plan(plan: Any) -> None:
+    if not isinstance(plan, dict) or plan.get("schema") != "z0int.models_plan.v1":
+        raise ValueError("invalid saved model plan schema")
+    for key in ("resident", "on_demand"):
+        values = plan.get(key)
+        if not isinstance(values, list) or any(
+            not isinstance(value, str) or not value.strip() for value in values
+        ):
+            raise ValueError(f"invalid model plan {key} selection")
+
+
 def _saved_run(state: dict[str, Any]) -> dict[str, Any] | None:
     if "run" not in state:
         return None
@@ -329,12 +355,21 @@ def _saved_run(state: dict[str, Any]) -> dict[str, Any] | None:
     ):
         raise ValueError("invalid in-flight step")
     context = run.get("context")
-    if not isinstance(context, dict) or set(context) - {"doctor", "models_plan", "evolution_lab_path"}:
+    if not isinstance(context, dict) or set(context) - {"doctor", "models_plan", "evolution_lab_path", "omp_paths"}:
         raise ValueError("invalid saved operation context")
     if any(not isinstance(context[key], dict) for key in ("doctor", "models_plan") if key in context):
         raise ValueError("invalid saved model or doctor context")
+    if "models_plan" in context:
+        _validate_model_plan(context["models_plan"])
+    omp_paths = context.get("omp_paths")
+    if "omp_paths" in context and (
+        not isinstance(omp_paths, dict)
+        or set(omp_paths) != {"extensions_dir", "repo_extensions"}
+        or any(not isinstance(value, str) or not Path(value).is_absolute() for value in omp_paths.values())
+    ):
+        raise ValueError("invalid saved OMP paths")
     destination = context.get("evolution_lab_path")
-    if destination is not None and (not isinstance(destination, str) or not Path(destination).is_absolute()):
+    if "evolution_lab_path" in context and (not isinstance(destination, str) or not Path(destination).is_absolute()):
         raise ValueError("invalid saved evolution-lab destination")
     if not isinstance(run.get("inputs"), dict):
         raise ValueError("invalid saved operation inputs")
@@ -343,7 +378,10 @@ def _saved_run(state: dict[str, Any]) -> dict[str, Any] | None:
 
 def _execution_inputs(selected: list[str], options: dict[str, bool]) -> dict[str, Any]:
     """Bind resumable operations to their source and effective configuration."""
-    inputs: dict[str, Any] = {"repo": str(_repo_root()), "home": str(paths.home()), "python": sys.executable}
+    inputs: dict[str, Any] = {
+        "repo": str(_repo_root()), "home": str(paths.home()),
+        "user_home": str(Path.home().resolve()), "python": sys.executable,
+    }
     if "evolution_lab" in selected and not options["skip_evolution_lab"]:
         inputs["evolution_lab"] = {
             "repo": EVOLUTION_LAB_REPO,
@@ -486,7 +524,7 @@ def run_onboard(
                     _mark(state, name, "error", message)
                     results[name] = {"ok": False, "error": message}
                 run["context"] = {
-                    key: ctx[key] for key in ("doctor", "models_plan", "evolution_lab_path") if key in ctx
+                    key: ctx[key] for key in ("doctor", "models_plan", "evolution_lab_path", "omp_paths") if key in ctx
                 }
                 if results[name].get("ok") is False:
                     run["status"] = "failed"

@@ -36,6 +36,7 @@ class OnboardSteps(unittest.TestCase):
         self.plan = {
             "schema": "z0int.models_plan.v1",
             "resident": ["fixture_model"],
+            "on_demand": [],
             "recommendation": "synthetic resident plan",
         }
         self.manifest = {
@@ -298,6 +299,57 @@ class OnboardSteps(unittest.TestCase):
         self.sync_models.assert_called_with(plan=self.plan, which="resident", dry_run=False)
         self.assertEqual(self.plan_models.call_count, 1)
 
+    def test_resume_rejects_empty_saved_download_plan_without_replanning(self):
+        self.sync_models.side_effect = SimulatedCrash()
+        with self.assertRaises(SimulatedCrash):
+            ob.run_onboard(only=["models.sync"], sync_models=True)
+        state = self.state()
+        state["run"]["context"]["models_plan"] = {}
+        self.write_state(state)
+        before = self.snapshot()
+        report = ob.run_onboard(resume=True)
+        self.assertEqual(report["error_code"], "invalid_state")
+        self.assertEqual(self.plan_models.call_count, 1)
+        self.assertEqual(self.sync_models.call_count, 1)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_resume_keeps_original_omp_paths_and_rejects_home_drift(self):
+        user_home = self.root / "user-one"
+        user_home.mkdir()
+        extension_root = user_home / ".omp" / "agent" / "extensions"
+        source = self.repo / "omp-extensions"
+        (source / "fixture-extension").mkdir(parents=True)
+        self.omp.return_value = {
+            "omp_home": str(user_home / ".omp"),
+            "extensions_dir": str(extension_root),
+            "repo_extensions": str(source),
+        }
+        with mock.patch.dict(os.environ, {"HOME": str(user_home)}):
+            with mock.patch.object(Path, "symlink_to", side_effect=SimulatedCrash()):
+                with self.assertRaises(SimulatedCrash):
+                    ob.run_onboard(only=["omp_plugins"])
+        saved = self.state()["run"]["context"]["omp_paths"]
+        self.assertEqual(saved["extensions_dir"], str(extension_root.resolve()))
+        before = self.snapshot()
+        with mock.patch.dict(os.environ, {"HOME": str(self.root / "user-two")}):
+            report = ob.run_onboard(resume=True)
+        self.assertEqual(report["error_code"], "resume_mismatch")
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse((self.root / "user-two").exists())
+
+        # Even if discovery later returns another tree, retry the saved paths.
+        self.omp.return_value = {
+            "omp_home": str(self.root / "different-omp"),
+            "extensions_dir": str(self.root / "different-omp" / "extensions"),
+            "repo_extensions": str(self.root / "different-source"),
+        }
+        with mock.patch.dict(os.environ, {"HOME": str(user_home)}):
+            report = ob.run_onboard(resume=True)
+        self.assertTrue(report["ok"], report)
+        self.assertEqual((extension_root / "fixture-extension").resolve(), (source / "fixture-extension").resolve())
+        self.omp.assert_called_once_with()
+        self.assertFalse((self.root / "different-omp").exists())
+
     def test_resume_rejects_model_manifest_drift_before_download(self):
         self.sync_models.side_effect = SimulatedCrash()
         with self.assertRaises(SimulatedCrash):
@@ -382,8 +434,12 @@ class OnboardSteps(unittest.TestCase):
             {"steps": ["privacy", "layout"]}, {"completed": ["privacy"]},
             {"in_flight": "layout"}, {"status": "done"}, {"status": []},
             {"options": {"force": 1, "sync_models": False, "skip_evolution_lab": False}},
-            {"context": []}, {"context": {"models_plan": []}},
-            {"context": {"evolution_lab_path": "relative/path"}}, {"inputs": []},
+            {"context": []}, {"context": {"models_plan": []}}, {"context": {"models_plan": {}}},
+            {"context": {"models_plan": dict(self.plan, resident="fixture_model")}},
+            {"context": {"models_plan": dict(self.plan, on_demand=[None])}},
+            {"context": {"omp_paths": {}}},
+            {"context": {"evolution_lab_path": "relative/path"}},
+            {"context": {"evolution_lab_path": None}}, {"inputs": []},
         ]
         for change in changes:
             with self.subTest(change=change):

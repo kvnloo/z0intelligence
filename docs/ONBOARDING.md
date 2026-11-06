@@ -96,10 +96,10 @@ a saved plan that would install it. An explicit `--step` list on resume must
 match the original selection. Completed steps are not repeated, including
 doctor and runs originally started with `--force`.
 
-The resident model plan and discovered evolution-lab destination survive
-interruption. Resume checks the effective model manifest for downloads and the
-evolution-lab source/ref/environment overrides, repository/state paths and Python
-executable before retrying. Restore the original inputs if they changed.
+The validated resident model plan, evolution-lab destination and OMP source
+and destination paths survive interruption. Resume checks the effective model manifest for downloads and the
+evolution-lab source/ref/environment overrides, repository/state/user-home paths
+and Python executable before retrying. Restore the original inputs if they changed.
 Malformed or unsupported checkpoints fail closed. To deliberately abandon a
 plan or recover irreparable state, stop all onboarding invocations, archive
 `state/onboard.json` yourself, then preview and approve a new explicit selection.
