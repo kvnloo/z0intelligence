@@ -2,6 +2,7 @@
 import json
 import os
 import socket
+import unittest.mock
 from pathlib import Path
 import subprocess
 
@@ -59,6 +60,7 @@ def test_failure_instruction_carries_the_same_contract():
 
 def _handler(module, service_url):
     """Register against a stub context pointed at service_url; return the handler."""
+
     class StubCtx:
         def __init__(self):
             self.config = {"service_url": service_url}
@@ -101,6 +103,55 @@ def test_remote_service_origin_skips_the_local_existence_probe():
     assert module._same_host("http://localhost:11501") is True
     assert module._same_host("http://groot:11501") is False
     assert module._same_host("http://172.19.0.1:11501") is False
+
+
+class _Response:
+    def __init__(self, payload):
+        self._payload = json.dumps(payload)
+
+    def read(self):
+        return self._payload.encode()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_rejected_root_packet_names_the_reason_and_the_fallback():
+    """The real failure mode: the service answers ok:false, naming the cause only
+    inside unresolved_gaps. The handler must not hand that back bare."""
+    module = load_plugin_module()
+    with unittest.mock.patch.object(module.os.path, "isdir", return_value=True), \
+            unittest.mock.patch.object(module.urllib.request, "urlopen",
+                                       return_value=_Response({
+                                           "ok": False,
+                                           "unresolved_gaps": [
+                                               "file-search: no retrieval hits for 'x' "
+                                               "(fff=rejected_root, qmd=disabled)"],
+                                       })):
+        handler = _handler(module, "http://127.0.0.1:11501")
+        body = json.loads(handler({"repository_root": "/mnt/zer0models/workspace/zer0",
+                                  "query": "x", "limit": 3}))
+    assert body["reason"] == "rejected_root"
+    assert "search_files" in body["instruction"]
+    assert "/mnt/zer0models/workspace/zer0" in body["instruction"]
+    assert body["unresolved_gaps"]  # the service's own fields survive
+    assert body["ok"] is False
+
+
+def test_ok_packet_is_returned_unannotated():
+    """Success must stay byte-for-byte the service's answer."""
+    module = load_plugin_module()
+    packet = {"ok": True, "schema": "z0int.context_resolve.v1", "evidence": [{"path": "a.py"}]}
+    with unittest.mock.patch.object(module.os.path, "isdir", return_value=True), \
+            unittest.mock.patch.object(module.urllib.request, "urlopen",
+                                       return_value=_Response(packet)):
+        handler = _handler(module, "http://127.0.0.1:11501")
+        body = json.loads(handler({"repository_root": "/mnt/zer0models/workspace/zer0/oss/oss-agent",
+                                   "query": "x", "limit": 3}))
+    assert body == packet
 
 
 # Executed in a separate Hermes interpreter: no z0int or adapters on PYTHONPATH.

@@ -65,6 +65,25 @@ def _same_host(origin: str) -> bool:
     return host in _LOOPBACK
 
 
+def _annotate_service_failure(packet, text):
+    """A rejected root reaches the agent as an ok:false ContextPacket with no error.
+
+    The service names the cause only inside unresolved_gaps (fff=rejected_root), so the
+    old handler handed the agent a failure with no reason and no next step. Attach the
+    reason and the same contract used everywhere else; the packet's own fields stay.
+    """
+    if not isinstance(packet, dict) or packet.get("ok") is not False:
+        return packet
+    if "rejected_root" in text:
+        packet["reason"] = "rejected_root"
+    elif "no retrieval hits" in text:
+        packet["reason"] = "no_hits"
+    else:
+        packet["reason"] = "service_reported_failure"
+    packet["instruction"] = FAILURE_INSTRUCTION
+    return packet
+
+
 def register(ctx):
     """Register one native tool and static priority guidance; no automatic hooks."""
     origin = ctx.get_config("service_url", os.environ.get("Z0INT_SERVICE_URL", "http://127.0.0.1:11501"))
@@ -95,7 +114,8 @@ def register(ctx):
                 headers={"Content-Type": "application/json"},
             )
             with urllib.request.urlopen(request, timeout=15) as response:
-                return json.dumps(json.load(response))
+                text = response.read().decode()
+            return json.dumps(_annotate_service_failure(json.loads(text), text))
         except urllib.error.HTTPError as exc:
             status = exc.code
             try:  # Carry the service's own reason; its 400 body is otherwise opaque.
