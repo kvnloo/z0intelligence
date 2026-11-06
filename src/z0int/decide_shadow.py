@@ -9,6 +9,7 @@ The only write is the shadow log under ~/.z0int/shadow/decide/. No live routing 
 import argparse
 import collections
 import json
+import math
 import os
 import re
 import sqlite3
@@ -179,18 +180,21 @@ GAP_S = 20 * 60
 
 
 def coverage(rows, source='vllm-sr', start=None, end=None):
-    """Holes > GAP_S in a source's row stream (e.g. pod logs rotated while the tap was down)."""
-    ts = sorted(r['ts'] for r in rows if r['source'] == source)
+    """Traffic-gap heuristic, not evidence of collector uptime or complete capture."""
+    ts = sorted(r['ts'] for r in rows if r['source'] == source
+                and (start is None or r['ts'] >= start) and (end is None or r['ts'] <= end))
+    note = 'Traffic-gap heuristic, not collector uptime; silent traffic and missing capture are indistinguishable.'
     if not ts:
-        return {'source': source, 'pct': 0.0, 'gaps': []}
-    start, end = start or ts[0], end or ts[-1]
+        return {'source': source, 'pct': 0.0, 'gaps': [], 'note': note}
+    start = ts[0] if start is None else start
+    end = ts[-1] if end is None else end
     edges = [start] + ts + [end]
     gaps = [(a, b) for a, b in zip(edges, edges[1:]) if b - a > GAP_S]
     lost = sum(b - a for a, b in gaps)
     fmt = lambda t: datetime.fromtimestamp(t).strftime('%m-%d %H:%M')
     return {'source': source, 'pct': round(100.0 * (1 - lost / max(end - start, 1)), 1),
             'gaps': [{'from': fmt(a), 'to': fmt(b), 'minutes': round((b - a) / 60)} for a, b in gaps],
-            'note': 'rate figures cover only the time with rows'}
+            'note': note}
 
 
 def _cooldown_section(rows):
@@ -218,9 +222,17 @@ def _total(t):
     return sum(t.values())
 
 
-def report(rows, price):
+def report(rows, price, *, start=None, end=None):
     """price(provider, model, tokens) -> API-equivalent USD or None."""
-    rows = list({(r['source'], r['id']): r for r in rows}.values())
+    rows = list({(r['source'], r['id']): r for r in rows
+                 if (start is None or r['ts'] >= start) and (end is None or r['ts'] <= end)}.values())
+    times = [r['ts'] for r in rows]
+    first, last = (min(times), max(times)) if times else (None, None)
+    window = {'start_ts': start, 'end_ts': end,
+              'requested_hours': (end - start) / 3600 if start is not None and end is not None else None,
+              'first_event_ts': first, 'last_event_ts': last,
+              'observed_span_hours': (last - first) / 3600 if times else 0.0,
+              'note': 'Event span does not prove continuous collector uptime or source completeness.'}
     n = len(rows)
     pct = lambda xs: round(100.0 * sum(r['agree'] for r in xs) / len(xs), 1) if xs else None
     by = collections.defaultdict(list)
@@ -246,7 +258,10 @@ def report(rows, price):
         if d['kind'] == 'ROUTE':
             quota[POOL.get(d['provider'], d['provider'])] += _total(t)
     top = sorted(groups.items(), key=lambda kv: -kv[1]['n'])
-    return {'vllm_sr_groq_cooldown': _cooldown_section(rows), 'vllm_sr_coverage': coverage(rows),
+    return {'window': window,
+            'agreement_basis': 'provider and model only; harness, effort and account are not compared',
+            'cost_basis': 'API-equivalent estimate: decided minus actual; non-ROUTE uses zero; not billed savings or measured counterfactual usage',
+            'vllm_sr_groq_cooldown': _cooldown_section(rows), 'vllm_sr_coverage': coverage(rows, start=start, end=end),
             'errors': sum(1 for r in rows if r['decided']['kind'] == 'ERROR'),
             'n': n, 'agree_pct': pct(rows),
             'privacy_unresolved': {'rows_with_personal_hint': sum(1 for r in rows if r.get('personal_hint')),
@@ -337,12 +352,20 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog='z0int.decide_shadow')
     ap.add_argument('cmd', choices=['tap', 'report'])
     ap.add_argument('--hours', type=float, default=24)
+    ap.add_argument('--end', type=float, help='Report window end as a Unix timestamp; defaults to now')
+    ap.add_argument('--rows', type=Path, help='Existing decision metadata JSONL; never reads source conversations')
     a = ap.parse_args(argv)
     if a.cmd == 'tap':
         return tap()
-    cut = time.time() - a.hours * 3600
-    rows = [r for line in (OUT / 'rows.jsonl').open() if (r := json.loads(line))['ts'] >= cut]
-    print(json.dumps(report(rows, hermes_price), indent=1))
+    if not math.isfinite(a.hours) or a.hours <= 0:
+        ap.error('--hours must be positive finite hours')
+    end = time.time() if a.end is None else a.end
+    if not math.isfinite(end):
+        ap.error('--end must be a finite Unix timestamp')
+    start = end - a.hours * 3600
+    with (a.rows if a.rows is not None else OUT / 'rows.jsonl').open() as f:
+        rows = [json.loads(line) for line in f]
+    print(json.dumps(report(rows, hermes_price, start=start, end=end), indent=1))
 
 
 if __name__ == '__main__':
