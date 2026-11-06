@@ -168,3 +168,41 @@ def test_destructive_question_requires_contract_not_question_bypass(tmp_path):
     srv = service(tmp_path, draft)
     with pytest.raises(ValueError, match="Destructive scope requires"):
         asyncio.run(srv.reconcile({**request(), "text": "Should I wipe all repos?"}))
+
+def test_review_card_projects_aodl_concept_target_verifier_and_cited_uncertainty():
+    from z0int.intent_service import render_contract
+
+    target = "repo:src/search.py"
+    doc = {"intentGraph": {"nodes": [{"id": "task.1", "kind": "task"}]},
+           "plan": {"bindings": {
+               "task.1": {"entryId": "entry", "sentenceId": "s0.0.15",
+                   "text": "Improve search.", "target": target,
+                   "interpretation": "Use existing search", "executor": "self",
+                   "acceptance": "task.1.acceptance", "preconditions": ["task.1.pre.0"],
+                   "assumptions": [{"claim": "The index is current", "citations": [
+                       {"source": "state_packet", "id": "snapshot", "evidence_kind": "claimed"}]}]},
+               "task.1.acceptance": {"type": "human_review", "target": target},
+               "task.1.pre.0": {"type": "file_contains", "target": target,
+                                "path": "src/search.py", "pattern": "index"},
+               "compiler": {"assumptions": [{"claim": "Source file exists", "citations": [
+                   {"source": "repo", "id": "src/search.py", "evidence_kind": "observed"}]}],
+                   "conflicts": [], "delegation_plan": []}}}}
+    card = render_contract(doc)
+    assert "Concept [entry:s0.0.15]: Improve search." in card
+    assert "Proposed interpretation (not evidence): Use existing search" in card
+    assert f"Target: {target} · Executor: self" in card
+    assert 'Check (not run): human_review' in card
+    assert "BEFORE work (not run):" in card
+    assert "[task task.1] UNVERIFIED CLAIM: The index is current [state_packet:snapshot (claimed)]" in card
+    assert "[all tasks] OBSERVED CITATION: Source file exists [repo:src/search.py (observed)]" in card
+    assert "look good?" in card
+
+
+def test_review_card_does_not_invent_source_links_without_assumptions():
+    from z0int.intent_service import render_contract
+
+    doc = {"intentGraph": {"nodes": []}, "plan": {"bindings": {
+        "compiler": {"assumptions": [], "conflicts": [], "delegation_plan": []}}}}
+    card = render_contract(doc)
+    assert "relationships are not established" in card
+    assert "OBSERVED CITATION" not in card
