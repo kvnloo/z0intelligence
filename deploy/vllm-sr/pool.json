@@ -186,6 +186,30 @@
    "tool_call": false,
    "tool_s": 0.36,
    "error": "{\"code\":30001,\"message\":\"Sorry, your account balance is insufficient\",\"data\":null}"
+  },
+  {
+   "name": "nim-deepseek-v4.1-flash",
+   "tool_status": "error",
+   "tool_call": false,
+   "tool_s": 90.17,
+   "error": "The read operation timed out"
+  },
+  {
+   "name": "nim-glm-5.3-flash",
+   "tool_status": "error",
+   "tool_call": false,
+   "tool_s": 90.18,
+   "error": "The read operation timed out"
+  },
+  {
+   "name": "nim-step-5-preview",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 3.68,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 1.62,
+   "ctx_30000_s": 2.4,
+   "ctx_100000_s": 5.53
   }
  ]
 }

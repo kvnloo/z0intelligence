@@ -13,10 +13,11 @@ re-renders + redeploys without backends blocked >= 10 min, only when that set ch
 ~/.z0int/state/posture/free-pace.json, which burn-pace reports as lane "free".
 
 CANDIDATES is ordered most capable first (prior: profiles/scores.json hard tier, then size). `render` keeps that
-order for every backend whose probe passed a tool call or was only rate-limited, and records the largest prompt it
+order (vllm-sr/free) for every backend whose probe passed a tool call or was only rate-limited, and records the largest prompt it
 accepted as the model card's context window. On 408/413/429/5xx the router moves to the next candidate (an oversized
 prompt costs one instant 413; `candidate_requirements.context: known_limits` refused every request here, 2026-11-05). No paid route: OpenRouter calls carry
-max_price 0, and Cerebras (credit) and Google models (owner rule) are excluded.
+max_price 0; Google models are excluded (owner rule). Cerebras is owner-approved prepaid credit: turbo only (CREDIT).
+Order: models on the Hermes Index (HERMES_INDEX) lead, best score first; the rest follow in CANDIDATES order.
 """
 import concurrent.futures as cf
 import json
@@ -33,11 +34,16 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 OR, NIM, KILO = "https://openrouter.ai/api/v1", "https://integrate.api.nvidia.com/v1", "https://api.kilo.ai/api/gateway"
 GROQ, SAMBA = "https://api.groq.com/openai/v1", "https://api.sambanova.ai/v1"
+CEREBRAS = "https://api.cerebras.ai/v1"
 OVH, SF = "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1", "https://api.siliconflow.com/v1"
 ANON = None  # keyless endpoint
 
 # (router name, base_url, key env or ANON, provider model id, claimed context window)
 CANDIDATES = [
+    # On the Hermes Index and free on NIM (render orders these by HERMES_INDEX).
+    ("nim-deepseek-v4.1-flash", NIM, "NVIDIA_API_KEY", "deepseek-ai/deepseek-v4.1-flash", 1000000),
+    ("nim-glm-5.3-flash", NIM, "NVIDIA_API_KEY", "z-ai/glm-5.3-flash", 200000),
+    ("nim-step-5-preview", NIM, "NVIDIA_API_KEY", "stepfun-ai/step-5-preview", 262144),
     ("kilo-nemotron-3-ultra", KILO, ANON, "nvidia/nemotron-3-ultra-550b-a55b:free", 1000000),
     ("or-nemotron-3-ultra", OR, "OPENROUTER_API_KEY", "nvidia/nemotron-3-ultra-550b-a55b:free", 1000000),
     ("nim-nemotron-3-ultra", NIM, "NVIDIA_API_KEY", "nvidia/nemotron-3-ultra-550b-a55b", 1000000),
@@ -104,7 +110,14 @@ def probe(c):
     return row
 
 
-TRANSIENT = (408, 429, 500, 502, 503, 504, "error")  # quota/overload: still a free backend, retried later
+# Hermes Index (portal.nousresearch.com/bench, read 2026-11-05): mean pass@1 over Hermes Bench, TerminalBench 4,
+# TerminalBench Science and SkillsBench, every model run in the Hermes Agent harness. Only models we can reach free.
+# Keyed by bare model id (provider prefix and ":free" dropped). Scored models lead every free cascade, best first.
+HERMES_INDEX = {"deepseek-v4.1-flash": 36.91, "glm-5.3-flash": 34.95, "step-5-preview": 32.83,
+                "nemotron-3.5-super-vl": 24.10}
+# Owner-approved prepaid credit (not free): turbo only, ahead of the free pool, for throughput.
+CREDIT = []  # Cerebras answered 402 (credit used up) 2026-11-05; re-add its two models here after a top-up.
+TRANSIENT = (408, 429, 500, 502, 503, 504)  # quota/overload: still a free backend. A probe timeout (>90 s) is not: it would stall the cascade.
 SMALL_CAP = 7000  # unprobed context (e.g. Groq's 8K TPM free tier): only small prompts go there
 
 
@@ -116,11 +129,32 @@ def _cascade(name, refs):
             "algorithm": {"type": "static"}, "modelRefs": refs, "fallback": fallback}
 
 
+FAMILIES = ("reason", "verify", "longctx", "extract", "classify", "format")  # profiles/tasks.py families
+
+
+def eval_scores():
+    """Per-model eval scores from profiles/results.jsonl (profiles/eval_free.py), keyed by bare model id.
+
+    Quality is the model's, not the host's, so one score covers every provider serving that model."""
+    sys.path.insert(0, str(HERE / "profiles"))
+    from score import score
+    rows = [json.loads(l) for l in (HERE / "profiles/results.jsonl").read_text().splitlines() if l.strip()]
+    out = {}
+    for key, v in score(rows).items():
+        if v["provider"] != "router" and (v["n_hard"] or 0) >= 8:
+            k = key.split("/")[-1].removesuffix(":free")
+            if k not in out or v["reliability"] > out[k]["reliability"]:  # best-behaved host's run
+                out[k] = v
+    return out
+
+
 def render(exclude=(), out=HERE / "config.yaml"):
     """Write the router config. *exclude*: backends `pace` found out of quota until their reset."""
     pool = {r["name"]: r for r in json.loads((HERE / "pool.json").read_text())["rows"]}
     live = [c for c in CANDIDATES if pool.get(c[0], {}).get("tool_call") or pool.get(c[0], {}).get("tool_status") in TRANSIENT]
     live = [c for c in live if c[0] not in exclude] or live  # every backend capped: keep the pool, never render empty
+    bare = lambda c: c[3].split("/")[-1].removesuffix(":free")
+    live.sort(key=lambda c: -HERMES_INDEX.get(bare(c), 0))  # stable: unscored keep CANDIDATES order
     if not live:
         sys.exit("no candidate passed the tool probe; refusing to render an empty pool")
     models, cards, refs = [], [], []
@@ -139,14 +173,37 @@ def render(exclude=(), out=HERE / "config.yaml"):
         refs.append({"model": name, "use_reasoning": False})
     # turbo = same pool, fastest measured tool turn first (unmeasured last).
     speed = sorted(refs, key=lambda r: pool[r["model"]]["tool_s"] if pool[r["model"]].get("tool_call") else 1e9)
+    credit = []
+    for name, base, env, model, ctx in CREDIT:
+        models.append({"name": name, "provider_model_id": model, "backend_refs": [
+            {"name": "cerebras", "provider": "vllm", "openai_compat_gateway": True, "base_url": base, "api_key_env": env,
+             "weight": 100}]})
+        cards.append({"name": name, "context_window_size": ctx})
+        credit.append({"model": name, "use_reasoning": False})
+    speed = credit + speed
+    # Per-task profiles: the same pool, ordered by eval accuracy x reliability on that task family (profiles/eval_free.py).
+    # Models the eval has not scored keep CANDIDATES order after the scored ones, so the cascade never ends early.
+    ev, ids = eval_scores(), {c[0]: c[3].split("/")[-1].removesuffix(":free") for c in live}
+
+    def by(metric):
+        def key(i_r):
+            v = ev.get(ids[i_r[1]["model"]])
+            hi = HERMES_INDEX.get(ids[i_r[1]["model"]], 0)  # the Hermes Index outranks our small task eval
+            return (-hi, -(metric(v) * v["reliability"]) if v else 1, i_r[0])
+        return [r for _, r in sorted(enumerate(refs), key=key)]
+    task = {"quality": by(lambda v: v["quality_hard"] or 0)}
+    task |= {f: by(lambda v, f=f: v["family_acc"].get(f, 0)) for f in FAMILIES}
     cfg = {
         "version": "v0.3",
-        "entrypoints": [{"model_names": ["vllm-sr/free", "vllm-sr/auto"], "recipe": "default"},
-                        {"model_names": ["vllm-sr/turbo"], "recipe": "turbo"}],
+        "entrypoints": [{"model_names": ["vllm-sr/free", "vllm-sr/auto", "vllm-sr/free-quality"], "recipe": "default"},
+                        {"model_names": ["vllm-sr/turbo"], "recipe": "turbo"}]
+                       + [{"model_names": [f"vllm-sr/free-{f}"], "recipe": f} for f in FAMILIES],
         "recipes": [{"name": "turbo", "description": "Free pool, fastest first.",
-                     "routing": {"decisions": [_cascade("free-fastest", speed)]}}],
+                     "routing": {"decisions": [_cascade("free-fastest", speed)]}}]
+                   + [{"name": f, "description": f"Free pool, best eval score on {f} tasks first.",
+                       "routing": {"decisions": [_cascade(f"free-{f}", task[f])]}} for f in FAMILIES],
         "listeners": [{"name": "http-8899", "address": "0.0.0.0", "port": 8899, "timeout": "1800s"}],
-        "global": {"router": {"fallback": {"enabled": True, "max_attempts": len(refs),
+        "global": {"router": {"fallback": {"enabled": True, "max_attempts": len(speed),
                                           "circuit_breaker": {"consecutive_failures": 2, "cooldown_period": "120s",
                                                               "half_open_probes": 1}}},
                    "services": {"observability": {"tracing": {}}, "response_api": {}},
@@ -154,12 +211,14 @@ def render(exclude=(), out=HERE / "config.yaml"):
         "providers": {"defaults": {"model": refs[0]["model"]}, "models": models},
         "routing": {
             "modelCards": cards,
-            "decisions": [_cascade("free-capable", refs)],
+            "decisions": [_cascade("free-quality", task["quality"])],
         },
     }
     import yaml
     Path(out).write_text(yaml.safe_dump(cfg, sort_keys=False))
     print(f"rendered {len(refs)} backends:", ", ".join(f"{r['model']}({c['context_window_size']})" for r, c in zip(refs, cards)))
+    for f, rs in task.items():
+        print(f"  free-{f}:", " > ".join(r["model"] for r in rs[:4]), "...")
 
 
 # --- pace: rate limits from router traffic ----------------------------------------------------------------------

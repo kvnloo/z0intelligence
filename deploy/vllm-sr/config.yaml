@@ -3,10 +3,29 @@ entrypoints:
 - model_names:
   - vllm-sr/free
   - vllm-sr/auto
+  - vllm-sr/free-quality
   recipe: default
 - model_names:
   - vllm-sr/turbo
   recipe: turbo
+- model_names:
+  - vllm-sr/free-reason
+  recipe: reason
+- model_names:
+  - vllm-sr/free-verify
+  recipe: verify
+- model_names:
+  - vllm-sr/free-longctx
+  recipe: longctx
+- model_names:
+  - vllm-sr/free-extract
+  recipe: extract
+- model_names:
+  - vllm-sr/free-classify
+  recipe: classify
+- model_names:
+  - vllm-sr/free-format
+  recipe: format
 recipes:
 - name: turbo
   description: Free pool, fastest first.
@@ -21,63 +40,336 @@ recipes:
       algorithm:
         type: static
       modelRefs:
-      - &id013
+      - &id017
         model: or-nemotron-3.5-lightning
         use_reasoning: false
-      - &id014
+      - &id018
         model: kilo-north-mini-code
         use_reasoning: false
-      - &id002
+      - &id006
         model: or-nemotron-3-ultra
         use_reasoning: false
-      - &id003
+      - &id007
         model: nim-nemotron-3-ultra
         use_reasoning: false
-      - &id001
+      - &id005
         model: kilo-nemotron-3-ultra
         use_reasoning: false
-      - &id005
+      - &id003
         model: or-nemotron-3.5-super-vl
         use_reasoning: false
-      - &id004
+      - &id002
         model: kilo-nemotron-3.5-super-vl
         use_reasoning: false
-      - &id017
+      - &id019
         model: or-nemotron-nano-omni
         use_reasoning: false
-      - &id008
+      - &id015
         model: or-flint-v1
         use_reasoning: false
-      - &id007
+      - &id009
         model: or-dots-3-note
         use_reasoning: false
-      - &id006
+      - &id008
         model: kilo-dots-3-note
         use_reasoning: false
-      - &id012
+      - &id016
         model: kilo-nemotron-3.5-lightning
         use_reasoning: false
-      - &id015
+      - &id014
         model: or-xing4.0-29b
         use_reasoning: false
-      - &id011
+      - &id004
         model: nim-nemotron-3.5-lightning
         use_reasoning: false
-      - &id009
-        model: samba-gpt-oss-120b
+      - &id001
+        model: nim-step-5-preview
         use_reasoning: false
       - &id010
+        model: samba-gpt-oss-120b
+        use_reasoning: false
+      - &id011
         model: groq-gpt-oss-120b
         use_reasoning: false
-      - &id016
+      - &id013
         model: groq-qwen3.8-27b
         use_reasoning: false
-      - &id018
+      - &id012
         model: groq-gpt-oss-20b
         use_reasoning: false
       fallback:
         enabled: true
-        max_attempts: 18
+        max_attempts: 19
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes:
+        - 408
+        - 413
+        - 429
+        - 500
+        - 502
+        - 503
+        - 504
+- name: reason
+  description: Free pool, best eval score on reason tasks first.
+  routing:
+    decisions:
+    - name: free-reason
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: Every probed free backend in order; next one on 408/413/429/5xx.
+      algorithm:
+        type: static
+      modelRefs:
+      - *id001
+      - *id002
+      - *id003
+      - *id004
+      - *id005
+      - *id006
+      - *id007
+      - *id008
+      - *id009
+      - *id010
+      - *id011
+      - *id012
+      - *id013
+      - *id014
+      - *id015
+      - *id016
+      - *id017
+      - *id018
+      - *id019
+      fallback:
+        enabled: true
+        max_attempts: 19
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes:
+        - 408
+        - 413
+        - 429
+        - 500
+        - 502
+        - 503
+        - 504
+- name: verify
+  description: Free pool, best eval score on verify tasks first.
+  routing:
+    decisions:
+    - name: free-verify
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: Every probed free backend in order; next one on 408/413/429/5xx.
+      algorithm:
+        type: static
+      modelRefs:
+      - *id001
+      - *id002
+      - *id003
+      - *id004
+      - *id005
+      - *id006
+      - *id007
+      - *id008
+      - *id009
+      - *id010
+      - *id011
+      - *id012
+      - *id013
+      - *id014
+      - *id015
+      - *id016
+      - *id017
+      - *id018
+      - *id019
+      fallback:
+        enabled: true
+        max_attempts: 19
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes:
+        - 408
+        - 413
+        - 429
+        - 500
+        - 502
+        - 503
+        - 504
+- name: longctx
+  description: Free pool, best eval score on longctx tasks first.
+  routing:
+    decisions:
+    - name: free-longctx
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: Every probed free backend in order; next one on 408/413/429/5xx.
+      algorithm:
+        type: static
+      modelRefs:
+      - *id001
+      - *id002
+      - *id003
+      - *id004
+      - *id005
+      - *id006
+      - *id007
+      - *id008
+      - *id009
+      - *id010
+      - *id011
+      - *id012
+      - *id013
+      - *id014
+      - *id015
+      - *id016
+      - *id017
+      - *id018
+      - *id019
+      fallback:
+        enabled: true
+        max_attempts: 19
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes:
+        - 408
+        - 413
+        - 429
+        - 500
+        - 502
+        - 503
+        - 504
+- name: extract
+  description: Free pool, best eval score on extract tasks first.
+  routing:
+    decisions:
+    - name: free-extract
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: Every probed free backend in order; next one on 408/413/429/5xx.
+      algorithm:
+        type: static
+      modelRefs:
+      - *id001
+      - *id002
+      - *id003
+      - *id004
+      - *id005
+      - *id006
+      - *id007
+      - *id008
+      - *id009
+      - *id010
+      - *id011
+      - *id012
+      - *id013
+      - *id014
+      - *id015
+      - *id016
+      - *id017
+      - *id018
+      - *id019
+      fallback:
+        enabled: true
+        max_attempts: 19
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes:
+        - 408
+        - 413
+        - 429
+        - 500
+        - 502
+        - 503
+        - 504
+- name: classify
+  description: Free pool, best eval score on classify tasks first.
+  routing:
+    decisions:
+    - name: free-classify
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: Every probed free backend in order; next one on 408/413/429/5xx.
+      algorithm:
+        type: static
+      modelRefs:
+      - *id001
+      - *id002
+      - *id003
+      - *id004
+      - *id005
+      - *id006
+      - *id007
+      - *id008
+      - *id009
+      - *id010
+      - *id011
+      - *id012
+      - *id014
+      - *id013
+      - *id015
+      - *id016
+      - *id017
+      - *id018
+      - *id019
+      fallback:
+        enabled: true
+        max_attempts: 19
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes:
+        - 408
+        - 413
+        - 429
+        - 500
+        - 502
+        - 503
+        - 504
+- name: format
+  description: Free pool, best eval score on format tasks first.
+  routing:
+    decisions:
+    - name: free-format
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: Every probed free backend in order; next one on 408/413/429/5xx.
+      algorithm:
+        type: static
+      modelRefs:
+      - *id001
+      - *id002
+      - *id003
+      - *id004
+      - *id010
+      - *id011
+      - *id012
+      - *id005
+      - *id006
+      - *id007
+      - *id008
+      - *id009
+      - *id013
+      - *id014
+      - *id015
+      - *id016
+      - *id017
+      - *id018
+      - *id019
+      fallback:
+        enabled: true
+        max_attempts: 19
         per_attempt_timeout: 120s
         total_timeout: 600s
         retryable_status_codes:
@@ -97,7 +389,7 @@ global:
   router:
     fallback:
       enabled: true
-      max_attempts: 18
+      max_attempts: 19
       circuit_breaker:
         consecutive_failures: 2
         cooldown_period: 120s
@@ -110,8 +402,35 @@ global:
     response_cache: {}
 providers:
   defaults:
-    model: kilo-nemotron-3-ultra
+    model: nim-step-5-preview
   models:
+  - name: nim-step-5-preview
+    provider_model_id: stepfun-ai/step-5-preview
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      api_key_env: NVIDIA_API_KEY
+  - name: kilo-nemotron-3.5-super-vl
+    provider_model_id: nvidia/nemotron-3.5-super-vl:free
+    backend_refs:
+    - name: kilo
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.kilo.ai/api/gateway
+      weight: 100
+      api_key_env: FREE_ANON_API_KEY
+  - name: or-nemotron-3.5-super-vl
+    provider_model_id: nvidia/nemotron-3.5-super-vl:free
+    backend_refs:
+    - name: or
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      api_key_env: OPENROUTER_API_KEY
   - name: kilo-nemotron-3-ultra
     provider_model_id: nvidia/nemotron-3-ultra-550b-a55b:free
     backend_refs:
@@ -139,24 +458,6 @@ providers:
       base_url: https://integrate.api.nvidia.com/v1
       weight: 100
       api_key_env: NVIDIA_API_KEY
-  - name: kilo-nemotron-3.5-super-vl
-    provider_model_id: nvidia/nemotron-3.5-super-vl:free
-    backend_refs:
-    - name: kilo
-      provider: vllm
-      openai_compat_gateway: true
-      base_url: https://api.kilo.ai/api/gateway
-      weight: 100
-      api_key_env: FREE_ANON_API_KEY
-  - name: or-nemotron-3.5-super-vl
-    provider_model_id: nvidia/nemotron-3.5-super-vl:free
-    backend_refs:
-    - name: or
-      provider: vllm
-      openai_compat_gateway: true
-      base_url: https://openrouter.ai/api/v1
-      weight: 100
-      api_key_env: OPENROUTER_API_KEY
   - name: kilo-dots-3-note
     provider_model_id: dots-studio/dots-3-note-preview:free
     backend_refs:
@@ -276,15 +577,17 @@ providers:
       api_key_env: GROQ_API_KEY
 routing:
   modelCards:
+  - name: nim-step-5-preview
+    context_window_size: 262144
+  - name: kilo-nemotron-3.5-super-vl
+    context_window_size: 1000000
+  - name: or-nemotron-3.5-super-vl
+    context_window_size: 1000000
   - name: kilo-nemotron-3-ultra
     context_window_size: 1000000
   - name: or-nemotron-3-ultra
     context_window_size: 1000000
   - name: nim-nemotron-3-ultra
-    context_window_size: 1000000
-  - name: kilo-nemotron-3.5-super-vl
-    context_window_size: 1000000
-  - name: or-nemotron-3.5-super-vl
     context_window_size: 1000000
   - name: kilo-dots-3-note
     context_window_size: 512000
@@ -313,7 +616,7 @@ routing:
   - name: groq-gpt-oss-20b
     context_window_size: 7000
   decisions:
-  - name: free-capable
+  - name: free-quality
     priority: 100
     rules:
       operator: AND
@@ -340,9 +643,10 @@ routing:
     - *id016
     - *id017
     - *id018
+    - *id019
     fallback:
       enabled: true
-      max_attempts: 18
+      max_attempts: 19
       per_attempt_timeout: 120s
       total_timeout: 600s
       retryable_status_codes:
