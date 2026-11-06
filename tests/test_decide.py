@@ -118,3 +118,11 @@ def test_missing_burn_lane_rejects_metered_provider():
     burn = {"lanes": {"claude": lane()}}
     d = decide({"role": "task", "privacy": "public", "executors": ["fx"]}, signals(burn=burn))
     assert d["kind"] == "HOLD" and any("no burn-pace row" in r for r in d["rejected"])
+
+
+def test_null_burn_fields_do_not_crash():
+    s = signals()
+    s["burn"]["lanes"]["claude"]["pace_ratio"] = None
+    s["burn"]["lanes"]["claude2"]["max_workflow_agents"] = None
+    d = decide({"role": "plan", "privacy": "public", "executors": ["hermes"]}, s)
+    assert d["kind"] == "ROUTE" and d["provider"] == "anthropic"

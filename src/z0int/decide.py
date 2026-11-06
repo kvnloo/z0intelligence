@@ -33,10 +33,10 @@ def _pool(c, table, lanes):
     rows = [(n, lanes[n]) for n in names if n in lanes]
     if not rows:
         return None, 'no burn-pace row for ' + '/'.join(names)
-    open_rows = [(n, r) for n, r in rows if r.get('band') not in BLOCKED_BANDS and r.get('max_workflow_agents', 1) > 0]
+    open_rows = [(n, r) for n, r in rows if r.get('band') not in BLOCKED_BANDS and (r.get('max_workflow_agents') is None or r['max_workflow_agents'] > 0)]
     if not open_rows:
         return None, 'burn: ' + ', '.join(f"{n} {r.get('band')}" for n, r in rows)
-    return min(open_rows, key=lambda nr: nr[1].get('pace_ratio', 0)), None
+    return min(open_rows, key=lambda nr: nr[1].get('pace_ratio') or 0), None  # burn-pace emits null pace_ratio
 
 
 def _cap(effort, cap):

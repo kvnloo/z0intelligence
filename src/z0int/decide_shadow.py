@@ -158,15 +158,39 @@ def shadow_rows(events, signals):
     rows = []
     for e in events:
         s = dict(signals, saturation={**(signals.get('saturation') or {}), **e.get('saturation', {})})
-        d = decide(e['req'], s)
+        try:
+            d = decide(e['req'], s)
+        except Exception as exc:  # one bad signal must not drop the batch; the cursor has already advanced
+            d = {'kind': 'ERROR', 'reason': repr(exc)[:200]}
         agree = d['kind'] == 'ROUTE' and (d['provider'], d['model']) == (e['actual']['provider'], e['actual']['model'])
         row = {k: e[k] for k in ('source', 'id', 'ts', 'req', 'actual', 'tokens')} | {
             'status': e.get('status'), 'personal_hint': e.get('personal_hint', False), 'decided': d, 'agree': agree}
         extra = [FAILOVER[x] for x in e['req'].get('executors') or [] if x in FAILOVER]
         if extra and d['kind'] == 'HOLD':
-            row['decided_failover'] = decide(dict(e['req'], executors=e['req']['executors'] + extra), s)
+            try:
+                row['decided_failover'] = decide(dict(e['req'], executors=e['req']['executors'] + extra), s)
+            except Exception as exc:
+                row['decided_failover'] = {'kind': 'ERROR', 'reason': repr(exc)[:200]}
         rows.append(row)
     return rows
+
+
+GAP_S = 20 * 60
+
+
+def coverage(rows, source='vllm-sr', start=None, end=None):
+    """Holes > GAP_S in a source's row stream (e.g. pod logs rotated while the tap was down)."""
+    ts = sorted(r['ts'] for r in rows if r['source'] == source)
+    if not ts:
+        return {'source': source, 'pct': 0.0, 'gaps': []}
+    start, end = start or ts[0], end or ts[-1]
+    edges = [start] + ts + [end]
+    gaps = [(a, b) for a, b in zip(edges, edges[1:]) if b - a > GAP_S]
+    lost = sum(b - a for a, b in gaps)
+    fmt = lambda t: datetime.fromtimestamp(t).strftime('%m-%d %H:%M')
+    return {'source': source, 'pct': round(100.0 * (1 - lost / max(end - start, 1)), 1),
+            'gaps': [{'from': fmt(a), 'to': fmt(b), 'minutes': round((b - a) / 60)} for a, b in gaps],
+            'note': 'rate figures cover only the time with rows'}
 
 
 def _cooldown_section(rows):
@@ -208,7 +232,7 @@ def report(rows, price):
         if r['agree']:
             continue
         a, d, t = r['actual'], r['decided'], r['tokens']
-        dk = f"{d['provider']}/{d['model']}" if d['kind'] == 'ROUTE' else 'HOLD'
+        dk = f"{d['provider']}/{d['model']}" if d['kind'] == 'ROUTE' else d['kind']
         g = groups[(r['source'], f"{a['provider']}/{a['model']}", dk)]
         pa = price(a['provider'], a['model'], t)
         pd = price(d['provider'], d['model'], t) if d['kind'] == 'ROUTE' else 0.0
@@ -222,7 +246,8 @@ def report(rows, price):
         if d['kind'] == 'ROUTE':
             quota[POOL.get(d['provider'], d['provider'])] += _total(t)
     top = sorted(groups.items(), key=lambda kv: -kv[1]['n'])
-    return {'vllm_sr_groq_cooldown': _cooldown_section(rows),
+    return {'vllm_sr_groq_cooldown': _cooldown_section(rows), 'vllm_sr_coverage': coverage(rows),
+            'errors': sum(1 for r in rows if r['decided']['kind'] == 'ERROR'),
             'n': n, 'agree_pct': pct(rows),
             'privacy_unresolved': {'rows_with_personal_hint': sum(1 for r in rows if r.get('personal_hint')),
                                    'note': 'flagged, not scored as violations: eval use of owner messages on GPT awaits a cited approval'},

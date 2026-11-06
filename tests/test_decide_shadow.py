@@ -95,3 +95,20 @@ def test_shadow_rows_and_report():
     assert top["actual"] == "openai-codex/gpt-6.1-sol" and top["decided"] == "openai-codex/gpt-6.1-terra" and top["n"] == 1
     assert rep["cost_delta_usd"] == -1.0
     assert rep["quota_delta_tokens"] == {"codex": 0}
+
+
+def test_one_bad_event_does_not_drop_the_batch(monkeypatch):
+    ev = [{"source": "fx", "id": i, "ts": 1, "req": {"role": "task", "privacy": "public", "executors": ["fx"]},
+           "actual": {"provider": "openai-codex", "model": "gpt-6.1-terra"}, "tokens": {}} for i in ("ok", "bad")]
+    real = S.decide
+    monkeypatch.setattr(S, "decide", lambda req, s: (_ for _ in ()).throw(TypeError("boom")) if req.get("boom") else real(req, s))
+    ev[1]["req"]["boom"] = True
+    rows = S.shadow_rows(ev, sig())
+    assert [r["id"] for r in rows] == ["ok", "bad"]
+    assert rows[1]["decided"]["kind"] == "ERROR" and "boom" in rows[1]["decided"]["reason"] and rows[1]["agree"] is False
+
+
+def test_coverage_reports_hole():
+    rows = [{"source": "vllm-sr", "ts": t} for t in (0, 600, 1200, 1200 + 83 * 60, 1200 + 83 * 60 + 600)]
+    c = S.coverage(rows)
+    assert len(c["gaps"]) == 1 and c["gaps"][0]["minutes"] == 83 and c["pct"] == 26.5
