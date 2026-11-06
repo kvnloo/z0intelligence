@@ -120,6 +120,7 @@ def test_signal_digest_logs_unknown_pace():
     d = S.signal_digest(s, 5)
     assert d["pace_unknown"] == ["claude"] and d["bands"]["claude"] == s["burn"]["lanes"]["claude"]["band"]
 
+
 def test_coverage_includes_silent_leading_and_trailing_window_edges():
     # Two observed events 10 minutes apart do not cover a two-hour request window.
     rows = [{"source": "vllm-sr", "ts": 3600}, {"source": "vllm-sr", "ts": 4200}]
