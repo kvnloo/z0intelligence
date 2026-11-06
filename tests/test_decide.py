@@ -126,3 +126,12 @@ def test_null_burn_fields_do_not_crash():
     s["burn"]["lanes"]["claude2"]["max_workflow_agents"] = None
     d = decide({"role": "plan", "privacy": "public", "executors": ["hermes"]}, s)
     assert d["kind"] == "ROUTE" and d["provider"] == "anthropic"
+
+
+def test_exhausted_lane_with_null_pace_is_never_picked():
+    s = signals()
+    for n in ("claude", "claude2"):
+        s["burn"]["lanes"][n]["pace_ratio"] = 0.9
+    s["burn"]["lanes"]["claude3"] = {"band": "hard-stop-exhausted", "pace_ratio": None, "max_workflow_agents": None}
+    d = decide({"role": "plan", "privacy": "public", "executors": ["hermes"]}, s)
+    assert d["account"] != "claude3"

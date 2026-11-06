@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROLES_PATH = Path(__file__).resolve().parents[2] / 'manifests/roles.v1.json'
 EFFORTS = ('low', 'medium', 'high', 'xhigh')
-BLOCKED_BANDS = ('hard-throttle',)
+BLOCKED_BANDS = ('hard-throttle', 'hard-stop-exhausted')   # bands burn-pace emits for no-new-work lanes
 CAPPING_BANDS = ('throttle', 'hard-throttle')
 
 
