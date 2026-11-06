@@ -283,6 +283,12 @@ def _vllm_sr_lines(since):
     return p.stdout.splitlines()
 
 
+def signal_digest(signals, now):
+    lanes = {k: v for k, v in signals['burn'].get('lanes', {}).items() if isinstance(v, dict) and 'band' in v}
+    return {'at': now, 'burn_at': signals['burn'].get('at'), 'bands': {k: v.get('band') for k, v in lanes.items()},
+            'pace_unknown': sorted(k for k, v in lanes.items() if v.get('pace_ratio') is None)}
+
+
 def tap(now=None):
     now = now or time.time()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -303,7 +309,9 @@ def tap(now=None):
         events += got
         cur[src] = now - 60 if src == 'vllm-sr' else until
     rows = shadow_rows(events, signals)
-    digest = {'at': now, 'burn_at': signals['burn'].get('at'), 'bands': {k: v.get('band') for k, v in signals['burn'].get('lanes', {}).items() if isinstance(v, dict) and 'band' in v}}
+    digest = signal_digest(signals, now)
+    if digest['pace_unknown']:
+        print(f"burn-pace pace_ratio unknown for {','.join(digest['pace_unknown'])}; treated as 0", file=sys.stderr)
     with (OUT / 'rows.jsonl').open('a') as f:
         for r in rows:
             f.write(json.dumps(r | {'signals': digest}) + '\n')

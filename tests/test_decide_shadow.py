@@ -112,3 +112,10 @@ def test_coverage_reports_hole():
     rows = [{"source": "vllm-sr", "ts": t} for t in (0, 600, 1200, 1200 + 83 * 60, 1200 + 83 * 60 + 600)]
     c = S.coverage(rows)
     assert len(c["gaps"]) == 1 and c["gaps"][0]["minutes"] == 83 and c["pct"] == 26.5
+
+
+def test_signal_digest_logs_unknown_pace():
+    s = sig()
+    s["burn"]["lanes"]["claude"]["pace_ratio"] = None
+    d = S.signal_digest(s, 5)
+    assert d["pace_unknown"] == ["claude"] and d["bands"]["claude"] == s["burn"]["lanes"]["claude"]["band"]
