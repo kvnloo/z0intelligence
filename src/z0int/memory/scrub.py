@@ -43,12 +43,28 @@ def redact_spans(text: str, spans) -> tuple[str, int]:
     return (raw.decode('utf-8', errors='replace'), n) if n else (text, 0)
 
 
+# Per pattern (same order as _SECRET_RES): (case-insensitive, substrings at least one of which every match contains).
+# A pattern is skipped only when none is present, so output is identical to running every pattern. casefold()
+# (not lower()) because (?i) matches U+017F for "s" and U+212A for "k". Test: tests/test_memory_hc2.py.
+_NEEDLES = (
+    (False, ('-----BEGIN ',)), (False, ('0.',)), (False, ('k-',)), (False, ('AIza',)), (False, ('AKIA', 'ASIA')),
+    (False, ('gh',)), (False, ('xox',)), (False, ('xai-', 'gsk_', 'hf_', 'github_pat_')),
+    (True, ('key', 'token', 'secret', 'passw')), (True, ('bearer',)),
+)
+
+
 def scrub_text(text: str) -> tuple[str, int]:
     """Blank every credential shape; returns (text, number of spans removed)."""
-    n = 0
-    for rx in _SECRET_RES:
+    n, folded = 0, None
+    for rx, (ci, needles) in zip(_SECRET_RES, _NEEDLES):
+        if ci and folded is None:
+            folded = text.casefold()
+        hay = folded if ci else text
+        if not any(s in hay for s in needles):
+            continue
         text, k = rx.subn(REDACTED, text)
-        n += k
+        if k:
+            n, folded = n + k, None
     return text, n
 
 

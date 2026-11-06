@@ -388,13 +388,32 @@ def _scope_of(raw: Any) -> MemoryScope | None:
     return MemoryScope(**{k: raw.get(k) for k in ('user', 'project', 'repo', 'task')})
 
 
+_PARSED: dict[str, tuple[tuple[int, int, int], Any]] = {}
+
+
+def _parsed_events(log: EventLog) -> tuple[list[MemoryEvent], dict[int, dict[str, Any]], list[str]]:
+    """Events, current claim rows and lowercased payload text, re-read only when the log file changes
+    (keyed on inode, size and mtime_ns; every append changes size)."""
+    st = log.events_path.stat()
+    key, sig = str(log.events_path.resolve()), (st.st_ino, st.st_size, st.st_mtime_ns)
+    hit = _PARSED.get(key)
+    if hit is not None and hit[0] == sig:
+        return hit[1]
+    events = list(log.iter_events())
+    claims = {c['event_id']: c for c in _claim_rows(events)}
+    texts = [json.dumps(e.payload, ensure_ascii=False, sort_keys=True).lower() if e.payload is not None else ''
+             for e in events]
+    _PARSED[key] = (sig, (events, claims, texts))
+    return events, claims, texts
+
+
 def _temporal_candidates(query: str, *, ledger_root: str | Path | None,
                          join_uids: set[str]) -> tuple[dict[str, Any], list[dict[str, Any]], int]:
     log = EventLog(ledger_root, read_only=True)
     if not log.events_path.is_file():
         return _layer('ok', revision='empty', events=0), [], 0
     try:
-        events = list(log.iter_events())
+        events, claims, texts = _parsed_events(log)
     except Exception as exc:  # noqa: BLE001 - a corrupt ledger is reported, not raised
         return _layer('unavailable', 'corrupt', detail=type(exc).__name__), [], 0
     tree = log.root / 'TREE' / 'manifest.json'
@@ -403,10 +422,8 @@ def _temporal_candidates(query: str, *, ledger_root: str | Path | None,
     except (OSError, ValueError):
         tree_rev = None
     terms, out, scrubbed = _terms(query), [], 0
-    claims = {c['event_id']: c for c in _claim_rows(events)}
-    for e in events:
+    for e, text in zip(events, texts):
         ident = e.event_identity()
-        text = json.dumps(e.payload, ensure_ascii=False, sort_keys=True).lower() if e.payload is not None else ''
         score = sum(1 for t in terms if t in text)
         joined = ident is not None and ident.event_uid in join_uids
         if not score and not joined:
