@@ -106,9 +106,11 @@ def _cascade(name, refs):
             "algorithm": {"type": "static"}, "modelRefs": refs, "fallback": fallback}
 
 
-def render():
+def render(exclude=(), out=HERE / "config.yaml"):
+    """Write the router config. *exclude*: backends free_pace.py found out of quota until their reset."""
     pool = {r["name"]: r for r in json.loads((HERE / "pool.json").read_text())["rows"]}
     live = [c for c in CANDIDATES if pool.get(c[0], {}).get("tool_call") or pool.get(c[0], {}).get("tool_status") in TRANSIENT]
+    live = [c for c in live if c[0] not in exclude] or live  # every backend capped: keep the pool, never render empty
     if not live:
         sys.exit("no candidate passed the tool probe; refusing to render an empty pool")
     models, cards, refs = [], [], []
@@ -146,7 +148,7 @@ def render():
         },
     }
     import yaml
-    (HERE / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False))
+    Path(out).write_text(yaml.safe_dump(cfg, sort_keys=False))
     print(f"rendered {len(refs)} backends:", ", ".join(f"{r['model']}({c['context_window_size']})" for r, c in zip(refs, cards)))
 
 
