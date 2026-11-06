@@ -194,34 +194,45 @@ def validate_draft(draft: dict, records: list) -> None:
 
 
 def render_contract(doc: dict) -> str:
+    """Project canonical AODL bindings into the existing native review UI.
+
+    This is presentation only: citations are evidence, model interpretations
+    are proposals, and checks are NOT execution or approval receipts.
+    """
     b = doc["plan"]["bindings"]
-    lines = ["Proposed intent contract"]
-    for node in doc["intentGraph"]["nodes"]:
-        if node["kind"] != "task":
-            continue
+    lines = ["Proposed intent contract",
+             "Owner review: exact concept → proposed implementation → acceptance (not run)"]
+    task_nodes = [n for n in doc["intentGraph"]["nodes"] if n["kind"] == "task"]
+    for node in task_nodes:
         task = b[node["id"]]
         verifier = b[task["acceptance"]]
-        lines += [f"• {task['text'].strip()}", f"  Target: {task['target']} · Executor: {task.get('executor', 'self')}",
-                  f"  Check: {verifier['type']} {json.dumps(verifier, ensure_ascii=False)}"]
+        source = f"{task.get('entryId', 'unrecorded')}:{task.get('sentenceId', 'unrecorded')}"
+        lines += [
+            f"• Concept [{source}]: {task['text'].strip()}",
+            f"  Proposed interpretation (not evidence): {task.get('interpretation', '')}",
+            f"  Target: {task['target']} · Executor: {task.get('executor', 'self')}",
+            f"  Check (not run): {verifier['type']} {json.dumps(verifier, ensure_ascii=False)}",
+        ]
         for prerequisite_id in task.get("preconditions", []):
-            lines.append(f"  BEFORE work: {json.dumps(b[prerequisite_id], ensure_ascii=False)}")
+            lines.append(f"  BEFORE work (not run): {json.dumps(b[prerequisite_id], ensure_ascii=False)}")
         if task.get("status") == "dropped":
             lines.append(f"  Superseded: {task.get('reason', '')}")
     compiler = b.get("compiler", {})
-    assumptions = compiler.get("assumptions", []) + [a for n in doc["intentGraph"]["nodes"] if n["kind"] == "task" for a in b[n["id"]].get("assumptions", [])]
-    lines.append("Memory facts:")
-    for a in assumptions:
-        refs = ", ".join(f"{c['source']}:{c.get('path') or c['id']} ({c['evidence_kind']})" for c in a["citations"])
-        kind = "" if any(c["evidence_kind"] == "observed" for c in a["citations"]) else "UNVERIFIED CLAIM: "
-        lines.append(f"• {kind}{a['claim']} [{refs}]")
+    assumptions = [(None, a) for a in compiler.get("assumptions", [])]
+    assumptions += [(n["id"], a) for n in task_nodes for a in b[n["id"]].get("assumptions", [])]
+    lines.append("Memory facts (cited source references, not execution authority):")
+    for task_id, assumption in assumptions:
+        refs = ", ".join(f"{c['source']}:{c.get('path') or c['id']} ({c['evidence_kind']})" for c in assumption["citations"])
+        kind = "OBSERVED CITATION" if any(c["evidence_kind"] == "observed" for c in assumption["citations"]) else "UNVERIFIED CLAIM"
+        scope = f"task {task_id}" if task_id else "all tasks"
+        lines.append(f"• [{scope}] {kind}: {assumption['claim']} [{refs}]")
     if not assumptions:
-        lines.append("• No memory assumption cited.")
-    conflicts = compiler.get("conflicts", []) + [c for n in doc["intentGraph"]["nodes"] if n["kind"] == "task" for c in b[n["id"]].get("conflicts", [])]
+        lines.append("• No cited assumptions; product, file, and memory relationships are not established by this card.")
+    conflicts = compiler.get("conflicts", []) + [c for n in task_nodes for c in b[n["id"]].get("conflicts", [])]
     lines.append("Conflicts: " + (json.dumps(conflicts, ensure_ascii=False) if conflicts else "none flagged"))
     lines.append("Delegation: " + json.dumps(compiler.get("delegation_plan", []), ensure_ascii=False))
     lines.append("look good?")
     return "\n".join(lines)
-
 
 class IntentService:
     def __init__(self, root: Path | None = None, retriever=None, model=None, bridge=None, validator=None):
