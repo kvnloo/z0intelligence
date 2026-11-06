@@ -135,3 +135,34 @@ def test_exhausted_lane_with_null_pace_is_never_picked():
     s["burn"]["lanes"]["claude3"] = {"band": "hard-stop-exhausted", "pace_ratio": None, "max_workflow_agents": None}
     d = decide({"role": "plan", "privacy": "public", "executors": ["hermes"]}, s)
     assert d["account"] != "claude3"
+
+
+# Every band burn-pace knobs() emits (burn-pace L136-151). Null pace_ratio means ratio 0 (under-burn) or undefined (unknown).
+BANDS = {"under-burn": "pick", "on-pace": "pick", "throttle": "pick", "unknown": "pick", "hard-throttle": "block", "hard-stop-exhausted": "block"}
+
+
+def test_band_domain_is_fully_classified():
+    from z0int import decide as D
+    for band, want in BANDS.items():
+        assert (band in D.BLOCKED_BANDS) == (want == "block"), band
+
+
+def test_unknown_lane_ranks_behind_a_measured_lane_and_is_capped():
+    s = signals()
+    s["burn"]["lanes"] = {"claude": {"band": "unknown", "pace_ratio": None, "max_workflow_agents": 4, "effort": "medium"},
+                          "claude2": {"band": "on-pace", "pace_ratio": 0.9, "max_workflow_agents": 6, "effort": "medium"},
+                          "claude3": {"band": "hard-throttle", "pace_ratio": 2.0, "max_workflow_agents": 0, "effort": "low"},
+                          "codex": {"band": "on-pace", "pace_ratio": 0.9, "max_workflow_agents": 6, "effort": "medium"}}
+    d = decide({"role": "plan", "privacy": "public", "executors": ["hermes"]}, s)
+    assert d["account"] == "claude2"
+    s["burn"]["lanes"]["claude2"]["band"] = "hard-throttle"
+    d = decide({"role": "plan", "privacy": "public", "executors": ["hermes"]}, s)
+    assert d["account"] == "claude" and d["effort"] == "medium"     # unknown is usable, capped at burn-pace's effort
+
+
+def test_null_pace_under_burn_still_ranks_first():
+    s = signals()
+    s["burn"]["lanes"]["claude"].update(band="under-burn", pace_ratio=None)
+    s["burn"]["lanes"]["claude2"].update(band="on-pace", pace_ratio=0.5)
+    d = decide({"role": "plan", "privacy": "public", "executors": ["hermes"]}, s)
+    assert d["account"] == "claude"

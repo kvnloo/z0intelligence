@@ -10,7 +10,7 @@ from pathlib import Path
 ROLES_PATH = Path(__file__).resolve().parents[2] / 'manifests/roles.v1.json'
 EFFORTS = ('low', 'medium', 'high', 'xhigh')
 BLOCKED_BANDS = ('hard-throttle', 'hard-stop-exhausted')   # bands burn-pace emits for no-new-work lanes
-CAPPING_BANDS = ('throttle', 'hard-throttle')
+CAPPING_BANDS = ('throttle', 'hard-throttle', 'unknown')
 
 
 def load_roles(path=ROLES_PATH):
@@ -36,7 +36,16 @@ def _pool(c, table, lanes):
     open_rows = [(n, r) for n, r in rows if r.get('band') not in BLOCKED_BANDS and (r.get('max_workflow_agents') is None or r['max_workflow_agents'] > 0)]
     if not open_rows:
         return None, 'burn: ' + ', '.join(f"{n} {r.get('band')}" for n, r in rows)
-    return min(open_rows, key=lambda nr: nr[1].get('pace_ratio') or 0), None  # burn-pace emits null pace_ratio
+    return min(open_rows, key=lambda nr: _pace(nr[1])), None
+
+
+def _pace(row):
+    """burn-pace writes null for ratio 0 (band under-burn) and for an undefined ratio (band unknown).
+    Unknown ranks as on-pace (1.0) so a measured lane wins; it is never preferred blind."""
+    p = row.get('pace_ratio')
+    if p is not None:
+        return p
+    return 0.0 if row.get('band') == 'under-burn' else 1.0
 
 
 def _cap(effort, cap):

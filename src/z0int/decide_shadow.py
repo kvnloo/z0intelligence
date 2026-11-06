@@ -311,7 +311,7 @@ def tap(now=None):
     rows = shadow_rows(events, signals)
     digest = signal_digest(signals, now)
     if digest['pace_unknown']:
-        print(f"burn-pace pace_ratio unknown for {','.join(digest['pace_unknown'])}; treated as 0", file=sys.stderr)
+        print(f"burn-pace pace_ratio unknown for {','.join(digest['pace_unknown'])}; ranked as on-pace unless band is under-burn", file=sys.stderr)
     with (OUT / 'rows.jsonl').open('a') as f:
         for r in rows:
             f.write(json.dumps(r | {'signals': digest}) + '\n')
