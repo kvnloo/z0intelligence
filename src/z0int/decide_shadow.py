@@ -181,9 +181,13 @@ GAP_S = 20 * 60
 def coverage(rows, source='vllm-sr', start=None, end=None):
     """Holes > GAP_S in a source's row stream (e.g. pod logs rotated while the tap was down)."""
     ts = sorted(r['ts'] for r in rows if r['source'] == source)
-    if not ts:
+    if not ts and (start is None or end is None):
         return {'source': source, 'pct': 0.0, 'gaps': []}
-    start, end = start or ts[0], end or ts[-1]
+    start = ts[0] if start is None else start
+    end = ts[-1] if end is None else end
+    if end < start:
+        raise ValueError('coverage window end is before start')
+    ts = [t for t in ts if start <= t <= end]
     edges = [start] + ts + [end]
     gaps = [(a, b) for a, b in zip(edges, edges[1:]) if b - a > GAP_S]
     lost = sum(b - a for a, b in gaps)
@@ -218,8 +222,11 @@ def _total(t):
     return sum(t.values())
 
 
-def report(rows, price):
-    """price(provider, model, tokens) -> API-equivalent USD or None."""
+def report(rows, price, *, window_start=None, window_end=None):
+    """price(provider, model, tokens) -> API-equivalent USD or None.
+
+    Explicit bounds prevent a partial event stream from appearing to cover 24 hours.
+    """
     rows = list({(r['source'], r['id']): r for r in rows}.values())
     n = len(rows)
     pct = lambda xs: round(100.0 * sum(r['agree'] for r in xs) / len(xs), 1) if xs else None
@@ -246,7 +253,12 @@ def report(rows, price):
         if d['kind'] == 'ROUTE':
             quota[POOL.get(d['provider'], d['provider'])] += _total(t)
     top = sorted(groups.items(), key=lambda kv: -kv[1]['n'])
-    return {'vllm_sr_groq_cooldown': _cooldown_section(rows), 'vllm_sr_coverage': coverage(rows),
+    window = None if window_start is None or window_end is None else {
+        'start': datetime.fromtimestamp(window_start, timezone.utc).isoformat(),
+        'end': datetime.fromtimestamp(window_end, timezone.utc).isoformat()}
+    return {'window_utc': window,
+            'vllm_sr_groq_cooldown': _cooldown_section(rows),
+            'vllm_sr_coverage': coverage(rows, start=window_start, end=window_end),
             'errors': sum(1 for r in rows if r['decided']['kind'] == 'ERROR'),
             'n': n, 'agree_pct': pct(rows),
             'privacy_unresolved': {'rows_with_personal_hint': sum(1 for r in rows if r.get('personal_hint')),
@@ -340,9 +352,10 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if a.cmd == 'tap':
         return tap()
-    cut = time.time() - a.hours * 3600
-    rows = [r for line in (OUT / 'rows.jsonl').open() if (r := json.loads(line))['ts'] >= cut]
-    print(json.dumps(report(rows, hermes_price), indent=1))
+    end = time.time()
+    cut = end - a.hours * 3600
+    rows = [r for line in (OUT / 'rows.jsonl').open() if cut <= (r := json.loads(line))['ts'] <= end]
+    print(json.dumps(report(rows, hermes_price, window_start=cut, window_end=end), indent=1))
 
 
 if __name__ == '__main__':
