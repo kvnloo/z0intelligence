@@ -1,238 +1,355 @@
 version: v0.3
-# Turbo v2 (2026-11-01): pool of measured free/fast backends for parallel small calls.
-# Probed 2026-11-01 (probes.jsonl): Groq 3 models TTFT ~0.21s, Cerebras 2 models ~0.18-0.25s.
-# Excluded: NVIDIA gpt-oss-20b (TTFT 18-29s), OpenRouter nemotron-3-super:free (no longer free),
-# Cerebras uses provider vllm + openai_compat_gateway: the router rejects its non-canonical `time_info` field otherwise.
-# OpenCode Zen free (API refuses: "free models work in OpenCode only"), DeepSeek (paid).
-listeners:
-  - name: http-8899
-    address: 0.0.0.0
-    port: 8899
-    timeout: 1800s
-providers:
-  defaults:
-    model: groq-gpt-oss-20b
-  models:
-    - name: groq-gpt-oss-20b
-      provider_model_id: openai/gpt-oss-20b
-      backend_refs:
-        - {name: groq, provider: vllm, openai_compat_gateway: true, base_url: "https://api.groq.com/openai/v1", api_key_env: GROQ_API_KEY, weight: 100}
-    - name: groq-gpt-oss-120b
-      provider_model_id: openai/gpt-oss-120b
-      backend_refs:
-        - {name: groq, provider: vllm, openai_compat_gateway: true, base_url: "https://api.groq.com/openai/v1", api_key_env: GROQ_API_KEY, weight: 100}
-    - name: groq-qwen3.8-27b
-      provider_model_id: qwen/qwen3.8-27b
-      backend_refs:
-        - {name: groq, provider: vllm, openai_compat_gateway: true, base_url: "https://api.groq.com/openai/v1", api_key_env: GROQ_API_KEY, weight: 100}
-    - name: cerebras-gpt-oss-120b
-      provider_model_id: gpt-oss-120b
-      backend_refs:
-        - {name: cerebras, provider: vllm, openai_compat_gateway: true, base_url: "https://api.cerebras.ai/v1", api_key_env: CEREBRAS_API_KEY, weight: 100}
-    - name: cerebras-qwen-3.8-27b
-      provider_model_id: qwen-3.8-27b
-      backend_refs:
-        - {name: cerebras, provider: vllm, openai_compat_gateway: true, base_url: "https://api.cerebras.ai/v1", api_key_env: CEREBRAS_API_KEY, weight: 100}
-    # --- free profiles (2026-11-02, profiles/eval_free.py: 20-task graded battery x2 per model) ---
-    - name: nim-nemotron-3.5-lightning
-      provider_model_id: nvidia/nemotron-3.5-lightning-30b-a3b
-      backend_refs:
-        - {name: nvidia, provider: vllm, openai_compat_gateway: true, base_url: "https://integrate.api.nvidia.com/v1", api_key_env: NVIDIA_API_KEY, weight: 100}
-    - name: nim-nemotron-3-ultra
-      provider_model_id: nvidia/nemotron-3-ultra-550b-a55b
-      backend_refs:
-        - {name: nvidia, provider: vllm, openai_compat_gateway: true, base_url: "https://integrate.api.nvidia.com/v1", api_key_env: NVIDIA_API_KEY, weight: 100}
-    - name: or-nemotron-3-ultra-free
-      provider_model_id: nvidia/nemotron-3-ultra-550b-a55b:free
-      backend_refs:
-        - {name: openrouter, provider: vllm, openai_compat_gateway: true, base_url: "https://openrouter.ai/api/v1", api_key_env: OPENROUTER_API_KEY, weight: 100}
-    - name: or-nemotron-3.5-super-vl-free
-      provider_model_id: nvidia/nemotron-3.5-super-vl:free
-      backend_refs:
-        - {name: openrouter, provider: vllm, openai_compat_gateway: true, base_url: "https://openrouter.ai/api/v1", api_key_env: OPENROUTER_API_KEY, weight: 100}
-    - name: or-dots-3-note-free
-      provider_model_id: dots-studio/dots-3-note-preview:free
-      backend_refs:
-        - {name: openrouter, provider: vllm, openai_compat_gateway: true, base_url: "https://openrouter.ai/api/v1", api_key_env: OPENROUTER_API_KEY, weight: 100}
-    # --- paid subscriptions (2026-11-03): host sub-proxy (subproxy/sub_proxy.py) attaches the owner's
-    # Hermes-pool OAuth credentials; the router only sees VLLM_SR_SUBPROXY_TOKEN. 10.42.0.1 = groot cni0.
-    - name: paid-gpt-6.1-sol
-      provider_model_id: gpt-6.1-sol
-      backend_refs:
-        - {name: subproxy-codexchat, provider: vllm, openai_compat_gateway: true, base_url: "http://10.42.0.1:18800/codexchat/v1", api_key_env: VLLM_SR_SUBPROXY_TOKEN, weight: 100}
-    - name: paid-grok-4.7
-      provider_model_id: grok-4.7
-      backend_refs:
-        - {name: subproxy-xai, provider: vllm, openai_compat_gateway: true, base_url: "http://10.42.0.1:18800/xai/v1", api_key_env: VLLM_SR_SUBPROXY_TOKEN, weight: 100}
-routing:
-  modelCards:
-    - name: paid-gpt-6.1-sol
-    - name: paid-grok-4.7
-    - name: groq-gpt-oss-20b
-    - name: groq-gpt-oss-120b
-    - name: groq-qwen3.8-27b
-    - name: cerebras-gpt-oss-120b
-    - name: cerebras-qwen-3.8-27b
-    - name: nim-nemotron-3.5-lightning
-    - name: nim-nemotron-3-ultra
-    - name: or-nemotron-3-ultra-free
-    - name: or-nemotron-3.5-super-vl-free
-    - name: or-dots-3-note-free
-  decisions:
-    - name: turbo-fanout
-      description: "Spread independent small calls across every fast free backend; fail over on rate limits."
+entrypoints:
+- model_names:
+  - vllm-sr/free
+  - vllm-sr/auto
+  recipe: default
+- model_names:
+  - vllm-sr/turbo
+  recipe: turbo
+recipes:
+- name: turbo
+  description: Free pool, fastest first.
+  routing:
+    decisions:
+    - name: free-fastest
       priority: 100
       rules:
         operator: AND
         conditions: []
-      modelRefs:
-        - {model: groq-gpt-oss-20b, use_reasoning: false}
-        - {model: groq-qwen3.8-27b, use_reasoning: false}
-        - {model: groq-gpt-oss-120b, use_reasoning: false}
-        - {model: cerebras-qwen-3.8-27b, use_reasoning: false}
-        - {model: cerebras-gpt-oss-120b, use_reasoning: false}
+      description: Every probed free backend in order; next one on 408/413/429/5xx.
       algorithm:
-        type: random
+        type: static
+      modelRefs:
+      - &id013
+        model: or-nemotron-3.5-lightning
+        use_reasoning: false
+      - &id014
+        model: kilo-north-mini-code
+        use_reasoning: false
+      - &id002
+        model: or-nemotron-3-ultra
+        use_reasoning: false
+      - &id003
+        model: nim-nemotron-3-ultra
+        use_reasoning: false
+      - &id001
+        model: kilo-nemotron-3-ultra
+        use_reasoning: false
+      - &id005
+        model: or-nemotron-3.5-super-vl
+        use_reasoning: false
+      - &id004
+        model: kilo-nemotron-3.5-super-vl
+        use_reasoning: false
+      - &id017
+        model: or-nemotron-nano-omni
+        use_reasoning: false
+      - &id008
+        model: or-flint-v1
+        use_reasoning: false
+      - &id007
+        model: or-dots-3-note
+        use_reasoning: false
+      - &id006
+        model: kilo-dots-3-note
+        use_reasoning: false
+      - &id012
+        model: kilo-nemotron-3.5-lightning
+        use_reasoning: false
+      - &id015
+        model: or-xing4.0-29b
+        use_reasoning: false
+      - &id011
+        model: nim-nemotron-3.5-lightning
+        use_reasoning: false
+      - &id009
+        model: samba-gpt-oss-120b
+        use_reasoning: false
+      - &id010
+        model: groq-gpt-oss-120b
+        use_reasoning: false
+      - &id016
+        model: groq-qwen3.8-27b
+        use_reasoning: false
+      - &id018
+        model: groq-gpt-oss-20b
+        use_reasoning: false
       fallback:
         enabled: true
-        max_attempts: 4
-        total_timeout: 60s
-        per_attempt_timeout: 30s
-        retryable_status_codes: [413, 429, 500, 502, 503, 504]
-entrypoints:
-  # Default recipe = turbo (top-level routing). Profiles are virtual models picked by name; see profiles/README.md.
-  - model_names: ["vllm-sr/auto", "vllm-sr/turbo"]
-    recipe: default
-  - model_names: ["vllm-sr/free-quality"]
-    recipe: free-quality
-  - model_names: ["vllm-sr/free-reasoning"]
-    recipe: free-reasoning
-  - model_names: ["vllm-sr/free-verify"]
-    recipe: free-verify
-  - model_names: ["vllm-sr/free-longctx"]
-    recipe: free-longctx
-  - model_names: ["vllm-sr/paid"]
-    recipe: paid
-recipes:
-  - name: paid
-    description: "Owner paid subscriptions: ChatGPT Sol -> Grok. Claude is NOT routed here: Anthropic bills router-shaped requests as third-party usage (extra usage, not plan limits; 400 seen 2026-11-03), so Claude turns stay on Hermes' direct Anthropic provider."
-    routing:
-      decisions:
-        - name: paid
-          description: "Ordered paid fallback: ChatGPT first, then Grok."
-          priority: 100
-          rules:
-            operator: AND
-            conditions: []
-          modelRefs:
-            - {model: paid-gpt-6.1-sol, use_reasoning: false}
-            - {model: paid-grok-4.7, use_reasoning: false}
-          algorithm:
-            type: static
-          fallback:
-            enabled: true
-            max_attempts: 3
-            total_timeout: 1800s
-            per_attempt_timeout: 900s
-            retryable_status_codes: [401, 403, 408, 429, 500, 502, 503, 504, 529]
-  - name: free-quality
-    description: "Most accurate reliable free models (hard-tier 0.94-1.00, reliability >= 0.97). Easy, well-defined, non-code work only."
-    routing:
-      decisions:
-        - name: free-quality
-          description: "Most accurate reliable free models (hard-tier 0.94-1.00, reliability >= 0.97). Easy, well-defined, non-code work only."
-          priority: 100
-          rules:
-            operator: AND
-            conditions: []
-          modelRefs:
-            - {model: nim-nemotron-3.5-lightning, use_reasoning: false}
-            - {model: or-nemotron-3.5-super-vl-free, use_reasoning: false}
-            - {model: or-nemotron-3-ultra-free, use_reasoning: false}
-            - {model: nim-nemotron-3-ultra, use_reasoning: false}
-          algorithm:
-            type: random
-          fallback:
-            enabled: true
-            max_attempts: 3
-            total_timeout: 240s
-            per_attempt_timeout: 120s
-            retryable_status_codes: [408, 413, 429, 500, 502, 503, 504]
-  - name: free-reasoning
-    description: "Free models with 1.00 on the reasoning family (math, dates, logic, table aggregation)."
-    routing:
-      decisions:
-        - name: free-reasoning
-          description: "Free models with 1.00 on the reasoning family (math, dates, logic, table aggregation)."
-          priority: 100
-          rules:
-            operator: AND
-            conditions: []
-          modelRefs:
-            - {model: or-nemotron-3.5-super-vl-free, use_reasoning: false}
-            - {model: or-nemotron-3-ultra-free, use_reasoning: false}
-            - {model: nim-nemotron-3-ultra, use_reasoning: false}
-            - {model: or-dots-3-note-free, use_reasoning: false}
-          algorithm:
-            type: random
-          fallback:
-            enabled: true
-            max_attempts: 3
-            total_timeout: 240s
-            per_attempt_timeout: 120s
-            retryable_status_codes: [408, 413, 429, 500, 502, 503, 504]
-  - name: free-verify
-    description: "Free checkers for draft->check: 1.00 on claim/answer verification."
-    routing:
-      decisions:
-        - name: free-verify
-          description: "Free checkers for draft->check: 1.00 on claim/answer verification."
-          priority: 100
-          rules:
-            operator: AND
-            conditions: []
-          modelRefs:
-            - {model: or-nemotron-3.5-super-vl-free, use_reasoning: false}
-            - {model: or-nemotron-3-ultra-free, use_reasoning: false}
-            - {model: nim-nemotron-3-ultra, use_reasoning: false}
-            - {model: or-dots-3-note-free, use_reasoning: false}
-          algorithm:
-            type: random
-          fallback:
-            enabled: true
-            max_attempts: 3
-            total_timeout: 240s
-            per_attempt_timeout: 120s
-            retryable_status_codes: [408, 413, 429, 500, 502, 503, 504]
-  - name: free-longctx
-    description: "Free models that found every needle at 8k-32k tokens (Groq gpt-oss 413s above 8K TPM, so it is excluded)."
-    routing:
-      decisions:
-        - name: free-longctx
-          description: "Free models that found every needle at 8k-32k tokens (Groq gpt-oss 413s above 8K TPM, so it is excluded)."
-          priority: 100
-          rules:
-            operator: AND
-            conditions: []
-          modelRefs:
-            - {model: or-nemotron-3.5-super-vl-free, use_reasoning: false}
-            - {model: or-nemotron-3-ultra-free, use_reasoning: false}
-            - {model: nim-nemotron-3-ultra, use_reasoning: false}
-            - {model: or-dots-3-note-free, use_reasoning: false}
-          algorithm:
-            type: random
-          fallback:
-            enabled: true
-            max_attempts: 3
-            total_timeout: 240s
-            per_attempt_timeout: 120s
-            retryable_status_codes: [408, 413, 429, 500, 502, 503, 504]
+        max_attempts: 18
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes:
+        - 408
+        - 413
+        - 429
+        - 500
+        - 502
+        - 503
+        - 504
+listeners:
+- name: http-8899
+  address: 0.0.0.0
+  port: 8899
+  timeout: 1800s
 global:
   router:
     fallback:
       enabled: true
-      max_attempts: 4
+      max_attempts: 18
       circuit_breaker:
         consecutive_failures: 2
-        cooldown_period: 30s
+        cooldown_period: 120s
         half_open_probes: 1
+  services:
+    observability:
+      tracing: {}
+    response_api: {}
+  stores:
+    response_cache: {}
+providers:
+  defaults:
+    model: kilo-nemotron-3-ultra
+  models:
+  - name: kilo-nemotron-3-ultra
+    provider_model_id: nvidia/nemotron-3-ultra-550b-a55b:free
+    backend_refs:
+    - name: kilo
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.kilo.ai/api/gateway
+      weight: 100
+      api_key_env: FREE_ANON_API_KEY
+  - name: or-nemotron-3-ultra
+    provider_model_id: nvidia/nemotron-3-ultra-550b-a55b:free
+    backend_refs:
+    - name: or
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      api_key_env: OPENROUTER_API_KEY
+  - name: nim-nemotron-3-ultra
+    provider_model_id: nvidia/nemotron-3-ultra-550b-a55b
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      api_key_env: NVIDIA_API_KEY
+  - name: kilo-nemotron-3.5-super-vl
+    provider_model_id: nvidia/nemotron-3.5-super-vl:free
+    backend_refs:
+    - name: kilo
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.kilo.ai/api/gateway
+      weight: 100
+      api_key_env: FREE_ANON_API_KEY
+  - name: or-nemotron-3.5-super-vl
+    provider_model_id: nvidia/nemotron-3.5-super-vl:free
+    backend_refs:
+    - name: or
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      api_key_env: OPENROUTER_API_KEY
+  - name: kilo-dots-3-note
+    provider_model_id: dots-studio/dots-3-note-preview:free
+    backend_refs:
+    - name: kilo
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.kilo.ai/api/gateway
+      weight: 100
+      api_key_env: FREE_ANON_API_KEY
+  - name: or-dots-3-note
+    provider_model_id: dots-studio/dots-3-note-preview:free
+    backend_refs:
+    - name: or
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      api_key_env: OPENROUTER_API_KEY
+  - name: or-flint-v1
+    provider_model_id: recursive/flint-v1.0:free
+    backend_refs:
+    - name: or
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      api_key_env: OPENROUTER_API_KEY
+  - name: samba-gpt-oss-120b
+    provider_model_id: gpt-oss-120b
+    backend_refs:
+    - name: samba
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.sambanova.ai/v1
+      weight: 100
+      api_key_env: SAMBANOVA_API_KEY
+  - name: groq-gpt-oss-120b
+    provider_model_id: openai/gpt-oss-120b
+    backend_refs:
+    - name: groq
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.groq.com/openai/v1
+      weight: 100
+      api_key_env: GROQ_API_KEY
+  - name: nim-nemotron-3.5-lightning
+    provider_model_id: nvidia/nemotron-3.5-lightning-30b-a3b
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      api_key_env: NVIDIA_API_KEY
+  - name: kilo-nemotron-3.5-lightning
+    provider_model_id: nvidia/nemotron-3.5-lightning:free
+    backend_refs:
+    - name: kilo
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.kilo.ai/api/gateway
+      weight: 100
+      api_key_env: FREE_ANON_API_KEY
+  - name: or-nemotron-3.5-lightning
+    provider_model_id: nvidia/nemotron-3.5-lightning:free
+    backend_refs:
+    - name: or
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      api_key_env: OPENROUTER_API_KEY
+  - name: kilo-north-mini-code
+    provider_model_id: cohere/north-mini-code:free
+    backend_refs:
+    - name: kilo
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.kilo.ai/api/gateway
+      weight: 100
+      api_key_env: FREE_ANON_API_KEY
+  - name: or-xing4.0-29b
+    provider_model_id: xingchen-agi/xing4.0-29b-a4b:free
+    backend_refs:
+    - name: or
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      api_key_env: OPENROUTER_API_KEY
+  - name: groq-qwen3.8-27b
+    provider_model_id: qwen/qwen3.8-27b
+    backend_refs:
+    - name: groq
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.groq.com/openai/v1
+      weight: 100
+      api_key_env: GROQ_API_KEY
+  - name: or-nemotron-nano-omni
+    provider_model_id: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
+    backend_refs:
+    - name: or
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://openrouter.ai/api/v1
+      weight: 100
+      api_key_env: OPENROUTER_API_KEY
+  - name: groq-gpt-oss-20b
+    provider_model_id: openai/gpt-oss-20b
+    backend_refs:
+    - name: groq
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.groq.com/openai/v1
+      weight: 100
+      api_key_env: GROQ_API_KEY
+routing:
+  modelCards:
+  - name: kilo-nemotron-3-ultra
+    context_window_size: 1000000
+  - name: or-nemotron-3-ultra
+    context_window_size: 1000000
+  - name: nim-nemotron-3-ultra
+    context_window_size: 1000000
+  - name: kilo-nemotron-3.5-super-vl
+    context_window_size: 1000000
+  - name: or-nemotron-3.5-super-vl
+    context_window_size: 1000000
+  - name: kilo-dots-3-note
+    context_window_size: 512000
+  - name: or-dots-3-note
+    context_window_size: 512000
+  - name: or-flint-v1
+    context_window_size: 262144
+  - name: samba-gpt-oss-120b
+    context_window_size: 7000
+  - name: groq-gpt-oss-120b
+    context_window_size: 7000
+  - name: nim-nemotron-3.5-lightning
+    context_window_size: 1000000
+  - name: kilo-nemotron-3.5-lightning
+    context_window_size: 1000000
+  - name: or-nemotron-3.5-lightning
+    context_window_size: 1000000
+  - name: kilo-north-mini-code
+    context_window_size: 256000
+  - name: or-xing4.0-29b
+    context_window_size: 4000
+  - name: groq-qwen3.8-27b
+    context_window_size: 7000
+  - name: or-nemotron-nano-omni
+    context_window_size: 256000
+  - name: groq-gpt-oss-20b
+    context_window_size: 7000
+  decisions:
+  - name: free-capable
+    priority: 100
+    rules:
+      operator: AND
+      conditions: []
+    description: Every probed free backend in order; next one on 408/413/429/5xx.
+    algorithm:
+      type: static
+    modelRefs:
+    - *id001
+    - *id002
+    - *id003
+    - *id004
+    - *id005
+    - *id006
+    - *id007
+    - *id008
+    - *id009
+    - *id010
+    - *id011
+    - *id012
+    - *id013
+    - *id014
+    - *id015
+    - *id016
+    - *id017
+    - *id018
+    fallback:
+      enabled: true
+      max_attempts: 18
+      per_attempt_timeout: 120s
+      total_timeout: 600s
+      retryable_status_codes:
+      - 408
+      - 413
+      - 429
+      - 500
+      - 502
+      - 503
+      - 504

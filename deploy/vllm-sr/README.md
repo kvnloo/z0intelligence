@@ -48,8 +48,15 @@ Turbo v1 (PR #176) never ran more than one call at a time; the router fixes that
 - The chart keeps the live ConfigMap unless `configMap.applyValuesRevision` changes.
   `deploy.sh` sets the revision to the config file's hash.
 
+## Free cascade (2026-11-05)
+
+`free_pool.py probe` tests every zero-cost backend (tool call, then 6K/30K/100K-token prompts) into `pool.json`;
+`free_pool.py render` writes `config.yaml`. `vllm-sr/free` (= `auto`) tries them most capable first,
+`vllm-sr/turbo` fastest first; on 408/413/429/5xx the router moves to the next one (up to the whole pool), and the
+circuit breaker skips a backend for 120 s after two failures. Auth/billing failures (401/402/403) are left out of
+the pool; rate-limited ones stay in. Re-run probe + render + `deploy.sh` to refresh the pool.
+
 ## Not yet
 
-- Size guard: Groq free allows 8K TPM per model. Large prompts rely on fallback; there is no routing by size yet.
 - Pool generated from z0int `/v1/providers` and Kerdoios placement (PLAN P1).
 - Turbo runtime (#176) calling this endpoint instead of its per-provider adapters (PLAN P2).
