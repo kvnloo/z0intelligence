@@ -9,7 +9,8 @@
  "caveats": [
   "Limits are per model per organization: each model is an independent bucket.",
   "Cerebras is trial/paid credit, not a permanent free tier: these limits say nothing about remaining credit.",
-  "null = not published/observed; never treat as unlimited."
+  "null = not published/observed; never treat as unlimited.",
+  "accounts: providers that pool limits across every model on one key/IP; one bucket each."
  ],
  "models": [
   {
@@ -96,5 +97,20 @@
    "basis": "header",
    "probe_latency_s": 0.238
   }
- ]
+ ],
+ "accounts": {
+  "openrouter": {
+   "rpm": 20,
+   "rpd": 1000,
+   "basis": "openrouter.ai/docs/api/reference/limits: 20 RPM, 1000 RPD on :free with >=10 credits, per account"
+  },
+  "kilo": {
+   "rph": 200,
+   "basis": "Kilo gateway anonymous :free, ~200 req/h per IP (PROMOTION_MODEL_LIMIT_REACHED)"
+  },
+  "nim": {
+   "rpm": 40,
+   "basis": "build.nvidia.com free API, ~40 RPM per account"
+  }
+ }
 }

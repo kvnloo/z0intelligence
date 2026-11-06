@@ -11,7 +11,8 @@ Main agent turns stay on the session's frontier model.
 | `config.yaml` | Router config: backend pool, `turbo-fanout` decision, and cross-model fallback |
 | `chart-local.patch` | Changes to the upstream Helm chart at the pinned commit: image digest pin and memory caps that leave room for the desktop |
 | `deploy.sh` | Idempotent deploy to local k3s, namespace `vllm-sr`. Fetches and patches the chart once, gets keys through `dsh-env-exec`, and gates on the Deployment rollout |
-| `probe_backends.py` | Probes each candidate backend once for status, TTFT and stream rate |
+| `free_pool.py` | The free pool, all in one file: `probe` (which backends work, how big a prompt) -> `pool.json`; `render` -> `config.yaml`; `pace` (free-pace.timer, every minute) tracks rate limits from router traffic and pulls capped backends |
+| `limits.json` | The one rate-limit table: per-model rows (Groq) and per-account buckets (OpenRouter, Kilo, NIM) |
 | `bench_fanout.py` | Runs N small tasks through the router, first serially, then at concurrency C |
 
 ## Backend pool (probed 2026-11-01)

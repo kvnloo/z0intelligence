@@ -5,6 +5,6 @@ Description=free-pace: track free-model rate limits from router traffic; pull ca
 Type=oneshot
 Environment=KUBECONFIG=%h/.kube/k3s.yaml
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
-ExecStart=%h/.hermes/hermes-agent/venv/bin/python /mnt/zer0models/z0-wt/z0int-vllm-sr-turbo/deploy/vllm-sr/free_pace.py
+ExecStart=%h/.hermes/hermes-agent/venv/bin/python /mnt/zer0models/z0-wt/z0int-vllm-sr-turbo/deploy/vllm-sr/free_pool.py pace
 TimeoutStartSec=700
 Nice=10

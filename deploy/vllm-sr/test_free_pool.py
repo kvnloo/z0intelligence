@@ -1,10 +1,10 @@
-"""python3 -m pytest deploy/vllm-sr/test_free_pace.py"""
+"""python3 -m pytest deploy/vllm-sr/test_free_pool.py"""
 import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import free_pace as fp  # noqa: E402
+import free_pool as fp  # noqa: E402
 
 GROQ_TPD = ("Rate limit reached for model `openai/gpt-oss-20b` in organization `org_x` service tier `on_demand` on "
             "tokens per day (TPD): Limit 200000, Used 199645, Requested 1234. Please try again in 7m12.5s.")
