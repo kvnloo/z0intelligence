@@ -1,0 +1,42 @@
+name: Claim bot
+
+# `/claim <task-id> ...` on an issue (docs/contrib/CONTRIBUTOR-LAYER.md §2.4).
+# Owner decision O-4: the bot may add the `claimed` label (with a lease) and post one
+# claim comment per command. That is the only origin write of the contributor layer.
+# Expiry stays in claim-expiry.yml (expire-claims.sh). Kill switch: set the repo
+# variable Z0_CLAIM_BOT=off.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  # One claim decision at a time per issue; every run re-reads the comments.
+  group: claim-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  claim:
+    if: >-
+      startsWith(github.event.comment.body, '/claim') &&
+      !startsWith(github.event.comment.body, '/claim rejected') &&
+      github.event.issue.pull_request == null &&
+      github.event.comment.user.login != 'github-actions[bot]' &&
+      vars.Z0_CLAIM_BOT != 'off'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install PyYAML
+        run: python -m pip install PyYAML==6.0.3
+      - name: Decide and record the claim
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONPATH: src
+        run: python3 .github/scripts/claim-bot.py

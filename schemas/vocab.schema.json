@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kvnloo/z0intelligence/schemas/vocab.schema.json",
+  "title": "z0.vocab.v1 — closed tag vocabulary for priorities and contributor profiles (.z0/vocab.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "languages", "domains", "toolchains"],
+  "properties": {
+    "schema": {"const": "z0.vocab.v1"},
+    "languages": {"$ref": "#/$defs/tags"},
+    "domains": {"$ref": "#/$defs/tags"},
+    "toolchains": {"$ref": "#/$defs/tags"},
+    "toolchain_languages": {
+      "description": "Closed toolchain -> language map used when no language histogram is consented (T0/T1).",
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/tags_or_empty"}
+    },
+    "affinity": {
+      "description": "Closed language/toolchain -> domain map (owner decision O-2). Deterministic; no free-text inference.",
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/tags_or_empty"}
+    },
+    "installable_toolchains": {
+      "description": "Toolchains a contributor can install at consent level C1. A missing toolchain outside this list removes the task.",
+      "$ref": "#/$defs/tags_or_empty"
+    }
+  },
+  "$defs": {
+    "tag": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "tags": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/tag"}},
+    "tags_or_empty": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/tag"}}
+  }
+}

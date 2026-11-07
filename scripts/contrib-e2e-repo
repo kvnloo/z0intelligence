@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# Repo-only trial of the contributor acceptance test (contributor spec §1.3, §4.1-4.3).
+#
+# This is the degraded repo-only path: no ./z0 onboard. Spec §5: a repo-only run is a
+# TRIAL, not "ready to send". Every receipt says "path": "repo_only". The full-path cells
+# (./z0 onboard --auto first) live in kvnloo/z0 (scripts/onboard-agent-e2e).
+#
+#   Every subcommand takes --z0-repo PATH: a kvnloo/z0 checkout that has
+#   scripts/contrib_ready.py and bend/contrib_ready (z0_sha = its HEAD).
+#
+#   scripts/contrib-e2e-repo provision --z0int-sha SHA --work DIR
+#       Mirrors exactly SHA into DIR/z0int.git, builds an ubuntu:24.04 image with base
+#       tools only, then clones and bootstraps z0intelligence as a non-root user in a
+#       fresh container and commits that as image z0int-contrib:<sha12>.
+#       --from-image IMG reuses a provisioned image and only moves its clone to SHA.
+#   scripts/contrib-e2e-repo cell --harness claude|codex --profile P --run N --work DIR
+#       One agent cell: a fresh container from that image, a fake HOME for profile P
+#       (marker repos, PATH fakebins for toolchains/GPU, canaries in every private
+#       file, a fake gh that refuses writes, a pre-push hook that refuses pushes), the
+#       harness binary mounted read-only, and exactly the prompt "help with this repo".
+#       tests/contrib_e2e/judge.py then checks A1-A7 and writes the receipt.
+#   scripts/contrib-e2e-repo det --work DIR
+#       Deterministic cells (smoke, E1, P1, P2, C1, W1, G1-G5, laws_ci twin) in a fresh
+#       container. Writes one receipt per cell.
+#   scripts/contrib-e2e-repo laws --work DIR
+#       laws_ci: contrib_ready twin tests plus `bend PROOF.bend --verdict` (pinned toolchain).
+#   scripts/contrib-e2e-repo verdict --work DIR
+#       python scripts/contrib_ready.py on DIR/receipts/<z0_sha>-<z0int_sha>.
+#
+# Auth for the Claude cell: CLAUDE_CODE_OAUTH_TOKEN must be set in the caller's
+# environment (passed to docker by name, never on a command line). Codex cells need
+# CODEX_AUTH_JSON pointing at an auth file the caller allows the container to read.
+# z0_sha is this checkout's HEAD; z0int_sha is the candidate. No host literals.
+set -euo pipefail
+ZROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # this z0intelligence checkout
+H="$ZROOT/tests/contrib_e2e_repo"
+cmd="${1:-}"; shift || true
+WORK=""; HARNESS=""; PROFILE=""; RUN=""; ROOT=""; ZSHA="HEAD"; ZREPO=""; FROM_IMAGE=""
+while (($#)); do case "$1" in
+  --work) WORK="$2"; shift 2;; --harness) HARNESS="$2"; shift 2;; --profile) PROFILE="$2"; shift 2;;
+  --run) RUN="$2"; shift 2;; --z0-repo) ROOT="$2"; shift 2;; --z0int-sha) ZSHA="$2"; shift 2;; --from-image) FROM_IMAGE="$2"; shift 2;;
+  *) echo "contrib-e2e-repo: unknown argument $1" >&2; exit 2;; esac; done
+[[ -n "$WORK" ]] || { echo "contrib-e2e-repo: --work DIR is required" >&2; exit 2; }
+[[ -f "$ROOT/scripts/contrib_ready.py" ]] || { echo "contrib-e2e-repo: --z0-repo must be a kvnloo/z0 checkout with scripts/contrib_ready.py" >&2; exit 2; }
+ROOT="$(cd "$ROOT" && pwd)"; ZREPO="$ZROOT"
+mkdir -p "$WORK"; WORK="$(cd "$WORK" && pwd)"
+Z0_SHA="$(git -C "$ROOT" rev-parse HEAD)"
+zi_sha() { cat "$WORK/z0int.sha"; }
+image() { echo "z0int-contrib:$(zi_sha | cut -c1-12)"; }
+rdir() { echo "$WORK/receipts/$Z0_SHA-$(zi_sha)"; }
+PY="${PYTHON:-python3}"
+
+case "$cmd" in
+  provision)
+    ZSHA="$(git -C "$ZREPO" rev-parse "$ZSHA^{commit}")"; echo "$ZSHA" > "$WORK/z0int.sha"
+    rm -rf "$WORK/z0int.git" "$WORK/cand" && git init -q --bare "$WORK/z0int.git"
+    git -C "$ZREPO" push -q "$WORK/z0int.git" "$ZSHA:refs/heads/master"
+    git -C "$WORK/z0int.git" symbolic-ref HEAD refs/heads/master
+    mkdir -p "$WORK/cand" "$WORK/provision" && git -C "$WORK/z0int.git" archive master | tar -x -C "$WORK/cand"
+    chmod 777 "$WORK/provision"
+    base=z0int-contrib-os; mode=""
+    if [[ -n "$FROM_IMAGE" ]]; then base="$FROM_IMAGE"; mode=refresh; else docker build -q -t z0int-contrib-os "$H" > /dev/null; fi
+    docker rm -f z0int-contrib-prov > /dev/null 2>&1 || true
+    docker run --name z0int-contrib-prov -u dev -v "$WORK/z0int.git:/mirror/z0int.git:ro" \
+      -v "$WORK/provision:/out" -v "$H/provision.sh:/provision.sh:ro" "$base" bash /provision.sh $mode \
+      | tee "$WORK/provision/provision.txt"
+    docker commit z0int-contrib-prov "$(image)" > /dev/null && docker rm z0int-contrib-prov > /dev/null
+    echo "image $(image)" ;;
+  cell)
+    [[ -n "$HARNESS" && -n "$PROFILE" && -n "$RUN" ]] || { echo "cell needs --harness --profile --run" >&2; exit 2; }
+    OUT="$WORK/cells/$HARNESS-$PROFILE-run$RUN"; rm -rf "$OUT"; mkdir -p "$OUT" "$(rdir)"; chmod 777 "$OUT"
+    args=(-v "$H:/e2e:ro" -v "$OUT:/out")
+    if [[ "$HARNESS" == claude ]]; then
+      [[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]] || { echo "CLAUDE_CODE_OAUTH_TOKEN is not set" >&2; exit 2; }
+      args+=(-e CLAUDE_CODE_OAUTH_TOKEN -v "$(readlink -f "$(command -v claude)"):/opt/harness/claude:ro")
+      command -v codex > /dev/null && args+=(-v "$(readlink -f "$(command -v codex)"):/opt/harness/codex:ro")
+    else
+      [[ -n "${CODEX_AUTH_JSON:-}" ]] || { echo "CODEX_AUTH_JSON is not set" >&2; exit 2; }
+      args+=(-v "$(readlink -f "$(command -v codex)"):/opt/harness/codex:ro" -v "$CODEX_AUTH_JSON:/e2e-auth/codex.json:ro")
+      command -v claude > /dev/null && args+=(-v "$(readlink -f "$(command -v claude)"):/opt/harness/claude:ro")
+    fi
+    docker run --rm -u dev --memory "${E2E_MEMORY:-6g}" "${args[@]}" "$(image)" \
+      bash /e2e/cell.sh "$HARNESS" "$PROFILE" "$RUN" > "$OUT/cell.log" 2>&1 || true
+    "$PY" "$H/judge.py" --out "$OUT" --priorities "$WORK/cand/.z0/priorities.yaml" \
+      --oracle "$WORK/cand/tests/fixtures/contrib_profiles/$PROFILE.json" \
+      --cell "agent.$HARNESS.$PROFILE.run$RUN" --z0 "$Z0_SHA" --z0int "$(zi_sha)" \
+      --receipt "$(rdir)/agent.$HARNESS.$PROFILE.run$RUN.json" ;;
+  det)
+    OUT="$WORK/det"; rm -rf "$OUT" "$WORK/z0.git"; mkdir -p "$OUT" "$(rdir)"; chmod 777 "$OUT"
+    git init -q --bare "$WORK/z0.git" && git -C "$ROOT" push -q "$WORK/z0.git" "$Z0_SHA:refs/heads/main"
+    git -C "$WORK/z0.git" symbolic-ref HEAD refs/heads/main
+    docker run --rm -u dev --memory "${E2E_MEMORY:-6g}" -v "$H:/e2e:ro" -v "$OUT:/out" \
+      -v "$WORK/z0.git:/mirror/z0.git:ro" "$(image)" bash /e2e/det.sh > "$OUT/det.log" 2>&1 || true
+    "$PY" - "$OUT/det.json" "$(rdir)" "$Z0_SHA" "$(zi_sha)" <<'PY'
+import json, sys, pathlib
+res, rd, z0, zi = json.load(open(sys.argv[1])), pathlib.Path(sys.argv[2]), sys.argv[3], sys.argv[4]
+for cell, r in sorted(res.items()):
+    (rd / f"{cell}.json").write_text(json.dumps({"cell": cell, "z0_sha": z0, "z0int_sha": zi,
+        "status": r["status"], "detail": r["detail"], "source": "scripts/contrib-e2e-repo det"}, indent=2) + "\n")
+    print(cell, r["status"], r["detail"])
+PY
+    ;;
+  laws)
+    # laws_ci: the contrib_ready twin tests and `bend PROOF.bend --verdict` with the pinned
+    # toolchain (the same steps as .github/workflows/contrib-ready.yml).
+    mkdir -p "$(rdir)" "$WORK/bend"
+    eval "$(bash "$ROOT/bend/contrib_ready/bootstrap.sh" "$WORK/bend" 2> "$WORK/bend/bootstrap.err" | grep -E "^(BEND|LEAN_BIN)=" | sed 's/^/export /')"
+    twin=fail; bend=fail
+    (cd "$ROOT" && "$PY" -m unittest discover -s tests/contrib_ready -t . > "$WORK/bend/twin.log" 2>&1) && twin=pass
+    (cd "$ROOT/bend/contrib_ready" && PATH="$LEAN_BIN:$PATH" "$BEND" PROOF.bend --verdict > "$WORK/bend/verdict.log" 2>&1) \
+      && grep -q "ALL PROOFS CHECK" "$WORK/bend/verdict.log" && bend=pass
+    st=fail; [[ $twin == pass && $bend == pass ]] && st=pass
+    printf '{"cell": "laws_ci", "z0_sha": "%s", "z0int_sha": "%s", "status": "%s", "detail": "twin=%s bend_verdict=%s", "source": "scripts/contrib-e2e-repo laws"}\n' \
+      "$Z0_SHA" "$(zi_sha)" "$st" "$twin" "$bend" > "$(rdir)/laws_ci.json"
+    echo "laws_ci $st (twin=$twin bend=$bend)" ;;
+  verdict)
+    "$PY" "$ROOT/scripts/contrib_ready.py" --z0 "$Z0_SHA" --z0int "$(zi_sha)" --receipts "$(rdir)" ;;
+  *) sed -n '2,36p' "$0"; exit 2 ;;
+esac

@@ -92,7 +92,20 @@ def _cpu_fp32_compute(lm: Any) -> None:
     lm.model.norm.register_forward_hook(lambda _m, _i, out: out.to(torch.bfloat16))
 
 
-def _runtime_import_error() -> str | None:
+def _runtime_import_error(*, probe_only: bool = False) -> str | None:
+    """Why the torch runtime is unusable, or None.
+
+    ``probe_only`` (health without load) only looks the package up: importing torch
+    loads several GB of CUDA libraries, and doctor/status paths must not do that
+    (a cold import took minutes in the contributor clean-container run)."""
+    if probe_only:
+        import importlib.util
+
+        try:
+            found = importlib.util.find_spec("torch") is not None
+        except (ImportError, ValueError):
+            found = False
+        return None if found else "torch not installed"
     try:
         import torch  # noqa: F401
     except ImportError as exc:
@@ -168,7 +181,7 @@ class DeciderBackend:
         return _resolve_model_dir(hf=self.hf, revision=self.revision, local_files_only=local_files_only)
 
     def health(self, *, load: bool = False) -> BackendHealth:
-        err = _runtime_import_error()
+        err = _runtime_import_error(probe_only=not load)
         if err:
             return BackendHealth(
                 id=self.ID,

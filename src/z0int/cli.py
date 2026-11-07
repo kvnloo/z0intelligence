@@ -646,6 +646,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("loop", "Verified learning loop: export tables, merge hosts, scheduled tick (→ z0int.loop_export)"),
         ("memory", "z0 memory surface: doctor, bench, eval, rules (→ z0int.memory.cli)"),
         ("policy", "Evidence-bound decision policy: ingest, compile, show, explain, changelog"),
+        ("contribute", "Contributor start-here protocol: run, status, suggest, claim, start, evidence, pr"),
     ):
         sp = sub.add_parser(name, help=help_txt)
         sp.add_argument(
@@ -916,6 +917,14 @@ def _cmd_task(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "contribute":
+        # Dispatch before the top-level parse: argparse.REMAINDER drops a leading
+        # option, so `z0int contribute --json` (the AGENTS.md start-here command)
+        # failed with "unrecognized arguments: --json".
+        from .contribute.cli import main as _contribute_main
+
+        rest = argv[1:]
+        return int(_contribute_main(rest[1:] if rest[:1] == ["--"] else rest))
     parser = build_parser()
     args = parser.parse_args(argv)
     as_json = bool(getattr(args, "as_json", False))
@@ -1186,6 +1195,16 @@ def main(argv: list[str] | None = None) -> int:
         rest += ["--no-external"] if args.no_external else []
         from .utilization import run as _util_run
         return int(_util_run(rest))
+
+    if args.cmd == "contribute":
+        rest = list(getattr(args, "module_argv", None) or [])
+        if rest and rest[0] == "--":
+            rest = rest[1:]
+        if as_json and "--json" not in rest:
+            rest = ["--json", *rest]
+        from .contribute.cli import main as _contribute_main
+
+        return int(_contribute_main(rest))
 
     if args.cmd in ("routine", "cascade", "aodl", "repair", "abab", "claude-code", "hermes", "outcomes", "loop",
                     "memory", "policy"):

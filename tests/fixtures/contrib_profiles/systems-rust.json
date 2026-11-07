@@ -1,0 +1,14 @@
+{
+  "profile": {
+    "schema": "z0.contribute.profile.v1", "tier": "T1", "source": "fixture",
+    "hw": {"os": "linux", "arch": "x86_64", "ram_gib": 32, "disk_free_gib": 100, "gpu": {"class": "none", "vram_gib": 0}},
+    "network": true,
+    "toolchains": ["python", "cargo", "go"], "harnesses": ["codex"]
+  },
+  "prefs": {},
+  "oracle": {
+    "allowed_pick_skills_any": ["rust", "systems", "latency"],
+    "forbidden": {"newcomer_false": true, "gpu_vram_gib_gt": 0, "frontend_only": true},
+    "reasons": ["skill_match:systems"]
+  }
+}

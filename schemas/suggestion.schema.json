@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kvnloo/z0intelligence/schemas/suggestion.schema.json",
+  "title": "z0.contribute.suggestion.v1 — alignment engine output (~/.z0int/contribute/suggestion.json; never posted)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "sha", "priorities_sha256", "profile_tier", "engine", "pick", "alternatives", "excluded_counts"
+  ],
+  "properties": {
+    "schema": {"const": "z0.contribute.suggestion.v1"},
+    "sha": {"type": ["string", "null"]},
+    "priorities_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "profile_tier": {"enum": ["T0", "T1", "T2", "T3"]},
+    "source": {"enum": ["priorities", "fallback:labels", "fallback:feedback"]},
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "llm"],
+      "properties": {
+        "version": {"type": "string"},
+        "llm": {"type": "string", "pattern": "^(none|local:[A-Za-z0-9._/-]+|claude:[A-Za-z0-9._-]+)$"},
+        "llm_reason": {"type": "string"},
+        "answers_ref": {"type": ["string", "null"]}
+      }
+    },
+    "pick": {"$ref": "#/$defs/card"},
+    "alternatives": {"type": "array", "maxItems": 2, "items": {"$ref": "#/$defs/card"}},
+    "excluded_counts": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task", "issue", "score", "reasons", "next"],
+      "properties": {
+        "task": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "issue": {"type": ["integer", "null"]},
+        "title": {"type": "string"},
+        "kind": {"type": "string"},
+        "difficulty": {"enum": ["S", "M", "L"]},
+        "impact_note": {"type": "string"},
+        "score": {"type": "number"},
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(tier:P[0-3]|skill_match:[a-z0-9-]+|interest:[a-z0-9-]+|first_task_size:[SML]|size:[SML]|hw_unique:[a-z0-9-]+|missing_toolchain:[a-z0-9-]+|fallback:(labels|feedback))$"
+          }
+        },
+        "next": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

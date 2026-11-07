@@ -1,0 +1,564 @@
+# DRAFT — FOR OWNER REVIEW (owner decision O-1, 2026-10-26).
+# Ranks, tiers, difficulty, hours, hardware and skills below are ESTIMATES made
+# from the open issues on 2026-10-26. The owner confirms or edits them before merge.
+#
+# Authority (spec docs/contrib/CONTRIBUTOR-LAYER.md §2.1): this file wins for order
+# and eligibility; GitHub labels win for claim state. Only the owner/maintainers
+# edit it (CODEOWNERS /.z0/). Agents may propose changes through a PR only, and
+# must never invent tasks that are not listed here.
+#
+# Checked by `python -m z0int.contribute.priorities --check` (CI job priorities-check):
+# schema schemas/priorities.schema.json, vocabulary .z0/vocab.yaml, verifier paths,
+# newcomer laws, and (with --live) issue state and labels.
+schema: z0.priorities.v1
+draft: true
+updated: 2026-10-26
+north_star: "reduce frontier-model work without reducing verified task quality"
+alignment:                       # owner-tunable engine weights (spec §3.3)
+  weights: {impact: 0.30, fit: 0.30, interest: 0.15, ramp: 0.15, uniq_hw: 0.10}
+  setup_penalty_per_missing: 0.08
+  tie_epsilon: 0.05
+tasks:
+  # ---------------------------------------------------------------- P0
+  - id: t-139-e2e-trace
+    issue: 139
+    title: "e2e trace: no per-turn process spawn, fast Kerdoios-missing path, Groq quota fail-open"
+    kind: issue
+    tier: P0
+    rank: 1
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: S
+    expected_hours: 3
+    skills: [typescript, python, plugin-hooks, latency, systems]
+    toolchains: [python, bun]
+    touches: [omp-extensions/, src/z0int/hook_entry.py, src/z0int/hook_adapter.py]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 5, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: low
+    smoke: null
+    verifier: "python -m pytest -q tests/test_omp_hook_context.py"
+    exit_criterion: "hook path spawns no per-turn process on the fixture; checklist in #139 ticked"
+    impact_note: "unblocks every harness turn (hook latency on the hot path)"
+
+  - id: t-133-capacity-snapshot
+    issue: 133
+    title: "emit read-only z0.capacity.snapshot.v1 for federated capacity"
+    kind: issue
+    tier: P0
+    rank: 2
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: M
+    expected_hours: 4
+    skills: [python, schemas, systems]
+    toolchains: [python]
+    touches: [src/z0int/posture.py, src/z0int/quota_budget.py, schemas/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: low
+    smoke: null
+    verifier: "python -m pytest -q tests/test_posture.py"
+    exit_criterion: "snapshot validates against a new schema; read-only (no writes outside ~/.z0int)"
+    impact_note: "first machine-readable capacity view for routing"
+
+  - id: t-94-governed-canary
+    issue: 94
+    title: "run the first governed OMP AODL golden canary"
+    kind: experiment
+    tier: P0
+    rank: 3
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: true
+    claim: exclusive
+    difficulty: M
+    expected_hours: 4
+    skills: [python, protocol]
+    touches: [scripts/run-aodl-golden-canary.py]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 5, os: [linux], arch: [x86_64]}
+    runtime: z0
+    network: other
+    risk_class: high
+    smoke: null
+    verifier: null
+    exit_criterion: "owner-run canary"
+    impact_note: "owner-only canary"
+
+  - id: t-95-canary-packet
+    issue: 95
+    title: "AODL governed OMP golden acceptance packet"
+    kind: experiment
+    tier: P0
+    rank: 4
+    status: open
+    gate: {issue: 94}
+    newcomer: false
+    needs_owner_approval: true
+    claim: exclusive
+    difficulty: M
+    expected_hours: 4
+    skills: [python, protocol]
+    touches: [scripts/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 5, os: [linux], arch: [x86_64]}
+    runtime: z0
+    network: other
+    risk_class: high
+    smoke: null
+    verifier: null
+    exit_criterion: "owner-run canary"
+    impact_note: "owner-only canary"
+
+  - id: t-22-memory-plan
+    issue: 22
+    title: "memory: canonical continuity plan, State Packet, implementation status (umbrella)"
+    kind: review
+    tier: P0
+    rank: 5
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: true
+    claim: none
+    difficulty: L
+    expected_hours: 40
+    skills: [python, retrieval]
+    touches: [src/z0int/memory/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 5, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: z0
+    network: none
+    risk_class: medium
+    smoke: null
+    verifier: null
+    exit_criterion: "umbrella; children carry the work"
+    impact_note: "umbrella issue, not a task"
+
+  # ---------------------------------------------------------------- P1
+  - id: t-231-local-inference-profile
+    issue: 231
+    title: "benchmark GGUF vs EXL3 vs MoE offload; contribute one measured profile per GPU model"
+    kind: experiment
+    tier: P1
+    rank: 1
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: parallel(6)
+    difficulty: M
+    expected_hours: 4
+    skills: [python, inference, benchmarking, llama-cpp]
+    toolchains: [python]
+    touches: [src/z0int/backends/, results/]
+    hardware: {gpu_vram_gib: 8, ram_gib: 16, disk_gib: 40, os: [linux], arch: [x86_64]}
+    runtime: repo_only
+    network: hf_download
+    risk_class: low
+    smoke: "python -m pytest -q tests/test_llama_http_backend.py"
+    verifier: "python -m pytest -q tests/test_backend_bench.py"
+    exit_criterion: "one profile receipt per GPU model, created-only under results/"
+    impact_note: "a measured local profile from your card"
+
+  - id: t-137-reuse-gate
+    issue: 137
+    title: "memory/reuse: continuously fresh code intelligence + reuse-before-write gate"
+    kind: issue
+    tier: P1
+    rank: 2
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: M
+    expected_hours: 4
+    skills: [python, retrieval, latency, systems]
+    toolchains: [python]
+    touches: [src/z0int/reuse_packet.py, src/z0int/file_search.py]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: low
+    smoke: null
+    verifier: "python -m pytest -q tests/test_reuse_packet_freshness.py"
+    exit_criterion: "stale reuse packets are refused on the fixture; freshness test green"
+    impact_note: "stops duplicate code before it is written"
+
+  - id: t-24-rlcd-alignbench
+    issue: 24
+    title: "integrate RLCDAlignBench as an external Jev-style detector benchmark"
+    kind: issue
+    tier: P1
+    rank: 3
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: S
+    expected_hours: 3
+    skills: [python, ml-eval, benchmarking]
+    toolchains: [python]
+    touches: [src/z0int/alignbench.py, benchmarks/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 5, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: github_read
+    risk_class: low
+    smoke: null
+    verifier: "python -m pytest -q tests/test_alignbench.py"
+    exit_criterion: "benchmark adapter runs on the fixture with pinned source revisions"
+    impact_note: "external benchmark for the decision models"
+
+  - id: t-14-observer-eval-receipts
+    issue: 14
+    title: "observer-first eval receipts, stability replay, outcome-grounded calibration"
+    kind: issue
+    tier: P1
+    rank: 4
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: M
+    expected_hours: 4
+    skills: [python, ml-eval, schemas]
+    toolchains: [python]
+    touches: [src/z0int/receipt.py, src/z0int/outcome_verifier.py]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: low
+    smoke: null
+    verifier: "python -m pytest -q tests/test_receipt.py tests/test_outcome_verifier.py"
+    exit_criterion: "eval receipts replay to identical verdicts; tests green"
+    impact_note: "makes every eval result replayable"
+
+  - id: t-z0evals-memory-cohort
+    issue: null
+    title: "z0evals: reproduce the frozen memory acceptance cohort and add one question case"
+    kind: z0evals
+    tier: P1
+    rank: 5
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: none
+    difficulty: S
+    expected_hours: 2
+    skills: [python, ml-eval, benchmarking, retrieval]
+    toolchains: [python]
+    touches: [tests/fixtures/z0evals-fb14919/, tests/test_memory_acceptance.py]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: low
+    smoke: "python -m pytest -q tests/test_memory_acceptance.py"
+    verifier: "python -m pytest -q tests/test_memory_acceptance.py"
+    exit_criterion: "new question case is red before the fix and green after, on the frozen cohort"
+    impact_note: "grows the frozen eval that gates memory changes"
+
+  - id: t-234-tensor-unlock
+    issue: 234
+    title: "3080 Ti tensor unlock x llama.cpp — verified-work ROI, ABAB and rollback"
+    kind: experiment
+    tier: P1
+    rank: 6
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: true
+    claim: exclusive
+    difficulty: L
+    expected_hours: 16
+    skills: [cpp, inference, llama-cpp, cuda]
+    toolchains: [cuda, llama-cpp]
+    touches: [scripts/]
+    hardware: {gpu_vram_gib: 12, ram_gib: 32, disk_gib: 60, os: [linux], arch: [x86_64]}
+    runtime: z0
+    network: hf_download
+    risk_class: high
+    smoke: null
+    verifier: null
+    exit_criterion: "owner hardware experiment"
+    impact_note: "owner hardware experiment"
+
+  - id: t-187-service-identity
+    issue: 187
+    title: "identity for intelligence_service: Host/Origin guard, scoped tokens"
+    kind: issue
+    tier: P1
+    rank: 7
+    status: open
+    gate: null
+    newcomer: false
+    needs_owner_approval: true
+    claim: exclusive
+    difficulty: M
+    expected_hours: 6
+    skills: [python, security-review, protocol]
+    touches: [src/z0int/intelligence_service.py]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: high
+    smoke: null
+    verifier: null
+    exit_criterion: "security change; owner only"
+    impact_note: "security boundary; owner only"
+
+  # ---------------------------------------------------------------- P2
+  - id: t-25-alignbench-bakeoff
+    issue: 25
+    title: "bake off NanoJev / OpenJev / local baselines on RLCDAlignBench"
+    kind: experiment
+    tier: P2
+    rank: 1
+    status: open
+    gate: {issue: 24}
+    newcomer: true
+    needs_owner_approval: false
+    claim: parallel(3)
+    difficulty: M
+    expected_hours: 4
+    skills: [python, ml-eval, benchmarking, inference]
+    toolchains: [python, cuda]
+    touches: [benchmarks/, results/]
+    hardware: {gpu_vram_gib: 12, ram_gib: 16, disk_gib: 30, os: [linux], arch: [x86_64]}
+    runtime: repo_only
+    network: hf_download
+    risk_class: low
+    smoke: "python -m pytest -q tests/test_nanojev_parity.py"
+    verifier: "python -m pytest -q tests/test_alignbench.py"
+    exit_criterion: "one bake-off table per GPU class with row-level evidence"
+    impact_note: "first head-to-head of local judges on one benchmark"
+
+  - id: t-136-qmd-retrieval
+    issue: 136
+    title: "retrieval(qmd): measured hybrid docs/notes tier behind the FFF fast path"
+    kind: issue
+    tier: P2
+    rank: 2
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: M
+    expected_hours: 4
+    skills: [python, retrieval, benchmarking]
+    toolchains: [python]
+    touches: [src/z0int/context_resolve.py, src/z0int/file_search.py]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: low
+    smoke: null
+    verifier: "python -m pytest -q tests/test_retrieval_replay.py tests/test_context_resolve.py"
+    exit_criterion: "hybrid tier measured on the replay fixture; no regression on the fast path"
+    impact_note: "better recall for docs and notes"
+
+  - id: t-26-safety-sentinel
+    issue: 26
+    title: "shadow SafetySentinel question pack over the DecisionBackend contract"
+    kind: issue
+    tier: P2
+    rank: 3
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: exclusive
+    difficulty: M
+    expected_hours: 4
+    skills: [python, ml-eval, schemas]
+    toolchains: [python]
+    touches: [src/z0int/backends/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: medium
+    smoke: null
+    verifier: "python -m pytest -q tests/test_backend_contract.py"
+    exit_criterion: "question pack runs in shadow only; contract tests green"
+    impact_note: "a safety signal that never blocks a turn"
+
+  - id: t-obspack-bun-tests
+    issue: null
+    title: "omp-extensions/z0-obspack: add bun tests for the observation pack hook"
+    kind: issue
+    tier: P2
+    rank: 4
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: none
+    difficulty: S
+    expected_hours: 2
+    skills: [typescript, plugin-hooks, frontend]
+    toolchains: [bun]
+    touches: [omp-extensions/z0-obspack/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 4, disk_gib: 1, os: [linux, macos], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: low
+    smoke: null
+    verifier: "bun --cwd omp-extensions/z0-obspack test"
+    exit_criterion: "index.test.ts covers archive + recall paths; bun test green"
+    impact_note: "first tests for a hook every OMP turn runs"
+
+  - id: t-131-federated-capacity
+    issue: 131
+    title: "RFC: federated capacity plane — Tern fleet x Kerdoios placement x Kubernetes"
+    kind: review
+    tier: P2
+    rank: 5
+    status: open
+    gate: {issue: 133}
+    newcomer: false
+    needs_owner_approval: true
+    claim: none
+    difficulty: L
+    expected_hours: 20
+    skills: [systems, protocol]
+    touches: [docs/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux], arch: [x86_64]}
+    runtime: z0
+    network: other
+    risk_class: medium
+    smoke: null
+    verifier: null
+    exit_criterion: "RFC; owner decides"
+    impact_note: "RFC; owner decides"
+
+  - id: t-181-hcl-routing
+    issue: 181
+    title: "[HCL] low-latency bounded recommendation routing"
+    kind: issue
+    tier: P2
+    rank: 6
+    status: parked
+    gate: null
+    newcomer: false
+    needs_owner_approval: true
+    claim: none
+    difficulty: L
+    expected_hours: 20
+    skills: [python, latency]
+    touches: [src/z0int/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux], arch: [x86_64]}
+    runtime: z0
+    network: none
+    risk_class: medium
+    smoke: null
+    verifier: null
+    exit_criterion: "backlog (hcl:backlog)"
+    impact_note: "parked in the HCL backlog"
+
+  # ---------------------------------------------------------------- P3
+  - id: t-onboarding-feedback
+    issue: null
+    title: "onboarding friction report on the setup you just did (always available)"
+    kind: docs
+    tier: P3
+    rank: 1
+    status: open
+    gate: null
+    newcomer: true
+    needs_owner_approval: false
+    claim: none
+    difficulty: S
+    expected_hours: 1
+    skills: [docs]
+    touches: [docs/contrib/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 0, disk_gib: 0, os: [linux, macos, windows], arch: [x86_64, arm64]}
+    runtime: repo_only
+    network: none
+    risk_class: low
+    smoke: null
+    verifier: "python -m z0int contribute feedback --check"
+    exit_criterion: "feedback.json validates (z0.contribute.feedback.v1)"
+    impact_note: "tells the owner where onboarding hurts"
+
+  - id: t-208-research-wave
+    issue: 208
+    title: "research wave: Fettl, SLM context injection, laws x z0intelligence"
+    kind: review
+    tier: P3
+    rank: 2
+    status: parked
+    gate: null
+    newcomer: false
+    needs_owner_approval: true
+    claim: none
+    difficulty: L
+    expected_hours: 20
+    skills: [ml-eval]
+    touches: [docs/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux], arch: [x86_64]}
+    runtime: z0
+    network: other
+    risk_class: medium
+    smoke: null
+    verifier: null
+    exit_criterion: "research umbrella"
+    impact_note: "research umbrella"
+
+  - id: t-195-optmem-research
+    issue: 195
+    title: "OptMem x unified memory: research wave (umbrella)"
+    kind: review
+    tier: P3
+    rank: 3
+    status: parked
+    gate: null
+    newcomer: false
+    needs_owner_approval: true
+    claim: none
+    difficulty: L
+    expected_hours: 20
+    skills: [retrieval]
+    touches: [docs/]
+    hardware: {gpu_vram_gib: 0, ram_gib: 8, disk_gib: 2, os: [linux], arch: [x86_64]}
+    runtime: z0
+    network: other
+    risk_class: medium
+    smoke: null
+    verifier: null
+    exit_criterion: "research umbrella"
+    impact_note: "research umbrella"
+
+  - id: t-203-byte-distillation
+    issue: 203
+    title: "research: exact end-of-token byte distillation for local specialists"
+    kind: review
+    tier: P3
+    rank: 4
+    status: parked
+    gate: null
+    newcomer: false
+    needs_owner_approval: true
+    claim: none
+    difficulty: L
+    expected_hours: 20
+    skills: [training]
+    touches: [docs/]
+    hardware: {gpu_vram_gib: 12, ram_gib: 32, disk_gib: 40, os: [linux], arch: [x86_64]}
+    runtime: z0
+    network: hf_download
+    risk_class: medium
+    smoke: null
+    verifier: null
+    exit_criterion: "research umbrella"
+    impact_note: "research umbrella"
