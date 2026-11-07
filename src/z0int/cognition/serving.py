@@ -35,6 +35,10 @@ GGUF_LAYOUT: dict[str, str] = {
     "hammer2.1_7b": "hammer2.1-7b/Hammer2.1-7b-Q4_K_M.gguf",
     "nemotron_orchestrator_8b": "nvidia-orchestrator-8b/nvidia_Orchestrator-8B-Q4_K_M.gguf",
     "qwen3.5_9b": "qwen3.5-9b/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+    "bonsai2_2b": "bonsai2_2b/Ternary-Bonsai-2-2B-PQ2_0.gguf",
+    "bonsai2_4b": "bonsai2_4b/Ternary-Bonsai-2-4B-PQ2_0.gguf",
+    "bonsai2_9b": "bonsai2_9b/Ternary-Bonsai-2-9B-PQ2_0.gguf",
+    "bonsai2_27b": "bonsai2_27b/Ternary-Bonsai-2-27B-PQ2_0.gguf",
     "qwen3.5_4b": "qwen3.5-4b/Qwen_Qwen3.5-4B-Q4_K_M.gguf",
 }
 
@@ -77,7 +81,7 @@ def llama_build(binary: str) -> str:
 
 def quant_from_name(name: str) -> str:
     lowered = name.lower()
-    for tag in ("q8_0", "q6_k", "q5_k_m", "q4_k_m", "q4_0", "q3_k_m", "iq4_xs", "f16", "bf16"):
+    for tag in ("ptq1_0", "pq2_0", "q2_0", "q8_0", "q6_k", "q5_k_m", "q4_k_m", "q4_0", "q3_k_m", "iq4_xs", "f16", "bf16"):
         if tag in lowered:
             return tag.upper()
     return "unknown"
