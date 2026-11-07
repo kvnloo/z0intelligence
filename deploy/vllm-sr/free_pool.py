@@ -372,6 +372,87 @@ def pace():
     print("excluded from router:", st.get("excluded", []))
 
 
+# ---- consumers: call deployed backends by name through the router (diversity / cross-model replay) ----
+# Every vllm-sr/free-* entrypoint is a static cascade (first healthy backend answers), so replay and
+# fan-out must address backends by name. Moved here from chatgpt-driver/free-lane/free_llm.py (2026-11-07)
+# so the router, its limits and its clients live in one place.
+import re as _re
+from concurrent.futures import ThreadPoolExecutor as _TPE
+ROUTER = "http://10.43.216.55:8899/v1/chat/completions"
+# Strong, diverse families first; each provider bucket appears at most twice.
+# Deployed backends only (semantic-router-config); see deployed(). Order: strong, diverse families first.
+REASONERS = ["nim-nemotron-3-ultra", "groq-gpt-oss-120b", "or-dots-3-note", "nim-step-5-preview",
+             "or-nemotron-3-ultra", "or-xing4.0-29b", "groq-qwen3.8-27b", "or-flint-v1"]
+FAST = ["groq-gpt-oss-20b", "nim-nemotron-3.5-lightning", "or-nemotron-3.5-lightning", "groq-qwen3.8-27b"]
+# Groq free tier is 8K tokens/minute per model: keep any single prompt under ~6K tokens (~24K chars).
+MAX_PROMPT_CHARS = 24000
+
+
+def deployed():
+    """Backend names in the live router config (falls back to the static lists)."""
+    import subprocess
+    r = subprocess.run(["kubectl", "-n", "vllm-sr", "get", "cm", "semantic-router-config", "-o",
+                        "jsonpath={.data.config\\.yaml}"], capture_output=True, text=True, timeout=30)
+    names = set(_re.findall(r"\b(?:nim|groq|or|kilo|ovh|samba|sf|cerebras)-[a-z0-9.\-]+", r.stdout))
+    return names or set(REASONERS + FAST)
+
+
+def _json(text):
+    if not text:
+        return None
+    m = _re.search(r"\{.*\}", text, _re.S)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(0))
+    except ValueError:
+        return None
+
+
+def ask(model, prompt, system=None, max_tokens=8000, timeout=300):
+    prompt = prompt[:MAX_PROMPT_CHARS]
+    msgs = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
+    body = json.dumps({"model": model, "messages": msgs, "max_tokens": max_tokens, "temperature": 0}).encode()
+    t0 = time.time()
+    try:
+        req = urllib.request.Request(ROUTER, data=body, headers={"Content-Type": "application/json",
+                                     # Groq's Cloudflare front returns 403 to the default Python-urllib agent.
+                                     "User-Agent": "vllm-sr-free-pool/1"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            served = r.headers.get("X-Vsr-Selected-Model") or model
+            d = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        return {"model": model, "ok": False, "error": f"http {e.code}", "secs": round(time.time() - t0, 1)}
+    except Exception as e:  # timeouts, resets
+        return {"model": model, "ok": False, "error": type(e).__name__, "secs": round(time.time() - t0, 1)}
+    msg = (d.get("choices") or [{}])[0].get("message") or {}
+    text = msg.get("content") or ""
+    j = _json(text) or _json(msg.get("reasoning_content") or "")
+    u = d.get("usage") or {}
+    return {"model": served, "ok": j is not None, "json": j, "text": text[-2000:], "secs": round(time.time() - t0, 1),
+            "tokens": [u.get("prompt_tokens"), u.get("completion_tokens")],
+            "error": None if j is not None else ("empty content" if not text else "no json")}
+
+
+DEAD = set()  # backends that answered 401/404 this process (missing key / not deployed): never retried
+
+
+def fanout(prompt, models=REASONERS, n=3, system=None, workers=3):
+    """First n distinct models that return parseable JSON; failures fall through to the next model."""
+    live = deployed()
+    out, tried, queue = [], [], [m for m in models if m in live and m not in DEAD]
+    with _TPE(workers) as ex:
+        while len(out) < n and queue:
+            batch = [queue.pop(0) for _ in range(min(n - len(out), len(queue)))]
+            for r in ex.map(lambda m: ask(m, prompt, system), batch):
+                tried.append(r)
+                if r.get("error") in ("http 401", "http 404"):
+                    DEAD.add(r["model"])
+                if r["ok"]:
+                    out.append(r)
+    return out, tried
+
+
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["probe"]:
@@ -382,6 +463,10 @@ if __name__ == "__main__":
             print(json.dumps(r)[:240])
     elif sys.argv[1:2] == ["pace"]:
         pace()
+    elif sys.argv[1:2] == ["ask"]:  # free_pool.py ask <backend|any> "<prompt>"
+        m = sys.argv[2]
+        r = fanout(sys.argv[3], n=1)[0][0] if m == "any" else ask(m, sys.argv[3])
+        print(json.dumps(r))
     elif sys.argv[1:] == ["render"]:
         render()
     else:
