@@ -1,0 +1,19 @@
+[Unit]
+Description=circadiand: owner human posture (phase, notification policy) on loopback
+Documentation=file://%h/.local/lib/circadian/current/deploy/circadian/README.md
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/circadian serve
+Restart=on-failure
+RestartSec=30
+Nice=10
+MemoryMax=128M
+CPUQuota=10%
+TasksMax=16
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target
