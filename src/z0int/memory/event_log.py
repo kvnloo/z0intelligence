@@ -10,6 +10,7 @@ copies the log, avoiding silent history mutation.
 """
 
 from __future__ import annotations
+from contextlib import contextmanager, nullcontext
 
 import fcntl
 import hashlib
@@ -242,6 +243,15 @@ class EventLog:
     def _writable(self) -> None:
         if self.read_only:
             raise PermissionError("read-only view of the canonical ledger: workers cannot write it")
+
+    @contextmanager
+    def _locked_writer(self):
+        """Hold the canonical event-file lock across a multi-event admission."""
+        self._writable()
+        self.events_path.touch(mode=0o600, exist_ok=True)
+        with self.events_path.open("r+b") as events:
+            fcntl.flock(events, fcntl.LOCK_EX)
+            yield events
 
     def _identity_index_locked(self, events, committed_end: int) -> dict[str, tuple[int, str, int, int]]:
         """Index source identities by reading only rows since the cached offset."""
@@ -517,6 +527,7 @@ class EventLog:
         parent_event_ids: tuple[int, ...] | list[int] = (),
         ts: float | None = None,
         identity: EventIdentity | None = None,
+        _locked_events=None,
     ) -> MemoryEvent:
         """Internal writer used by admit_user_claim after native hydration validation."""
         return self._append_event(
@@ -528,6 +539,7 @@ class EventLog:
             parent_event_ids=parent_event_ids,
             ts=ts,
             identity=identity,
+            _locked_events=_locked_events,
         )
 
     def _append_event(
@@ -541,6 +553,7 @@ class EventLog:
         parent_event_ids: tuple[int, ...] | list[int] = (),
         ts: float | None = None,
         identity: EventIdentity | None = None,
+        _locked_events=None,
     ) -> MemoryEvent:
         """Shared write primitive. Callers enforce any domain admission policy."""
         self._writable()
@@ -576,9 +589,7 @@ class EventLog:
             }
         payload_bytes = _canonical(payload)
 
-        self.events_path.touch(mode=0o600, exist_ok=True)
-        with self.events_path.open("r+b") as events:
-            fcntl.flock(events, fcntl.LOCK_EX)
+        with self._locked_writer() if _locked_events is None else nullcontext(_locked_events) as events:
             event_id, committed_end = self._append_state_locked(events)
             if identity_row is not None:
                 seen = self._identity_index_locked(events, committed_end).get(identity_row["event_uid"])
@@ -845,7 +856,7 @@ class EventLog:
             return self._index_rows()
         return rows
 
-    def get(self, event_id: int, *, resolve_blob: bool = False) -> MemoryEvent:
+    def get(self, event_id: int) -> MemoryEvent:
         if type(event_id) is not int or event_id < 0:
             raise KeyError(event_id)
         rows = self._index_rows()
@@ -866,24 +877,12 @@ class EventLog:
             if self.read_only:
                 raise EventLogCorruption("read-only event index checksum mismatch")
             self.rebuild_index()
-            return self.get(event_id, resolve_blob=resolve_blob)
-        event = MemoryEvent.from_dict(row)
-        if not resolve_blob or event.blob is None:
-            return event
-        payload = self.read_blob(event.blob)
-        return MemoryEvent(
-            event_id=event.event_id,
-            event_type=event.event_type,
-            ts=event.ts,
-            source=event.source,
-            payload=payload,
-            blob=event.blob,
-            project=event.project,
-            session_id=event.session_id,
-            parent_event_ids=event.parent_event_ids,
-            checksum=event.checksum,
-            identity=event.identity,
-        )
+            return self.get(event_id)
+        return MemoryEvent.from_dict(row)
+
+    def resolve_payload(self, event: MemoryEvent) -> Any:
+        """Resolve payload separately without altering the canonical event envelope."""
+        return self.read_blob(event.blob) if event.blob is not None else event.payload
 
     def read_blob(self, ref: Mapping[str, Any]) -> Any:
         sha = str(ref.get("sha256") or "")

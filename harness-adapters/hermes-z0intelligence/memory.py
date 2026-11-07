@@ -130,11 +130,12 @@ class Memory:
         return {'context': out['context']}
 
     def post_llm_call(self, session_id='', turn_id='', **_):
-        """The memory-use receipt of an injected turn, once the model call ran (content-free)."""
+        """Record a completed call after returning context, not model use of evidence."""
         with self._lock:
             out = self._injected.pop((session_id, str(turn_id)), None)
         if out:
-            self._row({'event': 'post_llm_call', 'outcome': 'used', 'turn_key': out.get('turn_key'), 'injected': True,
+            self._row({'event': 'post_llm_call', 'outcome': 'call_completed', 'turn_key': out.get('turn_key'),
+                       'context_returned': True, 'model_use_observed': False,
                        'memory_snapshot_id': out.get('memory_snapshot_id'), 'memory': out.get('memory')})
         return None
 

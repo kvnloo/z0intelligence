@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import importlib.util
 import json
 import platform
 import random
@@ -38,10 +39,14 @@ from typing import Any, Callable, Iterator
 ROOT = Path(__file__).resolve().parents[1]
 REF = ROOT / "third_party" / "aodl_a848270"
 sys.path.insert(0, str(ROOT / "src"))
-sys.path.insert(0, str(REF))
 
-from aodl_contract import validate  # noqa: E402
 from z0int import bend_gate as bg  # noqa: E402
+
+# Keep the frozen reference independent of the installed canonical package.
+_spec = importlib.util.spec_from_file_location("bend_aodl_reference", REF / "aodl_contract" / "validator.py")
+_reference = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_reference)
+validate = _reference.validate
 
 CATALOG = bg.load_catalog(REF / "harnesses" / "catalog.json")
 H = "0" * 64
@@ -623,9 +628,12 @@ def run(n_fuzz: int, seed: int, out: Path | None, spawn_sample: int) -> dict:
     report = {
         "experiment": "z0intelligence#48 Bend AODL structural gate parity",
         "aodl_reference": bg.AODL_REFERENCE,
-        "kernel_revision": bg.kernel_revision(),
-        "bend_version": subprocess.run([str(Path.home() / ".bend/bin/bend"), "version"], capture_output=True,
-                                       text=True, env={"BEND_NO_TELEMETRY": "1", "PATH": "/usr/bin"}).stdout.strip(),
+        "kernel_revision": gate.revision,
+        "kernel_source_revision": gate.source_revision,
+        "executable_sha256": gate.executable_sha256,
+        "build_provenance": "unverified",
+        # The compiler installed now need not be the compiler that built this binary.
+        "bend_version": None,
         "seed": seed, "fuzz": n_fuzz, "corpus_sha256": corpus_hash.hexdigest(),
         "host": {"python": platform.python_version(), "machine": platform.machine(), "cpu": platform.processor()},
         "summary": {k or "all": summarize(k) for k in (None, "fixture", "z0int", "mut", "fuzz")},
@@ -745,6 +753,8 @@ def run_transitions(n: int, seed: int) -> dict:
         return {"n": len(xs), "p50_us": round(pct(xs, 0.5), 1), "p95_us": round(pct(xs, 0.95), 1)} if xs else {}
 
     return {"stats": dict(stats), "latency": {"bend_roundtrip": lat(bend_lat), "python_reference": lat(ref_lat)},
+            "kernel_revision": gate.revision, "kernel_source_revision": gate.source_revision,
+            "executable_sha256": gate.executable_sha256, "build_provenance": "unverified",
             "disagreements": disagreements[:20]}
 
 
@@ -762,8 +772,9 @@ def main(argv: list[str] | None = None) -> int:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(rep, indent=2) + "\n")
     print(json.dumps(rep["transitions"], indent=2)[:3000])
-    view = {k: rep[k] for k in ("aodl_reference", "kernel_revision", "bend_version", "corpus_sha256", "summary",
-                                "latency", "kernel_peak_rss_kb")}
+    view = {k: rep[k] for k in ("aodl_reference", "kernel_revision", "kernel_source_revision",
+                                "executable_sha256", "build_provenance", "bend_version",
+                                "corpus_sha256", "summary", "latency", "kernel_peak_rss_kb")}
     print(json.dumps(view, indent=2))
     for r in rep["disagreements"][:10]:
         print("DISAGREE", r["case"], r["python_codes"], r["python_exception"], r["bend_codes"], r["route"], r["explained"])

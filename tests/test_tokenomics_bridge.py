@@ -97,7 +97,7 @@ class TokenomicsBridgeTests(unittest.TestCase):
         self.assertEqual(len(rows), 44)
 
     def test_mock_bench_event_sourced(self):
-        from tests.test_backend_bench import GoldMockBackend
+        from test_backend_bench import GoldMockBackend
 
         examples = load_fixtures()
         gold_map = {e.id: e.gold for e in examples}

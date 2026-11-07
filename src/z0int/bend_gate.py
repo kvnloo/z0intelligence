@@ -77,7 +77,7 @@ _CLAMP = 1 << 30
 
 
 def kernel_revision(kernel_dir: Path = KERNEL_DIR) -> str:
-    """sha256 over the Bend sources: the exact kernel a decision came from."""
+    """Fingerprint the source tree only; this does not identify a compiled executable."""
 
     h = hashlib.sha256()
     for name in KERNEL_SOURCES:
@@ -538,10 +538,13 @@ class GateDecision:
     allowed: bool
     codes: tuple[str, ...]
     source: str  # "bend" | "host-shape" | "unsupported" | "fail-closed" | "canonical-mismatch"
-    kernel_revision: str
+    kernel_revision: str | None
     aodl_reference: str = AODL_REFERENCE
     latency_us: float = 0.0
     detail: str = ""
+    kernel_source_revision: str | None = None
+    executable_sha256: str | None = None
+    build_provenance: str = "unverified"
 
 
 def default_binary() -> Path:
@@ -586,7 +589,11 @@ class BendGate:
         self.binary = Path(binary) if binary is not None else default_binary()
         self.timeout_s = timeout_s
         self.threads = threads
-        self.revision = kernel_revision()
+        # No build record binds this source tree to the selected executable.
+        # Keep the two observations separate rather than fabricating attribution.
+        self.revision: str | None = None
+        self.source_revision = kernel_revision()
+        self.executable_sha256: str | None = None
         self._proc: subprocess.Popen[bytes] | None = None
         self._lock = threading.Lock()
 
@@ -594,6 +601,11 @@ class BendGate:
     def _start(self) -> subprocess.Popen[bytes]:
         if self._proc is not None and self._proc.poll() is None:
             return self._proc
+        with self.binary.open("rb") as executable:
+            digest = hashlib.file_digest(executable, "sha256").hexdigest()
+        if self.executable_sha256 is not None and digest != self.executable_sha256:
+            raise RuntimeError("bend gate executable changed; create a new gate for a new experiment")
+        self.executable_sha256 = digest
         args = [str(self.binary)]
         if self.threads:
             args += ["--threads", str(self.threads)]
@@ -649,18 +661,26 @@ class BendGate:
         return parse_reply(reply.decode("ascii", "replace"))
 
     # -- decisions -----------------------------------------------------------
+    def _decision(self, allowed: bool, codes: tuple[str, ...], source: str, **details: Any) -> GateDecision:
+        return GateDecision(
+            allowed, codes, source, self.revision,
+            kernel_source_revision=self.source_revision,
+            executable_sha256=self.executable_sha256,
+            **details,
+        )
+
     def _decide(self, tokens: Iterable[Any], names: Mapping[int, str]) -> GateDecision:
         t0 = time.perf_counter()
         try:
             allowed, codes = self.raw(tokens)
         except Exception as exc:  # every failure denies
-            return GateDecision(False, ("bend.unavailable",), "fail-closed", self.revision,
-                                latency_us=(time.perf_counter() - t0) * 1e6, detail=repr(exc))
+            return self._decision(False, ("bend.unavailable",), "fail-closed",
+                                  latency_us=(time.perf_counter() - t0) * 1e6, detail=repr(exc))
         dt = (time.perf_counter() - t0) * 1e6
         if allowed:
-            return GateDecision(True, (), "bend", self.revision, latency_us=dt)
+            return self._decision(True, (), "bend", latency_us=dt)
         labels = tuple("unparseable" if c == UNPARSEABLE else names.get(c, f"unknown:{c}") for c in codes)
-        return GateDecision(False, labels, "bend", self.revision, latency_us=dt)
+        return self._decision(False, labels, "bend", latency_us=dt)
 
     def check_document(self, doc: Any, catalog: Mapping[str, Any] | None,
                        canonical: Callable[[Any], Sequence[Any]] | None = None) -> GateDecision:
@@ -668,26 +688,26 @@ class BendGate:
 
         enc = encode_document(doc, catalog)
         if enc.unsupported:
-            return GateDecision(False, ("core.unsupported",), "unsupported", self.revision, detail=enc.unsupported)
+            return self._decision(False, ("core.unsupported",), "unsupported", detail=enc.unsupported)
         if not enc.representable:
-            return GateDecision(False, tuple(sorted({c for c, _ in enc.shape})), "host-shape", self.revision)
+            return self._decision(False, tuple(sorted({c for c, _ in enc.shape})), "host-shape")
         decision = self._decide(enc.tokens or [], RULE_CODES)
         if canonical is not None and decision.allowed:
             try:
                 issues = list(canonical(doc))
             except Exception as exc:
-                return GateDecision(False, ("canonical.error",), "canonical-mismatch", self.revision, detail=repr(exc))
+                return self._decision(False, ("canonical.error",), "canonical-mismatch", detail=repr(exc))
             if issues:
-                return GateDecision(False, tuple(sorted({getattr(i, "code", str(i)) for i in issues})),
-                                    "canonical-mismatch", self.revision,
-                                    detail="bend allowed, canonical validator rejected")
+                return self._decision(False, tuple(sorted({getattr(i, "code", str(i)) for i in issues})),
+                                      "canonical-mismatch",
+                                      detail="bend allowed, canonical validator rejected")
         return decision
 
     def check_spawn(self, proposal: SpawnProposal) -> GateDecision:
         try:
             tokens = encode_transition(proposal)
         except ValueError as exc:
-            return GateDecision(False, ("core.unrepresentable",), "host-shape", self.revision, detail=str(exc))
+            return self._decision(False, ("core.unrepresentable",), "host-shape", detail=str(exc))
         return self._decide(tokens, TRANSITION_CODES)
 
 

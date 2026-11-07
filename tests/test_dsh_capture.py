@@ -5,6 +5,7 @@ send; each event then goes through ``hook_adapter --harness dsh`` (the detached 
 in-process, as in test_hook_adapter). Synthetic prompts only; nothing starts DSH or opens a socket.
 """
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -59,8 +60,9 @@ def home(monkeypatch, tmp_path):
 
 @pytest.fixture
 def inline(monkeypatch):
-    def run(argv, job):
-        he.handle('opportunity', json.dumps(job), argv[argv.index('--harness') + 1])
+    def run(argv, job, *, pass_fds=()):
+        he.handle('opportunity', json.dumps(dict(job, slot_fd=os.dup(job['slot_fd']))),
+                  argv[argv.index('--harness') + 1])
     monkeypatch.setattr(hc, 'spawn_detached', run)
 
 

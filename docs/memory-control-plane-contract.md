@@ -82,6 +82,30 @@ Newer evidence must not destroy historical claims. Supersession is explicit via
 
 `verified` claims require source event IDs. Confidence is metadata only.
 
+The ordinary temporal search/brief/history surface and `project_claims` use
+one trust-and-correction reducer over a complete EventLog snapshot. Scope
+filtering precedes reduction. A later model assertion cannot replace an
+admitted explicit-user correction; only the validated same-scope correction
+link creates `superseded_by`. Unlinked equal-trust disagreement stays visible
+as a contradiction rather than fabricated supersession.
+
+Matching unresolved claim conflicts make the brief abstain, `unknowns`
+non-answerable, and `verify` return `FALLBACK` even when a requested word is
+present in a candidate. Unrelated claim groups do not block the query.
+An unreadable requested temporal layer blocks a successful search verdict,
+even when lexical evidence is available. Otherwise the missing ledger could
+hide a correction or conflict.
+
+A query that matches an older claim value returns the group's canonical
+current value. Current claims take precedence over historical prose when
+the result limit is applied. The historical value remains available through
+history, not as a current decision.
+
+These are retrieval semantics, not human-authorship or model-use proof.
+The old frozen diagnostic cohort's derived, timestamp-only supersession case
+therefore remains unsupported. Its expected answer is not used to manufacture
+a user correction or change the frozen evidence.
+
 ## Memory is never instruction authority
 
 Persisted or retrieved memory is data even if it originated from a tool result,
@@ -99,7 +123,7 @@ policy authority it belongs in the existing policy/AODL surface, not memory.
 
 ## Decision-time snapshots
 
-`MemorySnapshot` content-addresses the memory/state inputs to a decision:
+`MemorySnapshot` content-addresses the supplied memory/state metadata:
 
 - scope
 - state revision
@@ -108,11 +132,36 @@ policy authority it belongs in the existing policy/AODL surface, not memory.
 - evidence event IDs
 - optional policy/ontology revisions
 
-The snapshot ID intentionally excludes `created_at`; identical state produces
-an identical ID. Any relevant source revision change produces a different ID.
+The snapshot ID excludes `created_at`: identical supplied metadata produces
+the same ID, and a change to a supplied source revision changes it. Its
+freshness is no stronger than those revisions; it does not by itself prove
+which source bytes a decision saw.
 
-This gives replay/evals a stable answer to: **what memory state did this
-decision actually see?**
+The native brief surface currently uses an AgentsView schema version and
+maximum message ID as a cheap revision **hint**. That hint can stay unchanged
+when content, scope or secret findings change, when rows are deleted, or when
+the database is replaced. `memory_snapshot_id` and the StatePacket field are
+therefore not exact-content freshness proofs or authorization checks.
+The brief bypasses the persistent cache whenever the lexical layer is
+requested, including when AgentsView is unavailable, and performs a fresh
+scope-filtered retrieval. This also bypasses old cache entries. The tradeoff
+is a source read on each lexical brief rather than a warm cache hit.
+Temporal briefs also bypass caching: EventLog's derived `last_checksum`
+state file can remain unchanged after a damaged append and does not prove
+that the complete ledger is readable. The temporal path validates the
+complete snapshot before reducing claims; it does not accept a recoverable
+prefix as current history. A reachable unversioned TencentDB gateway
+likewise bypasses caching. These rules do not change the separate exact-source
+memory MCP's grant checks and fetch revalidation.
+
+State Packet document evidence uses a separate consumed-byte binding. Both the
+document adapter's evidence references and its stored source revisions hash the
+first 128 KiB of raw bytes actually read. A probe of version A cannot label
+evidence from version B as A, even if the file returns to A before authorization.
+The final cache key uses the consumed revisions. Incomplete document reads and
+legacy packets without this binding must be refreshed before authorization.
+The bound prefix is explicit: changes beyond it are outside this check. This
+does not turn other adapters' revision hints into exact-content proofs.
 
 ## Outcome linkage
 
@@ -173,6 +222,15 @@ There is no second index, memory database, store, registry or bridge.
   local-filesystem boundary. A scope label from a model is not a grant:
   source-scope attribution, caller authentication and policy live at the
   existing host/read-facade admission boundary.
+- Memory retrieval applies both `request_scope` and the existing `ScopePolicy`.
+  Comparable boundaries use their narrower ancestor-visibility set. Disjoint
+  boundaries stop before retrieval or injection ownership. Requester and
+  cross-harness restrictions remain in force. This does not authenticate either
+  scope or replace the source's access checks.
+- The resolver preserves the memory surface's failed verdict. A lexical hit
+  cannot hide conflicting current claims, and a temporal hit cannot hide an
+  unavailable required lexical source. Rejected memory contributes no evidence.
+  Conflicts remain in the packet, and failed required needs remain explicit gaps.
 - MemorySnapshot.build is reused, not reimplemented. It binds the
   requested scope, workstream/state revision, source versions, policy
   revision, compiler/ontology revision and optional repository HEAD plus

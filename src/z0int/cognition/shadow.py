@@ -26,6 +26,7 @@ import fcntl
 import threading
 import re
 import time
+import weakref
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -43,6 +44,29 @@ SOURCE_REVISION = _SOURCE_STAMP.read_text().strip() if _SOURCE_STAMP.exists() el
 _ALLOWED_KINDS = ("tool", "model", "control")
 _ALLOWED_RISKS = ("read", "write", "destructive", "publish", "credential", "payment")
 DEFAULT_SERVER_TIMEOUT_MS = 30_000
+
+# Process-local coordination complements the supervisor's per-response lock.
+# A timed-out caller cannot release an arm that is still using its server.
+_server_locks: weakref.WeakValueDictionary[str | None, threading.Lock] = weakref.WeakValueDictionary()
+_server_locks_guard = threading.Lock()
+
+
+def _server_key(backend: Any) -> str | None:
+    config = getattr(getattr(backend, "_transport", None), "config", None)
+    if config is None:
+        config = getattr(backend, "config", None)
+    base_url = getattr(config, "base_url", None)
+    # Unknown endpoints cannot safely be assumed to be independent.
+    return base_url.rstrip("/") if isinstance(base_url, str) and base_url else None
+
+
+def _server_lock(key: str | None) -> threading.Lock:
+    with _server_locks_guard:
+        lock = _server_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _server_locks[key] = lock
+        return lock
 
 
 class ShadowPayloadError(ValueError):
@@ -338,27 +362,50 @@ def _decision_rows(
     legal: Any, payload: Mapping[str, Any], *, timeout_s: float,
     shortlist: Sequence[str] = (), n_ctx: int = 4096,
     policy_identity: dict | None = None, policy_home: Path | None = None,
+    decision_config: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Run only binary-logit arms, under one shared caller deadline."""
+    """Run scoped counterfactual arms under one shared caller deadline."""
     from .shadow_binary import run_goal_binary
     results: dict[int, dict] = {}
     lock = threading.Lock()
     deadline = time.monotonic() + max(.1, timeout_s)
 
+
     def run(index: int, backend: Any) -> None:
-        row = run_goal_binary(payload, legal, backend, shortlist=shortlist, n_ctx=n_ctx,
-                             policy_identity=policy_identity, policy_home=policy_home)
+        if decision_config and decision_config.get('decision_method') != 'per_candidate_binary_logit':
+            from .slm_scoped import run_scoped
+            row = run_scoped(payload, legal, backend, dict(decision_config),
+                shortlist=shortlist, n_ctx=n_ctx,
+                policy_identity=policy_identity, policy_home=policy_home)
+        else:
+            row = run_goal_binary(payload, legal, backend, shortlist=shortlist, n_ctx=n_ctx,
+                                  policy_identity=policy_identity, policy_home=policy_home)
         row['failure_class'] = failure_class(row.get('error') or row.get('parse_error'))
         with lock:
             results[index] = row
 
-    threads = []
+    def run_group(group: list[tuple[int, Any]], server_lock: threading.Lock) -> None:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not server_lock.acquire(timeout=remaining):
+            return
+        try:
+            for index, backend in group:
+                if time.monotonic() >= deadline:
+                    return
+                run(index, backend)
+        finally:
+            server_lock.release()
+
+    groups: dict[str | None, list[tuple[int, Any]]] = {}
     for index, (_, backend, _) in enumerate(resolved):
         if backend is not None:
-            thread = threading.Thread(target=run, args=(index, backend), daemon=True,
-                                      name=f'z0int-shadow-{index}')
-            threads.append(thread)
-            thread.start()
+            groups.setdefault(_server_key(backend), []).append((index, backend))
+    threads = []
+    for number, (key, group) in enumerate(groups.items()):
+        thread = threading.Thread(target=run_group, args=(group, _server_lock(key)), daemon=True,
+                                  name=f'z0int-shadow-{number}')
+        threads.append(thread)
+        thread.start()
     for thread in threads:
         thread.join(max(0, deadline-time.monotonic()))
     rows = []
@@ -371,9 +418,36 @@ def _decision_rows(
                 'backend': None, 'model': spec.model_id, 'selected_action': None,
                 'abstained': True, 'invalid_call': False, 'error': error,
                 'failure_class': failure_class(error), 'latency_ms': timeout_s*1000 if backend else 0}
+            if decision_config and decision_config.get('decision_method') != 'per_candidate_binary_logit':
+                from .slm_scoped import scope_digest
+                digest = scope_digest(dict(decision_config))
+                row.update(label='slm-method', arm='slm-method:'+digest, arm_scope=digest,
+                           method_config=dict(decision_config))
             if backend is not None:
                 row['timed_out'] = True
                 row['waited_ms'] = timeout_s*1000
+        # Request scope is configuration, not a physical-model attestation.
+        if backend is not None:
+            from urllib.parse import urlsplit, urlunsplit
+            config = getattr(getattr(backend, '_transport', None), 'config', None)
+            base_url = getattr(config, 'base_url', None)
+            if isinstance(base_url, str):
+                try:
+                    parsed = urlsplit(base_url)
+                    host = parsed.hostname or ''
+                    if ':' in host:
+                        host = '[' + host + ']'
+                    if parsed.port is not None:
+                        host += ':' + str(parsed.port)
+                    row['request_scope'] = {
+                        'base_url': urlunsplit((parsed.scheme, host, parsed.path, '', '')),
+                        'model': getattr(config, 'model', None), 'runtime': getattr(config, 'runtime', None),
+                        'quantization': getattr(config, 'quantization', None),
+                        'revision': getattr(config, 'revision', None),
+                        'identity_binding': 'unattested',
+                    }
+                except ValueError:
+                    pass
         row['requested_model'] = spec.model_id
         rows.append(row)
     return rows
@@ -390,6 +464,8 @@ def failure_class(error: Any) -> str | None:
     text = str(error or "").lower()
     if not text:
         return None
+    if text.startswith("invalid_call:"):
+        return "invalid_call"
     if "context_overflow" in text or ("exceed" in text and "context" in text):
         return "context_overflow"
     if "connection refused" in text or "errno 111" in text:
@@ -404,7 +480,7 @@ def failure_class(error: Any) -> str | None:
         return "model_not_served"
     if "transport_error" in text or "badstatusline" in text:
         return "transport_error"
-    return "parse_error" if ("unparseable" in text or "invalid_call" in text) else "backend_error"
+    return "parse_error" if ("unparseable" in text or text == "non_binary_response") else "backend_error"
 
 
 
@@ -541,8 +617,9 @@ def run_shadow(
     shadow_rows: list[dict[str, Any]] = []
     active = learning_state.get('family_search', {}).get('families', {}).get('omp.tool', {})
     projection_strategy = active.get('current_strategy', 'history-1')
-    projection_config = {**(active.get('strategy') or {}).get('config', {}),
-                         'candidate_k': 3, 'max_options': 3, 'decision_method': 'per_candidate_binary_logit'}
+    projection_config = {'candidate_k': 3, 'max_options': 3,
+                         'decision_method': 'per_candidate_binary_logit',
+                         **(active.get('strategy') or {}).get('config', {})}
     local = None
     recent = payload.get("recent_tools")
     if isinstance(recent, list) and all(isinstance(x, str) for x in recent):
@@ -567,7 +644,7 @@ def run_shadow(
             shadow_rows = _decision_rows(resolved, legal, binary_payload,
                 timeout_s=_timeout_s(payload, timeout_s), shortlist=shortlist, n_ctx=n_ctx,
                 policy_identity=learning_state.get('experiments', {}).get('identity'),
-                policy_home=paths.home())
+                policy_home=paths.home(), decision_config=projection_config)
     if local is not None:
         shadow_rows.append(local)
 
@@ -588,6 +665,8 @@ def run_shadow(
     }
 
     if write:
+        from .shadow_binary import _context
+        receipt_goal_context, receipt_context_diagnostics = _context(payload)
         receipt = {
             "schema": RECEIPT_SCHEMA,
             "ts": time.time(),
@@ -603,6 +682,8 @@ def run_shadow(
             "graph_digest": legal.graph_digest,
             "candidate_action_count": legal.candidate_count,
             "legal_ids": list(legal.ids()),
+            "goal_context": receipt_goal_context,
+            "goal_context_diagnostics": receipt_context_diagnostics,
             "projection_config": projection_config,
             "projection_strategy": projection_strategy,
             "eliminated": [e.to_dict() for e in legal.eliminated],
@@ -702,14 +783,15 @@ def summarize_shadow_receipts(
                     ),
                 )
                 counts["rows"] += 1
-                # A backend that could not reach its server still returns a row
-                # of its own, with the failure in ``parse_error``.
+                # Historical rows stored transport failures in parse_error.
+                # New rows separate transport, parser and invalid-action failures.
                 failure = row.get("error") or row.get("parse_error")
-                failure = failure if isinstance(failure, str) else ""
-                if not row.get("backend") or row.get("error") or failure.startswith(
-                    "transport_error"
-                ):
-                    timed_out = failure == "shadow_timeout" or "timed out" in failure
+                kind = failure_class(failure)
+                error_kind = row.get("error_kind")
+                if (not row.get("backend") or error_kind in ("transport", "timeout")
+                        or kind in TRANSPORT_FAILURES
+                        or (row.get("error") and kind != "invalid_call")):
+                    timed_out = error_kind == "timeout" or kind == "timeout"
                     counts["timed_out" if timed_out else "unreachable"] += 1
                     continue
                 counts["answered"] += 1

@@ -16,6 +16,9 @@ AODL JSON ──► z0int.bend_gate (host, Python)            ──► Bend ker
 Built against Bend **2.0.34** (BendTT, an affine dependent type theory with
 laws and proofs). This is not Bend 1 / HVM. The AODL reference is frozen at
 `kvnloo/aodl@a848270` in `third_party/aodl_a848270/`.
+The parity runner and tests load that frozen validator under an isolated module
+name. They never put the reference package on `sys.path` or replace the installed
+`aodl_contract`, whose canonicalization API remains authoritative for runtime use.
 
 ## Files
 
@@ -49,6 +52,19 @@ A proven law is a theorem about the **Bend kernel's own functions over the
 Core IR**. It says nothing about the host encoder, about agreement with the
 Python validator, or about whether a task succeeds in the world. None of
 this is surfaced as task success.
+
+Runtime provenance is separate from source identity. `kernel_source_revision`
+fingerprints the current source tree. `executable_sha256` fingerprints the
+selected executable file before process launch. Neither binds that executable
+to these sources, its compiler, or the formal proofs. The adapter and parity
+report therefore emit `kernel_revision: null`, `build_provenance: unverified`,
+and no inferred build-compiler version. These are observations, not a loaded-image
+attestation or protection against hostile filesystem mutation during launch.
+
+A gate refuses to restart with changed executable bytes. Use a new gate and a
+new experiment for a different executable. Missing executables carry no binary
+identity. Historical source fingerprints in results below remain source
+fingerprints, not retrospective proof of the executable that produced them.
 
 | property | status | evidence |
 | --- | --- | --- |

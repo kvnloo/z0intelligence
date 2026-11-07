@@ -57,6 +57,7 @@ INTENTS: dict[str, tuple[str, ...]] = {
 
 DOC_NAMES = ("AGENTS.md", "CLAUDE.md", "README.md", "ROADMAP.md", "CONTRIBUTING.md")
 DOC_MAX_BYTES = 128 * 1024
+_DOC_REVISION_BINDING = "raw-sha256-prefix-v1"
 EXCERPT_CHARS = 160
 MAX_SESSIONS = 4
 MAX_LIST = 8
@@ -124,7 +125,7 @@ class Reader:
             return None
         return proc.stdout
 
-    def read_text(self, path: Path, *, max_bytes: int = DOC_MAX_BYTES) -> str | None:
+    def _read_bytes(self, path: Path, *, max_bytes: int = DOC_MAX_BYTES) -> bytes | None:
         try:
             with path.open("rb") as fh:
                 data = fh.read(max_bytes)
@@ -133,7 +134,11 @@ class Reader:
         self.reads += 1
         self.bytes += len(data)
         self.log.append(f"read {path.name}")
-        return data.decode("utf-8", "replace")
+        return data
+
+    def read_text(self, path: Path, *, max_bytes: int = DOC_MAX_BYTES) -> str | None:
+        data = self._read_bytes(path, max_bytes=max_bytes)
+        return data.decode("utf-8", "replace") if data is not None else None
 
 
 @dataclass
@@ -387,6 +392,7 @@ def adapter_docs(repo: Path, reader: Reader) -> EvidenceBundle:
     b = EvidenceBundle(facet="docs")
     docs = _doc_files(repo)
     now = _now_iso()
+    b.source_revision = {}
     if not docs:
         b.coverage = "none"
         b.unknowns.append({"key": "docs.any", "reason": "no top-level AGENTS/README/ROADMAP docs"})
@@ -405,12 +411,15 @@ def adapter_docs(repo: Path, reader: Reader) -> EvidenceBundle:
         for f in lines[1:]:
             last_touch.setdefault(f, {"sha": sha, "date": date})
     revs: dict[str, str] = {}
+    complete = True
     priority_set = False
     for d in docs:
-        text = reader.read_text(d)
-        if text is None:
+        data = reader._read_bytes(d)
+        if data is None:
+            complete = False
             continue
-        version = "sha256:" + _sha(text, 12)
+        text = data.decode("utf-8", "replace")
+        version = "sha256:" + hashlib.sha256(data).hexdigest()[:12]
         revs[d.name] = version
 
         def ref(line: int, d: Path = d, version: str = version) -> EvidenceRef:
@@ -490,7 +499,7 @@ def adapter_docs(repo: Path, reader: Reader) -> EvidenceBundle:
             b.contradictions = b.contradictions[:12]
     if not priority_set:
         b.unknowns.append({"key": "docs.priority", "reason": "no P0 heading found in ROADMAP/README/AGENTS"})
-    b.source_revision = revs
+    b.source_revision = revs if complete else None
     b.reads, b.bytes_read = reader.reads, reader.bytes
     return b
 
@@ -1130,11 +1139,8 @@ def source_revisions(repo: Path, projects_root: Path | None = None, reader: Read
     git = _git_revision(repo, r)
     docs = {}
     for d in _doc_files(repo):
-        try:
-            data = d.read_bytes()[:DOC_MAX_BYTES]
-            r.reads += 1
-            r.bytes += len(data)
-        except OSError:
+        data = r._read_bytes(d)
+        if data is None:
             continue
         docs[d.name] = "sha256:" + hashlib.sha256(data).hexdigest()[:12]
     _, sessions = scan_transcripts(repo, projects_root or default_projects_root(), r)
@@ -1143,9 +1149,9 @@ def source_revisions(repo: Path, projects_root: Path | None = None, reader: Read
 
 
 def _memory_snapshot_id(revisions: dict[str, Any]) -> str | None:
-    """The memory view this packet was built against (AgentsView generation, TencentDB rev, ledger tail, HEAD).
+    """Identifier of memory revision hints (AgentsView high-water mark, TencentDB rev, ledger tail, HEAD).
 
-    Recomputed on a cache hit too: the packet's own sources may be unchanged while memory moved on. This runs
+    Recomputed on a cache hit too, but unchanged hints do not prove unchanged memory content or scope. This runs
     inside synchronous harness hooks, so it is local only: a short AgentsView busy timeout and the gateway
     revision last observed by a real memory query, never a network call.
     """
@@ -1186,7 +1192,9 @@ def build_state_packet(
     key = _cache_key(intent, required, root, revisions)
     prior = _load_prior(root) if (use_cache or store) else None
     memory_snapshot_id = _memory_snapshot_id(revisions)
-    if use_cache and prior and prior.get("packet_id") == key:
+    expected_doc_binding = _DOC_REVISION_BINDING if "docs" in adapters else "not-collected"
+    if (use_cache and prior and prior.get("packet_id") == key
+            and prior.get("docs_revision_binding") == expected_doc_binding):
         out = dict(prior, memory_snapshot_id=memory_snapshot_id)
         m = dict(out.get("measurements") or {})
         m.update({"cache_hit": True, "wall_ms": round((time.perf_counter() - t0) * 1000, 2),
@@ -1218,6 +1226,18 @@ def build_state_packet(
     names = [a for a in adapters if a in runners]
     with ThreadPoolExecutor(max_workers=len(names) or 1) as pool:
         bundles = list(pool.map(run, names))
+    doc_bundles = [b for b in bundles if b.facet == "docs"]
+    doc_binding = "not-collected"
+    if doc_bundles:
+        doc_revisions = [b.source_revision for b in doc_bundles]
+        if all(isinstance(rev, dict) and rev == doc_revisions[0] for rev in doc_revisions):
+            revisions["docs"] = doc_revisions[0]
+            doc_binding = _DOC_REVISION_BINDING
+        else:
+            # Missing or inconsistent observations cannot authorize or enter the cache.
+            revisions["docs"] = None
+            doc_binding = "unavailable"
+        key = _cache_key(intent, required, root, revisions)
     reduced = reduce_bundles(bundles, repo=root, intent=intent, required=required, prior=prior)
     claims = reduced.pop("claims_index")
     current = [c for c in claims.values()]
@@ -1231,6 +1251,7 @@ def build_state_packet(
         "current_claims": current,
         **reduced,
         "source_revisions": revisions,
+        "docs_revision_binding": doc_binding,
         "memory_snapshot_id": memory_snapshot_id,
         "policy_revision": POLICY_REVISION,
         "coverage": {b.facet: b.coverage for b in bundles},
@@ -1274,6 +1295,12 @@ def check_packet(packet: dict[str, Any], projects_root: str | Path | None = None
     old = packet.get("source_revisions") or {}
     live = source_revisions(root, proj, github="github" in old, resource="resource" in old)
     changed = [k for k in ("git", "docs", "claude_code", "resource", "github") if (old.get(k) or {}) != (live.get(k) or {})]
+    binding = packet.get("docs_revision_binding")
+    expected_binding = _DOC_REVISION_BINDING if "docs" in (packet.get("coverage") or {}) else "not-collected"
+    if (binding != expected_binding
+            or (binding == _DOC_REVISION_BINDING and not isinstance(old.get("docs"), dict))):
+        if "docs" not in changed:
+            changed.append("docs")
     return {"valid": not changed, "changed_sources": changed, "packet_id": packet.get("packet_id")}
 
 

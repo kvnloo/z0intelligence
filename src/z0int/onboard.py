@@ -72,6 +72,9 @@ StepFn = Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]
 
 
 def step_layout(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    if ctx.get("dry_run"):
+        _mark(state, "layout", "would_run", str(paths.home()))
+        return {"ok": True, "dry_run": True, "root": str(paths.home())}
     layout = paths.ensure_layout()
     _mark(state, "layout", "done", str(layout["root"]))
     return {"ok": True, "root": str(layout["root"])}
@@ -87,16 +90,17 @@ def step_doctor(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
 def step_models_plan(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     plan = models_mgmt.plan_models()
     ctx["models_plan"] = plan
-    cfg = paths.config_path()
-    cfg.parent.mkdir(parents=True, exist_ok=True)
-    existing = {}
-    if cfg.is_file():
-        try:
-            existing = json.loads(cfg.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            existing = {}
-    existing["models_plan"] = plan
-    cfg.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+    if not ctx.get("dry_run"):
+        cfg = paths.config_path()
+        cfg.parent.mkdir(parents=True, exist_ok=True)
+        existing = {}
+        if cfg.is_file():
+            try:
+                existing = json.loads(cfg.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                existing = {}
+        existing["models_plan"] = plan
+        cfg.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
     _mark(state, "models.plan", "done", plan.get("recommendation"))
     return {"ok": True, "plan": plan}
 
@@ -142,44 +146,59 @@ def step_evolution_lab(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, 
     return {"ok": ok, "path": str(dest), "stderr": r.stderr[-400:] if not ok else None}
 
 
+def _invalid_omp_extensions(names: list[str]) -> list[str]:
+    repo_ext = _repo_root() / "omp-extensions"
+    return [
+        name for name in names
+        if not name or name in {".", ".."} or Path(name).name != name
+        or name.startswith(".") or not (repo_ext / name).is_dir()
+        or (repo_ext / name).resolve().parent != repo_ext.resolve()
+    ]
+
+
 def step_omp_links(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    names = list(dict.fromkeys(ctx.get("omp_extensions") or []))
+    hint = "z0int onboard --omp-extension NAME"
+    if not names:
+        _mark(state, "omp_plugins", "skipped", f"Optional; use {hint}")
+        return {"ok": True, "skipped": True, "reason": "opt_in", "opt_in": hint}
+    invalid = _invalid_omp_extensions(names)
+    if invalid:
+        return {"ok": False, "error": f"Unknown or invalid OMP extensions: {invalid}"}
     omp = doctor.discover_omp()
     if not omp.get("omp_home"):
-        _mark(state, "omp_plugins", "skipped", "OMP not installed")
-        return {"ok": True, "skipped": True, "reason": "no_omp"}
+        _mark(state, "omp_plugins", "error", "OMP not installed")
+        return {"ok": False, "error": "OMP not installed"}
+    ext_dir = Path(omp["omp_home"]) / "agent" / "extensions"
+    repo_ext = _repo_root() / "omp-extensions"
+    conflicts = [
+        name for name in names
+        if (ext_dir / name).is_symlink()
+        and (ext_dir / name).resolve() != (repo_ext / name).resolve()
+        or ((ext_dir / name).exists() and not (ext_dir / name).is_symlink())
+    ]
+    if conflicts:
+        error = f"OMP extension paths already occupied: {', '.join(conflicts)}"
+        _mark(state, "omp_plugins", "error", error)
+        return {"ok": False, "error": error, "conflicts": conflicts}
     if ctx.get("dry_run"):
-        _mark(state, "omp_plugins", "would_run", json.dumps(omp.get("missing_links")))
-        return {"ok": True, "dry_run": True, "missing": omp.get("missing_links")}
-    ext_dir = Path(omp["extensions_dir"] or (Path.home() / ".omp" / "agent" / "extensions"))
+        _mark(state, "omp_plugins", "would_run", ",".join(names))
+        return {"ok": True, "dry_run": True, "selected": names}
     ext_dir.mkdir(parents=True, exist_ok=True)
-    repo_ext = Path(omp["repo_extensions"] or (_repo_root() / "omp-extensions"))
-    linked: list[str] = []
-    for child in sorted(repo_ext.iterdir()):
-        if not child.is_dir() or child.name.startswith("."):
-            continue
-        target = ext_dir / child.name
-        if target.exists() or target.is_symlink():
-            # refresh symlink if pointing elsewhere
-            if target.is_symlink() and Path(os.path.realpath(target)) != child.resolve():
-                target.unlink()
-            else:
-                linked.append(child.name)
-                continue
-        try:
-            target.symlink_to(child.resolve(), target_is_directory=True)
-            linked.append(child.name)
-        except OSError as exc:
-            _mark(state, "omp_plugins", "error", str(exc))
-            return {"ok": False, "error": str(exc)}
-    _mark(state, "omp_plugins", "done", ",".join(linked))
-    return {"ok": True, "linked": linked}
+    for name in names:
+        target = ext_dir / name
+        if not target.is_symlink():
+            target.symlink_to((repo_ext / name).resolve(), target_is_directory=True)
+    _mark(state, "omp_plugins", "done", ",".join(names))
+    return {"ok": True, "linked": names}
 
 
 def step_data_discover(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     data = doctor.discover_data_sources()
     ctx["data"] = data
     out = paths.home() / "sources" / "discovered.json"
-    out.write_text(json.dumps({"schema": "z0int.sources_discovered.v1", "sources": data}, indent=2) + "\n")
+    if not ctx.get("dry_run"):
+        out.write_text(json.dumps({"schema": "z0int.sources_discovered.v1", "sources": data}, indent=2) + "\n")
     _mark(state, "data.discover", "done", f"n={len(data)}")
     return {"ok": True, "sources": data, "path": str(out)}
 
@@ -213,7 +232,8 @@ def step_write_env_hints(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str
         "note": "Export these for OMP extensions; onboard does not mutate your shell rc.",
     }
     p = paths.home() / "config" / "env_hints.json"
-    p.write_text(json.dumps(hints, indent=2) + "\n")
+    if not ctx.get("dry_run"):
+        p.write_text(json.dumps(hints, indent=2) + "\n")
     _mark(state, "env_hints", "done", str(p))
     return {"ok": True, "path": str(p), "hints": hints}
 
@@ -238,22 +258,30 @@ def run_onboard(
     dry_run: bool = False,
     sync_models: bool = False,
     skip_evolution_lab: bool = False,
+    omp_extensions: list[str] | None = None,
     only: list[str] | None = None,
 ) -> dict[str, Any]:
     """Run onboard steps. Idempotent: done steps skipped unless force."""
+    invalid = _invalid_omp_extensions(omp_extensions or [])
+    if invalid:
+        error = f"Unknown or invalid OMP extensions: {invalid}"
+        return {"schema": "z0int.onboard_report.v1", "ok": False,
+                "failed": ["omp_plugins"], "results": {"omp_plugins": {"ok": False, "error": error}},
+                "state_path": str(paths.onboard_state_path()), "next": []}
     state = load_state()
     ctx: dict[str, Any] = {
         "auto": auto,
         "dry_run": dry_run,
         "sync_models": sync_models,
         "skip_evolution_lab": skip_evolution_lab or os.environ.get("SKIP_EVOLUTION_LAB") == "1",
+        "omp_extensions": omp_extensions or [],
     }
     results: dict[str, Any] = {}
     for name, fn in STEPS:
         if only and name not in only:
             continue
         prev = (state.get("steps") or {}).get(name) or {}
-        if not force and prev.get("status") == "done" and name != "doctor":
+        if not force and prev.get("status") == "done" and name not in {"doctor", "omp_plugins"}:
             results[name] = {"ok": True, "skipped": True, "reason": "already_done"}
             continue
         try:
@@ -261,10 +289,12 @@ def run_onboard(
         except Exception as exc:  # noqa: BLE001
             _mark(state, name, "error", str(exc))
             results[name] = {"ok": False, "error": str(exc)}
-        save_state(state)
+        if not dry_run:
+            save_state(state)
         if results[name].get("ok") is False and name in {"privacy", "layout"}:
             break
-    save_state(state)
+    if not dry_run:
+        save_state(state)
     failed = [k for k, v in results.items() if v.get("ok") is False]
     return {
         "schema": "z0int.onboard_report.v1",
@@ -278,6 +308,8 @@ def run_onboard(
 
 def _next_actions(results: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     actions: list[str] = []
+    if (results.get("omp_plugins") or {}).get("reason") == "opt_in":
+        actions.append("Optional: z0int onboard --omp-extension NAME  # select one extension; repeat for more")
     if (results.get("models.sync") or {}).get("skipped"):
         actions.append("Optional: z0int models sync  # download resident HF weights")
     data = (results.get("data.discover") or {}).get("sources") or {}

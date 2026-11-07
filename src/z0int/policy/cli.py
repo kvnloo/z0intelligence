@@ -25,6 +25,13 @@ def _load(directory: Path, version: str | None = None) -> dict:
 
 
 def _revision() -> str:
+    release_root = Path(__file__).resolve().parents[3]
+    stamp = release_root / "DEPLOYED_SHA"
+    if stamp.exists():
+        revision = stamp.read_text().strip()
+        if len(revision) != 40 or any(c not in "0123456789abcdef" for c in revision):
+            raise ValueError("Invalid immutable release revision")
+        return revision
     try:
         return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[3],
                                        stderr=subprocess.DEVNULL, timeout=3, text=True).strip()
@@ -61,13 +68,15 @@ def main(argv: list[str] | None = None) -> int:
             result = ingest_sources(sources, home)
         elif args.command == "compile":
             findings = read_findings(ledger_path(home))
-            previous = _load(directory) if (directory / "decision-policy.json").exists() else None
+            output_home = Path(os.environ.get("Z0INT_POLICY_OUTPUT_HOME", str(home))).expanduser().resolve()
+            output_directory = output_home / "policy"
+            previous = _load(output_directory) if (output_directory / "decision-policy.json").exists() else None
             config = json.loads(args.config.read_text(encoding="utf-8")) if args.config else {}
             if "compiler_revision" not in config:
                 config["compiler_revision"] = _revision()
             now = args.now or datetime.now(timezone.utc)
             result = compile_policy(findings, previous, now, CompilerConfig(**config))
-            write_policy(result, home)
+            write_policy(result, output_home)
         elif args.command == "show":
             result = _load(directory)
         elif args.command == "explain":

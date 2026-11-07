@@ -92,6 +92,30 @@ def _admit(
     )
 
 
+def test_replay_is_idempotent_even_when_source_is_not_projection_trusted(tmp_path, monkeypatch):
+    from z0int.memory.event_log import EventLog
+
+    monkeypatch.setenv("Z0INT_MEMORY_SOURCE_INGEST", "references")
+    scope = MemoryScope(user="u1", project="p1")
+    content = "Synthetic source decision"
+    identity = _native_identity(event_id="1", content=content, system="other-source")
+    args = {
+        "identity": identity, "locator": "custom:s1#1", "scope": scope,
+        "subject": "deployment", "predicate": "strategy", "value": "blue-green",
+        "observed_at": "2026-10-01T00:00:00Z",
+        "source_reader": _reader(identity, content, scope),
+        "ledger_root": tmp_path / "memory",
+    }
+    first = admit_user_claim(**args)
+    second = admit_user_claim(**args)
+    assert first.event_id == second.event_id
+    assert [event.event_type for event in EventLog(args["ledger_root"]).iter_events()] == [
+        "source.reference", "memory.claim",
+    ]
+    packet = project_claims(scope, ledger_root=args["ledger_root"])
+    assert packet.measurements["selected_claims"][0]["origin_trust"] == "model_assertion"
+
+
 def test_admission_hydrates_user_source_and_persists_reference_only(tmp_path, monkeypatch):
     scope = MemoryScope(user="u1", project="p1", repo="org/repo", task="task-a")
     event = _admit(
@@ -621,3 +645,74 @@ def test_snapshot_binds_selected_claims_and_source_revision(tmp_path, monkeypatc
         after.measurements["memory_use_receipt"]["snapshot_id"]
         == after.measurements["memory_snapshot"]["snapshot_id"]
     )
+
+
+def test_temporal_brief_keeps_explicit_correction_over_later_model_claim(tmp_path, monkeypatch):
+    from z0int.memory.surface import ScopePolicy, claim_history, memory_brief
+    from z0int.memory_contract import BitemporalClaim
+
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path / "home"))
+    scope = MemoryScope(user="u1", project="p1", repo="org/repo", task="task-a")
+    first = _admit(tmp_path, monkeypatch, event_id="1", value="blue-green",
+                   scope=scope, observed_at="2026-10-01T00:00:00Z")
+    corrected = _admit(tmp_path, monkeypatch, event_id="2", value="canary",
+                       scope=scope, observed_at="2026-10-02T00:00:00Z",
+                       correction_of=first.payload["claim_id"])
+    record_claim(BitemporalClaim(
+        claim_id="late-model", scope=scope, subject="deployment", predicate="strategy",
+        value="rolling", status="observed", observed_at="2026-10-03T00:00:00Z",
+        recorded_at="2099-01-01T00:00:00Z"), ledger_root=tmp_path / "memory")
+    policy = ScopePolicy(scope=scope)
+    brief = memory_brief("deployment strategy", policy, layers=("temporal",),
+                         required=("temporal",), config={}, use_cache=False,
+                         ledger_root=tmp_path / "memory")
+    assert [row["value"] for row in brief["current_claims"]] == ["canary"]
+    assert "rolling" not in brief["text"] and not brief["abstained"]
+    history = claim_history("deployment", "strategy", policy, ledger_root=tmp_path / "memory")
+    by_id = {row["claim_id"]: row for row in history}
+    assert by_id[first.payload["claim_id"]]["superseded_by"] == corrected.payload["claim_id"]
+    assert by_id[corrected.payload["claim_id"]]["superseded_by"] is None
+    assert by_id["late-model"]["current"] is False
+
+
+def test_temporal_brief_abstains_on_unlinked_equal_trust_conflict(tmp_path, monkeypatch):
+    from z0int.memory.surface import ScopePolicy, memory_brief, unknowns, verify
+
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path / "home"))
+    scope = MemoryScope(user="u1", project="p1", repo="org/repo", task="task-a")
+    for event_id, value in (("1", "blue-green"), ("2", "canary")):
+        _admit(tmp_path, monkeypatch, event_id=event_id, value=value,
+               scope=scope, observed_at=f"2026-10-0{event_id}T00:00:00Z")
+    brief = memory_brief("deployment strategy", ScopePolicy(scope=scope),
+                         layers=("temporal",), required=("temporal",), config={},
+                         ledger_root=tmp_path / "memory")
+    assert brief["abstained"] and not brief["current_claims"]
+    assert brief["contradictions"]
+    assert brief["receipt"]["included_claim_ids"] == []
+    options = {"layers": ("temporal",), "required": ("temporal",), "config": {},
+               "ledger_root": tmp_path / "memory"}
+    assert verify("deployment strategy", requires=["deployment"],
+                  policy=ScopePolicy(scope=scope), **options)["verdict"] == "FALLBACK"
+    assert unknowns("deployment strategy", ScopePolicy(scope=scope), **options)["answerable"] is False
+
+
+def test_temporal_brief_rejects_incomplete_claim_history(tmp_path, monkeypatch):
+    from z0int.memory.event_log import EventLog
+    from z0int.memory.surface import ScopePolicy, memory_brief
+
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path / "home"))
+    scope = MemoryScope(user="u1", project="p1")
+    _admit(tmp_path, monkeypatch, event_id="1", value="blue-green",
+           scope=scope, observed_at="2026-10-01T00:00:00Z")
+    before = memory_brief("deployment strategy", ScopePolicy(scope=scope),
+                          layers=("temporal",), required=("temporal",), config={},
+                          ledger_root=tmp_path / "memory")
+    assert [row["value"] for row in before["current_claims"]] == ["blue-green"]
+    log = EventLog(tmp_path / "memory")
+    with log.events_path.open("ab") as stream:
+        stream.write(b'{"incomplete":')
+    brief = memory_brief("deployment strategy", ScopePolicy(scope=scope),
+                         layers=("temporal",), required=("temporal",), config={},
+                         ledger_root=tmp_path / "memory")
+    assert brief["abstained"] and not brief["current_claims"]
+    assert any("temporal" in gap for gap in brief["gaps"])

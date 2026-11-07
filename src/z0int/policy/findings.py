@@ -30,6 +30,24 @@ def canonical(value: Any) -> bytes:
 def digest(value: Any) -> str:
     return hashlib.sha256(canonical(value)).hexdigest()
 
+def outcome_members(protocol: dict) -> dict[str, str]:
+    """Return the complete frozen pair/snapshot manifest, or reject it."""
+    if protocol.get("expected_roles") != ["candidate", "reference"]:
+        raise FindingsError("Paired outcome protocol requires both expected roles")
+    members = protocol.get("expected_pairs")
+    if not isinstance(members, list) or not 1 <= len(members) <= 1_000:
+        raise FindingsError("Paired outcome protocol requires bounded expected pairs")
+    pairs, snapshots = {}, set()
+    for member in members:
+        if (not isinstance(member, dict) or set(member) != {"pair_id", "task_snapshot_id"}
+                or any(not isinstance(member[key], str) or not member[key]
+                       for key in ("pair_id", "task_snapshot_id"))
+                or member["pair_id"] in pairs or member["task_snapshot_id"] in snapshots):
+            raise FindingsError("Paired outcome protocol has invalid or duplicate members")
+        pairs[member["pair_id"]] = member["task_snapshot_id"]
+        snapshots.add(member["task_snapshot_id"])
+    return pairs
+
 
 def timestamp(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -53,11 +71,16 @@ class Finding:
     id: str = ""
     prev: str = ""
     synthetic: bool = False
+    evidence_kind: str | None = None
+    verifier_receipt: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         row = asdict(self)
         if row["synthetic"] is False:
             del row["synthetic"]
+        for key in ("evidence_kind", "verifier_receipt"):
+            if row[key] is None:
+                del row[key]
         row["id"] = finding_id(row)
         validate(row)
         return row
@@ -73,6 +96,10 @@ def validate(row: dict) -> None:
             raise FindingsError("Unknown finding schema or evidence class")
         if type(row.get("synthetic", False)) is not bool:
             raise FindingsError("Finding synthetic must be boolean")
+        if row.get("evidence_kind") not in (None, "proxy", "product_outcome"):
+            raise FindingsError("Unknown finding evidence_kind")
+        if row.get("evidence_kind") == "product_outcome" and not isinstance(row.get("verifier_receipt"), dict):
+            raise FindingsError("Product outcome requires a verifier receipt")
         source = row["source"]
         if source["kind"] not in {"z0eval_result", "shadow_learner", "edge_probe", "engine_bench", "shadow_offload", "manual"}:
             raise FindingsError("Unknown finding source kind")

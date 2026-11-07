@@ -76,6 +76,16 @@ def test_runtime_derives_three_families_emits_canonical_findings_and_scoped_sear
     assert all(row['metric']['n'] > 0 and row['metric']['total'] >= row['metric']['n'] for row in ledger)
     assert all(row['metric']['projection']['candidate_k'] <= 3 for row in ledger)
     assert report['transport_tick']['errors'] == 0
+    # The first tick persists the selected strategy; the next must consume it.
+    db.execute('''INSERT INTO calls(session,call,tool,features,outcome,ts,arguments,outcome_ts)
+               VALUES(?,?,?,?,?,?,?,?)''', ('s', 'new', 'read', '["read"]',
+               '{"tool_error":false}', 121, '{"path":"skill://ctx"}', 122))
+    second = runtime.runtime_tick(db, tmp_path, now=130, deadline=time.monotonic()+5,
+                                  config={'jobs_per_tick': 12})
+    assert second['jobs_evaluated'] > 0
+    stored = [json.loads(r[0]) for r in db.execute(
+        "SELECT config FROM family_strategies WHERE strategy_id='history-1'")]
+    assert any(row.get('decision_method') == 'per_candidate_binary_logit' for row in stored)
     db.close()
 
 
@@ -84,18 +94,258 @@ def test_tool_comparison_keeps_abstentions_out_of_accuracy_denominator(tmp_path)
     for i, selected in enumerate(('read', None)):
         receipt = {'identity_contract': 'session-tool-call.v1', 'projection_strategy': 'history-1',
                    'projection_config': {'candidate_k': 3}, 'shadow': [{
-                       'model': IDENTITY['model'], 'arm': 'goal-binary', 'selected_action': selected}]}
+                       'model': IDENTITY['model'], 'physical_identity': IDENTITY,
+                       'arm': 'goal-binary', 'selected_action': selected}]}
         db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
                    (str(i), 's', str(i), 100+i, 'omp.tool', json.dumps(receipt)))
         db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
                    (str(i), 's', str(i), 'omp.tool', 100+i, 'read', '[]', None, 120))
     observations, comparison = runtime.tool_observations(db, IDENTITY, SCOPE)
-    assert comparison['goal_binary'] == {'total': 2, 'n': 1, 'correct': 1,
-        'accuracy': 1, 'coverage': .5, 'wilson95_lower': comparison['goal_binary']['wilson95_lower']}
-    slm = next(row for row in observations if row['identity']['kind'] == 'slm')
-    assert slm['n'] == 1 and slm['total'] == 2
+    arm = next(iter(comparison['arms'].values()))
+    assert (arm['model']['total'], arm['model']['n'], arm['model']['correct']) == (2, 1, 1)
+    assert arm['model']['coverage'] == .5
+    assert all(row['promotion_eligible'] is False for row in observations)
+    assert comparison['binding']['model_credit'] is False
     db.close()
 
+
+def test_tool_comparison_reports_all_unattested_attempts_without_credit(tmp_path):
+    db = connect(tmp_path)
+    for i, physical in enumerate((None, {**IDENTITY, 'backend':'cpu'}, IDENTITY)):
+        shadow={'model':IDENTITY['model'],'arm':'slm-method:scope',
+                'method_config':{'decision_method':'scoped'},'selected_action':'read','rpc_count':1}
+        if physical is not None:
+            shadow['physical_identity']=physical
+        receipt={'shadow':[shadow], 'projection_config':{'candidate_k':3}}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(i),'s',str(i),100+i,'omp.tool',json.dumps(receipt)))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(i),'s',str(i),'omp.tool',100+i,'read','[]',None,120))
+    observations, comparison=runtime.tool_observations(db,IDENTITY,SCOPE)
+    assert len(observations) == 2
+    assert next(iter(comparison['arms'].values()))['model']['total'] == 3
+    assert comparison['binding']['attested_attempts']==0
+    db.close()
+
+
+
+def test_shadow_receipts_keep_zero_rpc_abstentions_in_denominator(tmp_path):
+    db=connect(tmp_path)
+    for i in range(10):
+        shadow={'model':IDENTITY['model'],'physical_identity':IDENTITY,
+                'arm':'slm-method:scope','method_config':{'decision_method':'scoped'},
+                'selected_action':'read','rpc_count':int(i == 0)}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(i),'s',str(i),100+i,'omp.tool',json.dumps({'shadow':[shadow]})))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(i),'s',str(i),'omp.tool',100+i,'read','[]',None,120))
+    observations,comparison=runtime.tool_observations(db,IDENTITY,SCOPE)
+    assert len(observations) == 2
+    arm = next(iter(comparison['arms'].values()))
+    assert (arm['model']['n'], arm['model']['total'], arm['model']['correct']) == (1, 10, 1)
+    assert arm['model']['coverage'] == .1
+    assert arm['baseline']['total'] == 10
+    db.close()
+
+
+def test_tool_comparison_pairs_each_configured_arm_with_its_own_calls(tmp_path):
+    db = connect(tmp_path)
+    db.execute('INSERT INTO examples VALUES(?,?,?,?,?)',
+               ('prior', 'omp.tool', 'read', '["a","b"]', 1))
+    db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)', ('prior', 's', 'prior', 1, 'omp.tool', '{}'))
+    db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+               ('prior', 's', 'prior', 'omp.tool', 1, 'read', '["a","b"]', None, 1))
+    db.execute('INSERT INTO calls(session,call,tool,features,ts) VALUES(?,?,?,?,?)',
+               ('s', 'prior', 'read', '["a","b"]', 1))
+    scope_a = {'base_url': 'http://a', 'model': 'alias', 'runtime': 'cpu',
+               'quantization': 'q8', 'revision': 'one', 'identity_binding': 'unattested'}
+    scope_b = {**scope_a, 'runtime': 'cuda', 'revision': 'two'}
+    def shadow(scope, model='alias', arm='goal-binary', **extra):
+        return {'request_scope': scope, 'model': model, 'arm': arm, **extra}
+    receipts = [
+        ('read', [shadow(scope_a, selected_action='read'),
+                  shadow(scope_b, selected_action='read'),
+                  shadow(scope_a, model='other', selected_action='read')]),
+        ('edit', [shadow(scope_a, selected_action='edit'),
+                  shadow(scope_b, selected_action='read', error='timeout')]),
+        ('read', [shadow(scope_b, arm='slm-method:digest', selected_action='read', rpc_count=0),
+                  shadow(None, model='unavailable', error='unavailable')]),
+    ]
+    for i, (label, shadows) in enumerate(receipts):
+        body = {'projection_strategy': 'history-1', 'projection_config': {'candidate_k': 3},
+                'shadow': shadows}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(i), 's', str(i), 100+i, 'omp.tool', json.dumps(body)))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(i), 's', str(i), 'omp.tool', 100+i, label, '["a","b"]', None, 120))
+        db.execute('INSERT INTO calls(session,call,tool,features,ts) VALUES(?,?,?,?,?)',
+                   ('s', str(i), label, '["a","b"]', 100+i))
+    observations, comparison = runtime.tool_observations(db, IDENTITY, SCOPE)
+    arms = list(comparison['arms'].values())
+    assert len(arms) == 5 and len(observations) == 10
+    def group(scope, model='alias', method='goal-binary'):
+        return next(a for a in arms if a['provenance']['legacy_result_scope'] ==
+                    {'model': model, 'request_scope': scope} and a['provenance']['method'] == method)
+    a, b = group(scope_a), group(scope_b)
+    assert (a['model']['total'], a['model']['n'], a['model']['correct']) == (2, 2, 2)
+    assert (a['baseline']['total'], a['baseline']['n'], a['baseline']['correct']) == (2, 2, 1)
+    assert (b['model']['total'], b['model']['n'], b['model']['correct']) == (2, 1, 1)
+    assert (b['baseline']['total'], b['baseline']['n'], b['baseline']['correct']) == (2, 2, 1)
+    assert group(scope_a, 'other')['baseline']['total'] == 1
+    assert group(scope_b, method='slm-method:digest')['model']['n'] == 0
+    assert group(None, 'unavailable')['model']['total'] == 1
+    assert comparison['binding']['attempts'] == 7
+    assert all(row['evidence_kind'] == 'proxy' and not row['promotion_eligible'] for row in observations)
+    db.close()
+
+
+def test_logical_request_cohorts_include_timeouts_and_unavailable_without_starvation(tmp_path):
+    from z0int.cognition.learning_search import SearchConfig, search_tick
+    db = connect(tmp_path)
+    for i in range(10):
+        first = {'requested_model': 'registry-a', 'arm': 'goal-binary',
+                 'model': 'served-alias' if i == 9 else 'registry-a',
+                 'request_scope': {'base_url': 'http://a', 'identity_binding': 'unattested'},
+                 'selected_action': 'read' if i == 9 else None}
+        if i != 9:
+            first['error'] = 'shadow_timeout'
+        second = {'requested_model': 'registry-b', 'arm': 'goal-binary',
+                  'model': 'registry-b' if i == 0 else 'served-b',
+                  'request_scope': None if i == 0 else {
+                      'base_url': 'http://b', 'identity_binding': 'unattested'},
+                  'selected_action': None if i == 0 else 'read'}
+        if i == 0:
+            second['error'] = 'unavailable'
+        body = {'projection_strategy': 'history-1', 'shadow': [first, second]}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(i), 's', str(i), 100+i, 'omp.tool', json.dumps(body)))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(i), 's', str(i), 'omp.tool', 100+i, 'read', '[]', None, 120))
+    rows, comparison = runtime.tool_observations(db, IDENTITY, SCOPE)
+    arms = {arm['provenance']['requested_model']: arm for arm in comparison['arms'].values()}
+    assert set(arms) == {'registry-a', 'registry-b'}
+    assert (arms['registry-a']['model']['total'], arms['registry-a']['model']['n']) == (10, 1)
+    assert (arms['registry-b']['model']['total'], arms['registry-b']['model']['n']) == (10, 9)
+    assert all(arm['baseline']['total'] == 10 for arm in arms.values())
+    assert all(len(arm['result_variants']) == 2 for arm in arms.values())
+    cfg = SearchConfig(plateau_ticks=2, min_observations=5)
+    first = search_tick(db, tick_id='1', now=120, observations=rows, config=cfg)
+    second = search_tick(db, tick_id='2', now=121, observations=rows, config=cfg)
+    assert first['families']['omp.tool']['current_strategy'] == 'history-1'
+    assert second['families']['omp.tool']['current_strategy'] == 'history-3'
+    assert all(row['promotion_eligible'] is False for row in rows)
+    db.close()
+
+
+def test_baseline_uses_only_calls_and_receipts_prior_to_target_start(tmp_path):
+    db = connect(tmp_path)
+    def prior(name, receipt_ts, call_ts, action):
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (name, 's', name, receipt_ts, 'omp.tool', '{}'))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (name, 's', name, 'omp.tool', receipt_ts, action, '["a","b"]', None, 200))
+        db.execute('INSERT INTO examples VALUES(?,?,?,?,?)',
+                   (name, 'omp.tool', action, '["a","b"]', receipt_ts))
+        db.execute('INSERT INTO calls(session,call,tool,features,ts) VALUES(?,?,?,?,?)',
+                   ('s', name, action, '["a","b"]', call_ts))
+    prior('valid', 40, 40, 'read')
+    prior('future-call', 50, 150, 'edit')
+    prior('future-receipt', 150, 50, 'edit')
+    prior('missing-call-time', 60, 0, 'edit')
+    for name in ('target', 'missing-target-call'):
+        body = {'shadow': [{'requested_model': 'registry', 'arm': 'goal-binary',
+                            'model': 'alias', 'selected_action': 'read'}]}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (name, 's', name, 200, 'omp.tool', json.dumps(body)))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (name, 's', name, 'omp.tool', 200, 'read', '["a","b"]', None, 210))
+    db.execute('INSERT INTO calls(session,call,tool,features,ts) VALUES(?,?,?,?,?)',
+               ('s', 'target', 'read', '["a","b"]', 100))
+    _, comparison = runtime.tool_observations(db, IDENTITY, SCOPE)
+    arm = next(iter(comparison['arms'].values()))
+    assert (arm['baseline']['total'], arm['baseline']['n'], arm['baseline']['correct']) == (2, 1, 1)
+    db.close()
+
+
+def test_tool_research_initializes_and_advances_without_canonical_credit(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime, 'load_serving', lambda path: {'qwen3_06b': ENDPOINT})
+    monkeypatch.setattr(runtime, 'serving_identity', lambda endpoint: (IDENTITY, SCOPE))
+    from z0int.cognition import slm_candidates
+    candidate = {'id': 'methods-pipeline-fixture', 'kind': 'bounded_projection',
+                 'families': ['omp.tool'], 'config': {
+                     **runtime.DEFAULT_STRATEGIES[0]['config'], 'decision_method': 'slm_pipeline_v1'}}
+    monkeypatch.setattr(slm_candidates, 'candidate_catalogue',
+                        lambda home, defaults: (*defaults, candidate))
+    db = connect(tmp_path)
+    def add_receipt(index, strategy):
+        scoped = strategy.startswith('methods-')
+        body = {'projection_strategy': strategy, 'projection_config': {'candidate_k': 3},
+                'shadow': [{'arm': 'slm-method:digest' if scoped else 'goal-binary',
+                            'model': 'alias', 'selected_action': 'read', 'rpc_count': 1,
+                            'request_scope': {'base_url': 'http://fixture', 'identity_binding': 'unattested'}}]}
+        db.execute('INSERT INTO receipts VALUES(?,?,?,?,?,?)',
+                   (str(index), 's', str(index), 100+index, 'omp.tool', json.dumps(body)))
+        db.execute('INSERT INTO labels VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(index), 's', str(index), 'omp.tool', 100+index, 'read', '[]', None, 120))
+    add_receipt(0, 'history-1')
+    cfg = {'jobs_per_tick': 0, 'plateau_ticks': 2, 'min_observations': 1}
+    first = runtime.runtime_tick(db, tmp_path, now=120, deadline=time.monotonic()+30, config=cfg)
+    assert first['search']['families']['omp.tool']['current_strategy'] == 'history-1'
+    second = runtime.runtime_tick(db, tmp_path, now=121, deadline=time.monotonic()+30, config=cfg)
+    assert second['search']['families']['omp.tool']['current_strategy'] == 'history-3'
+    add_receipt(1, 'history-3')
+    third = runtime.runtime_tick(db, tmp_path, now=122, deadline=time.monotonic()+30, config=cfg)
+    assert third['search']['families']['omp.tool']['trial']['status'] == 'running'
+    fourth = runtime.runtime_tick(db, tmp_path, now=123, deadline=time.monotonic()+30, config=cfg)
+    assert fourth['search']['families']['omp.tool']['current_strategy'] == 'projection-recent-sessions'
+    reports = [first, second, third, fourth]
+    now = 124
+    for index, strategy in enumerate(('projection-recent-sessions', 'few-shot-3',
+                                      'methods-threeway-v1', 'methods-hierarchy-v1'), start=2):
+        add_receipt(index, strategy)
+        running = runtime.runtime_tick(db, tmp_path, now=now, deadline=time.monotonic()+30, config=cfg)
+        assert running['search']['families']['omp.tool']['trial']['status'] == 'running'
+        selected = runtime.runtime_tick(db, tmp_path, now=now+1, deadline=time.monotonic()+30, config=cfg)
+        reports.extend((running, selected))
+        now += 2
+    assert selected['search']['families']['omp.tool']['current_strategy'] == candidate['id']
+    add_receipt(6, candidate['id'])
+    pipeline = runtime.runtime_tick(db, tmp_path, now=now, deadline=time.monotonic()+30, config=cfg)
+    assert pipeline['search']['families']['omp.tool']['trial']['status'] == 'running'
+    assert all(not report['findings'] for report in (*reports, pipeline))
+    source = json.loads(Path(pipeline['findings_source']).read_text())
+    assert source['observations'] == []
+    rows, _ = runtime.tool_observations(db, IDENTITY, SCOPE)
+    blocked = runtime.emit_findings(db, tick_id='explicit', now=now+1, observations=rows,
+                                    source_path=Path(pipeline['findings_source']), run_id='explicit', home=tmp_path)
+    assert all(row['reason'] == 'nonpromotable_research_observation' for row in blocked)
+    assert not (tmp_path/'findings'/'findings.jsonl').exists()
+    db.close()
+
+
+def test_shadow_request_scope_never_uses_metadata_rpc_or_claims_identity(monkeypatch):
+    from z0int.cognition import shadow, slm_scoped
+    config=SimpleNamespace(base_url='http://user:secret@fixture:123/v1?token=secret',
+                           model=IDENTITY['model'],runtime='llama.cpp',quantization='Q8_0',revision=None)
+    class Transport:
+        def __init__(self):
+            self.config=config
+        def _get(self,path):
+            raise AssertionError('metadata RPC must not block prediction')
+    backend=SimpleNamespace(config=config,_transport=Transport())
+    calls=[]
+    def predict(*args,**kwargs):
+        calls.append(True)
+        return {'model':IDENTITY['model'],'arm':'slm-method:scope',
+                'selected_action':'read','rpc_count':1}
+    monkeypatch.setattr(slm_scoped,'run_scoped',predict)
+    result=shadow._decision_rows([(SimpleNamespace(model_id='alias'),backend,None)],None,{},
+        timeout_s=5,decision_config={'decision_method':'slm_bt_v1'})[0]
+    assert calls == [True]
+    assert result['selected_action']=='read' and 'physical_identity' not in result
+    assert result['request_scope']=={'base_url':'http://fixture:123/v1',
+        'model':IDENTITY['model'],'runtime':'llama.cpp','quantization':'Q8_0',
+        'revision':None,'identity_binding':'unattested'}
 
 def test_census_queue_keeps_only_exact_new_families_and_frozen_provenance(tmp_path):
     folder = tmp_path/'loop'

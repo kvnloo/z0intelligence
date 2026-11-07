@@ -5,6 +5,7 @@ rows + manifest counts that the 6fee859 capture path (claude_code.on_prompt / on
 exported for them. Raw opportunity rows may differ (request text is opt-in now); exported rows may not.
 """
 import json
+import os
 from pathlib import Path
 
 from z0int import automatic
@@ -34,8 +35,10 @@ def replay(monkeypatch, tmp_path):
     monkeypatch.setattr(sp, 'repo_root', lambda p: Path(p) if str(p).endswith('repo') else None)
     monkeypatch.setattr(sp, 'build_state_packet', lambda *a, **k: json.loads(json.dumps(GOLDEN['packet'])))
     monkeypatch.setattr(automatic, 'handle_event', lambda e: {'action': 'native', 'disabled': True})
-    monkeypatch.setattr(hc, 'spawn_detached',
-                        lambda argv, job: he.handle('opportunity', json.dumps(job), argv[argv.index('--harness') + 1]))
+    def inline_spawn(argv, job, *, pass_fds=()):
+        he.handle('opportunity', json.dumps(dict(job, slot_fd=os.dup(job['slot_fd']))),
+                  argv[argv.index('--harness') + 1])
+    monkeypatch.setattr(hc, 'spawn_detached', inline_spawn)
     (tmp_path / 'repo').mkdir()
     (tmp_path / 'plain').mkdir()
     for session, pid, cwd, prompt, reply, tools in GOLDEN['turns']:

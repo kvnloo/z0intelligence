@@ -13,6 +13,17 @@ Two service paths are intentionally distinct:
 
 For an active call, an ambiguous timeout never authorizes a new physical attempt. Reconcile the identical request with the identical trace id. A changed request reusing that identity must be rejected by the authority.
 
+Overload admission emits HTTP 503 with `Retry-After: 1` and
+`X-Z0-Execution: not_started` before reading the request or starting dispatch.
+Only a received response with that marker establishes pre-execution rejection.
+A client can instead fail while writing its body after the server closes.
+That transport error remains ambiguous. It does not authorize a new attempt.
+
+The wire regression sends one complete HTTP request frame and checks the response
+and unchanged dispatch counters. It does not require a client library to recover
+an early response after a second-write failure. No request queue or automatic
+retry is part of this contract.
+
 ## Safety defaults
 
 - AgentWeb adapter mode is expected to default to `off`.

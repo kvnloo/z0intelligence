@@ -9,7 +9,6 @@ import os
 import time
 from typing import Any
 
-from z0int.harness_id import HarnessIdentity, identity_from_bridge
 
 
 def normalize_envelope(raw: dict[str, Any], *, build_id: str | None = None) -> dict[str, Any]:
@@ -28,15 +27,15 @@ def normalize_envelope(raw: dict[str, Any], *, build_id: str | None = None) -> d
     except (TypeError, ValueError):
         process_id = None
 
-    identity = identity_from_bridge(
-        session_id=str(session_id) if session_id else None,
-        process_id=process_id,
-        trace_id=str(trace_id) if trace_id else None,
-        turn_id=str(turn_id) if turn_id else None,
-        bridge_generation=int(raw["bridge_generation"]) if raw.get("bridge_generation") is not None else None,
-        build_id=build_id or raw.get("build_id") or os.environ.get("Z0INT_BUILD_ID"),
-        harness_id="hermes",
-    )
+    identity = {
+        "harness_id": "hermes",
+        "session_id": str(session_id) if session_id else None,
+        "process_id": process_id,
+        "trace_id": str(trace_id) if trace_id else None,
+        "turn_id": str(turn_id) if turn_id else None,
+        "bridge_generation": int(raw["bridge_generation"]) if raw.get("bridge_generation") is not None else None,
+        "build_id": build_id or raw.get("build_id") or os.environ.get("Z0INT_BUILD_ID"),
+    }
     text = raw.get("text") or raw.get("content") or raw.get("message") or ""
     if isinstance(text, list):
         # Hermes sometimes sends content blocks
@@ -50,7 +49,7 @@ def normalize_envelope(raw: dict[str, Any], *, build_id: str | None = None) -> d
 
     return {
         "schema": "z0int.harness_envelope.v1",
-        "identity": identity.to_dict(),
+        "identity": {key: value for key, value in identity.items() if value is not None},
         "text": text,
         "capability_id": raw.get("capability_id"),
         "meta": {
