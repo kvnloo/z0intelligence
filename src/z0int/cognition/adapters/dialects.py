@@ -36,11 +36,22 @@ def extract_json_object(text: str) -> dict[str, Any] | None:
                 return parsed
         except json.JSONDecodeError:
             pass
-        # Balanced-brace scan.
         depth = 0
         start = -1
+        in_string = False
+        escaped = False
         for i, ch in enumerate(cand):
-            if ch == "{":
+            if depth > 0 and in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+                continue
+            if depth > 0 and ch == '"':
+                in_string = True
+            elif ch == "{":
                 if depth == 0:
                     start = i
                 depth += 1

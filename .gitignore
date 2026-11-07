@@ -10,3 +10,4 @@ cache/
 .z0int/
 data/private/
 omp-extensions/**/*.log
+.empryo

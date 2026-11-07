@@ -2,6 +2,7 @@
 """Codex MCP transport adapter; routing and execution belong to z0intelligence."""
 import json
 import os
+import urllib.error
 import urllib.request
 from pathlib import Path
 import sys
@@ -24,6 +25,30 @@ def route_worker(args):
         return json.load(response)
 
 SERVER_NAME="z0intelligence"
+
+
+def file_search(args):
+    """Thin read-only client; harness identity comes from the launcher, not tool args."""
+    payload = {**args, 'harness': os.environ.get('Z0INT_HARNESS', 'codex')}
+    request = urllib.request.Request(
+        os.environ.get('Z0INT_SERVICE_URL', 'http://127.0.0.1:11501').rstrip('/') + '/v1/file-search',
+        data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json'},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as exc:
+        status = exc.code
+        exc.close()
+        return {'ok': False,
+                'error': 'invalid_file_search_request' if status in (400, 413) else 'file_search_unavailable',
+                'http_status': status,
+                'instruction': 'Correct the request, or report unavailability and use an explicit bounded local search fallback.'}
+    except (OSError, ValueError):
+        return {'ok': False, 'error': 'file_search_unavailable',
+                'instruction': 'Report unavailability and use an explicit bounded local search fallback; no evidence was returned.'}
+
+
 SERVER_VERSION="1.0.0"
 PROTOCOL_VERSION="2024-11-05"
 
@@ -35,14 +60,25 @@ common = {'task': text, 'context': text, 'parent_agent': text,
           'max_tokens': {'type': 'integer', 'minimum': 1, 'maximum': 2048, 'default': 512}}
 SERVER_NAME = 'z0intelligence'
 TOOLS = [
+    {'name': 'file_search', 'description': 'Repository path/symbol/content discovery through the shared resident FFF index. For a known exact path prefer read_file. Returns a provenance ContextPacket, not authorization or verified success. If unavailable, report it and use an explicit bounded local search fallback. Not for system metadata, du, or the Git worktree registry.',
+     'inputSchema': schema({
+         'repository_root': {'type': 'string', 'minLength': 1, 'maxLength': 4096, 'description': 'Absolute repository directory on the service host.'},
+         'query': {'type': 'string', 'minLength': 1, 'maxLength': 2048},
+         'kind': {'type': 'string', 'enum': ['exact_path', 'exact_symbol', 'natural_language'], 'default': 'natural_language'},
+         'limit': {'type': 'integer', 'minimum': 1, 'maximum': 20, 'default': 5},
+         'time_budget_ms': {'type': 'integer', 'minimum': 10, 'maximum': 1000, 'default': 120},
+         'trace_id': {'type': 'string', 'maxLength': 256},
+         'session_id': {'type': 'string', 'maxLength': 256},
+     }, ('repository_root', 'query'))},
     {'name': 'list_models', 'description': 'List configured z0intelligence worker providers, default models and credential availability; does not claim successful execution.', 'inputSchema': schema({})},
     {'name': 'route_worker', 'description': 'Canonical capability router: returns PARENT_ONLY when delegation is unwarranted, otherwise executes an evidenced typed function or bounded text worker via the shared host service. Supply stable trace_id, function, estimates for text work and explicit allow_remote authorization. Returns canonical execution receipts; selection alone is not execution.', 'inputSchema': schema({**common, 'trace_id': text, 'function': text, 'state': {'type': 'object'}, 'expected_parent_tokens': {'type': 'number', 'minimum': 0}, 'expected_parent_ms': {'type': 'number', 'minimum': 0}, 'allow_remote': {'type': 'boolean', 'default': False}, 'experimental': {'type': 'boolean', 'default': False}}, ('task', 'parent_agent', 'trace_id', 'function'))},
     {'name': 'delegate_worker', 'description': 'Explicitly select one registered provider/model for a real bounded text worker. Returns output and canonical receipt; for explicit user model requests. Use route_worker for automatic routing.',
      'inputSchema': schema({**common, 'trace_id': text, 'provider': text, 'model': text, 'reason': text}, ('task', 'parent_agent', 'trace_id', 'provider', 'model', 'reason'))}]
-HANDLERS = {'list_models': lambda args: list_models(), 'route_worker': route_worker, 'delegate_worker': delegate_worker}
+HANDLERS = {'file_search': file_search, 'list_models': lambda args: list_models(), 'route_worker': route_worker, 'delegate_worker': delegate_worker}
 if os.environ.get('Z0INT_SHARED_ONLY') == '1':
-    TOOLS = [tool for tool in TOOLS if tool['name'] == 'route_worker']
-    HANDLERS = {'route_worker': route_worker}
+    shared = {'route_worker', 'file_search'}
+    TOOLS = [tool for tool in TOOLS if tool['name'] in shared]
+    HANDLERS = {name: handler for name, handler in HANDLERS.items() if name in shared}
 if os.environ.get('Z0INT_HARNESS') == 'dsh':
     def dsh_schema(value):
         if isinstance(value, dict):

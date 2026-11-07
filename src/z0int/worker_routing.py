@@ -196,12 +196,9 @@ def available(provider, config):
 
 def free_route(policy, provider, model):
     """Exact measured route allowlist; credits and model-name guesses are not $0."""
-    if provider in (policy.get('free_policy_exclusions') or {}):
-        return None
     return next((entry for entry in policy.get('validated_free_routes', [])
                  if entry.get('provider') == provider and entry.get('model') == model
-                 and entry.get('validated') is True
-                 and type(entry.get('price_usd')) in (int, float) and entry.get('price_usd') == 0
+                 and entry.get('validated') is True and entry.get('price_usd') == 0
                  and entry.get('evidence_sha256')), None)
 
 
@@ -211,17 +208,14 @@ def free_required(policy, args=None):
 def blocked_provider(provider):
     name=str(provider or '').lower()
     blocked={p.lower() for p in (configuration()[0].get('sidestep_blocked_providers') or [])}
-    return name in blocked or name.startswith('cursor') or name in {'cursor','paid-api','openai-codex','codex','xai','xai-oauth','grok'}
+    return name in blocked or name.startswith('cursor') or name in {'cursor','paid-api','openai-codex','xai','xai-oauth'}
 
 
-def sidestep_candidates(policy, tried, args=None):
+def sidestep_candidates(policy, tried):
     out=[]
     for item in policy.get('sidestep_order') or []:
         provider, model = item.get('provider'), item.get('model')
         if not isinstance(provider, str) or not isinstance(model, str) or provider in tried or blocked_provider(provider):
-            continue
-        # Free-only: a 402/429 never opens a route without validated zero-cost evidence.
-        if free_required(policy, args) and free_route(policy, provider, model) is None:
             continue
         out.append({'provider': provider, 'model': model, 'sidestep': True})
     return out
@@ -332,31 +326,11 @@ def error_status(exc):
     return None
 
 
-def record_reported_cost(row, body, free_only):
-    """Read usage.cost off a 200 response body and judge it, before any content-shape check.
-
-    Under free-only a cost field that is present must be exactly a finite zero. Null, negative,
-    non-numeric, boolean, NaN and Infinity are violations. An absent cost field (or no usage
-    object to hold one) is not a violation. Returns True on a violation.
-    """
-    usage = body.get('usage') if isinstance(body, dict) else None
-    present = isinstance(usage, dict) and 'cost' in usage
-    cost = usage['cost'] if present else None
-    number = type(cost) is int or (type(cost) is float and math.isfinite(cost))  # bool is not a number here
-    # The receipt stays strict JSON and never stores a provider-chosen non-number.
-    row.extra['provider_reported_cost_usd'] = cost if number or not present else (
-        'unreadable:' + (repr(cost) if type(cost) is float else type(cost).__name__))
-    violation = bool(free_only) and present and not (number and cost == 0)
-    if violation:
-        row.extra['free_only_violation'] = 'provider_reported_nonzero_cost'
-    return violation
-
-
 def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_index, *, receipt_sink, admission, sidestep=False):
     provider, model = candidate['provider'], candidate['model']
     if blocked_provider(provider):
         raise ValueError('paid parent is not a test or sidestep route: '+provider)
-    free = require_free_route(policy, provider, model, args)
+    free = None if sidestep else require_free_route(policy, provider, model, args)
     call_id = uuid.uuid4().hex
     messages = messages_for(args)
     row = DecisionReceipt(trace_id=call_id, session_id=args['parent_agent'], capability_id='codex.delegated_text',
@@ -370,7 +344,7 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
                'task_sha256': hashlib.sha256(args['task'].encode()).hexdigest(),
                'context_sha256': hashlib.sha256(args.get('context', '').encode()).hexdigest(),
                'usage_source': 'unknown', 'expected_cost': None})
-    row.extra.update(free_only=free_required(policy,args),free_tier_validated=free is not None,
+    row.extra.update(free_only=free_required(policy,args) and not sidestep,free_tier_validated=free is not None,
                      free_tier_evidence=free.get('evidence_sha256') if free else None,
                      validated_price_usd=free.get('price_usd') if free else None,
                      sidestep=sidestep)
@@ -398,10 +372,9 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
             timeout_s=policy['timeout_s'], runtime='api', extra_headers={'User-Agent': 'z0int-api-eval/1.0 (+https://github.com/kvnloo/z0intelligence)'}))
         row.extra['physical_call_attempted'] = True
         row.extra['physical_started_at'] = time.time()
-        constraints = request_constraints(policy, provider, model, args)
+        constraints = {} if sidestep else request_constraints(policy, provider, model, args)
         response = transport.chat(messages, max_tokens=args.get('max_tokens', 512), temperature=0, seed=None, extra_body=permit.get('request_constraints', constraints))
         transport_status=200
-        cost_violation = record_reported_cost(row, {'usage': response.usage}, free_required(policy,args) or row.extra.get('free_only'))
         output = response.content
         if not isinstance(output, str):
             raise ValueError('Provider returned non-text content')
@@ -412,6 +385,9 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         row.cached_input_tokens = token(response.usage.get('prompt_tokens_details') or {}, 'cached_tokens')
         metered = row.input_tokens is not None and row.output_tokens is not None
         identified = bool(response.raw.get('model'))
+        cost = response.usage.get('cost')
+        row.extra['provider_reported_cost_usd'] = cost
+        cost_violation = (not sidestep) and (free_required(policy,args) or row.extra.get('free_only')) and cost is not None and (type(cost) not in (int,float) or cost != 0)
         ok = complete and metered and identified and not cost_violation
         row.outcome = {'execution_completed': complete, 'source': 'codex_plugin'}
         row.extra.update(status='completed' if ok else ('failed' if cost_violation else 'completed_unmetered_or_unidentified' if complete else 'incomplete'),
@@ -435,10 +411,6 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
         ok = False
         row.outcome = {'execution_completed': False, 'source': 'codex_plugin'}
         row.extra.update(status='failed', error_type=type(exc).__name__, http_status=error_status(exc))
-        # A 200 body the transport parsed and then rejected for its shape still reports its cost.
-        body = getattr(transport, 'last_body', None)
-        if body is not None and 'provider_reported_cost_usd' not in row.extra:
-            record_reported_cost(row, body, free_required(policy,args) or row.extra.get('free_only'))
     finally:
         if transport is not None:row.extra['quota_headers']=getattr(transport,'quota_headers',{})
         if row.extra.get('physical_call_attempted'):row.extra['physical_finished_at']=time.time()
@@ -446,7 +418,7 @@ def execute_attempt(args, candidate, config, policy, plan, route_id, attempt_ind
     row.latency_ms = (time.monotonic() - start) * 1000
     # Do not return success if canonical receipt persistence fails.
     receipt = receipt_sink(row)
-    return {'ok': ok, 'output': output, 'receipt': receipt, 'cost_violation': bool(row.extra.get('free_only_violation'))}
+    return {'ok': ok, 'output': output, 'receipt': receipt}
 
 
 def posture_annotate(plan, route_kind='offload'):
@@ -519,40 +491,32 @@ def execute_plan(args, policy, providers, plan, *, receipt_sink, receipt_locatio
     started = time.monotonic()
     attempts = []
     result = {'ok': False, 'output': ''}
-    # Only a 402/429 inside this call makes a sidestep; a plan cannot mark its own candidates.
-    queue=[{k:v for k,v in candidate.items() if k!='sidestep'} for candidate in plan['candidates']]
+    queue=[dict(candidate) for candidate in plan['candidates']]
     tried=set()
     limit=int(policy.get('max_attempts',3))+len(policy.get('sidestep_order') or [])
     sidestep_http=set(policy.get('sidestep_http') or [402,429])
     while queue and len(attempts)<limit:
         candidate=queue.pop(0)
-        if candidate['provider'] in tried or candidate['provider'] not in providers:
-            continue
-        sidestep=candidate.get('sidestep') is True
-        if blocked_provider(candidate['provider']):
-            # Never called. A plan that names one under free-only is still refused as a
-            # whole, exactly as before the provider was blocked.
-            if not sidestep:
-                require_free_route(policy,candidate['provider'],candidate['model'],args)
+        if candidate['provider'] in tried or blocked_provider(candidate['provider']) or candidate['provider'] not in providers:
             continue
         tried.add(candidate['provider'])
-        require_free_route(policy,candidate['provider'],candidate['model'],args)
+        sidestep=candidate.get('sidestep') is True
+        if not sidestep:
+            require_free_route(policy,candidate['provider'],candidate['model'],args)
         result = execute_attempt(args, candidate, providers[candidate['provider']], policy, plan, route_id, len(attempts), receipt_sink=receipt_sink, admission=admission, sidestep=sidestep)
         attempts.append(result['receipt'])
-        if result['ok'] or result.get('cost_violation'):
-            # A reported cost under free-only ends the call: no retry after money was spent.
+        if result['ok']:
             break
         status=(result['receipt'].get('extra') or {}).get('http_status')
         if status in sidestep_http:
             queued={item['provider'] for item in queue}
-            for extra in sidestep_candidates(policy, tried|queued, args):
+            for extra in sidestep_candidates(policy, tried|queued):
                 queue.append(extra)
     return {'ok': result['ok'], 'subagent_id': route_id, 'route': plan, 'output': result['output'],
             'provider': attempts[-1]['provider'] if attempts else None,
             'model': attempts[-1]['model'] if attempts else None,
             'free_only':free_required(policy,args),'requires_parent':not result['ok'],
-            'refusal_reason':None if result['ok'] else ('free_only violated: provider reported nonzero cost; call failed closed' if result.get('cost_violation')
-                                                        else 'Resource posture BURN (enforced): frontier surplus perishes; parent should absorb'
+            'refusal_reason':None if result['ok'] else ('Resource posture BURN (enforced): frontier surplus perishes; parent should absorb'
                                                         if (plan.get('resource_posture') or {}).get('enforced') else 'No candidate completed; no paid overflow'),
             'attempts': attempts, 'receipt_path': receipt_location if receipt_location is not None else str(receipts_path()),
             'latency_ms': (time.monotonic() - started) * 1000,
