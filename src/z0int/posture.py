@@ -447,7 +447,7 @@ def pools_from_worker_routes() -> list[Pool]:
     pools = []
     for route in policy.get("validated_free_routes") or []:
         provider, model = route.get("provider"), route.get("model")
-        if not provider or free_route(policy, provider, model) is None:
+        if not isinstance(provider, str) or not provider or free_route(policy, provider, model) is None:
             continue
         cohort = (providers.get(provider) or {}).get("cohort")
         kind = "local" if cohort == "local" else "fast" if provider in FAST_PROVIDERS else "free"
