@@ -1,0 +1,116 @@
+{
+ "schema": "turbo.router.limits.v1",
+ "observed_at": "2026-11-02T15:20:42Z",
+ "sources": {
+  "groq_headers": "x-ratelimit-limit-requests = RPD, x-ratelimit-limit-tokens = TPM (per Groq docs)",
+  "groq_docs": "https://console.groq.com/docs/rate-limits read 2026-11-02 (RPM, TPD)",
+  "cerebras_headers": "x-ratelimit-limit-{requests,tokens}-{minute,hour,day}"
+ },
+ "caveats": [
+  "Limits are per model per organization: each model is an independent bucket.",
+  "Cerebras is trial/paid credit, not a permanent free tier: these limits say nothing about remaining credit.",
+  "null = not published/observed; never treat as unlimited.",
+  "accounts: providers that pool limits across every model on one key/IP; one bucket each."
+ ],
+ "models": [
+  {
+   "provider": "groq",
+   "model": "allam-2-7b",
+   "rpm": null,
+   "rpd": 7000,
+   "tpm": 6000,
+   "tpd": null,
+   "basis": {
+    "rpd": "header",
+    "tpm": "header",
+    "rpm": null,
+    "tpd": null
+   },
+   "probe_latency_s": 0.384
+  },
+  {
+   "provider": "groq",
+   "model": "openai/gpt-oss-120b",
+   "rpm": 30,
+   "rpd": 1000,
+   "tpm": 8000,
+   "tpd": 200000,
+   "basis": {
+    "rpd": "header",
+    "tpm": "header",
+    "rpm": "docs",
+    "tpd": "docs"
+   },
+   "probe_latency_s": 0.464
+  },
+  {
+   "provider": "groq",
+   "model": "openai/gpt-oss-20b",
+   "rpm": 30,
+   "rpd": 1000,
+   "tpm": 8000,
+   "tpd": 200000,
+   "basis": {
+    "rpd": "header",
+    "tpm": "header",
+    "rpm": "docs",
+    "tpd": "docs"
+   },
+   "probe_latency_s": 0.398
+  },
+  {
+   "provider": "groq",
+   "model": "qwen/qwen3.8-27b",
+   "rpm": 30,
+   "rpd": 1000,
+   "tpm": 8000,
+   "tpd": 200000,
+   "basis": {
+    "rpd": "header",
+    "tpm": "header",
+    "rpm": "docs",
+    "tpd": "docs"
+   },
+   "probe_latency_s": 0.281
+  },
+  {
+   "provider": "cerebras",
+   "model": "gpt-oss-120b",
+   "rpm": 1000,
+   "rpd": 1440000,
+   "tpm": 500000,
+   "tpd": 720000000,
+   "rph": 60000,
+   "tph": 30000000,
+   "basis": "header",
+   "probe_latency_s": 0.253
+  },
+  {
+   "provider": "cerebras",
+   "model": "qwen-3.8-27b",
+   "rpm": 450,
+   "rpd": 648000,
+   "tpm": 150000,
+   "tpd": 216000000,
+   "rph": 27000,
+   "tph": 9000000,
+   "basis": "header",
+   "probe_latency_s": 0.238
+  }
+ ],
+ "accounts": {
+  "openrouter": {
+   "rpm": 20,
+   "rpd": 1000,
+   "basis": "openrouter.ai/docs/api/reference/limits: 20 RPM, 1000 RPD on :free with >=10 credits, per account"
+  },
+  "kilo": {
+   "rph": 200,
+   "basis": "Kilo gateway anonymous :free, ~200 req/h per IP (PROMOTION_MODEL_LIMIT_REACHED)"
+  },
+  "nim": {
+   "rpm": 40,
+   "basis": "build.nvidia.com free API, ~40 RPM per account"
+  }
+ }
+}
