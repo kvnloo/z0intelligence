@@ -20,6 +20,11 @@ git -C "$SOURCE" archive "$SHA" | tar -x -C "$TMP"
 printf '%s\n' "$SHA" > "$TMP/DEPLOYED_SHA"
 ln -s "$RUNTIME/.venv" "$TMP/.venv"
 printf '%s\n' "$RUNTIME" > "$TMP/RUNTIME_ROOT"
+# The sealed tree cannot cache bytecode, so every hook/tick would recompile src (~0.7 s per hook at load).
+# Ship it compiled; a source the runtime cannot compile is reported, never silently skipped.
+if [[ -d "$TMP/src" ]]; then
+  "$RUNTIME/.venv/bin/python" -m compileall -q -j 1 "$TMP/src" >/dev/null || echo 'compileall reported errors; those modules compile at import' >&2
+fi
 chmod -R a-w "$TMP"
 mv -T "$TMP" "$TARGET"
 printf '%s\n' "$TARGET"
