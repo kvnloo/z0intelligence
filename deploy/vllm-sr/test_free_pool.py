@@ -61,3 +61,10 @@ def test_alive_rejects_quota_dead_429_and_slow_backends():
     assert not f.alive({"tool_status": 429, "error": '{"code":"1113","message":"Insufficient balance or no resource package. Please recharge"}'})
     assert not f.alive({"tool_status": 429, "error": '{"code":"PROMOTION_MODEL_LIMIT_REACHED"}'})
     assert not f.alive({"tool_status": 402, "error": "payment required"})
+
+
+def test_cascade_moves_on_from_any_backend_error():
+    # One backend's 403 (Cloudflare 1010), 401/402 (key/balance), 404 (model gone) or 400 (context too long)
+    # says nothing about the next backend, so sr:free must try it instead of failing the request.
+    codes = set(fp._cascade("x", [{"model": "a"}, {"model": "b"}])["fallback"]["retryable_status_codes"])
+    assert {400, 401, 402, 403, 404, 408, 413, 422, 429, 500, 502, 503, 504} <= codes

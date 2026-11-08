@@ -139,11 +139,16 @@ TRANSIENT = (408, 429, 500, 502, 503, 504)  # quota/overload: still a free backe
 SMALL_CAP = 7000  # unprobed context (e.g. Groq's 8K TPM free tier): only small prompts go there
 
 
+# In a pool of independent providers, one backend's error says nothing about the next: 400 context too long,
+# 401/402 key or balance, 403 Cloudflare 1010, 404 model gone, 413/429 quota. Move on; max_attempts bounds it.
+NEXT_ON = [400, 401, 402, 403, 404, 408, 409, 413, 422, 429, 500, 502, 503, 504, 529]
+
+
 def _cascade(name, refs):
     fallback = {"enabled": True, "max_attempts": len(refs), "per_attempt_timeout": "120s", "total_timeout": "600s",
-                "retryable_status_codes": [408, 413, 429, 500, 502, 503, 504]}
+                "retryable_status_codes": NEXT_ON}
     return {"name": name, "priority": 100, "rules": {"operator": "AND", "conditions": []},
-            "description": "Every probed free backend in order; next one on 408/413/429/5xx.",
+            "description": "Every probed free backend in order; next one on any backend error.",
             "algorithm": {"type": "static"}, "modelRefs": refs, "fallback": fallback}
 
 
@@ -235,7 +240,9 @@ def render(exclude=(), out=HERE / "config.yaml"):
                        "routing": {"decisions": [_cascade(f"free-{f}", task[f])]}} for f in FAMILIES],
         "listeners": [{"name": "http-8899", "address": "0.0.0.0", "port": 8899, "timeout": "1800s"}],
         "global": {"router": {"fallback": {"enabled": True, "max_attempts": len(speed),
-                                          "circuit_breaker": {"consecutive_failures": 2, "cooldown_period": "120s",
+                                          # Gentle: 2 failures/120 s turned a restart's DNS warm-up into 2 min
+                                          # of every circuit open (whole request fails with circuit_open).
+                                          "circuit_breaker": {"consecutive_failures": 5, "cooldown_period": "30s",
                                                               "half_open_probes": 1}}},
                    "services": {"observability": {"tracing": {}}, "response_api": {}},
                    "stores": {"response_cache": {}}},
@@ -255,7 +262,9 @@ def render(exclude=(), out=HERE / "config.yaml"):
 # --- pace: rate limits from router traffic ----------------------------------------------------------------------
 STATE = Path.home() / ".z0int/state/posture"
 OUT, LIVE_CFG = STATE / "free-pace.json", STATE / "vllm-sr-live.yaml"
-NS, MARGIN, EXCLUDE_S = "vllm-sr", 0.95, 600
+# Excluding a backend means a redeploy, and each pod restart fails requests for ~3 min while DNS warms up.
+# The cascade already skips a 429ing backend in-band, so only pull buckets capped for an hour or more.
+NS, MARGIN, EXCLUDE_S = "vllm-sr", 0.95, 3600
 MIN, HOUR, DAY = 60, 3600, 86400
 WIN = {"rpm": ("req", MIN), "rph": ("req", HOUR), "rpd": ("req", DAY), "tpm": ("tok", MIN), "tpd": ("tok", DAY)}
 SHARED = {"or-": "openrouter", "kilo-": "kilo", "nim-": "nim", "cohere-": "cohere", "zai-": "zai", "llm7-": "llm7"}

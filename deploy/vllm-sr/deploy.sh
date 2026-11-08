@@ -41,6 +41,18 @@ python3 "$HERE/no_google_guard.py" "$CFG" "$0" || { echo "deploy refused by no_g
 CHART=$CACHE/deploy/helm/semantic-router
 REV="cfg-$(sha256sum "$CFG" | cut -c1-12)"
 sed -i -E "s/^  applyValuesRevision: .*/  applyValuesRevision: \"$REV\"/" "$CHART/values.yaml"
+# Patched router binary (build-router.sh): without it every agent turn after a tool call gets no fallback.
+ROUTER_BIN=${ROUTER_BIN:-$HOME/.local/lib/vllm-sr/router-e38f1fe7-clienttools}
+[[ -x $ROUTER_BIN ]] || { echo "deploy refused: $ROUTER_BIN missing; run $HERE/build-router.sh" >&2; exit 1; }
+"$(dirname "$VSR")/python" - "$CHART/values.yaml" "$ROUTER_BIN" <<'PY'
+import pathlib, sys, yaml
+p, binary = pathlib.Path(sys.argv[1]), sys.argv[2]
+v = yaml.safe_load(p.read_text())
+v["nodeSelector"] = {"kubernetes.io/hostname": "groot"}  # the hostPath binary lives on groot
+v["extraVolumes"] = [{"name": "router-bin", "hostPath": {"path": binary, "type": "File"}}]
+v["extraVolumeMounts"] = [{"name": "router-bin", "mountPath": "/usr/local/bin/router", "readOnly": True}]
+p.write_text(yaml.safe_dump(v, sort_keys=False))
+PY
 
 cd "$HERE"
 # `vllm-sr serve` waits with `kubectl wait pod -l ...`, which can latch onto the outgoing pod and block
@@ -61,6 +73,10 @@ if ! grep -qE 'has been upgraded|Install complete|deployed successfully' "$LOG";
 fi
 rm -f "$LOG"
 kubectl -n vllm-sr rollout status deploy/semantic-router --timeout=300s
+# Invariant: the serving pod runs the patched router, not the image's stock binary.
+POD=$(kubectl -n vllm-sr get pod -l app.kubernetes.io/name=semantic-router --field-selector=status.phase=Running -o name | head -1)
+[[ $(kubectl -n vllm-sr exec "$POD" -- sha256sum /usr/local/bin/router | cut -d' ' -f1) == $(sha256sum "$ROUTER_BIN" | cut -d' ' -f1) ]] \
+  || { echo "deploy check failed: $POD is not running $ROUTER_BIN" >&2; exit 1; }
 
 IP=$(kubectl -n vllm-sr get svc semantic-router -o jsonpath='{.spec.clusterIP}')
 echo "router: http://$IP:8899/v1  config revision: $REV"
