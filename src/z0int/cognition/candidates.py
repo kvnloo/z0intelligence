@@ -771,21 +771,6 @@ class CandidateRungBackend:
             "candidates": list(ready),
         }
 
-    def allowed_for(self, request: "ToolDecisionRequest") -> tuple[CandidateModel, ...]:
-        """The eligible candidate set for this request, best-first."""
-        required = self._required or requirement_for_legal_set(request.legal)
-        eligible, _ = filter_candidates(
-            self._candidates,
-            tier=self._tier,
-            required=required,
-            quality_class_required=self._quality_class_required,
-            risk_class=request.risk_class or "read",
-            max_cost_class=self._max_cost_class,
-        )
-        ordered = rank_candidates(eligible, required=required)
-        order = {s.candidate_id: i for i, s in enumerate(ordered)}
-        return tuple(sorted(eligible, key=lambda c: order[c.candidate_id]))
-
     def decide(self, request: "ToolDecisionRequest") -> "ToolDecision":
         from .adapters.local_slm import ToolDecision, abstain  # avoid an import cycle
 

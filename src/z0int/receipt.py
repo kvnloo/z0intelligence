@@ -231,11 +231,6 @@ def effective_tier(
     return normalize_outcome(outcome).raw_tier()
 
 
-    def is_verified(self) -> bool:
-        """True only when a verification signal supports quality learning."""
-        return self.tier() == "gold"
-
-
 @dataclass
 class DecisionReceipt:
     """One specialist/model decision and its (optional) measured economics."""
@@ -403,7 +398,6 @@ def treatment_hash(
     return hashlib.sha256(blob).hexdigest()[:16]
 
 
-
 def validate_receipt(raw: dict[str, Any]) -> list[str]:
     """Return list of problems; empty = ok enough to store."""
     errs: list[str] = []
@@ -539,9 +533,6 @@ def join_outcome(
         updated["schema"] = SCHEMA
         append_receipt(updated, root=root)
     return joined
-
-
-
 
 
 def close_turn(

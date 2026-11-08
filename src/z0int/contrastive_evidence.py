@@ -495,11 +495,6 @@ def store_dependency(record: dict[str, Any] | EvidenceDependency) -> Path:
     return path
 
 
-def family_fingerprint(family: ContrastFamily) -> str:
-    blob = json.dumps(family.to_dict(), sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(blob).hexdigest()[:16]
-
-
 def aggregate_family_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
     """Aggregate grouped-family metrics across a cohort."""
     if not results:
