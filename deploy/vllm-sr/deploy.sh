@@ -36,13 +36,15 @@ PY
   touch "$CACHE.tmp/.patched"
   rm -rf "$CACHE" && mv "$CACHE.tmp" "$CACHE"
 fi
+# REQUIREMENTS.md invariants (spread, task decisions, fallback codes) are tests: a failing render never deploys.
+"$ENV_PY" -m pytest -q -p no:cacheprovider "$HERE/test_free_pool.py" >/dev/null || { echo "deploy refused: test_free_pool.py fails" >&2; exit 1; }
 # Owner rule: no Google/Gemini route or key may ever reach the router (Gemini only via the agy CLI).
 python3 "$HERE/no_google_guard.py" "$CFG" "$0" || { echo "deploy refused by no_google_guard" >&2; exit 1; }
 CHART=$CACHE/deploy/helm/semantic-router
 REV="cfg-$(sha256sum "$CFG" | cut -c1-12)"
 sed -i -E "s/^  applyValuesRevision: .*/  applyValuesRevision: \"$REV\"/" "$CHART/values.yaml"
-# Patched router binary (build-router.sh): without it every agent turn after a tool call gets no fallback.
-ROUTER_BIN=${ROUTER_BIN:-$HOME/.local/lib/vllm-sr/router-e38f1fe7-clienttools}
+# Patched router binary (build-router.sh), named by router.patch hash: a patch change without a rebuild refuses to deploy.
+ROUTER_BIN=${ROUTER_BIN:-$HOME/.local/lib/vllm-sr/router-e38f1fe7-$(sha256sum "$HERE/router.patch" | cut -c1-12)}
 [[ -x $ROUTER_BIN ]] || { echo "deploy refused: $ROUTER_BIN missing; run $HERE/build-router.sh" >&2; exit 1; }
 "$(dirname "$VSR")/python" - "$CHART/values.yaml" "$ROUTER_BIN" <<'PY'
 import pathlib, sys, yaml

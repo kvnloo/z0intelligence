@@ -144,12 +144,53 @@ SMALL_CAP = 7000  # unprobed context (e.g. Groq's 8K TPM free tier): only small 
 NEXT_ON = [400, 401, 402, 403, 404, 408, 409, 413, 422, 429, 500, 502, 503, 504, 529]
 
 
-def _cascade(name, refs):
+def _cascade(name, refs, priority=100, signal=None):
+    """One decision: the first backend is drawn by weight (patched random selector), the fallback then walks
+    *refs* in order. *signal*: keyword signal that must match for this decision (None = match all)."""
     fallback = {"enabled": True, "max_attempts": len(refs), "per_attempt_timeout": "120s", "total_timeout": "600s",
                 "retryable_status_codes": NEXT_ON}
-    return {"name": name, "priority": 100, "rules": {"operator": "AND", "conditions": []},
-            "description": "Every probed free backend in order; next one on any backend error.",
-            "algorithm": {"type": "static"}, "modelRefs": refs, "fallback": fallback}
+    conds = [{"type": "keyword", "name": signal}] if signal else []
+    return {"name": name, "priority": priority, "rules": {"operator": "OR" if signal else "AND", "conditions": conds},
+            "description": "First backend drawn by capacity x eval weight; then every free backend in order.",
+            "algorithm": {"type": "random"}, "modelRefs": refs, "fallback": fallback}
+
+
+# Owner (11-04): "use all available free models in parallel while respecting rate limits"; (11-02) "choose the best
+# model for each job". A model draws first traffic in proportion to its quota bucket's per-minute limit (split across
+# that bucket's models) times its eval score for the task. Below QUALITY_FLOOR, or with no published limit, it is
+# fallback-only (weight 0): unproven models never take first traffic, and unknown limits are never pushed.
+QUALITY_FLOOR = 0.7
+# Groq's Cloudflare front answers 403 (1010) to some client User-Agents (Python-urllib); the router forwards the
+# client's, so pin our own on every backend.
+UA = {"User-Agent": "vllm-sr-free/1"}
+# Last resort when every hosted free backend is out (owner 11-05: "work regardless of whats available… even local
+# small models"): the z0 farm llama.cpp router on groot. Fallback-only, 8K context, swaps models (models-max 1).
+LOCAL = [("local-qwen3-8b", "http://100.113.138.100:11530/v1", None, "qwen3-8b-q4km", 8192)]
+
+
+def weigh(refs, quality):
+    rpm = {r["model"]: limits(bucket(r["model"])).get("req", {}).get(MIN) for r in refs}
+    q = {r["model"]: quality(r["model"]) for r in refs}
+    first = [m for m in rpm if rpm[m] and q[m] >= QUALITY_FLOOR]
+    per_bucket = {}
+    for m in first:
+        per_bucket[bucket(m)] = per_bucket.get(bucket(m), 0) + 1
+    out = []
+    for r in refs:
+        m = r["model"]
+        w = round(rpm[m] / per_bucket[bucket(m)] * q[m], 3) if m in first else 0
+        out.append({**r, "weight": w} if w else dict(r))
+    return out
+
+
+# Task signals for vllm-sr/free: the last user message picks the family's eval-ranked decision. Plain substring
+# keywords, no model download (the router runs in minimal CPU mode). Unmatched requests use free-quality.
+TASK_KEYWORDS = {
+    "classify": ["classify", "categorize", "categorise", "which category", "label each", "sentiment of"],
+    "extract": ["extract", "pull out", "list every", "list all", "find all", "parse the"],
+    "format": ["as json", "in json", "json schema", "as yaml", "reformat", "format as", "convert to", "markdown table"],
+    "verify": ["verify", "double-check", "double check", "check whether", "is this correct", "fact-check", "review this"],
+}
 
 
 FAMILIES = ("reason", "verify", "longctx", "extract", "classify", "format")  # profiles/tasks.py families
@@ -195,8 +236,10 @@ def render(exclude=(), out=HERE / "config.yaml"):
         sys.exit("no candidate passed the tool probe; refusing to render an empty pool")
     models, cards, refs = [], [], []
     for name, base, env, model, claimed in live:
-        backend = {"name": name.split("-")[0], "provider": "vllm", "openai_compat_gateway": True,
-                   "base_url": base, "weight": 100}
+        # Backend = quota bucket, so the circuit breaker trips per bucket: one Groq model (own limits) never
+        # benches its siblings, while NIM/OpenRouter models share their account's breaker.
+        backend = {"name": bucket(name), "provider": "vllm", "openai_compat_gateway": True,
+                   "base_url": base, "weight": 100, "extra_headers": UA}
         if env:
             backend["api_key_env"] = env
         else:
@@ -217,6 +260,13 @@ def render(exclude=(), out=HERE / "config.yaml"):
         cards.append({"name": name, "context_window_size": ctx})
         credit.append({"model": name, "use_reasoning": False})
     speed = credit + speed
+    local = []
+    for name, base, env, model, ctx in LOCAL:
+        models.append({"name": name, "provider_model_id": model, "backend_refs": [
+            {"name": "local", "provider": "vllm", "openai_compat_gateway": True, "base_url": base,
+             "api_key_env": "FREE_ANON_API_KEY", "weight": 100, "extra_headers": UA}]})
+        cards.append({"name": name, "context_window_size": ctx})
+        local.append({"model": name, "use_reasoning": False})
     # Per-task profiles: the same pool, ordered by eval accuracy x reliability on that task family (profiles/eval_free.py).
     # Models the eval has not scored keep CANDIDATES order after the scored ones, so the cascade never ends early.
     ev, ids = eval_scores(), {c[0]: c[3].split("/")[-1].removesuffix(":free") for c in live}
@@ -229,6 +279,18 @@ def render(exclude=(), out=HERE / "config.yaml"):
         return [r for _, r in sorted(enumerate(refs), key=key)]
     task = {"quality": by(lambda v: v["quality_hard"] or 0)}
     task |= {f: by(lambda v, f=f: v["family_acc"].get(f, 0)) for f in FAMILIES}
+
+    def qual(f):
+        def q(model):
+            v = ev.get(ids.get(model, ""))
+            if v:
+                return (v["family_acc"].get(f, 0) if f != "quality" else (v["quality_hard"] or 0)) * v["reliability"]
+            return 0.9 if HERMES_INDEX.get(ids.get(model, "")) else 0  # unevaluated: fallback-only
+        return q
+    task = {f: weigh(rs, qual(f)) + local for f, rs in task.items()}
+    fastest = min((pool[m]["tool_s"] for m in ids if pool[m].get("tool_call")), default=1)
+    speed = weigh(speed, lambda m: min(1.0, fastest / pool[m]["tool_s"]) * 2 * qual("quality")(m)
+                  if m in ids and pool[m].get("tool_call") else 0) + local
     cfg = {
         "version": "v0.3",
         "entrypoints": [{"model_names": ["vllm-sr/free", "vllm-sr/auto", "vllm-sr/free-quality"], "recipe": "default"},
@@ -249,14 +311,19 @@ def render(exclude=(), out=HERE / "config.yaml"):
         "providers": {"defaults": {"model": refs[0]["model"]}, "models": models},
         "routing": {
             "modelCards": cards,
-            "decisions": [_cascade("free-quality", task["quality"])],
+            "signals": {"keywords": [{"name": f"task_{f}", "operator": "OR", "case_sensitive": False, "keywords": kw}
+                                     for f, kw in TASK_KEYWORDS.items()]},
+            "decisions": [_cascade(f"auto-{f}", task[f], priority=200, signal=f"task_{f}") for f in TASK_KEYWORDS]
+                         + [_cascade("free-quality", task["quality"])],
         },
     }
     import yaml
     Path(out).write_text(yaml.safe_dump(cfg, sort_keys=False))
     print(f"rendered {len(refs)} backends:", ", ".join(f"{r['model']}({c['context_window_size']})" for r, c in zip(refs, cards)))
-    for f, rs in task.items():
-        print(f"  free-{f}:", " > ".join(r["model"] for r in rs[:4]), "...")
+    for f, rs in list(task.items()) + [("turbo", speed)]:
+        w = sorted((r for r in rs if r.get("weight")), key=lambda r: -r["weight"])
+        print(f"  {f}: first draw", ", ".join(f"{r['model']}={r['weight']}" for r in w) or "NONE",
+              f"| fallback-only {len(rs) - len(w)}")
 
 
 # --- pace: rate limits from router traffic ----------------------------------------------------------------------
@@ -383,6 +450,38 @@ def excluded(st, now):
     return sorted(c[0] for c in CANDIDATES if bucket(c[0]) in long)
 
 
+FAILED = {"candidates_exhausted", "circuit_open", "side_effect_failure", "non_retryable", "max_attempts_exceeded",
+          "total_deadline_exceeded", "fallback_halted", "body_not_replayable"}
+
+
+def audit(lines):
+    """REQUIREMENTS.md R1-R3 measured from router traffic: spread of first draws, failed requests, task decisions."""
+    recs = []
+    for line in lines:
+        if "fallback_execution_complete" not in line:
+            continue
+        try:
+            recs.append(json.loads(json.loads(line)["execution_record"]))
+        except (ValueError, KeyError):
+            continue
+    if not recs:
+        return {"requests": 0, "ok": True, "why": "no traffic"}
+    first = {}
+    for r in recs:
+        b = bucket((r.get("visited_models") or ["?"])[0])
+        first[b] = first.get(b, 0) + 1
+    failed = sum(1 for r in recs if r.get("final_status") in FAILED)
+    decisions = sorted({r.get("decision_name") for r in recs})
+    top = max(first.values()) / len(recs)
+    why = []
+    if failed:
+        why.append(f"R2: {failed}/{len(recs)} requests failed")
+    if len(recs) >= 20 and (len(first) < 2 or top > 0.8):
+        why.append(f"R1: first draws not spread ({len(first)} buckets, top {top:.0%})")
+    return {"requests": len(recs), "failed": failed, "first_draw_buckets": first, "decisions": decisions,
+            "ok": not why, "why": "; ".join(why) or "R1 spread, R2 no failures"}
+
+
 def pace():
     now = time.time()
     try:
@@ -391,7 +490,11 @@ def pace():
         st = {}
     st.setdefault("events", []), st.setdefault("blocked", {})
     since = min(now - st.get("cursor", now - HOUR), DAY) + 30
-    ingest(st, pod_log(since), now)
+    lines = pod_log(since)
+    ingest(st, lines, now)
+    st["audit"] = audit(pod_log(HOUR))  # last hour, read each minute
+    if not st["audit"]["ok"]:
+        print("REQUIREMENTS FAIL:", st["audit"]["why"])
     st["cursor"] = now
     usage = assess(st, now)
     want = excluded(st, now)
@@ -509,5 +612,9 @@ if __name__ == "__main__":
         print(json.dumps(r))
     elif sys.argv[1:] == ["render"]:
         render()
+    elif sys.argv[1:2] == ["audit"]:  # free_pool.py audit [hours]: exit 1 when REQUIREMENTS R1/R2 fail live
+        a = audit(pod_log(float(sys.argv[2] if len(sys.argv) > 2 else 1) * HOUR))
+        print(json.dumps(a))
+        sys.exit(0 if a["ok"] else 1)
     else:
         sys.exit(__doc__)
