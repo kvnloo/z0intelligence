@@ -35,6 +35,7 @@ HERE = Path(__file__).resolve().parent
 OR, NIM, KILO = "https://openrouter.ai/api/v1", "https://integrate.api.nvidia.com/v1", "https://api.kilo.ai/api/gateway"
 GROQ, SAMBA = "https://api.groq.com/openai/v1", "https://api.sambanova.ai/v1"
 CEREBRAS = "https://api.cerebras.ai/v1"
+COHERE, ZAI, LLM7 = "https://api.cohere.ai/compatibility/v1", "https://api.z.ai/api/paas/v4", "https://api.llm7.io/v1"
 OVH, SF = "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1", "https://api.siliconflow.com/v1"
 ANON = None  # keyless endpoint
 
@@ -65,6 +66,23 @@ CANDIDATES = [
     ("or-nemotron-nano-omni", OR, "OPENROUTER_API_KEY", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", 256000),
     ("groq-gpt-oss-20b", GROQ, "GROQ_API_KEY", "openai/gpt-oss-20b", 131072),
     ("sf-qwen3-8b", SF, "SILICONFLOW_API_KEY", "Qwen/Qwen3-8B", 131072),
+    # 2026-11-07 owner "wire every free model and provider": NIM catalog additions, new OpenRouter :free,
+    # Cohere trial, Z.ai flash, SambaNova free tier and llm7 (open-weight only; closed models there are
+    # unvetted resales and GPT/Gemini/Claude have their own owner-mandated routes).
+    ("nim-kimi-k2.6", NIM, "NVIDIA_API_KEY", "moonshotai/kimi-k2.6", 262144),
+    ("nim-minimax-m3.1-flash", NIM, "NVIDIA_API_KEY", "minimaxai/minimax-m3.1-flash", 1000000),
+    ("nim-mistral-large-4", NIM, "NVIDIA_API_KEY", "mistralai/mistral-large-4-1t-a52b", 262144),
+    ("nim-nemotron-3-super", NIM, "NVIDIA_API_KEY", "nvidia/nemotron-3-super-120b-a12b", 1000000),
+    ("nim-gpt-oss-20b", NIM, "NVIDIA_API_KEY", "openai/gpt-oss-20b", 131072),
+    ("nim-laguna-xs-2.1", NIM, "NVIDIA_API_KEY", "poolside/laguna-xs-2.1", 131072),
+    ("cohere-command-a-reasoning", COHERE, "COHERE_API_KEY", "command-a-reasoning-08-2025", 256000),
+    ("cohere-command-a-plus", COHERE, "COHERE_API_KEY", "command-a-plus-05-2026", 256000),
+    ("cohere-north-mini-code", COHERE, "COHERE_API_KEY", "north-mini-code-1.0", 256000),
+    ("zai-glm-5.3-flash", ZAI, "ZAI_API_KEY", "glm-5.3-flash", 200000),
+    ("samba-glm-5.3", SAMBA, "SAMBANOVA_API_KEY", "GLM-5.3", 131072),
+    ("samba-minimax-m3.1-flash", SAMBA, "SAMBANOVA_API_KEY", "MiniMax-M3.1-Flash", 131072),
+    ("llm7-deepseek-v4-pro", LLM7, ANON, "deepseek-v4-pro", 131072),
+    ("llm7-glm-5.3", LLM7, ANON, "glm-5.3", 131072),
 ]
 TOOL = {"type": "function", "function": {"name": "get_weather", "description": "Weather for a city",
         "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}}
@@ -148,10 +166,23 @@ def eval_scores():
     return out
 
 
+# A 429 is transient only when it is a rate limit. These bodies mean the account has no free quota at all
+# (no balance, promo cap, plan required), which retries never fix: Z.ai 1113, Kilo anonymous cap.
+DEAD_429 = re.compile(r"insufficient balance|recharge|no resource package|PROMOTION_MODEL_LIMIT_REACHED|balance_units", re.I)
+SLOW_S = 30  # a tool turn slower than this stalls every cascade behind it (owner: timeouts are not transient)
+
+
+def alive(row):
+    """Probe row -> deployable: passed the tool probe in time, or failed only on a real rate limit."""
+    if row.get("tool_call"):
+        return row.get("tool_s", 0) <= SLOW_S
+    return row.get("tool_status") in TRANSIENT and not DEAD_429.search(str(row.get("error", "")))
+
+
 def render(exclude=(), out=HERE / "config.yaml"):
     """Write the router config. *exclude*: backends `pace` found out of quota until their reset."""
     pool = {r["name"]: r for r in json.loads((HERE / "pool.json").read_text())["rows"]}
-    live = [c for c in CANDIDATES if pool.get(c[0], {}).get("tool_call") or pool.get(c[0], {}).get("tool_status") in TRANSIENT]
+    live = [c for c in CANDIDATES if alive(pool.get(c[0], {}))]
     live = [c for c in live if c[0] not in exclude] or live  # every backend capped: keep the pool, never render empty
     bare = lambda c: c[3].split("/")[-1].removesuffix(":free")
     live.sort(key=lambda c: -HERMES_INDEX.get(bare(c), 0))  # stable: unscored keep CANDIDATES order
@@ -227,7 +258,7 @@ OUT, LIVE_CFG = STATE / "free-pace.json", STATE / "vllm-sr-live.yaml"
 NS, MARGIN, EXCLUDE_S = "vllm-sr", 0.95, 600
 MIN, HOUR, DAY = 60, 3600, 86400
 WIN = {"rpm": ("req", MIN), "rph": ("req", HOUR), "rpd": ("req", DAY), "tpm": ("tok", MIN), "tpd": ("tok", DAY)}
-SHARED = {"or-": "openrouter", "kilo-": "kilo", "nim-": "nim"}
+SHARED = {"or-": "openrouter", "kilo-": "kilo", "nim-": "nim", "cohere-": "cohere", "zai-": "zai", "llm7-": "llm7"}
 
 
 def bucket(backend):

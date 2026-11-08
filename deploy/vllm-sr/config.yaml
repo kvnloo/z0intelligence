@@ -40,66 +40,69 @@ recipes:
       algorithm:
         type: static
       modelRefs:
-      - &id017
-        model: or-nemotron-3.5-lightning
-        use_reasoning: false
-      - &id018
-        model: kilo-north-mini-code
-        use_reasoning: false
-      - &id006
-        model: or-nemotron-3-ultra
+      - &id010
+        model: groq-qwen3.8-27b
         use_reasoning: false
       - &id007
-        model: nim-nemotron-3-ultra
-        use_reasoning: false
-      - &id005
-        model: kilo-nemotron-3-ultra
-        use_reasoning: false
-      - &id003
-        model: or-nemotron-3.5-super-vl
-        use_reasoning: false
-      - &id002
-        model: kilo-nemotron-3.5-super-vl
-        use_reasoning: false
-      - &id019
-        model: or-nemotron-nano-omni
-        use_reasoning: false
-      - &id015
-        model: or-flint-v1
-        use_reasoning: false
-      - &id009
-        model: or-dots-3-note
+        model: groq-gpt-oss-120b
         use_reasoning: false
       - &id008
-        model: kilo-dots-3-note
+        model: groq-gpt-oss-20b
+        use_reasoning: false
+      - &id018
+        model: cohere-command-a-plus
+        use_reasoning: false
+      - &id019
+        model: cohere-north-mini-code
+        use_reasoning: false
+      - &id002
+        model: or-nemotron-3.5-super-vl
+        use_reasoning: false
+      - &id005
+        model: nim-nemotron-3-ultra
         use_reasoning: false
       - &id016
-        model: kilo-nemotron-3.5-lightning
+        model: nim-laguna-xs-2.1
         use_reasoning: false
-      - &id014
-        model: or-xing4.0-29b
+      - &id015
+        model: nim-mistral-large-4
+        use_reasoning: false
+      - &id013
+        model: or-nemotron-3.5-lightning
+        use_reasoning: false
+      - &id017
+        model: cohere-command-a-reasoning
+        use_reasoning: false
+      - &id006
+        model: or-dots-3-note
+        use_reasoning: false
+      - &id012
+        model: or-flint-v1
         use_reasoning: false
       - &id004
-        model: nim-nemotron-3.5-lightning
+        model: or-nemotron-3-ultra
+        use_reasoning: false
+      - &id014
+        model: or-nemotron-nano-omni
+        use_reasoning: false
+      - &id011
+        model: or-xing4.0-29b
+        use_reasoning: false
+      - &id009
+        model: nim-minimax-m3.1-flash
         use_reasoning: false
       - &id001
         model: nim-step-5-preview
         use_reasoning: false
-      - &id010
-        model: samba-gpt-oss-120b
+      - &id003
+        model: nim-nemotron-3.5-lightning
         use_reasoning: false
-      - &id011
-        model: groq-gpt-oss-120b
-        use_reasoning: false
-      - &id013
-        model: groq-qwen3.8-27b
-        use_reasoning: false
-      - &id012
-        model: groq-gpt-oss-20b
+      - &id020
+        model: samba-glm-5.3
         use_reasoning: false
       fallback:
         enabled: true
-        max_attempts: 19
+        max_attempts: 20
         per_attempt_timeout: 120s
         total_timeout: 600s
         retryable_status_codes:
@@ -142,9 +145,10 @@ recipes:
       - *id017
       - *id018
       - *id019
+      - *id020
       fallback:
         enabled: true
-        max_attempts: 19
+        max_attempts: 20
         per_attempt_timeout: 120s
         total_timeout: 600s
         retryable_status_codes:
@@ -187,9 +191,10 @@ recipes:
       - *id017
       - *id018
       - *id019
+      - *id020
       fallback:
         enabled: true
-        max_attempts: 19
+        max_attempts: 20
         per_attempt_timeout: 120s
         total_timeout: 600s
         retryable_status_codes:
@@ -219,9 +224,9 @@ recipes:
       - *id004
       - *id005
       - *id006
+      - *id009
       - *id007
       - *id008
-      - *id009
       - *id010
       - *id011
       - *id012
@@ -232,9 +237,10 @@ recipes:
       - *id017
       - *id018
       - *id019
+      - *id020
       fallback:
         enabled: true
-        max_attempts: 19
+        max_attempts: 20
         per_attempt_timeout: 120s
         total_timeout: 600s
         retryable_status_codes:
@@ -266,8 +272,8 @@ recipes:
       - *id006
       - *id007
       - *id008
-      - *id009
       - *id010
+      - *id009
       - *id011
       - *id012
       - *id013
@@ -277,9 +283,10 @@ recipes:
       - *id017
       - *id018
       - *id019
+      - *id020
       fallback:
         enabled: true
-        max_attempts: 19
+        max_attempts: 20
         per_attempt_timeout: 120s
         total_timeout: 600s
         retryable_status_codes:
@@ -312,19 +319,20 @@ recipes:
       - *id007
       - *id008
       - *id009
-      - *id010
       - *id011
+      - *id010
       - *id012
-      - *id014
       - *id013
+      - *id014
       - *id015
       - *id016
       - *id017
       - *id018
       - *id019
+      - *id020
       fallback:
         enabled: true
-        max_attempts: 19
+        max_attempts: 20
         per_attempt_timeout: 120s
         total_timeout: 600s
         retryable_status_codes:
@@ -351,15 +359,15 @@ recipes:
       - *id001
       - *id002
       - *id003
+      - *id007
+      - *id008
       - *id004
+      - *id005
+      - *id006
+      - *id009
       - *id010
       - *id011
       - *id012
-      - *id005
-      - *id006
-      - *id007
-      - *id008
-      - *id009
       - *id013
       - *id014
       - *id015
@@ -367,9 +375,10 @@ recipes:
       - *id017
       - *id018
       - *id019
+      - *id020
       fallback:
         enabled: true
-        max_attempts: 19
+        max_attempts: 20
         per_attempt_timeout: 120s
         total_timeout: 600s
         retryable_status_codes:
@@ -389,7 +398,7 @@ global:
   router:
     fallback:
       enabled: true
-      max_attempts: 19
+      max_attempts: 20
       circuit_breaker:
         consecutive_failures: 2
         cooldown_period: 120s
@@ -413,15 +422,6 @@ providers:
       base_url: https://integrate.api.nvidia.com/v1
       weight: 100
       api_key_env: NVIDIA_API_KEY
-  - name: kilo-nemotron-3.5-super-vl
-    provider_model_id: nvidia/nemotron-3.5-super-vl:free
-    backend_refs:
-    - name: kilo
-      provider: vllm
-      openai_compat_gateway: true
-      base_url: https://api.kilo.ai/api/gateway
-      weight: 100
-      api_key_env: FREE_ANON_API_KEY
   - name: or-nemotron-3.5-super-vl
     provider_model_id: nvidia/nemotron-3.5-super-vl:free
     backend_refs:
@@ -431,15 +431,6 @@ providers:
       base_url: https://openrouter.ai/api/v1
       weight: 100
       api_key_env: OPENROUTER_API_KEY
-  - name: kilo-nemotron-3-ultra
-    provider_model_id: nvidia/nemotron-3-ultra-550b-a55b:free
-    backend_refs:
-    - name: kilo
-      provider: vllm
-      openai_compat_gateway: true
-      base_url: https://api.kilo.ai/api/gateway
-      weight: 100
-      api_key_env: FREE_ANON_API_KEY
   - name: or-nemotron-3-ultra
     provider_model_id: nvidia/nemotron-3-ultra-550b-a55b:free
     backend_refs:
@@ -458,15 +449,6 @@ providers:
       base_url: https://integrate.api.nvidia.com/v1
       weight: 100
       api_key_env: NVIDIA_API_KEY
-  - name: kilo-dots-3-note
-    provider_model_id: dots-studio/dots-3-note-preview:free
-    backend_refs:
-    - name: kilo
-      provider: vllm
-      openai_compat_gateway: true
-      base_url: https://api.kilo.ai/api/gateway
-      weight: 100
-      api_key_env: FREE_ANON_API_KEY
   - name: or-dots-3-note
     provider_model_id: dots-studio/dots-3-note-preview:free
     backend_refs:
@@ -485,15 +467,6 @@ providers:
       base_url: https://openrouter.ai/api/v1
       weight: 100
       api_key_env: OPENROUTER_API_KEY
-  - name: samba-gpt-oss-120b
-    provider_model_id: gpt-oss-120b
-    backend_refs:
-    - name: samba
-      provider: vllm
-      openai_compat_gateway: true
-      base_url: https://api.sambanova.ai/v1
-      weight: 100
-      api_key_env: SAMBANOVA_API_KEY
   - name: groq-gpt-oss-120b
     provider_model_id: openai/gpt-oss-120b
     backend_refs:
@@ -512,15 +485,6 @@ providers:
       base_url: https://integrate.api.nvidia.com/v1
       weight: 100
       api_key_env: NVIDIA_API_KEY
-  - name: kilo-nemotron-3.5-lightning
-    provider_model_id: nvidia/nemotron-3.5-lightning:free
-    backend_refs:
-    - name: kilo
-      provider: vllm
-      openai_compat_gateway: true
-      base_url: https://api.kilo.ai/api/gateway
-      weight: 100
-      api_key_env: FREE_ANON_API_KEY
   - name: or-nemotron-3.5-lightning
     provider_model_id: nvidia/nemotron-3.5-lightning:free
     backend_refs:
@@ -530,15 +494,6 @@ providers:
       base_url: https://openrouter.ai/api/v1
       weight: 100
       api_key_env: OPENROUTER_API_KEY
-  - name: kilo-north-mini-code
-    provider_model_id: cohere/north-mini-code:free
-    backend_refs:
-    - name: kilo
-      provider: vllm
-      openai_compat_gateway: true
-      base_url: https://api.kilo.ai/api/gateway
-      weight: 100
-      api_key_env: FREE_ANON_API_KEY
   - name: or-xing4.0-29b
     provider_model_id: xingchen-agi/xing4.0-29b-a4b:free
     backend_refs:
@@ -575,45 +530,110 @@ providers:
       base_url: https://api.groq.com/openai/v1
       weight: 100
       api_key_env: GROQ_API_KEY
+  - name: nim-minimax-m3.1-flash
+    provider_model_id: minimaxai/minimax-m3.1-flash
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      api_key_env: NVIDIA_API_KEY
+  - name: nim-mistral-large-4
+    provider_model_id: mistralai/mistral-large-4-1t-a52b
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      api_key_env: NVIDIA_API_KEY
+  - name: nim-laguna-xs-2.1
+    provider_model_id: poolside/laguna-xs-2.1
+    backend_refs:
+    - name: nim
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://integrate.api.nvidia.com/v1
+      weight: 100
+      api_key_env: NVIDIA_API_KEY
+  - name: cohere-command-a-reasoning
+    provider_model_id: command-a-reasoning-08-2025
+    backend_refs:
+    - name: cohere
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.cohere.ai/compatibility/v1
+      weight: 100
+      api_key_env: COHERE_API_KEY
+  - name: cohere-command-a-plus
+    provider_model_id: command-a-plus-05-2026
+    backend_refs:
+    - name: cohere
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.cohere.ai/compatibility/v1
+      weight: 100
+      api_key_env: COHERE_API_KEY
+  - name: cohere-north-mini-code
+    provider_model_id: north-mini-code-1.0
+    backend_refs:
+    - name: cohere
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.cohere.ai/compatibility/v1
+      weight: 100
+      api_key_env: COHERE_API_KEY
+  - name: samba-glm-5.3
+    provider_model_id: GLM-5.3
+    backend_refs:
+    - name: samba
+      provider: vllm
+      openai_compat_gateway: true
+      base_url: https://api.sambanova.ai/v1
+      weight: 100
+      api_key_env: SAMBANOVA_API_KEY
 routing:
   modelCards:
   - name: nim-step-5-preview
-    context_window_size: 262144
-  - name: kilo-nemotron-3.5-super-vl
-    context_window_size: 1000000
+    context_window_size: 6000
   - name: or-nemotron-3.5-super-vl
-    context_window_size: 1000000
-  - name: kilo-nemotron-3-ultra
     context_window_size: 1000000
   - name: or-nemotron-3-ultra
     context_window_size: 1000000
   - name: nim-nemotron-3-ultra
     context_window_size: 1000000
-  - name: kilo-dots-3-note
-    context_window_size: 512000
   - name: or-dots-3-note
     context_window_size: 512000
   - name: or-flint-v1
     context_window_size: 262144
-  - name: samba-gpt-oss-120b
-    context_window_size: 7000
   - name: groq-gpt-oss-120b
-    context_window_size: 7000
+    context_window_size: 6000
   - name: nim-nemotron-3.5-lightning
-    context_window_size: 1000000
-  - name: kilo-nemotron-3.5-lightning
     context_window_size: 1000000
   - name: or-nemotron-3.5-lightning
     context_window_size: 1000000
-  - name: kilo-north-mini-code
-    context_window_size: 256000
   - name: or-xing4.0-29b
-    context_window_size: 4000
+    context_window_size: 6000
   - name: groq-qwen3.8-27b
-    context_window_size: 7000
+    context_window_size: 6000
   - name: or-nemotron-nano-omni
     context_window_size: 256000
   - name: groq-gpt-oss-20b
+    context_window_size: 6000
+  - name: nim-minimax-m3.1-flash
+    context_window_size: 1000000
+  - name: nim-mistral-large-4
+    context_window_size: 262144
+  - name: nim-laguna-xs-2.1
+    context_window_size: 131072
+  - name: cohere-command-a-reasoning
+    context_window_size: 256000
+  - name: cohere-command-a-plus
+    context_window_size: 30000
+  - name: cohere-north-mini-code
+    context_window_size: 256000
+  - name: samba-glm-5.3
     context_window_size: 7000
   decisions:
   - name: free-quality
@@ -644,9 +664,10 @@ routing:
     - *id017
     - *id018
     - *id019
+    - *id020
     fallback:
       enabled: true
-      max_attempts: 19
+      max_attempts: 20
       per_attempt_timeout: 120s
       total_timeout: 600s
       retryable_status_codes:

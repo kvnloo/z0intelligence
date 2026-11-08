@@ -111,6 +111,20 @@
   "nim": {
    "rpm": 40,
    "basis": "build.nvidia.com free API, ~40 RPM per account"
+  },
+  "cohere": {
+   "rpm": 20,
+   "rpd": 33,
+   "basis": "docs.cohere.com/docs/rate-limits: trial key 20 RPM chat, 1000 calls/month (~33/day), per account"
+  },
+  "zai": {
+   "rpm": 10,
+   "basis": "Z.ai flash models are free with low concurrency; no published RPM, conservative 10 until measured"
+  },
+  "llm7": {
+   "rpm": 10,
+   "rph": 100,
+   "basis": "llm7.io publishes no hard numbers for anonymous use; conservative until measured"
   }
  }
 }

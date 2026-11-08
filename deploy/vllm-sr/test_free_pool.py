@@ -51,3 +51,13 @@ def test_long_blocks_exclude_every_backend_in_the_bucket():
     st = {"blocked": {"openrouter": {"until": now + 5000, "why": ""}, "nim": {"until": now + 30, "why": ""}}}
     ex = fp.excluded(st, now)
     assert ex and all(b.startswith("or-") for b in ex)  # NIM's 30 s block stays with the router's own fallback
+
+
+def test_alive_rejects_quota_dead_429_and_slow_backends():
+    import free_pool as f
+    assert f.alive({"tool_call": True, "tool_s": 1.0})
+    assert not f.alive({"tool_call": True, "tool_s": 55.0})
+    assert f.alive({"tool_status": 429, "error": "rate limit exceeded, retry after 20s"})
+    assert not f.alive({"tool_status": 429, "error": '{"code":"1113","message":"Insufficient balance or no resource package. Please recharge"}'})
+    assert not f.alive({"tool_status": 429, "error": '{"code":"PROMOTION_MODEL_LIMIT_REACHED"}'})
+    assert not f.alive({"tool_status": 402, "error": "payment required"})
