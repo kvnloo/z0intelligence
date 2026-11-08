@@ -9,13 +9,6 @@ from typing import Any
 from .fixtures import BenchExample
 
 
-def _pred_str(answer: dict[str, Any], example: BenchExample) -> str:
-    val = answer.get("value")
-    if example.question.type == "boolean":
-        return "true" if val is True or val == "true" else "false"
-    return str(val)
-
-
 def score_example(
     example: BenchExample,
     *,

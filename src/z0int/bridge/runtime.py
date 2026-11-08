@@ -78,15 +78,6 @@ def read_session_open(session_id: str | None, omp_pid: int | None = None) -> dic
         return None
 
 
-def clear_session_open(session_id: str | None, omp_pid: int | None = None) -> None:
-    path = session_open_path(session_id, omp_pid)
-    try:
-        if path.is_file():
-            path.unlink()
-    except OSError:
-        pass
-
-
 def _meta_stamp(
     *,
     generation: int,

@@ -750,16 +750,6 @@ def runtime_contract(doc: Mapping[str, Any]) -> AodlRuntimeContract:
     )
 
 
-def spend_from_decision(decision: Any) -> AodlSpend:
-    """Project a z0int cascade decision into Gamma accounting dimensions."""
-
-    return AodlSpend(
-        tokens=max(0, int(getattr(decision, "total_tokens", 0) or 0)),
-        premium_tokens=max(0, int(getattr(decision, "premium_tokens", 0) or 0)),
-        latency_ms=max(0.0, float(getattr(decision, "latency_ms", 0.0) or 0.0)),
-    )
-
-
 def check_budget(
     contract: AodlRuntimeContract,
     *,

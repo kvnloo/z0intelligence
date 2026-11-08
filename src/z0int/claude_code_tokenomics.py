@@ -498,45 +498,6 @@ def displacement_estimate(receipt: dict[str, Any], transcript_call: dict[str, An
 
 # --------------------------------------------------------------------------- live hook
 
-def events_for_stop(transcript_files: list[tuple[str, Path]], *, session_id: str, state: dict[str, Any],
-                    env_profile: str | None = None, root: Path | None = None) -> tuple[list[dict[str, Any]], dict[str, list]]:
-    """Events for bytes appended to the session's transcripts since the last Stop.
-
-    Returns ``(events, fresh_records_by_role)``; ``state`` is updated in place with per-file
-    byte cursors (``state['files']``) and billed message ids (``state['message_ids']``).
-    """
-    cursors = state.setdefault('files', {})
-    state.pop('lines', None)  # pre-release line-count cursors are superseded by byte offsets
-    seen = set(state.get('message_ids', []))
-    launches = None
-    events: list[dict[str, Any]] = []
-    fresh_by_role: dict[str, list] = {}
-    for role, path in transcript_files:
-        had_cursor = path.name in cursors
-        parsed = parse_transcript(path, cursors.get(path.name))
-        cursors[path.name] = parsed['cursor']
-        records = parsed['records']
-        if (not had_cursor or parsed['reset']) and seen:
-            # First run over a file already billed by id-only state (or after rotation):
-            # skip everything up to the last already-billed message.
-            last = max((i for i, r in enumerate(records) if r['kind'] == 'assistant' and r['id'] in seen), default=-1)
-            records = records[last + 1:]
-        # Keep only message ids not yet billed (streaming rows can straddle a Stop).
-        records = [r for r in records if r['kind'] != 'assistant' or r['id'] not in seen]
-        if not records:
-            continue
-        if launches is None and not env_profile:
-            launches = _launches(root)
-        mech = session_mechanisms(parsed['session'], role=role, env_profile=env_profile, launches=launches)
-        carry = carried_requests(records)
-        events += turn_events(records, carry, session_id=session_id, role=role, source_name=path.name,
-                              mechanisms=mech, complete=True, observer_id='z0int.claude_code.stop')
-        seen.update(r['id'] for r in records if r['kind'] == 'assistant')
-        fresh_by_role.setdefault(role, []).extend(records)
-    state['message_ids'] = sorted(seen)
-    return events, fresh_by_role
-
-
 # --------------------------------------------------------------------------- backfill
 
 def projects_dir() -> Path:
