@@ -8,10 +8,10 @@ or ``$Z0INT_BEND_GATE_BIN``); build it with ``z0int.bend_gate.build_kernel()``.
 from __future__ import annotations
 
 import copy
+import importlib.util
 import json
 import os
 import stat
-import sys
 import unittest
 from collections import Counter
 from pathlib import Path
@@ -20,8 +20,16 @@ from z0int import bend_gate as bg
 
 ROOT = Path(__file__).resolve().parents[1]
 REF = ROOT / "third_party" / "aodl_a848270"
-sys.path.insert(0, str(REF))
-from aodl_contract import validate  # noqa: E402
+# Load the historical reference validator by file path without changing sys.path
+# or populating the live aodl_contract module in sys.modules. The runtime must
+# continue to resolve the pinned package's canonicalization API in this suite.
+REFERENCE_VALIDATOR = REF / "aodl_contract" / "validator.py"
+REFERENCE_SPEC = importlib.util.spec_from_file_location("bend_aodl_reference_validator", REFERENCE_VALIDATOR)
+if REFERENCE_SPEC is None or REFERENCE_SPEC.loader is None:
+    raise RuntimeError(f"Cannot load the pinned Bend reference validator: {REFERENCE_VALIDATOR}")
+_reference_validator = importlib.util.module_from_spec(REFERENCE_SPEC)
+REFERENCE_SPEC.loader.exec_module(_reference_validator)
+validate = _reference_validator.validate
 
 CATALOG = bg.load_catalog(REF / "harnesses" / "catalog.json")
 FIXTURES = sorted((REF / "examples").rglob("*.json"))
@@ -45,6 +53,15 @@ def fake_kernel(tmp: Path, body: str) -> Path:
     path.write_text("#!/bin/sh\n" + body + "\n")
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
     return path
+
+
+class ReferenceImportTests(unittest.TestCase):
+    def test_historical_validator_does_not_shadow_canonical_aodl(self) -> None:
+        import aodl_contract
+
+        self.assertEqual(aodl_contract.CANON_VERSION, "aodl-canon-1")
+        self.assertTrue(callable(aodl_contract.semantic_fingerprint))
+        self.assertIsNot(validate, aodl_contract.validate)
 
 
 class EncoderTests(unittest.TestCase):
