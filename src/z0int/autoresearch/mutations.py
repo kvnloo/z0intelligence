@@ -58,8 +58,7 @@ def challenger_policies(champion: dict[str, Any]) -> list[dict[str, Any]]:
         }
     )
     # exact path only
-    if "exact_path" in base_ops or True:
-        out.append(
+    out.append(
             {
                 "role": "challenger",
                 "ops": ["exact_path"],

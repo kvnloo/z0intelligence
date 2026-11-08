@@ -219,10 +219,6 @@ def pi_session_id(path: str | Path) -> str | None:
     return None
 
 
-def is_pi_session(path: str | Path) -> bool:
-    return pi_session_id(path) is not None
-
-
 def pi_mirror_path(root: str | Path) -> Path:
     """Session-only mirror beside the agent dir (same filesystem, so hard links work): ~/.omp/.z0int-ctx-mirror/sessions."""
     root = Path(_real(root))

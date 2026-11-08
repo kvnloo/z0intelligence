@@ -852,8 +852,7 @@ def _cmd_context(args: argparse.Namespace) -> int:
         turn_key=getattr(args, "turn_key", None),
     )
     payload = packet.to_dict()
-    if args.json or True:
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
     return 0 if not packet.unresolved_gaps else 0  # gaps are data, not process failure
 
 
@@ -873,8 +872,7 @@ def _cmd_task(args: argparse.Namespace) -> int:
     )
 
     def emit(obj: dict) -> None:
-        if getattr(args, "json", False) or True:
-            print(json.dumps(obj, indent=2, ensure_ascii=False, default=str))
+        print(json.dumps(obj, indent=2, ensure_ascii=False, default=str))
 
     cmd = args.task_cmd
     if cmd == "status":
