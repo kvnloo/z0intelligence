@@ -79,6 +79,40 @@ def atomic_write(path: Path, text: str) -> None:
             os.unlink(temporary)
 
 
+def repo_map_rows(path: Path, sources: dict[str, str] | None = None, cap: int = 32) -> list[str]:
+    """One sourced row per registry component: repo, owns, not_here. Text only; no YAML dependency."""
+    if not path.is_file():
+        return []
+    if sources is not None:
+        sources[str(path)] = digest(path)
+    rows: list[str] = []
+    cur: dict[str, str] = {}
+
+    def flush() -> None:
+        if cur.get('id') and (cur.get('owns') or cur.get('repo')):
+            text = f"{cur['id']} ({cur.get('repo', 'no repo')}): owns {cur.get('owns', '[]')}"
+            if cur.get('not_here'):
+                text += f"; not here {cur['not_here']}"
+            rows.append(f"- `{path}:{cur['line']}` → {clean(text, 360)}")
+
+    for n, line in enumerate(path.read_text(errors='replace').splitlines(), 1):
+        top = re.match(r'^  ([A-Za-z0-9_.-]+):\s*$', line)
+        if top:
+            flush()
+            cur = {'id': top.group(1), 'line': str(n)}
+            continue
+        if not cur:
+            continue
+        field = re.match(r'^\s{4}repo:\s*(\S+)', line) or None
+        if field:
+            cur['repo'] = field.group(1)
+        field = re.match(r'^\s+(owns|not_here):\s*(\[.*\])\s*$', line)
+        if field:
+            cur[field.group(1)] = field.group(2)
+    flush()
+    return rows[:cap]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--repo', type=Path, default=DEFAULT_REPO)
@@ -106,6 +140,10 @@ def main() -> None:
     # with sources. Agents kept re-deriving these (2026-10-25 Codex Cloud incident).
     section("Owner canon — Kevin's established workflows (verbatim, sourced); follow before acting",
         extract(OPS / 'unified-memory/OWNER-CANON.md', r'^- CANON ', 16, 520))
+    # Second: the z0 repo map, so "who owns X / does X already exist" is answered from the
+    # registry before anyone builds a duplicate (owner: "use the z0 repo map", 2026-10-03).
+    section('Repo map — who owns what (kvnloo/z0 registry); search here and memory before building',
+        repo_map_rows(Path(os.environ.get('Z0_REPO_MAP', str(Path.home() / '.local/share/z0/registry/components.yaml'))), sources))
     section('North-star goals — repository quotations',
         extract(args.repo / 'README.md', r'^\*\*A provenance|^z0intelligence turns', 2) +
         extract(args.repo / 'ROADMAP.md', r'^>.*Optimize for|^Success means|^z0int is not trying', 3))
@@ -314,8 +352,8 @@ def main() -> None:
         f'{provenance} → Re-observe live state before action. No gold questions or experiment answers are inputs.',
     ]
     # Reserve space for every section. Headers and facts all carry source paths.
-    # Owner canon first (10 rows); measured findings give up 11 rows to keep 223 lines.
-    caps = [10,5,17,12,6,30,27,35,22,10,30]
+    # Owner canon first (10 rows), then the repo map (14); the report-header index gives up 14 rows to keep 223 lines.
+    caps = [10,14,5,17,12,6,30,27,35,22,10,16]
     if len(caps) != len(sections):
         raise RuntimeError(f'caps/sections mismatch: {len(caps)} != {len(sections)}')
     for (name, rows), cap in zip(sections.items(), caps):

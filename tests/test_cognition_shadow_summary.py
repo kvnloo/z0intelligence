@@ -87,6 +87,26 @@ def test_a_row_without_a_backend_or_with_an_error_did_not_answer(tmp_path: Path)
     assert [out["models"][m]["timed_out"] for m in "abc"] == [0, 1, 0]
 
 
+def test_typed_outage_attempts_and_invalid_answers_keep_distinct_counts(tmp_path: Path) -> None:
+    trials = [
+        _model("slm", error="transport_error: connection refused", error_kind="transport"),
+        _model("slm", error="transport_error: connection refused", error_kind="transport"),
+        _model("slm", error="invalid_call:rm", error_kind="none", invalid_call=True),
+        _model("slm", parse_error="unparseable_response", error_kind="parse"),
+        _model("slm", selected_action="read", abstained=False, error_kind="none"),
+    ]
+    rows = [{"tool_name": "read", "legal_ids": ["read"], "shadow": [trial]} for trial in trials]
+    path = _write(tmp_path, rows)
+    before = path.read_bytes()
+    out = summarize_shadow_receipts(path)
+    assert out["receipts"] == 5
+    assert out["models"]["slm"] == {
+        "rows": 5, "answered": 3, "unreachable": 2, "timed_out": 0,
+        "abstained": 1, "invalid": 1, "selections": 1, "agreements": 1,
+    }
+    assert path.read_bytes() == before
+
+
 def test_since_ts_and_empty(tmp_path: Path) -> None:
     out = summarize_shadow_receipts(_write(tmp_path, ROWS), since_ts=400.0)
     assert out["receipts"] == 3

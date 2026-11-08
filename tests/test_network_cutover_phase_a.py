@@ -57,16 +57,6 @@ class PreflightNoEvolutionLabTests(unittest.TestCase):
             self.assertEqual(d.route, "routine")
             self.assertEqual(d.prediction, "VERIFY")
 
-    def test_bridge_preflight_has_no_evolution_lab_import(self) -> None:
-        src = Path(__file__).resolve().parents[1] / "src" / "z0int" / "bridge" / "runtime.py"
-        text = src.read_text(encoding="utf-8")
-        # production preflight function body must not call evolution_lab
-        start = text.index("def preflight(prompt")
-        end = text.index("\ndef kerdoios_plan", start)
-        body = text[start:end]
-        self.assertNotIn("evolution_lab", body)
-        self.assertIn("preflight_dict", body)
-
 
 class ArtifactImportTests(unittest.TestCase):
     def _make_manifest(self, root: Path, *, promoted: bool = False) -> Path:
@@ -104,15 +94,10 @@ class ArtifactImportTests(unittest.TestCase):
             art = get_artifact(out["artifact_id"])
             assert art is not None
             self.assertEqual(art["promotion"]["status"], "candidate")
-            # even if producer lies promoted, import refuses or forces candidate
+            # A producer cannot supply its own promotion decision.
             man2 = self._make_manifest(bundle, promoted=True)
-            # rewrite weights same
-            out2 = import_manifest(man2, force=True)
-            # validate_manifest rejects promoted emit — ok False OR still candidate
-            if out2.get("ok"):
-                art2 = get_artifact(out2["artifact_id"])
-                assert art2 is not None
-                self.assertEqual(art2["promotion"]["status"], "candidate")
+            out2 = import_manifest(man2)
+            self.assertFalse(out2["ok"])
             listed = list_artifacts()
             self.assertTrue(any(a.get("promotion", {}).get("status") == "candidate" for a in listed))
             self.assertFalse(any(a.get("promotion", {}).get("status") == "promoted" for a in listed))

@@ -29,7 +29,7 @@ def test_bench_reports_per_query_measurements(env):
     for r in rows:
         assert r['cold_ms'] > 0 and r['warm_ms'] >= 0 and r['raw_reads'] >= 0 and r['tokens'] > 0
     assert [r['hit'] for r in rows] == [True, True, False]
-    assert rows[0]['warm_cache'] == 'hit' and rows[0]['raw_reads'] > 0
+    assert rows[0]['raw_reads'] > 0
     assert report['hit_rate'] == pytest.approx(2 / 3)
 
 

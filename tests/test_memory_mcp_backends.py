@@ -422,3 +422,45 @@ def test_unknown_archive_schema_falls_back_to_http(native, tmp_path):
     _sqlite_archive(tmp_path, [(SESSION, PROJECT, 7, "assistant", "verified", None)], user_version=1)
     rows = backend.search_backend("agentsview", "verified", [grant()], 1, 2)
     assert rows and native["calls"]  # served by the HTTP contract path
+
+
+def test_sqlite_ranks_across_grants_instead_of_first_grant_filling_every_slot(native, tmp_path):
+    filler = " ".join(["cron status line"] * 40)
+    rows = [(f"codex:cron-{i}", "automation", 1, "assistant", f"{filler} hw_monitor {filler}", None) for i in range(6)]
+    rows.append((SESSION, PROJECT, 7, "user", "call the folder hw_monitor on the big drive", None))
+    _sqlite_archive(tmp_path, rows)
+    found = backend.search_backend("agentsview", "hw_monitor", [grant(scope="automation"), grant()], 3, 2)
+    assert found[0]["scope"] == PROJECT and "hw_monitor" in found[0]["text"]
+    assert native["calls"] == []
+
+
+def test_sqlite_caps_hits_per_session_and_keeps_scope_filter(native, tmp_path):
+    rows = [(SESSION, PROJECT, i, "assistant", f"larkd note {i}", None) for i in range(1, 6)]
+    rows.append(("codex:other-2", PROJECT, 1, "user", "larkd once", None))
+    rows.append(("codex:hidden-3", "ungranted", 1, "user", "larkd larkd larkd", None))
+    _sqlite_archive(tmp_path, rows)
+    found = backend.search_backend("agentsview", "larkd", [grant()], 5, 2)
+    sessions = [r["native"]["session_id"] for r in found]
+    assert sessions.count(SESSION) == 2 and "codex:other-2" in sessions
+    assert all(r["scope"] == PROJECT for r in found)
+
+
+@pytest.mark.parametrize("message_class", [None, "thinking"])
+def test_sqlite_session_diversity_survives_a_longer_high_ranked_transcript(
+    native, tmp_path, message_class
+):
+    rows = [
+        (SESSION, PROJECT, i, "assistant", "continuity", message_class)
+        for i in range(100)
+    ]
+    rows.append((
+        "codex:owner-decision", PROJECT, 1, "user",
+        "continuity must preserve the corrected owner decision across harnesses", None,
+    ))
+    _sqlite_archive(tmp_path, rows)
+    found = backend.search_backend("agentsview", "continuity", [grant()], 3, 2)
+    sessions = [row["native"]["session_id"] for row in found]
+    assert "codex:owner-decision" in sessions
+    assert sessions.count(SESSION) == (0 if message_class else 2)
+    assert all(row["scope"] == PROJECT for row in found)
+    assert native["calls"] == []

@@ -17,7 +17,7 @@ Safety invariants (z0intelligence#20, oh-my-pi#83):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Protocol, runtime_checkable
+from typing import Any, Literal, Mapping, Protocol, runtime_checkable
 import json
 import time
 
@@ -74,6 +74,8 @@ class ToolDecision:
     parse_error: str | None = None
     reasoning_metadata: Mapping[str, Any] = field(default_factory=dict)
     diagnostics: Mapping[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    error_kind: Literal["transport", "timeout", "parse", "none"] = "none"
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -90,6 +92,7 @@ class ToolDecision:
             "invalid_call": self.invalid_call,
             "irrelevant_call": self.irrelevant_call,
             "unnecessary_call": self.unnecessary_call,
+            "error_kind": self.error_kind,
         }
         for key in (
             "ttft_ms",
@@ -98,6 +101,7 @@ class ToolDecision:
             "completion_tokens",
             "cached_tokens",
             "parse_error",
+            "error",
         ):
             value = getattr(self, key)
             if value is not None:
@@ -134,6 +138,7 @@ def _abstain(
     reason: str,
     invalid_call: bool = False,
     extra: Mapping[str, Any] | None = None,
+    error_kind: Literal["transport", "timeout", "parse", "none"] = "none",
 ) -> ToolDecision:
     diagnostics: dict[str, Any] = {"reason": reason}
     if extra:
@@ -150,7 +155,9 @@ def _abstain(
         abstained=True,
         candidate_action_count=candidate_count,
         invalid_call=invalid_call,
-        parse_error=reason,
+        error=reason if error_kind != "parse" else None,
+        parse_error=reason if error_kind == "parse" else None,
+        error_kind=error_kind,
         diagnostics=diagnostics,
     )
 
@@ -309,6 +316,7 @@ class LocalSLMBackend:
                 candidate_count=len(ids),
                 latency_ms=(time.perf_counter() - started) * 1000.0,
                 reason=f"{kind}: {exc}",
+                error_kind="timeout" if "timeout" in detail or "timed out" in detail else "transport",
                 extra={"model_candidate_ids": list(ids)},
             )
 
@@ -360,7 +368,8 @@ class LocalSLMBackend:
                 distribution=None,
                 latency_ms=outcome.latency_ms,
                 abstained=True,
-                parse_error=f"invalid_call:{invocation.tool}",
+                parse_error=None,
+                error=f"invalid_call:{invocation.tool}",
                 invalid_call=True,
                 diagnostics={
                     "attempted_action": invocation.tool,
@@ -419,6 +428,7 @@ class LocalSLMBackend:
         cached_tokens: int | None = None,
         diagnostics: Mapping[str, Any] | None = None,
         supervisor: Mapping[str, Any] | None = None,
+        error: str | None = None,
     ) -> ToolDecision:
         merged: dict[str, Any] = dict(diagnostics or {})
         if supervisor:
@@ -441,6 +451,8 @@ class LocalSLMBackend:
             candidate_action_count=candidate_count,
             invalid_call=invalid_call,
             parse_error=parse_error,
+            error=error,
+            error_kind="parse" if parse_error else "none",
             diagnostics=merged,
         )
 

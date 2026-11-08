@@ -11,9 +11,9 @@ silent empty):
   they are not canonical provenance (z0int#63 stays UNMET while the gateway is unavailable).
 
 Scope is filtered before ranking (the ranker never sees a sibling project/repo/task item), evidence is merged
-on ``event_uid`` across layers, and every output passes the secret scrub. ``memory_brief`` is bounded,
-abstains on a missing required source and is cached on disk by snapshot with the MemoryPacketCache key rules
-(policy version, canonical scope JSON, normalized query; an empty or abstained brief is never cached).
+on ``event_uid`` across layers, and every output passes the secret scrub. ``memory_brief`` is bounded and
+abstains on a missing required source. Cache keys include policy, scope, query and source revision hints.
+AgentsView has no reliable content revision, so briefs requesting its lexical layer bypass the cache.
 Memory is evidence, never instructions.
 """
 
@@ -38,12 +38,13 @@ from .. import agentsview_ro, paths
 from ..context_resolve import EvidenceRef
 from ..memory_contract import (BitemporalClaim, EventIdentity, MemoryScope, MemorySnapshot, MemoryUseReceipt,
                                derive_event_uid)
+from .claims import _project_claim_rows
 from .event_log import EventLog, MemoryEvent, SourceIngestDisabled, source_ingest_enabled
 from .scrub import redact_spans, scrub_obj, scrub_text
 
 SCHEMA = 'z0int.memory.search.v0'
 BRIEF_SCHEMA = 'z0int.memory.brief.v0'
-POLICY_VERSION = 'z0-memory-1'  # part of every cache key and snapshot: bump when a brief's meaning changes
+POLICY_VERSION = 'z0-memory-3'  # part of every cache key and snapshot: bump when a brief's meaning changes
 LAYERS = ('temporal', 'lexical', 'semantic')
 HARNESS_OF_AGENT = {'claude': 'claude-code', 'deepseek-harness': 'dsh'}
 DEFAULT_USER = 'local'
@@ -157,6 +158,7 @@ def _without_brief(content: str | None) -> str:
 
 
 def agentsview_generation(conn: sqlite3.Connection) -> str:
+    """Cheap schema/high-water hint, not a content, scope, source identity or deletion revision."""
     uv = conn.execute('pragma user_version').fetchone()[0]
     return f"uv{uv}:m{conn.execute('select max(id) from messages').fetchone()[0] or 0}"
 
@@ -364,22 +366,6 @@ class TencentDBClient:
 
 
 # ----------------------------------------------------------------------------- temporal: EventLog + claims
-def _claim_rows(events: Iterable[MemoryEvent]) -> list[dict[str, Any]]:
-    """Scoped supersession: within one (scope, subject, predicate) the latest recorded claim is current."""
-    claims = [dict(e.payload, event_id=e.event_id, checksum=e.checksum) for e in events
-              if e.event_type == 'memory.claim' and isinstance(e.payload, dict)]
-    groups: dict[tuple, list[dict[str, Any]]] = {}
-    for c in claims:
-        scope = c.get('scope') or {}
-        key = (tuple(scope.get(k) for k in ('user', 'project', 'repo', 'task')), c.get('subject'), c.get('predicate'))
-        groups.setdefault(key, []).append(c)
-    for rows in groups.values():
-        rows.sort(key=lambda c: (str(c.get('recorded_at')), c['event_id']))
-        for older, newer in zip(rows, rows[1:]):
-            older['superseded_by'] = older.get('superseded_by') or newer['claim_id']
-        for c in rows:
-            c['current'] = c is rows[-1]
-    return claims
 
 
 def _scope_of(raw: Any) -> MemoryScope | None:
@@ -388,13 +374,13 @@ def _scope_of(raw: Any) -> MemoryScope | None:
     return MemoryScope(**{k: raw.get(k) for k in ('user', 'project', 'repo', 'task')})
 
 
-def _temporal_candidates(query: str, *, ledger_root: str | Path | None,
+def _temporal_candidates(query: str, policy: ScopePolicy, *, ledger_root: str | Path | None,
                          join_uids: set[str]) -> tuple[dict[str, Any], list[dict[str, Any]], int]:
     log = EventLog(ledger_root, read_only=True)
     if not log.events_path.is_file():
         return _layer('ok', revision='empty', events=0), [], 0
     try:
-        events = list(log.iter_events())
+        events = list(log.iter_events(require_complete=True))
     except Exception as exc:  # noqa: BLE001 - a corrupt ledger is reported, not raised
         return _layer('unavailable', 'corrupt', detail=type(exc).__name__), [], 0
     tree = log.root / 'TREE' / 'manifest.json'
@@ -402,28 +388,50 @@ def _temporal_candidates(query: str, *, ledger_root: str | Path | None,
         tree_rev = json.loads(tree.read_text(encoding='utf-8')).get('coarse_history_hash') if tree.is_file() else None
     except (OSError, ValueError):
         tree_rev = None
+    projection = _project_claim_rows(events, policy.scope)
+    contradictions: list[str] = []
     terms, out, scrubbed = _terms(query), [], 0
-    claims = {c['event_id']: c for c in _claim_rows(events)}
+    claims = {c['event_id']: c for c in projection.history}
+    emitted_claims: dict[int, dict[str, Any]] = {}
     for e in events:
         ident = e.event_identity()
-        text = json.dumps(e.payload, ensure_ascii=False, sort_keys=True).lower() if e.payload is not None else ''
+        payload = e.payload if isinstance(e.payload, dict) else {}
+        harness = HARNESS_OF_AGENT.get(ident.source_system, ident.source_system) if ident else None
+        if not policy.admits(_scope_of(payload.get('scope')), harness):
+            continue
+        claim = claims.get(e.event_id)
+        if e.event_type == 'memory.claim' and claim is None:
+            continue
+        raw = (f"{claim.get('subject')} {claim.get('predicate')} = {json.dumps(claim.get('value'))}"
+               if claim else json.dumps(e.payload, ensure_ascii=False) if e.payload is not None else '')
+        text = raw.lower()
         score = sum(1 for t in terms if t in text)
         joined = ident is not None and ident.event_uid in join_uids
         if not score and not joined:
             continue
-        claim = claims.get(e.event_id)
-        if claim is not None and not claim['current']:
-            continue  # superseded claims stay in history(), never in current evidence
+        contradictions.extend(projection.conflicts_by_event.get(e.event_id, ()))
         if claim is not None:
+            # Match the whole claim history, but emit only its canonical current value.
+            current_id = projection.current_by_event[e.event_id]
+            if current_id in emitted_claims:
+                emitted_claims[current_id]['score'] = max(emitted_claims[current_id]['score'], float(score))
+                continue
+            e = projection.event_by_id[current_id]
+            claim = claims[current_id]
+            payload = e.payload
+            ident = e.event_identity()
+            harness = HARNESS_OF_AGENT.get(ident.source_system, ident.source_system) if ident else None
+            if not policy.admits(_scope_of(payload.get('scope')), harness):
+                continue
             raw = f"{claim.get('subject')} {claim.get('predicate')} = {json.dumps(claim.get('value'))}"
+        if claim is not None:
             uid = derive_event_uid(source_system='z0-memory', source_session='claims', source_event_id=claim['claim_id'])
         else:
-            raw = json.dumps(e.payload, ensure_ascii=False) if e.payload is not None else ''
             uid = ident.event_uid if ident else derive_event_uid(
                 source_system=e.source, source_session=e.session_id or 'ledger', source_event_id=e.checksum[:32])
         clean, n = scrub_text(raw)
         scrubbed += n
-        payload = e.payload if isinstance(e.payload, dict) else {}
+        # Payload and scope were checked before matching or claim reduction.
         locator = f'eventlog:{e.event_id}'
         out.append({
             'event_uid': uid, 'layers': ['temporal'], 'source_system': ident.source_system if ident else e.source,
@@ -439,8 +447,13 @@ def _temporal_candidates(query: str, *, ledger_root: str | Path | None,
                                             '%Y-%m-%dT%H:%M:%SZ', time.gmtime(e.ts)),
                                         excerpt=_excerpt(clean, terms)).to_dict(),
         })
+        if claim is not None:
+            emitted_claims[e.event_id] = out[-1]
+    contradictions, n = scrub_obj(sorted(set(contradictions)))
+    scrubbed += n
     return _layer('ok', revision=events[-1].checksum[:16] if events else 'empty', events=len(events),
-                  reads=len(events), **({'optmem_tree': tree_rev} if tree_rev else {})), out, scrubbed
+                  reads=len(events), contradictions=contradictions,
+                  **({'optmem_tree': tree_rev} if tree_rev else {})), out, scrubbed
 
 
 # ----------------------------------------------------------------------------- snapshot
@@ -488,8 +501,9 @@ def _snapshot_of(scope: MemoryScope | None, revisions: Mapping[str, str]) -> str
 
 
 def memory_snapshot_id(scope: MemoryScope | None = None, **kw: Any) -> str:
-    """Content-addressed id of the memory view: changes iff a source revision (or the policy version) changes.
-    An ``unversioned`` TencentDB gateway contributes no content revision (see ``UNVERSIONED``)."""
+    """Content-addressed identifier of source revision hints, not a proof of an unchanged memory view.
+    AgentsView's high-water hint misses edits, deletions, scope changes and source replacement; an
+    ``unversioned`` TencentDB gateway contributes no content revision."""
     return _snapshot_of(scope, source_revisions(**kw))
 
 
@@ -527,7 +541,7 @@ def search(query: str, policy: ScopePolicy | None = None, *, layers: Iterable[st
         scrubbed += n
     if 'temporal' in layers:
         status['temporal'], found, n = _temporal_candidates(
-            query, ledger_root=ledger_root, join_uids={c['event_uid'] for c in candidates})
+            query, policy, ledger_root=ledger_root, join_uids={c['event_uid'] for c in candidates})
         candidates += found
         scrubbed += n
     admitted, out_of_scope = [], 0
@@ -552,11 +566,17 @@ def search(query: str, policy: ScopePolicy | None = None, *, layers: Iterable[st
         merged[c['event_uid']] = c
         if c.get('payload_hash'):
             by_hash.setdefault(c['payload_hash'], c['event_uid'])
-    ranked = (ranker or _default_rank)(list(merged.values()))[:max(1, int(limit))]
+    ranked = sorted(
+        (ranker or _default_rank)(list(merged.values())),
+        key=lambda evidence: not bool(evidence.get('claim_id')),
+    )[:max(1, int(limit))]  # Current decisions must not lose their slot to matching historical prose.
     for layer, st in status.items():
         st['hits'] = sum(1 for e in ranked if layer in e['layers'])
     req = [r for r in required if r in layers]
-    ok = any(s['status'] == 'ok' for s in status.values()) and all(status[r]['status'] == 'ok' for r in req)
+    ok = (any(s['status'] == 'ok' for s in status.values())
+          and all(status[r]['status'] == 'ok' for r in req)
+          and ('temporal' not in status or status['temporal']['status'] == 'ok')
+          and not status.get('temporal', {}).get('contradictions'))
     snap = snapshot_id or memory_snapshot_id(policy.scope, av_db=av_db, config=cfg, ledger_root=ledger_root,
                                              gateway=gateway, probe_gateway='semantic' in layers)
     result = {
@@ -645,12 +665,9 @@ def claim_history(subject: str, predicate: str | None = None, policy: ScopePolic
         return list(packet.measurements.get("claim_history", []))
     policy = policy or ScopePolicy()
     log = EventLog(ledger_root, read_only=True)
-    events = list(log.iter_events()) if log.events_path.is_file() else []
-    rows = [c for c in _claim_rows(events) if c.get('subject') == subject
-            and (predicate is None or c.get('predicate') == predicate) and policy.admits(_scope_of(c.get('scope')), None)]
-    rows.sort(key=lambda c: (str(c.get('recorded_at')), c['event_id']))
-    return [{k: c.get(k) for k in ('claim_id', 'subject', 'predicate', 'value', 'status', 'observed_at',
-                                   'recorded_at', 'scope', 'superseded_by', 'current', 'event_id')} for c in rows]
+    events = list(log.iter_events(require_complete=True)) if log.events_path.is_file() else []
+    projection = _project_claim_rows(events, policy.scope, subject=subject, predicate=predicate)
+    return [row for row in projection.history if policy.admits(_scope_of(row.get('scope')), None)]
 
 
 INJECTOR_MARKER_TTL_S = 86400.0
@@ -699,9 +716,10 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
                  required: Iterable[str] = ('lexical',), use_cache: bool = True, limit: int = 8,
                  config: Mapping[str, Any] | None = None, av_db: str | Path | None = None,
                  ledger_root: str | Path | None = None, layers: Iterable[str] = LAYERS) -> dict[str, Any]:
-    """A bounded, scrubbed, provenance-carrying brief. ``use_cache=False`` skips the lookup but still stores.
-    With the TencentDB gateway reachable (``unversioned``) the cache is bypassed: no lookup, no store.
-    ``layers`` narrows the sources (a host that already injects TencentDB memory passes the other two)."""
+    """A bounded, scrubbed, provenance-carrying brief. ``use_cache=False`` skips lookup but still stores if safe.
+    AgentsView lacks a reliable revision and the EventLog state hint does not prove a complete ledger;
+    requesting either layer bypasses the cache. A reachable unversioned TencentDB gateway also bypasses it.
+    ``layers`` narrows the sources."""
     t0 = time.perf_counter()
     policy = policy or ScopePolicy()
     cfg = load_config() if config is None else config
@@ -711,7 +729,10 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
     revisions = source_revisions(av_db=av_db, config=cfg, ledger_root=ledger_root, gateway=gateway,
                                  probe_gateway='semantic' in layers)
     snap = _snapshot_of(policy.scope, revisions)
-    cacheable = 'semantic' not in layers or revisions['tencentdb'] != UNVERSIONED
+    bypass = ('agentsview_unversioned' if 'lexical' in layers else
+              'eventlog_unverified' if 'temporal' in layers else
+              'tencentdb_unversioned' if 'semantic' in layers and revisions['tencentdb'] == UNVERSIONED else None)
+    cacheable = bypass is None
     key = _sha('\x1f'.join((POLICY_VERSION, policy.key(), _normalize(query), str(max_tokens), ','.join(required),
                             ','.join(layers), snap)))
     if use_cache and cacheable:
@@ -725,12 +746,15 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
                  ledger_root=ledger_root, snapshot_id=snap, gateway=gateway)
     gaps = [f"{layer}: unavailable ({st.get('reason')})" for layer, st in res['layers'].items()
             if st['status'] != 'ok']
-    abstained = any(res['layers'].get(r, {}).get('status') != 'ok' for r in required)
+    contradictions = res['layers'].get('temporal', {}).get('contradictions', [])
+    if contradictions:
+        gaps.append('temporal: conflicting current claims require resolution')
+    abstained = bool(contradictions) or any(res['layers'].get(r, {}).get('status') != 'ok' for r in required)
     lines = [BRIEF_MARKER]
     used: list[dict[str, Any]] = []
     claims = [e for e in res['evidence'] if e.get('claim_id')]
     if abstained:
-        lines.append('ABSTAIN: a required memory source is unavailable; no evidence is offered.')
+        lines.append('ABSTAIN: memory is unavailable or contradictory; no evidence is offered.')
         lines += [f'gap: {g}' for g in gaps]
     else:
         lines += [f'gap: {g}' for g in gaps]
@@ -755,8 +779,8 @@ def memory_brief(query: str, policy: ScopePolicy | None = None, *, max_tokens: i
         raw_source_reads=res['raw_reads'])
     brief = {
         'schema': BRIEF_SCHEMA, 'query': query, 'text': text, 'tokens': estimate_tokens(text), 'max_tokens': max_tokens,
-        'abstained': abstained, 'gaps': gaps, 'memory_snapshot_id': snap,
-        'cache': 'miss' if cacheable else 'bypass:tencentdb_unversioned',
+        'abstained': abstained, 'gaps': gaps, 'contradictions': contradictions, 'memory_snapshot_id': snap,
+        'cache': f'bypass:{bypass}' if bypass else 'miss',
         'current_claims': [{k: c.get(k) for k in ('claim_id', 'subject', 'predicate', 'value')} for c in used
                            if c.get('claim_id')],
         'evidence': [e['locator'] for e in used], 'evidence_refs': [e['evidence_ref'] for e in used],
@@ -805,41 +829,44 @@ def inspect(locator: str, *, chars: int = 400, context: int = 1, av_db: str | Pa
     if m:
         log = worker_ledger(ledger_root)
         try:
-            event = log.get(int(m.group(1)), resolve_blob=True)
+            event = log.get(int(m.group(1)))
+            payload = log.resolve_payload(event)
         except (KeyError, OSError):
             return {'ok': False, 'error': f'no such event {locator}'}
         return scrub_obj({'ok': True, 'locator': locator, 'event_type': event.event_type, 'source': event.source,
                           'identity': event.identity,
-                          'payload': scrub_text(json.dumps(event.payload, ensure_ascii=False))[0][:chars]})[0]
+                          'payload': scrub_text(json.dumps(payload, ensure_ascii=False))[0][:chars]})[0]
     return {'ok': False, 'error': f'unsupported locator {locator!r}: expected agentsview:<sid>#<mid> or eventlog:<id>'}
 
 
 def unknowns(query: str, policy: ScopePolicy | None = None, **kw: Any) -> dict[str, Any]:
     res = search(query, policy, **kw)
     gaps = [f"{layer}: unavailable ({st.get('reason')})" for layer, st in res['layers'].items() if st['status'] != 'ok']
+    contradictions = res['layers'].get('temporal', {}).get('contradictions', [])
+    if contradictions:
+        gaps.append('temporal: conflicting current claims require resolution')
     return {'ok': True, 'query': query, 'unresolved_gaps': gaps, 'answerable': res['ok'] and bool(res['evidence']),
             'evidence_count': len(res['evidence']), 'layers': res['layers'],
             'memory_snapshot_id': res['memory_snapshot_id']}
 
 
 def verify(query: str, requires: Iterable[str] = (), policy: ScopePolicy | None = None, **kw: Any) -> dict[str, Any]:
-    """USE iff every declared requirement is grounded in returned evidence; otherwise FALLBACK (kernel rule)."""
+    """USE only for available, noncontradictory evidence satisfying every declared requirement."""
     res = search(query, policy, **kw)
     blob = ' '.join(f"{e['locator']} {e.get('excerpt') or ''}" for e in res['evidence']).lower()
     requires = [str(r) for r in requires]
     missing = [r for r in requires if r.lower() not in blob]
-    verdict = ('USE' if not missing else 'FALLBACK') if requires else ('USE' if res['ok'] and res['evidence']
-                                                                         else 'FALLBACK')
+    verdict = 'USE' if res['ok'] and res['evidence'] and not missing else 'FALLBACK'
     return {'ok': True, 'query': query, 'verdict': verdict, 'requires': requires, 'missing': missing,
             'grounded': len(requires) - len(missing), 'evidence_count': len(res['evidence']),
             'memory_snapshot_id': res['memory_snapshot_id'],
-            'rule': 'USE iff every declared requirement is grounded in returned evidence; otherwise FALLBACK'}
+            'rule': 'USE only with available, noncontradictory evidence grounding every requirement; otherwise FALLBACK'}
 
 
 # ----------------------------------------------------------------------------- bench (z0int#22 measurement)
 def bench(queries: Iterable[Mapping[str, Any]], *, config: Mapping[str, Any] | None = None,
           av_db: str | Path | None = None, ledger_root: str | Path | None = None) -> dict[str, Any]:
-    """Per query: cold (resolver) and warm (snapshot cache) latency, raw source reads, brief tokens, hit."""
+    """Per query: first and repeat latency, raw source reads, brief tokens and hit; repeats may bypass cache."""
     queries, rows = list(queries), []
     for q in queries:
         scope = MemoryScope(user=DEFAULT_USER, project=q['project']) if q.get('project') else None

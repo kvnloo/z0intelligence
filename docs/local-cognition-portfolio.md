@@ -79,6 +79,23 @@ All five fit at 4096 context; none were co-resident.
 model, swap on request, unload when idle. Everything that produces a training
 label goes through it.
 
+The supervisor serializes requests through complete upstream response consumption.
+Model swaps, release, shutdown and idle eviction wait for that response; the idle
+window begins after the request completes, including transport failures. This
+prevents a second caller from killing the first caller's resident model. It does
+not provide cancellation or concurrent model execution. The transport timeout
+remains unchanged. Regression coverage includes delayed reads and eviction paths;
+a two-model loopback HTTP smoke verifies response/residency attribution without
+loading weights. That smoke is not new model-performance evidence.
+
+Request timing uses a monotonic clock: `wall_ms` includes queue wait;
+`queue_wait_ms` ends when the residency lock is acquired; `active_ms` covers the
+locked load/swap/transport interval. Active time is not measured GPU utilization.
+Cascade receipts retain these facts in `extra.supervisor`, expose queue wait in
+`latency.queue_wait_ms`, and leave `cost.gpu_ms` unknown instead of charging
+another request's queue time as GPU cost. Older wall-only metadata is not treated
+as GPU measurement either.
+
 | model | quant | cold load ms | TTFT ms | decode tok/s | short decision ms | long decision ms |
 |---|---|---|---|---|---|---|
 | functiongemma_270m | Q8_0 | 5319 | 8.6 | 351.1 | 139 | 83 |
@@ -341,6 +358,53 @@ execution outcome, verified outcome, tokens, GPU/provider cost, and retries. The
 receipt round-trips through JSON and `receipt_from_dict()` reconstructs it for
 replay without a model server; `mark_execution()` and `mark_verification()` join
 the runtime and verifier facts later without collapsing them.
+
+Candidate fallback retains each returned attempt's typed error, parser error and
+invalid-call flag. If all returned decisions abstain, the final result preserves
+the last decision's failure and model identity, with
+`diagnostics.reason=all_candidates_abstained`; `candidate_attempts` retains the
+earlier failures. Raised exceptions remain separate attempt records. An outage,
+timeout or invalid call therefore does not become an unclassified abstention
+when routed through `CandidateRungBackend`.
+
+Rung measurements include all attempted candidates, not only the final selection.
+Elapsed latency spans the complete fallback loop. Token counts, reasoning tokens,
+queue wait and reported USD cost are summed only when every attempt reports that
+field; otherwise the total stays unknown. An exception cannot count as zero cost.
+Per-attempt model, usage, timing, cost and failure facts remain in
+`extra.candidate_attempts`, including known partial measurements. Provider-specific
+cost units, TTFT and decode rate are not combined across multiple candidates.
+The selected/last-returned model still identifies the decision, not every billed
+model; `measurement_scope=candidate_rung` identifies the aggregate measurement.
+An abstaining learned rung emits a `log_only` receipt so its work is not omitted
+from the returned cascade evidence.
+Non-finite optional measurements stay unknown and are named in each attempt's
+`invalid_measurements`; they cannot crash receipt creation or serialize as
+nonstandard NaN/Infinity values in the aggregate measurements.
+
+### Bounded opportunity collection
+
+Hook and bridge producers persist turn identity before attempting capture admission.
+They acquire a shared slot **before** starting an opportunity process. A full pool
+records `fanout_cap` immediately without creating a waiting interpreter; failed
+serialization or launch records `spawn_failed` and releases the slot. The admitted
+child inherits the lock and releases it at exit, including abnormal exit.
+
+Detached jobs use anonymous seekable stdin rather than a blocking pipe. Linux uses
+memory-backed descriptors; other platforms use private temporary files. The parent
+does not wait for the child to read the job. Serialization, process creation,
+session-state locks and receipt writes still cost time: this is not a hard
+nonblocking guarantee or a claim that shadow hooks have zero overhead.
+The existing 5 ms in-process and bare-Python + 40 ms subprocess checks remain
+unchanged. Held-slot measurements now refuse children rather than accumulating
+60-second waiters; real child delivery and inherited-lock lifetime require separate
+runtime checks.
+
+Cold hook startup also pays for imported dependencies. The canonical turn-key module
+does not construct a bridge-only dataclass or import `dataclasses` and `inspect`.
+The Hermes transport adapter constructs its existing serialized identity mapping
+directly and still omits unknown fields. This removes unrelated startup work without
+changing the turn-key algorithm or the envelope schema.
 
 ### Ownership boundary
 

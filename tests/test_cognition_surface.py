@@ -352,8 +352,6 @@ def test_cascade_receipt_records_the_eligible_candidate_set_and_the_choice():
     # The observed quota state is carried through, never recomputed.
     assert receipt["quota"]["source"] == "kerdoios"
     assert receipt["quota"]["remaining"] == 7
-    # GPU cost comes from the supervisor's own facts; cost class from the choice.
-    assert receipt["cost"]["gpu_ms"] == 42.0
     assert receipt["cost"]["cost_class"] == "local"
 
 

@@ -478,3 +478,68 @@ def test_explicit_binary_abstention_is_uncovered_not_predictor_error():
                 assert metric["covered_n"] == 0
                 assert metric["coverage"] == 0
                 assert metric["errors"] == 0
+
+
+def test_scoped_pipeline_validates_pinned_graph_set_not_history(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from z0int.cognition import learning_runtime
+    from z0int.cognition.adapters.transport import ChatOutcome
+    contexts=[]
+
+    class Transport:
+        def __init__(self, config):
+            pass
+        def chat(self, messages, **kwargs):
+            contexts.append(json.loads(messages[-1]['content'])['context'])
+            raw = {'choices': [{'message': {'content': 'yes'}, 'logprobs': {'content': [{
+                'token': 'yes', 'logprob': -.1, 'top_logprobs': [
+                    {'token': 'yes', 'logprob': -.1}, {'token': 'no', 'logprob': -3}]}]}}]}
+            return ChatOutcome('yes', None, {'total_tokens': 1}, {}, raw, 1)
+
+    monkeypatch.setattr(learning_runtime, 'OpenAICompatTransport', Transport)
+    db=connection()
+    for i, label in enumerate(('a','a','b','b','c','c','d')):
+        add(db, str(i), ts=i+1, arguments={'model':label})
+    derive_jobs(db, now=20)
+    endpoint=SimpleNamespace(base_url='http://fixture',served_model='fixed',timeout_s=1,
+                             runtime=None,quantization=None)
+    predict=learning_runtime.choice_predictor(db, endpoint, {}, {'n_ctx':4096})
+    config={'history_width':1,'candidate_k':3,'max_options':3,'prompt_bytes':3000,
+            'decision_method':'slm_pipeline_v1','frozen_categories':[['d','illegal']],
+            'training_digest':'training','first':'binary','final':'binary','margin':0}
+    catalogue=[{'id':'history-1','kind':'bounded_projection','config':config}]
+    strategy=learning_runtime._configs({'omp.model_choice':'history-1'},catalogue)
+    target=job_id('session','6','omp.model_choice')
+    pending=run_jobs(db,predict,now=19,max_jobs=1,families=('omp.model_choice',),
+                     strategies=strategy)
+    assert pending['jobs_evaluated']==0
+    assert db.execute('SELECT COUNT(*) FROM family_evaluations').fetchone()[0]==0
+    ready=run_jobs(db,predict,now=20,max_jobs=1,families=('omp.model_choice',),
+                   strategies=strategy,legal_candidates={target:['d']})
+    assert ready['jobs_evaluated']==1
+    oldest=job_id('session','0','omp.model_choice')
+    assert db.execute('SELECT COUNT(*) FROM family_evaluations WHERE id=?',(oldest,)).fetchone()[0]==0
+    result=db.execute("SELECT prediction,choices,error FROM family_evaluations WHERE id=? AND arm LIKE 'slm:%'",(target,)).fetchone()
+    assert result['prediction']=='d' and result['error'] is None
+    assert json.loads(result['choices'])==['d']
+    prompt=db.execute("SELECT prompt FROM family_evaluations WHERE id=? AND arm LIKE 'slm:%'",(target,)).fetchone()['prompt']
+    assert 'd' not in json.loads(prompt)['choices']
+    baseline=db.execute("SELECT prediction,choices FROM family_evaluations WHERE id=? AND arm LIKE 'heuristic:%'",(target,)).fetchone()
+    assert baseline['prediction'] is None and json.loads(baseline['choices'])==['d']
+    assert contexts and contexts[0]['previous_tools']==[{'tool':'read','intent':None}]
+    assert contexts[0]['task']=='Predict the exact next explicit model argument.'
+    assert contexts[0]['examples'] and all(item['next_tool'] != 'd' for item in contexts[0]['examples'])
+    assert 'choices' not in contexts[0]
+    empty=job_id('session','5','omp.model_choice')
+    run_jobs(db,predict,now=20,max_jobs=1,families=('omp.model_choice',),
+             strategies=strategy,legal_candidates={empty:[]})
+    rows=db.execute('SELECT prediction,choices FROM family_evaluations WHERE id=?',(empty,)).fetchall()
+    assert len(rows)==2 and all(row['prediction'] is None and json.loads(row['choices'])==[] for row in rows)
+
+    # Even a faulty predictor cannot select a frozen but graph-illegal action.
+    changed={**strategy['omp.model_choice'],'strategy_id':'second'}
+    run_jobs(db,lambda *args: {'selected_action':'illegal','confidence':.9},
+             now=21,max_jobs=20,families=('omp.model_choice',),
+             strategies={'omp.model_choice':changed},legal_candidates={target:['d']})
+    result=db.execute("SELECT prediction,error FROM family_evaluations WHERE id=? AND arm LIKE 'slm:%@second:%'",(target,)).fetchone()
+    assert result['prediction'] is None and result['error']=='out_of_set'

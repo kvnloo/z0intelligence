@@ -20,7 +20,7 @@ Canonical runtime repo: **kvnloo/z0intelligence** (package/CLI `z0int`, dist `op
 - **AODL validation**: importable `aodl_contract` (hotl-0.2 + `spec_revision()`); CLI=same impl.
 - **Observations**: Kerdoios V2 `execution_completed` ≠ `verified_success` (null ≠ success); `observations import`.
 - **Allocation**: Kerdoios accepts `z0int.allocation_request.v1`; multi-quota shared groups; ExecutionPlan v2 metadata only.
-- **Harness**: OMP bridge via `omp-extensions/` + `z0int onboard` symlink only; Hermes thin adapter `adapters/hermes_z0int/`.
+- **Harness**: OMP bridge via `omp-extensions/` + explicit `z0int onboard --omp-extension z0int-bridge`; Hermes thin adapter `adapters/hermes_z0int/`.
 
 ## Remaining duplicates / follow-ups
 

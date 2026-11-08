@@ -35,11 +35,78 @@ def compile_rows(rows, previous=None, now=NOW, config=CONFIG):
     return compile_policy(rows, previous, now, config)
 
 
+def outcome_pairs(n=80, expires_at="2026-11-07T10:00:00Z", kind="canary"):
+    subject = {"family": "omp.tool", "job": "next-action"}
+    candidate = {"kind": "slm", "model": "synthetic@rev"}
+    reference = {"kind": "rules", "model": "synthetic@rev"}
+    protocol = {"schema": "z0.policy.paired_outcome_protocol.v1", "subject": subject,
+                "candidate_arm": candidate, "reference_arm": reference, "experiment_id": "fixture",
+                "frozen_at": "2026-10-23T00:00:00Z", "expires_at": expires_at,
+                "noninferiority_margin": .1, "expected_roles": ["candidate", "reference"],
+                "expected_pairs": [{"pair_id": f"pair-{i}", "task_snapshot_id": f"snapshot-{i}"}
+                                   for i in range(n)]}
+    protocol_sha = digest(protocol)
+    rows = []
+    for index in range(n):
+        for role, arm in (("candidate", candidate), ("reference", reference)):
+            trace = f"{role}-{index}"
+            evaluation = {"protocol_sha256": protocol_sha, "subject": subject, "arm": arm,
+                          "experiment_id": "fixture", "pair_id": f"pair-{index}",
+                          "task_snapshot_id": f"snapshot-{index}", "arm_id": role,
+                          "observed_at": "2026-10-24T10:02:00Z"}
+            proof = {"kind": "product_check", "trace_id": trace, "receipt_id": trace,
+                     "sha256": digest(trace), "success": True, "evaluation": evaluation}
+            rows.append(Finding(ts=evaluation["observed_at"], source={"kind": "manual",
+                "adapter": "agent_outcomes", "path": "/synthetic/results.json",
+                "sha256": "b" * 64, "run_id": trace}, subject=subject, arm=arm,
+                metric={"name": "task_success", "value": 1., "n": 1, "ci_low": .206,
+                        "ci_high": 1., "ci_method": "wilson95", "higher_is_better": True,
+                        "outcome_ledger_verified": True, "promotion_eligible": True},
+                evidence_class=kind, scope_note="Synthetic paired fixture.", expires_at=expires_at,
+                baseline={"outcome_protocol": {"sha256": protocol_sha, "document": protocol}},
+                synthetic=True, evidence_kind="product_outcome", verifier_receipt=proof).to_dict())
+    return rows
+
+
 def all_evidence():
     return [finding(metric={"live_shadow": True}),
-            finding("replayed_L1", ts="2026-10-24T10:01:00Z", metric={"divergence": .01, "aa_noise_floor": .01}),
-            finding("canary", ts="2026-10-24T10:02:00Z", metric={"name": "task_success", "divergence": 0.,
-                "aa_noise_floor": .01, "outcome_ledger_verified": True})]
+            finding("replayed_L1", ts="2026-10-24T10:01:00Z",
+                    metric={"divergence": .01, "aa_noise_floor": .01})] + outcome_pairs()
+
+def test_single_product_success_does_not_demote_and_latest_failure_does():
+    base = all_evidence()[:2]
+    canary = compile_rows(base, compile_rows(base))
+    single = outcome_pairs(1)[0]
+    assert stage(compile_rows(base + [single], canary)) == "canary"
+    failed = deepcopy(single)
+    failed["verifier_receipt"]["success"] = False
+    failed["metric"]["value"] = 0.
+    failed["id"] = digest({k: v for k, v in failed.items() if k not in {"id", "prev"}})
+    result = compile_rows(base + [failed], canary)
+    assert stage(result) == "none"
+    assert next(iter(result["families"].values()))["demoted_reason"] == "latest_product_failure"
+
+
+def test_incomplete_frozen_cohort_cannot_hide_candidate_failures():
+    base = all_evidence()[:2]
+    previous = compile_rows(base, compile_rows(base))
+    outcomes = outcome_pairs(160)
+    retained = []
+    for row in outcomes:
+        evaluation = row["verifier_receipt"]["evaluation"]
+        index = int(evaluation["pair_id"].split("-")[-1])
+        if index >= 80 and evaluation["arm_id"] == "reference":
+            continue
+        row = deepcopy(row)
+        if index >= 80:
+            row["verifier_receipt"]["success"] = False
+            row["metric"]["value"] = 0.
+        elif index == 79 and evaluation["arm_id"] == "candidate":
+            row["ts"] = "2026-10-24T11:00:00Z"
+            row["verifier_receipt"]["evaluation"]["observed_at"] = row["ts"]
+        row["id"] = digest({k: v for k, v in row.items() if k not in {"id", "prev"}})
+        retained.append(row)
+    assert stage(compile_rows(base + retained, previous)) == "canary"
 
 
 def test_byte_identical_inputs_and_content_address():
@@ -59,6 +126,41 @@ def test_exactly_one_promotion_step_per_compile():
     live = compile_rows(rows, canary)
     assert [stage(p) for p in (shadow, canary, live)] == ["shadow", "canary", "live"]
     assert stage(compile_rows(rows, live)) == "live"
+
+
+@pytest.mark.parametrize("job,family", [
+    ("next-action", "other.family"),
+    ("select-tool", "omp.tool"),
+])
+@pytest.mark.parametrize("previous_stage", ["shadow", "canary", "live"])
+def test_historical_unattested_shadow_learner_loses_credit(tmp_path, job, family, previous_stage):
+    from z0int.policy.findings import append_findings, read_findings
+
+    old = finding(source={"kind": "shadow_learner", "path": "/synthetic/status.json",
+                          "sha256": "b" * 64, "run_id": "shadow-old"},
+                  metric={"live_shadow": True, "promotion_eligible": True})
+    old["subject"] = {"family": family, "job": job}
+    old["id"] = digest({k: v for k, v in old.items() if k not in {"id", "prev"}})
+    path = tmp_path / "findings.jsonl"
+    append_findings([old], path)
+    rows = read_findings(path)
+    key = rule_key(family, scope_of(old))
+    prior = {"families": {key: {"family": family, "scope": scope_of(old),
+                                "stage": previous_stage, "arm": old["arm"]}}}
+    policy = compile_rows(rows, prior)
+    assert policy["families"][key]["stage"] == "none"
+    assert rows[0]["metric"]["n"] == 200
+
+
+def test_shadow_learner_rules_and_independent_evaluation_remain_eligible():
+    source = {"kind": "shadow_learner", "path": "/synthetic/status.json",
+              "sha256": "b" * 64, "run_id": "shadow-old"}
+    rules = finding(source=source, arm={"kind": "rules", "model": "rules"})
+    assert stage(compile_rows([rules])) == "shadow"
+    direct = finding(metric={"live_shadow": True})
+    replay = finding("replayed_L1", metric={"divergence": 0., "aa_noise_floor": .01})
+    rows = [direct, replay]
+    assert stage(compile_rows(rows, compile_rows(rows))) == "canary"
 
 
 @pytest.mark.parametrize("kind", ["inference", "published", "replayed_L1", "replayed_L2", "canary"])
@@ -85,7 +187,7 @@ def test_shadow_canary_requires_live_labels_and_aa_replay(shadow_metric, replay_
 
 
 @pytest.mark.parametrize("kind,verified,n,expected", [
-    ("canary", True, 50, "live"), ("replayed_L2", True, 50, "live"),
+    ("canary", True, 50, "canary"), ("replayed_L2", True, 50, "canary"),
     ("canary", False, 50, "canary"), ("canary", True, 49, "canary"),
     ("measured", True, 50, "canary"),
 ])
@@ -196,11 +298,7 @@ def test_latest_failure_cannot_repromote_from_old_success():
 
 def test_expired_outcome_demotes_live_to_canary_with_fresh_lower_stage_support():
     rows = all_evidence()
-    old_outcome = finding("canary", ts="2026-10-24T09:00:00Z",
-        expires_at="2026-10-24T12:30:00Z",
-        metric={"name": "task_success", "divergence": 0., "aa_noise_floor": .01,
-                "outcome_ledger_verified": True})
-    rows = [old_outcome] + rows[:2]
+    rows = outcome_pairs(expires_at="2026-10-24T12:30:00Z") + rows[:2]
     previous = compile_rows(rows)
     previous = compile_rows(rows, previous)
     previous = compile_rows(rows, previous)
@@ -285,7 +383,7 @@ def choice_finding(task, k, *, value=1., n=100, low=1., arm=None,
                    ts="2026-10-24T10:00:00Z", expires_at="2026-11-07T10:00:00Z",
                    evidence_class="measured", metric=None):
     row = finding(evidence_class, synthetic=True, n=n, low=low, ts=ts, expires_at=expires_at,
-        arm=arm or {"kind": "slm", "model": "choice-model@rev", "quant": "Q8_0",
+        arm=arm or {"kind": "slm", "model": "sha256:" + "a" * 64, "quant": "Q8_0",
                     "engine": "choice-engine@rev", "backend": "cpu", "device": "fixture"},
         metric={"name": "choice_accuracy", "option_count": k, "value": value, **(metric or {})})
     row["subject"] = {"family": "choice.option_capacity", "job": "ChoiceLadder", "task": task}
@@ -293,51 +391,86 @@ def choice_finding(task, k, *, value=1., n=100, low=1., arm=None,
     return row
 
 
-def capacity(policy, row):
+def capacity(policy, row, risk="read"):
     from z0int.policy.compile import option_capacity_key
-    return policy["option_capacity"][option_capacity_key(scope_of(row))]
+    return policy["option_capacity"][option_capacity_key(scope_of(row))][risk]
+
+
+def compile_capacity(rows):
+    """Supply explicit synthetic measured economics for capacity-only fixtures."""
+    costs = []
+    seen = set()
+    for choice in rows:
+        identity = canonical(scope_of(choice))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        for field, value in {"cost_call": .1, "cost_frontier": 1.,
+                             "cost_error": 20., "abstain_rate": 0.}.items():
+            row = finding(synthetic=True, arm=choice["arm"],
+                metric={"name": field, "value": value, "ci_low": value,
+                        "ci_high": value, "ci_method": "none",
+                        "higher_is_better": False, "cost_unit": "latency_ms_lambda0"})
+            row["subject"] = {"family": "choice.error_cost", "risk_class": "read",
+                              "job": "observed_frontier_recovery"}
+            row["id"] = digest({k: v for k, v in row.items() if k not in {"id", "prev"}})
+            costs.append(row)
+    return compile_rows(rows + costs)
 
 
 def test_option_capacity_minimum_of_task_maxima_and_recomputed_wilson():
     rows = [choice_finding("T1", 8), choice_finding("T1", 16, value=.9),
             choice_finding("T2", 5), choice_finding("T3", 16), choice_finding("T4", 10)]
-    policy = compile_rows(rows)
+    policy = compile_capacity(rows)
     entry = capacity(policy, rows[0])
     assert entry["allowed_k"] == 5
     assert entry["task"] == ["T1", "T2", "T3", "T4"]
-    assert len(entry["finding_ids"]) == 4
+    assert len(entry["finding_ids"]) == 8
     assert .96 < entry["wilson_lower"] < .97  # Stated 1.0 cannot inflate the Wilson bound.
-    assert entry["bar"] == .95
+    assert entry["bar_derived"] == pytest.approx(.955)
     assert stage(policy) == "none"  # Choice capacity does not create routing credit.
-    assert canonical(policy) == canonical(compile_rows(rows))
+    assert canonical(policy) == canonical(compile_capacity(rows))
 
 
-def test_option_capacity_missing_failed_expired_tasks_and_unknown_scope_default_two():
+def test_unmeasured_default_economics_never_authorize_routing():
+    rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3", "T4")]
+    policy = compile_rows(rows)
+    for risk, bar in (("read", .955), ("mutating_reversible", .991)):
+        entry = capacity(policy, rows[0], risk)
+        assert entry["allowed_k"] == 0
+        assert entry["bar_derived"] == pytest.approx(bar)
+        assert entry["inputs"]["status"] == "unmeasured"
+        assert entry["wilson_lower"] is None
+        assert entry["finding_ids"] == []
+
+
+def test_option_capacity_missing_failed_expired_tasks_and_unknown_scope_disable_slm():
     rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3")]
-    missing = capacity(compile_rows(rows), rows[0])
-    assert missing["allowed_k"] == 2
-    assert missing["finding_ids"] == [] and missing["wilson_lower"] is None
+    missing = capacity(compile_capacity(rows), rows[0])
+    assert missing["allowed_k"] == 0
+    assert len(missing["finding_ids"]) == 4 and missing["wilson_lower"] is None
     rows.append(choice_finding("T4", 10, value=.8))
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+    assert capacity(compile_capacity(rows), rows[0])["allowed_k"] == 0
     rows[-1] = choice_finding("T4", 10, expires_at=NOW)
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+    assert capacity(compile_capacity(rows), rows[0])["allowed_k"] == 0
     assert compile_rows([])["option_capacity"] == {}
 
 
 def test_option_capacity_never_crosses_any_physical_scope_dimension():
     rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3", "T4")]
     for dimension in ("model", "quant", "engine", "backend", "device"):
-        different = {**rows[0]["arm"], dimension: "different-" + dimension}
+        different = {**rows[0]["arm"], dimension: ("sha256:" + "b" * 64 if dimension == "model"
+                                                else "different-" + dimension)}
         other = choice_finding("T1", 32, arm=different)
-        policy = compile_rows(rows + [other])
+        policy = compile_capacity(rows + [other])
         assert capacity(policy, rows[0])["allowed_k"] == 8
-        assert capacity(policy, other)["allowed_k"] == 2
+        assert capacity(policy, other)["allowed_k"] == 0
 
 
 def test_option_capacity_latest_failure_supersedes_old_success():
     rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3", "T4")]
     rows.append(choice_finding("T2", 8, value=.5, ts="2026-10-24T11:00:00Z"))
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+    assert capacity(compile_capacity(rows), rows[0])["allowed_k"] == 0
 
 
 @pytest.mark.parametrize("override", [
@@ -350,23 +483,141 @@ def test_option_capacity_latest_failure_supersedes_old_success():
 def test_option_capacity_rejects_ineligible_or_inconsistent_evidence(override):
     rows = [choice_finding(task, 8) for task in ("T1", "T2", "T3")]
     rows.append(choice_finding("T4", 8, **override))
-    assert capacity(compile_rows(rows), rows[0])["allowed_k"] == 2
+    assert capacity(compile_capacity(rows), rows[0])["allowed_k"] == 0
 
 
-def test_option_capacity_required_tasks_bar_and_support_expiry_are_configurable():
-    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_bar=.99,
-                            option_capacity_tasks=("custom-task",))
-    row = choice_finding("custom-task", 16)
-    assert capacity(compile_rows([row], config=config), row)["allowed_k"] == 2
-    stronger = choice_finding("custom-task", 16, n=2000, expires_at="2026-10-24T13:00:00Z")
-    entry = capacity(compile_rows([stronger], config=config), stronger)
-    assert entry["allowed_k"] == 16 and entry["expires_at"] == "2026-10-24T13:00:00Z"
-    assert capacity(compile_rows([stronger], now="2026-10-24T13:00:00Z", config=config), stronger)["allowed_k"] == 2
+def test_option_capacity_risk_expected_cost_and_expiry():
+    config = CompilerConfig(compiler_revision="a" * 40,
+        option_capacity_tasks=("custom-task",),
+        option_capacity_costs={
+            "read": {"cost_call": 1., "cost_frontier": 10., "cost_error": 2.,
+                     "abstain_rate": 0., "measured": False, "finding_ids": []},
+            "mutating_reversible": {"cost_call": 1., "cost_frontier": 10.,
+                     "cost_error": 100., "abstain_rate": 0., "measured": False, "finding_ids": []}})
+    row = choice_finding("custom-task", 8, value=.85, n=1000,
+                         expires_at="2026-10-24T13:00:00Z")
+    policy = compile_rows([row], config=config)
+    assert capacity(policy, row)["allowed_k"] == 0
+    assert capacity(policy, row, "mutating_reversible")["allowed_k"] == 0
+    assert capacity(policy, row, "destructive")["allowed_k"] == 0
+    assert capacity(policy, row)["inputs"]["status"] == "unmeasured"
+    assert capacity(policy, row)["bar_derived"] == pytest.approx(-3.5)
+    assert capacity(policy, row)["wilson_lower"] is None
+    assert capacity(compile_rows([row], now="2026-10-24T13:00:00Z", config=config), row)["allowed_k"] == 0
 
 
-def test_option_capacity_missing_evidence_known_scope_still_emits_default_two():
-    row = finding(arm={"kind": "slm", "model": "model", "quant": "Q4_0",
+def test_option_capacity_missing_evidence_known_scope_disables_slm():
+    row = finding(arm={"kind": "slm", "model": "sha256:" + "c" * 64, "quant": "Q4_0",
                        "engine": "engine", "backend": "cpu", "device": "fixture"})
     entry = capacity(compile_rows([row]), row)
-    assert entry["allowed_k"] == 2
+    assert entry["allowed_k"] == 0
     assert not entry["finding_ids"] and entry["wilson_lower"] is None
+
+
+def test_measured_capacity_costs_require_real_risk_bound_findings():
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_costs={
+        "read": {"cost_call": 1., "cost_frontier": 10., "cost_error": 2.,
+                 "abstain_rate": 0., "measured": True, "finding_ids": ["missing"]}})
+    with pytest.raises(ValueError, match="fresh exact-scope"):
+        compile_rows([choice_finding("T1", 8)], config=config)
+
+
+def test_capacity_cost_measurements_are_bound_to_finding_values_and_expiry():
+    costs = {"cost_call": 1., "cost_frontier": 10., "cost_error": 2., "abstain_rate": 0.}
+    choice = choice_finding("T1", 8, value=.85, n=1000)
+    sources = []
+    for field, value in costs.items():
+        row = finding(synthetic=True, arm=choice["arm"], expires_at="2026-10-24T13:00:00Z",
+            metric={"name": field, "value": value, "ci_low": value,
+                    "ci_high": value, "ci_method": "none", "higher_is_better": False,
+                    "cost_unit": "latency_ms_lambda0"})
+        row["subject"] = {"family": "choice.error_cost", "risk_class": "read",
+                          "job": "observed_frontier_recovery"}
+        row["id"] = digest({key: value for key, value in row.items() if key not in {"id", "prev"}})
+        sources.append(row)
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_tasks=("T1",),
+        option_capacity_costs={"read": {**costs, "measured": True,
+                                      "cost_unit": "latency_ms_lambda0",
+                                      "finding_ids": [row["id"] for row in sources]}})
+    entry = capacity(compile_rows(sources + [choice], config=config), choice)
+    assert entry["allowed_k"] == 8
+    assert entry["expires_at"] == "2026-10-24T13:00:00Z"
+    assert entry["inputs"]["status"] == "measured"
+    config.option_capacity_costs["read"]["cost_error"] = 3.
+    with pytest.raises(ValueError, match="matching finding"):
+        compile_rows(sources + [choice], config=config)
+
+
+@pytest.mark.parametrize("dimension", ["model", "quant", "engine", "backend", "device"])
+def test_option_capacity_configured_costs_do_not_cross_scope(dimension):
+    choice = choice_finding("T1", 8, n=1000)
+    other = {**choice["arm"], dimension: ("sha256:" + "b" * 64 if dimension == "model" else "other")}
+    costs = {"cost_call": .1, "cost_frontier": 1., "cost_error": 20., "abstain_rate": 0.}
+    sources = []
+    for name, value in costs.items():
+        row = finding(arm=other, metric={"name": name, "value": value, "cost_unit": "latency_ms_lambda0"})
+        row["subject"] = {"family": "choice.error_cost", "risk_class": "read"}
+        row["id"] = digest({k: v for k, v in row.items() if k not in {"id", "prev"}})
+        sources.append(row)
+    other_choice = choice_finding("T1", 8, n=1000, arm=other)
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_tasks=("T1",), option_capacity_costs={"read": {
+        **costs, "measured": True, "cost_unit": "latency_ms_lambda0",
+        "finding_ids": [row["id"] for row in sources]}})
+    policy = compile_rows([choice, other_choice] + sources, config=config)
+    assert capacity(policy, choice)["allowed_k"] == 0
+    assert capacity(policy, choice)["inputs"]["status"] == "unmeasured"
+    assert capacity(policy, other_choice)["allowed_k"] == 8
+    mixed = deepcopy(sources[0])
+    mixed["arm"] = choice["arm"]
+    mixed["id"] = digest({k: v for k, v in mixed.items() if k not in {"id", "prev"}})
+    config.option_capacity_costs["read"]["finding_ids"][0] = mixed["id"]
+    with pytest.raises(ValueError, match="one exact-scope"):
+        compile_rows([choice, other_choice, mixed] + sources[1:], config=config)
+
+
+def test_capacity_abstention_cost_can_remove_otherwise_profitable_route():
+    costs = {"cost_call": 1., "cost_frontier": 10., "cost_error": 2.,
+             "abstain_rate": 1., "measured": False, "finding_ids": []}
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_tasks=("T1",),
+                            option_capacity_costs={"read": costs})
+    row = choice_finding("T1", 8, n=1000)
+    assert capacity(compile_rows([row], config=config), row)["allowed_k"] == 0
+
+
+def test_fresh_scoped_cost_findings_are_adopted_without_configuration_flip():
+    choice = choice_finding("T1", 8, value=.85, n=1000)
+    rows = [choice]
+    for field, value in {"cost_call": 1., "cost_frontier": 10.,
+                         "cost_error": 2., "abstain_rate": 0.}.items():
+        row = finding(synthetic=True, arm=choice["arm"],
+            metric={"name": field, "value": value, "ci_low": value,
+                    "ci_high": value, "ci_method": "none", "higher_is_better": False,
+                    "cost_unit": "latency_ms_lambda0"})
+        row["subject"] = {"family": "choice.error_cost", "risk_class": "read",
+                          "job": "observed_frontier_recovery"}
+        row["id"] = digest({key: value for key, value in row.items() if key not in {"id", "prev"}})
+        rows.append(row)
+    config = CompilerConfig(compiler_revision="a" * 40, option_capacity_tasks=("T1",))
+    entry = capacity(compile_rows(rows, config=config), choice)
+    assert entry["allowed_k"] == 8
+    assert entry["inputs"]["status"] == "measured"
+    other = choice_finding("T1", 8, value=.85, n=1000,
+                           arm={**choice["arm"], "device": "unmeasured-device"})
+    assert capacity(compile_rows(rows + [other], config=config), other)["allowed_k"] == 0
+    proxy = deepcopy(rows[1])
+    proxy["ts"] = "2026-10-24T11:00:00Z"
+    proxy["evidence_kind"] = "proxy"
+    proxy["id"] = digest({k: v for k, v in proxy.items() if k not in {"id", "prev"}})
+    with_proxy = capacity(compile_rows(rows + [proxy], config=config), choice)
+    assert with_proxy["allowed_k"] == 8
+    assert proxy["id"] not in with_proxy["inputs"]["finding_ids"]
+
+
+def test_capacity_identity_rejects_aliases_and_uses_content_addressed_scope():
+    from z0int.policy.compile import option_capacity_key
+    row = choice_finding("T1", 8)
+    scope = scope_of(row)
+    assert option_capacity_key(scope) == option_capacity_key(dict(reversed(list(scope.items()))))
+    with pytest.raises(ValueError, match="GGUF bytes"):
+        option_capacity_key({**scope, "model": "friendly-alias"})
+    assert option_capacity_key({**scope, "model": "sha256:" + "b" * 64}) != option_capacity_key(scope)

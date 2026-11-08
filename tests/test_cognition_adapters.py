@@ -228,16 +228,28 @@ def test_backend_never_readmits_a_filtered_action():
     assert decision.selected_action is None
     assert decision.abstained is True
     assert decision.invalid_call is True
-    assert "fs.rm" in (decision.parse_error or "")
+    assert decision.parse_error is None
+    assert decision.error == "invalid_call:fs.rm"
 
 
-def test_backend_fails_open_on_transport_error():
-    transport = _FakeTransport(error=TransportError("connection refused"))
+@pytest.mark.parametrize("message,kind", [
+    ("connection refused", "transport"),
+    ("request timed out", "timeout"),
+    ("context_length_exceeded", "transport"),
+])
+def test_backend_fails_open_on_transport_error(message, kind):
+    transport = _FakeTransport(error=TransportError(message))
     decision = _backend(transport).decide(ToolDecisionRequest(state="s", legal=_legal()))
     assert decision.abstained is True
     assert decision.selected_action is None
     assert decision.invalid_call is False
-    assert "transport_error" in (decision.parse_error or "")
+    assert decision.parse_error is None
+    assert decision.error_kind == kind
+    row = decision.to_dict()
+    assert row["error_kind"] == kind
+    assert row["error"] == decision.error
+    assert message in row["error"]
+    assert "parse_error" not in row
 
 
 def test_backend_fails_open_on_unparseable_output():
@@ -246,6 +258,8 @@ def test_backend_fails_open_on_unparseable_output():
     assert decision.abstained is True
     assert decision.selected_action is None
     assert decision.parse_error == "unparseable_response"
+    assert decision.error_kind == "parse"
+    assert decision.error is None
 
 
 def test_backend_abstains_when_nothing_is_legal_and_makes_no_call():
@@ -261,7 +275,9 @@ def test_backend_abstains_when_nothing_is_legal_and_makes_no_call():
     transport = _FakeTransport(_outcome())
     decision = _backend(transport).decide(ToolDecisionRequest(state="s", legal=legal))
     assert decision.abstained is True
-    assert decision.parse_error == "no legal actions"
+    assert decision.parse_error is None
+    assert decision.error_kind == "none"
+    assert decision.error is not None
     assert transport.calls == []
 
 
@@ -400,7 +416,8 @@ def test_jev_adapter_abstains_when_the_scorer_has_too_many_options():
         ToolDecisionRequest(state="s", legal=_legal())
     )
     assert decision.abstained is True
-    assert "exceed" in (decision.parse_error or "")
+    assert decision.parse_error is None
+    assert decision.error is not None
     assert stub.requests == []
 
 

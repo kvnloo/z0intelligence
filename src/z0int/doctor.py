@@ -105,13 +105,16 @@ def discover_omp() -> dict[str, Any]:
     repo_ext = _repo_root() / "omp-extensions"
     linked: list[str] = []
     missing: list[str] = []
+    conflicts: list[str] = []
     if repo_ext.is_dir():
         for child in sorted(repo_ext.iterdir()):
             if not child.is_dir() or child.name.startswith("."):
                 continue
             target = ext / child.name
-            if target.exists() or target.is_symlink():
+            if target.is_symlink() and target.resolve() == child.resolve():
                 linked.append(child.name)
+            elif target.exists() or target.is_symlink():
+                conflicts.append(child.name)
             else:
                 missing.append(child.name)
     return {
@@ -120,6 +123,7 @@ def discover_omp() -> dict[str, Any]:
         "repo_extensions": str(repo_ext) if repo_ext.is_dir() else None,
         "linked": linked,
         "missing_links": missing,
+        "conflicts": conflicts,
     }
 
 
@@ -252,9 +256,9 @@ def run_doctor() -> DoctorReport:
         Check(
             id="omp",
             ok=omp.get("omp_home") is not None,
-            detail=f"linked={omp.get('linked')} missing={omp.get('missing_links')}",
+            detail=f"linked={omp.get('linked')} missing={omp.get('missing_links')} conflicts={omp.get('conflicts')}",
             required=False,
-            fix="Install OMP or run z0int onboard to symlink omp-extensions",
+            fix="Install OMP if needed; optional plugins require z0int onboard --omp-extension NAME",
         ),
     )
 

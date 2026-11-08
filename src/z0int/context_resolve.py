@@ -16,7 +16,7 @@ import shutil
 import stat
 import subprocess
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -808,6 +808,19 @@ def resolve_context(
                 continue
             from .memory import surface as memory_surface
 
+            policy = memory_policy or memory_surface.ScopePolicy()
+            if request_scope is not None:
+                # Both boundaries apply. Ancestor visibility sets intersect at the
+                # shallower comparable scope; never widen an existing read policy.
+                policy_scope = policy.scope
+                if policy_scope is None or request_scope.is_visible_to(policy_scope):
+                    policy = replace(policy, scope=request_scope)
+                elif not policy_scope.is_visible_to(request_scope):
+                    ops.append({"op": "memory_skipped", "need": need.id, "reason": "scope excluded"})
+                    if need.required:
+                        gaps.append(f"{need.id}: memory scope unavailable or excluded")
+                    continue
+
             if turn_key is None:  # without a turn the single-injector guard cannot run, so memory stays out
                 ops.append({"op": "memory_skipped", "need": need.id, "reason": "double_inject_guard: no turn_key"})
                 if need.required:
@@ -818,14 +831,20 @@ def resolve_context(
                 if need.required:
                     gaps.append(f"{need.id}: double_inject_guard: another injector owns memory for this turn")
                 continue
-            res = memory_surface.search(need.description, memory_policy)
+            res = memory_surface.search(need.description, policy)
+            conflicts = res["layers"].get("temporal", {}).get("contradictions", [])
+            contradictions.extend(conflicts)
+            accepted = res["ok"] and not conflicts
             ops.append({"op": "memory_resolve", "need": need.id, "hits": len(res["evidence"]),
+                        "accepted": accepted,
                         "layers": {k: v["status"] for k, v in res["layers"].items()}})
             measurements_extra["memory_snapshot_id"] = res["memory_snapshot_id"]
-            evidence.extend(EvidenceRef(**e["evidence_ref"]) for e in res["evidence"])
-            if need.required and not res["evidence"]:
+            if accepted:
+                evidence.extend(EvidenceRef(**e["evidence_ref"]) for e in res["evidence"])
+            if need.required and (not accepted or not res["evidence"]):
                 down = [f"{k}={v.get('reason')}" for k, v in res["layers"].items() if v["status"] != "ok"]
-                gaps.append(f"{need.id}: no memory evidence for {need.description!r}"
+                reason = "conflicting current claims" if conflicts else "no usable memory evidence"
+                gaps.append(f"{need.id}: {reason}"
                             + (f" (unavailable: {', '.join(down)})" if down else ""))
         else:
             gaps.append(f"{need.id}: unsupported kind {need.kind}")

@@ -257,7 +257,7 @@ class BridgeRuntime:
             if kind == "opportunity_record":
                 ctx = hc.begin_turn(harness, job)
                 if ctx:
-                    self._capture_spawn(hc.child_argv(harness), {"payload": job, "ctx": ctx})
+                    hc.spawn_opportunity(harness, {"payload": job, "ctx": ctx}, spawn=self._capture_spawn)
             else:
                 ctx = hc.outcome_context(harness, job["turn"])
                 if ctx and ctx.get("trace_id") is not None:
@@ -659,6 +659,10 @@ class BridgeRuntime:
             closed = {"ok": False, "error": str(exc), "trace_id": trace_id}
 
         ok = not closed.get("error") and closed.get("ok") is not False
+        if ok:
+            measurement_state = closed.get("measurement_state")
+            state_reason = closed.get("state_reason")
+            measured = closed.get("measured_frontier_tokens")
         heart = {
             "schema": SCHEMA_HEART,
             "ts": time.time(),

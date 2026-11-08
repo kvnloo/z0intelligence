@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -342,6 +344,109 @@ def test_empty_action_set_compiles_to_an_empty_legal_set():
     assert result["shadow"] == []
 
 
+@pytest.mark.parametrize("same_server", [True, False])
+def test_challengers_share_one_server_without_interleaving(same_server):
+    entered = threading.Event()
+    release = threading.Event()
+    other_entered = threading.Event()
+    calls = []
+
+    class First(_FakeBackend):
+        def chat(self, messages, **kwargs):
+            calls.append("first")
+            entered.set()
+            assert release.wait(3)
+            return super().chat(messages, **kwargs)
+
+    class Second(_FakeBackend):
+        def chat(self, messages, **kwargs):
+            other_entered.set()
+            calls.append("second")
+            return super().chat(messages, **kwargs)
+
+    first, second = First(action="read"), Second(action="grep")
+    first.config = ServerConfig("http://serialized-fixture", "m1")
+    second.config = ServerConfig(
+        "http://serialized-fixture/" if same_server else "http://independent-fixture", "m2")
+    registry = _FakeRegistry(backends={"m1": first, "m2": second}, served=("m1", "m2"))
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(run_shadow, _payload(shadows=["m1", "m2"]),
+                             registry=registry, write=False, timeout_s=2)
+        try:
+            assert entered.wait(2)
+            overlapped = other_entered.wait(.1 if same_server else 2)
+        finally:
+            release.set()
+        rows = future.result(timeout=3)["shadow"]
+    assert overlapped is (not same_server)
+    assert [row["selected_action"] for row in rows] == ["read", "grep"]
+    if same_server:
+        assert calls == ["first", "first", "second", "second"]
+
+
+def test_expired_challenger_never_starts_after_inflight_arm_finishes():
+    entered = threading.Event()
+    release = threading.Event()
+    completed = threading.Event()
+
+    class First(_FakeBackend):
+        def chat(self, messages, **kwargs):
+            entered.set()
+            assert release.wait(3)
+            result = super().chat(messages, **kwargs)
+            if len(self.seen_legal) == 2:
+                completed.set()
+            return result
+
+    first, second = First(action="read"), _FakeBackend(action="grep")
+    first.config = ServerConfig("http://deadline-fixture", "m1")
+    second.config = ServerConfig("http://deadline-fixture", "m2")
+    registry = _FakeRegistry(backends={"m1": first, "m2": second}, served=("m1", "m2"))
+    try:
+        rows = run_shadow(_payload(shadows=["m1", "m2"]), registry=registry,
+                          write=False, timeout_s=.1)["shadow"]
+        assert entered.is_set()
+    finally:
+        release.set()
+    assert completed.wait(2)
+    assert second.seen_legal == []
+    assert [row["requested_model"] for row in rows] == ["m1", "m2"]
+    assert all(row["error"] == "shadow_timeout" for row in rows)
+
+
+def test_timed_out_arm_keeps_server_exclusive_across_shadow_calls():
+    release = threading.Event()
+    completed = threading.Event()
+
+    class First(_FakeBackend):
+        def chat(self, messages, **kwargs):
+            assert release.wait(3)
+            result = super().chat(messages, **kwargs)
+            if len(self.seen_legal) == 2:
+                completed.set()
+            return result
+
+    first, second = First(action="read"), _FakeBackend(action="grep")
+    first.config = ServerConfig("http://cross-call-fixture", "m1")
+    second.config = ServerConfig("http://cross-call-fixture", "m2")
+    try:
+        initial = run_shadow(_payload(shadows=["m1"]),
+            registry=_FakeRegistry(backends={"m1": first}), write=False, timeout_s=.1)
+        later = run_shadow(_payload(shadows=["m2"]),
+            registry=_FakeRegistry(backends={"m2": second}, served=("m2",)),
+            write=False, timeout_s=.1)
+    finally:
+        release.set()
+    assert completed.wait(2)
+    assert second.seen_legal == []
+    assert initial["shadow"][0]["error"] == "shadow_timeout"
+    assert later["shadow"][0]["error"] == "shadow_timeout"
+    recovered = run_shadow(_payload(shadows=["m2"]),
+        registry=_FakeRegistry(backends={"m2": second}, served=("m2",)),
+        write=False, timeout_s=2)
+    assert recovered["shadow"][0]["selected_action"] == "grep"
+
+
 # --- receipts -----------------------------------------------------------
 
 
@@ -620,3 +725,13 @@ def test_persisted_observation_keeps_identity_without_prompt_or_tool_arguments(t
     assert receipt["tool_name"] == "read"
     assert receipt["tool_call_id"] == "call-private"
     assert "state" not in receipt
+
+
+def test_absent_scoped_candidate_preserves_goal_binary_shadow(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    backend = _FakeBackend(action="read")
+    result = run_shadow(_payload(), registry=_FakeRegistry(backends={"m1": backend}), write=False)
+    assert result["ok"] is True
+    assert result["shadow"][0]["selected_action"] == "read"
+    assert {value for call in backend.seen_legal for value in call} == {"read", "grep"}
+    assert result["selected_action"] is None and result["executed_action"] is None

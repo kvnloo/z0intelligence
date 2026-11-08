@@ -12,6 +12,15 @@ OMP, Hermes, DSH, and Codex can poll this same read-only snapshot and render wor
 
 Each physical call has one trace ID. A terminal record supersedes its start; a later duplicate start cannot erase a terminal. Latest appended terminal wins for conflicting terminal records. Retries retain separate trace IDs and are ordered by attempt index. Known tokens from failed/incomplete attempts remain chargeable. Savings are taken only from the latest successful attempt, never summed across retry history. The existing bytes/4 baseline estimates delegated frontier workload, not measured net savings after orchestration.
 
+The worker records valid prompt, completion and cached-input counts before
+accepting the response content. A parsed HTTP 200 with missing choices,
+malformed choices or non-text output can still report billable usage; those
+counts survive the failed attempt and contribute to the fallback-chain totals.
+Invalid or absent individual counts remain unknown, not zero. The failed
+attempt receives no savings credit, and a reported nonzero cost still stops
+a free-only call before another provider is tried. The retained response
+model string is provider-reported metadata, not loaded-weight attestation.
+
 Execution completion does not verify output quality or parent consumption. The snapshot explicitly reports `quality_verified: false` and `parent_consumption: not_recorded`; actual parent adoption must be evidenced separately. Started means no terminal receipt has been observed, not proof that the worker is still alive. An unfinished trailing JSONL append is ignored until its newline arrives; malformed complete lines raise an error.
 
 ## Live Codex terminal view
