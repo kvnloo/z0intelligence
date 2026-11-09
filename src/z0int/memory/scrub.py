@@ -31,6 +31,30 @@ _SECRET_RES = (
                r'(?!\[redacted)[^\s"\',;]{8,}'),
     re.compile(r'(?i)\bbearer\s+[A-Za-z0-9._\-]{16,}'),
 )
+# For each pattern above, in order: the literal substrings that must appear somewhere in the text for that
+# pattern to have any chance of matching (never a stricter condition than the pattern itself), and whether
+# to check them case-insensitively. A redaction can only erase characters (replacing a match with the fixed
+# REDACTED literal, which contains none of these substrings) and this pattern set's matches never straddle
+# or start right after an earlier REDACTED marker (verified for every pair here, including the generic
+# key=value pattern's own ``(?!\[redacted)`` guard), so checking every pattern's literals against the one
+# pristine, never-mutated copy of the input is always at least as inclusive as checking the live, partially
+# redacted text would be — it only ever over-triggers (an extra, harmless subn on a span already consumed by
+# an earlier pattern), never under-triggers. This is the fast path for the common case (no credential shape
+# present at all): a handful of substring checks replace 9 regex scans. Combining the patterns into one
+# alternation instead was tried and rejected — it silently reorders which shape wins at a shared position
+# (e.g. "Bearer sk-..." redacts the whole phrase instead of just the key) and was not even faster in CPython.
+_TRIGGERS = (
+    (('-----BEGIN ',), False),
+    (('0.',), False),
+    (('sk-', 'pk-', 'rk-'), False),
+    (('AIza',), False),
+    (('AKIA', 'ASIA'), False),
+    (('ghp_', 'gho_', 'ghu_', 'ghs_', 'ghr_'), False),
+    (('xoxb-', 'xoxa-', 'xoxp-', 'xoxr-', 'xoxs-'), False),
+    (('xai-', 'gsk_', 'hf_', 'github_pat_'), False),
+    (('key', 'token', 'secret', 'password', 'passwd'), True),
+    (('bearer',), True),
+)
 
 
 def redact_spans(text: str, spans) -> tuple[str, int]:
@@ -45,8 +69,15 @@ def redact_spans(text: str, spans) -> tuple[str, int]:
 
 def scrub_text(text: str) -> tuple[str, int]:
     """Blank every credential shape; returns (text, number of spans removed)."""
-    n = 0
-    for rx in _SECRET_RES:
+    original, low, n = text, None, 0
+    for rx, (lits, case_insensitive) in zip(_SECRET_RES, _TRIGGERS):
+        if case_insensitive:
+            low = low if low is not None else original.lower()
+            haystack = low
+        else:
+            haystack = original
+        if not any(lit in haystack for lit in lits):
+            continue
         text, k = rx.subn(REDACTED, text)
         n += k
     return text, n
