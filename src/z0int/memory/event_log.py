@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,6 +51,16 @@ BODY_FIELDS = frozenset(
         "command",
     }
 )
+
+# HC-2: mtime/size(+inode)-keyed cache of the fully parsed and checksum-validated committed events for a
+# given events.jsonl, shared process-wide across EventLog instances (a read-only EventLog is created fresh
+# per query by the memory surface). A query against an unchanged ledger file skips re-reading, re-decoding
+# and re-validating every committed event; an append changes the file's size (and mtime), which changes the
+# key, so a stale entry is never served. Bounded (FIFO eviction) since one long-running process can touch
+# many distinct ledger roots across its lifetime (tests do this routinely); real deployments keep one.
+_COMMITTED_EVENTS_CACHE: dict[tuple[int, int, int], list["MemoryEvent"]] = {}
+_COMMITTED_EVENTS_CACHE_LOCK = threading.Lock()
+_COMMITTED_EVENTS_CACHE_MAX = 64
 
 
 class EventLogCorruption(RuntimeError):
@@ -727,6 +738,42 @@ class EventLog:
         ):
             raise EventLogCorruption("event state last-event record does not match committed history")
 
+    def _read_committed_events(self) -> list[MemoryEvent]:
+        """One shared-lock pass decoding and checksum-validating every committed line. An incomplete
+        trailing write (a crash mid-append) is dropped silently, never raised: this is the recovery-reader
+        path used by ``iter_events(require_complete=False)``."""
+        events: list[MemoryEvent] = []
+        with self.events_path.open("rb") as fh:
+            fcntl.flock(fh, fcntl.LOCK_SH)
+            expected = 0
+            while True:
+                raw = fh.readline()
+                if not raw or not raw.endswith(b"\n"):
+                    break
+                events.append(MemoryEvent.from_dict(self._decode_committed_line(raw, expected_id=expected)))
+                expected += 1
+        return events
+
+    def _cached_committed_events(self) -> list[MemoryEvent]:
+        """``_read_committed_events`` behind the mtime/size(+inode)-keyed cache (see
+        ``_COMMITTED_EVENTS_CACHE``): skip the read entirely when the file is unchanged since it was last
+        parsed here, in this process or another EventLog instance on the same path."""
+        try:
+            st = self.events_path.stat()
+        except OSError:
+            return self._read_committed_events()
+        key = (st.st_ino, st.st_mtime_ns, st.st_size)
+        with _COMMITTED_EVENTS_CACHE_LOCK:
+            cached = _COMMITTED_EVENTS_CACHE.get(key)
+        if cached is not None:
+            return cached
+        events = self._read_committed_events()
+        with _COMMITTED_EVENTS_CACHE_LOCK:
+            _COMMITTED_EVENTS_CACHE[key] = events
+            while len(_COMMITTED_EVENTS_CACHE) > _COMMITTED_EVENTS_CACHE_MAX:
+                _COMMITTED_EVENTS_CACHE.pop(next(iter(_COMMITTED_EVENTS_CACHE)))
+        return events
+
     def iter_events(self, *, require_complete: bool = False) -> Iterator[MemoryEvent]:
         """Iterate committed events, optionally requiring a complete snapshot.
 
@@ -738,6 +785,9 @@ class EventLog:
         if not self.events_path.is_file():
             if require_complete:
                 raise EventLogCorruption("event log is unavailable")
+            return
+        if not require_complete:
+            yield from self._cached_committed_events()
             return
         with self.events_path.open("rb") as fh:
             fcntl.flock(fh, fcntl.LOCK_SH)
@@ -752,28 +802,21 @@ class EventLog:
                 if not raw:
                     break
                 if not raw.endswith(b"\n"):
-                    if require_complete:
-                        raise EventLogCorruption("incomplete trailing event")
-                    break
+                    raise EventLogCorruption("incomplete trailing event")
                 row = self._decode_committed_line(raw, expected_id=expected)
-                event = MemoryEvent.from_dict(row)
+                complete_events.append(MemoryEvent.from_dict(row))
                 last_row = row
                 last_offset = offset
                 last_length = len(raw)
                 expected += 1
-                if require_complete:
-                    complete_events.append(event)
-                else:
-                    yield event
-            if require_complete:
-                self._validate_complete_snapshot_state(
-                    fh,
-                    event_count=expected,
-                    last_row=last_row,
-                    last_offset=last_offset,
-                    last_length=last_length,
-                )
-                yield from complete_events
+            self._validate_complete_snapshot_state(
+                fh,
+                event_count=expected,
+                last_row=last_row,
+                last_offset=last_offset,
+                last_length=last_length,
+            )
+            yield from complete_events
 
     def rebuild_index(self) -> int:
         """Rebuild derived offset/state files without mutating events.jsonl."""
