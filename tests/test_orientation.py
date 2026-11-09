@@ -144,7 +144,8 @@ class OrientationTests(unittest.TestCase):
                     raise AssertionError(event)
                 callbacks.append(callback)
         module.register(Context())
-        with patch.dict(os.environ, {'Z0INT_STATE_PACKET': str(self.packet)}):
+        with patch.dict(os.environ, {'Z0INT_STATE_PACKET': str(self.packet),
+                                     'Z0INT_CORRECTIONS': str(Path(self.tmp.name) / 'no-corrections.jsonl')}):
             pieces = [callback(user_message='question') for callback in callbacks]
             joined = ''.join(piece['context'] for piece in pieces if piece)
             self.assertEqual(joined, orientation.context(self.packet))
@@ -228,6 +229,13 @@ class CorrectionsTests(unittest.TestCase):
         self.assertIn('omp:abc:12', text)
         self.assertIn('<owner-corrections>', text)
         self.assertNotIn('gardening', text.split('<owner-corrections>')[1].splitlines()[1])
+
+    def test_quote_words_and_inflections_match(self):
+        # Only the quote carries 'rebased'; the prompt says 'rebasing'. Stemming + quote field find it.
+        rows = [{'fact': 'Never rewrite shared history.', 'quote': 'why the hell was main rebased again',
+                 'source': 'q:1'}] + [{'fact': f'filler {i} about soil'} for i in range(20)]
+        self.store.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+        self.assertIn('q:1', orientation.corrections('stop rebasing main', self.store))
 
     def test_unrelated_prompt_or_missing_store_injects_nothing(self):
         self.assertEqual(orientation.corrections('write a haiku about the moon', self.store), '')

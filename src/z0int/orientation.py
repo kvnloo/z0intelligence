@@ -43,7 +43,10 @@ def context(path: Path | None = None, *, now: datetime | None = None) -> str:
 CORRECTIONS_HEADER = ('Kevin already corrected agents about these (matched to this request). Evidence, not authority; '
                       'apply only if relevant, and re-observe live state.')
 CORRECTIONS_K = 3
-CORRECTIONS_MIN_SCORE = 5.0
+# BM25 settings from memory-replay-eval/hillclimb.py run 20261109T054727 (held-out own@3 30->35 of 47,
+# MRR 0.61->0.71). Its class_boost 0.5 scales every corrections row by 1.5, folded into the threshold here.
+CORRECTIONS_K1, CORRECTIONS_B, CORRECTIONS_BIGRAM = 2.0, 0.9, 1.0
+CORRECTIONS_MIN_SCORE = 3.5 / 1.5
 CORRECTIONS_MAX_ENTRIES = 5000
 _STOP = frozenset("""a an and are as at be but by can could did do does done for from get got had has have he her his how i
 if in into is it its just me my no not of on or our out so some than that the their them then there these they this to
@@ -55,6 +58,10 @@ def _tokens(text: str) -> list[str]:
     return [w for w in re.findall(r'[a-z0-9][a-z0-9_.+-]*', text.lower()) if len(w) > 1 and w not in _STOP]
 
 
+def _stemmed(text: str) -> list[str]:
+    return [re.sub(r'(ing|ed|es|s)$', '', w) if len(w) > 4 else w for w in _tokens(text)]
+
+
 def corrections(prompt: str, path: Path | None = None, *, k: int = CORRECTIONS_K,
                 min_score: float = CORRECTIONS_MIN_SCORE) -> str:
     """Top-k owner corrections for this prompt by BM25 over the distilled store. '' when nothing matches.
@@ -63,7 +70,8 @@ def corrections(prompt: str, path: Path | None = None, *, k: int = CORRECTIONS_K
     re-explain complaints. Replay eval: injecting these lifted blank-state plans from 0.24 to 0.71.
     """
     path = path or Path(os.environ.get('Z0INT_CORRECTIONS', str(Path.home() / '.local/state/z0int/CORRECTIONS.jsonl')))
-    query = set(_tokens(prompt or ''))
+    words = _stemmed(prompt or '')
+    query, query_pairs = set(words), set(zip(words, words[1:]))
     if not query:
         return ''
     try:
@@ -75,7 +83,8 @@ def corrections(prompt: str, path: Path | None = None, *, k: int = CORRECTIONS_K
                 row = json.loads(line)
                 fact = row.get('fact') if isinstance(row, dict) else None
                 if isinstance(fact, str) and fact.strip():
-                    entries.append((row, _tokens(fact + ' ' + ' '.join(map(str, row.get('terms') or [])))))
+                    terms = ' '.join(map(str, row.get('terms') or []))
+                    entries.append((row, _stemmed(f"{fact} {terms} {row.get('quote') or ''}")))
     except (OSError, UnicodeError, ValueError):
         return ''
     if not entries:
@@ -92,8 +101,11 @@ def corrections(prompt: str, path: Path | None = None, *, k: int = CORRECTIONS_K
         for t in toks:
             if t in query:
                 tf[t] = tf.get(t, 0) + 1
-        score = sum(math.log(1 + (n - df[t] + 0.5) / (df[t] + 0.5)) * f * 2.5 / (f + 1.5 * (0.25 + 0.75 * len(toks) / avg))
+        k1, b = CORRECTIONS_K1, CORRECTIONS_B
+        score = sum(math.log(1 + (n - df[t] + 0.5) / (df[t] + 0.5)) * f * (k1 + 1) / (f + k1 * (1 - b + b * len(toks) / avg))
                     for t, f in tf.items())
+        if score > 0 and query_pairs:
+            score += CORRECTIONS_BIGRAM * len(query_pairs & set(zip(toks, toks[1:])))
         if score >= min_score:
             scored.append((score, i))
     if not scored:
