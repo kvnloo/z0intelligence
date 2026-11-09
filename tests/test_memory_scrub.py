@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -143,3 +144,16 @@ def test_inspect_scrubs_before_it_truncates_an_eventlog_payload(env):
     out = ms.inspect('eventlog:0', chars=raw.index(SECRETS['aws']) + 12)
     assert out['ok'] is True
     assert SECRETS['aws'][:12] not in json.dumps(out)
+
+
+_SCRUB_GOLDEN = Path(__file__).resolve().parents[1] / 'benchmarks' / 'memory_search' / 'fixtures' / 'scrub_golden.json'
+
+
+def test_scrub_text_matches_the_pre_hc2_golden_output_byte_for_byte():
+    """HC-2: the single-pass regex rewrite of scrub_text must not change a single scrubbed byte.
+
+    ``scrub_golden.json`` was captured from the sequential-subn implementation before the HC-2 change."""
+    golden = json.loads(_SCRUB_GOLDEN.read_text(encoding='utf-8'))
+    for row in golden:
+        text, n = scrub.scrub_text(row['text'])
+        assert text == row['scrubbed'] and n == row['count'], row['text']
