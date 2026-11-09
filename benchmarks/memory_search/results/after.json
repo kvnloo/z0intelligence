@@ -1,0 +1,761 @@
+{
+  "summary": {
+    "n": 50,
+    "p50_ms": 92.883,
+    "p90_ms": 128.982,
+    "max_ms": 316.846,
+    "combined_hash": "92c6b68ef1437cf6a939ee76d9b1228e785ac3029e045dc9f85230d28264c487"
+  },
+  "rows": [
+    {
+      "query": "ledger tether courier",
+      "latency_ms": 316.84646099984093,
+      "hash": "b5e6dd00435d3f0dd51c78aaf5ac4a48a16d76158b321de15cd77a25db8ce040",
+      "event_uids": [
+        "evt_33b496bb3cd7ec07e5110a4dd5895beb",
+        "evt_cb5d6c412eea0a4cdc080e9da1e4f31e",
+        "evt_d90721d49f173156d4a86276604677d9",
+        "evt_abfea3fbbe0d1decb9e70b6e67d3192c",
+        "evt_84a6dafeb1b11c06adbc8d83332f811d",
+        "evt_f6009e5c4e22f564af08c059c011ae0e",
+        "evt_8465c3ed009c9a0932c3e94b5969f57a",
+        "evt_8a3d040cc94534a80da10a3333950ee3"
+      ]
+    },
+    {
+      "query": "ember",
+      "latency_ms": 61.96961400019063,
+      "hash": "76d5dfa7b9f69c7559120ec373128d08d5d20bf19d96b800083b0ffaf7104bdb",
+      "event_uids": [
+        "evt_49384b8184261e7ed06bf9b6697c6533",
+        "evt_61dc4011fa3210db6facd3cb4f159143",
+        "evt_5581acf792e2bf89f29bcafc0d9cc060",
+        "evt_3434d8ff2c01b3e02256822426f8163a",
+        "evt_86df9e0956c2acf7840fda075b187b8f",
+        "evt_28c478d1d1150c98738cceeec6f6a038",
+        "evt_c150d1900c28a7b2fdf7318f1161c1be",
+        "evt_fb998be5b43a399bea47c655a2c5c3b7"
+      ]
+    },
+    {
+      "query": "scrub",
+      "latency_ms": 33.3318370003326,
+      "hash": "782163f4bf928c8ccbeff5e5c21b3f7d0346e3d4858527d39fe41c82e235e2e4",
+      "event_uids": [
+        "evt_053c7c5b19838ef779d5705b4cd0af88",
+        "evt_0970cd381fa7b728def916e8f3f2d85a",
+        "evt_1aeb5535748bc2d413e49346777da871",
+        "evt_cb5a81450e940aa9c1353b557fe5c976",
+        "evt_8465c3ed009c9a0932c3e94b5969f57a",
+        "evt_5f5579ebcc6df44eaedee7890b28665b",
+        "evt_6b51e71be1e93639c8c77b0d01f53566",
+        "evt_a4b839cf7425b4cd5a3ce4c4e08dba72"
+      ]
+    },
+    {
+      "query": "manifest",
+      "latency_ms": 45.115875999726995,
+      "hash": "469143bfa873a35b809eafa1181fb894bdf739d6da3566bbdb3ef2b877dd1853",
+      "event_uids": [
+        "evt_3df2e4109120a148d3bfafd0682db9e3",
+        "evt_5581acf792e2bf89f29bcafc0d9cc060",
+        "evt_8b5949b5f5781b51f5a5caf004a02818",
+        "evt_9aad62dcdf29b82b609f477cd31fb941",
+        "evt_0970cd381fa7b728def916e8f3f2d85a",
+        "evt_be40a1679b4eb0179f822b22bc3045b9",
+        "evt_6af12deff0c2efbf7e8b22f6cc24df08",
+        "evt_e4e8c49ddb04bf84c970821c8526a379"
+      ]
+    },
+    {
+      "query": "ledger shard tether",
+      "latency_ms": 106.33860799953254,
+      "hash": "30ceb34cd466ed246ffaf28b27025f674182757553b4670b6702daa87d97bbd9",
+      "event_uids": [
+        "evt_25c60b8d38ce3b48d08c5c20d63f45e2",
+        "evt_abfea3fbbe0d1decb9e70b6e67d3192c",
+        "evt_b95acd8545a2d936c0d924f3eadaff69",
+        "evt_84a6dafeb1b11c06adbc8d83332f811d",
+        "evt_8465c3ed009c9a0932c3e94b5969f57a",
+        "evt_e2a6ba9b90f80872fbf2ee8cfc9742ef",
+        "evt_68420770b1f6e933a176b14fd624764d",
+        "evt_3fa895f9581cf24ba07e9969e8d77b13"
+      ]
+    },
+    {
+      "query": "router token prism",
+      "latency_ms": 109.46933899958822,
+      "hash": "cfeb6094c885bd075e608b6c36329c5a3c1a07d87a1f217426ab56bd2e791ec7",
+      "event_uids": [
+        "evt_0579c28855f9872055f39d6012346b90",
+        "evt_d0561c5f44f9482e8163408123eb42f2",
+        "evt_7688db9fb7cff4803b14a7c0ce20e94a",
+        "evt_fc1f556382f98a58238884a9880a3eb8",
+        "evt_6acf2f962a72b30d9cee3a774b843ae6",
+        "evt_2bc78810bd5bdb2a0eb0433a2333968f",
+        "evt_0a9058ac896c7eb761dd7d7749e5dd06",
+        "evt_6c90919ea7f349c174f72c0990bdb5d4"
+      ]
+    },
+    {
+      "query": "token harness anchor",
+      "latency_ms": 122.9621299999053,
+      "hash": "a46d5163248d6115033519b79c8df6de583357e640601896784d040bb30e97d5",
+      "event_uids": [
+        "evt_c150d1900c28a7b2fdf7318f1161c1be",
+        "evt_a6b0e0904d60d85444d815d0728cf490",
+        "evt_c2d37c64f4642162a45437d5f8f8ddfc",
+        "evt_5acbec85f8bf4596f47c9eb6b3da21ac",
+        "evt_459feadf96f7888c1cf2a5fde25cf1c6",
+        "evt_498a6e337d074ed39ff85f744d3868e7",
+        "evt_fc1f556382f98a58238884a9880a3eb8",
+        "evt_47bc8929e718ab8f9d519179c065978f"
+      ]
+    },
+    {
+      "query": "shard relay bridge",
+      "latency_ms": 131.24754000000394,
+      "hash": "c88281d9bcc2c4cb0fe5336f46e66f938ff1e6551ea6c6a88a9ebf7a4f5813b6",
+      "event_uids": [
+        "evt_a4f621a6d18db21a6725e1db98d5bd50",
+        "evt_0fe51971d34748f33cf416ffd70c52d5",
+        "evt_68420770b1f6e933a176b14fd624764d",
+        "evt_e2a6ba9b90f80872fbf2ee8cfc9742ef",
+        "evt_3f056378e0e5f4b61dfb9f1f397f0c4e",
+        "evt_6c43db3e06787928d76670fba9107080",
+        "evt_3d07f353af34e2472457e286f79b8a7a",
+        "evt_0a9058ac896c7eb761dd7d7749e5dd06"
+      ]
+    },
+    {
+      "query": "cluster relay",
+      "latency_ms": 74.65491899984045,
+      "hash": "0092ef1fb8df36576196c18320989c1be372b5e22506ba992420ff35380602d8",
+      "event_uids": [
+        "evt_5f5579ebcc6df44eaedee7890b28665b",
+        "evt_27d655aa4aef0ddb3a72889a76b1f84b",
+        "evt_f504b9cf91556ea0961148fe934797e0",
+        "evt_89247fe7382e16423306acca7980f3f6",
+        "evt_bfccad49852169e385ac5273c619fe44",
+        "evt_06f85adac43e938c05963e67a91ad0e6",
+        "evt_250e1f34c19b65a326d9de550b73f42c",
+        "evt_9a38a397cc88e7a1cb2ffb0172654b72"
+      ]
+    },
+    {
+      "query": "courier anchor lexical",
+      "latency_ms": 111.05357100041147,
+      "hash": "1ad0307809e42bef45b35a268b481711a5dec831e18fcae588d2b7104020de96",
+      "event_uids": [
+        "evt_1a3a09c063190d5022de7ce36f469ce0",
+        "evt_70ec5f4e19e4d19803139134699632e5",
+        "evt_067cfb29fbad69f8096284dd518311b4",
+        "evt_3fa895f9581cf24ba07e9969e8d77b13",
+        "evt_3d6fcf8399818c8a6bf1e5d3bca88ea1",
+        "evt_6ee1a465bb74a34c00116b5fd24f8a95",
+        "evt_60ce125a33b2b5dfbc9896b729cd5613",
+        "evt_bc5c577e7a598d711dfc88e76649bdb9"
+      ]
+    },
+    {
+      "query": "queue",
+      "latency_ms": 50.58667699995567,
+      "hash": "6f813a967edfbe8169105602513cf3820945353928daf1cd39d1f5963aff3333",
+      "event_uids": [
+        "evt_4567c595304604245de06783b07da91f",
+        "evt_0fe51971d34748f33cf416ffd70c52d5",
+        "evt_283d230de5a44f2182a5b7f4f1e2dc44",
+        "evt_dde3485ead477a6f9c43164760b4f286",
+        "evt_bfccad49852169e385ac5273c619fe44",
+        "evt_49384b8184261e7ed06bf9b6697c6533",
+        "evt_3b4b6cba01c0de6bfab7e2593e71b852",
+        "evt_615b3de2889d94502a39ef325e87ca6d"
+      ]
+    },
+    {
+      "query": "snapshot kernel",
+      "latency_ms": 74.01710100020864,
+      "hash": "60e76d62e3d53ac1137a4a3b237385ba84f0f08147db8c2279de86707cef46e0",
+      "event_uids": [
+        "evt_9748c9b33df46b7609bf117d0ec7f889",
+        "evt_d94b209222930a16509dc5b5f998f507",
+        "evt_b4e3af176006c1c284dee77cd0a13535",
+        "evt_241169bde9df8974a884f3743b71480a",
+        "evt_c6eceb5038f8be90d412a970b6dd4f89",
+        "evt_f5ba5ab4ec74bb07b7b0e7d5d91a494b",
+        "evt_28fcd0f69560c4918862bdfd335759bf",
+        "evt_69ff1edea31a3d04eef26bb10b6af12f"
+      ]
+    },
+    {
+      "query": "kernel temporal ember",
+      "latency_ms": 128.7298010001905,
+      "hash": "e2c6dea2bd01484247811a76d68b2f2fd2ef11f4d7305465280c624fc5f110a8",
+      "event_uids": [
+        "evt_c6eceb5038f8be90d412a970b6dd4f89",
+        "evt_5581acf792e2bf89f29bcafc0d9cc060",
+        "evt_b9ea17068f8e699cc85e1a575981c1d5",
+        "evt_f5ba5ab4ec74bb07b7b0e7d5d91a494b",
+        "evt_d70ec28ac4880b9d8777e78ff8d7b83b",
+        "evt_c150d1900c28a7b2fdf7318f1161c1be",
+        "evt_809ead9edb0724c191282da13264ae6f",
+        "evt_cc2b2035b6af118ecc7254c7bdef6c67"
+      ]
+    },
+    {
+      "query": "vault beacon router",
+      "latency_ms": 103.17265599951497,
+      "hash": "487f503446df0a3044e488c38ec802facc720ec1c8783b7146d06c48308a11c7",
+      "event_uids": [
+        "evt_fe20fc98abe839b3a7460a52c943bb1c",
+        "evt_7d7f7324b5cee60eda3128fe973d0fec",
+        "evt_0a9058ac896c7eb761dd7d7749e5dd06",
+        "evt_85f3c166947eb3d800e8376d032f11cb",
+        "evt_5acbec85f8bf4596f47c9eb6b3da21ac",
+        "evt_3df2e4109120a148d3bfafd0682db9e3",
+        "evt_28fcd0f69560c4918862bdfd335759bf",
+        "evt_c9da7ccdc2a423d13b087b7cb4404b55"
+      ]
+    },
+    {
+      "query": "snapshot relay",
+      "latency_ms": 73.31415499993454,
+      "hash": "2906073f9c33533808585b7fe16da262e3b09be15bdfa6aea8a449c680c70d71",
+      "event_uids": [
+        "evt_69be282c21d42cbf82d2439fbb1aff1b",
+        "evt_c604e3fc68f769736f9cc225fdb4bb6a",
+        "evt_283d230de5a44f2182a5b7f4f1e2dc44",
+        "evt_40af263aa29177d4f86ccaa076eda918",
+        "evt_087cf5d0e073651d235ee5f147de47ed",
+        "evt_c9da7ccdc2a423d13b087b7cb4404b55",
+        "evt_28fcd0f69560c4918862bdfd335759bf",
+        "evt_69ff1edea31a3d04eef26bb10b6af12f"
+      ]
+    },
+    {
+      "query": "quokka",
+      "latency_ms": 29.50445100032084,
+      "hash": "9cc4451a8d33fbd91d643691a597b3957cd7b5f3eb8e4571fabf21ee96aa8753",
+      "event_uids": [
+        "evt_7ebbf3959147a6b7fe2f613e8ab38107",
+        "evt_84687b8bba2d1dd925ac40b87a79bdb9",
+        "evt_4567c595304604245de06783b07da91f",
+        "evt_c150d1900c28a7b2fdf7318f1161c1be",
+        "evt_e4e8c49ddb04bf84c970821c8526a379",
+        "evt_70ec5f4e19e4d19803139134699632e5",
+        "evt_348c584ede49dc625d5b947d0ea957c9",
+        "evt_61dc4011fa3210db6facd3cb4f159143"
+      ]
+    },
+    {
+      "query": "token worker",
+      "latency_ms": 69.99916499989922,
+      "hash": "7c7557f308240ab3175e6697e6c90909d667384d7a624f8d52553d848b76a97e",
+      "event_uids": [
+        "evt_f954cea4dcce747ec270afd4d9ecd011",
+        "evt_d0561c5f44f9482e8163408123eb42f2",
+        "evt_eda7da76fbb8b4e10f5f963f7bdf07a8",
+        "evt_a206a518eb9058115a0ad706cfe7d639",
+        "evt_f7bb2e6672608b5f176388ff5dd42673",
+        "evt_3df2e4109120a148d3bfafd0682db9e3",
+        "evt_33e33ca311c4a176e6ea41afc8b69a89",
+        "evt_a6b0e0904d60d85444d815d0728cf490"
+      ]
+    },
+    {
+      "query": "snapshot",
+      "latency_ms": 41.20843399959995,
+      "hash": "435198b3c83583b125a51e288c53275982c799b12c650a4085ea650b2ecce7d9",
+      "event_uids": [
+        "evt_28fcd0f69560c4918862bdfd335759bf",
+        "evt_69ff1edea31a3d04eef26bb10b6af12f",
+        "evt_bdc5baa976a858cce21e73220d0a1726",
+        "evt_0970cd381fa7b728def916e8f3f2d85a",
+        "evt_be40a1679b4eb0179f822b22bc3045b9",
+        "evt_69be282c21d42cbf82d2439fbb1aff1b",
+        "evt_bc21dd09f7746e56339ce65d65ad8ad9",
+        "evt_bd9800d4f0a0356f29cfab45d425ddec"
+      ]
+    },
+    {
+      "query": "courier",
+      "latency_ms": 43.43130600045697,
+      "hash": "ed6f947c4d192913f193677734ae6d4e8817ffb3b1e1af445e1fef8c4e787960",
+      "event_uids": [
+        "evt_84a6dafeb1b11c06adbc8d83332f811d",
+        "evt_f504b9cf91556ea0961148fe934797e0",
+        "evt_7ac62a1affb456fca50236e019a3f4d7",
+        "evt_887c6945a960dd62132f8244c1e3994b",
+        "evt_ec09fbf8e8cd3ab67fa18db9618034ef",
+        "evt_d90721d49f173156d4a86276604677d9",
+        "evt_c1b4de4ff230eaaf1d735f3c18fef682",
+        "evt_1a7839d6781d1925256191b65b7edca9"
+      ]
+    },
+    {
+      "query": "vault",
+      "latency_ms": 37.66583099968557,
+      "hash": "3f5b4c68ab3b8e3c51d2900bad71f41bf53caf4bb3c72ad75c7332e945e37beb",
+      "event_uids": [
+        "evt_abfea3fbbe0d1decb9e70b6e67d3192c",
+        "evt_a51337520824f0314e859acf09415dc1",
+        "evt_dc45fd3472235e5f25aa03dd88f8af69",
+        "evt_c2d37c64f4642162a45437d5f8f8ddfc",
+        "evt_5b5cae4d4ede1cad560868b4ee7fdd31",
+        "evt_0a9058ac896c7eb761dd7d7749e5dd06",
+        "evt_459feadf96f7888c1cf2a5fde25cf1c6",
+        "evt_eb9891dd73f42f843c6756623d19748e"
+      ]
+    },
+    {
+      "query": "gateway prism signal",
+      "latency_ms": 110.7985729995562,
+      "hash": "0e20c8a5c575e2fedbcbe6e0629d56436d07ff829c597e1189769fefdb49d8ab",
+      "event_uids": [
+        "evt_3cffe65b444501b61a70576cb77f4d5f",
+        "evt_0e77e3f5a84285cd1c2343d827a3a4c0",
+        "evt_4567c595304604245de06783b07da91f",
+        "evt_872b6bc7a4a96226a7539b474bf0ee94",
+        "evt_6acf2f962a72b30d9cee3a774b843ae6",
+        "evt_fb998be5b43a399bea47c655a2c5c3b7",
+        "evt_a987defeefa10be73b4901f09a5b69a2",
+        "evt_cfc176d810e892ac1a5ec7db0c8be81f"
+      ]
+    },
+    {
+      "query": "capsule receipt token",
+      "latency_ms": 110.76144300022861,
+      "hash": "556c43cc021c8ecd7f62323e4d00883e5e007723dfe2ac1919c53d6b31a0d894",
+      "event_uids": [
+        "evt_ae9a75dc3df8548a46307668865c7e8a",
+        "evt_4f3aa8a140adcf1137c2ec91002196cd",
+        "evt_9c1491c3beb85540c585169f1c2d2754",
+        "evt_2b43fbce83d720ab32f9b7dbca5e985b",
+        "evt_a206a518eb9058115a0ad706cfe7d639",
+        "evt_d9936bd1259a3d2a50de501dfdff4e19",
+        "evt_7688db9fb7cff4803b14a7c0ce20e94a",
+        "evt_3df2e4109120a148d3bfafd0682db9e3"
+      ]
+    },
+    {
+      "query": "queue kernel",
+      "latency_ms": 124.44818899984966,
+      "hash": "76d62de09d1f9e523e79bb395e9c7796f5e282ef6b0da7e2b4034af5b32c72c1",
+      "event_uids": [
+        "evt_bfccad49852169e385ac5273c619fe44",
+        "evt_21774edf3feebff5dadb596ad22593c4",
+        "evt_382360baa6e887b818778c85d52c12c2",
+        "evt_241169bde9df8974a884f3743b71480a",
+        "evt_c6eceb5038f8be90d412a970b6dd4f89",
+        "evt_4567c595304604245de06783b07da91f",
+        "evt_f5ba5ab4ec74bb07b7b0e7d5d91a494b",
+        "evt_0fe51971d34748f33cf416ffd70c52d5"
+      ]
+    },
+    {
+      "query": "claim router courier",
+      "latency_ms": 155.5774480002583,
+      "hash": "1376f3eb0897479f697e8181643ef1195c2c6bd4d3333ebd461e28644f12034e",
+      "event_uids": [
+        "evt_30521dceb124f53eb247c75b945bc293",
+        "evt_0579c28855f9872055f39d6012346b90",
+        "evt_cb877053eb56c2b33b6844e8dea65897",
+        "evt_60ce125a33b2b5dfbc9896b729cd5613",
+        "evt_7ac62a1affb456fca50236e019a3f4d7",
+        "evt_0a9058ac896c7eb761dd7d7749e5dd06",
+        "evt_25c60b8d38ce3b48d08c5c20d63f45e2",
+        "evt_c1b4de4ff230eaaf1d735f3c18fef682"
+      ]
+    },
+    {
+      "query": "token relay",
+      "latency_ms": 152.13083200069377,
+      "hash": "b2fb42fceb4a82c0ca60d25334d994271531e11337293ef345ed5ee0b90daa13",
+      "event_uids": [
+        "evt_86df9e0956c2acf7840fda075b187b8f",
+        "evt_c604e3fc68f769736f9cc225fdb4bb6a",
+        "evt_f954cea4dcce747ec270afd4d9ecd011",
+        "evt_bd22c46ac20ca371dcd43118f0bf3bf0",
+        "evt_66cbd85e1226c2692fcb2ed2329c133b",
+        "evt_6c43db3e06787928d76670fba9107080",
+        "evt_a28f3da8a75aa0c35ba878fa1d86bb2f",
+        "evt_615b3de2889d94502a39ef325e87ca6d"
+      ]
+    },
+    {
+      "query": "cluster",
+      "latency_ms": 67.11455899949215,
+      "hash": "b525ce4304833b0362c88525bcbfd1bfb8424896250d4bf708419919ff1575c6",
+      "event_uids": [
+        "evt_89247fe7382e16423306acca7980f3f6",
+        "evt_bfccad49852169e385ac5273c619fe44",
+        "evt_06f85adac43e938c05963e67a91ad0e6",
+        "evt_250e1f34c19b65a326d9de550b73f42c",
+        "evt_9a38a397cc88e7a1cb2ffb0172654b72",
+        "evt_c1b4de4ff230eaaf1d735f3c18fef682",
+        "evt_5f5579ebcc6df44eaedee7890b28665b",
+        "evt_5b5cae4d4ede1cad560868b4ee7fdd31"
+      ]
+    },
+    {
+      "query": "bridge index",
+      "latency_ms": 96.484445999522,
+      "hash": "46db50b039173465f5c65f4c8a5d853fec418fb9d2ca0211e9349bb43b8729eb",
+      "event_uids": [
+        "evt_bd9800d4f0a0356f29cfab45d425ddec",
+        "evt_68420770b1f6e933a176b14fd624764d",
+        "evt_3cffe65b444501b61a70576cb77f4d5f",
+        "evt_ae9a75dc3df8548a46307668865c7e8a",
+        "evt_0fe51971d34748f33cf416ffd70c52d5",
+        "evt_a4f621a6d18db21a6725e1db98d5bd50",
+        "evt_8aed72b6700fd44c40c70e7af113b68d",
+        "evt_7ebbf3959147a6b7fe2f613e8ab38107"
+      ]
+    },
+    {
+      "query": "relay scrub anchor",
+      "latency_ms": 166.50222099997336,
+      "hash": "6855a47484500a05fc992c0e588fda8f68e8bca9c4360194583584f02e1653b9",
+      "event_uids": [
+        "evt_a4b839cf7425b4cd5a3ce4c4e08dba72",
+        "evt_053c7c5b19838ef779d5705b4cd0af88",
+        "evt_5f5579ebcc6df44eaedee7890b28665b",
+        "evt_97b2d7d656c0adbc459b0a4c041d5dc8",
+        "evt_ec0e9aa0903fc7fdc8c1910a630c7a0c",
+        "evt_b927d9fcab250fd3cae2666f2889cfae",
+        "evt_04125aa857f022a475278bacfa3b63b5",
+        "evt_1de333d0555966b133e281059b87aac6"
+      ]
+    },
+    {
+      "query": "vault",
+      "latency_ms": 36.52867500022694,
+      "hash": "3f5b4c68ab3b8e3c51d2900bad71f41bf53caf4bb3c72ad75c7332e945e37beb",
+      "event_uids": [
+        "evt_abfea3fbbe0d1decb9e70b6e67d3192c",
+        "evt_a51337520824f0314e859acf09415dc1",
+        "evt_dc45fd3472235e5f25aa03dd88f8af69",
+        "evt_c2d37c64f4642162a45437d5f8f8ddfc",
+        "evt_5b5cae4d4ede1cad560868b4ee7fdd31",
+        "evt_0a9058ac896c7eb761dd7d7749e5dd06",
+        "evt_459feadf96f7888c1cf2a5fde25cf1c6",
+        "evt_eb9891dd73f42f843c6756623d19748e"
+      ]
+    },
+    {
+      "query": "signal",
+      "latency_ms": 61.84142799975234,
+      "hash": "d252fc3eb12794ef1ba3fcd01b9826cea4e5cec159d6869525c0d65e86450dac",
+      "event_uids": [
+        "evt_43e90f9a96a394b7687f9004d7c02f17",
+        "evt_872b6bc7a4a96226a7539b474bf0ee94",
+        "evt_49384b8184261e7ed06bf9b6697c6533",
+        "evt_1b66b3bba8800f7b6c7e13bdc132e24c",
+        "evt_ce23b5445b0a44796e1614fbc79e072b",
+        "evt_3b4b6cba01c0de6bfab7e2593e71b852",
+        "evt_0d5b833dd08a4d6b889cac740dbb0818",
+        "evt_6af12deff0c2efbf7e8b22f6cc24df08"
+      ]
+    },
+    {
+      "query": "vector",
+      "latency_ms": 97.62219599997479,
+      "hash": "cfc29721955c2dc4a9ad98c1d7d5499974af49a3a8260554365b8cde1c2b45ac",
+      "event_uids": [
+        "evt_cc2b2035b6af118ecc7254c7bdef6c67",
+        "evt_86df9e0956c2acf7840fda075b187b8f",
+        "evt_37e1cf54146e90c0024a60e3f8b5b6bd",
+        "evt_9aad62dcdf29b82b609f477cd31fb941",
+        "evt_05a9415edc6ebe288539e5636f670b3d",
+        "evt_6b51e71be1e93639c8c77b0d01f53566",
+        "evt_fb998be5b43a399bea47c655a2c5c3b7",
+        "evt_70ec5f4e19e4d19803139134699632e5"
+      ]
+    },
+    {
+      "query": "claim coral",
+      "latency_ms": 93.48281100028544,
+      "hash": "28bc5dabbe72f106749a251702a998d6c0e44e8676d4a55dba10906c85e57a25",
+      "event_uids": [
+        "evt_ce23b5445b0a44796e1614fbc79e072b",
+        "evt_69ff1edea31a3d04eef26bb10b6af12f",
+        "evt_e04a646fc6a774891c0ec7d7160217c2",
+        "evt_7ac62a1affb456fca50236e019a3f4d7",
+        "evt_68f0388cc98a3c9fc579c0bfc946929c",
+        "evt_4f3aa8a140adcf1137c2ec91002196cd",
+        "evt_0579c28855f9872055f39d6012346b90",
+        "evt_dc45fd3472235e5f25aa03dd88f8af69"
+      ]
+    },
+    {
+      "query": "beacon",
+      "latency_ms": 75.94962300026964,
+      "hash": "f994d90f7dafd0fedaff397130d97753f98af6a2b05f5f7b612731126a7c8930",
+      "event_uids": [
+        "evt_2531e852bb423581e430e1b8a3d2cf62",
+        "evt_67e48ab282236c24103a9ce4dbae4050",
+        "evt_3d6fcf8399818c8a6bf1e5d3bca88ea1",
+        "evt_e04a646fc6a774891c0ec7d7160217c2",
+        "evt_887c6945a960dd62132f8244c1e3994b",
+        "evt_73fb4cb7b27bcd3f3730c3a05451f16a",
+        "evt_0d5b833dd08a4d6b889cac740dbb0818",
+        "evt_8465c3ed009c9a0932c3e94b5969f57a"
+      ]
+    },
+    {
+      "query": "worker prism lexical",
+      "latency_ms": 116.22304400043504,
+      "hash": "1b625d5772aec5d09dd15e03718da047bd22e2af8225b980103e4b830b66158d",
+      "event_uids": [
+        "evt_3fa895f9581cf24ba07e9969e8d77b13",
+        "evt_1aa3168d402908cf78b5383ec85e8f1e",
+        "evt_d0561c5f44f9482e8163408123eb42f2",
+        "evt_9a770e22925ea433538974641521e1f5",
+        "evt_3df2e4109120a148d3bfafd0682db9e3",
+        "evt_6ee1a465bb74a34c00116b5fd24f8a95",
+        "evt_2bc78810bd5bdb2a0eb0433a2333968f",
+        "evt_067cfb29fbad69f8096284dd518311b4"
+      ]
+    },
+    {
+      "query": "temporal cache",
+      "latency_ms": 92.2838189999311,
+      "hash": "d5007c91e7b747be2b2234f341d38b3e6c0d5899104e3967b9f3b4671b701bf6",
+      "event_uids": [
+        "evt_ba2f2fd4df29a4aafe9de4dfa48cd4ba",
+        "evt_bd22c46ac20ca371dcd43118f0bf3bf0",
+        "evt_b9ea17068f8e699cc85e1a575981c1d5",
+        "evt_7688db9fb7cff4803b14a7c0ce20e94a",
+        "evt_a51337520824f0314e859acf09415dc1",
+        "evt_087cf5d0e073651d235ee5f147de47ed",
+        "evt_ce23b5445b0a44796e1614fbc79e072b",
+        "evt_f6009e5c4e22f564af08c059c011ae0e"
+      ]
+    },
+    {
+      "query": "coral snapshot lexical",
+      "latency_ms": 112.72994499995548,
+      "hash": "d2546d9330d225170d84c5eb3241ac6bceaae6a5a32027faaeb40cf11b8c851d",
+      "event_uids": [
+        "evt_d70ec28ac4880b9d8777e78ff8d7b83b",
+        "evt_1a3a09c063190d5022de7ce36f469ce0",
+        "evt_69ff1edea31a3d04eef26bb10b6af12f",
+        "evt_bd9800d4f0a0356f29cfab45d425ddec",
+        "evt_3d6fcf8399818c8a6bf1e5d3bca88ea1",
+        "evt_7b7f68e51db4294dd1fe3e04352f6ef1",
+        "evt_68f0388cc98a3c9fc579c0bfc946929c",
+        "evt_c9da7ccdc2a423d13b087b7cb4404b55"
+      ]
+    },
+    {
+      "query": "snapshot courier anchor",
+      "latency_ms": 118.45725199964363,
+      "hash": "b74c8d3eb1e7861310046e1f8e4fb4d4f309920ffd6534507da0f4bdd9e658bd",
+      "event_uids": [
+        "evt_04125aa857f022a475278bacfa3b63b5",
+        "evt_84a6dafeb1b11c06adbc8d83332f811d",
+        "evt_f84acf46f734c93b5f83ea5e147cd512",
+        "evt_68f0388cc98a3c9fc579c0bfc946929c",
+        "evt_459feadf96f7888c1cf2a5fde25cf1c6",
+        "evt_8a3d040cc94534a80da10a3333950ee3",
+        "evt_7141d58cc22d1b3fd0b32ba9dbfa5a98",
+        "evt_382360baa6e887b818778c85d52c12c2"
+      ]
+    },
+    {
+      "query": "shard profile",
+      "latency_ms": 73.24955700005376,
+      "hash": "a216056c7a7756a3a9fbd3918855ea56d34e31ccf444b9c063681cdd353a7684",
+      "event_uids": [
+        "evt_f0860cdf7cb062c527dc6be0eeb9cf77",
+        "evt_3d07f353af34e2472457e286f79b8a7a",
+        "evt_68420770b1f6e933a176b14fd624764d",
+        "evt_3997ba002e5f3ce649da45dc8cef1ad4",
+        "evt_7141d58cc22d1b3fd0b32ba9dbfa5a98",
+        "evt_551a46f96139845e5ade3eea3372d865",
+        "evt_77ab64d92b491b3ca786e67a47234380",
+        "evt_9748c9b33df46b7609bf117d0ec7f889"
+      ]
+    },
+    {
+      "query": "policy shard ledger",
+      "latency_ms": 94.36764600013703,
+      "hash": "970decc7dbeba887316be2faacddf45db16f2c46483c9ecab221dff76f6f35df",
+      "event_uids": [
+        "evt_551a46f96139845e5ade3eea3372d865",
+        "evt_77ab64d92b491b3ca786e67a47234380",
+        "evt_25c60b8d38ce3b48d08c5c20d63f45e2",
+        "evt_c11884193e74c37c5bbcdc9929c5f45d",
+        "evt_b95acd8545a2d936c0d924f3eadaff69",
+        "evt_f0860cdf7cb062c527dc6be0eeb9cf77",
+        "evt_e2a6ba9b90f80872fbf2ee8cfc9742ef",
+        "evt_a206a518eb9058115a0ad706cfe7d639"
+      ]
+    },
+    {
+      "query": "ledger",
+      "latency_ms": 43.44480800045858,
+      "hash": "f4716b826d103fb8e4c8d84a973260ac9c9f4194bfefcebae42b00b4b2241b1a",
+      "event_uids": [
+        "evt_9b69d5dd52274fe33dffb80f45c301d0",
+        "evt_1b66b3bba8800f7b6c7e13bdc132e24c",
+        "evt_62c78349a70ceaf5b1024d44e78fb59f",
+        "evt_abfea3fbbe0d1decb9e70b6e67d3192c",
+        "evt_d90721d49f173156d4a86276604677d9",
+        "evt_8465c3ed009c9a0932c3e94b5969f57a",
+        "evt_fb998be5b43a399bea47c655a2c5c3b7",
+        "evt_a987defeefa10be73b4901f09a5b69a2"
+      ]
+    },
+    {
+      "query": "scrub orbit shard",
+      "latency_ms": 96.50935900026525,
+      "hash": "178c5245df2b3bc70aac4df41c9b0961bb3ebbe39ea30100f2b976550a90701d",
+      "event_uids": [
+        "evt_25c60b8d38ce3b48d08c5c20d63f45e2",
+        "evt_e2a6ba9b90f80872fbf2ee8cfc9742ef",
+        "evt_a4b839cf7425b4cd5a3ce4c4e08dba72",
+        "evt_683ad5e89fdf3f5080ebaf1a1b2071ce",
+        "evt_067cfb29fbad69f8096284dd518311b4",
+        "evt_b927d9fcab250fd3cae2666f2889cfae",
+        "evt_053c7c5b19838ef779d5705b4cd0af88",
+        "evt_3997ba002e5f3ce649da45dc8cef1ad4"
+      ]
+    },
+    {
+      "query": "cache queue",
+      "latency_ms": 86.27133000027243,
+      "hash": "0aa142219bbc36775c165bdcb71a5cf3915a65cb1c3f33a524f4657e4c654a92",
+      "event_uids": [
+        "evt_615b3de2889d94502a39ef325e87ca6d",
+        "evt_9b69d5dd52274fe33dffb80f45c301d0",
+        "evt_ba2f2fd4df29a4aafe9de4dfa48cd4ba",
+        "evt_3997ba002e5f3ce649da45dc8cef1ad4",
+        "evt_02fbffda8ebe915ccb36257c9b7f3aa8",
+        "evt_bd22c46ac20ca371dcd43118f0bf3bf0",
+        "evt_4567c595304604245de06783b07da91f",
+        "evt_0fe51971d34748f33cf416ffd70c52d5"
+      ]
+    },
+    {
+      "query": "tether vector",
+      "latency_ms": 102.61936500046431,
+      "hash": "11c5e9816f4610812a3dd3f9db4a61f761a1c0a016b46f58051fddd6754f5e17",
+      "event_uids": [
+        "evt_c93e90b9dfa7f9a53a7880d61e9376e7",
+        "evt_e2a6ba9b90f80872fbf2ee8cfc9742ef",
+        "evt_61bb4fd8db21bb814a044f02ad557e04",
+        "evt_245729a1b88a8708f231b4647ea455e2",
+        "evt_683ad5e89fdf3f5080ebaf1a1b2071ce",
+        "evt_43e90f9a96a394b7687f9004d7c02f17",
+        "evt_33b496bb3cd7ec07e5110a4dd5895beb",
+        "evt_cb5d6c412eea0a4cdc080e9da1e4f31e"
+      ]
+    },
+    {
+      "query": "receipt",
+      "latency_ms": 44.22447000069951,
+      "hash": "6326ab9ef66f28b522261bd7e4bf02f4fa75f9737506d5d3a249fc457687c58a",
+      "event_uids": [
+        "evt_9c1491c3beb85540c585169f1c2d2754",
+        "evt_1d54d37bc87bad931679a48218b28fc1",
+        "evt_b99c096cd01f6c1e115e44f5177aac2c",
+        "evt_9a38a397cc88e7a1cb2ffb0172654b72",
+        "evt_69be282c21d42cbf82d2439fbb1aff1b",
+        "evt_b4d10ba8d5d6ffb04648cb61f386240e",
+        "evt_f84acf46f734c93b5f83ea5e147cd512",
+        "evt_cfc176d810e892ac1a5ec7db0c8be81f"
+      ]
+    },
+    {
+      "query": "vector harness",
+      "latency_ms": 75.99834500069846,
+      "hash": "d16ab3e95b7f2399a20e326289b13608ceeaf7e4e019cb452c000013c5afcdbe",
+      "event_uids": [
+        "evt_9aad62dcdf29b82b609f477cd31fb941",
+        "evt_6b51e71be1e93639c8c77b0d01f53566",
+        "evt_50a2d1ba5fedc6f347a08b339925a546",
+        "evt_a4f621a6d18db21a6725e1db98d5bd50",
+        "evt_60ce125a33b2b5dfbc9896b729cd5613",
+        "evt_245729a1b88a8708f231b4647ea455e2",
+        "evt_02fbffda8ebe915ccb36257c9b7f3aa8",
+        "evt_cc2b2035b6af118ecc7254c7bdef6c67"
+      ]
+    },
+    {
+      "query": "courier capsule coral",
+      "latency_ms": 119.70943400046963,
+      "hash": "14cbba2affc2fdeb971f0825a78958b7a2fe789e2f1f368c9dabdeda582c2e9b",
+      "event_uids": [
+        "evt_7ac62a1affb456fca50236e019a3f4d7",
+        "evt_1a3a09c063190d5022de7ce36f469ce0",
+        "evt_459feadf96f7888c1cf2a5fde25cf1c6",
+        "evt_e04a646fc6a774891c0ec7d7160217c2",
+        "evt_68f0388cc98a3c9fc579c0bfc946929c",
+        "evt_2a038530ea34c971081df2bc33c2fd6f",
+        "evt_20d498afef2604e0050c36f321bbad6f",
+        "evt_4f3aa8a140adcf1137c2ec91002196cd"
+      ]
+    },
+    {
+      "query": "temporal lexical",
+      "latency_ms": 70.47561400031555,
+      "hash": "b3cb5065b5a145c6a552a3781bf56dee0ffbc1ad1bf7c1befcb4fba7fda8002f",
+      "event_uids": [
+        "evt_b9ea17068f8e699cc85e1a575981c1d5",
+        "evt_d70ec28ac4880b9d8777e78ff8d7b83b",
+        "evt_5b5cae4d4ede1cad560868b4ee7fdd31",
+        "evt_1aa3168d402908cf78b5383ec85e8f1e",
+        "evt_bd22c46ac20ca371dcd43118f0bf3bf0",
+        "evt_cb5a81450e940aa9c1353b557fe5c976",
+        "evt_ba2f2fd4df29a4aafe9de4dfa48cd4ba",
+        "evt_3b4b6cba01c0de6bfab7e2593e71b852"
+      ]
+    },
+    {
+      "query": "token orbit manifest",
+      "latency_ms": 119.12651900001947,
+      "hash": "b5f7f2bbb821452c0b5ff0e2306e847ef972c356b113abf6703ef0877b543056",
+      "event_uids": [
+        "evt_ac2bc680809243769a07ef832d2ca1a5",
+        "evt_3df2e4109120a148d3bfafd0682db9e3",
+        "evt_bd22c46ac20ca371dcd43118f0bf3bf0",
+        "evt_0579c28855f9872055f39d6012346b90",
+        "evt_fc1f556382f98a58238884a9880a3eb8",
+        "evt_ae9a75dc3df8548a46307668865c7e8a",
+        "evt_5acbec85f8bf4596f47c9eb6b3da21ac",
+        "evt_02fbffda8ebe915ccb36257c9b7f3aa8"
+      ]
+    },
+    {
+      "query": "vector signal",
+      "latency_ms": 85.81762600078946,
+      "hash": "157a4bbd729976036c487e5b7543cc5085e740bb9870085f7e3aacb98f05d009",
+      "event_uids": [
+        "evt_43e90f9a96a394b7687f9004d7c02f17",
+        "evt_348c584ede49dc625d5b947d0ea957c9",
+        "evt_62a10f32968b85e4b5d246a8d7a34df7",
+        "evt_6c43db3e06787928d76670fba9107080",
+        "evt_355fb383b8154872edccc436a8018adb",
+        "evt_cc2b2035b6af118ecc7254c7bdef6c67",
+        "evt_872b6bc7a4a96226a7539b474bf0ee94",
+        "evt_49384b8184261e7ed06bf9b6697c6533"
+      ]
+    },
+    {
+      "query": "profile",
+      "latency_ms": 72.3326300003464,
+      "hash": "e4861f7bdca1e6e13b5f574b05f7670bdaeb3df26ed77573a4ea923c9b832209",
+      "event_uids": [
+        "evt_88f403a58fdc49a7346353f5b0d9d0be",
+        "evt_97b2d7d656c0adbc459b0a4c041d5dc8",
+        "evt_28c478d1d1150c98738cceeec6f6a038",
+        "evt_dc45fd3472235e5f25aa03dd88f8af69",
+        "evt_ec09fbf8e8cd3ab67fa18db9618034ef",
+        "evt_8b5949b5f5781b51f5a5caf004a02818",
+        "evt_0c06b2b7b8dd67712256e2291222b7a2",
+        "evt_1aeb5535748bc2d413e49346777da871"
+      ]
+    }
+  ]
+}

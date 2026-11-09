@@ -30,7 +30,11 @@ regenerate them after the HC-2 change lands, that would defeat the point of the 
 |---------------|----|---------|---------|---------|----------------|
 | baseline      | 50 | 302.151 | 350.890 | 476.438 | `92c6b68e...`  |
 | baseline_aa   | 50 | 309.163 | 353.216 | 415.713 | `92c6b68e...`  |
+| scrub_change  | 50 | 288.030 | 328.280 | 490.451 | `92c6b68e...`  |
+| after         | 50 |  92.883 | 128.982 | 316.846 | `92c6b68e...`  |
+| after_aa      | 50 |  83.360 | 118.565 | 313.526 | `92c6b68e...`  |
 
-Baseline and its A/A rerun (same unmodified code, run twice) share the same `combined_hash` — the
-~2% p50 spread between them is run-to-run noise on this machine, not a code difference. See
-`results/baseline.json` and `results/baseline_aa.json` for the full per-query rows.
+Every label shares the same `combined_hash` — the HC-2 changes (scrub single-scan gating, then the
+temporal mtime/size-keyed cache) never changed a single query's result set or order, only the time to
+compute it. `after`/`after_aa` (same final code, run twice) land under the 100ms p50 target with
+similar run-to-run noise to the baseline pair. See `results/*.json` for the full per-query rows.

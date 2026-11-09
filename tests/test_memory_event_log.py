@@ -100,6 +100,18 @@ class EventLogTests(unittest.TestCase):
                 parent_event_ids=[0],
             )
 
+    def test_iter_events_cache_sees_a_later_append_from_a_fresh_instance(self):
+        """HC-2: the mtime/size-keyed cache must miss, not serve stale history, once the file changes —
+        including when the read comes from a brand new EventLog instance on the same path, the pattern
+        the memory surface uses (one EventLog object per query)."""
+        self.log.append("memory.note", {"text": "one"}, source="z0")
+        reader = EventLog(self.root, read_only=True)
+        self.assertEqual([e.payload["text"] for e in reader.iter_events()], ["one"])
+        self.log.append("memory.note", {"text": "two"}, source="z0")
+        fresh = EventLog(self.root, read_only=True)
+        self.assertEqual([e.payload["text"] for e in fresh.iter_events()], ["one", "two"])
+        self.assertEqual([e.payload["text"] for e in reader.iter_events()], ["one", "two"])
+
 
 if __name__ == "__main__":
     unittest.main()
