@@ -58,7 +58,7 @@ BODY_FIELDS = frozenset(
 # and re-validating every committed event; an append changes the file's size (and mtime), which changes the
 # key, so a stale entry is never served. Bounded (FIFO eviction) since one long-running process can touch
 # many distinct ledger roots across its lifetime (tests do this routinely); real deployments keep one.
-_COMMITTED_EVENTS_CACHE: dict[tuple[int, int, int], list["MemoryEvent"]] = {}
+_COMMITTED_EVENTS_CACHE: dict[tuple[str, int, int, int, int], list["MemoryEvent"]] = {}
 _COMMITTED_EVENTS_CACHE_LOCK = threading.Lock()
 _COMMITTED_EVENTS_CACHE_MAX = 64
 
@@ -762,7 +762,7 @@ class EventLog:
             st = self.events_path.stat()
         except OSError:
             return self._read_committed_events()
-        key = (st.st_ino, st.st_mtime_ns, st.st_size)
+        key = (str(self.events_path), st.st_dev, st.st_ino, st.st_mtime_ns, st.st_size)
         with _COMMITTED_EVENTS_CACHE_LOCK:
             cached = _COMMITTED_EVENTS_CACHE.get(key)
         if cached is not None:
