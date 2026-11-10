@@ -189,10 +189,12 @@ def coverage(rows, source='vllm-sr', start=None, end=None):
         raise ValueError('coverage window end is before start')
     ts = [t for t in ts if start <= t <= end]
     edges = [start] + ts + [end]
-    gaps = [(a, b) for a, b in zip(edges, edges[1:]) if b - a > GAP_S]
+    # Gap tolerance applies between observed rows, never to an absent stream.
+    gaps = [(a, b) for a, b in zip(edges, edges[1:])
+            if b - a > GAP_S or (not ts and b > a)]
     lost = sum(b - a for a, b in gaps)
     fmt = lambda t: datetime.fromtimestamp(t).strftime('%m-%d %H:%M')
-    return {'source': source, 'pct': round(100.0 * (1 - lost / max(end - start, 1)), 1),
+    return {'source': source, 'pct': round(100.0 * (1 - lost / max(end - start, 1)), 1) if ts else 0.0,
             'gaps': [{'from': fmt(a), 'to': fmt(b), 'minutes': round((b - a) / 60)} for a, b in gaps],
             'note': 'rate figures cover only the time with rows'}
 
