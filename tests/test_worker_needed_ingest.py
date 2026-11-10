@@ -205,3 +205,27 @@ def test_non_object_json_line_skipped(home: Path) -> None:
     report = ingest_worker_needed_results()
     assert report["ingested"] == 2
     assert [event["pair_id"] for event in _events(home)] == ["p0", "p1"]
+
+
+@pytest.mark.parametrize("field", ["native_aggregate", "worker_aggregate"])
+@pytest.mark.parametrize("value", [[1], "invalid", True, 7, [], False])
+def test_malformed_aggregate_does_not_stop_valid_rows(home, field, value):
+    _write_results(
+        json.dumps({"pair_id": "before", "gold": "A"}),
+        json.dumps({"pair_id": "bad", "gold": "B", field: value}),
+        json.dumps({"pair_id": "after", "gold": "A"}),
+    )
+    report = ingest_worker_needed_results()
+    assert report["ingested"] == 2
+    assert report["by_gold"] == {"A": 2}
+    assert [event["pair_id"] for event in _events(home)] == ["before", "after"]
+
+
+@pytest.mark.parametrize("value", [None, {}])
+def test_unknown_aggregate_remains_unknown(home, value):
+    _write_results(json.dumps({"native_aggregate": value, "worker_aggregate": value}))
+    assert ingest_worker_needed_results()["ingested"] == 1
+    event, = _events(home)
+    for prefix in ("native", "worker"):
+        for suffix in ("pass", "wall_ms", "tokens"):
+            assert event[f"{prefix}_{suffix}"] is None

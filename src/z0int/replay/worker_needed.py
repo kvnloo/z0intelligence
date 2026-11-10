@@ -41,6 +41,11 @@ def ingest_worker_needed_results(
             continue
         if not isinstance(row, dict):
             continue
+        if any(
+            row.get(key) is not None and not isinstance(row[key], dict)
+            for key in ("native_aggregate", "worker_aggregate")
+        ):
+            continue
         rows.append(row)
 
     emitted = 0
