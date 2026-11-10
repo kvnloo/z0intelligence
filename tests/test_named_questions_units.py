@@ -188,3 +188,28 @@ def test_boolean_question_default_and_partial_criteria():
         "false": DEFAULT_FALSE_CRITERION,
         "true": "T",
     }
+
+
+@pytest.mark.parametrize("selected", [0, "0"])
+def test_explicit_zero_choice_is_preserved_instead_of_argmax(selected):
+    question = DecisionQuestion(
+        id="q", type="choice", instructions="p",
+        options=(DecisionOption("0", "Zero"), DecisionOption("1", "One")),
+    )
+    answer = answer_from_named(
+        question,
+        {"type": "choice", "choice": selected, "probabilities": {"0": 0.2, "1": 0.8}},
+        source="t",
+    )
+    assert answer.value == "0"
+    assert answer.probabilities == {"0": 0.2, "1": 0.8}
+
+
+@pytest.mark.parametrize("selected", [None, ""])
+def test_absent_choice_still_falls_back_to_argmax(selected):
+    answer = answer_from_named(
+        _choice_question(),
+        {"type": "choice", "choice": selected, "probabilities": {"a": 0.2, "b": 0.8}},
+        source="t",
+    )
+    assert answer.value == "b"
