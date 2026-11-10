@@ -119,3 +119,49 @@ def test_signal_digest_logs_unknown_pace():
     s["burn"]["lanes"]["claude"]["pace_ratio"] = None
     d = S.signal_digest(s, 5)
     assert d["pace_unknown"] == ["claude"] and d["bands"]["claude"] == s["burn"]["lanes"]["claude"]["band"]
+
+
+def test_coverage_includes_silent_leading_and_trailing_window_edges():
+    # Two observed events 10 minutes apart do not cover a two-hour request window.
+    rows = [{"source": "vllm-sr", "ts": 3600}, {"source": "vllm-sr", "ts": 4200}]
+    c = S.coverage(rows, start=0, end=7200)
+    assert c["pct"] == 8.3
+    assert [gap["minutes"] for gap in c["gaps"]] == [60, 50]
+    empty = S.coverage([], start=0, end=7200)
+    assert empty["pct"] == 0.0
+    assert [gap["minutes"] for gap in empty["gaps"]] == [120]
+
+
+def test_report_cli_preserves_full_24_hour_window_when_no_events(tmp_path, monkeypatch, capsys):
+    (tmp_path / "rows.jsonl").write_text("")
+    monkeypatch.setattr(S, "OUT", tmp_path)
+    monkeypatch.setattr(S.time, "time", lambda: 1_800_000_000)
+    S.main(["report", "--hours", "24"])
+    rep = json.loads(capsys.readouterr().out)
+    assert rep["n"] == 0
+    assert rep["window_utc"]["start"].endswith("+00:00")
+    assert rep["window_utc"]["end"].endswith("+00:00")
+    assert rep["vllm_sr_coverage"]["pct"] == 0.0
+    assert [gap["minutes"] for gap in rep["vllm_sr_coverage"]["gaps"]] == [1440]
+
+
+def test_empty_short_window_never_reports_observed_coverage():
+    # GAP_S tolerates spacing between observations, not an entirely absent stream.
+    for duration in (0, 60, S.GAP_S, S.GAP_S + 1):
+        for rows in ([], [{"source": "vllm-sr", "ts": -1}],
+                     [{"source": "fx", "ts": duration / 2}]):
+            result = S.coverage(rows, start=0, end=duration)
+            assert result["pct"] == 0.0, (duration, rows, result)
+            if duration:
+                assert [gap["minutes"] for gap in result["gaps"]] == [round(duration / 60)]
+
+
+def test_report_cli_empty_short_window_has_zero_coverage(tmp_path, monkeypatch, capsys):
+    (tmp_path / "rows.jsonl").write_text("")
+    monkeypatch.setattr(S, "OUT", tmp_path)
+    monkeypatch.setattr(S.time, "time", lambda: 1_800_000_000)
+    S.main(["report", "--hours", "0.25"])
+    result = json.loads(capsys.readouterr().out)
+    assert result["n"] == 0
+    assert result["vllm_sr_coverage"]["pct"] == 0.0
+    assert [gap["minutes"] for gap in result["vllm_sr_coverage"]["gaps"]] == [15]
