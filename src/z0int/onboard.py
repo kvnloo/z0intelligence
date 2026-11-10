@@ -173,11 +173,22 @@ def step_evolution_lab(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, 
             if r2.returncode != 0:
                 _mark(state, "evolution_lab", "error", r2.stderr[-400:])
                 return {"ok": False, "error": r2.stderr[-400:]}
-            _run(["git", "-C", str(dest), "checkout", EVOLUTION_LAB_REF])
+            r = _run(["git", "-C", str(dest), "checkout", EVOLUTION_LAB_REF])
+            if r.returncode != 0:
+                detail = f"git checkout failed (exit {r.returncode}): {r.stderr[-400:]}"
+                _mark(state, "evolution_lab", "error", detail)
+                return {"ok": False, "path": str(dest), "error": detail}
     else:
-        _run(["git", "-C", str(dest), "fetch", "origin"])
-        _run(["git", "-C", str(dest), "checkout", EVOLUTION_LAB_REF])
-        _run(["git", "-C", str(dest), "pull", "--ff-only", "origin", EVOLUTION_LAB_REF])
+        for args in (
+            ["fetch", "origin"],
+            ["checkout", EVOLUTION_LAB_REF],
+            ["pull", "--ff-only", "origin", EVOLUTION_LAB_REF],
+        ):
+            r = _run(["git", "-C", str(dest), *args])
+            if r.returncode != 0:
+                detail = f"git {args[0]} failed (exit {r.returncode}): {r.stderr[-400:]}"
+                _mark(state, "evolution_lab", "error", detail)
+                return {"ok": False, "path": str(dest), "error": detail}
     # editable install into current env
     r = _run([sys.executable, "-m", "pip", "install", "-q", "-e", str(dest)])
     ok = r.returncode == 0

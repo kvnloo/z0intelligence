@@ -380,6 +380,60 @@ class OnboardSteps(unittest.TestCase):
         self.el.assert_called_once_with()
         self.assertFalse(second_destination.exists())
 
+    def test_evolution_lab_stops_before_install_when_git_update_fails(self):
+        destination = self.root / "evolution-lab"
+        (destination / ".git").mkdir(parents=True)
+        self.el.return_value = {"found": True, "path": str(destination)}
+        for failed_action in ("fetch", "checkout", "pull"):
+            with self.subTest(action=failed_action):
+                calls = []
+
+                def command(argv, **kwargs):
+                    calls.append(argv)
+                    failed = argv[0] == "git" and argv[3] == failed_action
+                    return subprocess.CompletedProcess(argv, 1 if failed else 0, "", "synthetic git failure" if failed else "")
+
+                state = {"steps": {}}
+                with mock.patch.object(ob, "_run", side_effect=command):
+                    result = ob.step_evolution_lab(state, {})
+                self.assertFalse(result["ok"])
+                self.assertEqual(state["steps"]["evolution_lab"]["status"], "error")
+                self.assertEqual(calls[-1][3], failed_action)
+                self.assertTrue(all(argv[0] == "git" for argv in calls))
+
+    def test_evolution_lab_failed_fallback_checkout_is_not_installed(self):
+        responses = [
+            subprocess.CompletedProcess([], 1, "", "branch clone failed"),
+            subprocess.CompletedProcess([], 0, "", ""),
+            subprocess.CompletedProcess([], 1, "", "requested ref missing"),
+            subprocess.CompletedProcess([], 0, "", ""),
+        ]
+        state = {"steps": {}}
+        with mock.patch.object(ob, "_run", side_effect=responses) as command:
+            result = ob.step_evolution_lab(state, {})
+        self.assertFalse(result["ok"])
+        self.assertEqual(state["steps"]["evolution_lab"]["status"], "error")
+        self.assertEqual(command.call_count, 3)
+
+    def test_failed_git_update_remains_resumable_and_blocks_later_steps(self):
+        destination = self.root / "evolution-lab"
+        (destination / ".git").mkdir(parents=True)
+        self.el.return_value = {"found": True, "path": str(destination)}
+        with mock.patch.object(ob, "_run", return_value=subprocess.CompletedProcess([], 1, "", "offline")) as command:
+            result = ob.run_onboard(only=["evolution_lab", "privacy"])
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["failed"], ["evolution_lab"])
+        self.assertEqual(result["completed"], [])
+        self.assertNotIn("privacy", result["results"])
+        self.assertEqual(command.call_count, 1)
+        self.assertEqual(self.state()["run"]["status"], "failed")
+        with mock.patch.object(ob, "_run", return_value=subprocess.CompletedProcess([], 0, "", "")) as command:
+            resumed = ob.run_onboard(resume=True)
+        self.assertTrue(resumed["ok"])
+        self.assertEqual(resumed["completed"], ["evolution_lab", "privacy"])
+        self.assertEqual(command.call_count, 4)
+        self.assertEqual(self.state()["run"]["status"], "done")
+
     def test_resume_rejects_changed_evolution_source(self):
         with mock.patch.object(ob, "_run", side_effect=SimulatedCrash()):
             with self.assertRaises(SimulatedCrash):
