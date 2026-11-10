@@ -365,3 +365,17 @@ def test_check_uses_given_backend(monkeypatch):
     assert probe.check(endpoint, request=explicit, tool_backend=backend) == expected
     assert backend.requests[1] is explicit
     assert lookups == ["m", "m"]
+
+
+@pytest.mark.parametrize(
+    "timings, expected",
+    [({"load_ms": 0.0}, 0.0), ({"load_ms": None}, 2000.0), ({}, 2000.0)],
+)
+def test_probe_endpoint_preserves_zero_load_time(fake_transport, stub_telemetry, timings, expected):
+    prepared, _instances = fake_transport
+    prepared.extend([_outcome(timings=timings, latency_ms=2000.0), _outcome(), _outcome()])
+
+    receipt = probe.probe_endpoint(_endpoint(), repeats=1)
+
+    assert receipt.cold_start_ms == expected
+    assert probe.receipts_to_measurements(receipt)["cold_start_ms"] == expected
