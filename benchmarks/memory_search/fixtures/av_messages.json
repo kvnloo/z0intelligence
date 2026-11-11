@@ -1,0 +1,2930 @@
+[
+{
+"session_id": "bench-s0",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"lexical quokka scrub tether ledger scrub temporal sk-FAKEFAKEFAKEFAKEFAKEFAKE router capsule gateway"
+],
+[
+"assistant",
+"gateway router coral lattice"
+],
+[
+"user",
+"orbit claim scrub brief lexical quokka courier prism"
+]
+]
+},
+{
+"session_id": "bench-s1",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"tether prism receipt kernel"
+],
+[
+"assistant",
+"harness claim gateway router lexical anchor claim vector"
+],
+[
+"user",
+"ledger queue cache ledger brief cache claim"
+]
+]
+},
+{
+"session_id": "bench-s2",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"temporal prism shard token policy router temporal receipt"
+],
+[
+"assistant",
+"cache claim manifest beacon kernel scrub replica harness"
+]
+]
+},
+{
+"session_id": "bench-s3",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"profile snapshot snapshot bridge coral receipt claim"
+],
+[
+"assistant",
+"kernel manifest receipt quokka bridge scrub claim harness"
+]
+]
+},
+{
+"session_id": "bench-s4",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"quokka kernel lattice replica vector signal"
+]
+]
+},
+{
+"session_id": "bench-s5",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"lexical capsule token cluster snapshot gateway replica ledger"
+]
+]
+},
+{
+"session_id": "bench-s6",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"cluster kernel cluster queue"
+],
+[
+"assistant",
+"ember coral kernel manifest"
+],
+[
+"user",
+"coral policy router anchor shard"
+],
+[
+"assistant",
+"prism bridge gateway beacon scrub index signal profile"
+],
+[
+"user",
+"prism capsule gateway router tether"
+]
+]
+},
+{
+"session_id": "bench-s7",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"cluster ember cluster index replica queue cluster"
+]
+]
+},
+{
+"session_id": "bench-s8",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"anchor replica tether snapshot temporal lattice prism temporal relay"
+]
+]
+},
+{
+"session_id": "bench-s9",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"token signal manifest profile vector tether signal drift receipt"
+],
+[
+"assistant",
+"replica quokka index ember ember index manifest"
+],
+[
+"user",
+"capsule claim policy coral beacon ember beacon queue"
+]
+]
+},
+{
+"session_id": "bench-s10",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"shard prism shard capsule vector courier manifest anchor anchor"
+],
+[
+"assistant",
+"kernel vector gateway courier brief claim claim"
+],
+[
+"user",
+"signal brief anchor snapshot vector temporal prism"
+]
+]
+},
+{
+"session_id": "bench-s11",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"harness profile coral queue quokka"
+],
+[
+"assistant",
+"router policy worker vault gateway gateway cluster beacon"
+],
+[
+"user",
+"quokka queue signal prism queue"
+],
+[
+"assistant",
+"tether anchor capsule tether drift drift"
+]
+]
+},
+{
+"session_id": "bench-s12",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"coral kernel cluster receipt worker"
+],
+[
+"assistant",
+"courier shard ledger snapshot AKIAFAKEFAKEFAKEFAKE cache courier gateway"
+]
+]
+},
+{
+"session_id": "bench-s13",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"receipt signal profile coral index temporal scrub"
+],
+[
+"assistant",
+"queue drift profile anchor ember ledger queue beacon"
+],
+[
+"user",
+"brief replica temporal vault anchor profile tether anchor"
+]
+]
+},
+{
+"session_id": "bench-s14",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"coral ledger drift profile relay profile harness scrub"
+],
+[
+"assistant",
+"capsule temporal vector gateway kernel scrub gateway vector"
+],
+[
+"user",
+"coral router coral signal coral gateway replica orbit"
+]
+]
+},
+{
+"session_id": "bench-s15",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"ember scrub courier signal cluster gateway queue"
+],
+[
+"assistant",
+"policy relay receipt coral drift worker"
+],
+[
+"user",
+"signal receipt signal prism snapshot shard courier lattice drift"
+]
+]
+},
+{
+"session_id": "bench-s16",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"shard index manifest vault shard queue cache"
+]
+]
+},
+{
+"session_id": "bench-s17",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"vault token brief replica beacon token cache beacon scrub api_key: FakeApiKeyValue1234567890 receipt anchor orbit"
+]
+]
+},
+{
+"session_id": "bench-s18",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"token coral signal index cluster beacon worker"
+]
+]
+},
+{
+"session_id": "bench-s19",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"vault kernel tether kernel anchor cluster cluster prism"
+],
+[
+"assistant",
+"bridge quokka gateway coral"
+],
+[
+"user",
+"worker tether lexical shard cache courier vault worker"
+],
+[
+"assistant",
+"vector kernel kernel coral index profile Bearer fakebearerxxxxxxxxxxxxxxxxxxxx profile signal lattice"
+],
+[
+"user",
+"ledger orbit queue relay manifest harness harness policy cache"
+]
+]
+},
+{
+"session_id": "bench-s20",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"ember ember queue signal"
+],
+[
+"assistant",
+"scrub beacon capsule tether ledger"
+],
+[
+"user",
+"temporal token quokka harness ember"
+],
+[
+"assistant",
+"shard vault gateway policy claim temporal profile"
+]
+]
+},
+{
+"session_id": "bench-s21",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"worker beacon tether beacon courier cluster courier drift manifest"
+],
+[
+"assistant",
+"drift index prism lexical courier cache prism cluster orbit"
+],
+[
+"user",
+"temporal claim brief temporal cache queue"
+]
+]
+},
+{
+"session_id": "bench-s22",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"cache policy ember relay"
+],
+[
+"assistant",
+"router cluster cache courier lattice"
+],
+[
+"user",
+"anchor orbit ledger signal"
+]
+]
+},
+{
+"session_id": "bench-s23",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"index index kernel queue worker ledger anchor anchor courier"
+],
+[
+"assistant",
+"claim prism token prism anchor manifest"
+],
+[
+"user",
+"capsule beacon anchor relay temporal"
+],
+[
+"assistant",
+"lexical scrub policy bridge tether shard vector"
+]
+]
+},
+{
+"session_id": "bench-s24",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"manifest beacon capsule receipt claim relay signal"
+],
+[
+"assistant",
+"snapshot manifest receipt snapshot prism beacon profile"
+],
+[
+"user",
+"brief worker harness lexical token anchor ghp_F4K3F4K3F4K3F4K3F4K3 cluster lattice index"
+],
+[
+"assistant",
+"coral relay replica scrub cluster"
+],
+[
+"user",
+"replica shard worker policy router token receipt"
+]
+]
+},
+{
+"session_id": "bench-s25",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"vector ember bridge ledger temporal gateway"
+],
+[
+"assistant",
+"lattice token worker token"
+],
+[
+"user",
+"temporal coral kernel lexical profile"
+],
+[
+"assistant",
+"gateway cluster vector snapshot orbit beacon drift temporal"
+],
+[
+"user",
+"beacon lexical lattice receipt beacon anchor snapshot"
+]
+]
+},
+{
+"session_id": "bench-s26",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"harness scrub vector profile replica"
+],
+[
+"assistant",
+"kernel token cache router shard snapshot"
+],
+[
+"user",
+"ledger capsule capsule relay"
+],
+[
+"assistant",
+"coral claim temporal signal"
+],
+[
+"user",
+"orbit anchor router tether profile drift replica tether bridge"
+]
+]
+},
+{
+"session_id": "bench-s27",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"relay capsule lexical anchor harness replica beacon ember"
+],
+[
+"assistant",
+"cache token lexical vector queue cluster temporal token orbit"
+]
+]
+},
+{
+"session_id": "bench-s28",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"relay vector ember token"
+],
+[
+"assistant",
+"anchor replica beacon manifest capsule brief"
+],
+[
+"user",
+"quokka cache lattice index anchor vector drift"
+],
+[
+"assistant",
+"profile courier cache relay cluster courier replica brief"
+],
+[
+"user",
+"tether anchor receipt temporal snapshot gateway"
+]
+]
+},
+{
+"session_id": "bench-s29",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"capsule bridge snapshot queue replica relay queue"
+]
+]
+},
+{
+"session_id": "bench-s30",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"kernel beacon claim kernel token worker replica"
+],
+[
+"assistant",
+"capsule signal manifest gateway relay harness snapshot policy"
+]
+]
+},
+{
+"session_id": "bench-s31",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"relay router prism cache lexical orbit"
+],
+[
+"assistant",
+"cache gateway worker orbit courier beacon token bridge vector"
+]
+]
+},
+{
+"session_id": "bench-s32",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"scrub courier tether ledger cache vault kernel vector lattice"
+],
+[
+"assistant",
+"cache capsule policy orbit anchor gateway"
+],
+[
+"user",
+"kernel quokka profile claim lattice shard receipt bridge"
+],
+[
+"assistant",
+"tether prism receipt kernel"
+],
+[
+"user",
+"harness claim gateway router lexical anchor claim vector"
+]
+]
+},
+{
+"session_id": "bench-s33",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"profile tether orbit lattice ledger lattice ember"
+],
+[
+"assistant",
+"beacon anchor beacon index cache"
+],
+[
+"user",
+"brief queue signal lexical"
+],
+[
+"assistant",
+"temporal prism shard token policy router temporal receipt"
+]
+]
+},
+{
+"session_id": "bench-s34",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"signal policy temporal replica policy orbit courier capsule cluster"
+],
+[
+"assistant",
+"courier queue brief tether harness"
+],
+[
+"user",
+"bridge router relay claim prism vault"
+]
+]
+},
+{
+"session_id": "bench-s35",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"token cache queue replica"
+]
+]
+},
+{
+"session_id": "bench-s36",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"router index vector tether profile drift"
+],
+[
+"assistant",
+"drift policy courier cache kernel relay"
+],
+[
+"user",
+"ember harness profile courier profile manifest orbit cache scrub Bearer fakebearerxxxxxxxxxxxxxxxxxxxx anchor tether tether"
+],
+[
+"assistant",
+"lexical capsule token cluster snapshot gateway replica ledger"
+],
+[
+"user",
+"ledger harness claim manifest anchor router signal courier kernel"
+]
+]
+},
+{
+"session_id": "bench-s37",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"receipt lattice prism snapshot relay"
+],
+[
+"assistant",
+"coral kernel claim relay capsule receipt courier courier"
+],
+[
+"user",
+"replica manifest snapshot vault drift relay coral ember beacon"
+],
+[
+"assistant",
+"cluster kernel cluster queue"
+],
+[
+"user",
+"ember coral kernel manifest"
+]
+]
+},
+{
+"session_id": "bench-s38",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"prism capsule gateway router tether"
+],
+[
+"assistant",
+"queue brief kernel gateway harness policy"
+],
+[
+"user",
+"coral vault claim courier snapshot token bridge ember"
+],
+[
+"assistant",
+"cluster ember cluster index replica queue cluster"
+],
+[
+"user",
+"index quokka manifest tether cache"
+]
+]
+},
+{
+"session_id": "bench-s39",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"brief orbit receipt quokka relay queue capsule policy beacon"
+],
+[
+"assistant",
+"brief router tether queue anchor prism"
+]
+]
+},
+{
+"session_id": "bench-s40",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"policy brief ember profile"
+]
+]
+},
+{
+"session_id": "bench-s41",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"capsule index receipt receipt queue receipt"
+],
+[
+"assistant",
+"worker drift relay router ghp_F4K3F4K3F4K3F4K3F4K3 relay harness signal"
+],
+[
+"user",
+"gateway vault replica kernel kernel kernel capsule"
+]
+]
+},
+{
+"session_id": "bench-s42",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"kernel beacon worker beacon capsule"
+],
+[
+"assistant",
+"cache claim vault cache"
+],
+[
+"user",
+"replica harness policy vault anchor"
+],
+[
+"assistant",
+"harness profile coral queue quokka"
+]
+]
+},
+{
+"session_id": "bench-s43",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"vector lattice tether gateway gateway index drift"
+],
+[
+"assistant",
+"beacon drift capsule replica"
+]
+]
+},
+{
+"session_id": "bench-s44",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"bridge index capsule beacon orbit brief token receipt"
+],
+[
+"assistant",
+"vector anchor quokka index manifest ember harness"
+],
+[
+"user",
+"ledger vector ember prism gateway"
+],
+[
+"assistant",
+"receipt signal profile coral index temporal scrub"
+],
+[
+"user",
+"queue drift profile anchor ember ledger queue beacon"
+]
+]
+},
+{
+"session_id": "bench-s45",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"kernel profile coral lattice token kernel kernel ember beacon"
+],
+[
+"assistant",
+"quokka router ledger tether coral harness temporal beacon"
+],
+[
+"user",
+"vault brief drift ledger cache courier tether replica vector"
+],
+[
+"assistant",
+"coral ledger drift profile relay profile harness scrub"
+]
+]
+},
+{
+"session_id": "bench-s46",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"shard router temporal gateway snapshot snapshot sk-FAKEFAKEFAKEFAKEFAKEFAKE beacon router snapshot"
+],
+[
+"assistant",
+"bridge cache drift receipt"
+],
+[
+"user",
+"coral profile vault coral"
+],
+[
+"assistant",
+"ember scrub courier signal cluster gateway queue"
+]
+]
+},
+{
+"session_id": "bench-s47",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"token coral vector capsule index receipt claim ember tether"
+],
+[
+"assistant",
+"orbit bridge token queue cluster bridge router quokka courier"
+],
+[
+"user",
+"policy coral vector policy"
+],
+[
+"assistant",
+"shard index manifest vault shard queue cache"
+]
+]
+},
+{
+"session_id": "bench-s48",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"drift router policy courier brief bridge shard"
+]
+]
+},
+{
+"session_id": "bench-s49",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"temporal receipt ember bridge lexical temporal claim"
+]
+]
+},
+{
+"session_id": "bench-s50",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"cluster orbit lexical signal scrub index queue anchor"
+]
+]
+},
+{
+"session_id": "bench-s51",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"ledger orbit queue relay manifest harness harness policy cache"
+]
+]
+},
+{
+"session_id": "bench-s52",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"relay scrub scrub lexical"
+],
+[
+"assistant",
+"ledger policy replica replica policy profile tether"
+],
+[
+"user",
+"bridge bridge queue relay queue beacon"
+]
+]
+},
+{
+"session_id": "bench-s53",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"vault tether vault ledger"
+],
+[
+"assistant",
+"manifest beacon anchor temporal relay bridge capsule"
+],
+[
+"user",
+"harness scrub temporal replica xai-F4K3TOKENVALUE0000000000 replica cluster profile"
+],
+[
+"assistant",
+"cache policy ember relay"
+],
+[
+"user",
+"router cluster cache courier lattice"
+]
+]
+},
+{
+"session_id": "bench-s54",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"anchor signal ember receipt index prism"
+],
+[
+"assistant",
+"courier kernel policy profile"
+],
+[
+"user",
+"temporal orbit tether lexical prism prism replica"
+]
+]
+},
+{
+"session_id": "bench-s55",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"replica brief policy policy snapshot"
+],
+[
+"assistant",
+"lexical quokka vector cache anchor"
+],
+[
+"user",
+"snapshot bridge drift coral index"
+],
+[
+"assistant",
+"manifest beacon capsule receipt claim relay signal"
+],
+[
+"user",
+"snapshot manifest receipt snapshot prism beacon profile"
+]
+]
+},
+{
+"session_id": "bench-s56",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"replica shard worker policy router token receipt"
+],
+[
+"assistant",
+"tether snapshot signal token relay"
+],
+[
+"user",
+"cache signal capsule replica replica scrub kernel"
+]
+]
+},
+{
+"session_id": "bench-s57",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"beacon lexical lattice receipt beacon anchor snapshot"
+],
+[
+"assistant",
+"anchor vault gateway harness courier capsule"
+],
+[
+"user",
+"gateway snapshot router router receipt quokka capsule ledger"
+],
+[
+"assistant",
+"harness scrub vector profile replica"
+]
+]
+},
+{
+"session_id": "bench-s58",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"orbit anchor router tether profile drift replica tether bridge"
+]
+]
+},
+{
+"session_id": "bench-s59",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"router profile ledger router tether cache orbit"
+],
+[
+"assistant",
+"orbit gateway ledger prism temporal"
+],
+[
+"user",
+"manifest lexical harness token router vault signal policy"
+],
+[
+"assistant",
+"relay vector ember token"
+],
+[
+"user",
+"anchor replica beacon manifest capsule brief"
+]
+]
+},
+{
+"session_id": "bench-s60",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"tether anchor receipt temporal snapshot gateway"
+],
+[
+"assistant",
+"profile manifest tether anchor"
+],
+[
+"user",
+"gateway temporal index coral prism relay profile lattice"
+]
+]
+},
+{
+"session_id": "bench-s61",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"lexical replica tether courier coral"
+]
+]
+},
+{
+"session_id": "bench-s62",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"drift snapshot temporal gateway ledger router"
+],
+[
+"assistant",
+"snapshot gateway gateway queue prism"
+],
+[
+"user",
+"router claim prism claim orbit token"
+]
+]
+},
+{
+"session_id": "bench-s63",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"gateway router coral lattice"
+],
+[
+"assistant",
+"orbit claim scrub brief lexical quokka courier prism"
+]
+]
+},
+{
+"session_id": "bench-s64",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"harness claim gateway router lexical anchor claim vector"
+],
+[
+"assistant",
+"ledger queue cache ledger brief cache claim"
+],
+[
+"user",
+"claim orbit ledger drift shard router"
+]
+]
+},
+{
+"session_id": "bench-s65",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"cache claim manifest beacon kernel scrub replica harness"
+],
+[
+"assistant",
+"index ledger worker courier"
+],
+[
+"user",
+"manifest vector orbit kernel api_key: FakeApiKeyValue1234567890 tether token kernel"
+],
+[
+"assistant",
+"signal policy temporal replica policy orbit courier capsule cluster"
+],
+[
+"user",
+"courier queue brief tether harness"
+]
+]
+},
+{
+"session_id": "bench-s66",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"kernel manifest receipt quokka bridge scrub claim harness"
+]
+]
+},
+{
+"session_id": "bench-s67",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"lattice brief replica lattice receipt index tether cluster ember"
+],
+[
+"assistant",
+"harness receipt anchor drift orbit lattice"
+],
+[
+"user",
+"gateway orbit temporal gateway cluster lattice kernel snapshot tether"
+]
+]
+},
+{
+"session_id": "bench-s68",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"ledger harness claim manifest anchor router signal courier kernel"
+]
+]
+},
+{
+"session_id": "bench-s69",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"ember coral kernel manifest"
+]
+]
+},
+{
+"session_id": "bench-s70",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"index quokka manifest tether cache"
+]
+]
+},
+{
+"session_id": "bench-s71",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"snapshot token capsule kernel profile replica index anchor"
+],
+[
+"assistant",
+"replica vault policy ember lattice orbit"
+],
+[
+"user",
+"beacon anchor temporal relay orbit scrub"
+],
+[
+"assistant",
+"policy brief ember profile"
+]
+]
+},
+{
+"session_id": "bench-s72",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"replica quokka index ember ember index manifest"
+],
+[
+"assistant",
+"capsule claim policy coral beacon ember beacon queue"
+],
+[
+"user",
+"profile anchor cache signal replica token drift prism"
+],
+[
+"assistant",
+"capsule index receipt receipt queue receipt"
+],
+[
+"user",
+"worker drift relay router ghp_F4K3F4K3F4K3F4K3F4K3 relay harness signal"
+]
+]
+},
+{
+"session_id": "bench-s73",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"kernel vector gateway courier brief claim claim"
+],
+[
+"assistant",
+"signal brief anchor snapshot vector temporal prism"
+],
+[
+"user",
+"profile ember snapshot cache signal lattice cache manifest"
+],
+[
+"assistant",
+"kernel beacon worker beacon capsule"
+],
+[
+"user",
+"cache claim vault cache"
+]
+]
+},
+{
+"session_id": "bench-s74",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"router policy worker vault gateway gateway cluster beacon"
+],
+[
+"assistant",
+"quokka queue signal prism queue"
+],
+[
+"user",
+"tether anchor capsule tether drift drift"
+]
+]
+},
+{
+"session_id": "bench-s75",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"courier shard ledger snapshot AKIAFAKEFAKEFAKEFAKE cache courier gateway"
+]
+]
+},
+{
+"session_id": "bench-s76",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"queue drift profile anchor ember ledger queue beacon"
+]
+]
+},
+{
+"session_id": "bench-s77",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"capsule temporal vector gateway kernel scrub gateway vector"
+]
+]
+},
+{
+"session_id": "bench-s78",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"policy relay receipt coral drift worker"
+],
+[
+"assistant",
+"signal receipt signal prism snapshot shard courier lattice drift"
+],
+[
+"user",
+"vector drift cache token claim router snapshot"
+],
+[
+"assistant",
+"token coral vector capsule index receipt claim ember tether"
+]
+]
+},
+{
+"session_id": "bench-s79",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"anchor bridge ember coral profile token policy"
+],
+[
+"assistant",
+"temporal replica coral cluster cluster signal"
+],
+[
+"user",
+"shard queue index token ember receipt"
+]
+]
+},
+{
+"session_id": "bench-s80",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"bridge bridge vector harness shard snapshot queue"
+],
+[
+"assistant",
+"tether kernel policy claim index cluster index brief"
+]
+]
+},
+{
+"session_id": "bench-s81",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"manifest bridge harness vector"
+],
+[
+"assistant",
+"replica anchor cluster anchor prism vector token receipt brief"
+]
+]
+},
+{
+"session_id": "bench-s82",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"bridge quokka gateway coral"
+],
+[
+"assistant",
+"worker tether lexical shard cache courier vault worker"
+],
+[
+"user",
+"vector kernel kernel coral index profile Bearer fakebearerxxxxxxxxxxxxxxxxxxxx profile signal lattice"
+]
+]
+},
+{
+"session_id": "bench-s83",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"scrub beacon capsule tether ledger"
+],
+[
+"assistant",
+"temporal token quokka harness ember"
+]
+]
+},
+{
+"session_id": "bench-s84",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"drift index prism lexical courier cache prism cluster orbit"
+]
+]
+},
+{
+"session_id": "bench-s85",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"router cluster cache courier lattice"
+]
+]
+},
+{
+"session_id": "bench-s86",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"claim prism token prism anchor manifest"
+],
+[
+"assistant",
+"capsule beacon anchor relay temporal"
+],
+[
+"user",
+"lexical scrub policy bridge tether shard vector"
+],
+[
+"assistant",
+"replica brief policy policy snapshot"
+]
+]
+},
+{
+"session_id": "bench-s87",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"snapshot manifest receipt snapshot prism beacon profile"
+]
+]
+},
+{
+"session_id": "bench-s88",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"lattice token worker token"
+],
+[
+"assistant",
+"temporal coral kernel lexical profile"
+],
+[
+"user",
+"gateway cluster vector snapshot orbit beacon drift temporal"
+],
+[
+"assistant",
+"beacon lexical lattice receipt beacon anchor snapshot"
+],
+[
+"user",
+"anchor vault gateway harness courier capsule"
+]
+]
+},
+{
+"session_id": "bench-s89",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"kernel token cache router shard snapshot"
+],
+[
+"assistant",
+"ledger capsule capsule relay"
+]
+]
+},
+{
+"session_id": "bench-s90",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"cache token lexical vector queue cluster temporal token orbit"
+]
+]
+},
+{
+"session_id": "bench-s91",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"anchor replica beacon manifest capsule brief"
+],
+[
+"assistant",
+"quokka cache lattice index anchor vector drift"
+],
+[
+"user",
+"profile courier cache relay cluster courier replica brief"
+]
+]
+},
+{
+"session_id": "bench-s92",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"token ember profile anchor lexical signal brief gateway index sk-FAKEFAKEFAKEFAKEFAKEFAKE replica quokka vault"
+],
+[
+"assistant",
+"lattice kernel cache receipt prism cache brief bridge"
+],
+[
+"user",
+"shard replica bridge ledger profile manifest bridge index router"
+]
+]
+},
+{
+"session_id": "bench-s93",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"capsule signal manifest gateway relay harness snapshot policy"
+],
+[
+"assistant",
+"anchor index router cluster capsule vault"
+]
+]
+},
+{
+"session_id": "bench-s94",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"cache gateway worker orbit courier beacon token bridge vector"
+],
+[
+"assistant",
+"token coral capsule lattice shard cache vector vault"
+],
+[
+"user",
+"lexical quokka scrub tether ledger scrub temporal sk-FAKEFAKEFAKEFAKEFAKEFAKE router capsule gateway"
+]
+]
+},
+{
+"session_id": "bench-s95",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"cache capsule policy orbit anchor gateway"
+]
+]
+},
+{
+"session_id": "bench-s96",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"beacon anchor beacon index cache"
+]
+]
+},
+{
+"session_id": "bench-s97",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"courier queue brief tether harness"
+],
+[
+"assistant",
+"bridge router relay claim prism vault"
+],
+[
+"user",
+"profile snapshot snapshot bridge coral receipt claim"
+],
+[
+"assistant",
+"kernel manifest receipt quokka bridge scrub claim harness"
+]
+]
+},
+{
+"session_id": "bench-s98",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"cache anchor lexical shard cache harness vector tether"
+]
+]
+},
+{
+"session_id": "bench-s99",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"drift policy courier cache kernel relay"
+],
+[
+"assistant",
+"ember harness profile courier profile manifest orbit cache scrub Bearer fakebearerxxxxxxxxxxxxxxxxxxxx anchor tether tether"
+]
+]
+},
+{
+"session_id": "bench-s100",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"coral kernel claim relay capsule receipt courier courier"
+],
+[
+"assistant",
+"replica manifest snapshot vault drift relay coral ember beacon"
+]
+]
+},
+{
+"session_id": "bench-s101",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"queue brief kernel gateway harness policy"
+]
+]
+},
+{
+"session_id": "bench-s102",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"brief router tether queue anchor prism"
+],
+[
+"assistant",
+"tether lattice lattice courier beacon cluster coral temporal"
+],
+[
+"user",
+"anchor replica tether snapshot temporal lattice prism temporal relay"
+],
+[
+"assistant",
+"snapshot token capsule kernel profile replica index anchor"
+]
+]
+},
+{
+"session_id": "bench-s103",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"shard cache policy token gateway"
+]
+]
+},
+{
+"session_id": "bench-s104",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"worker drift relay router ghp_F4K3F4K3F4K3F4K3F4K3 relay harness signal"
+],
+[
+"assistant",
+"gateway vault replica kernel kernel kernel capsule"
+],
+[
+"user",
+"shard prism shard capsule vector courier manifest anchor anchor"
+],
+[
+"assistant",
+"kernel vector gateway courier brief claim claim"
+]
+]
+},
+{
+"session_id": "bench-s105",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"cache claim vault cache"
+],
+[
+"assistant",
+"replica harness policy vault anchor"
+],
+[
+"user",
+"harness profile coral queue quokka"
+],
+[
+"assistant",
+"router policy worker vault gateway gateway cluster beacon"
+]
+]
+},
+{
+"session_id": "bench-s106",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"beacon drift capsule replica"
+],
+[
+"assistant",
+"harness ledger signal replica lexical queue brief"
+],
+[
+"user",
+"coral kernel cluster receipt worker"
+],
+[
+"assistant",
+"courier shard ledger snapshot AKIAFAKEFAKEFAKEFAKE cache courier gateway"
+]
+]
+},
+{
+"session_id": "bench-s107",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"vector anchor quokka index manifest ember harness"
+],
+[
+"assistant",
+"ledger vector ember prism gateway"
+],
+[
+"user",
+"receipt signal profile coral index temporal scrub"
+]
+]
+},
+{
+"session_id": "bench-s108",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"quokka router ledger tether coral harness temporal beacon"
+],
+[
+"assistant",
+"vault brief drift ledger cache courier tether replica vector"
+]
+]
+},
+{
+"session_id": "bench-s109",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"bridge cache drift receipt"
+],
+[
+"assistant",
+"coral profile vault coral"
+],
+[
+"user",
+"ember scrub courier signal cluster gateway queue"
+],
+[
+"assistant",
+"policy relay receipt coral drift worker"
+],
+[
+"user",
+"signal receipt signal prism snapshot shard courier lattice drift"
+]
+]
+},
+{
+"session_id": "bench-s110",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"orbit bridge token queue cluster bridge router quokka courier"
+],
+[
+"assistant",
+"policy coral vector policy"
+]
+]
+},
+{
+"session_id": "bench-s111",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"orbit tether snapshot capsule shard vector cluster queue"
+],
+[
+"assistant",
+"token worker manifest vault beacon manifest lexical receipt"
+]
+]
+},
+{
+"session_id": "bench-s112",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"lexical lattice cluster temporal vault"
+],
+[
+"assistant",
+"scrub harness snapshot manifest"
+],
+[
+"user",
+"token coral signal index cluster beacon worker"
+]
+]
+},
+{
+"session_id": "bench-s113",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"manifest snapshot replica cache"
+],
+[
+"assistant",
+"ledger shard quokka queue gateway worker anchor"
+],
+[
+"user",
+"vault kernel tether kernel anchor cluster cluster prism"
+],
+[
+"assistant",
+"bridge quokka gateway coral"
+],
+[
+"user",
+"worker tether lexical shard cache courier vault worker"
+]
+]
+},
+{
+"session_id": "bench-s114",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"queue anchor gateway orbit"
+]
+]
+},
+{
+"session_id": "bench-s115",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"ledger policy replica replica policy profile tether"
+],
+[
+"assistant",
+"bridge bridge queue relay queue beacon"
+]
+]
+},
+{
+"session_id": "bench-s116",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"manifest beacon anchor temporal relay bridge capsule"
+],
+[
+"assistant",
+"harness scrub temporal replica xai-F4K3TOKENVALUE0000000000 replica cluster profile"
+],
+[
+"user",
+"cache policy ember relay"
+]
+]
+},
+{
+"session_id": "bench-s117",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"courier kernel policy profile"
+],
+[
+"assistant",
+"temporal orbit tether lexical prism prism replica"
+],
+[
+"user",
+"index index kernel queue worker ledger anchor anchor courier"
+]
+]
+},
+{
+"session_id": "bench-s118",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"lexical quokka vector cache anchor"
+],
+[
+"assistant",
+"snapshot bridge drift coral index"
+],
+[
+"user",
+"manifest beacon capsule receipt claim relay signal"
+],
+[
+"assistant",
+"snapshot manifest receipt snapshot prism beacon profile"
+]
+]
+},
+{
+"session_id": "bench-s119",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"tether snapshot signal token relay"
+],
+[
+"assistant",
+"cache signal capsule replica replica scrub kernel"
+],
+[
+"user",
+"vector ember bridge ledger temporal gateway"
+],
+[
+"assistant",
+"lattice token worker token"
+]
+]
+},
+{
+"session_id": "bench-s120",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"anchor vault gateway harness courier capsule"
+],
+[
+"assistant",
+"gateway snapshot router router receipt quokka capsule ledger"
+],
+[
+"user",
+"harness scrub vector profile replica"
+],
+[
+"assistant",
+"kernel token cache router shard snapshot"
+],
+[
+"user",
+"ledger capsule capsule relay"
+]
+]
+},
+{
+"session_id": "bench-s121",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"vector manifest coral tether brief scrub vault AKIAFAKEFAKEFAKEFAKE router ember beacon"
+],
+[
+"assistant",
+"index anchor signal beacon"
+],
+[
+"user",
+"relay capsule lexical anchor harness replica beacon ember"
+]
+]
+},
+{
+"session_id": "bench-s122",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"orbit gateway ledger prism temporal"
+],
+[
+"assistant",
+"manifest lexical harness token router vault signal policy"
+],
+[
+"user",
+"relay vector ember token"
+]
+]
+},
+{
+"session_id": "bench-s123",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"profile manifest tether anchor"
+],
+[
+"assistant",
+"gateway temporal index coral prism relay profile lattice"
+],
+[
+"user",
+"capsule bridge snapshot queue replica relay queue"
+],
+[
+"assistant",
+"token ember profile anchor lexical signal brief gateway index sk-FAKEFAKEFAKEFAKEFAKEFAKE replica quokka vault"
+]
+]
+},
+{
+"session_id": "bench-s124",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"ember queue policy signal coral"
+]
+]
+},
+{
+"session_id": "bench-s125",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"snapshot gateway gateway queue prism"
+],
+[
+"assistant",
+"router claim prism claim orbit token"
+]
+]
+},
+{
+"session_id": "bench-s126",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"orbit claim scrub brief lexical quokka courier prism"
+],
+[
+"assistant",
+"kernel relay orbit kernel ember"
+],
+[
+"user",
+"scrub courier tether ledger cache vault kernel vector lattice"
+]
+]
+},
+{
+"session_id": "bench-s127",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"ledger queue cache ledger brief cache claim"
+],
+[
+"assistant",
+"claim orbit ledger drift shard router"
+],
+[
+"user",
+"profile tether orbit lattice ledger lattice ember"
+],
+[
+"assistant",
+"beacon anchor beacon index cache"
+],
+[
+"user",
+"brief queue signal lexical"
+]
+]
+},
+{
+"session_id": "bench-s128",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"index ledger worker courier"
+],
+[
+"assistant",
+"manifest vector orbit kernel api_key: FakeApiKeyValue1234567890 tether token kernel"
+],
+[
+"user",
+"signal policy temporal replica policy orbit courier capsule cluster"
+],
+[
+"assistant",
+"courier queue brief tether harness"
+],
+[
+"user",
+"bridge router relay claim prism vault"
+]
+]
+},
+{
+"session_id": "bench-s129",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"signal replica manifest harness"
+],
+[
+"assistant",
+"shard cache relay vector signal manifest drift claim relay"
+],
+[
+"user",
+"token cache queue replica"
+]
+]
+},
+{
+"session_id": "bench-s130",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"harness receipt anchor drift orbit lattice"
+],
+[
+"assistant",
+"gateway orbit temporal gateway cluster lattice kernel snapshot tether"
+],
+[
+"user",
+"router index vector tether profile drift"
+],
+[
+"assistant",
+"drift policy courier cache kernel relay"
+],
+[
+"user",
+"ember harness profile courier profile manifest orbit cache scrub Bearer fakebearerxxxxxxxxxxxxxxxxxxxx anchor tether tether"
+]
+]
+},
+{
+"session_id": "bench-s131",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"token prism tether worker router courier"
+],
+[
+"assistant",
+"gateway tether profile drift"
+],
+[
+"user",
+"receipt lattice prism snapshot relay"
+],
+[
+"assistant",
+"coral kernel claim relay capsule receipt courier courier"
+]
+]
+},
+{
+"session_id": "bench-s132",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"coral policy router anchor shard"
+],
+[
+"assistant",
+"prism bridge gateway beacon scrub index signal profile"
+]
+]
+},
+{
+"session_id": "bench-s133",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"relay ember ledger harness xai-F4K3TOKENVALUE0000000000 relay drift tether"
+],
+[
+"assistant",
+"relay brief manifest index cluster cache"
+]
+]
+},
+{
+"session_id": "bench-s134",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"replica vault policy ember lattice orbit"
+],
+[
+"assistant",
+"beacon anchor temporal relay orbit scrub"
+],
+[
+"user",
+"policy brief ember profile"
+],
+[
+"assistant",
+"shard cache policy token gateway"
+]
+]
+},
+{
+"session_id": "bench-s135",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"capsule claim policy coral beacon ember beacon queue"
+],
+[
+"assistant",
+"profile anchor cache signal replica token drift prism"
+],
+[
+"user",
+"capsule index receipt receipt queue receipt"
+],
+[
+"assistant",
+"worker drift relay router ghp_F4K3F4K3F4K3F4K3F4K3 relay harness signal"
+],
+[
+"user",
+"gateway vault replica kernel kernel kernel capsule"
+]
+]
+},
+{
+"session_id": "bench-s136",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"signal brief anchor snapshot vector temporal prism"
+],
+[
+"assistant",
+"profile ember snapshot cache signal lattice cache manifest"
+]
+]
+},
+{
+"session_id": "bench-s137",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"quokka queue signal prism queue"
+],
+[
+"assistant",
+"tether anchor capsule tether drift drift"
+],
+[
+"user",
+"vector lattice tether gateway gateway index drift"
+]
+]
+},
+{
+"session_id": "bench-s138",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"courier bridge cache anchor gateway ledger"
+],
+[
+"assistant",
+"lattice gateway index brief worker coral prism"
+],
+[
+"user",
+"bridge index capsule beacon orbit brief token receipt"
+],
+[
+"assistant",
+"vector anchor quokka index manifest ember harness"
+],
+[
+"user",
+"ledger vector ember prism gateway"
+]
+]
+},
+{
+"session_id": "bench-s139",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"brief replica temporal vault anchor profile tether anchor"
+],
+[
+"assistant",
+"policy anchor temporal replica scrub manifest courier snapshot"
+],
+[
+"user",
+"kernel profile coral lattice token kernel kernel ember beacon"
+]
+]
+},
+{
+"session_id": "bench-s140",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"coral router coral signal coral gateway replica orbit"
+],
+[
+"assistant",
+"harness scrub router profile"
+],
+[
+"user",
+"shard router temporal gateway snapshot snapshot sk-FAKEFAKEFAKEFAKEFAKEFAKE beacon router snapshot"
+]
+]
+},
+{
+"session_id": "bench-s141",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"signal receipt signal prism snapshot shard courier lattice drift"
+],
+[
+"assistant",
+"vector drift cache token claim router snapshot"
+]
+]
+},
+{
+"session_id": "bench-s142",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"temporal replica coral cluster cluster signal"
+],
+[
+"assistant",
+"shard queue index token ember receipt"
+]
+]
+},
+{
+"session_id": "bench-s143",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"tether kernel policy claim index cluster index brief"
+],
+[
+"assistant",
+"relay signal lattice bridge capsule drift tether lattice"
+],
+[
+"user",
+"temporal receipt ember bridge lexical temporal claim"
+]
+]
+},
+{
+"session_id": "bench-s144",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"replica anchor cluster anchor prism vector token receipt brief"
+],
+[
+"assistant",
+"ember gateway ledger profile courier profile"
+],
+[
+"user",
+"cluster orbit lexical signal scrub index queue anchor"
+]
+]
+},
+{
+"session_id": "bench-s145",
+"agent": "claude",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"worker tether lexical shard cache courier vault worker"
+],
+[
+"assistant",
+"vector kernel kernel coral index profile Bearer fakebearerxxxxxxxxxxxxxxxxxxxx profile signal lattice"
+]
+]
+},
+{
+"session_id": "bench-s146",
+"agent": "hermes",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"temporal token quokka harness ember"
+],
+[
+"assistant",
+"shard vault gateway policy claim temporal profile"
+],
+[
+"user",
+"relay scrub scrub lexical"
+],
+[
+"assistant",
+"ledger policy replica replica policy profile tether"
+],
+[
+"user",
+"bridge bridge queue relay queue beacon"
+]
+]
+},
+{
+"session_id": "bench-s147",
+"agent": "codex",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"temporal claim brief temporal cache queue"
+],
+[
+"assistant",
+"orbit courier tether tether cache cache"
+]
+]
+},
+{
+"session_id": "bench-s148",
+"agent": "omp",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"anchor orbit ledger signal"
+],
+[
+"assistant",
+"policy lexical vector brief"
+],
+[
+"user",
+"anchor signal ember receipt index prism"
+]
+]
+},
+{
+"session_id": "bench-s149",
+"agent": "deepseek-harness",
+"project": "z0",
+"cwd": "/w/z0",
+"messages": [
+[
+"user",
+"capsule beacon anchor relay temporal"
+],
+[
+"assistant",
+"lexical scrub policy bridge tether shard vector"
+],
+[
+"user",
+"replica brief policy policy snapshot"
+],
+[
+"assistant",
+"lexical quokka vector cache anchor"
+],
+[
+"user",
+"snapshot bridge drift coral index"
+]
+]
+}
+]

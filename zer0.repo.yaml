@@ -59,7 +59,6 @@ architecture:
     - tests/test_cognition_compiler.py
     - tests/test_cognition_candidates.py
     - tests/test_cognition_cascade.py
-    - tests/test_cognition_orchestration.py
     - tests/test_cognition_surface.py
     depends_on:
     - context-resolution
