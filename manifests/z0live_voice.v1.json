@@ -1,0 +1,24 @@
+{
+  "schema": "z0int.voice_plan.v1",
+  "revision": "z0live-voice-1",
+  "actor_id": "chatgpt-realtime-marin",
+  "provider": "openai",
+  "model": "gpt-realtime",
+  "voice": "marin",
+  "adapter": "desktop-webrtc",
+  "backend": "remote",
+  "device": "remote",
+  "harness": "hermes",
+  "fixture_revision": "desktop-stack-v1",
+  "roles": {
+    "smol": {"provider": "anthropic", "model": "claude-haiku-4-5"},
+    "default": {"provider": "openai-codex", "model": "gpt-6.1-sol"},
+    "plan": {"provider": "anthropic", "model": "claude-opus-5-5"},
+    "slow": {"provider": "anthropic", "model": "claude-opus-5-5"},
+    "task": {"provider": "openai-codex", "model": "gpt-6.1-sol"},
+    "judge": {"provider": "typesafe", "model": "jev-latest"}
+  },
+  "meta_role": "plan",
+  "evidence": ["https://github.com/kvnloo/z0live/issues/1", "owner-selected desktop voice deployment; not a benchmark promotion"],
+  "fallbacks": []
+}
