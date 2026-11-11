@@ -45,7 +45,13 @@ _PATH = re.compile(r"(?<![\w:/.@~-])(~?(?:/[\w.+-]+){2,})(?![\w/]*[@*<{$])")
 _PATH_SKIP = re.compile(r"(?i)\b(deleted?|removed?|rm|pruned?|moved|renamed|gone|missing|absent|not found|no such|"
                         r"not exist|cleaned|purged|will|would|should|create|write|put|save|to be)\b")
 _PUSHED = re.compile(r"(?i)\b(pushed|landed on (?:origin|main|master|preview))\b")
-_MERGED = re.compile(r"(?i)\b(merged|on main)\b")
+# "on main" is a claim only as a state ("is on main"); "fixed on main by upstream", "fails on main" are locations
+_MERGED = re.compile(r"(?i)\b(merged|(?:is|are|was|now|landed|lands|already) on main)\b")
+# "merged into preview": a side-branch merge says nothing about the PR being merged or the default branch
+_SIDE_BRANCH = re.compile(r"(?i)\s+(?:in)?to\s+(?:the\s+)?[`'\"]?(?!(?:origin/)?(?:main|master|trunk)\b|default\b|upstream\b|"
+                          r"its\b|their\b)[\w./-]+")
+# a PR's head sha is the one written right after the PR reference, never a hex run elsewhere in the paragraph
+_HEAD_AFTER = re.compile(r"[\s(,`]*(?:(?:at|@|head|commit|sha)[\s:`]*){0,2}(?=[0-9]*[a-f])(" + _SHA + r")(?![\w…-])")
 # "merged" is a PR/branch claim only next to one; "merged into its version" is a file edit
 _MERGE_CTX = re.compile(r"(?i)\bPRs?\b|#\d+|/pull/|squash|\b(main|master|preview|upstream|origin)\b|@" + _SHA)
 _PR_SHORT = re.compile(r"(?<![\w/.-])([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+) ?#([1-9][0-9]*)\b")  # owner/repo#N
@@ -57,7 +63,8 @@ _TESTS = re.compile(r"(?i)\b(?:(\d+)\s*/\s*(\d+)\s+(?:tests?\s+)?(?:passed|pass|
                     r"tests?\s+(?:all\s+)?(?:are\s+)?(?:pass(?:ed|ing)?|green)|suite\s+(?:is\s+)?(?:passed|passes|green))\b")
 _FAILED = re.compile(r"(?i)\b[1-9]\d*\s+(failed|errors?)\b")
 _RESULT_FILE = re.compile(r"(?<![\w:/.@~-])(~?(?:/[\w.+-]+)+\.(?:xml|log|txt))\b")
-_DEPLOYED = re.compile(r"(?i)\b(deployed|live at|is live|now live)\b")
+_DET = "".join(rf"(?<!\b{w} )" for w in ("the", "that", "this", "a", "an", "its", "our", "your", "their", "each", "every"))
+_DEPLOYED = re.compile(r"(?i)\b(" + _DET + r"deployed|live at|is live|now live)\b")  # "the deployed reader" is an adjective
 _URL = re.compile(r"https?://[^\s)>\]\"'`,]+")
 _SHA256 = re.compile(r"(?i)sha-?256\W{0,3}([0-9a-f]{8,64})\b")
 _SERVICE = re.compile(r"(?i)\b(healthy|active \(running\)|restarted|is-active|is active|is running)\b")
@@ -145,7 +152,7 @@ def _check_pr(repo: str, number: str, sha: str, merged: bool, home: str | None) 
         return False, f"PR #{number} is {state}, not merged"
     if state != "open" and is_merged != "true":
         return False, f"PR #{number} is closed and unmerged"
-    if sha and not head.startswith(sha):
+    if sha and is_merged != "true" and not head.startswith(sha):  # a merged PR is often cited by its squash sha
         return False, f"PR #{number} head is {head[:9]}, not {sha}"
     return True, f"#{number} {'merged' if is_merged == 'true' else state} {head[:9]}"
 
@@ -270,7 +277,8 @@ def extract(text: str) -> list[tuple]:
     claims: dict[tuple, tuple] = {}
     add = lambda t, loc, *a: claims.setdefault((t, loc), (t, loc, a))  # noqa: E731
     done = bool(_DONE.search(text))
-    for raw in text.splitlines():
+    lines = text.splitlines()
+    for i, raw in enumerate(lines):
         line = raw.strip().lstrip("-*•> ").strip()
         if not line or line.lower().startswith("unverified:") or line.endswith("?"):
             continue
@@ -281,16 +289,29 @@ def extract(text: str) -> list[tuple]:
             line = line.replace(short.group(0), f"https://github.com/{short.group(1)}/pull/{short.group(2)}")
         pr = _PR.search(line)
         merged = live(_MERGED) if _MERGE_CTX.search(line) else None
+        side = bool(merged) and bool(_SIDE_BRANCH.match(line, merged.end()))
         if pr:
-            sha = re.search(r"\b" + _SHA + r"\b", _PR.sub(" ", line))
-            add("merged" if merged else "pr", pr.group(0), pr.group(1), pr.group(2), sha.group(0) if sha else "", bool(merged))
-        elif merged:
+            sha = None if side else _HEAD_AFTER.match(line, pr.end())
+            add("merged" if merged else "pr", pr.group(0), pr.group(1), pr.group(2), sha.group(1) if sha else "",
+                bool(merged) and not side)
+        elif merged and not side:
             add("merged", repo.group(0) if repo else "", *(repo.groups() if repo else ()))
         elif live(_PRWORD):
             pr = _one(_PR, line, text)
             add("pr", pr.group(0) if pr else "", *((pr.group(1), pr.group(2), "", False) if pr else ()))
         if live(_PUSHED):
-            add("pushed", repo.group(0) if repo else "", *(repo.groups() if repo else ()))
+            listed = []  # "pushed to the fork:" heads a list; its locators are on the lines below
+            if not _REPOSHA.search(line) and line.rstrip("*_ ").endswith(":"):
+                for nxt in lines[i + 1:]:
+                    if not nxt.strip():
+                        break
+                    listed += _REPOSHA.finditer(nxt)
+            for r in listed or [repo]:
+                add("pushed", r.group(0) if r else "", *(r.groups() if r else ()))
+        for r in _REPOSHA.finditer(line):  # owner/repo@sha is checked whatever the verb ("is on the fork", "runs")
+            sentence = re.split(r"[.;]\s", line[:r.start()])[-1] + re.split(r"[.;]\s", line[r.start():])[0]
+            if not _local(r.group(1)) and not _NEG.search(sentence):
+                add("pushed", r.group(0), *r.groups())
         t = live(_TESTS)
         if t and not _FAILED.search(_clause(line, t.start(), False)) and (t.group(1) is None or t.group(1) == t.group(2)):
             n = t.group(1) or t.group(3)
