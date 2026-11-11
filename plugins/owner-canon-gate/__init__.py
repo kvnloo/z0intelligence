@@ -6,7 +6,12 @@ twin of canon.bend). The kernel's refusal is final for the call; nothing here gr
 
 Rules (law -> locked canon rule):
   gui_never_steals_focus  3:  GUI automation only on a virtual/headless display
-  done_needs_receipt      6:  a done/fixed report to a teammate needs evidence (path, sha, URL, exit code)
+  done_needs_receipt      6:  a done/fixed report (message_agent, send_message, kanban_complete) must survive
+                              claimcheck.py: every typed claim (path, pushed, pr, merged, tests, deployed, service)
+                              is dereferenced here. A failed or unlocated typed claim blocks; a bare done-word with
+                              no typed claim, or a check that could not run (infra), is flagged. Mode key
+                              "done_untyped": "enforce" also blocks the bare done-word. Lines starting with
+                              "unverified:" are not claims. The final reply gets a "Checks:" footer instead of a block.
   quota_backs_off         15: after a 429/quota error, the same call waits for Retry-After (default 60 s)
 Rule 8 (route by measured capability/quota) is proven in canon.bend route_ok over bend/model_routing; its runtime
 gate is the existing router, not this plugin.
@@ -23,11 +28,12 @@ Standing rules (bend/owner_standing; Kevin's explicit rules, not canon; twin ker
                                 owner-written; agent writes to it are blocked)
 
 Modes per rule in $HERMES_HOME/owner-canon-gate.json {"mode": {"<law>": "enforce"|"flag"|"off"}}; default
-enforce, except done_needs_receipt and reuse_before_create = flag. Reuse (canon 5) reads
+enforce, except reuse_before_create = flag. Reuse (canon 5) reads
 $HERMES_HOME/EXISTS.jsonl (id, name, where, seen_epoch); absent/invalid rows and rows older than 6h fail open.
 Its action-slot log is $HERMES_HOME/owner-canon-gate/exists-injections.jsonl.
 DONE.jsonl adds flag-only plan/edit lookups, logged to owner-canon-gate/done-injections.jsonl.
-Receipts: $HERMES_HOME/owner-canon-gate/receipts.jsonl (law, tool, decision; no args).
+Receipts: $HERMES_HOME/owner-canon-gate/receipts.jsonl (law, tool, decision; no args) and
+claim-receipts.jsonl (one line per typed claim: tool, type, ok, detail; no message text).
 Other enforce rules fail closed per call: a classifier error blocks the call.
 """
 from __future__ import annotations
@@ -51,9 +57,15 @@ _spec2 = importlib.util.spec_from_file_location("owner_standing_kernel", Path(__
 assert _spec2 and _spec2.loader
 KS = importlib.util.module_from_spec(_spec2)
 _spec2.loader.exec_module(KS)
+_spec3 = importlib.util.spec_from_file_location("owner_canon_claimcheck", Path(__file__).with_name("claimcheck.py"))
+assert _spec3 and _spec3.loader
+claimcheck = importlib.util.module_from_spec(_spec3)
+_spec3.loader.exec_module(claimcheck)
 
-DEFAULT_MODE = {law: "enforce" for law in (*K.RULES, *KS.RULES)} | {
-    "done_needs_receipt": "flag", "reuse_before_create": "flag"}
+DEFAULT_MODE = {law: "enforce" for law in (*K.RULES, *KS.RULES)} | {"reuse_before_create": "flag"}
+_MESSAGE_TOOLS = {"message_agent": ("message", "text"), "mcp__message_agent": ("message", "text"),
+                  "send_message": ("message", "text"), "kanban_complete": ("summary", "result"),
+                  "mcp__kanban_complete": ("summary", "result")}
 _SHELL_TOOLS = {"terminal", "execute_code", "process", "mcp__terminal", "mcp__execute_code"}
 _GUI = re.compile(r"(?i)\b(xdotool|ydotool|wmctrl|wtype|xte|hyprctl\s+dispatch|swaymsg\s+focus|osascript|cliclick|"
                   r"adb\b[^|;&]*\bshell\s+input\b|adb\b[^|;&]*\bam\s+start\b|pyautogui|pynput)\b")
@@ -76,8 +88,6 @@ _PUBLIC = re.compile(r"(?i)\b(gh\s+(pr|issue)\s+(create|comment)\b[^\n]*--repo[ 
                      r"gh\s+(release\s+create|gist\s+create\b[^\n]*--public)|xurl\s+(post|tweet)|twurl|"
                      r"npm\s+publish|twine\s+upload|cargo\s+publish|gh\s+repo\s+edit\b[^\n]*--visibility\s+public)")
 _DONE = re.compile(r"(?i)\b(done|fixed|finished|complete[d]?|works now|verified|shipped|resolved)\b")
-_EVIDENCE = re.compile(r"(/[\w.\-]+){2,}|\b[0-9a-f]{7,40}\b|https?://|\bexit(\s*code)?\s*[=:]?\s*\d|\brc=\d|"
-                       r"\bsha256\b|\bPASS\b|\d+/\d+\s+(passed|ok)")
 _QUOTA = re.compile(r"(?i)(\b429\b|rate.?limit|quota|too many requests|usage limit|retry-after)")
 _last_limited: dict[str, float] = {}
 
@@ -98,7 +108,7 @@ def _json(path: Path) -> dict:
 
 
 def _mode(law: str) -> str:
-    return (_json(_home() / "owner-canon-gate.json").get("mode") or {}).get(law, DEFAULT_MODE[law])
+    return (_json(_home() / "owner-canon-gate.json").get("mode") or {}).get(law, DEFAULT_MODE.get(law, "flag"))
 
 
 def _receipt(rec: dict, filename: str = "receipts.jsonl") -> None:
@@ -301,6 +311,47 @@ def reuse_facts(tool: str, args: dict) -> tuple[bool, bool, str]:
     return bool(rows), False, why + ("; reuse that location or add exists-ack=<id> plus a reason" if rows else "")
 
 
+def checked_claims(tool: str, msg: str, session_id=None) -> list[dict]:
+    """Typed claims in msg, each dereferenced by claimcheck and written to claim-receipts.jsonl (no message text)."""
+    claims = claimcheck.check(msg, str(_home()))
+    for c in claims:
+        _receipt({"tool": tool, "type": c["type"], "ok": c["ok"] is True, "detail": c["detail"],
+                  "session_id": session_id}, "claim-receipts.jsonl")
+    return claims
+
+
+def claim_facts(tool: str, msg: str) -> tuple[bool, bool, str, bool]:
+    """(trigger, cleared, why, flag_only) for done_needs_receipt. Blocks only on a typed claim that was checked
+    and failed, or that names nothing to check."""
+    try:
+        claims = checked_claims(tool, msg)
+    except Exception as e:  # a checker bug flags; it never blocks a teammate message
+        return bool(_DONE.search(msg)), False, f"claim check failed to run ({type(e).__name__})", True
+    bad = [c for c in claims if c["ok"] is not True]
+    if claims and not bad:
+        return True, True, "", False
+    if not claims:
+        return bool(_DONE.search(msg)), False, "done claim with nothing checkable", _mode("done_untyped") != "enforce"
+    return True, False, ("claims NOT verified: " + claimcheck.summary(claims) +
+                         '. Fix the claim, add its locator, or start that line with "unverified:"'), all(
+        claimcheck.infra(c) for c in bad)
+
+
+def reply_footer(response_text: str = "", **kw):
+    """transform_llm_output: the final reply is never blocked; unverified typed claims get one honest line."""
+    try:
+        if not response_text or "\nChecks: " in response_text:
+            return None
+        claims = checked_claims("reply", response_text, kw.get("session_id"))
+        bad = [c for c in claims if c["ok"] is not True]
+        if not bad:
+            return None
+        return (f"{response_text.rstrip()}\n\nChecks: {len(claims) - len(bad)} verified · {len(bad)} NOT verified "
+                f"({claimcheck.summary(claims)})")
+    except Exception:
+        return None
+
+
 def _done_matches(tool: str, args: dict) -> list[tuple[str, str]]:
     """DONE rows: id, kind, scope, repo, branch, paths, seen_epoch.
 
@@ -365,10 +416,8 @@ def facts(tool: str, args: dict) -> dict:
     f = {"reuse_before_create": reuse_facts(tool, args)}
     gui = tool in _SHELL_TOOLS and bool(_GUI.search(t))
     f["gui_never_steals_focus"] = (gui, gui and bool(_GUI_ISOLATED.search(t)), "GUI input on the owner's display")
-    if tool in ("message_agent", "mcp__message_agent", "send_message"):
-        msg = str(args.get("message") or args.get("text") or "")
-        claim = bool(_DONE.search(msg))
-        f["done_needs_receipt"] = (claim, claim and bool(_EVIDENCE.search(msg)), "done claim without evidence")
+    if tool in _MESSAGE_TOOLS:
+        f["done_needs_receipt"] = claim_facts(tool, "\n".join(str(args.get(k) or "") for k in _MESSAGE_TOOLS[tool]))
     dispatch = tool in ("delegate_task", "mcp__delegate_task") or (tool in _SHELL_TOOLS and bool(_MODEL_CLI.search(t)))
     gpt = dispatch and bool(_GPT.search(t))
     f["gpt_only_via_fx_pi"] = (gpt, gpt and bool(_FX_PI.search(t)), "GPT model dispatched outside fx/pi")
@@ -455,3 +504,4 @@ def on_post_tool_call(tool_name: str = "", args: dict | None = None, result=None
 def register(ctx):
     ctx.register_hook("pre_tool_call", on_pre_tool_call)
     ctx.register_hook("post_tool_call", on_post_tool_call)
+    ctx.register_hook("transform_llm_output", reply_footer)

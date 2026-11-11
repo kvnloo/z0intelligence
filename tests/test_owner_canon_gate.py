@@ -61,11 +61,60 @@ def test_quota_backoff():
     assert not blocked("terminal", **args)
 
 
-def test_done_claim_flag_then_enforce(home):
-    assert not blocked("message_agent", target="ayo", message="Done, all fixed.")  # default: flag
-    (home / "owner-canon-gate.json").write_text('{"mode": {"done_needs_receipt": "enforce"}}')
+def claim_rows(home):
+    f = home / "owner-canon-gate" / "claim-receipts.jsonl"
+    return [json.loads(x) for x in f.read_text().splitlines()] if f.exists() else []
+
+
+def test_done_claims_are_dereferenced(home):
+    assert not blocked("message_agent", target="ayo", message="Done, all fixed.")  # no typed claim: flag
+    assert claim_rows(home) == []
+    made_up = f"Done: commit 6a7b5a8, receipt {home}/missing.json"
+    assert blocked("message_agent", target="ayo", message=made_up)  # the regex gate passed this
+    (home / "missing.json").write_text("{}")
+    G.claimcheck._cache.clear()
+    assert not blocked("message_agent", target="ayo", message=made_up)
+    assert blocked("send_message", text="pushed 8b96606")  # typed claim, nothing to check
+    assert not blocked("message_agent", message="unverified: gh unreachable, pushed 8b96606")
+    assert not blocked("message_agent", message="local branch ayo/Z11, not pushed")
+    rows = claim_rows(home)
+    assert [r["ok"] for r in rows] == [False, True, False] and all("message" not in r for r in rows)
+    assert not any(r["ok"] is None for r in rows) and "6a7b5a8" not in json.dumps(rows[2])
+    r = G.on_pre_tool_call(tool_name="message_agent", args={"message": "pushed 8b96606"})
+    assert "pushed: no locator" in r["message"] and "unverified:" in r["message"]
+    (home / "owner-canon-gate.json").write_text('{"mode": {"done_untyped": "enforce"}}')
     assert blocked("message_agent", target="ayo", message="Done, all fixed.")
-    assert not blocked("message_agent", target="ayo", message="Done: commit 6a7b5a8, receipt /a/b/c.json")
+    (home / "owner-canon-gate.json").write_text('{"mode": {"done_needs_receipt": "flag"}}')
+    assert not blocked("send_message", text="pushed 8b96606")
+
+
+def test_kanban_complete_is_gated(home):
+    assert blocked("kanban_complete", task_id="t1", summary="pushed and PR opened")
+    assert [r["type"] for r in claim_rows(home)] == ["pr", "pushed"]
+    assert blocked("mcp__kanban_complete", summary="ok", result="45 tests pass (reported)")
+    assert not blocked("kanban_complete", summary="Reviewed the plan; two questions filed.")
+
+
+def test_infra_failure_and_checker_bug_flag_only(home, monkeypatch):
+    monkeypatch.setattr(G.claimcheck, "RUN", lambda cmd, env=None: (None, b"", "TimeoutExpired"))
+    assert not blocked("message_agent", message="pushed kvnloo/x@8b96606")
+    assert claim_rows(home)[-1]["ok"] is False and claim_rows(home)[-1]["detail"].startswith("infra")
+    monkeypatch.setattr(G.claimcheck, "check", lambda *a, **k: 1 / 0)
+    assert not blocked("message_agent", message="Done. pushed kvnloo/x@8b96606")
+
+
+def test_reply_footer(home):
+    assert G.reply_footer(response_text="Here is the plan for tomorrow.") is None
+    (home / "r.json").write_text("{}")
+    assert G.reply_footer(response_text=f"Done. Receipt {home}/r.json") is None
+    out = G.reply_footer(response_text=f"Done. Receipt {home}/r.json\npushed 8b96606 and 45 tests pass", session_id="s1")
+    assert out.startswith(f"Done. Receipt {home}/r.json\npushed 8b96606 and 45 tests pass\n\nChecks: 1 verified · 2 NOT verified (")
+    assert "pushed: no locator" in out and "tests: no locator" in out
+    assert G.reply_footer(response_text=out) is None  # never stacks a second footer
+    assert claim_rows(home)[-1]["tool"] == "reply" and claim_rows(home)[-1]["session_id"] == "s1"
+    hooks = {}
+    G.register(type("Ctx", (), {"register_hook": lambda self, name, fn: hooks.setdefault(name, fn)})())
+    assert hooks["transform_llm_output"] is G.reply_footer
 
 
 def test_ordinary_calls_pass():
