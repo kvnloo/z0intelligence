@@ -205,3 +205,19 @@ def test_render_analytics_md():
         f"## Measurement coverage\n\n{fence}\nline1\n{fence}\n"
     )
     assert "- rows total: None" in an.render_analytics_md({})
+
+
+@pytest.mark.parametrize("events", [R, iter(R)])
+def test_decision_analytics_materializes_once(monkeypatch, events):
+    calls = []
+
+    def materialize(source):
+        calls.append(1)
+        return list(source)
+
+    monkeypatch.setattr(an, "materialize_rows", materialize)
+    result = an.build_decision_analytics(events)
+    assert result["reliability"] == {
+        "rows_total": 6, "rows_ok": 4, "rows_unavailable": 1, "rows_error": 1,
+    }
+    assert calls == [1]
