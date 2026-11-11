@@ -31,7 +31,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Iterator, Mapping
+from typing import Any, BinaryIO, Callable, Iterator, Mapping
 
 from .harness_id import turn_key
 
@@ -206,11 +206,32 @@ def _session_path(harness: str, session: Any, root: str | Path | None) -> Path:
     return state_dir(harness, root) / 'sessions' / f'{_h(str(session), 16)}.json'
 
 
+def _session_state(fh: BinaryIO) -> dict[str, Any]:
+    """Read the newest valid snapshot from the tail, including a legacy single JSON object."""
+    pos, tail = fh.seek(0, os.SEEK_END), b''
+    while pos:
+        start = max(0, pos - 8192)
+        fh.seek(start)
+        lines = (fh.read(pos - start) + tail).split(b'\n')
+        pos, tail = start, lines.pop(0)
+        if not pos:
+            lines.insert(0, tail)
+        for line in reversed(lines):
+            try:
+                state = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(state, dict):
+                return state
+    return {}
+
+
 def _read_session(harness: str, session: Any, root: str | Path | None) -> dict[str, Any]:
     try:
-        value = json.loads(_session_path(harness, session, root).read_text())
-        return value if isinstance(value, dict) else {}
-    except (OSError, ValueError):
+        with open(_session_path(harness, session, root), 'rb') as fh:
+            fcntl.flock(fh, fcntl.LOCK_SH)
+            return _session_state(fh)
+    except OSError:
         return {}
 
 
@@ -224,18 +245,17 @@ def _keep(entries: Mapping[str, Any] | list, add: Any = None) -> Any:
 def _update_session(harness: str, session: Any, root: str | Path | None,
                     step: Callable[[dict[str, Any]], dict[str, Any]]) -> dict[str, Any]:
     path = _session_path(harness, session, root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, 'a+', encoding='utf-8') as fh:
+    try:
+        fh = open(path, 'r+b')
+    except FileNotFoundError:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fh = open(path, 'a+b')
+    with fh:
         fcntl.flock(fh, fcntl.LOCK_EX)
-        fh.seek(0)
-        try:
-            state = json.loads(fh.read() or '{}')
-        except ValueError:
-            state = {}
-        state = step(state if isinstance(state, dict) else {})
-        fh.seek(0)
-        fh.truncate()
-        fh.write(json.dumps(state))
+        state = step(_session_state(fh))
+        fh.seek(0, os.SEEK_END)
+        # Separate legacy JSON or an interrupted write before appending a complete snapshot.
+        fh.write(b'\n' + json.dumps(state).encode('utf-8') + b'\n')
     return state
 
 
