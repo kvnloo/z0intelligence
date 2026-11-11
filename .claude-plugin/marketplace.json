@@ -14,6 +14,11 @@
       "name": "z0-obspack",
       "source": "./harness-adapters/claude-code-z0-obspack",
       "description": "ObservationPack for long output-heavy sessions (measured -30%)"
+    },
+    {
+      "name": "z0int-contribute",
+      "source": "./harness-adapters/z0int-contribute",
+      "description": "Contributor start-here skill: runs z0int contribute --json and follows next_action"
     }
   ]
 }

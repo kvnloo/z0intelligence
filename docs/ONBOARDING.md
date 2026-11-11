@@ -29,6 +29,18 @@ The agent should:
 3. Run `z0int onboard --auto` (add `--dry-run` first if unsure).
 4. Report only **unresolved** user decisions from JSON `next` / `unresolved`.
 
+## Contributing (start here)
+
+To find and do a first task, run `z0int contribute` (agents: `z0int contribute --json`
+and follow `next_action`). It checks this setup, runs an offline smoke eval, and
+suggests a task from `.z0/priorities.yaml` that fits the machine. Steps, the claim
+protocol, the CLA and credit are in [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+z0evals ([kvnloo/z0evals](https://github.com/kvnloo/z0evals)) holds the frozen
+studies and public results. It is in scope for contributors: tasks of kind `z0evals`
+have an offline smoke path (for example `python -m pytest -q tests/test_memory_acceptance.py`),
+and a full study runs with `--z0evals-root` / `Z0INT_Z0EVALS_ROOT`.
+
 ## What `z0int onboard` does
 
 Idempotent steps (state: `~/.z0int/state/onboard.json`):

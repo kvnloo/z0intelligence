@@ -1,5 +1,17 @@
 # Repository instructions
 
+## Start here (any agent)
+
+If the user asks for general help with this repo, or you have no task: run `z0int contribute --json`
+(if `z0int` is missing: `./scripts/bootstrap.sh` first) and follow `next_action`.
+Stop when `next_action.kind` is `ask_human`; show `needs_human` to the user.
+Do not post to GitHub, push, or open PRs without the user's explicit yes.
+Work only in the worktree that `z0int contribute start` creates.
+Contributor PRs come from your fork and target the default branch (`master`), never `dev`/`preview`/`nightly`.
+Every claim of success needs a receipt from `z0int contribute evidence`.
+The priority source is `.z0/priorities.yaml`; do not invent tasks.
+Thin skill: `skills/z0int-contribute/SKILL.md`. Humans: `CONTRIBUTING.md`.
+
 ## Onboarding (do this first)
 
 1. Read **`docs/ONBOARDING.md`** (canonical product setup).
@@ -17,7 +29,7 @@ This repo follows the [Verified OSS Loop](https://github.com/kvnloo/verified-oss
 
 - Kit: `.verified-oss-loop/` (inventory, rollout, kit skills)
 - Issues are not claims. Workers never merge `master` or `dev`.
-- Day-pass PRs → `preview`; overnight unattended → `nightly` (see `python3 .verified-oss-loop/rollout.py show`).
+- Internal day-pass worker PRs → `preview`; overnight unattended → `nightly` (see `python3 .verified-oss-loop/rollout.py show`). External contributor PRs → `master` (owner decision O-5), opened as drafts from a fork.
 - Evidence: revision-bound unit + product smoke; mutation is `n/a` unless adopted.
 
 ## Runtime / bench

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kvnloo/z0intelligence/schemas/profile.schema.json",
+  "title": "z0.contribute.profile.v1 — consented contributor facts (stays in ~/.z0int/contribute, mode 0600)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "tier", "hw", "toolchains", "harnesses"],
+  "properties": {
+    "schema": {"const": "z0.contribute.profile.v1"},
+    "tier": {"enum": ["T0", "T1", "T2", "T3"]},
+    "source": {"enum": ["z0int.profile_min", "z0.detect.profile", "fixture"]},
+    "hw": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "arch", "ram_gib", "gpu"],
+      "properties": {
+        "os": {"enum": ["linux", "macos", "windows", "unknown"]},
+        "arch": {"enum": ["x86_64", "arm64", "unknown"]},
+        "ram_gib": {"type": ["number", "null"], "minimum": 0},
+        "disk_free_gib": {"type": ["number", "null"], "minimum": 0},
+        "gpu": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["class", "vram_gib"],
+          "properties": {
+            "class": {"enum": ["none", "nvidia", "amd", "apple", "intel"]},
+            "vram_gib": {"type": "number", "minimum": 0}
+          }
+        }
+      }
+    },
+    "network": {"type": ["boolean", "null"]},
+    "toolchains": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/tag"}},
+    "harnesses": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/tag"}},
+    "instruction_files": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["exists"],
+        "properties": {
+          "exists": {"type": "boolean"},
+          "size": {"type": ["integer", "null"]},
+          "mtime": {"type": ["integer", "null"]}
+        }
+      }
+    },
+    "languages": {
+      "description": "T2 only: normalized histogram over the closed vocabulary.",
+      "type": "object",
+      "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1}
+    },
+    "recency": {"description": "T2 only", "enum": ["active_30d", "active_365d", "dormant", "unknown"]},
+    "interests": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/tag"}},
+    "experience": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repos_bucket": {"type": "string"},
+        "contrib_done": {"type": "integer", "minimum": 0}
+      }
+    }
+  },
+  "$defs": {
+    "tag": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"}
+  }
+}

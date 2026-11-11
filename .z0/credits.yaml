@@ -1,0 +1,8 @@
+# Contributor credit (owner decision O-3, 2026-10-26).
+# Credit is given in two places: the PR body line `Credit: @login` (written by
+# `z0int contribute pr`) and one entry here per contributor. A contributor may add
+# their own entry in their PR, or a maintainer adds it when the PR merges.
+# Entry: {login: <GitHub handle>, tasks: [<task ids>], prs: [<PR numbers>], since: YYYY-MM-DD}
+# Only public GitHub handles. Never an email address.
+schema: z0.credits.v1
+contributors: []
