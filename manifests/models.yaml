@@ -146,6 +146,78 @@ models:
       - native_reranker
     optional: true
 
+
+  bonsai2_2b:
+    family: local_cognition
+    type: gguf_bundle
+    hf: prism-ml/Ternary-Bonsai-2-2B-gguf
+    revision: 683f7be2629342a50987627b40881e54761a2430
+    allow_patterns:
+      - Ternary-Bonsai-2-2B-PQ2_0.gguf
+    min_vram_gb: 3
+    dtype: PQ2_0
+    license: apache-2.0
+    commercial_use: true
+    platforms: [cuda]
+    roles: [tiny_action_specialist, general_function_caller]
+    resident_preferred: false
+    optional: true
+    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Managed at ~/.z0int/models/bonsai2_2b/; one GGUF resident at a time; see docs/bonsai2-3080ti.md.
+
+
+  bonsai2_4b:
+    family: local_cognition
+    type: gguf_bundle
+    hf: prism-ml/Ternary-Bonsai-2-4B-gguf
+    revision: 8d6557168168f91ea6697a4a49ed2ef622b53adb
+    allow_patterns:
+      - Ternary-Bonsai-2-4B-PQ2_0.gguf
+    min_vram_gb: 4
+    dtype: PQ2_0
+    license: apache-2.0
+    commercial_use: true
+    platforms: [cuda]
+    roles: [general_function_caller, semantic_orchestrator]
+    resident_preferred: false
+    optional: true
+    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Managed at ~/.z0int/models/bonsai2_4b/; one GGUF resident at a time; see docs/bonsai2-3080ti.md.
+
+
+  bonsai2_9b:
+    family: local_cognition
+    type: gguf_bundle
+    hf: prism-ml/Ternary-Bonsai-2-9B-gguf
+    revision: 5b2abb02362efbed46bbe204014b02837778b2c2
+    allow_patterns:
+      - Ternary-Bonsai-2-9B-PQ2_0.gguf
+    min_vram_gb: 6
+    dtype: PQ2_0
+    license: apache-2.0
+    commercial_use: true
+    platforms: [cuda]
+    roles: [semantic_orchestrator, general_local_fallback, general_function_caller]
+    resident_preferred: false
+    optional: true
+    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Managed at ~/.z0int/models/bonsai2_9b/; one GGUF resident at a time; see docs/bonsai2-3080ti.md.
+
+
+  bonsai2_27b:
+    family: local_cognition
+    type: gguf_bundle
+    hf: prism-ml/Ternary-Bonsai-2-27B-gguf
+    revision: b072e1d3b35a0a630cece372c2127528e0994386
+    allow_patterns:
+      - Ternary-Bonsai-2-27B-PQ2_0.gguf
+    min_vram_gb: 11
+    dtype: PQ2_0
+    license: apache-2.0
+    commercial_use: true
+    platforms: [cuda]
+    roles: [semantic_orchestrator, general_local_fallback]
+    resident_preferred: false
+    optional: true
+    note: Unmeasured PrismML ternary GGUF; PrismML llama.cpp CUDA fork required. Managed at ~/.z0int/models/bonsai2_27b/; one GGUF resident at a time; see docs/bonsai2-3080ti.md.
+
   local_mb:
     family: mushroom_body
     type: generated
@@ -167,6 +239,10 @@ policies:
       - openjev_4b
       - openjev_06b
       - system_one_4b
+      - bonsai2_2b
+      - bonsai2_4b
+      - bonsai2_9b
+      - bonsai2_27b
     never_coreside:
       - [nanojev_06b, openjev_4b]
       - [nanojev_06b, openjev_06b]
@@ -174,6 +250,10 @@ policies:
       - [openjev_06b, openjev_4b]
       - [openjev_06b, system_one_4b]
       - [decider_2b, system_one_4b]
+      - [bonsai2_27b, laya_421m]
+      - [bonsai2_27b, openjev_4b]
+      - [bonsai2_27b, system_one_4b]
+      - [bonsai2_9b, openjev_4b]
   cpu_only:
     resident:
       - local_mb
@@ -189,6 +269,10 @@ policies:
       - nanojev_06b
       - openjev_06b
       - system_one_4b
+      - bonsai2_2b
+      - bonsai2_4b
+      - bonsai2_9b
+      - bonsai2_27b
     never_coreside:
       - [nanojev_06b, openjev_06b]
       - [nanojev_06b, system_one_4b]

@@ -253,6 +253,19 @@ def bundle_complete(model_id: str, meta: dict[str, Any] | None = None) -> bool:
         return True
 
 
+def gguf_bundle_complete(model_id: str, meta: dict[str, Any] | None = None) -> bool:
+    """Check only exact, safe GGUF filenames under the managed model directory."""
+    patterns = (meta or {}).get("allow_patterns") or []
+    if not patterns or not all(
+        isinstance(name, str) and Path(name).name == name and name.endswith(".gguf")
+        and not any(char in name for char in "*?[]")
+        for name in patterns
+    ):
+        return False
+    root = managed_model_dir(model_id)
+    return all((root / name).is_file() for name in patterns)
+
+
 def model_present(model_id: str, meta: dict[str, Any]) -> bool:
     """Whether weights appear available for plan/sync status."""
     mtype = meta.get("type") or "hf"
@@ -260,6 +273,8 @@ def model_present(model_id: str, meta: dict[str, Any]) -> bool:
         return True
     if mtype == "hf_bundle":
         return bundle_complete(model_id, meta)
+    if mtype == "gguf_bundle":
+        return gguf_bundle_complete(model_id, meta)
     hf = meta.get("hf")
     rev = meta.get("revision")
     if not hf:
@@ -299,9 +314,22 @@ def sync_models(
         if not hf or not rev:
             results.append({"id": mid, "status": "missing_pin"})
             continue
-        if mtype == "hf_bundle":
+        if mtype in ("hf_bundle", "gguf_bundle"):
             local_dir = managed_model_dir(mid)
-            if bundle_complete(mid, meta):
+            if mtype == "gguf_bundle":
+                patterns = meta.get("allow_patterns") or []
+                if not patterns or not all(
+                    isinstance(name, str) and Path(name).name == name and name.endswith(".gguf")
+                    and not any(char in name for char in "*?[]")
+                    for name in patterns
+                ):
+                    results.append({"id": mid, "status": "invalid_allow_patterns"})
+                    continue
+            complete = (
+                gguf_bundle_complete(mid, meta) if mtype == "gguf_bundle"
+                else bundle_complete(mid, meta)
+            )
+            if complete:
                 results.append(
                     {
                         "id": mid,
