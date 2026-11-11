@@ -281,6 +281,10 @@ class DossierTests(unittest.TestCase):
                 row('blender-3d', 'Blender renders cycles moss materials', 'Render Blender stills with Cycles on the GPU.', 'b1')]
         rows += [row(f'filler-{i}', 'gardening soil compost', f'Water plant {i} weekly.', 'b1') for i in range(60)]
         self.store.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+        self.delta = Path(self.tmp.name) / 'DOSSIER-DELTA.jsonl'
+        env = patch.dict(os.environ, {'Z0INT_DOSSIER_DELTA': str(self.delta)})
+        env.start()
+        self.addCleanup(env.stop)
 
     def test_routes_the_matching_dossier_with_citations(self):
         text, keys = orientation.dossiers('tap the launcher settings on the S25 phone with adb', self.store)
@@ -317,3 +321,62 @@ class DossierTests(unittest.TestCase):
                              input=json.dumps({'prompt': 'tap the launcher settings on the S25 phone with adb'}),
                              capture_output=True, text=True, env=env, timeout=20).stdout
         self.assertIn('<owner-dossiers>', json.loads(out)['hookSpecificOutput']['additionalContext'])
+
+
+class DossierDeltaTests(unittest.TestCase):
+    """Continuous capture: an owner message in one session reaches every other session's next turn."""
+    BUILT = '2026-11-10T00:00:00+00:00'
+
+    def setUp(self):
+        DossierTests.setUp(self)
+        self.store.write_text(self.store.read_text().replace('"b1"', f'"{self.BUILT}"'))
+    Q = 'tap the launcher settings on the S25 phone with adb'
+    RULE = 'from now on the S25 launcher work goes through phone-harness on adb, never Maestro'
+
+    def test_rule_said_in_session_a_shows_in_session_b_next_turn_and_resends(self):
+        _, keys_b = orientation.dossiers(self.Q, self.store, session='B')
+        self.assertEqual(keys_b, [f'phone-android@{self.BUILT}'])
+        self.assertEqual(orientation.record(self.RULE, harness='hermes', session='A', path=self.store), ['phone-android'])
+        text_b, keys_b2 = orientation.dossiers(self.Q, self.store, session='B', skip=set(keys_b))
+        self.assertEqual(keys_b2, [f'phone-android@{self.BUILT}+1'])  # already-seen dossier is re-sent because of the delta
+        self.assertIn('never Maestro', text_b)
+        self.assertLess(text_b.index('never Maestro'), text_b.index('uiautomator2'))  # newest first, above the rules
+        text_a, keys_a = orientation.dossiers(self.Q, self.store, session='A')
+        self.assertEqual(keys_a, [f'phone-android@{self.BUILT}'])  # a session never gets its own words back
+        self.assertNotIn('never Maestro', text_a)
+
+    def test_unrelated_short_or_already_distilled_messages_stay_out(self):
+        self.assertEqual(orientation.record('write a haiku about the moon and stars', harness='omp', path=self.store), [])
+        self.assertEqual(orientation.record('ok adb', harness='omp', path=self.store), [])
+        self.assertFalse(self.delta.exists())
+        old = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        orientation.record(self.RULE, harness='omp', session='A', path=self.store, now=old)
+        rows = [json.loads(l) for l in self.store.read_text().splitlines()]
+        rows[0]['built_at'] = '2026-11-11T00:00:00+00:00'  # rebuilt after the message: folded in, not repeated
+        self.store.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+        text, _ = orientation.dossiers(self.Q, self.store, session='B')
+        self.assertNotIn('never Maestro', text)
+        with self.delta.open('a') as f:
+            f.write('{torn\n')
+        self.assertIn('uiautomator2', orientation.dossiers(self.Q, self.store, session='B')[0])
+
+    def test_scripted_runs_and_worker_sessions_are_not_captured(self):
+        self.assertFalse(orientation._owner_turn({'CLAUDE_CODE_ENTRYPOINT': 'sdk-cli'}))
+        self.assertFalse(orientation._owner_turn({'Z0INT_DELTA_OFF': '1'}))
+        self.assertTrue(orientation._owner_turn({'CLAUDE_CODE_ENTRYPOINT': 'cli'}))
+        env = {**os.environ, 'Z0INT_DOSSIERS': str(self.store), 'Z0INT_CORRECTIONS': str(Path(self.tmp.name) / 'none')}
+        hook = [sys.executable, str(ROOT / 'src/z0int/orientation.py'), '--claude-hook', '--corrections']
+        payload = json.dumps({'prompt': self.RULE, 'session_id': 'cc1'})
+        subprocess.run(hook, input=payload, capture_output=True, text=True, timeout=20,
+                       env={**env, 'CLAUDE_CODE_ENTRYPOINT': 'sdk-cli'})
+        self.assertFalse(self.delta.exists())
+        subprocess.run(hook, input=payload, capture_output=True, text=True, timeout=20, env={**env, 'CLAUDE_CODE_ENTRYPOINT': 'cli'})
+        row = json.loads(self.delta.read_text())
+        self.assertEqual((row['harness'], row['session'], row['nodes']), ('claude-code', 'cc1', ['phone-android']))
+        module = load('hermes_state_packet_delta', ROOT / 'harness-adapters/hermes-state-packet/__init__.py')
+        with patch.dict(os.environ, {'Z0INT_DOSSIERS': str(self.store), 'Z0INT_CORRECTIONS': str(Path(self.tmp.name) / 'none')}):
+            module.corrections_hook(user_message=self.RULE, session_id='k1', platform='kanban')
+            module.corrections_hook(user_message=self.RULE, session_id='s1', platform='cli', parent_session_id='p')
+            self.assertEqual(len(self.delta.read_text().splitlines()), 1)
+            module.corrections_hook(user_message=self.RULE, session_id='h1', platform='telegram')
+            self.assertEqual(json.loads(self.delta.read_text().splitlines()[-1])['harness'], 'hermes')

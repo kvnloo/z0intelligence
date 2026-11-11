@@ -1,7 +1,8 @@
-"""Read-only, bounded orientation shared by installed harness hooks."""
+"""Bounded orientation shared by installed harness hooks. Read-only except `record` (owner dossier delta)."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import json
 import math
 import os
@@ -121,32 +122,105 @@ DOSSIERS_MIN_SCORE = 10.0  # dev split (pre-11-01, 101 tasks): 48% routed; below
 DOSSIERS_MAX_CHARS = 2400
 
 
+DELTA_SHOWN = 5  # newest undistilled messages shown under a dossier
+DELTA_CHARS = 400
+DELTA_MIN_CHARS = 15
+
+
+def _paths(path: Path | None, delta_path: Path | None) -> tuple[Path, Path]:
+    state = Path.home() / '.local/state/z0int'
+    return (path or Path(os.environ.get('Z0INT_DOSSIERS', str(state / 'DOSSIERS.jsonl'))),
+            delta_path or Path(os.environ.get('Z0INT_DOSSIER_DELTA', str(state / 'DOSSIER-DELTA.jsonl'))))
+
+
+def _jsonl(path: Path) -> list[dict]:
+    try:
+        rows = []
+        for line in path.open(encoding='utf-8'):
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue  # a torn concurrent append costs one row, never the store
+            if isinstance(row, dict):
+                rows.append(row)
+        return rows
+    except (OSError, UnicodeError):
+        return []
+
+
+def _route(prompt: str, rows: list[dict], k: int, min_score: float) -> list[int]:
+    query = set(_tokens(prompt or ''))
+    if not query:
+        return []
+    docs = [_tokens(' '.join([r['node'].replace('-', ' '), str(r.get('desc') or '')] +
+                             [str(x.get('text', '')) for x in r['current'] if isinstance(x, dict)])) for r in rows]
+    return [i for _, i in sorted(_bm25(query, docs, min_score), reverse=True)[:k]]
+
+
+def _dossier_rows(path: Path) -> list[dict]:
+    return [r for r in _jsonl(path) if r.get('node') and isinstance(r.get('current'), list) and r['current']]
+
+
+def record(prompt: str, *, harness: str, session: str = '', path: Path | None = None,
+           delta_path: Path | None = None, k: int = 3, min_score: float = DOSSIERS_MIN_SCORE,
+           now: datetime | None = None) -> list[str]:
+    """Append one owner message to the delta of every dossier node it routes to; returns those nodes.
+
+    Called by the per-prompt hooks with Kevin's own words only. The next turn of ANY session that routes to
+    the node shows the message under the dossier (see `dossiers`), so a rule said in one chat reaches the
+    others without waiting for a rebuild; the re-distill worker later folds the delta into the dossier.
+    """
+    text = ' '.join((prompt or '').split())
+    if len(text) < DELTA_MIN_CHARS:
+        return []
+    path, delta_path = _paths(path, delta_path)
+    rows = _dossier_rows(path)
+    nodes = [rows[i]['node'] for i in _route(text, rows, k, min_score)]
+    if not nodes:
+        return []
+    ts = (now or datetime.now(timezone.utc)).isoformat()
+    mid = f"delta:{harness}:{hashlib.sha1((session + ts + text).encode()).hexdigest()[:10]}"
+    line = json.dumps({'id': mid, 'ts': ts, 'harness': harness, 'session': session, 'nodes': nodes,
+                       'text': text[:4000]}, ensure_ascii=False) + '\n'
+    delta_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(delta_path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    try:
+        os.write(fd, line.encode('utf-8'))  # one O_APPEND write: concurrent hooks never interleave a line
+    finally:
+        os.close(fd)
+    return nodes
+
+
 def dossiers(prompt: str, path: Path | None = None, *, k: int = DOSSIERS_K, min_score: float = DOSSIERS_MIN_SCORE,
-             skip: frozenset[str] | set[str] = frozenset()) -> tuple[str, list[str]]:
-    """Top-k topic dossiers for this prompt and their keys ('node@built_at'); ('', []) when none match.
+             skip: frozenset[str] | set[str] = frozenset(), session: str = '',
+             delta_path: Path | None = None) -> tuple[str, list[str]]:
+    """Top-k topic dossiers for this prompt and their keys ('node@built_at+N'); ('', []) when none match.
 
     The store (one JSON object per node: node, desc, asof, built_at, current/decisions/open_asks/superseded rows
     of {text, cites}) is written by memory-replay-eval/bruteforce-distill/dossiers.py from Kevin's messages.
-    Keys in `skip` (already shown in this session) are not re-sent, so an updated dossier still shows next turn.
+    Under each dossier go his newest messages on that node from OTHER sessions since it was built (the delta,
+    see `record`); N counts them, so a new delta or a rebuild re-sends the dossier on the next turn.
+    Keys in `skip` (already shown in this session) are not re-sent.
     """
-    path = path or Path(os.environ.get('Z0INT_DOSSIERS', str(Path.home() / '.local/state/z0int/DOSSIERS.jsonl')))
-    query = set(_tokens(prompt or ''))
-    if not query:
+    path, delta_path = _paths(path, delta_path)
+    rows = _dossier_rows(path)
+    picked = _route(prompt, rows, k, min_score)
+    if not picked:
         return '', []
-    try:
-        rows = [r for r in (json.loads(line) for line in path.open(encoding='utf-8') if line.strip())
-                if isinstance(r, dict) and r.get('node') and r.get('current')]
-    except (OSError, UnicodeError, ValueError):
-        return '', []
-    docs = [_tokens(' '.join([r['node'].replace('-', ' '), str(r.get('desc') or '')] +
-                             [str(x.get('text', '')) for x in r['current'] if isinstance(x, dict)])) for r in rows]
+    delta = [d for d in _jsonl(delta_path) if d.get('text') and not (session and d.get('session') == session)]
     blocks, keys = [], []
-    for _, i in sorted(_bm25(query, docs, min_score), reverse=True)[:k]:
+    for i in picked:
         r = rows[i]
-        key = f"{r['node']}@{r.get('built_at', '')}"
+        built = str(r.get('built_at', ''))
+        fresh = [d for d in delta if r['node'] in (d.get('nodes') or []) and str(d.get('ts', '')) > built]
+        key = f"{r['node']}@{built}" + (f"+{len(fresh)}" if fresh else '')
         if key in skip:
             continue
         out = [f"## {r['node']} (from his messages up to {str(r.get('asof', ''))[:10]})"]
+        if fresh:
+            out.append('Since then (his newest messages, not yet distilled; these win over older lines):')
+            out += [f"- {str(d['ts'])[:16]} {d.get('harness', '')}: {str(d['text'])[:DELTA_CHARS]} [{str(d.get('id', ''))[-12:]}]"
+                    for d in fresh[-DELTA_SHOWN:][::-1]]
         for field, title in (('current', 'In force'), ('open_asks', 'Open asks'), ('decisions', 'Decisions')):
             items = [x for x in r.get(field) or [] if isinstance(x, dict) and x.get('text')]
             if items:
@@ -179,6 +253,11 @@ def chunks(text: str) -> list[str]:
     return result
 
 
+def _owner_turn(env=os.environ) -> bool:
+    """False for scripted runs (claude -p / SDK, evals, workers): only Kevin's interactive prompts are captured."""
+    return not env.get('Z0INT_DELTA_OFF') and not str(env.get('CLAUDE_CODE_ENTRYPOINT', '')).startswith('sdk')
+
+
 def main() -> None:
     if '--corrections' in sys.argv:
         # Claude Code UserPromptSubmit passes {"prompt": ...} on stdin; omp passes the raw prompt with --raw.
@@ -186,7 +265,7 @@ def main() -> None:
             raw = sys.stdin.read(65536)
         except (OSError, UnicodeError):
             return
-        prompt = raw
+        prompt, payload = raw, None
         if '--raw' not in sys.argv:
             try:
                 payload = json.loads(raw)
@@ -194,7 +273,15 @@ def main() -> None:
             except ValueError:
                 prompt = ""
         prompt = prompt if isinstance(prompt, str) else ''
-        text = '\n\n'.join(t for t in (dossiers(prompt)[0], corrections(prompt)) if t)
+        harness = sys.argv[sys.argv.index('--harness') + 1] if '--harness' in sys.argv[:-1] else (
+            'omp' if '--raw' in sys.argv else 'claude-code')
+        session = '' if '--raw' in sys.argv or not isinstance(payload, dict) else str(payload.get('session_id') or '')
+        text = '\n\n'.join(t for t in (dossiers(prompt, session=session)[0], corrections(prompt)) if t)
+        if _owner_turn():
+            try:
+                record(prompt, harness=harness, session=session)
+            except OSError:
+                pass  # capture must never block or alter the turn
         if not text:
             return
         if '--claude-hook' in sys.argv:

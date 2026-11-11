@@ -29,14 +29,23 @@ def _text(value):
 _dossiers_sent = {}  # session id -> dossier keys already shown (an updated dossier has a new key)
 
 
-def corrections_hook(user_message=None, conversation_history=None, session_id=None, **_):
+OWNER_PLATFORMS = {'', 'cli', 'tui', 'local', 'acp', 'gui', 'telegram', 'discord'}  # not kanban/cron/api workers
+
+
+def corrections_hook(user_message=None, conversation_history=None, session_id=None, platform='',
+                     parent_session_id='', **_):
     prompt = _text(user_message)
     if not prompt.strip() and conversation_history:
         last = [m for m in conversation_history if isinstance(m, dict) and m.get('role') == 'user']
         prompt = _text(last[-1]) if last else ''
     sent = _dossiers_sent.setdefault(session_id or '', set())
-    dossier, keys = _orientation.dossiers(prompt, skip=sent)
+    dossier, keys = _orientation.dossiers(prompt, skip=sent, session=session_id or '')
     sent.update(keys)
+    if (platform or '') in OWNER_PLATFORMS and not parent_session_id and _orientation._owner_turn():
+        try:  # Kevin's own turn: append to the dossier delta so every other session sees it next turn
+            _orientation.record(prompt, harness='hermes', session=session_id or '')
+        except OSError:
+            pass
     text = '\n\n'.join(t for t in (dossier, _orientation.corrections(prompt)) if t)
     return {'context': text} if text else None
 
