@@ -218,3 +218,48 @@ def test_can_run_rejects_unknown_class(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="bogus"):
         res.can_run("bogus")
+
+
+@pytest.mark.parametrize('relative', ['runtime/interactive.touch', 'stream/bridge_heart.jsonl'])
+def test_interactive_recent_uses_one_snapshot_during_marker_removal(tmp_path, monkeypatch, relative):
+    from pathlib import Path
+
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
+    monkeypatch.delenv('Z0INT_PAUSE_RESEARCH', raising=False)
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True)
+    target.touch()
+    original_stat = Path.stat
+    probes = []
+
+    def disappearing_stat(path, *args, **kwargs):
+        result = original_stat(path, *args, **kwargs)
+        if path == target:
+            probes.append(path)
+            path.unlink()
+        return result
+
+    monkeypatch.setattr(Path, 'stat', disappearing_stat)
+    assert res.interactive_recent(grace=60) is True
+    assert probes == [target]
+    assert res.interactive_recent(grace=60) is False
+
+
+def test_interactive_recent_ignores_marker_directory_and_uses_heart(tmp_path, monkeypatch):
+    monkeypatch.setenv('Z0INT_HOME', str(tmp_path))
+    monkeypatch.delenv('Z0INT_PAUSE_RESEARCH', raising=False)
+    (tmp_path / 'runtime' / 'interactive.touch').mkdir(parents=True)
+    heart = tmp_path / 'stream' / 'bridge_heart.jsonl'
+    heart.parent.mkdir()
+    heart.touch()
+    assert res.interactive_recent(grace=60) is True
+
+
+def test_interactive_recent_ignores_non_directory_marker_parent(tmp_path, monkeypatch):
+    monkeypatch.setenv("Z0INT_HOME", str(tmp_path))
+    monkeypatch.delenv("Z0INT_PAUSE_RESEARCH", raising=False)
+    (tmp_path / "runtime").write_text("not a directory")
+    heart = tmp_path / "stream" / "bridge_heart.jsonl"
+    heart.parent.mkdir()
+    heart.touch()
+    assert res.interactive_recent(grace=60) is True
