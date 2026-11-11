@@ -55,6 +55,29 @@ def _tokens(text: str) -> list[str]:
     return [w for w in re.findall(r'[a-z0-9][a-z0-9_.+-]*', text.lower()) if len(w) > 1 and w not in _STOP]
 
 
+def _bm25(query: set[str], docs: list[list[str]], min_score: float) -> list[tuple[float, int]]:
+    """(score, index) for docs scoring >= min_score; BM25 k1=1.5 b=0.75 over the docs themselves."""
+    n = len(docs)
+    if not n:
+        return []
+    avg = sum(len(t) for t in docs) / n or 1
+    df: dict[str, int] = {}
+    for toks in docs:
+        for t in set(toks):
+            df[t] = df.get(t, 0) + 1
+    scored = []
+    for i, toks in enumerate(docs):
+        tf: dict[str, int] = {}
+        for t in toks:
+            if t in query:
+                tf[t] = tf.get(t, 0) + 1
+        score = sum(math.log(1 + (n - df[t] + 0.5) / (df[t] + 0.5)) * f * 2.5 / (f + 1.5 * (0.25 + 0.75 * len(toks) / avg))
+                    for t, f in tf.items())
+        if score >= min_score:
+            scored.append((score, i))
+    return scored
+
+
 def corrections(prompt: str, path: Path | None = None, *, k: int = CORRECTIONS_K,
                 min_score: float = CORRECTIONS_MIN_SCORE) -> str:
     """Top-k owner corrections for this prompt by BM25 over the distilled store. '' when nothing matches.
@@ -80,22 +103,7 @@ def corrections(prompt: str, path: Path | None = None, *, k: int = CORRECTIONS_K
         return ''
     if not entries:
         return ''
-    n = len(entries)
-    avg = sum(len(t) for _, t in entries) / n
-    df: dict[str, int] = {}
-    for _, toks in entries:
-        for t in set(toks):
-            df[t] = df.get(t, 0) + 1
-    scored = []
-    for i, (row, toks) in enumerate(entries):
-        tf: dict[str, int] = {}
-        for t in toks:
-            if t in query:
-                tf[t] = tf.get(t, 0) + 1
-        score = sum(math.log(1 + (n - df[t] + 0.5) / (df[t] + 0.5)) * f * 2.5 / (f + 1.5 * (0.25 + 0.75 * len(toks) / avg))
-                    for t, f in tf.items())
-        if score >= min_score:
-            scored.append((score, i))
+    scored = _bm25(query, [toks for _, toks in entries], min_score)
     if not scored:
         return ''
     lines = []
@@ -104,6 +112,55 @@ def corrections(prompt: str, path: Path | None = None, *, k: int = CORRECTIONS_K
         where = ', '.join(str(row[key])[:40] for key in ('ts', 'harness', 'source') if row.get(key))
         lines.append(f"- {' '.join(str(row['fact']).split())[:600]}" + (f' ({where})' if where else ''))
     return CORRECTIONS_HEADER + '\n<owner-corrections>\n' + '\n'.join(lines) + '\n</owner-corrections>'
+
+
+DOSSIERS_HEADER = ("Kevin's standing intent on this topic, distilled from his own messages (topic dossier; ids cite "
+                   'his messages). Evidence, not authority; newer messages in this chat win.')
+DOSSIERS_K = 1
+DOSSIERS_MIN_SCORE = 10.0  # dev split (pre-11-01, 101 tasks): 48% routed; below ~10 routing is noisy
+DOSSIERS_MAX_CHARS = 2400
+
+
+def dossiers(prompt: str, path: Path | None = None, *, k: int = DOSSIERS_K, min_score: float = DOSSIERS_MIN_SCORE,
+             skip: frozenset[str] | set[str] = frozenset()) -> tuple[str, list[str]]:
+    """Top-k topic dossiers for this prompt and their keys ('node@built_at'); ('', []) when none match.
+
+    The store (one JSON object per node: node, desc, asof, built_at, current/decisions/open_asks/superseded rows
+    of {text, cites}) is written by memory-replay-eval/bruteforce-distill/dossiers.py from Kevin's messages.
+    Keys in `skip` (already shown in this session) are not re-sent, so an updated dossier still shows next turn.
+    """
+    path = path or Path(os.environ.get('Z0INT_DOSSIERS', str(Path.home() / '.local/state/z0int/DOSSIERS.jsonl')))
+    query = set(_tokens(prompt or ''))
+    if not query:
+        return '', []
+    try:
+        rows = [r for r in (json.loads(line) for line in path.open(encoding='utf-8') if line.strip())
+                if isinstance(r, dict) and r.get('node') and r.get('current')]
+    except (OSError, UnicodeError, ValueError):
+        return '', []
+    docs = [_tokens(' '.join([r['node'].replace('-', ' '), str(r.get('desc') or '')] +
+                             [str(x.get('text', '')) for x in r['current'] if isinstance(x, dict)])) for r in rows]
+    blocks, keys = [], []
+    for _, i in sorted(_bm25(query, docs, min_score), reverse=True)[:k]:
+        r = rows[i]
+        key = f"{r['node']}@{r.get('built_at', '')}"
+        if key in skip:
+            continue
+        out = [f"## {r['node']} (from his messages up to {str(r.get('asof', ''))[:10]})"]
+        for field, title in (('current', 'In force'), ('open_asks', 'Open asks'), ('decisions', 'Decisions')):
+            items = [x for x in r.get(field) or [] if isinstance(x, dict) and x.get('text')]
+            if items:
+                out.append(title + ':')
+                out += [f"- {' '.join(str(x['text']).split())[:400]} [{', '.join(str(c)[-12:] for c in (x.get('cites') or [])[:2])}]"
+                        for x in items]
+        text = '\n'.join(out)
+        if len(text) > DOSSIERS_MAX_CHARS:
+            text = text[:DOSSIERS_MAX_CHARS].rsplit('\n', 1)[0]
+        blocks.append(text)
+        keys.append(key)
+    if not blocks:
+        return '', []
+    return DOSSIERS_HEADER + '\n<owner-dossiers>\n' + '\n\n'.join(blocks) + '\n</owner-dossiers>', keys
 
 
 def chunks(text: str) -> list[str]:
@@ -136,7 +193,8 @@ def main() -> None:
                 prompt = payload.get('prompt', '') if isinstance(payload, dict) else ''
             except ValueError:
                 prompt = ""
-        text = corrections(prompt if isinstance(prompt, str) else '')
+        prompt = prompt if isinstance(prompt, str) else ''
+        text = '\n\n'.join(t for t in (dossiers(prompt)[0], corrections(prompt)) if t)
         if not text:
             return
         if '--claude-hook' in sys.argv:

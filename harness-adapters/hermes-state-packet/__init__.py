@@ -26,12 +26,18 @@ def _text(value):
     return ''
 
 
-def corrections_hook(user_message=None, conversation_history=None, **_):
+_dossiers_sent = {}  # session id -> dossier keys already shown (an updated dossier has a new key)
+
+
+def corrections_hook(user_message=None, conversation_history=None, session_id=None, **_):
     prompt = _text(user_message)
     if not prompt.strip() and conversation_history:
         last = [m for m in conversation_history if isinstance(m, dict) and m.get('role') == 'user']
         prompt = _text(last[-1]) if last else ''
-    text = _orientation.corrections(prompt)
+    sent = _dossiers_sent.setdefault(session_id or '', set())
+    dossier, keys = _orientation.dossiers(prompt, skip=sent)
+    sent.update(keys)
+    text = '\n\n'.join(t for t in (dossier, _orientation.corrections(prompt)) if t)
     return {'context': text} if text else None
 
 

@@ -236,7 +236,7 @@ class CorrectionsTests(unittest.TestCase):
         self.assertEqual(orientation.corrections('uiautomator2 adb', self.store), '')
 
     def _cli(self, args, stdin):
-        env = {**os.environ, 'Z0INT_CORRECTIONS': str(self.store)}
+        env = {**os.environ, 'Z0INT_CORRECTIONS': str(self.store), 'Z0INT_DOSSIERS': str(Path(self.tmp.name) / 'none.jsonl')}
         return subprocess.run([sys.executable, str(ROOT / 'src/z0int/orientation.py'), *args], input=stdin,
                               capture_output=True, text=True, env=env, timeout=20).stdout
 
@@ -257,10 +257,63 @@ class HermesCorrectionsHookTests(unittest.TestCase):
             store = Path(tmp) / 'c.jsonl'
             store.write_text(json.dumps({'fact': 'Bend runs on the GPU with CUDA only.', 'source': 's1'}) + '\n'
                              + ''.join(json.dumps({'fact': f'filler {i} soil'}) + '\n' for i in range(20)))
-            with patch.dict(os.environ, {'Z0INT_CORRECTIONS': str(store)}):
+            with patch.dict(os.environ, {'Z0INT_CORRECTIONS': str(store), 'Z0INT_DOSSIERS': str(Path(tmp) / 'none')}):
                 q = 'run the bend benchmark on cuda gpu'
                 for shape in (q, [{'type': 'text', 'text': q}], {'role': 'user', 'content': q}):
                     self.assertIn('CUDA', module.corrections_hook(user_message=shape)['context'])
                 self.assertIn('CUDA', module.corrections_hook(
                     user_message=None, conversation_history=[{'role': 'user', 'content': q}])['context'])
                 self.assertIsNone(module.corrections_hook(user_message='write a haiku about the moon'))
+
+
+class DossierTests(unittest.TestCase):
+    """Topic dossiers: routed per prompt, cited, sent once per session until the dossier is rebuilt."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.store = Path(self.tmp.name) / 'DOSSIERS.jsonl'
+        row = lambda node, desc, rule, built: {
+            'node': node, 'desc': desc, 'asof': '2026-11-10T00:00:00Z', 'built_at': built,
+            'current': [{'text': rule, 'cites': ['hermes-clean:s1:111']}],
+            'open_asks': [{'text': 'Finish the S25 launcher theme.', 'cites': ['omp:s2:222']}]}
+        rows = [row('phone-android', 'Android phones S25 S22 adb uiautomator2 launcher', 'Drive the S25 with uiautomator2, never raw adb taps.', 'b1'),
+                row('blender-3d', 'Blender renders cycles moss materials', 'Render Blender stills with Cycles on the GPU.', 'b1')]
+        rows += [row(f'filler-{i}', 'gardening soil compost', f'Water plant {i} weekly.', 'b1') for i in range(10)]
+        self.store.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+
+    def test_routes_the_matching_dossier_with_citations(self):
+        text, keys = orientation.dossiers('tap the launcher settings on the S25 phone with adb', self.store)
+        self.assertEqual(keys, ['phone-android@b1'])
+        self.assertIn('uiautomator2', text)
+        self.assertIn('s1:111', text)
+        self.assertIn('Open asks:', text)
+        self.assertNotIn('Cycles', text)
+
+    def test_unrelated_seen_or_missing_injects_nothing(self):
+        q = 'tap the launcher settings on the S25 phone with adb'
+        self.assertEqual(orientation.dossiers('write a haiku about the moon', self.store), ('', []))
+        self.assertEqual(orientation.dossiers(q, self.store, skip={'phone-android@b1'}), ('', []))
+        self.assertEqual(orientation.dossiers(q, Path(self.tmp.name) / 'missing.jsonl'), ('', []))
+        self.store.write_text('not json\n')
+        self.assertEqual(orientation.dossiers(q, self.store), ('', []))
+
+    def test_hermes_hook_sends_once_per_session_and_resends_a_rebuilt_dossier(self):
+        module = load('hermes_state_packet_dossier', ROOT / 'harness-adapters/hermes-state-packet/__init__.py')
+        q = 'tap the launcher settings on the S25 phone with adb'
+        with patch.dict(os.environ, {'Z0INT_DOSSIERS': str(self.store), 'Z0INT_CORRECTIONS': str(Path(self.tmp.name) / 'none')}):
+            self.assertIn('uiautomator2', module.corrections_hook(user_message=q, session_id='A')['context'])
+            self.assertIsNone(module.corrections_hook(user_message=q, session_id='A'))
+            self.assertIn('uiautomator2', module.corrections_hook(user_message=q, session_id='B')['context'])
+            rows = [json.loads(l) for l in self.store.read_text().splitlines()]
+            rows[0]['built_at'] = 'b2'
+            rows[0]['current'][0]['text'] = 'Drive the S25 through phone-harness now.'
+            self.store.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+            self.assertIn('phone-harness', module.corrections_hook(user_message=q, session_id='A')['context'])
+
+    def test_claude_hook_emits_dossier_and_corrections_together(self):
+        env = {**os.environ, 'Z0INT_DOSSIERS': str(self.store), 'Z0INT_CORRECTIONS': str(Path(self.tmp.name) / 'none')}
+        out = subprocess.run([sys.executable, str(ROOT / 'src/z0int/orientation.py'), '--claude-hook', '--corrections'],
+                             input=json.dumps({'prompt': 'tap the launcher settings on the S25 phone with adb'}),
+                             capture_output=True, text=True, env=env, timeout=20).stdout
+        self.assertIn('<owner-dossiers>', json.loads(out)['hookSpecificOutput']['additionalContext'])
