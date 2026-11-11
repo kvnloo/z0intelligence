@@ -228,7 +228,8 @@ def test_overload_disconnect_still_shuts_down_socket(monkeypatch, error):
     def disconnect(data):
         raise error("client disconnected")
 
-    request = SimpleNamespace(sendall=disconnect)
+    # Request already fully read (EOF); the reply write is what hits the disconnect.
+    request = SimpleNamespace(sendall=disconnect, recv=lambda size: b"", settimeout=lambda timeout: None)
     server.process_request(request, ("127.0.0.1", 1234))
     assert closed == [request]
 
