@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh z0intelligence federated capacity snapshot
+
+[Timer]
+OnBootSec=3s
+OnUnitActiveSec=5s
+AccuracySec=1s
+Unit=z0-capacity-snapshot.service
+
+[Install]
+WantedBy=timers.target

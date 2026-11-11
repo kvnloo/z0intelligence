@@ -1,0 +1,13 @@
+[Unit]
+Description=z0intelligence read-only federated capacity snapshot
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/z0intelligence/service.env
+EnvironmentFile=-%h/.config/z0intelligence/capacity.env
+ExecStart=/bin/sh -c 'exec "$Z0INT_PYTHON" -m z0int.capacity_snapshot'
+UMask=0077
+Nice=10
+StandardOutput=journal
+StandardError=journal

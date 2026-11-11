@@ -1,0 +1,7 @@
+schema = 1
+id = "z0-capacity"
+name = "z0 Capacity Export"
+version = "0.1.0"
+description = "Read-only Tern host/session export for z0intelligence capacity snapshots."
+icon = "terminal"
+window = "window.luau"
