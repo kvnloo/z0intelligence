@@ -101,6 +101,7 @@ def test_output_never_contains_config_secret_values(env, capsys, monkeypatch):
     from z0int.memory import cli
     monkeypatch.setenv('AGENTSVIEW_DATA_DIR', str(env['av_dir']))
     rc = cli.main(['doctor', '--json', '--agentsview-bin', str(env['agentsview_bin']),
+                   '--ctx-bin', str(env['ctx_bin']),  # never the host's real ctx (resolve_bin falls back to ~/.local/bin)
                    '--claude-home', str(env['claude_home'])])
     out = capsys.readouterr()
     assert rc == 0
