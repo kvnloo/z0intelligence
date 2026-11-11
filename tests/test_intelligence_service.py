@@ -6,23 +6,64 @@ import time
 from z0int.intelligence_service import Service, Handler
 
 
-def test_health_and_bounded_admission():
-    server=Service(('127.0.0.1',0),Handler)
-    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
-    address=server.server_address
-    sockets=[]
+def test_health_and_bounded_admission(monkeypatch):
+    import z0int.intelligence_service as svc
+    from z0int.agentweb_bridge_capabilities import MAX_ACTIVE
+
+    # The readiness contracts are tested separately below. Keep this admission
+    # test independent of host AODL installs and optional governed-worker flags.
+    monkeypatch.setattr(
+        svc, 'aodl_admission_state',
+        lambda: {'aodl_admission_ready': True, 'aodl_canon_version': 'aodl-canon-1'},
+    )
+    monkeypatch.setattr(
+        svc, 'governed_worker_state',
+        lambda: {'governed_remote_enabled': False, 'governed_remote_ready': False},
+    )
+    # Admission slots and draining are module globals shared by all servers.
+    monkeypatch.setattr(svc, 'DRAINING', threading.Event())
+    monkeypatch.setattr(svc, 'SLOTS', threading.BoundedSemaphore(MAX_ACTIVE))
+
+    server = Service(('127.0.0.1', 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    address = server.server_address
+    sockets = []
     try:
-        with urllib.request.urlopen(f'http://127.0.0.1:{address[1]}/readyz') as r:assert r.status==200
-        for _ in range(4):
-            s=socket.create_connection(address);s.sendall(b'POST /v1/intelligence HTTP/1.0\r\nContent-Length: 1\r\n\r\n');sockets.append(s)
-        time.sleep(.1)
-        with socket.create_connection(address) as s:
+        with urllib.request.urlopen(
+            f'http://127.0.0.1:{address[1]}/readyz', timeout=3
+        ) as response:
+            assert response.status == 200
+
+        with svc.METRIC_LOCK:
+            before_admitted = svc.METRICS['admitted_connections_total']
+        for _ in range(MAX_ACTIVE):
+            s = socket.create_connection(address, timeout=3)
+            sockets.append(s)
+            s.sendall(
+                b'POST /v1/intelligence HTTP/1.0\r\n'
+                b'Content-Length: 1\r\n\r\n'
+            )
+
+        # Wait for all slots to be acquired rather than assume 100ms is enough.
+        deadline = time.monotonic() + 5
+        while True:
+            with svc.METRIC_LOCK:
+                admitted = svc.METRICS['admitted_connections_total']
+            if admitted == before_admitted + MAX_ACTIVE:
+                break
+            assert time.monotonic() < deadline, 'pending requests did not fill admission slots'
+            time.sleep(0.01)
+
+        with socket.create_connection(address, timeout=3) as s:
             s.sendall(b'GET /healthz HTTP/1.0\r\n\r\n')
             assert b'503 Service Unavailable' in s.recv(1000)
     finally:
-        for s in sockets:s.close()
-        server.shutdown();server.server_close();thread.join()
-
+        for s in sockets:
+            s.close()
+        server.shutdown()
+        server.server_close()
+        thread.join()
 
 def test_metrics_track_real_dispatch_and_replay(tmp_path,monkeypatch):
     import json
