@@ -2,6 +2,7 @@
 import json
 import os
 import socket
+import unittest.mock
 from pathlib import Path
 import subprocess
 
@@ -13,6 +14,145 @@ from test_shared_file_search import (  # Shared owned HTTP fixture, native FFF b
 from z0int.memory.event_log import EventLog
 
 PLUGIN = Path(__file__).resolve().parents[1] / "harness-adapters" / "hermes-file-search"
+
+
+def load_plugin_module():
+    """Import the adapter file directly: stdlib only, no Hermes SDK or service."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "hermes_file_search_under_test", PLUGIN / "__init__.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_guidance_names_the_admitted_root_contract():
+    """The 007 harm: agents passed roots the service always rejects.
+
+    The guidance must state the admission contract itself, so a call is either
+    admitted or never made, instead of burning a turn on a rejected_root.
+    """
+    module = load_plugin_module()
+    section = module.PRIORITY
+    for token in ("read_file", "z0_file_search", "repository_root", "Git toplevel",
+                  "Git worktree", "du", "fall back", "search_files"):
+        assert token in section, token
+    for rejected in ("/mnt/zer0models", "/mnt/zer0models/workspace/zer0", "/workspace",
+                     "/home/kvn", "filesystem root"):
+        assert rejected in section, rejected
+    assert "200,000 files" in section
+    # The registered prompt section is capped; the guidance must fit inside it.
+    assert len(section) <= module.SECTION_MAX_CHARS
+    assert module.SCHEMA["description"].endswith(section)
+
+
+def test_failure_instruction_carries_the_same_contract():
+    """A rejected root must tell the caller what to retry with, and the fallback."""
+    module = load_plugin_module()
+    instruction = module.FAILURE_INSTRUCTION
+    assert "fallback" in instruction.lower()
+    assert "search_files" in instruction
+    assert "/mnt/zer0models/workspace/zer0" in instruction
+    assert "Git toplevel" in instruction
+    assert "no evidence was returned" in instruction
+
+
+def _handler(module, service_url):
+    """Register against a stub context pointed at service_url; return the handler."""
+
+    class StubCtx:
+        def __init__(self):
+            self.config = {"service_url": service_url}
+            self.tools = {}
+            self.sections = {}
+
+        def get_config(self, key, default=None):
+            return os.environ.get("Z0INT_SERVICE_URL", self.config.get(key, default))
+
+        def register_tool(self, name=None, toolset=None, schema=None, handler=None, **_):
+            self.tools[name] = handler
+
+        def register_system_prompt_section(self, name, content, max_chars=None, **_):
+            self.sections[name] = (content, max_chars)
+
+    ctx = StubCtx()
+    module.register(ctx)
+    return ctx.tools["z0_file_search"]
+
+
+def test_nonexistent_root_fails_locally_without_a_request():
+    """007: 7 calls/wk spent a round trip on a root that does not exist."""
+    module = load_plugin_module()
+    with socket.socket() as dead:
+        dead.bind(("127.0.0.1", 0))  # any request here would raise, not answer
+        handler = _handler(module, f"http://127.0.0.1:{dead.getsockname()[1]}")
+        body = json.loads(handler({"repository_root": "/mnt/zer0models/github/oss-factory",
+                                   "query": "downstream experiments registry", "limit": 5}))
+    assert body["ok"] is False
+    assert body["error"] == "repository_root_not_found_on_service_host"
+    assert body["repository_root"] == "/mnt/zer0models/github/oss-factory"
+    assert "http_status" not in body  # no round trip was made
+    assert "ls" in body["instruction"]
+
+
+def test_remote_service_origin_skips_the_local_existence_probe():
+    """A stat is only valid when the service shares this filesystem."""
+    module = load_plugin_module()
+    assert module._same_host("http://127.0.0.1:11501") is True
+    assert module._same_host("http://localhost:11501") is True
+    assert module._same_host("http://groot:11501") is False
+    assert module._same_host("http://172.19.0.1:11501") is False
+
+
+class _Response:
+    def __init__(self, payload):
+        self._payload = json.dumps(payload)
+
+    def read(self):
+        return self._payload.encode()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_rejected_root_packet_names_the_reason_and_the_fallback():
+    """The real failure mode: the service answers ok:false, naming the cause only
+    inside unresolved_gaps. The handler must not hand that back bare."""
+    module = load_plugin_module()
+    with unittest.mock.patch.object(module.os.path, "isdir", return_value=True), \
+            unittest.mock.patch.object(module.urllib.request, "urlopen",
+                                       return_value=_Response({
+                                           "ok": False,
+                                           "unresolved_gaps": [
+                                               "file-search: no retrieval hits for 'x' "
+                                               "(fff=rejected_root, qmd=disabled)"],
+                                       })):
+        handler = _handler(module, "http://127.0.0.1:11501")
+        body = json.loads(handler({"repository_root": "/mnt/zer0models/workspace/zer0",
+                                  "query": "x", "limit": 3}))
+    assert body["reason"] == "rejected_root"
+    assert "search_files" in body["instruction"]
+    assert "/mnt/zer0models/workspace/zer0" in body["instruction"]
+    assert body["unresolved_gaps"]  # the service's own fields survive
+    assert body["ok"] is False
+
+
+def test_ok_packet_is_returned_unannotated():
+    """Success must stay byte-for-byte the service's answer."""
+    module = load_plugin_module()
+    packet = {"ok": True, "schema": "z0int.context_resolve.v1", "evidence": [{"path": "a.py"}]}
+    with unittest.mock.patch.object(module.os.path, "isdir", return_value=True), \
+            unittest.mock.patch.object(module.urllib.request, "urlopen",
+                                       return_value=_Response(packet)):
+        handler = _handler(module, "http://127.0.0.1:11501")
+        body = json.loads(handler({"repository_root": "/mnt/zer0models/workspace/zer0/oss/oss-agent",
+                                   "query": "x", "limit": 3}))
+    assert body == packet
+
 
 # Executed in a separate Hermes interpreter: no z0int or adapters on PYTHONPATH.
 NATIVE_PROBE = r'''
@@ -46,8 +186,10 @@ assert entry.schema["name"] == "z0_file_search"
 assert entry.schema["parameters"]["required"] == ["repository_root", "query"]
 assert "harness" not in entry.schema["parameters"]["properties"]
 section = manager._system_prompt_sections["hermes-file-search"].content
-assert "read_file" in section and "prefer z0_file_search" in section
-assert "fallback" in section and "Git worktree" in section and "du" in section
+assert "read_file" in section and "z0_file_search" in section
+assert "repository_root" in section and "Git toplevel" in section
+assert "fall back" in section and "Git worktree" in section and "du" in section
+assert "/mnt/zer0models/workspace/zer0" in section and "200,000 files" in section
 results = []
 for arguments in json.loads(sys.argv[2]):
     raw = registry.dispatch("z0_file_search", arguments, scope=manager.scope_key,

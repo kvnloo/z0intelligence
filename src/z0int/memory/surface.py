@@ -388,13 +388,47 @@ def _scope_of(raw: Any) -> MemoryScope | None:
     return MemoryScope(**{k: raw.get(k) for k in ('user', 'project', 'repo', 'task')})
 
 
+_TEMPORAL_INDEX_CACHE: dict[tuple[str, int, int, int, int], tuple[list[MemoryEvent], list[str], dict[int, dict[str, Any]]]] = {}
+_TEMPORAL_INDEX_LOCK = threading.Lock()
+_TEMPORAL_INDEX_CACHE_MAX = 64
+
+
+def _temporal_index(log: EventLog) -> tuple[list[MemoryEvent], list[str], dict[int, dict[str, Any]]]:
+    """The per-event lowercased searchable text and the current-claim projection ``_temporal_candidates``
+    scores every query against: both are pure functions of the committed events, so they are cached the same
+    mtime/size(+inode)-keyed way as ``EventLog``'s own parsed-event cache (one entry here also skips the
+    per-event ``json.dumps`` that building ``text`` requires, not just the parse+checksum ``EventLog``
+    already avoids on a hit)."""
+    try:
+        st = log.events_path.stat()
+    except OSError:
+        key = None
+    else:
+        key = (str(log.events_path), st.st_dev, st.st_ino, st.st_mtime_ns, st.st_size)
+    if key is not None:
+        with _TEMPORAL_INDEX_LOCK:
+            cached = _TEMPORAL_INDEX_CACHE.get(key)
+        if cached is not None:
+            return cached
+    events = list(log.iter_events())
+    texts = [json.dumps(e.payload, ensure_ascii=False, sort_keys=True).lower() if e.payload is not None else ''
+            for e in events]
+    result = (events, texts, {c['event_id']: c for c in _claim_rows(events)})
+    if key is not None:
+        with _TEMPORAL_INDEX_LOCK:
+            _TEMPORAL_INDEX_CACHE[key] = result
+            while len(_TEMPORAL_INDEX_CACHE) > _TEMPORAL_INDEX_CACHE_MAX:
+                _TEMPORAL_INDEX_CACHE.pop(next(iter(_TEMPORAL_INDEX_CACHE)))
+    return result
+
+
 def _temporal_candidates(query: str, *, ledger_root: str | Path | None,
                          join_uids: set[str]) -> tuple[dict[str, Any], list[dict[str, Any]], int]:
     log = EventLog(ledger_root, read_only=True)
     if not log.events_path.is_file():
         return _layer('ok', revision='empty', events=0), [], 0
     try:
-        events = list(log.iter_events())
+        events, texts, claims = _temporal_index(log)
     except Exception as exc:  # noqa: BLE001 - a corrupt ledger is reported, not raised
         return _layer('unavailable', 'corrupt', detail=type(exc).__name__), [], 0
     tree = log.root / 'TREE' / 'manifest.json'
@@ -403,10 +437,8 @@ def _temporal_candidates(query: str, *, ledger_root: str | Path | None,
     except (OSError, ValueError):
         tree_rev = None
     terms, out, scrubbed = _terms(query), [], 0
-    claims = {c['event_id']: c for c in _claim_rows(events)}
-    for e in events:
+    for e, text in zip(events, texts):
         ident = e.event_identity()
-        text = json.dumps(e.payload, ensure_ascii=False, sort_keys=True).lower() if e.payload is not None else ''
         score = sum(1 for t in terms if t in text)
         joined = ident is not None and ident.event_uid in join_uids
         if not score and not joined:
