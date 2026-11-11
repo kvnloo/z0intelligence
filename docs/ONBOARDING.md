@@ -47,6 +47,77 @@ Idempotent steps (state: `~/.z0int/state/onboard.json`):
 
 Personal artifacts **never** default into the repo. Only `~/.z0int/`.
 
+## Selected steps, preview and resume
+
+Use repeated `--step NAME` arguments for approval-driven callers. Names are the
+exact step IDs in the table above; they run in canonical table order, regardless
+of argument order. Unknown, empty or repeated names fail before checkpoint
+access. No dependency step is added implicitly. Omitting `--step` on a **new**
+run retains the complete setup pipeline, including evolution-lab and OMP links.
+
+```bash
+# Preview the selected effects; no probes, operations, directories or files.
+z0int onboard --step layout --step models.plan --step privacy --dry-run --json
+
+# Apply only these selected steps after approval.
+z0int onboard --step layout --step models.plan --step privacy --json
+
+# Downloads require both selection and the existing explicit download opt-in.
+z0int onboard --step models.sync --sync-models --json
+
+# Inspect an interrupted plan, then explicitly retry its unfinished steps.
+z0int onboard --resume --dry-run --json
+z0int onboard --resume --json
+```
+
+Preview reads the existing checkpoint, if any, and describes each selected
+step's effect, `would_run`, skip reason and potential network access. It does not
+call step functions, perform hardware/data discovery, compute a model plan,
+write checkpoints or mark steps complete. Obtain actual hardware/model
+information separately with `z0int doctor --json` and
+`z0int models plan --json`.
+
+Execution writes bookkeeping under `$Z0INT_HOME/state/` (default
+`~/.z0int/state/`). Each selected file-writing step creates only its needed
+parent directories. Only the `layout` step creates the full private tree.
+Selecting `models.sync` without `--sync-models` remains a skip. Omitting
+`models.sync` and `evolution_lab` from the selection prevents their downloads
+and installation.
+
+The checkpoint records the exact selection, effective options, completed
+prefix, in-flight step and necessary context before operations run. Any failed
+step stops the plan. An unfinished plan requires explicit `--resume`; a bare
+invocation, a changed selection or a newly enabled option cannot expand it.
+Resume restores the original flags, including `--sync-models`,
+`--skip-evolution-lab` (also when originally supplied through
+`SKIP_EVOLUTION_LAB=1`) and `--force`. A changed environment skip value does
+not rewrite that recorded decision; newly setting `SKIP_EVOLUTION_LAB=1` blocks
+a saved plan that would install it. An explicit `--step` list on resume must
+match the original selection. Completed steps are not repeated, including
+doctor and runs originally started with `--force`.
+
+The validated resident model plan, evolution-lab destination and OMP source
+and destination paths survive interruption. Resume checks the effective model manifest for downloads and the
+evolution-lab source/ref/environment overrides, repository/state/user-home paths
+and Python executable before retrying. Restore the original inputs if they changed.
+Malformed or unsupported checkpoints fail closed. To deliberately abandon a
+plan or recover irreparable state, stop all onboarding invocations, archive
+`state/onboard.json` yourself, then preview and approve a new explicit selection.
+The CLI never silently resets consent or removes that evidence.
+
+Checkpoint replacement is atomic. If a process stops after an external effect
+but before recording completion, `--resume` may repeat the in-flight operation:
+retries are **at least once**, not exactly once. Review the saved plan before
+retrying. Run only one onboarding invocation at a time per `Z0INT_HOME`;
+atomic file replacement does not provide a concurrent-run lock.
+
+Both `z0int onboard … --json` and `z0int --json onboard …` emit
+`z0int.onboard_report.v1` with `selected`, `options`, `completed`,
+`pending`, `results`, `failed` and `state_path`. Validation/checkpoint errors
+include `error_code` and `error`; unsuccessful invocations exit nonzero.
+A normal keyboard interruption returns a failed step report. A killed process
+cannot emit final JSON; its durable checkpoint is the recovery record.
+
 ## Hard boundaries
 
 ```text

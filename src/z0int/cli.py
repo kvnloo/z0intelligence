@@ -55,6 +55,8 @@ def cmd_onboard(
     sync_models: bool,
     skip_evolution_lab: bool,
     as_json: bool,
+    only: list[str] | None = None,
+    resume: bool = False,
 ) -> int:
     from .onboard import run_onboard
 
@@ -64,15 +66,19 @@ def cmd_onboard(
         dry_run=dry_run,
         sync_models=sync_models,
         skip_evolution_lab=skip_evolution_lab,
+        only=only,
+        resume=resume,
     )
     if as_json:
         print(json.dumps(report, indent=2, default=str))
     else:
-        print("z0int onboard")
+        print("z0int onboard" + (" preview" if dry_run else ""))
         print(f"  ok={report.get('ok')}  state={report.get('state_path')}")
+        if report.get("error"):
+            print(f"  {report['error_code']}: {report['error']}")
         for name, res in (report.get("results") or {}).items():
             mark = "✓" if res.get("ok") and not res.get("error") else ("○" if res.get("skipped") else "✗")
-            extra = " skipped" if res.get("skipped") else ""
+            extra = " would run" if res.get("would_run") else (" skipped" if res.get("skipped") else "")
             err = res.get("error")
             print(f"  {mark} {name}{extra}" + (f"  {err}" if err else ""))
         nxt = report.get("next") or []
@@ -290,11 +296,15 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("status", help="Product status dashboard")
     _json_flag(s)
 
-    on = sub.add_parser("onboard", help="Idempotent setup pipeline (safe defaults)")
-    _json_flag(on)
+    on = sub.add_parser("onboard", help="Resumable setup pipeline with selectable steps")
+    on.add_argument("--json", action="store_true", dest="as_json", default=argparse.SUPPRESS,
+                    help="Machine-readable JSON output")
     on.add_argument("--auto", action="store_true", default=True, help="Non-interactive safe path (default)")
     on.add_argument("--force", action="store_true", help="Re-run steps marked done")
-    on.add_argument("--dry-run", action="store_true", help="Plan only; no clone/pip/symlink/download")
+    on.add_argument("--dry-run", action="store_true", help="Preview only; no steps, probes or writes")
+    on.add_argument("--step", action="append", dest="onboard_steps", metavar="NAME",
+                    help="Select a step; repeat for multiple steps (canonical order)")
+    on.add_argument("--resume", action="store_true", help="Retry the saved plan with its original options")
     on.add_argument("--sync-models", action="store_true", help="Download resident HF weights")
     on.add_argument("--skip-evolution-lab", action="store_true")
 
@@ -940,6 +950,8 @@ def main(argv: list[str] | None = None) -> int:
             sync_models=bool(getattr(args, "sync_models", False)),
             skip_evolution_lab=bool(getattr(args, "skip_evolution_lab", False)),
             as_json=as_json,
+            only=getattr(args, "onboard_steps", None),
+            resume=bool(getattr(args, "resume", False)),
         )
     if args.cmd == "models":
         if args.models_cmd == "plan":
