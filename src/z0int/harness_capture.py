@@ -66,7 +66,7 @@ def home() -> Path:
 
 
 def _base(root: str | Path | None) -> Path:
-    return Path(root) if root else home()
+    return root if isinstance(root, Path) else Path(root) if root else home()
 
 
 def state_dir(harness: str, root: str | Path | None = None) -> Path:
@@ -225,17 +225,20 @@ def _update_session(harness: str, session: Any, root: str | Path | None,
                     step: Callable[[dict[str, Any]], dict[str, Any]]) -> dict[str, Any]:
     path = _session_path(harness, session, root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, 'a+', encoding='utf-8') as fh:
+    fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+    with os.fdopen(fd, 'r+', encoding='utf-8') as fh:
         fcntl.flock(fh, fcntl.LOCK_EX)
-        fh.seek(0)
         try:
             state = json.loads(fh.read() or '{}')
         except ValueError:
             state = {}
+        previous_size = fh.tell()
         state = step(state if isinstance(state, dict) else {})
+        encoded = json.dumps(state, separators=(',', ':'))
         fh.seek(0)
-        fh.truncate()
-        fh.write(json.dumps(state))
+        fh.write(encoded)
+        if len(encoded) < previous_size:
+            fh.truncate()
     return state
 
 
@@ -270,6 +273,7 @@ def begin_turn(harness: str, payload: Mapping[str, Any], *, env: Mapping[str, st
     shim's own capture-time cohort when it knows more than the prompt text (Hermes: ``automated`` sources,
     injected system turns as ``harness``); when given, it wins over the subagent rule.
     """
+    root = _base(root)
     if not supported(harness, root):
         return None
     session, tid = session_id_of(payload, env), turn_id(payload)
