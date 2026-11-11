@@ -388,7 +388,7 @@ def _scope_of(raw: Any) -> MemoryScope | None:
     return MemoryScope(**{k: raw.get(k) for k in ('user', 'project', 'repo', 'task')})
 
 
-_TEMPORAL_INDEX_CACHE: dict[tuple[int, int, int], tuple[list[MemoryEvent], list[str], dict[int, dict[str, Any]]]] = {}
+_TEMPORAL_INDEX_CACHE: dict[tuple[str, int, int, int, int], tuple[list[MemoryEvent], list[str], dict[int, dict[str, Any]]]] = {}
 _TEMPORAL_INDEX_LOCK = threading.Lock()
 _TEMPORAL_INDEX_CACHE_MAX = 64
 
@@ -404,7 +404,7 @@ def _temporal_index(log: EventLog) -> tuple[list[MemoryEvent], list[str], dict[i
     except OSError:
         key = None
     else:
-        key = (st.st_ino, st.st_mtime_ns, st.st_size)
+        key = (str(log.events_path), st.st_dev, st.st_ino, st.st_mtime_ns, st.st_size)
     if key is not None:
         with _TEMPORAL_INDEX_LOCK:
             cached = _TEMPORAL_INDEX_CACHE.get(key)
