@@ -161,6 +161,9 @@ def test_14_deployed_hash_must_match(fake):
     C._cache.clear()
     assert one("deployed to https://host:18799/acp.js", "deployed")["ok"] is False
     assert one("deployed", "deployed")["ok"] is None
+    answers["curl"] = (28, b"", "timed out")
+    C._cache.clear()
+    assert C.infra(one("deployed to https://host:18799/acp.js", "deployed"))  # a timeout flags, it does not block
 
 
 def show(**kv):

@@ -208,8 +208,10 @@ def _check_ci(repo: str, sha: str, home: str | None) -> tuple[bool | None, str]:
 
 def _check_deployed(url: str, want: str) -> tuple[bool | None, str]:
     rc, body, err = RUN(["curl", "-fsSk", "--max-time", "10", url])
+    if rc in (None, 28):  # a timeout says nothing about the claim
+        return None, f"infra: {url} timed out"
     if rc != 0:
-        return False, f"{url} did not return 200 ({'timeout' if rc is None else 'curl rc=' + str(rc)})"
+        return False, f"{url} did not return 200 (curl rc={rc})"
     got = hashlib.sha256(body).hexdigest()
     if want and not got.startswith(want.lower()):
         return False, f"served sha256 is {got[:12]}, not {want[:12]}"
