@@ -23,8 +23,11 @@ Standing rules (bend/owner_standing; Kevin's explicit rules, not canon; twin ker
                                 owner-written; agent writes to it are blocked)
 
 Modes per rule in $HERMES_HOME/owner-canon-gate.json {"mode": {"<law>": "enforce"|"flag"|"off"}}; default
-enforce, except done_needs_receipt = flag (text heuristic). Receipts: $HERMES_HOME/owner-canon-gate/receipts.jsonl
-(law, tool, decision; no args). Fail-closed per call for enforce rules: a classifier error blocks the call.
+enforce, except done_needs_receipt and reuse_before_create = flag. Reuse (canon 5) reads
+$HERMES_HOME/EXISTS.jsonl (id, name, where, seen_epoch); absent/invalid rows and rows older than 6h fail open.
+Its action-slot log is $HERMES_HOME/owner-canon-gate/exists-injections.jsonl.
+Receipts: $HERMES_HOME/owner-canon-gate/receipts.jsonl (law, tool, decision; no args).
+Other enforce rules fail closed per call: a classifier error blocks the call.
 """
 from __future__ import annotations
 
@@ -47,7 +50,8 @@ assert _spec2 and _spec2.loader
 KS = importlib.util.module_from_spec(_spec2)
 _spec2.loader.exec_module(KS)
 
-DEFAULT_MODE = {law: "enforce" for law in (*K.RULES, *KS.RULES)} | {"done_needs_receipt": "flag"}
+DEFAULT_MODE = {law: "enforce" for law in (*K.RULES, *KS.RULES)} | {
+    "done_needs_receipt": "flag", "reuse_before_create": "flag"}
 _SHELL_TOOLS = {"terminal", "execute_code", "process", "mcp__terminal", "mcp__execute_code"}
 _GUI = re.compile(r"(?i)\b(xdotool|ydotool|wmctrl|wtype|xte|hyprctl\s+dispatch|swaymsg\s+focus|osascript|cliclick|"
                   r"adb\b[^|;&]*\bshell\s+input\b|adb\b[^|;&]*\bam\s+start\b|pyautogui|pynput)\b")
@@ -95,11 +99,11 @@ def _mode(law: str) -> str:
     return (_json(_home() / "owner-canon-gate.json").get("mode") or {}).get(law, DEFAULT_MODE[law])
 
 
-def _receipt(rec: dict) -> None:
+def _receipt(rec: dict, filename: str = "receipts.jsonl") -> None:
     try:
         d = _home() / "owner-canon-gate"
         d.mkdir(parents=True, exist_ok=True)
-        with open(d / "receipts.jsonl", "a") as f:
+        with open(d / filename, "a") as f:
             f.write(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), **rec}) + "\n")
     except Exception:
         pass
@@ -194,10 +198,111 @@ def delete_facts(text: str, env: dict | None = None) -> tuple[bool, bool, bool]:
     return trigger, cleared if trigger else False, flag_only
 
 
+def _reuse_name(value: str) -> str:
+    name = value.rstrip("/").rsplit("/", 1)[-1]
+    name = re.split(r"[<>=!~\[]|@", name, maxsplit=1)[0]
+    name = re.sub(r"\.(git|service|timer)$", "", name, flags=re.I)
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _reuse_targets(tool: str, args: dict) -> set[str]:
+    if tool in ("write_file", "patch", "mcp__write_file", "mcp__patch"):
+        path = Path(str(args.get("path") or ""))
+        if path.name == "SKILL.md":
+            return {_reuse_name(path.parent.name)}
+        return {_reuse_name(path.name)} if path.suffix in (".service", ".timer") else set()
+    if tool not in _SHELL_TOOLS:
+        return set()
+    targets = set()
+    # shlex keeps quoted prose intact; only the command position can trigger.
+    for line in _text(tool, args).splitlines():
+        try:
+            lexer = shlex.shlex(line, posix=True, punctuation_chars=";&|()")
+            lexer.whitespace_split = True
+            words, commands = [], []
+            for word in lexer:
+                if word and all(c in ";&|()" for c in word):
+                    commands.append(words)
+                    words = []
+                else:
+                    words.append(word)
+            commands.append(words)
+        except ValueError:
+            continue
+        for words in commands:
+            while words and (words[0] in ("sudo", "env") or re.match(r"^\w+=", words[0])):
+                words = words[1:]
+            if not words:
+                continue
+            exe = Path(words[0]).name
+            tail, first = [], False
+            if exe == "git" and words[1:2] == ["clone"]:
+                tail, first = words[2:], True
+            elif exe == "gh" and words[1:3] == ["repo", "create"]:
+                tail, first = words[3:], True
+            elif re.fullmatch(r"python[\d.]*", exe) and words[1:3] == ["-m", "venv"]:
+                tail = words[3:]
+            elif exe in ("pip", "pip3", "uv", "npm", "cargo", "pacman", "yay"):
+                rest = words[1:]
+                if exe == "uv" and rest[:1] in (["pip"], ["tool"]):
+                    rest = rest[1:]
+                if rest and (rest[0] == "install" or
+                             exe in ("pacman", "yay") and re.fullmatch(r"-S\w*|--sync", rest[0])):
+                    tail = rest[1:]
+            elif exe == "systemctl" and "--user" in words:
+                rest = [w for w in words[1:] if w not in ("--user", "--now")]
+                if rest[:1] in (["enable"], ["link"]):
+                    tail = rest[1:]
+            elif exe == "mkdir":
+                tail = [w for w in words[1:] if "skills" in Path(w).parts[:-1] or
+                        Path(os.path.expanduser(w)).is_relative_to(Path.home() / "bin")]
+            values = []
+            it = iter(tail)
+            for word in it:
+                if word in ("--depth", "--branch", "-b", "--origin", "-o", "--config", "-c",
+                            "--version", "--root", "--target", "-t", "--index-url", "-i",
+                            "--extra-index-url", "--registry", "--prompt", "-r", "--requirement"):
+                    next(it, None)
+                elif not word.startswith("-"):
+                    values.append(word)
+            targets.update(_reuse_name(w) for w in (values[:1] if first else values))
+    return targets
+
+
+def reuse_facts(tool: str, args: dict) -> tuple[bool, bool, str]:
+    """Fresh exact-name inventory matches only; unavailable inventory fails open."""
+    targets = _reuse_targets(tool, args)
+    if not targets:
+        return False, False, ""
+    try:
+        lines = (_home() / "EXISTS.jsonl").read_text().splitlines()
+    except (OSError, UnicodeError):
+        return False, False, ""
+    text, rows = _text(tool, args), []
+    now = time.time()
+    for line in lines:
+        try:
+            row = json.loads(line)
+            if not all(isinstance(row[k], str) and row[k] for k in ("id", "name", "where")):
+                continue
+            if not 0 <= now - float(row["seen_epoch"]) <= 6 * 3600:
+                continue
+            if _reuse_name(row["name"]) not in targets or row["where"] in text:
+                continue
+            ack = re.search(r"\bexists-ack=" + re.escape(row["id"]) + r"[ \t]+([^\n;&|]+)", text)
+            if ack and re.sub(r"^(?:reason|why)\s*[=:]\s*", "", ack[1]).strip(" \t\"'}"):
+                continue
+            rows.append(row)
+        except (ValueError, KeyError, TypeError):
+            continue
+    why = "; ".join(f"{r['id']} at {r['where']} seen_epoch={r['seen_epoch']}" for r in rows[:3])
+    return bool(rows), False, why + ("; reuse that location or add exists-ack=<id> plus a reason" if rows else "")
+
+
 def facts(tool: str, args: dict) -> dict:
     """Host facts for one tool call: {law: (trigger, cleared, why)}."""
     t = _text(tool, args)
-    f = {}
+    f = {"reuse_before_create": reuse_facts(tool, args)}
     gui = tool in _SHELL_TOOLS and bool(_GUI.search(t))
     f["gui_never_steals_focus"] = (gui, gui and bool(_GUI_ISOLATED.search(t)), "GUI input on the owner's display")
     if tool in ("message_agent", "mcp__message_agent", "send_message"):
@@ -228,7 +333,8 @@ def decide(tool: str, args: dict) -> tuple[bool, list[tuple[str, str]]]:
     f = facts(tool, args)
     full = {law: f.get(law, (False, False, ""))[:2] for law in (*K.RULES, *KS.RULES)}
     canon = [b for law in ("gui_never_steals_focus", "done_needs_receipt", "quota_backs_off") for b in full[law]]
-    standing = [b for law in ("gpt_only_via_fx_pi", "delete_needs_creator_receipt", "public_needs_owner_ok") for b in full[law]]
+    standing = [b for law in ("gpt_only_via_fx_pi", "delete_needs_creator_receipt", "public_needs_owner_ok",
+                              "reuse_before_create") for b in full[law]]
     if K.admits(*canon) and KS.admits(*standing):
         return False, []
     rules = {**K.RULES, **KS.RULES}
@@ -254,6 +360,10 @@ def on_pre_tool_call(tool_name: str = "", args: dict | None = None, **kw):
         _receipt({"laws": [v[0] for v in viol], "tool": tool_name, "decision": "block" if block else "flag",
                   "session_id": kw.get("session_id")})
         text = "; ".join(f"{law} ({why})" for law, why in viol)
+        for law, why in viol:
+            if law == "reuse_before_create":
+                _receipt({"slot": "action", "law": law, "tool": tool_name, "message": why,
+                          "decision": _mode(law), "session_id": kw.get("session_id")}, "exists-injections.jsonl")
         if block:
             return {"action": "block", "message": f"owner-canon gate blocked this call: {text}. "
                     "See bend/owner_canon/LAWS.bend and bend/owner_standing/LAWS.bend. Fix the call (a virtual "
