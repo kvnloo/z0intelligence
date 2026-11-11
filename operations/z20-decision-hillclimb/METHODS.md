@@ -1,0 +1,13 @@
+# Why the published methods look easier
+
+Bradley-Terry estimates rankings. It does not train a better decision model. Chatbot Arena turns pairwise preferences into BT coefficients and reports uncertainty with bootstrap and sandwich estimates. Z20 instead derives pairwise wins from correctness on the same items, with half a win for ties. These are different observations, so the ratings are not comparable to Arena's leaderboard. Sources: [Chatbot Arena, sections 4 and 7.1](https://arxiv.org/html/2403.04132v1), `src/audit_round.py:92-137`.
+
+RouteLLM learns when to use a stronger model from preference data. Its similarity-weighted method fits a BT model with training comparisons weighted for the incoming prompt. The useful lesson for Z20 is to test a cheap router against the single-model controls before adding an SLM training loop. A ranking method cannot repair leaked inputs. Sources: [RouteLLM, section 3.2](https://arxiv.org/html/2406.18665v1), `src/audit_round.py:41-52`, `src/audit_round.py:189-225`.
+
+Distillation compresses a teacher or ensemble into a smaller model. That gives a training target, not an independent correctness test. Z20 explicitly separates Jev targets from maintainer-label gold. The present hard-target TF-IDF student is a baseline, not the promised SLM or soft-target distillation arm. Sources: [Hinton, Vinyals, and Dean, abstract](https://arxiv.org/abs/1503.02531), `/mnt/zer0models/workspace/zer0/data/operations/z20-decision-hillclimb/PREREG.md:10-15,68-72`, `src/audit_round.py:203-221`.
+
+Z20's current obstacle is data validity, not a missing optimizer. All 86 legacy D-A inputs expose candidate outcomes. Both legacy option-order checks change instructions without changing order. The corrected D-A exporter removes outcome fields, preserves task identities, and produces a real permutation without changing instructions. It does not relabel or score the repaired inputs. Sources: execution-folder `fleet-verify.log`, `src/build_da_items.py:14-82`, `src/test_audit_round.py:23-48,111-133`.
+
+The preregistered keep rule requires a paired validation gain whose confidence interval excludes zero, above the A/A noise floor in both time halves. Neither a higher point estimate nor a leaderboard CI against zero proves that condition. No candidate is promoted in this round. Sources: `/mnt/zer0models/workspace/zer0/data/operations/z20-decision-hillclimb/PREREG.md:63-67`, `src/audit_round.py:247-251`.
+
+All three paper URLs returned HTTP 200 on 2026-11-11. Exact URLs, status codes, and hashes of the saved paper snapshots are in execution-folder `source-http-current.log`. The snapshots are `sources/public/{arena,routellm,distillation}.txt`; they are outside git. No private chat source was used.
