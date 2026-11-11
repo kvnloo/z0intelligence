@@ -1,0 +1,3 @@
+#!/bin/sh
+# circadian CLI wrapper (installed to ~/.local/bin/circadian). Stdlib Python only.
+exec env PYTHONPATH="$HOME/.local/lib/circadian/current/src" python3 -m z0int.circadian "$@"
