@@ -383,7 +383,10 @@ def reset_after(error, now):
 
 def pod_log(since_s):
     cmd = ["kubectl", "-n", NS, "logs", "deploy/semantic-router", f"--since={int(since_s)}s"]
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=60).stdout.splitlines()
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    if r.returncode:  # no running router pod: fail the unit so service-watch sees it, never "pace" silently
+        sys.exit(f"ROUTER DOWN: {r.stderr.strip()[:200]}")
+    return r.stdout.splitlines()
 
 
 def ingest(st, lines, now):
