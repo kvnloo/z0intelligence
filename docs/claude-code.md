@@ -20,6 +20,7 @@ seam, Tokenomics usage receipts, and levers promoted only on paired, verified ev
 
 ```bash
 pip install -e '.[test]'                                   # this repo, Python 3.10–3.13
+/plugin marketplace add kvnloo/z0intelligence                # inside Claude Code: both plugins (.claude-plugin/marketplace.json)
 claude --plugin-dir harness-adapters/claude-code-z0intelligence   # per session
 z0int claude-code launch --profile lean -- -p "…"          # attaches the plugin itself
 ```
