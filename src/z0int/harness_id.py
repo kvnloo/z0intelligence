@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import os
-from dataclasses import asdict, dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, NamedTuple
 
 
-@dataclass(frozen=True)
-class HarnessIdentity:
+class HarnessIdentity(NamedTuple):  # not a dataclass: importing dataclasses costs ~10 ms per hook call
     harness_id: str
     session_id: str | None = None
     process_id: int | None = None
@@ -19,7 +17,7 @@ class HarnessIdentity:
     build_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {k: v for k, v in asdict(self).items() if v is not None}
+        return {k: v for k, v in self._asdict().items() if v is not None}
 
 
 def detect_harness_id(explicit: str | None = None) -> str:
