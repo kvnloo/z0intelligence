@@ -2,7 +2,6 @@
 
 This adapter never selects a provider. No conversation history or files are read.
 """
-import argparse
 import hashlib
 import json
 import os
@@ -130,6 +129,7 @@ def handle_event(event):
 
 
 def main():
+    import argparse  # CLI only: keeps the per-prompt hook import ~7 ms lighter
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('operation',choices=['event','consume','health'])
     args=parser.parse_args()
