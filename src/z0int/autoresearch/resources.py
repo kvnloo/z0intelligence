@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import stat
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -68,14 +69,20 @@ def interactive_recent(grace: float | None = None) -> bool:
     from z0int import paths
 
     g = grace if grace is not None else DEFAULTS.interactive_grace_seconds
-    marker = paths.home() / "runtime" / "interactive.touch"
-    if not marker.is_file():
-        heart = paths.home() / "stream" / "bridge_heart.jsonl"
-        if heart.is_file():
-            age = time.time() - heart.stat().st_mtime
-            return age < g
-        return False
-    return (time.time() - marker.stat().st_mtime) < g
+    home = paths.home()
+    for marker in (
+        home / "runtime" / "interactive.touch",
+        home / "stream" / "bridge_heart.jsonl",
+    ):
+        try:
+            snapshot = marker.stat()
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        if stat.S_ISREG(snapshot.st_mode):
+            # One observation: a marker may be removed/replaced between probes.
+            # An existing stale touch still takes precedence over the heartbeat.
+            return (time.time() - snapshot.st_mtime) < g
+    return False
 
 
 def should_pause(limits: ResourceLimits | None = None) -> dict[str, Any]:
