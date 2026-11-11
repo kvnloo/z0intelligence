@@ -18,12 +18,17 @@ def public_ok(public, owner_ok):
     return guard(public, owner_ok)
 
 
-def admits(g, gv, x, xc, p, po):
-    return gpt_ok(g, gv) and delete_ok(x, xc) and public_ok(p, po)
+def reuse_ok(creates, acknowledged):
+    return guard(creates, acknowledged)
+
+
+def admits(g, gv, x, xc, p, po, r=False, ra=False):
+    return gpt_ok(g, gv) and delete_ok(x, xc) and public_ok(p, po) and reuse_ok(r, ra)
 
 
 RULES = {  # law name -> (standing rule, twin predicate)
     "gpt_only_via_fx_pi": ("S1", gpt_ok),
     "delete_needs_creator_receipt": ("S2", delete_ok),
     "public_needs_owner_ok": ("S3", public_ok),
+    "reuse_before_create": (5, reuse_ok),  # Host inventory law, not yet a Bend twin.
 }

@@ -1,7 +1,9 @@
 """owner-canon-gate: twin parity with the Bend laws, and one case per law (block + allow)."""
 import importlib.util
 import itertools
+import json
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -157,3 +159,161 @@ def test_approvals_guard_judges_the_target_path_not_the_text():
     name = "owner-canon-" + "approvals.json"
     assert not blocked("patch", path="/x/tests/test_gate.py", old_string="a " + name, new_string="b " + name)
     assert blocked("patch", path="/x/" + name, old_string="{}", new_string='{"public": ["x"]}')
+
+
+@pytest.fixture
+def reuse_inventory(home):
+    row = {"id": "repo:demo", "name": "Demo_Tool", "where": "/existing/demo-tool",
+           "seen_epoch": time.time()}
+    (home / "EXISTS.jsonl").write_text(json.dumps(row) + "\n")
+    return row
+
+
+def test_reuse_clone_flag_and_enforce(home, reuse_inventory, caplog):
+    command = "git clone https://example.com/owner/demo-tool.git"
+    assert G.on_pre_tool_call("terminal", {"command": command}) is None
+    assert "reuse_before_create" in caplog.text
+    row = reuse_inventory
+    assert row["id"] in caplog.text and row["where"] in caplog.text
+    log = home / "owner-canon-gate" / "exists-injections.jsonl"
+    assert json.loads(log.read_text().splitlines()[-1])["slot"] == "action"
+    (home / "owner-canon-gate.json").write_text('{"mode": {"reuse_before_create": "enforce"}}')
+    result = G.on_pre_tool_call("terminal", {"command": command})
+    assert result["action"] == "block"
+    assert str(row["seen_epoch"]) in result["message"]
+    assert not blocked("terminal", command=command + " # exists-ack=repo:demo reason=isolated compatibility test")
+    assert not blocked("terminal", command=command + " # reuse /existing/demo-tool")
+    assert blocked("terminal", command=command + " # exists-ack=repo:demo")
+    assert blocked("terminal", command=command + " # exists-ack=repo:demo-other reason=test")
+
+
+@pytest.mark.parametrize("command", [
+    "git clone --depth 1 https://example.com/owner/demo-tool.git local-copy",
+    "pip install demo-tool==1.2", "uv pip install demo-tool", "uv tool install demo-tool",
+    "npm install demo-tool@1.2", "cargo install demo-tool", "pacman -S demo-tool", "yay -S demo-tool",
+    "python -m venv /venvs/demo-tool", "gh repo create owner/demo-tool --private",
+    "systemctl --user enable demo-tool.service", "systemctl --user link /units/demo-tool.timer",
+    "mkdir -p ~/.agents/skills/demo-tool", "mkdir ~/bin/demo-tool",
+])
+def test_reuse_shell_targets(command, reuse_inventory):
+    assert "reuse_before_create" in dict(G.decide("terminal", {"command": command})[1])
+
+
+@pytest.mark.parametrize("tool,path", [
+    ("write_file", "/skills/demo-tool/SKILL.md"), ("patch", "/skills/demo-tool/SKILL.md"),
+    ("write_file", "/units/demo-tool.service"), ("patch", "/units/demo-tool.timer"),
+])
+def test_reuse_file_targets(tool, path, reuse_inventory):
+    assert "reuse_before_create" in dict(G.decide(tool, {"path": path})[1])
+
+
+@pytest.mark.parametrize("command", [
+    "pip install unrelated", "pip install demo-tool-extra", "mkdir /tmp/demo-tool",
+    "echo 'git clone https://example.com/demo-tool.git'", "git status",
+])
+def test_reuse_unrelated(command, reuse_inventory):
+    assert G.decide("terminal", {"command": command}) == (False, [])
+
+
+def test_reuse_stale_missing_and_invalid_fail_open(home, reuse_inventory):
+    (home / "owner-canon-gate.json").write_text('{"mode": {"reuse_before_create": "enforce"}}')
+    inventory = home / "EXISTS.jsonl"
+    row = reuse_inventory | {"seen_epoch": time.time() - 21601}
+    inventory.write_text(json.dumps(row) + "\n")
+    command = "git clone https://example.com/demo-tool.git"
+    assert G.on_pre_tool_call("terminal", {"command": command}) is None
+    inventory.unlink()
+    assert G.on_pre_tool_call("terminal", {"command": command}) is None
+    inventory.write_text('not json\n' + json.dumps(row | {"seen_epoch": "invalid"}) + '\n')
+    assert G.on_pre_tool_call("terminal", {"command": command}) is None
+
+
+@pytest.fixture
+def done_inventory(home, monkeypatch):
+    import subprocess
+
+    repo = home / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "current", str(repo)], check=True)
+    (repo / "tracked.py").write_text("before\n")
+    subprocess.run(["git", "-C", str(repo), "add", "tracked.py"], check=True)
+    monkeypatch.chdir(repo)
+    row = {"id": "plan:demo", "kind": "plan", "scope": str(repo), "repo": str(repo),
+           "branch": "other", "paths": ["tracked.py"], "seen_epoch": time.time()}
+    (home / "DONE.jsonl").write_text(json.dumps(row) + "\n")
+    return row
+
+
+@pytest.mark.parametrize("tool,args,slot", [
+    ("write_file", {"path": "PLAN.md"}, "plan"),
+    ("patch", {"path": "docs/ROADMAP-next"}, "plan"),
+    ("write_file", {"path": "docs/replan-notes.md"}, "plan"),
+    ("kanban", {"action": "create", "title": "demo"}, "plan"),
+    ("patch", {"path": "tracked.py"}, "edit"),
+    ("write_file", {"path": "tracked.py"}, "edit"),
+])
+def test_done_flags_only(home, done_inventory, caplog, tool, args, slot):
+    (home / "owner-canon-gate.json").write_text('{"mode": {"reuse_before_create": "enforce"}}')
+    assert G.on_pre_tool_call(tool, args, session_id="done-test") is None
+    assert "reuse_before_create" in caplog.text and done_inventory["id"] in caplog.text
+    log = home / "owner-canon-gate" / "done-injections.jsonl"
+    rec = json.loads(log.read_text().splitlines()[-1])
+    assert (rec["slot"], rec["decision"], rec["session_id"]) == (slot, "flag", "done-test")
+    assert not (home / "owner-canon-gate" / "exists-injections.jsonl").exists()
+
+
+def test_done_task_row_explicit_scope_outside_git(home, done_inventory, monkeypatch, caplog):
+    monkeypatch.chdir(home)
+    row = done_inventory | {"kind": "task", "scope": "demo"}
+    (home / "DONE.jsonl").write_text(json.dumps(row) + "\n")
+    (home / "PLAN.md").touch()
+    assert G.on_pre_tool_call("patch", {"path": "PLAN.md", "scope": "demo"}) is None
+    assert row["id"] in caplog.text
+
+
+@pytest.mark.parametrize("change,path", [
+    ({}, "unrelated.md"),
+    ({"scope": "elsewhere"}, "PLAN.md"),
+    ({"kind": "fix"}, "PLAN.md"),
+    ({"repo": "elsewhere"}, "tracked.py"),
+    ({"branch": "current"}, "tracked.py"),
+    ({"paths": ["other.py"]}, "tracked.py"),
+    ({"seen_epoch": time.time() - 15 * 86400}, "tracked.py"),
+    ({"paths": ["untracked.py"]}, "untracked.py"),
+])
+def test_done_nonmatches(home, done_inventory, caplog, change, path):
+    Path("untracked.py").touch()
+    (home / "DONE.jsonl").write_text(json.dumps(done_inventory | change) + "\n")
+    assert G.on_pre_tool_call("write_file", {"path": path}) is None
+    assert "reuse_before_create" not in caplog.text
+    assert not (home / "owner-canon-gate" / "done-injections.jsonl").exists()
+
+
+@pytest.mark.parametrize("state", ["missing", "stale", "invalid", "off"])
+def test_done_fail_open(home, done_inventory, caplog, state):
+    import os
+
+    inventory = home / "DONE.jsonl"
+    if state == "missing":
+        inventory.unlink()
+    elif state == "stale":
+        os.utime(inventory, (time.time() - 21601,) * 2)
+    elif state == "invalid":
+        inventory.write_text('not json\nnull\n{}\n')
+    else:
+        (home / "owner-canon-gate.json").write_text('{"mode": {"reuse_before_create": "off"}}')
+    assert G.on_pre_tool_call("write_file", {"path": "PLAN.md"}) is None
+    assert "reuse_before_create" not in caplog.text
+    assert not (home / "owner-canon-gate" / "done-injections.jsonl").exists()
+
+
+def test_reuse_message_limit_and_off(home, reuse_inventory):
+    rows = [reuse_inventory | {"id": f"repo:{i}", "where": f"/existing/{i}"} for i in range(4)]
+    (home / "EXISTS.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows))
+    (home / "owner-canon-gate.json").write_text('{"mode": {"reuse_before_create": "enforce"}}')
+    result = G.on_pre_tool_call("terminal", {"command": "pip install demo-tool"})
+    assert result["action"] == "block"
+    assert all(row["id"] in result["message"] for row in rows[:3])
+    assert rows[3]["id"] not in result["message"]
+    (home / "owner-canon-gate.json").write_text('{"mode": {"reuse_before_create": "off"}}')
+    assert G.on_pre_tool_call("terminal", {"command": "pip install demo-tool"}) is None
