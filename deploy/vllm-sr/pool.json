@@ -1,0 +1,353 @@
+{
+ "probed_at": "2026-11-08T04:40:16Z",
+ "rows": [
+  {
+   "name": "nim-deepseek-v4.1-flash",
+   "tool_status": "error",
+   "tool_call": false,
+   "tool_s": 90.16,
+   "error": "The read operation timed out"
+  },
+  {
+   "name": "nim-glm-5.3-flash",
+   "tool_status": "error",
+   "tool_call": false,
+   "tool_s": 90.16,
+   "error": "The read operation timed out"
+  },
+  {
+   "name": "nim-step-5-preview",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 2.5,
+   "max_ok_tokens": 6000,
+   "ctx_6000_s": 1.55,
+   "ctx_30000": 429
+  },
+  {
+   "name": "kilo-nemotron-3-ultra",
+   "tool_status": 429,
+   "tool_call": false,
+   "tool_s": 0.25,
+   "error": "{\"error\":{\"code\":\"PROMOTION_MODEL_LIMIT_REACHED\",\"message\":\"Sign up for free to continue and explore 500 other models. Takes 2 minutes, no credit card required. Or come back later.\"},\"error_type\":\"rat"
+  },
+  {
+   "name": "or-nemotron-3-ultra",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 1.62,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 1.04,
+   "ctx_30000_s": 2.71,
+   "ctx_100000_s": 5.69
+  },
+  {
+   "name": "nim-nemotron-3-ultra",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 0.79,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 1.77,
+   "ctx_30000_s": 3.31,
+   "ctx_100000_s": 5.24
+  },
+  {
+   "name": "ovh-qwen3.5-397b",
+   "tool_status": 403,
+   "tool_call": false,
+   "tool_s": 1.18,
+   "error": "{\"message\":\"Forbidden: authentication failed.  Please generate a new one at https://kepler.ai.cloud.ovh.net/v1/oauth/ovh/authorize?iam_action=publicCloudProject:ai:endpoints/call\"}"
+  },
+  {
+   "name": "kilo-nemotron-3.5-super-vl",
+   "tool_status": 429,
+   "tool_call": false,
+   "tool_s": 0.21,
+   "error": "{\"error\":{\"code\":\"PROMOTION_MODEL_LIMIT_REACHED\",\"message\":\"Sign up for free to continue and explore 500 other models. Takes 2 minutes, no credit card required. Or come back later.\"},\"error_type\":\"rat"
+  },
+  {
+   "name": "or-nemotron-3.5-super-vl",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 0.68,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 1.65,
+   "ctx_30000_s": 2.74,
+   "ctx_100000_s": 7.7
+  },
+  {
+   "name": "kilo-dots-3-note",
+   "tool_status": 429,
+   "tool_call": false,
+   "tool_s": 0.22,
+   "error": "{\"error\":{\"code\":\"PROMOTION_MODEL_LIMIT_REACHED\",\"message\":\"Sign up for free to continue and explore 500 other models. Takes 2 minutes, no credit card required. Or come back later.\"},\"error_type\":\"rat"
+  },
+  {
+   "name": "or-dots-3-note",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 1.34,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 1.71,
+   "ctx_30000_s": 2.43,
+   "ctx_100000_s": 3.75
+  },
+  {
+   "name": "or-flint-v1",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 1.37,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 0.55,
+   "ctx_30000_s": 1.18,
+   "ctx_100000_s": 4.52
+  },
+  {
+   "name": "samba-gpt-oss-120b",
+   "tool_status": 402,
+   "tool_call": false,
+   "tool_s": 0.3,
+   "error": "{\"error\":{\"balance_units\":0,\"billing_portal_url\":\"https://cloud2.sambanova.ai/plans/billing\",\"code\":\"PAYMENT_METHOD_REQUIRED\",\"message\":\"A payment method is required. Add one at https://cloud2.sambano"
+  },
+  {
+   "name": "ovh-gpt-oss-120b",
+   "tool_status": 403,
+   "tool_call": false,
+   "tool_s": 0.36,
+   "error": "{\"message\":\"Forbidden: authentication failed.  Please generate a new one at https://kepler.ai.cloud.ovh.net/v1/oauth/ovh/authorize?iam_action=publicCloudProject:ai:endpoints/call\"}"
+  },
+  {
+   "name": "groq-gpt-oss-120b",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 0.3,
+   "max_ok_tokens": 6000,
+   "ctx_6000_s": 0.57,
+   "ctx_30000": 413
+  },
+  {
+   "name": "nim-nemotron-3.5-lightning",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 3.07,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 0.61,
+   "ctx_30000_s": 1.79,
+   "ctx_100000_s": 4.59
+  },
+  {
+   "name": "kilo-nemotron-3.5-lightning",
+   "tool_status": 429,
+   "tool_call": false,
+   "tool_s": 0.19,
+   "error": "{\"error\":{\"code\":\"PROMOTION_MODEL_LIMIT_REACHED\",\"message\":\"Sign up for free to continue and explore 500 other models. Takes 2 minutes, no credit card required. Or come back later.\"},\"error_type\":\"rat"
+  },
+  {
+   "name": "or-nemotron-3.5-lightning",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 1.28,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 1.4,
+   "ctx_30000_s": 0.72,
+   "ctx_100000_s": 4.07
+  },
+  {
+   "name": "kilo-north-mini-code",
+   "tool_status": 429,
+   "tool_call": false,
+   "tool_s": 0.21,
+   "error": "{\"error\":{\"code\":\"PROMOTION_MODEL_LIMIT_REACHED\",\"message\":\"Sign up for free to continue and explore 500 other models. Takes 2 minutes, no credit card required. Or come back later.\"},\"error_type\":\"rat"
+  },
+  {
+   "name": "or-xing4.0-29b",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 1.89,
+   "max_ok_tokens": 6000,
+   "ctx_6000_s": 2.17,
+   "ctx_30000": 429
+  },
+  {
+   "name": "groq-qwen3.8-27b",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 0.29,
+   "max_ok_tokens": 6000,
+   "ctx_6000_s": 1.79,
+   "ctx_30000": 413
+  },
+  {
+   "name": "or-nemotron-nano-omni",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 1.81,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 0.94,
+   "ctx_30000_s": 1.53,
+   "ctx_100000_s": 3.48
+  },
+  {
+   "name": "groq-gpt-oss-20b",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 0.39,
+   "max_ok_tokens": 6000,
+   "ctx_6000_s": 0.68,
+   "ctx_30000": 413
+  },
+  {
+   "name": "sf-qwen3-8b",
+   "tool_status": 402,
+   "tool_call": false,
+   "tool_s": 0.19,
+   "error": "{\"code\":30001,\"message\":\"Sorry, your account balance is insufficient\",\"data\":null}"
+  },
+  {
+   "name": "nim-kimi-k2.6",
+   "tool_status": 404,
+   "tool_call": false,
+   "tool_s": 0.12,
+   "error": "{\"status\":404,\"title\":\"Not Found\",\"detail\":\"Function '23d4f03a-b8a6-4adb-a183-7daa083a09cc': Not found for account '4XS7EgaHYfzNxlOWyQQCxjCyGL5v2fnXxGRnZ8Oc7sk'\"}"
+  },
+  {
+   "name": "nim-minimax-m3.1-flash",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 2.15,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 1.62,
+   "ctx_30000_s": 2.82,
+   "ctx_100000_s": 3.75
+  },
+  {
+   "name": "nim-mistral-large-4",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 1.02,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 5.52,
+   "ctx_30000_s": 8.36,
+   "ctx_100000_s": 19.23
+  },
+  {
+   "name": "nim-nemotron-3-super",
+   "tool_status": 404,
+   "tool_call": false,
+   "tool_s": 0.15,
+   "error": "{\"status\":404,\"title\":\"Not Found\",\"detail\":\"Function 'ac74040f-9fc9-4c5e-ac74-279ba5161d69': Not found for account '4XS7EgaHYfzNxlOWyQQCxjCyGL5v2fnXxGRnZ8Oc7sk'\"}"
+  },
+  {
+   "name": "nim-gemma-4-31b",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 54.89,
+   "max_ok_tokens": 6000,
+   "ctx_6000_s": 49.64,
+   "ctx_30000": "The read operation timed out"
+  },
+  {
+   "name": "nim-gpt-oss-20b",
+   "tool_status": "error",
+   "tool_call": false,
+   "tool_s": 90.15,
+   "error": "The read operation timed out"
+  },
+  {
+   "name": "nim-laguna-xs-2.1",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 1.01,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 0.34,
+   "ctx_30000_s": 1.01,
+   "ctx_100000_s": 4.56
+  },
+  {
+   "name": "or-gemma-4-31b",
+   "tool_status": 429,
+   "tool_call": false,
+   "tool_s": 0.15,
+   "error": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-31b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own provider key to use y"
+  },
+  {
+   "name": "or-gemma-4-26b",
+   "tool_status": 429,
+   "tool_call": false,
+   "tool_s": 0.16,
+   "error": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-26b-a4b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own provider key to u"
+  },
+  {
+   "name": "cohere-command-a-reasoning",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 1.32,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 1.24,
+   "ctx_30000_s": 3.65,
+   "ctx_100000_s": 11.5
+  },
+  {
+   "name": "cohere-command-a-plus",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 0.48,
+   "max_ok_tokens": 30000,
+   "ctx_6000_s": 0.61,
+   "ctx_30000_s": 1.52,
+   "ctx_100000": 500
+  },
+  {
+   "name": "cohere-north-mini-code",
+   "tool_status": 200,
+   "tool_call": true,
+   "tool_s": 0.58,
+   "max_ok_tokens": 100000,
+   "ctx_6000_s": 0.45,
+   "ctx_30000_s": 1.29,
+   "ctx_100000_s": 3.43
+  },
+  {
+   "name": "zai-glm-5.3-flash",
+   "tool_status": 429,
+   "tool_call": false,
+   "tool_s": 0.61,
+   "error": "{\"error\":{\"code\":\"1113\",\"message\":\"Insufficient balance or no resource package. Please recharge.\"}}"
+  },
+  {
+   "name": "samba-glm-5.3",
+   "tool_status": 429,
+   "tool_call": false,
+   "tool_s": 0.96,
+   "error": "{\"error\":{\"code\":null,\"message\":\"GLM-5.3-1024k is currently experiencing high demand. Please try again later!\",\"param\":null,\"type\":\"\"},\"request_id\":\"39c56bac-f9c3-4c32-95b3-0034bfb8184c\"}\n"
+  },
+  {
+   "name": "samba-minimax-m3.1-flash",
+   "tool_status": 402,
+   "tool_call": false,
+   "tool_s": 0.29,
+   "error": "{\"error\":{\"balance_units\":0,\"billing_portal_url\":\"https://cloud.sambanova.ai/plans/billing\",\"code\":\"PAYMENT_METHOD_REQUIRED\",\"message\":\"A payment method is required. Add one at https://cloud.sambanova"
+  },
+  {
+   "name": "samba-gemma-4-31b",
+   "tool_status": 402,
+   "tool_call": false,
+   "tool_s": 0.26,
+   "error": "{\"error\":{\"balance_units\":0,\"billing_portal_url\":\"https://cloud.sambanova.ai/plans/billing\",\"code\":\"PAYMENT_METHOD_REQUIRED\",\"message\":\"A payment method is required. Add one at https://cloud.sambanova"
+  },
+  {
+   "name": "llm7-deepseek-v4-pro",
+   "tool_status": 401,
+   "tool_call": false,
+   "tool_s": 0.34,
+   "error": "{\"error\":{\"message\":\"Your API key is invalid, expired, or revoked. Generate a new key at https://dash.llm7.io/#/api-keys\",\"type\":\"authentication_error\",\"param\":null,\"code\":\"invalid_api_key\"}}"
+  },
+  {
+   "name": "llm7-glm-5.3",
+   "tool_status": 401,
+   "tool_call": false,
+   "tool_s": 0.38,
+   "error": "{\"error\":{\"message\":\"Your API key is invalid, expired, or revoked. Generate a new key at https://dash.llm7.io/#/api-keys\",\"type\":\"authentication_error\",\"param\":null,\"code\":\"invalid_api_key\"}}"
+  }
+ ]
+}
