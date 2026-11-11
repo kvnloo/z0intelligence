@@ -279,7 +279,7 @@ class DossierTests(unittest.TestCase):
             'open_asks': [{'text': 'Finish the S25 launcher theme.', 'cites': ['omp:s2:222']}]}
         rows = [row('phone-android', 'Android phones S25 S22 adb uiautomator2 launcher', 'Drive the S25 with uiautomator2, never raw adb taps.', 'b1'),
                 row('blender-3d', 'Blender renders cycles moss materials', 'Render Blender stills with Cycles on the GPU.', 'b1')]
-        rows += [row(f'filler-{i}', 'gardening soil compost', f'Water plant {i} weekly.', 'b1') for i in range(10)]
+        rows += [row(f'filler-{i}', 'gardening soil compost', f'Water plant {i} weekly.', 'b1') for i in range(60)]
         self.store.write_text(''.join(json.dumps(r) + '\n' for r in rows))
 
     def test_routes_the_matching_dossier_with_citations(self):
