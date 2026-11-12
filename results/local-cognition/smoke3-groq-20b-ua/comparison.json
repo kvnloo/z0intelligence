@@ -1,0 +1,26 @@
+{
+  "aggregation_rule": "Per-model rows only. Never pool models into one universal score; report each model against the same fixture set separately.",
+  "fixture_count": 28,
+  "models": [
+    {
+      "abstained": 0,
+      "cohort": "renewable",
+      "dangerous_selected": 0,
+      "error": "PREFLIGHT_FAILED: transport error: HTTP 404 from /v1/chat/completions: {\"error\":{\"message\":\"Unknown request URL: POST /openai/v1/v1/chat/completions. Please check the URL for typos, or see the docs at https://console.groq.com/docs/\",\"type\":\"invalid_request_error\",\"code\":\"unknown_url\"}}\n",
+      "fabrication_proxy": 0,
+      "fixtures": 28,
+      "invalid_call": 0,
+      "label": "groq/openai/gpt-oss-20b",
+      "latency_ms": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null
+      },
+      "n": 0,
+      "provider": "groq",
+      "schema_valid": 0,
+      "trajectory_correct": 0
+    }
+  ]
+}

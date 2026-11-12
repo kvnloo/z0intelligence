@@ -1,0 +1,5 @@
+name: hermes-z0intelligence
+version: 0.1.0
+description: Canonical evidence-gated automatic intelligence decisions.
+provides_hooks:
+  - pre_llm_call

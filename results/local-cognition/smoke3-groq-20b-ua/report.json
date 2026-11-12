@@ -1,0 +1,32 @@
+{
+  "fixture_count": 28,
+  "fixtures_path": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/benchmarks/fixtures/local-cognition-v1/examples.jsonl",
+  "generated_at": "2026-09-22T10:11:27.961046+00:00",
+  "max_tokens": 700,
+  "mode": "api",
+  "provenance": [
+    {
+      "base_url": "https://api.groq.com/openai/v1",
+      "cohort": "renewable",
+      "context_declared": 131072,
+      "label": "groq/openai/gpt-oss-20b",
+      "max_tokens": 700,
+      "model": "openai/gpt-oss-20b",
+      "preflight": "transport error: HTTP 404 from /v1/chat/completions: {\"error\":{\"message\":\"Unknown request URL: POST /openai/v1/v1/chat/completions. Please check the URL for typos, or see the docs at https://console.groq.com/docs/\",\"type\":\"invalid_request_error\",\"code\":\"unknown_url\"}}\n",
+      "preflight_ok": false,
+      "provider": "groq",
+      "rep": 1
+    }
+  ],
+  "registry": "/mnt/zer0models/workspace/zer0/oss/.work/z0intelligence/benchmarks/manifests/api-provider-registry.json",
+  "reps": 1,
+  "results": [
+    {
+      "backend": "groq/openai/gpt-oss-20b",
+      "error": "PREFLIGHT_FAILED: transport error: HTTP 404 from /v1/chat/completions: {\"error\":{\"message\":\"Unknown request URL: POST /openai/v1/v1/chat/completions. Please check the URL for typos, or see the docs at https://console.groq.com/docs/\",\"type\":\"invalid_request_error\",\"code\":\"unknown_url\"}}\n",
+      "fixtures": 28,
+      "rows": []
+    }
+  ],
+  "schema": "z0int.local_tool_calling_eval.v1.api"
+}
