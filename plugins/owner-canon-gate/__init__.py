@@ -18,6 +18,8 @@ gate is the existing router, not this plugin.
 
 Standing rules (bend/owner_standing; Kevin's explicit rules, not canon; twin kernel_standing.py):
   gpt_only_via_fx_pi            S1: a GPT model dispatch (delegate_task or a model CLI launch) must go via fx/pi
+                                (OpenAI-subscription models only; open-weight gpt-oss and OpenAI-compatible
+                                /openai/v1 URLs on other providers are exempt, owner 11-12)
   delete_needs_creator_receipt  S2: deletes outside scratch need Kevin's 23:25 rule satisfied: the creating
                                 session/job finished, one-line receipt {path, size, session|job, why} naming the target
                                 in $HERMES_HOME/owner-canon-gate/creator-receipts/*.jsonl or the fleet-stage-lifecycle
@@ -71,7 +73,7 @@ _GUI = re.compile(r"(?i)\b(xdotool|ydotool|wmctrl|wtype|xte|hyprctl\s+dispatch|s
                   r"adb\b[^|;&]*\bshell\s+input\b|adb\b[^|;&]*\bam\s+start\b|pyautogui|pynput)\b")
 _GUI_ISOLATED = re.compile(r"(?i)(--display[ =]?[1-9]\d*|DISPLAY=:(9\d|[1-9]\d\d+)|xvfb-run|Xvfb|--headless|"
                            r"WAYLAND_DISPLAY=\S*headless|fsdisplay|cage\s+-d|\bweston\b.*--backend=headless)")
-_GPT = re.compile(r"(?i)\b(gpt-?\d[\w.\-]*|o[134](-mini|-pro)?\b|openai/[\w.\-]+|codex-mini[\w.\-]*|"
+_GPT = re.compile(r"(?i)\b(gpt-?\d[\w.\-]*|o[134](-mini|-pro)?\b|openai/(?!gpt-oss|v1\b)[\w.\-]+|codex-mini[\w.\-]*|"
                   r"gpt-6\.1-(sol|astra|terra|luna)|\b(sol|astra|terra|luna)-gpt)")
 _FX_PI = re.compile(r"(^|[;&|]\s*|\bexec\s+|\btimeout\s+\d+\s+)(fx|pi)\s")
 _MODEL_CLI = re.compile(r"(?i)\b(hermes|codex|openai|llm|aider|opencode|claude)\b[^\n]*(-m|--model|model[=:])")

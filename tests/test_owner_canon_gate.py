@@ -141,6 +141,13 @@ def test_gpt_outside_fx_blocked_and_via_fx_allowed():
     assert not blocked("terminal", command="fx ask --json --model gpt-6.1-terra 'x'")
 
 
+def test_open_weight_gpt_oss_is_not_openai_subscription():
+    # owner 11-12: the GPT rule covers the OpenAI subscription only; gpt-oss on Groq etc. is fine
+    assert not blocked("terminal", command="FC_BASE_URL=https://api.groq.com/openai/v1 FC_MODEL=openai/gpt-oss-120b python server.py q /x")
+    assert not blocked("terminal", command="FC_BASE_URL=https://api.groq.com/openai/v1 FC_MODEL=qwen/qwen3.8-27b python server.py q /x")
+    assert blocked("terminal", command="codex exec --model openai/gpt-6.1-terra 'x'")
+
+
 def test_prose_naming_gpt_is_not_a_dispatch():
     assert not blocked("message_agent", target="ayo", message="ran fx gpt-6.1-terra, see /a/b/c")
     assert not blocked("write_file", path="/x/notes.md", content="GPT models only via fx (gpt-6.1-terra)")
