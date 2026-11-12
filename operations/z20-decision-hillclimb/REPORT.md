@@ -2,6 +2,8 @@
 
 Status: partial, no promotion. The offline baselines and audit are reproducible; the requested SLM distillation comparison is not complete. Evidence folder `E` is `/mnt/zer0models/workspace/zer0/data/operations/intent-analyzer-20261104/ayo-runs/exec-Z20`. All tables below cite `E` artifacts, not private chat history.
 
+Latest recheck: [2026-11-12 verification and acceptance gaps](RECHECK-20261112.md). The new fleet run reproduced the existing evidence; it did not close the missing SLM or held-out Jev requirements.
+
 ## Frozen data and validity
 
 - Original preregistration: `/mnt/zer0models/workspace/zer0/data/operations/z20-decision-hillclimb/PREREG.md:25-80`. D-B uses 2,512 train, 488 validation, and 3,764 test issues. Training IDs SHA-256 is `a238f38bfb18683f5b07c27448a38cba44e3f88a1bbb2030815cf6d568666daa`; fitted vocabulary is `9323ee6a56829113d7f9137e7d64eb44f5d544606bbb34d1b83438ef0289f68c`. Source: `E/artifacts/validation-final/summary.json:1037-1043` and `E/artifacts/test-final/summary.json:1-17`.
