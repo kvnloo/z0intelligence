@@ -1,0 +1,10 @@
+$ sha256sum -c operations/z21-opus-infinite/evidence/source-sha256.txt
+src/z0int/z21_shadow.py: OK
+tests/test_z21_shadow.py: OK
+$ (cd operations/z21-opus-infinite && sh audit.sh)
+$ cmp operations/z21-opus-infinite/evidence/{expected-audit.json,current-z21/audit.json}
+$ python3 operations/z21-opus-infinite/check_report.py
+PASS: 39 report citations resolve to existing line ranges.
+$ git diff HEAD^ HEAD --check
+$ git status --porcelain
+PASS: source hashes, 15 frozen hashes, byte-identical audit, citations, diff, clean worktree. EXIT_CODE=0
