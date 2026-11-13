@@ -1,0 +1,24 @@
+Command: hostname; date -u; inspect owner paths; sha256sum explicit aggregate/document allowlist
+groot
+2026-11-11T12:32:29Z
+VERDICT: {}
+Owner operation: present
+Owner checkout /home/kvn/zer0/oss/z0intelligence: absent
+Broken prior worktree metadata: gitdir: /home/kvn/Documents/ChatGPT/z0/.work/critical-path/z0intelligence/.git/worktrees/z0intelligence-139-hermes-20261010
+
+No raw history, state.db, prompts, or shadow row logs accessed. No model requests.
+c4f6865c66109a6a5ba27d3c158578b8e3c8249d1ed1a082c40ca1ce5c458567  evidence/current-z21/sources/REPORT.md
+4784527f14b589095c13ea52f089bafb76b39b2d7e3ccfc0140916fb3da1c519  evidence/current-z21/sources/SHADOW-RESULTS.md
+42b4fdc20f73988621480e27566c0779fbc1ef221025d915cc6872c09c9158a0  evidence/current-z21/sources/AFTER-24h.md
+5385948f321a6d1844679fe33fa139597af822af504f4d1fce6cb3bf30b00eab  evidence/current-z21/sources/budget-7d.json
+5c744787d869081c03bce4dc1cc757b51c734c89278f74f174f05815c60367d9  evidence/current-z21/sources/budget.py
+78c0f436a6b10e091b21965899a4c396673c64c280b883a305785f8fac5ff0a9  evidence/current-z21/sources/extra-7d.json
+ac23cebe8d56811e8506b6e486f2462c79e227db48c264977592b73a8a76530c  evidence/current-z21/sources/turns-7d.json
+d410172f94be67395ee854d626ccc6ca9474cb602fae8777ad78993a388e72be  evidence/current-z21/sources/cron-ticks-7d.json
+ee820df032af88f886ceb4a4cea7c7d29da59004d05291f22abc848694f7cf55  evidence/current-z21/sources/families-7d.json
+677d83f9b9e87fb0d41c8ef42f95820edab1fc84904e48445d177701869b3769  evidence/current-z21/sources/route-summary.json
+df1a79aff08dee7e4c199a0d3b93c69a781e192997a6efa9cc20a926c89a5101  evidence/current-z21/sources/effort-summary.json
+ee05832dae95803b596ae670d69d0ecbf97b583a46083839583018e6c5864a58  evidence/current-z21/sources/calib-out.txt
+a110200666748641c04bdf619e65621828632f8640676753e1e2d4503769cd74  evidence/current-z21/sources/z21-before-24h.json
+b7988f4c4ab0dc59aa2f1c4e929e82b5944532948180d0f7995cce4e9a512c31  evidence/current-z21/sources/z21-after-24h.json
+a81ac0c4529cfd8a99dac909411e642369709d7a941459c77dab2dbf73efaf27  evidence/current-z21/sources/z21-after.py

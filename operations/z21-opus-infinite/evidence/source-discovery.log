@@ -1,0 +1,23 @@
+2026-11-13T05:03:50Z
+groot
+
+CHECKOUT /mnt/zer0models/z0-wt/z0intelligence
+/mnt/zer0models/z0-wt/z0intelligence
+f3303f1bd43aced4213109567ae4485128aa15d3
+## HEAD (no branch)
+ M tests/test_hook_adapter.py
+?? .test-state/
+?? .venv-311/
+
+CHECKOUT /mnt/zer0models/z0-wt/z21-shadows
+/mnt/zer0models/z0-wt/z21-shadows
+3b9de8dca9629d82685bf87d59be1f01f2302bf8
+## feat/z21-shadows...origin/feat/z21-shadows
+
+MBP checkout locally present: no
+
+Source and test hashes
+0ec49fcd1ef0b59a7fbbe211f1cd14e85e2ad0b12a03ddf022569208ab09e475  /mnt/zer0models/z0-wt/z21-shadows/src/z0int/z21_shadow.py
+13532a55258710e52212a62d36e9739731aefc26e1149899a8bd1c0f855bbbcf  /mnt/zer0models/z0-wt/z21-shadows/tests/test_z21_shadow.py
+
+Exact-name source callers

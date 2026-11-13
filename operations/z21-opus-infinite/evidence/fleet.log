@@ -1,0 +1,1 @@
+fleet-kueue: Command '['kubectl', '--kubeconfig', '/home/kvn/.kube/k3s.yaml', '-n', 'fleet-mbp', 'get', 'clusterqueue', 'lanes', '-o', 'json']' returned non-zero exit status 1.

@@ -1,0 +1,16 @@
+2026-11-13T05:09:07Z
+groot
+
+COMMAND: sha256sum -c operations/z21-opus-infinite/evidence/source-sha256.txt
+src/z0int/z21_shadow.py: OK
+tests/test_z21_shadow.py: OK
+
+COMMAND: cd operations/z21-opus-infinite && sh audit.sh
+
+COMMAND: cmp evidence/expected-audit.json evidence/current-z21/audit.json
+PASS: 15 frozen hashes and aggregate audit reproduced byte-for-byte; no model evaluation.
+PASS: 15 frozen hashes; aggregate arithmetic; historical window rejection; denominator and summary-count checks.
+INCOMPLETE: no production replay, 24h shadow, frozen-task A/A, or equal-pass Opus A/B executed.
+
+COMMAND: python3 check_report.py
+PASS: 35 report citations resolve to existing line ranges.

@@ -1,0 +1,60 @@
+{
+ "quota_weights": {
+  "input_tokens": 1,
+  "output_tokens": 5,
+  "cache_read_tokens": 0.1,
+  "cache_write_tokens": 1.25
+ },
+ "calls": {
+  "read/search": 5045,
+  "exec": 55317,
+  "final-text": 7535,
+  "write/patch": 4632,
+  "skill": 1805,
+  "poll/wait": 2694,
+  "other-tool": 2223,
+  "delegate/message": 727
+ },
+ "dup_tool_calls": 11180,
+ "weighted_share_pct": {
+  "exec": 63.7,
+  "final-text": 10.1,
+  "read/search": 9.4,
+  "write/patch": 7.0,
+  "poll/wait": 3.2,
+  "other-tool": 3.0,
+  "skill": 2.7,
+  "delegate/message": 0.9
+ },
+ "context_chars_share_pct": {
+  "tool:terminal": 40.2,
+  "user": 26.9,
+  "tool:skill": 7.9,
+  "tool:read_file": 7.4,
+  "assistant-text": 4.4,
+  "tool:execute_code": 2.4,
+  "tool:session_search": 2.1,
+  "tool:vision_analyze": 1.5,
+  "tool:patch": 1.3,
+  "tool:web_search": 1.1,
+  "tool:kanban_show": 0.6,
+  "tool:process_manage": 0.5,
+  "tool:write_file": 0.5,
+  "tool:tool_describe": 0.3,
+  "tool:web_extract": 0.3
+ },
+ "weighted_by_profile_pct": {
+  "clean": 74.0,
+  "ayo": 6.7,
+  "reliability": 5.6,
+  "ossfactory": 4.4,
+  "z0i": 3.2,
+  "product": 3.0,
+  "analyst": 1.4,
+  "intake": 0.7,
+  "chiefstaff": 0.5,
+  "hypothesis": 0.3,
+  "network": 0.1,
+  "n11scratch": 0.1
+ }
+}

@@ -1,0 +1,27 @@
+{
+ "dash-wave-integrator-20261025|report": {
+  "sessions": 117,
+  "calls": 2223,
+  "w_pct": 2.24
+ },
+ "factory-brain-1102|report": {
+  "sessions": 49,
+  "calls": 2652,
+  "w_pct": 2.72
+ },
+ "dash-wave-integrator-20261025|silent": {
+  "sessions": 132,
+  "calls": 461,
+  "w_pct": 0.95
+ },
+ "dash-wave-integrator-20261025|nothing-merged": {
+  "sessions": 39,
+  "calls": 843,
+  "w_pct": 0.77
+ },
+ "|report": {
+  "sessions": 1,
+  "calls": 26,
+  "w_pct": 0.04
+ }
+}

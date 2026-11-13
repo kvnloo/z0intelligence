@@ -1,0 +1,166 @@
+{
+  "source_hashes_verified": 15,
+  "opus_budget": {
+    "raw_tokens": 12356987259,
+    "components": {
+      "input_tokens": 3376655,
+      "output_tokens": 42281474,
+      "cache_read_tokens": 11738768138,
+      "cache_write_tokens": 572560992
+    },
+    "weighted_tokens_proxy": 2104362078.8,
+    "component_weight_share_pct": {
+      "input_tokens": 0.1605,
+      "output_tokens": 10.0461,
+      "cache_read_tokens": 55.783,
+      "cache_write_tokens": 34.0104
+    },
+    "api_calls": 65614,
+    "session_model_task_rows": 3514,
+    "straddling_session_model_task_rows": 1,
+    "profiles": 12,
+    "by_profile": {
+      "clean": {
+        "weighted_tokens": 1606073008.95,
+        "share_pct": 76.3211
+      },
+      "ayo": {
+        "weighted_tokens": 127220277.8,
+        "share_pct": 6.0456
+      },
+      "reliability": {
+        "weighted_tokens": 110147371.55,
+        "share_pct": 5.2342
+      },
+      "ossfactory": {
+        "weighted_tokens": 77069375.2,
+        "share_pct": 3.6624
+      },
+      "z0i": {
+        "weighted_tokens": 62143873.85,
+        "share_pct": 2.9531
+      },
+      "product": {
+        "weighted_tokens": 55841029.05,
+        "share_pct": 2.6536
+      },
+      "analyst": {
+        "weighted_tokens": 26878648.25,
+        "share_pct": 1.2773
+      },
+      "intake": {
+        "weighted_tokens": 17351783.8,
+        "share_pct": 0.8246
+      },
+      "chiefstaff": {
+        "weighted_tokens": 10605217.35,
+        "share_pct": 0.504
+      },
+      "hypothesis": {
+        "weighted_tokens": 6381358.8,
+        "share_pct": 0.3032
+      },
+      "network": {
+        "weighted_tokens": 3561314.2,
+        "share_pct": 0.1692
+      },
+      "n11scratch": {
+        "weighted_tokens": 1088820.0,
+        "share_pct": 0.0517
+      }
+    },
+    "by_source": {
+      "local": {
+        "weighted_tokens": 1304915197.95,
+        "share_pct": 62.01
+      },
+      "gui": {
+        "weighted_tokens": 270827513.35,
+        "share_pct": 12.8698
+      },
+      "oneshot": {
+        "weighted_tokens": 185760516.85,
+        "share_pct": 8.8274
+      },
+      "cron": {
+        "weighted_tokens": 137339138.8,
+        "share_pct": 6.5264
+      },
+      "kanban": {
+        "weighted_tokens": 107649442.5,
+        "share_pct": 5.1155
+      },
+      "telegram": {
+        "weighted_tokens": 33030953.9,
+        "share_pct": 1.5696
+      },
+      "acp": {
+        "weighted_tokens": 23805321.6,
+        "share_pct": 1.1312
+      },
+      "tui": {
+        "weighted_tokens": 22077263.25,
+        "share_pct": 1.0491
+      },
+      "api_server": {
+        "weighted_tokens": 9524910.15,
+        "share_pct": 0.4526
+      },
+      "subagent": {
+        "weighted_tokens": 7159013.15,
+        "share_pct": 0.3402
+      },
+      "bot_room": {
+        "weighted_tokens": 1219100.25,
+        "share_pct": 0.0579
+      },
+      "tool": {
+        "weighted_tokens": 1053707.05,
+        "share_pct": 0.0501
+      }
+    }
+  },
+  "windows": {
+    "z21-before-24h.json": {
+      "start_utc": "2026-11-07T00:42:31.400000+00:00",
+      "end_utc": "2026-11-08T00:42:31.400000+00:00",
+      "is_full_post_ship_window": false,
+      "pre_ship_hours": 23.6246,
+      "post_ship_hours": 0.3754,
+      "finished_tasks": 40,
+      "opus_matched_tasks": 1,
+      "opus_match_pct": 2.5,
+      "reported_tokens_per_matched_opus_task": 814476,
+      "unattributed_finished_tasks": 39
+    },
+    "z21-after-24h.json": {
+      "start_utc": "2026-11-07T02:00:27.500000+00:00",
+      "end_utc": "2026-11-08T02:00:27.500000+00:00",
+      "is_full_post_ship_window": false,
+      "pre_ship_hours": 22.3257,
+      "post_ship_hours": 1.6743,
+      "finished_tasks": 46,
+      "opus_matched_tasks": 1,
+      "opus_match_pct": 2.1739,
+      "reported_tokens_per_matched_opus_task": 814476,
+      "unattributed_finished_tasks": 45
+    }
+  },
+  "summary_counts": {
+    "route": 2909,
+    "effort": 540,
+    "calibration_route": 2919,
+    "calibration_effort": 2978
+  },
+  "acceptance": {
+    "done": false,
+    "gaps": [
+      "24h shadow bounds and trim shadow absent from inspected artifacts",
+      "frozen-task A/A and equal-pass Opus A/B absent from inspected artifacts",
+      "after-24h filename is a mixed pre/post-ship window, not a full post-ship day",
+      "lifetime cumulative rows are not window token deltas",
+      "task-to-usage join incomplete; objective pass labels absent",
+      "budget and after-query token weights differ"
+    ]
+  }
+}
