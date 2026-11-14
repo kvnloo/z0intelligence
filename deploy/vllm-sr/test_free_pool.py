@@ -101,3 +101,53 @@ def test_cascade_moves_on_from_any_backend_error():
     # says nothing about the next backend, so sr:free must try it instead of failing the request.
     codes = set(fp._cascade("x", [{"model": "a"}, {"model": "b"}])["fallback"]["retryable_status_codes"])
     assert {400, 401, 402, 403, 404, 408, 413, 422, 429, 500, 502, 503, 504} <= codes
+
+
+def test_capability_joins_hermes_and_ledger(tmp_path):
+    led = tmp_path / "cap.jsonl"
+    led.write_text("\n".join([
+        json.dumps({"model": "glm-5.3-flash", "source": "bench-round1", "score0to1": 0.5, "n": 20, "date": "2026-11-12"}),
+        json.dumps({"model": "newmodel", "source": "gepa-openusd", "score0to1": 0.8, "n": 2, "date": "2026-11-13"}),
+        "not json", json.dumps({"model": "bad", "source": "x", "score0to1": 7, "n": 3, "date": "d"})]))
+    cap = fp.capability(led)
+    assert cap["glm-5.3-flash"]["source"] == "bench-round1"  # more trials beats the index
+    assert cap["deepseek-v4.1-flash"]["source"] == "hermes-index"
+    assert cap["deepseek-v4.1-flash"]["date"] == fp.HERMES_DATE
+    assert "bad" not in cap and cap["newmodel"]["n"] == 2
+    assert fp.capability(tmp_path / "missing.jsonl").keys() == fp.HERMES_INDEX.keys()
+
+
+def test_cap_quality_is_real_score_times_confidence_not_a_fill_in():
+    cap = fp.capability(Path("/nonexistent"))
+    assert abs(fp.cap_quality("deepseek-v4.1-flash", cap) - 0.3691 * 4 / (4 + fp.CONF_K)) < 1e-9
+    assert fp.cap_quality("deepseek-v4.1-flash", cap) > fp.cap_quality("glm-5.3-flash", cap) > \
+        fp.cap_quality("nemotron-3.5-super-vl", cap)
+    assert fp.cap_quality("unknown", cap) == 0
+    cap["m"] = {"score0to1": 0.5, "conf": 0.9}
+    cap["n"] = {"score0to1": 0.5, "conf": 0.3}
+    assert fp.cap_quality("m", cap) > fp.cap_quality("n", cap)  # same score, more evidence wins
+
+
+def test_rank_is_best_first_with_source_and_keeps_all_backends():
+    r = fp.rank(fp.capability(Path("/nonexistent")))
+    assert len(r) == len(fp.CANDIDATES)
+    scored = [o for o in r if o["score"] is not None]
+    assert scored and r[:len(scored)] == scored
+    assert [o["score"] for o in scored] == sorted((o["score"] for o in scored), reverse=True)
+    assert all(o["source"] == "hermes-index" and o["date"] for o in scored)
+    assert all(o["source"] is None for o in r[len(scored):])
+
+
+def test_weigh_gives_scored_models_weight_below_the_eval_floor(monkeypatch):
+    refs = [{"model": "nim-a"}]
+    monkeypatch.setattr(fp, "limits", lambda b: {"req": {fp.MIN: 10}})
+    assert "weight" not in fp.weigh(refs, lambda m: 0.25)[0]
+    assert fp.weigh(refs, lambda m: 0.25, lambda m: True)[0]["weight"] > 0
+
+
+def test_rank_cli_json():
+    import subprocess
+    out = subprocess.run([sys.executable, str(Path(fp.__file__)), "rank", "--json"],
+                         capture_output=True, text=True, check=True)
+    rows = json.loads(out.stdout)
+    assert rows[0]["source"] and set(rows[0]) == {"backend", "model", "score", "source", "n", "date"}
