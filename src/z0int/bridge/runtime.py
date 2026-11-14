@@ -266,7 +266,7 @@ class BridgeRuntime:
             if kind == "opportunity_record":
                 ctx = hc.begin_turn(harness, job)
                 if ctx:
-                    self._capture_spawn(hc.child_argv(harness), {"payload": job, "ctx": ctx})
+                    hc.spawn_opportunity(harness, {"payload": job, "ctx": ctx}, spawn=self._capture_spawn)
             else:
                 ctx = hc.outcome_context(harness, job["turn"])
                 if ctx and ctx.get("trace_id") is not None:
