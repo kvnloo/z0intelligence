@@ -172,3 +172,21 @@ highest-value next slice:
    Python gate.
 3. Add rule-local lemmas for cycles, self-edges and verifier grants, so that
    proofs track rules instead of the whole issue chain.
+
+## Separate goal-continuity specification
+
+[`../goal_continuity/`](../goal_continuity/) models a different contract:
+an active unfinished goal cannot return unowned `Idle`. Missing workflow
+receipts select pstack/poteto loading; authorized work selects execution;
+an exhausted plan selects replanning; external waits require a registered wake
+source. Explicit user pause and stop remain authoritative.
+
+Check it with `bend bend/goal_continuity/PROOF.bend --verdict` from the repository
+root. `python benchmarks/goal_continuity_law_mutations.py` checks that well-typed
+weakenings of those decisions invalidate the proofs.
+
+This is a pure specification, not an installed OMP policy. The host must attest
+workflow loading, authorization, completion against the original goal, and wake
+registration. The proof establishes none of those facts and does not prove
+progress, wake delivery, or exhaustive exploration. OMP's no-progress circuit
+breaker remains a separate runtime policy.
