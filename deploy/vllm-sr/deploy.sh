@@ -47,7 +47,7 @@ cd "$HERE"
 # until its 600s timeout after a rollout. Bound it and gate on the Deployment rollout instead.
 LOG=$(mktemp)
 set +e
-timeout 180 "$ENV_PY" "$ENV_EXEC" --allow GROQ_API_KEY --allow CEREBRAS_API_KEY --allow NVIDIA_API_KEY --allow OPENROUTER_API_KEY --allow VLLM_SR_SUBPROXY_TOKEN -- \
+timeout 180 "$ENV_PY" "$ENV_EXEC" --allow GROQ_API_KEY -- \
   env PATH="$(dirname "$VSR"):$HOME/.local/bin:$PATH" KUBECONFIG="$KUBECONFIG" \
   "$VSR" serve --target kubernetes --config "$CFG" --chart-dir "$CHART" --namespace vllm-sr \
   --profile dev --platform cpu --minimal > "$LOG" 2>&1

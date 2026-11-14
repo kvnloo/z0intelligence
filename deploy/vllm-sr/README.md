@@ -1,8 +1,35 @@
 # Turbo router (vLLM Semantic Router)
 
 Part of turbo mode (RFC #175). Turbo sends independent, tool-free small calls in parallel to the fastest free backends.
-The router is the executor: one OpenAI-compatible endpoint, `model: vllm-sr/auto`.
+The router is the executor. The only entrypoints are `vllm-sr/free` and `vllm-sr/local`.
 Main agent turns stay on the session's frontier model.
+
+## A13 candidate, not deployed
+
+`free` currently contains the three qualified Groq models. `local` uses the existing
+llama.cpp `qwen3-0.6b-q8` at `http://100.113.138.100:11530/v1`, with no hosted fallback.
+The old paid and specialized entrypoints, including `auto` and `turbo`, are removed.
+Migrate their callers before rollout. Do not substitute a free route for paid code-writing work.
+
+The native in-process limiter has separate minute and day rules for each Groq model,
+using the observations in `limits.json`. These are historical ceilings, not live remaining quota.
+The limiter is per user and model, loses its counters on restart, and does not share state
+with direct provider callers. Output tokens are charged after completion, not reserved.
+The decision retains cross-model fallback on upstream 413 and 429. Failover after a
+local limiter denial is not established by the offline checks.
+
+The owner's all-free-provider target is not complete. Cerebras previously returned
+payment-required. Other providers need current free eligibility and limit evidence
+before admission. Do not infer that all account balances are exhausted.
+
+Run the offline contract tests through fleet from the repository root:
+
+```sh
+fleet-build --node mbp --light --wait 1800 --src-include deploy/vllm-sr -- python3 -m unittest discover -s deploy/vllm-sr/tests -v
+```
+
+The pool table and measurements below describe the historical November 1-2 pool,
+not current inference health or the candidate's provider set.
 
 ## Files
 

@@ -106,6 +106,61 @@ def corrections(prompt: str, path: Path | None = None, *, k: int = CORRECTIONS_K
     return CORRECTIONS_HEADER + '\n<owner-corrections>\n' + '\n'.join(lines) + '\n</owner-corrections>'
 
 
+_EXISTS_CACHE: dict[Path, tuple[int, list[dict]]] = {}
+
+
+def exists(text: str, path: Path | None = None, k: int = 2) -> list[dict]:
+    """Match rare, explicit name terms only; missing stores produce no hints."""
+    path = Path(path or os.environ.get('Z0INT_EXISTS', str(Path.home() / '.local/state/z0int/EXISTS.jsonl')))
+    hits = []
+    try:
+        stamp = path.stat().st_mtime_ns
+        cached = _EXISTS_CACHE.get(path)
+        if cached is None or cached[0] != stamp:
+            with path.open(encoding='utf-8') as stream:
+                rows = [row for line in stream if line.strip() for row in [json.loads(line)] if isinstance(row, dict)]
+            _EXISTS_CACHE[path] = (stamp, rows)
+        rows = _EXISTS_CACHE[path][1]
+        terms = [{t.lower() for t in row.get('terms', []) if isinstance(t, str) and len(t) >= 4} for row in rows]
+        counts: dict[str, int] = {}
+        for names in terms:
+            for term in names:
+                counts[term] = counts.get(term, 0) + 1
+        query = set(re.findall(r'[a-z0-9][a-z0-9_.+-]*', (text or '').lower()))
+        scored = [(len({t for t in names & query if counts[t] <= 3}), row) for row, names in zip(rows, terms)]
+        hits = [row for score, row in sorted(
+            (item for item in scored if item[0]),
+            key=lambda item: (item[0], float(item[1].get('mtime', 0))), reverse=True)][:max(0, k)]
+    except (OSError, UnicodeError, ValueError, TypeError):
+        _EXISTS_CACHE.pop(path, None)
+    try:
+        record = {'t': datetime.now(timezone.utc).isoformat(), 'slot': 'exists',
+                  'hits': len(hits), 'ids': [row.get('id') for row in hits], 'ack': False}
+        log = Path.home() / '.local/state/z0int/exists-injections.jsonl'
+        fd = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+        try:
+            os.fchmod(fd, 0o600)
+            os.write(fd, (json.dumps(record) + '\n').encode('utf-8'))
+        finally:
+            os.close(fd)
+    except (OSError, UnicodeError, ValueError, TypeError):
+        pass
+    return hits
+
+
+def exists_block(prompt: str, tail: str) -> str:
+    rows = exists(prompt + '\n' + tail)
+    if not rows:
+        return ''
+    opening, closing = '<exists>\n', '\n</exists>'
+    budget = (600 - len(opening) - len(closing) - len(rows) + 1) // len(rows)
+    lines = []
+    for row in rows:
+        label = row.get('fact') or row.get('name') or row.get('id', '')
+        lines.append((' '.join(f"- {label} {row.get('path', '')}".split()))[:budget])
+    return opening + '\n'.join(lines) + closing
+
+
 def chunks(text: str) -> list[str]:
     """Keep each hook context below the harness 10,000-character spill limit."""
     result: list[str] = []
@@ -123,7 +178,7 @@ def chunks(text: str) -> list[str]:
 
 
 def main() -> None:
-    if '--corrections' in sys.argv:
+    if '--corrections' in sys.argv or '--exists' in sys.argv:
         # Claude Code UserPromptSubmit passes {"prompt": ...} on stdin; omp passes the raw prompt with --raw.
         try:
             raw = sys.stdin.read(65536)
@@ -136,7 +191,8 @@ def main() -> None:
                 prompt = payload.get('prompt', '') if isinstance(payload, dict) else ''
             except ValueError:
                 prompt = ""
-        text = corrections(prompt if isinstance(prompt, str) else '')
+        prompt = prompt if isinstance(prompt, str) else ''
+        text = exists_block(prompt, '') if '--exists' in sys.argv else corrections(prompt)
         if not text:
             return
         if '--claude-hook' in sys.argv:
