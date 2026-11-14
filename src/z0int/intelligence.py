@@ -65,7 +65,16 @@ def paid_jev_exception(policy, args, entry):
 
 
 def route(args, snapshot):
-    """Pure decision: caller supplies immutable configuration and availability facts."""
+    """Pure role or capability decision using caller-supplied facts.
+
+    Role requests are shadow-only. dispatch() still accepts only validated capability
+    requests; adding this policy does not enable role execution or acquire signals.
+    """
+    if isinstance(args, dict) and 'role' in args:
+        if 'function' in args:
+            raise ValueError('Role and capability requests must not be mixed')
+        from .decide import _route_role
+        return _route_role(args, snapshot)
     validate(args)
     registry=copy.deepcopy(snapshot['registry'])
     candidates=[e for e in registry['entries'] if e['function']==args['function']]

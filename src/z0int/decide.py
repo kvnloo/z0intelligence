@@ -1,7 +1,7 @@
-"""One decision core: role -> harness, provider, model, effort, account (ledger Z17).
+"""Shadow role decisions through intelligence.route() (ledger Z17).
 
-Pure, like intelligence.route(): the caller passes every signal (role table, burn-pace,
-provider saturation, free inventory). Shadow-only today; nothing routes live from it.
+The caller supplies every signal. This module does not acquire live state or execute
+choices. decide() is a compatibility adapter; _route_role is route's role policy.
 """
 import hashlib
 import json
@@ -55,6 +55,12 @@ def _cap(effort, cap):
 
 
 def decide(req, signals):
+    """Use the host's pure routing entry point with caller-supplied role signals."""
+    from .intelligence import route
+    return route(req, signals)
+
+
+def _route_role(req, signals):
     table = signals['roles']
     role, privacy = req.get('role'), req.get('privacy')
     if role not in table['roles']:
