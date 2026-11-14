@@ -1,0 +1,51 @@
+{
+  "id": "47db5742-e265-4cce-8530-155e83a719fe",
+  "title": "Unified memory",
+  "customTitle": "Unified memory",
+  "cwd": "/mnt/zer0models/z0-wt/z0intelligence",
+  "startedAt": 1792095339094,
+  "updatedAt": 1792116640964,
+  "activeTabId": "9133c141-5b64-4b06-b127-b1ee758f56e8",
+  "forgeMode": "default",
+  "tabs": [
+    {
+      "id": "9133c141-5b64-4b06-b127-b1ee758f56e8",
+      "label": "Unified memory",
+      "activeModel": "subscriptions/gpt-6.1-sol",
+      "sessionId": "47db5742-e265-4cce-8530-155e83a719fe",
+      "planMode": false,
+      "planRequest": null,
+      "coAuthorCommits": false,
+      "forgeMode": "default",
+      "tokenUsage": {
+        "prompt": 12267694,
+        "completion": 174657,
+        "total": 12442351,
+        "cacheRead": 11774848,
+        "cacheWrite": 0,
+        "cost": 4.3701588000000005,
+        "modelBreakdown": {
+          "subscriptions/gpt-6.1-sol": {
+            "input": 12267694,
+            "output": 174657,
+            "cacheRead": 11774848,
+            "cacheWrite": 0,
+            "costUSD": 4.3701588
+          }
+        },
+        "subagentInput": 0,
+        "subagentOutput": 0
+      },
+      "messageRange": {
+        "startLine": 0,
+        "endLine": 12
+      },
+      "lastRequest": {
+        "inputTokens": 345126,
+        "requestChars": 1653876,
+        "systemChars": 33563,
+        "overheadChars": 63514
+      }
+    }
+  ]
+}
