@@ -133,6 +133,54 @@ def probe(c):
 # Keyed by bare model id (provider prefix and ":free" dropped). Scored models lead every free cascade, best first.
 HERMES_INDEX = {"deepseek-v4.1-flash": 36.91, "glm-5.3-flash": 34.95, "step-5-preview": 32.83,
                 "nemotron-3.5-super-vl": 24.10}
+HERMES_DATE, HERMES_N = "2026-11-05", 4  # read date; n = the four benchmarks averaged into each score
+LEDGER = HERE / "profiles/capability.jsonl"  # optional: {model, source, score0to1, n, date} per line (our own trials)
+CONF_K = 2  # confidence weight = n / (n + CONF_K): n=4 -> 0.67, n=20 -> 0.91, n=0 -> 0
+
+
+def capability(ledger=None):
+    """One dated capability row per bare model id: HERMES_INDEX joined with the optional ledger file.
+
+    Rows: {model, source, score0to1, n, date}. Per model the row with the most trials wins, then the newest date.
+    Malformed or out-of-range ledger lines are skipped. Returns {model: row + conf}."""
+    rows = [{"model": m, "source": "hermes-index", "score0to1": s / 100, "n": HERMES_N, "date": HERMES_DATE}
+            for m, s in HERMES_INDEX.items()]
+    path = LEDGER if ledger is None else Path(ledger)
+    if path.exists():
+        for line in path.read_text().splitlines():
+            try:
+                r = json.loads(line)
+                if (r["model"] and 0 <= float(r["score0to1"]) <= 1 and float(r["n"]) > 0 and r["source"] and r["date"]):
+                    rows.append({"model": r["model"], "source": r["source"], "score0to1": float(r["score0to1"]),
+                                 "n": float(r["n"]), "date": str(r["date"])})
+            except (ValueError, KeyError, TypeError):
+                continue
+    best = {}
+    for r in rows:
+        cur = best.get(r["model"])
+        if not cur or (r["n"], r["date"]) > (cur["n"], cur["date"]):
+            best[r["model"]] = r
+    return {m: {**r, "conf": r["n"] / (r["n"] + CONF_K)} for m, r in best.items()}
+
+
+def cap_quality(model, cap):
+    """Real normalized score times confidence; 0 when the model has no capability row."""
+    r = cap.get(model)
+    return r["score0to1"] * r["conf"] if r else 0.0
+
+
+def rank(cap=None):
+    """Every CANDIDATES backend, best first: {backend, model, score, source, n, date}. Unscored keep CANDIDATES order last."""
+    cap = capability() if cap is None else cap
+    out = []
+    for i, c in enumerate(CANDIDATES):
+        m = c[3].split("/")[-1].removesuffix(":free")
+        r = cap.get(m)
+        out.append({"backend": c[0], "model": m, "score": round(cap_quality(m, cap), 4) if r else None,
+                    "source": r["source"] if r else None, "n": r["n"] if r else 0, "date": r["date"] if r else None,
+                    "_i": i})
+    out.sort(key=lambda o: (o["score"] is None, -(o["score"] or 0), o["_i"]))
+    return [{k: v for k, v in o.items() if k != "_i"} for o in out]
 # Owner-approved prepaid credit (not free): turbo only, ahead of the free pool, for throughput.
 CREDIT = []  # Cerebras answered 402 (credit used up) 2026-11-05; re-add its two models here after a top-up.
 TRANSIENT = (408, 429, 500, 502, 503, 504)  # quota/overload: still a free backend. A probe timeout (>90 s) is not: it would stall the cascade.
@@ -168,10 +216,12 @@ UA = {"User-Agent": "vllm-sr-free/1"}
 LOCAL = [("local-qwen3-8b", "http://100.113.138.100:11530/v1", None, "qwen3-8b-q4km", 8192)]
 
 
-def weigh(refs, quality):
+def weigh(refs, quality, scored=lambda m: False):
+    """*scored*: models with a capability row. Their real score is a weight, not a pass/fail against QUALITY_FLOOR
+    (the floor is an eval-accuracy bar; a 0.37 pass@1 on hard agent benchmarks is a good model)."""
     rpm = {r["model"]: limits(bucket(r["model"])).get("req", {}).get(MIN) for r in refs}
     q = {r["model"]: quality(r["model"]) for r in refs}
-    first = [m for m in rpm if rpm[m] and q[m] >= QUALITY_FLOOR]
+    first = [m for m in rpm if rpm[m] and (q[m] >= QUALITY_FLOOR or (scored(m) and q[m] > 0))]
     per_bucket = {}
     for m in first:
         per_bucket[bucket(m)] = per_bucket.get(bucket(m), 0) + 1
@@ -231,7 +281,8 @@ def render(exclude=(), out=HERE / "config.yaml"):
     live = [c for c in CANDIDATES if alive(pool.get(c[0], {}))]
     live = [c for c in live if c[0] not in exclude] or live  # every backend capped: keep the pool, never render empty
     bare = lambda c: c[3].split("/")[-1].removesuffix(":free")
-    live.sort(key=lambda c: -HERMES_INDEX.get(bare(c), 0))  # stable: unscored keep CANDIDATES order
+    cap = capability()
+    live.sort(key=lambda c: -cap_quality(bare(c), cap))  # stable: unscored keep CANDIDATES order
     if not live:
         sys.exit("no candidate passed the tool probe; refusing to render an empty pool")
     models, cards, refs = [], [], []
@@ -274,7 +325,7 @@ def render(exclude=(), out=HERE / "config.yaml"):
     def by(metric):
         def key(i_r):
             v = ev.get(ids[i_r[1]["model"]])
-            hi = HERMES_INDEX.get(ids[i_r[1]["model"]], 0)  # the Hermes Index outranks our small task eval
+            hi = cap_quality(ids[i_r[1]["model"]], cap)  # measured capability outranks our small task eval
             return (-hi, -(metric(v) * v["reliability"]) if v else 1, i_r[0])
         return [r for _, r in sorted(enumerate(refs), key=key)]
     task = {"quality": by(lambda v: v["quality_hard"] or 0)}
@@ -285,12 +336,13 @@ def render(exclude=(), out=HERE / "config.yaml"):
             v = ev.get(ids.get(model, ""))
             if v:
                 return (v["family_acc"].get(f, 0) if f != "quality" else (v["quality_hard"] or 0)) * v["reliability"]
-            return 0.9 if HERMES_INDEX.get(ids.get(model, "")) else 0  # unevaluated: fallback-only
+            return cap_quality(ids.get(model, ""), cap)  # no task eval: real score x confidence (0 = fallback-only)
         return q
-    task = {f: weigh(rs, qual(f)) + local for f, rs in task.items()}
+    scored = lambda m: ids.get(m, "") in cap
+    task = {f: weigh(rs, qual(f), scored) + local for f, rs in task.items()}
     fastest = min((pool[m]["tool_s"] for m in ids if pool[m].get("tool_call")), default=1)
     speed = weigh(speed, lambda m: min(1.0, fastest / pool[m]["tool_s"]) * 2 * qual("quality")(m)
-                  if m in ids and pool[m].get("tool_call") else 0) + local
+                  if m in ids and pool[m].get("tool_call") else 0, scored) + local
     cfg = {
         "version": "v0.3",
         "entrypoints": [{"model_names": ["vllm-sr/free", "vllm-sr/auto", "vllm-sr/free-quality"], "recipe": "default"},
@@ -613,6 +665,13 @@ if __name__ == "__main__":
         m = sys.argv[2]
         r = fanout(sys.argv[3], n=1)[0][0] if m == "any" else ask(m, sys.argv[3])
         print(json.dumps(r))
+    elif sys.argv[1:2] == ["rank"]:  # free_pool.py rank [--json]: backends best-first with score and source
+        r = rank()
+        if "--json" in sys.argv:
+            print(json.dumps(r, indent=1))
+        else:
+            for o in r:
+                print(f"{o['backend']:<28} {o['score'] if o['score'] is not None else '-':<8} {o['source'] or '-'}")
     elif sys.argv[1:] == ["render"]:
         render()
     elif sys.argv[1:2] == ["audit"]:  # free_pool.py audit [hours]: exit 1 when REQUIREMENTS R1/R2 fail live
