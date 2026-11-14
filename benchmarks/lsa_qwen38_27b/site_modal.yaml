@@ -1,0 +1,13 @@
+# The Modal site: one H200 container that is itself the paper's serving image.
+# `runner: docker` is answered by docker_shim.py (identity mounts only), so the server runs in this container.
+launcher: local
+root: /lsa
+datasets: /lsa/datasets
+hf_home: /hf
+mounts: []
+images:
+  h200: ghcr.io/prefrontal-ai/sglang:lsa-v0.1.0
+  b300: ""
+  early: ""
+  papertrail5m: ""
+  papertrail10m: ""
