@@ -322,6 +322,9 @@ Current evaluation surfaces include:
 - contrastive evidence experiments;
 - OMP Decision Dataset v2;
 - routine/cascade/repair synthetic/unit harnesses.
+- [SLM context-injection replay](operations/slm-context/REPORT.md): bounded memory,
+  few-shot, summary and skill-context ablations. This experiment does not enable
+  production routing or treat behavioral labels as correctness gold.
 
 ## Quick start
 
