@@ -62,6 +62,8 @@ def load_xy(path: Path) -> tuple[np.ndarray, np.ndarray]:
     ys: list[int] = []
     with path.open(encoding="utf-8") as handle:
         for line in handle:
+            if not line.strip():
+                continue
             rec = json.loads(line)
             fam = rec.get("family")
             if fam not in idx:
@@ -91,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     X, y = load_xy(args.episodes)
     n = len(y)
+    if n <= 100:
+        raise SystemExit("need more than 100 episodes")
     n_c = max(100, int(n * args.confirm_frac))
     n_tr = n - n_c
     Xtr, ytr, Xcf, ycf = X[:n_tr], y[:n_tr], X[n_tr:], y[n_tr:]
