@@ -88,7 +88,8 @@ def answer_from_named(q: DecisionQuestion, raw: dict[str, Any], *, source: str) 
     if qtype == "choice" or q.type == "choice":
         probs_raw = raw.get("probabilities") or {}
         probs = normalize_probs({str(k): float(v) for k, v in probs_raw.items()}, source=source)
-        choice = str(raw.get("choice") or max(probs, key=probs.get))
+        selected = raw.get("choice")
+        choice = str(max(probs, key=probs.get) if selected is None or selected == "" else selected)
         return DecisionAnswer(
             question_id=q.id,
             type="choice",
