@@ -28,7 +28,8 @@ def _percentile(values: list[float], pct: float) -> float | None:
 
 
 def build_decision_analytics(events: Iterable[TokenomicsEvent]) -> dict[str, Any]:
-    rows = [r for r in materialize_rows(events) if r.get("status") == "ok"]
+    all_rows = materialize_rows(events)
+    rows = [r for r in all_rows if r.get("status") == "ok"]
     by_cap: dict[str, list[dict[str, Any]]] = defaultdict(list)
     by_backend: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
@@ -78,10 +79,10 @@ def build_decision_analytics(events: Iterable[TokenomicsEvent]) -> dict[str, Any
         },
         "latency": backend_sections,
         "reliability": {
-            "rows_total": len(materialize_rows(events)),
+            "rows_total": len(all_rows),
             "rows_ok": len(rows),
-            "rows_unavailable": sum(1 for r in materialize_rows(events) if r.get("status") == "unavailable"),
-            "rows_error": sum(1 for r in materialize_rows(events) if r.get("status") == "error"),
+            "rows_unavailable": sum(1 for r in all_rows if r.get("status") == "unavailable"),
+            "rows_error": sum(1 for r in all_rows if r.get("status") == "error"),
         },
     }
 
