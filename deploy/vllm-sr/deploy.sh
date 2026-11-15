@@ -80,6 +80,18 @@ POD=$(kubectl -n vllm-sr get pod -l app.kubernetes.io/name=semantic-router --fie
 [[ $(kubectl -n vllm-sr exec "$POD" -- sha256sum /usr/local/bin/router | cut -d' ' -f1) == $(sha256sum "$ROUTER_BIN" | cut -d' ' -f1) ]] \
   || { echo "deploy check failed: $POD is not running $ROUTER_BIN" >&2; exit 1; }
 
-IP=$(kubectl -n vllm-sr get svc semantic-router -o jsonpath='{.spec.clusterIP}')
-echo "router: http://$IP:8899/v1  config revision: $REV"
-echo "hermes: hermes -p clean config set providers.vllm-sr.base_url http://$IP:8899/v1"
+# One stable URL that survives cluster rebuilds: a fixed NodePort on the router node's tailnet IP
+# (ClusterIPs change per cluster and are reachable only from nodes). Separate Service, not helm-owned.
+NODEPORT=${NODEPORT:-30899}
+kubectl -n vllm-sr apply -f - >/dev/null <<YAML
+apiVersion: v1
+kind: Service
+metadata: {name: semantic-router-nodeport, namespace: vllm-sr}
+spec:
+  type: NodePort
+  selector: $(kubectl -n vllm-sr get svc semantic-router -o jsonpath='{.spec.selector}')
+  ports: [{name: http, port: 8899, targetPort: 8899, nodePort: $NODEPORT}]
+YAML
+NODE_IP=$(kubectl get node groot -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+echo "router: http://$NODE_IP:$NODEPORT/v1  config revision: $REV"
+echo "hermes: hermes -p clean config set providers.vllm-sr.base_url http://$NODE_IP:$NODEPORT/v1"
