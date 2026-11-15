@@ -224,7 +224,8 @@ def probe_endpoint(
             timings = outcome.timings or {}
             usage = outcome.usage or {}
             if attempt == 0:
-                cold_start_ms = float(timings.get("load_ms") or outcome.latency_ms)
+                load_ms = timings.get("load_ms")
+                cold_start_ms = float(outcome.latency_ms if load_ms is None else load_ms)
             if timings.get("prompt_ms") is not None:
                 warm_ttft = float(timings["prompt_ms"])
             elif outcome.ttft_ms is not None:
