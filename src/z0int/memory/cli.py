@@ -31,7 +31,9 @@ def main(argv: list[str] | None = None) -> int:
     sub = p.add_subparsers(dest='cmd', required=True)
     d = sub.add_parser('doctor', help='Read-only health of AgentsView, the Claude home index and the TencentDB gateway')
     d.add_argument('--av-dir', help='AgentsView data dir (default: AGENTSVIEW_DATA_DIR or ~/.agentsview)')
-    d.add_argument('--agentsview-bin', help='agentsview binary (default: on PATH)')
+    d.add_argument('--agentsview-bin', help='agentsview binary (default: Z0INT_AGENTSVIEW_BIN, PATH, ~/.local/bin)')
+    d.add_argument('--ctx-bin', help='ctx binary (default: Z0INT_CTX_BIN, PATH, ~/.local/bin)')
+    d.add_argument('--ctx-timeout', type=float, default=doctor.CTX_TIMEOUT)
     d.add_argument('--claude-home', help='Claude home (default: CLAUDE_CONFIG_DIR or ~/.claude-home)')
     d.add_argument('--stale-hours', type=float, default=doctor.STALE_HOURS)
     d.add_argument('--json', action='store_true')
@@ -97,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
         return sources.main(argv2)
     if args.cmd == 'doctor':
         out = doctor.run(av_dir=args.av_dir, agentsview_bin=args.agentsview_bin, claude_home=args.claude_home,
-                         stale_hours=args.stale_hours)
+                         stale_hours=args.stale_hours, ctx_bin=args.ctx_bin, ctx_timeout=args.ctx_timeout)
         _print(out, args.json)
         return 0 if out['ok'] else 1
     out = surface.bench(json.loads(Path(args.queries).read_text(encoding='utf-8')))
