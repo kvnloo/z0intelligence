@@ -189,7 +189,10 @@ class JuliaBackendOfflineTests(unittest.TestCase):
     def test_unavailable_without_checkout(self):
         backend = JuliaBackend(hf="SupersonicLabs/Julia-1", revision=REVISION,
                                model_dir=Path("/nonexistent/julia"))
-        health = backend.health(load=False)
+        # The checkout gate is under test, not this host's pinned Julia venv: the
+        # interpreter probe runs first and would otherwise decide the outcome.
+        with mock.patch.object(JuliaBackend, "_select_python", return_value=("python3", "stubbed")):
+            health = backend.health(load=False)
         self.assertFalse(health.ready)
         self.assertFalse(health.loaded)
         self.assertIn("incomplete Julia checkout", health.detail)
