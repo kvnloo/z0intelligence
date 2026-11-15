@@ -364,7 +364,7 @@ def test_identity_violation_in_any_grant_denies_the_whole_search(native, monkeyp
 
 
 
-def _sqlite_archive(tmp_path, rows, *, user_version=113):
+def _sqlite_archive(tmp_path, rows, *, user_version=113, stamps=None):
     """Minimal AgentsView-shaped sessions.db: sessions, messages, external-content FTS5."""
     import sqlite3
     path = tmp_path / ".agentsview" / "sessions.db"
@@ -379,7 +379,8 @@ def _sqlite_archive(tmp_path, rows, *, user_version=113):
     for sid, project, ordinal, role, content, extra in rows:
         conn.execute("insert or ignore into sessions values (?,?,?)", (sid, project, "fixture-host"))
         cur = conn.execute("insert into messages (session_id, ordinal, role, content, timestamp, has_thinking) "
-                           "values (?,?,?,?,?,?)", (sid, ordinal, role, content, "2026-10-22T17:00:00Z",
+                           "values (?,?,?,?,?,?)", (sid, ordinal, role, content,
+                                                    (stamps or {}).get((sid, ordinal), "2026-10-22T17:00:00Z"),
                                                     int(extra == "thinking")))
         conn.execute("insert into messages_fts (rowid, content) values (?, ?)", (cur.lastrowid, content))
     conn.execute(f"pragma user_version = {user_version}")
@@ -422,3 +423,79 @@ def test_unknown_archive_schema_falls_back_to_http(native, tmp_path):
     _sqlite_archive(tmp_path, [(SESSION, PROJECT, 7, "assistant", "verified", None)], user_version=1)
     rows = backend.search_backend("agentsview", "verified", [grant()], 1, 2)
     assert rows and native["calls"]  # served by the HTTP contract path
+
+
+def test_sqlite_ranks_across_grants_instead_of_first_grant_filling_every_slot(native, tmp_path):
+    filler = " ".join(["cron status line"] * 40)
+    rows = [(f"codex:cron-{i}", "automation", 1, "assistant", f"{filler} hw_monitor {filler}", None) for i in range(6)]
+    rows.append((SESSION, PROJECT, 7, "user", "call the folder hw_monitor on the big drive", None))
+    _sqlite_archive(tmp_path, rows)
+    found = backend.search_backend("agentsview", "hw_monitor", [grant(scope="automation"), grant()], 3, 2)
+    assert found[0]["scope"] == PROJECT and "hw_monitor" in found[0]["text"]
+    assert native["calls"] == []
+
+
+def test_sqlite_caps_hits_per_session_and_keeps_scope_filter(native, tmp_path):
+    rows = [(SESSION, PROJECT, i, "assistant", f"larkd note {i}", None) for i in range(1, 6)]
+    rows.append(("codex:other-2", PROJECT, 1, "user", "larkd once", None))
+    rows.append(("codex:hidden-3", "ungranted", 1, "user", "larkd larkd larkd", None))
+    _sqlite_archive(tmp_path, rows)
+    found = backend.search_backend("agentsview", "larkd", [grant()], 5, 2)
+    sessions = [r["native"]["session_id"] for r in found]
+    assert sessions.count(SESSION) == 2 and "codex:other-2" in sessions
+    assert all(r["scope"] == PROJECT for r in found)
+
+
+def test_sqlite_exact_phrase_beats_old_high_term_frequency_rows(native, tmp_path):
+    # Old rows repeat the terms many times; only the owner's message has the exact phrase.
+    filler = " ".join(["why is this automatable not"] * 30)
+    rows = [(f"codex:old-{i}", "automation", 1, "assistant", f"{filler} report {i}", None) for i in range(12)]
+    rows.append((SESSION, PROJECT, 7, "user", "ok but why is this not automatable? check memory first", None))
+    _sqlite_archive(tmp_path, rows)
+    found = backend.search_backend("agentsview", "why is this not automatable",
+                                   [grant(scope="automation"), grant()], 5, 2)
+    assert found[0]["native"]["session_id"] == SESSION
+    assert "why is this not automatable" in found[0]["text"]
+    assert len(found) == 5 and native["calls"] == []  # token pass still fills the remaining slots
+
+
+def test_sqlite_phrase_and_token_passes_share_the_per_session_cap(native, tmp_path):
+    rows = [(SESSION, PROJECT, i, "assistant", f"run the quiet lane now {i}", None) for i in range(1, 6)]
+    rows += [(SESSION, PROJECT, 10 + i, "assistant", f"lane quiet run {i}", None) for i in range(1, 4)]
+    rows.append(("codex:other-9", PROJECT, 1, "user", "quiet lane", None))
+    _sqlite_archive(tmp_path, rows)
+    found = backend.search_backend("agentsview", "quiet lane", [grant()], 5, 2)
+    sessions = [r["native"]["session_id"] for r in found]
+    assert sessions.count(SESSION) == 2 and "codex:other-9" in sessions
+    assert len({(r["native"]["session_id"], r["native"]["ordinal"]) for r in found}) == len(found)
+
+
+def test_sqlite_equal_rank_prefers_the_newer_message(native, tmp_path):
+    rows = [("codex:older-1", PROJECT, 1, "user", "zanzibar plan", None),
+            ("codex:newer-2", PROJECT, 1, "user", "zanzibar plan", None)]
+    _sqlite_archive(tmp_path, rows, stamps={("codex:older-1", 1): "2026-09-01T00:00:00Z",
+                                            ("codex:newer-2", 1): "2026-10-26T00:00:00Z"})
+    found = backend.search_backend("agentsview", "zanzibar", [grant()], 2, 2)
+    assert [r["native"]["session_id"] for r in found] == ["codex:newer-2", "codex:older-1"]
+
+
+def test_sqlite_host_uses_agentsview_machine_label_when_present(native, tmp_path):
+    import sqlite3
+    path = _sqlite_archive(tmp_path, [(SESSION, PROJECT, 7, "assistant", "labelled host answer", None),
+                                      ("codex:other-5", PROJECT, 1, "user", "labelled raw host", None)])
+    conn = sqlite3.connect(path)
+    conn.execute("update sessions set machine = 'b163c2db159f66e6' where id = ?", (SESSION,))
+    conn.execute("update sessions set machine = 'mbp' where id = 'codex:other-5'")
+    conn.execute("create table pg_sync_state (key text primary key, value text not null)")
+    conn.execute("insert into pg_sync_state values ('machine_label:b163c2db159f66e6', 'groot')")
+    conn.commit()
+    conn.close()
+    hosts = {r["native"]["session_id"]: r["host"]
+             for r in backend.search_backend("agentsview", "labelled", [grant()], 5, 2)}
+    assert hosts == {SESSION: "groot", "codex:other-5": "mbp"}
+
+
+def test_sqlite_host_falls_back_to_raw_machine_without_label_table(native, tmp_path):
+    _sqlite_archive(tmp_path, [(SESSION, PROJECT, 7, "assistant", "unlabelled host answer", None)])
+    rows = backend.search_backend("agentsview", "unlabelled", [grant()], 1, 2)
+    assert rows[0]["host"] == "fixture-host"
