@@ -110,6 +110,41 @@ def metrics_text():
 
 
 
+REJECT_DRAIN_SECONDS=1.0
+REJECT_DRAIN_BYTES=1<<20
+
+
+def drain_rejected_request(request, seconds=REJECT_DRAIN_SECONDS, cap=REJECT_DRAIN_BYTES):
+    """Read and discard headers plus Content-Length body before the 503.
+
+    Closing with unread request bytes makes the kernel reset the connection, so a
+    client still writing (headers and body in separate sends) gets EPIPE/ECONNRESET
+    instead of the 503. Bounded by deadline and byte cap; runs on the accept loop.
+    """
+    deadline=time.monotonic()+seconds
+    data=b''; need=None
+    try:
+        while len(data)<=cap:
+            if need is None and b'\r\n\r\n' in data:
+                head,_,_=data.partition(b'\r\n\r\n')
+                length=0
+                for line in head.split(b'\r\n')[1:]:
+                    name,_,value=line.partition(b':')
+                    if name.strip().lower()==b'content-length':
+                        length=int(value.strip())
+                if length<0 or len(head)+4+length>cap:return
+                need=len(head)+4+length
+            if need is not None and len(data)>=need:return
+            remaining=deadline-time.monotonic()
+            if remaining<=0:return
+            request.settimeout(remaining)
+            chunk=request.recv(min(65536,cap+1-len(data)))
+            if not chunk:return
+            data+=chunk
+    except (OSError,ValueError):return
+    finally:request.settimeout(None)
+
+
 class Service(ThreadingHTTPServer):
     daemon_threads=False
     request_queue_size=SOCKET_BACKLOG
@@ -117,6 +152,7 @@ class Service(ThreadingHTTPServer):
     def process_request(self, request, address):
         if DRAINING.is_set() or not SLOTS.acquire(blocking=False):
             metric("rejected_connections_total")
+            drain_rejected_request(request)
             try:request.sendall(
                 b'HTTP/1.1 503 Service Unavailable\r\n'
                 b'Retry-After: 1\r\n'
