@@ -144,14 +144,21 @@ def newest_source(provider: str, root: str | Path, *, budget: int = 200_000) -> 
     return best
 
 
-def agentsview_roots(conn: sqlite3.Connection, *, since_days: float = 365.0,
-                     now: float | None = None) -> dict[tuple[str, str], dict[str, Any]]:
-    """{(agent, ctx_root): {provider, sessions, av_newest}} from indexed session file paths."""
+def agentsview_roots(conn: sqlite3.Connection, *, since_days: float = 365.0, now: float | None = None,
+                     machines: Iterable[str] | None = None) -> dict[tuple[str, str], dict[str, Any]]:
+    """{(agent, ctx_root): {provider, sessions, av_newest}} from indexed session file paths.
+
+    ``machines`` limits the rows to those machine keys (e.g. this host's, so a remote host's identical
+    ``~/.claude`` path is not compared with this host's disk). None keeps every row.
+    """
     now = time.time() if now is None else now
     since = datetime.fromtimestamp(now - since_days * 86400, timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
     out: dict[tuple[str, str], dict[str, Any]] = {}
+    keys = None if machines is None else sorted(set(machines))
+    where = '' if keys is None else f" and machine in ({','.join('?' * len(keys))})"
     rows = conn.execute('select agent, file_path, max(started_at), count(*) from sessions '
-                        'where file_path is not null and started_at >= ? group by agent, file_path', (since,))
+                        'where file_path is not null and started_at >= ?' + where + ' group by agent, file_path',
+                        (since, *(keys or [])))
     for agent, file_path, newest, n in rows:
         rule = CTX_RULES.get(agent)
         root = rule[1](file_path) if rule else None
