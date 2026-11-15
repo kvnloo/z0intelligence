@@ -61,3 +61,22 @@ the pool; rate-limited ones stay in. Re-run probe + render + `deploy.sh` to refr
 
 - Pool generated from z0int `/v1/providers` and Kerdoios placement (PLAN P1).
 - Turbo runtime (#176) calling this endpoint instead of its per-provider adapters (PLAN P2).
+
+## Endpoints by workflow (2026-11-15)
+
+One router, base URL `http://100.113.138.100:30899/v1` (groot tailnet NodePort). `free_pool.py inventory` prints all of
+this live, with per-model rpm headroom from free-pace's counts; nothing below is probed.
+
+| Workflow | Endpoint | Behaviour | Typical caller |
+|---|---|---|---|
+| free | `vllm-sr/free` (= `auto`, `free-quality`) | every free model, best first, endless fallback; task keywords pick `auto-<family>` | Hermes `delegation`, z0live smol lanes |
+| free by task | `vllm-sr/free-{reason,verify,longctx,extract,classify,format}` | same pool, ranked by that family's eval | callers that know the task |
+| turbo | `vllm-sr/turbo` | fastest first | burst small units |
+| one model | `vllm-sr/m/<model>` (e.g. `m/gpt-oss-120b`, `m/nemotron-3-ultra`) | that model on any free host, falls over only to its other hosts | GEPA arms, diversity lanes |
+| one host | `vllm-sr/b/<backend>` (e.g. `b/groq-gpt-oss-120b`) | that host only, fallback off | evals, A/B arms that must not be scored on a substitute |
+| decision | `http://127.0.0.1:11532/v1` (outside the router) | local d1, native `/v1/systemone` | sr:decision |
+| paid | outside the router | Claude via `burn-gate --pick` / `t3pace.py pick`, Sol via fx | sr:paid |
+
+Lane plans: `free_pool.py lanes <x> [--models y] [--family f] [--pinned]` picks the y best models (by family eval)
+that have headroom now and splits x lanes across them in proportion to headroom. Each lane gets an endpoint and an
+`rpm_budget`; the plan warns when lanes would get under 1 request/min. `--pinned` hands out `b/` hosts instead of `m/`.

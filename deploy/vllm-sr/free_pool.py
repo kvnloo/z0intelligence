@@ -291,15 +291,29 @@ def render(exclude=(), out=HERE / "config.yaml"):
     fastest = min((pool[m]["tool_s"] for m in ids if pool[m].get("tool_call")), default=1)
     speed = weigh(speed, lambda m: min(1.0, fastest / pool[m]["tool_s"]) * 2 * qual("quality")(m)
                   if m in ids and pool[m].get("tool_call") else 0) + local
+    # Owner 11-15: an endpoint per free model, so callers can ask for x lanes on y models (plan_lanes).
+    # vllm-sr/m/<model>: that model on any host serving it, first host drawn by bucket capacity, falling over only to
+    # its other hosts. vllm-sr/b/<backend>: that one host, no fallback, for evals and A/B arms that must not be scored
+    # on a substitute model.
+    groups = {}
+    for m in models:
+        groups.setdefault(model_key(m["name"]), []).append({"model": m["name"], "use_reasoning": False})
+    pins = [(f"m-{k}", f"vllm-sr/m/{k}", f"{k} on any of its free hosts.", _cascade(f"m-{k}", weigh(rs, lambda _: 1.0)))
+            for k, rs in groups.items()]
+    pins += [(f"b-{m['name']}", f"vllm-sr/b/{m['name']}", f"{m['name']} only, no fallback.",
+              {**_cascade(f"b-{m['name']}", [{"model": m["name"], "use_reasoning": False}]), "fallback": {"enabled": False}})
+             for m in models]
     cfg = {
         "version": "v0.3",
         "entrypoints": [{"model_names": ["vllm-sr/free", "vllm-sr/auto", "vllm-sr/free-quality"], "recipe": "default"},
                         {"model_names": ["vllm-sr/turbo"], "recipe": "turbo"}]
-                       + [{"model_names": [f"vllm-sr/free-{f}"], "recipe": f} for f in FAMILIES],
+                       + [{"model_names": [f"vllm-sr/free-{f}"], "recipe": f} for f in FAMILIES]
+                       + [{"model_names": [ep], "recipe": rn} for rn, ep, _, _ in pins],
         "recipes": [{"name": "turbo", "description": "Free pool, fastest first.",
                      "routing": {"decisions": [_cascade("free-fastest", speed)]}}]
                    + [{"name": f, "description": f"Free pool, best eval score on {f} tasks first.",
-                       "routing": {"decisions": [_cascade(f"free-{f}", task[f])]}} for f in FAMILIES],
+                       "routing": {"decisions": [_cascade(f"free-{f}", task[f])]}} for f in FAMILIES]
+                   + [{"name": rn, "description": desc, "routing": {"decisions": [d]}} for rn, _, desc, d in pins],
         "listeners": [{"name": "http-8899", "address": "0.0.0.0", "port": 8899, "timeout": "1800s"}],
         "global": {"router": {"fallback": {"enabled": True, "max_attempts": len(speed),
                                           # Gentle: 2 failures/120 s turned a restart's DNS warm-up into 2 min
@@ -335,6 +349,11 @@ NS, MARGIN, EXCLUDE_S = "vllm-sr", 0.95, 3600
 MIN, HOUR, DAY = 60, 3600, 86400
 WIN = {"rpm": ("req", MIN), "rph": ("req", HOUR), "rpd": ("req", DAY), "tpm": ("tok", MIN), "tpd": ("tok", DAY)}
 SHARED = {"or-": "openrouter", "kilo-": "kilo", "nim-": "nim", "cohere-": "cohere", "zai-": "zai", "llm7-": "llm7"}
+
+
+def model_key(backend):
+    """Model a backend serves, provider prefix dropped: nim-nemotron-3-ultra and or-nemotron-3-ultra -> nemotron-3-ultra."""
+    return backend.split("-", 1)[1]
 
 
 def bucket(backend):
@@ -524,7 +543,9 @@ def pace():
 # so the router, its limits and its clients live in one place.
 import re as _re
 from concurrent.futures import ThreadPoolExecutor as _TPE
-ROUTER = "http://10.43.216.55:8899/v1/chat/completions"
+# The stable NodePort URL on groot's tailnet IP (deploy.sh); the old ClusterIP died with cluster 1.
+ROUTER_BASE = os.environ.get("VLLM_SR_URL", "http://100.113.138.100:30899/v1")
+ROUTER = ROUTER_BASE + "/chat/completions"
 # Strong, diverse families first; each provider bucket appears at most twice.
 # Deployed backends only (semantic-router-config); see deployed(). Order: strong, diverse families first.
 REASONERS = ["nim-nemotron-3-ultra", "groq-gpt-oss-120b", "or-dots-3-note", "nim-step-5-preview",
@@ -580,6 +601,136 @@ def ask(model, prompt, system=None, max_tokens=8000, timeout=300):
             "error": None if j is not None else ("empty content" if not text else "no json")}
 
 
+# ---- inventory + lane plans: "give me x lanes on y models" from what the endpoint can serve right now ----
+DECISION_URL = "http://127.0.0.1:11532/v1"  # sr:decision (d1 shim on groot), outside the router
+
+
+def model_quality():
+    """{model key: {family: score}}: eval accuracy x reliability (best host's run); Hermes Index only = 0.9 prior."""
+    ev, out = eval_scores(), {}
+    for name, _, _, pid, _ in CANDIDATES + LOCAL + CREDIT:
+        v, bare = ev.get(pid.split("/")[-1].removesuffix(":free")), pid.split("/")[-1].removesuffix(":free")
+        fam = {f: (v["family_acc"].get(f, 0) * v["reliability"]) for f in FAMILIES} if v else {}
+        fam["quality"] = (v["quality_hard"] or 0) * v["reliability"] if v else (0.9 if HERMES_INDEX.get(bare) else 0)
+        old = out.get(model_key(name), {})
+        out[model_key(name)] = {f: max(fam.get(f, fam["quality"]), old.get(f, 0)) for f in ("quality",) + FAMILIES}
+    return out
+
+
+def _live_cfg():
+    import yaml
+    r = subprocess.run(["kubectl", "-n", NS, "get", "cm", "semantic-router-config", "-o",
+                        "jsonpath={.data.config\\.yaml}"], capture_output=True, text=True, timeout=30,
+                       env={**os.environ, "KUBECONFIG": os.environ.get("KUBECONFIG", str(Path.home() / ".kube/k3s.yaml"))})
+    return yaml.safe_load(r.stdout) if r.returncode == 0 and r.stdout.strip() else None
+
+
+def _frac(cell):
+    used, cap = (int(x) for x in cell.split("/"))
+    return used, cap
+
+
+def inventory(cfg=None, st=None, now=None):
+    """Every endpoint by workflow, with per-model rpm headroom from free-pace's live counts (no probe calls)."""
+    import yaml
+    cfg = cfg or _live_cfg() or yaml.safe_load((HERE / "config.yaml").read_text())  # cluster unreachable: last render
+    now = now or time.time()
+    if st is None:
+        try:
+            st = json.loads(OUT.read_text())
+        except (OSError, ValueError):
+            st = {}
+    usage, blocked = st.get("usage", {}), {b: v for b, v in st.get("blocked", {}).items() if v["until"] > now}
+    names = [m["name"] for m in cfg["providers"]["models"]]
+    per_bucket = {}
+    for n in names:
+        per_bucket[bucket(n)] = per_bucket.get(bucket(n), 0) + 1
+    quality, groups = model_quality(), {}
+    for n in names:
+        b, cap = bucket(n), limits(bucket(n)).get("req", {}).get(MIN)
+        row, why = usage.get(b, {}), blocked.get(b, {}).get("why")
+        used = _frac(row["req_60s"])[0] if "req_60s" in row else 0
+        if not why and "req_86400s" in row:
+            u, c = _frac(row["req_86400s"])
+            why = f"daily {u}/{c}" if u >= MARGIN * c else None
+        head = None if not cap else 0 if why else round(max(0, cap - used) / per_bucket[b], 2)
+        groups.setdefault(model_key(n), []).append(
+            {"backend": n, "endpoint": f"vllm-sr/b/{n}", "bucket": b, "rpm_cap_shared": cap, "bucket_models": per_bucket[b],
+             "headroom_rpm": head, "blocked": why or False,
+             "tpm_cap": limits(b).get("tok", {}).get(MIN), "until": blocked.get(b, {}).get("until")})
+    models = sorted(({"model": k, "endpoint": f"vllm-sr/m/{k}", "quality": quality.get(k, {}), "hosts": hs,
+                      "headroom_rpm": round(sum(h["headroom_rpm"] or 0 for h in hs), 2)} for k, hs in groups.items()),
+                    key=lambda m: (-m["quality"].get("quality", 0), -m["headroom_rpm"]))
+    eps = [n for e in cfg["entrypoints"] for n in e["model_names"]]
+    try:
+        with urllib.request.urlopen(DECISION_URL + "/models", timeout=3) as r:
+            decision_up = r.status == 200
+    except Exception:
+        decision_up = False
+    try:
+        pick = json.loads((STATE / "burn-gate-pick.json").read_text())
+    except (OSError, ValueError):
+        pick = None
+    return {
+        "base_url": ROUTER_BASE, "at": datetime.fromtimestamp(now).astimezone().isoformat(timespec="seconds"),
+        "pace_at": st.get("at"),
+        "workflows": {
+            "free": {"endpoints": [e for e in eps if e.startswith("vllm-sr/free") or e == "vllm-sr/auto"],
+                     "use": "delegation, z0live smol lanes, background units: cascade over every free model"},
+            "turbo": {"endpoints": ["vllm-sr/turbo"], "use": "burst small units, fastest first"},
+            "model": {"endpoints": [m["endpoint"] for m in models],
+                      "use": "lanes pinned to one model (GEPA arms, diversity): falls over only to that model's other hosts"},
+            "pinned": {"endpoints": [h["endpoint"] for m in models for h in m["hosts"]],
+                       "use": "evals and A/B arms: one host, no fallback, never scored on a substitute"},
+            "decision": {"url": DECISION_URL, "up": decision_up, "outside_router": True,
+                         "use": "local d1 decisions; native /v1/systemone only (vllm-sr-turbo-router rule 23)"},
+            "paid": {"outside_router": True, "pick": pick,
+                     "use": "Claude subs via burn-gate --pick / t3pace.py pick, Sol via fx; never through vllm-sr"},
+            "opencode": {"outside_router": True, "use": "opencode run -m opencode/<free-model> (CLI-only free models)"},
+        },
+        "models": models,
+    }
+
+
+def _alloc(weights, n):
+    """Split n into len(weights) integer shares in proportion to weights, each >= 1 (needs n >= len(weights))."""
+    total, k = sum(weights), len(weights)
+    raw = [1 + (n - k) * w / total for w in weights]
+    out = [int(r) for r in raw]
+    for i in sorted(range(k), key=lambda i: out[i] - raw[i])[:n - sum(out)]:
+        out[i] += 1
+    return out
+
+
+def plan_lanes(inv, lanes, models=None, family="quality", pinned=False):
+    """*lanes* parallel workers over the *models* best free models (by *family* eval) that have rpm headroom now.
+
+    Lanes follow headroom, so no model or bucket is planned past its published limit. pinned=True hands each lane
+    a single host (vllm-sr/b/...) instead of the model's host cascade (vllm-sr/m/...)."""
+    score = lambda m: m["quality"].get(family, m["quality"].get("quality", 0))
+    cands = sorted((m for m in inv["models"] if m["headroom_rpm"] > 0), key=lambda m: (-score(m), -m["headroom_rpm"]))
+    want = models or lanes
+    chosen = cands[:min(want, lanes, len(cands))]
+    warnings = [] if len(chosen) >= min(want, lanes) else [f"only {len(chosen)} free models have headroom now"]
+    out = []
+    for m, c in zip(chosen, _alloc([m["headroom_rpm"] for m in chosen], lanes) if chosen else []):
+        if pinned:
+            hosts = sorted((h for h in m["hosts"] if (h["headroom_rpm"] or 0) > 0), key=lambda h: -h["headroom_rpm"])
+            hosts = hosts[:c]
+            for h, hc in zip(hosts, _alloc([h["headroom_rpm"] for h in hosts], c)):
+                out += [{"model": m["model"], "endpoint": h["endpoint"], "bucket": h["bucket"],
+                         "rpm_budget": round(h["headroom_rpm"] / hc, 2)} for _ in range(hc)]
+        else:
+            out += [{"model": m["model"], "endpoint": m["endpoint"], "rpm_budget": round(m["headroom_rpm"] / c, 2)}
+                    for _ in range(c)]
+    for i, l in enumerate(out):
+        l["lane"] = i
+    if any(l["rpm_budget"] < 1 for l in out):
+        warnings.append("some lanes get < 1 request/min: fewer lanes or more models, or expect 429 fallovers")
+    return {"base_url": inv.get("base_url", ROUTER_BASE), "family": family, "pinned": pinned, "lanes": out,
+            "total_rpm": round(sum(l["rpm_budget"] for l in out), 2), "warnings": warnings}
+
+
 DEAD = set()  # backends that answered 401/404 this process (missing key / not deployed): never retried
 
 
@@ -615,6 +766,15 @@ if __name__ == "__main__":
         print(json.dumps(r))
     elif sys.argv[1:] == ["render"]:
         render()
+    elif sys.argv[1:2] == ["inventory"]:  # free_pool.py inventory: every endpoint by workflow + live headroom
+        print(json.dumps(inventory(), indent=1))
+    elif sys.argv[1:2] == ["lanes"]:  # free_pool.py lanes <x> [--models y] [--family f] [--pinned]
+        args = sys.argv[2:]
+        opt = lambda k, d: args[args.index(k) + 1] if k in args else d
+        p = plan_lanes(inventory(), int(args[0]), models=int(opt("--models", "0")) or None,
+                       family=opt("--family", "quality"), pinned="--pinned" in args)
+        print(json.dumps(p, indent=1))
+        sys.exit(1 if not p["lanes"] else 0)
     elif sys.argv[1:2] == ["audit"]:  # free_pool.py audit [hours]: exit 1 when REQUIREMENTS R1/R2 fail live
         a = audit(pod_log(float(sys.argv[2] if len(sys.argv) > 2 else 1) * HOUR))
         print(json.dumps(a))

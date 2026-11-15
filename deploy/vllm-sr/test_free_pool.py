@@ -96,6 +96,53 @@ def test_audit_flags_failures_and_one_model_doing_everything():
     assert fp.audit([rec("nim-a")] * 12 + [rec("groq-gpt-oss-20b")] * 10 + [rec("or-x", "succeeded")] * 5)["ok"]
 
 
+def test_every_free_model_and_backend_gets_its_own_entrypoint():
+    # Owner 11-15: specific endpoints for each free model, so a caller can pin lanes to models.
+    import yaml, tempfile
+    out = Path(tempfile.mkdtemp()) / "c.yaml"
+    fp.render(out=out)
+    c = yaml.safe_load(out.read_text())
+    eps = {n: e["recipe"] for e in c["entrypoints"] for n in e["model_names"]}
+    recipes = {r["name"]: r["routing"]["decisions"][0] for r in c["recipes"]}
+    assert {"vllm-sr/free", "vllm-sr/auto", "vllm-sr/turbo", "vllm-sr/free-verify"} <= set(eps)  # clients keep working
+    backends = [m["name"] for m in c["providers"]["models"]]
+    for b in backends:                                   # pinned: exactly this backend, never another one
+        d = recipes[eps[f"vllm-sr/b/{b}"]]
+        assert [r["model"] for r in d["modelRefs"]] == [b] and d["fallback"]["enabled"] is False
+    for b in backends:                                   # per model: every host of that model, and only those
+        d = recipes[eps[f"vllm-sr/m/{fp.model_key(b)}"]]
+        assert b in [r["model"] for r in d["modelRefs"]]
+        assert {fp.model_key(r["model"]) for r in d["modelRefs"]} == {fp.model_key(b)}
+    assert len({fp.model_key(b) for b in backends}) < len(backends)  # some model has several hosts to fall over to
+
+
+def _inv():
+    m = lambda key, q, hosts: {"model": key, "endpoint": f"vllm-sr/m/{key}", "quality": {"quality": q, "reason": q},
+                               "hosts": hosts, "headroom_rpm": sum(h["headroom_rpm"] or 0 for h in hosts)}
+    h = lambda b, rpm, blocked=False: {"backend": b, "endpoint": f"vllm-sr/b/{b}", "bucket": fp.bucket(b),
+                                       "headroom_rpm": 0 if blocked else rpm, "blocked": blocked}
+    return {"models": [m("best", 0.9, [h("nim-best", 5), h("or-best", 20)]), m("good", 0.8, [h("groq-good", 30)]),
+                       m("capped", 1.0, [h("groq-capped", 30, blocked=True)]), m("meh", 0.75, [h("nim-meh", 5)])]}
+
+
+def test_lane_plan_spreads_lanes_over_best_models_with_headroom():
+    p = fp.plan_lanes(_inv(), lanes=6, models=2)
+    assert len(p["lanes"]) == 6
+    assert {l["endpoint"] for l in p["lanes"]} == {"vllm-sr/m/best", "vllm-sr/m/good"}  # capped model never planned
+    per = {e: sum(1 for l in p["lanes"] if l["endpoint"] == e) for e in ("vllm-sr/m/best", "vllm-sr/m/good")}
+    assert per["vllm-sr/m/good"] >= per["vllm-sr/m/best"] - 1  # lanes follow headroom (30 vs 25 rpm)
+    for l in p["lanes"]:                                         # lane budgets never exceed the model's headroom
+        assert l["rpm_budget"] <= {"vllm-sr/m/best": 25, "vllm-sr/m/good": 30}[l["endpoint"]] / per[l["endpoint"]] + 1e-9
+
+
+def test_pinned_lane_plan_uses_single_backends_and_warns_when_short():
+    p = fp.plan_lanes(_inv(), lanes=4, models=1, pinned=True)
+    assert {l["endpoint"] for l in p["lanes"]} <= {"vllm-sr/b/nim-best", "vllm-sr/b/or-best"}
+    assert all(l["model"] == "best" for l in p["lanes"])
+    short = fp.plan_lanes(_inv(), lanes=200, models=9)
+    assert short["warnings"] and len(short["lanes"]) == 200
+
+
 def test_cascade_moves_on_from_any_backend_error():
     # One backend's 403 (Cloudflare 1010), 401/402 (key/balance), 404 (model gone) or 400 (context too long)
     # says nothing about the next backend, so sr:free must try it instead of failing the request.

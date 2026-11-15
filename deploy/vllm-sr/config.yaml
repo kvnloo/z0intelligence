@@ -26,6 +26,126 @@ entrypoints:
 - model_names:
   - vllm-sr/free-format
   recipe: format
+- model_names:
+  - vllm-sr/m/step-5-preview
+  recipe: m-step-5-preview
+- model_names:
+  - vllm-sr/m/nemotron-3.5-super-vl
+  recipe: m-nemotron-3.5-super-vl
+- model_names:
+  - vllm-sr/m/nemotron-3-ultra
+  recipe: m-nemotron-3-ultra
+- model_names:
+  - vllm-sr/m/dots-3-note
+  recipe: m-dots-3-note
+- model_names:
+  - vllm-sr/m/flint-v1
+  recipe: m-flint-v1
+- model_names:
+  - vllm-sr/m/gpt-oss-120b
+  recipe: m-gpt-oss-120b
+- model_names:
+  - vllm-sr/m/nemotron-3.5-lightning
+  recipe: m-nemotron-3.5-lightning
+- model_names:
+  - vllm-sr/m/xing4.0-29b
+  recipe: m-xing4.0-29b
+- model_names:
+  - vllm-sr/m/qwen3.8-27b
+  recipe: m-qwen3.8-27b
+- model_names:
+  - vllm-sr/m/nemotron-nano-omni
+  recipe: m-nemotron-nano-omni
+- model_names:
+  - vllm-sr/m/gpt-oss-20b
+  recipe: m-gpt-oss-20b
+- model_names:
+  - vllm-sr/m/minimax-m3.1-flash
+  recipe: m-minimax-m3.1-flash
+- model_names:
+  - vllm-sr/m/mistral-large-4
+  recipe: m-mistral-large-4
+- model_names:
+  - vllm-sr/m/laguna-xs-2.1
+  recipe: m-laguna-xs-2.1
+- model_names:
+  - vllm-sr/m/command-a-reasoning
+  recipe: m-command-a-reasoning
+- model_names:
+  - vllm-sr/m/command-a-plus
+  recipe: m-command-a-plus
+- model_names:
+  - vllm-sr/m/north-mini-code
+  recipe: m-north-mini-code
+- model_names:
+  - vllm-sr/m/glm-5.3
+  recipe: m-glm-5.3
+- model_names:
+  - vllm-sr/m/qwen3-8b
+  recipe: m-qwen3-8b
+- model_names:
+  - vllm-sr/b/nim-step-5-preview
+  recipe: b-nim-step-5-preview
+- model_names:
+  - vllm-sr/b/or-nemotron-3.5-super-vl
+  recipe: b-or-nemotron-3.5-super-vl
+- model_names:
+  - vllm-sr/b/or-nemotron-3-ultra
+  recipe: b-or-nemotron-3-ultra
+- model_names:
+  - vllm-sr/b/nim-nemotron-3-ultra
+  recipe: b-nim-nemotron-3-ultra
+- model_names:
+  - vllm-sr/b/or-dots-3-note
+  recipe: b-or-dots-3-note
+- model_names:
+  - vllm-sr/b/or-flint-v1
+  recipe: b-or-flint-v1
+- model_names:
+  - vllm-sr/b/groq-gpt-oss-120b
+  recipe: b-groq-gpt-oss-120b
+- model_names:
+  - vllm-sr/b/nim-nemotron-3.5-lightning
+  recipe: b-nim-nemotron-3.5-lightning
+- model_names:
+  - vllm-sr/b/or-nemotron-3.5-lightning
+  recipe: b-or-nemotron-3.5-lightning
+- model_names:
+  - vllm-sr/b/or-xing4.0-29b
+  recipe: b-or-xing4.0-29b
+- model_names:
+  - vllm-sr/b/groq-qwen3.8-27b
+  recipe: b-groq-qwen3.8-27b
+- model_names:
+  - vllm-sr/b/or-nemotron-nano-omni
+  recipe: b-or-nemotron-nano-omni
+- model_names:
+  - vllm-sr/b/groq-gpt-oss-20b
+  recipe: b-groq-gpt-oss-20b
+- model_names:
+  - vllm-sr/b/nim-minimax-m3.1-flash
+  recipe: b-nim-minimax-m3.1-flash
+- model_names:
+  - vllm-sr/b/nim-mistral-large-4
+  recipe: b-nim-mistral-large-4
+- model_names:
+  - vllm-sr/b/nim-laguna-xs-2.1
+  recipe: b-nim-laguna-xs-2.1
+- model_names:
+  - vllm-sr/b/cohere-command-a-reasoning
+  recipe: b-cohere-command-a-reasoning
+- model_names:
+  - vllm-sr/b/cohere-command-a-plus
+  recipe: b-cohere-command-a-plus
+- model_names:
+  - vllm-sr/b/cohere-north-mini-code
+  recipe: b-cohere-north-mini-code
+- model_names:
+  - vllm-sr/b/samba-glm-5.3
+  recipe: b-samba-glm-5.3
+- model_names:
+  - vllm-sr/b/local-qwen3-8b
+  recipe: b-local-qwen3-8b
 recipes:
 - name: turbo
   description: Free pool, fastest first.
@@ -525,6 +645,825 @@ recipes:
         per_attempt_timeout: 120s
         total_timeout: 600s
         retryable_status_codes: *id002
+- name: m-step-5-preview
+  description: step-5-preview on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-step-5-preview
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-step-5-preview
+        use_reasoning: false
+        weight: 40.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-nemotron-3.5-super-vl
+  description: nemotron-3.5-super-vl on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-nemotron-3.5-super-vl
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-nemotron-3.5-super-vl
+        use_reasoning: false
+        weight: 20.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-nemotron-3-ultra
+  description: nemotron-3-ultra on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-nemotron-3-ultra
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-nemotron-3-ultra
+        use_reasoning: false
+        weight: 20.0
+      - model: nim-nemotron-3-ultra
+        use_reasoning: false
+        weight: 40.0
+      fallback:
+        enabled: true
+        max_attempts: 2
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-dots-3-note
+  description: dots-3-note on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-dots-3-note
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-dots-3-note
+        use_reasoning: false
+        weight: 20.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-flint-v1
+  description: flint-v1 on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-flint-v1
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-flint-v1
+        use_reasoning: false
+        weight: 20.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-gpt-oss-120b
+  description: gpt-oss-120b on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-gpt-oss-120b
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: groq-gpt-oss-120b
+        use_reasoning: false
+        weight: 30.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-nemotron-3.5-lightning
+  description: nemotron-3.5-lightning on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-nemotron-3.5-lightning
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-nemotron-3.5-lightning
+        use_reasoning: false
+        weight: 40.0
+      - model: or-nemotron-3.5-lightning
+        use_reasoning: false
+        weight: 20.0
+      fallback:
+        enabled: true
+        max_attempts: 2
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-xing4.0-29b
+  description: xing4.0-29b on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-xing4.0-29b
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-xing4.0-29b
+        use_reasoning: false
+        weight: 20.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-qwen3.8-27b
+  description: qwen3.8-27b on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-qwen3.8-27b
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: groq-qwen3.8-27b
+        use_reasoning: false
+        weight: 30.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-nemotron-nano-omni
+  description: nemotron-nano-omni on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-nemotron-nano-omni
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-nemotron-nano-omni
+        use_reasoning: false
+        weight: 20.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-gpt-oss-20b
+  description: gpt-oss-20b on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-gpt-oss-20b
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: groq-gpt-oss-20b
+        use_reasoning: false
+        weight: 30.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-minimax-m3.1-flash
+  description: minimax-m3.1-flash on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-minimax-m3.1-flash
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-minimax-m3.1-flash
+        use_reasoning: false
+        weight: 40.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-mistral-large-4
+  description: mistral-large-4 on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-mistral-large-4
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-mistral-large-4
+        use_reasoning: false
+        weight: 40.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-laguna-xs-2.1
+  description: laguna-xs-2.1 on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-laguna-xs-2.1
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-laguna-xs-2.1
+        use_reasoning: false
+        weight: 40.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-command-a-reasoning
+  description: command-a-reasoning on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-command-a-reasoning
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: cohere-command-a-reasoning
+        use_reasoning: false
+        weight: 20.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-command-a-plus
+  description: command-a-plus on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-command-a-plus
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: cohere-command-a-plus
+        use_reasoning: false
+        weight: 20.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-north-mini-code
+  description: north-mini-code on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-north-mini-code
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: cohere-north-mini-code
+        use_reasoning: false
+        weight: 20.0
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-glm-5.3
+  description: glm-5.3 on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-glm-5.3
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: samba-glm-5.3
+        use_reasoning: false
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: m-qwen3-8b
+  description: qwen3-8b on any of its free hosts.
+  routing:
+    decisions:
+    - name: m-qwen3-8b
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: local-qwen3-8b
+        use_reasoning: false
+      fallback:
+        enabled: true
+        max_attempts: 1
+        per_attempt_timeout: 120s
+        total_timeout: 600s
+        retryable_status_codes: *id002
+- name: b-nim-step-5-preview
+  description: nim-step-5-preview only, no fallback.
+  routing:
+    decisions:
+    - name: b-nim-step-5-preview
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-step-5-preview
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-or-nemotron-3.5-super-vl
+  description: or-nemotron-3.5-super-vl only, no fallback.
+  routing:
+    decisions:
+    - name: b-or-nemotron-3.5-super-vl
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-nemotron-3.5-super-vl
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-or-nemotron-3-ultra
+  description: or-nemotron-3-ultra only, no fallback.
+  routing:
+    decisions:
+    - name: b-or-nemotron-3-ultra
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-nemotron-3-ultra
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-nim-nemotron-3-ultra
+  description: nim-nemotron-3-ultra only, no fallback.
+  routing:
+    decisions:
+    - name: b-nim-nemotron-3-ultra
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-nemotron-3-ultra
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-or-dots-3-note
+  description: or-dots-3-note only, no fallback.
+  routing:
+    decisions:
+    - name: b-or-dots-3-note
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-dots-3-note
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-or-flint-v1
+  description: or-flint-v1 only, no fallback.
+  routing:
+    decisions:
+    - name: b-or-flint-v1
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-flint-v1
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-groq-gpt-oss-120b
+  description: groq-gpt-oss-120b only, no fallback.
+  routing:
+    decisions:
+    - name: b-groq-gpt-oss-120b
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: groq-gpt-oss-120b
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-nim-nemotron-3.5-lightning
+  description: nim-nemotron-3.5-lightning only, no fallback.
+  routing:
+    decisions:
+    - name: b-nim-nemotron-3.5-lightning
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-nemotron-3.5-lightning
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-or-nemotron-3.5-lightning
+  description: or-nemotron-3.5-lightning only, no fallback.
+  routing:
+    decisions:
+    - name: b-or-nemotron-3.5-lightning
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-nemotron-3.5-lightning
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-or-xing4.0-29b
+  description: or-xing4.0-29b only, no fallback.
+  routing:
+    decisions:
+    - name: b-or-xing4.0-29b
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-xing4.0-29b
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-groq-qwen3.8-27b
+  description: groq-qwen3.8-27b only, no fallback.
+  routing:
+    decisions:
+    - name: b-groq-qwen3.8-27b
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: groq-qwen3.8-27b
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-or-nemotron-nano-omni
+  description: or-nemotron-nano-omni only, no fallback.
+  routing:
+    decisions:
+    - name: b-or-nemotron-nano-omni
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: or-nemotron-nano-omni
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-groq-gpt-oss-20b
+  description: groq-gpt-oss-20b only, no fallback.
+  routing:
+    decisions:
+    - name: b-groq-gpt-oss-20b
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: groq-gpt-oss-20b
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-nim-minimax-m3.1-flash
+  description: nim-minimax-m3.1-flash only, no fallback.
+  routing:
+    decisions:
+    - name: b-nim-minimax-m3.1-flash
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-minimax-m3.1-flash
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-nim-mistral-large-4
+  description: nim-mistral-large-4 only, no fallback.
+  routing:
+    decisions:
+    - name: b-nim-mistral-large-4
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-mistral-large-4
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-nim-laguna-xs-2.1
+  description: nim-laguna-xs-2.1 only, no fallback.
+  routing:
+    decisions:
+    - name: b-nim-laguna-xs-2.1
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: nim-laguna-xs-2.1
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-cohere-command-a-reasoning
+  description: cohere-command-a-reasoning only, no fallback.
+  routing:
+    decisions:
+    - name: b-cohere-command-a-reasoning
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: cohere-command-a-reasoning
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-cohere-command-a-plus
+  description: cohere-command-a-plus only, no fallback.
+  routing:
+    decisions:
+    - name: b-cohere-command-a-plus
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: cohere-command-a-plus
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-cohere-north-mini-code
+  description: cohere-north-mini-code only, no fallback.
+  routing:
+    decisions:
+    - name: b-cohere-north-mini-code
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: cohere-north-mini-code
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-samba-glm-5.3
+  description: samba-glm-5.3 only, no fallback.
+  routing:
+    decisions:
+    - name: b-samba-glm-5.3
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: samba-glm-5.3
+        use_reasoning: false
+      fallback:
+        enabled: false
+- name: b-local-qwen3-8b
+  description: local-qwen3-8b only, no fallback.
+  routing:
+    decisions:
+    - name: b-local-qwen3-8b
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      description: First backend drawn by capacity x eval weight; then every free
+        backend in order.
+      algorithm:
+        type: random
+      modelRefs:
+      - model: local-qwen3-8b
+        use_reasoning: false
+      fallback:
+        enabled: false
 listeners:
 - name: http-8899
   address: 0.0.0.0
