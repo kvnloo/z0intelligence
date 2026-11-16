@@ -330,6 +330,31 @@ def test_pace_retries_a_failed_deploy_next_minute(monkeypatch):
     assert json.loads(fp.OUT.read_text())["pool"] == ["groq-gpt-oss-20b"] and not rcs
 
 
+def test_pace_redeploys_when_a_reprobe_only_resizes_a_card(monkeypatch):
+    # 11-16: a 429 had carded step-5-preview at 6K; the fixed re-probe re-sized it, but the alive set was
+    # unchanged, so pace never redeployed and the router kept answering 422 context_length_exceeded.
+    monkeypatch.setattr(fp, "OUT", fp.POOL.parent / "free-pace.json")
+    monkeypatch.setattr(fp, "STATE", fp.POOL.parent)
+    monkeypatch.setattr(fp, "pod_log", lambda s: [])
+    monkeypatch.setattr(fp, "render", lambda **k: None)
+    deploys = []
+
+    class R:
+        returncode, stdout, stderr = 0, "", ""
+    monkeypatch.setattr(fp.subprocess, "run", lambda *a, **k: deploys.append(a) or R())
+    monkeypatch.setattr(sys, "argv", ["free_pool.py", "pace"])
+    row = {"name": "groq-gpt-oss-20b", "tool_call": True, "tool_s": 1.0, "max_ok_tokens": 6000}
+    fp.POOL.write_text(json.dumps({"rows": [row]}))
+    fp.OUT.write_text(json.dumps({"probed_at": 1e12, "pool": ["groq-gpt-oss-20b"], "excluded": []}))
+    fp.pace()
+    assert not deploys                                              # nothing changed: no deploy
+    fp.POOL.write_text(json.dumps({"rows": [dict(row, max_ok_tokens=131072)]}))
+    fp.pace()
+    assert len(deploys) == 1 and json.loads(fp.OUT.read_text())["cards"] == {"groq-gpt-oss-20b": 131072}
+    fp.pace()
+    assert len(deploys) == 1                                        # deployed state recorded: no repeat
+
+
 def test_no_decision_exceeds_the_routers_32_candidate_limit(tmp_path):
     # 11-15 live: autoscale grew the pool to 38 and the router crash-looped on "exceeding ... limit of 32".
     import yaml

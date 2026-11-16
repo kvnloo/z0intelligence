@@ -694,6 +694,11 @@ def audit(lines):
             "ok": not why, "why": "; ".join(why) or "R1 spread, R2 no failures"}
 
 
+def cards():
+    """The per-backend context the router is told (alive rows only): a change here must redeploy."""
+    return {n: r.get("max_ok_tokens") for n, r in sorted(pool_rows().items()) if alive(r)}
+
+
 def pace():
     now = time.time()
     try:
@@ -701,6 +706,7 @@ def pace():
     except (OSError, ValueError):
         st = {}
     st.setdefault("events", []), st.setdefault("blocked", {})
+    st.setdefault("cards", cards())  # baseline before any re-probe, so a re-sized card below redeploys
     since = min(now - st.get("cursor", now - HOUR), DAY) + 30
     lines = pod_log(since)
     ingest(st, lines, now)
@@ -723,14 +729,15 @@ def pace():
             print("re-probed:", len(names), "backends alive")
         st["probed_at"] = now
     # Desired vs deployed, every minute: a deploy that failed (helm timeout) is retried next tick, not in 6 h.
-    pool_names = sorted(n for n, r in pool_rows().items() if alive(r))
-    changed = want != st.get("excluded", []) or pool_names != st.get("pool", [])
+    pool_names, now_cards = sorted(n for n, r in pool_rows().items() if alive(r)), cards()
+    # A re-probe that only re-sizes a card (6K -> 128K) keeps the same names, and must still redeploy.
+    changed = want != st.get("excluded", []) or pool_names != st.get("pool", []) or now_cards != st["cards"]
     if changed and "--dry-run" not in sys.argv:
         render(exclude=set(want), out=LIVE_CFG)
         r = subprocess.run([str(HERE / "deploy.sh"), str(LIVE_CFG)], capture_output=True, text=True, timeout=600)
         st["deploy"] = {"at": now, "rc": r.returncode, "excluded": want, "tail": r.stdout[-300:] + r.stderr[-300:]}
         if r.returncode == 0:  # a failed deploy keeps the old state, so the next minute retries it
-            st["excluded"], st["pool"] = want, pool_names
+            st["excluded"], st["pool"], st["cards"] = want, pool_names, now_cards
     st["at"] = datetime.fromtimestamp(now).astimezone().isoformat(timespec="seconds")
     st["usage"] = usage
     STATE.mkdir(parents=True, exist_ok=True)
