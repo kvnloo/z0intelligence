@@ -1,0 +1,157 @@
+diff --git i/src/semantic-router/pkg/extproc/fallback_client_tool_results_test.go w/src/semantic-router/pkg/extproc/fallback_client_tool_results_test.go
+new file mode 100644
+index 00000000..6dd0ffd4
+--- /dev/null
++++ w/src/semantic-router/pkg/extproc/fallback_client_tool_results_test.go
+@@ -0,0 +1,22 @@
++package extproc
++
++import (
++	"testing"
++
++	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/llmprotocol"
++)
++
++// An agent turn carries the client's earlier tool results. Replaying that body
++// to another candidate runs no tool again, so fallback must stay allowed.
++func TestClientToolResultsKeepFallbackAllowed(t *testing.T) {
++	ctx := &RequestContext{SemanticRequest: &llmprotocol.Request{Messages: []llmprotocol.Message{
++		{Role: llmprotocol.RoleUser},
++		{Role: llmprotocol.RoleTool},
++	}}}
++	if ctx.hasNonIdempotentToolExecution() {
++		t.Fatal("client-side tool results must not block fallback")
++	}
++	if fallbackCommitState(ctx).HasNonIdempotentSideEffects {
++		t.Fatal("commit state must not report side effects for client tool results")
++	}
++}
+diff --git i/src/semantic-router/pkg/extproc/fallback_dispatch.go w/src/semantic-router/pkg/extproc/fallback_dispatch.go
+index 17170880..185e2721 100644
+--- i/src/semantic-router/pkg/extproc/fallback_dispatch.go
++++ w/src/semantic-router/pkg/extproc/fallback_dispatch.go
+@@ -30,21 +30,13 @@ import (
+ 
+ type fallbackTransportCaller func(ctx context.Context, model string, body []byte, headers map[string]string) ([]byte, int, error)
+ 
+-// hasNonIdempotentToolExecution reports whether the request contains executed tool side-effects.
++// hasNonIdempotentToolExecution reports whether answering this request ran a
++// tool upstream. Tool results inside the request were produced by the client
++// before the call, and a chat completion is stateless, so sending the same body
++// to another candidate runs nothing twice. Treating them as side effects
++// disabled fallback for every agent turn after its first tool call, so one
++// 429 or 403 from the primary failed the request.
+ func (ctx *RequestContext) hasNonIdempotentToolExecution() bool {
+-	if ctx == nil || ctx.SemanticRequest == nil {
+-		return false
+-	}
+-	for _, msg := range ctx.SemanticRequest.Messages {
+-		if msg.Role == llmprotocol.RoleTool {
+-			return true
+-		}
+-		for _, content := range msg.Content {
+-			if content.Kind == llmprotocol.ContentToolResult {
+-				return true
+-			}
+-		}
+-	}
+ 	return false
+ }
+ 
+diff --git i/src/semantic-router/pkg/selection/random.go w/src/semantic-router/pkg/selection/random.go
+index 38ab9067..412579a2 100644
+--- i/src/semantic-router/pkg/selection/random.go
++++ w/src/semantic-router/pkg/selection/random.go
+@@ -4,6 +4,7 @@ import (
+ 	"context"
+ 	"math/rand/v2"
+ 
++	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/config"
+ 	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/observability/logging"
+ )
+ 
+@@ -32,6 +33,38 @@ func (s *RandomSelector) ExternalDependencies() []Dependency { return []Dependen
+ // UpdateFeedback does nothing for the random selector (no learning)
+ func (s *RandomSelector) UpdateFeedback(context.Context, *Feedback) error { return nil }
+ 
++// pick draws an index uniformly, or in proportion to ModelRef.Weight when any
++// candidate carries one. Weight 0 then means "fallback only": the candidate is
++// never drawn first but stays in the eligible list the fallback walks.
++func (s *RandomSelector) pick(candidates []config.ModelRef) int {
++	total := 0.0
++	for _, c := range candidates {
++		if c.Weight > 0 {
++			total += c.Weight
++		}
++	}
++	if total <= 0 {
++		return s.intn(len(candidates))
++	}
++	const scale = 1 << 30
++	r := float64(s.intn(scale)) / scale * total
++	for i, c := range candidates {
++		if c.Weight <= 0 {
++			continue
++		}
++		if r < c.Weight {
++			return i
++		}
++		r -= c.Weight
++	}
++	for i := len(candidates) - 1; i >= 0; i-- {
++		if candidates[i].Weight > 0 {
++			return i
++		}
++	}
++	return 0
++}
++
+ // Select draws one candidate uniformly from the eligible candidate models
+ func (s *RandomSelector) Select(_ context.Context, selCtx *SelectionContext) (*SelectionResult, error) {
+ 	if err := ValidateSelectionContext(selCtx); err != nil {
+@@ -39,7 +72,7 @@ func (s *RandomSelector) Select(_ context.Context, selCtx *SelectionContext) (*S
+ 	}
+ 
+ 	candidates := selCtx.CandidateModels
+-	chosen := candidates[s.intn(len(candidates))]
++	chosen := candidates[s.pick(candidates)]
+ 
+ 	// Each ModelRef is one equal slot, so scores stay per-candidate: two
+ 	// adapters on one base must not collapse into a single model-keyed score.
+diff --git i/src/semantic-router/pkg/selection/random_weighted_test.go w/src/semantic-router/pkg/selection/random_weighted_test.go
+new file mode 100644
+index 00000000..84f2cfeb
+--- /dev/null
++++ w/src/semantic-router/pkg/selection/random_weighted_test.go
+@@ -0,0 +1,31 @@
++package selection
++
++import (
++	"context"
++	"testing"
++
++	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/config"
++)
++
++// Weights steer the first draw in proportion; weight 0 is fallback-only.
++func TestRandomSelector_WeightedDraw(t *testing.T) {
++	selector := NewRandomSelector()
++	selCtx := &SelectionContext{CandidateModels: []config.ModelRef{
++		{Model: "heavy", Weight: 3}, {Model: "light", Weight: 1}, {Model: "reserve"},
++	}}
++	const draws = 8000
++	counts := map[string]int{}
++	for i := 0; i < draws; i++ {
++		result, err := selector.Select(context.Background(), selCtx)
++		if err != nil {
++			t.Fatalf("Select failed: %v", err)
++		}
++		counts[result.SelectedModel]++
++	}
++	if counts["reserve"] != 0 {
++		t.Fatalf("weight-0 candidate drawn first %d times", counts["reserve"])
++	}
++	if share := float64(counts["heavy"]) / draws; share < 0.68 || share > 0.82 {
++		t.Fatalf("heavy share %.2f, want ~0.75 (counts %v)", share, counts)
++	}
++}
