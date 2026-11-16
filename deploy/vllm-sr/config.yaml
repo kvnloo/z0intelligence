@@ -1058,6 +1058,7 @@ recipes:
       modelRefs:
       - model: samba-glm-5.3
         use_reasoning: false
+        weight: 20.0
       fallback:
         enabled: true
         max_attempts: 1
@@ -1080,6 +1081,7 @@ recipes:
       modelRefs:
       - model: local-qwen3-8b
         use_reasoning: false
+        weight: 30.0
       fallback:
         enabled: true
         max_attempts: 1

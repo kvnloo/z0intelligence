@@ -4,7 +4,8 @@
  "sources": {
   "groq_headers": "x-ratelimit-limit-requests = RPD, x-ratelimit-limit-tokens = TPM (per Groq docs)",
   "groq_docs": "https://console.groq.com/docs/rate-limits read 2026-11-02 (RPM, TPD)",
-  "cerebras_headers": "x-ratelimit-limit-{requests,tokens}-{minute,hour,day}"
+  "cerebras_headers": "x-ratelimit-limit-{requests,tokens}-{minute,hour,day}",
+  "samba_docs": "https://docs.sambanova.ai/docs/en/models/rate-limits read 2026-11-15 (free tier: RPM, RPD, TPD per model)"
  },
  "caveats": [
   "Limits are per model per organization: each model is an independent bucket.",
@@ -96,6 +97,36 @@
    "tph": 9000000,
    "basis": "header",
    "probe_latency_s": 0.238
+  },
+  {
+   "provider": "samba",
+   "model": "glm-5.3",
+   "rpm": 20,
+   "rpd": 20,
+   "tpm": null,
+   "tpd": 200000,
+   "basis": {
+    "rpm": "docs-tier",
+    "rpd": "docs-tier",
+    "tpm": null,
+    "tpd": "docs-tier"
+   },
+   "note": "docs.sambanova.ai/docs/en/models/rate-limits read 2026-11-15: every free-tier model listed is 20 RPM / 20 RPD / 200k TPD; GLM-5.3 itself is not listed, so the tier value is assumed"
+  },
+  {
+   "provider": "local",
+   "model": "qwen3-8b",
+   "rpm": 30,
+   "rpd": null,
+   "tpm": null,
+   "tpd": null,
+   "basis": {
+    "rpm": "self-imposed",
+    "rpd": null,
+    "tpm": null,
+    "tpd": null
+   },
+   "note": "groot llama-server :11530, no provider quota; 30 rpm is a self-imposed cap so lanes do not queue on one GPU slot"
   }
  ],
  "accounts": {

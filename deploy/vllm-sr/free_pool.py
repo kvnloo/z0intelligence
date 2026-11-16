@@ -647,17 +647,22 @@ def inventory(cfg=None, st=None, now=None):
         per_bucket[bucket(n)] = per_bucket.get(bucket(n), 0) + 1
     quality, groups = model_quality(), {}
     for n in names:
-        b, cap = bucket(n), limits(bucket(n)).get("req", {}).get(MIN)
-        row, why = usage.get(b, {}), blocked.get(b, {}).get("why")
-        used = _frac(row["req_60s"])[0] if "req_60s" in row else 0
+        b = bucket(n)
+        lim, row, why = limits(b), usage.get(b, {}), blocked.get(b, {}).get("why")
+        caps = {k: lim.get(kind, {}).get(w) for k, (kind, w) in WIN.items()}
+        cell = lambda k: f"{WIN[k][0]}_{WIN[k][1]}s"
+        left = {k: (caps[k] - (_frac(row[cell(k)])[0] if cell(k) in row else 0)) if caps[k] else None for k in caps}
+        cap = caps["rpm"]
         if not why and "req_86400s" in row:
             u, c = _frac(row["req_86400s"])
             why = f"daily {u}/{c}" if u >= MARGIN * c else None
-        head = None if not cap else 0 if why else round(max(0, cap - used) / per_bucket[b], 2)
+        # this minute's headroom, but never more requests than the hour/day windows have left
+        room = min(max(0, v) for v in (left["rpm"], left["rph"], left["rpd"]) if v is not None) if cap else None
+        head = None if not cap else 0 if why else round(room / per_bucket[b], 2)
         groups.setdefault(model_key(n), []).append(
             {"backend": n, "endpoint": f"vllm-sr/b/{n}", "bucket": b, "rpm_cap_shared": cap, "bucket_models": per_bucket[b],
              "headroom_rpm": head, "blocked": why or False,
-             "tpm_cap": limits(b).get("tok", {}).get(MIN), "until": blocked.get(b, {}).get("until")})
+             "caps": caps, "left": left, "until": blocked.get(b, {}).get("until")})
     models = sorted(({"model": k, "endpoint": f"vllm-sr/m/{k}", "quality": quality.get(k, {}), "hosts": hs,
                       "headroom_rpm": round(sum(h["headroom_rpm"] or 0 for h in hs), 2)} for k, hs in groups.items()),
                     key=lambda m: (-m["quality"].get("quality", 0), -m["headroom_rpm"]))
@@ -768,6 +773,12 @@ if __name__ == "__main__":
         render()
     elif sys.argv[1:2] == ["inventory"]:  # free_pool.py inventory: every endpoint by workflow + live headroom
         print(json.dumps(inventory(), indent=1))
+    elif sys.argv[1:2] == ["limits"]:  # free_pool.py limits: per-backend caps and what is left now (window: left/cap)
+        for m in inventory()["models"]:
+            for h in m["hosts"]:
+                cells = " ".join(f"{k}={h['left'][k]}/{c}" for k, c in h["caps"].items() if c)
+                print(f"{h['backend']:30} {h['bucket']:22} head={h['headroom_rpm']} {cells}"
+                      + (f" BLOCKED {h['blocked']}" if h["blocked"] else ""))
     elif sys.argv[1:2] == ["lanes"]:  # free_pool.py lanes <x> [--models y] [--family f] [--pinned]
         args = sys.argv[2:]
         opt = lambda k, d: args[args.index(k) + 1] if k in args else d

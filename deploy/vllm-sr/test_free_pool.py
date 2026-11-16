@@ -116,6 +116,22 @@ def test_every_free_model_and_backend_gets_its_own_entrypoint():
     assert len({fp.model_key(b) for b in backends}) < len(backends)  # some model has several hosts to fall over to
 
 
+def test_every_backend_has_a_rate_limit_row():
+    # A backend with no limits row gets no rpm cap, so the lane planner silently gives it zero lanes.
+    import yaml
+    c = yaml.safe_load((fp.HERE / "config.yaml").read_text())
+    missing = [m["name"] for m in c["providers"]["models"] if not fp.limits(fp.bucket(m["name"])).get("req", {}).get(fp.MIN)]
+    assert not missing, f"add these to limits.json: {missing}"
+
+
+def test_daily_cap_bounds_rpm_headroom():
+    # 18 of 20 requests used today: 20 rpm free this minute is really 2 requests until reset.
+    cfg = {"providers": {"models": [{"name": "samba-glm-5.3"}]}, "entrypoints": []}
+    st = {"usage": {"samba-glm-5.3": {"req_60s": "0/20", "req_86400s": "18/20"}}}
+    h = fp.inventory(cfg, st)["models"][0]["hosts"][0]
+    assert h["headroom_rpm"] == 2 and h["caps"]["rpd"] == 20 and h["left"]["rpd"] == 2
+
+
 def _inv():
     m = lambda key, q, hosts: {"model": key, "endpoint": f"vllm-sr/m/{key}", "quality": {"quality": q, "reason": q},
                                "hosts": hosts, "headroom_rpm": sum(h["headroom_rpm"] or 0 for h in hosts)}
