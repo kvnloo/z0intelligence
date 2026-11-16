@@ -247,7 +247,7 @@ def test_new_free_models_join_the_router_without_a_code_edit(tmp_path, monkeypat
 def test_reprobe_skips_blocked_backends_and_reuses_known_context(tmp_path, monkeypatch):
     # Never poll an exhausted provider (owner rule); a known context window is not re-measured with 100K prompts.
     now = 1_800_000_000.0
-    fp.POOL.write_text(json.dumps({"rows": [{"name": "groq-gpt-oss-20b", "tool_call": True, "max_ok_tokens": 30000},
+    fp.POOL.write_text(json.dumps({"rows": [{"name": "groq-gpt-oss-20b", "tool_call": True, "max_ok_tokens": 30000, "ctx_100000": 413},
                                             {"name": "samba-glm-5.3", "tool_status": 402}]}))
     calls = []
     monkeypatch.setattr(fp, "probe", lambda c, sizes=True: calls.append((c[0], sizes)) or {"name": c[0], "tool_call": True, "tool_s": 1.0})
@@ -277,6 +277,10 @@ def test_a_rate_limited_size_probe_never_caps_context(tmp_path, monkeypatch):
     fp.POOL.write_text(json.dumps({"rows": [small]}))
     rows = fp.reprobe({}, now, cands=[c for c in fp.CANDIDATES if c[0] == "groq-gpt-oss-20b"])
     assert rows[0]["ctx_30000"] == 413  # a reused cap keeps the evidence it was measured with
+    # 11-16 live: nim-step-5-preview sat at 6K with no ctx_* status left, so nothing ever re-measured it.
+    bare = {"name": "nim-step-5-preview", "tool_call": True, "tool_s": 1.0, "max_ok_tokens": 6000}
+    assert fp.ctx_open(bare) and not fp.ctx_open(dict(bare, max_ok_tokens=100000))
+    assert not fp.ctx_open(dict(bare, max_ok_tokens=30000, ctx_100000=400))  # a size error at 100K proves 30K
 
 
 def test_pace_refuses_a_reprobe_that_kills_half_the_pool(monkeypatch):
