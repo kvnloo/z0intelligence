@@ -56,4 +56,5 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "webgpu-demo"]
-markers = ["live: requires configured external or local model services"]
+markers = ["live: requires configured external or local model services",
+           "perf: wall-clock budgets; they measure the host, so run them on the host, not shared CI runners"]
