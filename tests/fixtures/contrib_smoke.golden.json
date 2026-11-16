@@ -1,0 +1,6 @@
+{
+  "schema": "z0.contrib.smoke-golden.v1",
+  "command": "python -m z0int contrastive eval --json",
+  "canonicalization": "json.loads(stdout); drop evaluated_at; json.dumps(sort_keys=True, separators=(',', ':')); sha256",
+  "output_sha256": "843ad334030a38329b78c089a8408b9b9568f63341a1c1405a06cad312a517c4"
+}

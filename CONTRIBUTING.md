@@ -1,63 +1,125 @@
 # Contributing to z0intelligence
 
-Thank you for helping. The project front door (what Zer0 is, the open problems,
-using a coding agent, where to talk, terms) is
-[z0's CONTRIBUTING](https://github.com/kvnloo/z0/blob/main/CONTRIBUTING.md).
-This page covers only what is specific to this repo.
+Thank you for helping. This page is for people. Coding agents follow the same
+steps through `z0int contribute --json` (see `AGENTS.md`, "Start here").
+The full design is in [docs/contrib/CONTRIBUTOR-LAYER.md](docs/contrib/CONTRIBUTOR-LAYER.md).
 
-## Pick a task
+## 1. Set up
 
-Open issues labeled
-[`claimable`](https://github.com/kvnloo/z0intelligence/issues?q=is%3Aopen+label%3Aclaimable)
-or [`good first issue`](https://github.com/kvnloo/z0intelligence/issues?q=is%3Aopen+label%3A%22good+first+issue%22).
-To take one, comment `/claim` on the issue; a maintainer confirms the claim
-(no claim bot yet). Propose new work in an issue first.
-
-## Set up and run the tests
-
-Python 3.11–3.13. The core install has no torch, so it works anywhere,
+Python 3.10–3.13. The core install has no torch, so it works anywhere,
 including Intel Macs:
 
 ```bash
 git clone https://github.com/<you>/z0intelligence && cd z0intelligence
-python3 -m venv .venv && . .venv/bin/activate
-python -m pip install -e '.[test]'
-python -m pytest -q tests/test_check_receipt.py   # or the test file your issue names
+./scripts/bootstrap.sh            # light .venv; or: python -m venv .venv && .venv/bin/pip install -e '.[test]'
 ```
 
-Tests that need the ML stack skip themselves without it. If your issue touches
-models or backends, add the `ml` extra (on Linux, install the CPU torch first to
-keep it small):
+Tests that need the ML stack skip themselves without it. If your task touches
+models or backends, add the `ml` extra: `Z0INT_EXTRAS=test,ml ./scripts/bootstrap.sh`
+(on Linux, `pip install torch==2.10.0+cpu --index-url https://download.pytorch.org/whl/cpu`
+first keeps it small). The full Zer0 runtime and harness plugins come from
+`git clone https://github.com/kvnloo/z0 && ./z0/z0 onboard --auto`; tasks that need
+it are not offered on the repo-only path.
+
+Then run:
 
 ```bash
-python -m pip install torch==2.10.0+cpu --index-url https://download.pytorch.org/whl/cpu
-python -m pip install -e '.[test,ml]'
+.venv/bin/z0int contribute
 ```
 
-`./scripts/bootstrap.sh` does the light install into `.venv`; run it as
-`Z0INT_EXTRAS=test,ml ./scripts/bootstrap.sh` for the ML stack.
+It checks your setup, runs an offline smoke eval (CPU only, no model downloads),
+and suggests one task plus two alternatives that fit your machine. It then stops
+and asks you. Nothing is posted anywhere.
 
-CI runs the full offline suite (`python -m pytest -q -m 'not live'`, about
-10,000 tests) on every PR, so you don't have to run it all locally.
+## 2. Pick and claim a task
 
-## Open the PR
+- The only task list is [`.z0/priorities.yaml`](.z0/priorities.yaml). Tasks with
+  `newcomer: true` are open to you. Please do not open PRs for tasks that are not
+  listed; propose new tasks in an issue instead.
+- `z0int contribute claim <task-id>` takes a **local lease** (so two agents on one
+  machine do not take the same task). You can explore on the local lease.
+- For an `exclusive` or `parallel(n)` task, post the public claim on its issue
+  before the PR. The CLI prints the exact text, for example:
 
-Target `master` from your fork. The template has an Evidence yaml block, and
-the `receipt` check fails until it is complete:
+  ```
+  /claim t-139-e2e-trace lease=72h harness=claude-code hw=cpu
+  ```
 
-1. Push your branch and open the PR.
-2. Fill in `issue`, `base_revision` (`git merge-base origin/master HEAD`),
-   `head_revision` (`git rev-parse HEAD`), and `tests.red` / `tests.green`
-   (the command and its result before and after your change).
-3. Save the description. Editing it re-runs the check.
+  The claim bot answers with the lease (72 h) or `/claim rejected: <reason>`.
+  `/claim renew` extends a lease when your fork branch has a commit in the last 72 h.
+  `/claim release` gives the task back. Expired leases are released automatically.
+  If the bot has not answered, a maintainer handles the claim by hand.
+- Tasks with `claim: none` (docs, reviews, the onboarding feedback task) need no public claim.
 
-`head_revision` must be the PR's head commit, so update it after every push.
-Test results from another commit are not evidence.
+## 3. Do the work with evidence
 
-Until you have had a PR merged here, CI waits for a maintainer to approve each
-workflow run.
-"Waiting for approval" just means no maintainer has approved the run yet;
-nothing is wrong with your PR.
+```bash
+z0int contribute start <task-id>      # makes a git worktree from master
+# work and commit inside that worktree only
+z0int contribute evidence <task-id>   # task verifier + product smoke on the exact HEAD
+```
 
-Your authorship stays in the git history. Terms and credit are described in
-z0's CONTRIBUTING.
+A new commit or a rebase needs new evidence. Evidence is a receipt bound to the
+commit sha; "it works on my machine" without a receipt is not enough.
+
+## 4. Open the pull request
+
+```bash
+z0int contribute pr <task-id>                 # writes the PR body (receipts, credit) to a file
+z0int contribute pr <task-id> --open --yes    # pushes to YOUR fork, opens a DRAFT PR
+```
+
+- PRs come from your fork and target the default branch **`master`**. Branch
+  protection and the required checks gate them; the owner reviews and merges.
+  (`preview` and `nightly` are for internal automated workers only.)
+- The PR body holds the task id, the receipts, your hardware class (for example
+  `nvidia-12g`), harness and model, and a `Credit: @you` line. It never holds your
+  profile or anything from your home directory.
+- The `receipt` check reads the yaml block in the PR body. `head_revision` must be
+  the PR head (`git rev-parse HEAD`), so update it after every push; editing the
+  description re-runs the check.
+- Until you have had a PR merged here, CI waits for a maintainer to approve each
+  workflow run. "Waiting for approval" means nobody has approved it yet; nothing is
+  wrong with your PR.
+
+## 5. Terms: no Contributor License Agreement
+
+z0intelligence is MIT-licensed and needs no Contributor License Agreement and no
+CLA bot: what you contribute is licensed to everyone under the same MIT license
+(inbound = outbound, GitHub Terms of Service D.6). Only contribute work you have
+the right to license that way.
+
+## 6. Credit
+
+You are credited in two places:
+
+- the `Credit: @<login>` line in your PR (written by `z0int contribute pr`), and
+- an entry in [`.z0/credits.yaml`](.z0/credits.yaml): `{login, tasks, prs, since}`.
+  Add your own entry in your PR, or a maintainer adds it when the PR merges.
+
+Upstream sources you build on must be cited in the PR.
+
+## 7. z0evals
+
+[z0evals](https://github.com/kvnloo/z0evals) holds the frozen evaluations and
+public results. It is in scope for contributors: tasks of `kind: z0evals` in
+`.z0/priorities.yaml` have a smoke path you can run offline, for example
+`python -m pytest -q tests/test_memory_acceptance.py` (the frozen memory cohort in
+`tests/fixtures/z0evals-fb14919/`). To run a full study, clone z0evals and point
+z0int at it with `--z0evals-root` / `Z0INT_Z0EVALS_ROOT` (see README).
+
+## 8. Privacy and safety rules
+
+- Your personal state stays in `~/.z0int/` (mode 0600). The contributor tooling
+  never reads your credentials, transcripts, or instruction-file contents. Richer
+  profile signals (for example a language histogram of your repos) are used only
+  after you say yes.
+- Nothing is posted to GitHub, pushed, or opened as a PR without your explicit yes.
+- Our tooling never uses grok or cursor as an LLM provider. You may use any coding
+  harness you like.
+
+## Always-available task
+
+If nothing fits, `z0int contribute feedback` gives you `t-onboarding-feedback`: a
+short friction report on the setup you just did. It needs no special hardware
+and it is always useful.

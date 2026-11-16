@@ -1,0 +1,7 @@
+# Hardware classes that already have an accepted receipt for a `parallel(n)` task.
+# The alignment engine gives `uniq_hw` credit to a task only when this host's class
+# (for example nvidia-12g) is not listed for it yet (spec §3.3). Maintainers update it
+# when they merge a profile receipt.
+# Entry: {task: <task id>, host_class: <cpu|<gpu-class>-<vram>g>, pr: <PR number>}
+schema: z0.receipts-index.v1
+receipts: []

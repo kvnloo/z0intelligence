@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kvnloo/z0intelligence/schemas/priorities.schema.json",
+  "title": "z0.priorities.v1 — ranked contributor task source (.z0/priorities.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "updated", "north_star", "alignment", "tasks"],
+  "properties": {
+    "schema": {"const": "z0.priorities.v1"},
+    "draft": {"type": "boolean"},
+    "updated": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "north_star": {"type": "string", "minLength": 1, "maxLength": 200},
+    "alignment": {"$ref": "#/$defs/alignment"},
+    "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/task"}}
+  },
+  "$defs": {
+    "unit": {"type": "number", "minimum": 0, "maximum": 1},
+    "alignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["weights", "setup_penalty_per_missing", "tie_epsilon"],
+      "properties": {
+        "weights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["impact", "fit", "interest", "ramp", "uniq_hw"],
+          "properties": {
+            "impact": {"$ref": "#/$defs/unit"},
+            "fit": {"$ref": "#/$defs/unit"},
+            "interest": {"$ref": "#/$defs/unit"},
+            "ramp": {"$ref": "#/$defs/unit"},
+            "uniq_hw": {"$ref": "#/$defs/unit"}
+          }
+        },
+        "setup_penalty_per_missing": {"$ref": "#/$defs/unit"},
+        "tie_epsilon": {"$ref": "#/$defs/unit"}
+      }
+    },
+    "tag": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "gate": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["issue"],
+          "properties": {"issue": {"type": "integer", "minimum": 1}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["task"],
+          "properties": {"task": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["condition"],
+          "properties": {"condition": {"type": "string", "minLength": 1}}
+        }
+      ]
+    },
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gpu_vram_gib", "ram_gib", "disk_gib", "os", "arch"],
+      "properties": {
+        "gpu_vram_gib": {"type": "number", "minimum": 0},
+        "ram_gib": {"type": "number", "minimum": 0},
+        "disk_gib": {"type": "number", "minimum": 0},
+        "os": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["linux", "macos", "windows"]}
+        },
+        "arch": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["x86_64", "arm64"]}
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "issue", "title", "kind", "tier", "rank", "status", "gate", "newcomer",
+        "needs_owner_approval", "claim", "difficulty", "expected_hours", "skills", "touches",
+        "hardware", "runtime", "network", "risk_class", "smoke", "verifier", "exit_criterion",
+        "impact_note"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "maxLength": 64},
+        "issue": {"type": ["integer", "null"], "minimum": 1},
+        "title": {"type": "string", "minLength": 1, "maxLength": 200},
+        "kind": {"enum": ["issue", "experiment", "review", "docs", "z0evals"]},
+        "tier": {"enum": ["P0", "P1", "P2", "P3"]},
+        "rank": {"type": "integer", "minimum": 1},
+        "status": {"enum": ["open", "gated", "done", "parked"]},
+        "gate": {"$ref": "#/$defs/gate"},
+        "newcomer": {"type": "boolean"},
+        "needs_owner_approval": {"type": "boolean"},
+        "claim": {"type": "string", "pattern": "^(exclusive|none|parallel\\([1-9][0-9]?\\))$"},
+        "difficulty": {"enum": ["S", "M", "L"]},
+        "expected_hours": {"type": "number", "exclusiveMinimum": 0, "maximum": 200},
+        "skills": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/tag"}},
+        "toolchains": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/tag"}},
+        "touches": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "hardware": {"$ref": "#/$defs/hardware"},
+        "runtime": {"enum": ["repo_only", "z0"]},
+        "network": {"enum": ["none", "github_read", "hf_download", "other"]},
+        "risk_class": {"enum": ["low", "medium", "high"]},
+        "smoke": {"type": ["string", "null"], "minLength": 1},
+        "verifier": {"type": ["string", "null"], "minLength": 1},
+        "exit_criterion": {"type": "string", "minLength": 1},
+        "impact_note": {"type": "string", "minLength": 1, "maxLength": 120}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"newcomer": {"const": true}}, "required": ["newcomer"]},
+          "then": {
+            "properties": {
+              "needs_owner_approval": {"const": false},
+              "risk_class": {"enum": ["low", "medium"]},
+              "verifier": {"type": "string"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"risk_class": {"const": "high"}}, "required": ["risk_class"]},
+          "then": {"properties": {"newcomer": {"const": false}}}
+        }
+      ]
+    }
+  }
+}

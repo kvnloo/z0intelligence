@@ -36,6 +36,28 @@ COMMENTS = {
         + [{"body": f"ordinary discussion {i}", "created_at": "2026-10-13T00:00:00Z"} for i in range(30)]
         + [{"body": "claiming for worker-new\nexpires: 2999-01-01T00:00:00Z", "created_at": "2026-10-15T00:00:00Z"}]
     ),
+    # z0-claim lease marker from the claim bot, expired -> expire
+    "6": [{"user": {"login": "github-actions[bot]"},
+           "body": 'Claim accepted <!-- z0-claim {"expires":"2020-01-01T00:00:00Z","login":"a","status":"active","task":"t-1"} -->',
+           "created_at": "2019-12-31T00:00:00Z"}],
+    # active bot marker -> keep (the legacy max-age rule must not expire it)
+    "7": [{"user": {"login": "github-actions[bot]"},
+           "body": 'Claim accepted <!-- z0-claim {"expires":"2999-01-01T00:00:00Z","login":"a","status":"active","task":"t-1"} -->',
+           "created_at": "2020-01-01T00:00:00Z"}],
+    # forged active marker from a non-bot user is ignored; the bot's marker expired -> expire
+    "8": [{"user": {"login": "github-actions[bot]"},
+           "body": 'ok <!-- z0-claim {"expires":"2020-01-01T00:00:00Z","login":"a","status":"active","task":"t-1"} -->',
+           "created_at": "2019-12-31T00:00:00Z"},
+          {"user": {"login": "mallory"},
+           "body": 'mine <!-- z0-claim {"expires":"2999-01-01T00:00:00Z","login":"mallory","status":"active","task":"t-1"} -->',
+           "created_at": "2020-01-02T00:00:00Z"}],
+    # released by its holder -> expire (returns the issue to claimable)
+    "9": [{"user": {"login": "github-actions[bot]"},
+           "body": 'ok <!-- z0-claim {"expires":"2999-01-01T00:00:00Z","login":"a","status":"active","task":"t-1"} -->',
+           "created_at": "2020-01-01T00:00:00Z"},
+          {"user": {"login": "github-actions[bot]"},
+           "body": 'released <!-- z0-claim {"expires":"2026-01-01T00:00:00Z","login":"a","status":"released","task":"t-1"} -->',
+           "created_at": "2026-01-01T00:00:00Z"}],
 }
 
 FAKE_GH = r"""#!/usr/bin/env python3
@@ -83,7 +105,10 @@ def main() -> int:
     failures = []
     if proc.returncode != 0:
         failures.append(f"exit {proc.returncode}: {proc.stderr.strip()}")
-    for want in ("expire #1 ", "keep #2 ", "expire #3 ", "keep #4 (no claim timestamp)", "keep #5 ", "released 2 lease(s)"):
+    for want in ("expire #1 ", "keep #2 ", "expire #3 ", "keep #4 (no claim timestamp)", "keep #5 ",
+                 "expire #6 (no active z0-claim lease)", "keep #7 (1 active z0-claim lease(s))",
+                 "expire #8 (no active z0-claim lease)", "expire #9 (no active z0-claim lease)",
+                 "released 5 lease(s)"):
         if want not in out:
             failures.append(f"missing {want!r}")
     if failures:
@@ -92,7 +117,7 @@ def main() -> int:
             print(f"  - {f}")
         print(out)
         return 1
-    print("expire-claims: OK (5 fixture issues, 2 released in dry-run)")
+    print("expire-claims: OK (9 fixture issues, 5 released in dry-run)")
     return 0
 
 

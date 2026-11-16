@@ -1,0 +1,61 @@
+name: Contributor task proposal
+description: Propose a task for .z0/priorities.yaml. Maintainers decide rank and eligibility; agents must not invent tasks.
+title: "task: "
+labels: ["needs-discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tasks open to contributors are listed in `.z0/priorities.yaml` (owner-maintained).
+        This form proposes a new entry. A maintainer adds it, with a rank, when it is accepted.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and outcome
+      description: What changes when this is done? Keep it to a few sentences.
+    validations:
+      required: true
+  - type: input
+    id: verifier
+    attributes:
+      label: Verifier command
+      description: A command that exits 0 when the task is done, runnable without owner secrets (for example `python -m pytest -q tests/test_x.py`).
+    validations:
+      required: true
+  - type: input
+    id: exit_criterion
+    attributes:
+      label: Exit criterion
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options: [issue, experiment, review, docs, z0evals]
+    validations:
+      required: true
+  - type: dropdown
+    id: difficulty
+    attributes:
+      label: Estimated size
+      options: ["S (<= 3 h)", "M (<= 8 h)", "L (> 8 h)"]
+    validations:
+      required: true
+  - type: input
+    id: skills
+    attributes:
+      label: Skills (closed vocabulary in .z0/vocab.yaml)
+      placeholder: "python, latency, systems"
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware needs
+      placeholder: "gpu_vram_gib: 0, ram_gib: 8, os: linux/macos"
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: The task needs no owner secrets, no production access, and no posts to other repos.
+          required: true
