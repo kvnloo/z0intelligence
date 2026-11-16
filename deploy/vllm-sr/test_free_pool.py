@@ -164,3 +164,15 @@ def test_cascade_moves_on_from_any_backend_error():
     # says nothing about the next backend, so sr:free must try it instead of failing the request.
     codes = set(fp._cascade("x", [{"model": "a"}, {"model": "b"}])["fallback"]["retryable_status_codes"])
     assert {400, 401, 402, 403, 404, 408, 413, 422, 429, 500, 502, 503, 504} <= codes
+
+
+def test_payment_required_blocks_backend_as_not_free():
+    # Owner: never call a backend free unless it is proven free; a 402 must not keep getting lanes.
+    rec = {"attempts": [{"attempt_id": "x1", "model": "samba-glm-5.3", "status_code": 402, "error": "Payment Required"}]}
+    line = json.dumps({"msg": "fallback_execution_complete", "ts": "2026-11-16T00:33:13.205",
+                       "request_id": "r1", "execution_record": json.dumps(rec)})
+    st = {"events": [], "blocked": {}}
+    fp.ingest(st, [line], now=1_800_000_000)
+    blk, (ts, b, _) = st["blocked"]["samba-glm-5.3"], st["events"][-1]
+    assert b == "samba-glm-5.3" and "402" in blk["why"]
+    assert blk["until"] - ts >= fp.EXCLUDE_S  # long enough that free-pace pulls it from the cascade

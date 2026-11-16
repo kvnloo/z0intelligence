@@ -346,6 +346,7 @@ OUT, LIVE_CFG = STATE / "free-pace.json", STATE / "vllm-sr-live.yaml"
 # Excluding a backend means a redeploy, and each pod restart fails requests for ~3 min while DNS warms up.
 # The cascade already skips a 429ing backend in-band, so only pull buckets capped for an hour or more.
 NS, MARGIN, EXCLUDE_S = "vllm-sr", 0.95, 3600
+NO_BALANCE_S = 6 * 3600  # a 402 / dead-balance 429 keeps the backend out this long, then free-pace lets it retry
 MIN, HOUR, DAY = 60, 3600, 86400
 WIN = {"rpm": ("req", MIN), "rph": ("req", HOUR), "rpd": ("req", DAY), "tpm": ("tok", MIN), "tpd": ("tok", DAY)}
 SHARED = {"or-": "openrouter", "kilo-": "kilo", "nim-": "nim", "cohere-": "cohere", "zai-": "zai", "llm7-": "llm7"}
@@ -435,10 +436,16 @@ def ingest(st, lines, now):
                 b = bucket(a.get("model", ""))
                 if a.get("status_code") != 200:
                     st["events"].append([ts, b, 0])  # a refused call still spends a request
-                if a.get("status_code") == 429:
-                    until = ts + reset_after(a.get("error") or "", ts)
-                    if until > st["blocked"].get(b, {}).get("until", 0):
-                        st["blocked"][b] = {"until": until, "why": "429: " + (a.get("error") or "")[:160]}
+                code, err = a.get("status_code"), a.get("error") or ""
+                if code == 402 or (code == 429 and DEAD_429.search(err)):
+                    # no free balance at all (insufficient funds): not free until it answers again; recheck in 6 h
+                    until, why = ts + NO_BALANCE_S, f"{code} no balance: " + err[:150]
+                elif code == 429:
+                    until, why = ts + reset_after(err, ts), "429: " + err[:160]
+                else:
+                    continue
+                if until > st["blocked"].get(b, {}).get("until", 0):
+                    st["blocked"][b] = {"until": until, "why": why}
     st["seen"] = {k: v for k, v in seen.items() if now - v < 2 * HOUR}
 
 
