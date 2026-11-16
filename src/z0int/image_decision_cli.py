@@ -31,7 +31,7 @@ def _parse_options(raw: Any) -> tuple[ImageDecisionOption, ...]:
             raise ValueError("each option must be an object")
         options.append(
             ImageDecisionOption(
-                id=str(item.get("id") or ""),
+                id=str(item["id"]) if item.get("id") is not None else "",
                 description=str(item.get("description") or ""),
             )
         )
