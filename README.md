@@ -8,6 +8,8 @@ The Python import/CLI namespace remains `z0int`; the distribution metadata still
 
 > Core invariant: **evidence ≠ claim/state ≠ authority ≠ action ≠ outcome ≠ learned procedure.**
 
+Want to help? Start with [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## What exists on master
 
 The current repository is much more than the original OpenJev prototype.
@@ -814,6 +816,7 @@ Unknown stays unknown. Partial measurement stays partial. Execution completion s
 - [Oh My Pi](https://github.com/can1357/oh-my-pi) — coding harness and local judgment surfaces
 - [Agent Orchestrator](https://github.com/kvnloo/agent-orchestrator) — durable session/execution orchestration lab
 - [AgentWeb](https://github.com/kvnloo/agentweb) — downstream Emma/AgentWeb integration lab
+- [semantic-router (fork)](https://github.com/kvnloo/semantic-router) — fork of vllm-project/semantic-router; its issues are off, so discuss it in [z0 Discussions](https://github.com/kvnloo/z0/discussions)
 
 ## Principles
 
