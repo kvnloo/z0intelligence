@@ -257,7 +257,7 @@ def _original(grant: dict[str, Any], native: dict[str, Any],
 # searches while read-only SQLite on the same sessions.db answered 8/8 in 0.04-0.25 s. Discovery and
 # original reads therefore use the archive directly (mode=ro, scope in the WHERE clause, the same
 # message-class checks, one read transaction per original). HTTP stays as the fallback.
-SQLITE_USER_VERSIONS = (74, 113)
+SQLITE_USER_VERSIONS = (74, 113, 143)  # 143: AgentsView v0.46.1
 _FTS_TOKEN = re.compile(r"[^\W_][\w.+-]*", re.UNICODE)
 
 
