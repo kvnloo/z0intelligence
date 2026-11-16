@@ -7,6 +7,9 @@ spec = importlib.util.spec_from_file_location("hz_compaction_carryover", RUN)
 cc = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cc)
 
+MANIFEST = "0a070915d095e3739600321f51ce3cf361048e641fb22b53db5d1d9e2c4891da"
+HEAD_TAIL, PINNED = 0.762744, 0.13753
+
 
 def test_fixture_is_deterministic():
     assert cc.fixture(5) == cc.fixture(5)
@@ -34,6 +37,16 @@ def test_budget_is_enforced_not_trusted(monkeypatch):
     s = {"turns": ["a"], "live": {"sk-z-9": "sk-z-9"}, "stale": {}}
     monkeypatch.setitem(cc.ARMS, "cheat", lambda turns, budget: "pad " * budget + "sk-z-9")
     assert cc.run_arm("cheat", [s]) == [1.0]
+    monkeypatch.setitem(cc.ARMS, "commas", lambda turns, budget: ",".join(["pad"] * budget + ["sk-z-9"]))
+    assert cc.run_arm("commas", [s]) == [1.0]  # one whitespace "word", budget + 1 tokens
+
+
+def test_fixture_and_baselines_are_pinned():
+    """Same numbers on every Python version: a changed value here needs an epoch bump."""
+    data = cc.fixture()
+    assert cc.result("head-tail", data)["data_manifest_sha256"] == MANIFEST
+    assert round(cc.mean(cc.run_arm("head-tail", data)), 6) == HEAD_TAIL
+    assert round(cc.mean(cc.run_arm("pinned-manifest", data)), 6) == PINNED
 
 
 def test_result_shape_and_verdicts(tmp_path):

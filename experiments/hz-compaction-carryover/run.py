@@ -26,6 +26,7 @@ from pathlib import Path
 EXP_ID, EPOCH, CONTROL = "hz-compaction-carryover", 1, "head-tail"
 SESSIONS, TURNS, BUDGET, SEED = 200, 80, 400, 1729
 WORDS = "amber birch cedar delta ember fjord grove harbor iris juniper kestrel lumen".split()
+TOKEN = re.compile(r"[\w-]+")
 REVISE = ["decision update: {k} = {v}", "actually, make {k} {v} instead", "switch {k} to {v} from now on"]
 
 
@@ -88,7 +89,7 @@ ARMS = {"head-tail": compactor_head_tail, "pinned-manifest": compactor_pinned_ma
 
 def score(s: dict, text: str) -> float:
     """Error rate for one session: share of items lost or shadowed by a stale value."""
-    seen = set(re.findall(r"[\w-]+", text))
+    seen = set(TOKEN.findall(text))
     bad = sum(v not in seen or any(o in seen for o in s["stale"].get(k, []))
               for k, v in s["live"].items())
     return bad / len(s["live"])
@@ -98,7 +99,8 @@ def run_arm(arm: str, data: list[dict]) -> list[float]:
     fn = ARMS[arm]
     out = []
     for s in data:
-        text = " ".join(fn(list(s["turns"]), BUDGET).split()[:BUDGET])  # budget is enforced, not trusted
+        # The budget is enforced, not trusted, and counted in the same tokens the scorer reads.
+        text = " ".join(TOKEN.findall(fn(list(s["turns"]), BUDGET))[:BUDGET])
         out.append(score(s, text))
     return out
 
