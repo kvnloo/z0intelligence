@@ -109,7 +109,7 @@ def call(base, env, model, body, timeout=90):
         return "error", str(e)[:200], time.time() - t0
 
 
-def probe(c):
+def probe(c, sizes=True):
     name, base, env, model, _ctx = c
     st, body, dt = call(base, env, model, {"messages": [{"role": "user", "content": "What's the weather in Paris? Use the tool."}],
                                            "tools": [TOOL], "max_tokens": 512})
@@ -117,7 +117,7 @@ def probe(c):
     row = {"name": name, "tool_status": st, "tool_call": bool(msg.get("tool_calls")), "tool_s": round(dt, 2)}
     if not isinstance(body, dict):
         row["error"] = body
-    if row["tool_call"]:
+    if row["tool_call"] and sizes:
         for n in SIZES:
             st, b, dt = call(base, env, model, {"messages": [{"role": "user", "content": FILLER * (n // 13) +
                                                               "\nReply with the single word OK."}], "max_tokens": 64}, 180)
@@ -144,9 +144,15 @@ SMALL_CAP = 7000  # unprobed context (e.g. Groq's 8K TPM free tier): only small 
 NEXT_ON = [400, 401, 402, 403, 404, 408, 409, 413, 422, 429, 500, 502, 503, 504, 529]
 
 
+MAX_REFS = 32  # router: "per-request upstream-call limit of 32" per decision's modelRefs
+
+
 def _cascade(name, refs, priority=100, signal=None):
     """One decision: the first backend is drawn by weight (patched random selector), the fallback then walks
-    *refs* in order. *signal*: keyword signal that must match for this decision (None = match all)."""
+    *refs* in order. *signal*: keyword signal that must match for this decision (None = match all).
+    The router refuses a decision over MAX_REFS candidates (crash loop, 11-15): keep the best and the last resort."""
+    if len(refs) > MAX_REFS:
+        refs = refs[:MAX_REFS - 1] + refs[-1:]
     fallback = {"enabled": True, "max_attempts": len(refs), "per_attempt_timeout": "120s", "total_timeout": "600s",
                 "retryable_status_codes": NEXT_ON}
     conds = [{"type": "keyword", "name": signal}] if signal else []
@@ -218,6 +224,143 @@ DEAD_429 = re.compile(r"insufficient balance|recharge|no resource package|PROMOT
 SLOW_S = 30  # a tool turn slower than this stalls every cascade behind it (owner: timeouts are not transient)
 
 
+# ---- autoscale: every free model the daily inventory sees joins the pool, re-probed with no hand edits ----
+# free-model-inventory.timer (salvage/free-lanes/freelane.py) classes every OpenRouter model by price each day.
+INVENTORY = Path("/mnt/zer0models/z0-wt/salvage/free-lanes/inventory")
+POOL = Path.home() / ".z0int/state/posture/pool.json"  # live re-probe; HERE/pool.json is the committed seed
+REPROBE_S = 6 * 3600
+# GPT/Claude/Grok have owner-mandated routes of their own; Google is banned from the router (no_google_guard).
+CLOSED = re.compile(r"^(openai/(?!gpt-oss)|anthropic/|x-ai/)|gemini|google|gemma|palm|bard", re.I)
+
+
+CATALOGS = Path.home() / ".z0int/state/posture/catalogs.json"  # provider /models lists, refreshed by reprobe
+NOT_CHAT = re.compile(r"embed|guard|safety|parse|clip|detector|retriever|rerank|translate|calibration|reward|"
+                      r"starcoder|whisper|tts|asr|riva", re.I)
+
+
+def refresh_catalogs():
+    """Free providers' own model lists (a GET, no tokens). NIM is free per account, so every chat model counts."""
+    out = {}
+    for prov, base, env in (("nim", NIM, "NVIDIA_API_KEY"),):
+        key = os.environ.get(env)
+        if not key:
+            continue
+        try:
+            req = urllib.request.Request(base + "/models", headers={"Authorization": f"Bearer {key}", **UA})
+            out[prov] = [m["id"] for m in json.load(urllib.request.urlopen(req, timeout=30))["data"]]
+        except (OSError, ValueError, KeyError):
+            continue
+    if out:
+        CATALOGS.parent.mkdir(parents=True, exist_ok=True)
+        CATALOGS.write_text(json.dumps(out | {k: v for k, v in _json_file(CATALOGS).items() if k not in out}))
+    return out
+
+
+def _json_file(p):
+    try:
+        return json.loads(p.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def discovered():
+    """Free models the daily inventory or a provider catalog lists that CANDIDATES lacks, as candidate tuples:
+    every OpenRouter :free model (also via Kilo's anonymous mirror, its own quota) and every NIM chat model."""
+    names, hosted = {c[0] for c in CANDIDATES}, {(c[1], c[3]) for c in CANDIDATES}  # same model on the same host
+    out = []
+
+    def add(name, base, env, mid, ctx):
+        if name not in names and (base, mid) not in hosted and not CLOSED.search(mid) and not NOT_CHAT.search(mid):
+            names.add(name), hosted.add((base, mid))
+            out.append((name, base, env, mid, ctx))
+    files = sorted(INVENTORY.glob("*.json")) if INVENTORY.is_dir() else []
+    models = _json_file(files[-1]).get("providers", {}).get("openrouter", {}).get("models", []) if files else []
+    for m in models:
+        mid = m.get("id", "")
+        if m.get("class") in ("free", "free-preview") and mid.endswith(":free"):
+            slug, ctx = mid.split("/")[-1].removesuffix(":free"), int(m.get("context_length") or 131072)
+            add("or-" + slug, OR, "OPENROUTER_API_KEY", mid, ctx)
+            add("kilo-" + slug, KILO, ANON, mid, ctx)
+    for mid in _json_file(CATALOGS).get("nim", []):
+        add("nim-" + mid.split("/")[-1], NIM, "NVIDIA_API_KEY", mid, 131072)
+    return out
+
+
+# ---- scout: keep finding new free providers (owner 11-15: "keep running that so we keep accumulating") ----
+RESEARCH = Path("/mnt/zer0models/workspace/zer0/data/operations/free-tier-research")
+QUEUE = RESEARCH / "20261102/signup-queue.json"  # the one signup queue (state todo/done/needs-kevin/...)
+
+
+def merge_scan(queue, providers, today):
+    """Append providers a scan found that the queue lacks, as todo rows; return the new rows."""
+    known = {r["domain"] for r in queue}
+    routed = {".".join((c[1].split("/")[2]).split(".")[-2:]) for c in CANDIDATES}  # e.g. nvidia.com, kilo.ai
+    new = []
+    for r in providers:
+        if r["domain"] in known or r["domain"] == "localhost" or r.get("status") not in ("open_catalog", "needs_key") or CLOSED.search(r["domain"]):
+            continue
+        free = [i for i in r.get("free_ids", []) if not CLOSED.search(i)]
+        new.append({"domain": r["domain"], "base_url": r.get("base_url"), "lists": r.get("lists", 0),
+                    "free_models": len(free), "state": "routed" if r["domain"] in routed else "todo", "vault_handle": None, "bws_key": None,
+                    "blocker": None, "found": today, "keyless": r["status"] == "open_catalog"})
+    return new
+
+
+def scout():
+    """Harvest free-LLM lists again (scan.py: one unauthenticated GET /models per domain, no signups),
+    queue every provider not seen before, and push the owner one note when there is something to sign up for."""
+    today = time.strftime("%Y%m%d")
+    out = RESEARCH / today
+    r = subprocess.run([sys.executable, "-I", str(RESEARCH / "20261102/scan.py"), str(out)], capture_output=True,
+                       text=True, timeout=1800)
+    if r.returncode:
+        sys.exit(f"scan failed rc={r.returncode}: {r.stderr[-400:]}")
+    queue = json.loads(QUEUE.read_text())
+    new = merge_scan(queue, json.loads((out / "providers.json").read_text()), today)
+    if new:
+        QUEUE.with_suffix(".tmp").write_text(json.dumps(queue + new, indent=1))
+        QUEUE.with_suffix(".tmp").replace(QUEUE)
+        top = sorted((x for x in new if x["state"] == "todo"), key=lambda x: (-x["free_models"], -x["lists"]))[:8]
+        subprocess.run(["kevin-push", "decision", f"{len(new)} new free LLM providers queued",
+                        "Sign-ups wanted (queue " + str(QUEUE) + "): " +
+                        ", ".join(f"{x['domain']} ({x['free_models']} free)" for x in top)], timeout=60)
+    print(f"scout: {len(new)} new providers queued; report {out / 'REPORT.md'}")
+
+
+def candidates():
+    return CANDIDATES + discovered()
+
+
+def pool_rows():
+    for p in (POOL, HERE / "pool.json"):
+        try:
+            return {r["name"]: r for r in json.loads(p.read_text())["rows"]}
+        except (OSError, ValueError, KeyError):
+            continue
+    return {}
+
+
+def reprobe(st, now, cands=None):
+    """Tool-probe every candidate again; a bucket blocked now keeps its last row (never poll an exhausted
+    provider), a known context window is reused, only new backends get the 6K/30K/100K sizing."""
+    if cands is None:
+        refresh_catalogs()
+    old, cands = pool_rows(), cands if cands is not None else candidates()
+    blocked = {b for b, v in st.get("blocked", {}).items() if v["until"] > now}
+    todo = [c for c in cands if bucket(c[0]) not in blocked or c[0] not in old]
+    with cf.ThreadPoolExecutor(8) as ex:
+        fresh = dict(zip([c[0] for c in todo], ex.map(lambda c: probe(c, sizes="max_ok_tokens" not in old.get(c[0], {})), todo)))
+    rows = []
+    for c in cands:
+        r = fresh.get(c[0])
+        if not r or r.get("tool_status") == "no-key":  # the prober's env lacks the key: that says nothing about the backend
+            r = old.get(c[0], {"name": c[0]})
+        if r.get("tool_call") and "max_ok_tokens" not in r and "max_ok_tokens" in old.get(c[0], {}):
+            r["max_ok_tokens"] = old[c[0]]["max_ok_tokens"]
+        rows.append(r)
+    return rows
+
+
 def alive(row):
     """Probe row -> deployable: passed the tool probe in time, or failed only on a real rate limit."""
     if row.get("tool_call"):
@@ -227,8 +370,8 @@ def alive(row):
 
 def render(exclude=(), out=HERE / "config.yaml"):
     """Write the router config. *exclude*: backends `pace` found out of quota until their reset."""
-    pool = {r["name"]: r for r in json.loads((HERE / "pool.json").read_text())["rows"]}
-    live = [c for c in CANDIDATES if alive(pool.get(c[0], {}))]
+    pool = pool_rows()
+    live = [c for c in candidates() if alive(pool.get(c[0], {}))]
     live = [c for c in live if c[0] not in exclude] or live  # every backend capped: keep the pool, never render empty
     bare = lambda c: c[3].split("/")[-1].removesuffix(":free")
     live.sort(key=lambda c: -HERMES_INDEX.get(bare(c), 0))  # stable: unscored keep CANDIDATES order
@@ -560,12 +703,27 @@ def pace():
     st["cursor"] = now
     usage = assess(st, now)
     want = excluded(st, now)
-    if want != st.get("excluded", []) and "--dry-run" not in sys.argv:
+    if now - st.get("probed_at", 0) > REPROBE_S and "--dry-run" not in sys.argv:
+        rows = reprobe(st, now)
+        names = sorted(r["name"] for r in rows if alive(r))
+        before = [n for n, r in pool_rows().items() if alive(r)]
+        if len(names) < len(before) // 2:  # half the pool died at once: the prober broke (keys, network), not the providers
+            print(f"re-probe kept the old pool: only {len(names)} of {len(before)} backends answered")
+        else:
+            POOL.parent.mkdir(parents=True, exist_ok=True)
+            POOL.with_suffix(".tmp").write_text(json.dumps({"probed_at": time.strftime("%FT%TZ", time.gmtime()), "rows": rows}, indent=1))
+            POOL.with_suffix(".tmp").replace(POOL)
+            print("re-probed:", len(names), "backends alive")
+        st["probed_at"] = now
+    # Desired vs deployed, every minute: a deploy that failed (helm timeout) is retried next tick, not in 6 h.
+    pool_names = sorted(n for n, r in pool_rows().items() if alive(r))
+    changed = want != st.get("excluded", []) or pool_names != st.get("pool", [])
+    if changed and "--dry-run" not in sys.argv:
         render(exclude=set(want), out=LIVE_CFG)
         r = subprocess.run([str(HERE / "deploy.sh"), str(LIVE_CFG)], capture_output=True, text=True, timeout=600)
         st["deploy"] = {"at": now, "rc": r.returncode, "excluded": want, "tail": r.stdout[-300:] + r.stderr[-300:]}
-        if r.returncode == 0:
-            st["excluded"] = want
+        if r.returncode == 0:  # a failed deploy keeps the old state, so the next minute retries it
+            st["excluded"], st["pool"] = want, pool_names
     st["at"] = datetime.fromtimestamp(now).astimezone().isoformat(timespec="seconds")
     st["usage"] = usage
     STATE.mkdir(parents=True, exist_ok=True)
@@ -799,10 +957,12 @@ def fanout(prompt, models=REASONERS, n=3, system=None, workers=3):
 if __name__ == "__main__":
     if sys.argv[1:] == ["probe"]:
         with cf.ThreadPoolExecutor(8) as ex:
-            rows = list(ex.map(probe, CANDIDATES))
+            rows = list(ex.map(probe, candidates()))
         (HERE / "pool.json").write_text(json.dumps({"probed_at": time.strftime("%FT%TZ", time.gmtime()), "rows": rows}, indent=1))
         for r in rows:
             print(json.dumps(r)[:240])
+    elif sys.argv[1:] == ["scout"]:  # free_pool.py scout: daily free-provider scan into the signup queue
+        scout()
     elif sys.argv[1:2] == ["pace"]:
         pace()
     elif sys.argv[1:2] == ["ask"]:  # free_pool.py ask <backend|any> "<prompt>"
