@@ -132,6 +132,7 @@ def test_turn_open_with_cwd_writes_an_omp_opportunity_through_the_detached_core(
     assert PROMPT not in json.dumps(opp)
 
 
+@pytest.mark.perf  # wall-clock ms bound: flakes on shared runners (#335); run with -m perf
 def test_bridge_reply_latency_stays_within_its_bound_over_200_turns(home, tmp_path):
     """The opportunity build is off the reply path: the reply pays only the hand-off (a session-file update and
     one detached spawn on open, the outcome rows on close). Over 200 open+close turns in a real task repo, with

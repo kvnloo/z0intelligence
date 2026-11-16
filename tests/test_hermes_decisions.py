@@ -95,6 +95,7 @@ def test_user_turn_emits_opportunity_off_the_hot_path_and_never_injects(plugin):
     assert job['ctx']['trace_id'] == 's1:t1' and job['payload']['user_message'] == 'fix the build'
 
 
+@pytest.mark.perf  # wall-clock ms bound: flakes on shared runners (#335); run with -m perf
 def test_hook_stays_under_5ms_even_when_the_child_is_slow(plugin, monkeypatch):
     monkeypatch.setattr(hcap, '_spawn_project', lambda job, slot: time.sleep(0.05))
     history = [{'role': 'user', 'content': 'x'}] + [{'role': 'assistant', 'content': 'y'}] * 200
