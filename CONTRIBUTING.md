@@ -15,20 +15,24 @@ To take one, comment `/claim` on the issue; a maintainer confirms the claim
 
 ## Set up and run the tests
 
-Python 3.11 or 3.13 (what CI runs). On Linux, the CPU build of torch keeps the
-install small:
+Python 3.11–3.13. The core install has no torch, so it works anywhere,
+including Intel Macs:
 
 ```bash
 git clone https://github.com/<you>/z0intelligence && cd z0intelligence
 python3 -m venv .venv && . .venv/bin/activate
-python -m pip install torch==2.10.0+cpu --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -e '.[test]'
 python -m pytest -q tests/test_check_receipt.py   # or the test file your issue names
 ```
 
-On an Apple-silicon Mac, skip the torch line: there is no separate CPU build
-for macOS, and the regular torch wheel is used. torch 2.10 has no wheel for Intel Macs, so there, use a
-Linux machine or container, or let CI run the tests.
+Tests that need the ML stack skip themselves without it. If your issue touches
+models or backends, add the `ml` extra (on Linux, install the CPU torch first to
+keep it small):
+
+```bash
+python -m pip install torch==2.10.0+cpu --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -e '.[test,ml]'
+```
 
 CI runs the full offline suite (`python -m pytest -q -m 'not live'`, about
 10,000 tests) on every PR, so you don't have to run it all locally.

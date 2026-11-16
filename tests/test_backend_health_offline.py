@@ -2,6 +2,8 @@
 import pytest
 from unittest.mock import patch
 
+pytest.importorskip("huggingface_hub")  # part of the optional `ml` extra
+
 from z0int.backends.decider import DeciderBackend
 from z0int.backends.julia import JuliaBackend
 from z0int.backends.laya import LayaBackend

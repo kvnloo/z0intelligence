@@ -28,7 +28,7 @@ fi
 source "$VENV/bin/activate"
 python -m pip install -q -U pip
 banner "Installing z0int / openjev-phase1 editable"
-pip install -q -e ".[test]"
+pip install -q -e ".[test,ml]"
 
 banner "doctor"
 python -m z0int doctor || true

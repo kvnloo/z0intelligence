@@ -72,6 +72,24 @@ jobs:
       - name: Local-cognition extension tests
         run: cd omp-extensions/local-cognition && bun test
 
+  contributor-install:
+    # Guards the lightweight path in CONTRIBUTING: `.[test]` without the `ml` extra
+    # (no torch) must install and collect every test, so Intel Macs and docs-only
+    # contributors can run the suite. Torch-only tests skip; they run in offline-suite.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install without the ml extra
+        run: python -m pip install -e '.[test]'
+      - name: Torch is absent and every test still collects
+        run: |
+          ! python -c "import torch" 2>/dev/null
+          python -c "import z0int.cli"
+          python -m pytest -q --co -m 'not live' > /dev/null
+
   offline-suite:
     runs-on: ubuntu-latest
     strategy:
@@ -97,7 +115,7 @@ jobs:
       - name: Install pinned CPU test environment
         run: |
           python -m pip install torch==2.10.0+cpu --index-url https://download.pytorch.org/whl/cpu
-          python -m pip install -e '.[test]'
+          python -m pip install -e '.[test,ml]'
       - name: Complete offline suite
         run: python -m pytest -q -m 'not live'
       - uses: actions/setup-node@v4
